@@ -22,6 +22,8 @@
 #include <gc_vx_nn_util.h>
 #include "gc_nn_arch_model.h"
 
+#define SHOW_TP_SPLITING_INFO 1
+
 VX_PRIVATE_API vx_float32 Fp21toFp32(const vx_uint32 in)
 {
     vx_uint32 t1;
@@ -1443,6 +1445,194 @@ void _fill_TP_RESHUFFLE_Command(
             info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
             info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
             info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = outSliceSize * outStrideSliceSize;
+        }
+
+        info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
+        info_array[i].vx_tp_general_cmd_split_info.last = 1;
+    }
+}
+
+typedef struct _vxnne_tensor_sub_block {
+    vx_uint32 offset_x;
+    vx_uint32 offset_y;
+    vx_uint32 offset_z;
+
+    vx_uint32 size_x;
+    vx_uint32 size_y;
+    vx_uint32 size_z;
+
+    vx_uint32  pad_left;
+    vx_uint32  pad_top;
+    vx_uint32  pad_right;
+    vx_uint32  pad_bottom;
+
+    vx_uint32 pitch_x;
+    vx_uint32 pitch_y;
+}
+vxnne_tensor_sub_block_s, *vxnne_tensor_sub_block;
+
+VX_PRIVATE_API void
+_fill_TP_RESHUFFLE_Command_EX(
+    vx_context                  context,
+    vxnne_tensor_info           input,
+    vxnne_tensor_info           output,
+    vx_op_param                 parameter,
+    vx_nn_cmd_info_u*           general_info,
+    vx_uint32                   split_count,
+    vxnne_tensor_sub_block      input_split_blocks,
+    vxnne_tensor_sub_block      output_split_blocks,
+    vx_nn_cmd_split_info_u*     info_array
+    )
+{
+    vx_uint32 i;
+    vx_weights_biases_parameter weights_biases;
+    vx_uint32 outSliceSize;
+    vx_uint32 inXSizeTmp, outSize;
+    vx_uint32 in_offset_x, in_offset_y, in_offset_z;
+    vx_uint32 in_size_x, in_size_y, in_size_z;
+    vx_uint32 in_pitch_x, in_pitch_y;
+    vx_int32 pad_left, pad_top, pad_right, pad_bottom;
+    vx_uint32 stride_x = 1, stride_y = 1;
+    vx_uint32 out_offset_x, out_offset_y, out_offset_z;
+    vx_uint32 out_size_x, out_size_y, out_size_z;
+    vx_uint32 out_pitch_x, out_pitch_y;
+    vx_bool optimization_for_1x1_conv = vx_false_e;
+
+    DEFINE_TP_GENERAL_PARAMETER();
+
+    weights_biases = (vx_weights_biases_parameter)other_tensor;
+    if (weights_biases)
+    {
+        stride_x = WB_STRIDE_X(weights_biases);
+        stride_y = WB_STRIDE_Y(weights_biases);
+
+        optimization_for_1x1_conv = WB_KERNEL_X(weights_biases) == 1 &&
+                                    WB_KERNEL_Y(weights_biases) == 1 &&
+                                    WB_ORG_KERNEL_X(weights_biases) == 1 &&
+                                    WB_ORG_KERNEL_Y(weights_biases) == 1;
+    }
+
+    outSliceSize = outZStride / outputElemSize;
+
+    for (i = 0; i < split_count; i++)
+    {
+        in_offset_x = input_split_blocks[i].offset_x;
+        in_offset_y = input_split_blocks[i].offset_y;
+        in_offset_z = input_split_blocks[i].offset_z;
+
+        in_size_x = input_split_blocks[i].size_x;
+        in_size_y = input_split_blocks[i].size_y;
+        in_size_z = input_split_blocks[i].size_z;
+
+        in_pitch_x = input_split_blocks[i].pitch_x;
+        in_pitch_y = input_split_blocks[i].pitch_y;
+
+        pad_left = input_split_blocks[i].pad_left;
+        pad_top = input_split_blocks[i].pad_top;
+        pad_right = input_split_blocks[i].pad_right;
+        pad_bottom = input_split_blocks[i].pad_bottom;
+
+        out_offset_x = output_split_blocks[i].offset_x;
+        out_offset_y = output_split_blocks[i].offset_y;
+        out_offset_z = output_split_blocks[i].offset_z;
+
+        out_size_x = output_split_blocks[i].size_x;
+        out_size_y = output_split_blocks[i].size_y;
+        out_size_z = output_split_blocks[i].size_z;
+
+        out_pitch_x = output_split_blocks[i].pitch_x;
+        out_pitch_y = output_split_blocks[i].pitch_y;
+
+        inXSizeTmp = out_size_x * stride_x;
+
+        info_array[i].vx_tp_general_cmd_split_info.needReorder = vx_false_e;
+
+        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REORDER) &&
+            inXSizeTmp <= context->nnConfig.fixedFeature.tpReorderInImageSize)
+        {
+            vx_bool disableTPReorder = vx_false_e;
+
+            /* Viv: 1948. */
+            if (pad_left || pad_top)
+            {
+                outSize = out_size_x * out_size_y * out_size_z;
+                if (!((outSize - 1) % 3))
+                {
+                    disableTPReorder = vx_true_e;
+                }
+            }
+
+            if (!disableTPReorder)
+            {
+                /* Viv: 1919. */
+                if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REORDER_FIX))
+                {
+                    info_array[i].vx_tp_general_cmd_split_info.needReorder = vx_true_e;
+                }
+                else if (inXSizeTmp <= in_size_x + pad_left ||
+                         in_size_x + pad_left - inXSizeTmp < stride_x)
+                {
+                    inXSize = inXSizeTmp;
+                    info_array[i].vx_tp_general_cmd_split_info.needReorder = vx_true_e;
+                }
+            }
+        }
+
+        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = in_size_x;
+        info_array[i].vx_tp_general_cmd_split_info.inImageYSize = in_size_y;
+        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = in_size_z;
+        info_array[i].vx_tp_general_cmd_split_info.inImageStride = in_pitch_x;
+        info_array[i].vx_tp_general_cmd_split_info.inImageSlice = in_pitch_x * in_pitch_y;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = (-1) * pad_left;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = (-1) * pad_top;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = in_size_x + pad_right - 1;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = in_size_y + pad_bottom - 1;
+        info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
+        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + (in_pitch_x * in_pitch_y * in_offset_z + in_pitch_x * in_offset_y + in_offset_x) * inputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.inTileXSize = out_size_x * stride_x;
+        info_array[i].vx_tp_general_cmd_split_info.inTileYSize = out_size_y * stride_y;
+        info_array[i].vx_tp_general_cmd_split_info.inTileXInc = out_size_x * stride_x;
+        info_array[i].vx_tp_general_cmd_split_info.inTileYInc = out_size_y * stride_y;
+        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + (out_pitch_x * out_pitch_y * out_offset_z + out_pitch_x * out_offset_y + out_offset_x) * outputElemSize;
+
+        if (optimization_for_1x1_conv)
+        {
+            /* Optimize reshuffle for 1x1 conv. */
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = out_pitch_x * out_pitch_y * in_size_z;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = stride_x;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = out_size_x;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = out_pitch_x * out_pitch_y * in_size_z;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = stride_y;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = out_size_x;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = out_size_y;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = out_pitch_x * out_pitch_y;
+        }
+        else
+        {
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = out_pitch_x * out_pitch_y;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = stride_x;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = out_size_x;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = out_pitch_x * out_pitch_y * stride_x;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = stride_y;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = out_pitch_x;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = out_size_y;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = out_pitch_x * out_pitch_y * stride_x * stride_y;
         }
 
         info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
@@ -3046,6 +3236,83 @@ void _fill_TP_TENSOR_COPY_Command(
     }
 }
 
+VX_PRIVATE_API void
+_fill_TP_TENSOR_COPY_Command_EX(
+    vx_context                  context,
+    vxnne_tensor_info           input,
+    vxnne_tensor_info           output,
+    vx_op_param                 parameter,
+    vx_nn_cmd_info_u*           general_info,
+    vx_uint32                   split_count,
+    vxnne_tensor_sub_block      input_split_blocks,
+    vxnne_tensor_sub_block      output_split_blocks,
+    vx_nn_cmd_split_info_u*     info_array
+    )
+{
+    vx_uint32 i;
+    DEFINE_TP_GENERAL_PARAMETER();
+
+    for (i = 0; i < split_count; i++)
+    {
+        vx_uint32 in_offset_x = input_split_blocks[i].offset_x;
+        vx_uint32 in_offset_y = input_split_blocks[i].offset_y;
+        vx_uint32 in_offset_z = input_split_blocks[i].offset_z;
+
+        vx_uint32 in_size_x = input_split_blocks[i].size_x;
+        vx_uint32 in_size_y = input_split_blocks[i].size_y;
+        vx_uint32 in_size_z = input_split_blocks[i].size_z;
+
+        vx_uint32 in_pitch_x = input_split_blocks[i].pitch_x;
+        vx_uint32 in_pitch_y = input_split_blocks[i].pitch_y;
+
+        vx_uint32 out_offset_x = output_split_blocks[i].offset_x;
+        vx_uint32 out_offset_y = output_split_blocks[i].offset_y;
+        vx_uint32 out_offset_z = output_split_blocks[i].offset_z;
+
+        vx_uint32 out_size_x = output_split_blocks[i].size_x;
+        vx_uint32 out_size_y = output_split_blocks[i].size_y;
+
+        vx_uint32 out_pitch_x = output_split_blocks[i].pitch_x;
+        vx_uint32 out_pitch_y = output_split_blocks[i].pitch_y;
+
+        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = in_size_x;
+        info_array[i].vx_tp_general_cmd_split_info.inImageYSize = in_size_y;
+        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = in_size_z;
+        info_array[i].vx_tp_general_cmd_split_info.inImageStride = in_pitch_x;
+        info_array[i].vx_tp_general_cmd_split_info.inImageSlice  = in_pitch_x * in_pitch_y;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = in_size_x - 1;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = in_size_y - 1;
+        info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
+        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + (in_pitch_x * in_pitch_y * in_offset_z + in_pitch_x * in_offset_y + in_offset_x) * inputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.inTileXSize = in_size_x;
+        info_array[i].vx_tp_general_cmd_split_info.inTileYSize = in_size_y;
+        info_array[i].vx_tp_general_cmd_split_info.inTileXInc = in_size_x;
+        info_array[i].vx_tp_general_cmd_split_info.inTileYInc = in_size_y;
+        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + (out_pitch_x * out_pitch_y * out_offset_z + out_pitch_x * out_offset_y + out_offset_x) * outputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = 1;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = out_size_x;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = out_pitch_x;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = out_size_y;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = 1;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = out_pitch_x * out_pitch_y;
+
+        info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
+        info_array[i].vx_tp_general_cmd_split_info.last = 1;
+    }
+}
+
 void _fill_TP_TENSOR_PAD_Command(
     vx_context                  context,
     vxnne_tensor_info           input,
@@ -3460,6 +3727,464 @@ void _fill_TP_TENSOR_COPY4CONCAT_Command(
     }
 }
 
+/*
+ * Split the tensor on X, Y and Z axises.
+ */
+VX_PRIVATE_API vx_status
+_CalculateSplitSizes(vxnne_tensor_info input,
+                     vxnne_tensor_info output,
+                     vx_op_param parameter,
+                     vx_uint32 div_x,
+                     vx_uint32 div_y,
+                     vx_uint32 div_z,
+                     vxnne_tensor_sub_block input_splits,
+                     vxnne_tensor_sub_block output_splits
+                     )
+{
+    vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter)parameter->other_ref;
+    vx_uint32 stride_x = 1, stride_y = 1;
+    vx_bool optimization_for_1x1_conv = vx_false_e;
+    vx_uint32 x, y, z;
+    vx_uint32 input_element_size = vxnneGetTypeSize(input->dataFormat);
+    vx_uint32 output_element_size = vxnneGetTypeSize(output->dataFormat);
+    vx_uint32 input_pitch_x = input->yStride / input_element_size;
+    vx_uint32 input_pitch_y = input->zStride / input->yStride;
+    vx_uint32 output_center_unit_size_x = 0, output_center_unit_size_y = 0, output_unit_z;
+    vx_uint32 output_remainder_size_x = 0, output_remainder_size_y = 0, output_remainder_z;
+    vx_uint32 output_pitch_x = output->yStride / output_element_size;
+    vx_uint32 output_pitch_y = output->zStride / output->yStride;
+    vx_uint32 inferred_input_size_x, inferred_input_size_y;
+    vx_uint32 output_left_unit_size_x = 0;
+    vx_uint32 output_right_unit_size_x = 0;
+    vx_uint32 output_top_unit_size_y = 0;
+    vx_uint32 output_bottom_unit_size_y = 0;
+    vx_uint32 pad_left, pad_right, pad_top, pad_bottom;
+    vx_uint32 index, last_x_index, last_y_index, last_z_index;
+
+    if (weights_biases)
+    {
+        stride_x = WB_STRIDE_X(weights_biases);
+        stride_y = WB_STRIDE_Y(weights_biases);
+
+        optimization_for_1x1_conv = WB_KERNEL_X(weights_biases) == 1 &&
+                                    WB_KERNEL_Y(weights_biases) == 1 &&
+                                    WB_ORG_KERNEL_X(weights_biases) == 1 &&
+                                    WB_ORG_KERNEL_Y(weights_biases) == 1;
+    }
+
+    inferred_input_size_x = output->width * stride_x;
+    inferred_input_size_y = output->height * stride_y;
+
+    pad_left = parameter->pad_x_left;
+    pad_top = parameter->pad_y_top;
+    pad_right = (inferred_input_size_x > parameter->pad_x_left + input->width) ?
+                inferred_input_size_x - (parameter->pad_x_left + input->width) : 0;
+    pad_bottom = (inferred_input_size_y > parameter->pad_y_top + input->height) ?
+                 inferred_input_size_y - (parameter->pad_y_top + input->height) : 0;
+
+    output_center_unit_size_x = output->width / div_x;
+    output_remainder_size_x = output->width % div_x;
+    if ((output_center_unit_size_x +  (output_remainder_size_x ? 1 : 0)) * stride_x <= pad_left)
+    {
+        output_left_unit_size_x = (pad_left + 1 + stride_x - 1) / stride_x;
+    }
+    else
+    {
+        output_left_unit_size_x = output_center_unit_size_x + (output_remainder_size_x ? 1 : 0);
+    }
+
+    if (div_x == 2)
+    {
+        vxmASSERT(pad_right < output->width * stride_x / 2);
+        output_right_unit_size_x = output->width - output_left_unit_size_x;
+    }
+    else if (div_x > 2)
+    {
+        if (output_center_unit_size_x * stride_x <= pad_right)
+        {
+            output_right_unit_size_x = (pad_right + 1 + stride_x - 1) / stride_x;
+        }
+        else
+        {
+            output_right_unit_size_x = output_center_unit_size_x;
+        }
+
+        output_center_unit_size_x = (output->width - output_left_unit_size_x - output_right_unit_size_x) / (div_x - 2);
+        output_remainder_size_x = (output->width - output_left_unit_size_x - output_right_unit_size_x) % (div_x - 2);
+    }
+
+    output_center_unit_size_y = output->height / div_y;
+    output_remainder_size_y = output->height % div_y;
+    if ((output_center_unit_size_y +  (output_remainder_size_y ? 1 : 0)) * stride_y <= pad_top)
+    {
+        output_top_unit_size_y = (pad_top + 1 + stride_y - 1) / stride_y;
+    }
+    else
+    {
+        output_top_unit_size_y = output_center_unit_size_y + (output_remainder_size_y ? 1 : 0);
+    }
+
+    if (div_y == 2)
+    {
+        vxmASSERT(pad_bottom < output->height * stride_y / 2);
+        output_bottom_unit_size_y = output->height - output_top_unit_size_y;
+    }
+    else if (div_y > 2)
+    {
+        if (output_center_unit_size_y * stride_y <= pad_bottom)
+        {
+            output_bottom_unit_size_y = (pad_bottom + 1 + stride_y - 1) / stride_y;
+        }
+        else
+        {
+            output_bottom_unit_size_y = output_center_unit_size_y;
+        }
+
+        output_center_unit_size_y = (output->height - output_top_unit_size_y - output_bottom_unit_size_y) / (div_y - 2);
+        output_remainder_size_y = (output->height - output_top_unit_size_y - output_bottom_unit_size_y) % (div_y - 2);
+    }
+
+    output_unit_z = (output->depth / stride_x / stride_y) / div_z;
+    output_remainder_z = (output->depth / stride_x / stride_y) % div_z;
+
+    for (z = 0; z < div_z; z++)
+    {
+        for (y = 0; y < div_y; y++)
+        {
+            for (x = 0; x < div_x; x++)
+            {
+                index = div_x * div_y * z + div_x * y + x;
+                last_x_index = div_x * div_y * z + div_x * y + x - 1;
+                last_y_index = div_x * div_y * z + div_x * (y - 1) + x;
+                last_z_index = div_x * div_y * (z - 1) + div_x * y + x;
+
+                /* Split on X axis. */
+                if (x == 0)
+                {
+                    input_splits[index].offset_x = 0;
+                    input_splits[index].pad_left = pad_left;
+
+                    output_splits[index].offset_x = 0;
+                    output_splits[index].size_x = output_left_unit_size_x;
+                }
+                else
+                {
+                    input_splits[index].offset_x = input_splits[last_x_index].offset_x +
+                                                   input_splits[last_x_index].size_x;
+                    input_splits[index].pad_left = 0;
+
+                    output_splits[index].offset_x = output_splits[last_x_index].offset_x +
+                                                    output_splits[last_x_index].size_x;
+                    if (x + 1== div_x)
+                    {
+                        output_splits[index].size_x = output_right_unit_size_x;
+                    }
+                    else
+                    {
+                        output_splits[index].size_x = output_center_unit_size_x + ((x - 1 < output_remainder_size_x) ? 1 : 0);
+                    }
+                }
+
+                if (x + 1 == div_x)
+                {
+                    /* Last block on X axis. */
+                    input_splits[index].pad_right = pad_right;
+                    vxmASSERT(input->width > input_splits[index].offset_x);
+                    input_splits[index].size_x = input->width - input_splits[index].offset_x;
+                }
+                else
+                {
+                    input_splits[index].pad_right = 0;
+                    vxmASSERT(output_splits[index].size_x * stride_x > input_splits[index].pad_left);
+                    input_splits[index].size_x = output_splits[index].size_x * stride_x -
+                                                 input_splits[index].pad_left;
+                }
+
+                input_splits[index].pitch_x = input_pitch_x;
+                output_splits[index].pitch_x = output_pitch_x;
+
+                /* Split on Y axis. */
+                if (y == 0)
+                {
+                    input_splits[index].offset_y = 0;
+                    input_splits[index].pad_top = pad_top;
+
+                    output_splits[index].offset_y = 0;
+                    output_splits[index].size_y = output_top_unit_size_y;
+                }
+                else
+                {
+                    input_splits[index].offset_y = input_splits[last_y_index].offset_y +
+                                                   input_splits[last_y_index].size_y;
+                    input_splits[index].pad_top = 0;
+
+                    output_splits[index].offset_y = output_splits[last_y_index].offset_y +
+                                                    output_splits[last_y_index].size_y;
+
+                    if (y + 1 == div_y)
+                    {
+                        output_splits[index].size_y = output_bottom_unit_size_y;
+                    }
+                    else
+                    {
+                        output_splits[index].size_y = output_center_unit_size_y + ((y - 1 < output_remainder_size_y) ? 1 : 0);
+                    }
+                }
+
+                if (y + 1 == div_y)
+                {
+                    /* Last block on Y axis. */
+                    input_splits[index].pad_bottom = pad_bottom;
+                    vxmASSERT(input->height > input_splits[index].offset_y);
+                    input_splits[index].size_y = input->height - input_splits[index].offset_y;
+                }
+                else
+                {
+                    input_splits[index].pad_bottom = 0;
+                    vxmASSERT(output_splits[index].size_y * stride_y > input_splits[index].pad_top);
+                    input_splits[index].size_y = output_splits[index].size_y * stride_y -
+                                                 input_splits[index].pad_top;
+                }
+
+                input_splits[index].pitch_y = input_pitch_y;
+                output_splits[index].pitch_y = output_pitch_y;
+
+                /* Split on Z axis. */
+                if (z == 0)
+                {
+                    input_splits[index].offset_z = 0;
+                    output_splits[index].offset_z = 0;
+                }
+                else
+                {
+                    input_splits[index].offset_z = input_splits[last_z_index].offset_z +
+                                                   input_splits[last_z_index].size_z;
+
+                    if (optimization_for_1x1_conv)
+                    {
+                        output_splits[index].offset_z = output_splits[last_z_index].offset_z +
+                                                        input_splits[last_z_index].size_z;
+                    }
+                    else
+                    {
+                        output_splits[index].offset_z = output_splits[last_z_index].offset_z +
+                                                        output_splits[last_z_index].size_z;
+                    }
+                }
+
+                output_splits[index].size_z = (output_unit_z + ((z < output_remainder_z) ? 1 : 0)) * stride_x * stride_y;
+
+                if (z + 1 == div_z)
+                {
+                    input_splits[index].size_z = input->depth - input_splits[index].offset_z;
+                }
+                else
+                {
+                    input_splits[index].size_z = output_splits[index].size_z / stride_x / stride_y;
+                }
+            }
+        }
+    }
+
+#if gcdDEBUG && SHOW_TP_SPLITING_INFO
+    gcmPRINT("Splinting info:\n");
+
+    gcmPRINT("div: %u, %u, %u\n", div_x, div_y, div_z);
+    gcmPRINT("padding: %u, %u, %u, %u\n",
+             parameter->pad_x_left,
+             parameter->pad_x_right,
+             parameter->pad_y_top,
+             parameter->pad_y_bottom);
+    gcmPRINT("stride x: %u\n", stride_x);
+    gcmPRINT("stride y: %u\n", stride_y);
+
+    gcmPRINT("input size: %u, %u, %u\n",
+             input->width,
+             input->height,
+             input->depth);
+    gcmPRINT("output size: %u, %u, %u\n",
+             output->width,
+             output->height,
+             output->depth);
+
+    for (z = 0; z < div_z; z++)
+    {
+        for (y = 0; y < div_y; y++)
+        {
+            for (x = 0; x < div_x; x++)
+            {
+                index = div_x * div_y * z + div_x * y + x;
+
+                gcmPRINT("input[%u][%u][%u]:\n", z, y, x);
+
+                gcmPRINT("    offset: %u, %u, %u\n",
+                         input_splits[index].offset_x,
+                         input_splits[index].offset_y,
+                         input_splits[index].offset_z);
+                gcmPRINT("    size: %u, %u, %u\n",
+                         input_splits[index].size_x,
+                         input_splits[index].size_y,
+                         input_splits[index].size_z);
+                gcmPRINT("    pitch: %u, %u\n",
+                         input_splits[index].pitch_x,
+                         input_splits[index].pitch_y);
+                gcmPRINT("    padding: l %u, r %u, t %u, b %u\n",
+                         input_splits[index].pad_left,
+                         input_splits[index].pad_right,
+                         input_splits[index].pad_top,
+                         input_splits[index].pad_bottom);
+
+                gcmPRINT("output[%u][%u][%u]:\n", z, y, x);
+
+                gcmPRINT("    offset: %u, %u, %u\n",
+                         output_splits[index].offset_x,
+                         output_splits[index].offset_y,
+                         output_splits[index].offset_z);
+                gcmPRINT("    size: %u, %u, %u\n",
+                         output_splits[index].size_x,
+                         output_splits[index].size_y,
+                         output_splits[index].size_z);
+                gcmPRINT("    pitch: %u, %u\n",
+                         output_splits[index].pitch_x,
+                         output_splits[index].pitch_y);
+            }
+        }
+    }
+#endif
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status
+_SplitInputAndOutputForMultiTPCores(vx_context context,
+                                    vxnne_tensor_info input,
+                                    vxnne_tensor_info output,
+                                    vx_op_param parameter,
+                                    vx_uint32 *split_count,
+                                    vxnne_tensor_sub_block *input_splits,
+                                    vxnne_tensor_sub_block *output_splits
+                                    )
+{
+    vx_status status = VX_SUCCESS;
+
+    vx_enum tp_type = parameter->tpType;
+    vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter)parameter->other_ref;
+    vx_uint32 stride_x = weights_biases ? WB_STRIDE_X(weights_biases) : 1;
+    vx_uint32 stride_y = weights_biases ? WB_STRIDE_Y(weights_biases) : 1;
+    vx_uint32 output_size_x = output->width;
+    vx_uint32 output_size_y = output->height;
+    vx_uint32 output_size_z = output->depth;
+
+    vx_uint32 num_slice;
+    vx_uint32 core = tp_type != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
+                                               context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
+    vx_bool mult = context->options.enableMultiTP && core > 1;
+    vx_uint32 div_x = 1, div_y = 1, div_z = 1;
+    vxnne_tensor_sub_block splits_of_input = VX_NULL;
+    vxnne_tensor_sub_block splits_of_output = VX_NULL;
+
+    /* Decide the slice num. */
+    switch (tp_type)
+    {
+        case TP_RESHUFFLE:
+        case TP_TENSOR_COPY:
+        case TP_TENSOR_COPY4CONCAT:
+        {
+            /* Don't split if the size is too small. */
+            if (mult && (output_size_x * output_size_y * output_size_z) > MULTI_TP_RESHUFFLE_SIZE)
+            {
+                num_slice = core;
+            }
+            else
+            {
+                num_slice = 1;
+            }
+
+            if ((output_size_z / stride_x / stride_y) % num_slice == 0)
+            {
+                div_z = num_slice;
+            }
+            else if (output_size_y % num_slice == 0)
+            {
+                div_y = num_slice;
+            }
+            else if (output_size_x % num_slice == 0)
+            {
+                div_x = num_slice;
+            }
+            else
+            {
+                vx_uint32 max = gcmMAX(gcmMAX(output_size_x * stride_x, output_size_y * stride_y), output_size_z / stride_x / stride_y);
+
+                if (output_size_z / stride_x / stride_y == max)
+                {
+                    div_z = gcmMIN(core, num_slice);
+                }
+                else if (output_size_y * stride_y == max)
+                {
+                    div_y = gcmMIN(core, num_slice);
+                }
+                else
+                {
+                    div_x = gcmMIN(core, num_slice);
+                }
+            }
+
+            break;
+        }
+
+
+        default:
+        {
+            vxmASSERT("TODO: Shouldn't go here at the moment." && 0);
+            num_slice = 1;
+            break;
+        }
+    }
+
+    splits_of_input = (vxnne_tensor_sub_block)vxAllocateAndZeroMemory(gcmSIZEOF(vxnne_tensor_sub_block_s) * (div_x * div_y * div_z));
+    if (!splits_of_input)
+    {
+        vxmONERROR(VX_ERROR_NO_MEMORY);
+    }
+
+    splits_of_output = (vxnne_tensor_sub_block)vxAllocateAndZeroMemory(gcmSIZEOF(vxnne_tensor_sub_block_s) * (div_x * div_y * div_z));
+    if (!splits_of_output)
+    {
+        vxmONERROR(VX_ERROR_NO_MEMORY);
+    }
+
+    vxmONERROR(_CalculateSplitSizes(input,
+                                    output,
+                                    parameter,
+                                    div_x,
+                                    div_y,
+                                    div_z,
+                                    splits_of_input,
+                                    splits_of_output
+                                    ));
+
+
+    *split_count = num_slice;
+    *input_splits = splits_of_input;
+    *output_splits = splits_of_output;
+
+    return VX_SUCCESS;
+
+OnError:
+    if (splits_of_input)
+    {
+        vxFree(splits_of_input);
+    }
+
+    if (splits_of_output)
+    {
+        vxFree(splits_of_output);
+    }
+
+    return status;
+}
+
 VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     vx_context                   context,
     vxnne_tensor_info            input,
@@ -3473,16 +4198,40 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     vx_nn_cmd_split_info_u * sinfoArray;
     vx_enum tpType, splitTypes[TP_TENSOR_COUNT] = {TP_SPLIT_Z_DIRECTION};
 
-    vx_uint32 i, splitCount;
+    vx_uint32 i, splitCount = 1;
     vx_uint32 splitSizes[TP_TENSOR_COUNT] = {0};
     vx_uint32 splitOffsets[TP_TENSOR_COUNT] = {0};
+    vxnne_tensor_sub_block input_splits = VX_NULL;
+    vxnne_tensor_sub_block output_splits = VX_NULL;
+    vx_uint32 core;
 
     vxmASSERT(parameter != VX_NULL);
 
     tpType = parameter->tpType;
 
+    core = tpType != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
+                                    context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
+
     /* TODO: Change if optimized */
-    _calculateTPSplitSizeOffset(context, input, output, parameter, splitTypes[tpType], &splitCount, splitSizes, splitOffsets);
+    switch (tpType)
+    {
+    case TP_RESHUFFLE:
+    case TP_TENSOR_COPY:
+    case TP_TENSOR_COPY4CONCAT:
+        _SplitInputAndOutputForMultiTPCores(context,
+                                            input,
+                                            output,
+                                            parameter,
+                                            &splitCount,
+                                            &input_splits,
+                                            &output_splits
+                                            );
+        break;
+
+    default:
+        _calculateTPSplitSizeOffset(context, input, output, parameter, splitTypes[tpType], &splitCount, splitSizes, splitOffsets);
+        break;
+    }
 
     sinfoArray = vxAllocateAndZeroMemory(sizeof(vx_nn_cmd_split_info_u) * splitCount);
     if (sinfoArray == VX_NULL) return VX_ERROR_NO_MEMORY;
@@ -3491,7 +4240,16 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     {
         case TP_RESHUFFLE:
         {
-            FILL_TP_COMMAND(context, input, output, parameter, splitTypes[tpType], splitCount, splitSizes, splitOffsets, sinfoArray, info_ptr, TP_RESHUFFLE);
+            _fill_TP_RESHUFFLE_Command_EX(context,
+                                          input,
+                                          output,
+                                          parameter,
+                                          info_ptr,
+                                          splitCount,
+                                          input_splits,
+                                          output_splits,
+                                          sinfoArray
+                                          );
             break;
         }
 
@@ -3612,8 +4370,18 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
         }
 
         case TP_TENSOR_COPY:
+        case TP_TENSOR_COPY4CONCAT:
         {
-            FILL_TP_COMMAND(context, input, output, parameter, splitTypes[tpType], splitCount, splitSizes, splitOffsets, sinfoArray, info_ptr, TP_TENSOR_COPY);
+            _fill_TP_TENSOR_COPY_Command_EX(context,
+                                            input,
+                                            output,
+                                            parameter,
+                                            info_ptr,
+                                            splitCount,
+                                            input_splits,
+                                            output_splits,
+                                            sinfoArray
+                                            );
             break;
         }
 
@@ -3653,14 +4421,20 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
             break;
         }
 
-        case TP_TENSOR_COPY4CONCAT:
-        {
-            FILL_TP_COMMAND(context, input, output, parameter, splitTypes[tpType], splitCount, splitSizes, splitOffsets, sinfoArray, info_ptr, TP_TENSOR_COPY4CONCAT);
-            break;
-        }
-
         default:
             break;
+    }
+
+    if (input_splits)
+    {
+        vxFree(input_splits);
+        input_splits = VX_NULL;
+    }
+
+    if (output_splits)
+    {
+        vxFree(output_splits);
+        output_splits = VX_NULL;
     }
 
     for (i = 0; i < splitCount; i++)

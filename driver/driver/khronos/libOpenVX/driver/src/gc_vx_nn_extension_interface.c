@@ -9372,6 +9372,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
             minVal = 0;
         }
 
+        batchCount = reshpTensor_Dims > 3 ? reshpTensor_Sizes[3] : 1;
+
         if(node->base.context->evisNoInst.supportEVIS)
         {
             if (enable_tensorABS_SHExe)

@@ -1020,8 +1020,9 @@ VX_INTERNAL_API vx_status ComputeMNEx(
             {
                 vx_uint32 outTileY, inputTileY;
                 vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
-                vx_arch_perf_s archPerfHandle = {0};
+                vx_arch_perf_s archPerfHandle;
 
+                INITIALIZE_STRUCT(archPerfHandle);
                 vxmASSERT(opInfo.opType != VXNNE_OPERATOR_FULLYCONNECTED);
                 vxmASSERT(axiSRAMsize > 0 && !phase3);
 
@@ -3826,8 +3827,9 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
             vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
             vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
             vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
-            vx_arch_perf_s archPerfHandle = {0};
+            vx_arch_perf_s archPerfHandle;
 
+            INITIALIZE_STRUCT(archPerfHandle);
             calculateArchPerfFromWB(graph->base.context,
                                 &archPerfHandle,
                                 opInfo.weightsBiases,

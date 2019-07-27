@@ -18,7 +18,7 @@
 #define _GC_OBJ_ZONE        gcdZONE_CL_MEM
 
 #if (defined(UNDER_CE) || defined(__QNXNTO__) || defined(LINUX))
-#if (0 || defined(ANDROID))
+#if (0
 #define MAP_TO_DEVICE 0
 #else
 #define MAP_TO_DEVICE 1
