@@ -728,10 +728,10 @@ vx_int32 vxnneGetTypeSize(vx_type_e format)
     return size;
 }
 
-vx_uint32 vxnneGetOneNumber(vx_uint32 value)
+vx_uint32 vxnneGetOneNumber(vx_uint64 value)
 {
     vx_uint32 count = 0;
-    vx_uint32 tempValue = value;
+    vx_uint64 tempValue = value;
 
     while (tempValue)
     {
@@ -4588,27 +4588,91 @@ vx_bool vxnneIsTPSupportFormat(
 }
 
 /* Get irreducible fraction of ratio, return numeration and denominator */
-void vxnneGetIrreducibleFraction(vx_float32 ratio, vx_uint32 *numerationPtr, vx_uint32 *denominatorPtr)
+void vxnneGetPatternBitAndVipSramSizeNeedFromOneZeroNum(
+    vx_uint32 oneNumber,
+    vx_uint32 zeroNumber,
+    vx_uint32 kernelStreamSize,
+    vx_uint32 dataUnitByte,
+    vx_uint64 *kernelPatternBitsPtr,
+    vx_uint32 *vipSRAMNeedPtr
+    )
 {
-    vx_uint32 x, y;
-    vx_float32 bestRatio = 0.0f;
+    vx_uint32 patternCount = 0;
+    vx_uint32 leftPatternBitSize = 0;
+    vx_uint64 leftPatternBits = 0;
 
-    if ((numerationPtr == VX_NULL) || (denominatorPtr == VX_NULL))
+    if (kernelPatternBitsPtr == VX_NULL || vipSRAMNeedPtr == VX_NULL)
     {
         return;
     }
 
+    patternCount = kernelStreamSize / ((oneNumber + zeroNumber) *  dataUnitByte);
+    leftPatternBitSize = (vx_uint32)gcoMATH_Ceiling((kernelStreamSize - patternCount * ((oneNumber + zeroNumber) *  dataUnitByte))/ dataUnitByte);
+    vxnneGetKernelPatternBits(oneNumber, zeroNumber, kernelPatternBitsPtr);
+    leftPatternBits = ((((vx_uint64)-1) >> (64 - leftPatternBitSize))) & (*kernelPatternBitsPtr);
+    *vipSRAMNeedPtr = (vxnneGetOneNumber(*kernelPatternBitsPtr) * patternCount + vxnneGetOneNumber(leftPatternBits)) * dataUnitByte;
+}
+
+/* Get irreducible fraction of ratio, return numeration and denominator */
+void vxnneGetPatternBitAndVipSramSizeNeed(
+    vx_float32 ratio,
+    vx_uint32 kernelCacheSize,
+    vx_uint32 kernelStreamSize,
+    vx_uint32 dataUnitByte,
+    vx_uint32 *oneNumPtr,
+    vx_uint32 *zeroNumPtr,
+    vx_uint64 *kernelPatternBitsPtr,
+    vx_uint32 *vipSramNeedPtr
+    )
+{
+    vx_uint32 x = 0, y = 0;
+    vx_float32 bestRatio = 0.0f;
+    vx_uint64 kernelPatternBits = 0;
+    vx_uint32 vipSramNeed = 0;
+
+    if ((oneNumPtr == VX_NULL) ||
+        (zeroNumPtr == VX_NULL) ||
+        (kernelPatternBitsPtr == VX_NULL) ||
+        (vipSramNeedPtr == VX_NULL))
+    {
+        return;
+    }
+
+    *oneNumPtr = 0;
+    *zeroNumPtr = 0;
+    *kernelPatternBitsPtr = 0;
+    *vipSramNeedPtr = 0;
+
     if (ratio >= (VX_KERNEL_PATTERN_BIT_SIZE - 1))
     {
-        *numerationPtr = (VX_KERNEL_PATTERN_BIT_SIZE - 1);
-        *denominatorPtr = 1;
-        return;
+        x = (VX_KERNEL_PATTERN_BIT_SIZE - 1);
+        y = 1;
     }
     else if ((ratio < 1.0f) &&
              ((1.0f / ratio) >= (VX_KERNEL_PATTERN_BIT_SIZE - 1)))
     {
-        *numerationPtr = 1;
-        *denominatorPtr = (VX_KERNEL_PATTERN_BIT_SIZE - 1);
+        x = 1;
+        y = (VX_KERNEL_PATTERN_BIT_SIZE - 1);
+    }
+
+    if (x != 0 && y != 0)
+    {
+        vxnneGetPatternBitAndVipSramSizeNeedFromOneZeroNum(x,
+            y,
+            kernelStreamSize,
+            dataUnitByte,
+            &kernelPatternBits,
+            &vipSramNeed
+            );
+
+        if (vipSramNeed < kernelCacheSize)
+        {
+            *oneNumPtr = x;
+            *zeroNumPtr = y;
+            *kernelPatternBitsPtr = kernelPatternBits;
+            *vipSramNeedPtr = vipSramNeed;
+        }
+
         return;
     }
 
@@ -4616,24 +4680,39 @@ void vxnneGetIrreducibleFraction(vx_float32 ratio, vx_uint32 *numerationPtr, vx_
     {
         for (x = 1; x < VX_KERNEL_PATTERN_BIT_SIZE; x++)
         {
-            vx_float32 temp = ((vx_float32)x / y);
+            vx_float32 tempRatio = ((vx_float32)x / y);
 
             if (((x + y) > VX_KERNEL_PATTERN_BIT_SIZE) ||
-                (temp > ratio))
+                (tempRatio > ratio))
             {
                 break;
             }
 
-            if (temp > bestRatio)
+            if ((bestRatio != 0) && (tempRatio < bestRatio))
             {
-                bestRatio = temp;
-                *numerationPtr = x;
-                *denominatorPtr = y;
+                continue;
+            }
+
+            vxnneGetPatternBitAndVipSramSizeNeedFromOneZeroNum(x,
+                y,
+                kernelStreamSize,
+                dataUnitByte,
+                &kernelPatternBits,
+                &vipSramNeed
+                );
+
+            if ((kernelPatternBits != 0) &&
+                (vipSramNeed <= kernelCacheSize))
+            {
+                bestRatio = tempRatio;
+                *oneNumPtr = x;
+                *zeroNumPtr = y;
+                *kernelPatternBitsPtr = kernelPatternBits;
+                *vipSramNeedPtr = vipSramNeed;
             }
         }
     }
 
-    vxmASSERT(((vx_float32)(*numerationPtr)/(*denominatorPtr)) <= ratio);
 }
 
 /* get kernel pattern bits, equidistribute binary bit '1' and '0' for hw requirement */

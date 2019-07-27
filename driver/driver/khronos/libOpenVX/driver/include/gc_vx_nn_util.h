@@ -161,7 +161,7 @@ vx_uint32 vxnneAlignWithStride(vx_uint32 inputSize, vx_uint32 stride);
 
 vx_int32 vxnneGetTypeSize(vx_type_e format);
 
-vx_uint32 vxnneGetOneNumber(vx_uint32 value);
+vx_uint32 vxnneGetOneNumber(vx_uint64 value);
 vx_float32 vxnneGetData(vx_type_e format, vx_int32 index, vx_uint8_ptr data, vx_int8 fixPointPos);
 vx_status vxnneSaveData(vx_type_e format, vx_int32 index, vx_float64 data, vx_ptr dst_data, vx_int8 fixedPointPos, vx_enum roundMode);
 vx_float32 vxnneGetDataQuant(vx_type_e format, vx_int32 index, vx_uint8_ptr data, vx_int32 zeroPoint, vx_float32 scale);
@@ -378,10 +378,15 @@ vx_bool vxnneIsTPSupportFormat(
     vx_weights_biases_parameter wb,
     vx_tensor outputTensor);
 
-void vxnneGetIrreducibleFraction(
+void vxnneGetPatternBitAndVipSramSizeNeed(
     vx_float32 ratio,
-    vx_uint32 *numerationPtr,
-    vx_uint32 *denominatorPtr);
+    vx_uint32 kernelCacheSize,
+    vx_uint32 kernelStreamSize,
+    vx_uint32 dataUnitByte,
+    vx_uint32 *oneNumPtr,
+    vx_uint32 *zeroNumPtr,
+    vx_uint64 *kernelPatternBitsPtr,
+    vx_uint32 *vipSramNeedPtr);
 
 void vxnneGetKernelPatternBits(
     vx_uint32 oneNum,

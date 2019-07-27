@@ -713,66 +713,38 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
             vx_uint32 dataUnitByte = 64;
             vx_uint32 zeroNum = 0;
             vx_uint32 oneNum = 0;
-            vx_uint32 vipSramNeedSize = 0;
+            vx_uint32 vipSramNeed = 0;
+            vx_uint32 partialCacheDataUnit = NN_KS_PARTIAL_CACHE_DATA_UNIT;
+
+            switch (partialCacheDataUnit)
+            {
+                case 0:
+                    dataUnitByte = 64;
+                    break;
+                case 1:
+                    dataUnitByte = 128;
+                    break;
+                case 2:
+                    dataUnitByte = 256;
+                    break;
+                case 3:
+                    dataUnitByte = 512;
+                    break;
+            }
 
             vxmASSERT(kernelStreamAlignSize - conv_cmd_ptr->kernelCacheSize > 0);
 
-            vxnneGetIrreducibleFraction(ratio, &oneNum, &zeroNum);
-            vxnneGetKernelPatternBits(oneNum, zeroNum, &kernelPatternBits);
+            vxnneGetPatternBitAndVipSramSizeNeed(ratio,
+                conv_cmd_ptr->kernelCacheSize,
+                kernelStreamAlignSize,
+                dataUnitByte,
+                &oneNum,
+                &zeroNum,
+                &kernelPatternBits,
+                &vipSramNeed
+                );
 
-            vxmASSERT((oneNum + zeroNum) <= VX_KERNEL_PATTERN_BIT_SIZE);
-
-            info->vx_nn_general_cmd_info.kernelPatternMsb        = (oneNum + zeroNum) - 1;
-            info->vx_nn_general_cmd_info.kernelPatternLow32Bits  = kernelPatternBits & 0xFFFFFFFF;
-            info->vx_nn_general_cmd_info.kernelPatternHigh32Bits = kernelPatternBits >> 32;
-
-            info->vx_nn_general_cmd_info.kernelCachingMode       = 2;
-            info->vx_nn_general_cmd_info.partialCacheDataUnit    = NN_KS_PARTIAL_CACHE_DATA_UNIT;
-            switch (info->vx_nn_general_cmd_info.partialCacheDataUnit)
-            {
-            case 0:
-                dataUnitByte = 64;
-                break;
-            case 1:
-                dataUnitByte = 128;
-                break;
-            case 2:
-                dataUnitByte = 256;
-                break;
-            case 3:
-                dataUnitByte = 512;
-                break;
-            }
-
-            info->vx_nn_general_cmd_info.kernelCacheStartAddress = conv_cmd_ptr->kernelCacheStart;
-
-
-            info->vx_nn_general_cmd_info.kernelCacheEndAddress =
-                info->vx_nn_general_cmd_info.kernelCacheStartAddress +
-                ((vx_uint32)gcoMATH_Ceiling((vx_float32)WB_CONV_STREAM_ALIGN_SIZE(weights_biases) /
-                 (dataUnitByte * (info->vx_nn_general_cmd_info.kernelPatternMsb + 1)))) *
-                (dataUnitByte * (vxnneGetOneNumber(info->vx_nn_general_cmd_info.kernelPatternLow32Bits) +
-                                 vxnneGetOneNumber(info->vx_nn_general_cmd_info.kernelPatternHigh32Bits)));
-
-            if(info->vx_nn_general_cmd_info.kernelCacheEndAddress > conv_cmd_ptr->kernelCacheStart + conv_cmd_ptr->kernelCacheSize)
-            {
-                vx_uint32 kernelCacheSizeInSram = conv_cmd_ptr->kernelCacheSize;
-                if(kernelCacheSizeInSram % dataUnitByte != 0 )
-                {
-                    kernelCacheSizeInSram = (kernelCacheSizeInSram / dataUnitByte) * dataUnitByte;
-                }
-                vxmASSERT(kernelCacheSizeInSram != 0);
-                info->vx_nn_general_cmd_info.kernelCacheEndAddress = info->vx_nn_general_cmd_info.kernelCacheStartAddress + kernelCacheSizeInSram;
-            }
-
-            vipSramNeedSize = (kernelStreamAlignSize / (dataUnitByte * (info->vx_nn_general_cmd_info.kernelPatternMsb + 1))) *
-                (dataUnitByte * (vxnneGetOneNumber(info->vx_nn_general_cmd_info.kernelPatternLow32Bits) +
-                                 vxnneGetOneNumber(info->vx_nn_general_cmd_info.kernelPatternHigh32Bits)));
-
-            vxmASSERT(info->vx_nn_general_cmd_info.kernelCacheEndAddress > info->vx_nn_general_cmd_info.kernelCacheStartAddress);
-            vxmASSERT(((info->vx_nn_general_cmd_info.kernelCacheEndAddress - info->vx_nn_general_cmd_info.kernelCacheStartAddress) % dataUnitByte) == 0);
-
-            if (vipSramNeedSize > conv_cmd_ptr->kernelCacheSize)
+            if (vipSramNeed == 0)
             {
                 conv_cmd_ptr->kernelCacheMode = VXNNE_SRAM_CACHE_MODE_NONE;
 
@@ -783,6 +755,25 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
                 info->vx_nn_general_cmd_info.kernelPatternHigh32Bits = 0;
                 info->vx_nn_general_cmd_info.kernelCacheStartAddress = 0;
                 info->vx_nn_general_cmd_info.kernelCacheEndAddress = 0;
+            }
+            else
+            {
+
+                vxmASSERT((oneNum + zeroNum) <= VX_KERNEL_PATTERN_BIT_SIZE);
+                vxmASSERT((oneNum / zeroNum) <= ratio);
+
+                info->vx_nn_general_cmd_info.kernelPatternMsb        = (oneNum + zeroNum) - 1;
+                info->vx_nn_general_cmd_info.kernelPatternLow32Bits  = kernelPatternBits & 0xFFFFFFFF;
+                info->vx_nn_general_cmd_info.kernelPatternHigh32Bits = kernelPatternBits >> 32;
+
+                info->vx_nn_general_cmd_info.kernelCachingMode       = 2;
+                info->vx_nn_general_cmd_info.partialCacheDataUnit    = partialCacheDataUnit;
+
+                info->vx_nn_general_cmd_info.kernelCacheStartAddress = conv_cmd_ptr->kernelCacheStart;
+                info->vx_nn_general_cmd_info.kernelCacheEndAddress = info->vx_nn_general_cmd_info.kernelCacheStartAddress + vipSramNeed;
+
+                vxmASSERT(info->vx_nn_general_cmd_info.kernelCacheEndAddress > info->vx_nn_general_cmd_info.kernelCacheStartAddress);
+                vxmASSERT((info->vx_nn_general_cmd_info.kernelCacheEndAddress - info->vx_nn_general_cmd_info.kernelCacheStartAddress) <= conv_cmd_ptr->kernelCacheSize);
             }
 
             _checkSramOverflow(context, weights_biases, info, dataUnitByte);
