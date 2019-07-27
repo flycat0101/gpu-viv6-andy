@@ -2607,6 +2607,11 @@ _IntrisicOrExtFuncName(
                     gcoOS_PrintStrSafe(buffer, 128, &offset, "_cube");
                     gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, buffer);
                 }
+                else if (VIR_TypeId_isImage1D(imageTypeId) || VIR_TypeId_isSampler1D(imageTypeId))
+                {
+                    gcoOS_PrintStrSafe(buffer, 128, &offset, "_1d");
+                    gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, buffer);
+                }
                 else
                 {
                     gcoOS_PrintStrSafe(buffer, 128, &offset, "_2d");
