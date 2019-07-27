@@ -34,8 +34,6 @@ EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
 EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
 EXTRA_INCVPATH += $(driver_root)/compiler/libCLC/inc
 EXTRA_INCVPATH += $(driver_root)/compiler/libCLC/compiler
-EXTRA_INCVPATH += $(driver_root)/compiler/libCLC/llvm/include
-EXTRA_INCVPATH += $(driver_root)/compiler/libCLC/llvm/tools/clang/include
 
 # from trunk/compiler/libCLC/common/makefile.linux
 SOURCE_OBJECTS += $(driver_root)/compiler/libCLC/common/gc_cl_common.o
