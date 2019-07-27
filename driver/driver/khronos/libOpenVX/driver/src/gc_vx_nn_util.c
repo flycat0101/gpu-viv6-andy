@@ -4607,7 +4607,7 @@ void vxnneGetPatternBitAndVipSramSizeNeedFromOneZeroNum(
     }
 
     patternCount = kernelStreamSize / ((oneNumber + zeroNumber) *  dataUnitByte);
-    leftPatternBitSize = (vx_uint32)gcoMATH_Ceiling((kernelStreamSize - patternCount * ((oneNumber + zeroNumber) *  dataUnitByte))/ dataUnitByte);
+    leftPatternBitSize = (vx_uint32)gcoMATH_Ceiling((vx_float32)(kernelStreamSize - patternCount * ((oneNumber + zeroNumber) *  dataUnitByte))/ dataUnitByte);
     vxnneGetKernelPatternBits(oneNumber, zeroNumber, kernelPatternBitsPtr);
     leftPatternBits = ((((vx_uint64)-1) >> (64 - leftPatternBitSize))) & (*kernelPatternBitsPtr);
     *vipSRAMNeedPtr = (vxnneGetOneNumber(*kernelPatternBitsPtr) * patternCount + vxnneGetOneNumber(leftPatternBits)) * dataUnitByte;
