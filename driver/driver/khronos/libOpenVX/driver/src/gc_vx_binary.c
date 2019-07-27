@@ -9924,7 +9924,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
 {
     vx_status status = VX_SUCCESS;
 
-    if ((0 == graph->nodeCount) && (VX_NULL == graph->nodeTable))
+    if (0 == graph->nodeCount)
     {
         vxError("%s[%d]: nodeCount is %d, nodeTable is NULL\n", __FUNCTION__, __LINE__, graph->nodeCount);
         vxmONERROR(VX_FAILURE);
