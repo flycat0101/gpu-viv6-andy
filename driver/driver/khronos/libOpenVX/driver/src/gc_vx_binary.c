@@ -911,8 +911,6 @@ static vx_status readBinDynamic(
                     __FUNCTION__, __LINE__, (vx_uint32)readSize, binLoad->fixed.LCD.size);
                 vxmONERROR(VX_FAILURE);
             }
-            gcoOS_Close(gcvNULL, binLoad->dFile);
-            binLoad->dFile = VX_NULL;
         }
         #endif
     }
@@ -951,30 +949,20 @@ OnError:
 }
 
 VX_PRIVATE_API gctUINT getFileSize(
-    gctCONST_STRING fileName
+    gctFILE df
     )
 {
-    gctFILE df = gcvNULL;
     gctUINT length = 0;
-    gcmHEADER_ARG("fileName=%s", fileName);
-
-    if (gcmIS_ERROR(gcoOS_Open(gcvNULL, fileName, gcvFILE_READ, &df)))
-    {
-        vxError("open network binary failed");
-        gcmFOOTER_ARG("%d", vx_false_e);
-        return vx_false_e;
-    }
+    gcmHEADER_ARG("df=%p", df);
 
     gcoOS_Seek(gcvNULL, df, 0, gcvFILE_SEEK_END);
     gcoOS_GetPos(gcvNULL, df, &length);
-    gcoOS_Close(gcvNULL, df);
 
     gcmFOOTER_ARG("0x%x", length);
     return length;
 }
 
 VX_PRIVATE_API gctSIZE_T loadBinaryEntry(
-    gctCONST_STRING fileName,
     vx_binary_loader_s *binLoad
     )
 {
@@ -983,7 +971,7 @@ VX_PRIVATE_API gctSIZE_T loadBinaryEntry(
     vx_uint32 LCDEntryOffsetPos = 0;
     gctSIZE_T readSize = 0;
     vx_status status = VX_SUCCESS;
-    gcmHEADER_ARG("fileName=%s binLoad=%p", fileName, binLoad);
+    gcmHEADER_ARG("binLoad=%p", binLoad);
 
     LCDEntryOffsetPos = sizeof(vx_binary_header_s) + sizeof(vx_binary_memory_pool_info_s)
                             + sizeof(vx_binary_axi_sram_info_s)
@@ -993,11 +981,6 @@ VX_PRIVATE_API gctSIZE_T loadBinaryEntry(
                             + sizeof(vx_binary_entry_s)/*opeartionTable*/
                             + sizeof(vx_binary_entry_s); /*LCDTable*/
 
-    if (gcmIS_ERROR(gcoOS_Open(gcvNULL, fileName, gcvFILE_READ, &binLoad->dFile)))
-    {
-        vxError("open network binary failed");
-        vxmONERROR(VX_FAILURE);
-    }
 
     gcoOS_Seek(gcvNULL, binLoad->dFile, LCDEntryOffsetPos, gcvFILE_SEEK_SET);
     gcoOS_Read(gcvNULL, binLoad->dFile, sizeof(vx_uint32), array, &readSize);
@@ -1032,29 +1015,20 @@ OnError:
 }
 
 VX_PRIVATE_API gctSIZE_T loadBinaryWhole(
-    gctCONST_STRING fileName,
     vx_binary_loader_s *binLoad
     )
 {
     gctUINT length = 0;
     gctSIZE_T readSize = 0;
 
-    gcmHEADER_ARG("fileName=%s binLoad=%p", fileName, binLoad);
+    gcmHEADER_ARG(" binLoad=%p", binLoad);
 
     vxmASSERT(binLoad->binaryBuffer != NULL);
-    if (gcmIS_ERROR(gcoOS_Open(gcvNULL, fileName, gcvFILE_READ, &binLoad->dFile)))
-    {
-        vxError("open network binary failed");
-        gcmFOOTER_ARG("%d", vx_false_e);
-        return vx_false_e;
-    }
+
     gcoOS_Seek(gcvNULL, binLoad->dFile, 0, gcvFILE_SEEK_END);
     gcoOS_GetPos(gcvNULL, binLoad->dFile, &length);
     gcoOS_Seek(gcvNULL, binLoad->dFile, 0, gcvFILE_SEEK_SET);
     gcoOS_Read(gcvNULL, binLoad->dFile, length, binLoad->binaryBuffer, &readSize);
-
-    gcoOS_Close(gcvNULL, binLoad->dFile);
-    binLoad->dFile = VX_NULL;
 
     gcmFOOTER_ARG("0x%x", readSize);
     return readSize;
@@ -3514,16 +3488,22 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_LoadFile(
     *binaryLoad = binLoad;
     binLoad->context = context;
 
+    if (gcmIS_ERROR(gcoOS_Open(gcvNULL, fileName, gcvFILE_READ, &binLoad->dFile)))
+    {
+        vxError("open network binary failed");
+        vxmONERROR(VX_FAILURE);
+    }
+
 #if LOAD_WHOLE_BINARY_TO_BUFFER
-    fileSize = getFileSize(fileName);
+    fileSize = getFileSize(binLoad->dFile);
     if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, fileSize, &binLoad->binaryBuffer)))
     {
         vxError("%s[%d]: fail to allocate memory for binary buffer\n", __FUNCTION__, __LINE__);
         vxmONERROR(VX_ERROR_NO_MEMORY);
     }
-    readSize = (vx_uint32)loadBinaryWhole(fileName, binLoad);
+    readSize = (vx_uint32)loadBinaryWhole(binLoad);
 #else
-    readSize = (vx_uint32)loadBinaryEntry(fileName, binLoad);
+    readSize = (vx_uint32)loadBinaryEntry(binLoad);
 #endif
     if (readSize <= 0)
     {
@@ -3600,6 +3580,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_LoadFile(
     if (binLoad->segmentsCount > 0)
     {
         binLoad->segments = (vx_binary_segment_s*)vxAllocateAndZeroMemory(binLoad->segmentsCount * sizeof(vx_binary_segment_s));
+    }
+
+    if (binLoad->dFile != VX_NULL)
+    {
+        gcoOS_Close(gcvNULL, binLoad->dFile);
+        binLoad->dFile = VX_NULL;
     }
 
     gcmFOOTER_ARG("%d", VX_SUCCESS);
