@@ -7863,11 +7863,11 @@ IN cloIR_EXPR RightOperand
                 cluCONSTANT_VALUE constantValue;
 
                 (void)gcoOS_ZeroMemory((gctPOINTER)&constantValue, sizeof(cluCONSTANT_VALUE));
-                constantValue.intValue = 1;
+                constantValue.floatValue = 1.0;
                 constantOne = _ParseCreateConstant(Compiler,
                                    RightOperand->base.lineNo,
                                    RightOperand->base.stringNo,
-                                   T_INT,
+                                   T_FLOAT,
                                    &constantValue);
                 if(!constantOne) return gcvNULL;
                 status = cloIR_BINARY_EXPR_Evaluate(Compiler,
