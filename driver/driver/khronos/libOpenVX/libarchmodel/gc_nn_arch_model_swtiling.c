@@ -1195,49 +1195,6 @@ static void _subimage_segment_cost(
         for (i = segment_first; i <= segment_last; i++)
         {
             zArray[i] = archModel->opInfoArray[i]->oz;
-            if (i == segment_last)
-            {
-                if (i > 0 && archModel->opInfoArray[i]->target == VXNNE_OPERATION_TARGET_TP)
-                {
-                    zArray[i] = zArray[i - 1] * archModel->opInfoArray[i]->oz / archModel->opInfoArray[i]->kz;
-                }
-            }
-            else {
-                if ((i + 1 <= segment_last)
-                    && (archModel->opInfoArray[i + 1]->target == VXNNE_OPERATION_TARGET_TP)
-                    && (archModel->opInfoArray[i + 1]->ky == 1)
-                    )
-                {
-                    if (archModel->opInfoArray[i]->target != VXNNE_OPERATION_TARGET_TP)
-                    {
-                        if (context->nnConfig.derivedFeature.nnXYDPX == 0)
-                        {
-                            zArray[i] = (vx_uint32)gcmMIN(archModel->opInfoArray[i]->oz,
-                                archModel->opInfoArray[i]->nnCores
-                                * ceilf((vx_float32)(context->nnConfig.unifiedFeature.maxTileSize + 8)
-                                / (vx_float32)(WB_NON_ZERO_RATIO(archModel->opInfoArray[i]->weight_bias) * context->nnConfig.fixedFeature.equivalentVipsramWidthInByte)));
-                        }
-                        else
-                        {
-                            zArray[i] = (vx_uint32)gcmMIN(archModel->opInfoArray[i]->oz,
-                                archModel->opInfoArray[i]->nnCores
-                                * ceilf((vx_float32)(context->nnConfig.unifiedFeature.maxTileSize + 8)
-                                / (ceilf((vx_float32)archModel->opInfoArray[i]->kx / context->nnConfig.derivedFeature.nnXYDPX)
-                                  * ceilf((vx_float32)archModel->opInfoArray[i]->ky / context->nnConfig.derivedFeature.nnXYDPY)
-                                  * (vx_float32)WB_NON_ZERO_RATIO(archModel->opInfoArray[i]->weight_bias)
-                                  * context->nnConfig.fixedFeature.equivalentVipsramWidthInByte)));
-                        }
-                    }
-                    else
-                    {
-                        zArray[i] = gcmMIN(archModel->opInfoArray[i]->oz, context->nnConfig.fixedFeature.tpCoreCount * 1 /*SIZSmallUnit(layer)*/);
-                        if (i > 0 && (i != segment_first))
-                        {
-                            zArray[i] = _calc_lcm(zArray[i], zArray[i - 1] * archModel->opInfoArray[i]->oz / archModel->opInfoArray[i]->kz);
-                        }
-                    }
-                }
-            }
         }
 
         for (i = segment_first; i <= segment_last; i++)
