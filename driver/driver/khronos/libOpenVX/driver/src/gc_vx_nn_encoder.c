@@ -14713,10 +14713,10 @@ vx_status vxoWeightsBiases_Compress(
             vx_uint32 index = 0;
             vx_size weightDataBytesOffset = 0;
 
-            kzoffset = 0;
             for (i = 0; i < wb->slice_z_num; i++)
             {
                 filterCount = wb->slice_array[index].z_count;
+                kzoffset = 0;
 
                 for (j = 0; j < wb->slice_kz_num; j++)
                 {
@@ -14725,7 +14725,7 @@ vx_status vxoWeightsBiases_Compress(
                     calculateWeightBiasStreamRelatedSize(
                         context,
                         wb,
-                        weight_ptr + kzoffset + weightDataBytesOffset,
+                        weight_ptr + weightDataBytesOffset + kzoffset,
                         sliceCount, /* slice */
                         filterCount, /* z count */
                         kernel_per_core, /* kernel per core */
@@ -14737,7 +14737,7 @@ vx_status vxoWeightsBiases_Compress(
                         0,
                         &minKernelBufferSize[index], &minZeroRunLen[index], &maxZeroRunLen[index]);
 
-                    kzoffset += sliceCount * weightSize;
+                    kzoffset +=  (wb->wb_base->weights_sizes[0] * wb->wb_base->weights_sizes[1]* sliceCount * weightSize);
                     minTotalKernelBufferSize += minKernelBufferSize[index];
                     index++;
                 }
