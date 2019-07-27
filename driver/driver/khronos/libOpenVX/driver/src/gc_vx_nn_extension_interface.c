@@ -5405,7 +5405,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     vx_bool   supportDataFormat3          = vx_false_e;
     vx_enum   input_dataformat            = TENSOR_DATA_TYPE(inputs);
     vx_enum   weight_dataformat           = TENSOR_DATA_TYPE(weights_biases->wb_base->origWeight);
-    vx_enum   bias_dataformat             = TENSOR_DATA_TYPE(weights_biases->wb_base->origBias);
+    vx_enum   bias_dataformat             = weights_biases->wb_base->origBias ? TENSOR_DATA_TYPE(weights_biases->wb_base->origBias) : VX_TYPE_INVALID;
     vx_enum   output_dataformat           = TENSOR_DATA_TYPE(outputs);
     vx_uint32 dims                        = TENSOR_VIEW_DIM_NUM(inputs);
     vx_uint32 width                       = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
@@ -5414,10 +5414,10 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     vx_uint32 inputDims                   = width * height * depth;
     vx_uint32 op_index = 0;
 
-    supportDataFormat0 = (vx_bool)(input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && bias_dataformat == VX_TYPE_FLOAT32 && output_dataformat == VX_TYPE_FLOAT16);
-    supportDataFormat1 = (vx_bool)(input_dataformat == VX_TYPE_INT8 && weight_dataformat == VX_TYPE_INT8 && bias_dataformat == VX_TYPE_INT32 && output_dataformat == VX_TYPE_INT8);
-    supportDataFormat2 = (vx_bool)(input_dataformat == VX_TYPE_INT16 && weight_dataformat == VX_TYPE_INT16 && bias_dataformat == VX_TYPE_INT32 && output_dataformat == VX_TYPE_INT16);
-    supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && bias_dataformat == VX_TYPE_INT32 && output_dataformat == VX_TYPE_UINT8);
+    supportDataFormat0 = (vx_bool)(input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_FLOAT32) && output_dataformat == VX_TYPE_FLOAT16);
+    supportDataFormat1 = (vx_bool)(input_dataformat == VX_TYPE_INT8 && weight_dataformat == VX_TYPE_INT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_INT8);
+    supportDataFormat2 = (vx_bool)(input_dataformat == VX_TYPE_INT16 && weight_dataformat == VX_TYPE_INT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_INT16);
+    supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_UINT8);
     enable_shader      = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
 
     if (TENSOR_DIM_NUM(inputs) == 2)
@@ -9032,7 +9032,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedLayer_Initializer(vx_nod
     vx_bool   supportDataFormat3          = vx_false_e;
     vx_enum   input_dataformat            = TENSOR_DATA_TYPE(inputs);
     vx_enum   weight_dataformat           = TENSOR_DATA_TYPE(weights);
-    vx_enum   bias_dataformat             = TENSOR_DATA_TYPE(biases);
+    vx_enum   bias_dataformat             = biases ? TENSOR_DATA_TYPE(biases) : VX_TYPE_INVALID;
     vx_enum   output_dataformat           = TENSOR_DATA_TYPE(outputs);
     vx_uint32 dims                        = TENSOR_VIEW_DIM_NUM(inputs);
     vx_uint32 width                       = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
@@ -9059,17 +9059,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedLayer_Initializer(vx_nod
 
     if(node->base.context->evisNoInst.supportEVIS)
     {
-        supportDataFormat0 = (vx_bool)(input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && bias_dataformat == VX_TYPE_FLOAT32 && output_dataformat == VX_TYPE_FLOAT16);
-        supportDataFormat1 = (vx_bool)(input_dataformat == VX_TYPE_INT8 && weight_dataformat == VX_TYPE_INT8 && bias_dataformat == VX_TYPE_INT32 && output_dataformat == VX_TYPE_INT8);
-        supportDataFormat2 = (vx_bool)(input_dataformat == VX_TYPE_INT16 && weight_dataformat == VX_TYPE_INT16 && bias_dataformat == VX_TYPE_INT32 && output_dataformat == VX_TYPE_INT16);
-        supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && bias_dataformat == VX_TYPE_INT32 && output_dataformat != VX_TYPE_FLOAT32);
+        supportDataFormat0 = (vx_bool)(input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_FLOAT32) && output_dataformat == VX_TYPE_FLOAT16);
+        supportDataFormat1 = (vx_bool)(input_dataformat == VX_TYPE_INT8 && weight_dataformat == VX_TYPE_INT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_INT8);
+        supportDataFormat2 = (vx_bool)(input_dataformat == VX_TYPE_INT16 && weight_dataformat == VX_TYPE_INT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_INT16);
+        supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat != VX_TYPE_FLOAT32);
         enable_shader      = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
     }
     else
     {
-        supportDataFormat0 = (vx_bool)((input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && bias_dataformat == VX_TYPE_FLOAT32 && output_dataformat == VX_TYPE_FLOAT16) ||
-                                        (input_dataformat == VX_TYPE_FLOAT32 && weight_dataformat == VX_TYPE_FLOAT32 && bias_dataformat == VX_TYPE_FLOAT32 && output_dataformat == VX_TYPE_FLOAT32));
-        supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && bias_dataformat == VX_TYPE_INT32 && output_dataformat == VX_TYPE_UINT8);
+        supportDataFormat0 = (vx_bool)((input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_FLOAT32) && output_dataformat == VX_TYPE_FLOAT16) ||
+                                        (input_dataformat == VX_TYPE_FLOAT32 && weight_dataformat == VX_TYPE_FLOAT32 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_FLOAT32) && output_dataformat == VX_TYPE_FLOAT32));
+        supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_UINT8);
         enable_shader      = (supportDataFormat0 || supportDataFormat3);
     }
 
