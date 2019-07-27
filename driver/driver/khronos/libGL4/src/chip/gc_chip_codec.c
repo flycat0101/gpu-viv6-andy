@@ -2610,6 +2610,12 @@ gcChipDecompressASTC(
 
     if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, blockWidth * blockHeight * 4, (gctPOINTER*)&line)))
     {
+        /* free memory.*/
+        if (pixels)
+        {
+            gcoOS_Free(gcvNULL, (gctPOINTER)pixels);
+            pixels = gcvNULL;
+        }
         gcmFOOTER_ARG("return=0x%x", gcvNULL);
         return gcvNULL;
     }

@@ -1780,6 +1780,9 @@ gcChipResidentTextureLevel(
                                                   &srcImageFormat,
                                                   &rowStride);
 
+                    compressed = GL_FALSE;
+                    needClean = GL_TRUE;
+
                     /* If resized or formated was changed, need to destroy the surf. */
                     if (chipMipLevel->astcSurf)
                     {
@@ -1821,8 +1824,6 @@ gcChipResidentTextureLevel(
 
                     gcoOS_MemCopy(chipMipLevel->astcData + face * mipmap->compressedSize, buf, numSlices * mipmap->compressedSize);
 
-                    compressed = GL_FALSE;
-                    needClean = GL_TRUE;
                 }
                 else
                 {
@@ -3754,6 +3755,8 @@ gcChipCompressedTexSubImage(
                 srcStride   = xBlock * 16;
                 dstStride   = widthBlock * 16;
 
+                needClean = GL_TRUE;
+
                 if (chipMipLevel->astcData)
                 {
                     GLuint j;
@@ -3774,8 +3777,6 @@ gcChipCompressedTexSubImage(
                 {
                     gcmONERROR(gcvSTATUS_INVALID_ADDRESS);
                 }
-
-                needClean = GL_TRUE;
             }
             break;
 

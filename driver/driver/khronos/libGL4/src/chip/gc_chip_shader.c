@@ -8972,6 +8972,7 @@ __glChipShaderBinary(
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     GLsizei     i;
+    gcSHADER    shader       = gcvNULL;
     gcSHADER    vertexShader = gcvNULL;
     gcSHADER    fragmentShader = gcvNULL;
     gceSTATUS   status = gcvSTATUS_OK;
@@ -9023,7 +9024,6 @@ __glChipShaderBinary(
     /* Set shader binary according to the format. */
     if (binaryformat == GL_SHADER_BINARY_VIV)
     {
-        gcSHADER        shader          = gcvNULL;
         gcSHADER        found           = gcvNULL;
         gctUINT32_PTR   compilerVersion = gcvNULL;
         gcSHADER_KIND   shaderType      = gcSHADER_TYPE_UNKNOWN;
@@ -9078,6 +9078,11 @@ __glChipShaderBinary(
     return GL_TRUE;
 
 OnError:
+    /* free memory.*/
+    if (shader)
+    {
+        gcmVERIFY_OK(gcSHADER_Destroy(shader));
+    }
     gcChipSetError(chipCtx, status);
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
