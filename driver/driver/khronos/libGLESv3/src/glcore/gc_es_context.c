@@ -70,7 +70,7 @@ extern GLvoid __glInitImageState(__GLcontext *gc);
 extern GLvoid __glInitDebugState(__GLcontext *gc);
 extern GLvoid __glFreeDebugState(__GLcontext *gc);
 
-extern GLboolean __glInitTracerDispatchTable(GLint trmode, __GLApiVersion apiVersion);
+extern GLboolean __glInitTracerDispatchTable(GLint trmode);
 extern __GLesDispatchTable __glesNopDispatchFuncTable;
 extern __GLesDispatchTable __glesApiProfileDispatchTable;
 extern GLvoid __glSetDrawable(__GLcontext* gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable);
@@ -844,7 +844,7 @@ GLvoid __glInitPattern(__GLcontext *gc)
 }
 #endif
 
-GLvoid __glInitGlobals(__GLApiVersion apiVersion)
+GLvoid __glInitGlobals()
 {
     gctSTRING mode = gcvNULL;
 
@@ -891,7 +891,7 @@ GLvoid __glInitGlobals(__GLApiVersion apiVersion)
             gcoOS_SetDebugZone(gcdZONE_ALL);
         }
 
-        if (!__glInitTracerDispatchTable(__glesApiTraceMode, apiVersion))
+        if (!__glInitTracerDispatchTable(__glesApiTraceMode))
         {
             /* Reset to regular API entry functions if tracer dispatch table initialization failed */
             __glesApiTraceMode = gcvTRACEMODE_NONE;
@@ -1061,7 +1061,7 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
 
     if (!initialized)
     {
-        __glInitGlobals(apiVersion);
+        __glInitGlobals();
         initialized = GL_TRUE;
     }
 

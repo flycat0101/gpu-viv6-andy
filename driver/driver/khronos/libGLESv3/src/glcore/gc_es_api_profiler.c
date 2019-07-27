@@ -18,6 +18,8 @@
 
 __GLesTracerDispatchTableStruct __glesTracerDispatchTable = {0};
 
+static const GLsizei __glesTracerDispatchTableSize = (GLsizei)(sizeof(__GLesTracerDispatchTableStruct) / sizeof(GLvoid*));
+
 #define __glesApiNameStr(func)  #func
 
 GLchar *__glesTracerFuncNames[] = {
@@ -60,7 +62,7 @@ GLint __glesApiProfileMode = -1;
 
 #endif
 
-GLboolean __glInitTracerDispatchTable(GLint trmode, __GLApiVersion apiVersion)
+GLboolean __glInitTracerDispatchTable(GLint trmode)
 {
     if (trmode == gcvTRACEMODE_LOGGER)
     {
@@ -68,7 +70,6 @@ GLboolean __glInitTracerDispatchTable(GLint trmode, __GLApiVersion apiVersion)
         gctPOINTER funcPtr = gcvNULL;
         gceSTATUS status;
         char trApiName[80];
-        GLsizei tableSize;
         GLsizei i;
 
 #if defined(_WIN32) || defined(_WIN32_WCE)
@@ -91,26 +92,7 @@ GLboolean __glInitTracerDispatchTable(GLint trmode, __GLApiVersion apiVersion)
             return GL_FALSE;
         }
 
-        switch (apiVersion)
-        {
-        case __GL_API_VERSION_ES20:
-            tableSize = (GLsizei)(offsetof(__GLesTracerDispatchTableStruct, ReadBuffer)              / sizeof(GLvoid*));
-            break;
-        case __GL_API_VERSION_ES30:
-            tableSize = (GLsizei)(offsetof(__GLesTracerDispatchTableStruct, DispatchCompute)         / sizeof(GLvoid*));
-            break;
-        case __GL_API_VERSION_ES31:
-            tableSize = (GLsizei)(offsetof(__GLesTracerDispatchTableStruct, TexStorage3DMultisample) / sizeof(GLvoid*));
-            break;
-        case __GL_API_VERSION_ES32:
-            tableSize = (GLsizei)(sizeof(__GLesTracerDispatchTableStruct)                            / sizeof(GLvoid*));
-            break;
-        default:
-            GL_ASSERT(0);
-            return GL_FALSE;
-        }
-
-        for (i = 0; i < tableSize; ++i)
+        for (i = 0; i < __glesTracerDispatchTableSize; ++i)
         {
             trApiName[0] = '\0';
             gcoOS_StrCatSafe(trApiName, 80, "TR_gl");
