@@ -737,6 +737,13 @@ static void __DestroySwapchain(
         __VK_FREE(sc->imageBuffers);
     }
 
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    if(sc->explicit_sync) {
+        zwp_linux_explicit_synchronization_v1_destroy(sc->explicit_sync);
+        sc->explicit_sync = gcvNULL;
+    }
+#endif
+
     if (sc->surface)
     {
         VkIcdSurfaceWayland *surf = sc->surface;
