@@ -1854,6 +1854,10 @@ _VIR_CG_AllocatePushConst(
             allocTyId = VIR_TYPE_FLOAT_X3;
             break;
 
+        case 4:
+            allocTyId = VIR_TYPE_FLOAT_X4;
+            break;
+
         default:
             gcmASSERT(gcvFALSE);
             allocTyId = VIR_TYPE_FLOAT_X4;
@@ -2018,7 +2022,13 @@ _VIR_CG_AllocateSampledImage(
     VIR_Uniform*                    pSeparateSamplerUniform;
     gctINT                          index = VIR_Symbol_GetSamplerIdxRange(pSampledImage);
 
-    gcmASSERT(index >= 0);
+    if (index < 0)
+    {
+        /* We meet a sampled image with a non-constant sampler(dynamic indexing), we can't support it yet. */
+        gcmASSERT(index == -1);
+        gcmASSERT(gcvFALSE);
+        index = 0;
+    }
 
     pSeparateSamplerUniform = VIR_Symbol_GetHwMappingSeparateSamplerUniform(pResLayout, pShader, pSampledImage);
 
