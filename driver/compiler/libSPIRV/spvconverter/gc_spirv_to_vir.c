@@ -5769,7 +5769,6 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
     VIR_SymId symId;
     VIR_Symbol * sym;
     VIR_TypeId virTypeId;
-    gctBOOL passByRef = gcvFALSE;
     gctSTRING paramName;
 
     if (SPV_ID_FUNC_SPV_ARG(spv->func) == gcvNULL)
@@ -5804,10 +5803,6 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
                                                &virTypeId);
     }
     else {
-        if (SPV_ID_TYPE_IS_POINTER(spv->resultTypeId))
-        {
-            passByRef = gcvTRUE;
-        }
         if (SPV_ID_TYPE_IS_POINTER(type))
         {
             virTypeId = SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(type));
@@ -5835,10 +5830,6 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
     VIR_Symbol_SetLayoutQualifier(sym, VIR_LAYQUAL_NONE);
     VIR_Symbol_SetFlag(sym,VIR_SYMFLAG_WITHOUT_REG);
     VIR_Symbol_SetLocation(sym, -1);
-    if(passByRef)
-    {
-        VIR_Symbol_SetFlag(sym,VIR_SYMFLAG_PASS_BY_REFERENCE);
-    }
 
     /* If the parameter is an image, we need to copy the image format. */
     if (SPV_ID_TYPE_IS_IMAGE(type))
@@ -5852,6 +5843,10 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
     SPV_SET_IDDESCRIPTOR_SYM(spv, id, symId);
     SPV_SET_IDDESCRIPTOR_TYPE(spv, id, virTypeId);
     SPV_SET_IDDESCRIPTOR_SPV_TYPE(spv, id, type);
+    if (SPV_ID_TYPE_IS_POINTER(spv->resultTypeId))
+    {
+        SPV_SET_IDDESCRIPTOR_SPV_POINTER_TYPE(spv, id, spv->resultTypeId);
+    }
     SPV_ID_TYPE(id) = SPV_ID_TYPE_SYMBOL;
     SPV_ID_SYM_IS_FUNC_PARAM(id) = gcvTRUE;
     SPV_ID_SYM_VIR_FUNC(id) = spv->virFunction;
@@ -9463,9 +9458,10 @@ VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
     }
 
     /* check if it is block, only works for accesschain for now */
-    if (SPV_ID_TYPE(spv->operands[0]) == SPV_ID_TYPE_SYMBOL)
+    spvOperand = spv->operands[0];
+    if (SPV_ID_TYPE(spvOperand) == SPV_ID_TYPE_SYMBOL)
     {
-        SpvId spvTypeId = SPV_ID_SYM_SRC_SPV_TYPE(spv->operands[0]);
+        SpvId spvTypeId = SPV_ID_SYM_SRC_SPV_TYPE(spvOperand);
 
         if (SPV_ID_TYPE_IS_ARRAY(spvTypeId))
         {
@@ -9473,7 +9469,7 @@ VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
         }
 
         useLoadToAccessBlock =
-            __SpvUseLoadStoreToAccessBlock(spv, virShader, spv->operands[0]) || SPV_ID_IS_MEM_ADDR_CALC(spv->operands[0]);
+            __SpvUseLoadStoreToAccessBlock(spv, virShader, spvOperand) || SPV_ID_IS_MEM_ADDR_CALC(spvOperand);
 
         /* Change MOV to LOAD/STORE if needed. */
         if (useLoadToAccessBlock)
@@ -9487,6 +9483,11 @@ VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
                 virOpcode = VIR_OP_STORE;
             }
         }
+        else if(dstVirSym && SPV_ID_SYM_IS_FUNC_PARAM(spvOperand) && SPV_ID_SYM_SPV_POINTER_TYPE(spvOperand))
+        {
+            VIR_Symbol_SetFlag(dstVirSym, VIR_SYMFLAG_PASS_BY_REFERENCE);
+            VIR_Function_SetFlag(spv->virFunction, VIR_FUNCFLAG_ALWAYSINLINE);
+        }
 
         if (SPV_ID_SYM_PER_VERTEX(spv->operands[0]))
         {
@@ -9494,7 +9495,6 @@ VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
         }
     }
 
-    spvOperand = spv->operands[0];
 
     if (SPV_ID_TYPE(spv->operands[1]) == SPV_ID_TYPE_SYMBOL ||
         SPV_ID_TYPE(spv->operands[1]) == SPV_ID_TYPE_CONST)
