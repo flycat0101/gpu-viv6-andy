@@ -1059,6 +1059,27 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
         return VX_SUCCESS;
     };
 
+    /*Function to align the tensor's dimensions in broadcast Ops*/
+    auto alignBroadcaseTensor = [&](VxRunTimeReferenceInfo &in1, VxRunTimeReferenceInfo &in2) -> void
+    {
+        if(in1.dimensions.size() != in2.dimensions.size())
+        {
+            VxRunTimeReferenceInfo *broadcastRef = in1.dimensions.size() > in2.dimensions.size() ? &in2: &in1;
+            VxRunTimeReferenceInfo *completeRef = in1.dimensions.size() > in2.dimensions.size() ? &in1: &in2;
+
+            vx_int32 tmpdims[4] = {1,1,1,1};
+            vx_int32 dims[4] = {1,1,1,1};
+
+            memcpy(tmpdims+ abs((int32_t)broadcastRef->dimensions.size()- (int32_t)completeRef->dimensions.size()),
+                        broadcastRef->dimensions.data(),
+                        broadcastRef->dimensions.size() * sizeof(vx_int32));
+
+            convertDims((vx_uint32 *)dims,  (vx_uint32 *)tmpdims, 4);
+            broadcastRef->ref = (vx_reference)vxReshapeTensor( (vx_tensor)broadcastRef->ref, dims, 4);
+        }
+
+    };
+
 
     for (vx_int32 i = 0; i < operation_count; i++)
     {
@@ -1106,13 +1127,14 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
         {
         case OperationType::ADD:
         {
-            const VxRunTimeReferenceInfo& in1 = mReferenceInfos[ins[0]];
-            const VxRunTimeReferenceInfo& in2 = mReferenceInfos[ins[1]];
+            VxRunTimeReferenceInfo& in1 = mReferenceInfos[ins[0]];
+            VxRunTimeReferenceInfo& in2 = mReferenceInfos[ins[1]];
             const VxRunTimeReferenceInfo& out = mReferenceInfos[outs[0]];
 
             if (mGraph)
             {
                 vx_tensor tmpTensor = createTempTensor(out, mReferenceInfos[ins[2]]);
+                alignBroadcaseTensor(in1, in2);
                 operation_info.node = vxTensorAddNode(mGraph, (vx_tensor)in1.ref, (vx_tensor)in2.ref, VX_CONVERT_POLICY_WRAP, tmpTensor);
 
                 VX_CHECK_ERROR( addActivationNode(out, tmpTensor, mReferenceInfos[ins[2]]) );
@@ -1123,8 +1145,8 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
             break;
         case OperationType::MUL:
             {
-            const VxRunTimeReferenceInfo& in1 = mReferenceInfos[ins[0]];
-            const VxRunTimeReferenceInfo& in2 = mReferenceInfos[ins[1]];
+            VxRunTimeReferenceInfo& in1 = mReferenceInfos[ins[0]];
+            VxRunTimeReferenceInfo& in2 = mReferenceInfos[ins[1]];
             const VxRunTimeReferenceInfo& out = mReferenceInfos[outs[0]];
 
             vx_float32 s = 1.0f;
@@ -1135,6 +1157,7 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
             if (mGraph)
             {
                 vx_tensor tmpTensor = createTempTensor(out, mReferenceInfos[ins[2]]);
+                alignBroadcaseTensor(in1, in2);
                 operation_info.node = vxTensorMultiplyNode(mGraph, (vx_tensor)in1.ref, (vx_tensor)in2.ref, scale, VX_CONVERT_POLICY_WRAP, VX_ROUND_POLICY_TO_ZERO, tmpTensor);
                 VX_CHECK_ERROR( addActivationNode(out, tmpTensor, mReferenceInfos[ins[2]]) );
             }
@@ -2084,7 +2107,7 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
                 if (!allParametersPresent(3, 1)) {
                     return ANEURALNETWORKS_BAD_DATA;
                 }
-                const VxRunTimeReferenceInfo& input0  = mReferenceInfos[ins[0]];
+                VxRunTimeReferenceInfo& input0  = mReferenceInfos[ins[0]];
                 VxRunTimeReferenceInfo& input1  = mReferenceInfos[ins[1]];
                 VxRunTimeReferenceInfo& activation     = mReferenceInfos[ins[2]];
                 VxRunTimeReferenceInfo& output          = mReferenceInfos[outs[0]];
@@ -2098,6 +2121,8 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
                 vx_scalar vxScaler = vxCreateScalar(vxGetContext((vx_reference)mGraph), VX_TYPE_FLOAT32, &scaler);
 
                 vx_tensor tmpTensor = createTempTensor(output, activation);
+
+                alignBroadcaseTensor(input0, input1);
 
                 operation_info.node = vxTensorDivideNode(mGraph, (vx_tensor)input0.ref, (vx_tensor)input1.ref,  vxScaler, VX_CONVERT_POLICY_WRAP, VX_ROUND_POLICY_TO_ZERO, tmpTensor );
                 if (operation_info.node == nullptr)
@@ -2115,12 +2140,14 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
                     return ANEURALNETWORKS_BAD_DATA;
                 }
 
-                const VxRunTimeReferenceInfo& input0  = mReferenceInfos[ins[0]];
-                const VxRunTimeReferenceInfo& input1  = mReferenceInfos[ins[1]];
+                VxRunTimeReferenceInfo& input0  = mReferenceInfos[ins[0]];
+                VxRunTimeReferenceInfo& input1  = mReferenceInfos[ins[1]];
                 VxRunTimeReferenceInfo& activation     = mReferenceInfos[ins[2]];
                 VxRunTimeReferenceInfo& output          = mReferenceInfos[outs[0]];
 
                 vx_tensor tmpTensor = createTempTensor(output, activation);
+
+                alignBroadcaseTensor(input0, input1);
                 operation_info.node = vxTensorSubtractNode(mGraph, (vx_tensor)input0.ref, (vx_tensor)input1.ref, VX_CONVERT_POLICY_WRAP, tmpTensor);
                 if (operation_info.node == nullptr)
                 {
