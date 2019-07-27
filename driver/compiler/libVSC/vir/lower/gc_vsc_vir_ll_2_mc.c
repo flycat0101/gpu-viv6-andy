@@ -2579,7 +2579,7 @@ DEF_SH_NECESSITY_CHECK(VIR_Lower_LowLevel_To_MachineCodeLevel)
     VIR_Shader * Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VSC_HW_CONFIG* HwCfg = &(&pPassWorker->pCompilerParam->cfg.ctx)->pSysCtx->pCoreSysCtx->hwCfg;
 
-    if (VIR_Shader_GetLevel(Shader) != VIR_SHLEVEL_Post_Low)
+    if (VIR_Shader_GetLevel(Shader) != VIR_SHLEVEL_Post_Low && VIR_Shader_GetLevel(Shader) != VIR_SHLEVEL_Pre_Machine)
     {
         return gcvFALSE;
     }
@@ -2604,39 +2604,49 @@ VIR_Lower_LowLevel_To_MachineCodeLevel(
     VSC_HW_CONFIG* HwCfg = &VscContext->pSysCtx->pCoreSysCtx->hwCfg;
     VIR_PatternLowerContext context;
     gctUINT codeCounter[VIR_OP_MAXOPCODE];
+    gctBOOL bScalarOnly = gcvFALSE;
+
+    if (pPassWorker->basePassWorker.pPassSpecificData)
+    {
+        bScalarOnly = *(gctBOOL *)pPassWorker->basePassWorker.pPassSpecificData;
+    }
 
     VIR_Lower_Initialize(Shader, &context, HwCfg, pPassWorker->basePassWorker.pMM);
-    /* count code to check */
-    gcoOS_ZeroMemory(&codeCounter, gcmSIZEOF(codeCounter));
-    VIR_Shader_CountCode(Shader, codeCounter);
-    if (codeCounter[VIR_OP_DSY] !=0)
+
+    if (!bScalarOnly)
     {
-        VIR_Shader_SetFlagExt1(Shader, VIR_SHFLAG_EXT1_HAS_DSY_BEFORE_LOWERING);
+        /* count code to check */
+        gcoOS_ZeroMemory(&codeCounter, gcmSIZEOF(codeCounter));
+        VIR_Shader_CountCode(Shader, codeCounter);
+        if (codeCounter[VIR_OP_DSY] !=0)
+        {
+            VIR_Shader_SetFlagExt1(Shader, VIR_SHFLAG_EXT1_HAS_DSY_BEFORE_LOWERING);
+        }
+
+        {
+            VIR_PatternContext_Initialize(&context.header, VscContext, Shader, context.pMM, VIR_PATN_CONTEXT_FLAG_NONE,
+                                          _GetPattern0, _CmpInstuction, 512);
+
+            errCode = VIR_Pattern_Transform((VIR_PatternContext *)&context);
+            CHECK_ERROR(errCode, "VIR_Lower_LowLevel_To_MachineCodeLevel failed.");
+
+            VIR_PatternContext_Finalize(&context.header);
+        }
+
+        {
+            VIR_PatternContext_Initialize(&context.header, VscContext, Shader, context.pMM, VIR_PATN_CONTEXT_FLAG_NONE,
+                                          _GetPattern1, _CmpInstuction, 512);
+
+            errCode = VIR_Pattern_Transform((VIR_PatternContext *)&context);
+            CHECK_ERROR(errCode, "VIR_Lower_LowLevel_To_MachineCodeLevel failed.");
+
+            VIR_PatternContext_Finalize(&context.header);
+        }
     }
 
     {
         VIR_PatternContext_Initialize(&context.header, VscContext, Shader, context.pMM, VIR_PATN_CONTEXT_FLAG_NONE,
-                                      _GetPattern0, _CmpInstuction, 512);
-
-        errCode = VIR_Pattern_Transform((VIR_PatternContext *)&context);
-        CHECK_ERROR(errCode, "VIR_Lower_LowLevel_To_MachineCodeLevel failed.");
-
-        VIR_PatternContext_Finalize(&context.header);
-    }
-
-    {
-        VIR_PatternContext_Initialize(&context.header, VscContext, Shader, context.pMM, VIR_PATN_CONTEXT_FLAG_NONE,
-                                      _GetPattern1, _CmpInstuction, 512);
-
-        errCode = VIR_Pattern_Transform((VIR_PatternContext *)&context);
-        CHECK_ERROR(errCode, "VIR_Lower_LowLevel_To_MachineCodeLevel failed.");
-
-        VIR_PatternContext_Finalize(&context.header);
-    }
-
-    {
-        VIR_PatternContext_Initialize(&context.header, VscContext, Shader, context.pMM, VIR_PATN_CONTEXT_FLAG_NONE,
-                                      _GetPatternScalar, _CmpInstuction, 512);
+                                        _GetPatternScalar, _CmpInstuction, 512);
 
         errCode = VIR_Pattern_Transform((VIR_PatternContext *)&context);
         CHECK_ERROR(errCode, "VIR_Lower_LowLevel_To_MachineCodeLevel failed.");
@@ -2646,7 +2656,14 @@ VIR_Lower_LowLevel_To_MachineCodeLevel(
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(Shader), VIR_Shader_GetId(Shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
-        VIR_Shader_Dump(gcvNULL, "After Lowered to MachineLevel.", Shader, gcvTRUE);
+        if (bScalarOnly)
+        {
+            VIR_Shader_Dump(gcvNULL, "After Lowered to MachineLevel(Scalar only).", Shader, gcvTRUE);
+        }
+        else
+        {
+            VIR_Shader_Dump(gcvNULL, "After Lowered to MachineLevel.", Shader, gcvTRUE);
+        }
     }
 
     VIR_Shader_SetLevel(Shader, VIR_SHLEVEL_Pre_Machine);

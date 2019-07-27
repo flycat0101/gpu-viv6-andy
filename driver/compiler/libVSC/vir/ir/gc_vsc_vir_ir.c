@@ -18269,7 +18269,6 @@ VIR_Shader_GenInvocationIndex(
         storageClass = VIR_STORAGE_INPUT;
     }
 
-    /* create a temp for invocation index */
     if (bUpdateSlot)
     {
         VIR_Symbol  *pVregSym = VIR_Shader_FindSymbolByTempIndex(Shader, VIR_Symbol_GetVariableVregIndex(VariableSym));
@@ -18277,6 +18276,7 @@ VIR_Shader_GenInvocationIndex(
     }
     else
     {
+        /* create a temp for invocation index */
         regId = VIR_Shader_NewVirRegId(Shader, 1);
         errCode = VIR_Shader_AddSymbol(Shader,
                     VIR_SYM_VIRREG,
@@ -18284,10 +18284,11 @@ VIR_Shader_GenInvocationIndex(
                     VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT32),
                     VIR_STORAGE_UNKNOWN,
                     &IndexSymId);
-        VIR_Symbol_ClrFlag(VariableSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
-        VIR_Symbol_SetFlag(VariableSym, VIR_SYMFLAG_UNUSED);
         VIR_Symbol_SetVariableVregIndex(VariableSym, regId);
     }
+
+    VIR_Symbol_ClrFlag(VariableSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
+    VIR_Symbol_SetFlag(VariableSym, VIR_SYMFLAG_UNUSED);
 
     /* add an attribute if not found - LocalInvocationID */
     for (i = 0;  i< VIR_IdList_Count(attIdList); i++)

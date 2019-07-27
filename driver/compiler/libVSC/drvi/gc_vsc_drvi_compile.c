@@ -864,6 +864,7 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_SHADER_PASS_MANAGER* pShPassMnger
     VIR_Shader*         pShader = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
     VSC_CPP_PASS_DATA   cppPassData = { VSC_CPP_NONE, gcvFALSE };
     gctBOOL             bRAEnabled = VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(pShPassMnger->basePM.pOptions, 0));
+    gctBOOL             bScalarOnly = gcvTRUE;
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Machine ||
               VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Post_Low);
@@ -903,6 +904,9 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_SHADER_PASS_MANAGER* pShPassMnger
     }
 
     CALL_SH_PASS(vscVIR_PostMCCleanup, 0, &bRAEnabled);
+
+    /* Call scalar again because MUL may be generated in vscVIR_PostMCCleanup. */
+    CALL_SH_PASS(VIR_Lower_LowLevel_To_MachineCodeLevel, 0, &bScalarOnly);
 
     /* We are at end of MC level of VIR, so set this correct level */
     VIR_Shader_SetLevel(pShader, VIR_SHLEVEL_Post_Machine);

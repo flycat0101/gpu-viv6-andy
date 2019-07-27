@@ -1295,6 +1295,39 @@ OnError:
 }
 
 static VSC_ErrCode
+_CalculateLocalInvocationIndex(
+    VIR_Shader*         pShader,
+    gctBOOL*            pChanged
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Symbol*         pLocalInvocationIndex = gcvNULL;
+    gctBOOL             bChanged = gcvTRUE;
+
+    if (!VIR_Shader_CalcLocalInvocationIndex(pShader))
+    {
+        return errCode;
+    }
+
+    pLocalInvocationIndex = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCALINVOCATIONINDEX);
+    errCode = VIR_Shader_GenInvocationIndex(pShader,
+                                            VIR_Shader_GetMainFunction(pShader),
+                                            pLocalInvocationIndex,
+                                            gcvNULL,
+                                            gcvTRUE);
+    ON_ERROR(errCode, "Calcualte local invocation index.");
+
+    VIR_Shader_ClrFlagExt1(pShader, VIR_SHFLAG_EXT1_CALC_LOCAL_INVOCATION_INDEX);
+    if (pChanged)
+    {
+        *pChanged |= bChanged;
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
 _ConvSingleTemp256Src(
     VIR_DEF_USAGE_INFO* pDuInfo,
     VIR_Shader*         pShader,
@@ -1670,6 +1703,7 @@ VSC_ErrCode vscVIR_PostMCCleanup(
     gctBOOL             bRAEnabled = *(gctBOOL*)pPassWorker->basePassWorker.pPassSpecificData;
     VSC_HW_CONFIG       *pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     gctBOOL             bInvalidCfg = gcvFALSE;
+    gctBOOL             bInvalidDu = gcvFALSE;
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -1747,12 +1781,20 @@ VSC_ErrCode vscVIR_PostMCCleanup(
     errCode = _ConvEvisInstForShader(pPassWorker);
     ON_ERROR(errCode, "Convert evis instruction");
 
+    /* Use gl_LocalInvocationID to calculate the gl_LocalInvocationIndex. */
+    errCode = _CalculateLocalInvocationIndex(pShader, &bInvalidDu);
+    ON_ERROR(errCode, "Calculate local invocation index. ");
+
     if (VirSHADER_DumpCodeGenVerbose(pShader))
     {
         VIR_Shader_Dump(gcvNULL, "Shader after post-MC-cleanup phase\n", pShader, gcvTRUE);
         VIR_LOG_FLUSH(pDumper);
     }
 
+    if (bInvalidDu)
+    {
+        pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+    }
     if (bInvalidCfg)
     {
         pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;

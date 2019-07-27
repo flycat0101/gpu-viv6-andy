@@ -4705,6 +4705,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
     VIR_SHFLAG_EXT1_HAS_DSY_BEFORE_LOWERING     = 0x00000010, /* shader has dsy IR before lowering to machine code, so it
                                                                   * wouldn't count fwidth() as using DSY for yInvert purpose. */
     VIR_SHFLAG_EXT1_ENABLE_ROBUST_CHECK         = 0x00000020, /* Whether enable robust out-of-bounds memory access check. */
+    VIR_SHFLAG_EXT1_CALC_LOCAL_INVOCATION_INDEX = 0x00000040, /* Whether need to calculate LocalInvocationIndex. */
 } VIR_ShaderFlagsExt1;
 
 /* Get the flags. */
@@ -4762,6 +4763,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
 #define VIR_Shader_DisableIRDump(Shader)            (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_DISABLE_IR_DUMP) != 0)
 #define VIR_Shader_hasDsyBeforeLowering(Shader)     (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_HAS_DSY_BEFORE_LOWERING) != 0)
 #define VIR_Shader_IsEnableRobustCheck(Shader)      (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_ENABLE_ROBUST_CHECK) != 0)
+#define VIR_Shader_CalcLocalInvocationIndex(Shader) (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_CALC_LOCAL_INVOCATION_INDEX) != 0)
 
 typedef struct _VIR_LIBRARYLIST VIR_LibraryList;
 

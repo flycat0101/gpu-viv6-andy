@@ -1383,7 +1383,7 @@ _ConvUniformFlag2Vir(
 **
 **  OUTPUT:
 **
-**      VIR_NameId * VirNameIdVIR_NAME_LOCALINVOCATIONINDEX
+**      VIR_NameId * VirNameId
 **          Pointer to a variable receiving the vir name id.
 */
 gceSTATUS

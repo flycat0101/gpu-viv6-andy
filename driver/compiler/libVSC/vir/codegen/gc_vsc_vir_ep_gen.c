@@ -401,8 +401,7 @@ static SHADER_IO_USAGE _MapBuiltInNameIdToIoUsage(VIR_Symbol* pVirIoSym, gctBOOL
     {
         return SHADER_IO_USAGE_THREADGROUPID;
     }
-    else if (virName == VIR_NAME_LOCAL_INVOCATION_ID ||
-             virName == VIR_NAME_LOCALINVOCATIONINDEX)
+    else if (virName == VIR_NAME_LOCAL_INVOCATION_ID)
     {
         return SHADER_IO_USAGE_THREADIDINGROUP;
     }
