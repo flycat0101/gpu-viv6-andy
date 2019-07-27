@@ -3656,6 +3656,10 @@ static VIR_TypeId __SpvImage2VirImageType(gcSPV spv, SpvId targetId, VIR_TypeId 
     format = SPV_ID_TYPE_IMAGE_FORMAT(targetId);
     dimension = SPV_ID_TYPE_IMAGE_DIM(targetId);
     depth = SPV_ID_TYPE_IMAGE_DEPTH(targetId);
+    if (depth != 0)
+    {
+        depth = 1;
+    }
     arrayed = SPV_ID_TYPE_IMAGE_ARRAY(targetId);
     msaa = SPV_ID_TYPE_IMAGE_MSAA(targetId);
     sampled = SPV_ID_TYPE_IMAGE_SAMPLED(targetId);
@@ -8486,8 +8490,6 @@ VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
     gctBOOL             isZeroComp = gcvFALSE;
     VIR_ParmPassing    *parmOpnd = gcvNULL;
     VIR_IntrinsicsKind  intrinsickKind = VIR_IK_NONE;
-    VIR_Type           *samplerType = VIR_Shader_GetTypeFromId(virShader, SPV_ID_VIR_TYPE_ID(spv->operands[0]));
-    VIR_TypeId          samplerTypeId = VIR_Type_GetBaseTypeId(samplerType);
 
     gcmEMIT_HEADER();
 
@@ -8555,14 +8557,7 @@ VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
         {
         case VIR_OP_TEXLD:
         case VIR_OP_TEXLD_U:
-            if (VIR_TypeId_isSamplerShadow(samplerTypeId))
-            {
-                intrinsickKind = VIR_IK_texldpcf;
-            }
-            else
-            {
-                intrinsickKind = VIR_IK_texld;
-            }
+            intrinsickKind = VIR_IK_texld;
             break;
 
         case VIR_OP_TEXLDPCF:
@@ -8593,30 +8588,6 @@ VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
 
         virOpcode = VIR_OP_INTRINSIC;
         useIntrinsicFunc = gcvTRUE;
-    }
-    else
-    {
-        /* Check if it is shadow. */
-        if (VIR_TypeId_isSamplerShadow(samplerTypeId))
-        {
-            switch (virOpcode)
-            {
-                case VIR_OP_TEXLD:
-                    virOpcode = VIR_OP_TEXLDPCF;
-                    break;
-
-                case VIR_OP_TEXLDPROJ:
-                    virOpcode = VIR_OP_TEXLDPCFPROJ;
-                    break;
-
-                case VIR_OP_TEXLD_GATHER:
-                    virOpcode = VIR_OP_TEXLD_GATHER_PCF;
-                    break;
-
-                default:
-                    break;
-            }
-        }
     }
 
     VIR_Function_AddInstruction(spv->virFunction,

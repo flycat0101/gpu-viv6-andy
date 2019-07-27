@@ -1014,7 +1014,7 @@
         { OperandId, OperandId, OperandId, OperandImageOperands, OperandVariableIds },
         { "Sampled Image", "Coordinate", "Dref", "Optional Image Operands", "" },
         { gcvNULL },
-        VIR_OP_TEXLD, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_TEXLDPCF, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpImageRead = 98 */
