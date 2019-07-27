@@ -2617,16 +2617,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         }
         else
         {
-            if (img->formatInfo.compressed && img->halTiling == gcvTILED)
-            {
-                /* compressed format is disable supertile */
-                alignment =  img->formatInfo.bitsPerBlock / 8;
-            }
-            else
-            {
-                /* alignment should be 16(pixels) * byte per pixels for tiled surface*/
-                alignment = (img->formatInfo.bitsPerBlock >= 64) ? (4 * 4 * img->formatInfo.bitsPerBlock/8) : 64;
-            }
+            /* alignment should be 16(pixels) * byte per pixels for tiled surface, and HW require minimum 64 bytes align*/
+            alignment = (img->formatInfo.bitsPerBlock >= 64) ? (4 * 4 * img->formatInfo.bitsPerBlock / 8) : 64;
         }
 
         width  = pCreateInfo->extent.width;
@@ -2656,6 +2648,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         for (level = 0; level < pCreateInfo->mipLevels; ++level)
         {
             __vkImageLevel *pLevel = &img->pImgLevels[level];
+            VkDeviceSize   alignedSlice;
 
             if (isCompatiableBppImage)
             {
@@ -2686,8 +2679,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
             pLevel->stride    = (pLevel->alignedW / img->formatInfo.blockSize.width)  * img->formatInfo.bitsPerBlock / 8;
             pLevel->stride    = pLevel->stride / pLevel->partCount;
             pLevel->sliceSize = (pLevel->alignedH / img->formatInfo.blockSize.height) * pLevel->stride;
-            pLevel->sliceSize = gcmALIGN(pLevel->sliceSize, alignment);
-            pLevel->partSize  = pLevel->sliceSize * pLevel->requestD;
+            alignedSlice      = gcmALIGN(pLevel->sliceSize, alignment);
+            pLevel->partSize  = alignedSlice * pLevel->requestD;
             pLevel->size      = pLevel->partSize * pLevel->partCount;
 
             pLevel->offset    = totalBytes;
