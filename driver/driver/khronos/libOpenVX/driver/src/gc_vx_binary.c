@@ -3772,6 +3772,37 @@ VX_PRIVATE_API vx_int32 vxoBinaryGraph_GetLCDTIndexForTempTensor(
     return -1;
 }
 
+VX_PRIVATE_API vx_status vxoBinaryGraph_Write(
+    vx_binary_save binarySave,
+    vx_uint32 offset,
+    vx_uint32 size,
+    void *data
+    )
+{
+    if ((size == 0) || (data == VX_NULL))
+    {
+        vxError("%s[%d]: data is null or size is 0\n", __FUNCTION__, __LINE__);
+        return VX_FAILURE;
+    }
+
+    if (1 == binarySave->generateNBGToMemory)
+    {   /* write NBG to memory */
+        vx_uint8_ptr buffer = (vx_uint8_ptr)binarySave->NBGBuffer + offset;
+        vxMemCopy((vx_ptr)buffer, data, size);
+        if ((offset + size) > *(binarySave->NBGSize))
+        {
+            *(binarySave->NBGSize) = offset + size;
+        }
+    }
+    else
+    {   /* write NBG file */
+        gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, offset, gcvFILE_SEEK_SET);
+        gcoOS_Write(gcvNULL, binarySave->binarySaveFile, size, data);
+    }
+
+    return VX_SUCCESS;
+}
+
 VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SavePatchEntry(
     vx_graph graph,
     void *patchEntry
@@ -3779,9 +3810,9 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SavePatchEntry(
 {
     vx_uint32 patchIndex;
     vx_binary_save binarySave = graph->binarySave;
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                graph->binarySave->currPatchOffset, gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_patch_info_s), patchEntry);
+
+    vxoBinaryGraph_Write(binarySave, binarySave->currPatchOffset,
+                         sizeof(vx_binary_patch_info_s), patchEntry);
 
     graph->binarySave->currPatchOffset += sizeof(vx_binary_patch_info_s);
     patchIndex = graph->binarySave->currPatchIndex++;
@@ -4128,20 +4159,22 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveLoadingConfigData(
     }
 
     /* save loading data */
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, binarySave->currLoadingDataOffset, gcvFILE_SEEK_SET);
     if (source != VX_NULL)
     {
-        gcoOS_Write(gcvNULL, binarySave->binarySaveFile, bytes, source);
+        vxoBinaryGraph_Write(binarySave, binarySave->currLoadingDataOffset, bytes, source);
+
         if (alignedBytes > bytes)
         {
+            vx_uint32 offset = binarySave->currLoadingDataOffset + bytes;
             /* fill zero to file for alignment data*/
             for (i = 0; i < (alignedBytes - bytes) / ONCE_FILL_SIZE; i++)
             {
-                gcoOS_Write(gcvNULL, binarySave->binarySaveFile, ONCE_FILL_SIZE, zero);
+                vxoBinaryGraph_Write(binarySave, offset, ONCE_FILL_SIZE, zero);
+                offset += ONCE_FILL_SIZE;
             }
             if (((alignedBytes - bytes) % ONCE_FILL_SIZE) != 0)
             {
-                gcoOS_Write(gcvNULL, binarySave->binarySaveFile, (alignedBytes - bytes) % ONCE_FILL_SIZE, zero);
+                vxoBinaryGraph_Write(binarySave, offset, (alignedBytes - bytes) % ONCE_FILL_SIZE, zero);
             }
         }
     }
@@ -4150,29 +4183,29 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveLoadingConfigData(
         /* fill zero to file for tp/nn source is NULL*/
         if (alignedBytes <= ONCE_FILL_SIZE)
         {
-            gcoOS_Write(gcvNULL, binarySave->binarySaveFile, alignedBytes, zero);
+            vxoBinaryGraph_Write(binarySave, binarySave->currLoadingDataOffset, alignedBytes, zero);
         }
         else
         {
+            vx_uint32 offset = binarySave->currLoadingDataOffset;
             for (i = 0; i < alignedBytes / ONCE_FILL_SIZE; i++)
             {
-                gcoOS_Write(gcvNULL, binarySave->binarySaveFile, ONCE_FILL_SIZE, zero);
+                vxoBinaryGraph_Write(binarySave, offset, ONCE_FILL_SIZE, zero);
+                offset += ONCE_FILL_SIZE;
             }
             if ((alignedBytes  % ONCE_FILL_SIZE) != 0)
             {
-                gcoOS_Write(gcvNULL, binarySave->binarySaveFile, alignedBytes % ONCE_FILL_SIZE, zero);
+                vxoBinaryGraph_Write(binarySave, offset, alignedBytes % ONCE_FILL_SIZE, zero);
             }
         }
     }
 
     /* save loading table */
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-        binarySave->currLoadingDataTableOffset, gcvFILE_SEEK_SET);
-
     loadingDataTable.loadingDataOffset = binarySave->currLoadingDataOffset - binarySave->loadingDataStartOffset;
     loadingDataTable.loadingDataSize = bytes;
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
-        sizeof(vx_binary_loadingdata_table_info_s), &loadingDataTable);
+
+    vxoBinaryGraph_Write(binarySave, binarySave->currLoadingDataTableOffset,
+                         sizeof(vx_binary_loadingdata_table_info_s), &loadingDataTable);
 
     binarySave->currLoadingDataTableOffset += sizeof(vx_binary_loadingdata_table_info_s);
     loadingDataTableIndex = binarySave->currLoadingDataTableIndex++;
@@ -4948,12 +4981,18 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_unInitial(
         binarySave->NNTPDataCmdPhysical = VX_NULL;
     }
 
-    gcoOS_Flush(gcvNULL, binarySave->binarySaveFile);
-    gcmVERIFY_OK(gcoOS_Close(gcvNULL, binarySave->binarySaveFile));
-    binarySave->binarySaveFile = VX_NULL;
+    if (binarySave->binarySaveFile != VX_NULL)
+    {
+        gcoOS_Flush(gcvNULL, binarySave->binarySaveFile);
+        gcmVERIFY_OK(gcoOS_Close(gcvNULL, binarySave->binarySaveFile));
+        binarySave->binarySaveFile = VX_NULL;
+    }
 
-    gcmVERIFY_OK(gcoOS_Free(gcvNULL, (gctPOINTER)graph->binarySave));
-    graph->binarySave = VX_NULL;
+    if (graph->binarySave != VX_NULL)
+    {
+        gcmVERIFY_OK(gcoOS_Free(gcvNULL, (gctPOINTER)graph->binarySave));
+        graph->binarySave = VX_NULL;
+    }
 
     vxInfo("network binary graph file has been closed\n");
     gcmFOOTER_ARG("%d", VX_SUCCESS);
@@ -4986,9 +5025,9 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveLayerParamTable(
 {
     vx_uint32 index = 0;
     vx_binary_save binarySave = graph->binarySave;
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                graph->binarySave->currLayerParamOffset, gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_layer_parameter_s), layerParam);
+
+    vxoBinaryGraph_Write(binarySave, binarySave->currLayerParamOffset,
+                         sizeof(vx_binary_layer_parameter_s), layerParam);
 
     graph->binarySave->currLayerParamOffset += sizeof(vx_binary_layer_parameter_s);
     index = graph->binarySave->currLayerParamIndex++;
@@ -5005,10 +5044,10 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveSWOperationInfo(
     vx_binary_save binarySave = graph->binarySave;
 
     swOperationInfo.swOperationType = operationType;
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                binarySave->currSWOperationOffset, gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
-                sizeof(vx_binary_sw_operation_info_s), &swOperationInfo);
+
+    vxoBinaryGraph_Write(binarySave, binarySave->currSWOperationOffset,
+                         sizeof(vx_binary_sw_operation_info_s), &swOperationInfo);
+
     binarySave->currSWOperationOffset += sizeof(vx_binary_sw_operation_info_s);
 
     return VX_SUCCESS;
@@ -5070,10 +5109,9 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveOperationTableForSW(
         vxmONERROR(VX_ERROR_INVALID_VALUE);
     }
 
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                binarySave->operationOffset[index], gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
-                sizeof(vx_binary_operation_info_s), &operationInfo);
+    vxoBinaryGraph_Write(binarySave, binarySave->operationOffset[index],
+                         sizeof(vx_binary_operation_info_s), &operationInfo);
+
     binarySave->swOperationOffset = binarySave->operationOffset[index];
 
 OnError:
@@ -5461,10 +5499,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
         operationInfo.operationIndex = 0xFFFF;
         operationInfo.stateLCDTIndex = stateLCDTIndex;
 
-        gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                    binarySave->currOperationOffset, gcvFILE_SEEK_SET);
-        gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
-                    sizeof(vx_binary_operation_info_s), &operationInfo);
+        vxoBinaryGraph_Write(binarySave, binarySave->currOperationOffset,
+                             sizeof(vx_binary_operation_info_s), &operationInfo);
 
         binarySave->currOperationOffset += sizeof(vx_binary_operation_info_s);
 
@@ -5520,10 +5556,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveEndOperation(
     operationInfo.operationIndex = 0xFFFF;
     operationInfo.stateLCDTIndex = stateLCDTIndex;
 
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                binarySave->lastOperation0ffset, gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
-                sizeof(vx_binary_operation_info_s), &operationInfo);
+    vxoBinaryGraph_Write(binarySave, binarySave->lastOperation0ffset,
+                         sizeof(vx_binary_operation_info_s), &operationInfo);
 
     binarySave->lastOperation0ffset += sizeof(vx_binary_operation_info_s);
 
@@ -5897,10 +5931,9 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
         vxmONERROR(VX_ERROR_INVALID_VALUE);
     }
 
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                binarySave->operationOffset[index], gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
-                sizeof(vx_binary_operation_info_s), &operationInfo);
+    vxoBinaryGraph_Write(binarySave, binarySave->operationOffset[index],
+                         sizeof(vx_binary_operation_info_s), &operationInfo);
+
     binarySave->scOperationOffset = binarySave->operationOffset[index];
 
     binarySave->savedOperationCount++;
@@ -6185,10 +6218,10 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
 
     /*5. save SH operation data */
     shOperationInfo.instructionCmdLCDTIndex = instructionLCDTIndex;
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                binarySave->currSHOperationOffset, gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
-                sizeof(vx_binary_sh_operation_info_s), &shOperationInfo);
+
+    vxoBinaryGraph_Write(binarySave, binarySave->currSHOperationOffset,
+                         sizeof(vx_binary_sh_operation_info_s), &shOperationInfo);
+
     binarySave->currSHOperationOffset += sizeof(vx_binary_sh_operation_info_s);
 
     /*6. save operation info */
@@ -6233,10 +6266,9 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
         vxmONERROR(VX_ERROR_INVALID_VALUE);
     }
 
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                binarySave->operationOffset[index], gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
-                sizeof(vx_binary_operation_info_s), &operationInfo);
+    vxoBinaryGraph_Write(binarySave, binarySave->operationOffset[index],
+                         sizeof(vx_binary_operation_info_s), &operationInfo);
+
     binarySave->currOperationOffset = binarySave->operationOffset[index];
 
     /* this is for save END operation */
@@ -6718,10 +6750,9 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
         binarySave->NNTPDataCount++;
 
         gcoOS_MemCopy(nnOperationInfo.nnCmd, cmdLogicalAddress, cmdSize);
-        gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                    binarySave->currNNOperationOffset, gcvFILE_SEEK_SET);
-        gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
-                    sizeof(vx_binary_nn_operation_info_s), &nnOperationInfo);
+
+        vxoBinaryGraph_Write(binarySave, binarySave->currNNOperationOffset,
+                             sizeof(vx_binary_nn_operation_info_s), &nnOperationInfo);
 
         binarySave->currNNOperationOffset += sizeof(vx_binary_nn_operation_info_s);
         currOperationIndex = binarySave->currNNOperationIndex;
@@ -6734,10 +6765,9 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
         binarySave->NNTPDataCount++;
 
         gcoOS_MemCopy(&tpOperationInfo.tpCmd, cmdLogicalAddress, cmdSize);
-        gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                    binarySave->currTPOperationOffset, gcvFILE_SEEK_SET);
-        gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
-                    sizeof(vx_binary_tp_operation_info_s), &tpOperationInfo);
+
+        vxoBinaryGraph_Write(binarySave, binarySave->currTPOperationOffset,
+                             sizeof(vx_binary_tp_operation_info_s), &tpOperationInfo);
 
         binarySave->currTPOperationOffset += sizeof(vx_binary_tp_operation_info_s);
         currOperationIndex = binarySave->currTPOperationIndex;
@@ -6771,10 +6801,9 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
     operationInfo.indexOfFirstPatch = indexOfFirstPatch;
     operationInfo.counterOfPatches = patchCount;
 
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                binarySave->currOperationOffset, gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
-                sizeof(vx_binary_operation_info_s), &operationInfo);
+    vxoBinaryGraph_Write(binarySave, binarySave->currOperationOffset,
+                         sizeof(vx_binary_operation_info_s), &operationInfo);
+
 
     binarySave->operationCmdPhysical[binarySave->currOperationIndex] = (vx_uint64)cmdPhysicalAddress;
     binarySave->operationOffset[binarySave->currOperationIndex] = binarySave->currOperationOffset;
@@ -6836,8 +6865,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveNNTPCommand(
     }
 
     location = binarySave->NNTPDataOffset[index] + offset;
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, location, gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_uint32), &value);
+
+    vxoBinaryGraph_Write(binarySave, location, sizeof(vx_uint32), &value);
 
 OnError:
     if ((node->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS))
@@ -6900,8 +6929,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveNNTPStates(
 
     /* 3 means: sizeof(Operation_type) + sizeof(Operation_index) + sizeof(Layer_id) */
     offset = binarySave->operationOffset[operationIndex] + 3 * sizeof(vx_uint32);
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, offset, gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_uint32), &stateLCDTIndex);
+    vxoBinaryGraph_Write(binarySave, offset, sizeof(vx_uint32), &stateLCDTIndex);
 
     /* 2. re-write nn/tp's command buffer offset to patch information table */
     for (index = 0; index < binarySave->patchNNTPCmdCount; index++)
@@ -6933,8 +6961,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveNNTPStates(
 
     /* 1 means: sizeof(type) in vx_binary_patch_info_s */
     offset = binarySave->patchNNTPCmdOffset[cmdIndex] + 1 * sizeof(vx_uint32);
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, offset, gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_uint32), &cmdOffsetInStates);
+    vxoBinaryGraph_Write(binarySave, offset, sizeof(vx_uint32), &cmdOffsetInStates);
 
 OnError:
     if ((node->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS))
@@ -6974,8 +7001,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
      if (binarySave->savedOperationCount < binarySave->operationCount)
      {
          binarySave->headerInfo.operationCount = binarySave->savedOperationCount;
-         gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, 0, gcvFILE_SEEK_SET);
-         gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_header_s), &binarySave->headerInfo);
+         vxoBinaryGraph_Write(binarySave, 0, sizeof(vx_binary_header_s), &binarySave->headerInfo);
 
          binarySave->entrancesInfo.operationsEntr.operationsBytes = binarySave->savedOperationCount * sizeof(vx_binary_operation_info_s);
      }
@@ -6988,8 +7014,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
 
     /* re-write loading data entrance of LCD bytes */
      binarySave->entrancesInfo.loadingConfigDataEntr.loadingConfigDataBytes = binarySave->loadingDataTotalBytes;
-     gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, binarySave->entryTablePos, gcvFILE_SEEK_SET);
-     gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_entrance_info_s), &binarySave->entrancesInfo);
+     vxoBinaryGraph_Write(binarySave, binarySave->entryTablePos, sizeof(vx_binary_entrance_info_s), &binarySave->entrancesInfo);
 
     /* should re-write input table and patch table if they size don't equal */
     inputEntryStartOffset = sizeof(vx_binary_header_s) +
@@ -7026,12 +7051,9 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
     if (reWrite && (graph->inputCount == 0))
     {
         /* re-write whole input entry table */
-        gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                    inputEntryStartOffset,
-                    gcvFILE_SEEK_SET);
-        gcoOS_Write(gcvNULL, binarySave->binarySaveFile,
-                    sizeof(vx_binary_input_output_info_s) * binarySave->inputParamCount,
-                    (gctPOINTER)(binarySave->inputInfo));
+        vxoBinaryGraph_Write(binarySave, inputEntryStartOffset,
+                             sizeof(vx_binary_input_output_info_s) * binarySave->inputParamCount,
+                             (gctPOINTER)(binarySave->inputInfo));
 
         /* re-write index value for patch teble info*/
         for (i = 0; i < binarySave->inputInPatchedNum; i++)
@@ -7044,8 +7066,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
                     {
                         /* 3 means: sizeof(type) + sizeof(offset) + sizeof(sourceType) */
                         patchOffset = binarySave->inputInPatchedBinOffset[i] + 3 * sizeof(vx_uint32);
-                        gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, patchOffset, gcvFILE_SEEK_SET);
-                        gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_uint32), (gctPOINTER)(&j));
+                        vxoBinaryGraph_Write(binarySave, patchOffset, sizeof(vx_uint32), (gctPOINTER)(&j));
                     }
                 }
             }
@@ -7084,11 +7105,9 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
         if (binarySave->inputParamCount != binarySave->inputInPatchedNum)
         {
             /* re-write input number of header info*/
-            gcoOS_Seek(gcvNULL, binarySave->binarySaveFile,
-                        sizeof(vx_binary_header_s) - 2 * sizeof(vx_uint32),
-                        gcvFILE_SEEK_SET);
-            gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_uint32),
-                        (gctPOINTER)(&binarySave->inputInPatchedNum));
+            vxoBinaryGraph_Write(binarySave, sizeof(vx_binary_header_s) - 2 * sizeof(vx_uint32),
+                                sizeof(vx_uint32),
+                                (gctPOINTER)(&binarySave->inputInPatchedNum));
 
             /* re-write input size of entrance infor */
             entracnceInputOffset = sizeof(vx_binary_header_s) +
@@ -7096,8 +7115,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
                                    sizeof(vx_binary_axi_sram_info_s) +
                                    sizeof(vx_uint32);
             inputSize = sizeof(vx_binary_input_output_info_s) * binarySave->inputInPatchedNum;
-            gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, entracnceInputOffset, gcvFILE_SEEK_SET);
-            gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_uint32), (gctPOINTER)(&inputSize));
+            vxoBinaryGraph_Write(binarySave, entracnceInputOffset,
+                                 sizeof(vx_uint32), (gctPOINTER)(&inputSize));
         }
     }
 
@@ -7137,7 +7156,10 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_GetGraphInputOutput(
         return VX_SUCCESS;
     }
 
-    vxmONERROR(vxoBinaryGraph_Initialize(graph, VX_NULL));
+    if (graph->binarySave == VX_NULL)
+    {
+        vxmONERROR(vxoBinaryGraph_Initialize(graph, VX_NULL));
+    }
     binarySave = graph->binarySave;
     if (binarySave == VX_NULL)
     {
@@ -8199,22 +8221,21 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
 
     /* save network binary header - re-write later */
     gcoOS_MemFill(&binarySave->headerInfo, 0, sizeof(vx_binary_header_s));
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, 0, gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_header_s), &binarySave->headerInfo);
+    vxoBinaryGraph_Write(binarySave, 0, sizeof(vx_binary_header_s), &binarySave->headerInfo);
     currPos = sizeof(vx_binary_header_s);
 
     /* save network binary memorypool */
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_memory_pool_info_s), &memoryPoolInfo);
+    vxoBinaryGraph_Write(binarySave, currPos, sizeof(vx_binary_memory_pool_info_s), &memoryPoolInfo);
     currPos += sizeof(vx_binary_memory_pool_info_s);
 
     /* save network binary axiSram */
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_axi_sram_info_s), &axiSramInfo);
+    vxoBinaryGraph_Write(binarySave, currPos, sizeof(vx_binary_axi_sram_info_s), &axiSramInfo);
     currPos += sizeof(vx_binary_axi_sram_info_s);
 
     /* save network binary entranceInfo - re-write later */
     binarySave->entryTablePos = currPos;
     gcoOS_MemFill(&binarySave->entrancesInfo, 0, sizeof(vx_binary_entrance_info_s));
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_entrance_info_s), &binarySave->entrancesInfo);
+    vxoBinaryGraph_Write(binarySave, currPos, sizeof(vx_binary_entrance_info_s), &binarySave->entrancesInfo);
     currPos += sizeof(vx_binary_entrance_info_s);
 
     /* refine input/output of graph if user call api vxIdentifyGraphInputsAndOutputs() */
@@ -8362,7 +8383,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                 vxmONERROR(VX_FAILURE);
             }
 
-            gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_input_output_info_s), inputInfo);
+            vxoBinaryGraph_Write(binarySave, currPos, sizeof(vx_binary_input_output_info_s), inputInfo);
             currPos += sizeof(vx_binary_input_output_info_s);
 
             binarySave->headerInfo.inputCount ++;
@@ -8562,7 +8583,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                vxmONERROR(VX_FAILURE);
             }
 
-            gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_input_output_info_s), &outputInfo);
+            vxoBinaryGraph_Write(binarySave, currPos, sizeof(vx_binary_input_output_info_s), &outputInfo);
             currPos += sizeof(vx_binary_input_output_info_s);
 
             binarySave->headerInfo.outputCount ++;
@@ -8592,7 +8613,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
 
         layersInfo.operationCount = node->layer->num_operations;
 
-        gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_layers_info_s), &layersInfo);
+        vxoBinaryGraph_Write(binarySave, currPos, sizeof(vx_binary_layers_info_s), &layersInfo);
         currPos += sizeof(vx_binary_layers_info_s);
     }
 
@@ -8636,8 +8657,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     binarySave->headerInfo.operationCount = binarySave->operationCount;
     vxoBinaryGraph_GetNetworkNameAndRank(binarySave);
 
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, 0, gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_header_s), &binarySave->headerInfo);
+    vxoBinaryGraph_Write(binarySave, 0, sizeof(vx_binary_header_s), &binarySave->headerInfo);
 
     /* save network binary entrance info */
     binarySave->entrancesInfo.inputEntr.inputInfoOffset = sizeof(vx_binary_header_s) + sizeof(vx_binary_memory_pool_info_s)
@@ -8691,26 +8711,26 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
 
     vxmASSERT(binarySave->entrancesInfo.loadingConfigDataEntr.loadingConfigDataOffset ==  binarySave->currLoadingDataOffset);
 
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, binarySave->entryTablePos, gcvFILE_SEEK_SET);
-    gcoOS_Write(gcvNULL, binarySave->binarySaveFile, sizeof(vx_binary_entrance_info_s), &binarySave->entrancesInfo);
+    vxoBinaryGraph_Write(binarySave, binarySave->entryTablePos, sizeof(vx_binary_entrance_info_s), &binarySave->entrancesInfo);
 
     /* fseek can't move file pointer to offset if offset is larger than the binary size*/
     /* so, fill zero to initial binary*/
-    gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, operationPos, gcvFILE_SEEK_SET);
     if ((currPos -  operationPos) > ONCE_FILL_SIZE)
     {
+        vx_uint32 offset = operationPos;
         for (i = 0; i < (currPos -  operationPos) / ONCE_FILL_SIZE; i++)
         {
-            gcoOS_Write(gcvNULL, binarySave->binarySaveFile, ONCE_FILL_SIZE, fillZero);
+            vxoBinaryGraph_Write(binarySave, offset, ONCE_FILL_SIZE, fillZero);
+            offset += ONCE_FILL_SIZE;
         }
         if (((currPos -  operationPos) % ONCE_FILL_SIZE) != 0)
         {
-            gcoOS_Write(gcvNULL, binarySave->binarySaveFile, (currPos -  operationPos) % ONCE_FILL_SIZE, fillZero);
+            vxoBinaryGraph_Write(binarySave, offset, (currPos -  operationPos) % ONCE_FILL_SIZE, fillZero);
         }
     }
     else
     {
-        gcoOS_Write(gcvNULL, binarySave->binarySaveFile, currPos -  operationPos, fillZero);
+        vxoBinaryGraph_Write(binarySave, operationPos, currPos -  operationPos, fillZero);
     }
 
     /* save initialization command */
@@ -9204,21 +9224,21 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RemoveUnusedFile()
     vx_bool removeDone = vx_false_e;
     gcmHEADER();
 
-    gcoOS_GetEnv(gcvNULL, "VIVANTE_VX_CACHE_GRAPH_BINARY_MAX_SIZEKB", &env);
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_CACHE_BINARY_GRAPH_MAX_SIZEKB", &env);
     if (env != VX_NULL)
     {
         maxCacheSizeKB = atoi(env);
     }
 
     env = VX_NULL;
-    gcoOS_GetEnv(gcvNULL, "VIVANTE_VX_CACHE_GRAPH_BINARY_MAX_COUNT", &env);
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_CACHE_BINARY_GRAPH_MAX_COUNT", &env);
     if (env != VX_NULL)
     {
         maxCacheCount = atoi(env);
     }
 
     env = VX_NULL;
-    gcoOS_GetEnv(gcvNULL, "VIVANTE_VX_CACHE_GRAPH_BINARY_DIR", &env);
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_CACHE_BINARY_GRAPH_DIR", &env);
     if (VX_NULL == env)
     {
         gcoOS_StrCopySafe(path, BINARY_FILE_NAME_MAX_SIZE, "./");
@@ -9364,7 +9384,7 @@ VX_PRIVATE_API vx_bool vxoBinaryGraph_SearchInSystem(
     gcmHEADER_ARG("binaryFile=%p", binaryFile);
 
     gcoOS_StrCopySafe(temp, BINARY_FILE_NAME_MAX_SIZE, binaryFile);
-    gcoOS_GetEnv(gcvNULL, "VIVANTE_VX_CACHE_GRAPH_BINARY_DIR", &env);
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_CACHE_BINARY_GRAPH_DIR", &env);
     if (env)
     {
         gcoOS_StrCopySafe(binaryFile, BINARY_FILE_NAME_MAX_SIZE, env);
@@ -9714,8 +9734,8 @@ VX_INTERNAL_API void vxoBinaryGraph_ReleaseCache(
     return;
 }
 
-/* cache graph binary to VIVANTE_VX_CACHE_GRAPH_BINARY_DIR
-   or import graph binary from VIVANTE_VX_CACHE_GRAPH_BINARY_DIR
+/* cache graph binary to VIV_VX_CACHE_BINARY_GRAPH_DIR
+   or import graph binary from VIV_VX_CACHE_BINARY_GRAPH_DIR
 */
 VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
     vx_graph graph
@@ -9807,7 +9827,7 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
     }
     gcoOS_StrCatSafe(base, KEY_LENGTH_BYTE * 2 + 4, ".nb");
 
-    /*4. search this binary name in ENV  VIVANTE_VX_CACHE_GRAPH_BINARY_DIR */
+    /*4. search this binary name in ENV  VIV_VX_CACHE_BINARY_GRAPH_DIR */
     if (vxoBinaryGraph_SearchInSystem(binaryName))
     {
         vxInfo("loading graph binary to run...\n");
@@ -9895,5 +9915,122 @@ OnError:
     }
     gcmFOOTER_NO();
     return;
+}
+
+VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
+    vx_graph graph,
+    vx_size *size
+    )
+{
+    vx_status status = VX_SUCCESS;
+
+    if ((0 == graph->nodeCount) && (VX_NULL == graph->nodeTable))
+    {
+        vxError("%s[%d]: nodeCount is %d, nodeTable is NULL\n", __FUNCTION__, __LINE__, graph->nodeCount);
+        vxmONERROR(VX_FAILURE);
+    }
+
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoBinaryGraph_GenerateNBG(
+    vx_graph graph,
+    vx_ptr buffer,
+    vx_size *size
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_context context =graph->base.context;
+    vx_uint32 nbgSize = 0;
+    vx_uint32 enableDumpNBG = 0;
+    gctSTRING envctrl = gcvNULL;
+
+    if (context->options.enableCacheBinaryGraph)
+    {
+        vxError("%s[%d]: not support this feature when cache binary graph enabled\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_ERROR_NOT_SUPPORTED);
+    }
+
+    if (vx_true_e == vxoBinaryGraph_HasBinaryInGraph(graph))
+    {
+        /* bypass the network if it import from binary graph */
+        vxError("%s[%d]: has binary in graph\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_ERROR_NOT_SUPPORTED);
+    }
+
+    graph->binarySave = (vx_binary_save)vxAllocateAndZeroMemory(sizeof(vx_binary_save_s));
+    if (VX_NULL == graph->binarySave)
+    {
+        vxError("fail to allocate memory for binary save\n");
+        vxmONERROR(VX_FAILURE);
+    }
+
+    /* enable save binary */
+    context->options.enableSaveBinary = 1;
+    graph->binarySave->generateNBGToMemory = 1;
+    graph->binarySave->NBGBuffer = buffer;
+    graph->binarySave->NBGSize = &nbgSize;
+
+    vxmONERROR(vxVerifyGraph(graph));
+
+    vxmONERROR(vxProcessGraph(graph));
+
+    if (size != VX_NULL)
+    {
+        *size = (vx_size)nbgSize;
+    }
+
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_DUMP_NBG", &envctrl)) && envctrl)
+    {
+        enableDumpNBG = atoi(envctrl);
+    }
+
+    if (enableDumpNBG == 1)
+    {
+        FILE *binarySaveFile;
+        gcmVERIFY_OK(gcoOS_Open(gcvNULL, "network_binary_graph.nb", gcvFILE_CREATE, (gctFILE*)(&binarySaveFile)));
+        gcoOS_Seek(gcvNULL, binarySaveFile, 0, gcvFILE_SEEK_SET);
+        gcoOS_Write(gcvNULL, binarySaveFile, nbgSize, buffer);
+        gcoOS_Flush(gcvNULL, binarySaveFile);
+        gcmVERIFY_OK(gcoOS_Close(gcvNULL, binarySaveFile));
+    }
+
+OnError:
+    context->options.enableSaveBinary = 0;
+    vxoBinaryGraph_unInitial(graph);
+
+    return status;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxGenerateNBG(vx_graph graph, void *buffer, vx_size *size)
+{
+    vx_status status = VX_SUCCESS;
+    gcmHEADER_ARG("graph=%p, buffer=%p, size=%p", graph, buffer, size);
+    gcmDUMP_API("$VX vxGenerateNBG: graph=%p, buffer=%p, size=%p", graph, buffer, size);
+
+    if (graph == VX_NULL)
+    {
+        vxError("%s[%d]: graph is NULL\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_FAILURE);
+    }
+
+    if ((buffer == VX_NULL) && (size != VX_NULL))
+    {
+        vxmONERROR(vxoBinaryGraph_GetNBGSize(graph, size));
+    }
+    else if (buffer != VX_NULL)
+    {
+        vxmONERROR(vxoBinaryGraph_GenerateNBG(graph, buffer, size));
+    }
+    else
+    {
+        vxError("%s[%d]: fail to generate NBG buffer: %p, size: %p\n", __FUNCTION__, __LINE__, buffer, size);
+    }
+
+    gcmFOOTER_ARG("%d", status);
+OnError:
+    return status;
 }
 
