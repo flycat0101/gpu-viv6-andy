@@ -83,11 +83,6 @@ VX_INTERNAL_API vx_bool vxoGraphOptimization_nnHalSupport(vx_tensor inputTensor)
     return nnSupportFormat;
 }
 
-VX_INTERNAL_API vx_bool vxoGraphOptimization_tpHalSupport(vx_context context)
-{
-    return context->nnConfig.fixedFeature.tpCoreCount > 0 ? vx_true_e : vx_false_e;
-}
-
 VX_PRIVATE_API void vxoGraphOptimization_getQuantizeParam(float dMax, float dMin, float *scale, vx_int32 *zp)
 {
     *scale = dMin> 0 ? dMax/ 255 :  (dMax - dMin)/ 255;
@@ -1636,7 +1631,12 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeFullyConnectedNodes(vx_node 
     vx_bool newNodeflag = vx_false_e;
     gcmHEADER_ARG("nodes=%p, nodeCount=0x%x", nodes, nodeCount);
 
-    if(!vxoGraphOptimization_tpHalSupport(vxGetContext((vx_reference)nodes[0])))
+    if(!vxnneIsTPSupportFormat(
+                    nodes[0]->base.context,
+                    (vx_tensor)nodes[0]->paramTable[0],
+                    VX_NULL,
+                    (vx_tensor)nodes[0]->paramTable[nodes[0]->numParameters -1] )
+        )
         return VX_SUCCESS;
     if(nodeCount == 1 && vxoGraphOptimization_getKernelType(nodes[0]) == OP_FULLYCONNECTED_RELU)
         return VX_SUCCESS;
