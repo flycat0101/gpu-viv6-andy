@@ -3538,8 +3538,19 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
 
     node->layer = &lstmlayer->base;
 
+    return VX_SUCCESS;
 
 exit:
+    if (lstmlayer)
+    {
+        if (lstmlayer->units)
+        {
+            gcoOS_Free(VX_NULL, lstmlayer->units);
+        }
+
+        gcoOS_Free(VX_NULL, lstmlayer);
+    }
+
     return status;
 }
 
@@ -3649,6 +3660,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, co
     vx_float32 cellClipValue = (vx_float32)((cell_clip == NULL) ? 0.0f : *((vx_float32*)TENSOR_LOGICAL_ADDR(cell_clip)));
     vx_float32 projClipValue = (vx_float32)((proj_clip == NULL) ? 0.0f : *((vx_float32*)TENSOR_LOGICAL_ADDR(proj_clip)));
     vx_bool enable_layernorm = ((layernorm2input_weight != VX_NULL) && (layernorm2forget_weight != VX_NULL) && (layernorm2cell_weight != VX_NULL) && (layernorm2output_weight != VX_NULL)) ? vx_true_e : vx_false_e;
+    vxnne_lstm_unit  lstmUnitNode = VX_NULL;
 
     /* make compiler happy */
     enable_layernorm = enable_layernorm;
@@ -3738,8 +3750,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, co
     }
     else
     {
-        vxnne_lstm_unit  lstmUnitNode;
-
         gcoOS_Allocate(gcvNULL, sizeof(vxnne_lstm_unit_s), (gctPOINTER*)&lstmUnitNode);
         if (!lstmUnitNode)
         {
@@ -4378,7 +4388,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, co
         node->layer = &lstmUnitNode->base;
     }
 
+    return VX_SUCCESS;
+
 exit:
+    if (lstmUnitNode)
+    {
+        gcoOS_Free(VX_NULL, lstmUnitNode);
+    }
+
     return status;
 
 }
@@ -6645,6 +6662,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRUUnit_Initializer(vx_node node, con
     vx_tensor  output_s = (vx_tensor)parameters[index++];
 
     vx_uint32 batchCount = TENSOR_SIZE_INDEX(output_s, 3);
+    vxnne_gru_unit  gru_layer = VX_NULL;
 
     /* destroy the existing layer */
     if (node->layer)
@@ -6654,8 +6672,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRUUnit_Initializer(vx_node node, con
     }
 
     {
-        vxnne_gru_unit  gru_layer = VX_NULL;
-
         gcoOS_Allocate(gcvNULL, sizeof(vxnne_gru_unit_s), (gctPOINTER*)&gru_layer);
         if (!gru_layer)
         {
@@ -6708,8 +6724,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRUUnit_Initializer(vx_node node, con
         node->layer = &gru_layer->base;
     }
 
+    return VX_SUCCESS;
 
 exit:
+    if (gru_layer)
+    {
+        gcoOS_Free(VX_NULL, gru_layer);
+    }
+
     return status;
 }
 
@@ -6820,6 +6842,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMUnit_Initializer(vx_node node
     vx_tensor  output_s = (vx_tensor)parameters[index++];
 
     vx_uint32 batchCount = TENSOR_SIZE_INDEX(output_s, 3);
+    vxnne_convlstm_unit  convlstm_layer = VX_NULL;
 
     /* destroy the existing layer */
     if (node->layer)
@@ -6829,8 +6852,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMUnit_Initializer(vx_node node
     }
 
     {
-        vxnne_convlstm_unit  convlstm_layer = VX_NULL;
-
         gcoOS_Allocate(gcvNULL, sizeof(vxnne_convlstm_unit_s), (gctPOINTER*)&convlstm_layer);
         if (!convlstm_layer)
         {
@@ -6886,8 +6907,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMUnit_Initializer(vx_node node
         node->layer = &convlstm_layer->base;
     }
 
+    return VX_SUCCESS;
 
 exit:
+    if (convlstm_layer)
+    {
+        gcoOS_Free(VX_NULL, convlstm_layer);
+    }
+
     return status;
 }
 

@@ -5457,7 +5457,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
         WB_IS_NN_FC_BATCH_MODE(weights_biases) == vx_false_e &&
         aligned64)
     {
-        vx_op_param_s conv = {0};
+        vx_op_param conv = VX_NULL;
         vx_uint32 kzgroup = weights_biases->weights_sizes[2] / weights_biases->slice_array[0].kz_count;
         vx_uint32 zoffset = 0;
 
@@ -5472,34 +5472,33 @@ vx_status vxoNNFullyConnectedLayerInitializer(
 
         node->layer = layer;
 
-        conv.pad_x_left = pad;
-        conv.pad_y_top = pad;
-        conv.pad_x_right = pad;
-        conv.pad_y_bottom = pad;
-        conv.pool_size_x = 0;
-        conv.pool_size_y = 0;
-        conv.pool_stride = 1;
-        conv.enable_relu = enable_relu;
-        conv.conv_rounding_type = 0;
-        conv.pad_mode = VX_PAD_CONSTANT;
-        conv.pad_const = 0;
+        conv = &tp_operation0->base.parameter;
+        conv->pad_x_left = pad;
+        conv->pad_y_top = pad;
+        conv->pad_x_right = pad;
+        conv->pad_y_bottom = pad;
+        conv->pool_size_x = 0;
+        conv->pool_size_y = 0;
+        conv->pool_stride = 1;
+        conv->enable_relu = enable_relu;
+        conv->conv_rounding_type = 0;
+        conv->pad_mode = VX_PAD_CONSTANT;
+        conv->pad_const = 0;
 
-        conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(weights_biases->slice_num * sizeof(vx_tp_value_cmd_s));
+        conv->tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(weights_biases->slice_num * sizeof(vx_tp_value_cmd_s));
 
         if (kzgroup == 1)
         {
-            conv.tpType = TP_SINGLE_FC;
-            conv.other_ref = (vx_reference)weights_biases;
-            conv.data_buff = gcvNULL;
+            conv->tpType = TP_SINGLE_FC;
+            conv->other_ref = (vx_reference)weights_biases;
+            conv->data_buff = gcvNULL;
 
             for (i = 0; i < weights_biases->slice_num; i++)
             {
-                conv.tp_value[i].u32[0] = kzgroup;
-                conv.tp_value[i].u32[1] = zoffset;
+                conv->tp_value[i].u32[0] = kzgroup;
+                conv->tp_value[i].u32[1] = zoffset;
                 zoffset += weights_biases->slice_array[i].z_count;
             }
-
-            memcpy(&tp_operation0->base.parameter, &conv, sizeof(vx_op_param_s));
 
             tp_operation0->input          = inputs;
             tp_operation0->weights_biases = weights_biases;
@@ -5551,17 +5550,17 @@ vx_status vxoNNFullyConnectedLayerInitializer(
                 vxmONERROR(VX_ERROR_NO_MEMORY);
             }
 
-            conv.tpType = TP_SINGLE_FC;
-            conv.other_ref = (vx_reference)weights_biases;
-            conv.data_buff = gcvNULL;
+            conv->tpType = TP_SINGLE_FC;
+            conv->other_ref = (vx_reference)weights_biases;
+            conv->data_buff = gcvNULL;
 
             for (i = 0; i < weights_biases->slice_num; i++)
             {
-                conv.tp_value[i].e32[0] = 0;
-                conv.tp_value[i].u32[0] = kzgroup;
-                conv.tp_value[i].u32[1] = zoffset;
-                conv.tp_value[i].u32[2] = kzoffset;
-                conv.tp_value[i].u32[3] = kzoffset2;
+                conv->tp_value[i].e32[0] = 0;
+                conv->tp_value[i].u32[0] = kzgroup;
+                conv->tp_value[i].u32[1] = zoffset;
+                conv->tp_value[i].u32[2] = kzoffset;
+                conv->tp_value[i].u32[3] = kzoffset2;
 
                 if (i % kzgroup == kzgroup - 1)
                 {
@@ -5575,7 +5574,6 @@ vx_status vxoNNFullyConnectedLayerInitializer(
                 }
             }
 
-            memcpy(&tp_operation0->base.parameter, &conv, sizeof(vx_op_param_s));
             vxnneLayer_SetOperation(
                 layer,
                 &tp_operation0->base,
@@ -5587,15 +5585,28 @@ vx_status vxoNNFullyConnectedLayerInitializer(
             vxnneOperation_AddReference(&tp_operation0->base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&tp_operation0->base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
-            conv.tpType = TP_SINGLE_FC;
-            conv.other_ref = gcvNULL;
-            conv.data_buff = gcvNULL;
-            conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
-            conv.tp_value->e32[0] = 1;
-            conv.tp_value->u32[0] = kzgroup;
-            conv.tp_value->u32[1] = weights_biases->weights_sizes[3];
+            conv = &tp_operation1->base.parameter;
 
-            vxMemCopy(&tp_operation1->base.parameter, &conv, sizeof(vx_op_param_s));
+            conv->pad_x_left = pad;
+            conv->pad_y_top = pad;
+            conv->pad_x_right = pad;
+            conv->pad_y_bottom = pad;
+            conv->pool_size_x = 0;
+            conv->pool_size_y = 0;
+            conv->pool_stride = 1;
+            conv->enable_relu = enable_relu;
+            conv->conv_rounding_type = 0;
+            conv->pad_mode = VX_PAD_CONSTANT;
+            conv->pad_const = 0;
+
+            conv->tpType = TP_SINGLE_FC;
+            conv->other_ref = gcvNULL;
+            conv->data_buff = gcvNULL;
+            conv->tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+            conv->tp_value->e32[0] = 1;
+            conv->tp_value->u32[0] = kzgroup;
+            conv->tp_value->u32[1] = weights_biases->weights_sizes[3];
+
             vxnneLayer_SetOperation(
                 layer,
                 &tp_operation1->base,

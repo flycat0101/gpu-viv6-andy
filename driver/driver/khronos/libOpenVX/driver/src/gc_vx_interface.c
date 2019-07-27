@@ -12756,8 +12756,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorCopy_Initialize(vx_node node, cons
     return VX_SUCCESS;
 
 OnError:
+    if (input_dims)
+    {
+        free(input_dims);
+    }
+
     if (output_dims)
+    {
         free(output_dims);
+    }
 
     gcmFOOTER_ARG("%d", VX_FAILURE);
     return VX_FAILURE;
