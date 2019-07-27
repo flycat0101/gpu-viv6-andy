@@ -364,6 +364,9 @@ _PLSDestructor(
     gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.clFECompilerAccessLock));
     gcPLS.clFECompilerAccessLock = gcvNULL;
 
+    gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.vxContextGlobalLock));
+    gcPLS.vxContextGlobalLock = gcvNULL;
+
     gcmVERIFY_OK(gcoOS_AtomDestroy(gcPLS.os, gcPLS.reference));
     gcPLS.reference = gcvNULL;
 
@@ -567,6 +570,9 @@ static void _ModuleConstructor(
 
     /* Construct cl FE compiler access lock */
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.clFECompilerAccessLock));
+
+    /* Construct vx context access lock */
+    gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.vxContextGlobalLock));
 
 #if gcdDUMP_2D
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &dumpMemInfoListMutex));

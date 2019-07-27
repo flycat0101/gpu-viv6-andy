@@ -406,6 +406,7 @@ OnError:
 \******************************************************************************/
 
 static void __attribute__((destructor)) _ModuleDestructor(void);
+static void __attribute__((constructor)) _ModuleConstructor(void);
 
 static gceSTATUS
 _QueryVideoMemory(
@@ -637,6 +638,9 @@ _PLSDestructor(
     gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.clFECompilerAccessLock));
     gcPLS.clFECompilerAccessLock = gcvNULL;
 
+    gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.vxContextGlobalLock));
+    gcPLS.vxContextGlobalLock = gcvNULL;
+
     gcmVERIFY_OK(gcoOS_AtomDestroy(gcPLS.os, gcPLS.reference));
     gcPLS.reference = gcvNULL;
 
@@ -864,6 +868,9 @@ _ModuleConstructor(
     /* Construct cl FE compiler access lock */
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.clFECompilerAccessLock));
 
+    /* Construct vx context access lock */
+    gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.vxContextGlobalLock));
+
 #if gcdDUMP_2D
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &dumpMemInfoListMutex));
 #endif
@@ -882,24 +889,35 @@ OnError:
     {
         /* Destroy access lock */
         gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.accessLock));
+        gcPLS.accessLock = gcvNULL;
     }
 
     if (gcPLS.glFECompilerAccessLock != gcvNULL)
     {
         /* Destroy access lock */
         gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.glFECompilerAccessLock));
+        gcPLS.glFECompilerAccessLock = gcvNULL;
     }
 
     if (gcPLS.clFECompilerAccessLock != gcvNULL)
     {
         /* Destroy access lock */
         gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.clFECompilerAccessLock));
+        gcPLS.clFECompilerAccessLock = gcvNULL;
+    }
+
+    if (gcPLS.vxContextGlobalLock != gcvNULL)
+    {
+        /* Destroy vx context access lock */
+        gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.vxContextGlobalLock));
+        gcPLS.vxContextGlobalLock = gcvNULL;
     }
 
     if (gcPLS.reference != gcvNULL)
     {
         /* Destroy the reference. */
         gcmVERIFY_OK(gcoOS_AtomDestroy(gcPLS.os, gcPLS.reference));
+        gcPLS.reference = gcvNULL;
     }
 
     gcmFOOTER();

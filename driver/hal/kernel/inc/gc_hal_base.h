@@ -270,6 +270,7 @@ gcsSystemInfo;
     gcvNULL, /* accessLock         */ \
     gcvNULL, /* GL FE compiler lock*/ \
     gcvNULL, /* CL FE compiler lock*/ \
+    gcvNULL, /* VX context lock    */ \
     gcvPATCH_NOTINIT,/* global patchID     */ \
     gcvNULL, /* global fenceID*/ \
     gcvFALSE, /* memory profile flag */ \
