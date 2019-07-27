@@ -115,7 +115,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
 
     tempCreateInfo = __VK_NON_DISPATCHABLE_HANDLE_CAST(VkRenderPassMultiviewCreateInfo *, pCreateInfo->pNext);
     /*judge the pNext whether point to a VkRenderPassMultiviewCreateInfo structure */
-    if (tempCreateInfo->sType == VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO)
+    if (tempCreateInfo && tempCreateInfo->sType == VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO)
     {
         multiViewCreateInfo = tempCreateInfo;
     }
