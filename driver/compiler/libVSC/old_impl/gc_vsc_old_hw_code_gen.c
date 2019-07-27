@@ -281,16 +281,6 @@ deleteCaller(
     return gcvSTATUS_OK;
 }
 
-static gctBOOL
-_hasFMA_SUPPORT(
-    IN gcLINKTREE Tree,
-    IN gcsCODE_GENERATOR_PTR CodeGen,
-    IN gcSL_INSTRUCTION Instruction,
-    IN OUT gctUINT32_PTR States
-    )
-{
-    return GetHWHasFmaSupport();
-}
 
 static gctBOOL
 _hasSIGN_FLOOR_CEIL(
