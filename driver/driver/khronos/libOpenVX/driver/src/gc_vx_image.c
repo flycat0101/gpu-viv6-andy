@@ -315,6 +315,11 @@ VX_INTERNAL_API void vxoImage_Initialize(
     gcmFOOTER_NO();
 }
 
+VX_INTERNAL_API vx_bool vxoImage_IsVirtualImage(vx_image image)
+{
+    return image->base.isVirtual;
+}
+
 VX_INTERNAL_CALLBACK_API void vxoImage_Destructor(vx_reference ref)
 {
     vx_image image = (vx_image)ref;
