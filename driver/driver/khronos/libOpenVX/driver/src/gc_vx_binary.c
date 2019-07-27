@@ -979,6 +979,7 @@ VX_PRIVATE_API gctSIZE_T loadBinaryEntry(
     )
 {
     vx_uint32 LCDOffsetPos = 0;
+    vx_uint32 array[2] = {0};
     vx_uint32 LCDEntryOffsetPos = 0;
     gctSIZE_T readSize = 0;
     vx_status status = VX_SUCCESS;
@@ -999,7 +1000,8 @@ VX_PRIVATE_API gctSIZE_T loadBinaryEntry(
     }
 
     gcoOS_Seek(gcvNULL, binLoad->dFile, LCDEntryOffsetPos, gcvFILE_SEEK_SET);
-    gcoOS_Read(gcvNULL, binLoad->dFile, sizeof(vx_uint32), &LCDOffsetPos, &readSize);
+    gcoOS_Read(gcvNULL, binLoad->dFile, sizeof(vx_uint32), array, &readSize);
+    LCDOffsetPos = array[0];
     if ((LCDOffsetPos <= LCDEntryOffsetPos) || ((vx_uint32)readSize != sizeof(vx_uint32)))
     {
         vxError("fail to read lcdt offset, cdt: %d, lcd: %d\n", LCDEntryOffsetPos, LCDOffsetPos);
@@ -3605,6 +3607,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_LoadFile(
 
 OnError:
     vxError("fail to load binary to create graph\n");
+    if (binLoad->dFile != VX_NULL)
+    {
+        gcoOS_Close(gcvNULL, binLoad->dFile);
+        binLoad->dFile = VX_NULL;
+    }
+
     if (binLoad != NULL)
     {
         vxoBinaryGraph_ReleaseFile(binLoad);
@@ -3706,6 +3714,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseFile(
     {
         gcmVERIFY_OK(gcoVX_FreeMemory(binLoad->LCD.nodePtr));
         binLoad->LCD.nodePtr = VX_NULL;
+    }
+
+    if (binLoad->dFile != VX_NULL)
+    {
+        gcoOS_Close(gcvNULL, binLoad->dFile);
+        binLoad->dFile = VX_NULL;
     }
 
     if (binLoad != NULL)
