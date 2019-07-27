@@ -810,10 +810,14 @@ vx_status OvxExecutor::convertAllOperandsToRefences(const std::vector<VxRunTimeP
                 if (!ref)
                     LOG(ERROR) << "vxCreateTensor for TENSOR_FLOAT32 FAILED! " << format;
 
-                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_RANK, &rank, sizeof(vx_enum)) );
-                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_VALUE,&value, sizeof(vx_bool)) );
-                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_LIFETIME, &lifetime, sizeof(vx_enum)) );
-                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_PRECISION, &precision, sizeof(vx_enum)) );
+                if (checkValid(mModel, i))
+                {
+
+                    VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_RANK, &rank, sizeof(vx_enum)) );
+                    VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_VALUE,&value, sizeof(vx_bool)) );
+                    VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_LIFETIME, &lifetime, sizeof(vx_enum)) );
+                    VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_PRECISION, &precision, sizeof(vx_enum)) );
+                }
 
                 if (ref)info.ref = ref;
 
@@ -855,10 +859,14 @@ vx_status OvxExecutor::convertAllOperandsToRefences(const std::vector<VxRunTimeP
                 if (!ref)
                     LOG(ERROR) << "vxCreateTensor for TENSOR_INT32 FAILED! ";
 
-                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_RANK, &rank, sizeof(vx_enum)) );
-                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_VALUE,&value, sizeof(vx_bool)) );
-                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_LIFETIME, &lifetime, sizeof(vx_enum)) );
-                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_PRECISION, &precision, sizeof(vx_enum)) );
+                if (checkValid(mModel, i))
+                {
+
+                    VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_RANK, &rank, sizeof(vx_enum)) );
+                    VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_VALUE,&value, sizeof(vx_bool)) );
+                    VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_LIFETIME, &lifetime, sizeof(vx_enum)) );
+                    VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_PRECISION, &precision, sizeof(vx_enum)) );
+                }
 
                 if (ref)info.ref = ref;
             }
@@ -897,10 +905,14 @@ vx_status OvxExecutor::convertAllOperandsToRefences(const std::vector<VxRunTimeP
                 if (!ref)
                     LOG(ERROR) << "vxCreateTensor for TENSOR_QUANT8_ASYMM Failed! scale = " << operand.scale << ", zeroPoint = " << operand.zeroPoint;
 
-                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_RANK, &rank, sizeof(vx_enum)) );
-                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_VALUE,&value, sizeof(vx_bool)) );
-                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_LIFETIME, &lifetime, sizeof(vx_enum)) );
-                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_PRECISION, &precision, sizeof(vx_enum)) );
+                if (checkValid(mModel, i))
+                {
+
+                    VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_RANK, &rank, sizeof(vx_enum)) );
+                    VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_VALUE,&value, sizeof(vx_bool)) );
+                    VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_LIFETIME, &lifetime, sizeof(vx_enum)) );
+                    VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)ref, VX_TENSOR_PRECISION, &precision, sizeof(vx_enum)) );
+                }
 
                 if (ref)info.ref = ref;
             }
@@ -1353,7 +1365,9 @@ vx_status OvxExecutor::getGraph(const std::vector<VxRunTimePoolInfo>* poolInfos)
             VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)mReferenceInfos[ins[13]].ref,  VX_TENSOR_PRECISION, &precision, sizeof(vx_enum)) );
             VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)mReferenceInfos[ins[14]].ref,  VX_TENSOR_PRECISION, &precision, sizeof(vx_enum)) );
             VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)mReferenceInfos[ins[15]].ref,  VX_TENSOR_PRECISION, &precision, sizeof(vx_enum)) );
-            VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)mReferenceInfos[ins[17]].ref,  VX_TENSOR_PRECISION, &precision, sizeof(vx_enum)) );
+
+            if (checkValid(mModel, ins[17]))
+                VX_CHECK_ERROR( vxSetTensorAttribute((vx_tensor)mReferenceInfos[ins[17]].ref,  VX_TENSOR_PRECISION, &precision, sizeof(vx_enum)) );
 
             for(auto &in : ins)
             {

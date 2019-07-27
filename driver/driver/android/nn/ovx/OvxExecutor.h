@@ -302,6 +302,11 @@ inline vx_bool isTensor(VxRunTimeReferenceInfo &info)
     return vx_false_e;
 }
 
+inline vx_bool checkValid(const Model* model, const vx_uint32 index)
+{
+    return (model->operands[index].dimensions.size() > 0 && model->operands[index].dimensions.data()[0] > 0)?vx_true_e:vx_false_e;
+}
+
 }  /* anonymous namespace */
 
 } /* namespace nn */
