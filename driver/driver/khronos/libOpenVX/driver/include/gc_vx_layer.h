@@ -3419,13 +3419,14 @@ vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
     vx_tensor               output
     );
 
-vxnne_shader_executable vxnneGetTensorMeanAxis0ShaderExecutable(
+vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
     vx_float32              axis_coef,
     vx_tensor               input,
-    vx_tensor               output);
+    vx_tensor               output,
+    vx_uint32               axis);
 
 vxnne_shader_executable vxnneGetTensorCropShaderExecutable(
     vx_context              context,
