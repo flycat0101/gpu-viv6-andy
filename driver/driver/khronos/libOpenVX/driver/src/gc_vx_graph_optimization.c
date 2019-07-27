@@ -4074,6 +4074,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_multiTranspose(vx_graph graph)
                 transposeCnt = 2;
                 vxoGraphOptimization_multiTranspose_mergeTransposes(transposeNodes, transposeCnt);
             }
+
+            if(sameTranspose)
+                vxFree(sameTranspose);
         }/*if(node->numChildren > 1)*/
         else
         {
