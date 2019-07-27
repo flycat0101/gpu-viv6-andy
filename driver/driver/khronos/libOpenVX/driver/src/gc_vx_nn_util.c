@@ -3778,7 +3778,7 @@ vx_status vxnneCalculateConvTilingParam(
             vx_uint32 fitN = 1;
             vx_bool doZdpOpt = vx_false_e;
 
-            if (inputDims[1] == TENSOR_SIZE_INDEX(conv_op->inputs, 1))
+            if (inputDims[1] == TENSOR_SIZE_INDEX(conv_op->orig_inputs, 1))
             {
                 doZdpOpt = calcFitZdp3N(context,
                                         inputDims[0],
