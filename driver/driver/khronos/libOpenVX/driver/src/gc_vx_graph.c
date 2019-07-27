@@ -2616,7 +2616,9 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
                     {
                         vx_memory m1 = checkArray[ii * MAX_INOUT_NUM + jj];
                         vx_memory m2 = checkArray[ii * MAX_INOUT_NUM + kk];
-                        if (VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m1->allocType) != VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m2->allocType) || m1 == m2)
+                        if (!m1->allocated || !m2->allocated ||
+                            VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m1->allocType) != VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m2->allocType) ||
+                            m1 == m2)
                         {
                             continue;
                         }
