@@ -3718,6 +3718,41 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseFile(
     return status;
 }
 
+VX_PRIVATE_API vx_uint32 vxoBinaryGraph_GetReferencePhyAddress(
+    vx_reference ref
+    )
+{
+    vx_uint32 physicalAddress = 0xFFFFFFFF;
+
+    if (ref->type == VX_TYPE_TENSOR)
+    {
+        vx_tensor tensor = (vx_tensor)ref;
+        physicalAddress = TENSOR_PHYSICAL_ADDR(tensor);
+    }
+    else if (ref->type == VX_TYPE_IMAGE)
+    {
+        vx_image image = (vx_image)ref;
+       physicalAddress = image->memory.physicals[0];/*Y channel*/
+    }
+    else if (ref->type == VX_TYPE_ARRAY)
+    {
+        vx_array array = (vx_array)ref;
+        physicalAddress = array->memory.physicals[0];
+    }
+    else if (ref->type == VX_TYPE_SCALAR)
+    {
+        vx_scalar scalar = (vx_scalar)ref;
+        physicalAddress = scalar->physical;
+    }
+    else
+    {
+        vxError("%s[%d]: can't support this data type: %d \n",
+            __FUNCTION__, __LINE__, ref->type);
+    }
+
+    return physicalAddress;
+}
+
 VX_PRIVATE_API vx_int32 vxoBinaryGraph_GetLCDTIndexForTempTensor(
     vx_graph graph,
     vx_uint32 tempPhysical,
@@ -4436,6 +4471,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
     vx_uint32 outCount = *outputCount;
     vx_reference ref = VX_NULL;
     vx_binary_save_s *binarySave = graph->binarySave;
+    vx_uint32 useUserSet = 1;
     gcmHEADER_ARG("graph=%p", graph);
 
     if (graph->inputCount && graph->inputs)
@@ -4450,6 +4486,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
                     break;
                 }
             }
+
+            if (vxoBinaryGraph_GetReferencePhyAddress(graph->inputs[i]) == 0)
+            {
+                /* doesn't allocate mmeory for this reference object, let bypass */
+                useUserSet = 0;
+                break;
+            }
+
             if (j == inCount)
             {
                 vxError("%s[%d]: can't search this input ref in inputEntry, index: %d \n",
@@ -4457,44 +4501,31 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
             }
         }
 
-        *inputCount = graph->inputCount;
-
-        for (i = 0; i < graph->inputCount; i++)
+        if (1 == useUserSet)
         {
-            ref = graph->inputs[i];
-            binarySave->inputEntry[i] = ref;
-            if (ref->type == VX_TYPE_TENSOR)
+            *inputCount = graph->inputCount;
+
+            for (i = 0; i < graph->inputCount; i++)
             {
-                vx_tensor tensor = (vx_tensor)ref;
-                binarySave->inputPhysicalEntry[i] = TENSOR_PHYSICAL_ADDR(tensor);
+                ref = graph->inputs[i];
+                binarySave->inputEntry[i] = ref;
+                binarySave->inputPhysicalEntry[i] = vxoBinaryGraph_GetReferencePhyAddress(ref);
             }
-            else if (ref->type == VX_TYPE_IMAGE)
+
+            /* clean other data*/
+            for (i = graph->inputCount; i < VX_MAX_NN_INOUT_PARAM_COUNT; i++)
             {
-                vx_image image = (vx_image)ref;
-                binarySave->inputPhysicalEntry[i] = image->memory.physicals[0];/*Y channel*/
-            }
-            else if (ref->type == VX_TYPE_ARRAY)
-            {
-                vx_array array = (vx_array)ref;
-                binarySave->inputPhysicalEntry[i] = array->memory.physicals[0];
-            }
-            else if (ref->type == VX_TYPE_SCALAR)
-            {
-                vx_scalar scalar = (vx_scalar)ref;
-                binarySave->inputPhysicalEntry[i] = scalar->physical;
-            }
-            else
-            {
-                vxError("%s[%d]: input can't support this data type: %d \n",
-                    __FUNCTION__, __LINE__, ref->type);
+                binarySave->inputPhysicalEntry[i] = 0;
             }
         }
-        /* clean other data*/
-        for (i = graph->inputCount; i < VX_MAX_NN_INOUT_PARAM_COUNT; i++)
+        else
         {
-            binarySave->inputPhysicalEntry[i] = 0;
+            vxError("%s[%d]: bypass use user set inputs. useUserSet: %d\n", __FUNCTION__, __LINE__, useUserSet);
+
         }
     }
+
+    useUserSet = 1;
 
     if (graph->outputCount && graph->outputs)
     {
@@ -4508,6 +4539,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
                     break;
                 }
             }
+
+            if (vxoBinaryGraph_GetReferencePhyAddress(graph->outputs[i]) == 0)
+            {
+                /* doesn't allocate mmeory for this reference object, let bypass */
+                useUserSet = 0;
+                break;
+            }
+
             if (j == outCount)
             {
                 vxError("%s[%d]: can't search this output ref in outputEntry, index: %d \n",
@@ -4515,42 +4554,26 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
             }
         }
 
-        *outputCount = graph->outputCount;
-
-        for (i = 0; i < graph->outputCount; i++)
+        if (1 == useUserSet)
         {
-            ref = graph->outputs[i];
-            binarySave->outputEntry[i] = ref;
-            if (ref->type == VX_TYPE_TENSOR)
+            *outputCount = graph->outputCount;
+
+            for (i = 0; i < graph->outputCount; i++)
             {
-                vx_tensor tensor = (vx_tensor)ref;
-                binarySave->outputPhysicalEntry[i] = TENSOR_PHYSICAL_ADDR(tensor);
+                ref = graph->outputs[i];
+                binarySave->outputEntry[i] = ref;
+                binarySave->outputPhysicalEntry[i] = vxoBinaryGraph_GetReferencePhyAddress(ref);
             }
-            else if (ref->type == VX_TYPE_IMAGE)
+            /* clean other data*/
+            for (i = graph->outputCount; i < VX_MAX_NN_INOUT_PARAM_COUNT; i++)
             {
-                vx_image image = (vx_image)ref;
-                binarySave->outputPhysicalEntry[i] = image->memory.physicals[0];/*Y channel*/
-            }
-            else if (ref->type == VX_TYPE_ARRAY)
-            {
-                vx_array array = (vx_array)ref;
-                binarySave->outputPhysicalEntry[i] = array->memory.physicals[0];
-            }
-            else if (ref->type == VX_TYPE_SCALAR)
-            {
-                vx_scalar scalar = (vx_scalar)ref;
-                binarySave->outputPhysicalEntry[i] = scalar->physical;
-            }
-            else
-            {
-                vxError("%s[%d]: output can't support this data type: %d \n",
-                    __FUNCTION__, __LINE__, ref->type);
+                binarySave->outputPhysicalEntry[i] = 0;
             }
         }
-        /* clean other data*/
-        for (i = graph->outputCount; i < VX_MAX_NN_INOUT_PARAM_COUNT; i++)
+        else
         {
-            binarySave->outputPhysicalEntry[i] = 0;
+            vxError("%s[%d]: bypass use user set outputs. useUserSet: %d\n", __FUNCTION__, __LINE__, useUserSet);
+
         }
     }
 
