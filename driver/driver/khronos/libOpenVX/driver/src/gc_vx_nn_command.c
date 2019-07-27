@@ -374,21 +374,25 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNSplitCommandInfo(
                 {
                     sinfoArray[0].vx_nn_general_cmd_split_info.inImageAddress  = input->physical.start;
                     sinfoArray[0].vx_nn_general_cmd_split_info.outImageAddress = output->physical.start;
+                    sinfoArray[0].vx_nn_general_cmd_split_info.kernelAddress   = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(wb, 0);
                 }
                 else if(k > 0 && j ==0 && i == 0)
                 {
                     sinfoArray[index].vx_nn_general_cmd_split_info.inImageAddress  = sinfoArray[index - ycount * xcount].vx_nn_general_cmd_split_info.inImageAddress;
-                    sinfoArray[index].vx_nn_general_cmd_split_info.outImageAddress = sinfoArray[index - ycount * xcount].vx_nn_general_cmd_split_info.outImageAddress + z_offsets[k] * output->zStride * vxnneGetTypeSize(outDataFormat);
+                    sinfoArray[index].vx_nn_general_cmd_split_info.outImageAddress = sinfoArray[index - ycount * xcount].vx_nn_general_cmd_split_info.outImageAddress + z_size[k] * vxnneGetTypeSize(outDataFormat);
+                    sinfoArray[index].vx_nn_general_cmd_split_info.kernelAddress   = WB_MEM_PHYSICAL_ADDR_INDEX(wb, index);
                 }
                 else if(j > 0 && i == 0)
                 {
                     sinfoArray[index].vx_nn_general_cmd_split_info.inImageAddress  = sinfoArray[index - xcount].vx_nn_general_cmd_split_info.inImageAddress + i_y_offset * input->yStride;
                     sinfoArray[index].vx_nn_general_cmd_split_info.outImageAddress = sinfoArray[index - xcount].vx_nn_general_cmd_split_info.outImageAddress + o_y_offset * output->yStride;
+                    sinfoArray[index].vx_nn_general_cmd_split_info.kernelAddress   = sinfoArray[index - 1].vx_nn_general_cmd_split_info.kernelAddress;
                 }
                 else
                 {
                     sinfoArray[index].vx_nn_general_cmd_split_info.inImageAddress  = sinfoArray[index - 1].vx_nn_general_cmd_split_info.inImageAddress + i_x_offset * vxnneGetTypeSize(inDataFormat);
-                    sinfoArray[index].vx_nn_general_cmd_split_info.outImageAddress = sinfoArray[index - 1].vx_nn_general_cmd_split_info.outImageAddress + o_y_offset * vxnneGetTypeSize(outDataFormat);
+                    sinfoArray[index].vx_nn_general_cmd_split_info.outImageAddress = sinfoArray[index - 1].vx_nn_general_cmd_split_info.outImageAddress + o_x_offset * vxnneGetTypeSize(outDataFormat);
+                    sinfoArray[index].vx_nn_general_cmd_split_info.kernelAddress   = sinfoArray[index - 1].vx_nn_general_cmd_split_info.kernelAddress;
                 }
 
                 vxmASSERT(sinfoArray[index].vx_nn_general_cmd_split_info.outImageXSize <= NN_IMAGE_XSIZE_MAX);

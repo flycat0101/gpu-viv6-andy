@@ -3043,6 +3043,7 @@ typedef union _vx_nn_cmd_split_info_union
         gctUINT32 outImageYSize;
         gctUINT32 outImageZSize;
         gctUINT32 outImageAddress;
+        gctUINT32 kernelAddress;
     }
     vx_nn_general_cmd_split_info;
 
