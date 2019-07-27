@@ -3040,6 +3040,7 @@ typedef union _vx_nn_cmd_split_info_union
 
         gctUINT32 outImageXSize;
         gctUINT32 outImageYSize;
+        gctUINT32 outImageZSize;
         gctUINT32 outImageAddress;
     }
     vx_nn_general_cmd_split_info;
@@ -3163,6 +3164,7 @@ typedef union _vx_nn_cmd_info_union
         gctINT32  inImageYOffset;
         gctUINT32 outImageXSize;
         gctUINT32 outImageYSize;
+        gctUINT32 outImageZSize;
         gctUINT32 outImageAddress;
 
         gctUINT32 kernelAddress;
@@ -3176,7 +3178,7 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 inImageYstride;
         gctUINT32 inImageCircularBufSize;
         gctUINT32 inImageCircularBufEndAddrPlus1;
-        gctUINT32 outImageZSize;
+
         gctUINT32 outImageTileXSize;
         gctUINT32 outImageTileYSize;
         gctUINT32 outImageXstride;
