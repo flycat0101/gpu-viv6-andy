@@ -2708,7 +2708,7 @@ vx_status calculateArchPerf(
 #ifdef USE_LIB_NN_ARCH_PERF
                                     if (context->apm)
                                     {
-                                        APM_IN_PERF_PARAMS inPerfParams;
+                                        APM_IN_PERF_PARAMS inPerfParams = {0};
                                         APM_COMM_INFO_T   *cmdInfo = &inPerfParams.cmdInfo;
                                         COMPRESSION_INFO_T *compInfo = &inPerfParams.compInfo;
 
@@ -2724,8 +2724,8 @@ vx_status calculateArchPerf(
                                         inPerfParams.op_type = op_type;
                                         inPerfParams.inDataBitSize = dataSize;
 
-                                        cmdInfo->inImageXsize  = inXSize;
-                                        cmdInfo->inImageYsize  = inYSize;
+                                        cmdInfo->outImageXsize  = inXSize;
+                                        cmdInfo->outImageYsize  = inYSize;
                                         cmdInfo->outImageZsize = outZSize;
                                         cmdInfo->inSIXRefined  = inSIXRefined;
                                         cmdInfo->inSIYRefined  = inSIYRefined;
@@ -2873,7 +2873,7 @@ vx_status calculateArchPerf(
 #ifdef USE_LIB_NN_ARCH_PERF
                     if (context->apm)
                     {
-                        APM_IN_PERF_PARAMS inPerfParams;
+                        APM_IN_PERF_PARAMS inPerfParams = {0};
                         APM_COMM_INFO_T   *cmdInfo = &inPerfParams.cmdInfo;
                         COMPRESSION_INFO_T *compInfo = &inPerfParams.compInfo;
 
@@ -2889,8 +2889,8 @@ vx_status calculateArchPerf(
                         inPerfParams.op_type = op_type;
                         inPerfParams.inDataBitSize = dataSize;
 
-                        cmdInfo->inImageXsize  = inXSize;
-                        cmdInfo->inImageYsize  = inYSize;
+                        cmdInfo->outImageXsize  = inXSize;
+                        cmdInfo->outImageYsize  = inYSize;
                         cmdInfo->outImageZsize = outZSize;
                         cmdInfo->inSIXRefined  = inSIXRefined;
                         cmdInfo->inSIYRefined  = inSIYRefined;
@@ -3020,7 +3020,7 @@ vx_status calculateArchPerf(
 #ifdef USE_LIB_NN_ARCH_PERF
                 if (context->apm)
                 {
-                    APM_IN_PERF_PARAMS inPerfParams;
+                    APM_IN_PERF_PARAMS inPerfParams = {0};
                     APM_COMM_INFO_T   *cmdInfo   = &inPerfParams.cmdInfo;
                     COMPRESSION_INFO_T *compInfo = &inPerfParams.compInfo;
 
@@ -3113,7 +3113,7 @@ vx_status calculateArchPerf(
 #ifdef USE_LIB_NN_ARCH_PERF
             if (context->apm)
             {
-                APM_IN_PERF_PARAMS inPerfParams;
+                APM_IN_PERF_PARAMS inPerfParams = {0};
                 APM_COMM_INFO_T   *cmdInfo = &inPerfParams.cmdInfo;
                 COMPRESSION_INFO_T *compInfo = &inPerfParams.compInfo;
 
@@ -3129,8 +3129,8 @@ vx_status calculateArchPerf(
                 inPerfParams.op_type = op_type;
                 inPerfParams.inDataBitSize = dataSize;
 
-                cmdInfo->inImageXsize  = inXSize;
-                cmdInfo->inImageYsize  = inYSize;
+                cmdInfo->outImageXsize  = inXSize;
+                cmdInfo->outImageYsize  = inYSize;
                 cmdInfo->outImageZsize = outZSize;
                 cmdInfo->inSIXRefined  = inSIXRefined;
                 cmdInfo->inSIYRefined  = inSIYRefined;
