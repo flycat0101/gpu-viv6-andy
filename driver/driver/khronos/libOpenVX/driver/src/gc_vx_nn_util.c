@@ -1135,7 +1135,7 @@ void initUndefinedHardwareConfig(vx_context context)
     context->nnConfig.unifiedFeature.maxTileSize = MAX_TILE_XSIZE;
     context->nnConfig.unifiedFeature.axiSramSlowedDownByAddr = AXI_SRAM_SLOWED_DOWN_BY_DDR;
     context->nnConfig.unifiedFeature.slowNNReqArbitrationFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_REQ_SLOWARBITRATION_FIX) ? 1 : 0;
-
+    context->nnConfig.unifiedFeature.diffConditionForCachelineModePreFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DR_JD_DIFF_CONDITION_FOR_CACHELINE_MODE_PRE_FIX) ? 1 : 0;
     context->nnConfig.customizedFeature.vipSWTiling = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE1) ? 1 : 0;
     context->nnConfig.unifiedFeature.axiSramOnlySWTiling = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE3) ? 0 :
                                                            vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE1) ? 1 : 0;

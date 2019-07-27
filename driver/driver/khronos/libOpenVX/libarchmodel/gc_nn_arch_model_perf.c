@@ -222,8 +222,8 @@ static void _calcArchModelCacheMode(vx_context context, vx_arch_perf perf, vx_in
 
 
 static vx_int8 gOrigShowType = -1;
-static const vx_char *archModelVersion = "ARCHCTS@214006";
-static const vx_char *SWTilingVersion = "ARCHCTS@214006";
+static const vx_char *archModelVersion = "ARCHCTS@215899";
+static const vx_char *SWTilingVersion = "ARCHCTS@215899";
 vx_status showArchPerformance(
     vx_context context,
     vxnne_layer layer,
@@ -382,6 +382,10 @@ vx_status showArchPerformance(
 
         vxInfo("LOW_EFFICIENCY_OF_ID_WRITE_IMGBUF_FIX: %d\n",
             context->nnConfig.unifiedFeature.lowEfficiencyOfIDWriteImgBufFix
+            );
+
+        vxInfo("DR_JD_Diff_For_Cacheline_Mode_FIX: %d\n",
+            context->nnConfig.unifiedFeature.diffConditionForCachelineModePreFix
             );
 
         vxInfo("\n");
@@ -2656,8 +2660,9 @@ vx_status calculateArchPerf(
                             }
                             for (y = minOutTileYSize; y <= tmpMaxOutTileYSize; y++)
                             {
-                                if (inXSize - xOffSet <= x + kernelXSize -1 &&
-                                    inYSize - yOffSet <= y + kernelYSize -1)
+                                if ((inXSize - xOffSet <= x + kernelXSize -1 &&
+                                    inYSize - yOffSet <= y + kernelYSize -1) &&
+                                    (y == inYSize && x == inXSize && context->nnConfig.unifiedFeature.diffConditionForCachelineModePreFix))
                                 {
                                     cacheLineMode = 1;
                                 }

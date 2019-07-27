@@ -158,6 +158,7 @@ typedef struct _gcsNN_UNIFIED_FEATURE
     gctUINT  lowEfficiencyOfIDWriteImgBufFix : 1;
     gctUINT  xyOffsetLimitationFix : 1;
     gctUINT  kernelPerCoreLTOneThirdCoefFix : 1;
+    gctUINT  diffConditionForCachelineModePreFix : 1;
 } gcsNN_UNIFIED_FEATURE;
 
 /* Features are derived from above ones */
