@@ -524,33 +524,34 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_updateTensorInGraph(vx_node curren
     {
         for (j = 0; j < currentNode->numParents; j++)
         {
+            vx_uint32 index = 0;
             vx_node parent = nodeTable[currentNode->parentNodes[j]];
-            if(vxoGraphOptimization_matchTensorInNode(parent,oldTensor[i], VX_NULL))
+
+            if(!vxoGraphOptimization_matchTensorInNode(parent,oldTensor[i], VX_NULL))
+                continue;
+
+            for(k = 0; k <parent->numChildren; k++)
             {
-                vx_uint32 index = 0;
-                for(k = 0; k <parent->numChildren; k++)
-                {
-                    vx_node twinsNode = nodeTable[parent->childNodes[k]];
-                    if(twinsNode == currentNode)
-                        continue;
+                vx_node twinsNode = nodeTable[parent->childNodes[k]];
+                if(twinsNode == currentNode)
+                    continue;
 
-                    if(vxoGraphOptimization_matchTensorInNode(twinsNode, oldTensor[i], &index))
-                    {
-                        vxoGraphOptimization_updateTensorInNode(&twinsNode, index, newTensor[i]);
-                    }
-                }
-
-                /*find valid parent*/
-                if(parent->merged)
+                if(vxoGraphOptimization_matchTensorInNode(twinsNode, oldTensor[i], &index))
                 {
-                    parent = parent->replacedBy;
+                    vxoGraphOptimization_updateTensorInNode(&twinsNode, index, newTensor[i]);
                 }
+            }
 
-                if(vxoGraphOptimization_matchTensorInNode(parent, oldTensor[i], &index))
-                {
-                    vxoGraphOptimization_updateTensorInNode(&parent, index, newTensor[i]);
-                    break;
-                }
+            /*find valid parent*/
+            if(parent->merged)
+            {
+                parent = parent->replacedBy;
+            }
+
+            if(vxoGraphOptimization_matchTensorInNode(parent, oldTensor[i], &index))
+            {
+                vxoGraphOptimization_updateTensorInNode(&parent, index, newTensor[i]);
+                break;
             }
         }
     }
@@ -3949,7 +3950,17 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_multiTranspose_mergeTransposes(vx_
 
     if(sync)
     {
-        if(VX_SUCCESS != vxoGraphOptimization_updateTensorInGraph(transposeNodes[0], &input, &finalout, 1))
+        /*if input can not be repalced, replace the casted node's input*/
+        if(input->isViewed || !input->isVirtual)
+        {
+            vx_node* nodeTable = transposeNodes[0]->graph->nodeTable;
+            vx_node tailnode = nodeTable[nodeCnt - 1];
+            vx_node castednode = nodeTable[tailnode->childNodes[0]];
+
+            if(VX_SUCCESS != vxoGraphOptimization_updateTensorInGraph(castednode, &finalout, &input, 1))
+                goto error;
+        }
+        else if(VX_SUCCESS != vxoGraphOptimization_updateTensorInGraph(transposeNodes[0], &input, &finalout, 1))
             goto error;
         transposeNodes[0]->merged = vx_true_e;
     }
