@@ -44,6 +44,7 @@ static const char * _dlls[] =
     "glesv1-dlls",                      /* OpenGL ES 1.1 Common */
     "glesv2-dlls",                      /* OpenGL ES 2.0 */
     "glesv2-dlls",                      /* OpenGL ES 3.0 */
+    "gl-dlls",                          /* OpenGL */
     "vg-dlls",                          /* OpenVG 1.0 */
 #elif defined(__APPLE__)
     "libEGL.dylib",                     /* EGL */
