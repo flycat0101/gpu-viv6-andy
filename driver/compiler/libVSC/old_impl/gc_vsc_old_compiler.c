@@ -24659,6 +24659,17 @@ gcSHADER_AddOpcodeConditionalFormattedEnable(
 
         link = pointer;
 
+        if (Opcode == gcSL_CALL)
+        {
+            gcFUNCTION func = gcvNULL;
+            gcSHADER_FindFunctionByLabel(Shader, Label, &func);
+            if (func)
+            {
+                label->function = func;
+                label->defined = func->codeStart;
+            }
+        }
+
         /* Initialize the gcSHADER_LINK structure. */
         link->next       = label->referenced;
         link->referenced = Shader->lastInstruction;
@@ -24725,6 +24736,7 @@ gcSHADER_AddLabel(
 
     /* Set definition of the label. */
     label->defined = Shader->lastInstruction;
+    label->function = gcvNULL;
 
     /* Success. */
     gcmFOOTER_NO();
@@ -31935,6 +31947,11 @@ gcSHADER_BeginFunction(
     Function->codeStart = Shader->lastInstruction;
 
     status = gcSHADER_AddLabel(Shader, Function->label);
+    {
+        gcSHADER_LABEL label;
+        if (gcSHADER_FindLabel(Shader, Function->label, &label))
+            label->function = Function;
+    }
 
     gcmFOOTER();
     return status;
