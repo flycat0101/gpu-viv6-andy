@@ -1999,6 +1999,60 @@ _ConvImageTypeId(
     return fixedTypeId;
 }
 
+static VIR_TypeId
+_ConvDepthImageTypeToNonDepthImageType(
+    VIR_TypeId       ImageTypeId,
+    VIR_ImageFormat  ImageFormat
+    )
+{
+    VIR_TypeId       fixedTypeId = ImageTypeId;
+
+    switch (fixedTypeId)
+    {
+    case VIR_TYPE_IMAGE_1D_DEPTH:
+        fixedTypeId = VIR_TYPE_IMAGE_1D;
+        break;
+
+    case VIR_TYPE_IMAGE_1D_ARRAY_DEPTH:
+        fixedTypeId = VIR_TYPE_IMAGE_1D_ARRAY;
+        break;
+
+    case VIR_TYPE_IMAGE_2D_MSSA_DEPTH:
+        fixedTypeId = VIR_TYPE_IMAGE_2D_MSSA;
+        break;
+
+    case VIR_TYPE_IMAGE_2D_ARRAY_MSSA_DEPTH:
+        fixedTypeId = VIR_TYPE_IMAGE_2D_ARRAY_MSSA;
+        break;
+
+    case VIR_TYPE_IMAGE_2D_DEPTH:
+        fixedTypeId = VIR_TYPE_IMAGE_2D;
+        break;
+
+    case VIR_TYPE_IMAGE_2D_ARRAY_DEPTH:
+        fixedTypeId = VIR_TYPE_IMAGE_2D_ARRAY;
+        break;
+
+    case VIR_TYPE_IMAGE_CUBE_DEPTH:
+        fixedTypeId = VIR_TYPE_IMAGE_CUBE;
+        break;
+
+    case VIR_TYPE_IIMAGE_CUBE_DEPTH:
+        fixedTypeId = VIR_TYPE_IIMAGE_CUBE;
+        break;
+
+    case VIR_TYPE_UIMAGE_CUBE_DEPTH:
+        fixedTypeId = VIR_TYPE_UIMAGE_CUBE;
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+
+    return fixedTypeId;
+}
+
 VIR_NameId
 VIR_Shader_GetImageRelatedLibFuncName(
     VIR_Shader      *pShader,
@@ -2041,6 +2095,10 @@ _IntrisicImageRelatedFuncName(
     }
 
     /* Convert the image type if needed. */
+    if (VIR_TypeId_isImageDepth(fixedTypeId))
+    {
+        fixedTypeId = _ConvDepthImageTypeToNonDepthImageType(fixedTypeId, imageFormat);
+    }
     if (!useImgInst || VIR_TypeId_isImageSubPassData(fixedTypeId))
     {
         fixedTypeId = _ConvImageTypeId(fixedTypeId, imageFormat);

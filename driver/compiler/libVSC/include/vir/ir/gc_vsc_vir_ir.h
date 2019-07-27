@@ -3352,6 +3352,10 @@ typedef enum _VIR_TYFLAG
                                 | VIR_TYFLAG_IS_SAMPLER_CUBE
                                 | VIR_TYFLAG_IS_SAMPLER_MS
                                 | VIR_TYFLAG_IS_SAMPLER_SHADOW,
+
+    /* For sampler and image*/
+    VIR_TYFLAG_IS_DEPTH         = 0x8000000,
+
     /* flags for function */
 
 } VIR_TyFlag;
@@ -3471,6 +3475,7 @@ VIR_Shader_GetBuiltInTypes(
                                              VIR_TypeId_isImageBuffer(Id)   || \
                                              VIR_TypeId_isImageCube(Id)     || \
                                              VIR_TypeId_isImageSubPassData(Id))
+#define VIR_TypeId_isImageDepth(Id)         (VIR_TypeId_isImage(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_DEPTH) != 0)
 
 #define VIR_TypeId_isImageT(Id)             (VIR_TypeId_isPrimitive(Id) && \
                                              (Id) >= VIR_TYPE_MIN_IMAGE_T_TYID && (Id) <= VIR_TYPE_MAX_IMAGE_T_TYID)
