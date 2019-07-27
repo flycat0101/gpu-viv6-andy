@@ -151,7 +151,7 @@ LOCAL_SHARED_LIBRARIES := \
     libdl \
     libcutils \
     libVSC \
-    libGAL
+    libGAL \
 
 LOCAL_MODULE         := libOpenVX
 LOCAL_MODULE_TAGS    := optional

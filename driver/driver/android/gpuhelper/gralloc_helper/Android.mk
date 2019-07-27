@@ -49,6 +49,12 @@ LOCAL_SHARED_LIBRARIES := \
     libGAL
 endif
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+        hardware/libhardware/include \
+        system/core/include
+endif
+
 # imx specific
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 25),1)
 ifneq ($(findstring x7.1.1,x$(PLATFORM_VERSION)), x7.1.1)

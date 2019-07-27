@@ -37,7 +37,6 @@ EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libarchmodel/include
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/include
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/kernels
 
-
 # from libCL (trunk/driver/khronos/libCL/makefile.linux)
 # Core
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_target.o

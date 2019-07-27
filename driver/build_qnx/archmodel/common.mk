@@ -23,7 +23,6 @@ define PINFO
 PINFO DESCRIPTION="NN arch model"
 endef
 
-
 include $(qnx_build_dir)/common.mk
 
 EXTRA_INCVPATH += $(driver_root)/sdk/inc
@@ -34,7 +33,6 @@ EXTRA_INCVPATH += $(driver_root)/hal/inc
 EXTRA_INCVPATH += $(driver_root)/hal/user
 EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
 EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
-
 
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/libarchmodel/gc_nn_arch_model_perf.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/libarchmodel/gc_nn_arch_model_swtiling.o
