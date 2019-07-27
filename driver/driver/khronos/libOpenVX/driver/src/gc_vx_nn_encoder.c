@@ -10272,8 +10272,15 @@ void analysisTPStreamForHuffman(
         dataCountToPross = kernelDataCount;
         pBS_U08 = (vx_uint8 * )reorderStream;
         pBS_U16 = (vx_uint16 *)reorderStream;
+        sliceIndex = 0;
         while(dataCountToPross--)
         {
+            vx_uint32 endOfCore = (dataCountToPross + accumCountEndOfCore[sliceIndex] == kernelDataCount - 1) ? 1 : 0;
+            if(endOfCore)
+            {
+                sliceIndex++;
+            }
+
             if (bit16Flag == 0)
             {
                 i = *(pBS_U08++);
@@ -10289,7 +10296,7 @@ void analysisTPStreamForHuffman(
 
             i = (i - bias);
             if (i == 0) run++;
-            if (run == sizeof(runZeros) / sizeof(vx_int32) || i)
+            if (run == sizeof(runZeros) / sizeof(vx_int32) || i || endOfCore)
             {
                 if(run)
                 {
