@@ -687,6 +687,11 @@ VX_INTERNAL_API void vxoGraph_GenerateOpParentChild(vx_graph graph)
             {
                 if (count == graph->base.context->allTensorNum)
                 {
+                    if (paramNodeTable)
+                    {
+                        gcoOS_FreeMemory(gcvNULL, paramNodeTable);
+                    }
+
                     gcmFOOTER_NO();
                     return;
                 }

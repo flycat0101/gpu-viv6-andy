@@ -13793,7 +13793,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
         node->layer = &rpnLayer->base;
     }
 
+    return VX_SUCCESS;
+
 exit:
+    if (rpnLayer)
+    {
+        gcoOS_Free(VX_NULL, rpnLayer);
+    }
+
     return status;
 }
 

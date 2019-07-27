@@ -1783,6 +1783,11 @@ VX_INTERNAL_API vx_bool vxoContext_AddObject(vx_context context, vx_reference re
         }
         else
         {
+            if (ritem)
+            {
+                vxFree(ritem);
+            }
+
             vxError("Context ref list error");
             gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;

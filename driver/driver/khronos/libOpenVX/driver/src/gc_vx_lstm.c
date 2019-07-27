@@ -3308,7 +3308,7 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
                 VXNNE_OPERATION_TARGET_TP,
                 VXNNE_OPERATOR_FULLYCONNECTED,
                 VX_NULL,
-                VX_NULL,
+                vxnneOperation_TP_Deinitialize,
                 batchCount,
                 0);
 
@@ -3820,7 +3820,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, co
             {
                 vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
                 status = VX_ERROR_NO_MEMORY;
-                return status;
+                goto exit;
             }
             lstmUnitNode->base.temp_tensors[tmpTensorIndex++] = w_x;
 
