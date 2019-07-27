@@ -57,6 +57,8 @@ VIR_TypeId __SpvIntToVirType(gctUINT width, gctBOOL isSigned)
     return typeId;
 }
 
+static SpvBuiltIn spvStartBuiltInName = SpvBuiltInPosition;
+static SpvBuiltIn spvEndBuiltInName = SpvBuiltInInstanceIndex;
 static gctCHAR * SpvBuiltInName [] =
 {
     "gl_Position", /* SpvBuiltInPosition = 0,*/
@@ -103,6 +105,37 @@ static gctCHAR * SpvBuiltInName [] =
     "gl_SubgroupInvocationID", /* SpvBuiltInSubgroupLocalInvocationId = 41, */
     "gl_VertexIndex", /* SpvBuiltInVertexIndex = 42, */
     "gl_InstanceIndex", /* SpvBuiltInInstanceIndex = 43, */
+};
+
+static SpvBuiltIn spvStartBuiltInExtension1Name = SpvBuiltInSubgroupEqMask;
+static SpvBuiltIn spvEndBuiltInExtension1Name = SpvBuiltInViewIndex;
+static gctCHAR * SpvBuiltInExtension1Name [] =
+{
+    "SubgroupEqMask",       /* SubgroupEqMask = 4416,*/
+    "SubgroupGeMask",       /* SubgroupGeMask = 4417,*/
+    "SubgroupGtMask",       /* SubgroupGtMask = 4418,*/
+    "SubgroupLeMask",       /* SubgroupLeMask = 4419,*/
+    "SubgroupLtMask",       /* SubgroupLtMask = 4420,*/
+    "",                     /* Reserved = 4421,*/
+    "",                     /* Reserved = 4422,*/
+    "",                     /* Reserved = 4423,*/
+    "gl_BaseVertex",        /* BaseVertex = 4424,*/
+    "gl_BaseInstance",      /* BaseInstance = 4425,*/
+    "gl_DrawIndex",         /* DrawIndex = 4426,*/
+    "",                     /* Reserved = 4427,*/
+    "",                     /* Reserved = 4428,*/
+    "",                     /* Reserved = 4429,*/
+    "",                     /* Reserved = 4430,*/
+    "",                     /* Reserved = 4431,*/
+    "",                     /* Reserved = 4432,*/
+    "",                     /* Reserved = 4433,*/
+    "",                     /* Reserved = 4434,*/
+    "",                     /* Reserved = 4435,*/
+    "",                     /* Reserved = 4436,*/
+    "",                     /* Reserved = 4437,*/
+    "gl_DeviceIndex",       /* DeviceIndex = 4438,*/
+    "",                     /* Reserved = 4439,*/
+    "gl_ViewIndex",         /* ViewIndex = 4440,*/
 };
 
 SpvOperandClass __SpvGetOperandClassFromOpCode(SpvOp opCode, gctUINT opndIndex)
@@ -1128,20 +1161,19 @@ static VSC_ErrCode __SpvReplaceBuiltInName(gcSPV spv, VIR_Shader * virShader, VI
         return virErrCode;
     }
 
+    /* Get the builtin name string. */
     builtIn = dec->decorationData.builtIn;
-
-    if (builtIn == SpvBuiltInDeviceIndex)
+    if (builtIn >= spvStartBuiltInName && builtIn <= spvEndBuiltInName)
     {
-        name = "gl_DeviceIndex";
+        name = SpvBuiltInName[builtIn - spvStartBuiltInName];
+    }
+    else if (builtIn >= spvStartBuiltInExtension1Name && builtIn <= spvEndBuiltInExtension1Name)
+    {
+        name = SpvBuiltInExtension1Name[builtIn - spvStartBuiltInExtension1Name];
     }
     else
     {
-        if ((builtIn < 0) || (builtIn >= gcmSIZEOF(SpvBuiltInName) / gcmSIZEOF(gctCHAR *)))
-        {
-            return virErrCode;
-        }
-
-        name = SpvBuiltInName[builtIn];
+        return virErrCode;
     }
 
     if (spv->shaderStage == VSC_SHADER_STAGE_GS &&
@@ -13295,10 +13327,6 @@ gceSTATUS __SpvCleanUpShader(
 
     /* Update per-vertex array symbols. */
     _SpvUpdatePerVertexArray(spv, virShader);
-
-    /* Replace gl_DeviceIndex with immediate 0,
-       as we will not be able to report multiple devices in a device group for the near future */
-    VIR_Shader_ReplaceDeviceIndex(virShader);
 
 OnError:
     return status;

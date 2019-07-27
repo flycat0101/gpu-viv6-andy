@@ -2366,6 +2366,7 @@ extern VIR_NameId   VIR_NAME_UNKNOWN,
                     VIR_NAME_SUBGROUP_SIZE, /* gl_SubgroupSize */
                     VIR_NAME_SUBGROUP_ID, /* gl_SubgroupID */
                     VIR_NAME_SUBGROUP_INVOCATION_ID, /* gl_SubgroupInvocationID */
+                    VIR_NAME_VIEW_INDEX, /* gl_ViewIndex */
                     VIR_NAME_BUILTIN_LAST;
 
 typedef enum _VIR_ROUNDMODE
@@ -2717,6 +2718,7 @@ typedef enum _VIR_UNIFORMKIND
     VIR_UNIFORM_WORK_GROUP_ID_OFFSET,
     VIR_UNIFORM_TEXELBUFFER_TO_IMAGE,
     VIR_UNIFORM_GLOBAL_WORK_SCALE,
+    VIR_UNIFORM_VIEW_INDEX,
     /* should not larger than 2^6, since it is using storageClass,
      * in case it is >= 64, need to enlarge _storageClass */
 } VIR_UniformKind;
@@ -6222,7 +6224,7 @@ VIR_Shader_RenumberInstId(
     );
 
 VSC_ErrCode
-VIR_Shader_ReplaceDeviceIndex(
+VIR_Shader_ReplaceBuiltInAttribute(
     IN VIR_Shader* Shader
     );
 

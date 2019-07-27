@@ -1058,6 +1058,7 @@ static gctBOOL _VIR_CG_isUniformAllocable(
         case VIR_UNIFORM_TRANSFORM_FEEDBACK_STATE:
         case VIR_UNIFORM_TEXELBUFFER_TO_IMAGE:
         case VIR_UNIFORM_GLOBAL_WORK_SCALE:
+        case VIR_UNIFORM_VIEW_INDEX:
 
             if (isSymUniformMovedToAUBO(pSym))
             {

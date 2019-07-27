@@ -1180,6 +1180,10 @@ _ConvUniformKind2Vir(
         virUniformKind = VIR_UNIFORM_LEVEL_BASE_SIZE;
         break;
 
+    case gcSHADER_VAR_CATEGORY_VIEW_INDEX:
+        virUniformKind = VIR_UNIFORM_VIEW_INDEX;
+        break;
+
     case gcSHADER_VAR_CATEGORY_NORMAL:
         switch(GetUniformKind(Uniform))
         {

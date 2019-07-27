@@ -472,6 +472,8 @@ _GetUniformKindString(
         return "general_patch";
     case VIR_UNIFORM_TEXELBUFFER_TO_IMAGE:
         return "texelBufferToImage";
+    case VIR_UNIFORM_VIEW_INDEX:
+        return "viewIndex";
     default:
         gcmASSERT(0);
         return "";

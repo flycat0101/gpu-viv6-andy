@@ -2466,6 +2466,10 @@ static SHS_PRIV_CONSTANT_KIND _MapUniformKindToPrivConstKind(VIR_Shader* pShader
         bOCLOnly = gcvTRUE;
         break;
 
+    case VIR_UNIFORM_VIEW_INDEX:
+        privConstKind = SHS_PRIV_CONSTANT_KIND_VIEW_INDEX;
+        break;
+
     default:
         break;
     }

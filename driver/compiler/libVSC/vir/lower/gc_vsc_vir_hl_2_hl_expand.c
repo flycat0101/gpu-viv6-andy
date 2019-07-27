@@ -5160,6 +5160,9 @@ VIR_Lower_HighLevel_To_HighLevel_Expand(
 
     _Lower_Initialize(shader, pmm, &context);
 
+    /* Replace some builtin attributes. */
+    VIR_Shader_ReplaceBuiltInAttribute(shader);
+
     /* Expand function arguments by expanding the argument list in VIR_OP_PARM.
     ** We need to do this before symbol allocation.
     */

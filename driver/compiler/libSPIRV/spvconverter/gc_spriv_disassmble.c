@@ -486,6 +486,7 @@ gctSTRING __SpvBuiltInToString(gctUINT builtIn)
     case 42: return "VertexIndex";                 // TBD: put next to VertexId?
     case 43: return "InstanceIndex";               // TBD: put next to InstanceId?
     case 4438: return "DeviceIndex";
+    case 4440: return "ViewIndex";
 
     default: return "Unsupported builtin";
     }

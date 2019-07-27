@@ -52,6 +52,7 @@ typedef enum SHS_PRIV_CONSTANT_KIND
     SHS_PRIV_CONSTANT_KIND_GLOBAL_WORK_SCALE                = 22,
     SHS_PRIV_CONSTANT_KIND_DATA_BIT_SIZE                    = 23,
     SHS_PRIV_CONSTANT_KIND_COMPUTE_GROUP_NUM_FOR_SINGLE_GPU = 24,
+    SHS_PRIV_CONSTANT_KIND_VIEW_INDEX                       = 25,
     SHS_PRIV_CONSTANT_KIND_COUNT, /* last member, add new kind beofre this */
 }SHS_PRIV_CONSTANT_KIND;
 

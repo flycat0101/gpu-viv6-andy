@@ -177,6 +177,7 @@ VIR_NameId  VIR_NAME_UNKNOWN,
     VIR_NAME_SUBGROUP_SIZE, /* gl_SubgroupSize */
     VIR_NAME_SUBGROUP_ID, /* gl_SubgroupID */
     VIR_NAME_SUBGROUP_INVOCATION_ID, /* gl_SubgroupInvocationID */
+    VIR_NAME_VIEW_INDEX, /* gl_ViewIndex */
     VIR_NAME_BUILTIN_LAST;
 
 VIR_BuiltinTypeInfo VIR_builtinTypes[] =
@@ -1714,9 +1715,10 @@ _initOpenGLBuiltinNames(VIR_Shader * Shader, VIR_StringTable *StrTable)
     _add_name(VIR_NAME_SUBGROUP_SIZE, "gl_SubgroupSize");
     _add_name(VIR_NAME_SUBGROUP_ID, "gl_SubgroupID");
     _add_name(VIR_NAME_SUBGROUP_INVOCATION_ID, "gl_SubgroupInvocationID");
+    _add_name(VIR_NAME_VIEW_INDEX, "gl_ViewIndex");
 
     /* WARNING!!! change builtin_last if add new name !!! */
-    VIR_NAME_BUILTIN_LAST = VIR_NAME_SUBGROUP_INVOCATION_ID + sizeof("gl_SubgroupInvocationID");
+    VIR_NAME_BUILTIN_LAST = VIR_NAME_VIEW_INDEX + sizeof("gl_SubgroupInvocationID");
 }
 #undef _add_name
 
@@ -9022,37 +9024,42 @@ VIR_Shader_RenumberInstId(
 }
 
 VSC_ErrCode
-VIR_Shader_ReplaceDeviceIndex(
-    IN VIR_Shader* Shader)
+VIR_Shader_ReplaceBuiltInAttribute(
+    IN VIR_Shader*          pShader
+    )
 {
-    VSC_ErrCode retValue  = VSC_ERR_NONE;
-    VIR_AttributeIdList     *pAttrs = VIR_Shader_GetAttributes(Shader);
-    gctUINT     attrCount = VIR_IdList_Count(pAttrs);
-    gctUINT     currAttr;
+    VSC_ErrCode             errCode  = VSC_ERR_NONE;
+    VIR_AttributeIdList*    pAttrs = VIR_Shader_GetAttributes(pShader);
+    gctUINT                 currAttr;
 
-    for (currAttr = 0; currAttr < attrCount; currAttr++)
+    /*
+    **  1) Replace gl_DeviceIndex with immediate 0, as we will not be able to report multiple devices in a device group for the near future
+    **  2) Change gl_ViewIndex from a attribute to a uniform as we can't directly support it.
+    */
+
+    for (currAttr = 0; currAttr < VIR_IdList_Count(pAttrs); currAttr++)
     {
-        VIR_Symbol  *attribute = VIR_Shader_GetSymFromId(Shader,
-                                    VIR_IdList_GetId(pAttrs, currAttr));
+        VIR_Symbol*         pAttributeSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pAttrs, currAttr));
+        gctBOOL             bRemoveAttr = gcvFALSE;
 
-        if (VIR_Symbol_GetName(attribute) == VIR_NAME_DEVICE_INDEX)
+        if (VIR_Symbol_GetName(pAttributeSym) == VIR_NAME_DEVICE_INDEX)
         {
-            VIR_FuncIterator   iter;
-            VIR_FunctionNode *funcNode;
+            VIR_FuncIterator    iter;
+            VIR_FunctionNode*   funcNode;
 
-            VIR_FuncIterator_Init(&iter, &Shader->functions);
-            funcNode = VIR_FuncIterator_First(&iter);
-            for (; funcNode != gcvNULL; funcNode = VIR_FuncIterator_Next(&iter))
+            VIR_FuncIterator_Init(&iter, &pShader->functions);
+            for (funcNode = VIR_FuncIterator_First(&iter); funcNode != gcvNULL; funcNode = VIR_FuncIterator_Next(&iter))
             {
-                VIR_InstIterator instIter;
-                VIR_Instruction  *inst = gcvNULL;
+                VIR_InstIterator    instIter;
+                VIR_Instruction*    inst = gcvNULL;
 
                 VIR_InstIterator_Init(&instIter, &funcNode->function->instList);
-                inst = (VIR_Instruction *)VIR_InstIterator_First(&instIter);
-                for (; inst != gcvNULL; inst = (VIR_Instruction *)VIR_InstIterator_Next(&instIter))
+                for (inst = (VIR_Instruction *)VIR_InstIterator_First(&instIter);
+                     inst != gcvNULL;
+                     inst = (VIR_Instruction *)VIR_InstIterator_Next(&instIter))
                 {
                     gctUINT srcId = 0;
-                    for(; srcId < VIR_Inst_GetSrcNum(inst); ++srcId)
+                    for (srcId = 0 ; srcId < VIR_Inst_GetSrcNum(inst); ++srcId)
                     {
                         VIR_Operand  *operand = VIR_Inst_GetSource(inst, srcId);
                         if (VIR_Operand_GetOpKind(operand) == VIR_OPND_SYMBOL)
@@ -9067,12 +9074,32 @@ VIR_Shader_ReplaceDeviceIndex(
                     }
                 }
             }
-            /* remove this attribute */
+
+            bRemoveAttr = gcvTRUE;
+        }
+        else if (VIR_Symbol_GetName(pAttributeSym) == VIR_NAME_VIEW_INDEX)
+        {
+            VIR_Symbol_SetKind(pAttributeSym, VIR_SYM_UNIFORM);
+            VIR_Symbol_ClrFlag(pAttributeSym, VIR_SYMFLAG_WITHOUT_REG);
+            VIR_Symbol_SetUniformKind(pAttributeSym, VIR_UNIFORM_VIEW_INDEX);
+            VIR_Symbol_SetAddrSpace(pAttributeSym, VIR_AS_CONSTANT);
+            VIR_Symbol_SetTyQualifier(pAttributeSym, VIR_TYQUAL_CONST);
+            VIR_Symbol_SetLayoutQualifier(pAttributeSym, VIR_LAYQUAL_NONE);
+
+            ON_ERROR(VIR_Shader_AddSymbolContents(pShader, pAttributeSym, VIR_INVALID_ID, gcvTRUE),
+                "Add uniform content fail.");
+            bRemoveAttr = gcvTRUE;
+        }
+
+        /* remove this attribute */
+        if (bRemoveAttr)
+        {
             VIR_IdList_DeleteByIndex(pAttrs, currAttr);
-            break;
         }
     }
-    return retValue;
+
+OnError:
+    return errCode;
 }
 
 VIR_Uniform*

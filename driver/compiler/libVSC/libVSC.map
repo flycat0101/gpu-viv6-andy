@@ -463,7 +463,6 @@
     VIR_Shader_GetCreatedSymAliasTable;
     VIR_Shader_IsNameBuiltIn;
     VIR_Shader_DuplicateVariablelFromSymId;
-    VIR_Shader_ReplaceDeviceIndex;
     VIR_Shader_TreatPushConstantAsBuffer;
     VIR_Shader_FindSymbolByName;
     VIR_Symbol_GetUniformPointer;
