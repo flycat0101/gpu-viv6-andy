@@ -981,6 +981,18 @@ VkResult halti2_clearImageWithRS(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))));
 
+        /*  RS and PE cache is shared on some chip, need flush PE cache befor trigger RS. */
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E03, VK_FALSE, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1))))))) << (0 ?
+ 1:1))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1))));
+
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0580, VK_FALSE, 0xBADABEEB);
 
         if (devCtx->enabledFeatures.robustBufferAccess &&
@@ -1635,6 +1647,18 @@ VkResult halti2_copyImageWithRS(
  0:0) - (0 ?
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))));
+
+    /*  RS and PE cache is shared on some chip, need flush PE cache befor trigger RS. */
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E03, VK_FALSE, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1))))))) << (0 ?
+ 1:1))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1))));
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0580, VK_FALSE, 0xBADABEEB);
 
