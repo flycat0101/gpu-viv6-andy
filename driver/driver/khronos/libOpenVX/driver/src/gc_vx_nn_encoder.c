@@ -11564,7 +11564,7 @@ vx_size estimateWeightBiasStreamSize(
             weightFormat,
             biasFormat,
             wb->wb_base->skipValue,
-            wb->weights_sizes[2] <= 1 ? 0 : wb->wb_base->setZeroLength,
+            /*wb->weights_sizes[2] <= 1 ? 0 : */wb->wb_base->setZeroLength,
             (vx_uint8)context->options.nnZeroRunLen,
             0,
             &kernelStreamSize, VX_NULL, VX_NULL);
@@ -14764,7 +14764,7 @@ vx_status vxoWeightsBiases_Compress(
                         wb_base->weights_data_format,
                         wb_base->biases_data_format,
                         wb_base->skipValue,
-                        wb->weights_sizes[2] <= 1 ? 0 : wb_base->setZeroLength,
+                        /*wb->weights_sizes[2] <= 1 ? 0 : */wb_base->setZeroLength,
                         (vx_uint8)context->options.nnZeroRunLen,
                         0,
                         &minKernelBufferSize[index], &minZeroRunLen[index], &maxZeroRunLen[index]);
