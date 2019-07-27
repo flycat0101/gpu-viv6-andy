@@ -14479,21 +14479,8 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
             if (i > MAX_ZGROUP_COUNT)
                 goto exit;
             zNum = i;
-
-            if (sliceCount < (0x1<<16))
-            {
-                kzNum = 1;
-                kzArray[0] = sliceCount;
-            }
-            else
-            {
-                /* let's first support 2^16<=kz<2^17 */
-                gcmASSERT(sliceCount < (0x1<<17));
-                kzNum = 2;
-                kzArray[0] = sliceCount / 2;
-                kzArray[1] = sliceCount - sliceCount / 2;
-            }
-
+            kzNum = sliceCount / (0x1 << 16) + 1;
+            calculateSplitSize(sliceCount, kzNum, kzArray, VX_NULL);
             zrlTmpPtr = wb_base->zrlTpFcPtr = (vx_uint8 *)vxAllocate(weight_dims[2] * zNum);
             if (wb_base->zrlTpFcPtr == NULL)
             {
