@@ -1752,7 +1752,7 @@ again:
 
                         if (find || (mem->allocPartial && asize > 0))
                         {
-                            vx_uint32 fid;
+                            vx_uint32 fid = 0;
 
                             asize = 0;
                             for (k = 0; k < acount; k++)
