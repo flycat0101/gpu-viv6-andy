@@ -5657,10 +5657,12 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
         if (operation->target == VXNNE_OPERATION_TARGET_NN)
         {
             vxnneModifyNNLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, operation, i != layer->opIndicesNum - 1 ? 1 : 0);
+            layer->opIndices[i].commandBuffer.eventID[layer->opIndices[i].commandBuffer.commandCount - 1] = 1;
         }
         else if (operation->target == VXNNE_OPERATION_TARGET_TP)
         {
             vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[i].commandBuffer, operation, i != layer->opIndicesNum - 1 ? 1 : 0);
+            layer->opIndices[i].commandBuffer.eventID[layer->opIndices[i].commandBuffer.commandCount - 1] = 1;
         }
     }
 
@@ -5866,6 +5868,7 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
                 }
 
                 vxnneModifyTPLastNoflushBit(graph->base.context, &layer->opIndices[flushTPPos].commandBuffer, operation, 0);
+                layer->opIndices[flushTPPos].commandBuffer.eventID[layer->opIndices[flushTPPos].commandBuffer.commandCount - 1] = 0;
                 vxInfo("TP flush %2d\n", operation->absoluteOperationID);
                 nnTPFlushed = tpTPFlushed = vx_false_e;
                 flushedTPOp = operation;
@@ -5924,6 +5927,7 @@ VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
             }
 
             vxnneModifyNNLastNoflushBit(graph->base.context, &layer->opIndices[flushNNPos].commandBuffer, operation, 0);
+            layer->opIndices[flushNNPos].commandBuffer.eventID[layer->opIndices[flushNNPos].commandBuffer.commandCount - 1] = 0;
             vxInfo("NN flush %2d\n", operation->absoluteOperationID);
             tpNNFlushed = vx_false_e;
             flushedNNOp = operation;
