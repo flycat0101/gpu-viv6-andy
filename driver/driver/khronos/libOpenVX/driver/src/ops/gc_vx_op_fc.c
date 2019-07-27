@@ -25,6 +25,13 @@ extern vx_status vxnneExecuteSWConvolution(vxnne_operation operation);
 
 extern vx_status vxnneExecuteSWTensorTranspose(struct _vxnne_operation_s *operation);
 
+extern vx_status vxnneExecuteCopy(vx_node node, vxnne_layer_s* layer,
+                         vxnne_tp_operation lstm_copy_tp_operation,
+                         vxnne_tensor_copy_sw_operation lstm_copy_sw_operation,
+                         vxnne_shader_operation lstm_copy_sh_operation,
+                         vx_tensor inputs, vx_tensor outputs,
+                         vx_bool enable_sw_tensor_copy, vx_int32_ptr count, vx_int32 batch);
+
 extern vx_status vxnneGetAlignStrides(vx_tensor tensor, vx_uint32_ptr strides, vx_bool align64);
 extern vx_status vxnneOperation_TP_Deinitialize(vxnne_operation_s *operation);
 extern vx_status vxnneOperation_AddReference(
@@ -50,6 +57,7 @@ vx_status vxoFC_NN_Trans_Initialize(
     vxnne_tensor_trans_operation operation_sw,
     vxnne_layer layer,
     vx_tensor inputs,
+    vx_uint32_ptr perms,
     vx_uint32 batch_count,
     vx_border_t* border_mode,
     vx_tensor outputs,
@@ -72,6 +80,38 @@ vx_status vxoFCOperation_TransposeTensor(vx_tensor weights, vx_tensor weight_con
     vxoTensor_GetTensorDimStride(weight_conv, &pnum, VX_NULL, tstrides);
 
     _TransposeTensor(inaddr, outaddr,TENSOR_DATA_SIZE(weights), dims, strides, tstrides, perm, pnum - 1);
+
+    return status;
+}
+
+vx_status vxoFCOperation_CopyTensor2D(vx_tensor src, vx_tensor dst, vx_bool transpose)
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 size = 0;
+    vx_uint8_ptr inaddr, outaddr;
+    vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION], tstrides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+
+    vxoTensor_GetTensorViewMemory(src, (gctPOINTER*)&inaddr, VX_NULL);
+    vxoTensor_GetTensorViewMemory(dst, (gctPOINTER*)&outaddr, VX_NULL);
+
+    vxoTensor_GetTensorDimStride(src, &size, dims, strides);
+    vxoTensor_GetTensorDimStride(dst, &size, VX_NULL, tstrides);
+
+    if (TENSOR_SIZE_INDEX(src, 0) == TENSOR_SIZE_INDEX(dst, 0) && TENSOR_SIZE_INDEX(src, 1) == TENSOR_SIZE_INDEX(dst, 1))
+    {
+        vx_uint32 i = 0, j = 0;
+        for (i = 0; i < TENSOR_SIZE_INDEX(src, 1); i ++)
+        {
+            gcoOS_MemCopy(outaddr + i * tstrides[1], inaddr + i * strides[1], strides[1]);
+
+            if (((tstrides[1] - strides[1]) > 0) && (TENSOR_QUANT_TYPE(dst) == VX_QUANT_AFFINE_SCALE))
+            {
+                for (j = 0; j < (tstrides[1] - strides[1]); j ++)
+                    gcoOS_MemFill(outaddr + i * tstrides[1] + strides[1] + j, (vx_uint8)TENSOR_TF_ZEROPOINT(dst), sizeof(vx_uint8));
+            }
+        }
+
+    }
 
     return status;
 }
@@ -245,6 +285,12 @@ OnError:
     return status;
 }
 
+enum
+{
+    bfc2conv_mode_1xn = 0,
+    bfc2conv_mode_nx1,
+};
+
 vx_status vxoFCOperation_Initialize(
     vxnne_fc_operation operation,
     vxnne_layer layer,
@@ -287,6 +333,33 @@ vx_status vxoFCOperation_Initialize(
     vx_tensor tp_fc_inputs = VX_NULL;
 
     vx_bool support_1xn = (width % 2 == 0)?vx_true_e:vx_false_e;
+    vx_int32 zdp_size = 3;
+    vx_enum mode = bfc2conv_mode_nx1;
+    gctSTRING env = VX_NULL;
+
+    gcoOS_GetEnv(gcvNULL, "BFC2CONV_MODE", &env);
+    if (env != NULL)
+    {
+        if (gcoOS_StrStr(env, "1xn", VX_NULL))
+            mode = bfc2conv_mode_1xn;
+        else if (gcoOS_StrStr(env, "nx1", VX_NULL))
+            mode = bfc2conv_mode_nx1;
+    }
+
+    gcoOS_GetEnv(gcvNULL, "BFC2CONV_ZDP", &env);
+    if (env != NULL)
+        zdp_size = atoi(env);
+
+    if (mode == bfc2conv_mode_nx1 && !vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0))
+    {
+        vxError(" V7 not support Nx1, force mode to 1x%d \n", zdp_size);
+        mode = bfc2conv_mode_1xn;
+    }
+    else if (zdp_size == 2 && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0))
+    {
+        vxError(" V8 not support 2x1 or 1x2, force zdp size = 3\n");
+        zdp_size = 3;
+    }
 
     if ((!weights_biases || !*weights_biases) &&
         (!weights || !biases))
@@ -329,8 +402,6 @@ vx_status vxoFCOperation_Initialize(
         target = VXNNE_OPERATION_TARGET_SW;
     }
 
-    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0) == vx_true_e)
-        target = VXNNE_OPERATION_TARGET_TP;
 
     /* Prepare for the tensor-copy operation for the non-64byte-aligned TP FC inputs. */
     if (target == VXNNE_OPERATION_TARGET_TP)
@@ -475,49 +546,205 @@ vx_status vxoFCOperation_Initialize(
 
     case VXNNE_OPERATION_TARGET_NN:
     {
-        vx_uint32 trans_sizes[][4] = {
-            {TENSOR_SIZE_INDEX(inputs, 0)/2, 2, TENSOR_SIZE_INDEX(inputs, 1), 1}, /* reshape: 1312x378 => 656x2x378x1  */
-            {TENSOR_SIZE_INDEX(inputs, 1), 2, TENSOR_SIZE_INDEX(inputs, 0)/2, 1}, /* input  : 1312x378 => 378x2x656x1  */
-            {TENSOR_SIZE_INDEX(outputs, 1), 1, TENSOR_SIZE_INDEX(outputs, 0), 1}, /* output : 4096x378 <= 378x1x4096x1 */
-            {TENSOR_SIZE_INDEX(outputs, 0), 1, TENSOR_SIZE_INDEX(outputs, 1), 1}, /* output : 378x1x4096x1 => 4096x1x378x1 */
+        vx_bool aligned = (TENSOR_SIZE_INDEX(inputs, 0) % zdp_size == 0) ? vx_true_e : vx_false_e;
+        vx_tensor input_conv = VX_NULL, input_reshape = VX_NULL, input_align = VX_NULL, input_copy = VX_NULL, input_trans = VX_NULL;
+        vx_tensor output_trans = VX_NULL, outputs_reshape = VX_NULL;
+
+        /***************************************************************************************************************************************
+         *            BatchFC to Conv [1XN] : zdp_size = 3 batch = 378 input_size = 1312 output_size = 4096
+         *
+         *
+         *                                          _________________
+         *                                         |                 |
+         *                                         |                 |                     _________________
+         *                                         |                 |                   _|_______________  |
+         *                                         |                 |  reshpe         _|______________   | |
+         *                                         |                 |  <===         _|_______________  | |_|
+         *                                         |                 |             _|_______________  | |_|
+         *                                         |                 |           _|_______________  | |_|
+         *                                         |                 |          |                 | |_|   _
+         *                                         |                 |          |                 |_|      |
+         *                                         |_________________| 1312     |_________________|        |
+         *                                         |_________________| 1314         378 x 3 x 438          |
+         *                                             378 x 1314                    input_conv            |
+         *                                           input_reshape                                         |
+         *                                                 ||  view                                        |                                               _________________           _________________________
+         *                                                 \/                                              |                                              |                 |         |                         |
+         *      _________________________           _________________                                      |                  ________________            |                 |         |                         |
+         *     |                         |         |                 |                                     |                _|______________ _|    reshpe |                 |transpose|                         |
+         *     |                         |         |                 |                                     |              _|______________ _|          => |                 | =>      |                         |
+         *     |                         |transpose|                 |                                     |            _|_______________ _|              |                 |         |                         |
+         *     |                         |   ==>   |                 |                                     | conv     _|_______________ _|                |                 |         |                         |
+         *     |                         |         |                 |                                     | ===>   _|_______________ _|                  |                 |         |                         |
+         *     |                         |         |                 |                                     |       |_________________|                    |                 |         |                         |
+         *     |                         |         |                 |                                     |                                              |                 |         |_________________________|
+         *     |                         |         |                 |                                     |          378 x 1 x 4096                      |                 |                 4096 x 378
+         *     |_________________________|         |                 |                                     |           output_trans                       |_________________|                   OUTPUTS
+         *             1312 x 378                  |                 |                                     |                                                   378 x 4096
+         *              INPUTS                     |_________________|                                     |                                                 outputs_reshape
+         *                                               378 x 1312                                        |
+         *                                               input_trans                          ____         |
+         *           _________________              ___________________                     _|__  |        |
+         *          |                 |            |       1312      | |                  _|__  | |        |
+         *          |                 |            |                 | |                _|__  | |_|        |
+         *          |                 |     view   |                 | | reshpe       _|__  | |_|          |
+         *          |                 |      ==>   |                 | | <===       _|__  | |_|            |
+         *          |                 |            |                 | |           |    | |_|             _|
+         *          |                 |            |                 | |           |    |_|   ____
+         *          |                 |            |                 | |           |____|   _|__  |
+         *          |                 |            |                 | |             .    _|__  | |
+         *          |                 |            |                 | |             .  _|__  | |_|
+         *          |_________________|            |_________________|_|             ._|__  | |_|
+         *               1312 x 4096                    1314 x 4096                 _|__  | |_|
+         *                 WEIGHTS                      _weights_pre               |    | |_|
+         *                                                                         |    |_|
+         *                                                                         |____|
+         *                                                                  1 x 3 x 438 x 4096
+         *                                                                      _weights
+         *
+         *
+         *            BatchFC to Conv [Nx1] : zdp_size = 3 batch = 378 input_size = 1312 output_size = 4096
+         *
+         *                 ______________________                          ___
+         *                |                      |                       _|_  |
+         *                |                      |                     _|_  | |                input_conv
+         *                |                      | reshap            _|_  | | |                      ___
+         *                |       aligned        |  ==>            _|_  | | | |                    _|_  |
+         *                |                      |               _|_  | | | | |     1<=>2        _|_  | |
+         *                |                      |              |   | | | | | |   transpose    _|_  | | |
+         *                |                      |              |   | | | | |_|      =>      _|_  | | | |
+         *                |                      |              |   | | | |_|              _|_  | | | | |
+         *                |______________________|              |   | | |_|               |   | | | | | | _
+         *                        1312 x 378                    |   | |_|                 |   | | | | |_|  |
+         *                         inputs                       |   |_|                   |   | | | |_|    |
+         *                                                      |___|                     |   | | |_|      |
+         *                                              3 x 438 x 378  input_reshape      |   | |_|        |
+         *                                                                                |   |_|          |
+         *    ----------------------------------------------------------   /\             |___|            |                                               _________________           _________________________
+         *                                                                 ||                3 x 378 x 438 |                                              |                 |         |                         |
+         *   ______________________         _____________________        _________________________         |                  ________________            |                 |         |                         |
+         *  |                      |       |                     |      |                       | |        |                _|______________ _|    reshpe |                 |transpose|                         |
+         *  |                      |       |                     |      |                       | |        |              _|______________ _|          => |                 | =>      |                         |
+         *  |                      | copy  |                     | view |                       | |        |            _|_______________ _|              |                 |         |                         |
+         *  |      unaligned       | ==>   |                     | <==  |                       | |        | conv     _|_______________ _|                |                 |         |                         |
+         *  |                      |       |                     |      |                       | |        | ===>   _|_______________ _|                  |                 |         |                         |
+         *  |                      |       |                     |      |                       | |        |       |_________________|                    |                 |         |                         |
+         *  |                      |       |                     |      |                       | |        |                                              |                 |         |_________________________|
+         *  |                      |       |                     |      |                       | |        |          1 x 378 x 4096                      |                 |                 4096 x 378
+         *  |______________________|       |_____________________|      |_______________________|_|        |           output_trans                       |_________________|                   OUTPUTS
+         *          1312 x 378                    1312 x 378                    1314 x 378                 |                                                   378 x 4096
+         *           inputs                       input_copy                  input_align                  |                                                 outputs_reshape
+         *                                                                                                 |
+         *                                               input_trans                          ____         |
+         *           _________________              ___________________                     _|__ _|        |
+         *          |                 |            |       1312      |0|                  _|__ _|          |
+         *          |                 |            |                 |0|                _|__ _|            |
+         *          |                 |     view   |                 |0| reshpe       _|__ _|              |
+         *          |                 |      ==>   |                 |0| <===       _|__ _|                |
+         *          |                 |            |                 |0|           |____|                 _|
+         *          |                 |            |                 |0|                      ____
+         *          |                 |            |                 |0|             .      _|__ _|
+         *          |                 |            |                 |0|             .    _|__ _|
+         *          |                 |            |                 |0|             .  _|__ _|
+         *          |_________________|            |_________________|0|              _|__ _|
+         *               1312 x 4096                    1314 x 4096                 _|__ _|
+         *                 WEIGHTS                      _weights_pre               |____|
+         *
+         *
+         *                                                                  3 x 1 x 438 x 4096
+         *                                                                      _weights
+         ***************************************************************************************************************************************/
+        vx_uint32 inputs_sizes_1xn[][4] = {
+            {TENSOR_SIZE_INDEX(inputs, 1), zdp_size, gcmALIGN_NP2(TENSOR_SIZE_INDEX(inputs, 0), zdp_size)/zdp_size, 1}, /* input_conv(input aligned)  : 80 x 2 x 45(378 x 3 x 438)  */
+            {TENSOR_SIZE_INDEX(inputs, 1), gcmALIGN_NP2(TENSOR_SIZE_INDEX(inputs, 0), zdp_size), 1, 1}, /* input_reshape(input viewed)   : 80 x 90 (378 x 1312 => 378 x 1314) */
         };
 
-        vx_tensor input_reshape = vxoTensor_ReshapeTensor(inputs, (vx_int32_ptr)trans_sizes[0], gcmCOUNTOF(trans_sizes[0]));
-        vx_tensor input_trans   = _createSimilarTensor(layer->node->graph, vx_false_e, gcmCOUNTOF(trans_sizes[1]), trans_sizes[1], inputs);
-        vx_tensor output_trans  = _createSimilarTensor(layer->node->graph, vx_false_e, gcmCOUNTOF(trans_sizes[2]), trans_sizes[2], outputs);
-        vx_tensor outputs_reshape = vxoTensor_ReshapeTensor(outputs, (vx_int32_ptr)trans_sizes[3], gcmCOUNTOF(trans_sizes[3]));
+        vx_uint32 inputs_sizes_nx1[][4] = {
+            {zdp_size, TENSOR_SIZE_INDEX(inputs, 1), gcmALIGN_NP2(TENSOR_SIZE_INDEX(inputs, 0), zdp_size)/zdp_size, 1}, /* input_conv(input aligned)  : 3 x 378 x 438 x 1 */
+            {zdp_size, gcmALIGN_NP2(TENSOR_SIZE_INDEX(inputs, 0), zdp_size)/zdp_size, TENSOR_SIZE_INDEX(inputs, 1), 1}, /* input_reshape(input reshape)  : 3 x 438 x 378 x 1 */
+            {gcmALIGN_NP2(TENSOR_SIZE_INDEX(inputs, 0), zdp_size), TENSOR_SIZE_INDEX(inputs, 1), 1, 1}, /* input_align(input viewed)   : 1312 x 378 => 1314 x 378 x 1 x 1*/
+        };
+
+        vx_int32 weights_sizes[][4] = {
+            {gcmALIGN_NP2(TENSOR_SIZE_INDEX(weights, 0), zdp_size), TENSOR_SIZE_INDEX(weights, 1), 1, 1}, /* _weights_pre(weights transpose): 90 x 400 (1312 x 4096 => 1314 x 4096)  */
+            {(mode == bfc2conv_mode_1xn)?
+1:zdp_size, (mode == bfc2conv_mode_1xn)?
+zdp_size:
+1, gcmALIGN_NP2(TENSOR_SIZE_INDEX(weights, 0), zdp_size)/zdp_size, TENSOR_SIZE_INDEX(weights, 1)},/* _weights(aligned weights)  :
+ 1 x 2 x 45 x 400(1 x 3 x 438 x 4096/3 x 1 x 438 x 4096)  */
+        };
+
+        vx_uint32 outputs_sizes[][4] = {
+            {(mode == bfc2conv_mode_1xn)?TENSOR_SIZE_INDEX(outputs, 1):1, (mode == bfc2conv_mode_1xn)?1:TENSOR_SIZE_INDEX(outputs, 1), TENSOR_SIZE_INDEX(outputs, 0), 1}, /* output_trans(output reshape)   : 378 x 1 x 4096/1 x 378 x 4096 */
+            {TENSOR_SIZE_INDEX(outputs, 1), TENSOR_SIZE_INDEX(outputs, 0), 1, 1}, /* outputs_reshape(output transpose) : 378 x 4096 => 4096x378x1 */
+        };
+
+        if (mode == bfc2conv_mode_1xn)
+        {
+            vx_uint32 start[4] = {0, 0, 0, 0}, end[4] = {TENSOR_SIZE_INDEX(inputs, 1), TENSOR_SIZE_INDEX(inputs, 0), 0, 0};
+            vx_tensor_view view = vxCreateTensorView(context, start, end, 4);
+            input_conv    = _createSimilarTensor(layer->node->graph, vx_false_e, gcmCOUNTOF(inputs_sizes_1xn[0]), inputs_sizes_1xn[0], inputs);
+            input_reshape = vxoTensor_ReshapeTensor(input_conv, (vx_int32_ptr)inputs_sizes_1xn[1], gcmCOUNTOF(inputs_sizes_1xn[1]));
+            input_trans   = vxoTensor_CreateTensorFromView(input_reshape, view);
+
+            vxReleaseTensorView(&view);
 
         vxmONERROR(vxoTensor_AllocateMemory(input_trans));
+        }
+        else if (mode == bfc2conv_mode_nx1)
+        {
+            input_conv    = _createSimilarTensor(layer->node->graph, vx_false_e, gcmCOUNTOF(inputs_sizes_nx1[0]), inputs_sizes_nx1[0], inputs);
+            if (aligned)
+            {
+                input_copy    = inputs;
+                input_reshape = vxoTensor_ReshapeTensor(inputs, (vx_int32_ptr)inputs_sizes_nx1[1], gcmCOUNTOF(inputs_sizes_nx1[1]));
+            }
+            else
+            {
+                vx_uint32 start[4] = {0, 0, 0, 0}, end[4] = {TENSOR_SIZE_INDEX(inputs, 0), TENSOR_SIZE_INDEX(inputs, 1), 0, 0};
+                vx_tensor_view view = vxCreateTensorView(context, start, end, 4);
+
+                input_align   = _createSimilarTensor(layer->node->graph, vx_false_e, gcmCOUNTOF(inputs_sizes_nx1[2]), inputs_sizes_nx1[2], inputs);
+                input_reshape = vxoTensor_ReshapeTensor(input_align, (vx_int32_ptr)inputs_sizes_nx1[1], gcmCOUNTOF(inputs_sizes_nx1[1]));
+                input_copy    = vxoTensor_CreateTensorFromView(input_align, view);
+
+                vxReleaseTensorView(&view);
+
+            }
+
+            vxmONERROR(vxoTensor_AllocateMemory(input_conv));
+        }
+
+        output_trans  = _createSimilarTensor(layer->node->graph, vx_false_e, gcmCOUNTOF(outputs_sizes[0]), outputs_sizes[0], outputs);
+        outputs_reshape = vxoTensor_ReshapeTensor(output_trans, (vx_int32_ptr)outputs_sizes[1], gcmCOUNTOF(outputs_sizes[1]));
         vxmONERROR(vxoTensor_AllocateMemory(output_trans));
 
-        layer->temp_tensors[layer->num_temp_tensors++] = input_reshape;
-        layer->temp_tensors[layer->num_temp_tensors++] = outputs_reshape;
-        layer->temp_tensors[layer->num_temp_tensors++] = input_trans;
-        layer->temp_tensors[layer->num_temp_tensors++] = output_trans;
+        if (input_conv)     layer->temp_tensors[layer->num_temp_tensors++] = input_conv;
+        if (input_reshape)  layer->temp_tensors[layer->num_temp_tensors++] = input_reshape;
+        if (input_align)    layer->temp_tensors[layer->num_temp_tensors++] = input_align;
+        if (input_trans)    layer->temp_tensors[layer->num_temp_tensors++] = input_trans;
+        if (input_copy)     layer->temp_tensors[layer->num_temp_tensors++] = input_copy;
+        if (outputs_reshape)layer->temp_tensors[layer->num_temp_tensors++] = outputs_reshape;
+        if (output_trans)   layer->temp_tensors[layer->num_temp_tensors++] = output_trans;
 
         if (wb == VX_NULL)
         {
 
-            vx_uint32 pnum = 4;
-            vx_int32 zdp_size = 2;
-            vx_uint32 perm[] = {1, 0, 2, 3}; /* transpose weights dim[0] and dim[1] */
-            vx_int32 weight_sizes[][4] = {
-                {gcmALIGN_NP2(TENSOR_SIZE_INDEX(weights, 0), zdp_size)/zdp_size, zdp_size, TENSOR_SIZE_INDEX(weights, 1), 1}, /* reshape: 90x400 => 45x2x400x1*/
-                {zdp_size, gcmALIGN_NP2(TENSOR_SIZE_INDEX(weights, 0), zdp_size)/zdp_size, TENSOR_SIZE_INDEX(weights, 1), 1}, /* trans  : 45x2x400x1 => 2x45x400x1*/
-                {1, zdp_size, gcmALIGN_NP2(TENSOR_SIZE_INDEX(weights, 0), zdp_size)/zdp_size, TENSOR_SIZE_INDEX(weights, 1)}, /* reshape: 2x45x400x1 => 1x2x45x400*/
-            };
+            vx_tensor _weights          = _createSimilarTensor(layer->node->graph, vx_false_e, gcmCOUNTOF(weights_sizes[1]), (vx_uint32_ptr)weights_sizes[1], weights);
+            vx_tensor _weights_pre      = vxoTensor_ReshapeTensor(_weights, weights_sizes[0], gcmCOUNTOF(weights_sizes[0]));
+            vx_uint32 _start[4] = {0, 0, 0, 0}, _end[4] = {TENSOR_SIZE_INDEX(weights, 0), TENSOR_SIZE_INDEX(weights, 1), 0, 0};
+            vx_tensor_view _view = vxCreateTensorView(context, _start, _end, 4);
+            vx_tensor _weights_trans    = vxoTensor_CreateTensorFromView(_weights_pre, _view);
 
-            vx_tensor _weights_pre      = vxoTensor_ReshapeTensor(weights, weight_sizes[0], gcmCOUNTOF(weight_sizes[0]));
-            vx_tensor _weights_trans    = _createSimilarTensor(layer->node->graph, vx_false_e, gcmCOUNTOF(weight_sizes[1]), (vx_uint32_ptr)weight_sizes[1], weights);
-            vx_tensor _weights          = vxoTensor_ReshapeTensor(_weights_trans, weight_sizes[2], gcmCOUNTOF(weight_sizes[2]));
+            vxReleaseTensorView(&_view);
 
             layer->temp_tensors[layer->num_temp_tensors++] = _weights_pre;
             layer->temp_tensors[layer->num_temp_tensors++] = _weights;
             layer->temp_tensors[layer->num_temp_tensors++] = _weights_trans;
 
-            vxmONERROR(vxoTensor_AllocateMemory(_weights_trans));
+            vxmONERROR(vxoTensor_AllocateMemory(_weights));
 
-            vxmONERROR(vxoFCOperation_TransposeTensor(_weights_pre, _weights_trans, perm, pnum));
+            vxmONERROR(vxoFCOperation_CopyTensor2D(weights, _weights_trans, vx_true_e));
 
             if (weights_biases && *weights_biases)
             {
@@ -531,7 +758,7 @@ vx_status vxoFCOperation_Initialize(
                 if (TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
                 {
                     vxZeroMemory(&wb_opt, gcmSIZEOF(wb_opt));
-                    wb_opt.inputZeroPoint = TENSOR_TF_ZEROPOINT(input_trans);
+                    wb_opt.inputZeroPoint = TENSOR_TF_ZEROPOINT(inputs);
                     wb_opt.zrl = -1;
                     wb_opt.outputFormat = TENSOR_DATA_TYPE(output_trans);
 
@@ -540,8 +767,8 @@ vx_status vxoFCOperation_Initialize(
 
                 wb = _createWeightsBiasesParameterFromTensors(context,
                                                               VX_NN_CONVOLUTION_LAYER,
-                                                              input_trans->dims, /* inputs_dims */
-                                                              input_trans->dimCount,
+                                                              (mode == bfc2conv_mode_1xn)?input_trans->dims:input_conv->dims, /* inputs_dims */
+                                                              (mode == bfc2conv_mode_1xn)?input_trans->dimCount:input_conv->dimCount,
                                                               output_trans->dimCount,
                                                               0,
                                                               0,
@@ -580,19 +807,35 @@ vx_status vxoFCOperation_Initialize(
 
         if (wb)
         {
+            vx_uint32 perm[] = {0, 2, 1, 3}; /*transpose dim[1] and dim[2]*/
+            vx_uint32 perm1[] = {1, 0, 2, 3}; /*transpose dim[0] and dim[1]*/
+
+            if (!aligned && (mode == bfc2conv_mode_nx1))
+            {
+                vxmONERROR(vxnneExecuteCopy(node, layer,
+                                                    &operation->nn_operation_cp_tp_operation,
+                                                    &operation->nn_operation_cp_sw_operation,
+                                                    VX_NULL,
+                                                    inputs,
+                                                    input_copy,
+                                                    vx_false_e,
+                                                    (vx_int32_ptr)op_index,
+                                                    1));
+            }
             vxmONERROR(vxoFC_NN_Trans_Initialize(&operation->nn_trans_tp_operation[0],
                                                     &operation->nn_trans_sh_operation[0],
                                                     &operation->nn_trans_sw_operation[0],
                                                     layer,
-                                                    input_reshape,
+                                                    (mode == bfc2conv_mode_1xn)?inputs:input_reshape,
+                                                    (mode == bfc2conv_mode_1xn)?perm1:perm,
                                                     1/*batch_count*/,
                                                     &node->kernelAttributes.borderMode,
-                                                    input_trans,
+                                                    (mode == bfc2conv_mode_1xn)?input_trans:input_conv,
                                                     op_index));
             vxmONERROR(vxoFCOperationNN_Initialize(&operation->nn_operation,
                                                     &operation->nn_operation_sw,
                                                     layer,
-                                                    input_trans,
+                                                    input_conv,
                                                     1/*batch_count*/,
                                                     wb,
                                                     overflow_policy,
@@ -605,10 +848,11 @@ vx_status vxoFCOperation_Initialize(
                                                     &operation->nn_trans_sh_operation[1],
                                                     &operation->nn_trans_sw_operation[1],
                                                     layer,
-                                                    output_trans,
+                                                    outputs_reshape,
+                                                    perm1,
                                                     1/*batch_count*/,
                                                     &node->kernelAttributes.borderMode,
-                                                    outputs_reshape,
+                                                    outputs,
                                                     op_index));
         }
     }
@@ -860,6 +1104,7 @@ vx_status vxoFC_NN_Trans_Initialize(
     vxnne_tensor_trans_operation operation_sw,
     vxnne_layer layer,
     vx_tensor inputs,
+    vx_uint32_ptr perms,
     vx_uint32 batch_count,
     vx_border_t* border_mode,
     vx_tensor outputs,
@@ -879,10 +1124,8 @@ vx_status vxoFC_NN_Trans_Initialize(
     vxmONERROR(vxoTensor_AllocateMemory(perm));
 
     vxmONERROR(vxoTensor_GetTensorViewMemory(perm, (gctPOINTER*)&ptr_base, VX_NULL));
-    ptr_base[0] = 2;
-    ptr_base[1] = 1;
-    ptr_base[2] = 0;
-    ptr_base[3] = 3;
+
+    gcoOS_MemCopy(ptr_base, perms, sizeof(vx_uint32) * 4);
 
     if (enable_sw)
     {

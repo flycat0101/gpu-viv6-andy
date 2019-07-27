@@ -2222,6 +2222,9 @@ typedef struct _vxnne_fc_operation_s {
     vxnne_convolution_relu_pooling_operation_s nn_operation;
     vxnne_convolution_operation_s nn_operation_sw;                /* NN fc sw operation */
 
+    vxnne_tp_operation_s                            nn_operation_cp_tp_operation;
+    vxnne_tensor_copy_sw_operation_s                nn_operation_cp_sw_operation;
+
     vxnne_shader_operation_s sh_operation;
     vxnne_fully_connected_sw_operation_s sw_operation;
     vx_weights_biases_parameter weights_biases;

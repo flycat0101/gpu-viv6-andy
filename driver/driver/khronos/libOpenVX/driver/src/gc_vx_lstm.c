@@ -70,6 +70,99 @@ vx_tensor _createSimilarTensor(vx_graph graph, vx_bool is_virtual, vx_uint32 num
         TENSOR_TF_SCALE(tensor), TENSOR_TF_ZEROPOINT(tensor));
 }
 
+vx_status vxnneExecuteCopy(vx_node node, vxnne_layer_s* layer,
+                         vxnne_tp_operation lstm_copy_tp_operation,
+                         vxnne_tensor_copy_sw_operation lstm_copy_sw_operation,
+                         vxnne_shader_operation lstm_copy_sh_operation,
+                         vx_tensor inputs, vx_tensor outputs,
+                         vx_bool enable_sw_tensor_copy, vx_int32_ptr count, vx_int32 batch)
+{
+    vx_status status = VX_SUCCESS;
+    vx_context context = vxGetContext((vx_reference)node);
+
+    if (enable_sw_tensor_copy && (lstm_copy_sw_operation != VX_NULL))
+    {
+        vxnneOperation_Initialize(&lstm_copy_sw_operation->base,
+            layer,
+            VXNNE_OPERATION_TARGET_SW,
+            VXNNE_OPERATOR_TENSOR_COPY,
+            vxnneExecuteSWTensorCopy,
+            VX_NULL,
+            batch,
+            0);
+        vxnneLayer_SetOperation(layer, &lstm_copy_sw_operation->base, (*count)++);
+
+        lstm_copy_sw_operation->src = inputs;
+        lstm_copy_sw_operation->dst = outputs;
+
+        vxnneOperation_AddReference(&lstm_copy_sw_operation->base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&lstm_copy_sw_operation->base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
+    else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP) && (lstm_copy_tp_operation != VX_NULL))
+    {
+        vx_op_param_s conv = { 0 };
+
+        status = vxnneOperation_Initialize(&lstm_copy_tp_operation->base,
+            layer,
+            VXNNE_OPERATION_TARGET_TP,
+            VXNNE_OPERATOR_TENSOR_COPY,
+            VX_NULL,
+            vxnneOperation_TP_Deinitialize,
+            batch,
+            0);
+
+        if (status != VX_SUCCESS) goto exit;
+
+        conv.enable_relu = vx_false_e;
+        conv.pool_stride = 1;
+        conv.tpType = TP_TENSOR_COPY;
+
+        memcpy(&lstm_copy_tp_operation->base.parameter, &conv, sizeof(vx_op_param_s));
+
+        vxnneOperation_AddReference(&lstm_copy_tp_operation->base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&lstm_copy_tp_operation->base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+        lstm_copy_tp_operation->input = inputs;
+        lstm_copy_tp_operation->output = outputs;
+
+        vxnneLayer_SetOperation(
+            layer,
+            &lstm_copy_tp_operation->base,
+            (*count)++);
+    }
+    else if (lstm_copy_sh_operation != VX_NULL)
+    {
+        vxnne_shader_executable shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, inputs, outputs);
+
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            goto exit;
+        }
+
+        status = vxnneShaderOperation_Initialize(lstm_copy_sh_operation,
+            layer,
+            VXNNE_OPERATOR_TENSOR_COPY,
+            batch,
+            shaderExecutable);
+
+        if (status != VX_SUCCESS) goto exit;
+
+        vxnneOperation_AddReference(&lstm_copy_sh_operation->base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&lstm_copy_sh_operation->base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+        vxnneLayer_SetOperation(
+            layer,
+            &lstm_copy_sh_operation->base,
+            (*count)++);
+    }
+    else
+        gcmPRINT("Error: Not Support!");
+
+exit:
+    return status;
+}
+
 
 /***************************************************************************************************************************
 *                                                 RNN
