@@ -25238,7 +25238,7 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
     vx_bool       useImage2DFlag        = vx_false_e;
     vx_uint32     sizes[4]              = {1};
     vx_uint32     last_axis             = axis;
-    vx_int32      width_align = 0, line_align, line_ret, zero_point_num;
+    vx_int32      width_align = 0, line_align = 0, line_ret = 0, zero_point_num = 0;
     char         *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
