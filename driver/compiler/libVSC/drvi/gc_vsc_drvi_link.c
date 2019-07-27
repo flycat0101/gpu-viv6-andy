@@ -2362,11 +2362,20 @@ static VSC_ErrCode _LinkUboBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBaseL
     gctUINT                    upperUboCount = VIR_IdList_Count(upperUBOList);
     gctUINT                    uboIdx;
     VIR_Symbol*                upperUboSym;
+    VIR_UniformBlock*          upperUbo;
 
     for (uboIdx = 0; uboIdx < upperUboCount; uboIdx++)
     {
         gctBOOL                matched = gcvFALSE;
+
         upperUboSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(upperUBOList, uboIdx));
+        upperUbo = VIR_Symbol_GetUBO(upperUboSym);
+
+        /* Skip push-constant. */
+        if (VIR_UBO_GetFlags(upperUbo) & VIR_IB_FOR_PUSH_CONST)
+        {
+            continue;
+        }
 
         if (vscBV_TestBit(uboWorkingMask, uboIdx))
         {
@@ -2403,6 +2412,7 @@ static VSC_ErrCode _LinkUbosBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBase
     gctUINT                    lowerUBOCount = VIR_IdList_Count(lowerUBOList);
     gctUINT                    uboIdx;
     VIR_Symbol*                lowerUBOSym;
+    VIR_UniformBlock*          lowerUBO;
     VSC_BIT_VECTOR             uboWorkingMask;
 
     if (upperUBOCount == 0 || lowerUBOCount == 0)
@@ -2415,6 +2425,13 @@ static VSC_ErrCode _LinkUbosBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBase
     for (uboIdx = 0; uboIdx < lowerUBOCount; uboIdx++)
     {
         lowerUBOSym = VIR_Shader_GetSymFromId(pLowerShader, VIR_IdList_GetId(lowerUBOList, uboIdx));
+        lowerUBO = VIR_Symbol_GetUBO(lowerUBOSym);
+
+        /* Skip push-constant. */
+        if (VIR_UBO_GetFlags(lowerUBO) & VIR_IB_FOR_PUSH_CONST)
+        {
+            continue;
+        }
 
         if (VIR_Symbol_GetUBO(lowerUBOSym)->blockSize > GetGLMaxUniformBLockSize())
         {
