@@ -203,6 +203,7 @@ typedef struct __vkCmdBindInfoRec
         __vkFramebuffer *fb;
         VkSubpassContents subPassContent;
         VkBool32 dirty;
+        uint32_t curSubpassIdx;
     } renderPass;
 
     struct

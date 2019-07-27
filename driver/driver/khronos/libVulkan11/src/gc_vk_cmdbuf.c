@@ -986,10 +986,11 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBeginRenderPass(
     uint32_t i;
 
     __VK_ASSERT(rdp->attachmentCount == fb->attachmentCount);
-
+    /*if the renderpass changed, the curSubpassIdx should reset to 0*/
     cmd->bindInfo.renderPass.rdp = (__vkRenderPass *)rdp;
     cmd->bindInfo.renderPass.subPass = &rdp->subPassInfo[0];
     cmd->bindInfo.renderPass.subPassContent = contents;
+    cmd->bindInfo.renderPass.curSubpassIdx = 0;
     cmd->bindInfo.renderPass.fb = fb;
     cmd->bindInfo.renderPass.dirty = VK_TRUE;
 
@@ -1031,8 +1032,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBeginRenderPass(
             (rdp->attachments[i].loadClear || rdp->attachments[i].stencil_loadClear))
         {
             VkImageSubresource subResource;
-            uint32_t il;
-            uint32_t baseArrayLayer;
+            uint32_t il, i2, i3, i4;
+            uint32_t baseArrayLayer, layerCount;
             __vkImageView* imageView = fb->imageViews[i];
             VkClearValue clearValue = pRenderPassBegin->pClearValues[i];
 
@@ -1046,6 +1047,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBeginRenderPass(
 
             subResource.aspectMask = imageView->createInfo.subresourceRange.aspectMask;
             subResource.mipLevel = imageView->createInfo.subresourceRange.baseMipLevel;
+            layerCount = imageView->createInfo.subresourceRange.layerCount;
 
             /* Determine correct aspect mask for depth / stencil clear */
             if (rdp->attachments[i].stencil_loadClear)
@@ -1062,16 +1064,68 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBeginRenderPass(
 
             baseArrayLayer = imageView->createInfo.subresourceRange.baseArrayLayer;
 
-            for (il = baseArrayLayer; il < (baseArrayLayer + fb->layers); il++)
+            /*when enabled multiview, implicit clear also need based no subpass's viewMask*/
+            if (rdp->multiViewInfo->enabledMultiView)
             {
-                subResource.arrayLayer = il;
-                __VK_ONERROR(cmd->devCtx->chipFuncs->ClearImage(
-                    commandBuffer,
-                    imageView->createInfo.image,
-                    &subResource,
-                    &clearValue,
-                    &rect
-                    ));
+                __vkRenderSubPassInfo *subpassInfo = rdp->subPassInfo;
+                uint32_t subpassCount = rdp->subPassInfoCount;
+                __vkSubpassViewInfo *subpassViewInfo = rdp->multiViewInfo->subPassViewInfo;
+
+                for (i2 = 0; i2 < subpassCount; i2++)
+                {
+                    for (i3 = 0; i3 < subpassInfo[i2].colorCount; i3++)
+                    {
+                        if (subpassInfo[i2].color_attachment_index[i3] == i ||
+                            subpassInfo[i2].resolve_attachment_index[i3] == i)
+                        {
+                            for (i4 = 0; i4 < subpassViewInfo[i2].validViewCount; i4++)
+                            {
+                                subResource.arrayLayer = subpassViewInfo[i2].enabledViewIdx[i4];
+                                __VK_ASSERT(subResource.arrayLayer < layerCount);
+                                __VK_ONERROR(cmd->devCtx->chipFuncs->ClearImage(
+                                    commandBuffer,
+                                    imageView->createInfo.image,
+                                    &subResource,
+                                    &clearValue,
+                                    &rect
+                                    ));
+                            }
+                        }
+                    }
+
+                    for (i3 = 0; i3 < subpassInfo[i2].inputCount; i3++)
+                    {
+                        if (subpassInfo[i2].input_attachment_index[i3] == i)
+                        {
+                            for (i4 = 0; i4 < subpassViewInfo[i2].validViewCount; i4++)
+                            {
+                                subResource.arrayLayer = subpassViewInfo[i2].enabledViewIdx[i4];
+                                __VK_ASSERT(subResource.arrayLayer < layerCount);
+                                __VK_ONERROR(cmd->devCtx->chipFuncs->ClearImage(
+                                    commandBuffer,
+                                    imageView->createInfo.image,
+                                    &subResource,
+                                    &clearValue,
+                                    &rect
+                                    ));
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (il = baseArrayLayer; il < (baseArrayLayer + fb->layers); il++)
+                {
+                    subResource.arrayLayer = il;
+                    __VK_ONERROR(cmd->devCtx->chipFuncs->ClearImage(
+                        commandBuffer,
+                        imageView->createInfo.image,
+                        &subResource,
+                        &clearValue,
+                        &rect
+                        ));
+                }
             }
 
             __vk_CmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
@@ -1157,6 +1211,9 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdNextSubpass(
     cmd->bindInfo.renderPass.subPassContent = contents;
     cmd->bindInfo.renderPass.dirty = VK_TRUE;
 
+    cmd->bindInfo.renderPass.curSubpassIdx++;
+    __VK_ASSERT(rdp->subPassInfoCount > cmd->bindInfo.renderPass.curSubpassIdx);
+
     if (rdp->dependencyCount > 0)
     {
         uint32_t isp,idp;
@@ -1225,8 +1282,14 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
 {
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
     __vkFramebuffer *fb = cmd->bindInfo.renderPass.fb;
+    __vkRenderPass *rdp = cmd->bindInfo.renderPass.rdp;
+    __vkRenderPassMultiViewInfo *multiView = VK_NULL_HANDLE;
+    __vkSubpassViewInfo *subPassView = VK_NULL_HANDLE;
+
+    uint32_t subPassIdx = cmd->bindInfo.renderPass.curSubpassIdx;
+    VkBool32 enableView = VK_FALSE;
     VkResult result = VK_SUCCESS;
-    uint32_t ia, ir;
+    uint32_t ia, ir, j;
 
     const VkMemoryBarrier memBarrier =
     {
@@ -1235,6 +1298,13 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
         VK_ACCESS_TRANSFER_WRITE_BIT,
         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
     };
+
+    if (rdp && rdp->multiViewInfo->enabledMultiView)
+    {
+        multiView = rdp->multiViewInfo;
+        subPassView = multiView->subPassViewInfo;
+        enableView = subPassView[subPassIdx].validSubpassView;
+    }
 
     for (ia = 0; ia < attachmentCount; ia++)
     {
@@ -1255,16 +1325,34 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
             subResource.mipLevel = fb->imageViews[imgViewIndex]->createInfo.subresourceRange.baseMipLevel;
             baseArrayLayer = pRects[ir].baseArrayLayer + fb->imageViews[imgViewIndex]->createInfo.subresourceRange.baseArrayLayer;
 
-            for (il = baseArrayLayer; il < (baseArrayLayer + pRects[ir].layerCount); il++)
+            if (enableView)
             {
-                subResource.arrayLayer = il;
-                __VK_ONERROR(cmd->devCtx->chipFuncs->ClearImage(
+                for (j = 0; j < subPassView[subPassIdx].validViewCount; j++)
+                {
+                    subResource.arrayLayer = subPassView[subPassIdx].enabledViewIdx[j];
+
+                    __VK_ONERROR(cmd->devCtx->chipFuncs->ClearImage(
                     commandBuffer,
                     fb->imageViews[imgViewIndex]->createInfo.image,
                     &subResource,
                     (VkClearValue *)&pAttachments[ia].clearValue,
                     (VkRect2D *)&pRects[ir].rect
                     ));
+                }
+            }
+            else
+            {
+                for (il = baseArrayLayer; il < (baseArrayLayer + pRects[ir].layerCount); il++)
+                {
+                    subResource.arrayLayer = il;
+                    __VK_ONERROR(cmd->devCtx->chipFuncs->ClearImage(
+                        commandBuffer,
+                        fb->imageViews[imgViewIndex]->createInfo.image,
+                        &subResource,
+                        (VkClearValue *)&pAttachments[ia].clearValue,
+                        (VkRect2D *)&pRects[ir].rect
+                        ));
+                }
             }
         }
     }
