@@ -1649,7 +1649,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_FlushMappedMemoryRanges(
                     dvm->devAddr,
                     dvm->hostAddr,
                     (gctSIZE_T)pMemRanges->offset,
-                    (gctSIZE_T)pMemRanges->size);
+                    pMemRanges->size == VK_WHOLE_SIZE ? (gctSIZE_T)(dvm->size - pMemRanges->offset - dvm->mappedOffset) : (gctSIZE_T)pMemRanges->size);
 #endif
     return VK_SUCCESS;
 }
@@ -1669,7 +1669,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_InvalidateMappedMemoryRanges(
                     dvm->devAddr,
                     dvm->hostAddr,
                     (gctSIZE_T)pMemRanges->offset,
-                    (gctSIZE_T)pMemRanges->size);
+                    pMemRanges->size == VK_WHOLE_SIZE ? (gctSIZE_T)(dvm->size - pMemRanges->offset - dvm->mappedOffset) : (gctSIZE_T)pMemRanges->size);
 #endif
     return VK_SUCCESS;
 }
