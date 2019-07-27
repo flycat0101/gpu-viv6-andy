@@ -55,6 +55,10 @@ LOCAL_MODULE      := android.hardware.neuralnetworks@1.0-service-ovx-driver
 
 endif
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 27),1)
+LOCAL_VENDOR_MODULE := true
+endif
+
 LOCAL_CFLAGS += -DANDROID_SDK_VERSION=$(PLATFORM_SDK_VERSION)
 
 LOCAL_MODULE_TAGS := optional
