@@ -116,7 +116,6 @@
     gcSHADER_GetAttributeByName;
     gcSHADER_GetAttributeCount;
     gcSHADER_GetAttributeAndBuiltinInputCount;
-    gcSHADER_GetHintSize;
     gcSHADER_GetOutput;
     gcSHADER_GetOutputByName;
     gcSHADER_GetOutputByTempIndex;
