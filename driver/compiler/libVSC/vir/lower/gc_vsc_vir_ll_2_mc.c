@@ -2562,7 +2562,7 @@ _GetPatternScalar(
 
 DEF_QUERY_PASS_PROP(VIR_Lower_LowLevel_To_MachineCodeLevel)
 {
-    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL | VSC_PASS_LEVEL_MC;
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
 
     /* Lower must invalidate all analyzed resources */

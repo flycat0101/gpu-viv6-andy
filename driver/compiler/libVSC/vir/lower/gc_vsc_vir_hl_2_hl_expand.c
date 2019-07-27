@@ -49,6 +49,7 @@ _SplitStructVariable(
     IN  VIR_Type                *Type,
     IN  VIR_SymId                BlockIndex,
     IN  VIR_SymFlag              SymFlag,
+    IN  VIR_SymFlagExt           SymFlagExt,
     IN  gctBOOL                  SplitArray,
     IN  gctBOOL                  AllocateSym,
     IN  gctBOOL                  AllocateReg,
@@ -69,6 +70,7 @@ _SplitArrayVariable(
     IN  gctSTRING                PrefixName,
     IN  VIR_SymId                BlockIndex,
     IN  VIR_SymFlag              SymFlag,
+    IN  VIR_SymFlagExt           SymFlagExt,
     IN  gctBOOL                  SplitArray,
     IN  gctBOOL                  AllocateSym,
     IN  gctBOOL                  AllocateReg,
@@ -123,6 +125,7 @@ _AddGeneralVariable(
     IN  VIR_StorageClass         StorageClass,
     IN  VIR_SymId                BlockIndex,
     IN  VIR_SymFlag              SymFlag,
+    IN  VIR_SymFlagExt           SymFlagExt,
     IN  gctBOOL                  AllocateSym,
     IN  gctBOOL                  AllocateReg,
     IN  gctUINT                 *UpcomingRegCount,
@@ -274,6 +277,7 @@ _AddGeneralVariable(
                 }
                 VIR_Symbol_SetFlag(sym, flags | SymFlag);
                 VIR_Symbol_ClrFlag(sym, VIR_SYMFLAG_WITHOUT_REG);
+                VIR_Symbol_SetFlagsExt(sym, SymFlagExt);
 
                 /* Set the uniform sym info.*/
                 virUniform = sym->u2.uniform;
@@ -306,6 +310,7 @@ _AddGeneralVariable(
             {
                 VIR_Symbol_SetFlag(sym, flags | SymFlag);
                 VIR_Symbol_ClrFlag(sym, VIR_SYMFLAG_WITHOUT_REG);
+                VIR_Symbol_SetFlagsExt(sym, SymFlagExt);
                 if (BlockIndex != VIR_INVALID_ID)
                 {
                     sym->ioBlockIndex = BlockIndex;
@@ -394,6 +399,7 @@ _SplitStructVariable(
     IN  VIR_Type                *Type,
     IN  VIR_SymId                BlockIndex,
     IN  VIR_SymFlag              SymFlag,
+    IN  VIR_SymFlagExt           SymFlagExt,
     IN  gctBOOL                  SplitArray,
     IN  gctBOOL                  AllocateSym,
     IN  gctBOOL                  AllocateReg,
@@ -412,6 +418,7 @@ _SplitStructVariable(
     VIR_SymbolKind               fieldKind;
     VIR_TypeId                   baseTypeId;
     VIR_SymId                    symId;
+    VIR_SymFlagExt               fieldSymFlagExt;
     gctUINT                      i;
     gctSTRING                    fieldName;
     gctCHAR                      prevName[__MAX_SYM_NAME_LENGTH__];
@@ -444,6 +451,7 @@ _SplitStructVariable(
         fieldName = VIR_Shader_GetSymNameString(Shader, fieldSym);
         fieldType = VIR_Symbol_GetType(fieldSym);
         baseTypeId = VIR_Type_GetBaseTypeId(fieldType);
+        fieldSymFlagExt = VIR_Symbol_GetFlagsExt(fieldSym) | SymFlagExt;
 
         /*
         ** In the early vulkan100 CTS, the location of a struct member is defined by OpMemberDecorate,
@@ -472,6 +480,7 @@ _SplitStructVariable(
                                                fieldType,
                                                BlockIndex,
                                                SymFlag,
+                                               fieldSymFlagExt,
                                                SplitArray,
                                                AllocateSym,
                                                AllocateReg,
@@ -499,6 +508,7 @@ _SplitStructVariable(
                                               mixName,
                                               BlockIndex,
                                               SymFlag,
+                                              fieldSymFlagExt,
                                               SplitArray,
                                               AllocateSym,
                                               AllocateReg,
@@ -535,6 +545,7 @@ _SplitStructVariable(
                                       StorageClass,
                                       BlockIndex,
                                       SymFlag,
+                                      fieldSymFlagExt,
                                       AllocateSym,
                                       AllocateReg,
                                       UpcomingRegCount,
@@ -570,6 +581,7 @@ _SplitArrayVariable(
     IN  gctSTRING                PrefixName,
     IN  VIR_SymId                BlockIndex,
     IN  VIR_SymFlag              SymFlag,
+    IN  VIR_SymFlagExt           SymFlagExt,
     IN  gctBOOL                  SplitArray,
     IN  gctBOOL                  AllocateSym,
     IN  gctBOOL                  AllocateReg,
@@ -616,6 +628,7 @@ _SplitArrayVariable(
                                                    baseType,
                                                    BlockIndex,
                                                    SymFlag,
+                                                   SymFlagExt,
                                                    SplitArray,
                                                    AllocateSym,
                                                    AllocateReg,
@@ -637,6 +650,7 @@ _SplitArrayVariable(
                                                   mixName,
                                                   BlockIndex,
                                                   SymFlag,
+                                                  SymFlagExt,
                                                   SplitArray,
                                                   AllocateSym,
                                                   AllocateReg,
@@ -671,6 +685,7 @@ _SplitArrayVariable(
                                               StorageClass,
                                               BlockIndex,
                                               SymFlag,
+                                              SymFlagExt,
                                               AllocateSym,
                                               AllocateReg,
                                               UpcomingRegCount,
@@ -711,6 +726,7 @@ _SplitArrayVariable(
                                       StorageClass,
                                       BlockIndex,
                                       SymFlag,
+                                      SymFlagExt,
                                       AllocateSym,
                                       AllocateReg,
                                       UpcomingRegCount,
@@ -766,6 +782,7 @@ _SplitUniforms(
                                       uniformName,
                                       VIR_INVALID_ID,
                                       VIR_SYMFLAG_NONE,
+                                      VIR_Symbol_GetFlagsExt(UniformSym),
                                       gcvFALSE,
                                       gcvTRUE,
                                       gcvFALSE,
@@ -788,6 +805,7 @@ _SplitUniforms(
                                        type,
                                        VIR_INVALID_ID,
                                        VIR_SYMFLAG_NONE,
+                                       VIR_Symbol_GetFlagsExt(UniformSym),
                                        gcvFALSE,
                                        gcvTRUE,
                                        gcvFALSE,
@@ -1330,6 +1348,7 @@ _SplitVariables(
                                           name,
                                           VIR_INVALID_ID,
                                           VIR_Symbol_GetFlags(VariableSym),
+                                          VIR_Symbol_GetFlagsExt(VariableSym),
                                           gcvFALSE,
                                           gcvTRUE,
                                           gcvTRUE,
@@ -1352,6 +1371,7 @@ _SplitVariables(
                                            type,
                                            VIR_INVALID_ID,
                                            VIR_Symbol_GetFlags(VariableSym),
+                                           VIR_Symbol_GetFlagsExt(VariableSym),
                                            gcvFALSE,
                                            gcvTRUE,
                                            gcvTRUE,
@@ -1377,6 +1397,7 @@ _SplitVariables(
                                       StorageClass,
                                       VIR_INVALID_ID,
                                       VIR_SYMFLAG_NONE,
+                                      VIR_Symbol_GetFlagsExt(VariableSym),
                                       gcvFALSE,
                                       gcvTRUE,
                                       &upcomingRegCount,
@@ -1424,6 +1445,7 @@ _SplitOutputs(
                                           name,
                                           VIR_INVALID_ID,
                                           VIR_Symbol_GetFlags(OutputSym),
+                                          VIR_Symbol_GetFlagsExt(OutputSym),
                                           splitArray,
                                           gcvTRUE,
                                           gcvTRUE,
@@ -1446,6 +1468,7 @@ _SplitOutputs(
                                            type,
                                            VIR_INVALID_ID,
                                            VIR_Symbol_GetFlags(OutputSym),
+                                           VIR_Symbol_GetFlagsExt(OutputSym),
                                            splitArray,
                                            gcvTRUE,
                                            gcvTRUE,
@@ -1470,6 +1493,7 @@ _SplitOutputs(
                                       StorageClass,
                                       VIR_INVALID_ID,
                                       VIR_SYMFLAG_NONE,
+                                      VIR_Symbol_GetFlagsExt(OutputSym),
                                       gcvFALSE,
                                       gcvTRUE,
                                       &upcomingRegCount,
@@ -1916,6 +1940,7 @@ _AllocateInterfaceBlock(
                                                baseType,
                                                blockIndex,
                                                SymFlag,
+                                               VIR_Symbol_GetFlagsExt(IBSymbol),
                                                gcvFALSE,
                                                AllocMemberSym,
                                                AllocMemberReg,
@@ -1936,6 +1961,7 @@ _AllocateInterfaceBlock(
                                               blockMemberStorageClass,
                                               blockIndex,
                                               SymFlag,
+                                              VIR_Symbol_GetFlagsExt(IBSymbol),
                                               AllocMemberSym,
                                               AllocMemberReg,
                                               &upcomingRegCount,
@@ -2592,8 +2618,10 @@ _ReplaceVariableWithVirReg(
     VSC_ErrCode                  errCode  = VSC_ERR_NONE;
     VIR_Symbol                  *opndSym = VIR_Operand_GetSymbol(Operand);
     VIR_VirRegId                 virRegId = VIR_Symbol_GetVregIndex(opndSym);
+    VIR_VirRegId                 variableRegId;
     VIR_SymId                    virRegSymId;
     VIR_Symbol                  *virRegSym;
+    VIR_Symbol                  *variableSym = gcvNULL;
     gctBOOL                      isInput = VIR_Symbol_isPerPatchInput(opndSym) || VIR_Symbol_isAttribute(opndSym);
     gctBOOL                      needReplaceSymWithReg = VIR_Symbol_NeedReplaceSymWithReg(opndSym);
     gctBOOL                      isConstIndex = gcvFALSE;
@@ -2646,7 +2674,17 @@ _ReplaceVariableWithVirReg(
                 VIR_Operand_SetRelIndex(Operand, 0);
             }
 
-            VIR_Operand_SetSym(Operand, VIR_Symbol_GetVregVariable(virRegSym));
+            variableSym = VIR_Symbol_GetVregVariable(virRegSym);
+            variableRegId = VIR_Symbol_GetVariableVregIndex(variableSym);
+
+            VIR_Operand_SetSym(Operand, variableSym);
+
+            if (variableRegId != virRegId)
+            {
+                gcmASSERT(virRegId > variableRegId);
+                VIR_Operand_SetIsConstIndexing(Operand, gcvTRUE);
+                VIR_Operand_SetRelIndex(Operand, virRegId - variableRegId);
+            }
         }
     }
 
