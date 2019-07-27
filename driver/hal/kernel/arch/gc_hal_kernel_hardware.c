@@ -10749,7 +10749,7 @@ gckHARDWARE_UpdateContextProfile(
     gctUINT32 chipRevision;
     gctUINT32 i;
     gctUINT32 resetValue = 0xF;
-    gctBOOL hasNewCounters = gcvFALSE;
+    gctBOOL newCounters0 = gcvFALSE;
     gctUINT32 clock;
     gctUINT32 colorKilled = 0, colorDrawn = 0, depthKilled = 0, depthDrawn = 0;
     gctUINT32 totalRead, totalWrite;
@@ -10775,7 +10775,7 @@ gckHARDWARE_UpdateContextProfile(
     if ((chipModel == gcv5000 && chipRevision == 0x5434) || (chipModel == gcv3000 && chipRevision == 0x5435))
     {
         resetValue = 0xFF;
-        hasNewCounters = gcvTRUE;
+        newCounters0 = gcvTRUE;
     }
 
     if (chipModel == gcv2100 || chipModel == gcv2000 || chipModel == gcv880)
@@ -11208,7 +11208,7 @@ gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x0045C, &profile
  31:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:24) - (0 ? 31:24) + 1))))))) << (0 ? 31:24))) ));
 gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x0045C, &profiler_part1->ps_texld_inst_counter));
-    if (hasNewCounters)
+    if (newCounters0)
     {
         gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00470,   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:24) - (0 ?
@@ -11363,7 +11363,7 @@ gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x0045C, &profile
     gcmkRESET_PROFILE_DATA_PART1(vs_texld_inst_counter);
     gcmkRESET_PROFILE_DATA_PART1(ps_branch_inst_counter);
     gcmkRESET_PROFILE_DATA_PART1(ps_texld_inst_counter);
-    if (hasNewCounters)
+    if (newCounters0)
     {
         gcmkRESET_PROFILE_DATA_PART1(vs_non_idle_starve_count);
         gcmkRESET_PROFILE_DATA_PART1(vs_starve_count);
@@ -11388,7 +11388,7 @@ gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x0045C, &profile
     gcmkUPDATE_PROFILE_DATA_PART1(vs_texld_inst_counter);
     gcmkUPDATE_PROFILE_DATA_PART1(ps_branch_inst_counter);
     gcmkUPDATE_PROFILE_DATA_PART1(ps_texld_inst_counter);
-    if (hasNewCounters)
+    if (newCounters0)
     {
         gcmkUPDATE_PROFILE_DATA_PART1(vs_non_idle_starve_count);
         gcmkUPDATE_PROFILE_DATA_PART1(vs_starve_count);
@@ -11517,7 +11517,7 @@ gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x00460, &profile
  7:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0))) ));
 gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x00460, &profiler_part1->pa_frustum_clipped_prim_counter));
-    if (hasNewCounters)
+    if (newCounters0)
     {
         gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00474,   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:0) - (0 ?
@@ -11573,7 +11573,7 @@ gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x00460, &profile
     gcmkRESET_PROFILE_DATA_PART1(pa_culled_prim_counter);
     gcmkRESET_PROFILE_DATA_PART1(pa_droped_prim_counter);
     gcmkRESET_PROFILE_DATA_PART1(pa_frustum_clipped_prim_counter);
-    if (hasNewCounters)
+    if (newCounters0)
     {
         gcmkRESET_PROFILE_DATA_PART1(pa_non_idle_starve_count);
         gcmkRESET_PROFILE_DATA_PART1(pa_starve_count);
@@ -11589,7 +11589,7 @@ gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x00460, &profile
     gcmkUPDATE_PROFILE_DATA_PART1(pa_culled_prim_counter);
     gcmkUPDATE_PROFILE_DATA_PART1(pa_droped_prim_counter);
     gcmkUPDATE_PROFILE_DATA_PART1(pa_frustum_clipped_prim_counter);
-    if (hasNewCounters)
+    if (newCounters0)
     {
         gcmkUPDATE_PROFILE_DATA_PART1(pa_non_idle_starve_count);
         gcmkUPDATE_PROFILE_DATA_PART1(pa_starve_count);
@@ -11675,7 +11675,7 @@ gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x00464, &profile
  15:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:8) - (0 ? 15:8) + 1))))))) << (0 ? 15:8))) ));
 gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x00464, &profiler_part1->se_trivial_rejected_line_count));
-    if (hasNewCounters)
+    if (newCounters0)
     {
         gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00474,   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:8) - (0 ?
@@ -11793,7 +11793,7 @@ gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00474,   ((((g
     gcmkUPDATE_PROFILE_DATA_PART1(se_culled_triangle_count);
     gcmkUPDATE_PROFILE_DATA_PART1(se_culled_lines_count);
     gcmkUPDATE_PROFILE_DATA_PART1(se_trivial_rejected_line_count);
-    if (hasNewCounters)
+    if (newCounters0)
     {
         gcmkUPDATE_PROFILE_DATA_PART1(se_starve_count);
         gcmkUPDATE_PROFILE_DATA_PART1(se_stall_count);
@@ -11905,7 +11905,7 @@ gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x00448, &profile
  23:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 23:16) - (0 ? 23:16) + 1))))))) << (0 ? 23:16))) ));
 gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x00448, &profiler_part1->ra_prefetch_hz_cache_miss_counter));
-    if (hasNewCounters)
+    if (newCounters0)
     {
         gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00474,   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  23:16) - (0 ?
@@ -11962,7 +11962,7 @@ gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x00448, &profile
     gcmkRESET_PROFILE_DATA_PART1(ra_eez_culled_counter);
     gcmkRESET_PROFILE_DATA_PART1(ra_pipe_hz_cache_miss_counter);
     gcmkRESET_PROFILE_DATA_PART1(ra_prefetch_hz_cache_miss_counter);
-    if (hasNewCounters)
+    if (newCounters0)
     {
         gcmkRESET_PROFILE_DATA_PART1(ra_non_idle_starve_count);
         gcmkRESET_PROFILE_DATA_PART1(ra_starve_count);
@@ -11979,7 +11979,7 @@ gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x00448, &profile
     gcmkUPDATE_PROFILE_DATA_PART1(ra_eez_culled_counter);
     gcmkUPDATE_PROFILE_DATA_PART1(ra_pipe_hz_cache_miss_counter);
     gcmkUPDATE_PROFILE_DATA_PART1(ra_prefetch_hz_cache_miss_counter);
-    if (hasNewCounters)
+    if (newCounters0)
     {
         gcmkUPDATE_PROFILE_DATA_PART1(ra_non_idle_starve_count);
         gcmkUPDATE_PROFILE_DATA_PART1(ra_starve_count);
@@ -12438,7 +12438,7 @@ gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x00478,   ((((g
     gcmkUPDATE_PROFILE_DATA_PART2(mc_sh1_write_bandwidth);
 
     /* read latency counters */
-    if (hasNewCounters)
+    if (newCounters0)
     {
         /* latency */
         gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
