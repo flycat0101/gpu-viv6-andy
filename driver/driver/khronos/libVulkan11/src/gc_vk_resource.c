@@ -1603,6 +1603,14 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_MapMemory(
     dvm->mappedOffset = offset;
     dvm->mapped = VK_TRUE;
 
+    gcmDUMP(gcvNULL, "#[info: update[ Map ] memory=%d]", dvm->obj.id);
+    gcmDUMP_BUFFER(gcvNULL,
+                    gcvDUMP_BUFFER_VERIFY,
+                    dvm->devAddr,
+                    dvm->hostAddr,
+                    dvm->mappedOffset,
+                    dvm->mappedSize);
+
     return VK_SUCCESS;
 }
 
@@ -1613,7 +1621,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_UnmapMemory(
 {
     __vkDeviceMemory *dvm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, mem);
 
-    gcmDUMP(gcvNULL, "#[info: update device memory=%d]", dvm->obj.id);
+    gcmDUMP(gcvNULL, "#[info: update[ Unmap ] device memory=%d]", dvm->obj.id);
     gcmDUMP_BUFFER(gcvNULL,
                    gcvDUMP_BUFFER_MEMORY,
                    dvm->devAddr,
@@ -1632,6 +1640,17 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_FlushMappedMemoryRanges(
     const VkMappedMemoryRange* pMemRanges
     )
 {
+#if gcdDUMP
+    __vkDeviceMemory *dvm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, pMemRanges->memory);
+
+    gcmDUMP(gcvNULL, "#[info: flush mapped memory=%d]", dvm->obj.id);
+    gcmDUMP_BUFFER(gcvNULL,
+                    gcvDUMP_BUFFER_MEMORY,
+                    dvm->devAddr,
+                    dvm->hostAddr,
+                    pMemRanges->offset,
+                    pMemRanges->size);
+#endif
     return VK_SUCCESS;
 }
 
@@ -1641,6 +1660,17 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_InvalidateMappedMemoryRanges(
     const VkMappedMemoryRange* pMemRanges
     )
 {
+#if gcdDUMP
+    __vkDeviceMemory *dvm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, pMemRanges->memory);
+
+    gcmDUMP(gcvNULL, "#[info: invalidate mapped memory=%d]", dvm->obj.id);
+    gcmDUMP_BUFFER(gcvNULL,
+                    gcvDUMP_BUFFER_VERIFY,
+                    dvm->devAddr,
+                    dvm->hostAddr,
+                    pMemRanges->offset,
+                    pMemRanges->size);
+#endif
     return VK_SUCCESS;
 }
 
