@@ -733,6 +733,7 @@ typedef struct
     halti5_priv_const baseInstance;
     halti5_priv_const sampleLocation;
     halti5_priv_const ehableMultiSampleBuffers;
+    halti5_priv_const useViewIndex;
 
     VkBool32 depthOnly;
     VkBool32 peDepth;

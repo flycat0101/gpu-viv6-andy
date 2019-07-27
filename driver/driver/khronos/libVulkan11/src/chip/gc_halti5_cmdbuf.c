@@ -723,7 +723,7 @@ VkResult halti5_draw(
     __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
     __vkRenderPass *rdp = pip->renderPass;
     __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
-    __vkSubpassViewInfo *subPassView;
+    __vkSubpassViewInfo *subPassView = VK_NULL_HANDLE;
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
     uint32_t drawCommand, drawCount;
     uint32_t *states;
@@ -897,6 +897,11 @@ VkResult halti5_draw(
             if (chipGfxPipeline->baseInstance.bUsed)
             {
                 __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, firstInstance);
+            }
+            /*if shader used gl_ViewIndex and HW not support multiview, we need program the value of gl_ViewIndex */
+            if (chipGfxPipeline->useViewIndex.bUsed)
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->useViewIndex.hwRegAddress, VK_FALSE, viewIdx[i]);
             }
 
             __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
@@ -1128,7 +1133,7 @@ VkResult halti5_drawIndexed(
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
     __vkRenderPass *rdp = pip->renderPass;
     __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
-    __vkSubpassViewInfo *subPassView;
+    __vkSubpassViewInfo *subPassView = VK_NULL_HANDLE;
     uint32_t drawCommand, drawCount;
     uint32_t *states;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
@@ -1304,6 +1309,12 @@ VkResult halti5_drawIndexed(
             {
                 __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, firstInstance);
             }
+            /*if shader used gl_ViewIndex and HW not support multiview, we need program the value of gl_ViewIndex */
+            if (chipGfxPipeline->useViewIndex.bUsed)
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->useViewIndex.hwRegAddress, VK_FALSE, viewIdx[i]);
+            }
+
             __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
             *pCmdBuffer++ = drawCommand;
             *pCmdBuffer++ = drawCount;
@@ -2510,7 +2521,7 @@ static VkResult halti5_drawIndirect_common(
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
     __vkRenderPass *rdp = pip->renderPass;
     __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
-    __vkSubpassViewInfo *subPassView;
+    __vkSubpassViewInfo *subPassView = VK_NULL_HANDLE;
     uint32_t drawCommand;
     uint32_t *states;
     uint32_t srcAddr;
@@ -2673,6 +2684,12 @@ static VkResult halti5_drawIndirect_common(
             {
                 __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, 0);
             }
+            /*if shader used gl_ViewIndex and HW not support multiview, we need program the value of gl_ViewIndex */
+            if (chipGfxPipeline->useViewIndex.bUsed)
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->useViewIndex.hwRegAddress, VK_FALSE, viewIdx[i]);
+            }
+
             __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
             *pCmdBuffer++ = drawCommand;
             *pCmdBuffer++ = srcAddr;

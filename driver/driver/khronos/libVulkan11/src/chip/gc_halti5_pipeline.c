@@ -5243,6 +5243,15 @@ static VkResult halti5_pip_process_priv_const(
                         (masterInstance->hwStates.hints.hwConstRegBases[gcvPROGRAM_STAGE_VERTEX] >> 2) + (chipGfxPipeline->baseInstance.hwRegNo * 4);
                     chipGfxPipeline->baseInstance.hwRegCount = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegRange;
                     break;
+                    /*HW not supoort the feature: multiview, so compiler treat the gl_ViewIndex as a private constant*/
+                case SHS_PRIV_CONSTANT_KIND_VIEW_INDEX:
+                    __VK_ASSERT(privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel == 0);
+                    chipGfxPipeline->useViewIndex.bUsed = VK_TRUE;
+                    chipGfxPipeline->useViewIndex.hwRegNo = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
+                    chipGfxPipeline->useViewIndex.hwRegAddress =
+                        (masterInstance->hwStates.hints.hwConstRegBases[gcvPROGRAM_STAGE_VERTEX] >> 2) + (chipGfxPipeline->useViewIndex.hwRegNo * 4);
+                    chipGfxPipeline->useViewIndex.hwRegCount = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegRange;
+                    break;
 
                 default:
                     break;
@@ -5279,6 +5288,15 @@ static VkResult halti5_pip_process_priv_const(
                         (chipGfxPipeline->ehableMultiSampleBuffers.hwRegNo * 4) +
                         privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
                     chipGfxPipeline->ehableMultiSampleBuffers.hwRegCount = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegRange;
+                    break;
+                    /*HW not support the feature: multiview, so compiler treat the gl_ViewIndex as a private constant*/
+                case SHS_PRIV_CONSTANT_KIND_VIEW_INDEX:
+                    __VK_ASSERT(privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel == 0);
+                    chipGfxPipeline->useViewIndex.bUsed = VK_TRUE;
+                    chipGfxPipeline->useViewIndex.hwRegNo = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
+                    chipGfxPipeline->useViewIndex.hwRegAddress =
+                        (masterInstance->hwStates.hints.hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2) + (chipGfxPipeline->useViewIndex.hwRegNo * 4);
+                    chipGfxPipeline->useViewIndex.hwRegCount = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegRange;
                     break;
 
                 default:
