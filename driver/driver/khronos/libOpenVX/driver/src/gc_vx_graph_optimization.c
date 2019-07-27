@@ -267,15 +267,15 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
             };
 
 
-            vx_int32 stride_x = (vx_int32)roundRTNE((vx_float32)(input_w + pad[0] + pad[2] - kernelx)/(output_w == 1? 1: output_w -1));
-            vx_int32 stride_y = (vx_int32)roundRTNE((vx_float32)(input_h + pad[1] + pad[3]- kernely)/(output_h == 1? 1: output_h-1));
+            vx_int32 stride_x = (vx_int32)roundRTNE((vx_float32)(input_w + pad[0] + pad[1] - kernelx)/(output_w == 1? 1: output_w -1));
+            vx_int32 stride_y = (vx_int32)roundRTNE((vx_float32)(input_h + pad[2] + pad[3]- kernely)/(output_h == 1? 1: output_h-1));
             stride_x = stride_x == 0 ? 1: stride_x;
             stride_y = stride_y == 0 ? 1: stride_y;
             if(poolType == VX_NN_POOLING_MAX)
             {
                 vx_uint32 poolx = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_SIZE_X_INDEX], u32);
                 vx_uint32 pooly = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_SIZE_Y_INDEX], u32);
-                if(poolx == pooly && pad[0]== 0 && pad[2]== 0  &&
+                if(poolx == pooly && pad[0]== 0 && pad[2]== 0  && pad[1]== 0 && pad[3]== 0   &&
                     (poolx == 2 || (poolx == 3 &&  !vxoGraphOptimization_isV8((vx_reference)node)) )
                   )
                 {
