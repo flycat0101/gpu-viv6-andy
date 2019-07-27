@@ -2842,6 +2842,12 @@ static VSC_ErrCode _VIR_HL_Process_Functions(
                 parmSymId = VIR_IdList_GetId(&pCalleeFunc->paramters, i);
                 parmSym = VIR_Function_GetSymFromId(pCalleeFunc, parmSymId);
                 parmType = VIR_Symbol_GetType(parmSym);
+                /* fix pointers to uint32 */
+                if(VIR_Type_isPointer(parmType))
+                {
+                    VIR_Symbol_SetTypeId(parmSym, VIR_TYPE_UINT32);
+                    parmType = VIR_Symbol_GetType(parmSym);
+                }
                 movEnable = VIR_TypeId_isPrimitive(VIR_Type_GetIndex(parmType)) ? VIR_Type_Conv2Enable(parmType) : VIR_ENABLE_XYZW;
 
                 /* Get argument operand. */

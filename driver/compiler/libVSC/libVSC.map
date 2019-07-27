@@ -454,6 +454,7 @@
     VIR_Shader_AddConstant;
     VIR_Shader_AddStructType;
     VIR_Shader_AddArrayType;
+    VIR_Shader_AddPointerType;
     VIR_Shader_AddFieldSymbol;
     VIR_Shader_CompositeConstruct;
     VIR_Shader_GetBuiltInTypes;

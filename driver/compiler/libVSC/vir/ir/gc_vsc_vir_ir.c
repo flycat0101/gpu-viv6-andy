@@ -4665,6 +4665,7 @@ VIR_Shader_UpdateCallParmAssignment(
     VIR_Symbol              *calleeParmSym = gcvNULL, *calleeParmVregSym = gcvNULL;
     VIR_Symbol              *newParmVregSym = gcvNULL;
     VIR_TypeId              parmTypeId, parmBaseTypeId;
+    VIR_Type                *parmType;
     VIR_Instruction         *newInst;
     VIR_Instruction         *pInInstIter, *pOutInstIter;
     VIR_Operand             *pOpnd;
@@ -4683,13 +4684,14 @@ VIR_Shader_UpdateCallParmAssignment(
         parmTypeId = VIR_Symbol_GetTypeId(parmSym);
         parmBaseTypeId = VIR_Type_GetBaseTypeId(VIR_Shader_GetTypeFromId(pShader, parmTypeId));
 
+        parmType = VIR_Shader_GetTypeFromId(pShader, parmTypeId);
         regCount = VIR_Type_GetRegOrOpaqueCount(pShader,
-                                                VIR_Shader_GetTypeFromId(pShader, parmTypeId),
+                                                parmType,
                                                 VIR_TypeId_isSampler(parmBaseTypeId),
                                                 VIR_TypeId_isImage(parmBaseTypeId),
                                                 VIR_TypeId_isAtomicCounters(parmBaseTypeId),
                                                 gcvFALSE);
-        compCount = VIR_GetTypeComponents(parmBaseTypeId);
+        compCount = VIR_Type_isPointer(parmType) ? 1 : VIR_GetTypeComponents(parmBaseTypeId);
         gcmASSERT(compCount <= VIR_CHANNEL_COUNT);
 
         /* go through every virReg in the parameter (long/ulong has two)
@@ -5358,17 +5360,25 @@ _GetBaseTypeOrFieldSymbol(
     gctUINT                 fieldOffset = 0;
     gctBOOL                 updateStructMemberInfo = gcvFALSE;
     VIR_LayoutQual          layoutQual = VIR_LAYQUAL_NONE;
+    VIR_TypeKind            typeKind;
 
     /* We need to get the array stride from VIR_Type,
     ** but we can't get the matrix stride from VIR_Type because we treat matrix as built-in type,
     ** so we can only get it from field info now.
     */
-    switch (VIR_Type_GetKind(Type))
+
+    if(VIR_Type_GetKind(type) == VIR_TY_POINTER)
+    {
+       type = VIR_Shader_GetTypeFromId(Shader, VIR_Type_GetBaseTypeId(type));
+    }
+
+    typeKind = VIR_Type_GetKind(type);
+    switch (typeKind)
     {
     case VIR_TY_ARRAY:
         {
             type = VIR_Shader_GetTypeFromId(Shader,
-                VIR_Type_GetBaseTypeId(Type));
+            VIR_Type_GetBaseTypeId(Type));
 
             arrayStride = VIR_Type_GetArrayStride(Type);
             break;
@@ -5568,6 +5578,10 @@ VIR_Type_GetRegOrOpaqueCount(
         {
             regCount = IsLogicalReg ? 1 : VIR_GetTypeRows(typeId);
         }
+    }
+    else if (VIR_Type_isPointer(Type))
+    {
+        regCount = 1;
     }
     /* If this is an array or struct, check its element. */
     else
@@ -15042,6 +15056,10 @@ VIR_Operand_EvaluateOffsetByAccessChain(
     gcoOS_PrintStrSafe(name, 32, &offset, "_spv_ac_id_%d", ResultId);
 
     /* Check all access chain indexes. */
+    if(VIR_Type_GetKind(type) == VIR_TY_POINTER)
+    {
+        type = VIR_Shader_GetTypeFromId(Shader, VIR_Type_GetBaseTypeId(type));
+    }
     for (i = 0; i < AccessChainLength; i++)
     {
         isTypeStruct = (VIR_Type_GetKind(type) == VIR_TY_STRUCT);

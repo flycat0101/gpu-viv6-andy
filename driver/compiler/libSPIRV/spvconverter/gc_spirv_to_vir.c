@@ -5761,7 +5761,11 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
 
     if (SPV_ID_IS_MEM_ADDR_CALC(spv->resultId))
     {
-        virTypeId = VIR_TYPE_UINT32;
+        virErrCode = VIR_Shader_AddPointerType(virShader,
+                                               SPV_ID_TYPE_VIR_TYPE_ID(type),
+                                               VIR_TYQUAL_NONE,
+                                               VIR_AS_PRIVATE,
+                                               &virTypeId);
     }
     else if (SPV_ID_TYPE_IS_POINTER(type))
     {
