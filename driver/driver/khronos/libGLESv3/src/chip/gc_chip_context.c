@@ -1703,8 +1703,6 @@ __glChipDestroyContext(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    GL_ASSERT(gc->imports.config);
-
     if (gc->constants.extensions)
     {
         (*gc->imports.free)(gc, gc->constants.extensions);
@@ -1797,8 +1795,6 @@ __glChipCreateContext(
     __GLchipContext * shareCtx;
 
     gcmHEADER_ARG("gc=0x%x", gc);
-
-    GL_ASSERT(gc->imports.config);
 
     chipCtx = (__GLchipContext*)(*gc->imports.calloc)(NULL, 1, sizeof(__GLchipContext));
     if (!chipCtx)

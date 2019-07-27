@@ -513,7 +513,10 @@ _CreateApiContext(
         return gcvNULL;
     }
 
-    gcmASSERT(Config);
+    if (!_IsExtSuppored(VEGL_EXTID_KHR_no_config_context))
+    {
+        gcmASSERT(Config);
+    }
 
     imports.config = Config;
     imports.robustAccess = Context->robustAccess;
@@ -957,7 +960,7 @@ eglCreateContext(
     EGLint major = 1;
     EGLint minor = 0;
     gctPOINTER pointer = gcvNULL;
-    VEGLConfig  eglConfig;
+    VEGLConfig  eglConfig = gcvNULL;
     EGLint flags = 0;
     gctBOOL robustAccess = EGL_FALSE;
     gctINT resetNotification = EGL_NO_RESET_NOTIFICATION_EXT;
@@ -1020,16 +1023,27 @@ eglCreateContext(
     /* Hardware relevant thread data initialization. */
     veglInitDeviceThreadData(thread);
 
-    /* Test for valid config. */
-    if (((EGLint)(intptr_t)config <= __EGL_INVALID_CONFIG__)
-    ||  ((EGLint)(intptr_t)config > dpy->configCount)
-    )
+    if (config != EGL_NO_CONFIG_KHR)
     {
-        veglSetEGLerror(thread,  EGL_BAD_CONFIG);
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-    }
+        /* Test for valid config. */
+        if (((EGLint)(intptr_t)config <= __EGL_INVALID_CONFIG__)
+        ||  ((EGLint)(intptr_t)config > dpy->configCount)
+        )
+        {
+            veglSetEGLerror(thread,  EGL_BAD_CONFIG);
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
 
-    eglConfig = VEGL_CONFIG(&dpy->config[(EGLint)(intptr_t)config - 1]);
+        eglConfig = VEGL_CONFIG(&dpy->config[(EGLint)(intptr_t)config - 1]);
+    }
+    else
+    {
+        if (!_IsExtSuppored(VEGL_EXTID_KHR_no_config_context))
+        {
+            veglSetEGLerror(thread,  EGL_BAD_CONFIG);
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+    }
 
     /* Get attribute. */
     if (attrib_list != gcvNULL)
@@ -1224,7 +1238,7 @@ eglCreateContext(
         }
     }
 
-    if (thread->api == EGL_OPENGL_ES_API)
+    if (eglConfig && thread->api == EGL_OPENGL_ES_API)
     {
         EGLBoolean valid = EGL_FALSE;
         EGLBoolean match = EGL_FALSE;
@@ -1299,22 +1313,19 @@ eglCreateContext(
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
     }
-    else
+    else if (eglConfig && (thread->api == EGL_OPENVG_API)
+    &&  !(eglConfig->renderableType & EGL_OPENVG_BIT)
+    )
     {
-        if ((thread->api == EGL_OPENVG_API)
-        &&  !(eglConfig->renderableType & EGL_OPENVG_BIT)
-        )
-        {
-            veglSetEGLerror(thread,  EGL_BAD_CONFIG);
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        }
-        else if ((thread->api == EGL_OPENGL_API)
-        &&  !(eglConfig->renderableType & EGL_OPENGL_BIT)
-        )
-        {
-            veglSetEGLerror(thread,  EGL_BAD_CONFIG);
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        }
+        veglSetEGLerror(thread,  EGL_BAD_CONFIG);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+    else if (eglConfig && (thread->api == EGL_OPENGL_API)
+    &&  !(eglConfig->renderableType & EGL_OPENGL_BIT)
+    )
+    {
+        veglSetEGLerror(thread,  EGL_BAD_CONFIG);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
 
@@ -1447,7 +1458,8 @@ eglCreateContext(
 #endif
 
     /* Copy config information */
-    gcoOS_MemCopy(&context->config, eglConfig, sizeof(context->config));
+    if (eglConfig)
+        gcoOS_MemCopy(&context->config, eglConfig, sizeof(context->config));
 
     /* Push context into stack. */
     veglPushResObj(dpy, (VEGLResObj *)&dpy->contextStack, (VEGLResObj)context);
@@ -1475,19 +1487,22 @@ eglCreateContext(
     }
 
     /* Useful for debugging */
-    gcmTRACE_ZONE(
-        gcvLEVEL_INFO, _GC_OBJ_ZONE,
-            "a,b,g,r=%d,%d,%d,%d, d,s=%d,%d, id=%d, AA=%d, t=0x%08X",
-            eglConfig->alphaSize,
-            eglConfig->blueSize,
-            eglConfig->greenSize,
-            eglConfig->redSize,
-            eglConfig->depthSize,
-            eglConfig->stencilSize,
-            eglConfig->configId,
-            eglConfig->samples,
-            eglConfig->surfaceType
-        );
+    if (eglConfig)
+    {
+        gcmTRACE_ZONE(
+            gcvLEVEL_INFO, _GC_OBJ_ZONE,
+                "a,b,g,r=%d,%d,%d,%d, d,s=%d,%d, id=%d, AA=%d, t=0x%08X",
+                eglConfig->alphaSize,
+                eglConfig->blueSize,
+                eglConfig->greenSize,
+                eglConfig->redSize,
+                eglConfig->depthSize,
+                eglConfig->stencilSize,
+                eglConfig->configId,
+                eglConfig->samples,
+                eglConfig->surfaceType
+            );
+    }
 
     /* Success. */
     veglSetEGLerror(thread,  EGL_SUCCESS);

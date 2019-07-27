@@ -660,6 +660,7 @@ typedef enum _VEGL_EXTID
     VEGL_EXTID_EXT_image_dma_buf_import_modifiers,
     VEGL_EXTID_KHR_lock_surface,
     VEGL_EXTID_KHR_create_context,
+    VEGL_EXTID_KHR_no_config_context,
     VEGL_EXTID_KHR_surfaceless_context,
     VEGL_EXTID_EXT_create_context_robustness,
     VEGL_EXTID_EXT_protected_surface,

@@ -304,8 +304,13 @@ eglQueryContext(
     {
         switch (attribute)
         {
+       /* EGL_KHR_no_config_context
+       ** "Querying EGL_CONFIG_ID returns the ID of the EGLConfig with respect
+       **  to which the context was created, or zero if created without
+       **  respect to an EGLConfig."
+       */
         case EGL_CONFIG_ID:
-            *value = context->config.configId;
+            *value = context->config.configId ? context->config.configId : 0;
             break;
 
         case EGL_CONTEXT_CLIENT_TYPE:
