@@ -382,7 +382,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNSplitCommandInfo(
                 {
                     sinfoArray[index].vx_nn_general_cmd_split_info.inImageAddress  = sinfoArray[index - ycount * xcount].vx_nn_general_cmd_split_info.inImageAddress;
                     sinfoArray[index].vx_nn_general_cmd_split_info.outImageAddress = sinfoArray[index - ycount * xcount].vx_nn_general_cmd_split_info.outImageAddress + z_size[k] * vxnneGetTypeSize(outDataFormat);
-                    sinfoArray[index].vx_nn_general_cmd_split_info.kernelAddress   = WB_MEM_PHYSICAL_ADDR_INDEX(wb, index);
+                    sinfoArray[index].vx_nn_general_cmd_split_info.kernelAddress   = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(wb, index);
                 }
                 else if(j > 0 && i == 0)
                 {
