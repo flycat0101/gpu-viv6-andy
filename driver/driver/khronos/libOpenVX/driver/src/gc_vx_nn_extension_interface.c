@@ -20922,10 +20922,23 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorRounding_Initializer(vx_node node,
     }
 
     if(node->base.context->evisNoInst.supportEVIS)
-        dataFormat_flag = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
+    {
+        dataFormat_flag = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
+                                    (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8) ||
+                                    (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16) ||
+                                    (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8) ||
+                                    (inputFormat == VX_TYPE_INT8    && outputFormat == VX_TYPE_FLOAT16) ||
+                                    (inputFormat == VX_TYPE_INT16   && outputFormat == VX_TYPE_FLOAT16) ||
+                                    (inputFormat == VX_TYPE_UINT8   && outputFormat == VX_TYPE_FLOAT16) ||
+                                    (inputFormat == VX_TYPE_UINT8   && outputFormat == VX_TYPE_UINT8  ) ||
+                                    (inputFormat == VX_TYPE_INT8    && outputFormat == VX_TYPE_INT8   ) ||
+                                    (inputFormat == VX_TYPE_INT16   && outputFormat == VX_TYPE_INT16  ) );
+    }
     else
+    {
         dataFormat_flag = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
                                     (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32));
+    }
     gcoOS_ZeroMemory(roundingLayer, sizeof(vxnne_tensor_rounding_layer_s));
 
     vxnneLayer_Initialize(&roundingLayer->base,
