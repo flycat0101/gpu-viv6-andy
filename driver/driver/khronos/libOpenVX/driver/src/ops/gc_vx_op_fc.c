@@ -329,6 +329,9 @@ vx_status vxoFCOperation_Initialize(
         target = VXNNE_OPERATION_TARGET_SW;
     }
 
+    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0) == vx_true_e)
+        target = VXNNE_OPERATION_TARGET_TP;
+
     /* Prepare for the tensor-copy operation for the non-64byte-aligned TP FC inputs. */
     if (target == VXNNE_OPERATION_TARGET_TP)
     {
