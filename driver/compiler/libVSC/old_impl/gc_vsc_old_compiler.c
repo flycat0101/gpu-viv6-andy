@@ -2093,7 +2093,7 @@ gcSHADER_Construct(
     /* check the shader binary output is consistent in 32bit and 64bit platform */
     if (!gcShader_CheckStructCompitibility())
     {
-        gcmFATAL("Invalid stuct size. Need to add padding bytes or adjust the struct layout.", status, gcoOS_DebugStatus2Name(status));
+        gcmFATAL("Invalid stuct size. Need to add padding bytes or adjust the struct layout.");
         gcmFOOTER();
         return gcvSTATUS_INVALID_DATA;
     }
