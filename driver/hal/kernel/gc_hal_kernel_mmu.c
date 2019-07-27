@@ -3168,7 +3168,7 @@ gckMMU_SetupPerHardware(
                                                                  Device->sRAMBaseAddresses[i - 1][gcvSRAM_INTERNAL] +
                                                                  gcmALIGN(Device->sRAMSizes[i - 1][gcvSRAM_INTERNAL], gcdRESERVE_ALIGN);
 
-                Device->sRAMBases[i][gcvSRAM_INTERNAL] = Device->sRAMBaseAddresses[i][gcvSRAM_INTERNAL];
+                Device->sRAMCPUBases[i][gcvSRAM_INTERNAL] = Device->sRAMBaseAddresses[i][gcvSRAM_INTERNAL];
             }
 
             /* Map all the axi SRAMs in MMU table. */
