@@ -2438,8 +2438,17 @@ OnError:
                 VK_FILTER_NEAREST,
                 VK_TRUE
                 ));
+
+#if gcdDUMP
+            dstRes.u.img.pImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage  *, dstImage);
+#endif
+
 #if __VK_RESOURCE_INFO
             __vk_utils_insertCopyCmdRes(commandBuffer, &srcRes, &dstRes);
+#endif
+
+#if gcdDUMP
+            dstRes.u.img.pImage = pDstImg;
 #endif
             srcRes.u.buf.offset += srcSliceBytes;
             dstRes.u.img.subRes.arrayLayer++;
