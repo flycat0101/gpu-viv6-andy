@@ -136,6 +136,7 @@ vx_int8 Fp32toInt8(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode);
 vx_int16 Fp32toInt16(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode);
 vx_float32 Int8toFp32(vx_int8 val, vx_int8 fixedPointPos);
 vx_float32 Int32toFp32(vx_int32 val, vx_int8 fixedPointPos);
+vx_float32 Int64toFp32(vx_int64 val, vx_int8 fixedPointPos);
 void getFP32M0AndN(vx_float32 mult, vx_uint16 *M0, vx_int8 *N);
 void calculateActivationRangeFloat16(vx_int32 activation, vx_int16* act_min, vx_int16* act_max);
 void calculateActivationRangeInt16(vx_int32 activation, vx_int8 fixedPointPos, vx_int16* act_min, vx_int16* act_max, vx_int32 roundMode);
