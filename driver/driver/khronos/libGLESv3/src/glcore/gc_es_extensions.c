@@ -13,8 +13,11 @@
 
 #include "gc_es_context.h"
 
-
 #define _GC_OBJ_ZONE gcdZONE_ES30_CORE
+
+/* Define glGetTexImage entry internally to support CL extension cl_khr_gl_sharing */
+GL_APICALL void GL_APIENTRY glGetTexImage(GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels);
+
 
 typedef struct
 {

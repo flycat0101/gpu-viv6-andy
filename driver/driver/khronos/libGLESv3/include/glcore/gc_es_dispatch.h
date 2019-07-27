@@ -400,7 +400,9 @@
     esApiMacro(TexDirectTiledMapVIV), \
     /* GL_EXT_multi_draw_indirect */ \
     esApiMacro(MultiDrawArraysIndirectEXT), \
-    esApiMacro(MultiDrawElementsIndirectEXT)
+    esApiMacro(MultiDrawElementsIndirectEXT), \
+    /* cl_khr_gl_sharing */ \
+    esApiMacro(GetTexImage)
 
 
 
@@ -793,7 +795,9 @@
     GLvoid         (GL_APIENTRY *TexDirectTiledMapVIV) (_gcArgComma_ GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** logical, const GLuint * physical); \
     /* GL_EXT_multi_draw_indirect */ \
     GLvoid         (GL_APIENTRY *MultiDrawArraysIndirectEXT) (_gcArgComma_ GLenum mode, const void *indirect, GLsizei drawcount, GLsizei stride); \
-    GLvoid         (GL_APIENTRY *MultiDrawElementsIndirectEXT) (_gcArgComma_ GLenum mode, GLenum type, const void *indirect, GLsizei drawcount, GLsizei stride);
+    GLvoid         (GL_APIENTRY *MultiDrawElementsIndirectEXT) (_gcArgComma_ GLenum mode, GLenum type, const void *indirect, GLsizei drawcount, GLsizei stride); \
+    /* cl_khr_gl_sharing */ \
+    GLvoid         (GL_APIENTRY *GetTexImage) (_gcArgComma_ GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels);
 
 /* Define GLES 3.0 API Dispatch Table */
 #define _gcArgComma_  __GLcontext* gc,

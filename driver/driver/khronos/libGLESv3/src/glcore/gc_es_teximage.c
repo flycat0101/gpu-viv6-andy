@@ -5397,3 +5397,94 @@ GLvoid __glSetFBOAttachedTexDirty(__GLcontext *gc, GLbitfield mask, GLint drawbu
     }
 }
 
+/* For cl_khr_gl_sharing */
+GLvoid GL_APIENTRY __gles_GetTexImage(__GLcontext *gc, GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels)
+{
+    GLint face;
+    GLuint activeUnit = gc->state.texture.activeTexIndex;
+    __GLtextureObject *tex;
+    GLint maxLod = (GLint)(gc->constants.maxNumTextureLevels - 1);
+    __GLbufferObject *packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
+
+    __GL_HEADER();
+
+    switch (target)
+    {
+        case GL_TEXTURE_2D:
+            face = 0;
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_INDEX];
+            break;
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
+            face = target - GL_TEXTURE_CUBE_MAP_POSITIVE_X;
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_INDEX];
+            break;
+        case GL_TEXTURE_2D_ARRAY:
+            face = 0;
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_ARRAY_INDEX];
+            break;
+        case GL_TEXTURE_3D:
+            face = 0;
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_3D_INDEX];
+            break;
+        case GL_TEXTURE_CUBE_MAP_ARRAY_EXT:
+            if (__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
+            {
+                face = 0;
+                tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_ARRAY_INDEX];
+                break;
+            }
+        default:
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
+
+    if (!tex)
+    {
+        __GL_EXIT();
+    }
+
+    /* Check lod, width, height */
+    if (level < 0 || level > maxLod)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
+    if (!__glCheckTexImgTypeArg(gc, tex, type))
+    {
+        __GL_EXIT();
+    }
+
+    if (!__glCheckTexImgFmtArg(gc, tex, format))
+    {
+        __GL_EXIT();
+    }
+
+    if (!__glCheckTexImgFmt(gc, tex, tex->faceMipmap[face][level].requestedFormat, format, type))
+    {
+        __GL_EXIT();
+    }
+    /* The image is from unpack buffer object? */
+    if (packBufObj)
+    {
+        __GLmipMapLevel *mipmap = &tex->faceMipmap[face][level];
+
+        if (!__glCheckPBO(gc, &gc->clientState.pixel.packModes, packBufObj, mipmap->width, mipmap->height, mipmap->depth, format, type, pixels))
+        {
+            __GL_EXIT();
+        }
+    }
+
+    if (!(*gc->dp.getTexImage)(gc, tex, face, level, (GLubyte*)pixels))
+    {
+        __GL_ERROR((*gc->dp.getError)(gc));
+    }
+
+OnExit:
+OnError:
+    __GL_FOOTER();
+}
+

@@ -2541,3 +2541,10 @@ GLvoid GL_APIENTRY __GLES_APINAME(GetnUniformivEXT)(GLuint program, GLint locati
 }
 #endif
 
+/* For cl_khr_gl_sharing */
+GLvoid GL_APIENTRY __GLES_APINAME(GetTexImage)( GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.GetTexImage(gc, target, level, format, type, pixels);
+}
+

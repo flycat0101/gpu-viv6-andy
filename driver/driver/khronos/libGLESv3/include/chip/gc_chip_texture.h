@@ -285,6 +285,15 @@ __glChipCompressedTexSubImage3D(
     );
 
 extern GLboolean
+__glChipGetTexImage(
+    __GLcontext* gc,
+    __GLtextureObject *texObj,
+    GLint face,
+    GLint level,
+    GLubyte *buf
+    );
+
+extern GLboolean
 __glChipGenerateMipMap(
     __GLcontext* gc,
     __GLtextureObject* texObj,

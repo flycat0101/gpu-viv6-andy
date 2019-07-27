@@ -3713,6 +3713,232 @@ OnError:
 }
 
 GLboolean
+__glChipGetTexImage(
+    __GLcontext* gc,
+    __GLtextureObject *texObj,
+    GLint face,
+    GLint level,
+    GLubyte *buf
+    )
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    __GLclientPixelState *ps = &gc->clientState.pixel;
+    gctUINT slice = face;
+    __GLmipMapLevel *mipmap = &texObj->faceMipmap[face][level];
+    gcsSURF_VIEW srcView = { gcvNULL, 0, 1 };
+    gcsSURF_VIEW dstView = { gcvNULL, 0, 1 };
+    __GLbufferObject *packBufObj = gcvNULL;
+    __GLchipVertexBufferInfo *packBufInfo = gcvNULL;
+    gctUINT32 physicalAddress = gcvINVALID_ADDRESS;
+    gctPOINTER logicalAddress = buf;
+    gcsSURF_RESOLVE_ARGS rlvArgs = { 0 };
+    gctSIZE_T rowStride = 0, imgHeight = 0, skipOffset = 0;
+    gctSIZE_T skipImgs = (__GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ||
+        texObj->targetIndex == __GL_TEXTURE_3D_INDEX) ?
+        (gctSIZE_T)gc->clientState.pixel.packModes.skipImages : 0;
+    GLuint i;
+    GLenum format = mipmap->format;
+    gceSURF_FORMAT wrapformat = gcvSURF_UNKNOWN;
+    __GLformatInfo *formatInfo = mipmap->formatInfo;
+    gctUINT w, h;
+    gctUINT dstWidth, dstHeight;
+    gctUINT numSlice = 0;
+    GLuint lineLength = ps->packModes.lineLength ? ps->packModes.lineLength : (GLuint)mipmap->width;
+    GLuint imageHeight = ps->packModes.imageHeight ? ps->packModes.imageHeight : (GLuint)mipmap->height;
+    gceSTATUS status = gcvSTATUS_OK;
+
+
+    gcmHEADER_ARG("gc=0x%x, texObj=0x%x, face=%d, level=%d, buf=0x%x",
+        gc, texObj, face, level, buf);
+
+    srcView = gcChipGetTextureSurface(chipCtx, texObj, gcvFALSE, level, slice);
+
+    switch (mipmap->type)
+    {
+    case GL_UNSIGNED_BYTE:
+        if (format == GL_RGBA)
+        {
+            wrapformat = gcvSURF_A8B8G8R8;
+        }
+        else if (format == GL_BGRA_EXT)
+        {
+            wrapformat = gcvSURF_A8R8G8B8;
+        }
+        break;
+    case GL_UNSIGNED_INT_2_10_10_10_REV:
+        if (format == GL_RGBA)
+        {
+            wrapformat = gcvSURF_A2B10G10R10;
+        }
+        break;
+    case GL_FLOAT:
+        if (format == GL_RGBA)
+        {
+            wrapformat = gcvSURF_A32B32G32R32F;
+        }
+        break;
+    case GL_UNSIGNED_INT:
+        if (format == GL_RGBA_INTEGER)
+        {
+            wrapformat = gcvSURF_A32B32G32R32UI;
+        }
+        break;
+    case GL_INT:
+        if (format == GL_RGBA_INTEGER)
+        {
+            wrapformat = gcvSURF_A32B32G32R32I;
+        }
+        break;
+    case GL_UNSIGNED_SHORT_4_4_4_4_REV_EXT:
+        {
+            wrapformat = gcvSURF_A4R4G4B4;
+        }
+        break;
+    case GL_UNSIGNED_SHORT_1_5_5_5_REV_EXT:
+        {
+            wrapformat = gcvSURF_A1R5G5B5;
+        }
+        break;
+    default:
+        break;
+    }
+
+    if (formatInfo == gcvNULL)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    if (gcvSURF_UNKNOWN == wrapformat)
+    {
+        __GLchipFmtMapInfo *formatMapInfo = gcChipGetFormatMapInfo(gc, formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_NONE);
+        wrapformat = formatMapInfo->requestFormat;
+    }
+
+    gcChipProcessPixelStore(gc,
+        &ps->packModes,
+        (gctSIZE_T)mipmap->width,
+        (gctSIZE_T)mipmap->height,
+        mipmap->format,
+        mipmap->type,
+        skipImgs,
+        &rowStride,
+        &imgHeight,
+        &skipOffset);
+
+    /* The image is from pack buffer object? */
+    packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
+    if (packBufObj)
+    {
+        packBufInfo = (__GLchipVertexBufferInfo *)(packBufObj->privateData);
+        GL_ASSERT(packBufInfo);
+        gcmONERROR(gcoBUFOBJ_Lock(packBufInfo->bufObj, &physicalAddress, &logicalAddress));
+        gcmONERROR(gcoBUFOBJ_WaitFence(packBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
+
+        skipOffset += __GL_PTR2SIZE(buf);
+        physicalAddress += (gctUINT32)skipOffset;
+    }
+    logicalAddress = (gctPOINTER)((gctINT8_PTR)logicalAddress + skipOffset);
+
+    switch (texObj->targetIndex)
+    {
+    case __GL_TEXTURE_2D_INDEX:
+    case __GL_TEXTURE_2D_MS_INDEX:
+    case __GL_TEXTURE_CUBEMAP_INDEX:
+        numSlice = 1;
+        break;
+    case __GL_TEXTURE_3D_INDEX:
+    case __GL_TEXTURE_2D_ARRAY_INDEX:
+    case __GL_TEXTURE_2D_MS_ARRAY_INDEX:
+    case __GL_TEXTURE_CUBEMAP_ARRAY_INDEX:
+        numSlice = (texObj->targetIndex == __GL_TEXTURE_3D_INDEX) ? texObj->faceMipmap[face][level].depth : texObj->arrays;
+        break;
+    default:
+        GL_ASSERT(0);
+    }
+
+    for (i = 0; i < numSlice; ++i)
+    {
+        gctPOINTER dstLogicalAddress;
+        srcView.firstSlice = (texObj->targetIndex == __GL_TEXTURE_CUBEMAP_INDEX) ? srcView.firstSlice : i;
+
+        dstLogicalAddress = (gctPOINTER)((GLbyte*)logicalAddress + rowStride * imgHeight * i);
+        physicalAddress = (physicalAddress == gcvINVALID_ADDRESS) ? gcvINVALID_ADDRESS : physicalAddress + (gctUINT32)(rowStride * imgHeight * i);
+
+        /* Create the wrapper surface. */
+        gcmONERROR(gcoSURF_Construct(gcvNULL, mipmap->width, mipmap->height, 1, gcvSURF_BITMAP,
+            wrapformat, gcvPOOL_USER, &dstView.surf));
+        gcmONERROR(gcoSURF_ResetSurWH(dstView.surf, mipmap->width, mipmap->height, lineLength, imageHeight, wrapformat));
+
+        gcmONERROR(gcoSURF_WrapSurface(dstView.surf, ps->packModes.alignment, dstLogicalAddress, physicalAddress));
+        gcmONERROR(gcoSURF_GetSize(srcView.surf, &w, &h, gcvNULL));
+        gcmONERROR(gcoSURF_GetSize(dstView.surf, &dstWidth, &dstHeight, gcvNULL));
+
+        /*
+        ** Set Non-Linear space for SRGB8_ALPHA8
+        */
+        if (formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8)
+        {
+            gcmONERROR(gcoSURF_SetColorSpace(dstView.surf, gcvSURF_COLOR_SPACE_NONLINEAR));
+        }
+
+        do {
+            rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+            rlvArgs.uArgs.v2.yInverted = gcvFALSE;
+            rlvArgs.uArgs.v2.srcOrigin.x = 0;
+            rlvArgs.uArgs.v2.srcOrigin.y = 0;
+            rlvArgs.uArgs.v2.dstOrigin.x = 0;
+            rlvArgs.uArgs.v2.dstOrigin.y = 0;
+            rlvArgs.uArgs.v2.rectSize.x = gcmMIN(mipmap->width, (gctINT)w);
+            rlvArgs.uArgs.v2.rectSize.y = gcmMIN(mipmap->height, (gctINT)h);
+            rlvArgs.uArgs.v2.numSlices = 1;
+            rlvArgs.uArgs.v2.dump = gcvTRUE;
+
+            if (packBufObj)
+            {
+                if (gcmIS_SUCCESS(gcoSURF_ResolveRect(&srcView, &dstView, &rlvArgs)))
+                {
+                    break;
+                }
+            }
+            gcmERR_BREAK(gcoSURF_CopyPixels(&srcView, &dstView, &rlvArgs));
+        } while (gcvFALSE);
+
+        if (dstView.surf)
+        {
+            gcmONERROR(gcoSURF_Destroy(dstView.surf));
+            dstView.surf = gcvNULL;
+        }
+    }
+
+OnError:
+    if (packBufInfo && gcvINVALID_ADDRESS != physicalAddress) /* The image is from pack buffer object */
+    {
+        /* CPU cache will not be flushed in HAL, bc HAL only see wrapped user pool surface.
+        ** Instead it will be flushed when unlock the packed buffer as non-user pool node.
+        */
+        gcmVERIFY_OK(gcoBUFOBJ_Unlock(packBufInfo->bufObj));
+        gcmVERIFY_OK(gcoBUFOBJ_CPUCacheOperation(packBufInfo->bufObj, gcvCACHE_CLEAN));
+    }
+
+    if (dstView.surf)
+    {
+        gcoSURF_Destroy(dstView.surf);
+    }
+
+    if (gcmIS_ERROR(status))
+    {
+        gcChipSetError(chipCtx, status);
+        gcmFOOTER_ARG("return=%d", GL_FALSE);
+        return GL_FALSE;
+    }
+    else
+    {
+        gcmFOOTER_ARG("return=%d", GL_TRUE);
+        return GL_TRUE;
+    }
+}
+
+GLboolean
 __glChipCopyTexBegin(
     __GLcontext* gc
     )
