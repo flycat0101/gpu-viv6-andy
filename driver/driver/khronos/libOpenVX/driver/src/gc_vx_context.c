@@ -907,7 +907,7 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     }
 
     envctrl = gcvNULL;
-    context->options.do1xnAfterSwtiling = 0;
+    context->options.do1xnAfterSwtiling = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DO_1XN_AFTER_SWTILING", &envctrl)) && envctrl)
     {
         context->options.do1xnAfterSwtiling = atoi(envctrl);

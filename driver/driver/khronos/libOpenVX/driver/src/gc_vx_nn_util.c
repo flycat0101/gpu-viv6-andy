@@ -1800,7 +1800,6 @@ void ReplaceOperationCmmdZdpOpt(
     outputInfo->height = fitN;
 
     inputInfo->yStride        = inputSize * inputInfo->width;
-    inputInfo->zStride        = inputInfo->yStride * inputInfo->height;
     outputInfo->yStride       = outputSize * outputInfo->width;
 }
 
@@ -3772,6 +3771,37 @@ vx_status vxnneCalculateConvTilingParam(
         vx_int32 offsets[2] = {(-1)*info[i].padLeft, (-1)*info[i].padTop};
 
         if (info[i].output.height == 0 ) continue;
+
+        if (conv_op->weights_biases->wb_base->do_zdp_opt &&
+            context->options.do1xnAfterSwtiling)
+        {
+            vx_uint32 fitN = 1;
+            vx_bool doZdpOpt = vx_false_e;
+
+            if (inputDims[1] == TENSOR_SIZE_INDEX(conv_op->inputs, 1))
+            {
+                doZdpOpt = calcFitZdp3N(context,
+                                        inputDims[0],
+                                        inputDims[1],
+                                        &fitN,
+                                        1,
+                                        conv_op->weights_biases->wb_base->pooling_size_x);
+
+                if (doZdpOpt)
+                {
+                    /* Need reshape input[x, y, kz] --> [x*y/fitN, fitN, kz] */
+                    /* Need reshape output[x, y, vz] --> [x*y/fitN, fitN, vz] */
+                    inputDims[0] = inputDims[0] * inputDims[1] / fitN;
+                    inputDims[1] = fitN;
+
+                    outputDims[0]= outputDims[0] * outputDims[1] / fitN;
+                    outputDims[1] = fitN;
+                }
+            }
+
+            conv_op->weights_biases->wb_base->do_zdp_opt = doZdpOpt;
+
+        }
 
         memset(&perf, 0, sizeof(vx_arch_perf_s));
 
