@@ -1755,6 +1755,9 @@ static slsBUILT_IN_FUNCTION FSBuiltInFunctions[] =
     {slvEXTENSION_HALTI,     "texture", gcvNULL, _GenTextureCode,            T_UVEC4,    3, {T_USAMPLERCUBEARRAY,  T_VEC4,     T_FLOAT}, {0}, {0}},
     {slvEXTENSION_HALTI,     "texture", gcvNULL, _GenTextureCode,            T_UVEC4,    3, {T_USAMPLER2DARRAY,    T_VEC3,     T_FLOAT}, {0}, {0}},
 
+    {slvEXTENSION_SUPPORT_OGL, "shadow2D", gcvNULL, _GenTextureCode,         T_VEC4,     2, {T_SAMPLER2DSHADOW,   T_VEC3}, {0}, {0}},
+    {slvEXTENSION_SUPPORT_OGL, "shadow2D", gcvNULL, _GenTextureCode,         T_VEC4,     3, {T_SAMPLER2DSHADOW,   T_VEC3,  T_FLOAT}, {0}, {0}},
+
     {slvEXTENSION_HALTI,     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     3, {T_SAMPLER2D,    T_VEC3, T_FLOAT}, {0}, {0}},
     {slvEXTENSION_HALTI,     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     3, {T_SAMPLER2D,    T_VEC4, T_FLOAT}, {0}, {0}},
     {slvEXTENSION_HALTI,     "textureProj", gcvNULL, _GenTextureProjCode,        T_VEC4,     3, {T_SAMPLER3D,    T_VEC4, T_FLOAT}, {0}, {0}},
