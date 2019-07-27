@@ -9527,6 +9527,52 @@ VIR_Shader_GetXFBVaryingTempRegInfo(
     return v;
 }
 
+gctBOOL
+VIR_Shader_TreatPushConstantAsBuffer(
+    IN VIR_Shader*      pShader,
+    IN VIR_Type*        pPushConstType
+    )
+{
+    VIR_SymIdList*          pFields;
+    VIR_Id                  fieldSymId;
+    VIR_Symbol*             pFieldSym;
+    VIR_Type*               pFieldType;
+    gctBOOL                 bIsArray;
+    gctUINT                 i;
+
+    pFields = VIR_Type_GetFields(pPushConstType);
+
+    for (i = 0; i < VIR_IdList_Count(pFields); i++)
+    {
+        fieldSymId = VIR_IdList_GetId(pFields, i);
+        pFieldSym = VIR_Shader_GetSymFromId(pShader, fieldSymId);
+        pFieldType = VIR_Symbol_GetType(pFieldSym);
+        bIsArray = VIR_Type_isArray(pFieldType);
+
+        /* Use the non-array struct type to calc and check if it is an arrays of arrays. */
+        while (VIR_Type_isArray(pFieldType))
+        {
+            pFieldType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pFieldType));
+        }
+
+        if (VIR_Type_isStruct(pFieldType))
+        {
+            if (VIR_Shader_TreatPushConstantAsBuffer(pShader, pFieldType))
+            {
+                return gcvTRUE;
+            }
+        }
+        else if ((bIsArray || VIR_Type_isMatrix(pFieldType))
+                 &&
+                 (VIR_GetTypeComponents(VIR_GetTypeRowType(VIR_Type_GetIndex(pFieldType))) <= 2))
+        {
+            return gcvTRUE;
+        }
+    }
+
+    return gcvFALSE;
+}
+
 
 void
 VIR_Symbol_AddFlag(

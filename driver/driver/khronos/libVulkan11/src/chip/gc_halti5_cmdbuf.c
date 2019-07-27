@@ -8326,11 +8326,15 @@ VkResult halti5_setPushConstants(
 
                     if (hwMapping->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER)
                     {
+                        /* Follow the same policy in compiler. */
+                        uint32_t realSkipOffset = (progPushConstRange->offset / 16) * 16;
+                        uint32_t realProgramSize = progPushConstRange->offset - realSkipOffset + progPushConstRange->size;
+
                         hwConstRegNo = hwMapping->hwLoc.constReg.hwRegNo;
                         hwConstRegAddr = (hwConstRegAddrBase >> 2) + (hwConstRegNo << 2) + hwMapping->firstValidHwChannel;
 
-                        __vkCmdLoadBatchHWStates(&pCmdBuffer, hwConstRegAddr, VK_FALSE, (progPushConstRange->size >> 2),
-                            &cmdBuf->bindInfo.pushConstants.values[progPushConstRange->offset >> 2]);
+                        __vkCmdLoadBatchHWStates(&pCmdBuffer, hwConstRegAddr, VK_FALSE, (realProgramSize >> 2),
+                            &cmdBuf->bindInfo.pushConstants.values[realSkipOffset >> 2]);
                     }
                     else if (hwMapping->hwAccessMode == SHADER_HW_ACCESS_MODE_MEMORY)
                     {

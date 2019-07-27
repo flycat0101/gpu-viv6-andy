@@ -543,172 +543,6 @@ static gctUINT8 _VIR_CG_EnableShiftWrap(
     return retEanble;
 }
 
-
-static gctUINT8 _VIR_CG_SwizzleShiftWrap(
-    gctUINT8    origSwizzle,
-    gctUINT     count,
-    gctUINT     step,
-    gctBOOL     *wrapAround
-    )
-{
-    gctUINT8 retSwizzle = VIR_SWIZZLE_X;
-
-    switch (step)
-    {
-    case 1:
-        retSwizzle = origSwizzle;
-        break;
-    case 2:
-        if ((count % 2) == 0)
-        {
-            retSwizzle = origSwizzle;
-        }
-        else
-        {
-            switch (origSwizzle)
-            {
-            case VIR_SWIZZLE_XYYY:
-                retSwizzle = VIR_SWIZZLE_ZWWW;
-                break;
-            case VIR_SWIZZLE_ZWWW:
-                retSwizzle = VIR_SWIZZLE_XYYY;
-                *wrapAround = gcvTRUE;
-                break;
-            default:
-                gcmASSERT(gcvFALSE);
-                break;
-            }
-        }
-        break;
-    case 4:
-        if ((count % 4) == 0)
-        {
-            retSwizzle = origSwizzle;
-        }
-        else if ((count % 4) == 1)
-        {
-            switch (origSwizzle)
-            {
-            case VIR_SWIZZLE_XXXX:
-                retSwizzle = VIR_SWIZZLE_YYYY;
-                break;
-            case VIR_SWIZZLE_YYYY:
-                retSwizzle = VIR_SWIZZLE_ZZZZ;
-                break;
-            case VIR_SWIZZLE_ZZZZ:
-                retSwizzle = VIR_SWIZZLE_WWWW;
-                break;
-            case VIR_SWIZZLE_WWWW:
-                *wrapAround = gcvTRUE;
-                retSwizzle = VIR_SWIZZLE_XXXX;
-                break;
-            default:
-                gcmASSERT(gcvFALSE);
-                break;
-            }
-        }
-        else if ((count % 4) == 2)
-        {
-            switch (origSwizzle)
-            {
-            case VIR_SWIZZLE_XXXX:
-                retSwizzle = VIR_SWIZZLE_ZZZZ;
-                break;
-            case VIR_SWIZZLE_YYYY:
-                retSwizzle = VIR_SWIZZLE_WWWW;
-                break;
-            case VIR_SWIZZLE_ZZZZ:
-                *wrapAround = gcvTRUE;
-                retSwizzle = VIR_SWIZZLE_XXXX;
-                break;
-            case VIR_SWIZZLE_WWWW:
-                *wrapAround = gcvTRUE;
-                retSwizzle = VIR_SWIZZLE_YYYY;
-                break;
-            default:
-                gcmASSERT(gcvFALSE);
-                break;
-            }
-        }
-        else
-        {
-            switch (origSwizzle)
-            {
-            case VIR_SWIZZLE_XXXX:
-                retSwizzle = VIR_SWIZZLE_WWWW;
-                break;
-            case VIR_SWIZZLE_YYYY:
-                *wrapAround = gcvTRUE;
-                retSwizzle = VIR_SWIZZLE_XXXX;
-                break;
-            case VIR_SWIZZLE_ZZZZ:
-                *wrapAround = gcvTRUE;
-                retSwizzle = VIR_SWIZZLE_YYYY;
-                break;
-            case VIR_SWIZZLE_WWWW:
-                *wrapAround = gcvTRUE;
-                retSwizzle = VIR_SWIZZLE_ZZZZ;
-                break;
-            default:
-                gcmASSERT(gcvFALSE);
-                break;
-            }
-        }
-        break;
-    default:
-        gcmASSERT(gcvFALSE);
-        break;
-    }
-
-    return retSwizzle;
-}
-
-/* mark uniform slot used */
-void VIR_CG_SetUniformUsedPacked(
-    IN VIR_RA_ColorMap  *uniformColorMap,
-    IN gctINT           origStartIdx,
-    IN gctINT           rows,
-    IN gctUINT8         enable,
-    IN gctUINT          step
-    )
-{
-    VSC_BIT_VECTOR  *usedColor = &uniformColorMap->usedColor;
-    gctUINT8        firstEnable = enable;
-    gctUINT         curIdx = origStartIdx;
-    gctUINT         count = 0;
-
-    while (rows-- > 0)
-    {
-         /* Test if x-component is available. */
-        if (enable & 0x1)
-        {
-             vscBV_SetBit(usedColor, curIdx * 4 + 0);
-        }
-
-        /* Test if y-component is available. */
-        if (enable & 0x2)
-        {
-            vscBV_SetBit(usedColor, curIdx * 4 + 1);
-        }
-
-        /* Test if z-component is available. */
-        if (enable & 0x4)
-        {
-            vscBV_SetBit(usedColor, curIdx * 4 + 2);
-        }
-
-        /* Test if w-component is available. */
-        if (enable & 0x8)
-        {
-            vscBV_SetBit(usedColor, curIdx * 4 + 3);
-        }
-
-        count ++;
-        curIdx = origStartIdx + count / step;
-        enable = _VIR_CG_EnableShiftWrap(firstEnable, count, step);;
-    }
-}
-
 gctBOOL VIR_CG_UniformAvailablePacked(
     IN VIR_RA_ColorMap      *uniformColorMap,
     IN gctINT               origStartIdx,
@@ -755,169 +589,6 @@ gctBOOL VIR_CG_UniformAvailablePacked(
     }
 
     return gcvTRUE;
-}
-
-/* find next available slot and mark it used,
-   the packed layout is used */
-VSC_ErrCode
-VIR_CG_FindUniformUsePacked(
-    IN VIR_RA_ColorMap  *uniformColorMap,
-    IN VIR_TypeId       type,
-    IN gctINT           arraySize,
-    IN gctBOOL          restricted,
-    OUT gctINT          *Physical,
-    OUT gctUINT8        *Swizzle)
-{
-    gctINT i;
-    gctUINT32 components = 0;
-    gctINT shift;
-    gctUINT8 swizzle = 0, enable = 0;
-    gctUINT vec4Size = arraySize, step = 1;
-
-    components = VIR_GetTypeComponents(type);
-
-    switch (components)
-    {
-    case 1:
-        vec4Size = arraySize / 4 + ((arraySize % 4 == 0) ? 0 : 1);
-        break;
-    case 2:
-        vec4Size = arraySize / 2 + ((arraySize % 2 == 0) ? 0 : 1);
-        break;
-    case 4:
-        vec4Size = arraySize;
-        break;
-    default:
-        gcmASSERT(gcvFALSE);
-        break;
-    }
-
-    if (uniformColorMap->maxReg < vec4Size)
-    {
-        return VSC_ERR_OUT_OF_RESOURCE;
-    }
-
-    for (i = 0; i <= (gctINT) (uniformColorMap->maxReg - vec4Size); ++i)
-    {
-        shift = -1;
-
-        switch (components)
-        {
-        case 1:
-            step = 4;
-
-            /* See if x-component is available. */
-            if (VIR_CG_UniformAvailablePacked(uniformColorMap, i, arraySize, 0x1 << 0, step))
-            {
-                shift   = 0;
-                enable  = VIR_ENABLE_X;
-                swizzle = VIR_SWIZZLE_XXXX;
-            }
-
-            /* See if y-component is available. */
-            else if (!restricted && VIR_CG_UniformAvailablePacked(uniformColorMap, i, arraySize, 0x1 << 1, step))
-            {
-                shift   = 1;
-                enable  = VIR_ENABLE_Y;
-                swizzle = VIR_SWIZZLE_YYYY;
-            }
-
-            /* See if z-component is available. */
-            else if (!restricted && VIR_CG_UniformAvailablePacked(uniformColorMap, i, arraySize, 0x1 << 2, step))
-            {
-                shift   = 2;
-                enable  = VIR_ENABLE_Z;
-                swizzle = VIR_SWIZZLE_ZZZZ;
-            }
-
-            /* See if w-component is available. */
-            else if (!restricted && VIR_CG_UniformAvailablePacked(uniformColorMap, i, arraySize, 0x1 << 3, step))
-            {
-                shift   = 3;
-                enable  = VIR_ENABLE_W;
-                swizzle = VIR_SWIZZLE_WWWW;
-            }
-
-            break;
-
-        case 2:
-            step = 2;
-            /* See if x- and y-components are available. */
-            if (VIR_CG_UniformAvailablePacked(uniformColorMap, i, arraySize, 0x3 << 0, step))
-            {
-                shift   = 0;
-                enable  = VIR_ENABLE_XY;
-                swizzle = VIR_SWIZZLE_XYYY;
-            }
-
-            /* See if y- and z-components are available. */
-            else if (!restricted && VIR_CG_UniformAvailablePacked(uniformColorMap, i, arraySize, 0x3 << 1, step))
-            {
-                shift   = 1;
-                enable  = VIR_ENABLE_YZ;
-                swizzle = VIR_SWIZZLE_YZZZ;
-            }
-
-            /* See if z- and w-components are available. */
-            else if (!restricted && VIR_CG_UniformAvailablePacked(uniformColorMap, i, arraySize, 0x3 << 2, step))
-            {
-                shift   = 2;
-                enable  = VIR_ENABLE_ZW;
-                swizzle = VIR_SWIZZLE_ZWWW;
-            }
-
-            break;
-
-        case 3:
-            step = 1;
-            /* See if x-, y- and z-components are available. */
-            if (VIR_CG_UniformAvailablePacked(uniformColorMap, i, arraySize, 0x7 << 0, step))
-            {
-                shift   = 0;
-                enable  = VIR_ENABLE_XYZ;
-                swizzle = VIR_SWIZZLE_XYZZ;
-            }
-
-            /* See if y-, z- and w-components are available. */
-            else if (!restricted && VIR_CG_UniformAvailablePacked(uniformColorMap, i, arraySize, 0x7 << 1, step))
-            {
-                shift   = 1;
-                enable  = VIR_ENABLE_YZW;
-                swizzle = VIR_SWIZZLE_YZWW;
-            }
-
-            break;
-
-        case 4:
-            step = 1;
-            /* See if x-, y-, z- and w-components are available. */
-            if (VIR_CG_UniformAvailablePacked(uniformColorMap, i, arraySize, 0xF << 0, step))
-            {
-                shift   = 0;
-                enable  = VIR_ENABLE_XYZW;
-                swizzle = VIR_SWIZZLE_XYZW;
-            }
-
-            break;
-
-        default:
-            gcmASSERT(gcvFALSE);
-            break;
-        }
-
-        if (shift >=0 )
-        {
-            *Physical = i;
-            *Swizzle = swizzle;
-
-            /* Set the uniform used */
-            VIR_CG_SetUniformUsedPacked(uniformColorMap, i, arraySize, enable, step);
-
-            return VSC_ERR_NONE;
-        }
-    }
-
-    return VSC_ERR_OUT_OF_RESOURCE;
 }
 
 static gctBOOL
@@ -2107,7 +1778,7 @@ static void _VIR_CG_FindPushConstUniform(
 
             if (VIR_Symbol_GetLayoutOffset(sym) == pConstRange->offset)
             {
-                if (VIR_UBO_GetBlockSize(pUbo) != pConstRange->size)
+                if (VIR_UBO_GetBlockSize(pUbo) != (pConstRange->size + pConstRange->offset))
                 {
                     gcmASSERT(gcvFALSE);
                 }
@@ -2140,34 +1811,57 @@ static void _VIR_CG_FindPushConstUniform(
     }
 }
 
+static gctUINT
+_VIR_CG_CalculateSkipOffset(
+    IN gctUINT startOffsetInByte
+    )
+{
+    return (startOffsetInByte / 16) * 16;
+}
+
 static VSC_ErrCode
 _VIR_CG_AllocatePushConst(
     IN VIR_RA_ColorMap *uniformColorMap,
     IN gctUINT maxAlignment,
-    IN gctUINT maxSize,
+    IN gctUINT fixedStartOffsetInByte,
+    IN gctUINT pushConstSizeInByte,
     OUT gctINT *physical,
     OUT gctUINT8 *swizzle)
 {
     VSC_ErrCode retValue = VSC_ERR_NONE;
-    gctUINT     allocateSize = (maxSize / maxAlignment) + (maxSize % maxAlignment == 0 ? 0 : 1);
+    gctUINT     totalSizeInByte = fixedStartOffsetInByte + pushConstSizeInByte;
+    gctUINT     allocateRegCount = (totalSizeInByte / 16) + (totalSizeInByte % 16 == 0 ? 0 : 1);
     VIR_TypeId  allocTyId = VIR_TYPE_FLOAT32;
+    gctINT      shift = 0;
 
-    switch (maxAlignment)
+    if (allocateRegCount > 1)
     {
-    case 4:
-        allocTyId = VIR_TYPE_FLOAT32;
-        break;
-    case 8:
-        allocTyId = VIR_TYPE_FLOAT_X2;
-        break;
-    case 16:
         allocTyId = VIR_TYPE_FLOAT_X4;
-        break;
-    default:
-        break;
+    }
+    else
+    {
+        switch (totalSizeInByte / 4)
+        {
+        case 1:
+            allocTyId = VIR_TYPE_FLOAT32;
+            break;
+
+        case 2:
+            allocTyId = VIR_TYPE_FLOAT_X2;
+            break;
+
+        case 3:
+            allocTyId = VIR_TYPE_FLOAT_X3;
+            break;
+
+        default:
+            gcmASSERT(gcvFALSE);
+            allocTyId = VIR_TYPE_FLOAT_X4;
+            break;
+        }
     }
 
-    retValue = VIR_CG_FindUniformUsePacked(uniformColorMap, allocTyId, allocateSize, gcvFALSE, physical, swizzle);
+    retValue = VIR_CG_FindUniformUse(uniformColorMap, allocTyId, allocateRegCount, gcvFALSE, physical, swizzle, &shift);
 
     return retValue;
 }
@@ -2176,43 +1870,119 @@ static void _VIR_CG_AssignPushConstUniform(
     IN VIR_Shader           *pShader,
     IN VSC_MM               *pMM,
     IN VSC_SHADER_PUSH_CONSTANT_RANGE   *pConstRange,
+    IN gctUINT              skipOffsetInByte,
     IN gctUINT              maxAlignment,
     IN VSC_SIMPLE_QUEUE     *pushConstList,
     IN gctINT               physical,
     IN gctUINT8             swizzle)
 {
-    VIR_Uniform     *pushCosntUniform = gcvNULL;
-    gctUINT         step = 1;
-
-    switch (maxAlignment)
-    {
-    case 16:
-        step = 1;
-        break;
-    case 8:
-        step = 2;
-        break;
-    case 4:
-        step = 4;
-        break;
-    default:
-        gcmASSERT(gcvFALSE);
-        break;
-    }
-
     while(!QUEUE_CHECK_EMPTY(pushConstList))
     {
-        VIR_Symbol  *sym;
-        gctUINT     distance = 0;
-        gctBOOL     wrapRound = gcvFALSE;
+        VIR_Symbol          *sym;
+        VIR_Type            *type;
+        VIR_TypeId          typeId;
+        gctUINT             offset, componentOffset, componentCount;
+        VIR_Swizzle         swizzle = VIR_SWIZZLE_XXXX;
+        VIR_Uniform         *pushConstUniform = gcvNULL;
 
-        _VIR_CG_UniformListDequeue(pMM, pushConstList, &pushCosntUniform);
+        _VIR_CG_UniformListDequeue(pMM, pushConstList, &pushConstUniform);
 
-        sym = VIR_Shader_GetSymFromId(pShader, VIR_Uniform_GetSymID(pushCosntUniform));
-        distance = (VIR_Symbol_GetLayoutOffset(sym) - pConstRange->offset) / maxAlignment;
-        gcmASSERT(((VIR_Symbol_GetLayoutOffset(sym) - pConstRange->offset) % maxAlignment) == 0);
-        pushCosntUniform->swizzle = _VIR_CG_SwizzleShiftWrap(swizzle, distance, step, &wrapRound);
-        pushCosntUniform->physical = physical +  (distance / step) + ((wrapRound) ? 1 : 0);
+        sym = VIR_Shader_GetSymFromId(pShader, VIR_Uniform_GetSymID(pushConstUniform));
+
+        /* Get offset. */
+        offset = VIR_Symbol_GetLayoutOffset(sym) - skipOffsetInByte;
+
+        /* Get basic type. */
+        type = VIR_Symbol_GetType(sym);
+        while (VIR_Type_isArray(type))
+        {
+            type = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(type));
+        }
+        typeId = VIR_Type_GetIndex(type);
+
+        /* Get component offset. */
+        componentOffset = (offset % 16) / 4;
+        componentCount = VIR_GetTypeComponents(VIR_GetTypeRowType(typeId));
+
+        /* Get swizzle. */
+        switch (componentOffset)
+        {
+            case 0:
+                if (componentCount == 1)
+                {
+                    swizzle = VIR_SWIZZLE_XXXX;
+                }
+                else if (componentCount == 2)
+                {
+                    swizzle = VIR_SWIZZLE_XYYY;
+                }
+                else if (componentCount == 3)
+                {
+                    swizzle = VIR_SWIZZLE_XYZZ;
+                }
+                else
+                {
+                    swizzle = VIR_SWIZZLE_XYZW;
+                }
+                break;
+
+            case 1:
+                if (componentCount == 1)
+                {
+                    swizzle = VIR_SWIZZLE_YYYY;
+                }
+                else if (componentCount == 2)
+                {
+                    swizzle = VIR_SWIZZLE_YZZZ;
+                }
+                else if (componentCount == 3)
+                {
+                    swizzle = VIR_SWIZZLE_YZWW;
+                }
+                else
+                {
+                    gcmASSERT(gcvFALSE);
+                    swizzle = VIR_SWIZZLE_XYZW;
+                }
+                break;
+
+            case 2:
+                if (componentCount == 1)
+                {
+                    swizzle = VIR_SWIZZLE_ZZZZ;
+                }
+                else if (componentCount == 2)
+                {
+                    swizzle = VIR_SWIZZLE_ZWWW;
+                }
+                else
+                {
+                    gcmASSERT(gcvFALSE);
+                    swizzle = VIR_SWIZZLE_XYZW;
+                }
+                break;
+
+            case 3:
+                if (componentCount == 1)
+                {
+                    swizzle = VIR_SWIZZLE_WWWW;
+                }
+                else
+                {
+                    gcmASSERT(gcvFALSE);
+                    swizzle = VIR_SWIZZLE_XYZW;
+                }
+                break;
+
+            default:
+                gcmASSERT(gcvFALSE);
+                swizzle = VIR_SWIZZLE_XYZW;
+                break;
+        }
+
+        /* Set physical/swizzle. */
+        pushConstUniform->physical = physical + offset / 16;
+        pushConstUniform->swizzle = (gctUINT8)swizzle;
     }
 }
 
@@ -2745,8 +2515,18 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
         {
             if (pushConstCount != 0)
             {
+                /*
+                ** Allocate policy:
+                **  1) The constant register always begins with channel x, if the offset of the first element is 4, then channel x is not used.
+                **  2) Skip the 16X offset, for exampler, if the offset is 20, then we skip the first 16bytes, and change the offset to 4, change the size = size + 4.
+                **  2) Contain any variable that need multiple-regs(matrix and array) and whose basic aligment is N/2N,
+                **       including array of float/vec2/mat2/mat3x2/mat4x2, and mat2/mat3x2/mat4x2, have been converted to memory in spirv converter.
+                */
+                gctUINT skipOffsetInByte = _VIR_CG_CalculateSkipOffset(pushConst.offset);
+
                 retValue = _VIR_CG_AllocatePushConst(&uniformColorMap,
                                                      maxAlignment,
+                                                     pushConst.offset - skipOffsetInByte,
                                                      pushConst.size,
                                                      &firstPhysical,
                                                      &firstSwizzle);
@@ -2765,6 +2545,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                 _VIR_CG_AssignPushConstUniform(pShader,
                                                pMM,
                                                &pushConst,
+                                               skipOffsetInByte,
                                                maxAlignment,
                                                &pushConstList,
                                                firstPhysical,

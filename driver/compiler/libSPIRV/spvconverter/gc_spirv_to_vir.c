@@ -4688,6 +4688,36 @@ static gctBOOL __SpvIsVariableInModel(gcSPV spv, VIR_Shader * virShader, SpvStor
     return inModel;
 }
 
+static gctBOOL __SpvTreatPushConstantAsBuffer(gcSPV spv, VIR_Shader * virShader, SpvId typeId)
+{
+    VIR_Type*   type = VIR_Shader_GetTypeFromId(virShader, SPV_ID_TYPE_VIR_TYPE_ID(typeId));
+
+    /*
+    ** Two cases that we need to treate a push constant as a bufffer:
+    **  1) Contain any 8bit/16bit variables.
+    **  2) Contain any variable that need multiple-regs(matrix and array) and whose basic aligment is N/2N.
+    **      including array of float/vec2/mat2/mat3x2/mat4x2, and mat2/mat3x2/mat4x2.
+    */
+#if VIV_TREAT_8BIT_16BIT_PUSH_CONSTANT_AS_BUFFER
+    if (SPV_ID_TYPE_HAS_8BIT_TYPE(typeId) || SPV_ID_TYPE_HAS_16BIT_TYPE(typeId))
+    {
+        return gcvTRUE;
+    }
+#endif
+
+    while (VIR_Type_isArray(type))
+    {
+        type = VIR_Shader_GetTypeFromId(virShader, VIR_Type_GetBaseTypeId(type));
+    }
+
+    if (VIR_Shader_TreatPushConstantAsBuffer(virShader, type))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
 /* The OpName/OpDecorate */
 VSC_ErrCode __SpvEmitVariable(gcSPV spv, VIR_Shader * virShader)
 {
@@ -4729,15 +4759,12 @@ VSC_ErrCode __SpvEmitVariable(gcSPV spv, VIR_Shader * virShader)
         SPV_ID_INITIALIZED(spv->resultId) = gcvTRUE;
         symSpv.virStorageClass = VIR_STORAGE_GLOBAL;
 
-#if VIV_TREAT_8BIT_16BIT_PUSH_CONSTANT_AS_BUFFER
-        if (storage == SpvStorageClassPushConstant &&
-            (SPV_ID_TYPE_HAS_8BIT_TYPE(baseTypeId) || SPV_ID_TYPE_HAS_16BIT_TYPE(baseTypeId)))
+        if (storage == SpvStorageClassPushConstant && __SpvTreatPushConstantAsBuffer(spv, virShader, baseTypeId))
         {
             SPV_ID_SYM_IS_PUSH_CONST_UBO(spv->resultId) = gcvTRUE;
             symSpv.virSymbolKind = VIR_SYM_UBO;
             break;
         }
-#endif
 
         if (SPV_ID_TYPE_IS_SAMPLER(baseTypeId))
         {

@@ -6192,6 +6192,12 @@ VIR_Shader_GetXFBVaryingTempRegInfo(
     IN gctUINT         VaryingIndex
     );
 
+gctBOOL
+VIR_Shader_TreatPushConstantAsBuffer(
+    IN VIR_Shader*      pShader,
+    IN VIR_Type*        pPushConstType
+    );
+
 gctUINT
 VIR_Shader_GetShareMemorySize(
     IN VIR_Shader *        pShader
