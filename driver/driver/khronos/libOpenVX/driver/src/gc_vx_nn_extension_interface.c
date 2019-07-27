@@ -10118,15 +10118,19 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
     if (shExe_flag && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER))
     {
         vxnne_shader_executable shaderExecutable;
-        vx_uint32 sizes[]   = {1, 1, 1, 1};
-        vx_uint32 dims      = 2;
+        vx_uint32  sizes[]          = {1, 1, 1, 1};
+        vx_uint32  dims             = 2;
         vx_float32 inputScale       = 1.0f;
         vx_float32 outputScale      = 1.0f;
         vx_int32   output_ZP        = 0;
         vx_int8    srcFixPointPos   = TENSOR_POS(input);
         vx_int8    dstFixPointPos   = TENSOR_POS(output);
+        vx_uint32  axis             = 2;
 
-        sizes[0]            = TENSOR_VIEW_SIZE_INDEX(input, 2) * 2;
+        if (TENSOR_DIM_NUM(input) < 3)
+            axis = 0;
+
+        sizes[0]            = TENSOR_VIEW_SIZE_INDEX(input, axis) * 2;
         sizes[1]            = 1;
 
         gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
@@ -10152,7 +10156,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
             goto exit;
         }
 
-        if(inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_INT16)
+        if ((inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_INT16) && TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
             if (srcFixPointPos >= 0)
             {
@@ -10163,12 +10167,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
                 inputScale = (vx_float32) (1 << -srcFixPointPos);
             }
         }
-        else if(inputFormat == VX_TYPE_UINT8)
+        else if (inputFormat == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
         {
-            inputScale     = TENSOR_TF_SCALE(input);
+            inputScale = TENSOR_TF_SCALE(input);
         }
 
-        if(outputFormat == VX_TYPE_INT8 || outputFormat == VX_TYPE_INT16)
+        if ((outputFormat == VX_TYPE_INT8 || outputFormat == VX_TYPE_INT16) && TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
             if (dstFixPointPos >= 0)
             {
@@ -10179,7 +10183,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
                 outputScale = 1.0f / (vx_float32) (1 << -dstFixPointPos);
             }
         }
-        else if(outputFormat == VX_TYPE_UINT8)
+        else if (outputFormat == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
         {
             outputScale     = 1.0f / TENSOR_TF_SCALE(output);
             output_ZP       = TENSOR_TF_ZEROPOINT(output);
@@ -10187,7 +10191,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
 
         vxnneExecuteSWBatchNormPreProcess(means, variances, gamma, beta, epss->value->f32, inputScale, outputScale, output_ZP, weights, biases);
 
-        shaderExecutable = vxnneGetBatchNormShaderExecutable(node->base.context, VXNNE_KERNEL_BATCHNORM, &node->kernelAttributes.borderMode,
+        shaderExecutable = vxnneGetBatchNormShaderExecutable(node->base.context, VXNNE_KERNEL_BATCHNORM, &node->kernelAttributes.borderMode, axis,
                                                               input, weights, biases, output);
 
         if (!shaderExecutable)

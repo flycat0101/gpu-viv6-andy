@@ -4,7 +4,7 @@ _viv_uniform VXC_512Bits uniInt8toFp32Part0_4x4;
 _viv_uniform VXC_512Bits uniInt8toFp32Part1_4x4;
 _viv_uniform VXC_512Bits uniInt8toFp32Part2_4x4;
 _viv_uniform VXC_512Bits uniInt8toFp32Part3_4x4;
-__kernel void vxcBatchNorm_int8
+__kernel void vxcBatchNorm_I8
     (
     __read_only     image2d_array_t inputs,
     __read_only     image2d_array_t weights,
@@ -50,7 +50,7 @@ __kernel void vxcBatchNorm_int8
 
     VXC_WriteImage2DArray(outputs, coord, dst, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
 }
-__kernel void vxcBatchNorm_int8_2D
+__kernel void vxcBatchNorm_I8_2D
     (
     __read_only     image2d_array_t inputs,
     __read_only     image2d_array_t weights,
@@ -97,7 +97,7 @@ __kernel void vxcBatchNorm_int8_2D
 _viv_uniform VXC_512Bits uniFp16toFp32Part0_4x4;
 _viv_uniform VXC_512Bits uniFp16toFp32Part1_4x4;
 _viv_uniform VXC_512Bits uniExtractHalf8_2x8;
-__kernel void vxcBatchNorm_fp16
+__kernel void vxcBatchNorm_F16
     (
     __read_only     image2d_array_t inputs,
     __read_only     image2d_array_t weights,
@@ -151,7 +151,7 @@ __kernel void vxcBatchNorm_fp16
     _viv_asm(COPY, src0, dst, 16);
     VXC_WriteImage2DArray(outputs, coord, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
-__kernel void vxcBatchNorm_fp16_2D
+__kernel void vxcBatchNorm_F16_2D
     (
     __read_only     image2d_array_t inputs,
     __read_only     image2d_array_t weights,
@@ -206,7 +206,7 @@ __kernel void vxcBatchNorm_fp16_2D
 _viv_uniform VXC_512Bits uniExtact16Bit_2x8;
 _viv_uniform VXC_512Bits UniInt16toFloat4Lo_4x4;
 _viv_uniform VXC_512Bits UniInt16toFloat4Hi_4x4;
-__kernel void vxcBatchNorm_int16
+__kernel void vxcBatchNorm_I16
     (
     __read_only     image2d_array_t inputs,
     __read_only     image2d_array_t weights,
@@ -254,7 +254,7 @@ __kernel void vxcBatchNorm_int16
 
     VXC_WriteImage2DArray(outputs, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
-__kernel void vxcBatchNorm_int16_2D
+__kernel void vxcBatchNorm_I16_2D
     (
     __read_only     image2d_array_t inputs,
     __read_only     image2d_array_t weights,
@@ -306,7 +306,7 @@ _viv_uniform VXC_512Bits uniUInt8toFp32Part1_4x4;
 _viv_uniform VXC_512Bits uniUInt8toFp32Part2_4x4;
 _viv_uniform VXC_512Bits uniUInt8toFp32Part3_4x4;
 _viv_uniform int   input_zeroPoint;
-__kernel void vxcBatchNorm_uint8
+__kernel void vxcBatchNorm_U8
     (
     __read_only     image2d_array_t inputs,
     __read_only     image2d_array_t weights,
@@ -354,7 +354,7 @@ __kernel void vxcBatchNorm_uint8
 
     VXC_WriteImage2DArray(outputs, coord, dst, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
 }
-__kernel void vxcBatchNorm_uint8_2D
+__kernel void vxcBatchNorm_U8_2D
     (
     __read_only     image2d_array_t inputs,
     __read_only     image2d_array_t weights,
@@ -489,16 +489,267 @@ _viv_uniform VXC_512Bits uniExtact8Bin_2x8;
     VXC_WriteImage(outputs, coord.xy, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));\
 }
 //          name0, name1, input_type,  incopy_type, output_type, convert_type, copy_type
-BATCHNORM_MIXED_MODE(Int8,  Fp16,  vxc_char16,  vxc_char16,  vxc_half8,   half4,        vxc_short8)
-BATCHNORM_MIXED_MODE(UInt8, Fp16,  vxc_uchar16, vxc_uchar16, vxc_half8,   half4,        vxc_short8)
-BATCHNORM_MIXED_MODE(Int16, Fp16,  vxc_short8,  vxc_short8,  vxc_half8,   half4,        vxc_short8)
-BATCHNORM_MIXED_MODE(Fp16,  Int8,  vxc_short8,  vxc_half8,   vxc_char16,  int4,         vxc_char16)
-BATCHNORM_MIXED_MODE(Fp16,  UInt8, vxc_short8,  vxc_half8,   vxc_uchar16, int4,         vxc_uchar16)
-BATCHNORM_MIXED_MODE(Fp16,  Int16, vxc_short8,  vxc_half8,   vxc_short8,  int4,         vxc_short8)
+BATCHNORM_MIXED_MODE(I8,  F16, vxc_char16,  vxc_char16,  vxc_half8,   half4,        vxc_short8)
+BATCHNORM_MIXED_MODE(U8,  F16, vxc_uchar16, vxc_uchar16, vxc_half8,   half4,        vxc_short8)
+BATCHNORM_MIXED_MODE(I16, F16, vxc_short8,  vxc_short8,  vxc_half8,   half4,        vxc_short8)
+BATCHNORM_MIXED_MODE(F16, I8,  vxc_short8,  vxc_half8,   vxc_char16,  int4,         vxc_char16)
+BATCHNORM_MIXED_MODE(F16, U8,  vxc_short8,  vxc_half8,   vxc_uchar16, int4,         vxc_uchar16)
+BATCHNORM_MIXED_MODE(F16, I16, vxc_short8,  vxc_half8,   vxc_short8,  int4,         vxc_short8)
 //                      name0, name1, input_type,  incopy_type, output_type, convert_type, copy_type
-BATCHNORM_MIXED_MODE_2D(Int8,  Fp16,  vxc_char16,  vxc_char16,  vxc_half8,   half4,        vxc_short8)
-BATCHNORM_MIXED_MODE_2D(UInt8, Fp16,  vxc_uchar16, vxc_uchar16, vxc_half8,   half4,        vxc_short8)
-BATCHNORM_MIXED_MODE_2D(Int16, Fp16,  vxc_short8,  vxc_short8,  vxc_half8,   half4,        vxc_short8)
-BATCHNORM_MIXED_MODE_2D(Fp16,  Int8,  vxc_short8,  vxc_half8,   vxc_char16,  int4,         vxc_char16)
-BATCHNORM_MIXED_MODE_2D(Fp16,  UInt8, vxc_short8,  vxc_half8,   vxc_uchar16, int4,         vxc_uchar16)
-BATCHNORM_MIXED_MODE_2D(Fp16,  Int16, vxc_short8,  vxc_half8,   vxc_short8,  int4,         vxc_short8)
+BATCHNORM_MIXED_MODE_2D(I8,  F16, vxc_char16,  vxc_char16,  vxc_half8,   half4,        vxc_short8)
+BATCHNORM_MIXED_MODE_2D(U8,  F16, vxc_uchar16, vxc_uchar16, vxc_half8,   half4,        vxc_short8)
+BATCHNORM_MIXED_MODE_2D(I16, F16, vxc_short8,  vxc_short8,  vxc_half8,   half4,        vxc_short8)
+BATCHNORM_MIXED_MODE_2D(F16, I8,  vxc_short8,  vxc_half8,   vxc_char16,  int4,         vxc_char16)
+BATCHNORM_MIXED_MODE_2D(F16, U8,  vxc_short8,  vxc_half8,   vxc_uchar16, int4,         vxc_uchar16)
+BATCHNORM_MIXED_MODE_2D(F16, I16, vxc_short8,  vxc_half8,   vxc_short8,  int4,         vxc_short8)
+
+__kernel void vxcBatchNorm_I8_Axis0_2D
+    (
+    __read_only     image2d_array_t inputs,
+    __read_only     image2d_array_t weights,
+    __read_only     image2d_array_t biases,
+    __write_only    image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(1));
+
+    vxc_char16 vec0, dst;
+    vxc_short8 vec1, vec2, vec3, vec4;
+    vxc_float4 weight0, weight1, bias0, bias1;
+    vxc_float4 vectA, vectB;
+    VXC_ReadImage(vec0, inputs,  coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    coord.zw = coord.z << 1;
+    VXC_ReadImage(vec1, weights, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, weight0, vec1, 16);
+    VXC_ReadImage(vec2, biases, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, bias0, vec2, 16);
+    VXC_ReadImage(vec3, weights, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, weight1, vec3, 16);
+    VXC_ReadImage(vec4, biases, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, bias1, vec4, 16);
+
+    VXC_DP4x4(vectA, vec0, vec0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniInt8toFp32Part0_4x4);
+    VXC_DP4x4(vectB, vec0, vec0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniInt8toFp32Part1_4x4);
+    vectA = vectA * weight0 + bias0;
+    vectB = vectB * weight1 + bias1;
+
+    coord.z += 16;
+    VXC_ReadImage(vec1, weights, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, weight0, vec1, 16);
+    VXC_ReadImage(vec2, biases, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, bias0, vec2, 16);
+    VXC_ReadImage(vec3, weights, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, weight1, vec3, 16);
+    VXC_ReadImage(vec4, biases, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, bias1, vec4, 16);
+
+
+    int4 dst0, dst1;
+    dst0 = convert_int4_rte(vectA);
+    dst1 = convert_int4_rte(vectB);
+    VXC_DP2x8(dst, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
+    VXC_DP4x4(vectA, vec0, vec0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniInt8toFp32Part2_4x4);
+    VXC_DP4x4(vectB, vec0, vec0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniInt8toFp32Part3_4x4);
+
+    vectA = vectA * weight0 + bias0;
+
+    vectB = vectB * weight1 + bias1;
+    dst0 = convert_int4_rte(vectA);
+    dst1 = convert_int4_rte(vectB);
+    VXC_DP2x8(dst, dst0, dst1, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
+
+    VXC_WriteImage(outputs, coord.xy, dst, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxcBatchNorm_F16_Axis0_2D
+    (
+    __read_only     image2d_array_t inputs,
+    __read_only     image2d_array_t weights,
+    __read_only     image2d_array_t biases,
+    __write_only    image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(1));
+
+    vxc_short8 src0, src1;
+    vxc_half8 vec0, vec1;
+    vxc_short8 vec2, vec3, vec4, vec5;
+    vxc_float4 weight0, weight1, bias0, bias1;
+    vxc_float4 vectA, vectB;
+    VXC_ReadImage(src0, inputs,  coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, vec0, src0, 16);
+    coord.zw = coord.z << 1;
+    VXC_ReadImage(vec2, weights, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, weight0, vec2, 16);
+    VXC_ReadImage(vec3, biases, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, bias0, vec3, 16);
+    VXC_ReadImage(vec4, weights, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, weight1, vec4, 16);
+    VXC_ReadImage(vec5, biases, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, bias1, vec5, 16);
+
+    VXC_DP4x4(vectA, vec0, vec0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniFp16toFp32Part0_4x4);
+    VXC_DP4x4(vectB, vec0, vec0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniFp16toFp32Part1_4x4);
+    vectA = vectA * weight0 + bias0;
+    vectB = vectB * weight1 + bias1;
+
+    half4 dst0, dst1;
+    _viv_asm(CONV, dst0, vectA);
+    _viv_asm(CONV, dst1, vectB);
+    vxc_half8 dst;
+    VXC_DP2x8(dst, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtractHalf8_2x8);
+    _viv_asm(COPY, src0, dst, 16);
+    VXC_WriteImage(outputs, coord.xy, src0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxcBatchNorm_I16_Axis0_2D
+    (
+    __read_only     image2d_array_t inputs,
+    __read_only     image2d_array_t weights,
+    __read_only     image2d_array_t biases,
+    __write_only    image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(1));
+
+    vxc_short8 vec0, vec1, dst;
+    vxc_short8 vec2, vec3, vec4, vec5;
+    vxc_float4 weight0, weight1, bias0, bias1;
+    vxc_float4 vectA, vectB;
+    VXC_ReadImage(vec0, inputs,  coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    coord.zw = coord.z << 1;
+    VXC_ReadImage(vec2, weights, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, weight0, vec2, 16);
+    VXC_ReadImage(vec3, biases, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, bias0, vec3, 16);
+    VXC_ReadImage(vec4, weights, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, weight1, vec4, 16);
+    VXC_ReadImage(vec5, biases, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, bias1, vec5, 16);
+
+    VXC_DP4x4(vectA, vec0, vec0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), UniInt16toFloat4Lo_4x4);
+    VXC_DP4x4(vectB, vec0, vec0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), UniInt16toFloat4Hi_4x4);
+
+    vectA = vectA * weight0 + bias0;
+    vectB = vectB * weight1 + bias1;
+
+    int4 dst0, dst1;
+    dst0 = convert_int4_rte(vectA);
+    dst1 = convert_int4_rte(vectB);
+    VXC_DP2x8(dst, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact16Bit_2x8);
+    VXC_WriteImage(outputs, coord.xy, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxcBatchNorm_U8_Axis0_2D
+    (
+    __read_only     image2d_array_t inputs,
+    __read_only     image2d_array_t weights,
+    __read_only     image2d_array_t biases,
+    __write_only    image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(1));
+
+    vxc_uchar16 vec0, dst;
+    vxc_short8 vec1, vec2, vec3, vec4;
+    vxc_float4 weight0, weight1, bias0, bias1;
+    vxc_float4 vectA, vectB;
+    VXC_ReadImage(vec0, inputs,  coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    coord.zw = coord.z << 1;
+    VXC_ReadImage(vec1, weights, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, weight0, vec1, 16);
+    VXC_ReadImage(vec2, biases, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, bias0, vec2, 16);
+    VXC_ReadImage(vec3, weights, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, weight1, vec3, 16);
+    VXC_ReadImage(vec4, biases, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, bias1, vec4, 16);
+
+    vxc_uchar16 zeroPoint;
+    _viv_asm(COPY, zeroPoint, input_zeroPoint, 4);
+    VXC_DP4x4(vectA, vec0, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniUInt8toFp32Part0_4x4);
+    VXC_DP4x4(vectB, vec0, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniUInt8toFp32Part1_4x4);
+
+    vectA = vectA * weight0 + bias0;
+    vectB = vectB * weight1 + bias1;
+
+    coord.z += 16;
+    VXC_ReadImage(vec1, weights, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, weight0, vec1, 16);
+    VXC_ReadImage(vec2, biases, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, bias0, vec2, 16);
+    VXC_ReadImage(vec3, weights, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, weight1, vec3, 16);
+    VXC_ReadImage(vec4, biases, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, bias1, vec4, 16);
+
+    int4 dst0, dst1;
+    dst0 = convert_int4_rte(vectA);
+    dst1 = convert_int4_rte(vectB);
+    VXC_DP2x8(dst, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
+
+    VXC_DP4x4(vectA, vec0, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniUInt8toFp32Part2_4x4);
+    VXC_DP4x4(vectB, vec0, zeroPoint, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniUInt8toFp32Part3_4x4);
+    vectA = vectA * weight0 + bias0;
+    vectB = vectB * weight1 + bias1;
+
+    dst0 = convert_int4_rte(vectA);
+    dst1 = convert_int4_rte(vectB);
+    VXC_DP2x8(dst, dst0, dst1, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
+
+    VXC_WriteImage(outputs, coord.xy, dst, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+}
+
+#define BATCHNORM_AXIS0_MIXED_MODE_2D(name0, name1, input_type, incopy_type, output_type, convert_type, copy_type) \
+    __kernel void vxcBatchNorm_##name0##to##name1##_Axis0_2D \
+    ( \
+    __read_only     image2d_array_t inputs,\
+    __read_only     image2d_array_t weights,\
+    __read_only     image2d_array_t biases,\
+    __write_only    image2d_array_t outputs\
+    )\
+{ \
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(1));\
+    \
+    input_type  src0; \
+    incopy_type vec0; \
+    vxc_short8 vec2, vec3, vec4, vec5; \
+    vxc_float4 weight0, bias0, weight1, bias1; \
+    vxc_float4 vectA, vectB; \
+    VXC_ReadImage(src0, inputs,  coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    _viv_asm(COPY, vec0, src0, 16); \
+    coord.zw = coord.z << 1; \
+    VXC_ReadImage(vec2, weights, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    _viv_asm(COPY, weight0, vec2, 16); \
+    VXC_ReadImage(vec3, biases, coord.zw, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    _viv_asm(COPY, bias0, vec3, 16); \
+    VXC_ReadImage(vec4, weights, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    _viv_asm(COPY, weight1, vec4, 16); \
+    VXC_ReadImage(vec5, biases, coord.zw, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    _viv_asm(COPY, bias1, vec5, 16); \
+    \
+    input_type input_ZP;\
+    _viv_asm(COPY, input_ZP, input_zeroPoint, 4);\
+    VXC_DP4x4(vectA, vec0, input_ZP, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniDataSubZPtoFp32Part0_4x4);\
+    VXC_DP4x4(vectB, vec0, input_ZP, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniDataSubZPtoFp32Part1_4x4);\
+    \
+    vectA = vectA * weight0 + bias0;\
+    \
+    vectB = vectB * weight1 + bias1; \
+    \
+    convert_type dst0, dst1; \
+    _viv_asm(CONV_RTE, dst0, vectA);\
+    _viv_asm(CONV_RTE, dst1, vectB);\
+    copy_type dst; \
+    output_type dst2;\
+    VXC_DP2x8(dst2, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bin_2x8); \
+    _viv_asm(COPY, dst, dst2, 16); \
+    VXC_WriteImage(outputs, coord.xy, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));\
+}
+//                            name0, name1, input_type,  incopy_type, output_type, convert_type, copy_type
+BATCHNORM_AXIS0_MIXED_MODE_2D(I8,  F16, vxc_char16,  vxc_char16,  vxc_half8,   half4,        vxc_short8)
+BATCHNORM_AXIS0_MIXED_MODE_2D(U8,  F16, vxc_uchar16, vxc_uchar16, vxc_half8,   half4,        vxc_short8)
+BATCHNORM_AXIS0_MIXED_MODE_2D(I16, F16, vxc_short8,  vxc_short8,  vxc_half8,   half4,        vxc_short8)
+BATCHNORM_AXIS0_MIXED_MODE_2D(F16, I8,  vxc_short8,  vxc_half8,   vxc_char16,  int4,         vxc_char16)
+BATCHNORM_AXIS0_MIXED_MODE_2D(F16, U8,  vxc_short8,  vxc_half8,   vxc_uchar16, int4,         vxc_uchar16)
+BATCHNORM_AXIS0_MIXED_MODE_2D(F16, I16, vxc_short8,  vxc_half8,   vxc_short8,  int4,         vxc_short8)

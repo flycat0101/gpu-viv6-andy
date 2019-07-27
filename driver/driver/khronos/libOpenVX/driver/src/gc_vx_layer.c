@@ -114,6 +114,7 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
+    vx_uint32               axis,
     vx_tensor               input,
     vx_tensor               weights,
     vx_tensor               biases,
@@ -140,7 +141,7 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
     vx_tensor       input_rs                   = NULL;
     vx_tensor       output_rs                  = NULL;
     vx_int32        sizes[4]                   = {1, 1, 1, 1};
-    vx_bool         useImage2DFlag             = (vx_bool)(width * height < IMG_MAX_WIDTH);
+    vx_bool         useImage2DFlag             = (vx_bool)((width * height < IMG_MAX_WIDTH) && axis != 0);
     char *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, weights=%p, biases=%p, output=%p", context, kernelEnum, borderMode, input, weights, biases, output);
@@ -166,7 +167,13 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
 
         parameters[0] = (vx_reference)input_rs;
         parameters[3] = (vx_reference)output_rs;
+
+        width = width * height;
+        height = depth;
+        depth = 1;
     }
+    else if (depth == 1)
+        useImage2DFlag = vx_true_e;
 
     borderMode->mode = VX_BORDER_REPLICATE;
 
@@ -253,7 +260,10 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
 
         if (useImage2DFlag)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_int8_2D", borderMode);
+            if (axis == 0)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I8_Axis0_2D", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I8_2D", borderMode);
             if (!shaderExecutable) goto OnError;
 
             execution_parameters.workDim             = 2;
@@ -262,7 +272,7 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
         }
         else
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_int8", borderMode);
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I8", borderMode);
             if (!shaderExecutable) goto OnError;
 
             execution_parameters.globalWorkScale[0]  = 16;
@@ -309,16 +319,19 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
 
         if (useImage2DFlag)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_fp16_2D", borderMode);
+            if (axis == 0)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F16_Axis0_2D", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F16_2D", borderMode);
             if (!shaderExecutable) goto OnError;
 
             execution_parameters.workDim             = 2;
-            execution_parameters.globalWorkScale[0]  = 16;
+            execution_parameters.globalWorkScale[0]  = axis == 0? 8 : 16;
             execution_parameters.globalWorkScale[1]  = 1;
         }
         else
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_fp16", borderMode);
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F16", borderMode);
             if (!shaderExecutable) goto OnError;
 
             execution_parameters.globalWorkScale[0]  = 16;
@@ -363,16 +376,19 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
 
         if (useImage2DFlag)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_int16_2D", borderMode);
+            if (axis == 0)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_Axis0_2D", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_2D", borderMode);
             if (!shaderExecutable) goto OnError;
 
             execution_parameters.workDim             = 2;
-            execution_parameters.globalWorkScale[0]  = 16;
+            execution_parameters.globalWorkScale[0]  = axis == 0? 8 : 16;
             execution_parameters.globalWorkScale[1]  = 1;
         }
         else
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_int16", borderMode);
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16", borderMode);
             if (!shaderExecutable) goto OnError;
 
             execution_parameters.globalWorkScale[0]  = 16;
@@ -435,7 +451,10 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
 
         if (useImage2DFlag)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_uint8_2D", borderMode);
+            if (axis == 0)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8_Axis0_2D", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8_2D", borderMode);
             if (!shaderExecutable) goto OnError;
 
             execution_parameters.workDim             = 2;
@@ -444,7 +463,7 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
         }
         else
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_uint8", borderMode);
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8", borderMode);
             if (!shaderExecutable) goto OnError;
 
             execution_parameters.globalWorkScale[0]  = 16;
@@ -505,16 +524,16 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
         switch (inputFormat)
         {
         case VX_TYPE_FLOAT16:
-            sprintf(kernelName, "_Fp16");
+            sprintf(kernelName, "_F16");
             break;
         case VX_TYPE_INT8:
-            sprintf(kernelName, "_Int8");
+            sprintf(kernelName, "_I8");
             break;
         case VX_TYPE_UINT8:
-            sprintf(kernelName, "_UInt8");
+            sprintf(kernelName, "_U8");
             break;
         case VX_TYPE_INT16:
-            sprintf(kernelName, "_Int16");
+            sprintf(kernelName, "_I16");
             break;
         default:
             break;
@@ -523,20 +542,23 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
         switch (outputFormat)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "toFp16" );
+            strcat(kernelName, "toF16" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "toInt8" );
+            strcat(kernelName, "toI8" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "toUInt8" );
+            strcat(kernelName, "toU8" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "toInt16" );
+            strcat(kernelName, "toI16" );
             break;
         default:
             break;
         }
+
+        if (axis == 0)
+            strcat(kernelName, "_Axis0" );
 
         if (useImage2DFlag)
         {
@@ -567,17 +589,9 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
         if (status != VX_SUCCESS) goto OnError;
     }
 
-    if (useImage2DFlag)
-    {
-        execution_parameters.globalWorkSize[0]   = gcmALIGN((width * height + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
-        execution_parameters.globalWorkSize[1]   = (depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
-    }
-    else
-    {
-        execution_parameters.globalWorkSize[0]   = gcmALIGN((width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
-        execution_parameters.globalWorkSize[1]   = (height + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
-        execution_parameters.globalWorkSize[2]   = depth;
-    }
+    execution_parameters.globalWorkSize[0]   = gcmALIGN((width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
+    execution_parameters.globalWorkSize[1]   = (height + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
+    execution_parameters.globalWorkSize[2]   = depth;
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
     if (status != VX_SUCCESS) goto OnError;

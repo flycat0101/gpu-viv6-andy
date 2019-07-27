@@ -2955,10 +2955,12 @@ vxnne_shader_executable vxnneGetBatch2SpaceShaderExecutable(
     vx_scalar               outc,
     vx_tensor               output
     );
+
 vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
+    vx_uint32               axis,
     vx_tensor               input,
     vx_tensor               weights,
     vx_tensor               biases,
