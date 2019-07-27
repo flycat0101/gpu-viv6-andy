@@ -6182,7 +6182,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
                     enable_dataConv2F32 = vx_true_e;
             }
 
-            shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+            shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat != VX_TYPE_FLOAT32)
                                  || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
                                  || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
                                  || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
@@ -9325,8 +9325,18 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
     else if(shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
         vxnne_shader_executable shaderExecutable;
+        vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+        vx_uint32  reshpTensor_Dims           = 2;
+        vx_tensor input      = NULL;
+        vx_tensor output     = NULL;
+
         vx_float32 minVal = (vx_float32)a_s->value->n32;
         vx_float32 maxVal = (vx_float32)b_s->value->n32;
+
+        vxoElementOptimization_GetTensorShape(inputs, reshpTensor_Sizes, &reshpTensor_Dims);
+
+        input     = vxoTensor_ReshapeTensor(inputs, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+        output     = vxoTensor_ReshapeTensor(outputs, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
 
         if (func_v == VX_NN_ACTIVATION_RELU1)
         {
@@ -9352,18 +9362,21 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
         if(node->base.context->evisNoInst.supportEVIS)
         {
             if (enable_tensorABS_SHExe)
-                shaderExecutable = vxnneGetTensorAbsShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_ABS, &node->kernelAttributes.borderMode, inputs, outputs);
+                shaderExecutable = vxnneGetTensorAbsShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_ABS, &node->kernelAttributes.borderMode, input, output);
             else if (enable_tensorTR_SHExe)
-                shaderExecutable = vxnneGetTensorTRShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSCENDENTAL, &node->kernelAttributes.borderMode, inputs, minVal, maxVal, func_v, outputs);
+                shaderExecutable = vxnneGetTensorTRShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSCENDENTAL, &node->kernelAttributes.borderMode, input, minVal, maxVal, func_v, output);
             else if (enable_tf_quantize)
-                shaderExecutable = vxnneGetActivation_UInt8ShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION_UINT8, &node->kernelAttributes.borderMode, func_v, inputs, minVal, maxVal, outputs);
+                shaderExecutable = vxnneGetActivation_UInt8ShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION_UINT8, &node->kernelAttributes.borderMode, func_v, input, minVal, maxVal, output);
             else
-                shaderExecutable = vxnneGetActivationShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION, &node->kernelAttributes.borderMode, func_v, inputs, minVal, maxVal, outputs);
+                shaderExecutable = vxnneGetActivationShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION, &node->kernelAttributes.borderMode, func_v, input, minVal, maxVal, output);
         }
         else
         {
-            shaderExecutable = vxnneGetGPUActivationShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION, &node->kernelAttributes.borderMode, func_v, inputs, minVal, maxVal, outputs);
+            shaderExecutable = vxnneGetGPUActivationShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION, &node->kernelAttributes.borderMode, func_v, input, minVal, maxVal, output);
         }
+
+        if (input) vxoTensor_ReleaseTensor(&input);
+        if (output) vxoTensor_ReleaseTensor(&output);
 
         if (!shaderExecutable)
         {

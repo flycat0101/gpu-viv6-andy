@@ -13,11 +13,8 @@ __kernel void vxcActivation_ReluUInt8(
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
 
-    vxc_uchar16 vec0, vec1, vec2, vec3, min, max, dst;
+    vxc_uchar16 vec0, min, max, dst;
     VXC_ReadImage2DArray(vec0, input,  coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage2DArray(vec1, input,  coord, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage2DArray(vec2, input,  coord, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage2DArray(vec3, input,  coord, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
 
     vxc_ushort8 multiplier;
     _viv_asm(COPY, multiplier, multAndoutZP, 16);
@@ -25,24 +22,6 @@ __kernel void vxcActivation_ReluUInt8(
     VXC_DP2x8(dst, vec0, multiplier, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Hi_2x8);
     _viv_asm(COPY, min, packedMinData, 16);
     _viv_asm(COPY, max, packedMaxData, 16);
-    VXC_Clamp(dst, dst, min, max, VXC_MODIFIER_CLAMP(0, 15, 0, 0));
-    VXC_WriteImage2DArray(output, coord, dst, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
-    coord.y ++;
-
-    VXC_DP2x8(dst, vec1, multiplier, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Lo_2x8);
-    VXC_DP2x8(dst, vec1, multiplier, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Hi_2x8);
-    VXC_Clamp(dst, dst, min, max, VXC_MODIFIER_CLAMP(0, 15, 0, 0));
-    VXC_WriteImage2DArray(output, coord, dst, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
-    coord.y ++;
-
-    VXC_DP2x8(dst, vec2, multiplier, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Lo_2x8);
-    VXC_DP2x8(dst, vec2, multiplier, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Hi_2x8);
-    VXC_Clamp(dst, dst, min, max, VXC_MODIFIER_CLAMP(0, 15, 0, 0));
-    VXC_WriteImage2DArray(output, coord, dst, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
-    coord.y ++;
-
-    VXC_DP2x8(dst, vec3, multiplier, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Lo_2x8);
-    VXC_DP2x8(dst, vec3, multiplier, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Hi_2x8);
     VXC_Clamp(dst, dst, min, max, VXC_MODIFIER_CLAMP(0, 15, 0, 0));
     VXC_WriteImage2DArray(output, coord, dst, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
 }
@@ -51,14 +30,10 @@ __kernel void vxcActivation_ReluUInt8_2D (
     __read_only image2d_array_t   input,
     __write_only image2d_array_t  output)
 {
-    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(1), get_global_id(1));
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
 
-    vxc_uchar16 vec0, vec1, vec2, vec3, min, max, dst;
-    VXC_ReadImage(vec0, input,  coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage(vec1, input,  coord.xy, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage(vec2, input,  coord.xy, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
-    VXC_ReadImage(vec3, input,  coord.xy, VXC_5BITOFFSET_XY(0, 3), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
-    coord.zw += (int2)(1, 2);
+    vxc_uchar16 vec0, min, max, dst;
+    VXC_ReadImage(vec0, input,  coord, 0, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
 
     vxc_ushort8 multiplier;
     _viv_asm(COPY, multiplier, multAndoutZP, 16);
@@ -67,22 +42,6 @@ __kernel void vxcActivation_ReluUInt8_2D (
     _viv_asm(COPY, min, packedMinData, 16);
     _viv_asm(COPY, max, packedMaxData, 16);
     VXC_Clamp(dst, dst, min, max, VXC_MODIFIER_CLAMP(0, 15, 0, 0));
-    VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
-    coord.y += 3;
-
-    VXC_DP2x8(dst, vec1, multiplier, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Lo_2x8);
-    VXC_DP2x8(dst, vec1, multiplier, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Hi_2x8);
-    VXC_Clamp(dst, dst, min, max, VXC_MODIFIER_CLAMP(0, 15, 0, 0));
-    VXC_WriteImage(output, coord.xz, dst, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
-
-    VXC_DP2x8(dst, vec2, multiplier, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Lo_2x8);
-    VXC_DP2x8(dst, vec2, multiplier, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Hi_2x8);
-    VXC_Clamp(dst, dst, min, max, VXC_MODIFIER_CLAMP(0, 15, 0, 0));
-    VXC_WriteImage(output, coord.xw, dst, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
-
-    VXC_DP2x8(dst, vec3, multiplier, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Lo_2x8);
-    VXC_DP2x8(dst, vec3, multiplier, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift_Hi_2x8);
-    VXC_Clamp(dst, dst, min, max, VXC_MODIFIER_CLAMP(0, 15, 0, 0));
-    VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
+    VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
 }
 
