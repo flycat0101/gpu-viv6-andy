@@ -334,7 +334,7 @@ vx_status vxoFCOperation_Initialize(
 
     vx_bool support_1xn = (width % 2 == 0)?vx_true_e:vx_false_e;
     vx_int32 zdp_size = 3;
-    vx_enum mode = bfc2conv_mode_nx1;
+    vx_enum mode = bfc2conv_mode_1xn;
     gctSTRING env = VX_NULL;
 
     gcoOS_GetEnv(gcvNULL, "BFC2CONV_MODE", &env);
