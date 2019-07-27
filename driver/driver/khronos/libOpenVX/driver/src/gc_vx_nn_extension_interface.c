@@ -25865,6 +25865,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node 
     vx_uint32 opIdx                 = 0;
     vx_uint32 input_size[4]         = {0};
     vx_uint32 i                     = 0;
+    vx_enum   inputFormat           = TENSOR_DATA_TYPE(input);
+    vx_enum   outputFormat          = TENSOR_DATA_TYPE(output);
+    vx_uint32 batch                 = TENSOR_VIEW_DIM_NUM(input) > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
     vx_bool   enable_sh_crop        = vx_false_e;
     vx_bool   enable_sh_reverse     = vx_false_e;
     vx_bool   shExe_flag            = vx_false_e;
@@ -25902,14 +25905,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node 
 
     vxoNNTensorStrideSlice_getStartStopStride(input, begin_dims, end_dims, stride_dims, begin_mask, end_mask, shrink_axis_mask, start, stop, stride);
 
-    enable_sh_crop = (vx_bool)(!checkOutputTensorDoAlu(input, output) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[1]) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[2]) && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && TENSOR_DIM_NUM(input) < 4);
+    enable_sh_crop = (vx_bool)((inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[1]) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[2]) && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && batch == 1);
 
 
     vxoNNTensorStrideSlice_getReverseAxis(start, stop, stride, reverseAxis, &numOfAxis, input_size);
 
     enable_sh_reverse    = (vx_bool)(numOfAxis > 0 && numOfAxis < 4);
 
-    shExe_flag = (vx_bool)(!checkOutputTensorDoAlu(input, output) && TENSOR_DIM_NUM(input) < 4);
+    shExe_flag = (vx_bool)((_IsSameType(input, output) && batch == 1) || enable_sh_crop);
 
     if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP) &&
         vxnneIsTPSupportFormat(node->base.context, input, VX_NULL, output) && STRIDED_SLICE_CHECK_TP_SUPPORT
