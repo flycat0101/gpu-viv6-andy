@@ -1107,11 +1107,6 @@ ValueFit20Bits(
     IN  gctUINT32           Hex32
     );
 
-gctUINT32
-gcSHADER_GetHintSize(
-    void
-    );
-
 gctBOOL
 gcSHADER_CheckBugFixes10(
     void

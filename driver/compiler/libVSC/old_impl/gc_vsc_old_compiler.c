@@ -24,10 +24,6 @@
 #define MAX_BLOCK_SIZE   0x20000     /* max block size 128 KB */
 #define MAX_BLOCK_NUM    1000
 
-/* To make 32bit and 64bit platforms save the exact same shader binary,
-   we need to make sure this struct size is same in different platforms */
-char _check_gcsHINT_size[(sizeof(gcsHINT) % 8) == 0 ? 1 : -1];
-
 #if (!VSC_LITE_BUILD)
 gctGLSLCompiler gcGLSLCompiler = gcvNULL;
 #endif
@@ -2024,6 +2020,38 @@ gcSHADER_EndInst(
 }
 #endif
 
+static gctUINT32
+gcSHADER_GetHintSize(
+    void
+    )
+{
+    gcmHEADER();
+
+    gcmFOOTER_ARG("return=%d", gcmSIZEOF(struct _gcsHINT));
+    return gcmSIZEOF(struct _gcsHINT);
+}
+
+/* this function is to check the shader binary output is consistent in 32bit and 64bit platform */
+static gctBOOL _isStructChecked = gcvFALSE;
+
+static gctBOOL
+gcShader_CheckStructCompitibility(void)
+{
+    gctBOOL ret = gcvTRUE;
+
+    if (_isStructChecked)
+        return ret;
+
+    if ((sizeof(struct _gcsHINT) % 8) != 0)
+        ret = gcvFALSE;
+
+    if ((gcmOFFSETOF(_gcsHINT, shaderVidNodes) % 8) != 0)
+        ret = gcvFALSE;
+
+    _isStructChecked = gcvTRUE;
+    return ret;
+}
+
 /*******************************************************************************
 **  gcSHADER_Construct
 **
@@ -2052,7 +2080,7 @@ gcSHADER_Construct(
     )
 {
     gcSHADER shader;
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_OK;
     gctINT vertexBase = 0, fragmentBase = 0;
     gctPOINTER pointer = gcvNULL;
     gceAPI apiVersion = gcvAPI_OPENGL_ES20;
@@ -2061,6 +2089,14 @@ gcSHADER_Construct(
 
     /* Verify the arguments. */
     gcmDEBUG_VERIFY_ARGUMENT(Shader != gcvNULL);
+
+    /* check the shader binary output is consistent in 32bit and 64bit platform */
+    if (!gcShader_CheckStructCompitibility())
+    {
+        gcmFATAL("Invalid stuct size. Need to add padding bytes or adjust the struct layout.", status, gcoOS_DebugStatus2Name(status));
+        gcmFOOTER();
+        return gcvSTATUS_INVALID_DATA;
+    }
 
     if (ShaderType != gcSHADER_TYPE_CL)
     {
@@ -37383,17 +37419,6 @@ OnError:
 }
 #endif
 
-gctUINT32
-gcSHADER_GetHintSize(
-    void
-    )
-{
-    gcmHEADER();
-
-    gcmFOOTER_ARG("return=%d", gcmSIZEOF(struct _gcsHINT));
-    return gcmSIZEOF(struct _gcsHINT);
-}
-
 #if (!VSC_LITE_BUILD)
 gctBOOL
 gcIsSBUnsized(
@@ -38448,7 +38473,8 @@ gcSaveProgram(
     gctUINT32 vertexShaderBytes;
     gctUINT32 fragmentShaderBytes;
     gctUINT32 bytes;
-    gctUINT32 hintSize = ProgramState.hints ? gcSHADER_GetHintSize() : 0;
+    gctUINT32 hintSize = ProgramState.hints ? gcmOFFSETOF(_gcsHINT, shaderVidNodes) : 0;
+    gctUINT32 vidNodesSize = _CaculateShaderVidNodesSize(gcvNULL, ProgramState.hints);
     gctUINT8_PTR bytePtr;
     gctUINT32 bufferSize;
     gctUINT8_PTR buffer = gcvNULL;
@@ -38476,7 +38502,10 @@ gcSaveProgram(
                      + gcmSIZEOF(gctUINT32) + gcmALIGN(vertexShaderBytes, 4)
                      + gcmSIZEOF(gctUINT32) + gcmALIGN(fragmentShaderBytes, 4)
                      + gcmSIZEOF(gctUINT32) + ProgramState.stateBufferSize
-                     + gcmSIZEOF(gctUINT32) + hintSize;
+                     + gcmSIZEOF(gctUINT32) + hintSize
+                     + gcmSIZEOF(gctUINT32) + ProgramState.stateDeltaSize
+                     + gcmSIZEOF(gctUINT32) + gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset)
+                     + gcmSIZEOF(gctUINT32) + vidNodesSize;
 
         if (BinarySize)
         {
@@ -38604,6 +38633,50 @@ gcSaveProgram(
         if (bytes > 0)
         {
             gcoOS_MemCopy(buffer, ProgramState.hints, bytes);
+        }
+        buffer += bytes;
+
+        /* Copy the size of the state delta. */
+        bytes = ProgramState.stateDeltaSize;
+        gcoOS_MemCopy(buffer,
+                      &bytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+        /* Copy the state delta */
+        if (ProgramState.stateDeltaSize)
+        {
+            gcoOS_MemCopy(buffer,
+                          ProgramState.stateDelta,
+                          ProgramState.stateDeltaSize);
+        }
+        buffer += ProgramState.stateDeltaSize;
+
+        /* Copy the size of patch offset */
+        bytes = gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset);
+        gcoOS_MemCopy(buffer,
+                      &bytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+        /* Copy the patch offsets */
+        gcoOS_MemCopy(buffer,
+                      &ProgramState.patchOffsetsInDW,
+                      gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset));
+        buffer += gcmSIZEOF(gcsPROGRAM_VidMemPatchOffset);
+
+        /* Copy the size of the video nodes. */
+        bytes = vidNodesSize;
+        gcoOS_MemCopy(buffer,
+                      &bytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Copy the video nodes if needed. */
+        if (bytes > 0)
+        {
+            gcmASSERT(ProgramState.hints);
+            gcmERR_BREAK(_SaveShaderVidNodes(gcvNULL,
+                                             ProgramState.hints,
+                                             buffer));
         }
         buffer += bytes;
 
@@ -39040,7 +39113,7 @@ gcLoadProgram(
         {
             /* Allocate program states buffer. */
             gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
-            ProgramState->stateBuffer= pointer;
+            ProgramState->stateBuffer = pointer;
             gcoOS_MemCopy(ProgramState->stateBuffer, buffer, *bufferSize);
         }
 
@@ -39051,29 +39124,101 @@ gcLoadProgram(
         if (bytes < sizeof(gctUINT32) ||
             bytes < (*bufferSize + sizeof(gctUINT32)))
         {
-           /* Invalid hint size. */
-           gcoOS_Print("gcLoadProgram: Invalid hints size %u", bytes);
-           gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
-           return gcvSTATUS_INVALID_DATA;
+            /* Invalid hint size. */
+            gcoOS_Print("gcLoadProgram: Invalid hints size %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
         }
 
         buffer += gcmSIZEOF(gctUINT32);
+        bytes -= gcmSIZEOF(gctUINT32);
 
         /* If this binary saves hints, then load it. */
         if (ProgramState && *bufferSize > 0)
         {
-          /* Allocate hint structure buffer. */
-          gcmERR_BREAK(gcoOS_Allocate(os,
-                                      gcSHADER_GetHintSize(),
-                                      &pointer));
+            /* Allocate hint structure buffer. */
+            gcmERR_BREAK(gcoOS_Allocate(os,
+                                        gcSHADER_GetHintSize(),
+                                        &pointer));
 
-          ProgramState->hints = pointer;
+            gcoOS_ZeroMemory(pointer, gcSHADER_GetHintSize());
+            ProgramState->hints = (gcsHINT_PTR)pointer;
 
-          /* Copy the HINT structure. */
-          gcoOS_MemCopy(ProgramState->hints, buffer, *bufferSize);
+            /* Copy the HINT structure. */
+            gcoOS_MemCopy(ProgramState->hints, buffer, *bufferSize);
         }
 
         buffer += *bufferSize;
+        bytes -= *bufferSize;
+
+        /* Load state delta */
+        bufferSize = (gctUINT32 *) buffer;
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            gcoOS_Print("gcLoadProgram: Invalid state delta %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+        if (ProgramState)
+        {
+            ProgramState->stateDeltaSize = *bufferSize;
+        }
+        buffer += gcmSIZEOF(gctUINT32);
+        bytes -= gcmSIZEOF(gctUINT32);
+        if (ProgramState && (*bufferSize > 0))
+        {
+            /* Allocate program states delta. */
+            gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
+            ProgramState->stateDelta = pointer;
+            gcoOS_MemCopy(ProgramState->stateDelta, buffer, *bufferSize);
+        }
+        buffer += *bufferSize;
+        bytes -= *bufferSize;
+
+        /* Load patch offsets */
+        bufferSize = (gctUINT32 *)buffer;
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            gcoOS_Print("gcLoadProgram: Invalid patch offsets %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+        buffer += gcmSIZEOF(gctUINT32);
+        bytes -= gcmSIZEOF(gctUINT32);
+        if (ProgramState && (*bufferSize > 0))
+        {
+            gcoOS_MemCopy(&ProgramState->patchOffsetsInDW, buffer, *bufferSize);
+        }
+        buffer += *bufferSize;
+        bytes -= *bufferSize;
+
+        /* Load video nodes. */
+        bufferSize = (gctUINT32 *) buffer;
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            /* Invalid video nodes. */
+            gcoOS_Print("gcLoadProgram: Invalid video nodes %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+
+        buffer += gcmSIZEOF(gctUINT32);
+        bytes -= gcmSIZEOF(gctUINT32);
+
+        /* Load vide nodes. */
+        if (ProgramState && *bufferSize > 0)
+        {
+            gcmASSERT(ProgramState->hints);
+            /* Allocate hint structure buffer. */
+            gcmERR_BREAK(_LoadShaderVidNodesAndFixup(gcvNULL,
+                                                     ProgramState,
+                                                     buffer));
+        }
+        buffer += *bufferSize;
+        bytes -= *bufferSize;
 
         /* Assert we copied the right number of bytes */
         gcmASSERT(buffer - BinarySize == Binary);
