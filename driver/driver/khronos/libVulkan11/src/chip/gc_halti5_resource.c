@@ -3624,6 +3624,8 @@ VkResult halti5_copyImage(
                 fmtInfo = __vk_GetVkFormatInfo((VkFormat) srcFormat);
                 rect = fmtInfo->blockSize;
                 dstRes->u.img.offset.x = gcmALIGN_NP2(dstOffset.x - rect.width + 1, rect.width) >> 1;
+                /*for ASTC format, need do align for width*/
+                dstRes->u.img.extent.width = gcmALIGN_NP2(dstRes->u.img.extent.width, rect.width);
                 dstRes->u.img.extent.width *= (rect.width >> 1);
                 dstRes->u.img.extent.height *= rect.height;
             }
