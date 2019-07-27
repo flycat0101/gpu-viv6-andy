@@ -13,7 +13,7 @@ binDir64="platform_binaries/aarch64le/iMX"
 cfgDir="platform_config/iMX"
 
 # Common file list for all platforms
-fileListCommon=(libCLC.so libEGL_viv.so libGalcore.so libGAL.so libGLES_CL_viv.so libGLES_CM_viv.so libGLESv2_viv.so libGLSLC.so libLLVM_viv.so libOpenCL.so libOpenVG_viv.so libVDK.so libVSC.so libOpenVG_viv.so.3d)
+fileListCommon=(libCLC.so libEGL_viv.so libGalcore.so libGAL.so libGLES_CL_viv.so libGLES_CM_viv.so libGLESv2_viv.so libGLSLC.so libOpenCL.so libOpenVG_viv.so libVDK.so libVSC.so libOpenVG_viv.so.3d)
 
 # OpenVG libs for VG core (only for iMX6X)
 fileListVG=(libOpenVG_viv.so.2d)
@@ -22,7 +22,7 @@ fileListVG=(libOpenVG_viv.so.2d)
 fileListVX=(libOpenVX.so libOpenVXU.so)
 
 # These files will be renamed to .so.1 and link .so will be created (if it exists in destination directory)
-linkList=(libOpenCL.so libVSC.so libEGL_viv.so libGAL.so libCLC.so libOpenVX.so libOpenVXU.so libLLVM_viv.so libVDK.so)
+linkList=(libOpenCL.so libVSC.so libEGL_viv.so libGAL.so libCLC.so libOpenVX.so libOpenVXU.so libVDK.so)
 
 
 function printHelp {

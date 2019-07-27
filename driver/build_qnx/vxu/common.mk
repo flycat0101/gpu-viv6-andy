@@ -67,7 +67,7 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS +=  LLVM_viv OpenVX CLC VSC GAL
+LIBS += OpenVX CLC VSC GAL
 
 #CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS
 #CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_1_APIS
