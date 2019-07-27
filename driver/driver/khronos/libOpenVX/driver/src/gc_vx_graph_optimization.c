@@ -3419,7 +3419,11 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM_padTensor(vx_ten
     {
         vxError("do not process the tensor whose's data size > 2\n");
         assert(0);
+        return VX_FAILURE;
     }
+    vxoGraphOptimization_copyConstData2tensor(padTensorData, padTensor, VX_WRITE_ONLY);
+
+    /*read raw data from tensor, and pad them and put them into new tensor*/
 
     vxoGraphOptimization_copyConstData2tensor(tensorData, orgTensor, VX_READ_ONLY);
 
