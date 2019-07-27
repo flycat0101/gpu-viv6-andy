@@ -14,7 +14,7 @@
 #ifndef __GRALLOC_UTIL_H_
 #define __GRALLOC_UTIL_H_
 
-#include <cutils/log.h>
+#include <log/log.h>
 #include <cutils/properties.h>
 
 #ifndef likely

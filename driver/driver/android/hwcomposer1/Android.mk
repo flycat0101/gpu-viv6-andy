@@ -51,6 +51,11 @@ LOCAL_C_INCLUDES += \
 	frameworks/native/libs/arect/include
 endif
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+	frameworks/native/include
+endif
+
 LOCAL_LDFLAGS := \
 	-Wl,--version-script=$(LOCAL_PATH)/hwcomposer.map
 

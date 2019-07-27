@@ -36,6 +36,12 @@ LOCAL_C_INCLUDES := \
     external/libdrm/include/drm \
     external/drm_gralloc
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+        hardware/libhardware/include \
+        system/core/include
+endif
+
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
     liblog \
@@ -57,6 +63,12 @@ LOCAL_CFLAGS := \
 LOCAL_C_INCLUDES := \
     external/libdrm/vivante \
     external/libdrm/include/drm
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+        hardware/libhardware/include \
+        system/core/include
+endif
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \

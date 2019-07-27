@@ -20,7 +20,7 @@
 #include <errno.h>
 
 #include <cutils/native_handle.h>
-#include <cutils/log.h>
+#include <log/log.h>
 
 #include <gralloc_priv.h>
 typedef struct private_handle_t gralloc_handle_t;

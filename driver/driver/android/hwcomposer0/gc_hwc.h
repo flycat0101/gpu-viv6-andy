@@ -102,7 +102,7 @@
 #include <stdlib.h>
 
 #include <hardware/hwcomposer.h>
-#include <cutils/log.h>
+#include <log/log.h>
 
 #if ANDROID_SDK_VERSION >= 16
 #   include <ui/ANativeObjectBase.h>

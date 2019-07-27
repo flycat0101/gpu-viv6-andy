@@ -14,14 +14,14 @@
 #ifndef __gc_copybit_h_
 #define __gc_copybit_h_
 
-// To enable verbose messages (0=Enable), see cutils/log.h
+// To enable verbose messages (0=Enable), see log/log.h
 #define LOG_NDEBUG 1
 
 #include <errno.h>
 #include <linux/fb.h>
 #include <linux/fs.h>
 #include <linux/android_pmem.h>
-#include <cutils/log.h>
+#include <log/log.h>
 
 #include <hardware/hardware.h>
 #include <hardware/copybit.h>

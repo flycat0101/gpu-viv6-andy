@@ -25,7 +25,7 @@ static gctINT32 totalTicks = 0;
 #include <android/log.h>
 #include <pthread.h>
 #include <sys/syscall.h>
-#include "utils/Log.h"
+#include "log/log.h"
 
 static gctUINT32 prevThreadID = 0;
 

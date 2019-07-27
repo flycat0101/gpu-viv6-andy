@@ -48,6 +48,11 @@ LOCAL_C_INCLUDES += \
 	system/core/libsync/include
 endif
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+   system/core/include
+endif
+
 LOCAL_MODULE         := libhalosuser
 LOCAL_MODULE_TAGS    := optional
 include $(BUILD_STATIC_LIBRARY)

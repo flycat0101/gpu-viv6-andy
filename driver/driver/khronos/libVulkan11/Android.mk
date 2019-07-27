@@ -124,6 +124,11 @@ LOCAL_C_INCLUDES += \
 	$(AQROOT)/driver/android/gralloc
 endif
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+	frameworks/native/include
+endif
+
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 24),1)
   LOCAL_MODULE         := libvulkan_$(GPU_VENDOR)
 else

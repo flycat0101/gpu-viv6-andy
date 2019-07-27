@@ -14,14 +14,14 @@
 #include <gc_egl_precomp.h>
 
 /*
- * To enable verbose messages, see cutils/log.h.
+ * To enable verbose messages, see #include <log/log.h>.
  * Must be included before log.h
  */
 #define LOG_NDEBUG 1
 
 #define ANDROID_DUMMY (31415926)
 
-#include <cutils/log.h>
+#include <log/log.h>
 
 #if ANDROID_SDK_VERSION >= 16
 #  include <ui/ANativeObjectBase.h>

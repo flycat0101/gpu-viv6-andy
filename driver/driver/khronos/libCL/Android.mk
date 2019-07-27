@@ -62,6 +62,11 @@ LOCAL_C_INCLUDES += \
 	frameworks/native/libs/arect/include
 endif
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+		system/core/include
+endif
+
 LOCAL_LDFLAGS := \
 	-Wl,-z,defs \
 	-Wl,--version-script=$(LOCAL_PATH)/libOpenCL12.map
@@ -75,6 +80,7 @@ LOCAL_SHARED_LIBRARIES := \
 ifeq ($(ENABLE_CL_GL), 1)
 LOCAL_SHARED_LIBRARIES += \
 	libGLESv2 \
+	libGLESv3 \
 	libEGL
 endif
 
