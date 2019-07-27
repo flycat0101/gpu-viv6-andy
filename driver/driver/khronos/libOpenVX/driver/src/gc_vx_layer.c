@@ -25378,7 +25378,6 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
 
     if (!kernel)
     {
-        char kernelName[64];
         /* register an shader kernel */
 #if gcdUSE_VXC_BINARY
         vx_uint32 len;
@@ -25404,8 +25403,7 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
 
         status = vxBuildProgram(program, "-cl-viv-vx-extension");
         if (status != VX_SUCCESS) goto OnError;
-        sprintf(kernelName, "vxcTensorMeanAxis%d", last_axis);
-        kernel = vxnneAddKernelShadersInProgram(context, kernelName, program, 2, kernelEnum);
+        kernel = vxnneAddKernelShadersInProgram(context, "vxcTensorMeanAxis", program, 2, kernelEnum);
         if (!kernel) goto OnError;
 
         vxReleaseProgram(&program);
@@ -25499,8 +25497,7 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
     {
         char subKernelName[64];
 
-        sprintf(subKernelName, "_");
-
+        sprintf(subKernelName, "%d_", last_axis);
         switch (input_format)
         {
         case VX_TYPE_FLOAT16:
