@@ -35543,7 +35543,7 @@ gcoHARDWAREVX_TriggerAccelerator(
     if (gcvVX_ACCELERATOR_NN == Type)
     {
         gctBOOL enableZDP3, enableZDP6, enableNNStride;
-        gctUINT disableZDPN, disableSWTiling, smallBatch;
+        gctUINT disableZDPN, disableSWTiling, smallBatch, ddrBurstSize;
 
         gctUINT NNconfig = 0;
 
@@ -35563,6 +35563,9 @@ gcoHARDWAREVX_TriggerAccelerator(
         {
             smallBatch = 0x0;
         }
+
+        ddrBurstSize = gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_256B) ? 0x2 :
+                                                                                                0x0;
 
         NNconfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:2) - (0 ?
@@ -35600,7 +35603,7 @@ gcoHARDWAREVX_TriggerAccelerator(
  ~0U : (~(~0U << ((1 ?
  6:5) - (0 ?
  6:5) + 1))))))) << (0 ?
- 6:5))) | (((gctUINT32) ((gctUINT32) (0x2) & ((gctUINT32) ((((1 ?
+ 6:5))) | (((gctUINT32) ((gctUINT32) (ddrBurstSize) & ((gctUINT32) ((((1 ?
  6:5) - (0 ?
  6:5) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ? 6:5)))

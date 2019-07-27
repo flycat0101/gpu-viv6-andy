@@ -405,6 +405,16 @@ _FillInOptions(
          gcOptions[gcvOPTION_OVX_USE_MULTI_DEVICES] = gcvTRUE;
     }
 
+    envctrl = gcvNULL;
+    gcOptions[gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_256B] = gcvTRUE;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NN_DDR_BURST_SIZE_256B", &envctrl)) && envctrl)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "0")))
+        {
+            gcOptions[gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_256B] = gcvFALSE;
+        }
+    }
+
 #endif
 
     return gcvSTATUS_OK;

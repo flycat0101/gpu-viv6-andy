@@ -675,6 +675,7 @@ typedef enum _gceOPTION
     gcvOPTION_OVX_ENABLE_NN_ZDP6,
     gcvOPTION_OVX_ENABLE_NN_STRIDE,
     gcvOPTION_OVX_USE_MULTI_DEVICES,
+    gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_256B,
 #endif
 
     /* Insert option above this comment only */
