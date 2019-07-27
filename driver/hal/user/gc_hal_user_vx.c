@@ -705,7 +705,7 @@ gcoVX_AllocateMemory(
     gceSTATUS          status = gcvSTATUS_OK;
     gctUINT32          size = Size;
 
-    gcmHEADER_ARG("Size=%d Logical=%p", Size);
+    gcmHEADER_ARG("Size=%u Logical=%p", Size);
 
     gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
 
