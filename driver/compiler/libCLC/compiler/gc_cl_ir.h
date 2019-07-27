@@ -38,7 +38,7 @@
 #define clmF2U(f)        ((gctUINT32)(f))
 #define clmF2L(f)        ((gctINT64)(f))
 #define clmF2UL(f)       ((gctUINT64)(f))
-#define clmF2C(f)        ((gctCHAR)(f))
+#define clmF2C(f)        ((gctSIGNED_CHAR)(f))
 #define clmF2H(f)        ((gctUINT)clConvFloatToHalf((f)))
 
 #define clmI2F(i)        ((gctFLOAT)(i))
@@ -46,7 +46,7 @@
 #define clmI2L(i)        ((gctINT64)(i))
 #define clmI2UL(i)       ((gctUINT64)(i))
 #define clmI2B(i)        (((i) != (gctINT32)0)? gcvTRUE : gcvFALSE)
-#define clmI2C(i)        ((gctCHAR)(i))
+#define clmI2C(i)        ((gctSIGNED_CHAR)(i))
 
 #define clmU2F(i)        ((gctFLOAT)(i))
 #define clmU2I(i)        ((gctINT32)(i))
@@ -60,7 +60,7 @@
 #define clmL2I(i)        ((gctINT32)(i))
 #define clmL2UL(i)       ((gctUINT64)(i))
 #define clmL2B(i)        (((i) != (gctINT64)0)? gcvTRUE : gcvFALSE)
-#define clmL2C(i)        ((gctCHAR)(i))
+#define clmL2C(i)        ((gctSIGNED_CHAR)(i))
 
 #define clmUL2F(i)       ((gctFLOAT)(i))
 #define clmUL2I(i)       ((gctINT32)(i))
