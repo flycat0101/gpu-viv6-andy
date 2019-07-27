@@ -14562,6 +14562,15 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
                 }
                 else
                 {
+                    vx_uint32 nnCoreCount = (wb_base->weights_data_format == VX_TYPE_INT16) ?
+                                    context->nnConfig.fixedFeature.nnCoreCountInt16 : (wb_base->weights_data_format == VX_TYPE_FLOAT16) ?
+                                        context->nnConfig.fixedFeature.nnCoreCountFloat16 : context->nnConfig.fixedFeature.nnCoreCount;
+                    if (nnCoreCount == 0)
+                    {
+                        vxInfo("%s[%d]: current NN didn't support this format 0x%x\n", __FUNCTION__, __LINE__, wb->wb_base->weights_data_format);
+                        goto exit;
+                    }
+
                     calculateWeightBiasStreamRelatedSize(
                         context,
                         wb,
