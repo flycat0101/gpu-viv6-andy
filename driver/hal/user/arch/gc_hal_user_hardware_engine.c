@@ -16190,7 +16190,9 @@ gcoHARDWARE_FlushShaders(
 };
 
 
-        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+        if (Hardware->features[gcvFEATURE_MULTI_CLUSTER])
+        {
+            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -16250,6 +16252,7 @@ gcoHARDWARE_FlushShaders(
  ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0))));    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
+        }
     }
 
     /* Bypass TS */
