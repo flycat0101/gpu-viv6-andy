@@ -37,6 +37,7 @@ EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libarchmodel/include
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/include
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/kernels
 
+
 # from libCL (trunk/driver/khronos/libCL/makefile.linux)
 # Core
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_target.o
@@ -160,7 +161,7 @@ $(foreach lib, $(STATIC_LIBS), $(eval LIBPREF_$(lib) = -Bstatic))
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
 LIBS += $(STATIC_LIBS)
-LIBS += CLC VSC GAL
+LIBS += LLVM_viv CLC VSC GAL
 
 #CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS
 #CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_1_APIS

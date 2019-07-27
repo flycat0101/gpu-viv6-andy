@@ -85,7 +85,7 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS += VSC GAL
+LIBS += VSC GAL LLVM_viv
 
 CCFLAGS += -Wno-error=unused-value
 
