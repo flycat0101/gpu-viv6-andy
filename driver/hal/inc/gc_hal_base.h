@@ -4449,7 +4449,7 @@ gckOS_DebugStatus2Name(
 **
 **      func    Function to evaluate.
 */
-#define _gcmERR_BREAK(prefix, func) \
+#define _gcmERR_BREAK(prefix, func){ \
     status = func; \
     if (gcmIS_ERROR(status)) \
     { \
@@ -4459,8 +4459,10 @@ gckOS_DebugStatus2Name(
             status, gcoOS_DebugStatus2Name(status), __FUNCTION__, __LINE__); \
         break; \
     } \
-    do { } while (gcvFALSE)
-#define _gcmkERR_BREAK(prefix, func) \
+    do { } while (gcvFALSE); \
+    }
+
+#define _gcmkERR_BREAK(prefix, func){ \
     status = func; \
     if (gcmIS_ERROR(status)) \
     { \
@@ -4470,7 +4472,9 @@ gckOS_DebugStatus2Name(
             status, gckOS_DebugStatus2Name(status), __FUNCTION__, __LINE__); \
         break; \
     } \
-    do { } while (gcvFALSE)
+    do { } while (gcvFALSE); \
+    }
+
 #define gcmERR_BREAK(func)          _gcmERR_BREAK(gcm, func)
 #define gcmkERR_BREAK(func)         _gcmkERR_BREAK(gcmk, func)
 
