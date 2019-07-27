@@ -1553,6 +1553,10 @@ VIR_Symbol_Dump(
         {
             VERIFY_OK(VIR_LOG(Dumper, " unDef"));
         }
+        if (isSymPassByReference(Sym))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, " passByRef"));
+        }
         VERIFY_OK(VIR_LOG(Dumper, " >"));
     }
     return errCode;

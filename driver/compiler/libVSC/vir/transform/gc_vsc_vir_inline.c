@@ -293,6 +293,46 @@ VSC_IL_DupInstruction(
     return errCode;
 }
 
+/* if getVariableSym is true, return variable sym if found
+ * otherwise  return virRegSymbol */
+static VIR_Symbol*
+_VSC_IL_GetActualParm(
+    IN  VIR_Function    *pCallerFunc,
+    IN  VIR_Function    *pCalleeFunc,
+    VIR_Instruction     *pCallSiteInst,
+    VIR_Symbol          *parmVregSym,
+    gctBOOL             isInput
+)
+{
+    VIR_Symbol* realParm = gcvNULL;
+    VIR_Instruction *newInst = gcvNULL;
+    if (isInput)
+    {
+        newInst = VIR_Shader_FindParmInst(pCalleeFunc, pCallSiteInst, gcvTRUE, parmVregSym, gcvNULL);
+        /* now only deal with assignment to parament is MOV case */
+        if (newInst && VIR_Inst_GetOpcode(newInst) == VIR_OP_MOV)
+        {
+            VIR_Operand *src0 = VIR_Inst_GetSource(newInst, 0);
+            gcmASSERT(VIR_Operand_isSymbol(src0));
+            realParm = VIR_Operand_GetSymbol(src0);
+            VIR_Function_ChangeInstToNop(pCallerFunc, newInst);
+        }
+    }
+    else
+    {
+        newInst = VIR_Shader_FindParmInst(pCalleeFunc, pCallSiteInst, gcvFALSE, parmVregSym, gcvNULL);
+        if (newInst && VIR_Inst_GetOpcode(newInst) == VIR_OP_MOV)
+        {
+            VIR_Operand *dest = VIR_Inst_GetDest(newInst);
+            gcmASSERT(VIR_Operand_isSymbol(dest));
+            realParm = VIR_Operand_GetSymbol(dest);
+            VIR_Function_ChangeInstToNop(pCallerFunc, newInst);
+        }
+    }
+
+    return realParm;
+}
+
 static VSC_ErrCode
 VSC_IL_DupSingleVariable(
     IN  VIR_Inliner     *pInliner,
@@ -300,6 +340,7 @@ VSC_IL_DupSingleVariable(
     IN  VIR_Function    *pCalleeFunc,
     IN  VIR_Symbol      *pOldSym,
     IN  gctUINT         callerIdx,
+    IN  VIR_Instruction *pCallSiteInst,
     OUT VSC_HASH_TABLE  *pTempSet
     )
 {
@@ -316,6 +357,8 @@ VSC_IL_DupSingleVariable(
     gctUINT             newVregId;
     gctBOOL             isCallerMainFunc = VIR_Function_HasFlag(pCallerFunc, VIR_FUNCFLAG_MAIN);
     gctBOOL             isParam = VIR_Symbol_isParamVariable(pOldSym);
+    /* we can't handle param is InOut at the same time */
+    gctBOOL             isInputOrOutParam = (VIR_Symbol_isInParam(pOldSym) ^ VIR_Symbol_isOutParam(pOldSym));
 
     oldRegId = VIR_Symbol_GetVariableVregIndex(pOldSym);
     /* for parameter, need to check if the corresponding global variable is array, if so
@@ -362,107 +405,135 @@ VSC_IL_DupSingleVariable(
 
     if (!vscHTBL_DirectTestAndGet(pTempSet, (void*)pOldSym, (void **)&pNewVarSym))
     {
-        gctCHAR     newVarName[__MAX_SYM_NAME_LENGTH__];
-        gctCHAR     temp[16];
-        gctUINT     offset = 0;
-
-        gcoOS_PrintStrSafe(temp, 16, &offset, "%d-%d-", VIR_Function_GetSymId(pCallerFunc), VIR_Function_GetSymId(pCalleeFunc));
-        gcoOS_StrCopySafe(newVarName, __MAX_SYM_NAME_LENGTH__, temp);
-        gcoOS_StrCatSafe(newVarName, __MAX_SYM_NAME_LENGTH__, oldName);
-
-        /* Pass index. */
-        offset = 0;
-        gcoOS_PrintStrSafe(temp, 16, &offset, "-%d", VSC_IL_GetPassData(pInliner)->passIndex);
-        gcoOS_StrCatSafe(newVarName, 128, temp);
-
-        /* Caller index. */
-        offset = 0;
-        gcoOS_PrintStrSafe(temp, 16, &offset, "-%d", callerIdx);
-        gcoOS_StrCatSafe(newVarName, __MAX_SYM_NAME_LENGTH__, temp);
-
-        /* 1. put local variables to global scope if the caller is main
-         * 2. put parameter variables to global scope */
-        if (isCallerMainFunc || isParam)
+        /* if parameter is pass by reference, find the real parameter to replace it
+         * now NOT deal with parameter used as input and output at the same time case.
+         * otherwise create a new temp variable to copy value
+         */
+        if (isParam && isInputOrOutParam && isSymPassByReference(pOldSym))
         {
-            errCode = VIR_Shader_AddSymbolWithName(pShader,
+            gcmASSERT(pCallSiteInst != gcvNULL);
+            for (i = 0; i < regCount; i++)
+            {
+                VIR_Symbol      *pTempVirReg = gcvNULL;
+                VIR_Symbol      *pNewVirReg = gcvNULL;
+                VIR_VirRegId    tmpVregId = oldRegId + i;
+                pTempVirReg = VIR_Shader_FindSymbolByTempIndex(pShader, tmpVregId);
+                if (pTempVirReg == gcvNULL || vscHTBL_DirectTestAndGet(pTempSet, (void*)pTempVirReg, (void **)&pNewVirReg))
+                {
+                    continue;
+                }
+                pNewVirReg = _VSC_IL_GetActualParm(pCallerFunc, pCalleeFunc, pCallSiteInst, pTempVirReg, VIR_Symbol_isInParam(pOldSym));
+                /* save the new vreg to the table */
+                if (pNewVirReg)
+                {
+                    vscHTBL_DirectSet(pTempSet, (void*)pTempVirReg, (void*)pNewVirReg);
+                }
+            }
+        }
+        else
+        {
+            gctCHAR     newVarName[__MAX_SYM_NAME_LENGTH__];
+            gctCHAR     temp[16];
+            gctUINT     offset = 0;
+
+            gcoOS_PrintStrSafe(temp, 16, &offset, "%d-%d-", VIR_Function_GetSymId(pCallerFunc), VIR_Function_GetSymId(pCalleeFunc));
+            gcoOS_StrCopySafe(newVarName, __MAX_SYM_NAME_LENGTH__, temp);
+            gcoOS_StrCatSafe(newVarName, __MAX_SYM_NAME_LENGTH__, oldName);
+
+            /* Pass index. */
+            offset = 0;
+            gcoOS_PrintStrSafe(temp, 16, &offset, "-%d", VSC_IL_GetPassData(pInliner)->passIndex);
+            gcoOS_StrCatSafe(newVarName, 128, temp);
+
+            /* Caller index. */
+            offset = 0;
+            gcoOS_PrintStrSafe(temp, 16, &offset, "-%d", callerIdx);
+            gcoOS_StrCatSafe(newVarName, __MAX_SYM_NAME_LENGTH__, temp);
+
+            /* 1. put local variables to global scope if the caller is main
+             * 2. put parameter variables to global scope */
+            if (isCallerMainFunc || isParam)
+            {
+                errCode = VIR_Shader_AddSymbolWithName(pShader,
                                                    VIR_SYM_VARIABLE,
                                                    newVarName,
                                                    VIR_Shader_GetTypeFromId(pShader, oldTypeId),
                                                    VIR_STORAGE_UNKNOWN,
                                                    &newVarSymId);
-            ON_ERROR(errCode, "duplicate variable list");
-        }
-        else
-        {
-            /* make this variable as a local variable. */
-            errCode = VIR_Function_AddLocalVar(pCallerFunc,
-                                               newVarName,
-                                               oldTypeId,
-                                               &newVarSymId);
-            ON_ERROR(errCode, "duplicate variable list");
-        }
-
-        pNewVarSym = VIR_Function_GetSymFromId(pCallerFunc, newVarSymId);
-
-        /* Copy some informations. */
-        VIR_Symbol_SetPrecision(pNewVarSym, VIR_Symbol_GetPrecision(pOldSym));
-        if (isCallerMainFunc || isParam)
-        {
-            /* Don't inherit the flag LOCAL. */
-            VIR_Symbol_SetFlag(pNewVarSym, (VIR_Symbol_GetFlags(pOldSym) & ~VIR_SYMFLAG_LOCAL));
-        }
-        else
-        {
-            /* Don't inherit the flag LOCAL. */
-            VIR_Symbol_SetFlag(pNewVarSym, VIR_Symbol_GetFlags(pOldSym));
-        }
-        /* Create new vreg symbol. */
-        if (regCount > 0)
-        {
-            /* create temp registers in Shader */
-            newVregId = VIR_Shader_NewVirRegId(pShader, regCount);
-            VIR_Symbol_SetVariableVregIndex(pNewVarSym, newVregId);
-
-            /* Update the reg. */
-            for (i = 0; i < regCount; i++)
+                ON_ERROR(errCode, "duplicate variable list");
+            }
+            else
             {
-                VIR_VirRegId    tmpVregId;
-                VIR_Symbol      *pTempVirReg = gcvNULL;
-                VIR_Symbol      *pNewVirReg = gcvNULL;
-                VIR_SymId       newVirRegId;
-
-                tmpVregId = oldRegId + i;
-                pTempVirReg = VIR_Shader_FindSymbolByTempIndex(pShader, tmpVregId);
-
-                if (pTempVirReg == gcvNULL)
-                {
-                    continue;
-                }
-
-                if (!vscHTBL_DirectTestAndGet(pTempSet, (void*)pTempVirReg, (void **)&pNewVirReg))
-                {
-                    errCode = VIR_Shader_AddSymbol(pShader,
-                                                   VIR_SYM_VIRREG,
-                                                   newVregId + i,
-                                                   VIR_Symbol_GetType(pTempVirReg),
-                                                   VIR_STORAGE_UNKNOWN,
-                                                   &newVirRegId);
-                    ON_ERROR(errCode, "add vreg symbol");
-
-                    pNewVirReg = VIR_Shader_GetSymFromId(pShader, newVirRegId);
-                    VIR_Symbol_SetVregVariable(pNewVirReg, pNewVarSym);
-
-                    /* Copy some informations. */
-                    VIR_Symbol_SetPrecision(pNewVirReg, VIR_Symbol_GetPrecision(pTempVirReg));
-
-                    /* save the new vreg to the table */
-                    vscHTBL_DirectSet(pTempSet, (void*)pTempVirReg, (void*)pNewVirReg);
-
-                    VIR_Symbol_SetIndexRange(pNewVirReg, VIR_Symbol_GetVregIndex(pNewVirReg) + indexRange - i);
-                }
+                /* make this variable as a local variable. */
+                errCode = VIR_Function_AddLocalVar(pCallerFunc,
+                                                   newVarName,
+                                                   oldTypeId,
+                                                   &newVarSymId);
+                ON_ERROR(errCode, "duplicate variable list");
             }
 
-            VIR_Symbol_SetIndexRange(pNewVarSym, VIR_Symbol_GetVregIndex(pNewVarSym) + indexRange);
+            pNewVarSym = VIR_Function_GetSymFromId(pCallerFunc, newVarSymId);
+
+            /* Copy some informations. */
+            VIR_Symbol_SetPrecision(pNewVarSym, VIR_Symbol_GetPrecision(pOldSym));
+            if (isCallerMainFunc || isParam)
+            {
+                /* Don't inherit the flag LOCAL. */
+                VIR_Symbol_SetFlag(pNewVarSym, (VIR_Symbol_GetFlags(pOldSym) & ~VIR_SYMFLAG_LOCAL));
+            }
+            else
+            {
+                /* Don't inherit the flag LOCAL. */
+                VIR_Symbol_SetFlag(pNewVarSym, VIR_Symbol_GetFlags(pOldSym));
+            }
+            /* Create new vreg symbol. */
+            if (regCount > 0)
+            {
+                /* create temp registers in Shader */
+                newVregId = VIR_Shader_NewVirRegId(pShader, regCount);
+                VIR_Symbol_SetVariableVregIndex(pNewVarSym, newVregId);
+
+                /* Update the reg. */
+                for (i = 0; i < regCount; i++)
+                {
+                    VIR_VirRegId    tmpVregId;
+                    VIR_Symbol      *pTempVirReg = gcvNULL;
+                    VIR_Symbol      *pNewVirReg = gcvNULL;
+                    VIR_SymId       newVirRegId;
+
+                    tmpVregId = oldRegId + i;
+                    pTempVirReg = VIR_Shader_FindSymbolByTempIndex(pShader, tmpVregId);
+
+                    if (pTempVirReg == gcvNULL)
+                    {
+                        continue;
+                    }
+
+                    if (!vscHTBL_DirectTestAndGet(pTempSet, (void*)pTempVirReg, (void **)&pNewVirReg))
+                    {
+                        errCode = VIR_Shader_AddSymbol(pShader,
+                                                       VIR_SYM_VIRREG,
+                                                       newVregId + i,
+                                                       VIR_Symbol_GetType(pTempVirReg),
+                                                       VIR_STORAGE_UNKNOWN,
+                                                       &newVirRegId);
+                        ON_ERROR(errCode, "add vreg symbol");
+
+                        pNewVirReg = VIR_Shader_GetSymFromId(pShader, newVirRegId);
+                        VIR_Symbol_SetVregVariable(pNewVirReg, pNewVarSym);
+
+                        /* Copy some informations. */
+                        VIR_Symbol_SetPrecision(pNewVirReg, VIR_Symbol_GetPrecision(pTempVirReg));
+
+                        /* save the new vreg to the table */
+                        vscHTBL_DirectSet(pTempSet, (void*)pTempVirReg, (void*)pNewVirReg);
+
+                        VIR_Symbol_SetIndexRange(pNewVirReg, VIR_Symbol_GetVregIndex(pNewVirReg) + indexRange - i);
+                    }
+                }
+
+                VIR_Symbol_SetIndexRange(pNewVarSym, VIR_Symbol_GetVregIndex(pNewVarSym) + indexRange);
+            }
         }
 
         /* save the new variable to the table */
@@ -480,6 +551,7 @@ VSC_IL_DupVariableList(
     IN  VIR_Function    *pCalleeFunc,
     IN  VIR_VariableIdList *pVarList,
     IN  gctUINT         callerIdx,
+    IN  VIR_Instruction *pCallSiteInst,
     OUT VSC_HASH_TABLE  *pTempSet
     )
 {
@@ -498,6 +570,7 @@ VSC_IL_DupVariableList(
                                            pCalleeFunc,
                                            pOldSym,
                                            callerIdx,
+                                           pCallSiteInst,
                                            pTempSet);
         ON_ERROR(errCode, "duplicate the single variable.");
     }
@@ -506,12 +579,17 @@ OnError:
     return errCode;
 }
 
+/* if parameter has flag passbyRef, find its actual argument in caller function
+ * and store <oldVirTempSym, actualVirTempSym> to pTempSet
+ * otherwise, create a new temp variable for parameter
+ */
 VSC_ErrCode
 VSC_IL_DupParamsAndLocalVars(
     IN  VIR_Inliner     *pInliner,
     IN  VIR_Function    *pCallerFunc,
     IN  VIR_Function    *pCalleeFunc,
     IN  gctUINT         callerIdx,
+    IN  VIR_Instruction *pCallSiteInst,
     OUT VSC_HASH_TABLE  *pTempSet
     )
 {
@@ -523,6 +601,7 @@ VSC_IL_DupParamsAndLocalVars(
                                      pCalleeFunc,
                                      &pCalleeFunc->paramters,
                                      callerIdx,
+                                     pCallSiteInst,
                                      pTempSet);
     ON_ERROR(errCode, "dupliate parameters");
 
@@ -532,6 +611,7 @@ VSC_IL_DupParamsAndLocalVars(
                                      pCalleeFunc,
                                      &pCalleeFunc->localVariables,
                                      callerIdx,
+                                     gcvNULL,
                                      pTempSet);
     ON_ERROR(errCode, "dupliate local variables");
 
@@ -639,6 +719,7 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
                                                         pCallerFunc,
                                                         pCalleeFunc,
                                                         callerIdx,
+                                                        pCallSiteInst,
                                                         pTempSet);
 
                 /* change the call instruction to a LABEL instruction */
