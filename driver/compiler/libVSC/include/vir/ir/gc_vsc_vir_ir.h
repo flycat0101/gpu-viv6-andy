@@ -1021,6 +1021,9 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
          VIR_Shader_GetKind(S) == VIR_SHADER_GEOMETRY)
 #define VIR_Shader_IsVS(S)        (VIR_Shader_GetKind(S) == VIR_SHADER_VERTEX)
 #define VIR_Shader_IsFS(S)        (VIR_Shader_GetKind(S) == VIR_SHADER_FRAGMENT)
+#define VIR_Shader_IsTCS(S)       (VIR_Shader_GetKind(S) == VIR_SHADER_TESSELLATION_CONTROL)
+#define VIR_Shader_IsTES(S)       (VIR_Shader_GetKind(S) == VIR_SHADER_TESSELLATION_EVALUATION)
+#define VIR_Shader_IsGS(S)        (VIR_Shader_GetKind(S) == VIR_SHADER_GEOMETRY)
 
 #define VIR_Shader_IsGraphics(S)     (VIR_Shader_IsGPipe(S) || VIR_Shader_IsFS(S))
 #define VIR_Shader_IsDesktopGL(S)    ((S)->clientApiVersion == gcvAPI_OPENGL)

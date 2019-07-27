@@ -13371,7 +13371,6 @@ VIR_Operand_SetRelIndexingImmed(
     Operand->u.n.u2.vlInfo._relIndexing = IndexImmed;
 }
 
-
 gctBOOL
 VIR_Operand_IsNegatable(
     IN  VIR_Shader *        Shader,
@@ -15090,6 +15089,9 @@ VIR_Operand_EvaluateOffsetByAccessChain(
     gctBOOL                 treatPushConstAsMemory = gcvFALSE;
     gctBOOL                 isTypeStruct, isTypeArray, isTypeMatrix, isTypeVector, isRowMajorMatrixColumnIndexing = gcvFALSE;
     gctBOOL                 noNeedWShift = gcvFALSE;
+    gctBOOL                 needToGenerateAttrLdForVector = gcvFALSE;
+    VIR_Type*               vectorType = gcvNULL;
+    VIR_Instruction*        initializeVectorInst = gcvNULL;
 
     /* Do the preprocessor. */
     for (i = 0; i < AccessChainLength; i++)
@@ -15272,7 +15274,15 @@ VIR_Operand_EvaluateOffsetByAccessChain(
                     VIR_Instruction* arrayInitializationInst;
                     gctUINT j;
 
-                    baseOffsetType = VIR_SYM_UNKNOWN;
+                    if (baseTypeInfo.bIsBasePerVertexArray && blockIndex != VIR_INVALID_ID)
+                    {
+                        needToGenerateAttrLdForVector = gcvTRUE;
+                        vectorType = type;
+                    }
+                    else
+                    {
+                        baseOffsetType = VIR_SYM_UNKNOWN;
+                    }
 
                     offset = 0;
                     gcoOS_PrintStrSafe(arrayName, 32, &offset, "#spv_ac_vector_dynamic_%d", ResultId);
@@ -15303,6 +15313,11 @@ VIR_Operand_EvaluateOffsetByAccessChain(
                         VIR_Operand_SetSwizzle(VIR_Inst_GetSource(arrayInitializationInst, 0), (VIR_Swizzle)(j | j << 2 | j << 4 | j << 6));
 
                         vectorArrayOperand[j] = VIR_Inst_GetSource(arrayInitializationInst, 0);
+
+                        if (j == 0)
+                        {
+                            initializeVectorInst = arrayInitializationInst;
+                        }
                     }
                 }
             }
@@ -15511,22 +15526,97 @@ VIR_Operand_EvaluateOffsetByAccessChain(
         noNeedWShift = gcvTRUE;
     }
 
-    /* If there is vectorArrayOperand, set the baseOffset to the source.*/
-    for (i = 0; i < 4; i++)
+    /* If the vertex index is a PerVertex, we need to generate a ATTR_LD to load the data first. */
+    if (needToGenerateAttrLdForVector)
     {
-        if (vectorArrayOperand[i] == gcvNULL)
-            continue;
+        VIR_SymId attrLdSymId;
+        VIR_Symbol* attrLdSym = gcvNULL;
+        VIR_Instruction* attrLdInst;
+        VIR_Operand* opnd = gcvNULL;
 
-        if (isBaseAllConstantIndex && baseOffset != 0)
+        /* Currectly only TCS can support loading a attribute from a output. */
+        gcmASSERT(VIR_Shader_IsTCS(Shader));
+
+        /* Add a temp symbol to save the vector data. */
+        offset = 0;
+        gcoOS_PrintStrSafe(arrayName, 32, &offset, "#spv_ac_vector_attrld_%d", ResultId);
+
+        VIR_Shader_AddString(Shader, arrayName, &nameId);
+        VIR_Shader_AddSymbol(Shader,
+            VIR_SYM_VARIABLE,
+            nameId,
+            vectorType,
+            VIR_STORAGE_GLOBAL,
+            &attrLdSymId);
+
+        attrLdSym = VIR_Shader_GetSymFromId(Shader, attrLdSymId);
+        VIR_Symbol_SetFlag(attrLdSym,VIR_SYMFLAG_WITHOUT_REG);
+
+        VIR_Function_AddInstructionBefore(Function,
+                                          VIR_OP_ATTR_LD,
+                                          VIR_Type_GetIndex(vectorType),
+                                          initializeVectorInst,
+                                          gcvTRUE,
+                                          &attrLdInst);
+
+        opnd = VIR_Inst_GetDest(attrLdInst);
+        VIR_Operand_SetSymbol(opnd, Function, attrLdSymId);
+        VIR_Operand_SetEnable(opnd, VIR_TypeId_Conv2Enable(VIR_Type_GetIndex(vectorType)));
+
+        opnd = VIR_Inst_GetSource(attrLdInst, 0);
+        VIR_Operand_SetSymbol(opnd, Function, VIR_Symbol_GetIndex(BaseSymbol));
+        VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_XYZW);
+
+        opnd = VIR_Inst_GetSource(attrLdInst, 1);
+        if (blockIndexType == VIR_SYM_CONST)
         {
-            VIR_Operand_SetIsConstIndexing(vectorArrayOperand[i], gcvTRUE);
-            VIR_Operand_SetRelIndex(vectorArrayOperand[i], baseOffset);
+            VIR_Operand_SetImmediateUint(opnd, blockIndex);
         }
-        else if (!isBaseAllConstantIndex && baseOffset != VIR_INVALID_ID)
+        else
         {
-            VIR_Operand_SetIsConstIndexing(vectorArrayOperand[i], gcvFALSE);
-            VIR_Operand_SetRelIndex(vectorArrayOperand[i], baseOffset);
-            VIR_Operand_SetRelAddrMode(vectorArrayOperand[i], VIR_INDEXED_X);
+            VIR_Operand_SetSymbol(opnd, Function, blockIndex);
+            VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_XXXX);
+        }
+
+        opnd = VIR_Inst_GetSource(attrLdInst, 2);
+        if (baseOffsetType == VIR_SYM_CONST)
+        {
+            VIR_Operand_SetImmediateUint(opnd, baseOffset);
+        }
+        else
+        {
+            VIR_Operand_SetSymbol(opnd, Function, baseOffset);
+            VIR_Operand_SetSwizzle(opnd, VIR_SWIZZLE_XXXX);
+        }
+
+        for (i = 0; i < 4; i++)
+        {
+            if (vectorArrayOperand[i] == gcvNULL)
+                continue;
+
+            VIR_Operand_SetSymbol(vectorArrayOperand[i], Function, attrLdSymId);
+            VIR_Operand_SetTypeId(vectorArrayOperand[i], VIR_GetTypeComponentType(VIR_Type_GetIndex(vectorType)));
+        }
+    }
+    else
+    {
+        /* If there is vectorArrayOperand, set the baseOffset to the source.*/
+        for (i = 0; i < 4; i++)
+        {
+            if (vectorArrayOperand[i] == gcvNULL)
+                continue;
+
+            if (isBaseAllConstantIndex && baseOffset != 0)
+            {
+                VIR_Operand_SetIsConstIndexing(vectorArrayOperand[i], gcvTRUE);
+                VIR_Operand_SetRelIndex(vectorArrayOperand[i], baseOffset);
+            }
+            else if (!isBaseAllConstantIndex && baseOffset != VIR_INVALID_ID)
+            {
+                VIR_Operand_SetIsConstIndexing(vectorArrayOperand[i], gcvFALSE);
+                VIR_Operand_SetRelIndex(vectorArrayOperand[i], baseOffset);
+                VIR_Operand_SetRelAddrMode(vectorArrayOperand[i], VIR_INDEXED_X);
+            }
         }
     }
 

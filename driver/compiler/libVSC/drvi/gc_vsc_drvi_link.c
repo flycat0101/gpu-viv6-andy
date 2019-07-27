@@ -6626,9 +6626,12 @@ static VSC_ErrCode _FindAndLinkAnOuputForAnInput(SHADER_HW_INFO* pUpperHwShader,
 
         if (pInputMapping->ioMode == SHADER_IO_MODE_ACTIVE)
         {
-            gcmASSERT(pThisOutputRegLinkage->linkNo ==
-                pThisInputRegMapping->ioChannelMapping[pThisInputRegMapping->firstValidIoChannel].
-                hwLoc.cmnHwLoc.u.hwChannelLoc/CHANNEL_NUM);
+            if (pThisInputRegMapping->regIoMode == SHADER_IO_MODE_ACTIVE)
+            {
+                gcmASSERT(pThisOutputRegLinkage->linkNo ==
+                    pThisInputRegMapping->ioChannelMapping[pThisInputRegMapping->firstValidIoChannel].
+                    hwLoc.cmnHwLoc.u.hwChannelLoc/CHANNEL_NUM);
+            }
         }
         else
         {

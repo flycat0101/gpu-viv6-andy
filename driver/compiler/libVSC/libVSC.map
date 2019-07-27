@@ -465,6 +465,7 @@
     VIR_Shader_DuplicateVariablelFromSymId;
     VIR_Shader_ReplaceDeviceIndex;
     VIR_Shader_TreatPushConstantAsBuffer;
+    VIR_Shader_FindSymbolByName;
     VIR_Symbol_GetUniformPointer;
     VIR_SymAliasTable_Insert;
     VIR_Function_AddLabel;
@@ -502,6 +503,7 @@
     VIR_Operand_SetTexldFetchMS;
     VIR_Operand_SetTexldGatherComp;
     VIR_Operand_SetTexldGatherRefZ;
+    VIR_Operand_SetRelIndexingImmed;
     VIR_Operand_Change2Src;
     VIR_Function_NewOperand;
     VIR_ConditionOp_Reverse;
@@ -512,6 +514,7 @@
     VIR_Type_GetTypeByteSize;
     VIR_Type_CalcByteOffset;
     VIR_TypeId_Conv2Enable;
+    VIR_TypeId_Conv2Swizzle;
     VIR_TypeId_ComposeNonOpaqueType;
     VIR_TypeId_ConvertIntegerType;
     VIR_Enable_2_Swizzle_WShift;
