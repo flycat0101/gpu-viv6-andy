@@ -3028,6 +3028,7 @@ typedef enum VIR_SYMFLAGEXT
 #define isSymInstanceMember(sym)                (((sym)->flags & VIR_SYMFLAG_IS_INSTANCE_MEMBER) != 0)
 #define isSymCombinedSampler(sym)               (((sym)->flags & VIR_SYMFLAG_COMBINED_SAMPLER) != 0)
 #define isSymSkipNameCheck(sym)                 (((sym)->flags & VIR_SYMFLAG_SKIP_NAME_CHECK) != 0)
+#define isSymPassByReference(sym)               (((sym)->flags & VIR_SYMFLAG_PASS_BY_REFERENCE) != 0)
 
 #define isSymUBODUBO(sym)                       (VIR_Symbol_isUBO(sym) && ((sym)->flags & VIR_SYMUBOFLAG_IS_DUBO) != 0)
 #define isSymUBOCUBO(sym)                       (VIR_Symbol_isUBO(sym) && ((sym)->flags & VIR_SYMUBOFLAG_IS_CUBO) != 0)
