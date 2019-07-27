@@ -19691,7 +19691,7 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
             }
             else if (operation->target == VXNNE_OPERATION_TARGET_SH)
             {
-                vxInfo("SH %2d eventId: %2d waitId: ", operation->absoluteOperationID, operation->engineSync.eventId[0]);
+                vxInfo("SH %2d eventId:  0 waitId: ", operation->absoluteOperationID);
             }
 
             for (j = 0; j < operation->engineSync.waitCnt; j++)
@@ -19747,6 +19747,12 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
             }
         }
 
+        if (vxoContext_IsFeatureAvailable(executionLayer->graph->base.context, VX_NN_TP_PARALLEL) &&
+            operation->target == VXNNE_OPERATION_TARGET_SH && operation->engineSync.eventId[0] != 0)
+        {
+            gcoVX_FlushCache(vx_false_e, vx_false_e, vx_false_e, vx_false_e, vx_true_e, vx_false_e);
+        }
+
         if (executionLayer->opIndices[i].dump)
         {
             executionLayer->opIndices[i].dump(&executionLayer->opIndices[i], operation, VXNNE_DUMP_POST_EXECUTION);
@@ -19795,12 +19801,6 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
                             &graph->binarySave->endCommandsSize,
                             gcvTRUE,
                             gcvFALSE);
-    }
-
-    if (vxoContext_IsFeatureAvailable(executionLayer->graph->base.context, VX_NN_TP_PARALLEL) &&
-        executionLayer->operations[executionLayer->opIndices[executionLayer->opIndicesNum-1].operationID]->target == VXNNE_OPERATION_TARGET_SH)
-    {
-        gcoVX_FlushCache(vx_false_e, vx_false_e, vx_false_e, vx_false_e, vx_true_e, vx_false_e);
     }
 
     vxnneMultiChannel_SetCurrentChannel(operationTarget);

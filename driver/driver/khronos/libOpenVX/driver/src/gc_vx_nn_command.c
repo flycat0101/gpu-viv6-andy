@@ -5005,6 +5005,11 @@ VX_INTERNAL_API vx_status vxnneModifyNNLastNoflushBit(
     vxoBinaryGraph_ReSaveNNTPCommand(operation, command_buffer->physical + offset,
                                      3 * sizeof(vx_uint32), data);
 
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_SMALLBATCH_PHASE1))
+    {
+        command_buffer->eventID[command_buffer->commandCount - 1] = value;
+    }
+
     return VX_SUCCESS;
 }
 
@@ -5032,6 +5037,12 @@ VX_INTERNAL_API vx_status vxnneModifyTPLastNoflushBit(
 
     vxoBinaryGraph_ReSaveNNTPCommand(operation, command_buffer->physical + offset,
                                         12 * sizeof(vx_uint32), data);
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_SMALLBATCH_PHASE1))
+    {
+        vx_bool flag = command_buffer->eventID[command_buffer->commandCount - 1] & 0x80000000 ? vx_true_e : vx_false_e;
+        command_buffer->eventID[command_buffer->commandCount - 1] = flag ? value | 0x80000000 : value;
+    }
 
     return VX_SUCCESS;
 }
