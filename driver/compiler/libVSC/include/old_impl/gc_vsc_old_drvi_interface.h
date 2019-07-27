@@ -806,14 +806,19 @@ typedef struct _gcsHINT
 
     /* Concurrent workGroupCount. */
     gctUINT16   workGroupCount;
-    gctCHAR     reserved[4];
 
     /* Sampler Base offset. */
     gctBOOL     useGPRSpill[gcvPROGRAM_STAGE_LAST];
 
+    /* padding bytes to make the offset of shaderVidNodes field be consistent in 32bit and 64bit platforms */
+    gctCHAR     reserved[8];
+
     /* shaderVidNodes should always be the LAST filed in hits. */
     /* SURF Node for memory that is used in shader. */
     gcSHADER_VID_NODES shaderVidNodes;
+
+    /* padding bytes to make the struct size be consistent in 32bit and 64bit platforms */
+    gctCHAR     reserved1[4];
 }gcsHINT;
 
 #define gcsHINT_isCLShader(Hint)            ((Hint)->clShader)
