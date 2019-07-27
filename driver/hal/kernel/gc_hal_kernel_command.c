@@ -3049,6 +3049,7 @@ OnError:
 static gceSTATUS
 _CommitMultiChannelOnce(
     IN gckCOMMAND Command,
+    IN gckCONTEXT Context,
     IN gcsHAL_COMMAND_LOCATION * CommandBuffer
     )
 {
@@ -3125,6 +3126,8 @@ _CommitMultiChannelOnce(
             (gctUINT32)CommandBuffer->channelId
             ));
     }
+
+    Command->currContext = Context;
 
     gckOS_AcquireMutex(Command->os, Command->mutexQueue, gcvINFINITE);
     acquired = gcvTRUE;
@@ -3286,7 +3289,7 @@ gckCOMMAND_Commit(
         }
         else if (Command->feType == gcvHW_FE_MULTI_CHANNEL)
         {
-            status = _CommitMultiChannelOnce(Command, cmdLoc);
+            status = _CommitMultiChannelOnce(Command, context, cmdLoc);
         }
         else
         {
