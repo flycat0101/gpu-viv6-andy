@@ -206,6 +206,11 @@ CONFIG_DOVE_GPU     := 0
 ###############################################################
 # Common flags.
 
+ifneq (,$(findstring -mcpu=,$(CC) $(CFLAGS)))
+CPU_TYPE=0
+CPU_ARCH=0
+endif
+
 ifeq ($(USE_ARMCC),1)
   CFLAGS            += --c99 #--strict
 else
