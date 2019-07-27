@@ -245,11 +245,13 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNSplitCommandInfo(
     vx_uint32 x_sizes[MAX_NN_SPLIT_XY_NUM], x_offsets[MAX_NN_SPLIT_XY_NUM], y_sizes[MAX_NN_SPLIT_XY_NUM], y_offsets[MAX_NN_SPLIT_XY_NUM], z_offsets[MAX_NN_SPLIT_XY_NUM], z_size[MAX_NN_SPLIT_XY_NUM];
     vx_enum inDataFormat = input->dataFormat;
     vx_enum outDataFormat = output->dataFormat;
+
+    wb = (vx_weights_biases_parameter)(conv_cmd_ptr->other_ref);
     vxmASSERT(sinfo_num_ptr != VX_NULL && sinfo_array_ptr != VX_NULL);
 
-    if(conv_cmd_ptr->other_ref)
+    if(wb)
     {
-        wb = (vx_weights_biases_parameter)(conv_cmd_ptr->other_ref);
+
         zcount = wb->slice_z_num != 0 ? wb->slice_z_num : 1;
         z_offsets[0]=0;
         for(k = 0; k < wb->slice_z_num; ++k)
