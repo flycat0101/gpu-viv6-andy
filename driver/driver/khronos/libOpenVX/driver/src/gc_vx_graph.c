@@ -744,7 +744,11 @@ VX_INTERNAL_API void vxoGraph_GenerateOpParentChild(vx_graph graph)
         }
     }
 
-    gcoOS_FreeMemory(gcvNULL, paramNodeTable);
+    if (paramNodeTable)
+    {
+        gcoOS_FreeMemory(gcvNULL, paramNodeTable);
+        paramNodeTable = VX_NULL;
+    }
     gcmFOOTER_NO();
 }
 

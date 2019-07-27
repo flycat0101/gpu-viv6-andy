@@ -1476,9 +1476,20 @@ vxCreateTensor(
                 );
     if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) {
         gcmFOOTER_NO();
+        if (dimensions)
+        {
+            vxFree(dimensions);
+            dimensions = VX_NULL;
+        }
+
         return VX_NULL;
     }
-    vxFree(dimensions);
+
+    if (dimensions)
+    {
+        vxFree(dimensions);
+        dimensions = VX_NULL;
+    }
     gcmFOOTER_NO();
     return tensor;
 }
@@ -1739,11 +1750,20 @@ vxCreateVirtualTensor(
     if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS)
     {
         gcmFOOTER_NO();
+        if (dimSizes)
+        {
+            vxFree(dimSizes);
+            dimSizes = VX_NULL;
+        }
         return VX_NULL;
     }
     tensor->base.scope = (vx_reference)graph;
 
-    vxFree(dimSizes);
+    if (dimSizes)
+    {
+        vxFree(dimSizes);
+        dimSizes = VX_NULL;
+    }
 
     gcmFOOTER_NO();
     return tensor;

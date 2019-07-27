@@ -3006,6 +3006,7 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
 
     vx_enum staging_format = TENSOR_DATA_TYPE(output);
     vx_uint8 staging_pos = TENSOR_POS(output);
+    vx_op_param_s conv = { 0 };
 
     if ((TENSOR_DATA_TYPE(output) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE) ||
         (TENSOR_DATA_TYPE(output) == VX_TYPE_INT16 && TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT))
@@ -3174,7 +3175,6 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
         else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP))
         {
             /* TP implement: Reshuffle input */
-            vx_op_param_s conv = { 0 };
             status = vxnneOperation_Initialize(&lstmUnitNode->lstm_resuffle_input_tp_operation.base,
                 &lstmlayer->base,
                 VXNNE_OPERATION_TARGET_TP,
@@ -3263,7 +3263,6 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
         else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP))
         {
             /* TP implement */
-            vx_op_param_s conv;
             vx_tp_value_cmd_s values;
             vx_uint32 zoffset = 0, s = 0;
 
@@ -3371,8 +3370,6 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
         else
         {
             /* NN implement */
-
-            vx_op_param_s conv;
             if (weights_biases == VX_NULL)
             {
                 weights_biases = _createWeightsBiasesParameterFromTensors(
@@ -3551,6 +3548,11 @@ exit:
         gcoOS_Free(VX_NULL, lstmlayer);
     }
 
+    if (conv.tp_value)
+    {
+        vxFree(conv.tp_value);
+        conv.tp_value = VX_NULL;
+    }
     return status;
 }
 

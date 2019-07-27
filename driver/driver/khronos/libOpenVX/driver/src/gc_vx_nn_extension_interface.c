@@ -12648,10 +12648,13 @@ vx_status vxnneExecuteSWRPN_Retrieve(struct _vxnne_operation_s *operation)
         vxoTensor_GetTensorSize(score_output, &score_output_size);
         vxoTensor_GetTensorViewMemory(score_output, &score_output_logical, VX_NULL);
         gcoOS_MemCopy(score_output_logical, out_score_data, score_output_size);
-
-        vxFree(out_score_data);
     }
 
+    if (out_score_data)
+    {
+        vxFree(out_score_data);
+        out_score_data = VX_NULL;
+    }
     return status;
 }
 
@@ -12744,12 +12747,16 @@ vx_status vxnneExecuteSWRPN_SortNMS(struct _vxnne_operation_s *operation)
             vxoTensor_GetTensorSize(score_output, &output_size);
             vxoTensor_GetTensorViewMemory(score_output, &output_logical, VX_NULL);
             gcoOS_MemCopy(output_logical, score_output_data, output_size);
-            vxFree(score_output_data);
         }
         vxFree(proposals_data);
         vxFree(roi_output_data);
     }
 
+    if (score_output_data)
+    {
+        vxFree(score_output_data);
+        score_output_data = VX_NULL;
+    }
     return status;
 }
 /*SHADER+CPU*/
@@ -13132,9 +13139,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd_cpu(vx_node n
 
 
         node->layer = &rpnLayer->base;
+        return VX_SUCCESS;
     }
 
 exit:
+    if (rpnLayer)
+    {
+        gcoOS_Free(gcvNULL, rpnLayer);
+        rpnLayer = VX_NULL;
+    }
     return status;
 }
 
