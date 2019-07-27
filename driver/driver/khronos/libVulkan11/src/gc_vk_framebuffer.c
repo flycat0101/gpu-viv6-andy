@@ -105,6 +105,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
     uint32_t i;
     uint32_t allocSize;
     VkRenderPassMultiviewCreateInfo *multiViewCreateInfo = VK_NULL_HANDLE;
+    VkRenderPassMultiviewCreateInfo *tempCreateInfo = VK_NULL_HANDLE;
 
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
@@ -112,7 +113,12 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
     __VK_ONERROR(__vk_CreateObject(devCtx,
         __VK_OBJECT_RENDER_PASS, sizeof(__vkRenderPass), (__vkObject**)&rdp));
 
-    multiViewCreateInfo = __VK_NON_DISPATCHABLE_HANDLE_CAST(VkRenderPassMultiviewCreateInfo *, pCreateInfo->pNext);
+    tempCreateInfo = __VK_NON_DISPATCHABLE_HANDLE_CAST(VkRenderPassMultiviewCreateInfo *, pCreateInfo->pNext);
+    /*judge the pNext whether point to a VkRenderPassMultiviewCreateInfo structure */
+    if (tempCreateInfo->sType == VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO)
+    {
+        multiViewCreateInfo = tempCreateInfo;
+    }
 
     rdp->attachmentCount = pCreateInfo->attachmentCount;
     rdp->subPassInfoCount = pCreateInfo->subpassCount;
