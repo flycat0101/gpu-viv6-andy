@@ -3318,6 +3318,7 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 inputZP;
         gctUINT32 outputZP;
         gctUINT32 aluOutputPostMultiplier;
+        gctUINT32 aluOutputPostMultiplierBit22to15;
     }
     vx_nn_tp_cmd_info;
 

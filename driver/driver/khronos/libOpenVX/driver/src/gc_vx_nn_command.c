@@ -4726,7 +4726,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 uintScale += 0x100;
             }
         }
-        tmpMultiply = (uintScale & 0x7FFFFF) >> 8; /* postMultiply is high 15-bit of Scale's mantissa */
+        tmpMultiply = uintScale & 0x7FFFFF;
         exp = (uintScale & 0x7F800000) >> 23; /* postShift is Scale's exp */
 
         tmpPostShift = (vx_int8)(127 - exp);
@@ -4734,7 +4734,19 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
         tmpPostShift = tmpPostShift >> 5;
         info->vx_nn_tp_cmd_info.aluOutputPostshiftBit6to5 = tmpPostShift & 3;
 
-        info->vx_nn_tp_cmd_info.aluOutputPostMultiplier = tmpMultiply;
+        if (0)
+        {
+            /* 23-bit post multiplier */
+            info->vx_nn_tp_cmd_info.aluOutputPostMultiplier = tmpMultiply & 0x7FFF;
+            info->vx_nn_tp_cmd_info.aluOutputPostMultiplierBit22to15 = tmpMultiply >> 15;
+        }
+        else
+        {
+            /* postMultiply is high 15-bit of Scale's mantissa */
+            info->vx_nn_tp_cmd_info.aluOutputPostMultiplier = tmpMultiply >> 8;
+            info->vx_nn_tp_cmd_info.aluOutputPostMultiplierBit22to15 = 0;
+        }
+
         info->vx_nn_tp_cmd_info.coefZP = weights_biases == VX_NULL ? 0 : WB_WEIGHT_ZP(weights_biases);
         if (tp_type == TP_ROI_POOLING_STEP_1)
         {
