@@ -1441,9 +1441,10 @@ vxnne_tensor_trans_operation_s, *vxnne_tensor_trans_operation;
 typedef struct _vxnne_tensor_trans_layer_s
 {
     vxnne_layer_s                                   base;
-    vxnne_operation                                 operations[1];
+    vxnne_operation                                 operations[2];
     vxnne_tensor_trans_operation_s                  tensor_trans_sw_operation;
     vxnne_shader_operation_s                        tensor_trans_shader_operation;
+    vxnne_shader_operation_s                        tensor_trans_shader_operation2;
     vxnne_shader_operation_s                        tensor_copy_sh_operation;
     vxnne_tp_operation_s                            tensor_trans_tp_operation;
 }

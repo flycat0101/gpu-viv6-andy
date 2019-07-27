@@ -7587,7 +7587,7 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     vx_enum    outputFormat              = TENSOR_DATA_TYPE(outputs);
     vx_bool    sammap_flag               = vx_false_e;
     vx_bool    acrossmap_flag            = vx_false_e;
-    vx_bool    dataformat_flag[4]        = {vx_false_e};
+    vx_bool    dataformat_flag[5]        = {vx_false_e};
     vx_bool    norm_config[3]            = {vx_false_e};
     vx_bool    generic_flag              = vx_false_e;
     vx_bool    isuint8_flag              = vx_false_e;
@@ -7607,13 +7607,14 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     dataformat_flag[1] = (vx_bool)(inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16);
     dataformat_flag[2] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8);
     dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
+    dataformat_flag[4] = (vx_bool)(inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32);
     isuint8_flag       = (vx_bool)(acrossmap_flag && dataformat_flag[2]);
     generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3]));
     norm_shader_flag   = (vx_bool)((sammap_flag && norm_config[0] && dataformat_flag[0])
                                 || (acrossmap_flag && norm_config[0] && dataformat_flag[0])
                                 || (acrossmap_flag && norm_config[1] && dataformat_flag[0])
                                 || (acrossmap_flag && norm_config[2] && (dataformat_flag[0] || dataformat_flag[1]))
-                                || generic_flag || isuint8_flag);
+                                || generic_flag || isuint8_flag || dataformat_flag[4]);
 
     if (div == 1)
     {
@@ -7851,7 +7852,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_Initializer(vx_node node, 
     vx_enum    output_format              = TENSOR_DATA_TYPE(outputs);
     vx_bool    sammap_flag                = vx_false_e;
     vx_bool    acrossmap_flag             = vx_false_e;
-    vx_bool    dataformat_flag[4]         = {vx_false_e};
+    vx_bool    dataformat_flag[5]         = {vx_false_e};
     vx_bool    norm_config[3]             = {vx_false_e};
     vx_bool    generic_flag               = vx_false_e;
     vx_bool    isuint8_flag               = vx_false_e;
@@ -7896,6 +7897,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_Initializer(vx_node node, 
     dataformat_flag[1] = (vx_bool)(input_format == VX_TYPE_INT16 && output_format == VX_TYPE_INT16);
     dataformat_flag[2] = (vx_bool)(input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_UINT8);
     dataformat_flag[3] = (vx_bool)(input_format == VX_TYPE_FLOAT16 && output_format == VX_TYPE_FLOAT16);
+    dataformat_flag[4] = (vx_bool)(input_format == VX_TYPE_FLOAT32 && output_format == VX_TYPE_FLOAT32);
     isuint8_flag       = (vx_bool)((acrossmap_flag && norm_config[0] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[2] && dataformat_flag[2]));
@@ -7905,7 +7907,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_Initializer(vx_node node, 
         || (acrossmap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[2] && (dataformat_flag[0] || dataformat_flag[1]))
-        || generic_flag || isuint8_flag);
+        || generic_flag || isuint8_flag || dataformat_flag[4]);
 
     /* Choose acceleration path. */
     if (vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs) &&
@@ -7995,7 +7997,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Initializer(vx_node 
     vx_enum    output_format              = TENSOR_DATA_TYPE(outputs);
     vx_bool    sammap_flag                = vx_false_e;
     vx_bool    acrossmap_flag             = vx_false_e;
-    vx_bool    dataformat_flag[4]         = {vx_false_e};
+    vx_bool    dataformat_flag[5]         = {vx_false_e};
     vx_bool    norm_config[3]             = {vx_false_e};
     vx_bool    generic_flag               = vx_false_e;
     vx_bool    isuint8_flag               = vx_false_e;
@@ -8040,6 +8042,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Initializer(vx_node 
     dataformat_flag[1] = (vx_bool)(input_format == VX_TYPE_INT16 && output_format == VX_TYPE_INT16);
     dataformat_flag[2] = (vx_bool)(input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_UINT8);
     dataformat_flag[3] = (vx_bool)(input_format == VX_TYPE_FLOAT16 && output_format == VX_TYPE_FLOAT16);
+    dataformat_flag[4] = (vx_bool)(input_format == VX_TYPE_FLOAT32 && output_format == VX_TYPE_FLOAT32);
     isuint8_flag       = (vx_bool)((acrossmap_flag && norm_config[0] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[2] && dataformat_flag[2]));
@@ -8049,7 +8052,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Initializer(vx_node 
         || (acrossmap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[2] && (dataformat_flag[0] || dataformat_flag[1]))
-        || generic_flag || isuint8_flag);
+        || generic_flag || isuint8_flag || dataformat_flag[4]);
 
     /* Choose acceleration path. */
     if (vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs) &&
@@ -9272,6 +9275,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
     shExe_flag = (vx_bool)((func_v == VX_NN_ACTIVATION_RELU && support_dataType[0]) ||
                            (func_v == VX_NN_ACTIVATION_RELU1 && support_dataType[1]) ||
                            (func_v == VX_NN_ACTIVATION_RELU6 && support_dataType[1]) ||
+                           (func_v == VX_NN_ACTIVATION_LOGISTIC && (support_dataType[1] || support_dataType[2])) ||
+                           (func_v == VX_NN_ACTIVATION_HYPERBOLIC_TAN && (support_dataType[1] || support_dataType[2])) ||
                            enable_tensorABS_SHExe ||
                            enable_tensorTR_SHExe  ||
                            enable_tf_quantize);
@@ -11472,7 +11477,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
     vx_array  perm    = (vx_array)parameters[1];
     vx_scalar pnum    = (vx_scalar)parameters[2];
     vx_tensor output  = (vx_tensor)parameters[3];
-    vx_uint32 batchCount = 1;
+    vx_uint32 batchCount = 1, batchCount2 = 1;
 
     vxnne_tensor_trans_layer tensor_trans_layer = VX_NULL;
 
@@ -11550,7 +11555,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
     else
     {
         vx_uint32_ptr  pPerm                   = (vx_uint32_ptr)perm->memory.logicals[0];
-        vx_uint32      num                     = pnum->value->u32;
+        vx_uint32      num                     = pnum->value->u32, num2 = 0;;
         vx_uint32      batch                   = TENSOR_VIEW_SIZE_INDEX(input, 3);
         vx_bool        shExe_flag              = vx_true_e;
         vx_bool        shExe_copy_flag         = vx_true_e;
@@ -11583,6 +11588,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
                                 ||(enable_dataFormat && pPerm[0] == 1 && pPerm[1] == 2 && pPerm[2] == 0  && num == 3)
                                 ||(enable_dataFormat && pPerm[0] == 0 && pPerm[1] == 2 && pPerm[2] == 1  && num == 3)
                                 ||(enable_dataFormat && pPerm[0] == 1 && pPerm[1] == 0 && num <= 3 && num >= 2)
+                                || (enable_dataFormat && pPerm[0] == 1 && pPerm[1] == 3 && pPerm[2] == 2 && pPerm[3] == 0 && num == 4)
                                 || enable_4Dtensor || enable_batch_sh);
 
         for (i = 0; i < gcmMIN(TENSOR_DIM_NUM(input), num); i++)
@@ -11660,10 +11666,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
             vx_uint32 height           = 0;
             vx_uint32 depth            = 0;
             vx_int32  size[4]          = {0, 0, 0, 0};
-            vx_uint32 permArray[4]     = {1, 2, 0, 3};
+            vx_uint32 permArray[4]     = {1, 2, 0, 3}, permArray2[4] = { 0, 2, 1, 3 };
             vx_uint32 dims             = 3;
-            vx_tensor src = NULL;
-            vx_tensor dst = NULL;
+            vx_tensor src = NULL, src2 = NULL;
+            vx_tensor dst = NULL, dst2 = NULL;
             vxnne_shader_executable shaderExecutable = VX_NULL;
 
             width       = TENSOR_VIEW_SIZE_INDEX(input, 0);
@@ -11711,6 +11717,48 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
                 dst = vxoTensor_ReshapeTensor(output, size, dims);
 
                 num = 3;
+            }
+            else if (pPerm[0] == 1 && pPerm[1] == 3 && pPerm[2] == 2 && pPerm[3] == 0 && width * height < IMG_MAX_WIDTH && depth < IMG_MAX_WIDTH)
+            {
+                size[0] = width;
+                size[1] = height * depth * batch;
+                size[2] = 1;
+                dims = 3;
+                src = vxoTensor_ReshapeTensor(input, size, dims);
+
+                {
+                    size[0] = height * depth * batch;
+                    size[1] = width;
+                    size[2] = 1;
+                    dims = 3;
+                    vx_tensor_create_params_t param = {dims, (vx_uint32 *)size, TENSOR_DATA_TYPE(input), TENSOR_QUANT_TYPE(input), };
+
+                    if (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
+                        param.quant_data.dfp.fixed_point_pos = TENSOR_POS(input);
+                    else if (TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
+                    {
+                        param.quant_data.affine.scale = TENSOR_TF_SCALE(input);
+                        param.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(input);
+                    }
+
+                    dst = vxoTensor_CreateTensor2(node->base.context, &param, sizeof(vx_tensor_create_params_t));
+                }
+
+                num = 3;
+                permArray[0] = 1;
+                permArray[1] = 0;
+                permArray[2] = 2;
+
+                size[0] = height;
+                size[1] = depth;
+                size[2] = batch;
+                size[3] = width;
+                dims = 4;
+                src2 = vxoTensor_ReshapeTensor(dst, size, dims);
+
+                dst2 = output;
+                batchCount2 = width;
+                num2 = 3;
             }
 
             if (src && dst)
@@ -11760,6 +11808,35 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
                 &tensor_trans_layer->base,
                 &tensor_trans_layer->tensor_trans_shader_operation.base,
                 0);
+
+            if (src2 && dst2)
+            {
+                vxnne_shader_executable shaderExecutable2 = VX_NULL;
+
+                if (node->base.context->evisNoInst.supportEVIS)
+                    shaderExecutable2 = vxnneTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src2, permArray2, num2, dst2);
+                else
+                    shaderExecutable2 = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src2, permArray2, num2, dst2);
+
+                status = vxnneShaderOperation_Initialize(&tensor_trans_layer->tensor_trans_shader_operation2,
+                    &tensor_trans_layer->base,
+                    VXNNE_OPERATOR_TENSOR_TRANS,
+                    batchCount2,
+                    shaderExecutable2);
+
+                if (status != VX_SUCCESS)
+                    goto exit;
+
+                vxnneLayer_SetOperation(
+                    &tensor_trans_layer->base,
+                    &tensor_trans_layer->tensor_trans_shader_operation2.base,
+                    1);
+
+                vxnneOperation_AddReference(&tensor_trans_layer->tensor_trans_shader_operation2.base, (vx_reference)src2, VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&tensor_trans_layer->tensor_trans_shader_operation2.base, (vx_reference)dst2, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+                vxoTensor_ReleaseTensor(&src2);
+            }
         }
         else
         {
@@ -20750,7 +20827,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReOrg2_Initializer(vx_node node, const v
     vx_tp_cmd_type_e tp_cmd_type    = TP_NONE;
     vxnne_reorg_layer reorg_layer   = VX_NULL;
     vx_uint32 op_index              = 0;
-    vx_bool    dataFormat_flag[4]   = {vx_false_e};
+    vx_bool    dataFormat_flag[5]   = {vx_false_e};
     vx_bool    depth2Space_flag     = vx_false_e;
     vx_bool    space2Depth_flag     = vx_false_e;
     vx_bool    space2Batch_flag     = vx_false_e;
@@ -20764,10 +20841,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReOrg2_Initializer(vx_node node, const v
     dataFormat_flag[1] = (vx_bool)((inputFormat == VX_TYPE_FLOAT16) && (outputFormat == VX_TYPE_FLOAT16));
     dataFormat_flag[2] = (vx_bool)((inputFormat == VX_TYPE_INT16) && (outputFormat == VX_TYPE_INT16) && (in_fixpoint == out_fixpoint));
     dataFormat_flag[3] = (vx_bool)((inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_INT8) && (in_fixpoint == out_fixpoint));
-    depth2Space_flag   = (vx_bool)(type == VX_REORG_DEPTH_TO_SPACE && (dataFormat_flag[0] || dataFormat_flag[1]));
-    space2Depth_flag   = (vx_bool)(type == VX_REORG_SPACE_TO_DEPTH && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[2] || dataFormat_flag[3]));
-    space2Batch_flag   = (vx_bool)(type == VX_REORG_SPACE_TO_BATCH_ND && (dataFormat_flag[0] || dataFormat_flag[1]));
-    batch2Space_flag   = (vx_bool)(type == VX_REORG_BATCH_TO_SPACE_ND && (dataFormat_flag[0] || dataFormat_flag[1]));
+    dataFormat_flag[4] = (vx_bool)((inputFormat == VX_TYPE_FLOAT32) && (outputFormat == VX_TYPE_FLOAT32) && (in_fixpoint == out_fixpoint));
+    depth2Space_flag   = (vx_bool)(type == VX_REORG_DEPTH_TO_SPACE && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[4]));
+    space2Depth_flag   = (vx_bool)(type == VX_REORG_SPACE_TO_DEPTH && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[2] || dataFormat_flag[3] || dataFormat_flag[4]));
+    space2Batch_flag   = (vx_bool)(type == VX_REORG_SPACE_TO_BATCH_ND && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[4]));
+    batch2Space_flag   = (vx_bool)(type == VX_REORG_BATCH_TO_SPACE_ND && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[4]));
 
     /* Destroy the existing layer. */
     if (node->layer)
