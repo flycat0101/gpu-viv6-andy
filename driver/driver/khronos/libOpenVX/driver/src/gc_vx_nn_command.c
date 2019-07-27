@@ -4585,7 +4585,6 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             break;
         }
 
-        case TP_TENSOR_COPY:
         case TP_RESHUFFLE:
         case TP_TRANSPOSE:
         case TP_REORG:
@@ -4618,6 +4617,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             break;
         }
 
+        case TP_TENSOR_COPY:
         case TP_TENSOR_COPY4CONCAT:
         {
             info->vx_nn_tp_cmd_info.inImageGlobalMem    = 1;
