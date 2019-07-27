@@ -3215,7 +3215,7 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
     vx_status status = VX_SUCCESS;
 
     vxnne_tiling_info tilingInfo = VX_NULL;
-    vx_uint32 l, k, i, bufferID;
+    vx_uint32 l, k, i, bufferID, viewOffset = 0;
     vx_bool   flush = vx_false_e;
 
     vxnne_operation_command         opCommand = VX_NULL, prevOpCommand = VX_NULL;
@@ -3284,8 +3284,11 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
 
                         if (opCommand->inputTile.sRAM)
                         {
+                            viewOffset = 0;
                             if (opCommand->operationID == segment->start)
                             {
+                                vxoTensor_GetTensorViewOffset((vx_tensor)graph->layer->operations[opCommand->operationID]->inputs[0], &viewOffset);
+
                                 opCommand->inputTile.xStride     = TENSOR_STRIDE_INDEX((vx_tensor)graph->layer->operations[opCommand->operationID]->inputs[0], 0);
                                 opCommand->inputTile.yStride     = TENSOR_STRIDE_INDEX((vx_tensor)graph->layer->operations[opCommand->operationID]->inputs[0], 1);
                                 opCommand->inputTile.zStride     = TENSOR_STRIDE_INDEX((vx_tensor)graph->layer->operations[opCommand->operationID]->inputs[0], 2);
@@ -3297,9 +3300,9 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
                                 opCommand->inputTile.zStride     = block->memParam[bufferID].inputMemory[0].strides[0][2];
                             }
 
-                            opCommand->inputTile.logicalBase = block->memParam[bufferID].inputMemory[0].logicals[0];
-                            opCommand->inputTile.physical  = block->memParam[bufferID].inputMemory[0].physicals[0];
-                            opCommand->inputTile.logical   = block->memParam[bufferID].inputMemory[0].logicals[0];
+                            opCommand->inputTile.logicalBase = block->memParam[bufferID].inputMemory[0].logicals[0] + viewOffset;
+                            opCommand->inputTile.physical  = block->memParam[bufferID].inputMemory[0].physicals[0] + viewOffset;
+                            opCommand->inputTile.logical   = block->memParam[bufferID].inputMemory[0].logicals[0] + viewOffset;
 
                             opCommand->inputTile.circleBufferSize        = (vx_uint32)block->memParam[bufferID].inputMemory[0].sizes[0];
                             opCommand->inputTile.circularBufEndAddrPlus1 = opCommand->inputTile.physical + opCommand->inputTile.circleBufferSize;
@@ -3344,8 +3347,11 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
 
                         if (opCommand->outputTile.sRAM)
                         {
-                            if (opCommand->operationID == (segment->start + segment->count))
+                            viewOffset = 0;
+                            if (opCommand->operationID == (segment->start + segment->count - 1))
                             {
+                                vxoTensor_GetTensorViewOffset((vx_tensor)graph->layer->operations[opCommand->operationID]->outputs[0], &viewOffset);
+
                                 opCommand->outputTile.xStride     = TENSOR_STRIDE_INDEX((vx_tensor)graph->layer->operations[opCommand->operationID]->outputs[0], 0);
                                 opCommand->outputTile.yStride     = TENSOR_STRIDE_INDEX((vx_tensor)graph->layer->operations[opCommand->operationID]->outputs[0], 1);
                                 opCommand->outputTile.zStride     = TENSOR_STRIDE_INDEX((vx_tensor)graph->layer->operations[opCommand->operationID]->outputs[0], 2);
@@ -3357,9 +3363,9 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
                                 opCommand->outputTile.zStride     = block->memParam[bufferID].outputMemory[0].strides[0][2];
                             }
 
-                            opCommand->outputTile.logicalBase = block->memParam[bufferID].outputMemory[0].logicals[0];
-                            opCommand->outputTile.physical  = block->memParam[bufferID].outputMemory[0].physicals[0];
-                            opCommand->outputTile.logical   = block->memParam[bufferID].outputMemory[0].logicals[0];
+                            opCommand->outputTile.logicalBase = block->memParam[bufferID].outputMemory[0].logicals[0] + viewOffset;
+                            opCommand->outputTile.physical  = block->memParam[bufferID].outputMemory[0].physicals[0] + viewOffset;
+                            opCommand->outputTile.logical   = block->memParam[bufferID].outputMemory[0].logicals[0] + viewOffset;
 
                             opCommand->outputTile.circleBufferSize        = (vx_uint32)block->memParam[bufferID].outputMemory[0].sizes[0];
                             opCommand->outputTile.circularBufEndAddrPlus1 = opCommand->outputTile.physical + opCommand->outputTile.circleBufferSize;
@@ -3746,7 +3752,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                 outputSize = TENSOR_SIZE_INDEX(opInfo.output, 3) * TENSOR_STRIDE_INDEX(opInfo.output, 3);
             }
 
-            vxInfo("%3d %s [%3d %3d %3d %3d 0x%p -> %3d %3d %3d %3d 0x%p] (k=%d i=%d O=%d)",
+            vxInfo("%3d %s [%3d %3d %3d %3d 0x%p(0x%p, 0x%p) -> %3d %3d %3d %3d 0x%p(0x%p, 0x%p)] (k=%d i=%d O=%d)",
                         i,
                         opTarget[graph->layer->operations[i]->target],
                         opInfo.input  ? TENSOR_SIZE_INDEX(opInfo.input, 0) : 0,
@@ -3754,11 +3760,15 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                         opInfo.input  ? TENSOR_SIZE_INDEX(opInfo.input, 2) : 0,
                         opInfo.input  ? TENSOR_SIZE_INDEX(opInfo.input, 3) : 0,
                         opInfo.input  ? opInfo.input->tensorBuffer + offsetIn : 0,
+                        opInfo.input  ? opInfo.input->tensorBuffer : 0,
+                        opInfo.input  ? offsetIn : 0,
                         opInfo.output ? TENSOR_SIZE_INDEX(opInfo.output, 0) : 0,
                         opInfo.output ? TENSOR_SIZE_INDEX(opInfo.output, 1) : 0,
                         opInfo.output ? TENSOR_SIZE_INDEX(opInfo.output, 2) : 0,
                         opInfo.output ? TENSOR_SIZE_INDEX(opInfo.output, 3) : 0,
                         opInfo.output ? opInfo.output->tensorBuffer+ offsetOut : 0,
+                        opInfo.output ? opInfo.output->tensorBuffer : 0,
+                        opInfo.output ? offsetOut : 0,
                         opInfo.weightsBiases ?  GetEsitimateWBSize(opInfo.weightsBiases) : 0,
                         inputSize,
                         outputSize);
