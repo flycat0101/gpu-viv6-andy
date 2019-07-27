@@ -273,9 +273,9 @@ static VkResult waylandGetPhysicalDeviceSurfaceCapabilities(
 
     pSurfaceCapabilities->minImageCount           = 1;
     pSurfaceCapabilities->maxImageCount           = 8;
-    pSurfaceCapabilities->currentExtent           = (VkExtent2D){1024, 768};
+    pSurfaceCapabilities->currentExtent           = VIV_EXTENT;
     pSurfaceCapabilities->minImageExtent          = (VkExtent2D){1, 1};
-    pSurfaceCapabilities->maxImageExtent          = VIV_EXTENT;
+    pSurfaceCapabilities->maxImageExtent          = (VkExtent2D){4096, 4096};
     pSurfaceCapabilities->maxImageArrayLayers     = 1;
     pSurfaceCapabilities->supportedTransforms     = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     pSurfaceCapabilities->currentTransform        = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
