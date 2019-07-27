@@ -1875,12 +1875,7 @@ _ConnectWindow(
 
 #ifndef gcdUSE_ZWP_SYNCHRONIZATION
     if (egl_surface->commit_queue == gcvNULL)
-    {
         egl_surface->commit_queue = wl_display_create_queue(egl_surface->display->wl_dpy);
-        wl_proxy_set_queue((struct wl_proxy *) egl_surface->display->wl_viv, egl_surface->commit_queue);
-        if(egl_surface->surface_sync)
-            wl_proxy_set_queue((struct wl_proxy *) egl_surface->surface_sync, egl_surface->commit_queue);
-    }
 #endif
     /* Save window info structure. */
     Surface->winInfo = (void *) 1;
