@@ -24610,7 +24610,11 @@ cloIR_UNARY_EXPR_GenComponentSelectionCode(
                 Parameters->lOperands[0].vectorIndex.mode = clvINDEX_CONSTANT;
                 Parameters->lOperands[0].vectorIndex.u.constant =
                    _ConvComponentToVectorIndex(UnaryExpr->u.componentSelection.selection[clvCOMPONENT_X]);
-                Parameters->lOperands[0].reg.componentSelection = UnaryExpr->u.componentSelection;
+                Parameters->lOperands[0].reg.componentSelection =
+                   _SwizzleComponentSelection(_CheckHighPrecisionComponentSelection(Parameters->lOperands[0].dataType,
+                                                                                    &UnaryExpr->u.componentSelection,
+                                                                                    componentSelection),
+                                              &operandParameters.lOperands[0].reg.componentSelection);
                 _CompleteComponentSelection(&Parameters->lOperands[0].reg.componentSelection, 1);
              }
              else
