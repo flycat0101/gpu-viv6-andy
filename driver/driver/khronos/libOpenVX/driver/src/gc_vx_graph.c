@@ -853,15 +853,14 @@ VX_PRIVATE_API vx_uint32  GetEsitimateWBSize(
 {
     vx_enum weightFormat = weightsBiases->wb_base->weights_data_format;
     vx_enum biasFormat = weightsBiases->wb_base->biases_data_format;
-    vx_float64 EstimateRatio = (1.25f-1.05f) * (1.0f - WB_COMPRESS_RATIO(weightsBiases)) / (1.0f - 0.02f) + 1.05f;
+    vx_float64 EstimateRatio = WB_COMPRESS_RATIO(weightsBiases) > 1.0f ? 1.05f : (1.25f-1.05f) * (1.0f - WB_COMPRESS_RATIO(weightsBiases)) / (1.0f - 0.02f) + 1.05f;
 
     vx_uint32 weightSize = weightsBiases->weights_sizes[0] * weightsBiases->weights_sizes[1] * weightsBiases->weights_sizes[2] *
                            weightsBiases->weights_sizes[3] * vxnneGetTypeSize((vx_type_e)weightFormat);
 
     vx_uint32 biasSize   = weightsBiases->weights_sizes[3] * vxnneGetTypeSize((vx_type_e)biasFormat);
 
-    return (vx_uint32)((weightSize + biasSize) * EstimateRatio + 0.5f);
-
+    return gcmALIGN_NP2((vx_uint32)((weightSize + biasSize) * EstimateRatio + 0.5f), CACHE_ALIGNMENT_SIZE);
 }
 
 VX_INTERNAL_API vx_status ComputeMNEx(
@@ -872,8 +871,8 @@ VX_INTERNAL_API vx_status ComputeMNEx(
     vx_uint32*              outM,
     vx_uint32*              axiSRAMUsed,
     vx_uint32*              vipSRAMUsed,
-    vx_bool                 sRamIn,
-    vx_bool                 sRamOut
+    vx_uint32               sRamIn,
+    vx_uint32               sRamOut
     )
 {
     vx_int32 i;
@@ -894,38 +893,30 @@ VX_INTERNAL_API vx_status ComputeMNEx(
     inputSize    = TENSOR_STRIDE_INDEX(opInfo.input, 2) * TENSOR_SIZE_INDEX(opInfo.input, 2);
     outputSize   = TENSOR_STRIDE_INDEX(opInfo2.output, 2) * TENSOR_SIZE_INDEX(opInfo2.output, 2);
 
-    if (phase3 && axiSRAMsize == 0)
+
+    if (sRamIn == VXNNE_MEM_POOL_TYPE_VIP_SRAM)
     {
-        vxmASSERT(vipSRAMsize > 0);
-
-        if (sRamIn)
-        {
-            vipSRAMsize -= inputSize;
-        }
-
-        if (sRamOut)
-        {
-            vipSRAMsize -= outputSize;
-        }
-
-        if (((vx_int32)vipSRAMsize) <= 0) return VX_FAILURE;
+        vipSRAMsize -= inputSize;
     }
-    else
+
+    if (sRamOut == VXNNE_MEM_POOL_TYPE_VIP_SRAM)
     {
-        vxmASSERT(axiSRAMsize > 0);
-
-        if (sRamIn)
-        {
-            axiSRAMsize -= inputSize;
-        }
-
-        if (sRamOut)
-        {
-            axiSRAMsize -= outputSize;
-        }
-
-        if (((vx_int32)axiSRAMsize) <= 0) return VX_FAILURE;
+        vipSRAMsize -= outputSize;
     }
+
+    if (((vx_int32)vipSRAMsize) <= 0) return VX_FAILURE;
+
+    if (sRamIn == VXNNE_MEM_POOL_TYPE_AXI_SRAM)
+    {
+        axiSRAMsize -= inputSize;
+    }
+
+    if (sRamOut == VXNNE_MEM_POOL_TYPE_AXI_SRAM)
+    {
+        axiSRAMsize -= outputSize;
+    }
+
+    if (((vx_int32)axiSRAMsize) <= 0) return VX_FAILURE;
 
 
     for (i = start + count - 1; i >= start; i--)
@@ -998,7 +989,7 @@ VX_INTERNAL_API vx_status ComputeMNEx(
 
         if (opInfo.weightsBiases)
         {
-            totalKernelbufferSize += (vx_uint32)gcmALIGN_NP2(GetEsitimateWBSize(opInfo.weightsBiases), CACHE_ALIGNMENT_SIZE);
+            totalKernelbufferSize += GetEsitimateWBSize(opInfo.weightsBiases);
         }
 
     }
@@ -1027,28 +1018,14 @@ VX_INTERNAL_API vx_status ComputeMNEx(
 
             if (opInfo.target == VXNNE_OPERATION_TARGET_NN && !sRamIn)
             {
-                vx_uint32 outTileX, outTileY;
+                vx_uint32 outTileY, inputTileY;
+                vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
+                vx_arch_perf_s archPerfHandle = {0};
+
                 vxmASSERT(opInfo.opType != VXNNE_OPERATOR_FULLYCONNECTED);
                 vxmASSERT(axiSRAMsize > 0 && !phase3);
 
-                outTileX = TENSOR_SIZE_INDEX(opInfo.output, 0);
                 outTileY = gcmMIN(TENSOR_SIZE_INDEX(opInfo.output, 1), M);
-
-                status = ComputeInputSizeEx(
-                                                opInfo.opType,
-                                                outTileX,
-                                                opInfo.kernelX,
-                                                0,
-                                                0,
-                                                opInfo.poolSizeX,
-                                                opInfo.poolStrideX,
-                                                opInfo.reshuffStrideX,
-                                                opInfo.normStrideX,
-                                                &outTileX,
-                                                VX_NULL
-                                                );
-
-                if (status != VX_SUCCESS) return status;
 
                 status = ComputeInputSizeEx(
                                                 opInfo.opType,
@@ -1060,16 +1037,39 @@ VX_INTERNAL_API vx_status ComputeMNEx(
                                                 opInfo.poolStrideY,
                                                 opInfo.reshuffStrideY,
                                                 opInfo.normStrideY,
-                                                &outTileY,
-                                                VX_NULL
+                                                VX_NULL,
+                                                &inputTileY
                                                 );
 
                 if (status != VX_SUCCESS) return status;
 
-                outTileX = gcmMIN(outTileX, layer->graph->base.context->nnConfig.unifiedFeature.maxTileSize);
+                {
+                    vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), outTileY, TENSOR_SIZE_INDEX(opInfo.output, 2)};
+                    vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), inputTileY, TENSOR_SIZE_INDEX(opInfo.input, 2)};
 
-                imageCacheSize = gcmALIGN_NP2_SAFE((outTileX + opInfo.kernelX - 1)   * (outTileY + opInfo.kernelY - 1), 16)
-                                    * opInfo.kernelZ * vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(opInfo.input));
+                    calculateArchPerfFromWB(layer->graph->base.context,
+                                        &archPerfHandle,
+                                        opInfo.weightsBiases,
+                                        inputDims,
+                                        outputDims,
+                                        VX_NULL,
+                                        vx_true_e,
+                                        SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
+                                        layer->graph->base.context->vipSRAM.size,
+                                        (vxnne_operation_target_e)opInfo.target,
+                                        (vxnne_operator_e)opInfo.opType);
+                }
+
+                outImageTileX   = archPerfHandle.resultInfo.outImageTileXSize;
+                outImageTileY   = archPerfHandle.resultInfo.outImageTileYSize;
+                interleaveMode  = archPerfHandle.resultInfo.interleaveMode;
+                kernelX         = opInfo.weightsBiases->weights_sizes[0];
+                kernelY         = opInfo.weightsBiases->weights_sizes[1];
+                inImageZ        = TENSOR_SIZE_INDEX(opInfo.input, 2);
+                inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
+
+                imageCacheSize =
+                    caculate3DTileSize(layer->graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
 
             }
 
@@ -1718,46 +1718,73 @@ VX_PRIVATE_API vx_status SetMemoryRequestList(
     vx_graph                graph,
     vx_uint32               start,
     vx_uint32               count,
-    vx_enum                 allocType,
+    vx_bool                 esitimateInAB,
     vx_bool                 sRamIn,
     vx_bool                 sRamOut)
 {
     vx_uint32 i, j, dims;
     vxnne_mem_request   memRequest = graph->layer->memRequestList + start;
     vx_memory_s         outputMemory[VX_MAX_MEM_REQUEST_OUTPUT];
+    vx_enum             allocType, allocType2;
+
+    if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_FEATURE_SWTILING_PHASE3))
+    {
+        vxmASSERT(graph->base.context->vipSRAM.size != 0);
+
+        allocType = graph->base.context->axiSRAM.size == 0 ? VXNNE_MEM_POOL_TYPE_VIP_SRAM : VXNNE_MEM_POOL_TYPE_SRAM;
+    }
+    else
+    {
+        vxmASSERT(graph->base.context->axiSRAM.size != 0);
+        allocType = VXNNE_MEM_POOL_TYPE_AXI_SRAM;
+    }
 
     for(j = 0; j < memRequest[count - 1].outputCount; j++)
     {
         outputMemory[j] = *memRequest[count - 1].outputMemory[j];
     }
 
-    for (i = 0; i < count - 1; i++)
+    for (i = 0; i < count; i++)
     {
+        if (((i == 0 || i == count - 2) && esitimateInAB) ||
+            ((i == count - 1) && sRamOut))
+        {
+            vxmASSERT(!sRamOut || !esitimateInAB);
+            allocType2 = allocType & ~VXNNE_MEM_POOL_TYPE_VIP_SRAM;
+        }
+        else
+        {
+            allocType2 = allocType;
+        }
+
         for(j = 0; j < memRequest[i].outputCount; j++)
         {
             dims = memRequest[i].outputMemory[j]->dimCount - 1;
-            memRequest[i].outputMemory[j]->allocType    = allocType;
+            memRequest[i].outputMemory[j]->allocType    = allocType2;
             memRequest[i].outputMemory[j]->sizes[0]     = gcmALIGN_NP2(memRequest[i].outputMemory[j]->strides[0][dims] * memRequest[i].outputMemory[j]->dims[0][dims], CACHE_ALIGNMENT_SIZE);
+            memRequest[i].outputMemory[j]->allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_3);
             vxmASSERT(memRequest[i].outputMemory[j]->sizes[0] > 0);
+        }
+
+        if (graph->layer->operations[start + i]->target == VXNNE_OPERATION_TARGET_SH)
+        {
+            for(j = 0; j < memRequest[i].outputCount; j++)
+            {
+                memRequest[i].outputMemory[j]->allocType &= ~VXNNE_MEM_POOL_TYPE_VIP_SRAM;
+            }
+
+            for(j = 0; j < memRequest[i].inputCount; j++)
+            {
+                memRequest[i].inputMemory[j]->allocType &= ~VXNNE_MEM_POOL_TYPE_VIP_SRAM;
+            }
         }
     }
 
-    if (sRamOut)
+    if (!sRamOut)
     {
-        /* currently sRamOut always put in AXI SRAM if available */
-        for(j = 0; j < memRequest[i].outputCount; j++)
+        for(j = 0; j < memRequest[i-1].outputCount; j++)
         {
-            dims = memRequest[i].outputMemory[j]->dimCount - 1;
-            memRequest[i].outputMemory[j]->allocType    = graph->base.context->axiSRAM.size != 0 ? VXNNE_MEM_POOL_TYPE_AXI_SRAM : VXNNE_MEM_POOL_TYPE_VIP_SRAM;
-            memRequest[i].outputMemory[j]->sizes[0]     = gcmALIGN_NP2(memRequest[i].outputMemory[j]->strides[0][dims] * memRequest[i].outputMemory[j]->dims[0][dims], CACHE_ALIGNMENT_SIZE);
-            vxmASSERT(memRequest[i].outputMemory[j]->sizes[0] > 0);
-        }
-    }
-    else
-    {
-        for(j = 0; j < memRequest[i].outputCount; j++)
-        {
-            *memRequest[i].outputMemory[j] = outputMemory[j];
+            *memRequest[i-1].outputMemory[j] = outputMemory[j];
         }
     }
 
@@ -1770,11 +1797,10 @@ VX_PRIVATE_API vx_status DetectABSegments(
     vx_uint32                  count,
     vxnne_segment_collection   collection)
 {
-    vx_uint32 i = 0, j = 0, k = 0;
+    vx_uint32 i = 0, j = 0, k = 0, mergeInputType, mergeOutputType;
     vxnne_operation_info_s opInfo;
     vx_status vStatus = VX_SUCCESS, vStatus1 = VX_SUCCESS;
     vxnne_mem_param memParam = VX_NULL;
-    vx_context context = graph->base.context;
     gceSTATUS status = gcvSTATUS_OK;
 
      gcmHEADER_ARG("graph=%p, start=0x%x, count=0x%x, collection=%p", graph, start, count, collection);
@@ -1795,8 +1821,7 @@ VX_PRIVATE_API vx_status DetectABSegments(
         {
             vxmASSERT((vx_int32) j > 0);
             vStatus = SetMemoryRequestList(
-                graph, i, j,
-                graph->base.context->axiSRAM.size != 0 ? VXNNE_MEM_POOL_TYPE_AXI_SRAM : VXNNE_MEM_POOL_TYPE_VIP_SRAM,
+                graph, i, j, vx_true_e,
                 vx_false_e, vx_false_e);
 
             if (vStatus != VX_SUCCESS) goto OnError;
@@ -1808,66 +1833,38 @@ VX_PRIVATE_API vx_status DetectABSegments(
                 if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
                 {
                     vxnne_mem_request requestList;
-                    vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat, imageTileSize;
 
-                    vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
-                    vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
-
-                    vx_uint8 srcBuf = MemPoolTypeToPerfType(opInfo.input->tensorBuffer->memory.allocType);
-                    vx_uint8 dstBuf = MemPoolTypeToPerfType(opInfo.output->tensorBuffer->memory.allocType);
-                    vx_uint8 kernelBuf = SW_TILING_FROM_DDR;
-                    vx_uint32 vipSize = graph->base.context->vipSRAM.size;
-
-                    if (opInfo.input->tensorBuffer->memory.allocType == VXNNE_MEM_POOL_TYPE_VIP_SRAM)
-                    {
-                        vipSize -= TENSOR_STRIDE_INDEX(opInfo.input, 2) * TENSOR_SIZE_INDEX(opInfo.input, 2);
-                    }
-
-                    if (opInfo.output->tensorBuffer->memory.allocType == VXNNE_MEM_POOL_TYPE_VIP_SRAM)
-                    {
-                        vipSize -= TENSOR_STRIDE_INDEX(opInfo.output, 2) * TENSOR_SIZE_INDEX(opInfo.output, 2);
-                    }
-
-                    gcoOS_ZeroMemory(opInfo.weightsBiases->archPerfHandle, sizeof(vx_arch_perf_s));
-
-                    calculateArchPerfFromWB(context,
-                                        opInfo.weightsBiases->archPerfHandle,
-                                        opInfo.weightsBiases,
-                                        inputDims,
-                                        outputDims,
-                                        VX_NULL,
-                                        vx_true_e,
-                                        srcBuf, dstBuf, kernelBuf,
-                                        vipSize,
-                                        (vxnne_operation_target_e)opInfo.target,
-                                        (vxnne_operator_e)opInfo.opType);
-
-                    outImageTileX = opInfo.weightsBiases->archPerfHandle->resultInfo.outImageTileXSize;
-                    outImageTileY = opInfo.weightsBiases->archPerfHandle->resultInfo.outImageTileYSize;
-                    interleaveMode = opInfo.weightsBiases->archPerfHandle->resultInfo.interleaveMode;
-                    kernelX = opInfo.weightsBiases->weights_sizes[0];
-                    kernelY = opInfo.weightsBiases->weights_sizes[1];
-                    inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
-                    inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
-
-                    imageTileSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
                     requestList = graph->layer->memRequestList  + k;
                     if (!(requestList->inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM) || (requestList->inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_AXI_SRAM))
                     {
                         requestList->imageCache.lastUseId = requestList->imageCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
-                        requestList->imageCache.sizes[0] = imageTileSize;
+                        requestList->imageCache.sizes[0]  = graph->layer->operations[k]->esitimateImageCacheSize;
                         requestList->imageCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
                         requestList->imageCache.allocPartial = vx_false_e;
 
-                        requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_MUST_HAVE;
+                        requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
 
                         requestList->inputMemory[requestList->inputCount] = &requestList->imageCache;
                         requestList->inputCount++;
                     }
+
+                    requestList->kernelCache.lastUseId = requestList->kernelCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                    requestList->kernelCache.sizes[0] = graph->layer->operations[k]->esitimateKernelCacheSize;;
+                    requestList->kernelCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                    requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2;
+                    requestList->kernelCache.allocPartial = vx_true_e;
+                    requestList->inputMemory[requestList->inputCount] = &requestList->kernelCache;
+                    requestList->inputCount++;
                 }
             }
 
             vStatus1 = vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, i, j, VX_NULL);
+
+            vxmASSERT(j >= 2);
+
+            mergeInputType  = (graph->layer->memRequestList + i)->outputMemory[0]->allocType;
+            mergeOutputType = (graph->layer->memRequestList + i + j - 1)->inputMemory[0]->allocType;
+
             RestoreMemoryParamList(graph, start, count, memParam);
 
             if (vStatus1 == VX_SUCCESS)
@@ -1877,6 +1874,8 @@ VX_PRIVATE_API vx_status DetectABSegments(
                 collection->segments[collection->segmentNum].start = i;
                 collection->segments[collection->segmentNum].count = j;
                 collection->segments[collection->segmentNum].end = i + j - 1;
+                collection->segments[collection->segmentNum].segmentInfo.ab.mergeInputType = mergeInputType;
+                collection->segments[collection->segmentNum].segmentInfo.ab.mergeOutputType = mergeOutputType;
                 collection->segmentNum++;
 
                 i = i + j - 1;
@@ -2008,6 +2007,7 @@ VX_PRIVATE_API vx_status DetectTilingSegments(
     vx_status status = VX_SUCCESS;
     vx_bool sRamIn, sRamOut, sRamIn2, sRamOut2;
     vxnne_segment_collection_s    tempCollection;
+    vx_uint32 mergeInputType, mergeOutputType;
 
     gcmHEADER_ARG("graph=%p, start=0x%x, count=0x%x, abCollection=%p, tilingCollection=%p", graph, start, count, abCollection, tilingCollection);
 
@@ -2034,7 +2034,10 @@ VX_PRIVATE_API vx_status DetectTilingSegments(
                     {
                         sRamOut2 = (tilingEnd == i + k -1 ? sRamOut : vx_false_e);
 
-                        status = ComputeMNEx(graph->layer, i, k, &N, &M, &axiSRAMUsed, &vipSRAMUsed, sRamIn2, sRamOut2);
+                        mergeInputType  = sRamIn2 ? (abCollection->segments[j-1].segmentInfo.ab.mergeOutputType) : VXNNE_MEM_POOL_TYPE_ORIG_DDR;
+                        mergeOutputType = sRamOut2 ? (abCollection->segments[j].segmentInfo.ab.mergeInputType) : VXNNE_MEM_POOL_TYPE_ORIG_DDR;
+
+                        status = ComputeMNEx(graph->layer, i, k, &N, &M, &axiSRAMUsed, &vipSRAMUsed, mergeInputType, mergeOutputType);
                         if (status == VX_SUCCESS)
                         {
                             vxmASSERT(tilingCollection->segmentNum < VX_MAX_SEGMENT_COUNT);
@@ -2099,8 +2102,7 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
     }
 
     status = SetMemoryRequestList(
-        graph, segment->start, segment->count,
-        graph->base.context->axiSRAM.size != 0 ? VXNNE_MEM_POOL_TYPE_AXI_SRAM : VXNNE_MEM_POOL_TYPE_VIP_SRAM,
+        graph, segment->start, segment->count, vx_false_e,
         sRamIn, sRamOut);
 
     for (i = 0; i < segment->count; i++)
@@ -2121,7 +2123,7 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
             {
                 vxnne_tiling_info_s tilingsInfo[8];
                 vxnne_operation op;
-                vx_uint32 j, vipSize = graph->base.context->vipSRAM.size;
+                vx_uint32 j;
 
                 j = 0;
                 op = operation;
@@ -2139,24 +2141,13 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                 }
                 vxmASSERT(j > 0);
 
-
-                if (requestList->inputMemory[0]->allocType == VXNNE_MEM_POOL_TYPE_VIP_SRAM)
-                {
-                    vipSize -= TENSOR_STRIDE_INDEX(opInfo.input, 2) * TENSOR_SIZE_INDEX(opInfo.input, 2);
-                }
-
-                if (requestList->outputMemory[0]->allocType == VXNNE_MEM_POOL_TYPE_VIP_SRAM)
-                {
-                    vipSize -= TENSOR_STRIDE_INDEX(opInfo.output, 2) * TENSOR_SIZE_INDEX(opInfo.output, 2);
-                }
-
                 status = vxnneCalculateConvTilingParam(graph->base.context,
                                                         convOperation,
                                                         tilingsInfo,
-                                                        MemPoolTypeToPerfType(requestList->inputMemory[0]->allocType),
-                                                        MemPoolTypeToPerfType(requestList->outputMemory[0]->allocType),
+                                                        SW_TILING_FROM_DDR,
+                                                        SW_TILING_FROM_DDR,
                                                         j,
-                                                        vipSize);
+                                                        graph->base.context->vipSRAM.size);
 
                 j = 0;
                 op = operation;
@@ -2209,7 +2200,7 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                 requestList->imageCache.sizes[0] = imageTileSize;
                 requestList->imageCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
                 requestList->imageCache.allocPartial = vx_false_e;
-                requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1;
+                requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
                 requestList->inputMemory[requestList->inputCount] = &requestList->imageCache;
                 requestList->inputCount++;
             }
@@ -2234,7 +2225,6 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
     vxnne_tiling_info tilingInfo = VX_NULL;
     vxnne_operation operation = VX_NULL;
     vxnne_mem_request requestList = VX_NULL;
-    vx_bool   phase3 = vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_FEATURE_SWTILING_PHASE3);
     vx_uint32 inputCount = 0;
 
     vx_status status = GenerateTilingInfo(
@@ -2285,8 +2275,7 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
     }
 
     status = SetMemoryRequestList(graph,
-        segment->start, segment->count,
-        phase3 ? VXNNE_MEM_POOL_TYPE_VIP_SRAM : VXNNE_MEM_POOL_TYPE_AXI_SRAM,
+        segment->start, segment->count, vx_false_e,
         sRamIn, sRamOut);
 
     if (status != VX_SUCCESS) goto OnError;
@@ -2388,7 +2377,7 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
             requestList->kernelCache.lastUseId = requestList->kernelCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
             requestList->kernelCache.sizes[0] = operation->kernelCacheSize;
             requestList->kernelCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
-            requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_MUST_HAVE;
+            requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
             requestList->kernelCache.allocPartial = vx_false_e;
 
              vxmASSERT(operation->imageCacheSize != 0);
@@ -2400,7 +2389,7 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
                      requestList->imageCache.lastUseId = requestList->imageCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
                      requestList->imageCache.sizes[0] = operation->imageCacheSize;
                      requestList->imageCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
-                     requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1;
+                     requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
                      requestList->imageCache.allocPartial = vx_false_e;
                  }
 
@@ -2532,7 +2521,7 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
                             vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i].start];
 
                             vx_uint32 EstimateKernelSize = GetEsitimateWBSize(opInfo.weightsBiases);
-                            vx_uint32 CompressedKernelSize = (vx_uint32)gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(opInfo.weightsBiases, 0), CACHE_ALIGNMENT_SIZE);
+                            vx_uint32 CompressedKernelSize = (vx_uint32)gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(convOperation->swtWeightBiases, 0), CACHE_ALIGNMENT_SIZE);
 
                             vxoReference_Release((vx_reference_ptr)&convOperation->swtWeightBiases, VX_TYPE_WEIGHTS_BIASES_PARAMETER, VX_REF_INTERNAL);
 
@@ -2542,7 +2531,7 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
                                 opInfo.input->tensorBuffer->memory.allocType &  VXNNE_MEM_POOL_TYPE_SRAM ? opInfo.input->tensorBuffer->memory.sizes[0]: 0,
                                 opInfo.output->tensorBuffer->memory.allocType &  VXNNE_MEM_POOL_TYPE_SRAM ? opInfo.output->tensorBuffer->memory.sizes[0]: 0,
                                 opInfo.input->tensorBuffer->memory.allocType &  VXNNE_MEM_POOL_TYPE_SRAM ? 0 : graph->layer->operations[j + block->segments[i].start]->imageCacheSize,
-                                EstimateKernelSize, CompressedKernelSize, (vx_float32)CompressedKernelSize/EstimateKernelSize);
+                                EstimateKernelSize, CompressedKernelSize, (vx_float32)(CompressedKernelSize/EstimateKernelSize)*100);
                         }
                     }
                     vxInfo("=======================================================================\n");
@@ -2562,6 +2551,89 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
             }
 
             goto OnError;
+        }
+        else
+        {
+            /* check memory allocation has overlap or not */
+            vx_uint32 ii, jj, kk;
+            vx_memory *checkArray;
+            vx_uint32 *checkCount;
+#define     MAX_INOUT_NUM  128
+            status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(vx_memory) * graph->layer->base.num_operations * MAX_INOUT_NUM, (gctPOINTER*)&checkArray);
+            if (gcmIS_ERROR(status)) goto OnError;
+            gcoOS_ZeroMemory(checkArray, gcmSIZEOF(vx_memory) * graph->layer->base.num_operations * MAX_INOUT_NUM);
+            status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(vx_uint32) * graph->layer->base.num_operations, (gctPOINTER*)&checkCount);
+            if (gcmIS_ERROR(status)) goto OnError;
+            gcoOS_ZeroMemory(checkCount, gcmSIZEOF(vx_uint32) * graph->layer->base.num_operations);
+
+            for (ii = block->start; ii < block->start+block->count; ii++)
+            {
+                for (jj = 0; jj < graph->layer->memRequestList[ii].outputCount; jj++)
+                {
+                    if (graph->layer->memRequestList[ii].outputMemory[jj]->allocType == VXNNE_MEM_POOL_TYPE_ORIG_DDR ||
+                        graph->layer->memRequestList[ii].outputMemory[jj]->allocType == VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        for (kk = graph->layer->memRequestList[ii].outputMemory[jj]->firstUseId; kk <= graph->layer->memRequestList[ii].outputMemory[jj]->lastUseId; kk++)
+                        {
+                            checkArray[kk * MAX_INOUT_NUM + checkCount[kk]] = graph->layer->memRequestList[ii].outputMemory[jj];
+                            checkCount[kk]++;
+                            vxmASSERT(checkCount[kk] < MAX_INOUT_NUM);
+                        }
+                    }
+                }
+
+                for (jj = 0; jj < graph->layer->memRequestList[ii].inputCount; jj++)
+                {
+                    if (graph->layer->memRequestList[ii].inputMemory[jj]->allocType == VXNNE_MEM_POOL_TYPE_ORIG_DDR ||
+                        graph->layer->memRequestList[ii].inputMemory[jj]->allocType == VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        for (kk = graph->layer->memRequestList[ii].inputMemory[jj]->firstUseId; kk <= graph->layer->memRequestList[ii].inputMemory[jj]->lastUseId; kk++)
+                        {
+                            checkArray[kk * MAX_INOUT_NUM + checkCount[kk]] = graph->layer->memRequestList[ii].inputMemory[jj];
+                            checkCount[kk]++;
+                            vxmASSERT(checkCount[kk] < MAX_INOUT_NUM);
+                        }
+                    }
+                }
+            }
+
+            for (ii = 0; ii < graph->layer->base.num_operations; ii++)
+            {
+                if (checkCount[ii] == 0) continue;
+
+                for (jj = 0; jj < checkCount[ii]; jj++)
+                {
+                    for (kk = jj+1; kk < checkCount[ii]; kk++)
+                    {
+                        vx_memory m1 = checkArray[ii * MAX_INOUT_NUM + jj];
+                        vx_memory m2 = checkArray[ii * MAX_INOUT_NUM + kk];
+                        if (VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m1->allocType) != VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m2->allocType) || m1 == m2)
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            vx_uint32 phys1 = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m1->allocType) && VXNNE_MEM_POOL_TYPE_IS_CACHE(m1->allocType) ? graph->base.context->vipSRAM.physBase + m1->physicals[0] : m1->physicals[0];
+                            vx_uint32 phys2 = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m2->allocType) && VXNNE_MEM_POOL_TYPE_IS_CACHE(m2->allocType) ? graph->base.context->vipSRAM.physBase + m2->physicals[0] : m2->physicals[0];
+                            if ((phys1 > phys2 && phys1 < phys2 + m2->sizes[0]) || (phys2 > phys1 && phys2 < phys1 + m1->sizes[0]) || phys1 == phys2)
+                            {
+                                vxmASSERT(0);
+                            }
+                        }
+                    }
+                }
+            }
+
+            gcoOS_FreeMemory(gcvNULL, checkArray);
+            gcoOS_FreeMemory(gcvNULL, checkCount);
         }
 
         /* temp solution for wb's reshuffleWeightPtr free, need remove it when solve reference count issue */
@@ -2648,7 +2720,7 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
         vx_uint32  j, k;
         vxnne_operation_info_s opInfo;
         char* opTarget[5] = {"NONE", "SH", "NN", "TP", "SW"};
-        char* memType[VXNNE_MEM_POOL_TYPE_END] = {"DD", "DD", "AS", "", "VS"};
+        char* memType[VXNNE_MEM_POOL_TYPE_END] = {"DD", "DD", "VS", "", "AS"};
 
         vxInfo("======================= start block  ==============================\n");
         vxInfo("            input          output    kernelSize  pad   pooling\n");
@@ -3523,9 +3595,9 @@ OnError:
 
 enum {
     BLOCK_ARGS_INIT_FLAG = 0,
-    BLOCK_ARGS_START_FLAG = 1,
-    BLOCK_ARGS_LAST_FLAG = 2,
-    BLOCK_ARGS_TYPE_FLAG = 3,
+    BLOCK_ARGS_START_FLAG,
+    BLOCK_ARGS_LAST_FLAG,
+    BLOCK_ARGS_TYPE_FLAG
 };
 
 VX_PRIVATE_API vx_status DetectBlocksFromConfig(
@@ -3640,7 +3712,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
     vx_status status = VX_SUCCESS;
     gceSTATUS gStatus;
     vx_uint32 s = 0, e = 0, maxOpCommandCount = 0;
-    vxnne_operation_info_s opInfo1;
+    vxnne_operation_info_s opInfo;
     gctSTRING blocksConfig = gcvNULL;
 
     gcmHEADER_ARG("graph=%p", graph);
@@ -3662,32 +3734,32 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
         {
             offsetIn = 0; offsetOut = 0;
             inputSize = 0; outputSize = 0;
-            vxnneOperation_GetInfo(graph->layer->operations[i], &opInfo1);
-            if (opInfo1.input)
+            vxnneOperation_GetInfo(graph->layer->operations[i], &opInfo);
+            if (opInfo.input)
             {
-                vxoTensor_GetTensorViewOffset(opInfo1.input, &offsetIn);
-                inputSize = TENSOR_SIZE_INDEX(opInfo1.input, 3) * TENSOR_STRIDE_INDEX(opInfo1.input, 3);
+                vxoTensor_GetTensorViewOffset(opInfo.input, &offsetIn);
+                inputSize = TENSOR_SIZE_INDEX(opInfo.input, 3) * TENSOR_STRIDE_INDEX(opInfo.input, 3);
             }
-            if (opInfo1.output)
+            if (opInfo.output)
             {
-                vxoTensor_GetTensorViewOffset(opInfo1.output, &offsetOut);
-                outputSize = TENSOR_SIZE_INDEX(opInfo1.output, 3) * TENSOR_STRIDE_INDEX(opInfo1.output, 3);
+                vxoTensor_GetTensorViewOffset(opInfo.output, &offsetOut);
+                outputSize = TENSOR_SIZE_INDEX(opInfo.output, 3) * TENSOR_STRIDE_INDEX(opInfo.output, 3);
             }
 
             vxInfo("%3d %s [%3d %3d %3d %3d 0x%p -> %3d %3d %3d %3d 0x%p] (k=%d i=%d O=%d)",
                         i,
                         opTarget[graph->layer->operations[i]->target],
-                        opInfo1.input  ? TENSOR_SIZE_INDEX(opInfo1.input, 0) : 0,
-                        opInfo1.input  ? TENSOR_SIZE_INDEX(opInfo1.input, 1) : 0,
-                        opInfo1.input  ? TENSOR_SIZE_INDEX(opInfo1.input, 2) : 0,
-                        opInfo1.input  ? TENSOR_SIZE_INDEX(opInfo1.input, 3) : 0,
-                        opInfo1.input  ? opInfo1.input->tensorBuffer + offsetIn : 0,
-                        opInfo1.output ? TENSOR_SIZE_INDEX(opInfo1.output, 0) : 0,
-                        opInfo1.output ? TENSOR_SIZE_INDEX(opInfo1.output, 1) : 0,
-                        opInfo1.output ? TENSOR_SIZE_INDEX(opInfo1.output, 2) : 0,
-                        opInfo1.output ? TENSOR_SIZE_INDEX(opInfo1.output, 3) : 0,
-                        opInfo1.output ? opInfo1.output->tensorBuffer+ offsetOut : 0,
-                        opInfo1.weightsBiases ?  GetEsitimateWBSize(opInfo1.weightsBiases) : 0,
+                        opInfo.input  ? TENSOR_SIZE_INDEX(opInfo.input, 0) : 0,
+                        opInfo.input  ? TENSOR_SIZE_INDEX(opInfo.input, 1) : 0,
+                        opInfo.input  ? TENSOR_SIZE_INDEX(opInfo.input, 2) : 0,
+                        opInfo.input  ? TENSOR_SIZE_INDEX(opInfo.input, 3) : 0,
+                        opInfo.input  ? opInfo.input->tensorBuffer + offsetIn : 0,
+                        opInfo.output ? TENSOR_SIZE_INDEX(opInfo.output, 0) : 0,
+                        opInfo.output ? TENSOR_SIZE_INDEX(opInfo.output, 1) : 0,
+                        opInfo.output ? TENSOR_SIZE_INDEX(opInfo.output, 2) : 0,
+                        opInfo.output ? TENSOR_SIZE_INDEX(opInfo.output, 3) : 0,
+                        opInfo.output ? opInfo.output->tensorBuffer+ offsetOut : 0,
+                        opInfo.weightsBiases ?  GetEsitimateWBSize(opInfo.weightsBiases) : 0,
                         inputSize,
                         outputSize);
 
@@ -3734,6 +3806,43 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
 
     gcoOS_ZeroMemory(graph->layer->blocks, sizeof(vxnne_block_s) * VX_MAX_BLOCK_COUNT);
 
+    /* initialize operations perfHandle with DDR->DDR kerelPerCore, tx, ty */
+    for (i = 0; i < graph->layer->base.num_operations; i++)
+    {
+        vxnneOperation_GetInfo(graph->layer->operations[i], &opInfo);
+
+        if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
+        {
+            vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
+            vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
+            vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
+            vx_arch_perf_s archPerfHandle = {0};
+
+            calculateArchPerfFromWB(graph->base.context,
+                                &archPerfHandle,
+                                opInfo.weightsBiases,
+                                inputDims,
+                                outputDims,
+                                VX_NULL,
+                                vx_true_e,
+                                SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
+                                graph->base.context->vipSRAM.size,
+                                (vxnne_operation_target_e)opInfo.target,
+                                (vxnne_operator_e)opInfo.opType);
+
+            outImageTileX   = archPerfHandle.resultInfo.outImageTileXSize;
+            outImageTileY   = archPerfHandle.resultInfo.outImageTileYSize;
+            interleaveMode  = archPerfHandle.resultInfo.interleaveMode;
+            kernelX         = opInfo.weightsBiases->weights_sizes[0];
+            kernelY         = opInfo.weightsBiases->weights_sizes[1];
+            inImageZ        = TENSOR_SIZE_INDEX(opInfo.input, 2);
+            inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
+
+            graph->layer->operations[i]->esitimateImageCacheSize =
+                caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
+            graph->layer->operations[i]->esitimateKernelCacheSize = GetEsitimateWBSize(opInfo.weightsBiases);
+        }
+    }
 
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_BLOCKS_CONFIG", &blocksConfig)) && blocksConfig)
     {

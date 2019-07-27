@@ -455,6 +455,9 @@ typedef struct _vxnne_operation_s
     vx_uint32                       kernelCacheSize;
     vx_enum                         kernelCacheMode;
 
+    vx_uint32                       esitimateKernelCacheSize;
+    vx_uint32                       esitimateImageCacheSize;
+
     vx_uint32                       perCmdSize;
 
     /* all references pass through operations */
@@ -646,6 +649,12 @@ enum
     VXNNE_SEGMENT_TYPE_TILING
 };
 
+typedef struct _vxnne_segment_ab_info_s
+{
+    vx_uint32 mergeInputType;
+    vx_uint32 mergeOutputType;
+}vxnne_segment_ab_info_s, *vxnne_segment_ab_info;
+
 typedef struct _vxnne_segment_s
 {
     vx_enum        type;
@@ -655,6 +664,7 @@ typedef struct _vxnne_segment_s
     union
     {
         vxnne_segment_tiling_info_s tiling;
+        vxnne_segment_ab_info_s     ab;
     }segmentInfo;
 
 }vxnne_segment_s, *vxnne_segment;

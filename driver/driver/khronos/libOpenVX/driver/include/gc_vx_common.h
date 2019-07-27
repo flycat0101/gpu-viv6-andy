@@ -1655,10 +1655,11 @@ enum
 {
     VXNNE_MEM_POOL_TYPE_ORIG_DDR     = 0x0,
     VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR  = 0x1,
-    VXNNE_MEM_POOL_TYPE_AXI_SRAM     = 0x2,
-    VXNNE_MEM_POOL_TYPE_VIP_SRAM     = 0x4,
-    VXNNE_MEM_POOL_TYPE_END          = 0x5, /* may change to 7 if second phase3 step */
+    VXNNE_MEM_POOL_TYPE_VIP_SRAM     = 0x2,
+    VXNNE_MEM_POOL_TYPE_AXI_SRAM     = 0x4,
+    VXNNE_MEM_POOL_TYPE_END          = 0x5,
     VXNNE_MEM_POOL_TYPE_SRAM         = 0x2 | 0x4,
+    VXNNE_MEM_POOL_TYPE_ALL          = 0x7,
 };
 
 typedef struct _vx_memory_s
@@ -1672,17 +1673,21 @@ typedef struct _vx_memory_s
 
     vx_bool                                 allocated;
 #define VXNNE_MEM_POOL_TYPE_SET_CACHE(t)       (t | 0x8000)
-#define VXNNE_MEM_POOL_TYPE_IS_CACHE(t)        (t & 0x8000)
+#define VXNNE_MEM_POOL_TYPE_IS_CACHE(t)        ((t & 0x8000) ? vx_true_e : vx_false_e)
 #define VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(t)   (t & 0x3FFF)
     vx_enum                                 allocType;
-#define  VXNNE_MEM_ALLOC_MUST_HAVE                  0    /* for default or swtiling */
-#define  VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1        1    /* for ab buffer */
-#define  VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2        2    /* for ab buffer */
+    vx_enum                                 allocTypeTmp;
+#define  VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(t)     (t | 0x8000)
+#define  VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(t)      ((t & 0x8000) ? vx_true_e : vx_false_e)
+#define  VXNNE_MEM_ALLOC_TYPE_WITHOUT_MUST_HAVE(t) (t & 0x3FFF)
+#define  VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1        0
+#define  VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2        1
+#define  VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_3        2
 #define  VXNNE_MEM_ALLOC_PRIORITY_TYPE_KIND         3
-#define  VXNNE_MEM_ALLOC_HIGHEST_PRIORITY           VXNNE_MEM_ALLOC_MUST_HAVE
-#define  VXNNE_MEM_ALLOC_LOWEST_PRIORITY            VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2
-#define  MEM_PRIORITY_LEFT_LOWER_RIGHT(left, right)  (left > right ? vx_true_e : vx_false_e)
-#define  MEM_PRIORITY_LEFT_HIGHER_RIGHT(left, right)  (left < right ? vx_true_e : vx_false_e)
+#define  VXNNE_MEM_ALLOC_HIGHEST_PRIORITY           VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1
+#define  VXNNE_MEM_ALLOC_LOWEST_PRIORITY            VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_3
+#define  MEM_PRIORITY_LEFT_LOWER_RIGHT(left, right)  (VXNNE_MEM_ALLOC_TYPE_WITHOUT_MUST_HAVE(left) > VXNNE_MEM_ALLOC_TYPE_WITHOUT_MUST_HAVE(right) ? vx_true_e : vx_false_e)
+#define  MEM_PRIORITY_LEFT_HIGHER_RIGHT(left, right)  (VXNNE_MEM_ALLOC_TYPE_WITHOUT_MUST_HAVE(left) < VXNNE_MEM_ALLOC_TYPE_WITHOUT_MUST_HAVE(right) ? vx_true_e : vx_false_e)
 #define  MEM_PRIORITY_DOWN_LEVEL(_p) ((_p) == VXNNE_MEM_ALLOC_LOWEST_PRIORITY ? (_p) : (_p+1))
 #define  MEM_PRIORITY_UP_LEVEL(_p)   ((_p) == VXNNE_MEM_ALLOC_HIGHEST_PRIORITY ? (_p) : (_p-1))
 #define  LOOP_MEM_PRIORITY_HIGH2LOWEST(_p, from) \
