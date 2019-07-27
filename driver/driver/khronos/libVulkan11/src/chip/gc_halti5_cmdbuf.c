@@ -8334,22 +8334,27 @@ VkResult halti5_setPushConstants(
                     }
                     else if (hwMapping->hwAccessMode == SHADER_HW_ACCESS_MODE_MEMORY)
                     {
+                        /*
+                        ** Compiler has calculated the address based on the offset, so don't skip offset here.
+                        ** Just copy the memory with size = size + offset.
+                        */
                         uint32_t physical;
                         uint32_t data[4];
                         uint32_t dataCount = 0;
-                        uint32_t* constantValue = &cmdBuf->bindInfo.pushConstants.values[progPushConstRange->offset >> 2];
+                        uint32_t* constantValue = cmdBuf->bindInfo.pushConstants.values;
+                        uint32_t totalSize = progPushConstRange->size + progPushConstRange->offset;
 
                         hwConstRegNo = hwMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase->hwLoc.constReg.hwRegNo;
 
                         hwConstRegAddr = (hwConstRegAddrBase >> 2) + (hwConstRegNo << 2) + hwMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase->firstValidHwChannel;
-                        __VK_MEMCOPY(cmdBuf->bindInfo.pushConstants.memory->hostAddr, constantValue, progPushConstRange->size);
+                        __VK_MEMCOPY(cmdBuf->bindInfo.pushConstants.memory->hostAddr, constantValue, totalSize);
                         physical = cmdBuf->bindInfo.pushConstants.memory->devAddr;
 
                         data[dataCount++] = physical;
                         if (cmdBuf->devCtx->enabledFeatures.robustBufferAccess && database->ROBUSTNESS)
                         {
                             data[dataCount++] = physical;
-                            data[dataCount++] = physical + progPushConstRange->size - 1;
+                            data[dataCount++] = physical + totalSize - 1;
                         }
                         __vkCmdLoadBatchHWStates(&pCmdBuffer, hwConstRegAddr, VK_FALSE, dataCount, data);
                     }
