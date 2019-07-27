@@ -3025,6 +3025,7 @@ typedef struct _vx_drv_option
     gctUINT enableMemOptimization;
     gctUINT tpCoreCount;
     gctUINT tpLiteCoreCount;
+    gctUINT enableForce64BitsBiasNN;
 }
 vx_drv_option;
 

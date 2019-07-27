@@ -14406,7 +14406,8 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
         /* Estimate sub wb stream size first */
         if (layer_type == VX_NN_FULLYCONNECTED_LAYER &&
             vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_SINGLE_FC) &&
-            weight_dims[3] > 1 && wb_base->nn_fc_batch_mode == vx_false_e && wb_base->biases_data_format != VX_TYPE_INT64)
+            weight_dims[3] > 1 && wb_base->nn_fc_batch_mode == vx_false_e &&
+            ((!context->options.enableForce64BitsBiasNN && wb_base->biases_data_format == VX_TYPE_INT64) || wb_base->biases_data_format != VX_TYPE_INT64))
         {
             vx_uint32 coreCount = context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
             sliceCount = weight_dims[2];

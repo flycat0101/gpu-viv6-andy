@@ -1031,6 +1031,13 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
         context->options.tpLiteCoreCount = atoi(envctrl);
     }
 
+    envctrl = gcvNULL;
+    context->options.enableForce64BitsBiasNN = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_64BITS_BIAS_NN", &envctrl)) && envctrl)
+    {
+        context->options.enableForce64BitsBiasNN = atoi(envctrl);
+    }
+
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
