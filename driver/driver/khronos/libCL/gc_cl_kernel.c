@@ -3836,16 +3836,16 @@ clfFlushVIRKernelResource(
                 gcoCL_MemWaitAndGetFence(memAllocInfo->node, gcvENGINE_RENDER, gcvFENCE_TYPE_ALL, gcvFENCE_TYPE_WRITE);
                 break;
             case SHS_PRIV_CONSTANT_KIND_GLOBAL_SIZE:
-                globalWorkSize[0] = NDRangeKernel->globalWorkSize[0];
-                globalWorkSize[1] = NDRangeKernel->globalWorkSize[1];
-                globalWorkSize[2] = NDRangeKernel->globalWorkSize[2];
+                globalWorkSize[0] = NDRangeKernel->globalWorkSize[0] ? NDRangeKernel->globalWorkSize[0] : 1;
+                globalWorkSize[1] = NDRangeKernel->globalWorkSize[1] ? NDRangeKernel->globalWorkSize[1] : 1;
+                globalWorkSize[2] = NDRangeKernel->globalWorkSize[2] ? NDRangeKernel->globalWorkSize[2] : 1;
                 data = (gctPOINTER)globalWorkSize;
                 Columns = 3;
                 break;
             case SHS_PRIV_CONSTANT_KIND_LOCAL_SIZE:
-                localWorkSize[0] = NDRangeKernel->localWorkSize[0];
-                localWorkSize[1] = NDRangeKernel->localWorkSize[1];
-                localWorkSize[2] = NDRangeKernel->localWorkSize[2];
+                localWorkSize[0] = NDRangeKernel->localWorkSize[0] ? NDRangeKernel->localWorkSize[0] : 1;
+                localWorkSize[1] = NDRangeKernel->localWorkSize[1] ? NDRangeKernel->localWorkSize[1] : 1;
+                localWorkSize[2] = NDRangeKernel->localWorkSize[2] ? NDRangeKernel->localWorkSize[1] : 1;
                 data = (gctPOINTER)localWorkSize;
                 Columns = 3;
                 break;
