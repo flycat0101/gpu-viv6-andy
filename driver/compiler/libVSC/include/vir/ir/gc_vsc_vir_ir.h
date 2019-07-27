@@ -2938,6 +2938,7 @@ typedef enum VIR_SYMFLAG
     VIR_SYMFLAG_IS_IOBLOCK_MEMBER               = 0x00004000, /* variable is a member of an IO block */
     VIR_SYMFLAG_IS_INSTANCE_MEMBER              = 0x00008000, /* variable is a member of an IO block with a instance name*/
     VIR_SYMFLAG_SKIP_NAME_CHECK                 = 0x00010000, /* don't need to check name match, for IO, uniform, ssbo. */
+    VIR_SYMFLAG_PASS_BY_REFERENCE               = 0x00080000, /* pass by reference to function parameter */
 
     /* ubo flags */
     VIR_SYMUBOFLAG_IS_DUBO                      = 0x00020000, /* ubo is default ubo */

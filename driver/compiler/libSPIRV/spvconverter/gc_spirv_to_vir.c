@@ -2297,6 +2297,10 @@ static VSC_ErrCode __SpvAddSharedSymbol(
     {
         size = 4 * SPV_ID_TYPE_MAT_COL_COUNT(elementType) * SPV_ID_TYPE_VEC_COMP_NUM(SPV_ID_TYPE_MAT_COL_TYPE(elementType));
     }
+    else if (SPV_ID_TYPE_IS_STRUCT(elementType))
+    {
+        /* Need to compute the size for the struct */
+    }
     else
     {
         gcmASSERT(gcvFALSE);
@@ -5765,6 +5769,7 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
     VIR_SymId symId;
     VIR_Symbol * sym;
     VIR_TypeId virTypeId;
+    gctBOOL passByRef = gcvFALSE;
     gctSTRING paramName;
 
     if (SPV_ID_FUNC_SPV_ARG(spv->func) == gcvNULL)
@@ -5798,13 +5803,19 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
                                                VIR_AS_PRIVATE,
                                                &virTypeId);
     }
-    else if (SPV_ID_TYPE_IS_POINTER(type))
-    {
-        virTypeId = SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(type));
-    }
-    else
-    {
-        virTypeId = SPV_ID_TYPE_VIR_TYPE_ID(type);
+    else {
+        if (SPV_ID_TYPE_IS_POINTER(spv->resultTypeId))
+        {
+            passByRef = gcvTRUE;
+        }
+        if (SPV_ID_TYPE_IS_POINTER(type))
+        {
+            virTypeId = SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_POINTER_OBJECT_SPV_TYPE(type));
+        }
+        else
+        {
+            virTypeId = SPV_ID_TYPE_VIR_TYPE_ID(type);
+        }
     }
 
     paramName = VIR_Shader_GetStringFromId(virShader, nameId);
@@ -5824,6 +5835,11 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
     VIR_Symbol_SetLayoutQualifier(sym, VIR_LAYQUAL_NONE);
     VIR_Symbol_SetFlag(sym,VIR_SYMFLAG_WITHOUT_REG);
     VIR_Symbol_SetLocation(sym, -1);
+    if(passByRef)
+    {
+        VIR_Symbol_SetFlag(sym,VIR_SYMFLAG_PASS_BY_REFERENCE);
+        VIR_Function_SetFlag(spv->virFunction, VIR_FUNCFLAG_ALWAYSINLINE);
+    }
 
     /* If the parameter is an image, we need to copy the image format. */
     if (SPV_ID_TYPE_IS_IMAGE(type))
