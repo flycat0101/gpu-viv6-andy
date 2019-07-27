@@ -996,9 +996,16 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_LayerSwaping(vx_graph graph)
             p.sizes                             = TENSOR_SIZES(leakyOut);
             p.num_of_dims                       = TENSOR_DIM_NUM(leakyOut);
             p.quant_format                      = TENSOR_QUANT_TYPE(leakyOut);
-            p.quant_data.affine.scale           = TENSOR_TF_SCALE(leakyOut);
-            p.quant_data.affine.zeroPoint       = TENSOR_TF_ZEROPOINT(leakyOut);
-            p.quant_data.dfp.fixed_point_pos    = TENSOR_POS(leakyOut);
+            if(TENSOR_QUANT_TYPE(leakyOut) == VX_QUANT_AFFINE_SCALE)
+            {
+                p.quant_data.affine.scale           = TENSOR_TF_SCALE(leakyOut);
+                p.quant_data.affine.zeroPoint       = TENSOR_TF_ZEROPOINT(leakyOut);
+            }
+            else
+            {
+                p.quant_data.dfp.fixed_point_pos    = TENSOR_POS(leakyOut);
+            }
+
 
             {
                 vx_tensor leakyIn = vxCreateTensor2(graph->base.context, &p, sizeof(p));
@@ -2057,9 +2064,15 @@ VX_PRIVATE_API vx_tensor vxoGraphOptimization_GetPermuteTensor(vx_graph graph, v
     p.sizes = permuterTensorDims;
     p.data_format = TENSOR_DATA_TYPE(orginalTensor);
     p.quant_format = TENSOR_QUANT_TYPE(orginalTensor);
-    p.quant_data.affine.scale = TENSOR_TF_SCALE(orginalTensor);
-    p.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(orginalTensor);
-    p.quant_data.dfp.fixed_point_pos = TENSOR_POS(orginalTensor);
+    if(TENSOR_QUANT_TYPE(orginalTensor) == VX_QUANT_AFFINE_SCALE)
+    {
+        p.quant_data.affine.scale = TENSOR_TF_SCALE(orginalTensor);
+        p.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(orginalTensor);
+    }
+    else
+    {
+        p.quant_data.dfp.fixed_point_pos = TENSOR_POS(orginalTensor);
+    }
 
     gcmFOOTER_NO();
     return vxCreateVirtualTensor2(graph, &p, sizeof(p));
@@ -2933,9 +2946,15 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
                 tensorParam.data_format                     = TENSOR_DATA_TYPE(tensorIn[0]);
                 tensorParam.num_of_dims                     = TENSOR_DIM_NUM(tensorIn[0]);
                 tensorParam.quant_format                    = TENSOR_QUANT_TYPE(tensorIn[0]);
-                tensorParam.quant_data.affine.scale         = TENSOR_TF_SCALE(tensorIn[0]);
-                tensorParam.quant_data.affine.zeroPoint     = TENSOR_TF_ZEROPOINT(tensorIn[0]);
-                tensorParam.quant_data.dfp.fixed_point_pos  = TENSOR_POS(tensorIn[0]);
+                if(TENSOR_QUANT_TYPE(tensorIn[0]) == VX_QUANT_AFFINE_SCALE)
+                {
+                    tensorParam.quant_data.affine.scale         = TENSOR_TF_SCALE(tensorIn[0]);
+                    tensorParam.quant_data.affine.zeroPoint     = TENSOR_TF_ZEROPOINT(tensorIn[0]);
+                }
+                else
+                {
+                    tensorParam.quant_data.dfp.fixed_point_pos  = TENSOR_POS(tensorIn[0]);
+                }
 
                 bigTensor = vxCreateVirtualTensor2(node->graph, &tensorParam, sizeof(tensorParam));
                 CHECK_NULL(bigTensor);
@@ -3096,9 +3115,15 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_splitMaxpFromCRL2(vx_graph graph)
                 convOuttensorP.num_of_dims                     = TENSOR_DIM_NUM(maxpOutTensor);
                 convOuttensorP.sizes                           = convOutDims;
                 convOuttensorP.quant_format                    = TENSOR_QUANT_TYPE(maxpOutTensor);
-                convOuttensorP.quant_data.affine.scale         = TENSOR_TF_SCALE(maxpOutTensor);
-                convOuttensorP.quant_data.affine.zeroPoint     = TENSOR_TF_ZEROPOINT(maxpOutTensor);
-                convOuttensorP.quant_data.dfp.fixed_point_pos  = TENSOR_POS(maxpOutTensor);
+                if(TENSOR_QUANT_TYPE(maxpOutTensor) == VX_QUANT_AFFINE_SCALE)
+                {
+                    convOuttensorP.quant_data.affine.scale         = TENSOR_TF_SCALE(maxpOutTensor);
+                    convOuttensorP.quant_data.affine.zeroPoint     = TENSOR_TF_ZEROPOINT(maxpOutTensor);
+                }
+                else
+                {
+                    convOuttensorP.quant_data.dfp.fixed_point_pos  = TENSOR_POS(maxpOutTensor);
+                }
 
                 convOutTensor = vxCreateVirtualTensor2(graph, &convOuttensorP, sizeof(convOuttensorP));
                 {
@@ -3471,9 +3496,15 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM(vx_graph graph)
                 p.num_of_dims = TENSOR_DIM_NUM(weightNxM);
                 p.sizes = dims;
                 p.quant_format = TENSOR_QUANT_TYPE(weightNxM);
-                p.quant_data.affine.scale = TENSOR_TF_SCALE(weightNxM);
-                p.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(weightNxM);
-                p.quant_data.dfp.fixed_point_pos = TENSOR_POS(weightNxM);
+                if(TENSOR_QUANT_TYPE(weightNxM) == VX_QUANT_AFFINE_SCALE)
+                {
+                    p.quant_data.affine.scale = TENSOR_TF_SCALE(weightNxM);
+                    p.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(weightNxM);
+                }
+                else
+                {
+                    p.quant_data.dfp.fixed_point_pos = TENSOR_POS(weightNxM);
+                }
 
                 padedWeight = vxCreateTensor2(((vx_reference)graph)->context, &p, sizeof(p));
             }
@@ -3790,9 +3821,16 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_unrollDWConv(vx_graph graph)
                 vx_tensor_create_params_t p; INITIALIZE_STRUCT(p);
                 p.data_format                       = TENSOR_DATA_TYPE(dwweight);
                 p.quant_format                      = TENSOR_QUANT_TYPE(dwweight);
-                p.quant_data.affine.scale           = TENSOR_TF_SCALE(dwweight);
-                p.quant_data.affine.zeroPoint       = TENSOR_TF_ZEROPOINT(dwweight);
-                p.quant_data.dfp.fixed_point_pos    = TENSOR_POS(dwweight);
+                if(TENSOR_QUANT_TYPE(dwweight) == VX_QUANT_AFFINE_SCALE)
+                {
+                    p.quant_data.affine.scale           = TENSOR_TF_SCALE(dwweight);
+                    p.quant_data.affine.zeroPoint       = TENSOR_TF_ZEROPOINT(dwweight);
+                }
+                else
+                {
+                    p.quant_data.dfp.fixed_point_pos    = TENSOR_POS(dwweight);
+                }
+
                 p.sizes                             = newTensorDims;
                 p.num_of_dims                       = 4;
 
@@ -4233,9 +4271,16 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_padConv(vx_graph graph)
             p.sizes                             = bigDims;
             p.num_of_dims                       = TENSOR_DIM_NUM(orgInput);
             p.quant_format                      = TENSOR_QUANT_TYPE(orgInput);
-            p.quant_data.affine.scale           = TENSOR_TF_SCALE(orgInput);
-            p.quant_data.affine.zeroPoint       = TENSOR_TF_ZEROPOINT(orgInput);
-            p.quant_data.dfp.fixed_point_pos    = TENSOR_POS(orgInput);
+            if(TENSOR_QUANT_TYPE(orgInput) ==  VX_QUANT_AFFINE_SCALE)
+            {
+                p.quant_data.affine.scale           = TENSOR_TF_SCALE(orgInput);
+                p.quant_data.affine.zeroPoint       = TENSOR_TF_ZEROPOINT(orgInput);
+            }
+            else
+            {
+                p.quant_data.dfp.fixed_point_pos    = TENSOR_POS(orgInput);
+            }
+
 
             padTensor = vxCreateVirtualTensor2(graph,&p, sizeof(p));
             CHECK_NULL(padTensor);
