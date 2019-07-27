@@ -20279,7 +20279,7 @@ _gcLINKTREE_ClampOutputColor(
 {
     gceSTATUS   status              = gcvSTATUS_OK;
     gcOUTPUT    outputColor[4]      = {gcvNULL, gcvNULL, gcvNULL, gcvNULL};
-    gctUINT     i;
+    gctUINT     i, j = 0;
     gctINT      mainEndIdx;
     gctBOOL     outputColorExist    = gcvFALSE;
     gctBOOL     isVertex            = (GetShaderType(Shader) == gcSHADER_TYPE_VERTEX);
@@ -20304,13 +20304,13 @@ _gcLINKTREE_ClampOutputColor(
              GetOutputNameLength(Shader->outputs[i]) == gcSL_FRONT_SECONDARY_COLOR  ||
              GetOutputNameLength(Shader->outputs[i]) == gcSL_BACK_SECONDARY_COLOR))
         {
-            outputColor[i] = Shader->outputs[i];
+            outputColor[j++] = Shader->outputs[i];
             outputColorExist = gcvTRUE;
         }
         else if (!isVertex &&
                  (GetOutputNameLength(Shader->outputs[i]) == gcSL_COLOR))
         {
-            outputColor[i] = Shader->outputs[i];
+            outputColor[j++] = Shader->outputs[i];
             outputColorExist = gcvTRUE;
         }
     }

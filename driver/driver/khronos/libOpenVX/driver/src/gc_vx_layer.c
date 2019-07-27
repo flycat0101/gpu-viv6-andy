@@ -25582,38 +25582,44 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
 
     if (0 == last_axis)
     {
-         vx_uint32 uniSumFp16toFp32_16x1[16] = {
-            0x55555555, // TCfg
-            0x55550000, // ASelt
-            0x76543210, 0x76543210, // ABin
-            0xaaaaaaaa, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00000100, // AccumType, ConstantType, and PostShift
-            0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00 // Constant
-        };
-
-        vx_uint32 uniSumI16toFp32_16x1[16] = {
-            0x55555555, // TCfg
-            0x55550000, // ASelt
-            0x76543210, 0x76543210, // ABin
-            0xaaaaaaaa, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00000300, // AccumType, ConstantType, and PostShift
-            0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001 // Constant
-        };
-
-        vx_uint32 uniSumI8toFp32_32x1[16] = {
-            0x55555555, 0x55555555, // TCfg
-            0x8a418820, 0xc5a92839, 0xca307b9a, 0x38bdab49, 0xffbbcdeb, // BinSelect
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x01010101, 0x01010101, 0x01010101, 0x01010101, 0x01010101, 0x01010101, 0x01010101, 0x01010101 // Constant
-        };
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumFp16toFp32_16x1", 1, uniSumFp16toFp32_16x1);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumI16toFp32_16x1", 1, uniSumI16toFp32_16x1);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumI8toFp32_32x1", 1, uniSumI8toFp32_32x1);
+        if (VX_TYPE_FLOAT16 == input_format)
+        {
+             vx_uint32 uniSumFp16toFp32_16x1[16] = {
+                0x55555555, // TCfg
+                0x55550000, // ASelt
+                0x76543210, 0x76543210, // ABin
+                0xaaaaaaaa, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000100, // AccumType, ConstantType, and PostShift
+                0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00, 0x3c003c00 // Constant
+            };
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumFp16toFp32_16x1", 1, uniSumFp16toFp32_16x1);
+        }
+        else if (VX_TYPE_INT16 == input_format)
+        {
+            vx_uint32 uniSumI16toFp32_16x1[16] = {
+                0x55555555, // TCfg
+                0x55550000, // ASelt
+                0x76543210, 0x76543210, // ABin
+                0xaaaaaaaa, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000300, // AccumType, ConstantType, and PostShift
+                0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001 // Constant
+            };
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumI16toFp32_16x1", 1, uniSumI16toFp32_16x1);
+        }
+        else if ((VX_TYPE_INT8 == input_format) || (VX_TYPE_UINT8 == input_format))
+        {
+            vx_uint32 uniSumI8toFp32_32x1[16] = {
+                0x55555555, 0x55555555, // TCfg
+                0x8a418820, 0xc5a92839, 0xca307b9a, 0x38bdab49, 0xffbbcdeb, // BinSelect
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x01010101, 0x01010101, 0x01010101, 0x01010101, 0x01010101, 0x01010101, 0x01010101, 0x01010101 // Constant
+            };
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumI8toFp32_32x1", 1, uniSumI8toFp32_32x1);
+        }
     }
-
-    if(VX_SUCCESS == status)
+    else
     {
         vx_uint32 uniSumOrder0_2x8[16] = {
             0x11111111, // TCfg
@@ -25633,71 +25639,91 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
             0x00000400, // AccumType, ConstantType, and PostShift
             0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
         };
-        vx_uint32 uniSumOrder2_2x8[16] = {
-            0x11111111, // TCfg
-            0x11110000, // ASelt
-            0x0b0a0908, 0x0b0a0908, // ABin
-            0x22222222, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
-        };
-        vx_uint32 uniSumOrder3_2x8[16] = {
-            0x11111111, // TCfg
-            0x11110000, // ASelt
-            0x0f0e0d0c, 0x0f0e0d0c, // ABin
-            0x22222222, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
-        };
-        vx_uint32 uniSumAxi1F16ToF32_4x4[16] = {
-            0x55555555, // TCfg
-            0x50505050, // ASelt
-            0x51514040, 0x73736262, // ABin
-            0xaaaaaaaa, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001 // Constant
-        };
-        vx_uint32 uniSumOrderChar4_2x8[16] = {
-            0x11111111, // TCfg
-            0x11110000, // ASelt
-            0x0c080400, 0x0c080400, // ABin
-            0x22222222, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
-        };
-        vx_uint32 uniSumOrderShort4_2x8[16] = {
-            0x11111111, // TCfg
-            0x11110000, // ASelt
-            0x06040200, 0x06040200, // ABin
-            0x22222222, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
-        };
-        vx_uint32 uniSumAxiU8ToF32_4x4[16] = {
-            0x55555555, // TCfg
-            0x00000000, // ASelt
-            0xd951c840, 0xfb73ea62, // ABin
-            0xaaaaaaaa, // BSelt
-            0x00000000, 0x00000000, // BBin
-            0x00000400, // AccumType, ConstantType, and PostShift
-            0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001 // Constant
-        };
-
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrder0_2x8", 1, uniSumOrder0_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrder1_2x8", 1, uniSumOrder1_2x8);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrder2_2x8", 1, uniSumOrder2_2x8);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrder3_2x8", 1, uniSumOrder3_2x8);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumAxi1F16ToF32_4x4", 1, uniSumAxi1F16ToF32_4x4);
+        if ((VX_TYPE_FLOAT16 == output_format) || (VX_TYPE_INT16 == output_format))
+        {
+            vx_uint32 uniSumOrderShort4_2x8[16] = {
+                0x11111111, // TCfg
+                0x11110000, // ASelt
+                0x06040200, 0x06040200, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrderShort4_2x8", 1, uniSumOrderShort4_2x8);
+        }
+        else if ((VX_TYPE_INT8 == output_format) || (VX_TYPE_UINT8 == output_format))
+        {
+            vx_uint32 uniSumOrderChar4_2x8[16] = {
+                0x11111111, // TCfg
+                0x11110000, // ASelt
+                0x0c080400, 0x0c080400, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrderChar4_2x8", 1, uniSumOrderChar4_2x8);
+        }
+
+        if ((VX_TYPE_FLOAT16 == input_format) || (VX_TYPE_INT16 == input_format))
+        {
+            vx_uint32 uniSumAxi1F16ToF32_4x4[16] = {
+                0x55555555, // TCfg
+                0x50505050, // ASelt
+                0x51514040, 0x73736262, // ABin
+                0xaaaaaaaa, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001 // Constant
+            };
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumAxi1F16ToF32_4x4", 1, uniSumAxi1F16ToF32_4x4);
+        }
+        else if ((VX_TYPE_INT8 == input_format) || (VX_TYPE_UINT8 == input_format))
+        {
+            vx_uint32 uniSumOrder2_2x8[16] = {
+                0x11111111, // TCfg
+                0x11110000, // ASelt
+                0x0b0a0908, 0x0b0a0908, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+            vx_uint32 uniSumOrder3_2x8[16] = {
+                0x11111111, // TCfg
+                0x11110000, // ASelt
+                0x0f0e0d0c, 0x0f0e0d0c, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+            vx_uint32 uniSumAxiU8ToF32_4x4[16] = {
+                0x55555555, // TCfg
+                0x00000000, // ASelt
+                0xd951c840, 0xfb73ea62, // ABin
+                0xaaaaaaaa, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001, 0x00010001 // Constant
+            };
+
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrder2_2x8", 1, uniSumOrder2_2x8);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrder3_2x8", 1, uniSumOrder3_2x8);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumAxiU8ToF32_4x4", 1, uniSumAxiU8ToF32_4x4);
+        }
+    }
+
+    if(VX_SUCCESS == status)
+    {
+        if (2 == last_axis)
+        {
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "line_ret", 1, &line_ret);
+        }
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "line_align", 1, &line_align);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "line_ret", 1, &line_ret);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrderChar4_2x8", 1, uniSumOrderChar4_2x8);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumOrderShort4_2x8", 1, uniSumOrderShort4_2x8);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumAxiU8ToF32_4x4", 1, uniSumAxiU8ToF32_4x4);
     }
 
     status |= vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);

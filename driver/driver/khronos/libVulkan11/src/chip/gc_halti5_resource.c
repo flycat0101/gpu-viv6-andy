@@ -6412,6 +6412,7 @@ VkResult halti5_helper_convertHwTxDesc(
     uint32_t hwDescriptorSize = TX_HW_DESCRIPTOR_MEM_SIZE;
     uint32_t partIdx, partCount = 1;
     uint32_t tmpResidentImgFormat = 0;
+    uint32_t width, height;
 
     __VK_ASSERT(hwTxDesc);
 
@@ -6523,15 +6524,17 @@ VkResult halti5_helper_convertHwTxDesc(
         __VK_ONERROR(VK_ERROR_FORMAT_NOT_SUPPORTED);
     }
 
-    __VK_ASSERT((baseLevel->allocedW * baseLevel->allocedH) >= 1);
+    width =  imgv && imgv->formatInfo->compressed ? baseLevel->alignedW : baseLevel->allocedW;
+    height = imgv && imgv->formatInfo->compressed ? baseLevel->alignedH : baseLevel->allocedH;
+    __VK_ASSERT((width * height) >= 1);
 
     swizzle_r = halti5_helper_convertHwTxSwizzle(residentFormatInfo, componentMapping->r, hwTxFmtInfo->hwSwizzles[0], hwTxFmtInfo->hwSwizzles);
     swizzle_g = halti5_helper_convertHwTxSwizzle(residentFormatInfo, componentMapping->g, hwTxFmtInfo->hwSwizzles[1], hwTxFmtInfo->hwSwizzles);
     swizzle_b = halti5_helper_convertHwTxSwizzle(residentFormatInfo, componentMapping->b, hwTxFmtInfo->hwSwizzles[2], hwTxFmtInfo->hwSwizzles);
     swizzle_a = halti5_helper_convertHwTxSwizzle(residentFormatInfo, componentMapping->a, hwTxFmtInfo->hwSwizzles[3], hwTxFmtInfo->hwSwizzles);
 
-    logWidth  = __vk_UtilLog2inXdot8(baseLevel->allocedW);
-    logHeight = __vk_UtilLog2inXdot8(baseLevel->allocedH);
+    logWidth  = __vk_UtilLog2inXdot8(width);
+    logHeight = __vk_UtilLog2inXdot8(height);
     logDepth  = __vk_UtilLog2inXdot8(baseLevel->requestD);
     addressing = (tiling == gcvLINEAR) ? 0x3 : 0x0;
     astcImage = ((((((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_NEW_SHIFT))) >> (0 ? 5:0)) & ((gctUINT32) ((((1 ? 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1)))))) ) == 0x14) ?
@@ -6631,8 +6634,8 @@ VkResult halti5_helper_convertHwTxDesc(
         hwTxDesc[partIdx].msaaImage =  msaaImage;
         hwTxDesc[partIdx].isCubmap = (viewType == VK_IMAGE_VIEW_TYPE_CUBE) || (viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY);
 
-        hwTxDesc[partIdx].baseWidth  = baseLevel->requestW;
-        hwTxDesc[partIdx].baseHeight = baseLevel->requestH;
+        hwTxDesc[partIdx].baseWidth  = width;
+        hwTxDesc[partIdx].baseHeight = height;
         hwTxDesc[partIdx].baseDepth  = baseLevel->requestD;
         hwTxDesc[partIdx].baseSlice  = (uint32_t)(baseLevel->sliceSize) / (residentFormatInfo->bitsPerBlock >> 3);
 
@@ -6724,7 +6727,7 @@ VkResult halti5_helper_convertHwTxDesc(
  ~0U : (~(~0U << ((1 ?
  14:0) - (0 ?
  14:0) + 1))))))) << (0 ?
- 14:0))) | (((gctUINT32) ((gctUINT32) (baseLevel->allocedW) & ((gctUINT32) ((((1 ?
+ 14:0))) | (((gctUINT32) ((gctUINT32) (width) & ((gctUINT32) ((((1 ?
  14:0) - (0 ?
  14:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 14:0) - (0 ? 14:0) + 1))))))) << (0 ? 14:0)))
@@ -6734,7 +6737,7 @@ VkResult halti5_helper_convertHwTxDesc(
  ~0U : (~(~0U << ((1 ?
  30:16) - (0 ?
  30:16) + 1))))))) << (0 ?
- 30:16))) | (((gctUINT32) ((gctUINT32) (baseLevel->allocedH) & ((gctUINT32) ((((1 ?
+ 30:16))) | (((gctUINT32) ((gctUINT32) (height) & ((gctUINT32) ((((1 ?
  30:16) - (0 ?
  30:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:16) - (0 ? 30:16) + 1))))))) << (0 ? 30:16)));
