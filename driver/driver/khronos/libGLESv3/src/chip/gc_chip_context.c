@@ -553,6 +553,12 @@ gcChipInitExtension(
     }
 
 #if defined(ANDROID)
+    if (chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653 && gcvPATCH_ANDROID_CTS_UIRENDERING == chipCtx->patchId)
+    {
+        __glExtension[__GL_EXTID_OES_texture_half_float].bEnabled = GL_TRUE;
+        __glExtension[__GL_EXTID_OES_texture_half_float_linear].bEnabled = GL_TRUE;
+    }
+
     if(chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653 && gcvPATCH_NATIVEHARDWARE_CTS == patchId)
     {
         /* force support RGB10_A2 for android nativehardware cts under es2.0.

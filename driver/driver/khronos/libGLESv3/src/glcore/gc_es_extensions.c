@@ -84,6 +84,7 @@ __GLextension __glExtension[] =
     {"GL_OES_texture_cube_map_array",               GL_FALSE, GL_TRUE },
     {"GL_OES_draw_elements_base_vertex",            GL_FALSE, GL_FALSE},
     {"GL_OES_texture_half_float",                   GL_FALSE, GL_FALSE},
+    {"GL_OES_texture_half_float_linear",            GL_FALSE, GL_FALSE},
     {"GL_OES_texture_float",                        GL_FALSE, GL_FALSE},
     {"GL_OES_primitive_bounding_box",               GL_FALSE, GL_TRUE },
 

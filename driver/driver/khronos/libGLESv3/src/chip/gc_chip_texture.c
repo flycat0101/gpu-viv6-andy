@@ -772,6 +772,12 @@ gcChipResidentTextureLevel(
         {
             patchCase = __GL_CHIP_FMT_PATCH_CASE3;
         }
+        else if (chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653 &&
+                (chipCtx->patchId == gcvPATCH_ANDROID_CTS_UIRENDERING ) &&
+                (mipmap->formatInfo->dataType == GL_HALF_FLOAT))
+        {
+            patchCase = __GL_CHIP_FMT_PATCH_CASE3;
+        }
         else if ((mipmap->formatInfo->drvFormat == __GL_FMT_Z16) &&
                  chipCtx->chipFeature.hwFeature.hasCompressionV1 &&
                  (chipCtx->chipFeature.hwFeature.hasTxTileStatus ||

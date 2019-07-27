@@ -369,7 +369,7 @@ gcChipInitFormatMapInfo(
         return gcvSTATUS_OK;
     }
 
-    if ((chipCtx->patchId == gcvPATCH_GTFES30 || chipCtx->patchId == gcvPATCH_NATIVEHARDWARE_CTS)&&
+    if ((chipCtx->patchId == gcvPATCH_GTFES30 || chipCtx->patchId == gcvPATCH_NATIVEHARDWARE_CTS || chipCtx->patchId == gcvPATCH_ANDROID_CTS_UIRENDERING)&&
         !chipCtx->chipFeature.hwFeature.hasHalfFloatPipe)
     {
         halfFloatTableSize = gcmCOUNTOF(patchHalfFloatFormats);

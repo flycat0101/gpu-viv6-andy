@@ -65,6 +65,7 @@ typedef enum
     __GL_EXTID_OES_texture_cube_map_array,
     __GL_EXTID_OES_draw_elements_base_vertex,
     __GL_EXTID_OES_texture_half_float,
+    __GL_EXTID_OES_texture_half_float_linear,
     __GL_EXTID_OES_texture_float,
     __GL_EXTID_OES_primitive_bounding_box,
 
