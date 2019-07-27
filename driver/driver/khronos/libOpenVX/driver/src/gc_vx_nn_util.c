@@ -1746,7 +1746,7 @@ vx_status vxnneCommandBuffer_ExecuteCommands(
                 vxmASSERT(0);
             }
 
-            vxoGraphBinary_SaveNNTPStates(node,
+            vxoBinaryGraph_SaveNNTPStates(node,
                                           cmdPhysical,
                                           captureBuffer,
                                           (vx_uint32)actualSize + binarySave->waitCommandsSize);

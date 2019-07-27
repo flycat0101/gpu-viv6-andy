@@ -1660,7 +1660,7 @@ VX_PRIVATE_API vx_status vxnneShaderOperation_Execute(vxnne_operation_s *operati
         {
             shParams = shaderOperation->shaderExecutable->param;
         }
-        vxmONERROR(vxoGraphBinary_SaveShaderOperation(node, &shaderOperation->base, kernelShader,
+        vxmONERROR(vxoBinaryGraph_SaveShaderOperation(node, &shaderOperation->base, kernelShader,
                                                     shParams,
                                                     shaderOperation->shaderExecutable->paramNum,
                                                     stateBuffer, actualSize + binarySave->waitCommandsSize,
@@ -11878,7 +11878,7 @@ vx_status vxnneExecuteSWRPN(struct _vxnne_operation_s *operation)
 
     vx_bool input_stage,output_stage;
 
-    vxoGraphBinary_SaveSWOperation(operation);
+    vxoBinaryGraph_SaveSWOperation(operation);
 
     if(score_height != bbox_height || score_width != bbox_width)
     {
@@ -22620,7 +22620,7 @@ vx_status vxnneExecuteSCYUV2RGBScale(struct _vxnne_operation_s *operation)
             vxmONERROR(VX_FAILURE);
         }
 
-        vxmONERROR(vxoGraphBinary_SaveScalerOperation(operation, stateBuffer, actualSize));
+        vxmONERROR(vxoBinaryGraph_SaveScalerOperation(operation, stateBuffer, actualSize));
     }
 
 OnError:

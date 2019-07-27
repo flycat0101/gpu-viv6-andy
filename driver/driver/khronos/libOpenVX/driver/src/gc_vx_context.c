@@ -990,10 +990,10 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     }
 
     envctrl = gcvNULL;
-    context->options.enableCacheGraphBinary = 0;
+    context->options.enableCacheBinaryGraph = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_CACHE_GRAPH_BINARY", &envctrl)) && envctrl)
     {
-        context->options.enableCacheGraphBinary = atoi(envctrl);
+        context->options.enableCacheBinaryGraph = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
@@ -1246,20 +1246,20 @@ VX_PRIVATE_API vx_status vxoContext_CaptureInitState(
     vx_uint32 i = 0;
     gcmHEADER_ARG("context=%p", context);
 
-    context->graphBinaryInitBuffer = (vx_ptr_ptr)vxAllocateAndZeroMemory(sizeof(vx_ptr) * context->deviceCount);
-    vxmONERROR_NULLPTR(context->graphBinaryInitBuffer);
+    context->binaryGraphInitBuffer = (vx_ptr_ptr)vxAllocateAndZeroMemory(sizeof(vx_ptr) * context->deviceCount);
+    vxmONERROR_NULLPTR(context->binaryGraphInitBuffer);
 
-    context->graphBinaryInitSize = (vx_uint32_ptr)vxAllocateAndZeroMemory(sizeof(vx_uint32) * context->deviceCount);
-    vxmONERROR_NULLPTR(context->graphBinaryInitSize);
+    context->binaryGraphInitSize = (vx_uint32_ptr)vxAllocateAndZeroMemory(sizeof(vx_uint32) * context->deviceCount);
+    vxmONERROR_NULLPTR(context->binaryGraphInitSize);
 
     for (i = 0; i < context->deviceCount; i++)
     {
-        context->graphBinaryInitBuffer[i] = (vx_ptr)vxAllocateAndZeroMemory(sizeof(vx_uint8) * VX_MAX_INITIALIZE_COMMAND_SIZE);
-        vxmONERROR_NULLPTR(context->graphBinaryInitBuffer[i]);
+        context->binaryGraphInitBuffer[i] = (vx_ptr)vxAllocateAndZeroMemory(sizeof(vx_uint8) * VX_MAX_INITIALIZE_COMMAND_SIZE);
+        vxmONERROR_NULLPTR(context->binaryGraphInitBuffer[i]);
     }
 
-    gcoVX_CaptureInitState(context->graphBinaryInitBuffer, VX_MAX_INITIALIZE_COMMAND_SIZE,
-                            context->graphBinaryInitSize, context->deviceCount);
+    gcoVX_CaptureInitState(context->binaryGraphInitBuffer, VX_MAX_INITIALIZE_COMMAND_SIZE,
+                            context->binaryGraphInitSize, context->deviceCount);
 
 OnError:
     gcmFOOTER_ARG("%d", status);
@@ -1569,23 +1569,23 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 
     if (context->options.enableSaveBinary)
     {
-        if (context->graphBinaryInitBuffer != VX_NULL)
+        if (context->binaryGraphInitBuffer != VX_NULL)
         {
             for (i = 0; i < context->deviceCount; i++)
             {
-                if (context->graphBinaryInitBuffer[i] != VX_NULL)
+                if (context->binaryGraphInitBuffer[i] != VX_NULL)
                 {
-                    vxFree(context->graphBinaryInitBuffer[i]);
-                    context->graphBinaryInitBuffer[i] = VX_NULL;
+                    vxFree(context->binaryGraphInitBuffer[i]);
+                    context->binaryGraphInitBuffer[i] = VX_NULL;
                 }
             }
-            vxFree(context->graphBinaryInitBuffer);
-            context->graphBinaryInitBuffer = VX_NULL;
+            vxFree(context->binaryGraphInitBuffer);
+            context->binaryGraphInitBuffer = VX_NULL;
         }
-        if (context->graphBinaryInitSize != VX_NULL)
+        if (context->binaryGraphInitSize != VX_NULL)
         {
-            vxFree(context->graphBinaryInitSize);
-            context->graphBinaryInitSize = VX_NULL;
+            vxFree(context->binaryGraphInitSize);
+            context->binaryGraphInitSize = VX_NULL;
         }
     }
 

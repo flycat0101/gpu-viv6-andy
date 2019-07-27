@@ -3826,7 +3826,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseKernel(vx_kernel *kernel)
     {
         /* release binary kernel*/
         vx_binary_loader_s *binaryLoad = (vx_binary_loader_s*)((*kernel)->base.reserved);
-        vxoGraphBinary_ReleaseFile(binaryLoad);
+        vxoBinaryGraph_ReleaseFile(binaryLoad);
         gcmFOOTER_NO();
         return vxoKernel_ExternalRelease(kernel);
     }
@@ -4958,7 +4958,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
             vxError("error: fail to save layer name : %s to binary in shader operation\n", node->layer->name);
         }
         /* one node just to support an operation for vxc shader*/
-        vxmONERROR(vxoGraphBinary_SaveShaderOperation(node, node->layer->operations[0], kernelShader,
+        vxmONERROR(vxoBinaryGraph_SaveShaderOperation(node, node->layer->operations[0], kernelShader,
                                                     (vx_reference*)parameters, paramCount,
                                                     stateBuffer, actualSize, 0));
     }
@@ -5365,7 +5365,7 @@ VX_INTERNAL_API vx_status VX_CALLBACK vxoProgramKernel_FunctionVX(vx_node node, 
             vxError("error: fail to save layer name : %s to binary in shader operation\n", node->layer->name);
         }
         /* one node just to support an operation for vxc shader*/
-        vxmONERROR(vxoGraphBinary_SaveShaderOperation(node, node->layer->operations[0], kernelShader,
+        vxmONERROR(vxoBinaryGraph_SaveShaderOperation(node, node->layer->operations[0], kernelShader,
                                                     (vx_reference*)parameters, paramCount,
                                                     stateBuffer, actualSize, 0));
     }
@@ -5850,7 +5850,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoImportKernelFromFile(vx_node node, const
         return VX_ERROR_NOT_IMPLEMENTED;
     }
 
-    vxmONERROR(vxoGraphBinary_Run(node, binaryLoad));
+    vxmONERROR(vxoBinaryGraph_Run(node, binaryLoad));
 
 OnError:
     gcmFOOTER_ARG("%d", status);
@@ -5886,9 +5886,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoImportKernelFromFile_Initializer(vx_node
     }
 
     /* use loading data to generate states buffer for nn/tp/sh */
-    vxmONERROR(vxoGraphBinary_GenerateStatesBuffer(node, binaryLoad));
+    vxmONERROR(vxoBinaryGraph_GenerateStatesBuffer(node, binaryLoad));
 
-    vxmONERROR(vxoGraphBinary_WrapNBGKernel(node, binaryLoad));
+    vxmONERROR(vxoBinaryGraph_WrapNBGKernel(node, binaryLoad));
 
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -5904,7 +5904,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoImportKernelFromFile_Deinitializer(vx_no
     gceSTATUS   status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("node=%p, parameters=%p, num=0x%x", node, parameters, num);
-    gcmONERROR(vxoGraphBinary_ReleaseStatesBuffer(node));
+    gcmONERROR(vxoBinaryGraph_ReleaseStatesBuffer(node));
 
     if (node->binLoadMem != VX_NULL)
     {
@@ -5952,7 +5952,7 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxImportKernelFromURL(vx_context context, con
         vx_char     *cPtr = VX_NULL;
         vx_target   target = VX_NULL;
         /* load binary file */
-        vxmONERROR(vxoGraphBinary_LoadFile(context, &binaryLoad, url));
+        vxmONERROR(vxoBinaryGraph_LoadFile(context, &binaryLoad, url));
         numParams = binaryLoad->fixed.header.inputCount + binaryLoad->fixed.header.outputCount;
 
         /* use url to get kernel's name*/
@@ -6014,7 +6014,7 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxImportKernelFromURL(vx_context context, con
         for(i = 0; i < binaryLoad->fixed.header.inputCount; i++)
         {
             vx_binary_input_output_info_s *inputs = binaryLoad->inputs;
-            vx_enum dataType = vxoGraphBinary_ConvertToOVXDataType(inputs[i].dataType);
+            vx_enum dataType = vxoBinaryGraph_ConvertToOVXDataType(inputs[i].dataType);
 
             status |= vxAddParameterToKernel(kernel, i, VX_INPUT,
                                              dataType, VX_PARAMETER_STATE_REQUIRED);
@@ -6023,7 +6023,7 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxImportKernelFromURL(vx_context context, con
         {
             vx_binary_input_output_info_s *outputs = binaryLoad->outputs;
             vx_uint32 outIndex = i - binaryLoad->fixed.header.inputCount;
-            vx_enum dataType = vxoGraphBinary_ConvertToOVXDataType(outputs[outIndex].dataType);
+            vx_enum dataType = vxoBinaryGraph_ConvertToOVXDataType(outputs[outIndex].dataType);
 
             status |= vxAddParameterToKernel(kernel, i, VX_OUTPUT,
                                              dataType, VX_PARAMETER_STATE_REQUIRED);

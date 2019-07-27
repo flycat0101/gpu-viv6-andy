@@ -3020,7 +3020,7 @@ typedef struct _vx_drv_option
     gctUINT enableVectorPrune;
     gctUINT enableYUV2RGBScaler;
     gctUINT enableVIPDEC400;
-    gctUINT enableCacheGraphBinary;
+    gctUINT enableCacheBinaryGraph;
     gctSTRING enableOpsDebugInfo;
     gctUINT enableMemOptimization;
     gctUINT tpCoreCount;

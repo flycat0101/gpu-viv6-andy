@@ -4851,7 +4851,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
                 vx_uint32 ksDataPhysical    = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(weights_biases, 0);
                 vx_uint32 ksDataSize        = (vx_uint32)WB_MEM_SIZE_INDEX(weights_biases, 0);
 
-                vxoGraphBinary_SaveTPNNOperation(node,
+                vxoBinaryGraph_SaveTPNNOperation(node,
                                                  cmdBufPtr,
                                                  cmdBufPhys,
                                                  NNE_COMMAND_SIZE,
@@ -4932,7 +4932,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
 
             if (node->graph->binarySave)
             {
-                vxoGraphBinary_SaveTPNNOperation(node,
+                vxoBinaryGraph_SaveTPNNOperation(node,
                                                  cmdBufPtr,
                                                  cmdBufPhys,
                                                  TP_COMMAND_SIZE,
@@ -5001,7 +5001,7 @@ VX_INTERNAL_API vx_status vxnneModifyNNLastNoflushBit(
 
     *((vx_uint32_ptr)ptr + 3) = data;
 
-    vxoGraphBinary_ReSaveNNTPCommand(operation, command_buffer->physical + offset,
+    vxoBinaryGraph_ReSaveNNTPCommand(operation, command_buffer->physical + offset,
                                      3 * sizeof(vx_uint32), data);
 
     return VX_SUCCESS;
@@ -5029,7 +5029,7 @@ VX_INTERNAL_API vx_status vxnneModifyTPLastNoflushBit(
 
     *((vx_uint32_ptr)ptr + 12) = data;
 
-    vxoGraphBinary_ReSaveNNTPCommand(operation, command_buffer->physical + offset,
+    vxoBinaryGraph_ReSaveNNTPCommand(operation, command_buffer->physical + offset,
                                         12 * sizeof(vx_uint32), data);
 
     return VX_SUCCESS;

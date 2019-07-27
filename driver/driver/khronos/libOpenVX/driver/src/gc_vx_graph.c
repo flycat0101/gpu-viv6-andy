@@ -6663,7 +6663,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseGraph(vx_graph *graph)
             vx_vivPeferGraph(*graph, path, vx_true_e, vx_true_e, NULL);
     }
 
-    vxoGraphBinary_ReleaseCache(*graph);
+    vxoBinaryGraph_ReleaseCache(*graph);
 
     status = vxoReference_Release((vx_reference_ptr)graph, VX_TYPE_GRAPH, VX_REF_EXTERNAL);
 
@@ -8028,7 +8028,7 @@ VX_PRIVATE_API vx_status vxoGraph_Adapter(vx_graph graph)
     gcmHEADER_ARG("graph=%p", graph);
     vxmASSERT(graph);
 
-    if (vx_true_e == vxoGraphBinary_HasBinaryInGraph(graph))
+    if (vx_true_e == vxoBinaryGraph_HasBinaryInGraph(graph))
     {
         status = VX_SUCCESS;
         goto exit;
@@ -8265,7 +8265,7 @@ VX_PRIVATE_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
 
 #if gcdUSE_VXC_BINARY
     vx_context context = vxoContext_GetFromReference((vx_reference)graph);
-    if (vx_false_e == vxoGraphBinary_HasBinaryInGraph(graph))
+    if (vx_false_e == vxoBinaryGraph_HasBinaryInGraph(graph))
     {
         gceSTATUS status = gcvSTATUS_OK;
         status = gcoOS_LoadLibrary(gcvNULL, NNVXC_LIB_NAME, &context->libNNVXCKernelHandle);
@@ -8928,7 +8928,7 @@ VX_PRIVATE_API void vxoGraph_GenerateCommandBuffer(vx_graph graph)
         vxmONERROR(VX_ERROR_NOT_SUPPORTED);
     }
 
-    if (vx_true_e == vxoGraphBinary_HasBinaryInGraph(graph))
+    if (vx_true_e == vxoBinaryGraph_HasBinaryInGraph(graph))
     {
         vxmONERROR(VX_ERROR_NOT_SUPPORTED);
     }
@@ -9080,7 +9080,7 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyGraph(vx_graph graph)
 
     vxmONERROR(vxoGraph_RetrieveTopology(graph));
 
-    vxoGraphBinary_CacheOrImport(graph);
+    vxoBinaryGraph_CacheOrImport(graph);
 
     if (graph->base.context->options.enableGraphAdapter)
     {
@@ -9093,7 +9093,7 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyGraph(vx_graph graph)
 
     vxmONERROR(vxoGraph_DetectAllTailNodes(graph));
 
-    vxmONERROR(vxoGraphBinary_GetGraphInputOutput(graph));
+    vxmONERROR(vxoBinaryGraph_GetGraphInputOutput(graph));
 
     vxmONERROR(vxoGraphOptimization(graph));
 
@@ -9142,7 +9142,7 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyGraph(vx_graph graph)
 
         vxmONERROR(vxoGraph_VerifyVirtualBuffer(graph));
 
-        vxmONERROR(vxoGraphBinary_SaveBinaryEntrance(graph));
+        vxmONERROR(vxoBinaryGraph_SaveBinaryEntrance(graph));
 
         vxmONERROR(vxnneExecutionLayer_GenerateCommands(graph->base.context, &graph->layer->base));
 
@@ -9516,7 +9516,7 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
         }
         if (graph->binarySave->endCommandsSize > 0)
         {
-            vxoGraphBinary_SaveEndOperation(graph,
+            vxoBinaryGraph_SaveEndOperation(graph,
                                             (vx_uint8_ptr)graph->binarySave->endCommands,
                                             (vx_uint32)graph->binarySave->endCommandsSize);
         }
@@ -9626,7 +9626,7 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
     if (graph->binarySave)
     {
         /* close binary graph file */
-        vxoGraphBinary_ReSaveInputAndPatchTable(graph);
+        vxoBinaryGraph_ReSaveInputAndPatchTable(graph);
     }
 
     vxoGraph_ClearAllVisitedFlags(graph);

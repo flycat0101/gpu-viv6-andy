@@ -1361,8 +1361,8 @@ typedef struct _vx_context
     void *                                  libOvx12VXCBinaryHandle;
     void *                                  libNNGPUKernelHandle;
 #endif
-    vx_ptr_ptr                              graphBinaryInitBuffer;
-    vx_uint32_ptr                           graphBinaryInitSize;
+    vx_ptr_ptr                              binaryGraphInitBuffer;
+    vx_uint32_ptr                           binaryGraphInitSize;
 }
 vx_context_s;
 

@@ -802,14 +802,14 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
        this is for importing binary graph */
     if (node->kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE)
     {
-        vxoGraphBinary_SetParameter(node, index);
+        vxoBinaryGraph_SetParameter(node, index);
     }
 
     /* update binary graph input/output table if user set parameter again
       this is for generating binary graph */
     if (1 == node->base.context->options.enableSaveBinary)
     {
-        vxoGraphBinary_UpdataIOPhsicalTable(node, index);
+        vxoBinaryGraph_UpdataIOPhsicalTable(node, index);
     }
 
     gcmFOOTER_ARG("%d", VX_SUCCESS);

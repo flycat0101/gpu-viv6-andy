@@ -637,54 +637,54 @@ typedef struct _vx_binary_reader
 } vx_binary_reader_s;
 
 /* graph binary functions */
-VX_INTERNAL_API vx_status vxoGraphBinary_WrapNBGKernel(
+VX_INTERNAL_API vx_status vxoBinaryGraph_WrapNBGKernel(
     vx_node node,
     vx_binary_loader_s *binLoad
     );
 
-VX_INTERNAL_API vx_enum vxoGraphBinary_ConvertToOVXDataType(
+VX_INTERNAL_API vx_enum vxoBinaryGraph_ConvertToOVXDataType(
     vx_enum dataType
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_GenerateStatesBuffer(
+VX_INTERNAL_API vx_status vxoBinaryGraph_GenerateStatesBuffer(
     vx_node node,
     vx_binary_loader_s *binLoad
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_ReleaseStatesBuffer(
+VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseStatesBuffer(
     vx_node node
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_Run(
+VX_INTERNAL_API vx_status vxoBinaryGraph_Run(
     vx_node node,
     vx_binary_loader_s *binLoad
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_LoadFile(
+VX_INTERNAL_API vx_status vxoBinaryGraph_LoadFile(
     vx_context context,
     vx_binary_loader_s **binLoad,
     gctCONST_STRING fileName
     );
 
-VX_INTERNAL_API vx_bool vxoGraphBinary_HasBinaryInGraph(
+VX_INTERNAL_API vx_bool vxoBinaryGraph_HasBinaryInGraph(
     vx_graph graph
 );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_SetParameter(
+VX_INTERNAL_API vx_status vxoBinaryGraph_SetParameter(
     vx_node node,
     vx_uint32 index
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_UpdataIOPhsicalTable(
+VX_INTERNAL_API vx_status vxoBinaryGraph_UpdataIOPhsicalTable(
     vx_node node,
     vx_uint32 index
 );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_ReleaseFile(
+VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseFile(
     vx_binary_loader_s *binLoad
     );
 
-VX_INTERNAL_API void vxoGraphBinary_SaveTPNNOperation(
+VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
     vx_node node,
     vx_uint8_ptr cmdLogicalAddress,
     vx_uint32 cmdPhysicalAddress,
@@ -699,7 +699,7 @@ VX_INTERNAL_API void vxoGraphBinary_SaveTPNNOperation(
     gctUINT32 outputPhyAddr
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_SaveShaderOperation(
+VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
     vx_node  node,
     vxnne_operation operation,
     vx_shader kernelShader,
@@ -710,53 +710,53 @@ VX_INTERNAL_API vx_status vxoGraphBinary_SaveShaderOperation(
     vx_uint32 batchIndex
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_SaveEndOperation(
+VX_INTERNAL_API vx_status vxoBinaryGraph_SaveEndOperation(
     vx_graph graph,
     vx_uint8_ptr stateBuffer,
     vx_uint32 stateSize
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_SaveSWOperation(
+VX_INTERNAL_API vx_status vxoBinaryGraph_SaveSWOperation(
     vxnne_operation operation
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_SaveScalerOperation(
+VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
     vxnne_operation operation,
     gctUINT8_PTR stateBuffer,
     gctUINT32 stateSize
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_ReSaveNNTPCommand(
+VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveNNTPCommand(
     vxnne_operation operation,
     vx_uint32 cmdPhysical,
     vx_uint32 offset,
     vx_uint32 value
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_ReSaveInputAndPatchTable(
+VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
     vx_graph graph
     );
 
 
-VX_INTERNAL_API vx_status vxoGraphBinary_SaveBinaryEntrance(
+VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     vx_graph graph
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_GetGraphInputOutput(
+VX_INTERNAL_API vx_status vxoBinaryGraph_GetGraphInputOutput(
     vx_graph graph
     );
 
-VX_INTERNAL_API vx_status vxoGraphBinary_SaveNNTPStates(
+VX_INTERNAL_API vx_status vxoBinaryGraph_SaveNNTPStates(
     vx_node node,
     vx_uint32 cmdPhysical,
     gctUINT8 *captureBuffer,
     vx_uint32 actualSize
     );
 
-VX_INTERNAL_API void vxoGraphBinary_CacheOrImport(
+VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
     vx_graph graph
     );
-VX_INTERNAL_API void vxoGraphBinary_ReleaseCache(
+VX_INTERNAL_API void vxoBinaryGraph_ReleaseCache(
     vx_graph graph
     );
 
