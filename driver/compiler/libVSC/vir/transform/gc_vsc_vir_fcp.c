@@ -2149,6 +2149,27 @@ _IsOperandFloat16(
     return gcvFALSE;
 }
 
+static gctBOOL
+_IsOperandInt16OrInt8(
+    IN VIR_Shader*          pShader,
+    IN VIR_Instruction*     pInst,
+    IN gctBOOL              bDst,
+    IN gctUINT32            srcIndex
+    )
+{
+    VIR_Operand*            pOpnd = bDst ?  VIR_Inst_GetDest(pInst) : VIR_Inst_GetSource(pInst, srcIndex);
+    VIR_TypeId              typeId = VIR_Operand_GetTypeId(pOpnd);
+    VIR_TypeId              componentTypeId = VIR_GetTypeComponentType(typeId);
+
+    if (componentTypeId == VIR_TYPE_INT16 || componentTypeId == VIR_TYPE_UINT16 ||
+        componentTypeId == VIR_TYPE_UINT8 || componentTypeId == VIR_TYPE_INT8)
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
 /*explicit show enable bits for highpvec2 in dual16 */
 static VIR_Enable
 _VIR_FCP_ExtendHighpvec2DefEnableInHighpvec2Dual16(
@@ -2321,30 +2342,32 @@ _VIR_FCP_ModifyFP16Instruction(
 
         bChanged = gcvTRUE;
     }
-    /* Change STORE_ATTR.fp16 to STORE_ATTR.uint16. */
-    else if (VIR_OPCODE_isAttrSt(opCode) && _IsOperandFloat16(pShader, pInst, gcvFALSE, 2))
+    /* Change INT16/FP16/INT8 LOAD_ATTR/STORE_ATTR to INT32/FP32. */
+    else if (VIR_OPCODE_isAttrSt(opCode) &&
+            (_IsOperandFloat16(pShader, pInst, gcvFALSE, 2) || _IsOperandInt16OrInt8(pShader, pInst, gcvFALSE, 2)))
     {
         VIR_Operand*    pDst = VIR_Inst_GetDest(pInst);
         VIR_TypeId      dstTypeId = VIR_Operand_GetTypeId(pDst);
         VIR_Operand*    pSrc2 = VIR_Inst_GetSource(pInst, 2);
         VIR_TypeId      src2TypeId = VIR_Operand_GetTypeId(pSrc2);
 
-        dstTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_UINT16,
+        dstTypeId = VIR_TypeId_ComposeNonOpaqueType(_IsOperandInt16OrInt8(pShader, pInst, gcvFALSE, 2) ? VIR_TYPE_UINT32 : VIR_TYPE_FLOAT32,
                                                     VIR_GetTypeComponents(dstTypeId),
                                                     1);
-        src2TypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_UINT16,
+        src2TypeId = VIR_TypeId_ComposeNonOpaqueType(_IsOperandInt16OrInt8(pShader, pInst, gcvFALSE, 2) ? VIR_TYPE_UINT32 : VIR_TYPE_FLOAT32,
                                                      VIR_GetTypeComponents(src2TypeId),
                                                      1);
         VIR_Operand_SetTypeId(pDst, dstTypeId);
         VIR_Operand_SetTypeId(pSrc2, src2TypeId);
         bChanged = gcvTRUE;
     }
-    else if (VIR_OPCODE_isAttrLd(opCode) && _IsOperandFloat16(pShader, pInst, gcvTRUE, 0))
+    else if (VIR_OPCODE_isAttrLd(opCode) &&
+            (_IsOperandFloat16(pShader, pInst, gcvTRUE, 0) || _IsOperandInt16OrInt8(pShader, pInst, gcvTRUE, 0)))
     {
         VIR_Operand*    pDst = VIR_Inst_GetDest(pInst);
         VIR_TypeId      dstTypeId = VIR_Operand_GetTypeId(pDst);
 
-        dstTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_UINT16,
+        dstTypeId = VIR_TypeId_ComposeNonOpaqueType(_IsOperandInt16OrInt8(pShader, pInst, gcvTRUE, 0) ? VIR_TYPE_UINT32 : VIR_TYPE_FLOAT32,
                                                     VIR_GetTypeComponents(dstTypeId),
                                                     1);
         VIR_Operand_SetTypeId(pDst, dstTypeId);
