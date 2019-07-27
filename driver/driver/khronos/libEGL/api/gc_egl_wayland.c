@@ -1288,7 +1288,7 @@ __wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
 
 
     /* Try to read and dispatch some events. */
-    __wl_egl_dispatch_queue(wl_dpy, wl_queue, 1);
+    wl_display_dispatch_queue_pending(wl_dpy, wl_queue);
 
     if (egl_surface->nr_buffers > 1)
     {
@@ -1875,7 +1875,12 @@ _ConnectWindow(
 
 #ifndef gcdUSE_ZWP_SYNCHRONIZATION
     if (egl_surface->commit_queue == gcvNULL)
+    {
         egl_surface->commit_queue = wl_display_create_queue(egl_surface->display->wl_dpy);
+        wl_proxy_set_queue((struct wl_proxy *) egl_surface->display->wl_viv, egl_surface->commit_queue);
+        if(egl_surface->surface_sync)
+            wl_proxy_set_queue((struct wl_proxy *) egl_surface->surface_sync, egl_surface->commit_queue);
+    }
 #endif
     /* Save window info structure. */
     Surface->winInfo = (void *) 1;
