@@ -1585,8 +1585,8 @@ _fill_TP_RESHUFFLE_Command_EX(
         info_array[i].vx_tp_general_cmd_split_info.inImageSlice = in_pitch_x * in_pitch_y;
         info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = (-1) * pad_left;
         info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = (-1) * pad_top;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = in_size_x + pad_right - 1;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = in_size_y + pad_bottom - 1;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = out_size_x * stride_x - pad_left - 1;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = out_size_y * stride_y - pad_top - 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
         info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + (in_pitch_x * in_pitch_y * in_offset_z + in_pitch_x * in_offset_y + in_offset_x) * inputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.inTileXSize = out_size_x * stride_x;
