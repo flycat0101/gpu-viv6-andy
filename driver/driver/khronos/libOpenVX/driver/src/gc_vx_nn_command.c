@@ -231,53 +231,51 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNSplitCommandInfo(
     vx_uint32 *                  sinfo_num_ptr
     )
 {
-    vx_uint32 i;
-    vx_uint32 xcount = gcmALIGN_NP2_SAFE(input->width, NN_IMAGE_XSIZE_MAX) / NN_IMAGE_XSIZE_MAX;
-    vx_uint32 ycount = gcmALIGN_NP2_SAFE(input->height, NN_IMAGE_YSIZE_MAX) / NN_IMAGE_YSIZE_MAX;
+#define MAX_NN_SPLIT_XY_NUM  8
+
+    vx_uint32 i = 0, j = 0, index = 0;
+    vx_uint32 inImageXSizeOrig = input->width, inImageYSizeOrig = input->height, outImageXSizeOrig = output->width, outImageYSizeOrig = output->height;
+    vx_int32  inImageXOffsetOrig = 0, inImageYOffsetOrig = 0;
+    vx_uint32 xcount = gcmALIGN_NP2(input->width, NN_IMAGE_XSIZE_MAX) / NN_IMAGE_XSIZE_MAX;
+    vx_uint32 ycount = gcmALIGN_NP2(input->height, NN_IMAGE_YSIZE_MAX) / NN_IMAGE_YSIZE_MAX;
     vx_uint32 count = xcount * ycount;
     vx_nn_cmd_split_info_u * sinfoArray;
+
+    vx_uint32 x_sizes[MAX_NN_SPLIT_XY_NUM], x_offsets[MAX_NN_SPLIT_XY_NUM], y_sizes[MAX_NN_SPLIT_XY_NUM], y_offsets[MAX_NN_SPLIT_XY_NUM];
     vx_enum inDataFormat = input->dataFormat;
     vx_enum outDataFormat = output->dataFormat;
-    vx_uint32 inImageXSizeOrig, inImageYSizeOrig, outImageXSizeOrig, outImageYSizeOrig, inImageXOffsetOrig, inImageYOffsetOrig;
-
     vxmASSERT(sinfo_num_ptr != VX_NULL && sinfo_array_ptr != VX_NULL);
 
     sinfoArray = vxAllocateAndZeroMemory(sizeof(vx_nn_cmd_split_info_u) * count);
     if (sinfoArray == VX_NULL) return VX_ERROR_NO_MEMORY;
 
-    sinfoArray[0].vx_nn_general_cmd_split_info.inImageXSize    = inImageXSizeOrig = input->width;
-    sinfoArray[0].vx_nn_general_cmd_split_info.inImageYSize    = inImageYSizeOrig = input->height;
-    sinfoArray[0].vx_nn_general_cmd_split_info.outImageXSize   = outImageXSizeOrig = output->width;
-    sinfoArray[0].vx_nn_general_cmd_split_info.outImageYSize   = outImageYSizeOrig = output->height;
-    sinfoArray[0].vx_nn_general_cmd_split_info.inImageAddress  = input->physical.start;
-    sinfoArray[0].vx_nn_general_cmd_split_info.outImageAddress = output->physical.start;
 
     if (input->brickMode)
     {
-        sinfoArray[0].vx_nn_general_cmd_split_info.inImageXOffset  = 0;
-        sinfoArray[0].vx_nn_general_cmd_split_info.inImageYOffset  = 0;
+        inImageXOffsetOrig  = 0;
+        inImageYOffsetOrig  = 0;
     }
     else
     {
-        sinfoArray[0].vx_nn_general_cmd_split_info.inImageXOffset  = (-1) * conv_cmd_ptr->pad_x_left;
-        sinfoArray[0].vx_nn_general_cmd_split_info.inImageYOffset  = (-1) * conv_cmd_ptr->pad_y_top;
+        inImageXOffsetOrig  = (-1) * conv_cmd_ptr->pad_x_left;
+        inImageYOffsetOrig  = (-1) * conv_cmd_ptr->pad_y_top;
 
         switch (context->nnConfig.fixedFeature.nnInImageOffsetBits)
         {
         case 5:
             /* 5-bit XYOffset: [-16, 15]. */
-            gcmASSERT((sinfoArray[0].vx_nn_general_cmd_split_info.inImageXOffset >= -16 && sinfoArray[0].vx_nn_general_cmd_split_info.inImageXOffset <= 15) &&
-                      (sinfoArray[0].vx_nn_general_cmd_split_info.inImageYOffset >= -16 && sinfoArray[0].vx_nn_general_cmd_split_info.inImageYOffset <= 15));
+            gcmASSERT((inImageXOffsetOrig >= -16 && inImageXOffsetOrig <= 15) &&
+                      (inImageYOffsetOrig >= -16 && inImageYOffsetOrig <= 15));
             break;
         case 4:
             /* 4-bit XYOffset: [-8, 7]. */
-            vxmASSERT((sinfoArray[0].vx_nn_general_cmd_split_info.inImageXOffset >= -8 && sinfoArray[0].vx_nn_general_cmd_split_info.inImageXOffset <= 7) &&
-                      (sinfoArray[0].vx_nn_general_cmd_split_info.inImageYOffset >= -8 && sinfoArray[0].vx_nn_general_cmd_split_info.inImageYOffset <= 7));
+            vxmASSERT((inImageXOffsetOrig >= -8 && inImageXOffsetOrig <= 7) &&
+                      (inImageYOffsetOrig >= -8 && inImageYOffsetOrig <= 7));
             break;
         case 3:
             /* 3-bit XYOffset: [-4, 3]. */
-            vxmASSERT((sinfoArray[0].vx_nn_general_cmd_split_info.inImageXOffset >= -4 && sinfoArray[0].vx_nn_general_cmd_split_info.inImageXOffset <= 3) &&
-                      (sinfoArray[0].vx_nn_general_cmd_split_info.inImageYOffset >= -4 && sinfoArray[0].vx_nn_general_cmd_split_info.inImageYOffset <= 3));
+            vxmASSERT((inImageXOffsetOrig >= -4 && inImageXOffsetOrig <= 3) &&
+                      (inImageYOffsetOrig >= -4 && inImageYOffsetOrig <= 3));
             break;
         default:
             vxError("Invalid nnInImageOffsetBits: %u.\n", context->nnConfig.fixedFeature.nnInImageOffsetBits);
@@ -286,103 +284,88 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNSplitCommandInfo(
         }
     }
 
-    inImageXOffsetOrig = sinfoArray[0].vx_nn_general_cmd_split_info.inImageXOffset;
-    inImageYOffsetOrig = sinfoArray[0].vx_nn_general_cmd_split_info.inImageYOffset;
+    calculateSplitSize(output->width, xcount, x_sizes, x_offsets);
+    calculateSplitSize(output->height, ycount, y_sizes, y_offsets);
 
-#define MAX_NN_SPLIT_XY_NUM  8
-
-    if (xcount > 1)
+    for(j = 0; j < ycount; j++)
     {
-        vx_uint32 isize, osize, ioffset, ooffset;
-        vx_uint32 osizes[MAX_NN_SPLIT_XY_NUM], ooffsets[MAX_NN_SPLIT_XY_NUM];
+        vx_uint32 i_y_size = 0, y_size = 0, i_y_offset = 0, o_y_offset = 0;
 
-        calculateSplitSize(output->width, xcount, osizes, ooffsets);
+        y_size = y_sizes[j];
+        o_y_offset = y_offsets[j];
 
-        for (i = 0; i < xcount; i++)
+        if (getHwPoolingType(conv_cmd_ptr->pool_type) == VIV_NN_POOLING_NON)
         {
-            osize = osizes[i];
-            ooffset = ooffsets[i];
+            i_y_size = y_size - 1 + conv_cmd_ptr->kernel_y;
+        }
+        else
+        {
+            i_y_size = ((y_size - 1) * conv_cmd_ptr->pool_stride + getHwPoolingSze(conv_cmd_ptr->pool_size_y)) - 1 + conv_cmd_ptr->kernel_y;
+        }
+
+        if (j > 0)
+        {
+            i_y_offset = inImageYOffsetOrig ? gcmMAX(0, (vx_int32)(o_y_offset + inImageYOffsetOrig)) : o_y_offset;
+        }
+
+        if (j == ycount - 1)
+        {
+            i_y_size = inImageYSizeOrig - i_y_offset;
+            y_size = outImageYSizeOrig - o_y_offset;
+        }
+
+        for(i = 0; i < xcount; i++)
+        {
+            vx_uint32 i_x_size = 0, x_size = 0, i_x_offset = 0, o_x_offset = 0;
+            x_size = x_sizes[i];
+            o_x_offset = x_offsets[i];
 
             if (getHwPoolingType(conv_cmd_ptr->pool_type) == VIV_NN_POOLING_NON)
             {
-                isize = osize - 1 + conv_cmd_ptr->kernel_x;
+                i_x_size = x_size - 1 + conv_cmd_ptr->kernel_x;
             }
             else
             {
-                isize = ((osize - 1) * conv_cmd_ptr->pool_stride + getHwPoolingSze(conv_cmd_ptr->pool_size_x)) - 1 + conv_cmd_ptr->kernel_x;
+                i_x_size = ((x_size - 1) * conv_cmd_ptr->pool_stride + getHwPoolingSze(conv_cmd_ptr->pool_size_x)) - 1 + conv_cmd_ptr->kernel_x;
             }
 
-            if (i > 0)
-            {
-                ioffset = inImageXOffsetOrig ? gcmMAX(0, (vx_int32)(ooffset + inImageXOffsetOrig)) : ooffset;
+             if (i > 0)
+                i_x_offset = inImageXOffsetOrig ? gcmMAX(0, (vx_int32)(o_x_offset + inImageXOffsetOrig)) : o_x_offset;
 
-                sinfoArray[i].vx_nn_general_cmd_split_info.inImageAddress = sinfoArray[i-1].vx_nn_general_cmd_split_info.inImageAddress + ioffset * vxnneGetTypeSize(inDataFormat);
-                sinfoArray[i].vx_nn_general_cmd_split_info.outImageAddress = sinfoArray[i-1].vx_nn_general_cmd_split_info.outImageAddress + ooffset * vxnneGetTypeSize(outDataFormat);
-                sinfoArray[i].vx_nn_general_cmd_split_info.inImageXOffset = gcmMIN(0, (vx_int32)(ooffset + inImageXOffsetOrig));
 
-                if (i == xcount - 1)
-                {
-                    isize = inImageXSizeOrig - ioffset;
-                    osize = outImageXSizeOrig - ooffset;
-                }
-
-                sinfoArray[i].vx_nn_general_cmd_split_info.inImageYSize   = inImageYSizeOrig;
-                sinfoArray[i].vx_nn_general_cmd_split_info.outImageYSize  = outImageYSizeOrig;
-                sinfoArray[i].vx_nn_general_cmd_split_info.inImageYOffset = inImageYOffsetOrig;
+             if (i == xcount - 1)
+             {
+                    i_x_size = inImageXSizeOrig - i_x_offset;
+                    x_size = outImageXSizeOrig - o_x_offset;
             }
 
-            sinfoArray[i].vx_nn_general_cmd_split_info.inImageXSize = i == xcount - 1 ? isize : isize + inImageXOffsetOrig;
-            sinfoArray[i].vx_nn_general_cmd_split_info.outImageXSize = osize;
+            index = i + j * xcount;
+            sinfoArray[index].vx_nn_general_cmd_split_info.inImageXSize    = i == xcount - 1 ? i_x_size : i_x_size + inImageXOffsetOrig;
+            sinfoArray[index].vx_nn_general_cmd_split_info.inImageYSize    = j == ycount - 1 ? i_y_size : i_y_size + inImageYOffsetOrig;
+            sinfoArray[index].vx_nn_general_cmd_split_info.inImageXOffset  = gcmMIN(0, (vx_int32)(o_x_offset + inImageXOffsetOrig));
+            sinfoArray[index].vx_nn_general_cmd_split_info.inImageYOffset  = gcmMIN(0, (vx_int32)(o_y_offset + inImageYOffsetOrig));
+            sinfoArray[index].vx_nn_general_cmd_split_info.outImageXSize   = x_size;
+            sinfoArray[index].vx_nn_general_cmd_split_info.outImageYSize   = y_size;
 
-            vxmASSERT(sinfoArray[i].vx_nn_general_cmd_split_info.outImageXSize <= NN_IMAGE_XSIZE_MAX);
-        }
-    }
-
-    if (ycount > 1)
-    {
-        vx_uint32 isize, osize, ioffset, ooffset;
-        vx_uint32 osizes[MAX_NN_SPLIT_XY_NUM], ooffsets[MAX_NN_SPLIT_XY_NUM];
-
-        calculateSplitSize(output->height, ycount, osizes, ooffsets);
-
-        for (i = 0; i < ycount; i++)
-        {
-            osize = osizes[i];
-            ooffset = ooffsets[i];
-
-            if (getHwPoolingType(conv_cmd_ptr->pool_type) == VIV_NN_POOLING_NON)
+            if(j == 0 && i == 0)
             {
-                isize = osize - 1 + conv_cmd_ptr->kernel_y;
+                sinfoArray[0].vx_nn_general_cmd_split_info.inImageAddress  = input->physical.start;
+                sinfoArray[0].vx_nn_general_cmd_split_info.outImageAddress = output->physical.start;
+            }
+            else if(j > 0 && i == 0)
+            {
+                sinfoArray[index].vx_nn_general_cmd_split_info.inImageAddress  = sinfoArray[index - xcount].vx_nn_general_cmd_split_info.inImageAddress + i_y_offset * input->yStride;
+                sinfoArray[index].vx_nn_general_cmd_split_info.outImageAddress = sinfoArray[index - xcount].vx_nn_general_cmd_split_info.outImageAddress + o_y_offset * input->yStride;
             }
             else
             {
-                isize = ((osize - 1) * conv_cmd_ptr->pool_stride + getHwPoolingSze(conv_cmd_ptr->pool_size_x)) - 1 + conv_cmd_ptr->kernel_y;
+                sinfoArray[index].vx_nn_general_cmd_split_info.inImageAddress  = sinfoArray[index - 1].vx_nn_general_cmd_split_info.inImageAddress + i_x_offset * vxnneGetTypeSize(inDataFormat);
+                sinfoArray[index].vx_nn_general_cmd_split_info.outImageAddress = sinfoArray[index - 1].vx_nn_general_cmd_split_info.outImageAddress + o_y_offset * vxnneGetTypeSize(outDataFormat);
             }
 
-            if (i > 0)
-            {
-                ioffset = inImageYOffsetOrig ? gcmMAX(0, (vx_int32)(ooffset + inImageYOffsetOrig)) : ooffset;
-
-                sinfoArray[i].vx_nn_general_cmd_split_info.inImageAddress = sinfoArray[i-1].vx_nn_general_cmd_split_info.inImageAddress + ioffset * input->yStride;
-                sinfoArray[i].vx_nn_general_cmd_split_info.outImageAddress = sinfoArray[i-1].vx_nn_general_cmd_split_info.outImageAddress + ooffset * output->yStride;
-                sinfoArray[i].vx_nn_general_cmd_split_info.inImageYOffset = gcmMIN(0, (vx_int32)(ooffset + inImageYOffsetOrig));
-
-                if (i == ycount - 1)
-                {
-                    isize = inImageYSizeOrig - ioffset;
-                    osize = outImageYSizeOrig - ooffset;
-                }
-
-                sinfoArray[i].vx_nn_general_cmd_split_info.inImageXSize   = inImageXSizeOrig;
-                sinfoArray[i].vx_nn_general_cmd_split_info.outImageXSize  = outImageXSizeOrig;
-                sinfoArray[i].vx_nn_general_cmd_split_info.inImageXOffset = inImageXOffsetOrig;
-            }
-
-            sinfoArray[i].vx_nn_general_cmd_split_info.inImageYSize = i == ycount - 1 ? isize : isize + inImageYOffsetOrig;
-            sinfoArray[i].vx_nn_general_cmd_split_info.outImageYSize = osize;
-
-            vxmASSERT(sinfoArray[i].vx_nn_general_cmd_split_info.outImageYSize <= NN_IMAGE_YSIZE_MAX);
+            vxmASSERT(sinfoArray[index].vx_nn_general_cmd_split_info.outImageXSize <= NN_IMAGE_XSIZE_MAX);
         }
+        vxmASSERT(sinfoArray[index].vx_nn_general_cmd_split_info.outImageYSize <= NN_IMAGE_YSIZE_MAX);
     }
 
     *sinfo_array_ptr = sinfoArray;
