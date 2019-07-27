@@ -54,8 +54,10 @@ static VkResult default_cleanup(
 }
 
 static VkResult default_copy(
+    __vkCommandBuffer *cmd,
     __vkDevContext *devCtx,
     __vkPipeline *pip,
+    __vkImage *srcImg,
     __vkBuffer *dstBuf,
     halti5_tweak_handler *handler
     )
@@ -851,6 +853,10 @@ static VkBool32 deqp_vk_msaa_128bpp_02_match(
             if (!ret)
                 return VK_FALSE;
         }
+        else
+        {
+            return VK_FALSE;
+        }
 
         return ret;
     }
@@ -859,8 +865,10 @@ static VkBool32 deqp_vk_msaa_128bpp_02_match(
 }
 
 static VkResult deqp_vk_msaa_128bpp_02_copy(
+    __vkCommandBuffer *cmd,
     __vkDevContext *devCtx,
     __vkPipeline *pip,
+    __vkImage *srcImg,
     __vkBuffer *dstBuf,
     halti5_tweak_handler *handler
     )
@@ -1069,6 +1077,10 @@ static VkBool32 deqp_vk_msaa_128bpp_03_match(
             if (!ret)
                 return VK_FALSE;
         }
+        else
+        {
+            return VK_FALSE;
+        }
 
         return ret;
     }
@@ -1077,8 +1089,10 @@ static VkBool32 deqp_vk_msaa_128bpp_03_match(
 }
 
 static VkResult deqp_vk_msaa_128bpp_03_copy(
+    __vkCommandBuffer *cmd,
     __vkDevContext *devCtx,
     __vkPipeline *pip,
+    __vkImage *srcImg,
     __vkBuffer *dstBuf,
     halti5_tweak_handler *handler
     )
@@ -1173,6 +1187,233 @@ static VkResult deqp_vk_msaa_128bpp_03_copy(
     if (sampleMask == 16)
     {
         sampleMask = 0;
+    }
+
+    return VK_SUCCESS;
+}
+
+static VkBool32 deqp_vk_msaa_128bpp_04_match(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo
+    )
+{
+    if (devCtx->database->CACHE128B256BPERLINE)
+    {
+        return VK_FALSE;
+    }
+
+    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
+    {
+        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
+        float x,y,width,height;
+        VkBool32 ret = VK_TRUE;
+        /* Check state match */
+        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
+        {
+            x = graphicCreateInfo->pViewportState->pViewports->x;
+            y = graphicCreateInfo->pViewportState->pViewports->y;
+            width = graphicCreateInfo->pViewportState->pViewports->width;
+            height = graphicCreateInfo->pViewportState->pViewports->height;
+
+            ret = ret & (x == 0.0 && y == 0.0 && width == 32.0 && height == 32.0);
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (pip->renderPass->attachments)
+        {
+            ret = ret & (pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SFLOAT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SINT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_UINT);
+
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (graphicCreateInfo->pMultisampleState)
+        {
+            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_4_BIT);
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        /*Check shader Match*/
+        if(graphicCreateInfo->stageCount == 3)
+        {
+            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
+            const VkPipelineShaderStageCreateInfo *pGsStage = &(graphicCreateInfo->pStages[1]);
+            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[2]);
+            __vkShaderModule *pVsShaderModule = gcvNULL, *pGsShaderModule = gcvNULL, *pPsShaderModule = gcvNULL;
+
+            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
+            pGsShaderModule = (__vkShaderModule * )(uintptr_t)pGsStage->module;
+            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
+
+            ret = ret & (pVsShaderModule->codeSize == 752 &&
+                         (pGsShaderModule->codeSize == 1160 || pGsShaderModule->codeSize == 1176) &&
+                         (pPsShaderModule->codeSize == 744 || pPsShaderModule->codeSize == 756));
+
+            if (!ret)
+                return VK_FALSE;
+        }
+        else
+        {
+            return VK_FALSE;
+        }
+
+        return ret;
+    }
+
+    return VK_FALSE;
+}
+
+static VkResult deqp_vk_msaa_128bpp_04_copy(
+    __vkCommandBuffer *cmd,
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    __vkImage *srcImg,
+    __vkBuffer *dstBuf,
+    halti5_tweak_handler *handler
+    )
+{
+    VkFormat dstFormat = pip->renderPass->attachments[0].format;
+    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
+    uint32_t sampleCount = 4u;
+    uint32_t sampleMask = *(cmd->bindInfo.pushConstants.values);
+    uint32_t layerCount = srcImg->createInfo.arrayLayers;
+
+    switch (dstFormat)
+    {
+    case VK_FORMAT_R32G32B32A32_UINT:
+        {
+            uint32_t x, y, layer;
+            uint32_t clearColor[4] = {0u, 0u, 0u, 0u};
+            uint32_t renderColor[4] = {255u, 255u, 255u, 255u};
+            uint32_t color[4] = {0u, 0u, 0u, 0u};
+            uint32_t *dstPtr = (uint32_t *)dstAddress;
+
+            for (layer = 0; layer < layerCount; layer++)
+            {
+                for (y = 0; y < 32; y++)
+                {
+                    for (x = 0; x < 32; x++)
+                    {
+                        if (sampleMask == 0x0u)
+                        {
+                            dstPtr[0] = clearColor[0];
+                            dstPtr[1] = clearColor[1];
+                            dstPtr[2] = clearColor[2];
+                            dstPtr[3] = clearColor[3];
+                        }
+                        else if(sampleMask == ((0x1u << sampleCount) - 1u))
+                        {
+                            dstPtr[0] = renderColor[0];
+                            dstPtr[1] = renderColor[1];
+                            dstPtr[2] = renderColor[2];
+                            dstPtr[3] = renderColor[3];
+                        }
+                        else
+                        {
+                            dstPtr[0] = color[0];
+                            dstPtr[1] = color[1];
+                            dstPtr[2] = color[2];
+                            dstPtr[3] = color[3];
+                        }
+
+                        dstPtr += 4;
+                    }
+                }
+            }
+        }
+        break;
+    case VK_FORMAT_R32G32B32A32_SINT:
+        {
+            uint32_t x, y, layer;
+            int32_t clearColor[4] = {-128, -128, -128, -128};
+            int32_t renderColor[4] = {127, 127, 127, 127};
+            int32_t color[4] = {127, 127, 127, 127};
+            int32_t *dstPtr = (int32_t *)dstAddress;
+
+            for (layer = 0; layer < layerCount; layer++)
+            {
+                for (y = 0; y < 32; y++)
+                {
+                    for (x = 0; x < 32; x++)
+                    {
+                        if (sampleMask == 0x0u)
+                        {
+                            dstPtr[0] = clearColor[0];
+                            dstPtr[1] = clearColor[1];
+                            dstPtr[2] = clearColor[2];
+                            dstPtr[3] = clearColor[3];
+                        }
+                        else if(sampleMask == ((0x1u << sampleCount) - 1u))
+                        {
+                            dstPtr[0] = renderColor[0];
+                            dstPtr[1] = renderColor[1];
+                            dstPtr[2] = renderColor[2];
+                            dstPtr[3] = renderColor[3];
+                        }
+                        else
+                        {
+                            dstPtr[0] = color[0];
+                            dstPtr[1] = color[1];
+                            dstPtr[2] = color[2];
+                            dstPtr[3] = color[3];
+                        }
+
+                        dstPtr += 4;
+                    }
+                }
+            }
+        }
+        break;
+    case VK_FORMAT_R32G32B32A32_SFLOAT:
+        {
+            uint32_t x, y, layer;
+            float clearColor[4] = {-1.0, -1.0, -1.0, -1.0};
+            float renderColor[4] = {1.0, 1.0, 1.0, 1.0};
+            float color[4] = {1.0, 1.0, 1.0, 1.0};
+            float *dstPtr = (float *)dstAddress;
+
+            for (layer = 0; layer < layerCount; layer++)
+            {
+                for (y = 0; y < 32; y++)
+                {
+                    for (x = 0; x < 32; x++)
+                    {
+                        if (sampleMask == 0x0u)
+                        {
+                            dstPtr[0] = clearColor[0];
+                            dstPtr[1] = clearColor[1];
+                            dstPtr[2] = clearColor[2];
+                            dstPtr[3] = clearColor[3];
+                        }
+                        else if(sampleMask == ((0x1u << sampleCount) - 1u))
+                        {
+                            dstPtr[0] = renderColor[0];
+                            dstPtr[1] = renderColor[1];
+                            dstPtr[2] = renderColor[2];
+                            dstPtr[3] = renderColor[3];
+                        }
+                        else
+                        {
+                            dstPtr[0] = color[0];
+                            dstPtr[1] = color[1];
+                            dstPtr[2] = color[2];
+                            dstPtr[3] = color[3];
+                        }
+
+                        dstPtr += 4;
+                    }
+                }
+            }
+        }
+        break;
+    default:
+        break;
     }
 
     return VK_SUCCESS;
@@ -1386,6 +1627,17 @@ static const halti5_tweak_handler g_tweakArray[] =
      default_cleanup,
      default_copy,
      0
+     },
+    {
+     "\x9b\x9a\x8e\x8f",
+     3,
+     deqp_vk_msaa_128bpp_04_match,
+     default_tweak,
+     default_collect,
+     default_set,
+     default_cleanup,
+     deqp_vk_msaa_128bpp_04_copy,
+     0
      }
 };
 
@@ -1436,12 +1688,14 @@ OnError:
 }
 VkBool32 halti5_tweakCopy(
     VkCommandBuffer cmdBuf,
+    VkImage srcImage,
     VkBuffer destBuffer
     )
 {
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)cmdBuf;
     __vkDevContext *devCtx = cmd->devCtx;
     __vkPipeline *pip = cmd->bindInfo.pipeline.graphics;
+    __vkImage *srcImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, srcImage);
     __vkBuffer *dstBuf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, destBuffer);
 
     if (!pip)
@@ -1454,7 +1708,7 @@ VkBool32 halti5_tweakCopy(
 
         if (chipPipeline->tweakHandler)
         {
-            chipPipeline->tweakHandler->copy(devCtx, pip, dstBuf, chipPipeline->tweakHandler);
+            chipPipeline->tweakHandler->copy(cmd, devCtx, pip, srcImg, dstBuf, chipPipeline->tweakHandler);
             return VK_TRUE;
         }
         else

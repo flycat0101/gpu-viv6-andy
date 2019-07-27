@@ -59,7 +59,7 @@ typedef struct __vkChipFuncTableRec
     void (*BindPipeline)(VkCommandBuffer commandBuffer, VkPipeline oldPipeline, VkPipeline newPipeline);
     VkResult (*setMultiGpuSync)(VkDevice device, uint32_t **commandBuffer, uint32_t *sizeInUint);
     VkResult (*flushCache)(VkDevice device, uint32_t **commandBuffer, uint32_t *sizeInUint, int32_t cacheMask);
-    VkBool32 (*tweakCopy)(VkCommandBuffer cmdBuf, VkBuffer destBuffer);
+    VkBool32 (*tweakCopy)(VkCommandBuffer cmdBuf,VkImage srcImage, VkBuffer destBuffer);
     VkResult (*getQueryResult)(VkDevice device, VkQueryPool queryPool, uint32_t queryIndex, uint64_t *retValue);
     VkResult (*copyQueryResult)(VkCommandBuffer commandBuffer, VkQueryPool queryPool, VkBuffer dstBuffer, uint32_t queryIndex, VkDeviceSize dstOffset, VkDeviceSize dstStride, VkQueryResultFlags flags);
 } __vkChipFuncTable;

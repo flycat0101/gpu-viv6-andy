@@ -2494,7 +2494,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
     if (pSrcImg->formatInfo.bitsPerBlock == 128 &&
         !devCtx->database->CACHE128B256BPERLINE)
     {
-        if (devCtx->chipFuncs->tweakCopy(commandBuffer, dstBuffer))
+        if (devCtx->chipFuncs->tweakCopy(commandBuffer, srcImage, dstBuffer))
         {
             return;
         }

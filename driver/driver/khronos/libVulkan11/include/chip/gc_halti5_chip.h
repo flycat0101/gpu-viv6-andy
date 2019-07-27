@@ -505,8 +505,10 @@ typedef struct halti5_tweak_handler
         );
 
     VkResult (* copy)(
+        __vkCommandBuffer *cmd,
         __vkDevContext *devCtx,
         __vkPipeline *pip,
+        __vkImage *srcImg,
         __vkBuffer *dstBuf,
         struct halti5_tweak_handler *handler
         );
@@ -1433,6 +1435,7 @@ VkResult halti5_flushCache(
 
 VkBool32 halti5_tweakCopy(
     VkCommandBuffer cmdBuf,
+    VkImage srcImage,
     VkBuffer destBuffer
     );
 
