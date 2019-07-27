@@ -1294,6 +1294,19 @@ __wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
 
     egl_surface->indequeue = 1;
 
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    /*Some vulkan case use EGL windows, so move the surface_sync creatation
+      from _ConnectWindow, because one surface only can create one sync object.
+    */
+    if(egl_surface->surface_sync == gcvNULL
+        && egl_surface->display->use_explicit_sync == 1)
+    {
+        egl_surface->surface_sync =
+            zwp_linux_explicit_synchronization_v1_get_synchronization(
+                  egl_surface->display->explicit_sync, window->surface);
+        wl_proxy_set_queue((struct wl_proxy *) egl_surface->surface_sync, egl_surface->wl_queue);
+    }
+#endif
 
     /* Make sure previous frame with this buffer is done. */
     while (egl_surface->frame_callback && ret != -1)
@@ -1865,28 +1878,11 @@ _ConnectWindow(
 
     gcmASSERT(Surface->renderTargetFormat != gcvSURF_UNKNOWN);
     __wl_egl_surface_set_format(egl_surface, gcvSURF_BITMAP, Surface->renderTargetFormat);
-#ifdef gcdUSE_ZWP_SYNCHRONIZATION
-    if(egl_surface->display != gcvNULL
-        && egl_surface->surface_sync == gcvNULL
-        && egl_surface->display->use_explicit_sync == 1)
-    {
-        egl_surface->surface_sync =
-            zwp_linux_explicit_synchronization_v1_get_synchronization(
-                  egl_surface->display->explicit_sync, window->surface);
-        if (!egl_surface->surface_sync)
-        {
-            gcmPRINT("zwp_linux_explicit_synchronization_v1_get_synchronization failed");
-        }
-    }
-#endif
+
     if (egl_surface->wl_queue == gcvNULL)
     {
         egl_surface->wl_queue = wl_display_create_queue(egl_surface->display->wl_dpy);
         wl_proxy_set_queue((struct wl_proxy *)egl_surface->display->wl_viv, egl_surface->wl_queue);
-#ifdef gcdUSE_ZWP_SYNCHRONIZATION
-        if(egl_surface->surface_sync)
-            wl_proxy_set_queue((struct wl_proxy *) egl_surface->surface_sync, egl_surface->wl_queue);
-#endif
     }
 
 #ifndef gcdUSE_ZWP_SYNCHRONIZATION
