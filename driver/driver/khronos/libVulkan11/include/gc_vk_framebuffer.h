@@ -17,6 +17,7 @@
 
 #define __VK_MAX_RENDER_TARGETS 4
 #define __VK_MAX_RENDER_TARGETS_INTERNAL 8
+#define __VK_MAX_MULTIVIEW_VIEW 6
 
 typedef struct __vkAttachmentDescRec
 {
@@ -50,6 +51,29 @@ typedef struct __vkRenderSubPassInfoRec
 
 }__vkRenderSubPassInfo;
 
+typedef struct __vkSubpassViewInfoRec
+{
+    uint32_t enabledViewIdx[__VK_MAX_MULTIVIEW_VIEW];
+    uint32_t validViewCount;
+
+    VkBool32 validSubpassView;
+    uint32_t curLayer;
+
+}__vkSubpassViewInfo;
+
+typedef struct __vkRenderPassMultiViewInfoRec
+{
+    VkBool32 enabledMultiView;
+    __vkSubpassViewInfo *subPassViewInfo;
+
+    uint32_t dependencyCount;
+    uint32_t pViewOffsets[__VK_MAX_MULTIVIEW_VIEW];
+
+    uint32_t correlationMaskCount;
+    uint32_t pCorrelationMasks[__VK_MAX_MULTIVIEW_VIEW];
+
+}__vkRenderPassMultiViewInfo;
+
 typedef struct __vkRenderPassRec
 {
     __vkObject obj; /* Must be the first field */
@@ -63,7 +87,12 @@ typedef struct __vkRenderPassRec
     uint32_t dependencyCount;
     VkSubpassDependency *pDependencies;
 
+    __vkRenderPassMultiViewInfo *multiViewInfo;
+
     struct __vkFramebufferRec *fbDefault;
+
+    VkBool32 usedMultiView;
+
 } __vkRenderPass;
 
 typedef struct __vkFramebufferRec

@@ -104,6 +104,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
     VkResult result;
     uint32_t i;
     uint32_t allocSize;
+    VkRenderPassMultiviewCreateInfo *multiViewCreateInfo = VK_NULL_HANDLE;
 
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
@@ -111,12 +112,15 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
     __VK_ONERROR(__vk_CreateObject(devCtx,
         __VK_OBJECT_RENDER_PASS, sizeof(__vkRenderPass), (__vkObject**)&rdp));
 
+    multiViewCreateInfo = __VK_NON_DISPATCHABLE_HANDLE_CAST(VkRenderPassMultiviewCreateInfo *, pCreateInfo->pNext);
+
     rdp->attachmentCount = pCreateInfo->attachmentCount;
     rdp->subPassInfoCount = pCreateInfo->subpassCount;
     rdp->dependencyCount =  pCreateInfo->dependencyCount;
     allocSize = sizeof(__vkAttachmentDesc) * rdp->attachmentCount +
                 sizeof(__vkRenderSubPassInfo) * rdp->subPassInfoCount +
-                sizeof(VkSubpassDependency) * rdp->dependencyCount;
+                sizeof(VkSubpassDependency) * rdp->dependencyCount +
+                sizeof(__vkRenderPassMultiViewInfo);
     rdp->attachments = (__vkAttachmentDesc *)__VK_ALLOC(allocSize, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 
     __VK_ONERROR(rdp->attachments ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
@@ -126,9 +130,15 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
     rdp->subPassInfo = (__vkRenderSubPassInfo *) (rdp->attachments + rdp->attachmentCount);
 
     if (rdp->dependencyCount)
+    {
         rdp->pDependencies = (VkSubpassDependency *) (rdp->subPassInfo + rdp->subPassInfoCount);
+        rdp->multiViewInfo = (__vkRenderPassMultiViewInfo *) (rdp->pDependencies + rdp->dependencyCount);
+    }
     else
+    {
         rdp->pDependencies = VK_NULL_HANDLE;
+        rdp->multiViewInfo = (__vkRenderPassMultiViewInfo *) (rdp->subPassInfo + rdp->subPassInfoCount);
+    }
 
     for (i = 0; i < rdp->attachmentCount; i++)
     {
@@ -287,6 +297,68 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
     for (i = 0; i < pCreateInfo->dependencyCount; i++)
     {
         rdp->pDependencies[i] = pCreateInfo->pDependencies[i];
+    }
+
+    /*record the multiView info if enable the multiView*/
+    if (multiViewCreateInfo)
+    {
+        __vkSubpassViewInfo * pViewInfo = VK_NULL_HANDLE;
+        uint32_t size = sizeof(__vkSubpassViewInfo) * rdp->subPassInfoCount;
+        __VK_ASSERT(multiViewCreateInfo->subpassCount == rdp->subPassInfoCount);
+
+        rdp->multiViewInfo = (__vkRenderPassMultiViewInfo *)__VK_ALLOC(
+            sizeof(__vkRenderPassMultiViewInfo), 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+        __VK_ONERROR(rdp->multiViewInfo ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+        __VK_MEMZERO(rdp->multiViewInfo, sizeof(__vkRenderPassMultiViewInfo));
+
+        rdp->multiViewInfo->subPassViewInfo = (__vkSubpassViewInfo *)__VK_ALLOC(
+            size, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+        __VK_ONERROR(rdp->multiViewInfo->subPassViewInfo ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+        pViewInfo= rdp->multiViewInfo->subPassViewInfo;
+        __VK_MEMZERO(pViewInfo, size);
+
+        rdp->multiViewInfo->enabledMultiView = VK_TRUE;
+        rdp->multiViewInfo->dependencyCount = multiViewCreateInfo->dependencyCount;
+        rdp->multiViewInfo->correlationMaskCount = multiViewCreateInfo->correlationMaskCount;
+
+        for (i = 0; i < multiViewCreateInfo->subpassCount; i++)
+        {
+            uint32_t viewMask = multiViewCreateInfo->pViewMasks[i];
+            uint32_t j;
+
+            if (viewMask)
+            {
+                uint32_t count = 0;
+                for (j = 0; j < __VK_MAX_MULTIVIEW_VIEW; j++)
+                {
+                    if (viewMask & (1<<j))
+                    {
+                        pViewInfo[i].enabledViewIdx[count++] = j;
+                    }
+                }
+                pViewInfo[i].validViewCount = count;
+                pViewInfo[i].curLayer = 0;
+
+                if (count > 0)
+                {
+                    pViewInfo[i].validSubpassView = VK_TRUE;
+                }
+                else
+                {
+                    pViewInfo[i].validSubpassView = VK_FALSE;
+                }
+            }
+        }
+
+        for (i = 0; i <multiViewCreateInfo->dependencyCount; i++)
+        {
+            rdp->multiViewInfo->pViewOffsets[i] = multiViewCreateInfo->pViewOffsets[i];
+        }
+
+        for (i = 0; i < multiViewCreateInfo->correlationMaskCount; i++)
+        {
+            rdp->multiViewInfo->pCorrelationMasks[i] = multiViewCreateInfo->pCorrelationMasks[i];
+        }
     }
 
     /* Return the object pointer as a 64-bit handle */

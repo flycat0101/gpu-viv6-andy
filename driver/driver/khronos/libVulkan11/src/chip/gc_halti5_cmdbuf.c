@@ -505,6 +505,8 @@ static VkResult halti5_draw_validate(
     )
 {
     __vkCmdBindInfo *bindInfo = &cmdBuf->bindInfo;
+    __vkRenderPass *rdp = bindInfo->pipeline.graphics->renderPass;
+    VkBool32 enableView = rdp->usedMultiView;
 
     VkResult result = VK_SUCCESS;
 
@@ -645,19 +647,22 @@ static VkResult halti5_draw_validate(
             __VK_ERR_BREAK(halti5_setPsOutputMode(cmdBuf, pip));
         }
 
-        if (bindInfo->renderPass.dirty)
+        if (bindInfo->renderPass.dirty || enableView)
         {
             __VK_ERR_BREAK(halti5_setRenderTargets(cmdBuf));
             bindInfo->renderPass.dirty = VK_FALSE;
         }
 
-        if (descSetInfo->dirtyMask)
+        if (descSetInfo->dirtyMask || enableView)
         {
             __VK_ERR_BREAK(halti5_setDesriptorSets(cmdBuf, pip, descSetInfo));
 #if __VK_ENABLETS
             __VK_ERR_BREAK(halti5_setTxTileStatus(cmdBuf, descSetInfo));
 #endif
-            descSetInfo->dirtyMask = 0;
+            if (!enableView)
+            {
+                descSetInfo->dirtyMask = 0;
+            }
         }
 
         if (bindInfo->pushConstants.dirtyMask)
@@ -716,6 +721,9 @@ VkResult halti5_draw(
 {
     __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
     __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
+    __vkRenderPass *rdp = pip->renderPass;
+    __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
+    __vkSubpassViewInfo *subPassView;
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
     uint32_t drawCommand, drawCount;
     uint32_t *states;
@@ -724,6 +732,9 @@ VkResult halti5_draw(
     __vkDrawComputeCmdParams cmdParams;
     VkBool32 useOneCore = VK_FALSE;
     __vkDevContext *devCtx = cmdBuf->devCtx;
+    VkBool32 validSubpass = VK_FALSE;
+    uint32_t stall = 0;
+
     static const uint32_t s_xlatePrimitiveTopology[] =
     {
         /* VK_PRIMITIVE_TOPOLOGY_POINT_LIST */
@@ -774,15 +785,31 @@ VkResult halti5_draw(
         cmdParams.draw.instanceCount = instanceCount;
     }
 
-    __VK_ONERROR(halti5_draw_validate(cmdBuf, &cmdParams));
-
-    if (cmdBuf->gpuRenderingMode == gcvMULTI_GPU_RENDERING_MODE_OFF)
+    if (multiView->enabledMultiView)
     {
-        useOneCore = VK_TRUE;
+        subPassView = multiView->subPassViewInfo;
+        validSubpass = subPassView[pip->subPass].validSubpassView;
     }
 
-    /* Determine draw command. */
-    drawCommand = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    if (validSubpass)
+    {
+        uint32_t i = 0;
+        uint32_t *viewIdx = subPassView[pip->subPass].enabledViewIdx;
+
+        for (i = 0; i < subPassView[pip->subPass].validViewCount; i++)
+        {
+            rdp->usedMultiView = VK_TRUE;
+            subPassView[pip->subPass].curLayer = viewIdx[i];
+
+             __VK_ONERROR(halti5_draw_validate(cmdBuf, &cmdParams));
+
+            if (cmdBuf->gpuRenderingMode == gcvMULTI_GPU_RENDERING_MODE_OFF)
+            {
+                useOneCore = VK_TRUE;
+            }
+
+            /* Determine draw command. */
+            drawCommand = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -792,7 +819,7 @@ VkResult halti5_draw(
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -802,7 +829,7 @@ VkResult halti5_draw(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -812,7 +839,7 @@ VkResult halti5_draw(
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  19:16) - (0 ?
  19:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -823,7 +850,7 @@ VkResult halti5_draw(
  19:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ? 19:16)));
 
-    drawCount = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            drawCount = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  23:0) - (0 ?
  23:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -833,7 +860,7 @@ VkResult halti5_draw(
  23:0) - (0 ?
  23:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 23:0) - (0 ? 23:0) + 1))))))) << (0 ? 23:0)))
-              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:24) - (0 ?
  31:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -844,14 +871,14 @@ VkResult halti5_draw(
  31:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:24) - (0 ? 31:24) + 1))))))) << (0 ? 31:24)));
 
-    pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
+            pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
 
-    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-    {
-        if (useOneCore)
-        {
-            halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
-            *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+            {
+                if (useOneCore)
+                {
+                    halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+                    *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -864,26 +891,26 @@ VkResult halti5_draw(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK);*(*&pCmdBuffer)++ = 0;
 ;
 
-        }
-    }
+                }
+            }
 
-    if (chipGfxPipeline->baseInstance.bUsed)
-    {
-        __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, firstInstance);
-    }
+            if (chipGfxPipeline->baseInstance.bUsed)
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, firstInstance);
+            }
 
-    __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
-    *pCmdBuffer++ = drawCommand;
-    *pCmdBuffer++ = drawCount;
-    *pCmdBuffer++ = firstVertex;
-    *pCmdBuffer++ = 0;
-    __VK_DEBUG_ONLY(});
+            __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
+            *pCmdBuffer++ = drawCommand;
+            *pCmdBuffer++ = drawCount;
+            *pCmdBuffer++ = firstVertex;
+            *pCmdBuffer++ = 0;
+            __VK_DEBUG_ONLY(});
 
-    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-    {
-        if (useOneCore)
-        {
-            *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+            {
+                if (useOneCore)
+                {
+                    *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -896,13 +923,184 @@ VkResult halti5_draw(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&pCmdBuffer)++ = 0;
 ;
 
-            halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+                    halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+                }
+            }
+
+            stall = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)));
+
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E02, VK_FALSE, stall);
+            *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));*(*&pCmdBuffer)++ = (stall);
+;
+
+
+            cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+
+            __VK_ASSERT(cmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
         }
     }
+    else
+    {
+        __VK_ONERROR(halti5_draw_validate(cmdBuf, &cmdParams));
 
-    cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+        if (cmdBuf->gpuRenderingMode == gcvMULTI_GPU_RENDERING_MODE_OFF)
+        {
+            useOneCore = VK_TRUE;
+        }
 
-    __VK_ASSERT(cmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+        /* Determine draw command. */
+        drawCommand = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0C & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ?
+ 22:20))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (instanceCount) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:16) - (0 ?
+ 19:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ?
+ 19:16))) | (((gctUINT32) ((gctUINT32) (s_xlatePrimitiveTopology[pip->topology]) & ((gctUINT32) ((((1 ?
+ 19:16) - (0 ?
+ 19:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ? 19:16)));
+
+        drawCount = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:0) - (0 ?
+ 23:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:0) - (0 ?
+ 23:0) + 1))))))) << (0 ?
+ 23:0))) | (((gctUINT32) ((gctUINT32) (vertexCount) & ((gctUINT32) ((((1 ?
+ 23:0) - (0 ?
+ 23:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 23:0) - (0 ? 23:0) + 1))))))) << (0 ? 23:0)))
+                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1))))))) << (0 ?
+ 31:24))) | (((gctUINT32) ((gctUINT32) ((instanceCount >> 16)) & ((gctUINT32) ((((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:24) - (0 ? 31:24) + 1))))))) << (0 ? 31:24)));
+
+        pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
+
+        if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+        {
+            if (useOneCore)
+            {
+                halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+                *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK);*(*&pCmdBuffer)++ = 0;
+;
+
+            }
+        }
+
+        if (chipGfxPipeline->baseInstance.bUsed)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, firstInstance);
+        }
+
+        __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
+        *pCmdBuffer++ = drawCommand;
+        *pCmdBuffer++ = drawCount;
+        *pCmdBuffer++ = firstVertex;
+        *pCmdBuffer++ = 0;
+        __VK_DEBUG_ONLY(});
+
+        if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+        {
+            if (useOneCore)
+            {
+                *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&pCmdBuffer)++ = 0;
+;
+
+                halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+            }
+        }
+
+        cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+
+        __VK_ASSERT(cmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+
+    }
+
 
     __vk_CmdAquireBuffer(commandBuffer, cmdBuf->curScrachBufIndex, &states);
 
@@ -928,6 +1126,9 @@ VkResult halti5_drawIndexed(
     __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
     __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
+    __vkRenderPass *rdp = pip->renderPass;
+    __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
+    __vkSubpassViewInfo *subPassView;
     uint32_t drawCommand, drawCount;
     uint32_t *states;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
@@ -935,6 +1136,9 @@ VkResult halti5_drawIndexed(
     __vkDrawComputeCmdParams cmdParams;
     VkBool32 useOneCore = VK_FALSE;
     __vkDevContext *devCtx = cmdBuf->devCtx;
+    VkBool32 validSubpass = VK_FALSE;
+    uint32_t stall = 0;
+
     static const uint32_t s_xlatePrimitiveTopology[] =
     {
         /* VK_PRIMITIVE_TOPOLOGY_POINT_LIST */
@@ -987,15 +1191,31 @@ VkResult halti5_drawIndexed(
         cmdParams.draw.firstVertex = vertexOffset;
     }
 
-    __VK_ONERROR(halti5_draw_validate(cmdBuf, &cmdParams));
-
-    if (cmdBuf->gpuRenderingMode == gcvMULTI_GPU_RENDERING_MODE_OFF)
+     if (multiView->enabledMultiView)
     {
-        useOneCore = VK_TRUE;
+        subPassView = multiView->subPassViewInfo;
+        validSubpass = subPassView[pip->subPass].validSubpassView;
     }
 
-    /* Determine draw command. */
-    drawCommand = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    if (validSubpass)
+    {
+        uint32_t i = 0;
+        uint32_t *viewIdx = subPassView[pip->subPass].enabledViewIdx;
+
+        for (i = 0; i < subPassView[pip->subPass].validViewCount; i++)
+        {
+            rdp->usedMultiView = VK_TRUE;
+            subPassView[pip->subPass].curLayer = viewIdx[i];
+
+            __VK_ONERROR(halti5_draw_validate(cmdBuf, &cmdParams));
+
+            if (cmdBuf->gpuRenderingMode == gcvMULTI_GPU_RENDERING_MODE_OFF)
+            {
+                useOneCore = VK_TRUE;
+            }
+
+            /* Determine draw command. */
+            drawCommand = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1005,7 +1225,7 @@ VkResult halti5_drawIndexed(
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1015,7 +1235,7 @@ VkResult halti5_drawIndexed(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1025,7 +1245,7 @@ VkResult halti5_drawIndexed(
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  19:16) - (0 ?
  19:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1036,7 +1256,7 @@ VkResult halti5_drawIndexed(
  19:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ? 19:16)));
 
-    drawCount = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            drawCount = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  23:0) - (0 ?
  23:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1046,7 +1266,7 @@ VkResult halti5_drawIndexed(
  23:0) - (0 ?
  23:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 23:0) - (0 ? 23:0) + 1))))))) << (0 ? 23:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:24) - (0 ?
  31:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1057,14 +1277,14 @@ VkResult halti5_drawIndexed(
  31:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:24) - (0 ? 31:24) + 1))))))) << (0 ? 31:24)));
 
-    pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
+            pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
 
-    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-    {
-        if (useOneCore)
-        {
-            halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
-            *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+            {
+                if (useOneCore)
+                {
+                    halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+                    *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1077,25 +1297,25 @@ VkResult halti5_drawIndexed(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&pCmdBuffer)++ = 0;
 ;
 
-        }
-    }
+                }
+            }
 
-    if (chipGfxPipeline->baseInstance.bUsed)
-    {
-        __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, firstInstance);
-    }
-    __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
-    *pCmdBuffer++ = drawCommand;
-    *pCmdBuffer++ = drawCount;
-    *pCmdBuffer++ = vertexOffset;
-    *pCmdBuffer++ = 0;
-    __VK_DEBUG_ONLY(});
+            if (chipGfxPipeline->baseInstance.bUsed)
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, firstInstance);
+            }
+            __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
+            *pCmdBuffer++ = drawCommand;
+            *pCmdBuffer++ = drawCount;
+            *pCmdBuffer++ = vertexOffset;
+            *pCmdBuffer++ = 0;
+            __VK_DEBUG_ONLY(});
 
-    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-    {
-        if (useOneCore)
-        {
-            *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+            {
+                if (useOneCore)
+                {
+                    *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1108,13 +1328,179 @@ VkResult halti5_drawIndexed(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&pCmdBuffer)++ = 0;
 ;
 
-            halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+                    halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+                }
+            }
+
+            stall = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)));
+
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E02, VK_FALSE, stall);
+            *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));*(*&pCmdBuffer)++ = (stall);
+;
+
+
+            cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+            __VK_ASSERT(cmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
         }
     }
+    else
+    {
+        __VK_ONERROR(halti5_draw_validate(cmdBuf, &cmdParams));
 
-    cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+        if (cmdBuf->gpuRenderingMode == gcvMULTI_GPU_RENDERING_MODE_OFF)
+        {
+            useOneCore = VK_TRUE;
+        }
 
-    __VK_ASSERT(cmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+        /* Determine draw command. */
+        drawCommand = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0C & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ?
+ 22:20))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 22:20) - (0 ?
+ 22:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (instanceCount) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:16) - (0 ?
+ 19:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ?
+ 19:16))) | (((gctUINT32) ((gctUINT32) (s_xlatePrimitiveTopology[pip->topology]) & ((gctUINT32) ((((1 ?
+ 19:16) - (0 ?
+ 19:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ? 19:16)));
+
+        drawCount = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:0) - (0 ?
+ 23:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:0) - (0 ?
+ 23:0) + 1))))))) << (0 ?
+ 23:0))) | (((gctUINT32) ((gctUINT32) (indexCount) & ((gctUINT32) ((((1 ?
+ 23:0) - (0 ?
+ 23:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 23:0) - (0 ? 23:0) + 1))))))) << (0 ? 23:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1))))))) << (0 ?
+ 31:24))) | (((gctUINT32) ((gctUINT32) ((instanceCount >> 16)) & ((gctUINT32) ((((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:24) - (0 ? 31:24) + 1))))))) << (0 ? 31:24)));
+
+        pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
+
+        if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+        {
+            if (useOneCore)
+            {
+                halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+                *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&pCmdBuffer)++ = 0;
+;
+
+            }
+        }
+
+        if (chipGfxPipeline->baseInstance.bUsed)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, firstInstance);
+        }
+        __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
+        *pCmdBuffer++ = drawCommand;
+        *pCmdBuffer++ = drawCount;
+        *pCmdBuffer++ = vertexOffset;
+        *pCmdBuffer++ = 0;
+        __VK_DEBUG_ONLY(});
+
+        if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+        {
+            if (useOneCore)
+            {
+                *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&pCmdBuffer)++ = 0;
+;
+
+                halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+            }
+        }
+
+        cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+        __VK_ASSERT(cmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+    }
 
     __vk_CmdAquireBuffer(commandBuffer, cmdBuf->curScrachBufIndex, &states);
 
@@ -2122,6 +2508,9 @@ static VkResult halti5_drawIndirect_common(
     __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
     __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
+    __vkRenderPass *rdp = pip->renderPass;
+    __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
+    __vkSubpassViewInfo *subPassView;
     uint32_t drawCommand;
     uint32_t *states;
     uint32_t srcAddr;
@@ -2131,6 +2520,9 @@ static VkResult halti5_drawIndirect_common(
     __vkDrawComputeCmdParams cmdParams;
     VkBool32 useOneCore = VK_FALSE;
     __vkDevContext *devCtx = cmdBuf->devCtx;
+    VkBool32 validSubpass = VK_FALSE;
+    uint32_t stall = 0;
+
     static const uint32_t s_xlatePrimitiveTopology[] =
     {
         /* VK_PRIMITIVE_TOPOLOGY_POINT_LIST */
@@ -2181,15 +2573,32 @@ static VkResult halti5_drawIndirect_common(
         cmdParams.draw.count = count;
         cmdParams.draw.stride = stride;
     }
-    __VK_ONERROR(halti5_draw_validate(cmdBuf, &cmdParams));
 
-    if (cmdBuf->gpuRenderingMode == gcvMULTI_GPU_RENDERING_MODE_OFF)
+    if (multiView->enabledMultiView)
     {
-        useOneCore = VK_TRUE;
+        subPassView = multiView->subPassViewInfo;
+        validSubpass = subPassView[pip->subPass].validSubpassView;
     }
 
-    /* Determine draw command. */
-    drawCommand = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    if (validSubpass)
+    {
+        uint32_t i = 0;
+        uint32_t *viewIdx = subPassView[pip->subPass].enabledViewIdx;
+
+        for (i = 0; i < subPassView[pip->subPass].validViewCount; i++)
+        {
+            rdp->usedMultiView = VK_TRUE;
+            subPassView[pip->subPass].curLayer = viewIdx[i];
+
+            __VK_ONERROR(halti5_draw_validate(cmdBuf, &cmdParams));
+
+            if (cmdBuf->gpuRenderingMode == gcvMULTI_GPU_RENDERING_MODE_OFF)
+            {
+                useOneCore = VK_TRUE;
+            }
+
+            /* Determine draw command. */
+            drawCommand = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2199,7 +2608,7 @@ static VkResult halti5_drawIndirect_common(
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:8) - (0 ?
  8:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2209,7 +2618,7 @@ static VkResult halti5_drawIndirect_common(
  8:8) - (0 ?
  8:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ? 8:8)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  3:0) - (0 ?
  3:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2220,9 +2629,9 @@ static VkResult halti5_drawIndirect_common(
  3:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)));
 
-    if (devCtx->pPhyDevice->phyDevFeatures.drawIndirectFirstInstance)
-    {
-        drawCommand = ((((gctUINT32) (drawCommand)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if (devCtx->pPhyDevice->phyDevFeatures.drawIndirectFirstInstance)
+            {
+                drawCommand = ((((gctUINT32) (drawCommand)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  14:14) - (0 ?
  14:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2232,19 +2641,19 @@ static VkResult halti5_drawIndirect_common(
  14:14) - (0 ?
  14:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 14:14) - (0 ? 14:14) + 1))))))) << (0 ? 14:14)));
-    }
+            }
 
-    srcAddr = buf->memory->devAddr;
-    srcAddr += (uint32_t)(buf->memOffset + offset);
+            srcAddr = buf->memory->devAddr;
+            srcAddr += (uint32_t)(buf->memOffset + offset);
 
-    pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
+            pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
 
-    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-    {
-        if (useOneCore)
-        {
-            halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
-            *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+            {
+                if (useOneCore)
+                {
+                    halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+                    *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2257,24 +2666,24 @@ static VkResult halti5_drawIndirect_common(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&pCmdBuffer)++ = 0;
 ;
 
-        }
-    }
+                }
+            }
 
-    if (chipGfxPipeline->baseInstance.bUsed)
-    {
-        __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, 0);
-    }
-    __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
-    *pCmdBuffer++ = drawCommand;
-    *pCmdBuffer++ = srcAddr;
-    __VK_DEBUG_ONLY(})
+            if (chipGfxPipeline->baseInstance.bUsed)
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, 0);
+            }
+            __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
+            *pCmdBuffer++ = drawCommand;
+            *pCmdBuffer++ = srcAddr;
+            __VK_DEBUG_ONLY(})
 
 
-    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-    {
-        if (useOneCore)
-        {
-            *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+            {
+                if (useOneCore)
+                {
+                    *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2287,13 +2696,166 @@ static VkResult halti5_drawIndirect_common(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&pCmdBuffer)++ = 0;
 ;
 
-            halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+                    halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+                }
+            }
+
+            stall = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 4:0) - (0 ?
+ 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ?
+ 12:8) - (0 ?
+ 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)));
+
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E02, VK_FALSE, stall);
+            *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));*(*&pCmdBuffer)++ = (stall);
+;
+
+
+            cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+
+            __VK_ASSERT(cmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
         }
     }
+    else
+    {
+        __VK_ONERROR(halti5_draw_validate(cmdBuf, &cmdParams));
 
-    cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+        if (cmdBuf->gpuRenderingMode == gcvMULTI_GPU_RENDERING_MODE_OFF)
+        {
+            useOneCore = VK_TRUE;
+        }
 
-    __VK_ASSERT(cmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+        /* Determine draw command. */
+        drawCommand = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x10 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 8:8) - (0 ?
+ 8:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 8:8) - (0 ?
+ 8:8) + 1))))))) << (0 ?
+ 8:8))) | (((gctUINT32) ((gctUINT32) (indexMode) & ((gctUINT32) ((((1 ?
+ 8:8) - (0 ?
+ 8:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ? 8:8)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1))))))) << (0 ?
+ 3:0))) | (((gctUINT32) ((gctUINT32) (s_xlatePrimitiveTopology[pip->topology]) & ((gctUINT32) ((((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)));
+
+        if (devCtx->pPhyDevice->phyDevFeatures.drawIndirectFirstInstance)
+        {
+            drawCommand = ((((gctUINT32) (drawCommand)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1))))))) << (0 ?
+ 14:14))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 14:14) - (0 ?
+ 14:14) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:14) - (0 ? 14:14) + 1))))))) << (0 ? 14:14)));
+        }
+
+        srcAddr = buf->memory->devAddr;
+        srcAddr += (uint32_t)(buf->memOffset + offset);
+
+        pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
+
+        if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+        {
+            if (useOneCore)
+            {
+                halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+                *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&pCmdBuffer)++ = 0;
+;
+
+            }
+        }
+
+        if (chipGfxPipeline->baseInstance.bUsed)
+        {
+            __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, 0);
+        }
+        __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
+        *pCmdBuffer++ = drawCommand;
+        *pCmdBuffer++ = srcAddr;
+        __VK_DEBUG_ONLY(})
+
+
+        if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+        {
+            if (useOneCore)
+            {
+                *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&pCmdBuffer)++ = 0;
+;
+
+                halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+            }
+        }
+
+        cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+
+        __VK_ASSERT(cmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+    }
 
     __vk_CmdAquireBuffer(commandBuffer, cmdBuf->curScrachBufIndex, &states);
 
@@ -5017,6 +5579,7 @@ VkResult halti5_setRenderTargets(
     __vkRenderSubPassInfo *subPass = cmdBuf->bindInfo.renderPass.subPass;
     __vkFramebuffer *fb = cmdBuf->bindInfo.renderPass.fb;
     __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
+    __vkRenderPass *rdp = pip->renderPass;
     uint32_t i;
     __vkImage *rtImage = VK_NULL_HANDLE, *dsImage = VK_NULL_HANDLE;
     __vkImageView *rtImageView, *dsImageView;
@@ -5026,6 +5589,7 @@ VkResult halti5_setRenderTargets(
     __vkImageLevel *pLevel;
     uint32_t baseAddresses[2];
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
+    uint32_t layerIndex = 0;
 #if __VK_ENABLETS
     VkImageSubresourceRange* pRanges;
 #endif
@@ -5039,6 +5603,11 @@ VkResult halti5_setRenderTargets(
     halti5_commandBuffer *chipCommand = (halti5_commandBuffer *)cmdBuf->chipPriv;
 #endif
     pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
+
+    if (rdp->usedMultiView)
+    {
+        layerIndex = rdp->multiViewInfo->subPassViewInfo[pip->subPass].curLayer;
+    }
 
     for (i = 0; i < subPass->colorCount; i++)
     {
@@ -5055,6 +5624,7 @@ VkResult halti5_setRenderTargets(
 
         rtImageView = fb->imageViews[subPass->color_attachment_index[i]];
         __VK_ASSERT(rtImageView->createInfo.subresourceRange.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT);
+        __VK_ASSERT(rtImageView->createInfo.subresourceRange.layerCount >= layerIndex + 1);
         chipImgv = (halti5_imageView *)rtImageView->chipPriv;
         rtImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, rtImageView->createInfo.image);
         pLevel = &rtImage->pImgLevels[rtImageView->createInfo.subresourceRange.baseMipLevel];
@@ -5102,7 +5672,7 @@ VkResult halti5_setRenderTargets(
             rtBaseAddr += (uint32_t)(rtImage->memOffset
                 + pLevel->partSize * partIndex
                 + pLevel->offset
-                + rtImageView->createInfo.subresourceRange.baseArrayLayer * pLevel->sliceSize);
+                + (rtImageView->createInfo.subresourceRange.baseArrayLayer + layerIndex) * pLevel->sliceSize);
 
             baseAddresses[0] = baseAddresses[1] = rtBaseAddr;
 #if __VK_ENABLETS
@@ -5472,7 +6042,7 @@ VkResult halti5_setRenderTargets(
 #endif
         rtBaseAddr = dsImage->memory->devAddr;
         rtBaseAddr += (uint32_t)(dsImage->memOffset + pLevel->offset +
-                                 dsImageView->createInfo.subresourceRange.baseArrayLayer * pLevel->sliceSize);
+            (dsImageView->createInfo.subresourceRange.baseArrayLayer + layerIndex) * pLevel->sliceSize);
 
         chipGfxPipeline->regDepthConfig &= (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:26) - (0 ?
@@ -6967,6 +7537,12 @@ static VkResult halti5_helper_setDescSetInputAttach(
     PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY *inputAttachEntry = VK_NULL_HANDLE;
     halti5_commandBuffer *chipCommandBuffer = (halti5_commandBuffer *)cmdBuf->chipPriv;
     halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
+    uint32_t layerIndex = 0;
+
+    if (pip->renderPass->usedMultiView)
+    {
+        layerIndex = pip->renderPass->multiViewInfo->subPassViewInfo[pip->subPass].curLayer;
+    }
 
     for (entryIdx = 0; entryIdx < progResourceSet->inputAttachmentTable.countOfEntries; entryIdx++)
     {
@@ -7015,6 +7591,10 @@ static VkResult halti5_helper_setDescSetInputAttach(
                 __vkImageView *imgv;
                 halti5_imageView *chipImgv;
                 __vkImage *img;
+                VkImageSubresourceRange *subResourceRange;
+                __vkImageLevel *baseLevel;
+                uint32_t physical = 0;
+
 
                 __vk_utils_region_mad(&curRegion, &descriptorBinding->perElementSize, arrayIdx, &descriptorBinding->offset);
                 resInfo = (__vkDescriptorResourceInfo *)((uint8_t*)descSet->resInfos + curRegion.resource);
@@ -7028,6 +7608,14 @@ static VkResult halti5_helper_setDescSetInputAttach(
                 img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imgv->createInfo.image);
                 chipImgv = (halti5_imageView *)imgv->chipPriv;
 
+                subResourceRange = &imgv->createInfo.subresourceRange;
+                baseLevel = &img->pImgLevels[subResourceRange->baseMipLevel];
+
+                physical = img->memory->devAddr;
+                physical += (uint32_t)(img->memOffset + baseLevel->offset +
+                               (subResourceRange->baseArrayLayer + layerIndex) * baseLevel->sliceSize);
+
+                chipImgv->imgDesc[0].imageInfo[0] = physical;
                 if (img->createInfo.samples > VK_SAMPLE_COUNT_1_BIT)
                 {
                     uint32_t hwSamplerNo = hwMapping->hwSamplerSlot + hints->samplerBaseOffset[stageIdx];
