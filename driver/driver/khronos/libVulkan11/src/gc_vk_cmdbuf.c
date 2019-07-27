@@ -2396,8 +2396,8 @@ OnError:
         dstRes.u.img.offset.x /= blockSize.width; /*offset is always multiple of blockSize*/
         dstRes.u.img.offset.y /= blockSize.height;
 
-        dstRes.u.img.extent.width = gcmALIGN(dstRes.u.img.extent.width, blockSize.width) / blockSize.width; /*extend may not muliple of blcokSize*/
-        dstRes.u.img.extent.height = gcmALIGN(dstRes.u.img.extent.height, blockSize.height) / blockSize.height;
+        dstRes.u.img.extent.width = gcmALIGN_NP2(dstRes.u.img.extent.width, blockSize.width) / blockSize.width; /*extend may not muliple of blcokSize*/
+        dstRes.u.img.extent.height = gcmALIGN_NP2(dstRes.u.img.extent.height, blockSize.height) / blockSize.height;
 
         if (pDstImg->createInfo.imageType == VK_IMAGE_TYPE_3D)
         {
