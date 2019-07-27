@@ -1,43 +1,56 @@
+/****************************************************************************
+*
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+*
+*    The material in this file is confidential and contains trade secrets
+*    of Vivante Corporation. This is proprietary information owned by
+*    Vivante Corporation. No part of this work may be disclosed,
+*    reproduced, copied, transmitted, or used in any way for any purpose,
+*    without the express written permission of Vivante Corporation.
+*
+*****************************************************************************/
+
+
 #ifndef __NN_GPU_BINARY_INTERFACE_H__
 #define __NN_GPU_BINARY_INTERFACE_H__
 
 typedef enum _nngpu_kernel_enum
 {
-    TensorTranspose,
-    Batch2Space,
-    TensorReduceDiv,
-    L2Pooling,
-    Activation,
-    Space2Batch,
-    Rnn,
-    L2NormSumSqrt,
-    Gemm_noBias,
-    Floor,
-    TensorStridedSlice,
-    TensorElewise,
-    TensorCopy,
-    TensorPad,
-    TensorMaxValue,
-    Space2Depth,
-    Tensor2Row,
-    FullyConnected,
-    Reverse,
-    L2NormSumScale,
+    Depth2Space,
     Normalization,
-    MaxPooling,
+    L2Pooling,
+    Batch2Space,
+    TensorCrop,
+    SoftMax,
+    TensorTranspose,
     LSTMUnitProjection,
     AvgPooling,
-    Depth2Space,
-    TensorMeanAxis0,
-    Svdf,
-    HashLUT,
-    SoftMax,
-    TensorCrop,
-    Gemm,
+    TensorMaxValue,
+    TensorElewise,
     EmbeddingLUT,
-    LSTMUnit,
+    HashLUT,
+    Tensor2Row,
+    FullyConnected,
     TensorScale,
+    Reverse,
+    TensorCopy,
+    L2NormSumSqrt,
+    TensorMeanAxis0,
+    MaxPooling,
     DepthwiseConv,
+    TensorPad,
+    Space2Depth,
+    L2NormSumScale,
+    TensorReduceDiv,
+    Svdf,
+    TensorStridedSlice,
+    Activation,
+    LSTMUnit,
+    Gemm,
+    Rnn,
+    Gemm_noBias,
+    Floor,
+    Space2Batch,
     NNGPU_KERNEL_NUM /*NNVXC_KERNEL_NUM should be the last item in the enum*/
 }
 nngpu_kernel_enum;

@@ -1,0 +1,61 @@
+;#############################################################################
+;#
+;#   Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+;#
+;#   The material in this file is confidential and contains trade secrets
+;#   of Vivante Corporation. This is proprietary information owned by
+;#   Vivante Corporation. No part of this work may be disclosed,
+;#   reproduced, copied, transmitted, or used in any way for any purpose,
+;#   without the express written permission of Vivante Corporation.
+;#
+;#############################################################################
+
+
+LIBRARY libVSC_Lite
+
+EXPORTS
+
+    ; gcSHADER
+    gcFreeProgramState
+    gcSHADER_GetAttributeCount
+    gcSHADER_GetUniform
+	gcSHADER_GetUniformByUniformIndex
+    gcSHADER_GetUniformCount
+    gcSHADER_GetUniformBlock
+    gcSHADER_GetStorageBlock
+    gcSHADER_GetKernelFunction
+    gcSHADER_GetKernelFunctionByName
+    gcSHADER_GetKernelFunctionCount
+    gcSHADER_GetConstantMemorySize
+    gcSHADER_GetPrivateMemorySize
+    gcSHADER_GetLocalMemorySize
+    gcSHADER_ComputeUniformPhysicalAddress
+
+    gcSHADER_LoadEx
+	gcSHADER_LoadHeader
+    gcSHADER_Construct
+    gcSHADER_Destroy
+    gcSHADER_SaveEx
+
+    gcLoadCLSingleKernel
+    gcGetHWCaps
+    gcTYPE_GetTypeInfo
+    gcHINTS_Destroy
+
+    ; gcFUNCTION
+    gcKERNEL_FUNCTION_GetName
+    gcKERNEL_FUNCTION_GetPropertyCount
+    gcKERNEL_FUNCTION_GetProperty
+
+    ; gcUNIFORM
+    gcUNIFORM_GetName
+    gcUNIFORM_GetSampler
+    gcUNIFORM_GetIndex
+    gcUNIFORM_GetType
+    gcUNIFORM_GetTypeEx
+    gcUNIFORM_GetFormat
+    gcUNIFORM_GetFlags
+    gcUNIFORM_SetFormat
+    gcUNIFORM_SetFlags
+    gcUNIFORM_SetValue
+    gcUNIFORM_SetValueF

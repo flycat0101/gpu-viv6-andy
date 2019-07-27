@@ -63,7 +63,7 @@
 #include "vxc_bin_TensorCopy.h"
 #include "vxc_bin_TensorCrop.h"
 #include "vxc_bin_TensorDiv.h"
-#include "vxc_bin_TensorMeanAxis0.h"
+#include "vxc_bin_TensorMeanAxis.h"
 #include "vxc_bin_TensorMul.h"
 #include "vxc_bin_TensorMulSatRTE.h"
 #include "vxc_bin_TensorPad.h"
