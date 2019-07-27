@@ -22942,7 +22942,6 @@ _GenerateStates(
             }
         }
 #endif
-        gcmASSERT(codeAddress <= gcHWCaps.ctxStateCount);
     }
     else
     {

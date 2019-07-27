@@ -282,6 +282,17 @@ deleteCaller(
 }
 
 static gctBOOL
+_hasFMA_SUPPORT(
+    IN gcLINKTREE Tree,
+    IN gcsCODE_GENERATOR_PTR CodeGen,
+    IN gcSL_INSTRUCTION Instruction,
+    IN OUT gctUINT32_PTR States
+    )
+{
+    return GetHWHasFmaSupport();
+}
+
+static gctBOOL
 _hasSIGN_FLOOR_CEIL(
     IN gcLINKTREE Tree,
     IN gcsCODE_GENERATOR_PTR CodeGen,
@@ -6836,6 +6847,20 @@ _UseDestInNextOnly(
     }
 
     return gcvTRUE;
+}
+
+static gctBOOL
+_UseDestInNextOnly_hasFMA_SUPPORT(
+    IN gcLINKTREE Tree,
+    IN gcsCODE_GENERATOR_PTR CodeGen,
+    IN gcSL_INSTRUCTION Instruction,
+    IN OUT gctUINT32 * States
+    )
+{
+    return _UseDestInNextOnly(Tree,
+                              CodeGen,
+                              Instruction,
+                              States)  && GetHWHasFmaSupport();
 }
 
 static gctBOOL
@@ -21213,6 +21238,41 @@ const gcsSL_PATTERN    patterns_CLAMP0MAX[] =
 /* 0x7B gcSL_FMA_MUL first part: MUL */
 const gcsSL_PATTERN patterns_FMA_MUL[] =
 {
+    /*
+        FMA_MUL 1, 2, 3
+        FMA_ADD 4, 1, 5
+            fma 4, 2, 3, 5, 0
+    */
+    { 2, gcSL_FMA_MUL, 1, 2, 3, 0, 0, _UseDestInNextOnly_hasFMA_SUPPORT },
+    { 1, gcSL_FMA_ADD, 4, 1, 5, 0, 0, _NoLabel },
+        { -1, 0x30, 4, 2, 3, 5, 0 },
+
+    /*
+        FMA_MUL 1, 2, 3
+        FMA_ADD 4, 5, 1
+            fma 4, 2, 3, 5, 0
+    */
+    { 2, gcSL_FMA_MUL, 1, 2, 3, 0, 0, _UseDestInNextOnly_hasFMA_SUPPORT },
+    { 1, gcSL_FMA_ADD, 4, 5, 1, 0, 0, _NoLabel },
+        { -1, 0x30, 4, 2, 3, 5, 0 },
+
+    /*
+        FMA_MUL 1, 2, 3
+        FMA_ADD 4, 5, 1
+            mad 4, 2, 3, 5, 0
+    */
+    { 2, gcSL_FMA_MUL, 1, 2, 3, 0, 0, _UseDestInNextOnly },
+    { 1, gcSL_FMA_ADD, 4, 5, 1, 0, 0, _NoLabel },
+        { -1, 0x02, 4, 2, 3, 5, 0 },
+
+    /*
+        FMA_MUL 1, 2, 3
+        FMA_ADD 4, 1, 5
+            mad 4, 2, 3, 5, 0
+    */
+    { 2, gcSL_FMA_MUL, 1, 2, 3, 0, 0, _UseDestInNextOnly },
+    { 1, gcSL_FMA_ADD, 4, 1, 5, 0, 0, _NoLabel },
+        { -1, 0x02, 4, 2, 3, 5, 0 },
     { 0 }
 };
 

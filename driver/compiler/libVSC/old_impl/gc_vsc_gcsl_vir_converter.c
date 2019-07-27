@@ -8476,6 +8476,15 @@ static VIR_PatternReplaceInst _cmpRepInst0[] = {
 };
 
 static gctBOOL
+_hasFMA_SUPPORT(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return GetHWHasFmaSupport();
+}
+
+static gctBOOL
 _isSrc1ConstInteger31(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -10151,14 +10160,8 @@ static VIR_Pattern _bitrange1Pattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
-/*
-fma_mul 1, 2, 3
-fma_add 4, 1, 5
-    fma 4, 2, 3, 5
-*/
-
 static VIR_PatternMatchInst _mulPatInst0[] = {
-    { MERGE_OPCODE(VIR_OP_MUL, EXTERN_FMA_MUL), VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { MERGE_OPCODE(VIR_OP_MUL, EXTERN_FMA_MUL), VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasFMA_SUPPORT }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 4, 1, 5, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
@@ -10166,8 +10169,19 @@ static VIR_PatternReplaceInst _mulRepInst0[] = {
     { VIR_OP_FMA, -2, 0, { 4, 2, 3, 5 }, { 0 } },
 };
 
+static VIR_PatternMatchInst _mulPatInst1[] = {
+    { MERGE_OPCODE(VIR_OP_MUL, EXTERN_FMA_MUL), VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 4, 1, 5, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _mulRepInst1[] = {
+    { VIR_OP_MUL, -2, 0, { 1, 2, 3, 0  }, { 0 } },
+    { VIR_OP_ADD, -2, 0, { 4, 1, 5, 0 }, { 0 } },
+};
+
 static VIR_Pattern _mulPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_mul, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_mul, 1) },
     { VIR_PATN_FLAG_NONE }
 };
 
