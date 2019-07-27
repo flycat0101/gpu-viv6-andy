@@ -11555,7 +11555,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
     else
     {
         vx_uint32_ptr  pPerm                   = (vx_uint32_ptr)perm->memory.logicals[0];
-        vx_uint32      num                     = pnum->value->u32, num2 = 0;;
+        vx_uint32      num                     = pnum->value->u32, num2 = 0;
         vx_uint32      batch                   = TENSOR_VIEW_SIZE_INDEX(input, 3);
         vx_bool        shExe_flag              = vx_true_e;
         vx_bool        shExe_copy_flag         = vx_true_e;
@@ -11726,12 +11726,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
                 dims = 3;
                 src = vxoTensor_ReshapeTensor(input, size, dims);
 
+                size[0] = height * depth * batch;
+                size[1] = width;
+                size[2] = 1;
+                dims = 3;
+
                 {
-                    size[0] = height * depth * batch;
-                    size[1] = width;
-                    size[2] = 1;
-                    dims = 3;
-                    vx_tensor_create_params_t param = {dims, (vx_uint32 *)size, TENSOR_DATA_TYPE(input), TENSOR_QUANT_TYPE(input), };
+                    vx_tensor_create_params_t param = {dims, VX_NULL, TENSOR_DATA_TYPE(input), TENSOR_QUANT_TYPE(input), };
+                    param.sizes = (vx_uint32_ptr)size;
 
                     if (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
                         param.quant_data.dfp.fixed_point_pos = TENSOR_POS(input);
