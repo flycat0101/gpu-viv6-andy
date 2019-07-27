@@ -10065,6 +10065,7 @@ OnError:
 VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
+    vx_bool isSwaped = vx_false_e;
     vx_uint32 i;
     gcmHEADER_ARG("graph=%p", graph);
 
@@ -10102,7 +10103,9 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 
         vxoGraph_BeginProcess(graph);
 
-        if (graph->commandBuffer)
+        isSwaped = vxo_updateSwapHandle(graph);
+
+        if (!isSwaped && graph->commandBuffer)
         {
             status = vxoGraph_Submit(graph);
         }
@@ -10110,6 +10113,7 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
         {
             status = vxoGraph_ProcessInternal(graph);
         }
+
 
         vxoGraph_EndProcess(graph);
 

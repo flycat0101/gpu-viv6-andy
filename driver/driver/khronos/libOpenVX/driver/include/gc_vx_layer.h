@@ -790,6 +790,19 @@ typedef struct _vxnne_operation_command_s
     vx_op_param_s                parameter;
 }vxnne_operation_command_s;
 
+#define MAX_SWAP_HANDLE 1024
+
+typedef struct _vx_swapHandel
+{
+    vx_reference     ref;
+    vx_uint32        orgAddress;             /*original address of tensor or image*/
+    vx_uint32*       cmdAddr[MAX_SWAP_HANDLE];/* NN or TP cmd address of tensor*/
+    vx_uint32        offset[MAX_SWAP_HANDLE];/*tensor or image input/output offset*/
+}
+vx_swapHandel;
+
+#define MAX_HANDEL 1024
+
 typedef struct _vxnne_execution_layer_s
 {
 
@@ -803,6 +816,8 @@ typedef struct _vxnne_execution_layer_s
 
     vx_uint32                    opIndicesNum;
     vxnne_operation_command      opIndices;
+    vx_swapHandel*               swapHandle[MAX_HANDEL];
+    vx_uint32                    swapcount;
 }
 vxnne_execution_layer_s, *vxnne_execution_layer;
 

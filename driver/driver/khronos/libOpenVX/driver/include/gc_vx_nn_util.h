@@ -414,6 +414,17 @@ void vxoWeightsBiases_Clear(
     vx_weights_biases_parameter wb
     );
 
+VX_INTERNAL_API vx_int32 vxoBinaryGraph_SearchPattern(
+    gctUINT32_PTR buffer,
+    gctUINT32 sizeInUint,
+    gctUINT32 pattern,
+    vx_uint32 *offset,
+    vx_bool multiple
+    );
+
+vx_status vxo_insertHandel(vxnne_execution_layer   executionLayer);
+vx_status vxo_updateSwapHandle(vx_graph graph);
+
 vx_bool _IsSameDataType(
     vx_tensor src,
     vx_tensor dst

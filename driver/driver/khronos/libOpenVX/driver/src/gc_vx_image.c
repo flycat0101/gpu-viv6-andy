@@ -2812,10 +2812,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
                     {
                         gcoOS_CacheInvalidate(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
                     }
-                    if (image->useInternalMem && image->memory.nodePtrs[p] != VX_NULL && image->memory.logicals[p] && image->memory.logicals[p] != image->memory.nodePtrs[p]->logical)
-                    {
-                        if (image->memory.sizes[p] > 0) gcoOS_MemCopy(image->memory.nodePtrs[p]->logical, image->memory.logicals[p], image->memory.sizes[p]);
-                    }
                     prev_ptrs[p] = image->memory.logicals[p];
                 }
             }

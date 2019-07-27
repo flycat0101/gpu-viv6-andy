@@ -4088,7 +4088,7 @@ VX_PRIVATE_API vx_int32 vxoBinaryGraph_GetIndexOfInputOutputEntry(
    return:  the number of the pattern in buffer
    offset:  all offsets in buffer be finded
 */
-VX_PRIVATE_API vx_int32 vxoBinaryGraph_SearchPattern(
+VX_INTERNAL_API vx_int32 vxoBinaryGraph_SearchPattern(
     gctUINT32_PTR buffer,
     gctUINT32 sizeInUint,
     gctUINT32 pattern,

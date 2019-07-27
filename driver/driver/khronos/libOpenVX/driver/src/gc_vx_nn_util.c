@@ -4784,6 +4784,223 @@ exit:
     }
 }
 
+vx_status vxo_insertHandel(vxnne_execution_layer   executionLayer)
+{
+    vx_uint32               i, j, n= 0;
+
+    if(executionLayer == VX_NULL)
+        return vx_true_e;
+
+    for(j = 0; j< MAX_HANDEL; ++j)
+    {
+        executionLayer->swapHandle[j] = VX_NULL;
+    }
+    executionLayer->swapcount = 0;
+
+    for (i = 0; i < executionLayer->opIndicesNum; i++)
+    {
+        vx_uint32 j, k;
+        vx_uint32 tileOffset = 0;
+        vxnne_operation op = executionLayer->operations[executionLayer->opIndices[i].operationID];
+
+        if(op->target != VXNNE_OPERATION_TARGET_TP && op->target != VXNNE_OPERATION_TARGET_NN)
+            continue;
+
+        if (!executionLayer->opIndices[i].inputTile.sRAM)
+        {
+            for (j = 0, n = executionLayer->swapcount; j < op->inputsNum; j++)
+            {
+                if ((op->inputs[j] != VX_NULL)  && (op->inputs[j]->type == VX_TYPE_TENSOR || op->inputs[j]->type == VX_TYPE_IMAGE))
+                {
+                    if(op->inputs[j]->type == VX_TYPE_TENSOR)
+                    {
+                        if((!vxoTensor_IsVirtualTensor((vx_tensor)op->inputs[j])) && ((vx_tensor)op->inputs[j])->tensorBuffer->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
+                        {
+                            if(executionLayer->swapHandle[n] == VX_NULL)
+                            {
+                                executionLayer->swapHandle[n] = (vx_swapHandel *) vxAllocate(sizeof(vx_swapHandel));
+                            }
+                            executionLayer->swapHandle[n]->ref = (vx_reference)op->inputs[j];
+                            tileOffset = executionLayer->opIndices[i].inputTile.physical - ((vx_tensor)op->inputs[j])->tensorBuffer->memory.physicals[0];
+                        }
+                        else
+                            continue;
+                    }
+                    else if(op->inputs[j]->type == VX_TYPE_IMAGE)
+                    {
+                        if(!vxoImage_IsVirtualImage((vx_image)op->inputs[j]) && ((vx_image)op->inputs[j])->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
+                        {
+                            if(executionLayer->swapHandle[n] == VX_NULL)
+                            {
+                                executionLayer->swapHandle[n] = (vx_swapHandel *) vxAllocate(sizeof(vx_swapHandel));
+                            }
+
+                            executionLayer->swapHandle[n]->ref = (vx_reference)op->inputs[j];
+                            tileOffset = executionLayer->opIndices[i].inputTile.physical - ((vx_image)op->inputs[j])->memory.physicals[0];
+                        }
+                        else
+                            continue;
+                    }
+
+                    if(op->target == VXNNE_OPERATION_TARGET_NN)
+                    {
+                        vx_uint32 offset[1], count;
+                        for(k = 0; k < (((&executionLayer->opIndices[i])->commandBuffer)).commandCount; ++k)
+                        {
+                            if(k == 0)
+                                count = vxoBinaryGraph_SearchPattern((gctUINT32_PTR)((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + NNE_COMMAND_SIZE * k)), NNE_COMMAND_SIZE, ((executionLayer->opIndices[i]).inputTile).physical, offset, vx_false_e);
+
+                            executionLayer->swapHandle[n]->cmdAddr[k] = ((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + NNE_COMMAND_SIZE * k)) + offset[0]/gcmSIZEOF(gctUINT32);
+                            executionLayer->swapHandle[n]->offset[k] = (*(executionLayer->swapHandle[n]->cmdAddr[k]) - *(executionLayer->swapHandle[n]->cmdAddr[0])) + tileOffset; /*tensor or image input address offset*/
+                        }
+                        tileOffset = 0;
+                    }
+                    if(op->target == VXNNE_OPERATION_TARGET_TP)
+                    {
+                        vx_uint32 offset[1], count;
+                        for(k = 0; k < (((&executionLayer->opIndices[i])->commandBuffer)).commandCount; ++k)
+                        {
+                            if(k == 0)
+                                count = vxoBinaryGraph_SearchPattern(((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + TP_COMMAND_SIZE * k)), TP_COMMAND_SIZE, ((executionLayer->opIndices[i]).inputTile).physical, offset, vx_false_e);
+
+                            executionLayer->swapHandle[n]->cmdAddr[k]= ((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + TP_COMMAND_SIZE * k)) + offset[0]/gcmSIZEOF(gctUINT32);
+                            executionLayer->swapHandle[n]->offset[k] = (*(executionLayer->swapHandle[n]->cmdAddr[k]) - *(executionLayer->swapHandle[n]->cmdAddr[0])) + tileOffset;/*tensor or image input address offset*/
+                        }
+                        tileOffset = 0;
+                    }
+                    executionLayer->swapHandle[n]->orgAddress = ((executionLayer->opIndices[i]).inputTile).physical;
+                    ++n;
+                    executionLayer->swapcount = n;
+                }
+            }
+        }
+        if (!executionLayer->opIndices[i].outputTile.sRAM)
+        {
+            for (j = 0; j < op->outputsNum; j++)
+            {
+                if ((op->outputs[j] != VX_NULL) && (op->outputs[j]->type == VX_TYPE_TENSOR || op->outputs[j]->type == VX_TYPE_IMAGE))
+                {
+
+                    if(op->outputs[j]->type == VX_TYPE_TENSOR)
+                    {
+                        if((!vxoTensor_IsVirtualTensor((vx_tensor)op->outputs[j])) && ((vx_tensor)op->outputs[j])->tensorBuffer->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
+                        {
+                            if(executionLayer->swapHandle[n] == VX_NULL)
+                            {
+                                executionLayer->swapHandle[n] = (vx_swapHandel *) vxAllocate(sizeof(vx_swapHandel));
+                            }
+                            executionLayer->swapHandle[n]->ref = (vx_reference)op->outputs[j];
+                            tileOffset = executionLayer->opIndices[i].outputTile.physical - ((vx_tensor)op->outputs[j])->tensorBuffer->memory.physicals[0];
+                        }
+                        else
+                            continue;
+                    }
+                    else if(op->outputs[j]->type == VX_TYPE_IMAGE)
+                    {
+                        if(!vxoImage_IsVirtualImage((vx_image)op->outputs[j]) && ((vx_image)op->outputs[j])->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
+                        {
+                             if(executionLayer->swapHandle[n] == VX_NULL)
+                            {
+                                executionLayer->swapHandle[n] = (vx_swapHandel *) vxAllocate(sizeof(vx_swapHandel));
+                            }
+
+                            executionLayer->swapHandle[n]->ref = (vx_reference)op->outputs[j];
+                            tileOffset = executionLayer->opIndices[i].outputTile.physical - ((vx_image)op->outputs[j])->memory.physicals[0];
+                        }
+                        else
+                            continue;
+                    }
+
+
+                    if(op->target == VXNNE_OPERATION_TARGET_NN)
+                    {
+                        vx_uint32 offset[1], count;
+                        for(k = 0;k < (((&executionLayer->opIndices[i])->commandBuffer)).commandCount; ++k)
+                        {
+                            if(k == 0)
+                                count = vxoBinaryGraph_SearchPattern((gctUINT32_PTR)((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + NNE_COMMAND_SIZE * k)), NNE_COMMAND_SIZE, ((executionLayer->opIndices[i]).outputTile).physical, offset, vx_false_e);
+
+                            executionLayer->swapHandle[n]->cmdAddr[k] = ((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + NNE_COMMAND_SIZE * k)) + offset[0]/gcmSIZEOF(gctUINT32);
+                            executionLayer->swapHandle[n]->offset[k] = (*(executionLayer->swapHandle[n]->cmdAddr[k]) - *(executionLayer->swapHandle[n]->cmdAddr[0])) + tileOffset;
+                        }
+                        tileOffset = 0;
+                    }
+                    if(op->target == VXNNE_OPERATION_TARGET_TP)
+                    {
+                        vx_uint32 offset[1], count;
+                        for(k = 0; k < (((&executionLayer->opIndices[i])->commandBuffer)).commandCount; ++k)
+                        {
+                            if(k == 0)
+                                count = vxoBinaryGraph_SearchPattern((gctUINT32_PTR)((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + TP_COMMAND_SIZE * k)), TP_COMMAND_SIZE, ((executionLayer->opIndices[i]).outputTile).physical, offset, vx_false_e);
+
+                            executionLayer->swapHandle[n]->cmdAddr[k] = ((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + TP_COMMAND_SIZE * k)) + offset[0]/gcmSIZEOF(gctUINT32);
+                            executionLayer->swapHandle[n]->offset[k] =  (*(executionLayer->swapHandle[n]->cmdAddr[k]) - *(executionLayer->swapHandle[n]->cmdAddr[0])) + tileOffset;
+                        }
+                        tileOffset = 0;
+                    }
+
+                    executionLayer->swapHandle[n]->orgAddress = ((executionLayer->opIndices[i]).outputTile).physical;
+                    ++n;
+                    executionLayer->swapcount = n;
+                }
+            }
+        }
+
+    }
+    return  vx_true_e;
+}
+
+vx_bool vxo_updateSwapHandle(vx_graph graph)
+{
+    vx_uint32 i = 0, j = 0, k;
+    vx_bool isSwaped = vx_false_e;
+
+    vxnne_execution_layer   executionLayer = (vxnne_execution_layer)&graph->layer->base;
+
+    if(executionLayer == VX_NULL)
+        return vx_false_e;
+
+    for (i = 0; i < executionLayer->opIndicesNum; i++)
+    {
+        for (; j < executionLayer->swapcount; ++j)
+        {
+            if (executionLayer->swapHandle[j] != VX_NULL && executionLayer->swapHandle[j]->ref != VX_NULL)
+            {
+                if(executionLayer->swapHandle[j]->ref->type == VX_TYPE_TENSOR)
+                {
+                    vx_uint32 offset;
+                    vxoTensor_GetTensorViewOffset(((vx_tensor)executionLayer->swapHandle[j]->ref), &offset);
+
+                    for(k = 0; k < (((&executionLayer->opIndices[i])->commandBuffer)).commandCount; ++k)
+                    {
+                        if(((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer->memory.physicals[0] + offset + executionLayer->swapHandle[j]->offset[k]!= (executionLayer->swapHandle[j]->orgAddress))
+                        {
+                            *(executionLayer->swapHandle[j]->cmdAddr[k]) = (vx_uint32)(((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer->memory.physicals[0] + executionLayer->swapHandle[j]->offset[k]);
+                            isSwaped = vx_true_e;
+                        }
+                    }
+
+                }
+                else if(executionLayer->swapHandle[j]->ref->type == VX_TYPE_IMAGE)
+                {
+
+                    for(k = 0; k < (((&executionLayer->opIndices[i])->commandBuffer)).commandCount; ++k)
+                    {
+                        if(((vx_image)(executionLayer->swapHandle[j]->ref))->memory.physicals[0] + executionLayer->swapHandle[j]->offset[k] != executionLayer->swapHandle[j]->orgAddress)
+                        {
+                            *(executionLayer->swapHandle[j]->cmdAddr[k]) = (vx_uint32)(((vx_image)(executionLayer->swapHandle[j]->ref))->memory.physicals[0] + executionLayer->swapHandle[j]->offset[k]);
+                            isSwaped = vx_true_e;
+                        }
+                    }
+                }
+                else
+                    vxmASSERT(0);
+            }
+        }
+    }
+    return  isSwaped;
+}
+
 vx_bool _IsSameDataType(
     vx_tensor src,
     vx_tensor dst
