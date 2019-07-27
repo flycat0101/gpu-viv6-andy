@@ -104,7 +104,7 @@ _viv_uniform VXC_512Bits uniDataSubZPtoFp32Part1_4x4;
 _viv_uniform VXC_512Bits uniExtact8Bin_2x8;
 _viv_uniform int inputZP0;
 _viv_uniform int inputZP1;
-#define TENSORADD_2D(name0, name1, name2, input_type0, copy_type0, input_type1, copy_type1, output_type, convert_type, copy_type, policy) \
+#define TENSORADD_2D(name0, name1, name2, input_type0, copy_type0, input_type1, copy_type1, output_type, convert_type, copy_type) \
     __kernel void vxcTensor2DAdd_##name0##Add##name1##to##name2##_2D( \
     __read_only  image2d_array_t input0, \
     __read_only  image2d_array_t input1, \
