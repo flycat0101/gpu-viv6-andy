@@ -25,9 +25,8 @@
 #define MAX_BLOCK_NUM    1000
 
 /* To make 32bit and 64bit platforms save the exact same shader binary,
-   we need to make sure this struct size and shaderVidNodes offset are same in different platforms */
+   we need to make sure this struct size is same in different platforms */
 char _check_gcsHINT_size[(sizeof(gcsHINT) % 8) == 0 ? 1 : -1];
-char _check_gcsHINT_offset[(gcmOFFSETOF(_gcsHINT, shaderVidNodes)  % 8) == 0 ? 1 : -1];
 
 #if (!VSC_LITE_BUILD)
 gctGLSLCompiler gcGLSLCompiler = gcvNULL;
