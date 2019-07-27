@@ -515,14 +515,6 @@ __wl_egl_display_destroy(__WLEGLDisplay display)
 
     __wl_egl_roundtrip_queue(display->wl_dpy, display->wl_queue);
 
-#ifdef gcdUSE_ZWP_SYNCHRONIZATION
-    if(display->explicit_sync)
-    {
-        zwp_linux_explicit_synchronization_v1_destroy(display->explicit_sync);
-        display->explicit_sync = gcvNULL;
-    }
-#endif
-
 #if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
     wl_proxy_wrapper_destroy(display->wrap_dpy);
 #endif
@@ -1308,16 +1300,8 @@ __wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
     }
 #endif
 
-    /* Make sure previous frame with this buffer is done. */
-    while (egl_surface->frame_callback && ret != -1)
-        ret = wl_display_dispatch_queue(wl_dpy, wl_queue);
-
-    if (ret == -1)
-    {
-        /* fatal error, can not recover. */
-        gcmPRINT("frame_callback was failed to return");
-        return NULL;
-    }
+    /* Try to read and dispatch some events. */
+    wl_display_dispatch_queue_pending(wl_dpy, wl_queue);
 
     if (egl_surface->nr_buffers > 1)
     {
@@ -1327,11 +1311,6 @@ __wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
         while (buffer->state != BUFFER_STATE_FREE && ret != -1)
         {
             ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 100);
-        }
-        if(ret == -1)
-        {
-            gcmPRINT("Cannot find a free back buffer");
-            return NULL;
         }
         if (buffer->release_fence_fd > 0)
         {
@@ -1471,16 +1450,18 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
 
     pthread_mutex_lock(&egl_surface->commit_mutex);
 
-#ifndef gcdUSE_ZWP_SYNCHRONIZATION
     /* Make sure previous frame with this buffer is done. */
     while (egl_surface->frame_callback && ret != -1)
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+        ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 100);
+#else
         ret = __wl_egl_dispatch_queue(wl_dpy, commit_queue, 100);
+#endif
     if (ret == -1)
     {
         /* fatal error, can not recover. */
         goto out;
     }
-#endif
 
     if (egl_surface->swap_interval > 0)
     {
@@ -1535,6 +1516,7 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
     wl_surface_attach(egl_surface->wrap_surface, buffer->wl_buf, window->dx, window->dy);
     wl_surface_damage(egl_surface->wrap_surface, x, y, width, height);
     wl_surface_commit(egl_surface->wrap_surface);
+
 
     /*
      * If we're not waiting for a frame callback then we'll at least throttle
@@ -1601,17 +1583,19 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
 
     pthread_mutex_lock(&egl_surface->commit_mutex);
 
-#ifndef gcdUSE_ZWP_SYNCHRONIZATION
     /* Make sure previous frame with this buffer is done. */
     while (egl_surface->frame_callback && ret != -1)
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+        ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 100);
+#else
         ret = __wl_egl_dispatch_queue(wl_dpy, commit_queue, 100);
+#endif
 
     if (ret == -1)
     {
         /* fatal error, can not recover. */
         goto out;
     }
-#endif
 
     if (egl_surface->swap_interval > 0)
     {
@@ -2449,13 +2433,6 @@ _SynchronousPost(
     if(Display->enableClient != -1)
     {
         return (Display->enableClient == 0);
-    }
-#endif
-
-#ifdef gcdUSE_ZWP_SYNCHRONIZATION
-    if(!egl_surface->surface_sync)
-    {
-        return EGL_TRUE;
     }
 #endif
 
