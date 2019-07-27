@@ -2432,6 +2432,39 @@ _IntrisicImageFetchFuncName(
 
         gcmASSERT(VIR_TypeId_isSampler2D(typeId));
     }
+    else if (VIR_TypeId_isSamplerShadow(typeId))
+    {
+        switch (typeId)
+        {
+            case VIR_TYPE_SAMPLER_1D_SHADOW:
+                typeId = VIR_TYPE_SAMPLER_1D;
+                break;
+
+            case VIR_TYPE_SAMPLER_2D_SHADOW:
+                typeId = VIR_TYPE_SAMPLER_2D;
+                break;
+
+            case VIR_TYPE_SAMPLER_CUBE_SHADOW:
+                typeId = VIR_TYPE_SAMPLER_CUBIC;
+                break;
+
+            case VIR_TYPE_SAMPLER_CUBE_ARRAY_SHADOW:
+                typeId = VIR_TYPE_SAMPLER_CUBE_ARRAY;
+                break;
+
+            case VIR_TYPE_SAMPLER_1D_ARRAY_SHADOW:
+                typeId = VIR_TYPE_SAMPLER_1D_ARRAY;
+                break;
+
+            case VIR_TYPE_SAMPLER_2D_ARRAY_SHADOW:
+                typeId = VIR_TYPE_SAMPLER_2D_ARRAY;
+                break;
+
+            default:
+                gcmASSERT(gcvFALSE);
+                break;
+        }
+    }
 
     gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__,
         VIR_Shader_GetTypeNameString(pShader, VIR_Shader_GetTypeFromId(pShader, typeId)));
