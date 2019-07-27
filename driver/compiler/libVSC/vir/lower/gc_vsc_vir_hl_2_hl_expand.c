@@ -2479,10 +2479,31 @@ static VSC_ErrCode _VIR_HL_Reg_Alloc(
     return errCode;
 }
 
+static gctBOOL
+_IsBlockSymbolSingleField(
+    IN VIR_Shader               *Shader,
+    IN VIR_Symbol               *BlockSym
+    )
+{
+    VIR_Type                    *blockType = VIR_Symbol_GetType(BlockSym);
+
+    while (VIR_Type_isArray(blockType))
+    {
+        blockType = VIR_Shader_GetTypeFromId(Shader, VIR_Type_GetBaseTypeId(blockType));
+    }
+
+    if (VIR_Type_isStruct(blockType) && VIR_IdList_Count(VIR_Type_GetFields(blockType)) > 1)
+    {
+        return gcvFALSE;
+    }
+    return gcvTRUE;
+}
+
 static VSC_ErrCode
 _ReplaceSymWithFirstElementSym(
     IN  VIR_Shader              *Shader,
     IN  VIR_Function            *Func,
+    IN  VIR_Instruction         *Inst,
     IN  VIR_Operand             *Operand
     )
 {
@@ -2493,6 +2514,7 @@ _ReplaceSymWithFirstElementSym(
     VIR_Symbol                  *virRegSym;
     VIR_SymId                    elementSymId, virRegSymId;
     VIR_VirRegId                 virRegId;
+    VIR_OpCode                   opCode = VIR_Inst_GetOpcode(Inst);
 
     gcmASSERT(!isSymCombinedSampler(operandSym));
 
@@ -2525,6 +2547,70 @@ _ReplaceSymWithFirstElementSym(
 
     if (!VIR_Symbol_NeedReplaceSymWithReg(elementSym))
     {
+        /* For a attribute, we need to get the exactly mapped attribute. */
+        if (VIR_Symbol_isIOB(operandSym) &&
+            !_IsBlockSymbolSingleField(Shader, operandSym) &&
+            (VIR_Symbol_isPerPatchInput(elementSym) || VIR_Symbol_isAttribute(elementSym)))
+        {
+            /* Get the constIndexing first. */
+            virRegId = VIR_Symbol_GetVregIndex(elementSym);
+
+            if (VIR_Operand_GetIsConstIndexing(Operand))
+            {
+                virRegId += VIR_Operand_GetConstIndexingImmed(Operand);
+                VIR_Operand_SetIsConstIndexing(Operand, gcvFALSE);
+                VIR_Operand_SetRelIndex(Operand, 0);
+            }
+
+            /* Get the matrix const index. */
+            virRegId += VIR_Operand_GetMatrixConstIndex(Operand);
+            VIR_Operand_SetMatrixConstIndex(Operand, 0);
+
+            /* Get the offset for ATTR_LD. */
+            if (opCode == VIR_OP_ATTR_LD && Operand == VIR_Inst_GetSource(Inst, 0))
+            {
+                VIR_Operand     *OffsetOpnd = VIR_Inst_GetSource(Inst, 2);
+
+                if (VIR_Operand_isImm(OffsetOpnd) && VIR_Operand_GetImmediateUint(OffsetOpnd) != 0)
+                {
+                    virRegId += VIR_Operand_GetImmediateUint(OffsetOpnd);
+                    VIR_Operand_SetImmUint(OffsetOpnd, 0);
+                }
+            }
+
+            /* Get the vir reg symbol. */
+            errCode = VIR_Shader_GetVirRegSymByVirRegId(Shader,
+                                                        virRegId,
+                                                        &virRegSymId);
+            CHECK_ERROR(errCode, "VIR_Shader_GetVirRegSymByVirRegId failed.");
+            virRegSym = VIR_Shader_GetSymFromId(Shader, virRegSymId);
+            gcmASSERT(virRegSym);
+
+            /* Get the corresponding variable symbol. */
+            elementSym = VIR_Symbol_GetVregVariable(virRegSym);
+
+            /* Set the offset if vir reg index is mismatch. */
+            if (VIR_Symbol_GetVregIndex(elementSym) != virRegId)
+            {
+                gcmASSERT(virRegId > VIR_Symbol_GetVregIndex(elementSym));
+
+                if (VIR_Type_isArray(VIR_Symbol_GetType(elementSym)))
+                {
+                    VIR_Operand_SetIsConstIndexing(Operand, gcvTRUE);
+                    VIR_Operand_SetRelIndex(Operand, virRegId - VIR_Symbol_GetVregIndex(elementSym));
+                }
+                else if (VIR_Type_isMatrix(VIR_Symbol_GetType(elementSym)))
+                {
+                    VIR_Operand_SetMatrixConstIndex(Operand, virRegId - VIR_Symbol_GetVregIndex(elementSym));
+                }
+                else
+                {
+                    gcmASSERT(gcvFALSE);
+                }
+            }
+        }
+
+        /* Replace the symbol. */
         VIR_Operand_SetSym(Operand, elementSym);
     }
     else
@@ -2538,6 +2624,22 @@ _ReplaceSymWithFirstElementSym(
             virRegId += VIR_Operand_GetConstIndexingImmed(Operand);
             VIR_Operand_SetIsConstIndexing(Operand, gcvFALSE);
             VIR_Operand_SetRelIndex(Operand, 0);
+        }
+
+        /* Get the matrix const index. */
+        virRegId += VIR_Operand_GetMatrixConstIndex(Operand);
+        VIR_Operand_SetMatrixConstIndex(Operand, 0);
+
+        /* Get the offset for ATTR_ST. */
+        if (opCode == VIR_OP_ATTR_ST && Operand == VIR_Inst_GetDest(Inst))
+        {
+            VIR_Operand         *OffsetOpnd = VIR_Inst_GetSource(Inst, 1);
+
+            if (VIR_Operand_isImm(OffsetOpnd) && VIR_Operand_GetImmediateUint(OffsetOpnd) != 0)
+            {
+                virRegId += VIR_Operand_GetImmediateUint(OffsetOpnd);
+                VIR_Operand_SetImmUint(OffsetOpnd, 0);
+            }
         }
 
         errCode = VIR_Shader_GetVirRegSymByVirRegId(Shader,
@@ -2696,6 +2798,7 @@ static VSC_ErrCode
 _ReplaceOperandSymbol(
     IN  VIR_Shader              *Shader,
     IN  VIR_Function            *Func,
+    IN  VIR_Instruction         *Inst,
     IN  VIR_Operand             *Operand
     )
 {
@@ -2737,7 +2840,7 @@ _ReplaceOperandSymbol(
         VIR_ParmPassing *parm = VIR_Operand_GetParameters(Operand);
         for (i = 0; i < parm->argNum; i++)
         {
-            _ReplaceOperandSymbol(Shader, Func, parm->args[i]);
+            _ReplaceOperandSymbol(Shader, Func, Inst, parm->args[i]);
         }
     }
     else if (VIR_Operand_isTexldParm(Operand))
@@ -2746,7 +2849,7 @@ _ReplaceOperandSymbol(
 
         for (i = 0; i < VIR_TEXLDMODIFIER_COUNT; ++i)
         {
-            _ReplaceOperandSymbol(Shader, Func, VIR_Operand_GetTexldModifier(texldOperand,i));
+            _ReplaceOperandSymbol(Shader, Func, Inst, VIR_Operand_GetTexldModifier(texldOperand,i));
         }
     }
 
@@ -2771,7 +2874,7 @@ _ReplaceOperandSymbol(
     */
     if (VIR_Symbol_GetFirstElementId(opndSym) != VIR_INVALID_ID)
     {
-        errCode = _ReplaceSymWithFirstElementSym(Shader, Func, Operand);
+        errCode = _ReplaceSymWithFirstElementSym(Shader, Func, Inst, Operand);
         CHECK_ERROR(errCode, "_ReplaceSymWithFirstElementSym failed.");
     }
     else if (VIR_Symbol_isIB(opndSym))
@@ -2799,13 +2902,13 @@ _ReplaceInstSymbol(
     VSC_ErrCode                  errCode  = VSC_ERR_NONE;
     gctUINT                      i;
 
-    errCode = _ReplaceOperandSymbol(Shader, Func, VIR_Inst_GetDest(Inst));
-    CHECK_ERROR(errCode, "_ReplaceOperandSymbol failed.");
+    errCode = _ReplaceOperandSymbol(Shader, Func, Inst, VIR_Inst_GetDest(Inst));
+    CHECK_ERROR(errCode, "replace operand symbol failed.");
 
     for (i = 0; i < VIR_Inst_GetSrcNum(Inst); i++)
     {
-        errCode = _ReplaceOperandSymbol(Shader, Func, VIR_Inst_GetSource(Inst, i));
-        CHECK_ERROR(errCode, "_ReplaceOperandSymbol failed.");
+        errCode = _ReplaceOperandSymbol(Shader, Func, Inst, VIR_Inst_GetSource(Inst, i));
+        CHECK_ERROR(errCode, "replace operand symbol failed.");
     }
 
     return errCode;
@@ -3184,6 +3287,12 @@ _ConvMatrixOperandToVectorOperand(
         else
         {
             if (VIR_Symbol_GetKind(symbol) == VIR_SYM_UNIFORM)
+            {
+                VIR_Operand_Copy(vectorOperand, MatrixOperand);
+                VIR_Operand_SetMatrixConstIndex(vectorOperand, MatrixIndex);
+                VIR_Operand_SetTypeId(vectorOperand, rowTypeId);
+            }
+            else if (!VIR_Symbol_NeedReplaceSymWithReg(symbol))
             {
                 VIR_Operand_Copy(vectorOperand, MatrixOperand);
                 VIR_Operand_SetMatrixConstIndex(vectorOperand, MatrixIndex);
@@ -4044,52 +4153,16 @@ _SplitMatrixAttrLoadStore(
 {
     VSC_ErrCode                 errCode  = VSC_ERR_NONE;
     VIR_OpCode                  opCode = VIR_Inst_GetOpcode(pInst);
-    gctBOOL                     bIsAttrLoad = (opCode == VIR_OP_ATTR_LD);
     VIR_Instruction*            pNewInst = gcvNULL;
     VIR_Operand*                pNewOpnd = gcvNULL;
     VIR_Operand*                pOrigOpnd = gcvNULL;
-    VIR_Operand*                pOrigOffsetOpnd = bIsAttrLoad ? VIR_Inst_GetSource(pInst, 2) : VIR_Inst_GetSource(pInst, 1);
     VIR_TypeId                  matrixTypeId = VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst));
     VIR_TypeId                  rowTypeId = VIR_GetTypeRowType(matrixTypeId);
-    VIR_VirRegId                regId;
-    VIR_SymId                   regSymId = VIR_INVALID_ID;
     gctUINT                     rowCount = VIR_GetTypeRows(matrixTypeId);
     gctUINT                     i, j;
 
-    /* Allocate a new reg to save the offset. */
-    regId = VIR_Shader_NewVirRegId(pShader, 1);
-    errCode = VIR_Shader_AddSymbol(pShader,
-                                   VIR_SYM_VIRREG,
-                                   regId,
-                                   VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT32),
-                                   VIR_STORAGE_UNKNOWN,
-                                   &regSymId);
-    CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
-
     for (i = 0; i < rowCount; i++)
     {
-        /* Insert a ADD to update the offset. */
-        errCode = VIR_Function_AddInstructionBefore(pFunc,
-                                                    VIR_OP_ADD,
-                                                    VIR_TYPE_UINT32,
-                                                    pInst,
-                                                    gcvTRUE,
-                                                    &pNewInst);
-        CHECK_ERROR(errCode, "VIR_Function_AddInstructionBefore failed.");
-
-        /* Set DEST. */
-        pNewOpnd = VIR_Inst_GetDest(pNewInst);
-        VIR_Operand_SetSymbol(pNewOpnd, pFunc, regSymId);
-        VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
-
-        /* Set SOURCE0. */
-        pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
-        VIR_Operand_Copy(pNewOpnd, pOrigOffsetOpnd);
-
-        /* Set SOURCE1. */
-        pNewOpnd = VIR_Inst_GetSource(pNewInst, 1);
-        VIR_Operand_SetImmediateUint(pNewOpnd, i);
-
         /* Spilt matrix to row. */
         errCode = VIR_Function_AddInstructionBefore(pFunc,
                                                     opCode,
@@ -4122,11 +4195,6 @@ _SplitMatrixAttrLoadStore(
                                                             i,
                                                             &pNewOpnd);
                 CHECK_ERROR(errCode, "_ConvMatrixOperandToVectorOperand failed.");
-            }
-            else if ((bIsAttrLoad && j == 2) || (!bIsAttrLoad && j == 1))
-            {
-                VIR_Operand_SetSymbol(pNewOpnd, pFunc, regSymId);
-                VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
             }
             else
             {
