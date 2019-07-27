@@ -271,6 +271,12 @@ vdkLoadTGA(
     imageWidth = ((unsigned short)tga.ImageWidthHigh << 8) + (unsigned short)tga.ImageWidthLow;
     imageHeight = ((unsigned short)tga.ImageHeightHigh << 8) + (unsigned short)tga.ImageHeightLow;
 
+    if (!(imageWidth && imageHeight))
+    {
+        /*invalid image size */
+        return NULL;
+    }
+
     /* Return texture dimension. */
     *Width  = imageWidth;
     *Height = imageHeight;
