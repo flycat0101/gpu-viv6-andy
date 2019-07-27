@@ -1747,8 +1747,8 @@ VX_PRIVATE_API vx_status SetMemoryRequestList(
 
     for (i = 0; i < count; i++)
     {
-        if (((i == 0 || i == count - 2) && esitimateInAB) ||
-            ((i == count - 1) && sRamOut))
+        if ((((i == 0 || i == count - 2) && esitimateInAB) ||
+            ((i == count - 1) && sRamOut)) && (allocType == VXNNE_MEM_POOL_TYPE_SRAM))
         {
             vxmASSERT(!sRamOut || !esitimateInAB);
             allocType2 = allocType & ~VXNNE_MEM_POOL_TYPE_VIP_SRAM;
