@@ -2874,6 +2874,7 @@ _InitializeContextBuffer(
     gctUINT clusterAliveMask;
     gctBOOL hasPSCSThrottle;
     gctBOOL hasMsaaFragOperation;
+    gctBOOL newGPipe;
 #endif
 
     gckHARDWARE hardware;
@@ -2924,6 +2925,7 @@ _InitializeContextBuffer(
     clusterAliveMask = hardware->identity.clusterAvailMask & hardware->options.userClusterMask;
     hasPSCSThrottle = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_PSCS_THROTTLE);
     hasMsaaFragOperation = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_MSAA_FRAGMENT_OPERATION);
+    newGPipe = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_NEW_GPIPE);
 
     /* Multi render target. */
     if (Context->hardware->identity.chipModel == gcv880 &&
@@ -3116,7 +3118,7 @@ if (smallBatch){    vsConstBase  = 0xD000;
         index += _State(Context, index, 0x007D0 >> 2, 0x00000000, 2, gcvFALSE, gcvFALSE);
         index += _State(Context, index, 0x007D8 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
         index += _State(Context, index, 0x17A80 >> 2, 0x00000000, 32, gcvFALSE, gcvFALSE);
-        if (genericAttrib)
+        if (genericAttrib || newGPipe)
         {
             index += _State(Context, index, 0x17880 >> 2, 0x00000000, 32, gcvFALSE, gcvFALSE);
             index += _State(Context, index, 0x17900 >> 2, 0x00000000, 32, gcvFALSE, gcvFALSE);
