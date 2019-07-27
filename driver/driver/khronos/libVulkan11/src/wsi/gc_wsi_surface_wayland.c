@@ -27,9 +27,16 @@
 #include <poll.h>
 #include <pthread.h>
 #include <fcntl.h>
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+#include <assert.h>
+#endif
 
 #include <wayland-client.h>
 #include <wayland-viv-client-protocol.h>
+
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+#include "linux-explicit-synchronization-unstable-v1-client-protocol.h"
+#endif
 
 typedef struct __vkWaylandSwapchainKHRRec   __vkWaylandSwapchainKHR;
 typedef struct __vkWaylandImageBufferRec    __vkWaylandImageBuffer;
@@ -49,6 +56,12 @@ struct __vkWaylandSwapchainKHRRec
 
     struct wl_registry *            wl_registry;
     struct wl_event_queue *         wl_queue;
+
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    int use_explicit_sync;
+    struct zwp_linux_explicit_synchronization_v1 *explicit_sync;
+    struct zwp_linux_surface_synchronization_v1 *surface_sync;
+#endif
 
     struct wl_viv *                 wl_viv;
     struct wl_compositor *          wl_compositor;
@@ -99,6 +112,11 @@ struct __vkWaylandImageBufferRec
     struct wl_buffer *              wl_buf;
     struct wl_callback *            frame_callback;
     __vkImageBufferState            state;
+
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    int release_fence_fd;
+    struct zwp_linux_buffer_release_v1 *buffer_release;
+#endif
 };
 
 static inline int
@@ -420,6 +438,43 @@ static VkResult __CreateSwapchainCommandBuffer(
     return result;
 }
 
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+static void
+buffer_fenced_release(void *data,
+              struct zwp_linux_buffer_release_v1 *release,
+                      int32_t fence)
+{
+    __vkWaylandImageBuffer *buffer = data;
+
+    assert(release == buffer->buffer_release);
+    assert(buffer->release_fence_fd == -1);
+
+    buffer->state = __VK_IMAGE_STATE_FREE;
+    buffer->release_fence_fd = fence;
+    zwp_linux_buffer_release_v1_destroy(buffer->buffer_release);
+    buffer->buffer_release = NULL;
+}
+
+static void
+buffer_immediate_release(void *data,
+    struct zwp_linux_buffer_release_v1 *release)
+{
+    __vkWaylandImageBuffer *buffer = data;
+
+    assert(release == buffer->buffer_release);
+    assert(buffer->release_fence_fd == -1);
+
+    buffer->state = __VK_IMAGE_STATE_FREE;
+    zwp_linux_buffer_release_v1_destroy(buffer->buffer_release);
+    buffer->buffer_release = NULL;
+}
+
+static const struct zwp_linux_buffer_release_v1_listener vk_buffer_release_listener = {
+       buffer_fenced_release,
+       buffer_immediate_release,
+};
+#endif
+
 static void buffer_handle_release(void *data, struct wl_buffer *wl_buf)
 {
     __vkWaylandImageBuffer *imageBuffer = data;
@@ -618,9 +673,18 @@ static VkResult __CreateImageBuffer(
             0,
             0,
             imageBuffer->resolveFd);
+#ifndef gcdUSE_ZWP_SYNCHRONIZATION
 
         wl_buffer_add_listener(imageBuffer->wl_buf, &buffer_listener, imageBuffer);
+#else
+        /* When not using explicit synchronization listen to
+         * wl_buffer.release for release notifications, otherwise we
+         * are going to use zwp_linux_buffer_release_v1. */
+        if(!sc->use_explicit_sync)
+            wl_buffer_add_listener(imageBuffer->wl_buf, &buffer_listener, imageBuffer);
 
+        imageBuffer->release_fence_fd = -1;
+#endif
         imageBuffer->frame_callback = NULL;
         imageBuffer->state = __VK_IMAGE_STATE_FREE;
     }
@@ -705,6 +769,19 @@ static void __DestroyImageBuffer(
         imageBuffer->resolveTarget = VK_NULL_HANDLE;
     }
 
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    if (imageBuffer->buffer_release)
+    {
+        zwp_linux_buffer_release_v1_destroy(imageBuffer->buffer_release);
+        imageBuffer->buffer_release = NULL;
+    }
+    if (imageBuffer->release_fence_fd >= 0)
+    {
+        close(imageBuffer->release_fence_fd);
+        imageBuffer->release_fence_fd = -1;
+    }
+#endif
+
     if (imageBuffer->wl_buf)
     {
         wl_buffer_destroy(imageBuffer->wl_buf);
@@ -736,6 +813,14 @@ static void __DestroySwapchain(
         }
         __VK_FREE(sc->imageBuffers);
     }
+
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    if (sc->surface_sync)
+    {
+        zwp_linux_surface_synchronization_v1_destroy(sc->surface_sync);
+        sc->surface_sync = gcvNULL;
+    }
+#endif
 
     if (sc->surface)
     {
@@ -788,6 +873,25 @@ static VkResult __GetSwapchainImages(
     return result;
 }
 
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+static void __WaitNativeFence(int fenceFd)
+{
+    gceSTATUS status;
+
+    /* GPU wait for 2000 ms. */
+    status = gcoOS_WaitNativeFence(gcvNULL, fenceFd, 2000);
+
+    if (status == gcvSTATUS_TIMEOUT)
+    {
+        /* Print a warning. */
+        gcmPRINT("%s: Warning: wait for fence fd=%d", __func__, fenceFd);
+
+        /* Wait for ever. */
+        status = gcoOS_WaitNativeFence(gcvNULL, fenceFd, gcvINFINITE);
+    }
+}
+#endif
+
 /* __vkSwapchainKHR::AcquireNextImage. */
 static VkResult __AcquireNextImage(
     VkDevice  device,
@@ -825,6 +929,14 @@ static VkResult __AcquireNextImage(
             {
                 if (sc->imageBuffers[i].state == __VK_IMAGE_STATE_FREE)
                 {
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+                    if(sc->imageBuffers[i].release_fence_fd > 0)
+                    {
+                        __WaitNativeFence(sc->imageBuffers[i].release_fence_fd);
+                        close(sc->imageBuffers[i].release_fence_fd);
+                        sc->imageBuffers[i].release_fence_fd = -1;
+                    }
+#endif
                     imageIndex  = i;
                     imageBuffer = &sc->imageBuffers[i];
                     break;
@@ -993,6 +1105,17 @@ static VkResult __QueuePresentSwapchainImage(
     if (sc->opaque_region)
         wl_surface_set_opaque_region(surf->surface, sc->opaque_region);
 
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    if (sc->use_explicit_sync)
+    {
+        imageBuffer->buffer_release =
+            zwp_linux_surface_synchronization_v1_get_release(sc->surface_sync);
+        wl_proxy_set_queue((struct wl_proxy *)imageBuffer->buffer_release, sc->wl_queue);
+        zwp_linux_buffer_release_v1_add_listener(
+            imageBuffer->buffer_release, &vk_buffer_release_listener, imageBuffer);
+    }
+#endif
+
     imageBuffer->frame_callback = wl_surface_frame(surf->surface);
     wl_proxy_set_queue((struct wl_proxy *)imageBuffer->frame_callback, sc->wl_queue);
     wl_callback_add_listener(imageBuffer->frame_callback, &frame_callback_listener, imageBuffer);
@@ -1045,6 +1168,15 @@ registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
                 &wl_compositor_interface, 1);
         wl_proxy_set_queue((struct wl_proxy *)sc->wl_compositor, sc->wl_queue);
     }
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    else if (strcmp(interface, "zwp_linux_explicit_synchronization_v1") == 0) {
+        sc->use_explicit_sync = 1;
+        sc->explicit_sync = wl_registry_bind(
+            registry, name,
+            &zwp_linux_explicit_synchronization_v1_interface, 1);
+        wl_proxy_set_queue((struct wl_proxy *)sc->explicit_sync, sc->wl_queue);
+    }
+#endif
 }
 
 static const struct wl_registry_listener registry_listener = {
@@ -1151,11 +1283,29 @@ static VkResult waylandCreateSwapchain(
     /* reigister wayland globals. */
     sc->wl_queue    = wl_display_create_queue(surf->display);
     sc->wl_registry = wl_display_get_registry(surf->display);
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    sc->use_explicit_sync = 0;
+    sc->surface_sync = NULL;
+#endif
 
     wl_proxy_set_queue((struct wl_proxy *)sc->wl_registry, sc->wl_queue);
     wl_registry_add_listener(sc->wl_registry, &registry_listener, sc);
 
     roundtrip_queue(surf->display, sc->wl_queue);
+
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    if(sc->use_explicit_sync == 1)
+    {
+        sc->surface_sync =
+            zwp_linux_explicit_synchronization_v1_get_synchronization(
+                  sc->explicit_sync, surf->surface);
+        if (!sc->surface_sync)
+        {
+            gcmPRINT("zwp_linux_explicit_synchronization_v1_get_synchronization failed");
+            goto OnError;
+        }
+    }
+#endif
 
     if (sc->compositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
     {

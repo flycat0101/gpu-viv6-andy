@@ -78,7 +78,8 @@ OBJECTS += \
 ifeq ($(EGL_API_WL),1)
 OBJECTS += \
     $(OBJ_DIR)/gc_wsi_surface_wayland.o \
-    $(OBJ_DIR)/wayland-viv-protocol.o
+    $(OBJ_DIR)/wayland-viv-protocol.o \
+	$(OBJ_DIR)/linux-explicit-synchronization-unstable-v1-protocol.o
 endif
 
 
