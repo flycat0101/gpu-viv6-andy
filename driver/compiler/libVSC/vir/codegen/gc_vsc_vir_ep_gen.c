@@ -3408,7 +3408,9 @@ static VSC_ErrCode _AddExtraSamplerArray(SHADER_PRIV_SAMPLER_ENTRY*** pppExtraSa
             {
                 matched = gcvTRUE;
             }
-            else if (bCheckSeparateImage || bCheckSeparateSampler)
+            else if ((bCheckSeparateImage || bCheckSeparateSampler)
+                     &&
+                     (VIR_Symbol_GetUniformKind(pVirUniformSymParent) == VIR_UNIFORM_SAMPLED_IMAGE))
             {
                 VIR_Symbol*   pSparateImageSym = gcvNULL;
                 VIR_Symbol*   pSeparateSamplerSym = gcvNULL;
