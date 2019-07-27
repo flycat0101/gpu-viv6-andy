@@ -6793,6 +6793,14 @@ VIR_Swizzle_SwizzleWShiftEnable(
     IN VIR_Enable enable
     );
 
+VIR_Swizzle
+VIR_Swizzle_ComposeSwizzle(
+    IN VIR_Swizzle channelX,
+    IN VIR_Swizzle channelY,
+    IN VIR_Swizzle channelZ,
+    IN VIR_Swizzle channelW
+    );
+
 /* enable */
 
 VIR_Swizzle

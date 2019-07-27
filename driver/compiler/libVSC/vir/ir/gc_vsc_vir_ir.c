@@ -12464,6 +12464,24 @@ VIR_Swizzle_SwizzleWShiftEnable(
     return result;
 }
 
+VIR_Swizzle
+VIR_Swizzle_ComposeSwizzle(
+    IN VIR_Swizzle channelX,
+    IN VIR_Swizzle channelY,
+    IN VIR_Swizzle channelZ,
+    IN VIR_Swizzle channelW
+    )
+{
+    VIR_Swizzle result = VIR_SWIZZLE_XYZW;
+
+    VIR_Swizzle_SetChannel(result, 0, channelX);
+    VIR_Swizzle_SetChannel(result, 1, channelY);
+    VIR_Swizzle_SetChannel(result, 2, channelZ);
+    VIR_Swizzle_SetChannel(result, 3, channelW);
+
+    return result;
+}
+
 /* enable */
 
 VIR_Swizzle

@@ -1866,6 +1866,99 @@ _VIR_CG_AllocatePushConst(
     return retValue;
 }
 
+static VIR_Swizzle _VIR_CG_SwizzleShiftWrap(
+    IN VIR_Swizzle          origSwizzle,
+    IN gctUINT              componentOffset,
+    IN gctUINT              componentCount
+    )
+{
+    VIR_Swizzle             newSwizzle = origSwizzle;
+    VIR_Swizzle             channelSwizzle[4];
+    gctUINT                 i;
+
+    for (i = 0; i < 4; i++)
+    {
+        channelSwizzle[i] = VIR_Swizzle_GetChannel(origSwizzle, i);
+    }
+
+    switch (componentOffset)
+    {
+        case 0:
+            if (componentCount == 1)
+            {
+                newSwizzle = VIR_Swizzle_ComposeSwizzle(channelSwizzle[0], channelSwizzle[0], channelSwizzle[0], channelSwizzle[0]);
+            }
+            else if (componentCount == 2)
+            {
+                newSwizzle = VIR_Swizzle_ComposeSwizzle(channelSwizzle[0], channelSwizzle[1], channelSwizzle[1], channelSwizzle[1]);
+            }
+            else if (componentCount == 3)
+            {
+                newSwizzle = VIR_Swizzle_ComposeSwizzle(channelSwizzle[0], channelSwizzle[1], channelSwizzle[2], channelSwizzle[2]);
+            }
+            else
+            {
+                newSwizzle = VIR_Swizzle_ComposeSwizzle(channelSwizzle[0], channelSwizzle[1], channelSwizzle[2], channelSwizzle[3]);
+            }
+            break;
+
+        case 1:
+            if (componentCount == 1)
+            {
+                newSwizzle = VIR_Swizzle_ComposeSwizzle(channelSwizzle[1], channelSwizzle[1], channelSwizzle[1], channelSwizzle[1]);
+            }
+            else if (componentCount == 2)
+            {
+                newSwizzle = VIR_Swizzle_ComposeSwizzle(channelSwizzle[1], channelSwizzle[2], channelSwizzle[2], channelSwizzle[2]);
+            }
+            else if (componentCount == 3)
+            {
+                newSwizzle = VIR_Swizzle_ComposeSwizzle(channelSwizzle[1], channelSwizzle[2], channelSwizzle[3], channelSwizzle[3]);
+            }
+            else
+            {
+                gcmASSERT(gcvFALSE);
+                newSwizzle = VIR_SWIZZLE_XYZW;
+            }
+            break;
+
+        case 2:
+            if (componentCount == 1)
+            {
+                newSwizzle = VIR_Swizzle_ComposeSwizzle(channelSwizzle[2], channelSwizzle[2], channelSwizzle[2], channelSwizzle[2]);
+            }
+            else if (componentCount == 2)
+            {
+                newSwizzle = VIR_Swizzle_ComposeSwizzle(channelSwizzle[2], channelSwizzle[3], channelSwizzle[3], channelSwizzle[3]);
+            }
+            else
+            {
+                gcmASSERT(gcvFALSE);
+                newSwizzle = VIR_SWIZZLE_XYZW;
+            }
+            break;
+
+        case 3:
+            if (componentCount == 1)
+            {
+                newSwizzle = VIR_Swizzle_ComposeSwizzle(channelSwizzle[3], channelSwizzle[3], channelSwizzle[3], channelSwizzle[3]);
+            }
+            else
+            {
+                gcmASSERT(gcvFALSE);
+                newSwizzle = VIR_SWIZZLE_XYZW;
+            }
+            break;
+
+        default:
+            gcmASSERT(gcvFALSE);
+            newSwizzle = VIR_SWIZZLE_XYZW;
+            break;
+    }
+
+    return newSwizzle;
+}
+
 static void _VIR_CG_AssignPushConstUniform(
     IN VIR_Shader           *pShader,
     IN VSC_MM               *pMM,
@@ -1874,7 +1967,7 @@ static void _VIR_CG_AssignPushConstUniform(
     IN gctUINT              maxAlignment,
     IN VSC_SIMPLE_QUEUE     *pushConstList,
     IN gctINT               physical,
-    IN gctUINT8             swizzle)
+    IN gctUINT8             origSwizzle)
 {
     while(!QUEUE_CHECK_EMPTY(pushConstList))
     {
@@ -1905,80 +1998,7 @@ static void _VIR_CG_AssignPushConstUniform(
         componentCount = VIR_GetTypeComponents(VIR_GetTypeRowType(typeId));
 
         /* Get swizzle. */
-        switch (componentOffset)
-        {
-            case 0:
-                if (componentCount == 1)
-                {
-                    swizzle = VIR_SWIZZLE_XXXX;
-                }
-                else if (componentCount == 2)
-                {
-                    swizzle = VIR_SWIZZLE_XYYY;
-                }
-                else if (componentCount == 3)
-                {
-                    swizzle = VIR_SWIZZLE_XYZZ;
-                }
-                else
-                {
-                    swizzle = VIR_SWIZZLE_XYZW;
-                }
-                break;
-
-            case 1:
-                if (componentCount == 1)
-                {
-                    swizzle = VIR_SWIZZLE_YYYY;
-                }
-                else if (componentCount == 2)
-                {
-                    swizzle = VIR_SWIZZLE_YZZZ;
-                }
-                else if (componentCount == 3)
-                {
-                    swizzle = VIR_SWIZZLE_YZWW;
-                }
-                else
-                {
-                    gcmASSERT(gcvFALSE);
-                    swizzle = VIR_SWIZZLE_XYZW;
-                }
-                break;
-
-            case 2:
-                if (componentCount == 1)
-                {
-                    swizzle = VIR_SWIZZLE_ZZZZ;
-                }
-                else if (componentCount == 2)
-                {
-                    swizzle = VIR_SWIZZLE_ZWWW;
-                }
-                else
-                {
-                    gcmASSERT(gcvFALSE);
-                    swizzle = VIR_SWIZZLE_XYZW;
-                }
-                break;
-
-            case 3:
-                if (componentCount == 1)
-                {
-                    swizzle = VIR_SWIZZLE_WWWW;
-                }
-                else
-                {
-                    gcmASSERT(gcvFALSE);
-                    swizzle = VIR_SWIZZLE_XYZW;
-                }
-                break;
-
-            default:
-                gcmASSERT(gcvFALSE);
-                swizzle = VIR_SWIZZLE_XYZW;
-                break;
-        }
+        swizzle = _VIR_CG_SwizzleShiftWrap((VIR_Swizzle)origSwizzle, componentOffset, componentCount);
 
         /* Set physical/swizzle. */
         pushConstUniform->physical = physical + offset / 16;
