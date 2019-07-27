@@ -11540,7 +11540,7 @@ const char * halti5_helper_patchFuc(
             HALTI5_PATCH_TX_GATHER_PCF,
             0,
             "_inputgather_pcf_D32SFLOAT",
-            VSC_RES_OP_BIT_GATHER_PCF | VSC_RES_OP_BIT_TEXLD_BIAS_PCF,
+            VSC_RES_OP_BIT_GATHER_PCF | VSC_RES_OP_BIT_TEXLD_BIAS_PCF | VSC_RES_OP_BIT_TEXLD_LOD_PCF,
             0,
             VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHERPCF_D32F
         },
