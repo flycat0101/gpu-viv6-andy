@@ -4712,8 +4712,9 @@ VX_PRIVATE_API vx_status vxnneConvolutionReluPoolingInitializer(
             vx_enum        outputFormat            = TENSOR_DATA_TYPE(reshuffleTensor);
             vx_bool        padMode_flag            = (vx_bool)(padMode == VX_PAD_CONSTANT || padMode == VX_PAD_REPLICATE || (pad_x_left == 0 && pad_x_right == 0 && pad_y_top == 0 && pad_y_bottom == 0));
 
-            shExe_flag    = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && stride_x == 2 && stride_y == 2)
-                                    ||(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && stride_x == 4 && stride_y == 4))
+            shExe_flag    = (vx_bool)(((_IsSameType(inputs, reshuffleTensor) && stride_x == 2 && stride_y == 2)
+                                    ||(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && stride_x == 4 && stride_y == 4)
+                                    ||(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && stride_x == 3 && stride_y == 3))
                                     && (kx != 1 || ky != 1));
             if(shExe_flag && padMode_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
             {
@@ -6600,13 +6601,28 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReduceSum_Initializer(vx_node no
         VX_NULL);
 
     if (reduceDim)
+    {
         axis = reduceDim->value->u32;
+        if (axis > 3)
+        {
+            status = VX_ERROR_INVALID_PARAMETERS;
+            vxError("Invalid input dimention %d function %s line %d", axis, __FUNCTION__, __LINE__);
+            goto exit;
+        }
+    }
 
     shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+        || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)
+        || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8)
+        || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
         || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
-        || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
-        || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8))
-        && reduceDim != NULL);
+        || (inputFormat == VX_TYPE_INT8  && outputFormat == VX_TYPE_INT8)
+        || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16)
+        || (inputFormat == VX_TYPE_INT8  && outputFormat == VX_TYPE_FLOAT16)
+        || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+        || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16))
+        && (reduceDim != NULL)
+        && (axis <= 3));
 
     if(shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
@@ -6622,27 +6638,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReduceSum_Initializer(vx_node no
         vx_tensor transTensor   = NULL;
         vx_uint32 i             = 0;
         vx_bool   enable_trans  = vx_false_e;
-        vx_bool   enable_axis0  = vx_true_e;
+        vx_bool   enable_axis   = vx_true_e;
 
-        if (axis != 0)
+        if (axis == 3)
         {
             enable_trans = vx_true_e;
 
-            if (axis == 1)
-            {
-                perm_array[0] = 1;
-                perm_array[1] = 0;
-                perm_array[2] = 2;
-                perm_array[3] = 3;
-            }
-            else if (axis == 2)
-            {
-                perm_array[0] = 2;
-                perm_array[1] = 0;
-                perm_array[2] = 1;
-                perm_array[3] = 3;
-            }
-            else if (axis == 3)
+            if (axis == 3)
             {
                 perm_array[0] = 3;
                 perm_array[1] = 0;
@@ -6757,13 +6759,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReduceSum_Initializer(vx_node no
             }
         }
 
-        if (enable_axis0)
+        if (enable_axis)
         {
             vxnne_shader_executable shaderExecutable = NULL;
             vx_float32              axis_coef        = 1.0f;
             vx_uint32               batch            = new_sizes[3];
 
-            shaderExecutable = vxnneGetTensorMeanAxis0ShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS0, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst);
+            shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS0, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, axis);
 
             if (!shaderExecutable)
             {
@@ -25015,7 +25017,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
     vx_int32     resolved_dim_count = 0;
     vx_uint32    i                  = 0;
     vx_uint32    j                  = 0;
-
+    vx_uint32   input_axis;
     vx_enum     inputFormat         = TENSOR_DATA_TYPE(input);
     vx_enum     outputFormat        = TENSOR_DATA_TYPE(output);
     vx_uint32   tmpTensorIndex      = 0;
@@ -25073,13 +25075,52 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
             resolved_dim[resolved_dim_count++] = current_axis;
     }
 
+    input_axis = 0;
+
+    {
+        vx_uint32 dst_elementCount = 0;
+
+        status = vxoTensor_GetTensorElementCount(output, &dst_elementCount);
+
+        if (dst_elementCount == 1) /* reudce mean all*/
+        {
+            vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+            vx_uint32  reshpTensor_Dims = 2;
+
+            resolved_dim_count = 0;
+
+            vxoElementOptimization_GetTensorShape(input, reshpTensor_Sizes, &reshpTensor_Dims);
+
+            for (i = 0; i < reshpTensor_Dims; i++)
+            {
+                if (reshpTensor_Sizes[i] != 1)
+                {
+                    resolved_dim[resolved_dim_count++] = i;
+                }
+                else
+                    break;
+            }
+
+            input = vxoTensor_ReshapeTensor((vx_tensor)parameters[0], (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+
+            tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = input;
+            tensor_mean_layer->base.num_temp_tensors = tmpTensorIndex;
+        }
+    }
+
     if(context->evisNoInst.supportEVIS)
     {
         shExe_flag = (vx_bool)((inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32 && resolved_dim_count == 2)
                            || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1)
+                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16 && resolved_dim_count == 1)
+                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8 && resolved_dim_count == 1)
+                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 1)
                            || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16 && resolved_dim_count == 1)
+                           || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1)
                            || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && resolved_dim_count == 1)
-                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 1));
+                           || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1)
+                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 1)
+                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1));
     }
     else
     {
@@ -25105,11 +25146,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
         vx_tensor transTensor   = NULL;
         vx_tensor dst           = NULL;
         vx_bool   enable_trans  = vx_false_e;
-        vx_bool   enable_axis0  = vx_false_e;
+        vx_bool   enable_axis  = vx_false_e;
 
         if (resolved_dim_count == 1)
         {
-            enable_axis0 = vx_true_e;
+            enable_axis = vx_true_e;
         }
 
         if (resolved_dim[0] + resolved_dim[1] != 1 && resolved_dim_count == 2)
@@ -25157,28 +25198,49 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
         }
         else if (resolved_dim[0] != 0 && resolved_dim_count == 1)
         {
-            enable_trans = vx_true_e;
 
-            if (resolved_dim[0] == 1)
+            if(node->base.context->evisNoInst.supportEVIS)
             {
-                perm_array[0] = 1;
-                perm_array[1] = 0;
-                perm_array[2] = 2;
-                perm_array[3] = 3;
+                if (resolved_dim[0] == 3)
+                {
+                    enable_trans = vx_true_e;
+                    input_axis = 0;
+                    perm_array[0] = 3;
+                    perm_array[1] = 0;
+                    perm_array[2] = 1;
+                    perm_array[3] = 2;
+                }
+                else
+                {
+                    transTensor = input;
+                    input_axis = resolved_dim[0];
+                }
             }
-            else if (resolved_dim[0] == 2)
+            else
             {
-                perm_array[0] = 2;
-                perm_array[1] = 0;
-                perm_array[2] = 1;
-                perm_array[3] = 3;
-            }
-            else if (resolved_dim[0] == 3)
-            {
-                perm_array[0] = 3;
-                perm_array[1] = 0;
-                perm_array[2] = 1;
-                perm_array[3] = 2;
+                enable_trans = vx_true_e;
+                input_axis = 0;
+                if (resolved_dim[0] == 1)
+                {
+                    perm_array[0] = 1;
+                    perm_array[1] = 0;
+                    perm_array[2] = 2;
+                    perm_array[3] = 3;
+                }
+                else if (resolved_dim[0] == 2)
+                {
+                    perm_array[0] = 2;
+                    perm_array[1] = 0;
+                    perm_array[2] = 1;
+                    perm_array[3] = 3;
+                }
+                else if (resolved_dim[0] == 3)
+                {
+                    perm_array[0] = 3;
+                    perm_array[1] = 0;
+                    perm_array[2] = 1;
+                    perm_array[3] = 2;
+                }
             }
         }
         else
@@ -25311,10 +25373,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
         {
             vx_uint32 output_dims         = dims < 3 ? 3 : dims;
 
-            sizes[0] = 1;
+            sizes[0] = new_sizes[0];
             sizes[1] = new_sizes[1];
             sizes[2] = new_sizes[2];
             sizes[3] = new_sizes[3];
+            sizes[input_axis] = 1;
             dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims);
 
             tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = dst;
@@ -25381,15 +25444,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
                 operationIdx++);
         }
 
-        if (enable_axis0)
+        if (enable_axis)
         {
             vxnne_shader_executable shaderExecutable = NULL;
-            vx_float32              axis_coef        = 1.0f / (vx_float32)(TENSOR_VIEW_SIZE_INDEX(transTensor, 0));
-            vx_uint32 batch               = new_sizes[3];
+            vx_float32              axis_coef        = 1.0f / (vx_float32)(TENSOR_VIEW_SIZE_INDEX(transTensor,input_axis));
+            vx_uint32               batch            = new_sizes[3];
 
             if(node->base.context->evisNoInst.supportEVIS)
             {
-                shaderExecutable = vxnneGetTensorMeanAxis0ShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS0, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst);
+                shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS0, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis);
             }
             else
             {
