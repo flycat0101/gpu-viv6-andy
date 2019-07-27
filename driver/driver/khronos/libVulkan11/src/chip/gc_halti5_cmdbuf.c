@@ -728,7 +728,7 @@ VkResult halti5_draw(
     uint32_t drawCommand, drawCount;
     uint32_t *states;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     __vkDrawComputeCmdParams cmdParams;
     VkBool32 useOneCore = VK_FALSE;
     __vkDevContext *devCtx = cmdBuf->devCtx;
@@ -1137,7 +1137,7 @@ VkResult halti5_drawIndexed(
     uint32_t drawCommand, drawCount;
     uint32_t *states;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     __vkDrawComputeCmdParams cmdParams;
     VkBool32 useOneCore = VK_FALSE;
     __vkDevContext *devCtx = cmdBuf->devCtx;
@@ -1539,7 +1539,7 @@ VkResult halti5_drawDirect(
     uint32_t drawCommand, drawCount;
     uint32_t *states;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     __vkDrawComputeCmdParams cmdParams;
     VkBool32 useOneCore = VK_FALSE;
     __vkDevContext *devCtx = cmdBuf->devCtx;
@@ -1741,7 +1741,7 @@ VkResult halti5_drawIndexedDirect(
     uint32_t drawCommand, drawCount;
     uint32_t *states;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     __vkDrawComputeCmdParams cmdParams;
     VkBool32 useOneCore = VK_FALSE;
     __vkDevContext *devCtx = cmdBuf->devCtx;
@@ -2294,7 +2294,7 @@ VkResult halti5_splitDrawIndexedPatchList(
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
     uint32_t *states;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     __vkDrawComputeCmdParams cmdParams;
     VkBool32 useOneCore = VK_FALSE;
     __vkDevContext *devCtx = cmdBuf->devCtx;
@@ -2527,7 +2527,7 @@ static VkResult halti5_drawIndirect_common(
     uint32_t srcAddr;
     __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, buffer);
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     __vkDrawComputeCmdParams cmdParams;
     VkBool32 useOneCore = VK_FALSE;
     __vkDevContext *devCtx = cmdBuf->devCtx;
@@ -3200,7 +3200,7 @@ VkResult halti5_dispatch(
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     halti5_computePipeline *chipCmptPipeline = (halti5_computePipeline *)cmdBuf->bindInfo.pipeline.compute->chipPriv;
     struct _gcsHINT *hints = &chipCmptPipeline->chipPipeline.masterInstance->hwStates.hints;
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     __vkDrawComputeCmdParams cmdParams;
     __vkDevContext *devCtx = cmdBuf->devCtx;
     VkBool32 needWorkaround = VK_FALSE;
@@ -3412,7 +3412,7 @@ VkResult halti5_dispatchIndirect(
     __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, buffer);
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     halti5_computePipeline *chipCmptPipeline = (halti5_computePipeline *)cmdBuf->bindInfo.pipeline.compute->chipPriv;
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     __vkDrawComputeCmdParams cmdParams;
     __vkDevContext *devCtx = cmdBuf->devCtx;
 
@@ -10768,7 +10768,7 @@ VkResult halti5_allocateCommandBuffer(
     __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
     __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, cmdBuf->commandPool);
     halti5_commandBuffer *chipCommand = VK_NULL_HANDLE;
-    VkResult result;
+    VkResult result = VK_SUCCESS;
 
     __VK_SET_ALLOCATIONCB(&cdp->memCb);
 
