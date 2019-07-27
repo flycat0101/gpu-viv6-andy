@@ -2938,7 +2938,6 @@ typedef enum VIR_SYMFLAG
     VIR_SYMFLAG_IS_IOBLOCK_MEMBER               = 0x00004000, /* variable is a member of an IO block */
     VIR_SYMFLAG_IS_INSTANCE_MEMBER              = 0x00008000, /* variable is a member of an IO block with a instance name*/
     VIR_SYMFLAG_SKIP_NAME_CHECK                 = 0x00010000, /* don't need to check name match, for IO, uniform, ssbo. */
-    VIR_SYMFLAG_PASS_BY_REFERENCE               = 0x00080000, /* pass by reference to function parameter */
 
     /* ubo flags */
     VIR_SYMUBOFLAG_IS_DUBO                      = 0x00020000, /* ubo is default ubo */
@@ -2989,6 +2988,8 @@ typedef enum VIR_SYMFLAG
 
     /* normal temp variable flags */
     VIR_SYMFLAG_DEFINED_BY_EVIS                 = 0x20000000, /* The symbol is defined EVIS instruction. */
+
+    VIR_SYMFLAG_PASS_BY_REFERENCE               = 0x40000000, /* pass by reference to function parameter */
 
     /* Function flags */
     VIR_SYMFLAG_ISKERNEL                        = 0x00020000, /* is kernel function */

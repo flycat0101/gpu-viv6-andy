@@ -5838,7 +5838,6 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
     if(passByRef)
     {
         VIR_Symbol_SetFlag(sym,VIR_SYMFLAG_PASS_BY_REFERENCE);
-        VIR_Function_SetFlag(spv->virFunction, VIR_FUNCFLAG_ALWAYSINLINE);
     }
 
     /* If the parameter is an image, we need to copy the image format. */
