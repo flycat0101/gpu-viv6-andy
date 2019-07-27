@@ -22631,12 +22631,12 @@ vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
 
         if (TENSOR_QUANT_TYPE(inputs) == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
-            vx_int32 fl = TENSOR_POS(inputs);
-            vx_float32 data = fl > 0 ? padConstv * (vx_float32)(1 << fl) : padConstv * (1.0f / (vx_float32)(1 << -fl));
-            vx_int32   padV = vxnneRound(data, VX_NN_ROUNDING_MODE_RTNE);
+            vx_int32 fl = (vx_int32)TENSOR_POS(inputs);
+            vx_float32 data = (vx_float32)(fl > 0 ? padConstv * (vx_float32)(1 << fl) : padConstv * (1.0f / (vx_float32)(1 << -fl)));
+            vx_int32   padV = (vx_int32)vxnneRound(data, VX_NN_ROUNDING_MODE_RTNE);
 
             if (inputFormat == VX_TYPE_INT16)
-                borderMode->constant_value.S16 = padV > 32767 ? 32767 : (padV < -32768) ? -32768 : padV;
+                borderMode->constant_value.S16 = (vx_int16)(padV > 32767 ? 32767 : (padV < -32768) ? -32768 : padV);
             else
                 borderMode->constant_value.U8 = (vx_uint8)(padV > 127 ? 127 : (padV < -128) ? -128 : padV);
         }
@@ -22646,9 +22646,9 @@ vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
         {
             vx_float32 scale = TENSOR_TF_SCALE(inputs);
             vx_int32 zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
-            vx_int32 padV = vxnneRound(padConstv / scale  + (vx_uint8)zeroPoint, VX_NN_ROUNDING_MODE_RTNE);
+            vx_int32 padV = (vx_int32)vxnneRound(padConstv / scale  + (vx_uint8)zeroPoint, VX_NN_ROUNDING_MODE_RTNE);
 
-            borderMode->constant_value.U8 = padV > 255 ? 255 : padV < 0 ? 0 : padV;
+            borderMode->constant_value.U8 = (vx_uint8)(padV > 255 ? 255 : padV < 0 ? 0 : padV);
         }
         else if (inputFormat == VX_TYPE_UINT8 || inputFormat == VX_TYPE_INT8)
             borderMode->constant_value.U8 = (vx_uint8)padConstv;
