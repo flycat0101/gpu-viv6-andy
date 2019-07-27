@@ -8446,22 +8446,22 @@ gceSTATUS gcoHARDWARE_TranslateSourceFormat(
         break;
 
     case gcvSURF_A2R10G10B10:
-        *HwValue = AQDE_SRC_CONFIG_SOURCE_FORMAT_A2R10G10B10;
+        *HwValue = 0x16;
         *HwSwizzleValue = swizzle_argb;
         break;
 
     case gcvSURF_A2B10G10R10:
-        *HwValue = AQDE_SRC_CONFIG_SOURCE_FORMAT_A2R10G10B10;
+        *HwValue = 0x16;
         *HwSwizzleValue = swizzle_abgr;
         break;
 
     case gcvSURF_R10G10B10A2:
-        *HwValue = AQDE_SRC_CONFIG_SOURCE_FORMAT_A2R10G10B10;
+        *HwValue = 0x16;
         *HwSwizzleValue = swizzle_rgba;
         break;
 
     case gcvSURF_B10G10R10A2:
-        *HwValue = AQDE_SRC_CONFIG_SOURCE_FORMAT_A2R10G10B10;
+        *HwValue = 0x16;
         *HwSwizzleValue = swizzle_bgra;
         break;
 
@@ -8513,7 +8513,7 @@ gceSTATUS gcoHARDWARE_TranslateSourceFormat(
         break;
 
     case gcvSURF_P010:
-        *HwValue = AQDE_SRC_CONFIG_SOURCE_FORMAT_P010;
+        *HwValue = 0x1B;
         *HwSwizzleValue = swizzle_uv;
         *HwIsYUVValue = gcvTRUE;
         break;
@@ -8530,33 +8530,29 @@ gceSTATUS gcoHARDWARE_TranslateSourceFormat(
         *HwIsYUVValue = gcvTRUE;
         break;
 
-#ifdef AQDE_SRC_CONFIG_SOURCE_FORMAT_NV12_10BIT
     case gcvSURF_NV12_10BIT:
-        *HwValue = AQDE_SRC_CONFIG_SOURCE_FORMAT_NV12_10BIT;
+        *HwValue = 0x15;
         *HwSwizzleValue = swizzle_uv;
         *HwIsYUVValue = gcvTRUE;
         break;
 
     case gcvSURF_NV21_10BIT:
-        *HwValue = AQDE_SRC_CONFIG_SOURCE_FORMAT_NV12_10BIT;
+        *HwValue = 0x15;
         *HwSwizzleValue = swizzle_vu;
         *HwIsYUVValue = gcvTRUE;
         break;
-#endif
 
-#ifdef AQDE_SRC_CONFIG_SOURCE_FORMAT_NV16_10BIT
     case gcvSURF_NV16_10BIT:
-        *HwValue = AQDE_SRC_CONFIG_SOURCE_FORMAT_NV16_10BIT;
+        *HwValue = 0x17;
         *HwSwizzleValue = swizzle_uv;
         *HwIsYUVValue = gcvTRUE;
         break;
 
     case gcvSURF_NV61_10BIT:
-        *HwValue = AQDE_SRC_CONFIG_SOURCE_FORMAT_NV16_10BIT;
+        *HwValue = 0x17;
         *HwSwizzleValue = swizzle_vu;
         *HwIsYUVValue = gcvTRUE;
         break;
-#endif
 
     case gcvSURF_RG16:
         *HwValue = 0x13;

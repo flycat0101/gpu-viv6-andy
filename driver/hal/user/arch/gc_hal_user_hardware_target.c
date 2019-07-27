@@ -3598,10 +3598,10 @@ gceSTATUS gcoHARDWARE_TranslateDestinationFormat(
     case 0x5:
     case 0x6:
     case 0x10:
-    case AQDE_SRC_CONFIG_SOURCE_FORMAT_A2R10G10B10:
-    case GCREG_DE_SRC_CONFIG_SOURCE_FORMAT_NV12_10BIT:
-    case GCREG_DE_SRC_CONFIG_SOURCE_FORMAT_NV16_10BIT:
-    case GCREG_DE_SRC_CONFIG_SOURCE_FORMAT_P010:
+    case 0x16:
+    case 0x15:
+    case 0x17:
+    case 0x1B:
     case 0x7:
     case 0x8:
         break;
