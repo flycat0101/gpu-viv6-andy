@@ -1066,6 +1066,7 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
         case TP_ADD:
         case TP_ACTIVATION:
         case TP_TENSOR_COPY:
+        case TP_TENSOR_COPY4CONCAT:
         {
             if (!mult || size < core || inputXSize != outputXSize || inputYSize != outputYSize || inputZSize != outputZSize)
             {
