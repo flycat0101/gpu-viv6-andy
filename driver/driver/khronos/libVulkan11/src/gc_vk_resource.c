@@ -2617,16 +2617,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         }
         else
         {
-            if (img->formatInfo.compressed && img->halTiling == gcvTILED)
-            {
-                /* compressed format is disable supertile */
-                alignment =  img->formatInfo.bitsPerBlock / 8;
-            }
-            else
-            {
-                /* alignment should be 16(pixels) * byte per pixels for tiled surface*/
-                alignment = (img->formatInfo.bitsPerBlock >= 64) ? (4 * 4 * img->formatInfo.bitsPerBlock/8) : 64;
-            }
+            /* alignment should be 16(pixels) * byte per pixels for tiled surface, and HW require minimum 64 bytes align*/
+            alignment = (img->formatInfo.bitsPerBlock >= 64) ? (4 * 4 * img->formatInfo.bitsPerBlock / 8) : 64;
         }
 
         width  = pCreateInfo->extent.width;
