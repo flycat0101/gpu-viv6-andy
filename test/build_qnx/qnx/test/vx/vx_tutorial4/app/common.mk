@@ -47,7 +47,7 @@ include $(MKFILES_ROOT)/qmacros.mk
 
 #LIBS += GAL VDK EGL OpenVG
 
-LDOPTS += -lGAL -lLLVM_viv -lOpenVX -lOpenVXU -lCLC -lVSC
+LDOPTS += -lGAL -lOpenVX -lOpenVXU -lCLC -lVSC
 
 include $(qnx_build_dir)/math.mk
 

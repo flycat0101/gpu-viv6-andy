@@ -54,11 +54,9 @@ ifeq ($(gcdSTATIC_LINK),1)
   LIBS += $(VIVANTE_SDK_LIB)/libOpenVXU.a
   LIBS += $(VIVANTE_SDK_LIB)/libOpenVX.a
   LIBS += $(VIVANTE_SDK_LIB)/libCLC.a
-  LIBS += $(VIVANTE_SDK_LIB)/libLLVM_viv.a
   LIBS += $(VIVANTE_SDK_LIB)/libclCompiler.a
   LIBS += $(VIVANTE_SDK_LIB)/libclPreprocessor.a
   LIBS += $(VIVANTE_SDK_LIB)/libclCommon.a
-  LIBS += $(VIVANTE_SDK_LIB)/libLLVM_viv.a
   LIBS += $(VIVANTE_SDK_LIB)/libVSC.a
   LIBS += $(VIVANTE_SDK_LIB)/libhalarchuser.a
   LIBS += $(VIVANTE_SDK_LIB)/libhalosuser.a

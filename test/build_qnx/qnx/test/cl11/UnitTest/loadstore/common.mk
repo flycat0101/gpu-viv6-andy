@@ -45,7 +45,7 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS += GAL VSC CLC OpenCL LLVM_viv
+LIBS += GAL VSC CLC OpenCL
 
 include $(qnx_build_dir)/math.mk
 

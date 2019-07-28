@@ -50,11 +50,9 @@ CFLAGS += $(INCLUDE)
 ifeq ($(gcdSTATIC_LINK), 1)
 LIBS += $(SDK_LIB)/libOpenCL.a
 LIBS += $(SDK_LIB)/libCLC.a
-LIBS += $(SDK_LIB)/libLLVM_viv.a
 LIBS += $(SDK_LIB)/libclCompiler.a
 LIBS += $(SDK_LIB)/libclPreprocessor.a
 LIBS += $(SDK_LIB)/libclCommon.a
-LIBS += $(SDK_LIB)/libLLVM_viv.a
 LIBS += $(SDK_LIB)/libVSC.a
 LIBS += $(SDK_LIB)/libhalarchuser.a
 LIBS += $(SDK_LIB)/libhalosuser.a
