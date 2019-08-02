@@ -20,6 +20,20 @@
 #include "gc_hal_user_precomp.h"
 #include "gc_hal_user_buffer.h"
 
+#ifdef __QNXNTO__
+
+#include <pthread.h>
+#include <sys/queue.h>
+#include "../os/qnx/inc/gc_hal_common_qnx.h"
+gceSTATUS
+gcoOS_SignalPending(
+    IN gcoOS Os,
+    IN gcsSIGNAL_PTR Signal
+    );
+
+#endif
+
+
 #if (gcdENABLE_3D || gcdENABLE_2D)
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcvZONE_BUFFER
@@ -196,7 +210,13 @@ gcoQUEUE_AppendEvent(
             Queue->maxUnlockBytes = Interface->u.UnlockVideoMemory.bytes;
         }
     }
-
+#if defined(__QNXNTO__)
+    else if (Interface->command == gcvHAL_SIGNAL)
+    {
+        gcsSIGNAL_PTR signal = gcmUINT64_TO_TYPE(Interface->u.Signal.signal, gcsSIGNAL_PTR);
+        gcoOS_SignalPending(gcvNULL, signal);
+    }
+#endif
     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;

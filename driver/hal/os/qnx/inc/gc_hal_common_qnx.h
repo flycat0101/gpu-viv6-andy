@@ -81,5 +81,6 @@ typedef struct _gcsSIGNAL
     LIST_ENTRY(_gcsSIGNAL)  node;
 }
 gcsSIGNAL;
+typedef struct _gcsSIGNAL *         gcsSIGNAL_PTR;
 
 #endif /* GC_HAL_COMMON_QNX_H_ */

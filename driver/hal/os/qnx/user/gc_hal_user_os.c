@@ -62,7 +62,7 @@ const char * _GAL_PLATFORM = "\n\0$PLATFORM$QNX$\n";
 ***************************** gcoOS Object Structure ***************************
 \******************************************************************************/
 
-typedef struct _gcsSIGNAL *         gcsSIGNAL_PTR;
+
 typedef struct _gcsSIGNAL_RECORD *  gcsSIGNAL_RECORD_PTR;
 
 typedef struct _gcsSIGNAL_RECORD
@@ -2376,7 +2376,6 @@ gcoOS_DeviceControl(
     int rc;
     gcsTLS_PTR tls;
     gctPOINTER logical;
-    gcsSIGNAL_PTR signal;
 
     gcsQUEUE_PTR queue;
 #if gcdENABLE_VG
@@ -2427,8 +2426,6 @@ gcoOS_DeviceControl(
         return (iface->status = gcvSTATUS_OK);
 
     case gcvHAL_SIGNAL:
-        signal = gcmUINT64_TO_TYPE(iface->u.Signal.signal, gcsSIGNAL_PTR);
-        gcoOS_SignalPending(Os, signal);
         iface->u.Signal.coid = gcPLS.os->pulseCoid;
         break;
 
@@ -2440,8 +2437,6 @@ gcoOS_DeviceControl(
             /* Test for signal event. */
             if (queue->iface.command == gcvHAL_SIGNAL)
             {
-                signal = gcmUINT64_TO_TYPE(queue->iface.u.Signal.signal, gcsSIGNAL_PTR);
-                gcoOS_SignalPending(Os, signal);
                 queue->iface.u.Signal.coid = gcPLS.os->pulseCoid;
             }
             queue = gcmUINT64_TO_PTR(queue->next);
@@ -2454,7 +2449,6 @@ gcoOS_DeviceControl(
         {
             context = gcmUINT64_TO_PTR(iface->u.VGCommit.context);
             context->coid = gcPLS.os->pulseCoid;
-            gcoOS_SignalPending(Os, context->signal);
         }
         else
 #endif
@@ -2466,8 +2460,6 @@ gcoOS_DeviceControl(
                 /* Test for signal event. */
                 if (queue->iface.command == gcvHAL_SIGNAL)
                 {
-                    signal = gcmUINT64_TO_TYPE(queue->iface.u.Signal.signal, gcsSIGNAL_PTR);
-                    gcoOS_SignalPending(Os, signal);
                     queue->iface.u.Signal.coid = gcPLS.os->pulseCoid;
                 }
                 queue = gcmUINT64_TO_PTR(queue->next);
@@ -6052,7 +6044,7 @@ gcoOS_DestroySignal(
     /* Acquire the mutex. */
     pthread_mutex_lock(&signal->mutex);
 
-    if ((signal->pending != signal->received) || !signal->pending)
+    if (signal->pending != signal->received)
     {
         gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_DRIVER,
                       "%s(%d): Signal=0x%x Pending=%d Received=%d.",
@@ -6063,7 +6055,6 @@ gcoOS_DestroySignal(
 
         /* Only mark the destroy flag if the signal is still pending. */
         signal->destroyed = gcvTRUE;
-
         /* Release the mutex. */
         pthread_mutex_unlock(&signal->mutex);
     }
@@ -6301,15 +6292,10 @@ gcoOS_SignalPending(
     {
         gcmONERROR(gcvSTATUS_GENERIC_IO);
     }
-    if (Signal->destroyed) {
-        _DestroySignal(Os, Signal);
-    }
-    else
-    {
-        Signal->pending++;
-        /* Release the mutex. */
-        pthread_mutex_unlock(&Signal->mutex);
-    }
+    Signal->pending++;
+
+    /* Release the mutex. */
+    pthread_mutex_unlock(&Signal->mutex);
     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
