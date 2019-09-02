@@ -6059,11 +6059,6 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxImportKernelFromURL(vx_context context, con
     return kernel;
 
 OnError:
-    if (binaryLoad != VX_NULL)
-    {
-        gcmVERIFY_OK(gcoOS_Free(gcvNULL, (gctPOINTER*)binaryLoad));
-        binaryLoad = VX_NULL;
-    }
     vxError("fail to import kernel from %s, error code: %d\n", url, status);
     gcmFOOTER_NO();
     return VX_NULL;

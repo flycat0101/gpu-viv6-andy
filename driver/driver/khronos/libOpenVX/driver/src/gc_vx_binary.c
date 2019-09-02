@@ -717,8 +717,10 @@ static vx_status readAxiSram(
     {
         vxError("%s[%d]: binary sramSize: 0x%x, context size: 0x%x\n",
             __FUNCTION__, __LINE__, axiTable->sramSize, reader->binLoad->context->axiSRAM.size);
+        vxmONERROR(VX_ERROR_INVALID_VALUE);
     }
 
+OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
