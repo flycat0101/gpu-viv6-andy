@@ -19643,7 +19643,7 @@ VX_PRIVATE_API vx_status vxnneOperation_ExecuteYUVScalerCommand(vx_node node, vx
     {
         rect = scaleOp->rect;
     }
-    if (!rect.end_x || !rect.end_y || rect.end_x < rect.start_x || rect.end_y < rect.end_y)
+    if (!rect.end_x || !rect.end_y || rect.end_x < rect.start_x || rect.end_y < rect.start_y)
     {
         vx_image image = scaleOp->inputs;
         if (image->region.start_x > image->region.end_x)

@@ -4504,7 +4504,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
         if (tpType == TP_ACTIVATION || tpType == TP_TENSOR_COPY || tpType == TP_ADD ||
             tpType == TP_LRN || tpType == TP_TENSOR_SVDF_MAP || tpType == TP_TENSOR_STRIDED_SLICE)
         {
-            outPixel = tmpPtr->inImageXSize * tmpPtr->inImageYSize * tmpPtr->inImageZSize;
+            outPixel = (vx_uint64)tmpPtr->inImageXSize * tmpPtr->inImageYSize * tmpPtr->inImageZSize;
         }
         else
         {
@@ -4618,7 +4618,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
     outZP = output->zeroPoint;
 
     vxmASSERT(conv_cmd_ptr != VX_NULL);
-    inPadZValue = conv_cmd_ptr != VX_NULL ? conv_cmd_ptr->pad_const : input->padZeorValue;
+    inPadZValue = conv_cmd_ptr->pad_const;
     tp_type = conv_cmd_ptr->tpType;
     other_tensor = (vx_tensor)conv_cmd_ptr->other_ref;
     data_buff = (vx_tensor)conv_cmd_ptr->data_buff;

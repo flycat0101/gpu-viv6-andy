@@ -373,7 +373,7 @@ VX_INTERNAL_API void vxoMemory_Dump(vx_memory memory)
     {
         vxTrace(VX_TRACE_MEMORY,
                 "<memory>\n"
-                "    <address>"VX_FORMAT_HEX"</address>\n"
+                "    <address>%p</address>\n"
                 "    <planeCount>%u</planeCount>\n"
                 "    <planes>",
                 memory, memory->planeCount);
@@ -465,7 +465,7 @@ VX_PRIVATE_API vx_memory_pool_item _pool_get_emtpy_item(vx_memory_pool pool)
         {
             for (i = i+1, j = i; i < VX_MAX_MEMPOOL_ITEM_NUM; i++)
             {
-                if (pool->pool[i].index != VX_MEMPOOL_ITEM_INVALID)
+                if (pool->pool[i].index != VX_MEMPOOL_ITEM_INVALID && j < VX_MAX_MEMPOOL_ITEM_NUM)
                 {
                     vx_memory_pool_item niptr = &pool->pool[j];
                     gcoOS_MemCopy(niptr, &pool->pool[i], sizeof(vx_memory_pool_item_s));
@@ -492,6 +492,12 @@ VX_PRIVATE_API vx_memory_pool_item _pool_get_emtpy_item(vx_memory_pool pool)
             }
             pool->count = j;
         }
+    }
+
+    if (pool->count >= VX_MAX_MEMPOOL_ITEM_NUM)
+    {
+        gcmFOOTER_NO();
+        return VX_NULL;
     }
 
     gcoOS_MemFill(&pool->pool[pool->count], 0, sizeof(vx_memory_pool_item_s));
@@ -602,10 +608,12 @@ VX_PRIVATE_API vx_bool _pool_get_memory(vx_memory_pool pool, vx_size size, vx_ui
     if (!pool->memExpandMode)
     {
         if (logical != VX_NULL)
+        {
             *logical = pool->logical + fiptr->offset;
+            gcoOS_ZeroMemory(*logical, size);
+        }
         if (physical != VX_NULL)
             *physical = pool->physical + (vx_uint32)fiptr->offset;
-        gcoOS_ZeroMemory(*logical, size);
         *node = (gcsSURF_NODE_PTR)fiptr;
     }
     else
@@ -769,7 +777,6 @@ VX_INTERNAL_API vx_bool vxoMemoryPool_Initialize(vx_graph graph, vx_size size)
                                       &pointer->physical, &pointer->nodePtr);
         if (gcmIS_ERROR(status))
         {
-            vxoMemoryPool_Deinitialize(graph);
             if(pointer) gcoOS_Free(NULL, (gctPOINTER)pointer);
             gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
@@ -1468,6 +1475,8 @@ vxoMemoryPool_RequestList(
     gcmHEADER_ARG("graph=%p, list=%p, list_count=0x%x, start=0x%x, count=0x%x, max_sizes=%p",
         graph, list, list_count, start, count, max_sizes);
     gcmASSERT(list_count >= start+count);
+
+    gcoOS_ZeroMemory(stacks, sizeof(vx_mempool_stack_s) * VXNNE_MEM_POOL_TYPE_END);
 
     /* sort based on 1.firstUseId from late to early 2.priority from low to high 3.size from big to small */
 #define NEED_SWAP(pa, pb, fa, fb, sa, sb) \

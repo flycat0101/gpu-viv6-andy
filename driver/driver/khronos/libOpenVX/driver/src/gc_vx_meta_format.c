@@ -204,6 +204,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatAttribute(vx_meta_format meta_
         case VX_THRESHOLD_INPUT_FORMAT:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_df_image, 0x3);
             meta_format->u.thresholdInfo.input_format = *(vx_df_image *)ptr;
+            break;
 
         case VX_VALID_RECT_CALLBACK:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_kernel_image_valid_rectangle_f, 0x0);
