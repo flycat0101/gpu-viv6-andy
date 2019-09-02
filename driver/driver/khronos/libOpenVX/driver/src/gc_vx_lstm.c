@@ -1118,12 +1118,6 @@ VX_PRIVATE_API vx_status vxnneExecuteSWSVDF_MAP(struct _vxnne_operation_s *opera
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxnneExecuteSWSVDF_ROTATION(struct _vxnne_operation_s *operation)
-{
-
-
-    return VX_SUCCESS;
-}
 
 VX_PRIVATE_API vx_status vxnneExecuteSVDF_DepthWeightsTime(vx_tensor input, vx_tensor output, vx_int32 rank)
 {
@@ -1902,57 +1896,6 @@ static vx_float32 sigmoid(vx_float32 x) {
     return (vx_float32)(1. / (1. + exp(-x)));
 }
 
-/*TODO: the function vxnneGetData/vxnneSaveData called in this function need to be replaced by vxnneGetDataExt/vxnneSaveDataExt !
-But as didn't find any place to call this function, delay the change as the interface need to be refined too! */
-VX_PRIVATE_API vx_status vxnneSW_LSTMUnit(vx_int32 batch, vx_int32 output_size, vx_type_e input_format, vx_type_e output_format,
-    vx_uint8_ptr c_i_1, vx_int8 c_i_1_fixed_position,
-    vx_uint8_ptr input_i, vx_int8 input_i_fixed_position,
-    vx_uint8_ptr forget_i, vx_int8 forget_i_fixed_position,
-    vx_uint8_ptr output_i, vx_int8 output_i_fixed_position,
-    vx_uint8_ptr gate_i, vx_int8 gate_i_fixed_position,
-    vx_uint8_ptr cont_i, vx_int8 cont_i_fixed_position,
-    vx_uint8_ptr c_i, vx_int8 c_i_fixed_position,
-    vx_uint8_ptr h_i, vx_int8 h_i_fixed_position
-)
-{
-    vx_int32 n = 0, d = 0;
-    vx_int32 x_dim = output_size * 4;
-    vx_int32 item_size = vxnneGetTypeSize(input_format);
-
-    for (n = 0; n < batch; n++)
-    {
-        for (d = 0; d < output_size; d++)
-        {
-            const vx_float64 i = sigmoid(vxnneGetData(input_format, d, input_i, input_i_fixed_position));
-            const vx_float64 f = (*cont_i == 0) ? 0 :
-                (*cont_i * sigmoid(vxnneGetData(input_format, d, forget_i, forget_i_fixed_position)));
-            const vx_float64 o = sigmoid(vxnneGetData(input_format, d, output_i, output_i_fixed_position));
-            const vx_float64 g = tanh((vx_float64)(vxnneGetData(input_format, d, gate_i, gate_i_fixed_position)));
-            const vx_float64 c_prev_data = vxnneGetData(input_format, d, c_i_1, c_i_1_fixed_position);
-            const vx_float64 c_data = (vx_float64)(f * c_prev_data + i * g);
-            vx_float64 tanh_c = 0;
-            /*c_i[d] = (vx_float32)c_data;*/
-            vxnneSaveData(output_format, d, c_data, c_i, c_i_fixed_position, VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING);
-            tanh_c = tanh(c_data);
-            /*h_i[d] = (vx_float32)(o * tanh_c);*/
-            vxnneSaveData(output_format, d, o * tanh_c, h_i, h_i_fixed_position, VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING);
-        }
-
-        c_i_1 += output_size * item_size;
-
-        input_i += x_dim * item_size;
-        forget_i += x_dim * item_size;
-        output_i += x_dim * item_size;
-        gate_i += x_dim * item_size;
-
-        c_i += output_size * item_size;
-        h_i += output_size * item_size;
-
-        cont_i += item_size;
-    }
-
-    return VX_SUCCESS;
-}
 
 typedef enum _lstm_activation_e
 {
@@ -2614,36 +2557,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_ValidateOutput(vx_node node,
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxnneExecute_LSTM_Convolution_DeInilition(struct _vxnne_operation_s *operation)
-{
-    vx_status status = VX_SUCCESS;
-    vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)operation;
-
-    if (convOperation->weights_biases)
-        vxReleaseWeightsBiasesParameter(&convOperation->weights_biases);
-
-    return status;
-}
-
-VX_PRIVATE_API vx_status vxnneExecute_LSTM_ConvolutionSW_DeInilition(struct _vxnne_operation_s *operation)
-{
-    vx_status status = VX_SUCCESS;
-    vxnne_convolution_operation convOperation = (vxnne_convolution_operation)operation;
-
-    if (convOperation->weights)
-        vxoTensor_ReleaseTensor(&convOperation->weights);
-
-    if (convOperation->padX)
-        vxReleaseScalar(&convOperation->padX);
-
-    if (convOperation->padY)
-        vxReleaseScalar(&convOperation->padY);
-
-    if (convOperation->downScaleSizeRounding)
-        vxReleaseScalar(&convOperation->downScaleSizeRounding);
-
-    return status;
-}
 
 
 VX_PRIVATE_API vx_status vxoNNSWLSTMConv_ReshuffleWeightBias(vx_tensor input2input_weights, vx_tensor input2forget_weights, vx_tensor input2cell_weights, vx_tensor input2output_weights,
@@ -3668,50 +3581,6 @@ exit:
     return status;
 }
 
-/*
- * Reshape LSTM layer tensors to fit FC operation.
- *
- * The FC tensors are always 2-dimentional with the
- *  layout of {#IFM, #batch}.
- */
-VX_PRIVATE_API vx_status _ReshapeTensor4FC(
-    vx_tensor input,
-    vx_uint32 batch_pos,
-    vx_tensor *reshaped
-    )
-{
-    vx_status status = VX_SUCCESS;
-
-    vx_uint32 dim_num = TENSOR_VIEW_DIM_NUM(input);
-    vx_uint32 size = 1, batch_count = 1;
-    vx_uint32 sizes[2] = {1, 1};
-    vx_tensor output = VX_NULL;
-    vx_uint32 i;
-
-    if (!reshaped)
-    {
-        vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
-    }
-
-    for (i = 0; i < batch_pos; i++)
-    {
-        size *= TENSOR_VIEW_SIZE_INDEX(input, i);
-    }
-    sizes[0] = size;
-
-    for (i = batch_pos; i < dim_num; i++)
-    {
-        batch_count *= TENSOR_VIEW_SIZE_INDEX(input, i);
-    }
-    sizes[1] = batch_count;
-
-    output = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2);
-
-    *reshaped = output;
-
-OnError:
-    return status;
-}
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
