@@ -1890,14 +1890,17 @@ static void
 _changeConvDataType(IN VIR_Instruction    *Inst)
 {
     VIR_ScalarConstVal  imm0;
-    VIR_Operand         *opnd = gcvNULL, *convDestOpnd = gcvNULL;
-    VIR_TypeId          ty, componentTy;
+    VIR_Operand         *opnd = gcvNULL, *convDestOpnd = gcvNULL, *i2iSrc0Opnd = gcvNULL;
+    VIR_TypeId          ty, componentTy, newComponentTy = VIR_TYPE_VOID, i2iSrc0Ty = VIR_TYPE_VOID;
     gctUINT32           componentCount;
     gctBOOL             needChangeSrc1 = gcvFALSE;
+    gctBOOL             bChangeToMov = gcvFALSE;
 
     if (VIR_Inst_GetOpcode(Inst) == VIR_OP_I2I)
     {
         opnd = VIR_Inst_GetDest(Inst);
+        i2iSrc0Opnd = VIR_Inst_GetSource(Inst, 0);
+        i2iSrc0Ty = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(i2iSrc0Opnd));
     }
     else
     {
@@ -1916,18 +1919,22 @@ _changeConvDataType(IN VIR_Instruction    *Inst)
         case VIR_TYPE_FLOAT32:
             needChangeSrc1 = gcvTRUE;
             imm0.iValue = 0x1;
+            newComponentTy = VIR_TYPE_FLOAT16;
             break;
         case VIR_TYPE_INT32:
             needChangeSrc1 = gcvTRUE;
             imm0.iValue = 0x3;
+            newComponentTy = VIR_TYPE_INT16;
             break;
         case VIR_TYPE_UINT32:
             needChangeSrc1 = gcvTRUE;
             imm0.iValue = 0x6;
+            newComponentTy = VIR_TYPE_UINT16;;
             break;
         case VIR_TYPE_BOOLEAN:
             needChangeSrc1 = gcvTRUE;
             imm0.iValue = 0x3;
+            newComponentTy = VIR_TYPE_INT16;
             break;
         default:
             break;
@@ -1935,11 +1942,28 @@ _changeConvDataType(IN VIR_Instruction    *Inst)
 
         if (VIR_Inst_GetOpcode(Inst) == VIR_OP_I2I)
         {
-            imm0.iValue <<= 4;
+            /*
+            ** I2I can't support that DEST and SRC use the same data type, so we just change it to MOV.
+            ** VIV:TODO: maybe we can move this check before RA so we may skip this MOV.
+            */
+            if (newComponentTy == i2iSrc0Ty)
+            {
+                bChangeToMov = gcvTRUE;
+            }
+            else
+            {
+                imm0.iValue <<= 4;
+            }
         }
     }
 
-    if (needChangeSrc1)
+    /* Change the instruction. */
+    if (bChangeToMov)
+    {
+        VIR_Inst_SetOpcode(Inst, VIR_OP_MOV);
+        VIR_Inst_SetSrcNum(Inst, 1);
+    }
+    else if (needChangeSrc1)
     {
         VIR_Operand_SetImmediate(Inst->src[1], VIR_TYPE_INT32, imm0);
 
