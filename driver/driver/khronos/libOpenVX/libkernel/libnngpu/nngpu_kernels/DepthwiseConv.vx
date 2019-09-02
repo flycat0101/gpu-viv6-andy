@@ -399,7 +399,7 @@ __kernel void gpuDepthwiseConv_3x3_c1_s1_Quant8_x2(
     int inz = z;
     int inyStart = y * strideY - padY;
     int inxStart = x * strideX - padX;
-    int inxEndLeft = inxStart + strideX + kernelX - inputWidth;
+    int inxEndLeft = inxStart + 4 - inputWidth;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, z);
     float4 sum = 0;
@@ -496,7 +496,7 @@ __kernel void gpuDepthwiseConv_3x3_c1_s2_Quant8_x2(
     int inz = z;
     int inyStart = y * strideY - padY;
     int inxStart = x * strideX - padX;
-    int inxEndLeft = inxStart + strideX + kernelX  - inputWidth;
+    int inxEndLeft = inxStart + 6 - inputWidth;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int4 coord_in2 = (int4)(inxStart + 2, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, z);
@@ -546,6 +546,9 @@ __kernel void gpuDepthwiseConv_3x3_c1_s2_Quant8_x2(
             case 1: \
                 tmp4.w = zpIn_int; \
             break; \
+            case 2: \
+                tmp4.zw = zpIn_int; \
+            break; \
             default: \
                 tmp4 = zpIn_int; \
             break; \
@@ -591,7 +594,7 @@ __kernel void gpuDepthwiseConv_3x3_c1_s2_Quant8_x4(
     int inz = z;
     int inyStart = y * strideY - padY;
     int inxStart = x * strideX - padX;
-    int inxEndLeft = inxStart + 3 * strideX + kernelX - inputWidth;
+    int inxEndLeft = inxStart + 10 - inputWidth;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int4 coord_in2 = (int4)(inxStart + 2, inyStart, inz, 0);
     int4 coord_in3 = (int4)(inxStart + 4, inyStart, inz, 0);
@@ -720,6 +723,9 @@ __kernel void gpuDepthwiseConv_3x3_c1_s2_NoPad_Quant8_x4(
             case 1: \
                 tmp2.w = zpIn_int; \
             break; \
+            case 2: \
+                tmp2.zw = zpIn_int; \
+            break; \
             default: \
                 tmp2 = zpIn_int; \
             break; \
@@ -765,7 +771,7 @@ __kernel void gpuDepthwiseConv_3x3_c1_s1_Quant8_x4(
     int inz = z;
     int inyStart = y * strideY - padY;
     int inxStart = x * strideX - padX;
-    int inxEndLeft = inxStart  + 3 * strideX + kernelX  - inputWidth;
+    int inxEndLeft = inxStart  + 6  - inputWidth;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int4 coord_in2 = (int4)(inxStart + 2, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, z);
