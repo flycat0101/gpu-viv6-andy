@@ -10748,12 +10748,12 @@ gckHARDWARE_UpdateContextProfile(
         resetValue = 0xFF;
         newCounters0 = gcvTRUE;
     }
-
+#if gcdKERNEL_QUERY_PERFORMANCE_COUNTER_V8
     if (gckHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_TP_NN_PROBE))
     {
         newCounters1 = gcvTRUE;
     }
-
+#endif
     if (chipModel == gcv2100 || chipModel == gcv2000 || chipModel == gcv880)
     {
         gcmkONERROR(
