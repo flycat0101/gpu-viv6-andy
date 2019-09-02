@@ -1046,6 +1046,28 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
         context->options.enableAllocateContigousMemForKernel = atoi(envctrl);
     }
 
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DISABLE_TP_NN_EVIS", &envctrl)) && envctrl)
+    {
+        vx_bool disable = (atoi(envctrl) == 0) ? vx_false_e : vx_true_e;
+        if (disable)
+        {
+            context->evisNoInst.isVX2       = vx_false_e;
+            context->evisNoInst.supportEVIS = vx_false_e;
+
+            context->nnConfig.fixedFeature.nnCoreCount        =
+            context->nnConfig.fixedFeature.nnCoreCountFloat16 =
+            context->nnConfig.fixedFeature.nnCoreCountInt16   =
+            context->nnConfig.fixedFeature.nnCoreCountInt8    =
+            context->nnConfig.fixedFeature.nnMadPerCore       =
+            context->nnConfig.fixedFeature.tpCoreCount        =
+            context->nnConfig.fixedFeature.tpliteCoreCount    =
+            context->nnConfig.fixedFeature.tpPwlLUTCount      =
+            context->nnConfig.fixedFeature.vipCoreCount       = 0;
+
+            context->deviceCount = 1;
+        }
+    }
+
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
