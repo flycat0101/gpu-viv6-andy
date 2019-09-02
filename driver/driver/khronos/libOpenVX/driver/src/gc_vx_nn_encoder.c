@@ -7064,6 +7064,7 @@ void reorderKernelBufferV8Huffman(
     vx_uint32 groupCount         = (filterTotalCount + batchSize - 1) / batchSize;
 
     vx_uint32 weightCount        = wb->weights_sizes[0] * wb->weights_sizes[1];
+    vx_uint32 filterWeightCount  = weightCount * slice_count;
     vx_uint32 weightSize         = (vx_uint32)vxDataType_GetSize((vx_type_e)weight_format);
     vx_uint32 weightBitSize      = weightSize * 8;
 
@@ -7085,6 +7086,8 @@ void reorderKernelBufferV8Huffman(
     vx_uint32 linesInImageBuffer = dpAmount * zDPLoopCount;
 
     vx_uint32 nonCoefIndex = 0, idx = 0, elementIndex = 0;
+    vx_bool isBias = vx_false_e;
+    vx_uint32 biasIdx = 0;
 #if DUMP_BF16_ENC
     static vx_uint32 n = 0;
     vx_char fileName[128];
@@ -7093,6 +7096,10 @@ void reorderKernelBufferV8Huffman(
 
     pfile1 = fopen(fileName, "wt");
 #endif
+
+    if (weight_format == VX_TYPE_BFLOAT16)
+        filterWeightCount += 3;
+
     for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
     {
         vx_uint32 coreFilterCount = (coreIndex < oddFilterPerCore) ? totalFilterPerCore + 1 : totalFilterPerCore;
@@ -7140,15 +7147,198 @@ void reorderKernelBufferV8Huffman(
             }
             filterEnd = filterStart + actualFilterCount - 1;
 
-            for (k = 0; k < weightCount * slice_count; k += linesInImageBuffer)
+            for (k = 0; k < filterWeightCount; k += linesInImageBuffer)
             {
-                vx_uint32 maxKCount = ((weightCount * slice_count) % linesInImageBuffer == 0) ? (weightCount * slice_count / linesInImageBuffer) : (weightCount * slice_count / linesInImageBuffer + 1);
-                kSize = gcmMIN((weightCount * slice_count - k), linesInImageBuffer);
+                vx_uint32 maxKCount = ((filterWeightCount) % linesInImageBuffer == 0) ? (filterWeightCount / linesInImageBuffer) : (filterWeightCount / linesInImageBuffer + 1);
+                kSize = gcmMIN((filterWeightCount - k), linesInImageBuffer);
 
                 for (filterIndex = filterStart; filterIndex <= filterEnd; filterIndex++)
                 {
                     for (sk = 0; sk < linesInImageBuffer; sk++)
                     {
+                        isBias = ((k + sk >= filterWeightCount - 3) && (sk < kSize) && (weight_format == VX_TYPE_BFLOAT16)) ? vx_true_e : vx_false_e;
+                        biasIdx = isBias ? (k + sk + 3 - filterWeightCount) : 0;
+
+                        if (isBias)
+                        {
+                            vx_uint16 biasL = 0;
+                            vx_uint16 expL = 0;
+                            vx_uint16 mantissaL = 0;
+                            vx_uint16 biasM = 0;
+                            vx_uint16 expM = 0;
+                            vx_uint16 mantissaM = 0;
+                            vx_uint16 biasH = 0;
+                            vx_uint16 expH = 0;
+                            vx_uint16 mantissaH = 0;
+                            vx_uint32 biasData = 0;
+                            vx_uint8 exp = 0;
+                            vx_uint32 mantissa = 0;
+                            vx_uint8 shift = 0;
+                            vx_uint8 i = 0;
+                            vx_uint8 signedBit = 0;
+
+                            if (bias_base_ptr != VX_NULL)
+                                biasData = *(bias_base_ptr + filterIndex);
+                            else
+                                biasData = 0;
+
+                            exp = (vx_uint8)((biasData & 0x7F800000) >> 23);
+                            mantissa = biasData & 0x7FFFFF;
+                            signedBit = (biasData & 0x80000000) >> 31;
+
+                            switch (biasIdx)
+                            {
+                            case 0:
+                                {
+                                    /*biasH is the high 16 bit of orginal 32 bit bias*/
+                                    biasH = biasData >> 16;
+                                    expH = (biasH & 0x7F80) >> 7;
+                                    mantissaH = biasH & 0x7F;
+#if DUMP_BF16_ENC
+                                    if(pfile1 != NULL)
+                                    {
+                                        fprintf(pfile1, "vz:%d, biasH: 0x%x\n", filterIndex, biasH);
+                                    }
+#endif
+                                    /*we didn't suppot INF & NAN*/
+                                    vxmASSERT(expH != 0xFFFF);
+                                    /* convert -zero to +zero*/
+                                    if (exp == 0 && mantissa == 0)
+                                        signedBit = 0;
+
+                                    /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
+                                    expH = expH ^ 0x80; /*~OrgValue[14]*/
+                                    biasH = (expH << 8) | (mantissaH << 1) | signedBit;
+                                    *kernelBufferInt16Ptr = biasH;
+                                    kernelBufferInt16Ptr++;
+                                    non_coef_index[nonCoefIndex++] = elementIndex++;
+                                    reoder_stream_count_per_core[coreIndex]++;
+#if DUMP_BF16_ENC
+                                    if(pfile1 != NULL)
+                                    {
+                                        fprintf(pfile1, "vz:%d, compressed  biasH: 0x%x\n", filterIndex, biasH);
+                                    }
+#endif
+                                }
+                                break;
+                            case 1:
+                                {
+                                    /*biasM contain 8 bit mantissa[15:8]*/
+                                    mantissaM = (mantissa & 0xFF00) >> 8;
+                                    expM = exp;
+                                    shift = 0;
+
+                                    if (mantissaM == 0)
+                                    {
+                                        biasM = 0;
+                                        expM = 0;
+                                        signedBit = 0;
+                                    }
+                                    else
+                                    {
+                                        signedBit = (biasData & 0x80000000) >> 31;
+                                        /*if find the most left 1 of manitssa, will set it as hidden bit*/
+                                        for (i = 0; i < 8; i++)
+                                        {
+                                            vx_uint8 temp = mantissaM & 0x80;
+                                            mantissaM = mantissaM << 1;
+
+                                            if (temp != 0)
+                                            {
+                                                mantissaM &= 0xFF;
+                                                break;
+                                            }
+
+                                            shift++;
+                                        }
+                                        expM -= shift;
+                                        /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
+                                    }
+#if DUMP_BF16_ENC
+                                    if(pfile1 != NULL)
+                                    {
+                                        biasM = (expM << 7) | (mantissaM >> 1) | ((vx_uint16)signedBit << 15);
+                                        fprintf(pfile1, "vz:%d, biasM: 0x%x\n", filterIndex, biasM);
+                                    }
+#endif
+                                    /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
+                                    expM = expM ^ 0x80; /*~OrgValue[14]*/
+                                    biasM = (expM << 8) | mantissaM | signedBit;
+
+                                    *kernelBufferInt16Ptr = biasM;
+                                    kernelBufferInt16Ptr++;
+                                    non_coef_index[nonCoefIndex++] = elementIndex++;
+                                    reoder_stream_count_per_core[coreIndex]++;
+#if DUMP_BF16_ENC
+                                    if(pfile1 != NULL)
+                                    {
+                                        fprintf(pfile1, "vz:%d, compressed biasM: 0x%x\n", filterIndex, biasM);
+                                    }
+#endif
+                                }
+                                break;
+                            case 2:
+                                {
+                                    /*biasL contain 8 bit mantissa[7:0]*/
+                                    mantissaL = mantissa & 0xFF;
+                                    expL = exp;
+                                    shift = 0;
+
+                                    if (mantissaL == 0)
+                                    {
+                                        biasL = 0;
+                                        expL = 0;
+                                        signedBit = 0;
+                                    }
+                                    else
+                                    {
+                                        signedBit = (biasData & 0x80000000) >> 31;
+                                        /*if find the most left 1 of manitssa, will set it as hidden bit*/
+                                        for (i = 0; i < 8; i++)
+                                        {
+                                            vx_uint8 temp = mantissaL & 0x80;
+                                            mantissaL = mantissaL << 1;
+
+                                            if (temp != 0)
+                                            {
+                                                mantissaL &= 0xFF;
+                                                break;
+                                            }
+
+                                            shift++;
+                                        }
+                                        expL -= shift;
+                                        /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
+                                    }
+#if DUMP_BF16_ENC
+                                    if(pfile1 != NULL)
+                                    {
+                                        biasL = (expL << 7) | (mantissaL >> 1) | ((vx_uint16)signedBit << 15);
+                                        fprintf(pfile1, "vz:%d, biasL: 0x%x\n", filterIndex, biasL);
+                                    }
+#endif
+                                    expL = expL ^ 0x80; /*~OrgValue[14]*/
+                                    biasL = (expL << 8) | mantissaL | signedBit;
+
+                                    *kernelBufferInt16Ptr = biasL;
+                                    kernelBufferInt16Ptr++;
+                                    non_coef_index[nonCoefIndex++] = elementIndex++;
+                                    reoder_stream_count_per_core[coreIndex]++;
+#if DUMP_BF16_ENC
+                                    if(pfile1 != NULL)
+                                    {
+                                        fprintf(pfile1, "vz:%d, compressed biasL: 0x%x\n", filterIndex, biasL);
+                                    }
+#endif
+                                }
+                                break;
+                            default:
+                                vxmASSERT(0);
+                                break;
+                            }
+                            continue;
+                        }
+
                         weightZIndex = (k + sk) / weightCount;
                         weightYIndex = (k + sk) % weightCount;
                         weightYIndex /= wb->weights_sizes[0];
@@ -7220,169 +7410,6 @@ void reorderKernelBufferV8Huffman(
                             limit_zrl_Index[limitIndex++] = elementIndex;
 
                         elementIndex++;
-                    }
-
-                    /*Driver split the Float32 Bias to BFloat16 BiasH, BiasM and BiasL and add them as coefs to the end of the coef stream*/
-                    if (weight_format == VX_TYPE_BFLOAT16 &&
-                        k == (maxKCount - 1) * linesInImageBuffer &&
-                        sk == linesInImageBuffer)
-                    {
-                        vx_uint16 biasL = 0;
-                        vx_uint16 expL = 0;
-                        vx_uint16 mantissaL = 0;
-                        vx_uint16 biasM = 0;
-                        vx_uint16 expM = 0;
-                        vx_uint16 mantissaM = 0;
-                        vx_uint16 biasH = 0;
-                        vx_uint16 expH = 0;
-                        vx_uint16 mantissaH = 0;
-                        vx_uint32 biasData = 0;
-                        vx_uint8 exp = 0;
-                        vx_uint32 mantissa = 0;
-                        vx_uint8 shift = 0;
-                        vx_uint8 i = 0;
-                        vx_uint8 signedBit = 0;
-
-                        if (bias_base_ptr != VX_NULL)
-                            biasData = *(bias_base_ptr + filterIndex);
-                        else
-                            biasData = 0;
-
-                        exp = (vx_uint8)((biasData & 0x7F800000) >> 23);
-                        mantissa = biasData & 0x7FFFFF;
-                        signedBit = (biasData & 0x80000000) >> 31;
-
-
-                        /*biasH is the high 16 bit of orginal 32 bit bias*/
-                        biasH = biasData >> 16;
-                        expH = (biasH & 0x7F80) >> 7;
-                        mantissaH = biasH & 0x7F;
-#if DUMP_BF16_ENC
-                        if(pfile1 != NULL)
-                        {
-                            fprintf(pfile1, "vz:%d, biasH: 0x%x\n", filterIndex, biasH);
-                        }
-#endif
-                        /*we didn't suppot INF & NAN*/
-                        vxmASSERT(expH != 0xFFFF);
-                        /* convert -zero to +zero*/
-                        if (exp == 0 && mantissa == 0)
-                            signedBit = 0;
-
-                        /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
-                        expH = expH ^ 0x80; /*~OrgValue[14]*/
-                        biasH = (expH << 8) | (mantissaH << 1) | signedBit;
-                        *kernelBufferInt16Ptr = biasH;
-                        kernelBufferInt16Ptr++;
-                        non_coef_index[nonCoefIndex++] = elementIndex++;
-#if DUMP_BF16_ENC
-                        if(pfile1 != NULL)
-                        {
-                            fprintf(pfile1, "vz:%d, compressed  biasH: 0x%x\n", filterIndex, biasH);
-                        }
-#endif
-                        /*biasM contain 8 bit mantissa[15:8]*/
-                        mantissaM = (mantissa & 0xFF00) >> 8;
-                        expM = exp;
-                        shift = 0;
-
-                        if (mantissaM == 0)
-                        {
-                            biasM = 0;
-                            expM = 0;
-                            signedBit = 0;
-                        }
-                        else
-                        {
-                            signedBit = (biasData & 0x80000000) >> 31;
-                            /*if find the most left 1 of manitssa, will set it as hidden bit*/
-                            for (i = 0; i < 8; i++)
-                            {
-                                vx_uint8 temp = mantissaM & 0x80;
-                                mantissaM = mantissaM << 1;
-
-                                if (temp != 0)
-                                {
-                                    mantissaM &= 0xFF;
-                                    break;
-                                }
-
-                                shift++;
-                            }
-                            expM -= shift;
-                            /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
-                        }
-#if DUMP_BF16_ENC
-                        if(pfile1 != NULL)
-                        {
-                            biasM = (expM << 7) | (mantissaM >> 1) | ((vx_uint16)signedBit << 15);
-                            fprintf(pfile1, "vz:%d, biasM: 0x%x\n", filterIndex, biasM);
-                        }
-#endif
-                        /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
-                        expM = expM ^ 0x80; /*~OrgValue[14]*/
-                        biasM = (expM << 8) | mantissaM | signedBit;
-
-                        *kernelBufferInt16Ptr = biasM;
-                        kernelBufferInt16Ptr++;
-                        non_coef_index[nonCoefIndex++] = elementIndex++;
-#if DUMP_BF16_ENC
-                        if(pfile1 != NULL)
-                        {
-                            fprintf(pfile1, "vz:%d, compressed biasM: 0x%x\n", filterIndex, biasM);
-                        }
-#endif
-                        /*biasL contain 8 bit mantissa[7:0]*/
-                        mantissaL = mantissa & 0xFF;
-                        expL = exp;
-                        shift = 0;
-
-                        if (mantissaL == 0)
-                        {
-                            biasL = 0;
-                            expL = 0;
-                            signedBit = 0;
-                        }
-                        else
-                        {
-                            signedBit = (biasData & 0x80000000) >> 31;
-                            /*if find the most left 1 of manitssa, will set it as hidden bit*/
-                            for (i = 0; i < 8; i++)
-                            {
-                                vx_uint8 temp = mantissaL & 0x80;
-                                mantissaL = mantissaL << 1;
-
-                                if (temp != 0)
-                                {
-                                    mantissaL &= 0xFF;
-                                    break;
-                                }
-
-                                shift++;
-                            }
-                            expL -= shift;
-                            /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
-                        }
-#if DUMP_BF16_ENC
-                        if(pfile1 != NULL)
-                        {
-                            biasL = (expL << 7) | (mantissaL >> 1) | ((vx_uint16)signedBit << 15);
-                            fprintf(pfile1, "vz:%d, biasL: 0x%x\n", filterIndex, biasL);
-                        }
-#endif
-                        expL = expL ^ 0x80; /*~OrgValue[14]*/
-                        biasL = (expL << 8) | mantissaL | signedBit;
-
-                        *kernelBufferInt16Ptr = biasL;
-                        kernelBufferInt16Ptr++;
-                        non_coef_index[nonCoefIndex++] = elementIndex++;
-                        reoder_stream_count_per_core[coreIndex] += 3;
-#if DUMP_BF16_ENC
-                        if(pfile1 != NULL)
-                        {
-                            fprintf(pfile1, "vz:%d, compressed biasL: 0x%x\n", filterIndex, biasL);
-                        }
-#endif
                     }
                 }
             }
@@ -7823,11 +7850,13 @@ vx_uint32 calcKernelSizeV8Huffman(
     vx_uint32 kernelStreamSizePerCore = 0;
     vx_uint32 limitZRLCountIdx = 0;
 
+    if (weight_format == VX_TYPE_BFLOAT16)
+    {
+        numOfInImageBuffer = (vx_uint32)gcoMATH_Ceiling((vx_float32)(weightCount * slice_count + 3) / (vx_float32)linesInImageBuffer);
+    }
+
     reorderStreamAllCount = (numOfInImageBuffer * linesInImageBuffer * filterTotalCount)
         + (usedCoreCount * (16 / weightBitSize));/*filterPerCore need 16 bit * nnCoreCount */
-    if (weight_format == VX_TYPE_BFLOAT16)
-        reorderStreamAllCount += filterTotalCount * 3; /*BFLOAT16 fp32 bias will be splitted to 3 BF16 to coef stream*/
-
     reorderStreamSize = reorderStreamAllCount * weightSize;
     if (hasNNPerFilterPostMultiply)
         reorderStreamSize += filterTotalCount; /*Per channel 8 bit zero point*/
@@ -8418,11 +8447,12 @@ void fillinKernelBufferV8Huffman(
         }
     }
 
+    if (weight_format == VX_TYPE_BFLOAT16)
+    {
+        numOfInImageBuffer = (vx_uint32)gcoMATH_Ceiling((vx_float32)(weightCount * slice_count + 3) / (vx_float32)linesInImageBuffer);
+    }
     reorderStreamAllCount = (numOfInImageBuffer * linesInImageBuffer * filterTotalCount)
         + (usedCoreCount * (16 / weightBitSize));/*filterPerCore need 16 bit * nnCoreCount */
-
-    if (weight_format == VX_TYPE_BFLOAT16)
-        reorderStreamAllCount += filterTotalCount * 3; /*BFLOAT16 fp32 bias will be splitted to 3 BF16 to coef stream*/
 
     reorderStreamSize = reorderStreamAllCount * weightSize;
 
