@@ -1292,12 +1292,6 @@ vxoMemoryPool_GetStackItemsByPriority(
     {
         do
         {
-            if (VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(stack->buffer[pos].memory->allocPriority) &&
-                (VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(stack->buffer[pos].memory->allocType) == VXNNE_MEM_POOL_TYPE_VIP_SRAM ||
-                 stack->buffer[pos].memory->allocTypeTmp == VXNNE_MEM_POOL_TYPE_AXI_SRAM || context->axiSRAM.size - context->axiSRAM.used == 0))
-            {
-                continue;
-            }
             if (VXNNE_MEM_ALLOC_TYPE_WITHOUT_MUST_HAVE(stack->buffer[pos].memory->allocPriority) == priority)
             {
                 array[count++] = stack->buffer[pos].memory;
@@ -1309,12 +1303,6 @@ vxoMemoryPool_GetStackItemsByPriority(
     {
         do
         {
-            if (VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(stack->buffer[pos].memory->allocPriority) &&
-                (VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(stack->buffer[pos].memory->allocType) == VXNNE_MEM_POOL_TYPE_VIP_SRAM ||
-                 stack->buffer[pos].memory->allocTypeTmp == VXNNE_MEM_POOL_TYPE_AXI_SRAM || context->axiSRAM.size - context->axiSRAM.used == 0))
-            {
-                continue;
-            }
             if (VXNNE_MEM_ALLOC_TYPE_WITHOUT_MUST_HAVE(stack->buffer[pos].memory->allocPriority) == priority)
             {
                 array[count++] = stack->buffer[pos].memory;
@@ -1782,7 +1770,11 @@ again:
                                     }
                                     else
                                     {
-                                        vxmASSERT(!VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(plist[k]->allocPriority));
+                                        if (VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(plist[k]->allocPriority))
+                                        {
+                                            status = VX_FAILURE;
+                                            goto exit;
+                                        }
                                         plist[k]->sizes[1] = 0;
                                     }
 
@@ -1809,7 +1801,11 @@ again:
                                     }
                                     else
                                     {
-                                        vxmASSERT(!VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(plist[k]->allocPriority));
+                                        if (VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(plist[k]->allocPriority))
+                                        {
+                                            status = VX_FAILURE;
+                                            goto exit;
+                                        }
                                         plist[k]->sizes[1] = 0;
                                     }
                                 }

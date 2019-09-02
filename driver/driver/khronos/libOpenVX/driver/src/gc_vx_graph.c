@@ -1764,7 +1764,7 @@ VX_PRIVATE_API vx_status SetMemoryRequestList(
             dims = memRequest[i].outputMemory[j]->dimCount - 1;
             memRequest[i].outputMemory[j]->allocType    = allocType2;
             memRequest[i].outputMemory[j]->sizes[0]     = gcmALIGN_NP2(memRequest[i].outputMemory[j]->strides[0][dims] * memRequest[i].outputMemory[j]->dims[0][dims], CACHE_ALIGNMENT_SIZE);
-            memRequest[i].outputMemory[j]->allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_3);
+            memRequest[i].outputMemory[j]->allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2);
             vxmASSERT(memRequest[i].outputMemory[j]->sizes[0] > 0);
         }
 
@@ -1853,7 +1853,7 @@ VX_PRIVATE_API vx_status DetectABSegments(
                     requestList->kernelCache.lastUseId = requestList->kernelCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
                     requestList->kernelCache.sizes[0] = graph->layer->operations[k]->esitimateKernelCacheSize;;
                     requestList->kernelCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
-                    requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2;
+                    requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_3;
                     requestList->kernelCache.allocPartial = vx_true_e;
                     requestList->inputMemory[requestList->inputCount] = &requestList->kernelCache;
                     requestList->inputCount++;
@@ -2191,7 +2191,7 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
             requestList->kernelCache.lastUseId = requestList->kernelCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
             requestList->kernelCache.sizes[0] = kernelbufferSize;
             requestList->kernelCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
-            requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2;
+            requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_3;
             requestList->kernelCache.allocPartial = vx_true_e;
             requestList->inputMemory[requestList->inputCount] = &requestList->kernelCache;
             requestList->inputCount++;
