@@ -17098,7 +17098,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                                 outputs_rs = outputs;
 
                             shaderExecutable = vxnneGPUConv2D_1x1ShaderExecutable(node->base.context, VXNNE_KERNEL_CONVOLUTION_1X1,
-                                &node->kernelAttributes.borderMode, enable_tensor_cast, input_rs, weights_new_rs, newBiases, outputs_rs);
+                                &node->kernelAttributes.borderMode, enable_tensor_cast || enable_ofm_gt_xy, input_rs, weights_new_rs, newBiases, outputs_rs);
                         }
                         else
                         {
