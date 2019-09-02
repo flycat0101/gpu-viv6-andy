@@ -2460,7 +2460,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_computeQuantAttribute(vx_enum qua
         maxValue = gcmMAX(maxValue, 0);
         minValue = gcmMIN(minValue, 0);
         local_scale = (maxValue - minValue)/drange;
-        local_zp    = gcmMIN(255, gcmMAX(0, (vx_int32)roundRTZ(0 - minValue/ *scale)));
+        local_zp    = gcmMIN(255, gcmMAX(0, (vx_int32)roundRTNE(0 - minValue/ local_scale)));
     }
     else if(quantType == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
