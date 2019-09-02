@@ -132,7 +132,7 @@ $(LIB_GLSLC):       $(LIB_GAL) $(LIB_VSC)
 $(LIB_VSC):         $(LIB_GAL)
 $(LIB_VSC_Lite):         $(LIB_GAL)
 
-.PHONY: oes11_drv gles11 oes2x_drv gles2x glslc vsc
+.PHONY: oes11_drv gles11 oes2x_drv gles2x glslc vsc vsc_lite
 oes11_drv gles11:   $(LIB_GLES11)
 oes2x_drv gles2x:   $(LIB_GLES2X)
 glslc:              $(LIB_GLSLC)
