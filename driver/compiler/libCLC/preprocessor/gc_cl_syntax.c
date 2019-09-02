@@ -1703,6 +1703,11 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
                 {
                     if (Extension == clvEXTENSION_VIV_VX)
                     {
+                        gctBOOL isVX2 = gcGetHWCaps()->hwFeatureFlags.supportEVISVX2;
+                        if (isVX2)
+                            status = ppoPREPROCESSOR_addMacroDef_Int(PP, "_VIV_VX_EXTENSION", "2");
+                        else
+                            status =  ppoPREPROCESSOR_addMacroDef_Int(PP, "_VIV_VX_EXTENSION", "1");
                         status = ppoPREPROCESSOR_addMacroDef_Int(PP, "_VIV_VX_EXTENSION", "1");
                         status = ppoPREPROCESSOR_AddSdkDirToPath(PP);
                         if (gcmIS_ERROR(status))
