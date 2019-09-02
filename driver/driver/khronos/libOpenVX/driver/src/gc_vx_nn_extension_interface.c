@@ -8220,11 +8220,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_Deinitializer(vx_node node
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNNNormalizationLayer2(vx_node node, const vx_reference *parameters, vx_uint32 num)
-{
-    return VX_SUCCESS;
-}
-
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_ValidateInput(vx_node node, vx_uint32 index)
 {
     return VX_SUCCESS;
@@ -10620,110 +10615,6 @@ vx_status vxnneExecuteSWEltwise(struct _vxnne_operation_s *operation)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_NNTensorEltwise(vx_node node, const vx_reference *parameters, vx_uint32 num)
-{
-    return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorEltwise_ValidateInput(vx_node node, vx_uint32 index)
-{
-    return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorEltwise_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
-{
-    return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorEltwise_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
-{
-   vx_status  status  = VX_SUCCESS;
-
-    vx_tensor input1   = (vx_tensor)parameters[0];
-    vx_tensor input2   = (vx_tensor)parameters[1];
-    vx_scalar scale = NULL;
-    vx_scalar overflow = (vx_scalar)parameters[2];
-    vx_scalar rounding = NULL;
-    vx_tensor output   = (vx_tensor)parameters[3];
-    vx_enum kernel     = node->kernel->enumeration;
-    vxnne_eltwise_layer eltwiseLayer = VX_NULL;
-    vxnne_eltwise_sw_operation_s * operation = VX_NULL;
-
-    if (kernel == VX_KERNEL_TENSOR_MULTIPLY)
-    {
-        scale = (vx_scalar)parameters[2];
-        overflow = (vx_scalar)parameters[3];
-        rounding = (vx_scalar)parameters[4];
-        output   = (vx_tensor)parameters[5];
-    }
-
-    /* destroy the existing layer */
-    if (node->layer)
-    {
-        vxnneLayer_Free(node->layer);
-        node->layer = VX_NULL;
-    }
-
-    gcoOS_Allocate(gcvNULL, sizeof(vxnne_eltwise_layer_s), (gctPOINTER*)&eltwiseLayer);
-    if (!eltwiseLayer)
-    {
-        status = VX_ERROR_NO_MEMORY;
-        vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
-        goto exit;
-    }
-
-    gcoOS_ZeroMemory(eltwiseLayer, sizeof(vxnne_eltwise_layer_s));
-
-    vxnneLayer_Initialize(&eltwiseLayer->base,
-                          "eltwiseLayer",
-                          node,
-                          vxmOPERATION_COUNT(eltwiseLayer),
-                          eltwiseLayer->operations,
-                          vxnneLayer_Deinitialize);
-
-    operation = &eltwiseLayer->eltwise_operation;
-
-    status = vxnneOperation_Initialize(&eltwiseLayer->eltwise_operation.base,
-                                       &eltwiseLayer->base,
-                                       VXNNE_OPERATION_TARGET_SW,
-                                       VXNNE_OPERATOR_ACTIVATION,
-                                       vxnneExecuteSWEltwise,
-                                       VX_NULL,
-                                       TENSOR_SIZE_INDEX(input1, 3),
-                                       0);
-
-    vxnneLayer_SetOperation(
-        &eltwiseLayer->base,
-        &eltwiseLayer->eltwise_operation.base,
-        0);
-
-    operation->kernel           = node->kernel->enumeration;
-    operation->input1           = input1;
-    operation->input2           = input2;
-    operation->scale            = scale;
-    operation->overflow         = overflow;
-    operation->rounding         = rounding;
-    operation->output           = output;
-
-    vxnneOperation_AddReference(&eltwiseLayer->eltwise_operation.base, (vx_reference)input1, VXNNE_OPERATION_REFENRENCE_INPUT);
-    vxnneOperation_AddReference(&eltwiseLayer->eltwise_operation.base, (vx_reference)input2, VXNNE_OPERATION_REFENRENCE_INPUT);
-    vxnneOperation_AddReference(&eltwiseLayer->eltwise_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-
-    node->layer = &eltwiseLayer->base;
-
-exit:
-    return status;
-}
-
-VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorEltwise_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
-{
-    if (node->layer)
-    {
-        vxnneLayer_Free(node->layer);
-    }
-    return VX_SUCCESS;
-}
-
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_NNTensorAdd(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     return VX_SUCCESS;
@@ -11268,39 +11159,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSub_Deinitializer(vx_node node, 
     return VX_SUCCESS;
 }
 //end tensor sub
-
-/* TODO: the round function may need to be refine on linux platform */
-VX_PRIVATE_API double roundDouble(double x)
-{
-    double tmpFloat = 0.0;
-
-    tmpFloat = floor(x + 0.5f);
-
-    return tmpFloat;
-}
-
-VX_PRIVATE_API vx_float32 roundFloat(vx_float32 x)
-{
-    vx_float32 tmpFloat = 0.0;
-
-    tmpFloat = floorf(x + 0.4999999f);
-
-    return tmpFloat;
-}
-
-static vx_int16 trunc_to_int16(int_fast32_t val)
-{
-    union { vx_int16 i; vx_uint16 u; } tmp;
-    tmp.u = (vx_uint16)val;
-    return tmp.i;
-}
-
-static vx_int8 trunc_to_int8(int_fast32_t val)
-{
-    union { vx_int8 i; vx_uint8 u; } tmp;
-    tmp.u = (vx_uint8)val;
-    return tmp.i;
-}
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_NNTensorMul(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
@@ -15727,17 +15585,6 @@ VX_PRIVATE_API vx_status vxnneExecuteSW_Depthwise_Convolution_DeInilition(struct
     return status;
 }
 
-VX_PRIVATE_API vx_status vxnneExecute_Depthwise_Convolution_DeInilition(struct _vxnne_operation_s *operation)
-{
-    vx_status status = VX_SUCCESS;
-    vxnne_convolution_relu_pooling_operation convOperation   = (vxnne_convolution_relu_pooling_operation)operation;
-
-    if (convOperation->weights_biases)
-        vxReleaseWeightsBiasesParameter(&convOperation->weights_biases);
-
-    return status;
-}
-
 VX_PRIVATE_API vx_status vxnneExecuteSWConv_Convolution_DeInilition2(struct _vxnne_operation_s *operation)
 {
     vx_status status = VX_SUCCESS;
@@ -18438,52 +18285,6 @@ VX_PRIVATE_API void vxnneLayerSW_gemm_u8(vx_type_e A_format, vx_type_e B_format,
 VX_PRIVATE_API vx_bool vxnneLayerSW_is_a_ge_zero_and_a_lt_b(vx_int32 a, vx_int32 b) {
   return (((vx_uint32)a) < (vx_uint32)(b))?vx_true_e:vx_false_e;
 }
-
-VX_PRIVATE_API void vxnneLayerSW_col2im(vx_type_e col_format, vx_type_e im_format, vx_int32 roundMode,
-                                        vx_int8 col_fixedPointPos, vx_int8 im_fixedPointPos,
-    vx_uint8_ptr data_col, const vx_int32 channels,
-    const vx_int32 height, const vx_int32 width, const vx_int32 kernel_h, const vx_int32 kernel_w,
-    const vx_int32 pad_h, const vx_int32 pad_w,
-    const vx_int32 stride_h, const vx_int32 stride_w,
-    const vx_int32 dilation_h, const vx_int32 dilation_w,
-    vx_uint8_ptr data_im) {
-    vx_int32 channel = 0, kernel_row = 0, kernel_col = 0, input_row = 0, output_rows = 0, input_col = 0;
-    vx_int32 output_col = 0;
-
-    const vx_int32 output_h = (height + 2 * pad_h - (dilation_h * (kernel_h - 1) + 1)) / stride_h + 1;
-    const vx_int32 output_w = (width + 2 * pad_w - (dilation_w * (kernel_w - 1) + 1)) / stride_w + 1;
-    const vx_int32 channel_size = height * width;
-    for (channel = channels; channel--; data_im += vxnneGetTypeSize(im_format) *channel_size) {
-        for (kernel_row = 0; kernel_row < kernel_h; kernel_row++) {
-            for (kernel_col = 0; kernel_col < kernel_w; kernel_col++) {
-                input_row = -pad_h + kernel_row * dilation_h;
-                for (output_rows = output_h; output_rows; output_rows--) {
-                    if (!vxnneLayerSW_is_a_ge_zero_and_a_lt_b(input_row, height)) {
-                        /*data_col += output_w;*/
-                        data_col += vxnneGetTypeSize(col_format) * output_w;
-                    } else {
-                          input_col = -pad_w + kernel_col * dilation_w;
-                          for (output_col = output_w; output_col; output_col--) {
-                              if (vxnneLayerSW_is_a_ge_zero_and_a_lt_b(input_col, width)) {
-                                  /*data_im[input_row * width + input_col] += *data_col;*/
-                                  vx_int32 idx = input_row * width + input_col;
-                                  vx_float64 val1 = vxnneGetData(col_format, 0, data_col, col_fixedPointPos);
-                                  vx_float64 val2 =  vxnneGetData(im_format, input_row * width + input_col, data_im, im_fixedPointPos);
-                                  vx_float64 val = val1 + val2;
-                                  vxnneSaveData(im_format, idx, val, data_im, im_fixedPointPos, roundMode);
-                              }
-                              /*data_col++;*/
-                              data_col += vxnneGetTypeSize(col_format);
-
-                              input_col += stride_w;
-                          }
-                    }
-                    input_row += stride_h;
-                }
-            }
-        }
-    }
-}
 VX_PRIVATE_API void vxnneLayerSW_col2im_add_bias(vx_type_e col_format, vx_type_e im_format,vx_type_e bias_format, vx_int32 roundMode,
                                         vx_int8 col_fixedPointPos, vx_int8 im_fixedPointPos, vx_int8 bias_fixedPointPos,
     vx_uint8_ptr data_col,vx_uint8_ptr biases,
@@ -18594,21 +18395,6 @@ VX_PRIVATE_API void vxnneLayerSW_col2im_add_bias_u8(vx_type_e col_format, vx_typ
             vx_float32 fbias = vxnneGetDataQuant(bias_format, channels-channel-1, biases, bias_zeroPoint, bias_scale);
             for(i=0;i<channel_size;i++)
                 vxnneSaveDataQuant(im_format, i, tmp_ptr[i]+fbias, data_im, im_zeroPoint, im_scale, roundMode);
-        }
-    }
-}
-
-VX_PRIVATE_API void vxnneLayerSW_add_bias(vx_type_e output_format, vx_type_e bias_format, vx_int32 roundMode,
-                                          vx_int8 output_fixedPointPos, vx_int8 bias_fixedPointPos,
-                vx_uint8_ptr output, vx_uint8_ptr biases, vx_int32 batch, vx_int32 n, vx_int32 size)
-{
-    vx_int32 i,j,b;
-    for(b = 0; b < batch; ++b){
-        for(i = 0; i < n; ++i){
-            for(j = 0; j < size; ++j){
-                /*output[(b*n + i)*size + j] += biases[i];*/
-                vxnneSaveData(output_format, (b*n + i)*size + j, vxnneGetData(bias_format, i, biases, bias_fixedPointPos) + vxnneGetData(output_format, (b*n + i)*size + j, output, output_fixedPointPos), output, output_fixedPointPos, roundMode);
-            }
         }
     }
 }
