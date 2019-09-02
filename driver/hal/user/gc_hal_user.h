@@ -5012,7 +5012,7 @@ gcoHARDWARE_GetBaseAddr(
 gceSTATUS
 gcoHARDWARE_QuerySRAM(
     IN gcoHARDWARE Hardware,
-    IN gceSRAM  Type,
+    IN gcePOOL  Type,
     OUT gctUINT32 *Base,
     OUT gctUINT32 *Size,
     OUT gctPHYS_ADDR_T *gpuPhysical,

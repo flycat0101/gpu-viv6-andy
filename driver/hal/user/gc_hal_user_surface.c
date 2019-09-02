@@ -13809,6 +13809,10 @@ gcsSURF_NODE_Construct(
     gceHARDWARE_TYPE type;
 #endif
 
+    /* Need refine this function to pass the internal and external SRAM index. */
+    gctINT32 sRAMIndex = 0;
+    gctINT32 extSRAMIndex = 0;
+
 #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_SPECIFY_POOL
     static gcePOOL poolPerType[gcvSURF_NUM_TYPES] =
     {
@@ -13883,6 +13887,9 @@ gcsSURF_NODE_Construct(
     alvm->type      = Type;
     alvm->pool      = Pool;
     alvm->flag      = Flag;
+
+    alvm->sRAMIndex    = (Pool == gcvPOOL_INTERNAL_SRAM) ? sRAMIndex : -1;
+    alvm->extSRAMIndex = (Pool == gcvPOOL_EXTERNAL_SRAM) ? extSRAMIndex : -1;
 
 #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_SPECIFY_POOL
     if (Pool == gcvPOOL_DEFAULT)

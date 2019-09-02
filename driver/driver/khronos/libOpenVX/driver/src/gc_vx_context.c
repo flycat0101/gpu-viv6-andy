@@ -1064,11 +1064,10 @@ void vxPRINT(vx_uint32 level, const char *msg, ...)
 
 VX_PRIVATE_API vx_status QuerySRAM(
     vx_context          context,
-    gceSRAM             type,
+    gcePOOL             type,
     gctUINT32*          sRamPhysical,
     gctPOINTER*         sRamLogical,
     gctUINT32*          sRamGpuPhysical,
-    gctPHYS_ADDR_T*     sRamCpuPhysical,
     gctUINT32*          sRamSize,
     gcsSURF_NODE_PTR*   sRamNode
     )
@@ -1081,62 +1080,56 @@ VX_PRIVATE_API vx_status QuerySRAM(
     gctUINT32           physical = 0xFFFFFFFF;
     gctUINT32           size = 0;
     gctPHYS_ADDR_T      gpuPhysical = ~0ull;
-    gctPHYS_ADDR_T      cpuPhysical = ~0ull;
 
-    gctUINT32           customizedAxiSRAMSize = context->nnConfig.customizedFeature.axiSRAMSize;
-    gctUINT32           customizedVipSRAMSize = context->nnConfig.customizedFeature.vipSRAMSize;
     gcmHEADER_ARG("context=%p, type=%p, sRamPhysical=%p, sRamLogical=%p, sRamSize=%p, sRamNode=%p",
         context, type, sRamPhysical, sRamLogical, sRamSize, sRamNode);
 
-    status = gcoHAL_QuerySRAM(gcvNULL, type, &physical, &size, &gpuPhysical, &cpuPhysical);
+    status = gcoHAL_QuerySRAM(gcvNULL, type, gcvNULL, &size, gcvNULL, gcvNULL);
     if (gcmIS_ERROR(status))
     {
         vxStatus = VX_FAILURE;
         goto OnError;
     }
 
-    if (type == gcvSRAM_EXTERNAL0)
+    if (type == gcvPOOL_EXTERNAL_SRAM)
     {
-        if (size != 0 && customizedAxiSRAMSize != 0)
+        if (context->options.axiSRAMSize != VX_INVALID_VALUE )
         {
-            if (physical == 0xFFFFFFFF)
-            {
-                /* on Cmodel */
-                gctUINT32 tempSize = size = customizedAxiSRAMSize;
-                status = gcoVX_AllocateMemoryEx(&tempSize, gcvSURF_VERTEX, 256, &physical, &logical, &node);
-                if (gcmIS_ERROR(status))
-                {
-                    vxStatus = VX_ERROR_NO_MEMORY;
-                    goto OnError;
-                }
-
-                gpuPhysical = 0;
-                cpuPhysical = 0;
-            }
-            else
-            {
-                /* on Chip */
-                size = gcmMIN(size, customizedAxiSRAMSize);
-            }
+            size = gcmMIN(size, context->options.axiSRAMSize);
         }
-        else
-        {
 
-            physical = 0xFFFFFFFF;
-            size = 0;
+        context->nnConfig.customizedFeature.axiSRAMSize = size;
+
+        if (size != 0)
+        {
+            gctUINT32 tempSize = size;
+
+            status = gcoVX_AllocateMemoryEx(&tempSize, gcvSURF_VERTEX, type, 256, &physical, &logical, &node);
+            if (gcmIS_ERROR(status))
+            {
+                vxStatus = VX_ERROR_NO_MEMORY;
+                goto OnError;
+            }
+
+            gpuPhysical = physical;
         }
     }
-    else if (type == gcvSRAM_INTERNAL)
+    else if (type == gcvPOOL_INTERNAL_SRAM)
     {
-        if (size != 0 && customizedVipSRAMSize != 0)
+        if (context->options.vipSRAMSize != VX_INVALID_VALUE )
         {
-            size = gcmMIN(size, customizedVipSRAMSize);
+            size = gcmMIN(size, context->options.vipSRAMSize);
+        }
 
-            if (physical == 0xFFFFFFFF && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
+        context->nnConfig.customizedFeature.vipSRAMSize = size;
+
+        if (size != 0)
+        {
+            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
             {
                 /* on Cmodel */
                 gctUINT32 tempSize = size;
-                status = gcoVX_AllocateMemoryEx(&tempSize, gcvSURF_VERTEX, 256, &physical, &logical, &node);
+                status = gcoVX_AllocateMemoryEx(&tempSize, gcvSURF_VERTEX, type, 256, &physical, &logical, &node);
                 if (gcmIS_ERROR(status))
                 {
                     vxStatus = VX_ERROR_NO_MEMORY;
@@ -1162,7 +1155,6 @@ VX_PRIVATE_API vx_status QuerySRAM(
     *sRamNode = node;
 
     if (sRamGpuPhysical) *sRamGpuPhysical = (gctUINT32)gpuPhysical;
-    if (sRamCpuPhysical) *sRamCpuPhysical = cpuPhysical;
 
 OnError:
     gcmFOOTER_ARG("%d", vxStatus);
@@ -1188,8 +1180,8 @@ VX_PRIVATE_API vx_status vxoContext_InitSRAM(
 
     gcmHEADER_ARG("context=%p", context);
 
-    vxmONERROR(QuerySRAM(context, gcvSRAM_EXTERNAL0, &axiSRAMPhysical, &axiSRAMLogical, &axiSRAMGpuPhysical, gcvNULL, &axiSRAMSize, &axiSRAMNode));
-    vxmONERROR(QuerySRAM(context, gcvSRAM_INTERNAL, &vipSRAMPhysical, &vipSRAMLogical, gcvNULL, gcvNULL, &vipSRAMSize, &vipSRAMNode));
+    vxmONERROR(QuerySRAM(context, gcvPOOL_EXTERNAL_SRAM, &axiSRAMPhysical, &axiSRAMLogical, &axiSRAMGpuPhysical, &axiSRAMSize, &axiSRAMNode));
+    vxmONERROR(QuerySRAM(context, gcvPOOL_INTERNAL_SRAM, &vipSRAMPhysical, &vipSRAMLogical, gcvNULL, &vipSRAMSize, &vipSRAMNode));
 
     vxmASSERT(vipSRAMSize != 0);
     vxmASSERT(axiSRAMSize == 0 || (axiSRAMPhysical != ~0u && axiSRAMGpuPhysical != ~0u));

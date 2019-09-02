@@ -7380,7 +7380,7 @@ OnError:
 gceSTATUS
 gcoHARDWARE_QuerySRAM(
     IN gcoHARDWARE Hardware,
-    IN gceSRAM  Type,
+    IN gcePOOL Type,
     OUT gctUINT32 *Base,
     OUT gctUINT32 *Size,
     OUT gctPHYS_ADDR_T *gpuPhysical,
@@ -7392,22 +7392,22 @@ gcoHARDWARE_QuerySRAM(
 
     gcmGETHARDWARE(Hardware);
 
-    if ((Type >= gcvSRAM_INTERNAL) && (Type < gcvSRAM_COUNT))
+    if ((Type == gcvPOOL_INTERNAL_SRAM) || (Type == gcvPOOL_EXTERNAL_SRAM))
     {
         if (Base)
-            *Base = Hardware->options.sRAMBaseAddresses[Type];
+            *Base = 0;
 
         if (Size)
-            *Size = Hardware->config->sRAMSizes[Type];
+            *Size = (Type == gcvPOOL_INTERNAL_SRAM ? Hardware->options.sRAMSizes[0] : Hardware->options.extSRAMSizes[0]);
 
         if (gpuPhysical)
         {
-            *gpuPhysical = Hardware->options.sRAMPhysicalBases[Type];
+            *gpuPhysical = 0;
         }
 
         if (cpuPhysical)
         {
-            *cpuPhysical = Hardware->options.sRAMCPUPhysicalBases[Type];
+            *cpuPhysical = 0;
         }
     }
     else

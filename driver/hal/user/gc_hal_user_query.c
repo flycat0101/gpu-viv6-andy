@@ -1504,7 +1504,7 @@ gcoHAL_QueryMultiGPUAffinityConfig(
 gceSTATUS
 gcoHAL_QuerySRAM(
     IN gcoHAL Hal,
-    IN gceSRAM Type,
+    IN gcePOOL Type,
     OUT gctUINT32 *Base,
     OUT gctUINT32 *Size,
     OUT gctPHYS_ADDR_T *gpuPhysical,

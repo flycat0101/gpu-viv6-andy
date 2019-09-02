@@ -3396,7 +3396,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_GenerateStatesBuffer(
     }
     if (shCmdsSize > 0)
     {
-        if (gcmIS_ERROR(gcoVX_AllocateMemoryEx(&shCmdsSize, gcvSURF_ICACHE, SH_COMMAND_ALIGN_SIZE,
+        if (gcmIS_ERROR(gcoVX_AllocateMemoryEx(&shCmdsSize, gcvSURF_ICACHE, gcvPOOL_DEFAULT, SH_COMMAND_ALIGN_SIZE,
                                         &node->binLoadMem->shCmdBuff.physical,
                                         (gctPOINTER*)&node->binLoadMem->shCmdBuff.logical,
                                         &node->binLoadMem->shCmdBuff.nodePtr)))

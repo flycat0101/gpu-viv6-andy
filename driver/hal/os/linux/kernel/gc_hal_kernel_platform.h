@@ -81,10 +81,20 @@ typedef struct _gcsMODULE_PARAMETERS
     gctPHYS_ADDR_T          externalBase;
     gctSIZE_T               externalSize;
 
-    /* SRAM. */
-    gctPHYS_ADDR_T          sRAMBases[gcvCORE_COUNT][gcvSRAM_COUNT];
-    gctUINT32               sRAMSizes[gcvCORE_COUNT][gcvSRAM_COUNT];
-    gctUINT32               sRAMMode;
+    /* Per-core SRAM. */
+    gctPHYS_ADDR_T          sRAMBases[gcvCORE_COUNT][gcvSRAM_INTER_COUNT];
+    gctUINT32               sRAMSizes[gcvCORE_COUNT][gcvSRAM_INTER_COUNT];
+
+    /* Shared SRAM. */
+    gctPHYS_ADDR_T          extSRAMBases[gcvSRAM_EXT_COUNT];
+    gctUINT32               extSRAMSizes[gcvSRAM_EXT_COUNT];
+#if USE_LINUX_PCIE
+    gctINT32                sRAMBars[gcvSRAM_EXT_COUNT];
+    gctINT32                sRAMOffsets[gcvSRAM_EXT_COUNT];
+#endif
+
+    gctBOOL                 sRAMRequested;
+    gctUINT32               sRAMLoopMode;
 
     gctPHYS_ADDR_T          baseAddress;
     gctSIZE_T               physSize;

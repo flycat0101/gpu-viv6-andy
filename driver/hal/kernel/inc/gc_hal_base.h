@@ -389,6 +389,8 @@ typedef enum _gcePOOL
     gcvPOOL_SRAM,
     gcvPOOL_VIRTUAL,
     gcvPOOL_USER,
+    gcvPOOL_INTERNAL_SRAM,
+    gcvPOOL_EXTERNAL_SRAM,
 
     gcvPOOL_NUMBER_OF_POOLS
 }
@@ -732,7 +734,7 @@ gcoHAL_QueryMultiGPUAffinityConfig(
 gceSTATUS
 gcoHAL_QuerySRAM(
     IN gcoHAL Hal,
-    IN gceSRAM Type,
+    IN gcePOOL Type,
     OUT gctUINT32 *Base,
     OUT gctUINT32 *Size,
     OUT gctPHYS_ADDR_T *gpuPhysical,

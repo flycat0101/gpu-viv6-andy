@@ -212,19 +212,41 @@ static int smallBatch = 1;
 module_param(smallBatch, int, 0644);
 MODULE_PARM_DESC(smallBatch, "Enable/disable small batch");
 
-static gctPHYS_ADDR_T sRAMBases[gcvSRAM_COUNT * gcvCORE_COUNT] = {[0 ... gcvSRAM_COUNT * gcvCORE_COUNT - 1] = gcvINVALID_PHYSICAL_ADDRESS};
+/*******************************************************************************
+***************************** SRAM description *********************************
+*******************************************************************************/
+
+/* Per-core SRAM physical address base, the order of configuration is according to access speed, gcvINVALID_PHYSICAL_ADDRESS means no bus address. */
+static gctPHYS_ADDR_T sRAMBases[gcvSRAM_INTER_COUNT * gcvCORE_COUNT] = {[0 ... gcvSRAM_INTER_COUNT * gcvCORE_COUNT - 1] = gcvINVALID_PHYSICAL_ADDRESS};
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)
 module_param_array(sRAMBases, ullong, NULL, 0644);
 MODULE_PARM_DESC(sRAMBases, "Array of base of bus address of SRAM,INTERNAL, EXTERNAL0, EXTERNAL1..., gcvINVALID_PHYSICAL_ADDRESS means no bus address");
 #endif
 
-static uint sRAMSizes[gcvSRAM_COUNT * gcvCORE_COUNT] = {[0 ... gcvSRAM_COUNT * gcvCORE_COUNT - 1] = 0};
+/* Per-core SRAM size. */
+static uint sRAMSizes[gcvSRAM_INTER_COUNT * gcvCORE_COUNT] = {[0 ... gcvSRAM_INTER_COUNT * gcvCORE_COUNT - 1] = 0};
 module_param_array(sRAMSizes, uint, NULL, 0644);
-MODULE_PARM_DESC(sRAMSizes, "Array of size of SRAM,INTERNAL, EXTERNAL0, EXTERNAL1..., 0 means no SRAM");
+MODULE_PARM_DESC(sRAMSizes, "Array of size of per-core SRAMs, 0 means no SRAM");
 
-static uint sRAMMode = 0;
-module_param(sRAMMode, uint, 0644);
-MODULE_PARM_DESC(sRAMMode, "Default 0 means SRAM is exclusive mode usage, 1 means contiguous memory heap usage.");
+/* Shared SRAM physical address bases. */
+static gctPHYS_ADDR_T extSRAMBases[gcvSRAM_EXT_COUNT] = {[0 ... gcvSRAM_EXT_COUNT - 1] = gcvINVALID_PHYSICAL_ADDRESS};
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)
+module_param_array(extSRAMBases, ullong, NULL, 0644);
+MODULE_PARM_DESC(extSRAMBases, "Shared SRAM physical address bases.");
+#endif
+
+/* Shared SRAM sizes. */
+static uint extSRAMSizes[gcvSRAM_EXT_COUNT] = {[0 ... gcvSRAM_EXT_COUNT - 1] = 0};
+module_param_array(extSRAMSizes, uint, NULL, 0644);
+MODULE_PARM_DESC(extSRAMSizes, "Shared SRAM sizes.");
+
+static uint sRAMRequested = 1;
+module_param(sRAMRequested, uint, 0644);
+MODULE_PARM_DESC(sRAMRequested, "Default 1 means AXI-SRAM is already reserved for GPU, 0 means GPU driver need request the memory region.");
+
+static uint sRAMLoopMode = 0;
+module_param(sRAMLoopMode, uint, 0644);
+MODULE_PARM_DESC(sRAMLoopMode, "Default 0 means SRAM pool must be specified when allocating SRAM memory, 1 means SRAM memory will be looped as default pool.");
 
 #if USE_LINUX_PCIE
 static int bar = 1;
@@ -234,7 +256,19 @@ MODULE_PARM_DESC(bar, "PCIE Bar index of GC core");
 static int bars[gcvCORE_COUNT] = {[0 ... gcvCORE_COUNT - 1] = -1};
 module_param_array(bars, int, NULL, 0644);
 MODULE_PARM_DESC(bars, "Array of bar index of PCIE platform for multi-GPU");
+
+static int sRAMBars[gcvSRAM_EXT_COUNT] = {[0 ... gcvSRAM_EXT_COUNT - 1] = -1};
+module_param_array(sRAMBars, int, NULL, 0644);
+MODULE_PARM_DESC(sRAMBars, "Array of SRAM bar index of shared external SRAMs.");
+
+static int sRAMOffsets[gcvSRAM_EXT_COUNT] = {[0 ... gcvSRAM_EXT_COUNT - 1] = -1};
+module_param_array(sRAMOffsets, int, NULL, 0644);
+MODULE_PARM_DESC(sRAMOffsets, "Array of SRAM offset inside bar of shared external SRAMs.");
 #endif
+
+static uint mmuPageTablePool = 1;
+module_param(mmuPageTablePool, uint, 0644);
+MODULE_PARM_DESC(mmuPageTablePool, "Default 1 means alloc mmu page table in virsual memory, 0 means auto select memory pool.");
 
 
 static int gpu3DMinClock = 1;
@@ -323,14 +357,25 @@ _InitModuleParam(
 
     for (i = 0; i < gcvCORE_COUNT; i++)
     {
-        for (j = 0; j < gcvSRAM_COUNT; j++)
+        for (j = 0; j < gcvSRAM_INTER_COUNT; j++)
         {
-            p->sRAMBases[i][j] = sRAMBases[i * gcvSRAM_COUNT + j];
-            p->sRAMSizes[i][j] = sRAMSizes[i * gcvSRAM_COUNT + j];
+            p->sRAMBases[i][j] = sRAMBases[i * gcvSRAM_INTER_COUNT + j];
+            p->sRAMSizes[i][j] = sRAMSizes[i * gcvSRAM_INTER_COUNT + j];
         }
     }
 
-    p->sRAMMode = sRAMMode;
+    for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
+    {
+        p->extSRAMBases[i] = extSRAMBases[i];
+        p->extSRAMSizes[i] = extSRAMSizes[i];
+#if USE_LINUX_PCIE
+        p->sRAMBars[i]     = sRAMBars[i];
+        p->sRAMOffsets[i]  = sRAMOffsets[i];
+#endif
+    }
+
+    p->sRAMRequested = sRAMRequested;
+    p->sRAMLoopMode = sRAMLoopMode;
 
     p->baseAddress = baseAddress;
     p->physSize    = physSize;
@@ -422,14 +467,26 @@ _SyncModuleParam(
 
     for (i = 0; i < gcvCORE_COUNT; i++)
     {
-        for (j = 0; j < gcvSRAM_COUNT; j++)
+        for (j = 0; j < gcvSRAM_INTER_COUNT; j++)
         {
-            sRAMBases[i * gcvSRAM_COUNT + j] = p->sRAMBases[i][j];
-            sRAMSizes[i * gcvSRAM_COUNT + j] = p->sRAMSizes[i][j];
+            sRAMBases[i * gcvSRAM_INTER_COUNT + j] = p->sRAMBases[i][j];
+            sRAMSizes[i * gcvSRAM_INTER_COUNT + j] = p->sRAMSizes[i][j];
         }
     }
 
-    sRAMMode = p->sRAMMode;
+    for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
+    {
+        extSRAMBases[i] = p->extSRAMBases[i];
+        extSRAMSizes[i] = p->extSRAMSizes[i];
+
+#if USE_LINUX_PCIE
+        sRAMBars[i]     = p->sRAMBars[i];
+        sRAMOffsets[i]  = p->sRAMOffsets[i];
+#endif
+    }
+
+    sRAMRequested = p->sRAMRequested;
+    sRAMLoopMode  = p->sRAMLoopMode;
 
     baseAddress = (ulong)p->baseAddress;
     physSize    = p->physSize;
@@ -545,14 +602,21 @@ gckOS_DumpParam(
 
     for (i = 0; i < gcvCORE_COUNT; i++)
     {
-        printk("  core %d sRAMBases = ", i);
+        printk("  core %d internal sRAMBases = ", i);
 
-        for (j = 0; j < gcvSRAM_COUNT; j++)
+        for (j = 0; j < gcvSRAM_INTER_COUNT; j++)
         {
-            printk("0x%llX, ", sRAMBases[i * gcvSRAM_COUNT + j]);
+            printk("0x%llX, ", sRAMBases[i * gcvSRAM_INTER_COUNT + j]);
         }
         printk("\n");
     }
+
+    printk("  External sRAMBases = ");
+    for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
+    {
+        printk("0x%llx, ", extSRAMBases[i]);
+    }
+    printk("\n");
 
     printk("Build options:\n");
     printk("  gcdGPU_TIMEOUT    = %d\n", gcdGPU_TIMEOUT);
@@ -1024,6 +1088,7 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 #endif
 {
     int ret = -ENODEV;
+    int i = 0;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
     static u64 dma_mask = DMA_BIT_MASK(40);
 #else
@@ -1059,6 +1124,15 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 
     /* Update module param because drv_init() uses them directly. */
     _SyncModuleParam(&moduleParam);
+
+    for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
+    {
+        if (extSRAMBases[i] != gcvINVALID_PHYSICAL_ADDRESS && !extSRAMSizes[i])
+        {
+            printk("Error! External SRAM base set, but size not set.\n");
+            return -1;
+        }
+    }
 
     ret = drv_init();
 

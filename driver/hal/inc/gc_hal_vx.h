@@ -258,6 +258,7 @@ gceSTATUS
 gcoVX_AllocateMemoryEx(
     IN OUT gctUINT *        Bytes,
     IN  gceSURF_TYPE        Type,
+    IN  gcePOOL             Pool,
     IN  gctUINT32           alignment,
     OUT gctUINT32 *         Physical,
     OUT gctPOINTER *        Logical,

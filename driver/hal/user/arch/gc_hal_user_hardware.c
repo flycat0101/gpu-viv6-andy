@@ -3105,8 +3105,6 @@ _FillInConfigTable(
     Config->resultWindowMaxSize     = featureDatabase->RESULT_WINDOW_MAX_SIZE;
     Config->l1CacheSizeInKbyte      = featureDatabase->L1CacheSize;
     Config->localStorageSizeInKbyte = featureDatabase->LocalStorageSize;
-    Config->sRAMSizes[gcvSRAM_INTERNAL]  = featureDatabase->VIP_SRAM_SIZE;
-    Config->sRAMSizes[gcvSRAM_EXTERNAL0] = featureDatabase->AXI_SRAM_SIZE;
     Config->uscCacheControllers          = featureDatabase->USC_CACHE_CONTROLLERS;
     Config->uscBanks                     = featureDatabase->USC_BANKS;
     Config->productName                  = featureDatabase->productName;

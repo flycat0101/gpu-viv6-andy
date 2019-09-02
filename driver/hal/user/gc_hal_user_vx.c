@@ -607,7 +607,7 @@ gcoVX_KernelConstruct(
     {
         gctPOINTER logical = gcvNULL;
         gctUINT32 size = Context->instructions->count * 4 * 4;
-        gcmONERROR(gcoVX_AllocateMemoryEx(&size, gcvSURF_ICACHE, 256, &Context->nodePhysicalAdress, &logical, &Context->node));
+        gcmONERROR(gcoVX_AllocateMemoryEx(&size, gcvSURF_ICACHE, gcvPOOL_DEFAULT, 256, &Context->nodePhysicalAdress, &logical, &Context->node));
         gcoOS_MemCopy(logical, (gctPOINTER)Context->instructions->binarys, Context->instructions->count * 4 * 4);
         gcmDUMP(gcvNULL, "#[info instruction memory");
         gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_MEMORY, Context->nodePhysicalAdress, (gctUINT32*)logical, 0, Context->instructions->count * 4 * 4);
@@ -636,7 +636,7 @@ gcoVX_LockKernel(
     {
         gctPOINTER logical = gcvNULL;
         gctUINT size = Context->instructions->count * 4 * 4;
-        gcmONERROR(gcoVX_AllocateMemoryEx(&size, gcvSURF_ICACHE, 256, &Context->instructions->physical, &logical, &Context->node));
+        gcmONERROR(gcoVX_AllocateMemoryEx(&size, gcvSURF_ICACHE, gcvPOOL_DEFAULT, 256, &Context->instructions->physical, &logical, &Context->node));
         gcoOS_MemCopy(logical, (gctPOINTER)Context->instructions->binarys, Context->instructions->count * 4 * 4);
         gcmDUMP(gcvNULL, "#[info instruction memory");
         gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_MEMORY, Context->instructions->physical, (gctUINT32*)logical, 0, Context->instructions->count * 4 * 4);
@@ -709,7 +709,7 @@ gcoVX_AllocateMemory(
 
     gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
 
-    gcmONERROR(gcoVX_AllocateMemoryEx(&size, gcvSURF_VERTEX, 64, Physical, Logical, Node));
+    gcmONERROR(gcoVX_AllocateMemoryEx(&size, gcvSURF_VERTEX, gcvPOOL_DEFAULT, 64, Physical, Logical, Node));
 
 OnError:
 
@@ -1151,7 +1151,8 @@ gceSTATUS
 gcoVX_AllocateMemoryEx(
     IN OUT gctUINT *        Bytes,
     IN  gceSURF_TYPE        Type,
-    IN  gctUINT32           alignment,
+    IN  gcePOOL             Pool,
+    IN  gctUINT32           Alignment,
     OUT gctUINT32 *         Physical,
     OUT gctPOINTER *        Logical,
     OUT gcsSURF_NODE_PTR *  Node
@@ -1167,7 +1168,7 @@ gcoVX_AllocateMemoryEx(
     gcmHEADER_ARG("*Bytes=%lu", *Bytes);
 
     /* memory allocat/release no need to gcoVX_VerifyHardware()); */
-    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SH_IMAGE_LD_LAST_PIXEL_FIX))
+    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SH_IMAGE_LD_LAST_PIXEL_FIX) && Pool != gcvPOOL_INTERNAL_SRAM && Pool != gcvPOOL_EXTERNAL_SRAM)
     {
         /* Allocate extra 15 bytes to avoid cache overflow */
         bytes = gcmALIGN(*Bytes + 15, 64);
@@ -1178,9 +1179,9 @@ gcoVX_AllocateMemoryEx(
     }
 
     /* By default, align it to 64 byte */
-    if (alignment == 0)
+    if (Alignment == 0)
     {
-        alignment = 64;
+        Alignment = 64;
     }
 
     gcmASSERT(Node);
@@ -1195,10 +1196,10 @@ gcoVX_AllocateMemoryEx(
     gcmONERROR(gcsSURF_NODE_Construct(
         node,
         bytes,
-        alignment,
+        Alignment,
         Type,
         gcvALLOC_FLAG_NONE,
-        gcvPOOL_DEFAULT
+        Pool
         ));
 
     /* Lock the buffer. */
