@@ -416,6 +416,7 @@ typedef struct __vkComputeBlitParams
     uint32_t   dstParts;
     const VkComponentMapping *txSwizzles;
     VkBool32   flushTex;
+    VkBool32   fmtConvert;
 
     VkOffset3D srcOffset;
     VkOffset3D dstOffset;

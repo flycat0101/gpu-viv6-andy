@@ -1417,9 +1417,11 @@ static VkResult halti5_program_blit_const(
 
     /* srcSize */
     pF += 4;
+    pB = (gctBOOL_PTR)pF;
     pF[0] = (gctFLOAT)params->srcSize.width;
     pF[1] = (gctFLOAT)params->srcSize.height;
     pF[2] = (gctFLOAT)params->srcSize.depth;
+    pB[3] = (gctBOOL)params->fmtConvert;
 
     /* uint clear value */
     pU = (gctUINT_PTR)(pF + 4);
@@ -2291,6 +2293,10 @@ static uint32_t halti5_detect_blit_kind(
         srcCategory = dstCategory = __VK_FMT_CATEGORY_UINT;
         params->dstSRGB = VK_FALSE;
         params->rawCopy = VK_TRUE;
+        if (fmtInfo->bitsPerBlock == 128)
+        {
+            params->fmtConvert = VK_TRUE;
+        }
     }
 
     switch (dstFormat)
