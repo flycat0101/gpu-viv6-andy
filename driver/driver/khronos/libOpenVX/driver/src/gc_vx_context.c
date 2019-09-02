@@ -960,7 +960,7 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     context->options.enableGraphReshapelayer = 1;
     context->options.enableGraphConcalayer = 0;
     context->options.enableTransformNMConv = 1;
-    context->options.enableGraphMergeTranspose = 0;
+    context->options.enableGraphMergeTranspose = 1;
     context->options.enableGraphPadConv = 1;
     context->options.enableGraphDeleteRelu = 1;
     context->options.enableGraphDeleteSqueeze = 1;
