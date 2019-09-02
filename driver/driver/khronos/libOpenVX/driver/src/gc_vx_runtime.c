@@ -433,6 +433,8 @@ VX_INTERNAL_API void vxoQueue_Initialize(vx_queue queue)
 
     vxCreateMutex(OUT &queue->lock);
 
+    vxAcquireMutex(queue->lock);
+
     queue->stopped      = vx_false_e;
 
     queue->beginIndex   = 0;
@@ -443,6 +445,9 @@ VX_INTERNAL_API void vxoQueue_Initialize(vx_queue queue)
     vxCreateEvent(vx_true_e, OUT &queue->writeEvent);
 
     vxSetEvent(queue->writeEvent);
+
+    vxReleaseMutex(queue->lock);
+
     gcmFOOTER_NO();
 }
 

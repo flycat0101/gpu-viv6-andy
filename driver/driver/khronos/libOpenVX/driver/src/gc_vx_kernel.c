@@ -1352,8 +1352,7 @@ gcfVX_LoadKernelArgValues(
 
                         elemSize =  ((format == gcSL_INT8)   ? 1 :
                                      (format == gcSL_UINT8)  ? 1 :
-                                     (format == gcSL_INT16)  ? 2 :
-                                     (format == gcSL_UINT16) ? 2 : 0);
+                                     (format == gcSL_INT16)  ? 2 : 2);
 
                         signMask =  ((format == gcSL_INT8)   ? 0x80 :
                                      (format == gcSL_INT16)  ? 0x8000 : 0);
@@ -2043,8 +2042,7 @@ gcfVX_LoadKernelArgValues(
 
                     elemSize =  ((format == gcSL_INT8)   ? 1 :
                                  (format == gcSL_UINT8)  ? 1 :
-                                 (format == gcSL_INT16)  ? 2 :
-                                 (format == gcSL_UINT16) ? 2 : 0);
+                                 (format == gcSL_INT16)  ? 2 : 2);
 
                     signMask =  ((format == gcSL_INT8)   ? 0x80 :
                                  (format == gcSL_INT16)  ? 0x8000 : 0);
@@ -2182,8 +2180,7 @@ gcfVX_LoadKernelArgValues(
 
                         elemSize =  ((format == gcSL_INT8)   ? 1 :
                                      (format == gcSL_UINT8)  ? 1 :
-                                     (format == gcSL_INT16)  ? 2 :
-                                     (format == gcSL_UINT16) ? 2 : 0);
+                                     (format == gcSL_INT16)  ? 2 : 2);
 
                         signMask =  ((format == gcSL_INT8)   ? 0x80 :
                                      (format == gcSL_INT16)  ? 0x8000 : 0);

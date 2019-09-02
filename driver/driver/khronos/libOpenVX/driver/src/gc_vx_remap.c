@@ -349,7 +349,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapRemapPatch(
 
     /* more bad parameters */
     if (zero_area == vx_false_e &&
-        ((0 >= remap->memory.nodePtrs) ||
+        ((remap->memory.nodePtrs[0] == VX_NULL) ||
         (start_x >= end_x) ||
         (start_y >= end_y)))
     {
@@ -390,8 +390,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapRemapPatch(
                 }
 
                 *ptr = buf;
-                vxoReference_Increment(&remap->base, VX_REF_EXTERNAL);
                 vxReleaseMutex(remap->base.lock);
+                vxoReference_Increment(&remap->base, VX_REF_EXTERNAL);
 
                 status = VX_SUCCESS;
             }
@@ -555,7 +555,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyRemapPatch(
 
     /* more bad parameters */
     if (zero_area == vx_false_e &&
-        ((0 >= remap->memory.nodePtrs) ||
+        ((remap->memory.nodePtrs[0] == VX_NULL) ||
          (start_x >= end_x) ||
          (start_y >= end_y)))
     {
