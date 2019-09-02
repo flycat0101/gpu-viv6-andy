@@ -89,6 +89,7 @@ typedef struct _gcsMODULE_PARAMETERS
     gctPHYS_ADDR_T          extSRAMBases[gcvSRAM_EXT_COUNT];
     gctUINT32               extSRAMSizes[gcvSRAM_EXT_COUNT];
 #if USE_LINUX_PCIE
+    gctUINT32               regOffsets[gcvCORE_COUNT];
     gctINT32                sRAMBars[gcvSRAM_EXT_COUNT];
     gctINT32                sRAMOffsets[gcvSRAM_EXT_COUNT];
 #endif

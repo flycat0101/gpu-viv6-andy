@@ -203,6 +203,17 @@ _AdjustParam(
     for (dev_index = 0; dev_index < pcie_platform->device_number; dev_index++)
     {
         struct pci_dev * pcieDev = pcie_platform->pcie_info[dev_index].pdev;
+
+        for (i = 0; i < MAX_PCIE_BAR; i++)
+        {
+            _QueryBarInfo(
+                pcieDev,
+                &pcie_platform->pcie_info[dev_index].bar[i].base,
+                &pcie_platform->pcie_info[dev_index].bar[i].size,
+                i
+                );
+        }
+
         for (i = 0; i < gcvCORE_COUNT; i++)
         {
             if (Args->bars[i] != -1)
@@ -226,21 +237,18 @@ _AdjustParam(
                     continue;
                 }
 
+                if (Args->regOffsets[i])
+                {
+                    gcmkASSERT(Args->regOffsets[i] + Args->registerSizes[core_index]
+                               < pcie_platform->pcie_info[dev_index].bar[Args->bars[i]].size);
+                }
+
                 Args->registerBasesMapped[core_index] =
                 pcie_platform->pcie_info[dev_index].bar[i].logical =
-                    (gctPOINTER)pci_iomap(pcieDev, Args->bars[i], Args->registerSizes[core_index]);
+                    (gctPOINTER)pci_iomap(pcieDev, Args->bars[i], Args->registerSizes[core_index] + Args->regOffsets[i]) + Args->regOffsets[i];
+
                 core_index++;
             }
-        }
-
-        for (i = 0; i < MAX_PCIE_BAR; i++)
-        {
-            _QueryBarInfo(
-                pdev,
-                &pcie_platform->pcie_info[dev_index].bar[i].base,
-                &pcie_platform->pcie_info[dev_index].bar[i].size,
-                i
-                );
         }
 
         for (i = 0; i < gcvSRAM_EXT_COUNT; i++)

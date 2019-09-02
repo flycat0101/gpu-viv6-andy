@@ -257,6 +257,10 @@ static int bars[gcvCORE_COUNT] = {[0 ... gcvCORE_COUNT - 1] = -1};
 module_param_array(bars, int, NULL, 0644);
 MODULE_PARM_DESC(bars, "Array of bar index of PCIE platform for multi-GPU");
 
+static uint regOffsets[gcvCORE_COUNT] = {[0 ... gcvCORE_COUNT - 1] = 0};
+module_param_array(regOffsets, uint, NULL, 0644);
+MODULE_PARM_DESC(regOffsets, "Array of register offsets in corresponding BAR space");
+
 static int sRAMBars[gcvSRAM_EXT_COUNT] = {[0 ... gcvSRAM_EXT_COUNT - 1] = -1};
 module_param_array(sRAMBars, int, NULL, 0644);
 MODULE_PARM_DESC(sRAMBars, "Array of SRAM bar index of shared external SRAMs.");
@@ -297,6 +301,7 @@ _InitModuleParam(
         }
 #if USE_LINUX_PCIE
         p->bars[i] = bars[i];
+        p->regOffsets[i] = regOffsets[i];
 #endif
     }
 
@@ -433,6 +438,7 @@ _SyncModuleParam(
         registerSizes[i] = (ulong)p->registerSizes[i];
  #if USE_LINUX_PCIE
         bars[i]          = p->bars[i];
+        regOffsets[i]    = p->regOffsets[i];
  #endif
     }
 
@@ -578,6 +584,14 @@ gckOS_DumpParam(
         printk("%d, ", bars[i]);
     }
     printk("\n");
+
+    printk("  regOffsets        = ");
+    for (i = 0; i < gcvCORE_COUNT; i++)
+    {
+        printk("%d, ", regOffsets[i]);
+    }
+    printk("\n");
+
 #endif
     printk("  registerBases     = ");
     for (i = 0; i < gcvCORE_COUNT; i++)
