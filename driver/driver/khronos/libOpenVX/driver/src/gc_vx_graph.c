@@ -3313,17 +3313,9 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
                             opCommand->inputTile.logical   = block->memParam[bufferID].inputMemory[0].logicals[0] + viewOffset;
 
                             opCommand->inputTile.circleBufferSize        = (vx_uint32)block->memParam[bufferID].inputMemory[0].sizes[0];
-                            opCommand->inputTile.circularBufEndAddrPlus1 = opCommand->inputTile.physical + opCommand->inputTile.circleBufferSize;
+                            opCommand->inputTile.circularBufEndAddrPlus1 = block->memParam[bufferID].inputMemory[0].physicals[0] + opCommand->inputTile.circleBufferSize;
 
-                            if (((vx_tensor)(graph->layer->operations[opCommand->operationID]->inputs[0]))->tensorBuffer->memory.allocType == VXNNE_MEM_POOL_TYPE_VIP_SRAM &&
-                                opCommand->inputTile.circularBufEndAddrPlus1 - graph->base.context->vipSRAM.physical > graph->base.context->vipSRAM.size)
-                            {
-                                opCommand->inputTile.circleBufferSize = gcmALIGN_NP2(graph->base.context->vipSRAM.size - (opCommand->inputTile.physical - graph->base.context->vipSRAM.physical) - CACHE_ALIGNMENT_SIZE, CACHE_ALIGNMENT_SIZE);
-                                vxmASSERT((vx_uint32)block->memParam[bufferID].inputMemory[0].sizes[0] - viewOffset <= opCommand->inputTile.circleBufferSize);
-                                opCommand->inputTile.circularBufEndAddrPlus1 = opCommand->inputTile.physical + opCommand->inputTile.circleBufferSize;
-                                vxmASSERT(opCommand->inputTile.circularBufEndAddrPlus1 - graph->base.context->vipSRAM.physical <= graph->base.context->vipSRAM.size);
-                            }
-
+                            vxmASSERT(!(opCommand->inputTile.circularBufEndAddrPlus1 & (CACHE_ALIGNMENT_SIZE - 1)));
                             vxmASSERT(!(opCommand->inputTile.circleBufferSize & (CACHE_ALIGNMENT_SIZE - 1)));
                             vxmASSERT(opCommand->inputTile.circleBufferSize > 0 );
                         }
@@ -3385,17 +3377,9 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
                             opCommand->outputTile.logical   = block->memParam[bufferID].outputMemory[0].logicals[0] + viewOffset;
 
                             opCommand->outputTile.circleBufferSize        = (vx_uint32)block->memParam[bufferID].outputMemory[0].sizes[0];
-                            opCommand->outputTile.circularBufEndAddrPlus1 = opCommand->outputTile.physical + opCommand->outputTile.circleBufferSize;
+                            opCommand->outputTile.circularBufEndAddrPlus1 = block->memParam[bufferID].outputMemory[0].physicals[0] + opCommand->outputTile.circleBufferSize;
 
-                            if (((vx_tensor)(graph->layer->operations[opCommand->operationID]->outputs[0]))->tensorBuffer->memory.allocType == VXNNE_MEM_POOL_TYPE_VIP_SRAM &&
-                                opCommand->outputTile.circularBufEndAddrPlus1 - graph->base.context->vipSRAM.physical > graph->base.context->vipSRAM.size)
-                            {
-                                opCommand->outputTile.circleBufferSize = gcmALIGN_NP2(graph->base.context->vipSRAM.size - (opCommand->outputTile.physical - graph->base.context->vipSRAM.physical) - CACHE_ALIGNMENT_SIZE, CACHE_ALIGNMENT_SIZE);
-                                vxmASSERT((vx_uint32)block->memParam[bufferID].outputMemory[0].sizes[0] - viewOffset <= opCommand->outputTile.circleBufferSize);
-                                opCommand->outputTile.circularBufEndAddrPlus1 = opCommand->outputTile.physical + opCommand->outputTile.circleBufferSize;
-                                vxmASSERT(opCommand->outputTile.circularBufEndAddrPlus1 - graph->base.context->vipSRAM.physical <= graph->base.context->vipSRAM.size);
-                            }
-
+                            vxmASSERT(!(opCommand->outputTile.circularBufEndAddrPlus1 & (CACHE_ALIGNMENT_SIZE - 1)));
                             vxmASSERT(!(opCommand->outputTile.circleBufferSize & (CACHE_ALIGNMENT_SIZE - 1)));
                             vxmASSERT(opCommand->outputTile.circleBufferSize > 0 );
                         }
