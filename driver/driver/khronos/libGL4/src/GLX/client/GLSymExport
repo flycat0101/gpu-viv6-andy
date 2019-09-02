@@ -53,7 +53,6 @@ VERSION {
         glXQueryGLXPbufferSGIX;
         glXSelectEventSGIX;
         glXGetSelectedEventSGIX;
-        glXGetProcAddressARB;
         glXBindChannelToWindowSGIX;
         glXChannelRectSGIX;
         glXQueryChannelRectSGIX;
