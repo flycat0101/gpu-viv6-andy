@@ -362,6 +362,8 @@ static clsBUILTIN_FUNCTION CommonBuiltinFunctions[] =
     {clvEXTENSION_VIV_BITFIELD,     "viv_bitfieldExtract",      T_U_GENTYPE,    3, {T_U_GENTYPE, T_INT, T_INT}, {0}, {0, 1, 1}, 1},
     {clvEXTENSION_VIV_BITFIELD,     "viv_bitfieldInsert",       T_I_GENTYPE,    4, {T_I_GENTYPE, T_I_GENTYPE, T_INT, T_INT}, {0}, {0, 0, 1, 1}, 1},
     {clvEXTENSION_VIV_BITFIELD,     "viv_bitfieldInsert",       T_U_GENTYPE,    4, {T_U_GENTYPE, T_U_GENTYPE, T_INT, T_INT}, {0}, {0, 0, 1, 1}, 1},
+    {clvEXTENSION_VIV_BITFIELD,     "viv_bitfieldExtract",      T_UINT4,        3, {T_UINT4, T_UINT4, T_UINT4}, {0}, {0, 1, 1}, 1},
+    {clvEXTENSION_VIV_BITFIELD,     "viv_bitfieldExtract",      T_USHORT8_PACKED, 3, {T_USHORT8_PACKED, T_USHORT8_PACKED, T_USHORT8_PACKED}, {0}, {0, 1, 1}, 1},
 
     {clvEXTENSION_NONE,     "viv_shuffle",              T_I_GENTYPE,    2, {T_CHAR2,    T_U_GENTYPE}, {0}, {0}, 0, 0, 1},
     {clvEXTENSION_NONE,     "viv_shuffle",              T_I_GENTYPE,    2, {T_CHAR4,    T_U_GENTYPE}, {0}, {0}, 0, 0, 1},
