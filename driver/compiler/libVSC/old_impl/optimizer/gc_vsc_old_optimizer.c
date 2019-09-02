@@ -3934,7 +3934,7 @@ _RemapTempIndexForExpandFunction(
         /*
         ** We need to make sure that we only remap the registers belong to this function.
         */
-        if (tempArray[i].arrayVariable)
+        if (tempArray[i].arrayVariable && tempArray[i].arrayVariable->nameLength >= 0)
         {
             gctCHAR variableName[256];
             gctUINT offset = 0;
