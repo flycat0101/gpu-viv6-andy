@@ -468,6 +468,7 @@ VX_PRIVATE_API vx_tensor vxoGraphOptimization_reshapeTensorAsOld(vx_tensor oldTe
     if(!vxoGraphOptimization_isSameShapeTensor(oldTensor, newTensor))
     {
         tmpTensor = vxReshapeTensor(newTensor, (vx_int32 *)TENSOR_SIZES(oldTensor), TENSOR_DIM_NUM(oldTensor));
+        tmpTensor->reshape = oldTensor;
     }
 
     return tmpTensor;
@@ -2986,6 +2987,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
 
                 convDims[2] /= 2;
                 convOutTensor = vxReshapeTensor(output, convDims, 3);
+                convOutTensor->reshape = output;
                 CHECK_NULL(convOutTensor);
             }
 
