@@ -941,7 +941,7 @@ clfEventCallbackWorker(
 
                 clfReleaseEvent(eventCallback->event);
 
-                gcoOS_Free(gcvNULL, eventCallback);
+                if(eventCallback) gcoOS_Free(gcvNULL, eventCallback);
             }
             else
             {

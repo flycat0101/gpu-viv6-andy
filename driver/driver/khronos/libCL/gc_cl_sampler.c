@@ -155,6 +155,7 @@ clReleaseSampler(
 
     if (oldReference == 1)
     {
+        VCL_TRACE_API(ReleaseSampler)(Sampler);
         /* Destroy the reference count object */
         gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, Sampler->referenceCount));
         Sampler->referenceCount = gcvNULL;
@@ -162,7 +163,6 @@ clReleaseSampler(
         gcoOS_Free(gcvNULL, Sampler);
     }
 
-    VCL_TRACE_API(ReleaseSampler)(Sampler);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 

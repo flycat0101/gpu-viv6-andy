@@ -2001,12 +2001,7 @@ clfWakeUpAllCommandQueueWorkers(
     clsContext_PTR      Context
     )
 {
-    clsCommandQueue_PTR     queue;
-
-    /* Lock the command queue list in the context. */
-    clfLockCommandQueueList(Context);
-
-    queue = Context->queueList;
+    clsCommandQueue_PTR queue = Context->queueList;
 
     /* Wake up all queue worker threads */
     while (queue != gcvNULL &&
@@ -2015,9 +2010,6 @@ clfWakeUpAllCommandQueueWorkers(
         clfWakeUpCommandQueueWorker(queue);
         queue = queue->next;
     }
-
-    /* Unlock the command queue list in the context. */
-    clfUnlockCommandQueueList(Context);
 }
 
 static gctINT
@@ -2408,7 +2400,7 @@ clfSubmitCommand(
     )
 {
     cl_event        commandEvent = gcvNULL;
-    gctINT          status;
+    gctINT          status = CL_SUCCESS;
     gctUINT         i;
     gctBOOL         locked = gcvFALSE;
 
@@ -2468,13 +2460,13 @@ clfSubmitCommand(
     if (CommandQueue->inThread)
     {
         /* Still in thread mode */
-        clfProcessCommandInThread(CommandQueue, Command);
+        if(clmIS_ERROR(clfProcessCommandInThread(CommandQueue, Command))) goto OnError;
     }
     else
     {
         /* Direct switch to worker, don't need flush command,
            as command already been handled (finish or in command buffer already) */
-        clfAddCommandToCommandQueue(CommandQueue, Command);
+        if(clmIS_ERROR(clfAddCommandToCommandQueue(CommandQueue, Command))) goto OnError;
     }
     clfUnlockCommandList(CommandQueue);
     locked = gcvFALSE;
@@ -2681,13 +2673,13 @@ clfCommandQueueWorker(
            If this is triggered by in thread mode, the commitRequest and commandlist would be empty.
            If this is triggered by out thread mode, we process as usual.
         */
-        clfProcessDeferredReleaseCommandList(commandQueue);
+        if(clmIS_ERROR(clfProcessDeferredReleaseCommandList(commandQueue))) goto OnError;
 
-        clfProcessCommitRequestList(commandQueue);
+        if(clmIS_ERROR(clfProcessCommitRequestList(commandQueue))) goto OnError;
 
         while (gcvTRUE)
         {
-            clfGetCommandFromCommandQueue(commandQueue, &command);
+            if(clmIS_ERROR(clfGetCommandFromCommandQueue(commandQueue, &command))) goto OnError;
 
             if (command == gcvNULL) break;
 
@@ -2701,7 +2693,7 @@ clfCommandQueueWorker(
             clfLockCommandList(commandQueue);
             acquired = gcvTRUE;
 
-            clfProcessCommitRequestList(commandQueue);
+            if(clmIS_ERROR(clfProcessCommitRequestList(commandQueue))) goto OnError;
         }
 
         /* Unlock the command list in the command queue. */

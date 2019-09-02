@@ -265,27 +265,16 @@ OnError:
             "OCL-006003: (clCreateProgramWithSource) cannot create program.  Maybe run out of memory.\n");
     }
 
-    if(source != gcvNULL)
-    {
-        gcmOS_SAFE_FREE(gcvNULL, source);
-    }
-
-    if (sizes  != gcvNULL)
-    {
-        gcmOS_SAFE_FREE(gcvNULL, sizes);
-    }
-
-    if(program != gcvNULL && program->devices != gcvNULL)
-    {
-        gcmOS_SAFE_FREE(gcvNULL, program->devices);
-    }
-
-    if(program != gcvNULL && program->referenceCount) gcoOS_AtomDestroy(gcvNULL, program->referenceCount);
+    if(sizes  != gcvNULL) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, sizes));
 
     if(program != gcvNULL)
     {
+        if(source != gcvNULL) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, source));
+        if(program->devices != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, program->devices);
+        if(program->referenceCount) gcoOS_AtomDestroy(gcvNULL, program->referenceCount);
         gcmOS_SAFE_FREE(gcvNULL, program);
     }
+
 
     if (ErrcodeRet)
     {
@@ -507,9 +496,9 @@ clReleaseProgram(
         clmRETURN_ERROR(CL_INVALID_PROGRAM);
     }
 
+    VCL_TRACE_API(ReleaseProgram)(Program);
     clfONERROR(clfReleaseProgram(Program));
 
-    VCL_TRACE_API(ReleaseProgram)(Program);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 

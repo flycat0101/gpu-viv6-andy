@@ -346,7 +346,6 @@ static gceSTATUS clfUpdateKernelArgs(
                                                *NumArgs,
                                                Args),
                        CL_OUT_OF_HOST_MEMORY);
-            gcoOS_ZeroMemory(*Args + oldNumArgs, 2 * gcmSIZEOF(clsArgument));
 
             clmONERROR(gcSHADER_GetUniform((gcSHADER) Kernel->recompileInstance->binary, prePatchDirective->patchValue.readImage->imageDataIndex, &gcUniform1), CL_INVALID_VALUE);
             argument = &((*Args)[oldNumArgs]);
@@ -401,7 +400,6 @@ static gceSTATUS clfUpdateKernelArgs(
                                                *NumArgs,
                                                Args),
                        CL_OUT_OF_HOST_MEMORY);
-            gcoOS_ZeroMemory(*Args + oldNumArgs, 2 * gcmSIZEOF(clsArgument));
 
             /* TODO - Need to handle image3D. */
 
@@ -641,7 +639,6 @@ DoReLink:
                                                    *NumArgs,
                                                    Args),
                            CL_OUT_OF_HOST_MEMORY);
-                gcoOS_ZeroMemory(*Args + oldNumArgs, 2 * gcmSIZEOF(clsArgument));
 
                 /* TODO - Need to handle image3D. */
 
@@ -734,7 +731,6 @@ DoReLink:
                                                    *NumArgs,
                                                    Args),
                            CL_OUT_OF_HOST_MEMORY);
-                gcoOS_ZeroMemory(*Args + oldNumArgs, 2 * gcmSIZEOF(clsArgument));
 
                 /* TODO - Need to handle image3D. */
 
@@ -3737,7 +3733,7 @@ clEnqueueMapBuffer(
     if (MapFlags & ~((cl_map_flags)(CL_MAP_READ|CL_MAP_WRITE)))
     {
         gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010144: (clEnqueueMapBuffer) invalid MapFlags (0x%x).\n",
+            "OCL-010144: (clEnqueueMapBuffer) invalid MapFlags (0x%llx).\n",
             MapFlags);
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
@@ -3997,7 +3993,7 @@ clEnqueueMapImage(
     if (MapFlags & ~((cl_map_flags)(CL_MAP_READ|CL_MAP_WRITE)))
     {
         gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010155: (clEnqueueMapImage) invalid MapFlags (0x%x).\n",
+            "OCL-010155: (clEnqueueMapImage) invalid MapFlags (0x%llx).\n",
             MapFlags);
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
@@ -5309,47 +5305,11 @@ clfEnqueueNDRangeVIRKernel(
     gctUINT                     i;
     gctINT                      status;
     size_t                      workGroupSize = 1;
-    clsPatchDirective_PTR       patchDirective = gcvNULL;
     gctPOINTER                  pointer = gcvNULL;
     gctUINT                     keyStateData[MAX_KEY_DATA_SIZE] = {0};
     gctUINT                     keyStateSize = 0;
     gctUINT                     currentKey = 0;
     gctBOOL                     aquired = gcvFALSE;
-
-    if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010165: (clEnqueueNDRangeKernel) invalid CommandQueue.\n");
-        clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
-    }
-
-    if (Kernel == gcvNULL || Kernel->objectType != clvOBJECT_KERNEL)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010166: (clEnqueueNDRangeKernel) invalid Kernel.\n");
-        clmRETURN_ERROR(CL_INVALID_KERNEL);
-    }
-
-    if (Kernel->program == gcvNULL)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010167: (clEnqueueNDRangeKernel) Kernel is not associate with any program.\n");
-        clmRETURN_ERROR(CL_INVALID_PROGRAM_EXECUTABLE);
-    }
-
-    if (CommandQueue->context != Kernel->context)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010168: (clEnqueueNDRangeKernel) CommandQueue's context is not the same as Kernel's context.\n");
-        clmRETURN_ERROR(CL_INVALID_CONTEXT);
-    }
-
-    if (EventWaitList == gcvNULL && NumEventsInWaitList > 0)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010169: (clEnqueueNDRangeKernel) EventWaitList is NULL, but NumEventsInWaitList is not 0.\n");
-        clmRETURN_ERROR(CL_INVALID_EVENT_WAIT_LIST);
-    }
 
     if (EventWaitList)
     {
@@ -5394,7 +5354,7 @@ clfEnqueueNDRangeVIRKernel(
         if (GlobalWorkSize[i] > CommandQueue->device->deviceInfo.maxGlobalWorkSize)
         {
             gcmUSER_DEBUG_ERROR_MSG(
-                "OCL-010174: (clEnqueueNDRangeKernel) GlobalWorkSize[%d] (%d) over hardware limit %d.\n",
+                "OCL-010174: (clEnqueueNDRangeKernel) GlobalWorkSize[%d] (%d) over hardware limit %lld.\n",
                 i, GlobalWorkSize[i], CommandQueue->device->deviceInfo.maxGlobalWorkSize);
             clmRETURN_ERROR(CL_INVALID_GLOBAL_WORK_SIZE);
         }
@@ -5404,7 +5364,7 @@ clfEnqueueNDRangeVIRKernel(
                 CommandQueue->device->deviceInfo.maxGlobalWorkSize))
         {
             gcmUSER_DEBUG_ERROR_MSG(
-                "OCL-010175: (clEnqueueNDRangeKernel) GlobalWorkSize[%d] (%d) + GlobalWorkOffset[%d] (%d) over hardware limit %d.\n",
+                "OCL-010175: (clEnqueueNDRangeKernel) GlobalWorkSize[%d] (%d) + GlobalWorkOffset[%d] (%d) over hardware limit %lld.\n",
                 i, GlobalWorkSize[i], i, GlobalWorkOffset[i],
                 CommandQueue->device->deviceInfo.maxGlobalWorkSize);
             clmRETURN_ERROR(CL_INVALID_GLOBAL_OFFSET);
@@ -5415,7 +5375,7 @@ clfEnqueueNDRangeVIRKernel(
             if (LocalWorkSize[i] > CommandQueue->device->deviceInfo.maxWorkItemSizes[i])
             {
                 gcmUSER_DEBUG_ERROR_MSG(
-                    "OCL-010176: (clEnqueueNDRangeKernel) LocalWorkSize[i] (%d) is over maxWorkItemSize (%d).\n",
+                    "OCL-010176: (clEnqueueNDRangeKernel) LocalWorkSize[%d] (%d) is over maxWorkItemSize (%d).\n",
                     i, LocalWorkSize[i], CommandQueue->device->deviceInfo.maxWorkItemSizes[i]);
                 clmRETURN_ERROR(CL_INVALID_WORK_ITEM_SIZE);
             }
@@ -5423,7 +5383,7 @@ clfEnqueueNDRangeVIRKernel(
             if (LocalWorkSize[i] == 0)
             {
                 gcmUSER_DEBUG_ERROR_MSG(
-                    "OCL-010177: (clEnqueueNDRangeKernel) LocalWorkSize[i] is 0.\n",
+                    "OCL-010177: (clEnqueueNDRangeKernel) LocalWorkSize[%d] is 0.\n",
                     i);
                 clmRETURN_ERROR(CL_INVALID_WORK_ITEM_SIZE);
             }
@@ -5560,11 +5520,6 @@ OnError:
             "OCL-010182: (clEnqueueNDRangeKernel) Run out of memory.\n");
     }
 
-    if(patchDirective)
-    {
-        clfDestroyPatchDirective(&patchDirective);
-    }
-
     if(command != gcvNULL)
     {
         clfReleaseCommand(command);
@@ -5623,24 +5578,6 @@ clEnqueueNDRangeKernel(
         clmRETURN_ERROR(CL_INVALID_KERNEL);
     }
 
-    if (Kernel->context->platform->virShaderPath)
-    {
-        status= clfEnqueueNDRangeVIRKernel(CommandQueue,
-                                           Kernel,
-                                           WorkDim,
-                                           GlobalWorkOffset,
-                                           GlobalWorkSize,
-                                           LocalWorkSize,
-                                           NumEventsInWaitList,
-                                           EventWaitList,
-                                           Event);
-
-        VCL_TRACE_API(EnqueueNDRangeKernel)(CommandQueue, Kernel, WorkDim, GlobalWorkOffset, GlobalWorkSize,
-                                            LocalWorkSize, NumEventsInWaitList, EventWaitList, Event);
-        gcmFOOTER_ARG("%d Command=0x%x", status, command);
-        return status;
-    }
-
     if (Kernel->program == gcvNULL)
     {
         gcmUSER_DEBUG_ERROR_MSG(
@@ -5660,6 +5597,24 @@ clEnqueueNDRangeKernel(
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010169: (clEnqueueNDRangeKernel) EventWaitList is NULL, but NumEventsInWaitList is not 0.\n");
         clmRETURN_ERROR(CL_INVALID_EVENT_WAIT_LIST);
+    }
+
+    if (Kernel->context->platform->virShaderPath)
+    {
+        status= clfEnqueueNDRangeVIRKernel(CommandQueue,
+                                           Kernel,
+                                           WorkDim,
+                                           GlobalWorkOffset,
+                                           GlobalWorkSize,
+                                           LocalWorkSize,
+                                           NumEventsInWaitList,
+                                           EventWaitList,
+                                           Event);
+
+        VCL_TRACE_API(EnqueueNDRangeKernel)(CommandQueue, Kernel, WorkDim, GlobalWorkOffset, GlobalWorkSize,
+                                            LocalWorkSize, NumEventsInWaitList, EventWaitList, Event);
+        gcmFOOTER_ARG("%d Command=0x%x", status, command);
+        return status;
     }
 
     if (EventWaitList)
@@ -5721,7 +5676,7 @@ clEnqueueNDRangeKernel(
         if (GlobalWorkSize[i] > CommandQueue->device->deviceInfo.maxGlobalWorkSize)
         {
             gcmUSER_DEBUG_ERROR_MSG(
-                "OCL-010174: (clEnqueueNDRangeKernel) GlobalWorkSize[%d] (%d) over hardware limit %d.\n",
+                "OCL-010174: (clEnqueueNDRangeKernel) GlobalWorkSize[%d] (%d) over hardware limit %lld.\n",
                 i, GlobalWorkSize[i], CommandQueue->device->deviceInfo.maxGlobalWorkSize);
             clmRETURN_ERROR(CL_INVALID_GLOBAL_WORK_SIZE);
         }
@@ -5731,7 +5686,7 @@ clEnqueueNDRangeKernel(
                 CommandQueue->device->deviceInfo.maxGlobalWorkSize))
         {
             gcmUSER_DEBUG_ERROR_MSG(
-                "OCL-010175: (clEnqueueNDRangeKernel) GlobalWorkSize[%d] (%d) + GlobalWorkOffset[%d] (%d) over hardware limit %d.\n",
+                "OCL-010175: (clEnqueueNDRangeKernel) GlobalWorkSize[%d] (%d) + GlobalWorkOffset[%d] (%d) over hardware limit %lld.\n",
                 i, GlobalWorkSize[i], i, GlobalWorkOffset[i],
                 CommandQueue->device->deviceInfo.maxGlobalWorkSize);
             clmRETURN_ERROR(CL_INVALID_GLOBAL_OFFSET);
@@ -5742,7 +5697,7 @@ clEnqueueNDRangeKernel(
             if (LocalWorkSize[i] > CommandQueue->device->deviceInfo.maxWorkItemSizes[i])
             {
                 gcmUSER_DEBUG_ERROR_MSG(
-                    "OCL-010176: (clEnqueueNDRangeKernel) LocalWorkSize[i] (%d) is over maxWorkItemSize (%d).\n",
+                    "OCL-010176: (clEnqueueNDRangeKernel) LocalWorkSize[%d] (%d) is over maxWorkItemSize (%d).\n",
                     i, LocalWorkSize[i], CommandQueue->device->deviceInfo.maxWorkItemSizes[i]);
                 clmRETURN_ERROR(CL_INVALID_WORK_ITEM_SIZE);
             }
@@ -5750,7 +5705,7 @@ clEnqueueNDRangeKernel(
             if (LocalWorkSize[i] == 0)
             {
                 gcmUSER_DEBUG_ERROR_MSG(
-                    "OCL-010177: (clEnqueueNDRangeKernel) LocalWorkSize[i] is 0.\n",
+                    "OCL-010177: (clEnqueueNDRangeKernel) LocalWorkSize[%d] is 0.\n",
                     i);
                 clmRETURN_ERROR(CL_INVALID_WORK_ITEM_SIZE);
             }
@@ -5938,28 +5893,6 @@ clEnqueueTask(
                   CommandQueue, Kernel, NumEventsInWaitList, EventWaitList, Event);
     gcmDUMP_API("${OCL clEnqueueTask 0x%x, 0x%x}", CommandQueue, Kernel);
 
-    /*  accordding to ocl1.2 spec, clEnqueueTask is equivalent to calling clEnqueueNDRangeKernel with work_dim = 1,
-        global_work_offset = NULL, global_work_size[0] set to 1 and local_work_size[0] set to 1.    */
-    if (Kernel->context->platform->virShaderPath)
-    {
-        size_t                      globalWorkSize = {1};
-        size_t                      localWorkSize = {1};
-
-        status= clfEnqueueNDRangeVIRKernel(CommandQueue,
-                                           Kernel,
-                                           1,
-                                           gcvNULL,
-                                           &globalWorkSize,
-                                           &localWorkSize,
-                                           NumEventsInWaitList,
-                                           EventWaitList,
-                                           Event);
-
-        VCL_TRACE_API(EnqueueTask)(CommandQueue, Kernel, NumEventsInWaitList, EventWaitList, Event);
-        gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
-        return status;
-    }
-
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
         gcmUSER_DEBUG_ERROR_MSG(
@@ -5993,6 +5926,28 @@ clEnqueueTask(
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010187: (clEnqueueTask) EventWaitList is NULL, but NumEventsInWaitList is not 0.\n");
         clmRETURN_ERROR(CL_INVALID_EVENT_WAIT_LIST);
+    }
+
+    /*  accordding to ocl1.2 spec, clEnqueueTask is equivalent to calling clEnqueueNDRangeKernel with work_dim = 1,
+        global_work_offset = NULL, global_work_size[0] set to 1 and local_work_size[0] set to 1.    */
+    if (Kernel->context->platform->virShaderPath)
+    {
+        size_t                      globalWorkSize = {1};
+        size_t                      localWorkSize = {1};
+
+        status= clfEnqueueNDRangeVIRKernel(CommandQueue,
+                                           Kernel,
+                                           1,
+                                           gcvNULL,
+                                           &globalWorkSize,
+                                           &localWorkSize,
+                                           NumEventsInWaitList,
+                                           EventWaitList,
+                                           Event);
+
+        VCL_TRACE_API(EnqueueTask)(CommandQueue, Kernel, NumEventsInWaitList, EventWaitList, Event);
+        gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
+        return status;
     }
 
     if (EventWaitList)

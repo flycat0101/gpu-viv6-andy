@@ -134,6 +134,12 @@ void khrIcdOsVendorsEnumerate(void)
                 }
                 fseek(fin, 0, SEEK_END);
                 bufferSize = ftell(fin);
+                if (bufferSize == -1)
+                {
+                    free(fileName);
+                    fclose(fin);
+                    break;
+                }
 
                 buffer = malloc(bufferSize+1);
                 if (!buffer)

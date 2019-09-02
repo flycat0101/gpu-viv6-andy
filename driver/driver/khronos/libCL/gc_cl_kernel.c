@@ -385,42 +385,45 @@ clfDeleteHashInstanceKey(
     clsVIRInstanceKey_PTR pObj
     )
 {
-    gctUINT entryId = pObj->key & (pHash->tbEntryNum - 1);
-    clsVIRInstanceKey_PTR pCurObj = pHash->ppHashTable[entryId];
+    gctUINT entryId = pObj ? (pObj->key & (pHash->tbEntryNum - 1)) : 0xffffffff;
+    clsVIRInstanceKey_PTR pCurObj = (entryId != 0xffffffff) ? pHash->ppHashTable[entryId] : gcvNULL;
     clsVIRInstanceKey_PTR pPreObj = gcvNULL;
 
     gcmHEADER_ARG("pHash=0x%x pObj=0x%x", pHash, pObj);
 
-    while (pCurObj)
+    if(pCurObj)
     {
-        if (pCurObj == pObj)
+        while (pCurObj)
         {
-            break;
+            if (pCurObj == pObj)
+            {
+                break;
+            }
+
+            pPreObj = pCurObj;
+            pCurObj = pCurObj->nextInstanceKey;
         }
 
-        pPreObj = pCurObj;
-        pCurObj = pCurObj->nextInstanceKey;
-    }
-
-    if (pPreObj == gcvNULL)
-    {
-        pHash->ppHashTable[entryId] = pCurObj->nextInstanceKey;
-    }
-    else
-    {
-        pPreObj->nextInstanceKey = pCurObj->nextInstanceKey;
-    }
-
-    --pHash->pEntryCounts[entryId];
-
-    if(pObj)
-    {
-        if(pObj->virInstance)
+        if (pPreObj == gcvNULL)
         {
-            clfFreeVIRKernelInstance(pObj->virInstance);
-            pObj->virInstance = gcvNULL;
+            pHash->ppHashTable[entryId] = pCurObj->nextInstanceKey;
         }
-        gcmOS_SAFE_FREE(gcvNULL, pObj);
+        else
+        {
+            pPreObj->nextInstanceKey = pCurObj->nextInstanceKey;
+        }
+
+        --pHash->pEntryCounts[entryId];
+
+        if(pObj)
+        {
+            if(pObj->virInstance)
+            {
+                clfFreeVIRKernelInstance(pObj->virInstance);
+                pObj->virInstance = gcvNULL;
+            }
+            gcmOS_SAFE_FREE(gcvNULL, pObj);
+        }
     }
 
     gcmFOOTER_NO();
@@ -2065,24 +2068,12 @@ clfLoadKernelArgValues(
                     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsPrivateBuffer), (gctPOINTER *)&tempNode), CL_OUT_OF_HOST_MEMORY);
 
                     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsMemAllocInfo), (gctPOINTER *)&privateBuf), CL_OUT_OF_HOST_MEMORY);
-                    status = gcoCL_AllocateMemory(&memAllocInfo->allocatedSize,
+                    clmONERROR(gcoCL_AllocateMemory(&memAllocInfo->allocatedSize,
                                                   &memAllocInfo->physical,
                                                   &memAllocInfo->logical,
                                                   &memAllocInfo->node,
                                                   gcvSURF_INDEX,
-                                                  0);
-                    if(gcmIS_ERROR(status))
-                    {
-                        if(tempNode != gcvNULL)
-                        {
-                            gcmOS_SAFE_FREE(gcvNULL, tempNode);
-                        }
-                        if (privateBuf != gcvNULL)
-                        {
-                            gcmOS_SAFE_FREE(gcvNULL, privateBuf);
-                        }
-                        clmONERROR(status, CL_INVALID_VALUE);
-                    }
+                                                  0), CL_OUT_OF_HOST_MEMORY);
 
                     gcoOS_MemCopy(privateBuf, memAllocInfo, sizeof(clsMemAllocInfo));
 
@@ -2476,6 +2467,17 @@ clfLoadKernelArgValues(
     status = CL_SUCCESS;
 
 OnError:
+    if(gcmIS_ERROR(status))
+    {
+        if(tempNode != gcvNULL)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, tempNode);
+        }
+        if (privateBuf != gcvNULL)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, privateBuf);
+        }
+    }
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -3540,12 +3542,15 @@ clfFlushVIRKernelResource(
     clsCommandNDRangeVIRKernel_PTR NDRangeKernel
     )
 {
-    gceSTATUS  status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsSURF_NODE_PTR node = gcvNULL;
     gctUINT i;
     KERNEL_EXECUTABLE_PROFILE * kep;
     clsSrcArgument_PTR arg;
     struct _gcsHINT *hints;
     gctPOINTER data;
+    gctUINT32  physical = 0; /* gpu virtual address */
+    gctPOINTER logical = gcvNULL;
 
     kep = &NDRangeKernel->currentInstance->kep;
     hints = &NDRangeKernel->currentInstance->hwStates.hints;
@@ -3562,9 +3567,6 @@ clfFlushVIRKernelResource(
                                                     * (NDRangeKernel->workDim > 1 ? (NDRangeKernel->globalWorkSize[1] / (NDRangeKernel->localWorkSize[1] ? NDRangeKernel->localWorkSize[1] : 1)) : 1)
                                                     * (NDRangeKernel->workDim > 2 ? (NDRangeKernel->globalWorkSize[2] / (NDRangeKernel->localWorkSize[2] ? NDRangeKernel->localWorkSize[2] : 1)) : 1);
         gctUINT                     localKernelArgSize = 0;
-        gctUINT32                   physical = 0; /* gpu virtual address */
-        gctPOINTER                  logical = gcvNULL;
-        gcsSURF_NODE_PTR            node = gcvNULL;
         gctINT                      totalArgSize = 0;
         gctINT                      totalArgAlignSize = 0;
 
@@ -3595,7 +3597,7 @@ clfFlushVIRKernelResource(
         if(localKernelArgSize > 0)
         {
             NDRangeKernel->localKernelArgSize = localKernelArgSize * totalNumGroups;
-            clmONERROR(gcoCL_AllocateMemory(&NDRangeKernel->localKernelArgSize, &physical, &logical, &node, gcvSURF_INDEX, 0), CL_INVALID_VALUE);
+            gcmONERROR(gcoCL_AllocateMemory(&NDRangeKernel->localKernelArgSize, &physical, &logical, &node, gcvSURF_INDEX, 0));
         }
 
         for (i = 0; i < kep->resourceTable.imageTable.countOfEntries; i++)
@@ -3695,12 +3697,12 @@ clfFlushVIRKernelResource(
                     memAllocInfo->allocatedSize *= privateItemsNum;
 
                     /* Allocate the physical buffer */
-                    gcoCL_AllocateMemory(&memAllocInfo->allocatedSize,
+                    gcmONERROR(gcoCL_AllocateMemory(&memAllocInfo->allocatedSize,
                                                     &memAllocInfo->physical,
                                                     &memAllocInfo->logical,
                                                     &memAllocInfo->node,
                                                     gcvSURF_INDEX,
-                                                    0);
+                                                    0));
 
                     data = (gctPOINTER) &memAllocInfo->physical;
 
@@ -4348,6 +4350,10 @@ clfFlushVIRKernelResource(
     return gcvSTATUS_OK;
 
 OnError:
+    if(node && clmIS_ERROR(status))
+    {
+        gcoCL_FreeMemory(physical, logical, NDRangeKernel->localKernelArgSize, node, gcvSURF_INDEX);
+    }
     return status;
 }
 
@@ -5706,6 +5712,8 @@ clfReallocateKernelArgs(
     /* Allocate the array of clsArgument structures. */
     clmONERROR(gcoOS_Allocate(gcvNULL, NewNumArgs * gcmSIZEOF(clsArgument), &pointer),
                CL_OUT_OF_HOST_MEMORY);
+
+    gcoOS_ZeroMemory(pointer, NewNumArgs * gcmSIZEOF(clsArgument));
 
     /* Copy the data. */
     if (*Args)
@@ -7240,6 +7248,8 @@ OnError:
         *ErrcodeRet = status;
     }
 
+    if(pointer) gcmOS_SAFE_FREE(gcvNULL, pointer);
+
     if (kernel)
     {
         if(kernel->referenceCount) gcoOS_AtomDestroy(gcvNULL, kernel->referenceCount);
@@ -7251,11 +7261,6 @@ OnError:
         if(kernel->cacheMutex) gcoOS_DeleteMutex(gcvNULL, kernel->cacheMutex);
 
         gcmOS_SAFE_FREE(gcvNULL, kernel);
-    }
-
-    if(pointer != gcvNULL)
-    {
-        gcmOS_SAFE_FREE(gcvNULL, pointer);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -7394,9 +7399,9 @@ clReleaseKernel(
         clmRETURN_ERROR(CL_INVALID_KERNEL);
     }
 
+    VCL_TRACE_API(ReleaseKernel)(Kernel);
     clfONERROR(clfReleaseKernel(Kernel));
 
-    VCL_TRACE_API(ReleaseKernel)(Kernel);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 

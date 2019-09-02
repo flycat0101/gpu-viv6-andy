@@ -365,7 +365,6 @@ clCreateContext(
     return context;
 
 OnError:
-
     if (status == CL_OUT_OF_HOST_MEMORY)
     {
         gcmUSER_DEBUG_ERROR_MSG(
@@ -428,6 +427,7 @@ OnError:
         {
             gcoOS_Free(gcvNULL, context->devices);
         }
+
         gcoOS_Free(gcvNULL, context);
     }
     if (ErrcodeRet)
@@ -461,7 +461,7 @@ clCreateContextFromType(
     if ((DeviceType & (CL_DEVICE_TYPE_GPU | CL_DEVICE_TYPE_DEFAULT)) == 0)
     {
         gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-002005: (clCreateContextFromType) DeviceType (0x%x) is not CL_DEVICE_TYPE_GPU or CL_DEVICE_TYPE_DEFAULT \n",
+            "OCL-002005: (clCreateContextFromType) DeviceType (0x%llx) is not CL_DEVICE_TYPE_GPU or CL_DEVICE_TYPE_DEFAULT \n",
             DeviceType);
         clmRETURN_ERROR(CL_DEVICE_NOT_FOUND);
     }
@@ -510,6 +510,8 @@ clCreateContextFromType(
     {
         clfGetDefaultPlatformID(&platform);
     }
+
+    clmASSERT(platform, CL_INVALID_PLATFORM);
 
     clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, gcvNULL, gcvNULL);
 

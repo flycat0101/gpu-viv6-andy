@@ -230,15 +230,15 @@ clfReleaseMemObject(
                 }
                 else if (MemObj->u.buffer.createType != CL_BUFFER_CREATE_TYPE_REGION)
                 {
-                    gcoCL_FreeMemory(MemObj->u.buffer.physical,
+                    clmONERROR(gcoCL_FreeMemory(MemObj->u.buffer.physical,
                                      MemObj->u.buffer.logical,
                                      MemObj->u.buffer.allocatedSize,
                                      MemObj->u.buffer.node,
-                                     gcvSURF_INDEX);
+                                     gcvSURF_INDEX), CL_INVALID_OPERATION);
 
                     if(MemObj->u.buffer.wrapped)
                     {
-                        gcoCL_Commit(gcvTRUE);
+                        clmONERROR(gcoCL_Commit(gcvTRUE), CL_INVALID_OPERATION);
                     }
                 }
 
@@ -3422,6 +3422,11 @@ clfInitImageDescriptor(clsMem_PTR image)
     {
     case CL_MEM_OBJECT_IMAGE1D:
         tmpData->sd.imageType = CL_MEM_OBJECT_IMAGE1D;
+        tmpData->rawbits[2] = (image->u.image.imageDesc.image_width) | (image->u.image.imageDesc.image_width<<16);
+        sliceSize = image->u.image.imageDesc.image_width;
+        depth = 1;
+        type = 0;
+        break;
     case CL_MEM_OBJECT_IMAGE1D_BUFFER:
         tmpData->rawbits[2] = (image->u.image.imageDesc.image_width) | (image->u.image.imageDesc.image_width<<16);
         sliceSize = image->u.image.imageDesc.image_width;
@@ -4379,18 +4384,18 @@ clCreateImage3D(
     gcmDUMP_API("${OCL clCreateImage3D 0x%x, 0x%x}", Context, Flags);
     VCL_TRACE_API(CreateImage3D_Pre)(Context, Flags, ImageFormat, ImageWidth, ImageHeight, ImageDepth, ImageRowPitch, ImageSlicePitch, HostPtr, ErrcodeRet);
 
-    if (Context->devices[0]->deviceInfo.image3DMaxDepth == 0)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-004023: (clCreateImage3D) image3D is not supported.\n");
-        clmRETURN_ERROR(CL_INVALID_OPERATION);
-    }
-
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-004013: (clCreateImage3D) invalid Context.\n");
         clmRETURN_ERROR(CL_INVALID_CONTEXT);
+    }
+
+    if (Context->devices[0]->deviceInfo.image3DMaxDepth == 0)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-004023: (clCreateImage3D) image3D is not supported.\n");
+        clmRETURN_ERROR(CL_INVALID_OPERATION);
     }
 
     if (ImageFormat == gcvNULL)
