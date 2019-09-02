@@ -15275,7 +15275,7 @@ vx_status vxoWeightsBiases_Compress(
                         wb_base->skipValue,
                         kernelBufferPtr,
                         weight_ptr + kzoffset + weightDataBytesOffset,
-                        !j ? bias_ptr + biasDataDWordOffset : VX_NULL,
+                        !j ? ((bias_ptr != VX_NULL) ? bias_ptr + biasDataDWordOffset : VX_NULL) : VX_NULL,
                         index);
 
                     zrlTmpPtr += sliceCount;
@@ -15293,7 +15293,7 @@ vx_status vxoWeightsBiases_Compress(
                         wb_base->skipValue,
                         kernelBufferPtr,
                         weight_ptr + kzoffset + weightDataBytesOffset,
-                        !j ? bias_ptr + biasDataDWordOffset : VX_NULL,
+                        !j ? ((bias_ptr != VX_NULL) ? bias_ptr + biasDataDWordOffset : VX_NULL) : VX_NULL,
                         index);
 
                     zrlTmpPtr += sliceCount;
