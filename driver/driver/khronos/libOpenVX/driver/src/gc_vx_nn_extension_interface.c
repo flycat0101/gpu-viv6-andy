@@ -7085,7 +7085,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad2_Initializer(vx_node node, c
     vx_scalar  padConst = (vx_scalar)parameters[4];
     vx_uint32  batchCount = TENSOR_SIZE_INDEX(src, 3);
 
-
     vxnne_tensor_pad  padNode = VX_NULL;
 
     /* destroy the existing layer */
@@ -7161,31 +7160,239 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad2_Initializer(vx_node node, c
     }
     else
     {
-        vxnneOperation_Initialize(&padNode->tensor_pad_operation.base,
-            &padNode->base,
-            VXNNE_OPERATION_TARGET_SW,
-            VXNNE_OPERATOR_TENSOR_PAD,
-            vxnneExecuteSWTensorPad2,
-            VX_NULL,
-            batchCount,
-            0);
+        vx_int32 inWidth = 0, inHeight = 0, inDepth = 0, inBatch = 0;
+        vx_int32 outWidth = 0, outHeight = 0, outDepth = 0, outBatch = 0;
+        vx_bool shader_flag = vx_false_e;
+        vx_bool pad_flag = vx_false_e;
+        vx_int32_ptr pad_base = VX_NULL;
+        vx_enum pad_mode = padMode->value->e;
 
-        vxnneLayer_SetOperation(
-            &padNode->base,
-            &padNode->tensor_pad_operation.base,
-            0);
+        outWidth  = TENSOR_SIZE_INDEX(dst, 0);
+        outHeight = TENSOR_SIZE_INDEX(dst, 1);
+        outDepth = TENSOR_SIZE_INDEX(dst, 2);
+        outBatch = TENSOR_SIZE_INDEX(dst, 3);
+        inWidth  = TENSOR_SIZE_INDEX(src, 0);
+        inHeight = TENSOR_SIZE_INDEX(src, 1);
+        inDepth = TENSOR_SIZE_INDEX(src, 2);
+        inBatch = TENSOR_SIZE_INDEX(src, 3);
+        vxoTensor_GetTensorViewMemory(pad_dims, (gctPOINTER*)&pad_base, VX_NULL);
 
-        padNode->tensor_pad_operation.src       = src;
-        padNode->tensor_pad_operation.dst       = dst;
-        padNode->tensor_pad_operation.pad_dims  = pad_dims;
-        padNode->tensor_pad_operation.padMode   = padMode;
-        padNode->tensor_pad_operation.padConst  = padConst;
+        if(outDepth == inDepth && outBatch == inBatch)
+        {
+            pad_flag = vx_true_e;
+            shader_flag = vx_true_e;
+        }
+        else if(outWidth == inWidth && outHeight == inHeight && pad_mode == VX_PAD_CONSTANT
+            && ((outDepth != inDepth && outBatch == inBatch) || (outDepth == inDepth && outBatch != inBatch)))
+        {
+            shader_flag = vx_true_e;
 
-        vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-        vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)pad_dims, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)padMode, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)padConst, VXNNE_OPERATION_REFENRENCE_INPUT);
+            if(outBatch > 1)
+            {
+                if(outDepth != inDepth)
+                {
+                    if(outWidth * outHeight < 65536
+                        || outDepth * outBatch < 65536)
+                        shader_flag = vx_true_e;
+                    else
+                        shader_flag = vx_false_e;
+                }
+                else
+                {
+                    if(outWidth * outHeight < 65536
+                        || outHeight * outDepth < 65536
+                        || outDepth * outBatch < 65536)
+                        shader_flag = vx_true_e;
+                    else
+                        shader_flag = vx_false_e;
+                }
+            }
+        }
+
+        if (shader_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
+        {
+            vxnne_shader_executable shaderExecutable;
+
+            if(pad_flag)
+            {
+                vx_scalar padLeft = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &pad_base[0]);
+                vx_scalar padRight = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &pad_base[1]);
+                vx_scalar padTop = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &pad_base[2]);
+                vx_scalar padBottom = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &pad_base[3]);
+
+                shaderExecutable = vxnneGetTensorPadShaderExecutable(node->base.context,
+                    VXNNE_KERNEL_TENSOR_PAD,
+                    &node->kernelAttributes.borderMode,
+                    src,
+                    padLeft,
+                    padRight,
+                    padTop,
+                    padBottom,
+                    padMode,
+                    padConst,
+                    dst);
+
+                vxReleaseScalar(&padLeft);
+                vxReleaseScalar(&padRight);
+                vxReleaseScalar(&padTop);
+                vxReleaseScalar(&padBottom);
+            }
+            else if(outWidth * outHeight < 65536 && outDepth != inDepth)
+            {
+                vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+                vx_uint32  reshpTensor_Dims           = 3;
+                vx_uint32 leftPad  = 0, topPad = 0, rightPad = 0, bottomPad = 0;
+                vx_tensor input      = NULL;
+                vx_tensor output     = NULL;
+                vx_scalar padLeft, padRight, padTop, padBottom;
+
+                reshpTensor_Sizes[0] = outWidth * outHeight;
+                reshpTensor_Sizes[1] = outDepth;
+                reshpTensor_Sizes[2] = outBatch == 0 ? 1: outBatch;
+                output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+
+                reshpTensor_Sizes[0] = inWidth * inHeight;
+                reshpTensor_Sizes[1] = inDepth;
+                reshpTensor_Sizes[2] = inBatch == 0 ? 1: inBatch;
+                input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+
+                topPad = pad_base[4];
+                bottomPad = pad_base[5];
+
+                padLeft = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &leftPad);
+                padRight = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &rightPad);
+                padTop = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &topPad);
+                padBottom = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &bottomPad);
+
+                shaderExecutable = vxnneGetTensorPadShaderExecutable(node->base.context,
+                    VXNNE_KERNEL_TENSOR_PAD,
+                    &node->kernelAttributes.borderMode,
+                    input,
+                    padLeft,
+                    padRight,
+                    padTop,
+                    padBottom,
+                    padMode,
+                    padConst,
+                    output);
+
+                vxReleaseScalar(&padLeft);
+                vxReleaseScalar(&padRight);
+                vxReleaseScalar(&padTop);
+                vxReleaseScalar(&padBottom);
+
+                if (input) vxoTensor_ReleaseTensor(&input);
+                if (output) vxoTensor_ReleaseTensor(&output);
+            }
+            else if(outWidth * outHeight * inDepth < 65536 && inBatch != outBatch)
+            {
+                vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+                vx_uint32  reshpTensor_Dims           = 3;
+                vx_uint32 leftPad  = 0, topPad = 0, rightPad = 0, bottomPad = 0;
+                vx_tensor input      = NULL;
+                vx_tensor output     = NULL;
+                vx_scalar padLeft, padRight, padTop, padBottom;
+
+                reshpTensor_Sizes[0] = outWidth * outHeight * outDepth;
+                reshpTensor_Sizes[1] = outBatch == 0 ? 1: outBatch;
+                reshpTensor_Sizes[2] = 1;
+                output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+
+                reshpTensor_Sizes[0] = inWidth * inHeight * inDepth;
+                reshpTensor_Sizes[1] = inBatch == 0 ? 1: inBatch;
+                reshpTensor_Sizes[2] = 1;
+                input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+
+                topPad = pad_base[6];
+                bottomPad = pad_base[7];
+
+                padLeft = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &leftPad);
+                padRight = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &rightPad);
+                padTop = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &topPad);
+                padBottom = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &bottomPad);
+
+                shaderExecutable = vxnneGetTensorPadShaderExecutable(node->base.context,
+                    VXNNE_KERNEL_TENSOR_PAD,
+                    &node->kernelAttributes.borderMode,
+                    input,
+                    padLeft,
+                    padRight,
+                    padTop,
+                    padBottom,
+                    padMode,
+                    padConst,
+                    output);
+
+                vxReleaseScalar(&padLeft);
+                vxReleaseScalar(&padRight);
+                vxReleaseScalar(&padTop);
+                vxReleaseScalar(&padBottom);
+
+                if (input) vxoTensor_ReleaseTensor(&input);
+                if (output) vxoTensor_ReleaseTensor(&output);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetTensorPad2ShaderExecutable(node->base.context,
+                    VXNNE_KERNEL_TENSOR_PAD,
+                    &node->kernelAttributes.borderMode,
+                    src,
+                    padConst,
+                    dst,
+                    pad_base);
+            }
+
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto exit;
+            }
+
+            status = vxnneShaderOperation_Initialize(&padNode->tensor_pad_sh_operation,
+                &padNode->base,
+                VXNNE_OPERATOR_TENSOR_PAD,
+                batchCount,
+                shaderExecutable);
+            if (status != VX_SUCCESS)
+                goto exit;
+
+            vxnneOperation_AddReference(&padNode->tensor_pad_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&padNode->tensor_pad_sh_operation.base, (vx_reference)padConst, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&padNode->tensor_pad_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+            vxnneLayer_SetOperation(
+                &padNode->base,
+                &padNode->tensor_pad_sh_operation.base,
+                0);
+        }
+        else
+        {
+            vxnneOperation_Initialize(&padNode->tensor_pad_operation.base,
+                &padNode->base,
+                VXNNE_OPERATION_TARGET_SW,
+                VXNNE_OPERATOR_TENSOR_PAD,
+                vxnneExecuteSWTensorPad2,
+                VX_NULL,
+                batchCount,
+                0);
+
+            vxnneLayer_SetOperation(
+                &padNode->base,
+                &padNode->tensor_pad_operation.base,
+                0);
+
+            padNode->tensor_pad_operation.src       = src;
+            padNode->tensor_pad_operation.dst       = dst;
+            padNode->tensor_pad_operation.pad_dims  = pad_dims;
+            padNode->tensor_pad_operation.padMode   = padMode;
+            padNode->tensor_pad_operation.padConst  = padConst;
+
+            vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)pad_dims, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)padMode, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)padConst, VXNNE_OPERATION_REFENRENCE_INPUT);
+        }
     }
 
     node->layer = &padNode->base;
