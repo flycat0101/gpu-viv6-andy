@@ -75,7 +75,6 @@ SOC_PLATFORM        ?= default
 
 GPU_CONFIG          ?= default
 USE_VXC_BINARY      ?= 0
-USE_NN_ADAPTER      ?= 0
 
 USE_VSC_LITE        ?= 0
 
