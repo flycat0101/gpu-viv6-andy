@@ -17034,7 +17034,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(v
     {
         vx_enum  inputFormat                       = TENSOR_DATA_TYPE(inputs);
         vx_enum  weightFormat                      = TENSOR_DATA_TYPE(weights);
-        vx_enum  biasFormat                        = VX_TYPE_INT32;
+        vx_enum  biasFormat                        = VX_TYPE_INVALID;
         vx_enum  outputFormat                      = TENSOR_DATA_TYPE(outputs);
         vx_bool  dataformat_flag[4]                = {vx_false_e};
         vx_bool  depthwiseConv_shader_flag         = vx_false_e;
@@ -18676,7 +18676,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
 
         if (((kx == 2 && ky == 2) || (kx == 4 && ky == 4))
             && src_width * 2 == dst_width && src_height * 2 == dst_height
-            && group_size == src_depth && dataTypeFlg)
+            && group_size == src_depth && dataTypeFlg && bias != NULL)
             deconvolution_mode = gcoNNE_DECONV_MODE_SHADER;
     }
     /* check NN input and output format according to need_upsample in gcoNNE_DECONV_MODE_NNE_TP*/
