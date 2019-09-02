@@ -1072,21 +1072,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMagnitude_ValidateInput(vx_node node, vx
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
-    if (index == 1)
+    if (vxoGetObjAttributeByNodeIndex(node, 1, VX_TYPE_IMAGE, &objData[1]) != VX_SUCCESS)
     {
-        if (vxoGetObjAttributeByNodeIndex(node, 1, VX_TYPE_IMAGE, &objData[1]) != VX_SUCCESS)
-        {
-            gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
-            return VX_ERROR_INVALID_PARAMETERS;
-        }
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
     }
-    else
+
+    if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData[0]) != VX_SUCCESS)
     {
-        if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData[0]) != VX_SUCCESS)
-        {
-            gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
-            return VX_ERROR_INVALID_PARAMETERS;
-        }
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
     }
 
     if (objData[index].u.imageInfo.format != VX_DF_IMAGE_S16)
@@ -1204,21 +1199,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoPhase_ValidateInput(vx_node node, vx_uin
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
-    if (index == 1)
+    if (vxoGetObjAttributeByNodeIndex(node, 1, VX_TYPE_IMAGE, &objData[1]) != VX_SUCCESS)
     {
-        if (vxoGetObjAttributeByNodeIndex(node, 1, VX_TYPE_IMAGE, &objData[1]) != VX_SUCCESS)
-        {
-            gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
-            return VX_ERROR_INVALID_PARAMETERS;
-        }
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
     }
-    else
+    if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData[0]) != VX_SUCCESS)
     {
-        if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData[0]) != VX_SUCCESS)
-        {
-            gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
-            return VX_ERROR_INVALID_PARAMETERS;
-        }
+        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
     }
 
     if (objData[index].u.imageInfo.format != VX_DF_IMAGE_S16)
