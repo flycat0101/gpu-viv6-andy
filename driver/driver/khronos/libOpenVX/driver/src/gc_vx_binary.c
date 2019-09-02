@@ -5455,7 +5455,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
     if ((initBuffer != VX_NULL) && (context->binaryGraphInitSize[deviceID] > 0))
     {
         vx_uint32 indexOfFirstPatch = 0, patchCount = 0;
-        vx_uint32 offsetArray[2] = {0};
+        vx_uint32 offsetArray[20] = {0};
         vx_int32 ret = 0;
         vx_binary_patch_info_s patchInfo;
 
@@ -5467,7 +5467,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
 
             ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)initBuffer,
                                           context->binaryGraphInitSize[deviceID]/gcmSIZEOF(gctUINT32),
-                                          axiSRAMPhysical, offsetArray, vx_false_e);
+                                          axiSRAMPhysical, offsetArray, vx_true_e);
             if (ret == 1)
             {   /* The AXI-SRAM need to be patched */
                 /*1.1 patch start remap address */
@@ -5483,7 +5483,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                 /*1.2 patch end remap address */
                 ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)initBuffer,
                                       context->binaryGraphInitSize[deviceID]/gcmSIZEOF(gctUINT32),
-                                      axiSRAMPhysicalEnd, offsetArray, vx_false_e);
+                                      axiSRAMPhysicalEnd, offsetArray, vx_true_e);
                 if (ret == 1)
                 {
                     patchInfo.offset = offsetArray[0];
@@ -5501,6 +5501,10 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                     vxError("fail to search axi sram end address in init command buffer\n");
                     vxmONERROR(VX_ERROR_INVALID_VALUE);
                 }
+            }
+            else
+            {
+                vxError("%s[%d]: search multi result for AXI-SRAM address in initialize command\n", __FUNCTION__, __LINE__);
             }
         }
 
@@ -6387,7 +6391,7 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
     vx_graph graph = node->graph;
     vx_uint32 patchCount = 0;
     vx_uint32 patchIndex;
-    vx_uint32 offsetArray[2] = {0};
+    vx_uint32 offsetArray[100] = {0};
     vx_int32 ret = 0;
     vx_uint32 index = 0, layerId = 0;
     vx_status status = VX_SUCCESS;
@@ -6494,12 +6498,41 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
         ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)cmdLogicalAddress,
                                       cmdSize / gcmSIZEOF(gctUINT32),
                                       inputPhyAddr,
-                                      offsetArray, vx_false_e);
-        vxmASSERT(1 == ret);
-        if (ret != 1)
+                                      offsetArray, vx_true_e);
+        if (ret > 1)
         {
-            vxError("fail to search input address in command buffer\n");
-            vxmONERROR(VX_ERROR_INVALID_VALUE);
+            vx_int32 count = 0;
+            /* muti inputPhyAddr data in cmdLogicalAddress */
+            if (cmdType == VX_BINARY_OPERATION_TYPE_NN)
+            {
+                for (count = 0; count < ret; count++)
+                {
+                    if (offsetArray[count] == 24)
+                    {
+                        offsetArray[0] = 24;/* 24 means input address offset of NN */
+                        break;
+                    }
+                }
+                if (count >= ret)
+                {
+                    vxError("%s[%d]: error search input for NN\n", __FUNCTION__, __LINE__);
+                }
+            }
+            else if (cmdType == VX_BINARY_OPERATION_TYPE_TP)
+            {
+                for (count = 0; count < ret; count++)
+                {
+                    if (offsetArray[count] == 40)
+                    {
+                        offsetArray[0] = 40;/* 40 means input address offset of TP */
+                        break;
+                    }
+                }
+                if (count >= ret)
+                {
+                    vxError("%s[%d]: error search input for TP\n", __FUNCTION__, __LINE__);
+                }
+            }
         }
 
         patchInfo.offset              = offsetArray[0];
@@ -6547,12 +6580,40 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
             ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)cmdLogicalAddress,
                                            cmdSize / gcmSIZEOF(gctUINT32),
                                            input->physical.circularBufEndAddrPlus1 >> 6,
-                                           offsetArray, vx_false_e);
-            vxmASSERT(1 == ret);
-            if (ret != 1)
+                                           offsetArray, vx_true_e);
+            if (ret > 1)
             {
-                vxError("fail to search input image circular in command buffer\n");
-                vxmONERROR(VX_ERROR_INVALID_VALUE);
+                vx_int32 count = 0;
+                if (cmdType == VX_BINARY_OPERATION_TYPE_NN)
+                {
+                    for (count = 0; count < ret; count++)
+                    {
+                        if (offsetArray[count] == 21 * 4)
+                        {
+                            offsetArray[0] = 21 * 4;/* 21 * 4 means circularBufEndAddrPlus1 address offset of NN instr */
+                            break;
+                        }
+                    }
+                    if (count >= ret)
+                    {
+                        vxError("%s[%d]: error search input for NN\n", __FUNCTION__, __LINE__);
+                    }
+                }
+                else if (cmdType == VX_BINARY_OPERATION_TYPE_TP)
+                {
+                    for (count = 0; count < ret; count++)
+                    {
+                        if (offsetArray[count] == 26 * 4)
+                        {
+                            offsetArray[0] = 26 * 4;/* 26 * 4 means circularBufEndAddrPlus1 offset of TP instr */
+                            break;
+                        }
+                    }
+                    if (count >= ret)
+                    {
+                        vxError("%s[%d]: error search input for TP\n", __FUNCTION__, __LINE__);
+                    }
+                }
             }
 
             patchInfo.offset = offsetArray[0];
@@ -6643,12 +6704,40 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
         ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)cmdLogicalAddress,
                                      cmdSize / gcmSIZEOF(gctUINT32),
                                      outputPhyAddr,
-                                     offsetArray, vx_false_e);
-        vxmASSERT(1 == ret);
-        if (ret != 1)
+                                     offsetArray, vx_true_e);
+        if (ret > 1)
         {
-            vxError("fail to search output address in command buffer\n");
-            vxmONERROR(VX_ERROR_INVALID_VALUE);
+            vx_int32 count = 0;
+            if (cmdType == VX_BINARY_OPERATION_TYPE_NN)
+            {
+                for (count = 0; count < ret; count++)
+                {
+                    if (offsetArray[count] == 7 * 4)
+                    {
+                        offsetArray[0] = 7 * 4;/* 7 * 4 means output address offset of NN instr*/
+                        break;
+                    }
+                }
+                if (count >= ret)
+                {
+                    vxError("%s[%d]: error search output for NN\n", __FUNCTION__, __LINE__);
+                }
+            }
+            else if (cmdType == VX_BINARY_OPERATION_TYPE_TP)
+            {
+                for (count = 0; count < ret; count++)
+                {
+                    if (offsetArray[count] == 13 * 4)
+                    {
+                        offsetArray[0] = 13 * 4;/* 13 * 4 means output offset of TP instr*/
+                        break;
+                    }
+                }
+                if (count >= ret)
+                {
+                    vxError("%s[%d]: error search output for TP\n", __FUNCTION__, __LINE__);
+                }
+            }
         }
 
         patchInfo.offset              = offsetArray[0];
@@ -6689,12 +6778,40 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
             ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)cmdLogicalAddress,
                                          cmdSize / gcmSIZEOF(gctUINT32),
                                          output->physical.circularBufEndAddrPlus1 >> 6,
-                                         offsetArray, vx_false_e);
-            vxmASSERT(1 == ret);
-            if (ret != 1)
+                                         offsetArray, vx_true_e);
+            if (ret > 1)
             {
-                vxError("fail to search axis sram address in command buffer\n");
-                vxmONERROR(VX_ERROR_INVALID_VALUE);
+                vx_int32 count = 0;
+                if (cmdType == VX_BINARY_OPERATION_TYPE_NN)
+                {
+                    for (count = 0; count < ret; count++)
+                    {
+                        if (offsetArray[count] == 19 * 4)
+                        {
+                            offsetArray[0] = 19 * 4;/* 19 * 4 means circularBufEndAddrPlus1 address offset of NN instr*/
+                            break;
+                        }
+                    }
+                    if (count >= ret)
+                    {
+                        vxError("%s[%d]: error circularBufEndAddrPlus1 input for NN\n", __FUNCTION__, __LINE__);
+                    }
+                }
+                else if (cmdType == VX_BINARY_OPERATION_TYPE_TP)
+                {
+                    for (count = 0; count < ret; count++)
+                    {
+                        if (offsetArray[count] == 28 * 4)
+                        {
+                            offsetArray[0] = 28 * 4;/* 28 * 4 means circularBufEndAddrPlus1 offset of TP instr*/
+                            break;
+                        }
+                    }
+                    if (count >= ret)
+                    {
+                        vxError("%s[%d]: error search circularBufEndAddrPlus1 for TP\n", __FUNCTION__, __LINE__);
+                    }
+                }
             }
 
             patchInfo.offset = offsetArray[0];
