@@ -148,7 +148,7 @@ VX_PRIVATE_API vx_string vxoLoadSource(vx_char *filename, vx_size *programSize)
 
     if (pFile)
     {
-        vx_int32 size = 0;
+        vx_size size = 0;
         /* obtain file size:*/
         if (-1 == fseek(pFile, 0, SEEK_END))
         {
