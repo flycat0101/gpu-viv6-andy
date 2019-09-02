@@ -487,10 +487,63 @@ vx_bool calcFitZdp3N(vx_context context,vx_uint32 inputX, vx_uint32 inputY, vx_u
     vx_uint32 maxN = gcmMIN(gcmMIN(context->nnConfig.fixedFeature.nnAccumBufferDepth, maxKernelSize), context->nnConfig.fixedFeature.nnInputBufferDepth);
     vx_bool   isV8 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0);
     vx_uint32 i;
+    vx_uint32 maxInImageYSize = maxInImageXSize;
+    vx_uint32 sliceSize = inputX * inputY;
 
     /*NX1 not support pooling now*/
     if (poolingSize > 1)
         return vx_false_e;
+
+    if (((inputX % 64) == 0) || ((inputX % 16) == 0))
+        return vx_false_e;
+
+    if (sliceSize % 64 == 0)
+    {
+        /* do 64xN rehape */
+        vx_uint32 tempX = 64 * 1;
+        vx_uint32 tempY = sliceSize / tempX;
+        i = 1;
+
+        while ((tempY > maxInImageYSize) && (tempX < maxInImageXSize))
+        {
+            i++;
+            tempX = 64 * i;
+            if ((sliceSize % tempX) == 0)
+            {
+                tempY = sliceSize / tempX;
+            }
+        }
+
+        if ((tempX < maxInImageXSize) && (tempY < maxInImageYSize) && (tempY != inputY))
+        {
+            *fitN = tempY;
+            return vx_true_e;
+        }
+    }
+
+    if (sliceSize % 16 == 0)
+    {
+        /* do 16xN rehape */
+        vx_uint32 tempX = 16 * 1;
+        vx_uint32 tempY = sliceSize / tempX;
+        i = 1;
+
+        while ((tempY > maxInImageYSize) && (tempX < maxInImageXSize))
+        {
+            i++;
+            tempX = 16 * i;
+            if ((sliceSize % tempX) == 0)
+            {
+                tempY = sliceSize / tempX;
+            }
+        }
+
+        if ((tempX < maxInImageXSize) && (tempY < maxInImageYSize) && (tempY != inputY))
+        {
+            *fitN = tempY;
+            return vx_true_e;
+        }
+    }
 
     if ((inputX * inputY) < maxInImageXSize && stride == 1 && poolingSize <= 1)
     {
