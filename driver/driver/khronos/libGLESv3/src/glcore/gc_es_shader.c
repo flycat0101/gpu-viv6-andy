@@ -620,6 +620,10 @@ GLvoid GL_APIENTRY __gles_ShaderBinary(__GLcontext *gc, GLsizei n, const GLuint*
     GLsizei i;
     GLsizei vertexCount = 0;
     GLsizei fragmentCount = 0;
+    GLsizei computeCount = 0;
+    GLsizei tcsCount = 0;
+    GLsizei tesCount = 0;
+    GLsizei gsCount = 0;
 
     __GL_HEADER();
 
@@ -667,6 +671,30 @@ GLvoid GL_APIENTRY __gles_ShaderBinary(__GLcontext *gc, GLsizei n, const GLuint*
             break;
         case GL_FRAGMENT_SHADER:
             if (++fragmentCount > 1)
+            {
+                __GL_ERROR(GL_INVALID_OPERATION);
+            }
+            break;
+        case GL_COMPUTE_SHADER:
+            if (++computeCount > 1)
+            {
+                __GL_ERROR(GL_INVALID_OPERATION);
+            }
+            break;
+        case GL_TESS_CONTROL_SHADER_EXT:
+            if (++tcsCount > 1)
+            {
+                __GL_ERROR(GL_INVALID_OPERATION);
+            }
+            break;
+        case GL_TESS_EVALUATION_SHADER_EXT:
+            if (++tesCount > 1)
+            {
+                __GL_ERROR(GL_INVALID_OPERATION);
+            }
+            break;
+        case GL_GEOMETRY_SHADER_EXT:
+            if (++gsCount > 1)
             {
                 __GL_ERROR(GL_INVALID_OPERATION);
             }

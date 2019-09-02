@@ -8436,10 +8436,16 @@ gcChipGetProgramBinary_V0(
     GL_ASSERT(masterPgInstance);
 
     /* Get size of program binary. */
-    gcmONERROR(gcSaveGraphicsProgram(masterPgInstance->savedBinaries,
-                                     masterPgInstance->programState,
-                                     gcvNULL,
-                                     (gctUINT32 *)&size));
+    if(masterPgInstance->savedBinaries[__GLSL_STAGE_CS])
+    {
+        gcmONERROR(gcSaveComputeProgram(masterPgInstance->savedBinaries[__GLSL_STAGE_CS],
+                                        masterPgInstance->programState, gcvNULL, (gctUINT32 *)&size));
+    }
+    else
+    {
+        gcmONERROR(gcSaveGraphicsProgram(masterPgInstance->savedBinaries,
+                                     masterPgInstance->programState, gcvNULL, (gctUINT32 *)&size));
+    }
 
     if (binary)
     {
@@ -8449,10 +8455,17 @@ gcChipGetProgramBinary_V0(
         }
 
         /* Save program binary. */
-        gcmONERROR(gcSaveGraphicsProgram(masterPgInstance->savedBinaries,
-                                         masterPgInstance->programState,
-                                         &binary,
-                                         (gctUINT32 *)&size));
+        if(masterPgInstance->savedBinaries[__GLSL_STAGE_CS])
+        {
+            gcmONERROR(gcSaveComputeProgram(masterPgInstance->savedBinaries[__GLSL_STAGE_CS],
+                                            masterPgInstance->programState, gcvNULL, (gctUINT32 *)&size));
+        }
+        else
+        {
+            /* Save program binary. */
+            gcmONERROR(gcSaveGraphicsProgram(masterPgInstance->savedBinaries,
+                                             masterPgInstance->programState, &binary, (gctUINT32 *)&size));
+        }
 
     }
 
@@ -8554,10 +8567,20 @@ gcChipProgramBinary_V0(
         gcmONERROR(gcSHADER_Construct(shaderTypes[stage], &masterPgInstance->savedBinaries[stage]));
     }
 
-    gcmONERROR(gcLoadGraphicsProgram((gctPOINTER)binary,
-                                     (gctUINT32)length,
-                                     masterPgInstance->binaries,
-                                     gcvNULL));
+    if(masterPgInstance->binaries[__GLSL_STAGE_CS])
+    {
+        gcmONERROR(gcLoadComputeProgram((gctPOINTER)binary,
+                                        (gctUINT32)length,
+                                         masterPgInstance->binaries[__GLSL_STAGE_CS],
+                                         gcvNULL));
+    }
+    else
+    {
+        gcmONERROR(gcLoadGraphicsProgram((gctPOINTER)binary,
+                                         (gctUINT32)length,
+                                         masterPgInstance->binaries,
+                                         gcvNULL));
+    }
 
     for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
     {
@@ -8989,6 +9012,10 @@ __glChipShaderBinary(
     gcSHADER    shaders[__GLSL_STAGE_FS + 1] = { gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL };
     gcSHADER    vertexShader = gcvNULL;
     gcSHADER    fragmentShader = gcvNULL;
+    gcSHADER    computeShader = gcvNULL;
+    gcSHADER    tcsShader   = gcvNULL;
+    gcSHADER    tesShader = gcvNULL;
+    gcSHADER    gsShader = gcvNULL;
     gceSTATUS   status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x shaderObjects=0x%x binaryformat=0x%04x binary=0x%x length=%d",
@@ -8997,6 +9024,8 @@ __glChipShaderBinary(
     /* Iterate all shader objects. */
     for (i = 0; i < n; i++)
     {
+        gcSHADER found = gcvNULL;
+
         switch (shaderObjects[i]->shaderInfo.shaderType)
         {
         case GL_VERTEX_SHADER:
@@ -9025,56 +9054,136 @@ __glChipShaderBinary(
             shaderObjects[i]->shaderInfo.compiledStatus = gcvTRUE;
             break;
 
+        case GL_COMPUTE_SHADER:
+            if (computeShader != gcvNULL)
+            {
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
+            if (shaderObjects[i]->shaderInfo.hBinary == gcvNULL)
+            {
+                gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_COMPUTE, (gcSHADER*)&shaderObjects[i]->shaderInfo.hBinary));
+            }
+            computeShader = (gcSHADER)shaderObjects[i]->shaderInfo.hBinary;
+            shaderObjects[i]->shaderInfo.compiledStatus = gcvTRUE;
+            break;
+
+        case GL_TESS_CONTROL_SHADER_EXT:
+            if (tcsShader != gcvNULL)
+            {
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
+            if (shaderObjects[i]->shaderInfo.hBinary == gcvNULL)
+            {
+                gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_TCS, (gcSHADER*)&shaderObjects[i]->shaderInfo.hBinary));
+            }
+            tcsShader = (gcSHADER)shaderObjects[i]->shaderInfo.hBinary;
+            shaderObjects[i]->shaderInfo.compiledStatus = gcvTRUE;
+            break;
+
+        case GL_TESS_EVALUATION_SHADER_EXT:
+            if (tesShader != gcvNULL)
+            {
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
+            if (shaderObjects[i]->shaderInfo.hBinary == gcvNULL)
+            {
+                gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_TES, (gcSHADER*)&shaderObjects[i]->shaderInfo.hBinary));
+            }
+            tesShader = (gcSHADER)shaderObjects[i]->shaderInfo.hBinary;
+            shaderObjects[i]->shaderInfo.compiledStatus = gcvTRUE;
+            break;
+
+        case GL_GEOMETRY_SHADER_EXT:
+            if (gsShader != gcvNULL)
+            {
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
+            if (shaderObjects[i]->shaderInfo.hBinary == gcvNULL)
+            {
+                gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_GEOMETRY, (gcSHADER*)&shaderObjects[i]->shaderInfo.hBinary));
+            }
+            gsShader = (gcSHADER)shaderObjects[i]->shaderInfo.hBinary;
+            shaderObjects[i]->shaderInfo.compiledStatus = gcvTRUE;
+            break;
+
         default:
             break;
         }
-    }
 
-    if ((vertexShader == gcvNULL) && (fragmentShader == gcvNULL))
-    {
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-    }
-
-    /* Set shader binary according to the format. */
-    if (binaryformat == GL_SHADER_BINARY_VIV)
-    {
-        gcSHADER        found           = gcvNULL;
-        gctUINT32_PTR   compilerVersion = gcvNULL;
-        gcSHADER_KIND   shaderType      = gcSHADER_TYPE_UNKNOWN;
-        gctUINT32       shaderVersion   = 0;
-
-        gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_PRECOMPILED, &shader));
-
-        gcSHADER_GetCompilerVersion(vertexShader? vertexShader: fragmentShader, &compilerVersion);
-        gcSHADER_SetCompilerVersion(shader, compilerVersion);
-        gcmONERROR(gcSHADER_LoadHeader(shader, (gctPOINTER) binary, length, &shaderVersion));
-
-        gcSHADER_GetType(shader, &shaderType);
-        if (shaderType == gcSHADER_TYPE_VERTEX && vertexShader)
-        {
-            found = vertexShader;
-        }
-        else if (shaderType == gcSHADER_TYPE_FRAGMENT && fragmentShader)
-        {
-            found = fragmentShader;
-        }
-
-        gcmONERROR(gcSHADER_Destroy(shader));
-
-        if (!found)
+        if ((vertexShader == gcvNULL) && (fragmentShader == gcvNULL) && (computeShader == gcvNULL))
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
 
-        gcmONERROR(gcSHADER_Load(found, (gctPOINTER) binary, length));
-    }
-    else
-    {
-        if (binaryformat != GL_PROGRAM_BINARY_VIV)
+        /* Set shader binary according to the format. */
+        if (binaryformat == GL_SHADER_BINARY_VIV)
         {
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        }
+            gcSHADER        shader          = gcvNULL;
+            gctUINT32_PTR   compilerVersion = gcvNULL;
+            gcSHADER_KIND   shaderType      = gcSHADER_TYPE_UNKNOWN;
+            gctUINT32       shaderVersion   = 0;
 
+            gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_PRECOMPILED, &shader));
+
+            gcSHADER_GetCompilerVersion((vertexShader ? vertexShader : fragmentShader ? fragmentShader : computeShader), &compilerVersion);
+            gcSHADER_SetCompilerVersion(shader, compilerVersion);
+            gcmONERROR(gcSHADER_LoadHeader(shader, (gctPOINTER) binary, length, &shaderVersion));
+
+            gcSHADER_GetType(shader, &shaderType);
+            if (shaderType == gcSHADER_TYPE_VERTEX && vertexShader)
+            {
+                found = vertexShader;
+            }
+            else if (shaderType == gcSHADER_TYPE_FRAGMENT && fragmentShader)
+            {
+                found = fragmentShader;
+            }
+            else if(shaderType == gcSHADER_TYPE_COMPUTE && computeShader)
+            {
+                found = computeShader;
+            }
+            else if (shaderType == gcSHADER_TYPE_TCS && tcsShader)
+            {
+                found = tcsShader;
+            }
+            else if (shaderType == gcSHADER_TYPE_TES && tesShader)
+            {
+                found = tesShader;
+            }
+            else if(shaderType == gcSHADER_TYPE_GEOMETRY && gsShader)
+            {
+                found = gsShader;
+            }
+
+            gcmONERROR(gcSHADER_Destroy(shader));
+            shader = gcvNULL;
+
+            if (!found)
+            {
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
+
+            gcmONERROR(gcSHADER_Load(found, (gctPOINTER) binary, length));
+        }
+        else
+        {
+            if (binaryformat != GL_PROGRAM_BINARY_VIV)
+            {
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
+
+            if (computeShader)
+            {
+                gcmONERROR(gcLoadComputeProgram((gctPOINTER) binary,
+                                                 length,
+                                                 computeShader,
+                                                 gcvNULL));
+            }
+        }
+    }
+
+    if((binaryformat == GL_PROGRAM_BINARY_VIV) && vertexShader)
+    {
         if ((vertexShader == gcvNULL) || (fragmentShader == gcvNULL))
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
@@ -9082,11 +9191,14 @@ __glChipShaderBinary(
 
         shaders[__GLSL_STAGE_VS] = vertexShader;
         shaders[__GLSL_STAGE_FS] = fragmentShader;
+        shaders[__GLSL_STAGE_TCS] = tcsShader;
+        shaders[__GLSL_STAGE_TES] = tesShader;
+        shaders[__GLSL_STAGE_GS] = gsShader;
 
         gcmONERROR(gcLoadGraphicsProgram((gctPOINTER) binary,
-                                         length,
-                                         shaders,
-                                         gcvNULL));
+                                            length,
+                                            shaders,
+                                            gcvNULL));
     }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
