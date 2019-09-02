@@ -1407,7 +1407,7 @@ VX_INTERNAL_API  vx_weights_biases_parameter vxoGraphOptimization_CreateWBParame
     return wb;
 }
 
-VX_INTERNAL_API vx_node vxoGraphOptimization_transformConv(vx_node convNode, vx_tensor input, vx_tensor output,
+VX_INTERNAL_API vx_node vxoGraphOptimization_transformConv(vx_graph graph, vx_tensor input, vx_tensor convOut, vx_tensor finalOutput,
                                                                vx_tensor weight, vx_tensor bias, vx_bool enable_relu,
                                                                vx_size dilation[2], vx_uint32 stride[2], vx_uint32 pad[4],
                                                                vx_uint8 accumulator_bits, vx_uint32 pool_size[2], vx_uint32 pad_const,
@@ -1417,7 +1417,7 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_transformConv(vx_node convNode, vx_
                                                                vx_tensor prelu_alpha)
 {
     vx_node node;
-    vx_context context = vxGetContext((vx_reference)convNode);
+    vx_context context = vxGetContext((vx_reference)graph);
     vx_scalar vxPadConst = vxCreateScalar(context, VX_TYPE_UINT32, &pad_const);
 
     vx_nn_convolution_relu_pooling_params_ext2_t wb_params =
@@ -1430,21 +1430,21 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_transformConv(vx_node convNode, vx_
             },
             stride[0], stride[1]
         },
-        depth_multiplier, VX_TENSOR_RANK_WHCN, TENSOR_DATA_TYPE(output)
+        depth_multiplier, VX_TENSOR_RANK_WHCN, TENSOR_DATA_TYPE(finalOutput)
     };
 
     vx_weights_biases_parameter wb = vxoGraphOptimization_CreateWBParameter(
         VX_NN_CONVOLUTION_LAYER,
         (vx_nn_convolution_relu_pooling_params_t *)&wb_params,
         sizeof(wb_params),
-        input, (vx_tensor)convNode->paramTable[convNode->numParameters - 1], output, weight, bias, prelu_alpha);
+        input, convOut, finalOutput, weight, bias, prelu_alpha);
     CHECK_NULL(wb);
 
     if(depth_multiplier == 1)
-        node = vxConvolutionReluLayer(convNode->graph, input, wb, pad[0], pad[2], 0, overflow_policy, rounding_policy, down_scale_size_rounding, enable_relu, output);
+        node = vxConvolutionReluLayer(graph, input, wb, pad[0], pad[2], 0, overflow_policy, rounding_policy, down_scale_size_rounding, enable_relu, finalOutput);
     else
-        node = vxConvolutionReluPoolingLayer2(convNode->graph, input, wb, (vx_nn_convolution_relu_pooling_params)&wb_params,
-            sizeof(wb_params), output);
+        node = vxConvolutionReluPoolingLayer2(graph, input, wb, (vx_nn_convolution_relu_pooling_params)&wb_params,
+            sizeof(wb_params), finalOutput);
 
     vxReleaseWeightsBiasesParameter(&wb);
     vxReleaseScalar(&vxPadConst);
@@ -1583,7 +1583,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
     TENSOR_POS(finalOutTensor)          = reluOutputTensor ? TENSOR_POS(reluOutputTensor)           : TENSOR_POS(convOutputTensor);
 
     nodes[0]->merged = vx_true_e;
-    newNode = vxoGraphOptimization_transformConv(nodes[0], inputTensor, finalOutTensor, weight, bias, enable_relu,
+    newNode = vxoGraphOptimization_transformConv(nodes[0]->graph, inputTensor, convOutputTensor,
+                                                    finalOutTensor, weight, bias, enable_relu,
                                                     dilation, stride, pad,accumulator_bits,
                                                     pool_size, pad_const, pool_type, pad_mode,
                                                     overflow_policy, rounding_policy,
