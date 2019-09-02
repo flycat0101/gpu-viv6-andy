@@ -143,3 +143,472 @@ __kernel void gpuPooling_AvgPadQuant8(__read_only image2d_array_t   input,
 
     write_imageui(output, (int4)(x, y, z, 0), tmp);
 }
+
+__kernel void gpuPooling_AvgNoPadFP32_opt(__read_only image2d_array_t   input,
+                                      int filterX,
+                                      int filterY,
+                                      int strideX,
+                                      int strideY,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float4 tmpOut = {0.0};
+    int i, j, count = 0;
+    float sum = 0;
+    int offset = x*strideX;
+    float4 one = {1.0, 1.0, 1.0, 1.0};
+
+    for(j = 0; j < filterY; j++)
+    {
+        for(i = 0; i < filterX; i+=4)
+        {
+            tmpOut += read_imagef(input, (int4)(offset+i, y*strideY+j, z, 0));
+            count += 4;
+        }
+    }
+    sum = dot(tmpOut, one);
+
+    tmpOut.x = sum/convert_float(count);
+
+    write_imagef(output, (int4)(x, y, z, 0), tmpOut);
+}
+
+__kernel void gpuPooling_AvgNoPadFP32_res1(__read_only image2d_array_t   input,
+                                      int filterX,
+                                      int filterY,
+                                      int strideX,
+                                      int strideY,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float4 tmpOut = {0.0}, data = {0.0};
+    int i, j, count = 0;
+    float sum = 0;
+
+    int iter = (filterX >> 2) << 2;
+    int offset1 = x*strideX;
+    int offset0 = offset1 + iter;
+    float4 one = {1.0, 1.0, 1.0, 1.0};
+
+    for(j = 0; j < filterY; j++)
+    {
+        for(i = 0; i < iter; i+=4)
+        {
+            tmpOut += read_imagef(input, (int4)(offset1+i, y*strideY+j, z, 0));
+            count+=4;
+        }
+        data = read_imagef(input, (int4)(offset0, y*strideY+j, z, 0));
+        sum += data.x;
+        count++;
+    }
+    sum += dot(tmpOut, one);
+    tmpOut.x = sum/convert_float(count);
+
+    write_imagef(output, (int4)(x, y, z, 0), tmpOut);
+}
+
+__kernel void gpuPooling_AvgNoPadFP32_res2(__read_only image2d_array_t   input,
+                                      int filterX,
+                                      int filterY,
+                                      int strideX,
+                                      int strideY,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float4 tmpOut = {0.0}, data = {0.0};
+    int i, j, count = 0;
+    float sum = 0;
+
+    int iter = (filterX >> 2) << 2;
+    int offset1 = x*strideX;
+    int offset0 = offset1 + iter;
+    float4 one = {1.0, 1.0, 1.0, 1.0};
+
+    for(j = 0; j < filterY; j++)
+    {
+        for(i = 0; i < iter; i+=4)
+        {
+            tmpOut += read_imagef(input, (int4)(offset1+i, y*strideY+j, z, 0));
+            count+=4;
+        }
+        data = read_imagef(input, (int4)(offset0, y*strideY+j, z, 0));
+        sum += (data.x + data.y);
+        count+=2;
+    }
+    sum += dot(tmpOut, one);
+    tmpOut.x = sum/convert_float(count);
+
+    write_imagef(output, (int4)(x, y, z, 0), tmpOut);
+}
+
+__kernel void gpuPooling_AvgNoPadFP32_res3(__read_only image2d_array_t   input,
+                                      int filterX,
+                                      int filterY,
+                                      int strideX,
+                                      int strideY,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float4 tmpOut = {0.0}, tmpOut1 = {0.0};
+    int i, j, count = 0;
+    float sum = 0;
+    float4 one = {1.0, 1.0, 1.0, 1.0};
+
+    int iter = (filterX >> 2) << 2;
+    int offset1 = x*strideX;
+    int offset0 = offset1 + iter;
+
+    for(j = 0; j < filterY; j++)
+    {
+        for(i = 0; i < iter; i+=4)
+        {
+            tmpOut += read_imagef(input, (int4)(offset1+i, y*strideY+j, z, 0));
+            count+=4;
+        }
+        tmpOut1 += read_imagef(input, (int4)(offset0, y*strideY+j, z, 0));
+        count+=3;
+    }
+    tmpOut1.w = 0;
+    tmpOut += tmpOut1;
+    sum = dot(tmpOut, one);
+    tmpOut.x = sum/convert_float(count);
+
+    write_imagef(output, (int4)(x, y, z, 0), tmpOut);
+}
+
+__kernel void gpuPooling_AvgNoPadQuant8_opt(__read_only image2d_array_t   input,
+                                      int   filterX,
+                                      int   filterY,
+                                      int   strideX,
+                                      int   strideY,
+                                      float scaleIn,
+                                      float scaleOut,
+                                      int   zeroPointIn,
+                                      int   zeroPointOut,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int i, j, count = 0;
+    uint4 tmp = {0}, tmpSum = {0};
+    uint sum = 0;
+    float tmpOut = 0.0;
+    int offset2 = y*strideY;
+
+    for(j = 0; j < filterY; j++)
+    {
+        int row = offset2 + j;
+        for(i = 0; i < filterX; i+=4)
+        {
+            tmpSum += read_imageui(input, (int4)(x*strideX+i, row, z, 0));
+            count+=4;
+        }
+    }
+    sum = tmpSum.x + tmpSum.y + tmpSum.z + tmpSum.w;
+    tmpOut = convert_int(sum - count * zeroPointIn) * scaleIn;
+    tmpOut = tmpOut/convert_float(count);
+    tmp.x = floor(tmpOut*scaleOut + zeroPointOut + 0.5);
+
+    write_imageui(output, (int4)(x, y, z, 0), tmp);
+}
+
+__kernel void gpuPooling_AvgNoPadQuant8_res1(__read_only image2d_array_t   input,
+                                      int   filterX,
+                                      int   filterY,
+                                      int   strideX,
+                                      int   strideY,
+                                      float scaleIn,
+                                      float scaleOut,
+                                      int   zeroPointIn,
+                                      int   zeroPointOut,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float4 tmpOut = {0.0};
+    int i, j, count = 0;
+    uint4 tmp, tmpSum = {0};
+    int iter = (filterX >> 2) << 2;
+    uint tmpSum1 = 0;
+    uint sum = 0;
+
+    int offset1 = x*strideX;
+    int offset0 = offset1 + iter;
+    int offset2 = y*strideY;
+
+    for(j = 0; j < filterY; j++)
+    {
+        int row = offset2 + j;
+        for(i = 0; i < iter; i+=4)
+        {
+            //tmp = read_imageui(input, (int4)(x*strideX+i, y*strideY+j, z, 0));
+            //tmpOut.x += (convert_int(tmp.x-zeroPointIn))*scaleIn;
+            tmpSum += read_imageui(input, (int4)(offset1+i, row, z, 0));
+            count+=4;
+        }
+        tmp = read_imageui(input, (int4)(offset0, row, z, 0));
+        tmpSum1 += tmp.x;
+        count++;
+    }
+    sum = tmpSum.x + tmpSum.y + tmpSum.z + tmpSum.w + tmpSum1;
+    tmpOut.x = convert_int(sum - count * zeroPointIn) * scaleIn;
+    tmpOut.x = tmpOut.x/convert_float(count);
+    tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
+
+    write_imageui(output, (int4)(x, y, z, 0), tmp);
+}
+
+__kernel void gpuPooling_AvgNoPadQuant8_res2(__read_only image2d_array_t   input,
+                                      int   filterX,
+                                      int   filterY,
+                                      int   strideX,
+                                      int   strideY,
+                                      float scaleIn,
+                                      float scaleOut,
+                                      int   zeroPointIn,
+                                      int   zeroPointOut,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float4 tmpOut = {0.0};
+    int i, j, count = 0;
+    uint4 tmp = {0}, tmpSum = {0}, data;
+    int iter = (filterX >> 2) << 2;
+    uint tmpSum1 = 0;
+    uint sum = 0;
+
+    int offset1 = x*strideX;
+    int offset0 = offset1 + iter;
+    int offset2 = y*strideY;
+
+    for(j = 0; j < filterY; j++)
+    {
+        int row = offset2 + j;
+        for(i = 0; i < iter; i+=4)
+        {
+            //tmp = read_imageui(input, (int4)(x*strideX+i, y*strideY+j, z, 0));
+            //tmpOut.x += (convert_int(tmp.x-zeroPointIn))*scaleIn;
+            tmpSum += read_imageui(input, (int4)(offset1+i, row, z, 0));
+            count+=4;
+        }
+        data = read_imageui(input, (int4)(offset0, row, z, 0));
+        tmpSum1 += (data.x + data.y);
+        count+=2;
+    }
+    sum = tmpSum.x + tmpSum.y + tmpSum.z + tmpSum.w + tmpSum1;
+    tmpOut.x = convert_int(sum - count * zeroPointIn) * scaleIn;
+    tmpOut.x = tmpOut.x/convert_float(count);
+    tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
+
+    write_imageui(output, (int4)(x, y, z, 0), tmp);
+}
+
+__kernel void gpuPooling_AvgNoPadQuant8_res3(__read_only image2d_array_t   input,
+                                      int   filterX,
+                                      int   filterY,
+                                      int   strideX,
+                                      int   strideY,
+                                      float scaleIn,
+                                      float scaleOut,
+                                      int   zeroPointIn,
+                                      int   zeroPointOut,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float4 tmpOut = {0.0};
+    int i, j, count = 0;
+    uint4 tmp, tmpSum = {0};
+    int iter = (filterX >> 2) << 2;
+    uint4 tmpSum1 = {0};
+    uint sum = 0;
+
+    int offset1 = x*strideX;
+    int offset0 = offset1 + iter;
+    int offset2 = y*strideY;
+
+    for(j = 0; j < filterY; j++)
+    {
+        int row = offset2 + j;
+        for(i = 0; i < iter; i+=4)
+        {
+            //tmp = read_imageui(input, (int4)(x*strideX+i, y*strideY+j, z, 0));
+            //tmpOut.x += (convert_int(tmp.x-zeroPointIn))*scaleIn;
+            tmpSum += read_imageui(input, (int4)(offset1+i, row, z, 0));
+            count+=4;
+        }
+        tmpSum1 += read_imageui(input, (int4)(offset0, row, z, 0));
+        count+=3;
+    }
+    tmpSum1.w = 0;
+    tmpSum += tmpSum1;
+    sum = tmpSum.x + tmpSum.y + tmpSum.z + tmpSum.w;
+    tmpOut.x = convert_int(sum - count * zeroPointIn) * scaleIn;
+    tmpOut.x = tmpOut.x/convert_float(count);
+    tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
+
+    write_imageui(output, (int4)(x, y, z, 0), tmp);
+}
+
+__kernel void gpuPooling_AvgNoPadQuant8_7x7(__read_only image2d_array_t   input,
+                                      int   filterX,
+                                      int   filterY,
+                                      int   strideX,
+                                      int   strideY,
+                                      float scaleIn,
+                                      float scaleOut,
+                                      int   zeroPointIn,
+                                      int   zeroPointOut,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float4 tmpOut = {0.0};
+    int j;
+    uint4 tmp, tmpSum = {0};
+    uint4 tmpSum1 = {0};
+    uint sum = 0;
+
+    int offset1 = x*strideX;
+    int offset0 = offset1 + 4;
+    int offset2 = y*strideY;
+    float constVal = 49.0;
+
+    for(j = 0; j < 7; j++)
+    {
+        int row = offset2 + j;
+        tmpSum += read_imageui(input, (int4)(offset1, row, z, 0));
+        tmpSum1 += read_imageui(input, (int4)(offset0, row, z, 0));
+    }
+    tmpSum1.w = 0;
+    tmpSum += tmpSum1;
+    sum = tmpSum.x + tmpSum.y + tmpSum.z + tmpSum.w;
+    tmpOut.x = convert_int(sum - 49 * zeroPointIn) * scaleIn;
+    tmpOut.x = tmpOut.x/constVal;
+    tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
+
+    write_imageui(output, (int4)(x, y, z, 0), tmp);
+}
+
+__kernel void gpuPooling_AvgPadFP32_opt(__read_only image2d_array_t   input,
+                                      int filterX,
+                                      int filterY,
+                                      int strideX,
+                                      int strideY,
+                                      int padX,
+                                      int padY,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int coordinX = x*strideX - padX;
+    int coordinY = y*strideY - padY;
+    int z = get_global_id(2);
+    float4 tmpOut = {0.0};
+    int inWidth = get_image_width(input);
+    int inHeight = get_image_height(input);
+    int iStart, iEnd, jStart, jEnd, count = 0;
+    int w, h;
+
+    iStart = max(coordinX, 0);
+    iEnd   = min(coordinX+filterX, inWidth);
+    jStart = max(coordinY, 0);
+    jEnd   = min(coordinY+filterY, inHeight);
+
+    float sum = 0;
+    int len = iEnd - iStart;
+    int iter = (len >> 2) << 2;
+    int offset = iStart + iter;
+    float4 data = {0.0};
+
+    for(h = jStart; h < jEnd; h++)
+    {
+        for(w = iStart; w < offset; w+=4)
+        {
+            tmpOut += read_imagef(input, (int4)(w, h, z, 0));
+            count+=4;
+        }
+        for(w = offset; w < iEnd; w++)
+        {
+            data = read_imagef(input, (int4)(w, h, z, 0));
+            sum += data.x;
+            count++;
+        }
+    }
+    sum += tmpOut.x + tmpOut.y + tmpOut.z + tmpOut.w;
+    tmpOut.x = sum/convert_float(count);
+
+    write_imagef(output, (int4)(x, y, z, 0), tmpOut);
+}
+
+__kernel void gpuPooling_AvgPadQuant8_opt(__read_only image2d_array_t   input,
+                                      int   filterX,
+                                      int   filterY,
+                                      int   strideX,
+                                      int   strideY,
+                                      float scaleIn,
+                                      float scaleOut,
+                                      int   zeroPointIn,
+                                      int   zeroPointOut,
+                                      int   padX,
+                                      int   padY,
+                                      __write_only image2d_array_t  output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int coordinX = x*strideX - padX;
+    int coordinY = y*strideY - padY;
+    float4 tmpOut = {0.0};
+    int inWidth = get_image_width(input);
+    int inHeight = get_image_height(input);
+    int iStart, iEnd, jStart, jEnd, count = 0;
+    int w, h;
+    uint4 tmp = {0}, data;
+
+    iStart = max(coordinX, 0);
+    iEnd   = min(coordinX+filterX, inWidth);
+    jStart = max(coordinY, 0);
+    jEnd   = min(coordinY+filterY, inHeight);
+
+    int len = iEnd - iStart;
+    int iter = (len >> 2) << 2;
+    uint tmpSum = 0;
+    int offset = iStart + iter;
+
+    for(h = jStart; h < jEnd; h++)
+    {
+        for(w = iStart; w < offset; w+=4)
+        {
+            tmp += read_imageui(input, (int4)(w, h, z, 0));
+            //tmpOut.x += (convert_int(tmp.x-zeroPointIn))*scaleIn;
+            count+=4;
+        }
+        for(w = offset; w < iEnd; w++)
+        {
+            data = read_imageui(input, (int4)(w, h, z, 0));
+            tmpSum += data.x;
+            count++;
+        }
+    }
+    tmpSum += tmp.x + tmp.y + tmp.z + tmp.w;
+    tmpOut.x = convert_int(tmpSum - count * zeroPointIn) * scaleIn;
+    tmpOut.x = tmpOut.x/convert_float(count);
+    tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
+
+    write_imageui(output, (int4)(x, y, z, 0), tmp);
+}

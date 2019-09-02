@@ -65,13 +65,13 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
     vx_tensor               output)
 {
 #if !gcdUSE_VXC_BINARY
-    vx_size    programLength[2] = {0};
+    vx_size                          programLength    = 0;
 #endif
     vx_program                       program = VX_NULL;
     vx_status                        status = VX_FAILURE;
     vxnne_shader_executable          shaderExecutable = VX_NULL;
     vxnne_kernel_shaders             kernel;
-    char *                           programSources[2] = {NULL, NULL};
+    char *                           programSources = NULL;
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 
     vx_enum      inputFormat        = input->tensorBuffer->dataFormat;
@@ -130,30 +130,21 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
         program = vxCreateProgramWithBinary(context, ptr, len);
 #else
         char path[_vxcFILENAME_MAX];
-        char path1[_vxcFILENAME_MAX];
 
         if ((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
             || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
             || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32))
         {
             vxmONERROR(getFilePath("nngpu_kernels/AvgPooling.vx", path));
-            vxmONERROR(getFilePath("nngpu_kernels/AvgPooling_opt.vx", path1));
 
-            vxmONERROR_NULLPTR(programSources[0] = loadSources(path, &programLength[0]));
-            vxmONERROR_NULLPTR(programSources[1] = loadSources(path1, &programLength[1]));
+            vxmONERROR_NULLPTR(programSources = loadSources(path, &programLength));
 
-            vxmONERROR_NULLPTR(program = vxCreateProgramWithSource(context, 2, (const vx_char**)programSources, programLength));
+            vxmONERROR_NULLPTR(program = vxCreateProgramWithSource(context, 1, (const vx_char**)&programSources, &programLength));
 
-            if (programSources[0])
+            if(programSources)
             {
-                vxFree(programSources[0]);
-                programSources[0] = NULL;
-            }
-
-            if (programSources[1])
-            {
-                vxFree(programSources[1]);
-                programSources[1] = NULL;
+                vxFree(programSources);
+                programSources = NULL;
             }
         }
         else
@@ -357,16 +348,10 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
-    if (programSources[0])
+    if(programSources)
     {
-        vxFree(programSources[0]);
-        programSources[0] = NULL;
-    }
-
-    if (programSources[1])
-    {
-        vxFree(programSources[1]);
-        programSources[1] = NULL;
+        vxFree(programSources);
+        programSources = NULL;
     }
 
     gcmFOOTER_NO();
@@ -536,7 +521,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
     )
 {
 #if !gcdUSE_VXC_BINARY
-    vx_size    programLength[2] = {0};
+    vx_size    programLength = 0;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -550,7 +535,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
     vx_uint32    depth             = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
     vx_enum      inputFormat       = input->tensorBuffer->dataFormat;
     vx_uint32    tmp               = 0;
-    char *programSources[2] = {NULL, NULL};
+    char *programSources = NULL;
     vx_bool      optFlg            = vx_false_e;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
@@ -566,26 +551,17 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
         program = vxCreateProgramWithBinary(context, ptr, len);
 #else
         char path[_vxcFILENAME_MAX];
-        char path1[_vxcFILENAME_MAX];
 
         vxmONERROR(getFilePath("nngpu_kernels/TensorTranspose.vx", path));
-        vxmONERROR(getFilePath("nngpu_kernels/TensorTranspose_opt.vx", path1));
 
-        vxmONERROR_NULLPTR(programSources[0] = loadSources(path, &programLength[0]));
-        vxmONERROR_NULLPTR(programSources[1] = loadSources(path1, &programLength[1]));
+        vxmONERROR_NULLPTR(programSources = loadSources(path, &programLength));
 
-        vxmONERROR_NULLPTR(program = vxCreateProgramWithSource(context, 2, (const vx_char**)programSources, programLength));
+        vxmONERROR_NULLPTR(program = vxCreateProgramWithSource(context, 1, (const vx_char**)&programSources, &programLength));
 
-        if (programSources[0])
+        if(programSources)
         {
-            vxFree(programSources[0]);
-            programSources[0] = NULL;
-        }
-
-        if (programSources[1])
-        {
-            vxFree(programSources[1]);
-            programSources[1] = NULL;
+            vxFree(programSources);
+            programSources = NULL;
         }
 #endif /*gcdUSE_VXC_BINARY*/
         status = vxGetStatus((vx_reference)program);
@@ -933,16 +909,10 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
-    if (programSources[0])
+    if(programSources)
     {
-        vxFree(programSources[0]);
-        programSources[0] = NULL;
-    }
-
-    if (programSources[1])
-    {
-        vxFree(programSources[1]);
-        programSources[1] = NULL;
+        vxFree(programSources);
+        programSources = NULL;
     }
 
     gcmFOOTER_NO();

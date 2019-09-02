@@ -137,3 +137,529 @@ __kernel void gpuTransposeQuant8_2D(
     tmp = read_imageui(input, (int4)(x, y, 0, 0));
     write_imageui(output, (int4)(y, x, 0, 0), tmp);
 }
+
+__kernel void gpuTransposeFP32_WHC2CHW_opt(__read_only image2d_array_t   input,
+                                       __write_only image2d_array_t  output)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.zyxw;
+    float4 tmpIn0 = {0.0};
+    float4 tmpIn1 = {0.0};
+    float4 tmpIn2 = {0.0};
+    float4 tmpIn3 = {0.0};
+    float4 tmpOut0 = {0.0};
+    float4 tmpOut1 = {0.0};
+    float4 tmpOut2 = {0.0};
+    float4 tmpOut3 = {0.0};
+
+    tmpIn0 = read_imagef(input, coord_in);
+    coord_in.z++;
+    tmpIn1 = read_imagef(input, coord_in);
+    coord_in.z++;
+    tmpIn2 = read_imagef(input, coord_in);
+    coord_in.z++;
+    tmpIn3 = read_imagef(input, coord_in);
+
+    tmpOut0 = (float4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (float4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (float4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (float4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    write_imagef(output, coord_out, tmpOut0);
+    coord_out.z++;
+    write_imagef(output, coord_out, tmpOut1);
+    coord_out.z++;
+    write_imagef(output, coord_out, tmpOut2);
+    coord_out.z++;
+    write_imagef(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeFP32_WHC2CWH_opt(__read_only image2d_array_t   input,
+                                       __write_only image2d_array_t  output)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.zxyw;
+    float4 tmpIn0 = {0.0};
+    float4 tmpIn1 = {0.0};
+    float4 tmpIn2 = {0.0};
+    float4 tmpIn3 = {0.0};
+    float4 tmpOut0 = {0.0};
+    float4 tmpOut1 = {0.0};
+    float4 tmpOut2 = {0.0};
+    float4 tmpOut3 = {0.0};
+
+    tmpIn0 = read_imagef(input, coord_in);
+    coord_in.z++;
+    tmpIn1 = read_imagef(input, coord_in);
+    coord_in.z++;
+    tmpIn2 = read_imagef(input, coord_in);
+    coord_in.z++;
+    tmpIn3 = read_imagef(input, coord_in);
+
+    tmpOut0 = (float4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (float4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (float4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (float4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    write_imagef(output, coord_out, tmpOut0);
+    coord_out.y++;
+    write_imagef(output, coord_out, tmpOut1);
+    coord_out.y++;
+    write_imagef(output, coord_out, tmpOut2);
+    coord_out.y++;
+    write_imagef(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeFP32_WHC2HCW_opt(__read_only image2d_array_t   input,
+                                       __write_only image2d_array_t  output)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.yzxw;
+    float4 tmpIn0 = {0.0};
+    float4 tmpIn1 = {0.0};
+    float4 tmpIn2 = {0.0};
+    float4 tmpIn3 = {0.0};
+    float4 tmpOut0 = {0.0};
+    float4 tmpOut1 = {0.0};
+    float4 tmpOut2 = {0.0};
+    float4 tmpOut3 = {0.0};
+
+    tmpIn0 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imagef(input, coord_in);
+
+    tmpOut0 = (float4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (float4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (float4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (float4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    write_imagef(output, coord_out, tmpOut0);
+    coord_out.z++;
+    write_imagef(output, coord_out, tmpOut1);
+    coord_out.z++;
+    write_imagef(output, coord_out, tmpOut2);
+    coord_out.z++;
+    write_imagef(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeFP32_3HC2HC3_opt(__read_only image2d_array_t   input,
+                                       __write_only image2d_array_t  output)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.yzxw;
+    float4 tmpIn0 = {0.0};
+    float4 tmpIn1 = {0.0};
+    float4 tmpIn2 = {0.0};
+    float4 tmpIn3 = {0.0};
+    float4 tmpOut0 = {0.0};
+    float4 tmpOut1 = {0.0};
+    float4 tmpOut2 = {0.0};
+
+    tmpIn0 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imagef(input, coord_in);
+
+    tmpOut0 = (float4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (float4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (float4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+
+    write_imagef(output, coord_out, tmpOut0);
+    coord_out.z++;
+    write_imagef(output, coord_out, tmpOut1);
+    coord_out.z++;
+    write_imagef(output, coord_out, tmpOut2);
+}
+
+__kernel void gpuTransposeFP32_WHC2WCH_opt(__read_only image2d_array_t   input,
+                                       __write_only image2d_array_t  output)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.xzyw;
+    float4 tmpOut = {0.0};
+
+    tmpOut = read_imagef(input, coord_in);
+
+    write_imagef(output, coord_out, tmpOut);
+}
+
+__kernel void gpuTransposeFP32_CHW2CWH_opt(__read_only image2d_array_t   input,
+                                       __write_only image2d_array_t  output)
+{
+    int4 coord_in = (int4)(get_global_id(1), get_global_id(0), get_global_id(2), 0);
+
+    float4 tmpIn0 = {0.0};
+    float4 tmpIn1 = {0.0};
+    float4 tmpIn2 = {0.0};
+    float4 tmpIn3 = {0.0};
+    float4 tmpOut0 = {0.0};
+    float4 tmpOut1 = {0.0};
+    float4 tmpOut2 = {0.0};
+    float4 tmpOut3 = {0.0};
+
+    int4 coord_out = coord_in.yxzw;
+
+    tmpIn0 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imagef(input, coord_in);
+
+    tmpOut0 = (float4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (float4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (float4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (float4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    write_imagef(output, coord_out, tmpOut0);
+    coord_out.y++;
+    write_imagef(output, coord_out, tmpOut1);
+    coord_out.y++;
+    write_imagef(output, coord_out, tmpOut2);
+    coord_out.y++;
+    write_imagef(output, coord_out, tmpOut3);
+}
+
+/*Quant 8 format*/
+__kernel void gpuTransposeQuant8_WHC2CHW_opt(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.zyxw;
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+    uint4 tmpOut3 = {0};
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.z++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.z++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.z++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (uint4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut2);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeQuant8_WHC2CWH_opt(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.zxyw;
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+    uint4 tmpOut3 = {0};
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.z++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.z++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.z++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (uint4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut2);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeQuant8_WHC2HCW_opt(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.yzxw;
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+    uint4 tmpOut3 = {0};
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (uint4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut2);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeQuant8_3HC2HC3_opt(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.yzxw;
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut2);
+}
+
+__kernel void gpuTransposeQuant8_WHC2WCH_opt(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.xzyw;
+    uint4 tmp = {0};
+
+    tmp = read_imageui(input, coord_in);
+    write_imageui(output, coord_out, tmp);
+}
+
+__kernel void gpuTransposeQuant8_CHW2CWH_opt(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output)
+{
+    int4 coord_in = (int4)(get_global_id(1), get_global_id(0), get_global_id(2), 0);
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+    uint4 tmpOut3 = {0};
+
+    int4 coord_out = coord_in.yxzw;
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (uint4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut2);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeFP32_2D_opt(
+                __read_only image2d_t input,
+                __write_only image2d_t output)
+{
+    int2 coord_in = (int2)(get_global_id(0), get_global_id(1));
+    int2 coord_out = coord_in.yx;
+    float4 tmpIn0 = {0.0};
+    float4 tmpIn1 = {0.0};
+    float4 tmpIn2 = {0.0};
+    float4 tmpIn3 = {0.0};
+    float4 tmpOut0 = {0.0};
+    float4 tmpOut1 = {0.0};
+    float4 tmpOut2 = {0.0};
+    float4 tmpOut3 = {0.0};
+
+    tmpIn0 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imagef(input, coord_in);
+
+    tmpOut0 = (float4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (float4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (float4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (float4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    write_imagef(output, coord_out, tmpOut0);
+    coord_out.y++;
+    write_imagef(output, coord_out, tmpOut1);
+    coord_out.y++;
+    write_imagef(output, coord_out, tmpOut2);
+    coord_out.y++;
+    write_imagef(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeFP32_2D_3h(
+                __read_only image2d_t input,
+                __write_only image2d_t output)
+{
+    int2 coord_in = (int2)(get_global_id(0), get_global_id(1));
+    int2 coord_out = coord_in.yx;
+    float4 tmpIn0 = {0.0};
+    float4 tmpIn1 = {0.0};
+    float4 tmpIn2 = {0.0};
+    float4 tmpIn3 = {0.0};
+    float4 tmpOut0 = {0.0};
+    float4 tmpOut1 = {0.0};
+    float4 tmpOut2 = {0.0};
+
+    tmpIn0 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imagef(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imagef(input, coord_in);
+
+    tmpOut0 = (float4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (float4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (float4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+
+    write_imagef(output, coord_out, tmpOut0);
+    coord_out.y++;
+    write_imagef(output, coord_out, tmpOut1);
+    coord_out.y++;
+    write_imagef(output, coord_out, tmpOut2);
+}
+
+__kernel void gpuTransposeQuant8_2D_opt(
+                __read_only image2d_t input,
+                __write_only image2d_t output)
+{
+    int2 coord_in = (int2)(get_global_id(0), get_global_id(1));
+    int2 coord_out = coord_in.yx;
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+    uint4 tmpOut3 = {0};
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (uint4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut2);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeQuant8_2D_3h(
+                __read_only image2d_t input,
+                __write_only image2d_t output)
+{
+    int2 coord_in = (int2)(get_global_id(0), get_global_id(1));
+    int2 coord_out = coord_in.yx;
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut2);
+}
