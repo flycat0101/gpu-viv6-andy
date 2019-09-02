@@ -406,8 +406,8 @@ VX_INTERNAL_API void vxoNode_Dump(vx_node node)
 
         vxTrace(VX_TRACE_NODE,
                 "<node>\n"
-                "   <address>"VX_FORMAT_HEX"</address>\n"
-                "   <kernel>"VX_FORMAT_HEX"</kernel>\n"
+                "   <address>%p</address>\n"
+                "   <kernel>%p</kernel>\n"
                 "</node>",
                 node, node->kernel);
     }

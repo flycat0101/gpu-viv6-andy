@@ -90,7 +90,7 @@ VX_INTERNAL_API void vxoScalar_Dump(vx_scalar scalar)
 
         vxTrace(VX_TRACE_SCALAR,
                 "<scalar>\n"
-                "   <address>"VX_FORMAT_HEX"</address>\n"
+                "   <address>%p</address>\n"
                 "   <dataType>"VX_FORMAT_HEX"</dataType>\n",
                 scalar, scalar->dataType);
 
@@ -125,11 +125,11 @@ VX_INTERNAL_API void vxoScalar_Dump(vx_scalar scalar)
                 break;
 
             case VX_TYPE_INT64:
-                vxmDUMP_SCALAR_VALUE("%ld", scalar->value->n64);
+                vxmDUMP_SCALAR_VALUE("%lld", scalar->value->n64);
                 break;
 
             case VX_TYPE_UINT64:
-                vxmDUMP_SCALAR_VALUE("%lu", scalar->value->u64);
+                vxmDUMP_SCALAR_VALUE("%llu", scalar->value->u64);
                 break;
 
 #if defined(OPENVX_PLATFORM_SUPPORTS_16_FLOAT)
@@ -155,7 +155,7 @@ VX_INTERNAL_API void vxoScalar_Dump(vx_scalar scalar)
                 break;
 
             case VX_TYPE_SIZE:
-                vxmDUMP_SCALAR_VALUE("%lu", scalar->value->s);
+                vxmDUMP_SCALAR_VALUE("%zu", scalar->value->s);
                 break;
 
             case VX_TYPE_BOOL:
@@ -288,7 +288,14 @@ VX_PRIVATE_API vx_status vxoScalar_CommitValue(vx_scalar scalar, const void *ptr
     {
         vx_context context = vxoContext_GetFromReference((vx_reference)scalar);
         vx_int32 index = vxoContext_GetUserStructIndex(context, scalar->dataType);
-
+        if (index == -1)
+        {
+            vxReleaseMutex(scalar->base.lock);
+            vxError("The value type of the scalar, %p->%d, is not supported", scalar, scalar->dataType);
+            vxmASSERT(0);
+            gcmFOOTER_NO();
+            return VX_ERROR_NOT_SUPPORTED;
+        }
         gcoOS_MemCopy(scalar->userValue, ptr, context->userStructTable[index].size);
     }
 
@@ -469,7 +476,16 @@ static vx_status gcoVX_ScalarToHostMem(vx_scalar scalar, void* user_ptr, vx_uint
     {
         vx_context context = vxoContext_GetFromReference((vx_reference)scalar);
         vx_int32 index = vxoContext_GetUserStructIndex(context, scalar->dataType);
-        vx_uint32 dataSize = (vx_uint32)(size ? size : context->userStructTable[index].size);
+        vx_uint32 dataSize;
+        if (index == -1)
+        {
+            vxReleaseMutex(scalar->base.lock);
+            vxError("The value type of the scalar, %p->%d, is not supported", scalar, scalar->dataType);
+            vxmASSERT(0);
+            gcmFOOTER_NO();
+            return VX_ERROR_NOT_SUPPORTED;
+        }
+        dataSize = (vx_uint32)(size ? size : context->userStructTable[index].size);
 
         gcoOS_MemCopy(user_ptr, scalar->userValue, dataSize);
     }
@@ -530,7 +546,16 @@ static vx_status gcoVX_HostMemToScalar(vx_scalar scalar, void* user_ptr, vx_uint
     {
         vx_context context = vxoContext_GetFromReference((vx_reference)scalar);
         vx_int32 index = vxoContext_GetUserStructIndex(context, scalar->dataType);
-        vx_uint32 dataSize = (vx_uint32)(size ? size : context->userStructTable[index].size);
+        vx_uint32 dataSize;
+        if (index == -1)
+        {
+            vxReleaseMutex(scalar->base.lock);
+            vxError("The value type of the scalar, %p->%d, is not supported", scalar, scalar->dataType);
+            vxmASSERT(0);
+            gcmFOOTER_NO();
+            return VX_ERROR_NOT_SUPPORTED;
+        }
+        dataSize = (vx_uint32)(size ? size : context->userStructTable[index].size);
 
         gcoOS_MemCopy(scalar->userValue, user_ptr, dataSize);
     }
@@ -680,6 +705,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxReadScalarValue(vx_scalar scalar, void *ptr
     {
         vx_context context = vxoContext_GetFromReference((vx_reference)scalar);
         vx_int32 index = vxoContext_GetUserStructIndex(context, scalar->dataType);
+        if (index == -1)
+        {
+            vxReleaseMutex(scalar->base.lock);
+            vxError("The value type of the scalar, %p->%d, is not supported", scalar, scalar->dataType);
+            vxmASSERT(0);
+            gcmFOOTER_NO();
+            return VX_ERROR_NOT_SUPPORTED;
+        }
 
         gcoOS_MemCopy(ptr, scalar->userValue, context->userStructTable[index].size);
     }

@@ -4928,6 +4928,12 @@ VX_PRIVATE_API vx_status vxnneConvolutionReluPoolingInitializer(
         calcFitZdp3N(context, TENSOR_VIEW_SIZE_INDEX(interTensor, 0), TENSOR_VIEW_SIZE_INDEX(interTensor, 1), &fitN, stride, pool_size_x);
         fitOutN = fitN / stride;
 
+        if (fitN == 0)
+        {
+            vxmASSERT(0 && "fitN = 0");
+            status = VX_FAILURE;
+            goto exit;
+        }
         reshapeInputSize[0] = TENSOR_VIEW_SIZE_INDEX(interTensor, 0) * TENSOR_VIEW_SIZE_INDEX(interTensor, 1) / fitN;
         reshapeInputSize[1] = fitN;
 
@@ -7454,11 +7460,21 @@ vx_status vxnneExecuteSWNormalization(struct _vxnne_operation_s *operation)
     vx_int8    input_fp_pos   = TENSOR_POS(input);
     vx_int8    output_fp_pos  = TENSOR_POS(output);
     vx_enum    output_rounding_mode = TENSOR_ROUNDING_MODE(output);
-    vx_uint32  input_stride  = TENSOR_STRIDE_INDEX(input, 2) / vxDataType_GetSize(input_format);
-    vx_uint32  output_stride = TENSOR_STRIDE_INDEX(output, 2) / vxDataType_GetSize(output_format);
+    vx_uint32  input_stride, output_stride;
     vx_float32 sum = 0, val = 0;
     vx_uint32  w, h, c, n, b, i, j;
     vx_uint32  start_w, end_w, start_h, end_h, start_c, end_c;
+    vx_uint32  input_data_size = vxDataType_GetSize(input_format);
+    vx_uint32  output_data_size = vxDataType_GetSize(output_format);
+    if ((input_data_size == 0) || (output_data_size == 0))
+    {
+        return VX_FAILURE;
+    }
+    else
+    {
+        input_stride = TENSOR_STRIDE_INDEX(input, 2) / input_data_size;
+        output_stride = TENSOR_STRIDE_INDEX(output, 2) / output_data_size;
+    }
 
     vxoTensor_GetTensorViewMemory(input, &input_base, VX_NULL);
     vxoTensor_GetTensorViewMemory(output, &output_base, VX_NULL);
@@ -7751,13 +7767,13 @@ VX_PRIVATE_API vx_status vxoLRNOperationTP_Initialize(
     return status;
 
 OnError:
-    if (op_param->data_buff)
+    if (op_param && op_param->data_buff)
     {
         vxoTensor_ReleaseTensor(&op_param->data_buff);
         op_param->data_buff = VX_NULL;
     }
 
-    if (op_param->tp_value)
+    if (op_param && op_param->tp_value)
     {
         vxFree(op_param->tp_value);
         op_param->tp_value = VX_NULL;
@@ -7959,7 +7975,7 @@ VX_PRIVATE_API vx_status _InitializeLRNOperation(
 
     if (!op_index)
     {
-        vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
     }
 
     switch (target)
@@ -8010,7 +8026,7 @@ VX_PRIVATE_API vx_status _InitializeLRNOperation(
         break;
 
     default:
-        vxmONERROR(VX_ERROR_NOT_SUPPORTED);
+        status = VX_ERROR_NOT_SUPPORTED;
         break;
     }
 
@@ -13291,7 +13307,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd_cpu(vx_node n
             min_box_W   = min_size_v * img_scale_W;
             min_box_H   = min_size_v * img_scale_H;
 
-            pScalarObj = (vx_scalar *)calloc(4, sizeof(vx_scalar *));
+            pScalarObj = (vx_scalar *)calloc(4, sizeof(vx_scalar));
             pScalarObj[0] = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &img_W);
             pScalarObj[1] = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &img_H);
             pScalarObj[2] = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &min_box_W);
@@ -13683,7 +13699,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
             min_box_W   = min_size_v * img_scale_W;
             min_box_H   = min_size_v * img_scale_H;
 
-            pScalarObj = (vx_scalar *)calloc(4, sizeof(vx_scalar *));
+            pScalarObj = (vx_scalar *)calloc(4, sizeof(vx_scalar));
             pScalarObj[0] = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &img_W);
             pScalarObj[1] = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &img_H);
             pScalarObj[2] = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &min_box_W);
@@ -20706,7 +20722,7 @@ VX_PRIVATE_API vx_status _GetTPReorgCmdType(vx_enum reorg_type,
 
     if (!cmd_type)
     {
-        vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
     }
 
     switch (reorg_type)
@@ -20728,11 +20744,10 @@ VX_PRIVATE_API vx_status _GetTPReorgCmdType(vx_enum reorg_type,
         break;
 
     default:
-        vxmONERROR(VX_ERROR_NOT_SUPPORTED);
+        status = VX_ERROR_NOT_SUPPORTED;
         break;
     }
 
-OnError:
     return status;
 }
 
@@ -20978,7 +20993,7 @@ VX_PRIVATE_API vx_status _InitializeReorg2Operation(
 
     if (!op_index)
     {
-        vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
+        return VX_ERROR_INVALID_PARAMETERS;
     }
 
     switch (target)
@@ -21017,7 +21032,7 @@ VX_PRIVATE_API vx_status _InitializeReorg2Operation(
         break;
 
     default:
-        vxmONERROR(VX_ERROR_NOT_SUPPORTED);
+        status = VX_ERROR_NOT_SUPPORTED;
         break;
     }
 
@@ -24355,6 +24370,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoAdapter_Deinitializer(vx_node node, cons
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = NULL;
     }
 
     return VX_SUCCESS;

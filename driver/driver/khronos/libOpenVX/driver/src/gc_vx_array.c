@@ -93,6 +93,7 @@ VX_INTERNAL_API void vxoArray_Dump(vx_array array)
 
         vxTrace(VX_TRACE_ARRAY,
                 "<array>\n"
+                "   <address>%p</address>\n"
                 "   <itemType>%d</itemType>\n"
                 "   <itemSize>%ul</itemSize>\n"
                 "   <itemCount>%ul</itemCount>\n"

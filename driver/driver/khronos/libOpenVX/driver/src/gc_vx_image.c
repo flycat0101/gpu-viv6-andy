@@ -406,7 +406,7 @@ VX_INTERNAL_API void vxoImage_Dump(vx_image image)
 
         vxTrace(VX_TRACE_IMAGE,
                 "<image>\n"
-                "    <address>"VX_FORMAT_HEX"</address>\n"
+                "    <address>%p</address>\n"
                 "    <width>%u</width>\n"
                 "    <height>%u</height>\n"
                 "    <format>%s</format>\n"
@@ -1556,11 +1556,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxAccessImagePatch(
     {
         gcmFOOTER_ARG("%d", VX_ERROR_OPTIMIZED_AWAY);
         return VX_ERROR_OPTIMIZED_AWAY;
-    }
-    if (patchAddr == VX_NULL || ptr == VX_NULL)
-    {
-        gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
-        return VX_ERROR_INVALID_PARAMETERS;
     }
     if (rect->start_x >= rect->end_x || rect->start_y >= rect->end_y)
     {

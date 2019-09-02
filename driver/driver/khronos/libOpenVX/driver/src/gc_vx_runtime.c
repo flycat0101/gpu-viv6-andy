@@ -399,14 +399,14 @@ VX_INTERNAL_API void vxoPerf_Dump(vx_perf perf)
     {
         vxTrace(VX_TRACE_PERF,
                 "<perf>\n"
-                "   <address>"VX_FORMAT_HEX"</address>\n"
+                "   <address>%p</address>\n"
                 "   <tmp>"VX_FORMAT_MS"</tmp>\n"
                 "   <beg>"VX_FORMAT_MS"</beg>\n"
                 "   <end>"VX_FORMAT_MS"</end>\n"
                 "   <sum>"VX_FORMAT_MS"</sum>\n"
                 "   <avg>"VX_FORMAT_MS"</avg>\n"
                 "   <min>"VX_FORMAT_MS"</min>\n"
-                "   <num>%lu</num>\n"
+                "   <num>%llu</num>\n"
                 "</perf>",
                 perf,
                 vxConvertPerfCountToMS(perf->tmp),

@@ -1117,13 +1117,8 @@ vx_status vxNonLinearFilter(vx_node node, vx_scalar function, vx_image src, vx_m
                     vx_int32 count = _gcfVX_ReadMaskedRectangleU8(src_base, &src_addr, border, VX_DF_IMAGE_U8, x, y, (vx_uint32)rx0, (vx_uint32)ry0, (vx_uint32)rx1, (vx_uint32)ry1, m, v);
 
                     qsort(v, count, sizeof(vx_uint8), vx_uint8_compare);
-
-                    switch (func)
-                    {
-                    case VX_NONLINEAR_FILTER_MIN: *dst = v[0]; break; /* minimal value */
-                    case VX_NONLINEAR_FILTER_MAX: *dst = v[count - 1]; break; /* maximum value */
-                    case VX_NONLINEAR_FILTER_MEDIAN: *dst = v[count / 2]; break; /* pick the middle value */
-                    }
+                    /*func == VX_NONLINEAR_FILTER_MEDIAN*/
+                    *dst = v[count / 2];
                 }
             }
         }

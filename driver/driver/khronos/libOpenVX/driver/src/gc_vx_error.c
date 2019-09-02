@@ -53,6 +53,7 @@ VX_INTERNAL_API vx_error_s *vxoError_GetErrorObject(vx_context_s *context, vx_st
             vx_error error = (vx_error_s *)current->ref;
 
             if (error->status == status) {
+                vxReleaseMutex(context->base.lock);
                 gcmFOOTER_ARG("%p", error);
                 return error;
             }

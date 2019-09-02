@@ -96,24 +96,26 @@ static void * getOvx12VXCKernelInfo(vx_context context, vx_enum kernelID, vx_uin
 }
 #endif
 
-static vx_status getOvx12FilePath(const char subfix[], char path[])
+static vx_status getOvx12FullFilePath(char *fullpath, vx_size len, const char subfix[], char *filename)
 {
     char* env = gcvNULL;
 
-    gcmHEADER_ARG("subfix=%s, path=%s", subfix, path);
+    gcmHEADER_ARG("subfix=%s, filename: %s", subfix, filename);
 
     gcoOS_GetEnv(gcvNULL, "VIVANTE_SDK_DIR", &env);
 
-    if(env) {
-        vx_size len;
-        len = gcoOS_StrLen(env, gcvNULL);
-        gcoOS_StrCopySafe(path, len + 1, env);
-
-        gcoOS_StrCatSafe(path, _ovx12vxcFILENAME_MAX, "/");
-        gcoOS_StrCatSafe(path, _ovx12vxcFILENAME_MAX, subfix);
-
-        gcmFOOTER_ARG("%d", VX_SUCCESS);
-        return VX_SUCCESS;
+    if (env) {
+        vx_uint32 offset = 0;
+        if (gcmIS_SUCCESS(gcoOS_PrintStrSafe(fullpath, len, &offset, "%s/%s/%s", env, subfix, filename)))
+        {
+            gcmFOOTER_ARG("%d", VX_SUCCESS);
+            return VX_SUCCESS;
+        }
+        else
+        {
+            gcmFOOTER_ARG("%d", VX_FAILURE);
+            return VX_FAILURE;
+        }
     }
     else
     {
@@ -127,16 +129,15 @@ VX_PRIVATE_API vx_string vxoLoadSource(vx_char *filename, vx_size *programSize)
 {
     FILE *pFile = NULL;
     vx_string programSource = NULL;
-    vx_char fullname[_ovx12vxcFILENAME_MAX] = "\0";
-    vx_char defname[_ovx12vxcFILENAME_MAX] = "\0";
-
+    vx_char fullname[_ovx12vxcFILENAME_MAX];
     gcmHEADER_ARG("filename=%s, programSize=%p", filename, programSize);
 
-    getOvx12FilePath("ovx12_vxcKernels/", defname);
-
-    strcat(fullname, defname);
-
-    strcat(fullname, filename);
+    memset(fullname, 0, sizeof(vx_char)* _ovx12vxcFILENAME_MAX);
+    if (VX_SUCCESS != getOvx12FullFilePath(fullname, sizeof(vx_char)* _ovx12vxcFILENAME_MAX, "ovx12_vxcKernels", filename))
+    {
+        gcmFOOTER_NO();
+        return NULL;
+    }
 
     if (!programSize)
     {
@@ -149,15 +150,26 @@ VX_PRIVATE_API vx_string vxoLoadSource(vx_char *filename, vx_size *programSize)
     {
         vx_int32 size = 0;
         /* obtain file size:*/
-        fseek(pFile, 0, SEEK_END);
+        if (-1 == fseek(pFile, 0, SEEK_END))
+        {
+            goto OnError;
+        }
         *programSize = ftell(pFile);
+        if (-1 == *programSize)
+        {
+           goto OnError;
+        }
+
         rewind(pFile);
 
         size = (int)(*programSize + 1);
         programSource = (char*)malloc(sizeof(char)*(size));
         if (programSource)
         {
-            fread(programSource, sizeof(char), *programSize, pFile);
+            if (fread(programSource, sizeof(char), *programSize, pFile) != *programSize)
+            {
+                goto OnError;
+            }
             programSource[*programSize] = '\0';
         }
 
@@ -166,6 +178,13 @@ VX_PRIVATE_API vx_string vxoLoadSource(vx_char *filename, vx_size *programSize)
 
     gcmFOOTER_ARG("programSource=%s", programSource);
     return programSource;
+
+OnError:
+    if (pFile)
+        fclose(pFile);
+
+    gcmFOOTER_NO();
+    return NULL;
 }
 
 VX_PRIVATE_API vx_shader* vxGetVxKernelShadersByEnum(vx_context context, vx_enum kernelEnum)
@@ -494,7 +513,7 @@ vx_status vxoGetObjAttributeByNodeIndex(vx_node node, vx_uint32 index, vx_enum t
         case VX_TYPE_OBJECT_ARRAY:
             vxQueryParameter(param, VX_PARAMETER_REF, &objarray, sizeof(objarray));
 
-            if (array == VX_NULL) goto ErrorExit;
+            if (objarray == VX_NULL) goto ErrorExit;
 
             vxQueryObjectArray(objarray, VX_OBJECT_ARRAY_ITEMTYPE, &objData->u.objArrayInfo.dataType, sizeof(vx_enum));
             break;
@@ -1053,23 +1072,21 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMagnitude_ValidateInput(vx_node node, vx
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
-    switch (index)
+    if (index == 1)
     {
-    case 1:
         if (vxoGetObjAttributeByNodeIndex(node, 1, VX_TYPE_IMAGE, &objData[1]) != VX_SUCCESS)
         {
             gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
             return VX_ERROR_INVALID_PARAMETERS;
         }
-    case 0:
+    }
+    else
+    {
         if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData[0]) != VX_SUCCESS)
         {
             gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
             return VX_ERROR_INVALID_PARAMETERS;
         }
-        break;
-    default:
-        break;
     }
 
     if (objData[index].u.imageInfo.format != VX_DF_IMAGE_S16)
@@ -1187,23 +1204,21 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoPhase_ValidateInput(vx_node node, vx_uin
         return VX_ERROR_INVALID_PARAMETERS;
     }
 
-    switch (index)
+    if (index == 1)
     {
-    case 1:
         if (vxoGetObjAttributeByNodeIndex(node, 1, VX_TYPE_IMAGE, &objData[1]) != VX_SUCCESS)
         {
             gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
             return VX_ERROR_INVALID_PARAMETERS;
         }
-    case 0:
+    }
+    else
+    {
         if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData[0]) != VX_SUCCESS)
         {
             gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
             return VX_ERROR_INVALID_PARAMETERS;
         }
-        break;
-    default:
-        break;
     }
 
     if (objData[index].u.imageInfo.format != VX_DF_IMAGE_S16)
@@ -1642,7 +1657,7 @@ VX_PRIVATE_API vx_convolution vxCreateGaussian5x5Convolution(vx_context context)
     status = vxWriteConvolutionCoefficients(conv, (vx_int16 *)gaussian5x5);
     if (status != VX_SUCCESS) goto ErrorExit;
 
-    vxSetConvolutionAttribute(conv, VX_CONVOLUTION_SCALE, (void *)&gaussian5x5scale, sizeof(vx_uint32));
+    status = vxSetConvolutionAttribute(conv, VX_CONVOLUTION_SCALE, (void *)&gaussian5x5scale, sizeof(vx_uint32));
     if (status != VX_SUCCESS) goto ErrorExit;
 
     gcmFOOTER_ARG("conv=%p", conv);
@@ -2368,7 +2383,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Threshold(vx_node node, const
         packedFalseArray[i] = packedFalse;
     }
 
-    status = vxSetNodeUniform(node, "packedTrueArray", 1, &packedTrueArray);
+    status |= vxSetNodeUniform(node, "packedTrueArray", 1, &packedTrueArray);
     status |= vxSetNodeUniform(node, "packedFalseArray", 1, &packedFalseArray);
 
 
@@ -6154,6 +6169,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9_Initializer(vx_node node, const vx
                 || !vxoImage_AllocateMemory((vx_image)output[1]))
             {
                 status |= VX_ERROR_NO_MEMORY;
+                gcmFOOTER_ARG("%d", VX_ERROR_NO_MEMORY);
+                return status;
             }
 
 
@@ -7310,7 +7327,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLister_Initializer(vx_node node, const v
 
     if (!vxoArray_AllocateMemory(tempArray))
     {
-        status |= VX_ERROR_NO_MEMORY;
+        status = VX_ERROR_NO_MEMORY;
+        gcmFOOTER_ARG("%d", status);
+        return status;
     }
 
     nodes[0] = vxCreateListerNode(graph, inputImage, countImage, tempArray);
@@ -12913,7 +12932,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoRemapCopy_Initialize(vx_node node, const
         gcmFOOTER_ARG("%d", status);
         return status;
     }
-    vxoMemory_Allocate(remap_output->base.context, &remap_output->memory);
+
+    if (!vxoMemory_Allocate(remap_output->base.context, &remap_output->memory))
+    {
+        status = VX_ERROR_NO_MEMORY;
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
+
     status |= vxQueryRemap(remap_input, VX_REMAP_SOURCE_WIDTH, &input_source_width, sizeof(input_source_width));
     status |= vxQueryRemap(remap_output, VX_REMAP_SOURCE_WIDTH, &output_source_width, sizeof(output_source_width));
     status |= vxQueryRemap(remap_input, VX_REMAP_SOURCE_HEIGHT, &input_source_height, sizeof(input_source_height));

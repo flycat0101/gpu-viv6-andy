@@ -38,7 +38,7 @@ VX_INTERNAL_API void vxoGraph_Dump(vx_graph graph)
 
         vxTrace(VX_TRACE_GRAPH,
             "<graph>\n"
-            "   <address>"VX_FORMAT_HEX"</address>\n"
+            "   <address>%p</address>\n"
             "</graph>",
             graph);
     }
@@ -2819,7 +2819,9 @@ OnError:
     if (status != VX_SUCCESS)
     {
         /* roll back */
-        RestoreMemoryParamList(graph, block->start, block->count, tempMemParam);
+        if (tempMemParam)
+            RestoreMemoryParamList(graph, block->start, block->count, tempMemParam);
+
         vxnneBlock_Free(block);
     }
 
@@ -6330,7 +6332,7 @@ VX_INTERNAL_API vx_status vxoGraph_PrepareParamMemory(vx_graph graph)
                 if (vxoTensor_AllocateMemory(node->layer->temp_tensors[i]) != VX_SUCCESS)
                 {
                     vxError("Node %p(\"%s\"): Can't allocate memory for No.%d tensor",
-                        node, node->kernel->name, node->layer->temp_tensors[i]);
+                        node, node->kernel->name, i);
                     status = VX_ERROR_NO_MEMORY;
                 }
             }
@@ -6867,7 +6869,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseGraph(vx_graph *graph)
     vx_status status;
     gcmHEADER_ARG("graph=%p", graph);
     gcmDUMP_API("$VX vxReleaseGraph: graph=%p", graph);
-    if (graph && *graph)
+
+    if (graph == NULL || *graph == NULL)
+    {
+        return VX_ERROR_INVALID_GRAPH;
+    }
+
     {
         vx_char * path = (vx_char *)((*graph)->base.context->options.graphPerfLogFile);
         if (path)
@@ -7199,7 +7206,7 @@ VX_PRIVATE_API vx_status vxoGraph_PostMetaFormatData(vx_node node, vx_reference 
             {
                 vxAddLogEntry(&node->base, VX_ERROR_INVALID_DIMENSION,
                     "Node: %s: parameter[%u] has an invalid matrix dimention %ux%u\n",
-                    node->kernel->name, paramIndex, matrix->dataType, matrix->rows, matrix->columns);
+                    node->kernel->name, paramIndex, matrix->rows, matrix->columns);
                 gcmFOOTER_ARG("%d", VX_ERROR_INVALID_DIMENSION);
                 return VX_ERROR_INVALID_DIMENSION;
             }
@@ -7240,7 +7247,7 @@ VX_PRIVATE_API vx_status vxoGraph_PostMetaFormatData(vx_node node, vx_reference 
             {
                 vxAddLogEntry(&node->base, VX_ERROR_INVALID_DIMENSION,
                     "Node: %s: parameter[%u] has an invalid dest dimention %ux%u\n",
-                    node->kernel->name, paramIndex);
+                    node->kernel->name, paramIndex, remap->destWidth, remap->destHeight);
                 gcmFOOTER_ARG("%d", VX_ERROR_INVALID_DIMENSION);
                 return VX_ERROR_INVALID_DIMENSION;
             }
@@ -7342,7 +7349,7 @@ VX_PRIVATE_API vx_status vxoGraph_PostMetaFormatData(vx_node node, vx_reference 
 
     default:
         vxAddLogEntry(&node->base, VX_ERROR_INVALID_TYPE,
-            "The format of meta is invalid objects %s for node: %s\n", metaFormat->type, node->kernel->name);
+            "The format of meta is invalid objects %d for node: %s\n", metaFormat->type, node->kernel->name);
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_FORMAT);
         return VX_ERROR_INVALID_FORMAT;
     }
@@ -9406,7 +9413,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxVerifyGraph(vx_graph graph)
     gctUINT32 savedCoreIndex = 0;
     gceHARDWARE_TYPE savedHardwareType = gcvHARDWARE_INVALID;
     vx_status status = VX_SUCCESS;
-    gctBOOL  switched = gcvFALSE;
 
     gcmHEADER_ARG("graph=%p", graph);
     gcmDUMP_API("$VX vxVerifyGraph: graph=%p", graph);
@@ -9415,7 +9421,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxVerifyGraph(vx_graph graph)
     if(graph->parentGraph == gcvNULL)
     {
         gcmONERROR(gcoVX_SwitchContext(graph->deviceID, &savedHardware, &savedHardwareType, &savedCoreIndex));
-        switched = gcvTRUE;
     }
     status = vxoGraph_VerifyGraph(graph);
 
@@ -9425,12 +9430,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxVerifyGraph(vx_graph graph)
     }
     gcmFOOTER_ARG("%d", status);
     return status;
-OnError:
-    if(switched)
-    {
-        gcoVX_RestoreContext(savedHardware,savedHardwareType,savedCoreIndex);
-    }
 
+OnError:
     vxError("%s[%d]: Verify Graph fail!\n", __FUNCTION__, __LINE__);
     vxAddLogEntry(&graph->base, VX_FAILURE, "%s[%d]: Verify Graph fail!\n", __FUNCTION__, __LINE__);
     gcmFOOTER_ARG("%d", VX_FAILURE);

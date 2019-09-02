@@ -177,7 +177,7 @@ VX_INTERNAL_API vx_bool vxDataType_IsValid(vx_enum type)
         return vx_true_e;
     }
 
-    vxError("The type, "VX_FORMAT_HEX", is invalid", type);
+    vxError("The type, %d, is invalid", type);
 
     return ret;
 }
@@ -296,7 +296,7 @@ VX_PRIVATE_API vx_return_value vxGraphThreadRoutine(vx_ptr arg)
 {
     vx_processor processor = (vx_processor)arg;
     gcmHEADER_ARG("arg=%p", arg);
-    vxInfo("Created VX Thread: %08x\n", gcoOS_GetCurrentThreadID());
+    vxInfo("Created VX Thread: %p\n", gcoOS_GetCurrentThreadID());
 
     while (processor->running)
     {
@@ -320,7 +320,7 @@ VX_PRIVATE_API vx_return_value vxGraphThreadRoutine(vx_ptr arg)
             }
         }
     }
-    vxInfo("Exit VX Thread: %08x\n", gcoOS_GetCurrentThreadID());
+    vxInfo("Exit VX Thread: %p\n", gcoOS_GetCurrentThreadID());
     gcmFOOTER_NO();
     return 0;
 }
@@ -1463,8 +1463,7 @@ VX_PRIVATE_API void vxoContext_ForceReleaseAllObjects(vx_context context)
             if (externalCount > 0)
             {
                 vxWarning("vxoContext_ForceReleaseAllObjects(): "
-                            "The reference, "VX_FORMAT_HEX", of type, "VX_FORMAT_HEX
-                            ", still has %u external count(s)\n",
+                            "The reference, %p, of type, %d, still has %u external count(s)\n",
                             ref, ref->type, externalCount);
             }
 
@@ -1716,6 +1715,7 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
     else
     {
         vxWarning("vxoContext_Release(): the context, %p, still has %u reference count(s) in total",
+                    &context->base,
                     vxoReference_GetTotalCount(&context->base));
 
         vxReleaseMutex(pls->vxContextGlobalLock);
@@ -2713,7 +2713,7 @@ VX_INTERNAL_API vx_bool vxoContext_MemoryMap(
         }
 
         /* we're done, unlock the table */
-        worked = vxReleaseMutex(context->memoryMapsLock);
+        worked &= vxReleaseMutex(context->memoryMapsLock);
     }
     else
         worked = vx_false_e;

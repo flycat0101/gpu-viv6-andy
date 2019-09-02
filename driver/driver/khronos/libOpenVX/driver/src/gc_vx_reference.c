@@ -137,9 +137,9 @@ VX_INTERNAL_API void vxoReference_Dump(vx_reference ref)
     {
         vxTrace(VX_TRACE_REF,
                 "<reference>\n"
-                "   <address>"VX_FORMAT_HEX"</address>\n"
+                "   <address>%p</address>\n"
                 "   <signature>"VX_FORMAT_HEX"</signature>\n"
-                "   <context>"VX_FORMAT_HEX"</context>\n"
+                "   <context>%p</context>\n"
                 "   <type>"VX_FORMAT_HEX"</type>\n"
                 "   <count>"VX_FORMAT_HEX" + "VX_FORMAT_HEX"</count>\n"
                 "</reference>",

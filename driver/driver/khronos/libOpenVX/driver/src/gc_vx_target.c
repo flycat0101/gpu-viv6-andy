@@ -790,7 +790,7 @@ VX_INTERNAL_API void vxoTarget_Dump(vx_target target, vx_uint32 index)
 
         vxTrace(VX_TRACE_TARGET,
                 "<target>\n"
-                "   <address>"VX_FORMAT_HEX"</address>\n"
+                "   <address>%p</address>\n"
                 "   <index>%d</index>\n"
                 "   <enabled>%s</enabled>\n"
                 "   <name>\"%s\"</name>\n"

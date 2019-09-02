@@ -431,6 +431,8 @@ VX_API_ENTRY vx_threshold VX_API_CALL vxCreateThresholdForImage(
     {
         vxAddLogEntry(&context->base, VX_ERROR_INVALID_TYPE, "Invalid input or output format\n");
         threshold = (vx_threshold)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_TYPE);
+        gcmFOOTER_NO();
+        return threshold;
     }
     threshold = (vx_threshold)vxoReference_Create(context, VX_TYPE_THRESHOLD, VX_REF_EXTERNAL, &context->base);
 

@@ -3325,7 +3325,7 @@ VX_INTERNAL_API void vxoKernel_Dump(vx_kernel kernel)
 
         vxTrace(VX_TRACE_KERNEL,
                 "<kernel>\n"
-                "   <address>"VX_FORMAT_HEX"</address>\n"
+                "   <address>%p</address>\n"
                 "   <name>%s</name>\n"
                 "   <enumeration>"VX_FORMAT_HEX"</enumeration>\n"
                 "   <enabled>%s</enabled>\n"
@@ -3491,7 +3491,7 @@ VX_PRIVATE_API vx_status vxoKernel_Remove(vx_kernel kernel)
 
         if (target && kernelIdx < VX_MAX_KERNEL_COUNT)
         {
-
+            vx_reference ref = &kernel->base;
             if (kernel->enabled)
             {
                 kernel->enabled = vx_false_e;
@@ -3505,9 +3505,9 @@ VX_PRIVATE_API vx_status vxoKernel_Remove(vx_kernel kernel)
 
             kernel->isUserkernel = vx_false_e;
 
-            status = vxoReference_Decrement(&kernel->base, VX_REF_EXTERNAL);
+            status = vxoReference_Decrement(ref, VX_REF_EXTERNAL);
 
-            status = vxoReference_Release((vx_reference*)&kernel, VX_TYPE_KERNEL, VX_REF_INTERNAL);
+            status = vxoReference_Release(&ref, VX_TYPE_KERNEL, VX_REF_INTERNAL);
 
             if (status == VX_SUCCESS)
             {
@@ -5614,7 +5614,10 @@ gcfVX_FreeKernelArgs(
             vx_mem_alloc_info memAllocInfo = (vx_mem_alloc_info) Args[i].data;
             gcoVX_FreeMemory(memAllocInfo->node);
             if (FreeAllocData && memAllocInfo->data)
-                gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, memAllocInfo->data));
+            {
+                gcmOS_SAFE_FREE(gcvNULL, memAllocInfo->data);
+                memAllocInfo->data = NULL;
+            }
         }
 
         if (Args[i].data)
@@ -6003,6 +6006,11 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxImportKernelFromURL(vx_context context, con
                 vxoReference_Increment(&kernel->base, VX_REF_EXTERNAL);
                 break;
             }
+        }
+        if (kernel == NULL)
+        {
+            status = VX_FAILURE;
+            goto OnError;
         }
 
         kernel->attributes.borderMode.mode               = VX_BORDER_UNDEFINED;

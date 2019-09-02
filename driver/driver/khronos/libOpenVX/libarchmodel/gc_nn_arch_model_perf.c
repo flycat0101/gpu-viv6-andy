@@ -150,8 +150,8 @@ static void _calcArchModelCacheMode(vx_context context, vx_arch_perf perf, vx_in
             }
             else
             {
-                cacheSpaceLeftInPixel = axiSramOnlySWTiling ? fullCacheSpaceSizeInPixel
-                                                        : (vx_int32)(fullCacheSpaceSizeInPixel - perf->swTilingInfo.segTotalBufferSizeInPixel);
+                cacheSpaceLeftInPixel = /*axiSramOnlySWTiling ? fullCacheSpaceSizeInPixel : */
+                                       (vx_int32)(fullCacheSpaceSizeInPixel - perf->swTilingInfo.segTotalBufferSizeInPixel);
                 if (perf->swTilingInfo.srcBuf == 0)
                 {
                     if (imageIdealCacheSizeInPixel <= cacheSpaceLeftInPixel)
@@ -1390,12 +1390,6 @@ vx_float64 _calcComputeCycleCount(
 
     if (vip_v7_16bit && (fp16 == 0))
     {
-        vx_bool int16OutSideConvCore = vx_false_e;
-        if (int16OutSideConvCore == 1)
-        {
-            dpKZ = (kz * 2);
-        }
-        else
         {
             dpKY = ky;
             dpKZ = kz;
@@ -2390,7 +2384,7 @@ vx_status calculateArchPerf(
     vx_bool singlePortAccBuffer = context->nnConfig.unifiedFeature.singlePortAccBuffer ? vx_true_e : vx_false_e;
     vx_bool isDepthWise = (vx_bool)(context->nnConfig.customizedFeature.depthWiseSupport && (op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV));
     vx_bool isNNWriteWithoutUSC = context->nnConfig.customizedFeature.nnWriteWithoutUSC ? vx_true_e : vx_false_e;
-    vx_bool isV8 = (context->nnConfig.derivedFeature.nnXYDPX == 0 && context->nnConfig.derivedFeature.nnXYDPX == 0) ? vx_true_e : vx_false_e;
+    vx_bool isV8 = (context->nnConfig.derivedFeature.nnXYDPX == 0 && context->nnConfig.derivedFeature.nnXYDPY == 0) ? vx_true_e : vx_false_e;
     vx_bool imageNotPackedInSram = context->nnConfig.unifiedFeature.imageNotPackedInSram ? vx_true_e : vx_false_e;
     vx_uint32 zrlBits = context->nnConfig.fixedFeature.zrlBits;
     vx_float32 totalLatency = context->nnConfig.derivedFeature.totalLatency;

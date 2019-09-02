@@ -149,7 +149,7 @@ VX_API_ENTRY void  VX_API_CALL vxAddLogEntry(vx_reference ref, vx_status status,
 
     if (status == VX_SUCCESS)
     {
-        vxError("Invalid status, VX_SUCCESS, for vxAddLogEntry", status);
+        vxError("Invalid status, %d, for vxAddLogEntry", status);
         gcmFOOTER_NO();
         return;
     }

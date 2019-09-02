@@ -121,7 +121,7 @@ vx_bool _cur_cost_is_more_better(struct _archModelCost *cost, struct _archModelC
     }
     if (bwDiff > 0 && bwDiff < 1)
     {
-        cycleDiff = (vx_float64)((vx_uint64)(bwDiff * 100000000 + 0.5))/100000000;
+        bwDiff = (vx_float64)((vx_uint64)(bwDiff * 100000000 + 0.5))/100000000;
     }
     else if (bwDiff < 0 && bwDiff > -1)
     {
@@ -562,7 +562,7 @@ static vx_float64 _calc_cost(
     perf->info.outy = y;
     perf->info.outz = z;
     perf->info.stridex = opInfo->stridex ? opInfo->stridex : 1;
-    perf->info.stridex = opInfo->stridey ? opInfo->stridey : 1;
+    perf->info.stridey = opInfo->stridey ? opInfo->stridey : 1;
     perf->info.poolingSize   = opInfo->psize;
     perf->info.poolingStride = opInfo->pstride;
     perf->info.xOffSet = (-1) * opInfo->xpad;
@@ -1878,8 +1878,6 @@ static void _split_segment(
         if ((split_array[i] || (i == (segment_last + 1))) && (i > segment_first))
         {
             vx_int32 bestCostSWTilingType = getBestCostSWTilingTypeInfo(archModel, prev_split, i - 1);
-            vx_bool alwaysSplit = vx_true_e;
-            if (bestCostSWTilingType != 1 || alwaysSplit)
             {
                 vx_int32 segStart, segEnd;
                 _split_segment_loop(context, archModel, prev_split, i - 1, x_array, y_array, z_array);
@@ -1917,16 +1915,6 @@ static void _split_segment(
                         }
                         segStart = temp_pos;
                     }
-                }
-            }
-            else
-            {
-                for (temp_pos = prev_split; temp_pos <= (i - 1); temp_pos++)
-                {
-                    x_array[temp_pos] = archModel->splitInfoArray[prev_split % MAX_LAYERS_OF_BLOCK]->savedSIX[(i - 1) % MAX_LAYERS_OF_BLOCK][temp_pos % MAX_LAYERS_OF_BLOCK];
-                    y_array[temp_pos] = archModel->splitInfoArray[prev_split % MAX_LAYERS_OF_BLOCK]->savedSIY[(i - 1) % MAX_LAYERS_OF_BLOCK][temp_pos % MAX_LAYERS_OF_BLOCK];
-                    z_array[temp_pos] = archModel->splitInfoArray[prev_split % MAX_LAYERS_OF_BLOCK]->savedSIZ[(i - 1) % MAX_LAYERS_OF_BLOCK][temp_pos % MAX_LAYERS_OF_BLOCK];
-                    archModel->opInfoArray[temp_pos]->swTilingType = archModel->splitInfoArray[prev_split % MAX_LAYERS_OF_BLOCK]->bestCostSWTilingType[(i - 1) % MAX_LAYERS_OF_BLOCK];
                 }
             }
             prev_split = i;
