@@ -349,8 +349,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapRemapPatch(
 
     /* more bad parameters */
     if (zero_area == vx_false_e &&
-        ((remap->memory.nodePtrs[0] == VX_NULL) ||
-        (start_x >= end_x) ||
+        ((start_x >= end_x) ||
         (start_y >= end_y)))
     {
         status = VX_ERROR_INVALID_PARAMETERS;
@@ -555,8 +554,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxCopyRemapPatch(
 
     /* more bad parameters */
     if (zero_area == vx_false_e &&
-        ((remap->memory.nodePtrs[0] == VX_NULL) ||
-         (start_x >= end_x) ||
+        ((start_x >= end_x) ||
          (start_y >= end_y)))
     {
         status = VX_ERROR_INVALID_PARAMETERS;
