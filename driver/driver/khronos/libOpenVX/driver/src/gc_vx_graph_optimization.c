@@ -107,6 +107,38 @@ VX_INTERNAL_API vx_uint32 vxoGraphOptimization_getTensorSize(vx_tensor org)
     return size * TENSOR_DATA_SIZE(org);
 }
 
+VX_PRIVATE_API vx_tensor vxoGraphOptimization_cloneTensor(vx_tensor tensor, vx_graph graph)
+{
+    vx_tensor cloneTensor = NULL;
+    vx_tensor_create_params_t p;
+
+    gcmHEADER_ARG("tensor=%p", tensor);
+
+    INITIALIZE_STRUCT(p);
+    p.data_format                       = TENSOR_DATA_TYPE(tensor);
+    p.sizes                             = TENSOR_SIZES(tensor);
+    p.num_of_dims                       = TENSOR_DIM_NUM(tensor);
+    p.quant_format                      = TENSOR_QUANT_TYPE(tensor);
+    if(TENSOR_QUANT_TYPE(tensor) == VX_QUANT_AFFINE_SCALE)
+    {
+        p.quant_data.affine.scale           = TENSOR_TF_SCALE(tensor);
+        p.quant_data.affine.zeroPoint       = TENSOR_TF_ZEROPOINT(tensor);
+    }
+    else
+    {
+        p.quant_data.dfp.fixed_point_pos    = TENSOR_POS(tensor);
+    }
+
+    if(vxoTensor_IsVirtualTensor(tensor))
+        cloneTensor = vxCreateVirtualTensor2(graph, &p, sizeof(p));
+    else
+        cloneTensor = vxCreateTensor2(graph->base.context, &p, sizeof(p));
+    CHECK_NULL(cloneTensor);
+
+    gcmFOOTER_ARG("clone tensor = %p", cloneTensor);
+    return cloneTensor;
+}
+
 VX_PRIVATE_API vx_status vxoGraphOptimization_copyConstData2tensor(void *data, vx_tensor *tensor, vx_enum readOrWrite)
 {
     vx_uint32 i = 0;
@@ -975,6 +1007,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_LayerSwaping(vx_graph graph)
     /* and swap their postion in the graph to the maxpooling-leakyrelu cascade relationship.    */
     for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)
     {
+        vx_tensor leakyInput    = NULL;
+        vx_tensor maxpoolOutput = NULL;
+
         leakyReluNode = graph->nodeTable[nodeIndex];
         if ((!vxoNode_IsLeakyReluNode(leakyReluNode)) ||
              (leakyReluNode->numChildren != 1) )
@@ -989,41 +1024,24 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_LayerSwaping(vx_graph graph)
             (maxPoolNode->numParents != 1) )
             continue;
 
-        {
-            vx_reference leakyInput     = leakyReluNode->paramTable[0];
-            vx_reference maxpoolOutput   = maxPoolNode->paramTable[maxPoolNode->numParameters - 1];
-
-            vxoNode_SetParameter(maxPoolNode, 0, leakyInput);
-            vxoNode_SetParameter(leakyReluNode, leakyReluNode->numParameters - 1, maxpoolOutput);
-        }
+        leakyInput     = (vx_tensor)leakyReluNode->paramTable[0];
+        maxpoolOutput  = (vx_tensor)maxPoolNode->paramTable[maxPoolNode->numParameters - 1];
 
         {
-            vx_tensor leakyOut = (vx_tensor)leakyReluNode->paramTable[leakyReluNode->numParameters - 1];
-            vx_tensor_create_params_t p; INITIALIZE_STRUCT(p);
-            p.data_format                       = TENSOR_DATA_TYPE(leakyOut);
-            p.sizes                             = TENSOR_SIZES(leakyOut);
-            p.num_of_dims                       = TENSOR_DIM_NUM(leakyOut);
-            p.quant_format                      = TENSOR_QUANT_TYPE(leakyOut);
-            if(TENSOR_QUANT_TYPE(leakyOut) == VX_QUANT_AFFINE_SCALE)
-            {
-                p.quant_data.affine.scale           = TENSOR_TF_SCALE(leakyOut);
-                p.quant_data.affine.zeroPoint       = TENSOR_TF_ZEROPOINT(leakyOut);
-            }
-            else
-            {
-                p.quant_data.dfp.fixed_point_pos    = TENSOR_POS(leakyOut);
-            }
+            vx_tensor intermediaTensor = vxoGraphOptimization_cloneTensor(maxpoolOutput, graph);
+            if(NULL == intermediaTensor)
+                continue;
+
+            intermediaTensor->isVirtual = vx_true_e; // set intermedia Tensor to b be virtual.
+
+            vxoNode_SetParameter(maxPoolNode, 0, (vx_reference)leakyInput);
+            vxoNode_SetParameter(leakyReluNode, leakyReluNode->numParameters - 1, (vx_reference)maxpoolOutput);
 
 
-            {
-                vx_tensor leakyIn = vxCreateTensor2(graph->base.context, &p, sizeof(p));
-                CHECK_NULL(leakyIn);
+            vxoNode_SetParameter(leakyReluNode, 0, (vx_reference)intermediaTensor);
+            vxoNode_SetParameter(maxPoolNode, maxPoolNode->numParameters - 1, (vx_reference)intermediaTensor);
 
-                vxoNode_SetParameter(leakyReluNode, 0, (vx_reference)leakyIn);
-                vxoNode_SetParameter(maxPoolNode, maxPoolNode->numParameters - 1, (vx_reference)leakyIn);
-
-                vxReleaseTensor(&leakyIn);
-            }
+            vxReleaseTensor(&intermediaTensor);
         }
     }
 
