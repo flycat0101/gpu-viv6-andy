@@ -1705,9 +1705,10 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
                     {
                         gctBOOL isVX2 = gcGetHWCaps()->hwFeatureFlags.supportEVISVX2;
                         if (isVX2)
-                            status = ppoPREPROCESSOR_addMacroDef_Int(PP, "_VIV_VX_EXTENSION", "2");
+                            status = ppoPREPROCESSOR_addMacroDef_Int(PP, "VX_VERSION", "2");
                         else
-                            status =  ppoPREPROCESSOR_addMacroDef_Int(PP, "_VIV_VX_EXTENSION", "1");
+                            status =  ppoPREPROCESSOR_addMacroDef_Int(PP, "VX_VERSION", "1");
+                        status = ppoPREPROCESSOR_addMacroDef_Int(PP, "_VIV_VX_EXTENSION", "1");
                         status = ppoPREPROCESSOR_AddSdkDirToPath(PP);
                         if (gcmIS_ERROR(status))
                             return status;
