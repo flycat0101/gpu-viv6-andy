@@ -1930,6 +1930,7 @@ static halti5_vscprogram_blit* halti5_GetComputeBlitProg(
             {"blit2D_uint_downsample", { 4, 5}, {13, 14}, 24},
 
             {"blit3D_unorm_float", { 6, ~0u}, {15, ~0u}, 24},
+            {"blit3D_unorm_float_hwdoublerounding", { 6, ~0u}, {15, ~0u}, 24},
             {"blit3D_unorm_to_pack", { 6, ~0u}, {17, ~0u}, 24},
             {"blit3D_sint", { 7, ~0u}, {16, ~0u}, 24},
             {"blit3D_uint", { 8, ~0u}, {17, ~0u}, 24},
@@ -3318,6 +3319,8 @@ VkResult halti5_computeBlit(
         __VK_ONERROR(VK_NOT_READY);
     }
 
+    /* TODO: implement blit3D_unorm_float_hwdoublerounding in gc_halti5_blit.comp */
+    __VK_ASSERT(blitKind != HALTI5_BLIT_3D_UNORM_FLOAT_HWDOUBLEROUNDING);
     blitProg = halti5_GetComputeBlitProg(devCtx, blitKind);
 
     scatch = scatchBegin = &pCmdBuf->scratchCmdBuffer[pCmdBuf->curScrachBufIndex];
