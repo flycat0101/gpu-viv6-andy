@@ -1228,6 +1228,43 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
                 y = strides[dnum-1] * dims[dnum-1] / dsize / dims[0];
                 slice = gcmALIGN_NP2(y, TP_MAX_XYSIZE-1) / (TP_MAX_XYSIZE-1);
             }
+            if (slice == 1 && (dnum == 3 || (dnum == 4 && dims[3] == 1)))
+            {
+                vx_uint32_ptr perm = (vx_uint32*)value->p8[0];
+                if (perm[0] == 1 && perm[1] == 0) /* y, x, z */
+                {
+                    slice = x * y > 128 ? gcmMIN(dims[2], core) : 1;
+                    size = dims[2];
+                    value->e32[0] = 1;
+                }
+                else if (perm[0] == 1 && perm[1] == 2) /* y, z, x */
+                {
+                    slice = x * y > 128 ? gcmMIN(dims[2], core) : 1;
+                    size = dims[2];
+                    value->e32[0] = 2;
+                }
+                if (context->hwChipInfo.customerID == 0xAE)
+                {
+                    if (perm[0] == 2 && perm[1] == 0) /* z, x, y */
+                    {
+                        slice = gcmMIN(dims[1], core);
+                        size = dims[1];
+                        value->e32[0] = 3;
+                    }
+                    else if (perm[0] == 2 && perm[1] == 1) /* z, y, x */
+                    {
+                        slice = gcmMIN(dims[1], core);
+                        size = dims[1];
+                        value->e32[0] = 4;
+                    }
+                    else if (perm[0] == 0 && perm[1] == 2) /* x, z, y */
+                    {
+                        slice = gcmMIN(dims[2], core);
+                        size = dims[2];
+                        value->e32[0] = 5;
+                    }
+                }
+            }
             break;
         }
 
@@ -1848,7 +1885,7 @@ void _fill_TP_TRANSPOSE_Command(
     totalSize = strides[pnum-1] * dims[pnum-1] / dsize;
     inXSizeNew = dims[0];
     inYSizeNew = totalSize / inXSizeNew;
-    if (split_count == 1)
+    if (split_count == 1 || value_cmd_ptr->e32[0] != 0)
     {
         for (i = 1; i < pnum; i++)
         {
@@ -1874,46 +1911,226 @@ void _fill_TP_TRANSPOSE_Command(
 
     for (i = 0; i < split_count; i++)
     {
-        if (split_count > 1)
+        if (split_count > 1 && value_cmd_ptr->e32[0] == 0)
         {
             inYSizeNew = strides[pnum-1] / dsize / dims[0] * split_sizes[i];
         }
         vxmASSERT(inXSizeNew < TP_MAX_XYSIZE && inYSizeNew < TP_MAX_XYSIZE);
 
-        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + strides[pnum-1] * split_offsets[i];
-        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + distances[pnum-1] * split_offsets[i] * outputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSizeNew;
-        info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = inYSizeNew;
-        info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = 1;
-        info_array[i].vx_tp_general_cmd_split_info.inImageStride  = inXSizeNew;
-        info_array[i].vx_tp_general_cmd_split_info.inImageSlice   = totalSize;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd   = inXSizeNew - 1;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd   = inYSizeNew - 1;
-        info_array[i].vx_tp_general_cmd_split_info.inTileXSize    = 1;
-        info_array[i].vx_tp_general_cmd_split_info.inTileYSize    = 1;
-        info_array[i].vx_tp_general_cmd_split_info.inTileXInc     = 1;
-        info_array[i].vx_tp_general_cmd_split_info.inTileYInc     = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = distances[0];
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = dims[0];
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = distances[1];
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = split_count > 1 && pnum == 2 ? split_sizes[i] : dims[1];
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = pnum > 2 ? distances[2] : 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = split_count > 1 && pnum == 3 ? split_sizes[i] : pnum > 2 ? dims[2] : 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = pnum > 3 ? distances[3] : 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = split_count > 1 && pnum == 4 ? split_sizes[i] : pnum > 3 ? dims[3] : 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = pnum > 4 ? distances[4] : 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = split_count > 1 && pnum == 5 ? split_sizes[i] : pnum > 4 ? dims[4] : 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = pnum > 5 ? distances[5] : 0;
+        if (value_cmd_ptr->e32[0] == 1)
+        {
+            vx_uint32 inTileXSize = 8;
+            vx_uint32 inTileYSize = 32;
+            info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = inYSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageStride  = inYStride / inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageSlice   = inZStride / inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd   = inXSize - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd   = inYSize - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXSize    = inTileXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYSize    = inTileYSize;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXInc     = inTileXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYInc     = inTileYSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc    = inYSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Count  = inTileXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset  = 0x1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Count  = inTileYSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset  = 0x1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc    = inYSize * inTileXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Count  = (inXSize + inTileXSize - 1) / inTileXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc    = inTileYSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Count  = (inYSize + inTileYSize - 1) / inTileYSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc    = outZStride / outputElemSize;
+        }
+        else if (value_cmd_ptr->e32[0] == 2)
+        {
+            info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inYSize * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = inYSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageStride  = inYStride / inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageSlice   = inZStride / inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd   = inXSize - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd   = inYSize - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXSize    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYSize    = inYSize;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXInc     = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYInc     = inYSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count  = inYSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc    = inYSize * inZSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Count  = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc    = inYSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Count  = split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc    = 0;
+        }
+        else if (value_cmd_ptr->e32[0] == 3)
+        {
+            info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x1;
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inZSize * inXSize * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = inZSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageStride  = inYStride / inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageSlice   = inZStride / inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd   = inXSize - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd   = split_sizes[i] - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXSize    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYSize    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXInc     = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYInc     = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count  = inZSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc    = inZSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Count  = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc    = inZSize * inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Count  = split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc    = 0;
+        }
+        else if (value_cmd_ptr->e32[0] == 4)
+        {
+            info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x1;
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inZSize * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = inZSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageStride  = inYStride / inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageSlice   = inZStride / inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd   = inXSize - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd   = split_sizes[i] - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXSize    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYSize    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXInc     = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYInc     = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count  = inZSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc    = inZSize * inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Count  = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc    = inZSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Count  = split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc    = 0;
+        }
+        else if (value_cmd_ptr->e32[0] == 5)
+        {
+            info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x1;
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inXSize * inZSize * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = inZSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageStride  = inYStride / inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageSlice   = inZStride / inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd   = inXSize - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd   = split_sizes[i] - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXSize    = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYSize    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXInc     = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYInc     = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count  = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc    = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Count  = inZSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc    = inXSize * inZSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Count  = split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset  = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc    = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Count  = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc    = 0;
+        }
+        else
+        {
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + strides[pnum-1] * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + distances[pnum-1] * split_offsets[i] * outputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSizeNew;
+            info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = inYSizeNew;
+            info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inImageStride  = inXSizeNew;
+            info_array[i].vx_tp_general_cmd_split_info.inImageSlice   = totalSize;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd   = inXSizeNew - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd   = inYSizeNew - 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXSize    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYSize    = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXInc     = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYInc     = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = distances[0];
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = dims[0];
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = distances[1];
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = split_count > 1 && pnum == 2 ? split_sizes[i] : dims[1];
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = pnum > 2 ? distances[2] : 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = split_count > 1 && pnum == 3 ? split_sizes[i] : pnum > 2 ? dims[2] : 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = pnum > 3 ? distances[3] : 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = split_count > 1 && pnum == 4 ? split_sizes[i] : pnum > 3 ? dims[3] : 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = pnum > 4 ? distances[4] : 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = split_count > 1 && pnum == 5 ? split_sizes[i] : pnum > 4 ? dims[4] : 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = pnum > 5 ? distances[5] : 0;
 
-        info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
-        info_array[i].vx_tp_general_cmd_split_info.last = 1;
+            info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
+            info_array[i].vx_tp_general_cmd_split_info.last = 1;
+        }
     }
 }
 
