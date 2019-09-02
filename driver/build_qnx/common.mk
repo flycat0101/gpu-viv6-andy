@@ -22,6 +22,7 @@ CUSTOM_PIXMAP?=0
 USE_NEW_LINUX_SIGNAL?=1
 USE_FB_DOUBLE_BUFFER?=0
 ENABLE_CL_GL ?=1
+USE_VXC_BINARY ?=0
 
 # This prevents the platform/board name from getting appended to every build target name.
 # This happens automatically as the build directory structure now includes the board above the
