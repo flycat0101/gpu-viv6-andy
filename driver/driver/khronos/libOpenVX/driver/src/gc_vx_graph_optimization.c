@@ -224,7 +224,9 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                 else
                 {
                     if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) == 1 &&
-                        vxoGraphOptimization_dwConvHalSupport(weight))
+                        vxoGraphOptimization_dwConvHalSupport(weight) &&
+                        (TENSOR_SIZE_INDEX(weight, 0) != 1 || TENSOR_SIZE_INDEX(weight, 1) != 1 )
+                        )
                     {
                         nodeOpType = OP_CONVOLUTION;
                     }
@@ -3817,7 +3819,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_unrollDWConv(vx_graph graph)
                     &rounding_policy, &down_scale_size_rounding,
                     &depth_mult, &pad_mode, &pad_const);
 
-            if(vxoGraphOptimization_dwConvHalSupport(input) && depth_mult == 1)
+            if(vxoGraphOptimization_dwConvHalSupport(input) && depth_mult == 1 &&
+                (TENSOR_SIZE_INDEX(dwweight, 0) != 1 || TENSOR_SIZE_INDEX(dwweight, 1) != 1) )
                 continue;
 
             if(!vxoGraphOptimization_nnHalSupport(dwweight))
