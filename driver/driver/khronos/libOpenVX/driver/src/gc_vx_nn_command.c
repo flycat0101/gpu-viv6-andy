@@ -3801,6 +3801,9 @@ _CalculateSplitSizes(vxnne_tensor_info input,
     {
         vxmASSERT(pad_right < output->width * stride_x / 2);
         output_right_unit_size_x = output->width - output_left_unit_size_x;
+
+        output_center_unit_size_x = 0;
+        output_remainder_size_x = 0;
     }
     else if (div_x > 2)
     {
@@ -3832,6 +3835,9 @@ _CalculateSplitSizes(vxnne_tensor_info input,
     {
         vxmASSERT(pad_bottom < output->height * stride_y / 2);
         output_bottom_unit_size_y = output->height - output_top_unit_size_y;
+
+        output_center_unit_size_y = 0;
+        output_remainder_size_y = 0;
     }
     else if (div_y > 2)
     {
@@ -4083,6 +4089,10 @@ _SplitInputAndOutputForMultiTPCores(vx_context context,
     vx_uint32 core = tp_type != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
                                                context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
     vx_bool mult = context->options.enableMultiTP && core > 1;
+    vx_uint32 pad_left = parameter->pad_x_left;
+    vx_uint32 pad_right = output->width * stride_x - pad_left - input->width;
+    vx_uint32 pad_top = parameter->pad_y_top;
+    vx_uint32 pad_bottom = output->height * stride_y - pad_top - input->height;
     vx_uint32 div_x = 1, div_y = 1, div_z = 1;
     vxnne_tensor_sub_block splits_of_input = VX_NULL;
     vxnne_tensor_sub_block splits_of_output = VX_NULL;
@@ -4108,11 +4118,15 @@ _SplitInputAndOutputForMultiTPCores(vx_context context,
             {
                 div_z = num_slice;
             }
-            else if (output_size_y % num_slice == 0)
+            else if (output_size_y % num_slice == 0 &&
+                     output_size_y / num_slice > pad_top &&
+                     output_size_y / num_slice > pad_bottom)
             {
                 div_y = num_slice;
             }
-            else if (output_size_x % num_slice == 0)
+            else if (output_size_x % num_slice == 0 &&
+                     output_size_x / num_slice > pad_left &&
+                     output_size_x / num_slice > pad_right)
             {
                 div_x = num_slice;
             }
