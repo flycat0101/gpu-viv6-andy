@@ -25757,11 +25757,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
             vx_uint32 pad_y_top           = 0;
             vx_uint32 batch               = new_sizes[3];
 
-            if (stride_s && poolSizeX && poolSizeY)
+            if (stride_s == NULL || poolSizeX == NULL || poolSizeY == NULL)
             {
                 if (stride_s)  vxReleaseScalar(&stride_s);
                 if (poolSizeX) vxReleaseScalar(&poolSizeX);
                 if (poolSizeY) vxReleaseScalar(&poolSizeY);
+                status = VX_FAILURE;
+
                 goto exit;
             }
 
