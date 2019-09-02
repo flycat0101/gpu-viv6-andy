@@ -1634,6 +1634,11 @@ VX_PRIVATE_API vx_status vxnneShaderOperation_Execute(vxnne_operation_s *operati
                                     VX_MAX_SH_OPERATION_STATE_SIZE,
                                     gcvNULL,
                                     gcvTRUE, gcvFALSE);
+        if (status != VX_SUCCESS)
+        {
+            vxError("fail to capture shader states\n");
+            vxmONERROR(VX_FAILURE);
+        }
     }
 
     status = vxoShader_Execute(shaderOperation->base.layer->node,
@@ -22997,6 +23002,11 @@ vx_status vxnneExecuteSCYUV2RGBScale(struct _vxnne_operation_s *operation)
                                     VX_MAX_SC_OPERATION_STATE_SIZE,
                                     gcvNULL,
                                     gcvTRUE, gcvFALSE);
+        if (status != VX_SUCCESS)
+        {
+            vxError("fail to capture scale states\n");
+            vxmONERROR(VX_FAILURE);
+        }
     }
 
     status = gcoVX_ProgrammYUV2RGBScale((void*)&info, operation->gpuId, operation->mGpuSync);

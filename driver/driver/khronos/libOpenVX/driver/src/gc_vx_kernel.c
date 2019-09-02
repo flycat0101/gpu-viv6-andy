@@ -4936,6 +4936,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
                                     VX_MAX_SH_OPERATION_STATE_SIZE,
                                     gcvNULL,
                                     gcvTRUE, gcvFALSE);
+        if (status != VX_SUCCESS)
+        {
+            vxError("error: capture shader states\n");
+            goto OnError;
+        }
     }
 
     status = vxoShader_Execute(node,
@@ -5343,6 +5348,11 @@ VX_INTERNAL_API vx_status VX_CALLBACK vxoProgramKernel_FunctionVX(vx_node node, 
                                     VX_MAX_SH_OPERATION_STATE_SIZE,
                                     gcvNULL,
                                     gcvTRUE, gcvFALSE);
+        if (status != VX_SUCCESS)
+        {
+            vxError("error: capture shader states in ex\n");
+            goto OnError;
+        }
     }
 
     status = vxoShader_Execute(node,
