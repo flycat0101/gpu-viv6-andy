@@ -97,6 +97,7 @@ vxoTensor_DataFormatIsSupported(
         case VX_TYPE_UINT16:
         case VX_TYPE_UINT32:
         case VX_TYPE_FLOAT16:
+        case VX_TYPE_BFLOAT16:
         case VX_TYPE_FLOAT32:
         case VX_TYPE_INT64:
             return vx_true_e;
@@ -183,6 +184,7 @@ vxoTensor_GetDataSizeByFormat(
         case VX_TYPE_INT16:
         case VX_TYPE_UINT16:
         case VX_TYPE_FLOAT16:
+        case VX_TYPE_BFLOAT16:
             return 2;
 
         case VX_TYPE_INT32:

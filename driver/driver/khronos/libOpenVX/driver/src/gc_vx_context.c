@@ -97,6 +97,7 @@ static vx_datatype_size_record_s vxDataTypeSizeRecords[] = {
     {VX_TYPE_UINT32, sizeof(vx_uint32)},
     {VX_TYPE_UINT64, sizeof(vx_uint64)},
     {VX_TYPE_FLOAT16, sizeof(vx_uint16)},
+    {VX_TYPE_BFLOAT16, sizeof(vx_uint16)},
     {VX_TYPE_FLOAT32, sizeof(vx_float32)},
     {VX_TYPE_FLOAT64, sizeof(vx_float64)},
     {VX_TYPE_ENUM, sizeof(vx_enum)},

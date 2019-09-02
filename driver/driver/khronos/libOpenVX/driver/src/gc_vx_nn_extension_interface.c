@@ -15544,7 +15544,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     || (inputFormat == VX_TYPE_INT8  && weightFormat == VX_TYPE_INT8  && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32)
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT64 && outputFormat == VX_TYPE_INT16)
-                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32));
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32)
+                    || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16));
             }
             else
             {
@@ -15552,7 +15553,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
                     || (inputFormat == VX_TYPE_INT8  && weightFormat == VX_TYPE_INT8  && outputFormat == VX_TYPE_INT8)
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
-                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                    || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16));
             }
             enable_shader = (vx_bool)(convsize < IMG_MAX_WIDTH && support_type && has_pool == vx_false_e);
             enable_2dTensor = (vx_bool)(size < IMG_MAX_WIDTH && dilation_x == 1 && dilation_y == 1);
@@ -15568,14 +15570,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     || (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
                     || (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT64 && outputFormat == VX_TYPE_INT16)
-                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8));
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8)
+                    || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16));
             }
             else
             {
                 support_type    = (vx_bool)
                     ((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
                     || (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
-                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                    || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16));
             }
 
             /*enable_2dTensor = (vx_bool)(size < IMG_MAX_WIDTH && dilation_x == 1 && dilation_y == 1);*/
@@ -17263,8 +17267,8 @@ vx_status vxnneExecuteSWReorg(struct _vxnne_operation_s *operation)
     vxoTensor_GetTensorViewMemory(inputs, &inputBase, VX_NULL);
     vxoTensor_GetTensorViewMemory(outputs, &outputBase, VX_NULL);
 
-    if ((TENSOR_DATA_TYPE(inputs) != VX_TYPE_FLOAT16 && TENSOR_DATA_TYPE(inputs) != VX_TYPE_FLOAT32 && TENSOR_DATA_TYPE(inputs) != VX_TYPE_INT8)
-        || (TENSOR_DATA_TYPE(outputs) != VX_TYPE_FLOAT16 && TENSOR_DATA_TYPE(outputs) != VX_TYPE_FLOAT32 && TENSOR_DATA_TYPE(outputs) != VX_TYPE_INT8))
+    if ((TENSOR_DATA_TYPE(inputs) != VX_TYPE_BFLOAT16 && TENSOR_DATA_TYPE(inputs) != VX_TYPE_FLOAT16 && TENSOR_DATA_TYPE(inputs) != VX_TYPE_FLOAT32 && TENSOR_DATA_TYPE(inputs) != VX_TYPE_INT8)
+        || (TENSOR_DATA_TYPE(outputs) != VX_TYPE_BFLOAT16 && TENSOR_DATA_TYPE(outputs) != VX_TYPE_FLOAT16 && TENSOR_DATA_TYPE(outputs) != VX_TYPE_FLOAT32 && TENSOR_DATA_TYPE(outputs) != VX_TYPE_INT8))
     {
         vxError("input or outputs format is not support");
         status = VX_ERROR_NOT_SUPPORTED;

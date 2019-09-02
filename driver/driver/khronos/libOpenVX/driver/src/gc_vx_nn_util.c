@@ -64,6 +64,27 @@ vx_float32 Fp16toFp32(const vx_uint16 in)
     return out;
 }
 
+vx_float32 BF16toFp32(const vx_uint16 in)
+{
+    vx_uint32 t1;
+    vx_uint32 t2;
+    vx_uint32 t3;
+    vx_float32 out;
+
+    t1 = in & 0x00FF;                       // Mantissa
+    t2 = in & 0xFF00;                       // Sign bit + Exponent
+    t3 = in & 0x7F00;                       // Exponent
+
+    t1 <<= 16;
+    t2 <<= 16;                              // Shift (sign + Exponent) bit into position
+
+    t1 = (t3 == 0 ? 0 : t1);                // Denormals-as-zero
+    t1 |= t2;                               // Re-insert sign bit
+    *((uint32_t*)&out) = t1;
+
+    return out;
+}
+
 vx_int16 Fp32toFp16(vx_float32 val)
 {
     vx_uint32 f32 = (*(vx_uint32 *) &val);
@@ -709,6 +730,7 @@ vx_int32 vxnneGetTypeSize(vx_type_e format)
         break;
     case VX_TYPE_INT16:
     case VX_TYPE_FLOAT16:
+    case VX_TYPE_BFLOAT16:
         size = sizeof(vx_int16);
         break;
     case VX_TYPE_FLOAT32:
@@ -1577,6 +1599,7 @@ vx_int32 getHWRoundingMode(vx_nn_round_mode_e roundingMode, vx_enum dataFormat, 
             }
             break;
         case VX_TYPE_FLOAT16:
+        case VX_TYPE_BFLOAT16:
             switch (roundingMode)
             {
             case VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING:
@@ -1591,6 +1614,7 @@ vx_int32 getHWRoundingMode(vx_nn_round_mode_e roundingMode, vx_enum dataFormat, 
                 return 0x1;
             }
             break;
+
         default:
             vxError("Invalid color format: %u.", dataFormat);
             gcmASSERT(0);
@@ -1621,6 +1645,7 @@ vx_int32 getHWRoundingMode(vx_nn_round_mode_e roundingMode, vx_enum dataFormat, 
             }
             break;
         case VX_TYPE_FLOAT16:
+        case VX_TYPE_BFLOAT16:
             switch (roundingMode)
             {
             case VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING:
@@ -4439,7 +4464,15 @@ vx_bool vxnneIsNNSupportFormat(
             isNNSupportFormat = vx_true_e;
         }
         break;
-
+    case VX_TYPE_BFLOAT16:
+        if (1/*gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_BF16_ALU) &&
+            context->nnConfig.fixedFeature.nnCoreCountBFloat16 > 0*/)
+        {
+            /*TODO: */
+            context->nnConfig.fixedFeature.nnCoreCountBFloat16 = 6;
+            isNNSupportFormat = vx_true_e;
+        }
+        break;
     case VX_TYPE_INT8:
         if ((inputQuantFormat == VX_QUANT_DYNAMIC_FIXED_POINT) &&
             (context->nnConfig.fixedFeature.nnCoreCountInt8 > 0))
@@ -4488,6 +4521,11 @@ vx_bool vxnneIsNNSupportFormat(
             {
                 return vx_true_e;
             }
+         case VX_TYPE_BFLOAT16:
+             if ((inputFormat == VX_TYPE_BFLOAT16) && (outputFormat == VX_TYPE_BFLOAT16))
+            {
+                return vx_true_e;
+            }
         default:
             return vx_false_e;
         }
@@ -4528,6 +4566,12 @@ vx_bool vxnneIsTPSupportFormat(
         switch (dataFormat[i])
         {
             case VX_TYPE_FLOAT16:
+                if (context->nnConfig.fixedFeature.tpCoreCount > 0)
+                {
+                    isTpSupportFormat[i] = vx_true_e;
+                }
+                break;
+             case VX_TYPE_BFLOAT16:
                 if (context->nnConfig.fixedFeature.tpCoreCount > 0)
                 {
                     isTpSupportFormat[i] = vx_true_e;

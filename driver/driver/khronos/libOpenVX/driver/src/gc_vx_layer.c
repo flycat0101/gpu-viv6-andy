@@ -15079,14 +15079,14 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExchangeStride4Even_2x8", 1, uniExchangeStride4Even_2x8);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT16 || inputFormat == VX_TYPE_UINT8 || inputFormat == VX_TYPE_INT8)
+    else if (inputFormat == VX_TYPE_BFLOAT16 || inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT16 || inputFormat == VX_TYPE_UINT8 || inputFormat == VX_TYPE_INT8)
     {
         vx_uint32 kernelSizeXY = kernelSize_x * kernelSize_y;
 
         vx_int32 padding_xy[2] = {padding_x, padding_y};
         vx_int32 strideXY[]    = {stride_x, stride_y};
 
-        if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT16)
+        if (inputFormat == VX_TYPE_BFLOAT16 || inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT16)
         {
             char kernelName[100];
             if (kernelSize_x < 17 && useImage2DFlag)

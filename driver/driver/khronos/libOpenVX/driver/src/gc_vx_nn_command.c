@@ -136,6 +136,8 @@ VX_PRIVATE_API vx_int8 getHWDataFormat(vx_enum dataFormat)
         return 0x1;
     case VX_TYPE_INT16:
         return 0x4;
+    case VX_TYPE_BFLOAT16:
+        return 0x7;
     default:
         break;
     }
@@ -514,19 +516,30 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
     /* Since V7 HW WORD1 only has 2 bits for kerenl data type, input data type & output data type,
      * int16 value 0x4 will overflow, need add MSB value to WORD15 to cover
      */
-    if (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT16)
+    if (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT16 || WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_BFLOAT16)
         info->vx_nn_general_cmd_info.kernelDataTypeMsb = 1;
 
-    if (inDataFormat == VX_TYPE_INT16)
+    if (inDataFormat == VX_TYPE_INT16 || inDataFormat == VX_TYPE_BFLOAT16)
         info->vx_nn_general_cmd_info.inImageDataTypeMsb = 1;
 
-    if (outDataFormat == VX_TYPE_INT16)
+    if (outDataFormat == VX_TYPE_INT16 || outDataFormat == VX_TYPE_BFLOAT16)
         info->vx_nn_general_cmd_info.outImageDataTypeMsb = 1;
 
     vxmASSERT(info->vx_nn_general_cmd_info.inImageDataType == info->vx_nn_general_cmd_info.kernelDataType);
 
     info->vx_nn_general_cmd_info.postMultiplier = 0;
     info->vx_nn_general_cmd_info.roundingMode   = getHWRoundingMode((vx_nn_round_mode_e)outRMode, outDataFormat, vx_false_e);
+
+
+    info->vx_nn_general_cmd_info.bFloat16Mode = (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_BFLOAT16) ? 1 : 0 ;
+
+    if(info->vx_nn_general_cmd_info.bFloat16Mode)
+    {
+        vxmASSERT(info->vx_nn_general_cmd_info.kernelDataType == 0x7 &&
+                  info->vx_nn_general_cmd_info.inImageDataType == 0x7 &&
+                  info->vx_nn_general_cmd_info.outImageDataType == 0x7 &&
+                  WB_BIAS_DATA_FORMAT(weights_biases) == VX_TYPE_FLOAT32);
+    }
 
     if (((inDataFormat == VX_TYPE_UINT8) && (inQuantFormat == VX_QUANT_AFFINE_SCALE)) ||
         ((WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8) && (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_AFFINE_SCALE)) ||

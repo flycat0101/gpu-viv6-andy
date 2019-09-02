@@ -3207,6 +3207,8 @@ typedef union _vx_nn_cmd_info_union
 
         gctUINT8   slowOutput;
 
+        gctUINT8   bFloat16Mode;
+
         /* for SRAM */
         gctUINT32 imageCachingMode;
         gctUINT32 kernelCachingMode;
