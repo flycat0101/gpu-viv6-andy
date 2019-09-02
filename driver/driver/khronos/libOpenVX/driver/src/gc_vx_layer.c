@@ -23034,7 +23034,9 @@ vxnne_shader_executable vxnneGetTensorPad2ShaderExecutable(
     vx_int32      sizes[4]  = {1, 1, 1, 1};
     vx_uint32     in_chn_num                 = input_depth;
     vx_uint32     out_chn_num                = output_depth;
-    vx_int32      padTop                     = pad_dims[4];
+    vx_int32      padChn                     = pad_dims[4];
+    vx_int32      padTop                     = pad_dims[2];
+    vx_int32      padLeft                    = pad_dims[0];
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, inputs=%p, outputs=%p",
          context, kernelEnum, borderMode, inputs, outputs);
@@ -23093,7 +23095,7 @@ vxnne_shader_executable vxnneGetTensorPad2ShaderExecutable(
             else
                 goto OnError;
 
-            padTop = pad_dims[6];
+            padChn = pad_dims[6];
         }
 
         src = vxoTensor_ReshapeTensor(inputs, sizes, 3);
@@ -23133,9 +23135,6 @@ vxnne_shader_executable vxnneGetTensorPad2ShaderExecutable(
         else if (inputFormat == VX_TYPE_UINT8 || inputFormat == VX_TYPE_INT8)
             borderMode->constant_value.U8 = (vx_uint8)padConstv;
     }
-    {
-        borderMode->mode = VX_BORDER_REPLICATE;
-    }
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
 
@@ -23173,15 +23172,31 @@ vxnne_shader_executable vxnneGetTensorPad2ShaderExecutable(
         vxReleaseProgram(&program);
     }
 
-    if (inputElementSize ==1)
+    if(input_width != output_width || input_height != output_height)
     {
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Const8Bits_chn", borderMode);
-        if (!shaderExecutable) goto OnError;
+        if (inputElementSize ==1)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Const8Bits_whc", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+        else if (inputElementSize ==2)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Const16Bits_whc", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
     }
-    else if (inputElementSize ==2)
+    else
     {
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Const16Bits_chn", borderMode);
-        if (!shaderExecutable) goto OnError;
+        if (inputElementSize ==1)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Const8Bits_chn", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+        else if (inputElementSize ==2)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Const16Bits_chn", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
     }
 
     status = vxnneShaderExecutable_GetMaxWorkGroupSize(shaderExecutable, &maxWorkGroupSize);
@@ -23217,9 +23232,12 @@ vxnne_shader_executable vxnneGetTensorPad2ShaderExecutable(
         };
 
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtract1Int32toInt16_2x8", 1, uniExtract1Int32toInt16_2x8);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "padChn", 1, &padChn);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "padTop", 1, &padTop);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "padLeft", 1, &padLeft);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "in_chn_num", 1, &in_chn_num);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "out_chn_num", 1, &out_chn_num);
+        if (status != VX_SUCCESS) goto OnError;
     }
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);

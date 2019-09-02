@@ -7170,17 +7170,18 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad2_Initializer(vx_node node, c
         vx_int32 outWidth = 0, outHeight = 0, outDepth = 0, outBatch = 0;
         vx_bool shader_flag = vx_false_e;
         vx_bool pad_flag = vx_false_e;
+        vx_bool whc_flag = vx_false_e;
         vx_int32_ptr pad_base = VX_NULL;
         vx_enum pad_mode = padMode->value->e;
 
-        outWidth  = TENSOR_SIZE_INDEX(dst, 0);
-        outHeight = TENSOR_SIZE_INDEX(dst, 1);
-        outDepth = TENSOR_SIZE_INDEX(dst, 2);
-        outBatch = TENSOR_SIZE_INDEX(dst, 3);
-        inWidth  = TENSOR_SIZE_INDEX(src, 0);
-        inHeight = TENSOR_SIZE_INDEX(src, 1);
-        inDepth = TENSOR_SIZE_INDEX(src, 2);
-        inBatch = TENSOR_SIZE_INDEX(src, 3);
+        outWidth  = TENSOR_VIEW_SIZE_INDEX(dst, 0);
+        outHeight = TENSOR_VIEW_SIZE_INDEX(dst, 1);
+        outDepth = TENSOR_VIEW_SIZE_INDEX(dst, 2);
+        outBatch = TENSOR_VIEW_SIZE_INDEX(dst, 3);
+        inWidth  = TENSOR_VIEW_SIZE_INDEX(src, 0);
+        inHeight = TENSOR_VIEW_SIZE_INDEX(src, 1);
+        inDepth = TENSOR_VIEW_SIZE_INDEX(src, 2);
+        inBatch = TENSOR_VIEW_SIZE_INDEX(src, 3);
         vxoTensor_GetTensorViewMemory(pad_dims, (gctPOINTER*)&pad_base, VX_NULL);
 
         if(outDepth == inDepth && outBatch == inBatch)
@@ -7214,6 +7215,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad2_Initializer(vx_node node, c
                 }
             }
         }
+        else if(pad_mode == VX_PAD_CONSTANT && outBatch < 2)
+        {
+            shader_flag = vx_true_e;
+            whc_flag = vx_true_e;
+        }
 
         if (shader_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
@@ -7243,7 +7249,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad2_Initializer(vx_node node, c
                 vxReleaseScalar(&padTop);
                 vxReleaseScalar(&padBottom);
             }
-            else if(outWidth * outHeight < 65536 && outDepth != inDepth)
+            else if(outWidth * outHeight < 65536 && outDepth != inDepth && !whc_flag)
             {
                 vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
                 vx_uint32  reshpTensor_Dims           = 3;
@@ -7290,7 +7296,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad2_Initializer(vx_node node, c
                 if (input) vxoTensor_ReleaseTensor(&input);
                 if (output) vxoTensor_ReleaseTensor(&output);
             }
-            else if(outWidth * outHeight * inDepth < 65536 && inBatch != outBatch)
+            else if(outWidth * outHeight * inDepth < 65536 && inBatch != outBatch && !whc_flag)
             {
                 vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
                 vx_uint32  reshpTensor_Dims           = 3;
