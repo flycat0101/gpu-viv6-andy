@@ -1,3 +1,5 @@
+#pragma OPENCL EXTENSION _VIV_VX_EXTENSION : on
+
 #include "cl_viv_vx_ext.h"
 
 #define FV(t) ((t) | ((t) << 8) | ((t) << 16) | ((t) << 24))

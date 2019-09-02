@@ -1,3 +1,5 @@
+#pragma OPENCL EXTENSION _VIV_VX_EXTENSION : on
+
 #if (VX_VERSION==1)
 #define VXC_VertMin3_Integer(dst, src0, src1, src2, info)\
 do\

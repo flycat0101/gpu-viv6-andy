@@ -1,3 +1,5 @@
+#pragma OPENCL EXTENSION _VIV_VX_EXTENSION : on
+
 #include "cl_viv_vx_ext.h"
 _viv_uniform VXC_512Bits uniExtact8Bit_2x8;
 _viv_uniform VXC_512Bits uniInt8toFp32Part0_4x4;

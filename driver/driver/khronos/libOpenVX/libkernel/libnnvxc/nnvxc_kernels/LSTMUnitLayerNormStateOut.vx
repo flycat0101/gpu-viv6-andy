@@ -6,6 +6,8 @@
  Description :
  ============================================================================
  */
+#pragma OPENCL EXTENSION _VIV_VX_EXTENSION : on
+
 #include "cl_viv_vx_ext.h"
 
 _viv_uniform float logE;
