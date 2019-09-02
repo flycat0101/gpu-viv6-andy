@@ -671,6 +671,13 @@ static vx_status readBinHeader(
     header->inputCount = readuInt(reader, 1);
     header->outputCount = readuInt(reader, 1);
 
+    /* NBG support feature database in version 1.3 or higher */
+    if (header->version >= 0x00010003)
+    {
+        vxmONERROR(readData(reader, &header->featureDB, sizeof(vx_binary_feature_database_s)));
+        vxmONERROR(readerForward(reader, sizeof(vx_binary_feature_database_s)));
+    }
+
 OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -1606,6 +1613,28 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNetworkNameAndRank(
 
     gcoOS_StrCopySafe(binarySave->headerInfo.networkName, VX_MAX_NAME_LEGTH, networkName);
     return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status vxoBinaryGraph_GetFeatureDB(
+    vx_binary_save_s *binarySave
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_binary_header_s *headerInfo = &binarySave->headerInfo;
+
+    headerInfo->featureDB.hi_reorder_fix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HI_REORDER_FIX);
+    headerInfo->featureDB.ocb_counter = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_OCB_COUNTER);
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MULTI_PIXELPIPES))
+    {
+        headerInfo->featureDB.num_pixel_pipes = 2;
+    }
+    else
+    {
+        headerInfo->featureDB.num_pixel_pipes = 1;
+    }
+
+    return status;
 }
 
 VX_PRIVATE_API vx_status vxoBinaryGraph_patchNN(
@@ -8403,7 +8432,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                         inputInfo->dataFormat    = vxoBinaryGraph_ConvertToBinaryBufferFormat((vx_uint32)format); /* uint8 */
                         inputInfo->dims[0]       = imageInfo.width;
                         inputInfo->dims[1]       = imageInfo.height;
-                        inputInfo->dims[2]       = 2;                         inputInfo->dims[3]       = 1;
+                        inputInfo->dims[2]       = 2;
+                        inputInfo->dims[3]       = 1;
                         inputInfo->fixedPointPos = 0;
                         inputInfo->tfScale       = 0;
                         inputInfo->tfZeroPoint   = 0;
@@ -8708,11 +8738,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     binarySave->headerInfo.magic[1]= 'P';
     binarySave->headerInfo.magic[2]= 'M';
     binarySave->headerInfo.magic[3]= 'N';
-    binarySave->headerInfo.version = 0x00010002;
+    binarySave->headerInfo.version = 0x00010003;
     binarySave->headerInfo.target = context->pid;
     binarySave->headerInfo.layerCount     = graph->nodeCount;
     binarySave->headerInfo.operationCount = binarySave->operationCount;
     vxoBinaryGraph_GetNetworkNameAndRank(binarySave);
+    vxoBinaryGraph_GetFeatureDB(binarySave);
 
     vxoBinaryGraph_Write(binarySave, 0, sizeof(vx_binary_header_s), &binarySave->headerInfo);
 

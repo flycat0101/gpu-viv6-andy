@@ -162,6 +162,20 @@ vx_binary_nn_layer_RPN_s;
 
 /**************CPU Operation Layer Define End**********/
 
+typedef struct _vx_binary_feature_database_s
+{
+    vx_uint32 hi_reorder_fix:1;  /* gcFEATURE_BIT_HI_REORDER_FIX */
+    vx_uint32 ocb_counter:1;     /* gcFEATURE_BIT_OCB_COUNTER */
+    vx_uint32 reserved:30;       /* reserved bits */
+
+    vx_uint32 num_pixel_pipes;   /* gcFEATURE_VALUE_NumPixelPipes */
+
+    vx_uint32 vsi_reserved[14];  /* reserved for  verisilicon */
+
+    vx_uint32 customer_reserved[48]; /* reserved for customer */
+}
+vx_binary_feature_database_s;
+
 typedef struct _vx_binary_segment_s
 {
     vx_binary_segment_base_s                *base;
@@ -191,6 +205,7 @@ typedef struct _vx_binary_header_s
     vx_uint32                               operationCount;
     vx_uint32                               inputCount;
     vx_uint32                               outputCount;
+    vx_binary_feature_database_s            featureDB;
 }
 vx_binary_header_s;
 
