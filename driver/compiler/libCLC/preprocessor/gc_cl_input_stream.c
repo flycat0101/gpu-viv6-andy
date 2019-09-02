@@ -1509,6 +1509,38 @@ ppoBYTE_INPUT_STREAM_GetChar_Phase_1(
     }
 
 }
+
+static gctBOOL
+ppoBYTE_INPUT_STREAM_Find_Line_Continuation(
+    IN        ppoPREPROCESSOR            PP,
+    IN        ppoBYTE_INPUT_STREAM    Bis
+    )
+ {
+    char c1,c2;
+    gctBOOL find_line_continuation = gcvFALSE;
+    ppoBYTE_INPUT_STREAM_GetChar_Phase_1(
+        PP,
+        Bis,
+        &c1
+        );
+    if(c1 == '\\')
+    {
+        ppoBYTE_INPUT_STREAM_GetChar_Phase_1(
+                PP,
+                Bis,
+                &c2
+                );
+
+        if(c2 == '\n')
+        {
+            find_line_continuation = gcvTRUE;
+        }
+        ppoBYTE_INPUT_STREAM_UnGetChar_Phase_0(PP);
+    }
+    ppoBYTE_INPUT_STREAM_UnGetChar_Phase_0(PP);
+    return find_line_continuation;
+}
+
 /******************************************************************************\
 To remove \ and  \n
 \******************************************************************************/
@@ -1546,7 +1578,11 @@ ppoBYTE_INPUT_STREAM_GetChar_Phase_2(
         if(c2 == '\n')
         {
             /* for bug#23624, allow the line-continuation character after "//" */
-            return ppoBYTE_INPUT_STREAM_GetChar_Phase_1(PP,    Bis, Pc);
+
+            if (ppoBYTE_INPUT_STREAM_Find_Line_Continuation(PP,    Bis))
+                return ppoBYTE_INPUT_STREAM_GetChar_Phase_2(PP,    Bis, Pc);
+            else
+                return ppoBYTE_INPUT_STREAM_GetChar_Phase_1(PP,    Bis, Pc);
         }
         else
         {
