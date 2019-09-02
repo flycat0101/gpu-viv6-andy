@@ -18123,10 +18123,23 @@ VIR_Shader_NeedToCutDownWorkGroupSize(
 
     if ((VIR_Shader_GetKind(pShader) == VIR_SHADER_COMPUTE) &&
         (VIR_Shader_GetMaxFreeRegCountPerThread(pShader, pHwCfg) <= minRegCount) &&
-        (pHwCfg->maxCoreCount == 1 || pHwCfg->maxCoreCount == 2) &&
-        (pShader->shaderLayout.compute.workGroupSize[0] % 2 == 0))
+        (pHwCfg->maxCoreCount == 1 || pHwCfg->maxCoreCount == 2))
     {
-        return gcvTRUE;
+        if (pShader->shaderLayout.compute.workGroupSize[0] == 0)
+        {
+            if (VIR_Shader_GetWorkGroupSize(pShader) % 2 == 0)
+            {
+                return gcvTRUE;
+            }
+        }
+        else if ((pShader->shaderLayout.compute.workGroupSize[0] % 2 == 0)
+                 ||
+                 (pShader->shaderLayout.compute.workGroupSize[1] % 2 == 0)
+                 ||
+                 (pShader->shaderLayout.compute.workGroupSize[2] % 2 == 0))
+        {
+            return gcvTRUE;
+        }
     }
 
     return gcvFALSE;

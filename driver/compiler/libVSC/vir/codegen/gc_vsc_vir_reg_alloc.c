@@ -12314,7 +12314,18 @@ void _VIR_RA_LS_UpdateWorkgroupNum(
     VIR_Function    *mainFunc = VIR_Shader_GetMainFunction(pShader);
     VIR_InstIterator inst_iter;
     VIR_Instruction *inst;
-    gctUINT16       maxMatchCount = VIR_Shader_GetWorkGroupSizeFactor(pShader, 0), count = 0;
+    gctUINT16       i;
+    gctUINT16       maxMatchCount = 0, count = 0;
+
+    for (i = 0; i < 3; i++)
+    {
+        maxMatchCount = VIR_Shader_GetWorkGroupSizeFactor(pShader, i);
+
+        if (maxMatchCount != 0)
+        {
+            break;
+        }
+    }
 
     if (maxMatchCount == 0)
     {

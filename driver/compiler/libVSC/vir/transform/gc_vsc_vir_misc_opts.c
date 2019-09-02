@@ -12297,8 +12297,8 @@ typedef struct VSC_CUTDOWN_WORKGROUPSIZE
     VSC_MM*             pMM;
     VSC_HW_CONFIG*      pHwCfg;
     VIR_Shader*         pShader;
-    /* So far we can only support X dimension cutting down. */
-    gctUINT16           xFactor;
+    gctUINT16           activeDimension;
+    gctUINT16           activeFactor;
     VSC_HASH_TABLE**    ppTempSet;
     VSC_HASH_TABLE**    ppLabelSet;
     VSC_HASH_TABLE**    ppJmpSet;
@@ -12320,26 +12320,26 @@ _vscVIR_CutDownWorkGroupSize(
     )
 {
     VIR_Shader*         pShader = pContext->pShader;
-    gctUINT16           xFactor = pContext->xFactor;
+    gctUINT16           activeFactor = pContext->activeFactor;
 
     if (VIR_Shader_IsGlCompute(pShader))
     {
-        pShader->shaderLayout.compute.workGroupSize[0] /= xFactor;
+        pShader->shaderLayout.compute.workGroupSize[pContext->activeDimension] /= activeFactor;
     }
     else
     {
         if (!VIR_Shader_IsWorkGroupSizeAdjusted(pShader) && pShader->shaderLayout.compute.workGroupSize[0] != 0)
         {
-            pShader->shaderLayout.compute.workGroupSize[0] /= xFactor;
+            pShader->shaderLayout.compute.workGroupSize[pContext->activeDimension] /= activeFactor;
         }
         else
         {
-            VIR_Shader_SetAdjustedWorkGroupSize(pShader, VIR_Shader_GetAdjustedWorkGroupSize(pShader) / xFactor);
+            VIR_Shader_SetAdjustedWorkGroupSize(pShader, VIR_Shader_GetAdjustedWorkGroupSize(pShader) / activeFactor);
         }
     }
 
     /* Save the factor. */
-    VIR_Shader_SetWorkGroupSizeFactor(pShader, 0, xFactor);
+    VIR_Shader_SetWorkGroupSizeFactor(pShader, pContext->activeDimension, activeFactor);
 }
 
 static void
@@ -12353,20 +12353,55 @@ _vscVIR_InitializeCutDownWGS(
     )
 {
     gctUINT             i;
+    gctBOOL             bCheckFactor4 = (pHwCfg->maxCoreCount == 1);
 
     gcoOS_ZeroMemory(pContext, sizeof(VSC_CutDownWGS));
 
     pContext->pMM = pMM;
     pContext->pHwCfg = pHwCfg;
     pContext->pShader = pShader;
-    /* The xFactor is 2 by default. */
-    pContext->xFactor = 2;
 
-    pContext->ppTempSet = (VSC_HASH_TABLE**)vscMM_Alloc(pContext->pMM, pContext->xFactor * sizeof(VSC_HASH_TABLE*));
-    pContext->ppLabelSet = (VSC_HASH_TABLE**)vscMM_Alloc(pContext->pMM, pContext->xFactor * sizeof(VSC_HASH_TABLE*));
-    pContext->ppJmpSet = (VSC_HASH_TABLE**)vscMM_Alloc(pContext->pMM, pContext->xFactor * sizeof(VSC_HASH_TABLE*));
+    /* Check OCL and CS. */
+    if (pShader->shaderLayout.compute.workGroupSize[0] == 0)
+    {
+        gctUINT workGroupSize = VIR_Shader_GetWorkGroupSize(pShader);
 
-    for (i = 0; i < pContext->xFactor; i++)
+        if (bCheckFactor4 && workGroupSize % 4 == 0)
+        {
+            pContext->activeFactor = 4;
+        }
+        else
+        {
+            pContext->activeFactor = 2;
+        }
+        pContext->activeDimension = 0;
+    }
+    else
+    {
+        for (i = 0; i < 3; i++)
+        {
+            if (bCheckFactor4 && pShader->shaderLayout.compute.workGroupSize[i] % 4 == 0)
+            {
+                pContext->activeFactor = 4;
+                pContext->activeDimension = (gctUINT16)i;
+                break;
+            }
+            else if (pShader->shaderLayout.compute.workGroupSize[i] % 2 == 0)
+            {
+                pContext->activeFactor = 2;
+                pContext->activeDimension = (gctUINT16)i;
+                break;
+            }
+        }
+    }
+
+    gcmASSERT(pContext->activeFactor != 0);
+
+    pContext->ppTempSet = (VSC_HASH_TABLE**)vscMM_Alloc(pContext->pMM, pContext->activeFactor * sizeof(VSC_HASH_TABLE*));
+    pContext->ppLabelSet = (VSC_HASH_TABLE**)vscMM_Alloc(pContext->pMM, pContext->activeFactor * sizeof(VSC_HASH_TABLE*));
+    pContext->ppJmpSet = (VSC_HASH_TABLE**)vscMM_Alloc(pContext->pMM, pContext->activeFactor * sizeof(VSC_HASH_TABLE*));
+
+    for (i = 0; i < pContext->activeFactor; i++)
     {
         pContext->ppTempSet[i] = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM,
                                                                  vscHFUNC_Default,
@@ -12407,7 +12442,7 @@ _vscVIR_FinalizeCutDownWGS(
 
     if (pContext->ppTempSet)
     {
-        for (i = 0; i < pContext->xFactor; i++)
+        for (i = 0; i < pContext->activeFactor; i++)
         {
             vscHTBL_Destroy(pContext->ppTempSet[i]);
         }
@@ -12416,7 +12451,7 @@ _vscVIR_FinalizeCutDownWGS(
 
     if (pContext->ppLabelSet)
     {
-        for (i = 0; i < pContext->xFactor; i++)
+        for (i = 0; i < pContext->activeFactor; i++)
         {
             /* destroy the hash table and free memory */
             vscHTBL_Destroy(pContext->ppLabelSet[i]);
@@ -12426,7 +12461,7 @@ _vscVIR_FinalizeCutDownWGS(
 
     if (pContext->ppJmpSet)
     {
-        for (i = 0; i < pContext->xFactor; i++)
+        for (i = 0; i < pContext->activeFactor; i++)
         {
             /* destroy the hash table and free memory */
             vscHTBL_Destroy(pContext->ppJmpSet[i]);
@@ -12995,12 +13030,11 @@ _vscVIR_RecalculateBuiltinAttributes(
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_Shader*         pShader = pContext->pShader;
-    gctUINT16           xFactor = pContext->xFactor;
+    gctUINT16           activeFactor = pContext->activeFactor;
     VSC_HASH_TABLE**    ppTempSet = pContext->ppTempSet;
     gctUINT             i, j;
     VIR_Symbol*         pIdSym[2] = { gcvNULL, gcvNULL };
     VIR_Symbol*         pVirRegSym = gcvNULL;
-    VIR_Symbol*         pLocalIndex = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCALINVOCATIONINDEX);
     VIR_VirRegId        newVirRegId = VIR_INVALID_ID;
     VIR_SymId           newVirSymId = VIR_INVALID_ID;
     VIR_Symbol*         pNewVirSym = gcvNULL;
@@ -13010,39 +13044,30 @@ _vscVIR_RecalculateBuiltinAttributes(
     VIR_Operand*        pNewOpnd = gcvNULL;
     VIR_Instruction*    pInitializationStartInst = gcvNULL;
     VIR_Instruction*    pInitializationEndInst = gcvNULL;
+    VIR_Enable          activeEnable = (VIR_Enable)(VIR_ENABLE_X << pContext->activeDimension);
+    VIR_Swizzle         activeSwizzle = VIR_Enable_2_Swizzle_WShift(activeEnable);
 
     pIdSym[0] = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCAL_INVOCATION_ID);
     pIdSym[1] = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_GLOBAL_INVOCATION_ID);
 
     /*
-    ** Since HW can't support localIndex and compiler generates instruction to calculate it,
-    ** we need to find the last instruction to calculate the localIndex, and recalculate it from there.
-    */
-    if (pLocalIndex)
-    {
-    }
-
-    /*
     ** Re-caculate the LocalInvocationId, GlobalInvocationId and LocalInvocationIndex:
     **
     **      LocalId_in_program0 = LocalId_in_hw * factor
-    **      LocalIdin_program1 = LocalId_in_hw * factor + 1
+    **      LocalIdin_programi = LocalId_in_hw * factor + i
     **
     **      GlobalId_in_program0 = GlobalId_in_hw * factor
-    **      GlobalId_in_program1 = GlobalId_in_hw * factor + 1
+    **      GlobalId_in_programi = GlobalId_in_hw * factor + i
     **
-    **      LocalIndex_in_program0 = Z * I * J + Y * I + X * factor
-    **      LocalIndex_in_program1 = Z * I * J + Y * I + X * factor + 1
+    **      LocalIndex:
+    **          We don't need to re-calculate LocalIndex because we have used the original LocalId and WorkGroupSize to calcualte it before.
     **
     ** For LocalId/GlobalId:
     **    1) For thread[0]: Id_in_hw = Id_in_hw * factor, so we can reuse the instruction set for thread[0].
-    **    2) For thread[1]~thread[Factor-1]: use new temp registers instread of attributes to save these builtin attributes,
+    **    2) For thread[1]~thread[factor-1]: use new temp registers instread of attributes to save these builtin attributes,
     **       and replace them in the instructions.
-    **
-    ** For LocalIndex:
-    **    We need to recalculate for all thread because the workGroupSize is changed.
     */
-    for (i = 0; i < xFactor; i++)
+    for (i = 0; i < activeFactor; i++)
     {
         for (j = 0; j < 2; j++)
         {
@@ -13069,14 +13094,14 @@ _vscVIR_RecalculateBuiltinAttributes(
 
                     pNewOpnd = VIR_Inst_GetDest(pNewInst);
                     VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pVirRegSym));
-                    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
+                    VIR_Operand_SetEnable(pNewOpnd, activeEnable);
 
                     pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
                     VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pIdSym[j]));
-                    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
+                    VIR_Operand_SetSwizzle(pNewOpnd, activeSwizzle);
 
                     pNewOpnd = VIR_Inst_GetSource(pNewInst, 1);
-                    VIR_Operand_SetImmediateUint(pNewOpnd, xFactor);
+                    VIR_Operand_SetImmediateUint(pNewOpnd, activeFactor);
                 }
                 /* For thread[1]~thread[factor-1]: Id_temp = Id + i. */
                 else
@@ -13121,11 +13146,11 @@ _vscVIR_RecalculateBuiltinAttributes(
 
                     pNewOpnd = VIR_Inst_GetDest(pNewInst);
                     VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, newVirSymId);
-                    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
+                    VIR_Operand_SetEnable(pNewOpnd, activeEnable);
 
                     pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
                     VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pIdSym[j]));
-                    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
+                    VIR_Operand_SetSwizzle(pNewOpnd, activeSwizzle);
 
                     pNewOpnd = VIR_Inst_GetSource(pNewInst, 1);
                     VIR_Operand_SetImmediateUint(pNewOpnd, i);
@@ -13133,10 +13158,6 @@ _vscVIR_RecalculateBuiltinAttributes(
                     vscHTBL_DirectSet(ppTempSet[i], pIdSym[j], (void*)pNewVirSym);
                 }
             }
-        }
-
-        if (pLocalIndex != gcvNULL)
-        {
         }
     }
 
@@ -13405,7 +13426,7 @@ _vscVIR_DuplicateBBs(
     VSC_MM*                 pMM = pContext->pMM;
     VSC_HASH_TABLE*         pSameJmpBBSet = pContext->pSameJmpBBSet;
     gctUINT                 i;
-    gctUINT16               factorIndex, xFactor = pContext->xFactor;
+    gctUINT16               factorIndex, activeFactor = pContext->activeFactor;
     gctBOOL                 bHasBarrier = BB_FLAGS_HAS_BARRIER(pBB);
     VIR_BASIC_BLOCK*        pCurrentWorkingBB = gcvNULL;
     VIR_Instruction*        pCurrentWorkingInst = gcvNULL;
@@ -13420,11 +13441,11 @@ _vscVIR_DuplicateBBs(
     }
 
     /* Allocate the start/end instruction. */
-    ppNewStartInst = (VIR_Instruction **)vscMM_Alloc(pMM, (xFactor - 1) * sizeof(VIR_Instruction*));
-    ppNewEndInst = (VIR_Instruction **)vscMM_Alloc(pMM, (xFactor - 1) * sizeof(VIR_Instruction*));
+    ppNewStartInst = (VIR_Instruction **)vscMM_Alloc(pMM, (activeFactor - 1) * sizeof(VIR_Instruction*));
+    ppNewEndInst = (VIR_Instruction **)vscMM_Alloc(pMM, (activeFactor - 1) * sizeof(VIR_Instruction*));
 
     /* Duplicate "factor-1" copies: Copy the instructions before BARRIER. */
-    for (factorIndex = 0; factorIndex < xFactor - 1; factorIndex++)
+    for (factorIndex = 0; factorIndex < activeFactor - 1; factorIndex++)
     {
         VSC_HASH_TABLE*     pTempSet = pContext->ppTempSet[factorIndex + 1];
         VSC_HASH_TABLE*     pLabelSet = pContext->ppLabelSet[factorIndex + 1];
@@ -13511,15 +13532,27 @@ _vscVIR_DuplicateBBs(
                 pCurrentWorkingInst = VIR_Inst_GetNext(pCurrentWorkingInst);
             }
 
+            /*
+            ** For those JMPs that cross the BARRIER, theoretically all threads within a local group have the same result,
+            ** so we only execute one JMP at last, and change all the other to NOPs.
+            */
             if (bLastInst && bSameJmpBB)
             {
                 VIR_OpCode      opCode = VIR_Inst_GetOpcode(pCurrentWorkingInst);
 
                 gcmASSERT(opCode == VIR_OP_NOP || VIR_OPCODE_isBranch(opCode) || opCode == VIR_OP_LABEL);
 
-                if (opCode == VIR_OP_NOP || VIR_OPCODE_isBranch(opCode))
+                if (VIR_OPCODE_isBranch(opCode))
                 {
-                    VIR_Function_ChangeInstToNop(pFunc, pCurrentWorkingInst);
+                    if (factorIndex != 0)
+                    {
+                        VIR_Function_ChangeInstToNop(pFunc, pNewInst);
+                    }
+
+                    if (factorIndex + 1== activeFactor - 1)
+                    {
+                        VIR_Function_ChangeInstToNop(pFunc, pCurrentWorkingInst);
+                    }
                 }
             }
         }
@@ -13547,7 +13580,7 @@ _vscVIR_CopyInstsAndRemapVariables(
     VIR_BASIC_BLOCK*        pPrevBB;
     VIR_IdList*             pWorkingBBList = gcvNULL;
     gctBOOL                 bLastInst = gcvFALSE, bSameJmpBB = gcvFALSE;
-    gctUINT16               factorIndex, xFactor = pContext->xFactor;
+    gctUINT16               factorIndex, activeFactor = pContext->activeFactor;
     VSC_HASH_ITERATOR       jmpInstIter;
     VSC_DIRECT_HNODE_PAIR   jmpInstPair;
 
@@ -13607,7 +13640,7 @@ _vscVIR_CopyInstsAndRemapVariables(
     }
 
     /* Update the label. */
-    for (factorIndex = 0; factorIndex < xFactor - 1; factorIndex++)
+    for (factorIndex = 0; factorIndex < activeFactor - 1; factorIndex++)
     {
         VSC_HASH_TABLE*     pLabelSet = pContext->ppLabelSet[factorIndex + 1];
         VSC_HASH_TABLE*     pJmpSet = pContext->ppJmpSet[factorIndex + 1];
