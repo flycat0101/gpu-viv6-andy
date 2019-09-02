@@ -12268,3 +12268,31 @@ OnError:
     return errCode;
 }
 
+DEF_SH_NECESSITY_CHECK(vscVIR_CutDownWorkGroupSize)
+{
+    return gcvTRUE;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_CutDownWorkGroupSize)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
+
+    /* Only constant allocation is enable, we can check constant reg file read port limitation */
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_RA;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedCg = gcvTRUE;
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+    pPassProp->passFlag.resCreationReq.s.bNeedWeb = gcvTRUE;
+    pPassProp->passFlag.resCreationReq.s.bNeedLvFlow = gcvTRUE;
+
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
+}
+
+VSC_ErrCode vscVIR_CutDownWorkGroupSize(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+
+    return errCode;
+}
+
+

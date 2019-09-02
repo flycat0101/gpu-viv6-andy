@@ -24274,6 +24274,10 @@ gcLINKTREE_GenerateStates(
         hints->texldFlags[gcvSHADER_MACHINE_LEVEL][stageIndex] = texldFlag;
 
         hints->threadGroupSync = threadGroupSync;
+        for (i = 0; i < 3; i++)
+        {
+            hints->workGroupSizeFactor[i] = shader->shaderLayout.compute.workGroupSizeFactor[i];
+        }
         /* The shader invocation control function is only available in compute shaders for OGL,
             * or OCL */
         if (threadGroupSync)

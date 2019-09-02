@@ -3106,6 +3106,7 @@ gcSHADER_ConvFromVIR(
         for (i = 0; i < 3; i++)
         {
             Shader->shaderLayout.compute.workGroupSize[i] = VirShader->shaderLayout.compute.workGroupSize[i];
+            Shader->shaderLayout.compute.workGroupSizeFactor[i] = VirShader->shaderLayout.compute.workGroupSizeFactor[i];
         }
         Shader->shaderLayout.compute.isWorkGroupSizeFixed = VirShader->shaderLayout.compute.isWorkGroupSizeFixed;
         Shader->shaderLayout.compute.isWorkGroupSizeAdjusted = VirShader->shaderLayout.compute.isWorkGroupSizeAdjusted;

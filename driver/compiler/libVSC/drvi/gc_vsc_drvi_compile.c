@@ -920,6 +920,7 @@ static VSC_ErrCode _PerformCodegen(VSC_SHADER_PASS_MANAGER*   pShPassMnger,
                                    gctBOOL                    bSkipPepGen)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
+    gctBOOL             bCutDownWorkGroupSize = gcvFALSE;
 
     /* Set PM level firstly */
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_CG);
@@ -934,7 +935,19 @@ static VSC_ErrCode _PerformCodegen(VSC_SHADER_PASS_MANAGER*   pShPassMnger,
 
     CALL_SH_PASS(VSC_IS_InstSched_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(vscVIR_GenRobustBoundCheck, 0, gcvNULL);
-    CALL_SH_PASS(VIR_RA_LS_PerformTempRegAlloc, 0, gcvNULL);
+
+    /* Start RA. */
+    CALL_SH_PASS_WITHOUT_ERRCHECK(VIR_RA_LS_PerformTempRegAlloc, 0, &bCutDownWorkGroupSize);
+    if (bCutDownWorkGroupSize)
+    {
+        /* Cut down the workGroupSize, then run RA again. */
+        CALL_SH_PASS(vscVIR_CutDownWorkGroupSize, 0, gcvNULL);
+        CALL_SH_PASS(VIR_RA_LS_PerformTempRegAlloc, 0, gcvNULL);
+    }
+    else
+    {
+        ON_ERROR(errCode, "VIR_RA_LS_PerformTempRegAlloc");
+    }
 
     CALL_SH_PASS(VSC_IS_InstSched_PerformOnShader, 1, gcvNULL);
 

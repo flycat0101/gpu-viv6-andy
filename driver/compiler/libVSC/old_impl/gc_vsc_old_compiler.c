@@ -2631,7 +2631,9 @@ _gcSHADER_Clean(
                      gcmSIZEOF(Shader->shaderLayout.compute.workGroupSize));
     Shader->shaderLayout.compute.isWorkGroupSizeFixed = gcvFALSE;
     Shader->shaderLayout.compute.isWorkGroupSizeAdjusted = gcvFALSE;
-    Shader->shaderLayout.compute.adjustedWorkGroupSize = 0;
+    Shader->shaderLayout.compute.adjustedWorkGroupSize = gcvFALSE;
+    gcoOS_ZeroMemory(Shader->shaderLayout.compute.workGroupSizeFactor,
+                     gcmSIZEOF(Shader->shaderLayout.compute.workGroupSizeFactor));
 
     /* Free any storage blocks. */
     if (Shader->storageBlocks != gcvNULL)
@@ -2984,6 +2986,10 @@ gcSHADER_Copy(
         Shader->shaderLayout.compute.isWorkGroupSizeFixed = Source->shaderLayout.compute.isWorkGroupSizeFixed;
         Shader->shaderLayout.compute.isWorkGroupSizeAdjusted = Source->shaderLayout.compute.isWorkGroupSizeAdjusted;
         Shader->shaderLayout.compute.adjustedWorkGroupSize = Source->shaderLayout.compute.adjustedWorkGroupSize;
+        for (i = 0; i < 3; i++)
+        {
+            Shader->shaderLayout.compute.workGroupSizeFactor[i] = Source->shaderLayout.compute.workGroupSizeFactor[i];
+        }
         break;
 
     case gcSHADER_TYPE_TES:
@@ -10073,6 +10079,12 @@ gcSHADER_Load(
                       gcmSIZEOF(Shader->shaderLayout.compute.adjustedWorkGroupSize));
         bytes -= gcmSIZEOF(Shader->shaderLayout.compute.adjustedWorkGroupSize);
         curPos += sizeof(Shader->shaderLayout.compute.adjustedWorkGroupSize);
+
+        gcoOS_MemCopy(&Shader->shaderLayout.compute.workGroupSizeFactor,
+                      curPos,
+                      gcmSIZEOF(Shader->shaderLayout.compute.workGroupSizeFactor));
+        bytes -= gcmSIZEOF(Shader->shaderLayout.compute.workGroupSizeFactor);
+        curPos += sizeof(Shader->shaderLayout.compute.workGroupSizeFactor);
     }
 
     /* hasNotStagesRelatedLinkError. */
@@ -10774,6 +10786,7 @@ gcSHADER_Save(
         bytes += gcmSIZEOF(Shader->shaderLayout.compute.isWorkGroupSizeFixed);
         bytes += gcmSIZEOF(Shader->shaderLayout.compute.isWorkGroupSizeAdjusted);
         bytes += gcmSIZEOF(Shader->shaderLayout.compute.adjustedWorkGroupSize);
+        bytes += gcmSIZEOF(Shader->shaderLayout.compute.workGroupSizeFactor);
     }
 
     /* hasNotStagesRelatedLinkError. */
@@ -11571,6 +11584,9 @@ gcSHADER_Save(
 
         gcoOS_MemCopy(buffer, &Shader->shaderLayout.compute.adjustedWorkGroupSize, gcmSIZEOF(Shader->shaderLayout.compute.adjustedWorkGroupSize));
         buffer += gcmSIZEOF(Shader->shaderLayout.compute.adjustedWorkGroupSize);
+
+        gcoOS_MemCopy(buffer, &Shader->shaderLayout.compute.workGroupSizeFactor, gcmSIZEOF(Shader->shaderLayout.compute.workGroupSizeFactor));
+        buffer += gcmSIZEOF(Shader->shaderLayout.compute.workGroupSizeFactor);
     }
 
     /* hasNotStagesRelatedLinkError. */
@@ -14598,6 +14614,13 @@ gcSHADER_LoadEx(
     Shader->shaderLayout.compute.adjustedWorkGroupSize = (gctBOOL)(*(gctUINT16 *) curPos);
     bytes -= sizeof(gctUINT16);
 
+    for (i = 0; i < 3; i++)
+    {
+        curPos += sizeof(gctUINT16);
+        Shader->shaderLayout.compute.workGroupSizeFactor[i] = *(gctUINT16 *) curPos;
+        bytes -= sizeof(gctUINT16);
+    }
+
     /* Point to the optimization option. */
     curPos += sizeof(gctUINT16);
     optimizationOption  = (gctUINT *) curPos;
@@ -15250,6 +15273,7 @@ gcSHADER_SaveEx(
     bytes += sizeof(gctUINT16);
     bytes += sizeof(gctUINT16);
     bytes += sizeof(gctUINT16);
+    bytes += 3 * sizeof(gctUINT16);
 
     /* Optimization option. */
     bytes += sizeof(gctUINT);
@@ -16181,6 +16205,12 @@ gcSHADER_SaveEx(
 
     *(gctUINT16 *) buffer = (gctUINT16)Shader->shaderLayout.compute.adjustedWorkGroupSize;
     buffer += sizeof(gctUINT16);
+
+    for (i = 0; i < 3; i++)
+    {
+        *(gctUINT16 *) buffer = (gctUINT16)Shader->shaderLayout.compute.workGroupSizeFactor[i];
+        buffer += sizeof(gctUINT16);
+    }
 
     /* Optimization option. */
     /**(gctUINT *) buffer = (gctUINT) Shader->optimizationOption;*/

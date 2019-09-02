@@ -1278,6 +1278,8 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
             gctUINT               bUseLocalMemory                 : 1;
 
             gctUINT               reserved                        : 30;
+
+            gctUINT16             workGroupSizeFactor[3];
         } gps;
     } prvStates;
 }SHADER_EXECUTABLE_DERIVED_HINTS;

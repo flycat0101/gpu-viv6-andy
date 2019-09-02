@@ -3614,33 +3614,6 @@ void _VIR_RA_LS_SetMaxAllocReg(
     }
 }
 
-gctBOOL
-_VIR_RA_LS_CalcMaxRegBasedOnWorkGroupSize(
-    VIR_RA_LS   *pRA
-    )
-{
-    VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
-
-    if (VIR_Shader_HasBarrier(pShader))
-    {
-        /* if compute shader has barrier, the temp count must follow
-            ceiling(work_group_size/(shader_core_count*4*threads_per_register)) <= floor(maxFreeReg/temp_register_count)
-            */
-        return gcvTRUE;
-    }
-
-    /*
-    ** If a shader uses the private memory, we use tempRegCount to calculate the concurrent workThreadCount,
-    ** so we need to calculate the workGroupSize based on tempRegCount.
-    */
-    if (VIR_Shader_UsePrivateMem(pShader))
-    {
-        return gcvTRUE;
-    }
-
-    return gcvFALSE;
-}
-
 gctUINT
 _VIR_RA_LS_GetMaxReg(
     VIR_RA_LS   *pRA,
@@ -3649,8 +3622,6 @@ _VIR_RA_LS_GetMaxReg(
 {
     VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
     VIR_RA_ColorPool    *pCP = VIR_RA_LS_GetColorPool(pRA);
-    gctUINT             maxFreeReg = 0;
-    gctFLOAT            workGroupSize = 0, threadCount;
     VSC_HW_CONFIG       *hwConfig = VIR_RA_LS_GetHwCfg(pRA);
     gctUINT             maxReg = pCP->colorMap[hwType].maxReg;
 
@@ -3667,40 +3638,9 @@ _VIR_RA_LS_GetMaxReg(
             maxReg -= 1;
         }
 
-        if (_VIR_RA_LS_CalcMaxRegBasedOnWorkGroupSize(pRA))
+        if (VIR_Shader_CalcMaxRegBasedOnWorkGroupSize(pShader))
         {
-            /* if compute shader has barrier, the temp count must follow
-               ceiling(work_group_size/(shader_core_count*4*threads_per_register)) <= floor(maxFreeReg/temp_register_count)
-               */
-
-            /* VIR_SHADER_TESSELLATION_CONTROL should not have barrier if core == 8 */
-            gcmASSERT(pShader->shaderKind == VIR_SHADER_COMPUTE ||
-                pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL);
-            threadCount = (gctFLOAT)(hwConfig->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1));
-
-            maxFreeReg = vscGetHWMaxFreeRegCount(hwConfig);
-
-            if (VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsCL(pShader))
-            {
-                /* Use initWorkGroupSizeToCalcRegCount to calculate the maxRegCount if needed. */
-                if (!VIR_Shader_IsWorkGroupSizeAdjusted(pShader) &&
-                    !VIR_Shader_IsWorkGroupSizeFixed(pShader))
-                {
-                    gcmASSERT(GetHWMaxWorkGroupSize() == VIR_Shader_GetWorkGroupSize(pShader));
-
-                    VIR_Shader_SetWorkGroupSizeAdjusted(pShader, gcvTRUE);
-                    VIR_Shader_SetAdjustedWorkGroupSize(pShader, GetHWInitWorkGroupSizeToCalcRegCount());
-                }
-                workGroupSize = (gctFLOAT)VIR_Shader_GetWorkGroupSize(pShader);
-                maxReg = maxFreeReg / (gctUINT)(ceil(workGroupSize / threadCount));
-            }
-            else if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
-            {
-                workGroupSize = (gctFLOAT)(pShader->shaderLayout.tcs.tcsPatchOutputVertices);
-                maxReg = maxFreeReg / (gctUINT)(ceil(workGroupSize / threadCount));
-            }
-
-            maxReg = vscMIN(maxReg, pCP->colorMap[hwType].maxReg);
+            maxReg = vscMIN(VIR_Shader_GetMaxFreeRegCountPerThread(pShader, hwConfig), pCP->colorMap[hwType].maxReg);
         }
 
         maxReg = vscMIN(maxReg, hwConfig->maxGPRCountPerThread);
@@ -12799,6 +12739,49 @@ _VIR_RA_UpdateBaseOperOfSpecialLoadStore(
     return retErrCode;
 }
 
+static gctBOOL
+_VIR_RA_NeedToCutDownWorkGroupSize(
+    VIR_RA_LS           *pRA)
+{
+    VIR_Shader          *pShader = pRA->pShader;
+    gctUINT             minRegCount = 3;
+
+    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_COMPUTE &&
+        VIR_Shader_GetMaxFreeRegCountPerThread(pShader, pRA->pHwCfg) <= minRegCount)
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+static void
+_VIR_RA_ClearColorPool(
+    VIR_RA_LS           *pRA,
+    gctBOOL             bEnableSpill,
+    gctUINT             reservedDataReg)
+{
+    VIR_Shader          *pShader = pRA->pShader;
+
+    /* clear color pool */
+    _VIR_RA_ColorPool_ClearAll(VIR_RA_LS_GetColorPool(pRA));
+    _VIR_RA_LRTable_ClearColor(pRA);
+    VIR_RA_LS_GetColorPool(pRA)->colorMap[VIR_RA_HWREG_GR].maxAllocReg = 0;
+    VIR_RA_LS_GetActiveLRHead(pRA)->nextActiveLR = &(LREndMark);
+    (pRA)->resDataRegisterCount = reservedDataReg;
+    pShader->hasRegisterSpill |= bEnableSpill;
+    (pRA)->spillOffset = (pShader->vidmemSizeOfSpill + 15) & ~ (gctUINT)0x0F;
+
+    /* Disable DUAL16 temporarily if registerSpill is used. */
+    if (pShader->hasRegisterSpill)
+    {
+        VIR_Shader_SetDual16Mode(pShader, gcvFALSE);
+    }
+
+    (pRA)->currentMaxRegCount = VIR_RA_LS_REG_MAX;
+    _VIR_RA_FlaseDepReg_ClearAll(pRA);
+}
+
 DEF_QUERY_PASS_PROP(VIR_RA_LS_PerformTempRegAlloc)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
@@ -12964,7 +12947,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
                         ** 2) Reduce the workGroupSize to use more registers, this is for CL/CS only.
                         ** Register spilling will generate lots of extra instructions, so try solution 2 first if it is possible.
                         */
-                        if (_VIR_RA_LS_CalcMaxRegBasedOnWorkGroupSize(&ra) && !VIR_Shader_CheckWorkGroupSizeFixed(pShader))
+                        if (VIR_Shader_CalcMaxRegBasedOnWorkGroupSize(pShader) && !VIR_Shader_CheckWorkGroupSizeFixed(pShader))
                         {
                             gctUINT preMaxGRReg = _VIR_RA_LS_GetMaxReg(&ra, VIR_RA_HWREG_GR, reservedDataReg);
                             gctUINT curMaxGRReg = preMaxGRReg;
@@ -13000,6 +12983,11 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
                     if (_VIR_RA_LS_GetMaxReg(&ra, VIR_RA_HWREG_GR, reservedDataReg) < 1)
                     {
                         retValue = VSC_RA_ERR_OUT_OF_REG_SPILL;
+                    }
+
+                    if (retValue != VSC_ERR_NONE)
+                    {
+                        _VIR_RA_ClearColorPool(&ra, gcvFALSE, 0);
                     }
                     ON_ERROR(retValue, "_VIR_RA_LS_PerformOnFunction");
                 }
@@ -13047,22 +13035,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
                 if (reColor)
                 {
                     /* clear color pool */
-                    _VIR_RA_ColorPool_ClearAll(VIR_RA_LS_GetColorPool(&ra));
-                    _VIR_RA_LRTable_ClearColor(&ra);
-                    VIR_RA_LS_GetColorPool(&ra)->colorMap[VIR_RA_HWREG_GR].maxAllocReg = 0;
-                    VIR_RA_LS_GetActiveLRHead(&ra)->nextActiveLR = &(LREndMark);
-                    (&ra)->resDataRegisterCount = reservedDataReg;
-                    pShader->hasRegisterSpill |= bSpillReg;
-                    (&ra)->spillOffset = (pShader->vidmemSizeOfSpill + 15) & ~ (gctUINT)0x0F;
-
-                    /* Disable DUAL16 temporarily if registerSpill is used. */
-                    if (pShader->hasRegisterSpill)
-                    {
-                        VIR_Shader_SetDual16Mode(pShader, gcvFALSE);
-                    }
-
-                    (&ra)->currentMaxRegCount = VIR_RA_LS_REG_MAX;
-                    _VIR_RA_FlaseDepReg_ClearAll(&ra);
+                    _VIR_RA_ClearColorPool(&ra, bSpillReg, reservedDataReg);
                 }
             }
 
@@ -13129,6 +13102,14 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
     }
 
 OnError:
+    /* Check if we need to cut down workGroupSize and try again. */
+    if ((retValue == VSC_RA_ERR_OUT_OF_REG_SPILL || retValue == VSC_RA_ERR_OUT_OF_REG_FAIL)
+        &&
+        pPassWorker->basePassWorker.pPassSpecificData != gcvNULL)
+    {
+        *((gctBOOL*)pPassWorker->basePassWorker.pPassSpecificData) = _VIR_RA_NeedToCutDownWorkGroupSize(&ra);
+    }
+
     _VIR_RA_LS_Final(&ra);
 
     return retValue;

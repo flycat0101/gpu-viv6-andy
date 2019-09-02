@@ -7338,7 +7338,7 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     SHADER_EXECUTABLE_PROFILE* pGpsSEP = pShHwInfo->pSEP;
-    gctUINT                    state, ioIdx, sortedIoIdx;
+    gctUINT                    i, state, ioIdx, sortedIoIdx;
     gctUINT                    gpsInputCount = 0, theadIdIdx = 0;
     gctUINT                    firstValidIoChannel;
     gctUINT                    varyingPacking[2] = {0, 0};
@@ -7443,6 +7443,10 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
     pStatesPgmer->pHints->threadGroupSync = pGpsSEP->exeHints.derivedHints.prvStates.gps.bThreadGroupSync;
     pStatesPgmer->pHints->useGroupId = (pGpsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_THREADGROUPID].ioIndexMask != 0);
     pStatesPgmer->pHints->useLocalId = (pGpsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_THREADIDINGROUP].ioIndexMask != 0);
+    for (i = 0; i < 3; i++)
+    {
+        pStatesPgmer->pHints->workGroupSizeFactor[i] = pGpsSEP->exeHints.derivedHints.prvStates.gps.workGroupSizeFactor[i];
+    }
 
     _ProgramSamplerCountInfo(pShHwInfo, pStatesPgmer, gcvFALSE);
 

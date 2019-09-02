@@ -995,6 +995,9 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Shader_GetAdjustedWorkGroupSize(Shader)         ((Shader)->shaderLayout.compute.adjustedWorkGroupSize)
 #define VIR_Shader_SetAdjustedWorkGroupSize(Shader, V)      do { (Shader)->shaderLayout.compute.adjustedWorkGroupSize = (V); } while (0)
 
+#define VIR_Shader_GetWorkGroupSizeFactor(Shader, idx)       ((Shader)->shaderLayout.compute.workGroupSizeFactor[(idx)])
+#define VIR_Shader_SetWorkGroupSizeFactor(Shader, idx, V)    do { (Shader)->shaderLayout.compute.workGroupSizeFactor[(idx)] = (V); } while (0)
+
 #define VIR_Shader_SetTCShaderLayout(s, outVertices, inVertices)            \
         do {                                                                \
              gcmASSERT(VIR_Shader_GetKind(s) == VIR_SHADER_TESSELLATION_CONTROL);  \
@@ -4887,6 +4890,9 @@ typedef struct _VIR_COMPUTELAYOUT
 
     /* Default workGroupSize. */
     gctUINT32           adjustedWorkGroupSize;
+
+    /* The factor of reducing WorkGroupSize, the default value is 0. */
+    gctUINT16           workGroupSizeFactor[3];
 } VIR_ComputeLayout;
 
 /* tcs and tes layout are defined in same struct */
@@ -7520,6 +7526,17 @@ VIR_Uniform *
 VIR_Shader_GetTempRegSpillAddrUniform(
     IN VIR_Shader *pShader,
     IN gctBOOL     bNeedBoundsCheck
+    );
+
+gctUINT
+VIR_Shader_GetMaxFreeRegCountPerThread(
+    VIR_Shader      *pShader,
+    VSC_HW_CONFIG   *pHwCfg
+    );
+
+gctBOOL
+VIR_Shader_CalcMaxRegBasedOnWorkGroupSize(
+    VIR_Shader      *pShader
     );
 
 /* return the concurrent workThreadCount. */

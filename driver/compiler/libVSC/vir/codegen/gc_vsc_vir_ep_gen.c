@@ -2232,6 +2232,11 @@ static void _CollectExeHints(VSC_SHADER_COMPILER_PARAM* pCompilerParam, VSC_SEP_
     {
         pOutSEP->exeHints.derivedHints.prvStates.gps.bThreadGroupSync = pShader->hasThreadGroupSync;
         pOutSEP->exeHints.derivedHints.prvStates.gps.bUseLocalMemory = VIR_Shader_UseLocalMem(pShader);
+
+        for (i = 0; i < 3; i++)
+        {
+            pOutSEP->exeHints.derivedHints.prvStates.gps.workGroupSizeFactor[i] = VIR_Shader_GetWorkGroupSizeFactor(pShader, i);
+        }
     }
 }
 

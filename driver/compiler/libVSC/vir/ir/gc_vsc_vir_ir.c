@@ -18050,6 +18050,74 @@ VIR_Shader_GetWorkGroupSize(
     return workGroupSize;
 }
 
+gctUINT
+VIR_Shader_GetMaxFreeRegCountPerThread(
+    VIR_Shader      *pShader,
+    VSC_HW_CONFIG   *pHwCfg
+    )
+{
+    gctUINT          maxFreeReg = vscGetHWMaxFreeRegCount(pHwCfg);
+    gctFLOAT         workGroupSize = 0, threadCount;
+
+    if (VIR_Shader_CalcMaxRegBasedOnWorkGroupSize(pShader))
+    {
+        /* if compute shader has barrier, the temp count must follow
+            ceiling(work_group_size/(shader_core_count*4*threads_per_register)) <= floor(maxFreeReg/temp_register_count)
+            */
+
+        /* VIR_SHADER_TESSELLATION_CONTROL should not have barrier if core == 8 */
+        gcmASSERT(pShader->shaderKind == VIR_SHADER_COMPUTE || pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL);
+        threadCount = (gctFLOAT)(pHwCfg->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1));
+
+        if (VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsCL(pShader))
+        {
+            /* Use initWorkGroupSizeToCalcRegCount to calculate the maxRegCount if needed. */
+            if (!VIR_Shader_IsWorkGroupSizeAdjusted(pShader) &&
+                !VIR_Shader_IsWorkGroupSizeFixed(pShader))
+            {
+                gcmASSERT(GetHWMaxWorkGroupSize() == VIR_Shader_GetWorkGroupSize(pShader));
+
+                VIR_Shader_SetWorkGroupSizeAdjusted(pShader, gcvTRUE);
+                VIR_Shader_SetAdjustedWorkGroupSize(pShader, GetHWInitWorkGroupSizeToCalcRegCount());
+            }
+            workGroupSize = (gctFLOAT)VIR_Shader_GetWorkGroupSize(pShader);
+            maxFreeReg = maxFreeReg / (gctUINT)(ceil(workGroupSize / threadCount));
+        }
+        else if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
+        {
+            workGroupSize = (gctFLOAT)(pShader->shaderLayout.tcs.tcsPatchOutputVertices);
+            maxFreeReg = maxFreeReg / (gctUINT)(ceil(workGroupSize / threadCount));
+        }
+    }
+
+    return maxFreeReg;
+}
+
+gctBOOL
+VIR_Shader_CalcMaxRegBasedOnWorkGroupSize(
+    VIR_Shader      *pShader
+    )
+{
+    if (VIR_Shader_HasBarrier(pShader))
+    {
+        /* if compute shader has barrier, the temp count must follow
+            ceiling(work_group_size/(shader_core_count*4*threads_per_register)) <= floor(maxFreeReg/temp_register_count)
+            */
+        return gcvTRUE;
+    }
+
+    /*
+    ** If a shader uses the private memory, we use tempRegCount to calculate the concurrent workThreadCount,
+    ** so we need to calculate the workGroupSize based on tempRegCount.
+    */
+    if (VIR_Shader_UsePrivateMem(pShader))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
 /* return the concurrent workThreadCount. */
 gctUINT
 VIR_Shader_ComputeWorkThreadNum(

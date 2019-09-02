@@ -41,19 +41,15 @@ BEGIN_EXTERN_C()
 #define gcdSL_SHADER_BINARY_BEFORE_LTC_FILE_VERSION gcmCC(0, 0, 1, 1)
 
 /* bump up version to 1.2 for Loadtime Constant optimization on 1/3/2012 */
-/*#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(0, 0, 1, 2)*/
 #define gcdSL_SHADER_BINARY_BEFORE_STRUCT_SYMBOL_FILE_VERSION gcmCC(0, 0, 1, 2)
 
 /* bump up version to 1.3 for struct support for variable and uniform on 3/9/2012 */
-/*#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(0, 0, 1, 3)*/
 #define gcdSL_SHADER_BINARY_BEFORE_VARIABLE_TYPE_QUALIFIER_FILE_VERSION gcmCC(0, 0, 1, 3)
 
 /* bump up version to 1.4 for variable type qualifier support on 4/2/2012 */
-/* #define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(0, 0, 1, 4)*/
 #define gcdSL_SHADER_BINARY_BEFORE_PRECISION_QUALIFIER_FILE_VERSION gcmCC(0, 0, 1, 4)
 
 /* bump up version to 1.5 for precision qualifier support on 8/23/2012 */
-/* #define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(0, 0, 1, 5) */
 #define gcdSL_SHADER_BINARY_BEFORE_HALTI_FILE_VERSION gcmCC(0, 0, 1, 5)
 
 /* bump up version to 1.6 for halti feature support on 9/10/2012 */
@@ -118,10 +114,11 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.33 for saving the shader source for OCL on 07/15/2019 */
 #define gcdSL_SHADER_BINARY_BEFORE_SAVING_SHADER_SOURCE_FOR_OCL gcmCC(0, 0, 1, 33)
 
+/* bump up version to 1.34 for workGroupSizeFactor into the binary on 07/18/2019 */
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 33)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 34)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 33)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 34)
 
 typedef union _gcsValue
 {
@@ -4329,6 +4326,9 @@ typedef struct _gcCOMPUTELAYOUT
 
     /* Default workGroupSize. */
     gctUINT32           adjustedWorkGroupSize;
+
+    /* The factor of reducing WorkGroupSize, the default value is 0. */
+    gctUINT16           workGroupSizeFactor[3];
 } gcComputeLayout;
 
 typedef struct _gcTCSLAYOUT

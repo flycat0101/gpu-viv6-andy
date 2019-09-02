@@ -118,6 +118,10 @@ VSC_ErrCode vscVIR_ClampPointSize(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_ClampPointSize);
 DECLARE_SH_NECESSITY_CHECK(vscVIR_ClampPointSize);
 
+VSC_ErrCode vscVIR_CutDownWorkGroupSize(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_SH_NECESSITY_CHECK(vscVIR_CutDownWorkGroupSize);
+DECLARE_QUERY_PASS_PROP(vscVIR_CutDownWorkGroupSize);
+
 END_EXTERN_C()
 
 #endif /* __gc_vsc_vir_misc_opts_h_ */

@@ -793,6 +793,7 @@ typedef struct _gcsHINT
     gctINT      psOutCntl12to15;
 
     gcWORK_GROUP_SIZE workGrpSize;
+    gctUINT16   workGroupSizeFactor[3];
 
     /* per-vertex attributeCount. */
     gctUINT     tcsPerVertexAttributeCount;

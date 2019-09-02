@@ -355,6 +355,9 @@ VSC_ErrCode vscGPPM_CallPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
           errCode = vscSPM_CallPass(pShPassMnger, (pfnPassRoutine), QUERY_PASS_PROP_NAME(pfnPassRoutine), NECESSITY_CHECK_NAME(pfnPassRoutine), (passId), (pPrvData)); \
           ON_ERROR(errCode, #pfnPassRoutine);
 
+#define CALL_SH_PASS_WITHOUT_ERRCHECK(pfnPassRoutine, passId, pPrvData) \
+          errCode = vscSPM_CallPass(pShPassMnger, (pfnPassRoutine), QUERY_PASS_PROP_NAME(pfnPassRoutine), NECESSITY_CHECK_NAME(pfnPassRoutine), (passId), (pPrvData)); \
+
 #define REGISTER_SH_PASS(pfnPassRoutine, pPrvData) \
           vscSPM_RegisterPass(pShPassMnger, (pfnPassRoutine), QUERY_PASS_PROP_NAME(pfnPassRoutine), (pPrvData));
 
