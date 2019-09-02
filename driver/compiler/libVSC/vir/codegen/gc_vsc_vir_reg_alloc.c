@@ -12857,7 +12857,8 @@ static void
 _VIR_RA_ClearColorPool(
     VIR_RA_LS           *pRA,
     gctBOOL             bEnableSpill,
-    gctUINT             reservedDataReg)
+    gctUINT             reservedDataReg,
+    gctBOOL             bReset)
 {
     VIR_Shader          *pShader = pRA->pShader;
 
@@ -12869,6 +12870,11 @@ _VIR_RA_ClearColorPool(
     (pRA)->resDataRegisterCount = reservedDataReg;
     pShader->hasRegisterSpill |= bEnableSpill;
     (pRA)->spillOffset = (pShader->vidmemSizeOfSpill + 15) & ~ (gctUINT)0x0F;
+
+    if (bReset)
+    {
+        pShader->hasRegisterSpill = gcvFALSE;
+    }
 
     /* Disable DUAL16 temporarily if registerSpill is used. */
     if (pShader->hasRegisterSpill)
@@ -13085,7 +13091,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
 
                     if (retValue != VSC_ERR_NONE)
                     {
-                        _VIR_RA_ClearColorPool(&ra, gcvFALSE, 0);
+                        _VIR_RA_ClearColorPool(&ra, gcvFALSE, 0, gcvTRUE);
                     }
                     ON_ERROR(retValue, "_VIR_RA_LS_PerformOnFunction");
                 }
@@ -13133,7 +13139,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
                 if (reColor)
                 {
                     /* clear color pool */
-                    _VIR_RA_ClearColorPool(&ra, bSpillReg, reservedDataReg);
+                    _VIR_RA_ClearColorPool(&ra, bSpillReg, reservedDataReg, gcvFALSE);
                 }
             }
 

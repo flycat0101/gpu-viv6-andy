@@ -8878,6 +8878,7 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
     gctUINT                             maxResCashWinSize = pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxResultCacheWinSize;
     USC_ANALYZE_TRIAL_TYPE              anaTrialType;
     gctBOOL                             bUSCAlloced;
+    gctBOOL                             bVsUSCAllocedSuccess = gcvFALSE;
 
     /* Check whether we need go on to analyze USC programming hints */
     if (!_NeedAnalyzeHwUSCProgrammingHints(pHwPipelineShsParam, pOutHwShdsLinkInfo, maxHwTGThreadCount, bSeperatedShaders))
@@ -8933,6 +8934,8 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
                     break;
                 }
 
+                bVsUSCAllocedSuccess = gcvTRUE;
+
                 pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.maxUscSizeInKbyte =
                                                                          realUSCThreshold[VSC_GFX_SHADER_STAGE_VS];
 
@@ -8950,7 +8953,14 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
                                                                              expectedMaxThreadsPerHwTG[VSC_GFX_SHADER_STAGE_VS];
             }
 
-            return VSC_ERR_NONE;
+            if (!bVsUSCAllocedSuccess)
+            {
+                return VSC_ERR_TOO_MANY_VARYINGS;
+            }
+            else
+            {
+                return VSC_ERR_NONE;
+            }
         }
     }
 
