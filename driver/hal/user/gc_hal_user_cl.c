@@ -1289,7 +1289,11 @@ gcoCL_QueryDeviceInfo(
                                     gcvNULL,
                                     gcvNULL));
 
-    DeviceInfo->maxComputeUnits = 1;
+    gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D, &DeviceInfo->maxComputeUnits, gcvNULL);
+    if(DeviceInfo->maxComputeUnits == 0)
+    {
+        gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D2D, &DeviceInfo->maxComputeUnits, gcvNULL);
+    }
     DeviceInfo->maxWorkItemDimensions = 3;
 
     /* The below restrictions are based on 16-bits for Global ID (per component)
