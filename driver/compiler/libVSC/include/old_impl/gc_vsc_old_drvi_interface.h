@@ -1258,6 +1258,7 @@ typedef struct _gcOPTIMIZER_OPTION
 
          SRC:  dump shader source code
          IR:   dump final IR
+         SRCLOC: dump IR's corresponding source location
          OPT:  dump incoming and final IR
          OPTV: dump result IR in each optimization phase
          CG:   dump generated machine code
@@ -1280,6 +1281,7 @@ typedef struct _gcOPTIMIZER_OPTION
     gctBOOL     dumpBEGenertedCode;    /* dump generated machine code */
     gctBOOL     dumpBEVerbose;         /* dump BE tree and optimization detail */
     gctBOOL     dumpBEFinalIR;         /* dump BE final IR */
+    gctBOOL     dumpSrcLoc;            /* dump IR instruction's corresponding source location*/
     gctBOOL     dumpFELog;             /* dump FE log file in case of compiler error */
     gctBOOL     dumpPPedStr2File;      /* dump FE preprocessed string to file */
     gctBOOL     dumpUniform;           /* dump uniform value when setting uniform */
@@ -1619,6 +1621,13 @@ typedef struct _gcOPTIMIZER_OPTION
      */
     gctBOOL     oclPassKernelStructArgByValue;
 
+    /*  Treat half types as floats in OCL
+     *
+     *   VC_OPTION=-OCLTREAT_HALF_AS_FLOAT:0|1
+     *
+    */
+    gctBOOL     oclTreatHalfAsFloat;
+
     /* Specify the log file name
      *
      *   VC_OPTION=-LOG:filename
@@ -1717,6 +1726,7 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_DUMP_UNIFORM()           (gcmGetOptimizerOption()->dumpUniform != 0)
 #define gcmOPT_DUMP_FELOG()             (gcmGetOptimizerOption()->dumpFELog != 0)
 #define gcmOPT_DUMP_PPEDSTR2FILE()      (gcmGetOptimizerOption()->dumpPPedStr2File != 0)
+#define gcmOPT_DUMP_SRCLOC()            (gcmGetOptimizerOption()->dumpSrcLoc != 0)
 
 #define gcmOPT_SET_DUMP_SHADER_SRC(v)   (gcmGetOptimizerOption()->dumpShaderSource = (v)
 
@@ -1772,6 +1782,7 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_oclUseNeg()          (gcmGetOptimizerOption()->oclUseNeg)
 #define gcmOPT_oclUseImgIntrinsicQuery()   (gcmGetOptimizerOption()->oclUseImgIntrinsicQuery)
 #define gcmOPT_oclPassKernelStructArgByValue()   (gcmGetOptimizerOption()->oclPassKernelStructArgByValue)
+#define gcmOPT_oclTreatHalfAsFloat()   (gcmGetOptimizerOption()->oclTreatHalfAsFloat)
 #define gcmOPT_UseVIRCodeGen()      (gcmGetOptimizerOption()->useVIRCodeGen)
 #define gcmOPT_VirCodeGenSpecified()(gcmGetOptimizerOption()->virCodeGenSpecified)
 #define gcmOPT_VIRCGStart()         (gcmGetOptimizerOption()->_vircgStart)

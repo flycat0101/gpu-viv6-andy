@@ -44,6 +44,7 @@ gcOPTIMIZER_OPTION theOptimizerOption =
     gcvFALSE, /* CGV:  dump BE tree and optimizer detail */
     gcvFALSE, /* HTP:  dump hash table performance */
     gcvFALSE, /* IR:   dump BE final IR */
+    gcvFALSE, /* SRCLOC: dump IR's corresponding source location */
     gcvFALSE, /* LOG:  dump FE log file in case of compiler error */
     gcvFALSE, /* PPEDSTR2FILE: dump FE preprocessed string to file */
     gcvFALSE, /* BIN2FILE: dump program binary to file when calling gcLoadProgram */
@@ -359,6 +360,13 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      *
      */
     gcvFALSE, /* oclPassKernelStructArgByValue */
+
+    /*  Treat half types as floats in OCL
+     *
+     *   VC_OPTION=-OCLTREAT_HALF_AS_FLOAT:0|1
+     *
+     */
+    gcvTRUE, /* oclTreatHalfAsFloat */
 
     /* Specify the log file name
      *

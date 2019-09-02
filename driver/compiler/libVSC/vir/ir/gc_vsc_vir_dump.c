@@ -2315,7 +2315,7 @@ _DumpGeneralInst(
         }
     }
 
-    if (gcmOPT_EnableDebug())
+    if (gcmOPT_EnableDebug() || gcmOPT_DUMP_SRCLOC())
     {
         VIR_LOG(Dumper, "\t\t #Loc(%d,%d,%d)", Inst->sourceLoc.fileId, Inst->sourceLoc.lineNo, Inst->sourceLoc.colNo);
     }
@@ -2393,7 +2393,7 @@ _DumpPhiInst(
     VERIFY_OK(
         VIR_LOG(Dumper, "}"));
 
-    if (gcmOPT_EnableDebug())
+    if (gcmOPT_EnableDebug() || gcmOPT_DUMP_SRCLOC())
     {
         VIR_LOG(Dumper, "\t\t #Loc(%d,%d,%d)", Inst->sourceLoc.fileId, Inst->sourceLoc.lineNo, Inst->sourceLoc.colNo);
     }
@@ -2501,7 +2501,7 @@ _DumpImgQueryInst(
         }
     }
 
-    if (gcmOPT_EnableDebug())
+    if (gcmOPT_EnableDebug() || gcmOPT_DUMP_SRCLOC())
     {
         VIR_LOG(Dumper, "\t\t #Loc(%d,%d,%d)", Inst->sourceLoc.fileId, Inst->sourceLoc.lineNo, Inst->sourceLoc.colNo);
     }
@@ -2545,7 +2545,7 @@ VIR_Inst_Dump(
             {
                 VIR_LOG(Dumper, "OUTPUT_USAGE_INST\n");
             }
-            if (gcmOPT_EnableDebug())
+            if (gcmOPT_EnableDebug() || gcmOPT_DUMP_SRCLOC())
             {
                 if (Inst->sourceLoc.fileId != 0 ||  Inst->sourceLoc.lineNo != 0 ||Inst->sourceLoc.colNo != 0)
                 {

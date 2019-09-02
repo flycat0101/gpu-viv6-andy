@@ -28100,7 +28100,13 @@ gcGetOptionFromEnv(
                 while (pos[0] == ':')
                 {
                     ++pos;
-                    if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "SRC", sizeof("SRC")-1))
+                    if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "SRCLOC", sizeof("SRCLOC")-1))
+                    {
+                        /* dump IR's corresponding source location */
+                        Option->dumpSrcLoc = gcvTRUE;
+                        pos += sizeof("SRCLOC") -1;
+                    }
+                    else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "SRC", sizeof("SRC")-1))
                     {
                         /* dump shader source code */
                         Option->dumpShaderSource = gcvTRUE;
@@ -29172,6 +29178,30 @@ gcGetOptionFromEnv(
                 {
                     /* turn on ocl to pass kernel struct argument by value */
                     Option->oclPassKernelStructArgByValue = gcvTRUE;
+                }
+            }
+
+            /*  Treat half types as floats in OCL
+             *
+             *   VC_OPTION=-OCLTREAT_HALF_AS_FLOAT:0|1
+             *
+             */
+            gcoOS_StrStr(p, "-OCLTREAT_HALF_AS_FLOAT:", &pos);
+            if (pos)
+            {
+                gctINT value=-1;
+                pos += sizeof("-OCLTREAT_HALF_AS_FLOAT:") -1;
+                gcoOS_StrToInt(pos, &value);
+
+                if (value == 0)
+                {
+                    /* turn off ocl to treat half types as floats */
+                    Option->oclTreatHalfAsFloat = gcvFALSE;
+                }
+                else if (value == 1)
+                {
+                    /* turn on ocl to treat half types as floats */
+                    Option->oclTreatHalfAsFloat = gcvTRUE;
                 }
             }
 
