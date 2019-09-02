@@ -1547,9 +1547,12 @@ clfLoadKernelArgValues(
         /*gcoOS_MemCopy(Arg->data, GlobalWorkSize, gcmSIZEOF(size_t) * 3);*/
         gctUINT32 globalWorkSize[3];
 
-        globalWorkSize[0] = GlobalWorkSize[0] ? GlobalWorkSize[0] : 1;
-        globalWorkSize[1] = GlobalWorkSize[1] ? GlobalWorkSize[1] : 1;
-        globalWorkSize[2] = GlobalWorkSize[2] ? GlobalWorkSize[2] : 1;
+        /* for get_global_size() in shader, it should be original size */
+        gctUINT16 *factor = hints ? hints->workGroupSizeFactor : gcvNULL;
+
+        globalWorkSize[0] = GlobalWorkSize[0] ? GlobalWorkSize[0] * (factor && factor[0] ? factor[0] : 1) : 1;
+        globalWorkSize[1] = GlobalWorkSize[1] ? GlobalWorkSize[1] * (factor && factor[1] ? factor[1] : 1) : 1;
+        globalWorkSize[2] = GlobalWorkSize[2] ? GlobalWorkSize[2] * (factor && factor[2] ? factor[2] : 1) : 1;
         gcoOS_MemCopy(Arg->data, globalWorkSize, gcmSIZEOF(gctUINT32) * 3);
 
         clmONERROR(clfSetUniformValue(Arg->uniform,
@@ -1563,9 +1566,12 @@ clfLoadKernelArgValues(
         /*gcoOS_MemCopy(Arg->data, LocalWorkSize, gcmSIZEOF(size_t) * 3);*/
         gctUINT32 localWorkSize[3];
 
-        localWorkSize[0] = LocalWorkSize[0] ? LocalWorkSize[0] : 1;
-        localWorkSize[1] = LocalWorkSize[1] ? LocalWorkSize[1] : 1;
-        localWorkSize[2] = LocalWorkSize[2] ? LocalWorkSize[2] : 1;
+        /* for get_local_size() in shader, it should be original size */
+        gctUINT16 *factor = hints ? hints->workGroupSizeFactor : gcvNULL;
+
+        localWorkSize[0] = LocalWorkSize[0] ? LocalWorkSize[0] * (factor && factor[0] ? factor[0] : 1) : 1;
+        localWorkSize[1] = LocalWorkSize[1] ? LocalWorkSize[1] * (factor && factor[1] ? factor[1] : 1) : 1;
+        localWorkSize[2] = LocalWorkSize[2] ? LocalWorkSize[2] * (factor && factor[2] ? factor[2] : 1) : 1;
         gcoOS_MemCopy(Arg->data, localWorkSize, gcmSIZEOF(gctUINT32) * 3);
 
         clmONERROR(clfSetUniformValue(Arg->uniform,
@@ -4164,18 +4170,28 @@ clfFlushVIRKernelResource(
                 gcoCL_MemWaitAndGetFence(memAllocInfo->node, gcvENGINE_RENDER, gcvFENCE_TYPE_ALL, gcvFENCE_TYPE_WRITE);
                 break;
             case SHS_PRIV_CONSTANT_KIND_GLOBAL_SIZE:
-                globalWorkSize[0] = NDRangeKernel->globalWorkSize[0] ? NDRangeKernel->globalWorkSize[0] : 1;
-                globalWorkSize[1] = NDRangeKernel->globalWorkSize[1] ? NDRangeKernel->globalWorkSize[1] : 1;
-                globalWorkSize[2] = NDRangeKernel->globalWorkSize[2] ? NDRangeKernel->globalWorkSize[2] : 1;
-                data = (gctPOINTER)globalWorkSize;
-                Columns = 3;
+                {
+                     /* for get_global_size() in shader, it should be original size */
+                    gctUINT16 *factor = hints ? hints->workGroupSizeFactor : gcvNULL;
+
+                    globalWorkSize[0] = NDRangeKernel->globalWorkSize[0] ? NDRangeKernel->globalWorkSize[0] * (factor && factor[0] ? factor[0] : 1) : 1;
+                    globalWorkSize[1] = NDRangeKernel->globalWorkSize[1] ? NDRangeKernel->globalWorkSize[1] * (factor && factor[1] ? factor[1] : 1) : 1;
+                    globalWorkSize[2] = NDRangeKernel->globalWorkSize[2] ? NDRangeKernel->globalWorkSize[2] * (factor && factor[2] ? factor[2] : 1) : 1;
+                    data = (gctPOINTER)globalWorkSize;
+                    Columns = 3;
+                }
                 break;
             case SHS_PRIV_CONSTANT_KIND_LOCAL_SIZE:
-                localWorkSize[0] = NDRangeKernel->localWorkSize[0] ? NDRangeKernel->localWorkSize[0] : 1;
-                localWorkSize[1] = NDRangeKernel->localWorkSize[1] ? NDRangeKernel->localWorkSize[1] : 1;
-                localWorkSize[2] = NDRangeKernel->localWorkSize[2] ? NDRangeKernel->localWorkSize[2] : 1;
-                data = (gctPOINTER)localWorkSize;
-                Columns = 3;
+                {
+                     /* for get_local_size() in shader, it should be original size */
+                    gctUINT16 *factor = hints ? hints->workGroupSizeFactor : gcvNULL;
+
+                    localWorkSize[0] = NDRangeKernel->localWorkSize[0] ? NDRangeKernel->localWorkSize[0] * (factor && factor[0] ? factor[0] : 1) : 1;
+                    localWorkSize[1] = NDRangeKernel->localWorkSize[1] ? NDRangeKernel->localWorkSize[1] * (factor && factor[1] ? factor[1] : 1) : 1;
+                    localWorkSize[2] = NDRangeKernel->localWorkSize[2] ? NDRangeKernel->localWorkSize[2] * (factor && factor[2] ? factor[2] : 1) : 1;
+                    data = (gctPOINTER)localWorkSize;
+                    Columns = 3;
+                }
                 break;
             case SHS_PRIV_CONSTANT_KIND_GLOBAL_OFFSET:
                 globalOffset[0] = NDRangeKernel->globalWorkOffset[0];
@@ -8222,6 +8238,8 @@ clGetKernelWorkGroupInfo(
     gctSIZE_T        retParamSize = 0;
     gctPOINTER       retParamPtr = NULL;
     gctINT           status;
+    gctINT           i;
+    gctSIZE_T        maxWorkGroupSize = 1;
 
     gcmHEADER_ARG("Kernel=0x%x Device=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   Kernel, Device, ParamName, ParamValueSize, ParamValue);
@@ -8244,8 +8262,26 @@ clGetKernelWorkGroupInfo(
     switch (ParamName)
     {
     case CL_KERNEL_WORK_GROUP_SIZE:
-        retParamSize = gcmSIZEOF(Kernel->maxWorkGroupSize);
-        retParamPtr = &Kernel->maxWorkGroupSize;
+        {
+            gctUINT16 *factor = gcvNULL;
+
+            if (Kernel->context->platform->virShaderPath)
+            {
+                factor = Kernel->virCurrentInstance ? Kernel->virCurrentInstance->hwStates.hints.workGroupSizeFactor : gcvNULL;
+            }
+            else
+            {
+                factor = Kernel->masterInstance.programState.hints ? Kernel->masterInstance.programState.hints->workGroupSizeFactor : gcvNULL;
+            }
+
+            retParamSize = gcmSIZEOF(Kernel->maxWorkGroupSize);
+            maxWorkGroupSize = Kernel->maxWorkGroupSize;
+            for (i = 0; i < 3; i++)
+            {
+                maxWorkGroupSize *= factor && factor[i] ? factor[i] : 1;
+            }
+            retParamPtr = &maxWorkGroupSize;
+        }
         break;
 
     case CL_KERNEL_COMPILE_WORK_GROUP_SIZE:

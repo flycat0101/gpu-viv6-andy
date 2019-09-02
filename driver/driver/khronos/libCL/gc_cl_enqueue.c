@@ -5557,6 +5557,9 @@ clEnqueueNDRangeKernel(
     size_t                      globalWorkOffset[3] = {0};
     size_t                      globalWorkSize[3] = {0};
     size_t                      localWorkSize[3] = {0};
+    size_t                      shadowLocalWorkSize[3] = { 0 };
+    size_t                      shadowGlobalWorkSize[3] = { 0 };
+    gctUINT16                   *factor;
 
 
     gcmHEADER_ARG("CommandQueue=0x%x Kernel=0x%x "
@@ -5597,6 +5600,33 @@ clEnqueueNDRangeKernel(
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010169: (clEnqueueNDRangeKernel) EventWaitList is NULL, but NumEventsInWaitList is not 0.\n");
         clmRETURN_ERROR(CL_INVALID_EVENT_WAIT_LIST);
+    }
+
+    if (Kernel->context->platform->virShaderPath)
+    {
+        factor = Kernel->virCurrentInstance ? Kernel->virCurrentInstance->hwStates.hints.workGroupSizeFactor : gcvNULL;
+    }
+    else
+    {
+        factor = Kernel->masterInstance.programState.hints ? Kernel->masterInstance.programState.hints->workGroupSizeFactor : gcvNULL;
+    }
+
+    if (factor)
+    {
+        for (i = 0; i < WorkDim; i++)
+        {
+            if (LocalWorkSize)
+            {
+                shadowLocalWorkSize[i] = LocalWorkSize[i] / (factor[i] ? factor[i] : 1);
+            }
+            shadowGlobalWorkSize[i] = GlobalWorkSize[i] / (factor[i] ? factor[i] : 1);
+        }
+
+        GlobalWorkSize = shadowGlobalWorkSize;
+        if (LocalWorkSize)
+        {
+            LocalWorkSize = shadowLocalWorkSize;
+        }
     }
 
     if (Kernel->context->platform->virShaderPath)
