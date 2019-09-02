@@ -1936,7 +1936,7 @@ void _fill_TP_MAX_POOLING_Command(
     DEFINE_TP_GENERAL_PARAMETER();
 
     vxmASSERT((poolingStride == 1 && parameter->pool_size_x <= 3) ||
-              ((poolingStride == parameter->pool_size_x || poolingStride == parameter->pool_size_x-1) &&
+              ((poolingStride == parameter->pool_size_x || poolingStride == parameter->pool_size_x-1 || parameter->pool_size_x == 1) &&
                 parameter->pool_size_x <= 64));
 
     outTileXSize = (64 + poolingStride - parameter->pool_size_x) / poolingStride;
@@ -1944,39 +1944,78 @@ void _fill_TP_MAX_POOLING_Command(
 
     for (i = 0; i < split_count; i++)
     {
-        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageYSize = inYSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
-        info_array[i].vx_tp_general_cmd_split_info.inImageStride = inYStride / inputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inZStride / inputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = (-1) * (vx_int32)parameter->pad_x_left;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = (-1) * (vx_int32)parameter->pad_y_top;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = (outXSize - 1) * poolingStride + parameter->pool_size_x - 1 - parameter->pad_x_left;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = (outYSize - 1) * poolingStride + parameter->pool_size_y - 1 - parameter->pad_y_top;
+        if (parameter->pool_size_x != 1)
+        {
+            info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageYSize = inYSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageStride = inYStride / inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inZStride / inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = (-1) * (vx_int32)parameter->pad_x_left;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = (-1) * (vx_int32)parameter->pad_y_top;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = (outXSize - 1) * poolingStride + parameter->pool_size_x - 1 - parameter->pad_x_left;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = (outYSize - 1) * poolingStride + parameter->pool_size_y - 1 - parameter->pad_y_top;
 
-        info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
-        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
-        info_array[i].vx_tp_general_cmd_split_info.inTileXSize = outTileXSize * poolingStride + parameter->pool_size_x - poolingStride;
-        info_array[i].vx_tp_general_cmd_split_info.inTileYSize = outTileYSize * poolingStride + parameter->pool_size_y - poolingStride;
-        info_array[i].vx_tp_general_cmd_split_info.inTileXInc = outTileXSize * poolingStride;
-        info_array[i].vx_tp_general_cmd_split_info.inTileYInc = outTileYSize * poolingStride;
-        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i];
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0x1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outXSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0x1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = outTileXSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = (outXSize + outTileXSize - 1) / outTileXSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0x0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = outTileYSize * outXSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = (outYSize + outTileYSize - 1) / outTileYSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = outZStride / outputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.inTileXSize = outTileXSize * poolingStride + parameter->pool_size_x - poolingStride;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYSize = outTileYSize * poolingStride + parameter->pool_size_y - poolingStride;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXInc = outTileXSize * poolingStride;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYInc = outTileYSize * poolingStride;
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0x1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0x1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = outTileXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = (outXSize + outTileXSize - 1) / outTileXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0x0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = outTileYSize * outXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = (outYSize + outTileYSize - 1) / outTileYSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = outZStride / outputElemSize;
+        }
+        else
+        {
+            info_array[i].vx_tp_general_cmd_split_info.inImageXSize = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inImageYSize = outXSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageZSize = outYSize * split_sizes[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageStride = poolingStride * inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inXSize * poolingStride * inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = 0;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = outXSize - 1;
+
+            info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.inTileXSize = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYSize = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileXInc = 1;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYInc = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = outXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0x0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = outYSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0x0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0x0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = outZStride / outputElemSize;
+        }
 
         /* Select the correct border mode if padding is not specified. */
         if (parameter->orig_no_pad &&
@@ -4751,7 +4790,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 info->vx_nn_tp_cmd_info.aluVertProcCount = conv_cmd_ptr->pool_size_y - 1;
                 info->vx_nn_tp_cmd_info.aluVertProcStride = 0;
             }
-            else
+            else if (conv_cmd_ptr->pool_size_x != 1)
             {
                 info->vx_nn_tp_cmd_info.aluHorzProcessing = 0x3;
                 info->vx_nn_tp_cmd_info.aluHorzProcCount = conv_cmd_ptr->pool_size_x - 1;

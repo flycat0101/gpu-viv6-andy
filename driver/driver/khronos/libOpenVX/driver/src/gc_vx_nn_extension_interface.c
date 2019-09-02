@@ -8835,12 +8835,13 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
         vx_bool isTpSupportFormat = vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs);
         vx_bool isStride1Support = ((stride == 1) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_MAX_POOLING_STRIDE1) && poolSizeXValue <= 3) ? vx_true_e : vx_false_e;
         vx_bool isStride2Support = ((stride == 2) && (stride == poolSizeXValue || stride == poolSizeXValue-1)) ? vx_true_e : vx_false_e;
+        vx_bool isPoolSizeSupport = (poolSizeXValue == 1 && !pool_pad_x_left && !pool_pad_y_top && TENSOR_VIEW_SIZE_INDEX(inputs, 0) % stride == 0 && TENSOR_VIEW_SIZE_INDEX(inputs, 1) % stride == 0) ? vx_true_e : vx_false_e;
 
         /* stride!=2 is not supported yet */
         if ((poolTypeValue == VX_NN_POOLING_MAX) &&
             isTpSupportFormat &&
             vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_MAX_POOLING) &&
-            (isStride1Support || isStride2Support) &&
+            (isStride1Support || isStride2Support || isPoolSizeSupport) &&
             (poolSizeXValue <= 64))
         {
             vx_op_param_s conv = {0};
