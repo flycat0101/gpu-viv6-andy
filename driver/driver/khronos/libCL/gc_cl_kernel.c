@@ -7248,7 +7248,10 @@ OnError:
         *ErrcodeRet = status;
     }
 
-    if(pointer) gcmOS_SAFE_FREE(gcvNULL, pointer);
+    if(pointer)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
+    }
 
     if (kernel)
     {

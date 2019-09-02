@@ -265,12 +265,21 @@ OnError:
             "OCL-006003: (clCreateProgramWithSource) cannot create program.  Maybe run out of memory.\n");
     }
 
-    if(sizes  != gcvNULL) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, sizes));
+    if(sizes != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, sizes);
+    }
 
     if(program != gcvNULL)
     {
-        if(source != gcvNULL) gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, source));
-        if(program->devices != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, program->devices);
+        if(source != gcvNULL)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, source);
+        }
+        if(program->devices != gcvNULL)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, program->devices);
+        }
         if(program->referenceCount) gcoOS_AtomDestroy(gcvNULL, program->referenceCount);
         gcmOS_SAFE_FREE(gcvNULL, program);
     }
