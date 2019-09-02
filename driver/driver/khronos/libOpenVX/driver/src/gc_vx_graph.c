@@ -4702,6 +4702,12 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitInputOutput(
         origOutputTensor = convOp->outputs;
     }
 
+    if ((origInputTensor == VX_NULL) || (origOutputTensor == VX_NULL))
+    {
+        vxError("%s[%d]: origInputTensor or origOutputTensor is NULL\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_ERROR_NO_MEMORY);
+    }
+
     origInputHeight = TENSOR_VIEW_SIZE_INDEX(origInputTensor, 1);
     origOutputHeight = TENSOR_VIEW_SIZE_INDEX(origOutputTensor, 1);
 
