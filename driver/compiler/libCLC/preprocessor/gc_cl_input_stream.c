@@ -751,14 +751,34 @@ ppoBYTE_INPUT_STREAM_GetToken(
                     ntoken->type =  ppvTokenType_ERROR;
 
                     ppmCheckFuncOk(ppoBYTE_INPUT_STREAM_GetChar(PP, bis, &c));
-
-                    while(ppoPREPROCESSOR_ishexnum(c) &&    ppoPREPROCESSOR_setnext(PP,c, cb, &cblen)==0)
+                    if (c == '#')
                     {
+                        /* for bug#24399, support 0x + ## */
+                        char c1;
+                        ppoPREPROCESSOR_setnext(PP, c, cb, &cblen);
+                        ppmCheckFuncOk(ppoBYTE_INPUT_STREAM_GetChar(PP, bis, &c1));
+                        if (c1 == '#')
+                        {
+                            ntoken->type = ppvTokenType_ID;
+                            ppoPREPROCESSOR_setnext(PP, c1, cb, &cblen);
+                            ppmCheckFuncOk(ppoBYTE_INPUT_STREAM_GetChar(PP, bis, &c));
+                            while(ppoPREPROCESSOR_isalnum_(c) && ppoPREPROCESSOR_setnext(PP,c, cb, &cblen)==0)
+                            {
+                                ppmCheckFuncOk(ppoBYTE_INPUT_STREAM_GetChar(PP, bis, &c));
+                            }
+                            ntoken->hideSet = gcvNULL;
+                        }
+                    }
+                    else
+                    {
+                        while(ppoPREPROCESSOR_ishexnum(c) &&    ppoPREPROCESSOR_setnext(PP,c, cb, &cblen)==0)
+                        {
 
-                        ntoken->type =  ppvTokenType_INT;
+                            ntoken->type =  ppvTokenType_INT;
 
-                        ppmCheckFuncOk(ppoBYTE_INPUT_STREAM_GetChar(PP, bis, &c));
+                            ppmCheckFuncOk(ppoBYTE_INPUT_STREAM_GetChar(PP, bis, &c));
 
+                        }
                     }
 
                 }/*Hex*/
