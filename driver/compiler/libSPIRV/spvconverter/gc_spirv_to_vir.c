@@ -11022,6 +11022,11 @@ VSC_ErrCode __SpvEmitName(gcSPV spv, VIR_Shader * virShader)
             gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_%s_%d", name, spv->operands[0]);
             VIR_Shader_AddString(virShader, spv->virName, &nameId);
         }
+        else if (gcoOS_StrLen(name, gcvNULL) > SPV_VIR_NAME_SIZE) /* if OpName is too long, skip original name and create a new temp */
+        {
+            gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#spv_%d", spv->operands[0]);
+            VIR_Shader_AddString(virShader, spv->virName, &nameId);
+        }
         else
         {
             VIR_Shader_AddString(virShader, name, &nameId);
