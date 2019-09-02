@@ -58,6 +58,9 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_MODULE         := libSPIRV_viv
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+ifeq ($(PLATFORM_VENDOR),1)
+LOCAL_VENDOR_MODULE  := true
+endif
 include $(BUILD_SHARED_LIBRARY)
 
 
@@ -70,6 +73,9 @@ LOCAL_MODULE         := libSPIRV_viv
 LOCAL_MODULE_SUFFIX  := .so
 LOCAL_MODULE_TAGS    := optional
 LOCAL_MODULE_CLASS   := SHARED_LIBRARIES
+ifeq ($(PLATFORM_VENDOR),1)
+LOCAL_VENDOR_MODULE  := true
+endif
 include $(BUILD_PREBUILT)
 
 endif

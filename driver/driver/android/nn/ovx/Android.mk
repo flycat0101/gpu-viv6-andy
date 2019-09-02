@@ -12,11 +12,12 @@
 
 
 LOCAL_PATH:= $(call my-dir)
+include $(LOCAL_PATH)/../../../../Android.mk.def
 include $(CLEAR_VARS)
 
-LOCAL_C_INCLUDES := $(LOCAL_PATH)/ovx_inc \
-                    $(LOCAL_PATH)/../../common/include/ \
-                    $(LOCAL_PATH)/../../runtime/include/    \
+LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../../../sdk/inc \
+                    frameworks/ml/nn/common/include/ \
+                    frameworks/ml/nn/runtime/include/    \
 
 LOCAL_SRC_FILES:= \
     OvxDevice.cpp   \
@@ -30,7 +31,6 @@ LOCAL_SHARED_LIBRARIES := \
     libhidlbase \
     libhidlmemory   \
     libhidltransport    \
-    libtextclassifier_hash  \
     liblog  \
     libutils    \
     android.hardware.neuralnetworks@1.0 \
@@ -55,8 +55,8 @@ LOCAL_MODULE      := android.hardware.neuralnetworks@1.0-service-ovx-driver
 
 endif
 
-ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 27),1)
-LOCAL_VENDOR_MODULE := true
+ifeq ($(PLATFORM_VENDOR),1)
+LOCAL_VENDOR_MODULE  := true
 endif
 
 LOCAL_CFLAGS += -DANDROID_SDK_VERSION=$(PLATFORM_SDK_VERSION)

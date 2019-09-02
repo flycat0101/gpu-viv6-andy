@@ -44,7 +44,9 @@ endif
 LOCAL_MODULE := libgpuhelper
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_TAGS    := optional
+ifeq ($(PLATFORM_VENDOR),1)
 LOCAL_VENDOR_MODULE  := true
+endif
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -86,7 +88,9 @@ endif
 LOCAL_MODULE := libgpuhelper
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_TAGS    := optional
+ifeq ($(PLATFORM_VENDOR),1)
 LOCAL_VENDOR_MODULE  := true
+endif
 
 include $(BUILD_SHARED_LIBRARY)
 endif

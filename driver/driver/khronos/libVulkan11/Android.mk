@@ -137,6 +137,9 @@ endif
 
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+ifeq ($(PLATFORM_VENDOR),1)
+LOCAL_VENDOR_MODULE  := true
+endif
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk

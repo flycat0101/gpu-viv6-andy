@@ -26,6 +26,9 @@ LOCAL_MODULE         := libCLC
 LOCAL_MODULE_SUFFIX  := .so
 LOCAL_MODULE_TAGS    := optional
 LOCAL_MODULE_CLASS   := SHARED_LIBRARIES
+ifeq ($(PLATFORM_VENDOR),1)
+LOCAL_VENDOR_MODULE  := true
+endif
 include $(BUILD_PREBUILT)
 
 include $(AQROOT)/copy_installed_module.mk
@@ -54,6 +57,9 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_MODULE         := libclCommon
 LOCAL_MODULE_TAGS    := optional
+ifeq ($(PLATFORM_VENDOR),1)
+LOCAL_VENDOR_MODULE  := true
+endif
 include $(BUILD_STATIC_LIBRARY)
 
 #
@@ -99,6 +105,9 @@ endif
 
 LOCAL_MODULE         := libclCompiler
 LOCAL_MODULE_TAGS    := optional
+ifeq ($(PLATFORM_VENDOR),1)
+LOCAL_VENDOR_MODULE  := true
+endif
 include $(BUILD_STATIC_LIBRARY)
 
 #
@@ -140,6 +149,9 @@ endif
 
 LOCAL_MODULE         := libclPreprocessor
 LOCAL_MODULE_TAGS    := optional
+ifeq ($(PLATFORM_VENDOR),1)
+LOCAL_VENDOR_MODULE  := true
+endif
 include $(BUILD_STATIC_LIBRARY)
 
 #
@@ -189,6 +201,9 @@ LOCAL_STATIC_LIBRARIES := \
 LOCAL_MODULE         := libCLC
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+ifeq ($(PLATFORM_VENDOR),1)
+LOCAL_VENDOR_MODULE  := true
+endif
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk

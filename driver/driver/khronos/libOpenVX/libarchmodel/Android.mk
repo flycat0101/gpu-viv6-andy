@@ -39,10 +39,9 @@ LOCAL_C_INCLUDES += \
 	system/core/libsync/include
 endif
 
-ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 27), 1)
-LOCAL_VENDOR_MODULE := true
-endif
-
 LOCAL_MODULE         := libarchmodel
 LOCAL_MODULE_TAGS    := optional
+ifeq ($(PLATFORM_VENDOR),1)
+LOCAL_VENDOR_MODULE  := true
+endif
 include $(BUILD_STATIC_LIBRARY)

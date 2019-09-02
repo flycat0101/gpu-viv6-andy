@@ -67,7 +67,9 @@ LOCAL_C_INCLUDES += \
     $(IMX_PATH)/imx/include
 
 LOCAL_MODULE         := libv_gralloc
+ifeq ($(PLATFORM_VENDOR),1)
 LOCAL_VENDOR_MODULE  := true
+endif
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_STATIC_LIBRARY)
