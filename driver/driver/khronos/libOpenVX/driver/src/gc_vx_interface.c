@@ -165,7 +165,7 @@ VX_PRIVATE_API vx_string vxoLoadSource(vx_char *filename, vx_size *programSize)
         programSource = (char*)malloc(sizeof(char)*(size + 1));
         if (programSource)
         {
-            if (fread(programSource, sizeof(char), *programSize, pFile) != *programSize)
+            if (fread(programSource, sizeof(char), size, pFile) != *programSize)
             {
                 goto OnError;
             }
@@ -13629,10 +13629,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxBaseKernelScalarOperation_Validator(vx_no
     ptr = metas[3];
     switch (stype3)
     {
-    case VX_TYPE_CHAR:
-        ptr->type = VX_TYPE_SCALAR;
-        ptr->u.scalarInfo.type = VX_TYPE_CHAR;
-        break;
     case VX_TYPE_INT8:
         ptr->type = VX_TYPE_SCALAR;
         ptr->u.scalarInfo.type = VX_TYPE_INT8;
@@ -13657,29 +13653,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxBaseKernelScalarOperation_Validator(vx_no
         ptr->type = VX_TYPE_SCALAR;
         ptr->u.scalarInfo.type = VX_TYPE_UINT32;
         break;
-    case VX_TYPE_INT64:
-        ptr->type = VX_TYPE_SCALAR;
-        ptr->u.scalarInfo.type = VX_TYPE_INT64;
-        break;
-    case VX_TYPE_UINT64:
-        ptr->type = VX_TYPE_SCALAR;
-        ptr->u.scalarInfo.type = VX_TYPE_UINT64;
-        break;
     case VX_TYPE_FLOAT32:
         ptr->type = VX_TYPE_SCALAR;
         ptr->u.scalarInfo.type = VX_TYPE_FLOAT32;
-        break;
-    case VX_TYPE_FLOAT64:
-        ptr->type = VX_TYPE_SCALAR;
-        ptr->u.scalarInfo.type = VX_TYPE_FLOAT64;
-        break;
-    case VX_TYPE_DF_IMAGE:
-        ptr->type = VX_TYPE_SCALAR;
-        ptr->u.scalarInfo.type = VX_TYPE_IMAGE;
-        break;
-    case VX_TYPE_ENUM:
-        ptr->type = VX_TYPE_SCALAR;
-        ptr->u.scalarInfo.type = VX_TYPE_ENUM;
         break;
     case VX_TYPE_SIZE:
         ptr->type = VX_TYPE_SCALAR;

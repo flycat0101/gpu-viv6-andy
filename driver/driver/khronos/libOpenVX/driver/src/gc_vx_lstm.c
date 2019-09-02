@@ -2423,7 +2423,7 @@ vx_status vxnneExecuteSW_LSTMUnit(struct _vxnne_operation_s *operation)
     vxnneLSTM_VectorBatchVectorAssign((vx_type_e)TENSOR_DATA_TYPE(cell_bias), input_format, cell_bias_base,
                 cell, TENSOR_POS(cell_bias), batch, (vx_uint8_ptr)scatch_cell_ptr, TENSOR_POS(scratch));
 
-        if (output_gate_bias)
+        if (forget_gate_bias)
     vxnneLSTM_VectorBatchVectorAssign((vx_type_e)TENSOR_DATA_TYPE(forget_gate_bias), input_format, forget_gate_bias_base,
                 cell, TENSOR_POS(forget_gate_bias), batch, (vx_uint8_ptr)scatch_forget_ptr, TENSOR_POS(scratch));
 
@@ -2981,7 +2981,7 @@ VX_PRIVATE_API vx_status vxoNNSWLSTM_StateOut(vxnne_operation operation)
     vxnneLSTM_VectorVectorCwiseProduct(scratch_format, scratch_format, scratch_format, (vx_uint8_ptr)scatch_output_ptr, (vx_uint8_ptr)scatch_cell_ptr, cell * batch, scratch_fpos, scratch_fpos, (vx_uint8_ptr)scatch_output_ptr, scratch_fpos);
 
     /* For each batch: update the projection and output_state_out.*/
-    if (enable_proj_weight)
+    if (enable_proj_weight && output)
     {
         if (enable_proj_bias)
             vxnneLSTM_VectorBatchVectorAssign((vx_type_e)TENSOR_DATA_TYPE(projection_bias), input_format, projection_bias_base,

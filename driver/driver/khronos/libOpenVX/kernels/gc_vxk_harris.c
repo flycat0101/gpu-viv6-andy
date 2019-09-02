@@ -32,6 +32,13 @@ vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image
             {    6, 4 * 4, {             1, 0, 0xffffffff, 0xfffffffe  }  }, /* x end */
         };
         gcoVX_Kernel_Context * kernelContext = gcvNULL;
+        status |= vxReadScalarValue(blocks, &block_size);
+        status |= vxReadScalarValue(sens, &k);
+        status |= vxReadScalarValue(grads, &grad);
+        if (grad == 0)
+        {
+            return VX_ERROR_INVALID_PARAMETERS;
+        }
 
 #if gcdVX_OPTIMIZER
         if (node && node->kernelContext)
@@ -51,9 +58,6 @@ vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image
             kernelContext->uniform_num = 0;
         }
 
-        status |= vxReadScalarValue(blocks, &block_size);
-        status |= vxReadScalarValue(sens, &k);
-        status |= vxReadScalarValue(grads, &grad);
 
         s = (1 / ((1 << (grad - 1)) * block_size * 255.0));
 

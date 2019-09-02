@@ -1991,6 +1991,12 @@ vx_status vxnneExecuteSWReshuffle(struct _vxnne_operation_s *operation)
     ky = WB_ORG_KERNEL_Y(weights_biases);
 
     padConstPtr = (void*)vxAllocateAndZeroMemory(sizeof(vx_int32));
+    if (padConstPtr == NULL)
+    {
+        status = VX_ERROR_NO_MEMORY;
+        vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+        return status;
+    }
 
     if (padConst != VX_NULL)
     {
@@ -3600,7 +3606,7 @@ vx_status vxnneExecuteSWConvertFormat(struct _vxnne_operation_s *operation)
     vxoTensor_GetTensorViewMemory(src, &srcLogical, VX_NULL);
     vxoTensor_GetTensorViewMemory(dst, &dstLogical, VX_NULL);
 
-    dstSize = (vx_uint32)vxoTensor_GetTensorSize(dst, 0);
+    vxoTensor_GetTensorSize(dst, &dstSize);
 
     memset(dstLogical,
            0,
@@ -5262,8 +5268,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionReluPoolingLayer2_Initializ
                                                          "ConvolutionReluPoolingLayer2",
                                                           inputs,
                                                           weights_biases,
-                                                          dilation_x_s->value->s,
-                                                          dilation_y_s->value->s,
+                                                          (dilation_x_s == NULL) ? 0 : dilation_x_s->value->s,
+                                                          (dilation_y_s == NULL) ? 0 : dilation_y_s->value->s,
                                                           pad_x_left_s->value->u32,
                                                           pad_x_right_s->value->u32,
                                                           pad_y_top_s->value->u32,
@@ -8579,6 +8585,17 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
             weightData = (vx_int8*)vxAllocate(poolSizeXValue * poolSizeYValue * inputsDepth * outputsDepth * weightItemSize);
             biasData = (vx_float32*)vxAllocate(outputsDepth * biasItemSize);
 
+            if (weightsValuePtr == NULL || zerosValuePtr == NULL || weightData == NULL || biasData == NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+                if (weightsValuePtr != VX_NULL) vxFree(weightsValuePtr);
+                if (zerosValuePtr != VX_NULL) vxFree(zerosValuePtr);
+                if (weightData != VX_NULL) vxFree(weightData);
+                if (biasData != VX_NULL) vxFree(biasData);
+                goto exit;
+            }
+
             weightItemCount = poolSizeXValue * poolSizeYValue;
 
             if (weightDataFormat == VX_TYPE_UINT8 && TENSOR_DATA_TYPE(outputs) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
@@ -8586,8 +8603,6 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                 vx_tensor_create_params_t  tensor_create_params;
                 vx_weights_biases_parameter_optimizations_t opt = {0};
                 vx_float32 scale = 1.0f / (vx_float32)(255 * weightItemCount);
-
-
 
                 opt.inputZeroPoint = TENSOR_TF_ZEROPOINT(inputs);
                 opt.zrl = -1;
@@ -8602,6 +8617,16 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                 tensor_create_params.quant_data.affine.zeroPoint = 0;
 
                 weights = vxoTensor_CreateTensor(context, node->graph, &tensor_create_params, vx_false_e);
+                if (weights == NULL)
+                {
+                    status = VX_ERROR_NO_MEMORY;
+                    vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+                    if (weightsValuePtr != VX_NULL) vxFree(weightsValuePtr);
+                    if (zerosValuePtr != VX_NULL) vxFree(zerosValuePtr);
+                    if (weightData != VX_NULL) vxFree(weightData);
+                    if (biasData != VX_NULL) vxFree(biasData);
+                    goto exit;
+                }
 
                 weightRoundingMode = TENSOR_ROUNDING_MODE(weights);
 
@@ -12251,6 +12276,15 @@ vx_status vxnneExecuteSWRPN(struct _vxnne_operation_s *operation)
     proposals       = (vx_float32_ptr)vxAllocateAndZeroMemory((proposal_count * 5) * sizeof(vx_float32)); /* 5: score,x1,y1,x2,y2 */
     roi_indices     = (vx_uint32_ptr)vxAllocateAndZeroMemory(post_nms_topn * sizeof(vx_uint32));
 
+    if (score_buffer == NULL || proposals == NULL || roi_indices == NULL)
+    {
+        vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+        if(score_buffer) vxFree(score_buffer);
+        if(proposals) vxFree(proposals);
+        if(roi_indices) vxFree(roi_indices);
+        return VX_ERROR_NO_MEMORY;
+    }
+
     input_stage = vx_true_e;
     output_stage = vx_true_e;
     vxnneGetTensorMemeory(score, (vx_ptr_ptr)&score_data, input_stage, vx_false_e);
@@ -15479,7 +15513,7 @@ VX_PRIVATE_API vx_status vxnneExecuteSWConv_Reshuffle(struct _vxnne_operation_s 
         }
     }
 
-    if (convOperation->create_wbp && (convOperation->weights_biaes == VX_NULL))
+    if (weights && convOperation->create_wbp && (convOperation->weights_biaes == VX_NULL))
     {
         convOperation->weights_biaes = _createWeightsBiasesParameterFromTensors(
                             vxGetContext((vx_reference)convOperation->weights),
