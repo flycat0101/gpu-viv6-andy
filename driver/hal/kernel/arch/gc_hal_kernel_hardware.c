@@ -12896,7 +12896,7 @@ _ResetGPU(
 
 #if gcdFPGA_BUILD
         /* Wait more time on FPGA for reset as lower frequency */
-        gcmkONERROR(gckOS_Delay(Os, 3));
+        gcmkONERROR(gckOS_Delay(Os, 10));
 #else
         /* Wait for reset. */
         gcmkONERROR(gckOS_Delay(Os, 1));
