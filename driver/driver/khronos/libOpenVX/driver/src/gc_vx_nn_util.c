@@ -1898,8 +1898,6 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateNNCommands(
     inputInfo.height         = input->height;
     inputInfo.depth          = TENSOR_VIEW_SIZE_INDEX(convOperation->inputs, 2);
 
-    vxmASSERT(convOperation->weights_biases->wb_base->hw_depth_wise || (WB_KERNEL_Z(convOperation->weights_biases) == inputInfo.depth));
-
     inputInfo.dataFormat     = TENSOR_DATA_TYPE(convOperation->inputs);
     inputInfo.roundingMode   = TENSOR_ROUNDING_MODE(convOperation->inputs);
     inputInfo.fixedPointPos  = TENSOR_POS(convOperation->inputs);
