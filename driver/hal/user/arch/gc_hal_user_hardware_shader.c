@@ -781,11 +781,6 @@ gcoHARDWARE_InvokeThreadWalkerCL(
 
                 if (groupCountX == 0)
                     usedGPUCount = restGroupCount;
-
-                for(i = 1; i < usedGPUCount; i++)
-                {
-                    eachGPUInfo[i].globalOffsetX = eachGPUInfo[i-1].workGroupCountX * Info->workGroupSizeX * eachGPUInfo[i].globalScaleX + eachGPUInfo[i-1].globalOffsetX;
-                }
             }
             break;
         case 1:
@@ -807,11 +802,6 @@ gcoHARDWARE_InvokeThreadWalkerCL(
 
                 if (groupCountY == 0)
                     usedGPUCount = restGroupCount;
-
-                for(i = 1; i < usedGPUCount; i++)
-                {
-                     eachGPUInfo[i].globalOffsetY = eachGPUInfo[i-1].workGroupCountY * Info->workGroupSizeY * eachGPUInfo[i].globalScaleY + eachGPUInfo[i-1].globalOffsetY;
-                }
             }
             break;
         case 2:
@@ -833,11 +823,6 @@ gcoHARDWARE_InvokeThreadWalkerCL(
 
                 if (groupCountZ == 0)
                     usedGPUCount = restGroupCount;
-
-                for(i = 1; i < usedGPUCount; i++)
-                {
-                     eachGPUInfo[i].globalOffsetZ = eachGPUInfo[i-1].workGroupCountZ * Info->workGroupSizeZ * eachGPUInfo[i].globalScaleZ + eachGPUInfo[i-1].globalOffsetZ;
-                }
             }
             break;
         default:

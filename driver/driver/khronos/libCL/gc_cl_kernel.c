@@ -801,6 +801,7 @@ clfLoadKernelArgValues(
     clsArgument_PTR       Arg,
     gctUINT               WorkDim,
     size_t                GlobalWorkOffset[3],
+    size_t                GlobalScale[3],
     size_t                GlobalWorkSize[3],
     size_t                LocalWorkSize[3],
     clsArgument_PTR       baseArg,
@@ -1892,6 +1893,65 @@ clfLoadKernelArgValues(
         for(i = 0; i < gpuCount; i++)
         {
             datas[i] = (gctINT *) eachGPUWorkGroupIDOffsets[i];
+        }
+
+       clmONERROR(clfSetUniformValueCombinedMode(Arg->uniform,
+                                      length,
+                                      datas,
+                                      gpuCount),
+                  CL_INVALID_VALUE);
+
+    }
+    else if(isUniformGlobalInvocationIdOffset(Arg->uniform))
+    {
+        gctUINT32 gpuCount,usedGpu;
+        gctUINT i = 0, maxDimIndex = 0;
+        gctUINT eachGPUWorkGroupSizes[gcdMAX_3DGPU_COUNT] = { 0 };
+        gctUINT eachGPUGlobalIDOffsets[gcdMAX_3DGPU_COUNT][3] = {{ 0 }};
+        gctUINT eachGPUGroupCount, restGroupCount;
+        gctINT *datas[gcdMAX_3DGPU_COUNT] = {gcvNULL};
+        gctUINT maxWorkGroupCount = GlobalWorkSize[0] / LocalWorkSize[0];
+
+        gcoCL_GetHWConfigGpuCount(&gpuCount);
+        usedGpu = gpuCount;
+
+        gcmASSERT(gpuCount > 1) ; /* We can assure it 's combined mode */
+
+        for(i = 1; i < WorkDim; i++)  /*The split method shoud match with gcoHardware_InvokThreadWalker  */
+        {
+            if(GlobalWorkSize[i] / LocalWorkSize[i] > maxWorkGroupCount)
+            {
+                maxWorkGroupCount = GlobalWorkSize[i] / LocalWorkSize[i];
+                maxDimIndex = i;
+            }
+        }
+
+        eachGPUGroupCount = maxWorkGroupCount / gpuCount;
+        restGroupCount = maxWorkGroupCount % gpuCount;
+
+        for(i = 0 ;i < gpuCount; i++)
+        {
+            eachGPUWorkGroupSizes[i] = eachGPUGroupCount;
+        }
+
+        for(i = 0 ;i <restGroupCount; i++)
+        {
+            eachGPUWorkGroupSizes[i]++;
+        }
+
+        if(eachGPUGroupCount == 0) usedGpu = restGroupCount;
+
+        eachGPUGlobalIDOffsets[0][maxDimIndex] = 0;
+
+        for(i = 1; i < usedGpu; i++)
+        {
+            eachGPUGlobalIDOffsets[i][maxDimIndex] = eachGPUWorkGroupSizes[i - 1]*LocalWorkSize[maxDimIndex]*GlobalScale[maxDimIndex] +  eachGPUGlobalIDOffsets[i-1][maxDimIndex];
+
+        }
+
+        for(i = 0; i < gpuCount; i++)
+        {
+            datas[i] = (gctINT *) eachGPUGlobalIDOffsets[i];
         }
 
        clmONERROR(clfSetUniformValueCombinedMode(Arg->uniform,
@@ -3059,6 +3119,7 @@ clfFlushKernelUniform(
     clsArgument_PTR     Args,
     gctUINT             WorkDim,
     size_t              GlobalWorkOffset[3],
+    size_t              GlobalScale[3],
     size_t              GlobalWorkSize[3],
     size_t              LocalWorkSize[3],
     clsPrivateBuffer_PTR *privateBufList
@@ -3079,6 +3140,7 @@ clfFlushKernelUniform(
                                                   &Args[i],
                                                   WorkDim,
                                                   GlobalWorkOffset,
+                                                  GlobalScale,
                                                   GlobalWorkSize,
                                                   LocalWorkSize,
                                                   &Args[0],
@@ -3159,6 +3221,7 @@ clfFlushKernelUniform(
                                                   &Args[i],
                                                   patchedWorkDim,
                                                   patchedGlobalWorkOffset,
+                                                  GlobalScale,
                                                   patchedGlobalWorkSize,
                                                   patchedLocalWorkSize,
                                                   &Args[0],
@@ -4287,6 +4350,64 @@ clfFlushVIRKernelResource(
                         1, gcvFALSE, Columns * 4, 0, (gctPOINTER) datas, gpuCount,gcvUNIFORMCVT_NONE, gcSHADER_TYPE_CL));
                 }
                 break;
+            case SHS_PRIV_CONSTANT_KIND_GLOBAL_INVOCATION_ID_OFFSET:
+                {
+                    gctUINT32 gpuCount,usedGpu;
+                    gctUINT i = 0, maxDimIndex = 0;
+                    gctUINT eachGPUGlobalIDOffsets[gcdMAX_3DGPU_COUNT][3] = {{ 0 }};
+                    gctUINT eachGPUWorkGroupSizes[gcdMAX_3DGPU_COUNT] = { 0};
+                    gctUINT eachGPUGroupCount, restGroupCount;
+                    gctINT *datas[gcdMAX_3DGPU_COUNT] = {gcvNULL};
+                    gctUINT maxWorkGroupCount = NDRangeKernel->globalWorkSize[0] / NDRangeKernel->localWorkSize[0];
+
+                    gcoCL_GetHWConfigGpuCount(&gpuCount);
+                    isCombinedMode = gcvTRUE;
+
+                    gcmASSERT(gpuCount > 1);  /*GLOBAL_ID_OFFSET only generated for CombinedMode*/
+                    usedGpu = gpuCount;
+
+                    for(i = 1; i < NDRangeKernel->workDim ; i++)  /*The split method shoud match with gcoHardware_InvokThreadWalker  */
+                    {
+                        if(NDRangeKernel->globalWorkSize[i] / NDRangeKernel->localWorkSize[i] > maxWorkGroupCount)
+                        {
+                            maxWorkGroupCount = NDRangeKernel->globalWorkSize[i] / NDRangeKernel->localWorkSize[i];
+                            maxDimIndex = i;
+                        }
+                    }
+
+                    eachGPUGroupCount = maxWorkGroupCount / gpuCount;
+                    restGroupCount = maxWorkGroupCount % gpuCount;
+
+                    for(i = 0 ;i < gpuCount; i++)
+                    {
+                        eachGPUWorkGroupSizes[i] = eachGPUGroupCount;
+                    }
+
+                    for(i = 0 ;i <restGroupCount; i++)
+                    {
+                        eachGPUWorkGroupSizes[i]++;
+                    }
+
+                    if(eachGPUGroupCount == 0) usedGpu = restGroupCount;
+
+                    eachGPUGlobalIDOffsets[0][maxDimIndex] = 0;
+
+                    for(i = 1; i < usedGpu; i++)
+                    {
+                        eachGPUGlobalIDOffsets[i][maxDimIndex] = eachGPUWorkGroupSizes[i - 1]*NDRangeKernel->localWorkSize[maxDimIndex]*NDRangeKernel->globalScale[maxDimIndex] +  eachGPUGlobalIDOffsets[i-1][maxDimIndex];
+
+                    }
+
+                    for(i = 0; i < gpuCount; i++)
+                    {
+                        datas[i] = (gctINT *) eachGPUGlobalIDOffsets[i];
+                    }
+
+                    Columns = 3;
+                    gcmONERROR(gcoSHADER_BindUniformCombinedMode(gcvNULL, hwConstRegAddr, hwConstRegNo, Columns, Rows,
+                        1, gcvFALSE, Columns * 4, 0, (gctPOINTER) datas, gpuCount,gcvUNIFORMCVT_NONE, gcSHADER_TYPE_CL));
+                }
+                break;
             case SHS_PRIV_CONSTANT_KIND_TEMP_REG_SPILL_MEM_ADDRESS:
                 {
                     gctUINT32 gpuCount, perGpuMemSize;
@@ -4445,6 +4566,7 @@ clfExecuteKernel(
                                      Args,
                                      WorkDim,
                                      GlobalWorkOffset,
+                                     GlobalScale,
                                      GlobalWorkSize,
                                      LocalWorkSize,
                                      privateBufList),
