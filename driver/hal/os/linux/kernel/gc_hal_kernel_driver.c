@@ -1088,7 +1088,6 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 #endif
 {
     int ret = -ENODEV;
-    int i = 0;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
     static u64 dma_mask = DMA_BIT_MASK(40);
 #else
