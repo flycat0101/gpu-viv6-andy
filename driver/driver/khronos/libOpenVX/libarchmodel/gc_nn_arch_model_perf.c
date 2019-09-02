@@ -500,9 +500,9 @@ vx_status showArchPerformance(
         );
 
     vxInfo("SrcBuf: %s\nDstBuf: %s\nKernelBuf: %s\n",
-            !perf->swTilingInfo.srcBuf ? "DDR" : "SRAM",
-            !perf->swTilingInfo.dstBuf ? "DDR" : "SRAM",
-            !perf->swTilingInfo.kernelBuf ? "DDR" : "SRAM");
+            !perf->swTilingInfo.srcBuf ? "DDR" : (perf->swTilingInfo.srcBuf == SW_TILING_FROM_AXI_SRAM) ? "AXI_SRAM" : "VIP_SRAM",
+            !perf->swTilingInfo.dstBuf ? "DDR" : (perf->swTilingInfo.dstBuf == SW_TILING_FROM_AXI_SRAM) ? "AXI_SRAM" : "VIP_SRAM",
+            !perf->swTilingInfo.kernelBuf ? "DDR" : (perf->swTilingInfo.kernelBuf == SW_TILING_FROM_AXI_SRAM) ? "AXI_SRAM" : "VIP_SRAM");
 
     if ((context->options.collectPerfType == COLLECT_PERF_ESTIMATE) || profileMode)
     {
@@ -3329,7 +3329,7 @@ VX_INTERNAL_API void calculateArchPerfFromTiling(
     vx_uint32 kernelXSize, kernelYSize, kernelZSize, poolingSize, poolingStride, strideX, strideY;
     vx_int32 inputDataSize, outputDataSize, xOffSet, yOffSet;
     vx_op_param conv_cmd = &op_command->parameter;
-    vx_bool axiSramOnlySWTiling = context->nnConfig.unifiedFeature.axiSramOnlySWTiling ? vx_true_e : vx_false_e;
+    /*vx_bool axiSramOnlySWTiling = context->nnConfig.unifiedFeature.axiSramOnlySWTiling ? vx_true_e : vx_false_e;*/
 
     kernelXSize = wb != VX_NULL && op_type != VXNNE_OPERATOR_RESHUFFLE ? WB_KERNEL_X(wb) : 1;
     kernelYSize = wb != VX_NULL && op_type != VXNNE_OPERATOR_RESHUFFLE ? WB_KERNEL_Y(wb) : 1;
@@ -3446,8 +3446,10 @@ VX_INTERNAL_API void calculateArchPerfFromTiling(
         }
     }
 
-    perf->swTilingInfo.srcBuf = input_tiling->sRAM ? (axiSramOnlySWTiling ? SW_TILING_FROM_AXI_SRAM : SW_TILING_FROM_VIP_SRAM) : SW_TILING_FROM_DDR;
-    perf->swTilingInfo.dstBuf = output_tiling->sRAM ? (axiSramOnlySWTiling ? SW_TILING_FROM_AXI_SRAM : SW_TILING_FROM_VIP_SRAM) : SW_TILING_FROM_DDR;
+    perf->swTilingInfo.srcBuf = (!input_tiling->sRAM) ? SW_TILING_FROM_DDR :
+                                (input_tiling->sRAM == VXNNE_MEM_POOL_TYPE_AXI_SRAM) ? SW_TILING_FROM_AXI_SRAM : SW_TILING_FROM_VIP_SRAM;
+    perf->swTilingInfo.dstBuf = (!output_tiling->sRAM) ? SW_TILING_FROM_DDR :
+                                (output_tiling->sRAM == VXNNE_MEM_POOL_TYPE_AXI_SRAM) ? SW_TILING_FROM_AXI_SRAM : SW_TILING_FROM_VIP_SRAM;
     perf->swTilingInfo.kernelBuf = (op_command->cmdInfo.kernelCacheMode == VXNNE_SRAM_CACHE_MODE_STREAM_CACHE) ? SW_TILING_FROM_VIP_SRAM : SW_TILING_FROM_DDR;
 
     perf->info.flush = op_command->cmdInfo.flush;
