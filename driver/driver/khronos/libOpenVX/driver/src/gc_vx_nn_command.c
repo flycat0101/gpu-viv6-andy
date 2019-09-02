@@ -4236,14 +4236,33 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     case TP_RESHUFFLE:
     case TP_TENSOR_COPY:
     case TP_TENSOR_COPY4CONCAT:
-        _SplitInputAndOutputForMultiTPCores(context,
-                                            input,
-                                            output,
-                                            parameter,
-                                            &splitCount,
-                                            &input_splits,
-                                            &output_splits
-                                            );
+        if ((vx_int32)parameter->pad_y_top == -1)
+        {
+            /*
+             * SWTiling subimage uses -1 of pad_y_top to
+             * make hardware just output pads if the whole
+             * subimage is in the padding area.
+             */
+            _calculateTPSplitSizeOffset(context,
+                                        input,
+                                        output,
+                                        parameter,
+                                        splitTypes[tpType],
+                                        &splitCount,
+                                        splitSizes,
+                                        splitOffsets);
+        }
+        else
+        {
+            _SplitInputAndOutputForMultiTPCores(context,
+                                                input,
+                                                output,
+                                                parameter,
+                                                &splitCount,
+                                                &input_splits,
+                                                &output_splits
+                                                );
+        }
         break;
 
     default:
@@ -4258,16 +4277,28 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     {
         case TP_RESHUFFLE:
         {
-            _fill_TP_RESHUFFLE_Command_EX(context,
-                                          input,
-                                          output,
-                                          parameter,
-                                          info_ptr,
-                                          splitCount,
-                                          input_splits,
-                                          output_splits,
-                                          sinfoArray
-                                          );
+            if ((vx_uint32)parameter->pad_y_top == -1)
+            {
+                /*
+                 * SWTiling subimage uses -1 of pad_y_top to
+                 * make hardware just output pads if the whole
+                 * subimage is in the padding area.
+                 */
+                FILL_TP_COMMAND(context, input, output, parameter, splitTypes[tpType], splitCount, splitSizes, splitOffsets, sinfoArray, info_ptr, TP_RESHUFFLE);
+            }
+            else
+            {
+                _fill_TP_RESHUFFLE_Command_EX(context,
+                                              input,
+                                              output,
+                                              parameter,
+                                              info_ptr,
+                                              splitCount,
+                                              input_splits,
+                                              output_splits,
+                                              sinfoArray
+                                              );
+            }
             break;
         }
 
