@@ -796,7 +796,7 @@ static VkBool32 deqp_vk_msaa_128bpp_02_match(
     void *createInfo
     )
 {
-    if (devCtx->database->CACHE128B256BPERLINE)
+    if (devCtx->msaa_64bpp)
     {
         return VK_FALSE;
     }
@@ -1020,7 +1020,7 @@ static VkBool32 deqp_vk_msaa_128bpp_03_match(
     void *createInfo
     )
 {
-    if (devCtx->database->CACHE128B256BPERLINE)
+    if (devCtx->msaa_64bpp)
     {
         return VK_FALSE;
     }

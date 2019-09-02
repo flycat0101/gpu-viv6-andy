@@ -6439,7 +6439,7 @@ VkResult halti5_helper_convertHwTxDesc(
         }
 
         if (img->formatInfo.bitsPerBlock == 64 && (img->createInfo.samples & VK_SAMPLE_COUNT_4_BIT) &&
-            !devCtx->database->CACHE128B256BPERLINE)
+            !devCtx->msaa_64bpp)
         {
             residentFormatInfo = &img->formatInfo;
             tmpResidentImgFormat = residentFormatInfo->residentImgFormat;
@@ -10840,7 +10840,7 @@ VkResult halti5_createImageView(
            && (formatFeatureFlags & VK_FORMAT_FEATURE_BLIT_DST_BIT)))
     {
         if (img->formatInfo.bitsPerBlock == 64 && (img->createInfo.samples & VK_SAMPLE_COUNT_4_BIT) &&
-            !devCtx->database->CACHE128B256BPERLINE)
+            !devCtx->msaa_64bpp)
         {
             residentImgFormat = img->formatInfo.residentImgFormat;
         }

@@ -1838,7 +1838,7 @@ VkResult __vki_AllocateTileStatus(
                 switch (img->formatInfo.residentImgFormat)
                 {
                 case __VK_FORMAT_A4R4G4B4_UNORM_PACK16:
-                    if (!devCtx->database->CACHE128B256BPERLINE)
+                    if (!devCtx->msaa_64bpp)
                     {
                         compressedFormat = 0x0;
                     }
@@ -2539,7 +2539,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
             __VK_ONERROR(VK_ERROR_FORMAT_NOT_SUPPORTED);
         }
         else if (img->formatInfo.bitsPerBlock == 64 && (img->createInfo.samples & VK_SAMPLE_COUNT_4_BIT) &&
-                 !devCtx->database->CACHE128B256BPERLINE)
+                 !devCtx->msaa_64bpp)
         {
             uint32_t fakedFormat = VK_FORMAT_UNDEFINED;
             switch (img->formatInfo.residentImgFormat)

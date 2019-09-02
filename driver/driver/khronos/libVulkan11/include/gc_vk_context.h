@@ -159,6 +159,7 @@ struct __vkDevContextRec
     __vkChipFuncTable *chipFuncs;
     void *chipPriv;
     struct __vkDevContextRec *pNext;
+    VkBool32  msaa_64bpp;
 };
 
 typedef struct __vkDebugCallbackEXTRec

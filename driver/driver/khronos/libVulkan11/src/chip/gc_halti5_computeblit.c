@@ -2504,7 +2504,6 @@ static uint32_t halti5_detect_blit_kind(
         __VK_ASSERT(VK_FALSE);
     }
     else if (srcRes->isImage && dstRes->isImage &&
-             srcBitsPerPixel >= 64 &&
              srcMsaa != dstMsaa)
     {
         __VK_ASSERT(srcBitsPerPixel == dstBitsPerPixel);

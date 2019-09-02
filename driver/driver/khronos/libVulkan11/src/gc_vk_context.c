@@ -348,6 +348,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
         devCtx->enabledFeatures.robustBufferAccess = VK_TRUE;
     }
 
+    if (devCtx->database->customerID != 0x4)
+    {
+        devCtx->msaa_64bpp = devCtx->database->CACHE128B256BPERLINE;
+    }
+
 #if __VK_RESOURCE_INFO
     __VK_ONERROR(gcoOS_AtomConstruct(gcvNULL, &devCtx->atom_id));
 #endif

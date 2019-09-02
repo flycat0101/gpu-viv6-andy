@@ -158,7 +158,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
         desc->formatInfo = __vk_GetVkFormatInfo((VkFormat) residentFormat);
 
         if (desc->sampleCount == 4 && desc->formatInfo->bitsPerBlock == 64 &&
-            !devCtx->database->CACHE128B256BPERLINE)
+            !devCtx->msaa_64bpp)
         {
             switch (desc->formatInfo->residentImgFormat)
             {

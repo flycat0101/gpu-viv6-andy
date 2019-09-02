@@ -2067,11 +2067,13 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
 
                 if (pSrcImage->formatInfo.compressed || pDstImage->formatInfo.compressed)
                 {
+                    VkBool32 rawCopy = pSrcImage->sampleInfo.product == pDstImage->sampleInfo.product;
+
                     __VK_ERR_BREAK(devCtx->chipFuncs->CopyImage(
                         commandBuffer,
                         pSrcRes,
                         pDstRes,
-                        VK_TRUE,
+                        rawCopy,
                         VK_FILTER_NEAREST,
                         VK_FALSE
                         ));
@@ -2608,7 +2610,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
     VkResult result = VK_SUCCESS;
 
     if (pSrcImg->formatInfo.bitsPerBlock == 128 &&
-        !devCtx->database->CACHE128B256BPERLINE)
+        !devCtx->msaa_64bpp)
     {
         if (devCtx->chipFuncs->tweakCopy(commandBuffer, srcImage, dstBuffer))
         {
