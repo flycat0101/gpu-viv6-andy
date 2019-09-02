@@ -2884,6 +2884,8 @@ IN OUT clsDECL *CandidateType
    }
 }
 
+#define _CONVERT_HALF_TO_FLOAT 0
+
 gctBOOL
 clsDECL_IsMatchingBuiltinArg(
 IN cloCOMPILER Compiler,
@@ -2892,7 +2894,10 @@ IN cloIR_EXPR Argument,
 IN OUT clsNAME **RefParamName
 )
 {
+#if _CONVERT_HALF_TO_FLOAT
   gceSTATUS status = gcvSTATUS_OK;
+  clsDECL refDecl[1];
+#endif
   clsDECL lDecl[1];
   clsDECL *paramDecl;
   clsDECL *rDecl;
@@ -2913,6 +2918,26 @@ IN OUT clsNAME **RefParamName
   }
   paramDecl = &ParamName->decl;
   rDecl = &Argument->decl;
+#if _CONVERT_HALF_TO_FLOAT
+  if (rDecl->dataType->elementType == clvTYPE_HALF &&
+      !clmDECL_IsPointerType(rDecl) && !clmDECL_IsArray(rDecl) &&
+      ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) {
+      gctINT resultType;
+      resultType = clGetVectorTerminalToken(clvTYPE_FLOAT,
+                                            clmDATA_TYPE_vectorSize_GET(rDecl->dataType));
+
+      if(resultType) {
+          status = cloCOMPILER_CreateDecl(Compiler,
+                                          resultType,
+                                          rDecl->dataType->u.generic,
+                                          rDecl->dataType->accessQualifier,
+                                          rDecl->dataType->addrSpaceQualifier,
+                                          refDecl);
+          if (gcmIS_ERROR(status)) return status;
+          rDecl = refDecl;
+      }
+  }
+#endif
   if(clmDECL_IsScalar(rDecl) &&
      (clmDECL_IsScalar(paramDecl) || !ParamName->u.variableInfo.builtinSpecific.s.hasGenType)) {
       ParamName->u.variableInfo.effectiveDecl = ParamName->decl;
