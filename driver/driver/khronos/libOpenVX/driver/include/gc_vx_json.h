@@ -149,14 +149,14 @@ VX_INTERNAL_API vxcJSON * vxoJson_CreateStringArray(const char **strings, int co
 
 /* Append item to the specified array/object. */
 VX_INTERNAL_API void vxoJson_AddItemToArray(vxcJSON *array, vxcJSON *item);
-VX_INTERNAL_API void vxoJson_AddItemToObject(vxcJSON *object, const char *string, vxcJSON *item);
+VX_INTERNAL_API vx_bool vxoJson_AddItemToObject(vxcJSON *object, const char *string, vxcJSON *item);
 /* Use this when string is definitely const (i.e. a literal, or as good as), and will definitely survive the vxcJson object.
  * WARNING: When this function was used, make sure to always check that (item->type & vxoJson_StringIsConst) is zero before
  * writing to `item->string` */
-VX_INTERNAL_API void vxoJson_AddItemToObjectCS(vxcJSON *object, const char *string, vxcJSON *item);
+VX_INTERNAL_API vx_bool vxoJson_AddItemToObjectCS(vxcJSON *object, const char *string, vxcJSON *item);
 /* Append reference to item to the specified array/object. Use this when you want to add an existing vxcJson to a new vxcJson, but don't want to corrupt your existing vxcJson. */
-VX_INTERNAL_API void vxoJson_AddItemReferenceToArray(vxcJSON *array, vxcJSON *item);
-VX_INTERNAL_API void vxoJson_AddItemReferenceToObject(vxcJSON *object, const char *string, vxcJSON *item);
+VX_INTERNAL_API vx_bool vxoJson_AddItemReferenceToArray(vxcJSON *array, vxcJSON *item);
+VX_INTERNAL_API vx_bool vxoJson_AddItemReferenceToObject(vxcJSON *object, const char *string, vxcJSON *item);
 
 /* Remove/Detatch items from Arrays/Objects. */
 VX_INTERNAL_API vxcJSON * vxoJson_DetachItemViaPointer(vxcJSON *parent, vxcJSON * const item);

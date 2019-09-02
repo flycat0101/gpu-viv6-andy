@@ -392,6 +392,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                     gcmFOOTER_ARG("%d", OP_ADD_SUB);
                     return OP_ADD_SUB;
                 }
+                break;
             case VX_TYPE_INT16:
             case VX_TYPE_UINT16:
                 if(TENSOR_DATA_TYPE(output) == VX_TYPE_UINT16 ||
@@ -402,6 +403,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                     gcmFOOTER_ARG("%d", OP_ADD_SUB);
                     return OP_ADD_SUB;
                 }
+                break;
             case VX_TYPE_INT8:
             case VX_TYPE_UINT8:
                 gcmFOOTER_ARG("%d", OP_ADD_SUB);
@@ -409,8 +411,6 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
             default:
                 break;
             }
-
-            nodeOpType = OP_ADD_SUB;
             break;
         }
     case  VX_KERNEL_NN_TENSOR_RESHPE:
@@ -1763,7 +1763,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeWithChildNodes(vx_node node)
     opType = vxoGraphOptimization_getKernelType(next);
     mergedNodes[0] = next;
     for (nodeCount = 1;
-        (nodeCount < MAX_MERGE_OPS) && (next != NULL);
+        (nodeCount < MAX_MERGE_OPS);
         nodeCount++)
     {
         /*check whether to finish*/
@@ -1776,13 +1776,13 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeWithChildNodes(vx_node node)
             }
         }
 
-        if((next->numChildren != 1) || (next->merged == vx_true_e) )
+        if((next->numChildren != 1))
             break;
 
         nodeIndex = next->childNodes[0];
         next = graph->nodeTable[nodeIndex];
 
-        if(next->numParents > 1)
+        if(next == NULL || next->numParents > 1 || (next->merged == vx_true_e))
             break;
 
         currNodeType = vxoGraphOptimization_getKernelType(next);

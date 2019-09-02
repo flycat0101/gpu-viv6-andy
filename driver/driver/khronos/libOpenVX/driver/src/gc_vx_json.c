@@ -853,7 +853,7 @@ VX_PRIVATE_API vx_bool print_string_ptr(const unsigned char * const input, print
             gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
-        strcpy((char*)output, "\"\"");
+        strncpy((char*)output, "\"\"", sizeof("\"\""));
 
         gcmFOOTER_ARG("%d", vx_true_e);
         return vx_true_e;
@@ -1164,11 +1164,6 @@ fail:
         hooks->deallocate(buffer->buffer);
     }
 
-    if (printed != NULL)
-    {
-        hooks->deallocate(printed);
-    }
-
     gcmFOOTER_NO();
     return NULL;
 }
@@ -1306,7 +1301,7 @@ VX_PRIVATE_API vx_bool print_value(const vxcJSON * const item, printbuffer * con
             {
                 return vx_false_e;
             }
-            strcpy((char*)output, "null");
+            strncpy((char*)output, "null", 5);
             return vx_true_e;
 
         case vxoJson_False:
@@ -1315,7 +1310,7 @@ VX_PRIVATE_API vx_bool print_value(const vxcJSON * const item, printbuffer * con
             {
                 return vx_false_e;
             }
-            strcpy((char*)output, "false");
+            strncpy((char*)output, "false",6);
             return vx_true_e;
 
         case vxoJson_True:
@@ -1324,7 +1319,7 @@ VX_PRIVATE_API vx_bool print_value(const vxcJSON * const item, printbuffer * con
             {
                 return vx_false_e;
             }
-            strcpy((char*)output, "true");
+            strncpy((char*)output, "true",5);
             return vx_true_e;
 
         case vxoJson_Number:
@@ -2002,35 +1997,35 @@ VX_PRIVATE_API vx_bool add_item_to_object(vxcJSON * const object, const char * c
     return add_item_to_array(object, item);
 }
 
-VX_INTERNAL_API void vxoJson_AddItemToObject(vxcJSON *object, const char *string, vxcJSON *item)
+VX_INTERNAL_API vx_bool vxoJson_AddItemToObject(vxcJSON *object, const char *string, vxcJSON *item)
 {
-    add_item_to_object(object, string, item, &global_hooks, vx_false_e);
+    return add_item_to_object(object, string, item, &global_hooks, vx_false_e);
 }
 
 /* Add an item to an object with constant string as key */
-VX_INTERNAL_API void vxoJson_AddItemToObjectCS(vxcJSON *object, const char *string, vxcJSON *item)
+VX_INTERNAL_API vx_bool vxoJson_AddItemToObjectCS(vxcJSON *object, const char *string, vxcJSON *item)
 {
-    add_item_to_object(object, string, item, &global_hooks, vx_true_e);
+    return add_item_to_object(object, string, item, &global_hooks, vx_true_e);
 }
 
-VX_INTERNAL_API void vxoJson_AddItemReferenceToArray(vxcJSON *array, vxcJSON *item)
+VX_INTERNAL_API vx_bool vxoJson_AddItemReferenceToArray(vxcJSON *array, vxcJSON *item)
 {
     if (array == NULL)
     {
-        return;
+        return vx_false_e;
     }
 
-    add_item_to_array(array, create_reference(item, &global_hooks));
+    return add_item_to_array(array, create_reference(item, &global_hooks));
 }
 
-VX_INTERNAL_API void vxoJson_AddItemReferenceToObject(vxcJSON *object, const char *string, vxcJSON *item)
+VX_INTERNAL_API vx_bool vxoJson_AddItemReferenceToObject(vxcJSON *object, const char *string, vxcJSON *item)
 {
     if ((object == NULL) || (string == NULL))
     {
-        return;
+        return vx_false_e;
     }
 
-    add_item_to_object(object, string, create_reference(item, &global_hooks), &global_hooks, vx_false_e);
+    return add_item_to_object(object, string, create_reference(item, &global_hooks), &global_hooks, vx_false_e);
 }
 
 VX_INTERNAL_API vxcJSON* vxoJson_AddNullToObject(vxcJSON * const object, const char * const name)
