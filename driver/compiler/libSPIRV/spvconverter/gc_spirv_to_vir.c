@@ -2683,6 +2683,15 @@ static VIR_SymId __SpvAddIdSymbol(
     SpvAttachmentDesc* attachmentDesc = gcvNULL;
     Spv_AttachmentFlag attachmentFlag = SPV_ATTACHMENTFLAG_NONE;
 
+    if (SPV_ID_TYPE(id) == SPV_ID_TYPE_SYMBOL)
+    {
+        return SPV_ID_VIR_SYM_ID(id);
+    }
+    else
+    {
+        gcmASSERT(SPV_ID_TYPE(id) == SPV_ID_TYPE_UNKNOW);
+    }
+
     /* Get the type id. */
     while (SPV_ID_TYPE_IS_POINTER(type))
     {
@@ -3009,7 +3018,6 @@ static VSC_ErrCode __SpvIDCopy(gcSPV spv, VIR_Shader * virShader, SpvId from, Sp
     VIR_Operand        *operand;
     SpvId               fromTypeId = 0;
     SpvIDType           fromIdType = SPV_ID_TYPE(from);
-    VIR_NameId          nameId = SPV_ID_VIR_NAME_ID(to);
     VIR_Symbol         *toVirSym;
     VIR_Symbol         *fromVirSym;
     VIR_TypeId          virTypeId;
@@ -3028,10 +3036,7 @@ static VSC_ErrCode __SpvIDCopy(gcSPV spv, VIR_Shader * virShader, SpvId from, Sp
     }
 
     /* Create the result variable. */
-    if (nameId == VIR_INVALID_ID)
-    {
-        __SpvAddIdSymbol(spv, virShader, gcvNULL, to, fromTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
-    }
+    __SpvAddIdSymbol(spv, virShader, gcvNULL, to, fromTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
 
     toVirSym = SPV_ID_VIR_SYM(to);
     virTypeId = SPV_ID_VIR_TYPE_ID(to);
@@ -6110,10 +6115,7 @@ VSC_ErrCode __SpvEmitIntrisicFunction(gcSPV spv, VIR_Shader * virShader)
         hasDest = gcvTRUE;
         if (!SPV_ID_TYPE_IS_VOID(spv->resultTypeId))
         {
-            if (SPV_ID_VIR_NAME_ID(spv->resultId) == VIR_INVALID_ID)
-            {
-                __SpvAddIdSymbol(spv, virShader, gcvNULL, spv->resultId, spv->resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
-            }
+            __SpvAddIdSymbol(spv, virShader, gcvNULL, spv->resultId, spv->resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
 
             dstVirSym = VIR_Shader_GetSymFromId(virShader, SPV_ID_VIR_SYM_ID(spv->resultId));
         }
@@ -6751,10 +6753,7 @@ SPV_2_VIR_INSTRUCTN;
     dstVirTypeId = SPV_ID_TYPE_VIR_TYPE_ID(resultTypeId); \
     dstVirType = SPV_ID_TYPE_VIR_TYPE(resultTypeId); \
     nameId = SPV_ID_VIR_NAME_ID(resultId); \
-    if (nameId == VIR_INVALID_ID) \
-        { \
-        __SpvAddIdSymbol(spv, virShader, gcvNULL, resultId, resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE); \
-        } \
+    __SpvAddIdSymbol(spv, virShader, gcvNULL, resultId, resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE); \
     virSymId = SPV_ID_VIR_SYM_ID(resultId); \
     dstVirSym = VIR_Shader_GetSymFromId(virShader, virSymId);
 
@@ -7689,10 +7688,7 @@ VSC_ErrCode __SpvEmitVectorExtractDynamic(gcSPV spv, VIR_Shader * virShader)
     VIR_OpCode          virOpcode;
 
     /* Create the result variable. */
-    if (SPV_ID_VIR_NAME_ID(resultId) == VIR_INVALID_ID)
-    {
-        __SpvAddIdSymbol(spv, virShader, gcvNULL, resultId, spv->resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
-    }
+    __SpvAddIdSymbol(spv, virShader, gcvNULL, resultId, spv->resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
 
     /* Get the dest symbol. */
     dstVirSym = SPV_ID_VIR_SYM(resultId);
@@ -7859,10 +7855,7 @@ VSC_ErrCode __SpvEmitVectorInsertDynamic(gcSPV spv, VIR_Shader * virShader)
     VIR_Enable          virEnable = VIR_ENABLE_X;
 
     /* Create the result variable. */
-    if (SPV_ID_VIR_NAME_ID(spv->resultId) == VIR_INVALID_ID)
-    {
-        __SpvAddIdSymbol(spv, virShader, gcvNULL, spv->resultId, spv->resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
-    }
+    __SpvAddIdSymbol(spv, virShader, gcvNULL, spv->resultId, spv->resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
 
     /* Get the dest symbol. */
     dstVirSym = SPV_ID_VIR_SYM(spv->resultId);
@@ -8976,7 +8969,6 @@ VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
     SpvId resultId = SPV_INVALID_ID;
     SpvId resultTypeId = SPV_INVALID_ID;
     SpvOp opCode = (SpvOp)spv->opCode;
-    VIR_NameId nameId;
     VIR_Symbol * dstVirSym = gcvNULL;
     VIR_Type *  dstVirType = gcvNULL;
     VIR_TypeId dstVirTypeId = VIR_TYPE_UNKNOWN;
@@ -9043,14 +9035,7 @@ VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
     /* If this instruction has dest, generate symbol if needed. */
     if (hasDest)
     {
-        nameId = SPV_ID_VIR_NAME_ID(resultId);
-        /* Check if we need to allocate a new symbol for this dest. */
-        if (nameId == VIR_INVALID_ID)
-        {
-            __SpvAddIdSymbol(spv, virShader, gcvNULL, resultId, resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
-        }
-
-        virSymId = SPV_ID_VIR_SYM_ID(resultId);
+        virSymId = __SpvAddIdSymbol(spv, virShader, gcvNULL, resultId, resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
         if (VIR_Id_isFunctionScope(virSymId))
         {
             dstVirSym = VIR_Function_GetSymFromId(spv->virFunction, virSymId);
@@ -9937,7 +9922,6 @@ VSC_ErrCode __SpvEmitArrayLength(gcSPV spv, VIR_Shader * virShader)
     VIR_OpCode virOpcode;
     SpvId resultId = SPV_INVALID_ID;
     SpvId resultTypeId = SPV_INVALID_ID;
-    VIR_NameId nameId;
     VIR_Symbol * dstVirSym = gcvNULL;
     VIR_Type *  dstVirType = gcvNULL;
     VIR_TypeId dstVirTypeId = VIR_TYPE_UNKNOWN;
@@ -9977,14 +9961,7 @@ VSC_ErrCode __SpvEmitArrayLength(gcSPV spv, VIR_Shader * virShader)
     /* If this instruction has dest, generate symbol if needed. */
     if (hasDest)
     {
-        nameId = SPV_ID_VIR_NAME_ID(resultId);
-        /* Check if we need to allocate a new symbol for this dest. */
-        if (nameId == VIR_INVALID_ID)
-        {
-            __SpvAddIdSymbol(spv, virShader, gcvNULL, resultId, resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
-        }
-
-        virSymId = SPV_ID_VIR_SYM_ID(resultId);
+        virSymId = __SpvAddIdSymbol(spv, virShader, gcvNULL, resultId, resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
         if (VIR_Id_isFunctionScope(virSymId))
         {
             dstVirSym = VIR_Function_GetSymFromId(spv->virFunction, virSymId);
@@ -10111,14 +10088,7 @@ VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
     /* If this instruction has dest, generate symbol if needed. */
     if (hasDest)
     {
-        nameId = SPV_ID_VIR_NAME_ID(resultId);
-        /* Check if we need to allocate a new symbol for this dest. */
-        if (nameId == VIR_INVALID_ID)
-        {
-            __SpvAddIdSymbol(spv, virShader, gcvNULL, resultId, resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
-        }
-
-        virSymId = SPV_ID_VIR_SYM_ID(resultId);
+        virSymId = __SpvAddIdSymbol(spv, virShader, gcvNULL, resultId, resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
         if (VIR_Id_isFunctionScope(virSymId))
         {
             dstVirSym = VIR_Function_GetSymFromId(spv->virFunction, virSymId);
@@ -10375,7 +10345,6 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
     SpvId resultId = SPV_INVALID_ID;
     SpvId resultTypeId = SPV_INVALID_ID;
     SpvOp opCode = (SpvOp)spv->opCode;
-    VIR_NameId nameId;
     VIR_Symbol * dstVirSym = gcvNULL;
     VIR_Type *  dstVirType = gcvNULL;
     VIR_TypeId dstVirTypeId = VIR_TYPE_UNKNOWN;
@@ -10455,14 +10424,7 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
     /* If this instruction has dest, generate symbol if needed. */
     if (hasDest)
     {
-        nameId = SPV_ID_VIR_NAME_ID(resultId);
-        /* Check if we need to allocate a new symbol for this dest. */
-        if (nameId == VIR_INVALID_ID)
-        {
-            __SpvAddIdSymbol(spv, virShader, gcvNULL, resultId, resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
-        }
-
-        virSymId = SPV_ID_VIR_SYM_ID(resultId);
+        virSymId = __SpvAddIdSymbol(spv, virShader, gcvNULL, resultId, resultTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
         if (VIR_Id_isFunctionScope(virSymId))
         {
             dstVirSym = VIR_Function_GetSymFromId(spv->virFunction, virSymId);
@@ -10622,7 +10584,6 @@ VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
     VIR_Symbol         *dstBlockSym = gcvNULL;
     VIR_Symbol         *srcBlockSym = gcvNULL;
     VIR_SymId           dstSymId = VIR_INVALID_ID;
-    VIR_NameId          nameId;
     VIR_Instruction    *virInst = gcvNULL;
     VIR_Operand        *operand = gcvNULL;
     VIR_Enable          virDstEnable = __SpvGenEnable(spv, VIR_Shader_GetTypeFromId(virShader, virDstTypeId), targetTypeId);
@@ -10666,13 +10627,7 @@ VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
     }
     else
     {
-        nameId = SPV_ID_VIR_NAME_ID(targetId);
-        /* Check if we need to allocate a new symbol for this dest. */
-        if (nameId == VIR_INVALID_ID)
-        {
-            __SpvAddIdSymbol(spv, virShader, gcvNULL, targetId, targetTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
-        }
-        dstSymId = SPV_ID_VIR_SYM_ID(targetId);
+        dstSymId = __SpvAddIdSymbol(spv, virShader, gcvNULL, targetId, targetTypeId, VIR_SYM_VARIABLE, VIR_STORAGE_GLOBAL, gcvFALSE);
     }
 
     /* Source is a memory address,
