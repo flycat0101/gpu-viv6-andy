@@ -35,6 +35,11 @@ extern vx_status vxnneOperation_AddReference(
     vxnne_operation_reference_e   refType
     );
 
+VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
+    vx_graph graph,
+    vx_size *size
+    );
+
 VX_PRIVATE_API vx_type_e vxoBinaryGraph_ConvertToOVXDataFormat(
     vx_uint32 format,
     vx_uint32 type
@@ -3841,6 +3846,10 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Write(
         gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, offset, gcvFILE_SEEK_SET);
         gcoOS_Write(gcvNULL, binarySave->binarySaveFile, size, data);
         gcoOS_Flush(gcvNULL, binarySave->binarySaveFile);
+        if ((offset + size) > binarySave->NBGFileSize)
+        {
+            binarySave->NBGFileSize = offset + size;
+        }
     }
 
     return VX_SUCCESS;
@@ -5033,6 +5042,12 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_unInitial(
     {
         vxFree((vx_ptr)binarySave->NNTPDataCmdPhysical);
         binarySave->NNTPDataCmdPhysical = VX_NULL;
+    }
+
+    if  ((0 == graph->binarySave->generateNBGToMemory) &&
+        (0 != graph->base.context->options.enableSaveBinary))
+    {
+        vxInfo("Actual NBG size : %d bytes\n", binarySave->NBGFileSize);
     }
 
     if (binarySave->binarySaveFile != VX_NULL)
@@ -7511,6 +7526,16 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
         gcmFOOTER_ARG("%d", VX_SUCCESS);
         return VX_SUCCESS;
     }
+
+    /* calculate size for online genereate NBG testing */
+    if ((0 == graph->binarySave->generateNBGToMemory) &&
+        (0 != graph->base.context->options.enableSaveBinary) &&
+        (0 == context->options.enableCacheBinaryGraph))
+    {
+        vxoBinaryGraph_GetNBGSize(graph, VX_NULL);
+    }
+
+    graph->binarySave->NBGFileSize = 0;
 
     /* create NBG file and allocate memory for binarySave */
     if (binarySave == VX_NULL)
@@ -10338,6 +10363,11 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
 
             ksDataSize = (vx_uint32)WB_MEM_SIZE_INDEX(weights_biases, 0);
             ksDataSize = gcmALIGN(ksDataSize, 64);
+            if (0 == ksDataSize)
+            {
+                vxError("fail to get NBG size, NN kernel stream size is 0\n");
+                vxmONERROR(VX_ERROR_INVALID_VALUE);
+            }
 
             KernelStreamSize += ksDataSize;
 
@@ -10654,14 +10684,11 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
     vx_uint32 outputCount = 0;
     vx_uint32 totalSize = 0;
 
-    /* 1. verify graph */
-    vxmONERROR(vxoBinaryGraph_VerifyGraph(graph));
-
-    /* 2. enrtance size */
+    /* 1. enrtance size */
     nbEntranceSize = sizeof(vx_binary_header_s) + sizeof(vx_binary_memory_pool_info_s) +
                      sizeof(vx_binary_axi_sram_info_s) + sizeof(vx_binary_entrance_info_s);
 
-    /* 3. input and output table size */
+    /* 2. input and output table size */
     if ((graph->inputCount == 0) || (graph->outputCount == 0))
     {
         vx_reference inputTableRef[VX_MAX_NN_INOUT_PARAM_COUNT];
@@ -10699,16 +10726,22 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
         vxmONERROR(VX_FAILURE);
     }
 
-    /* 4. layer size */
+    /* 3. layer size */
     layeSize = sizeof(vx_binary_layers_info_s) * graph->nodeCount;
 
-    /* 5. other sections size */
+    /* 4. other sections size */
     vxmONERROR(vxoBinaryGraph_GetSectionsSize(graph, &sectionsSize));
 
     totalSize = nbEntranceSize + nbIOSize + layeSize + sectionsSize;
 
-    *size = (vx_size)totalSize;
+    if (size != VX_NULL)
+    {
+        *size = (vx_size)totalSize;
+    }
 
+    graph->binarySave->NBGFileSize = totalSize;
+
+    vxInfo("Calculate NBG size : %d bytes\n", (vx_uint32)(totalSize));
 OnError:
     return status;
 }
@@ -10725,10 +10758,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GenerateNBG(
     vx_uint32 enableDumpNBG = 0;
     gctSTRING envctrl = gcvNULL;
 
-    graph->binarySave = (vx_binary_save)vxAllocateAndZeroMemory(sizeof(vx_binary_save_s));
-    if (VX_NULL == graph->binarySave)
+    if (((vx_int8_ptr)buffer + graph->binarySave->NBGFileSize) == VX_NULL)
     {
-        vxError("fail to allocate memory for binary save\n");
+        vxError("%s[%d]: buffer is not enough\n", __FUNCTION__, __LINE__);
         vxmONERROR(VX_FAILURE);
     }
 
@@ -10805,8 +10837,19 @@ VX_API_ENTRY vx_status VX_API_CALL vxGenerateNBG(vx_graph graph, void *buffer, v
 
     if (((buffer == VX_NULL) && (size != VX_NULL)) || (graph->verified == vx_false_e))
     {
+        /* 1. allocate memory for binarySave */
+        graph->binarySave = (vx_binary_save)vxAllocateAndZeroMemory(sizeof(vx_binary_save_s));
+        if (VX_NULL == graph->binarySave)
+        {
+            vxError("%s[%d]: fail to allocate memory for binary save\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_FAILURE);
+        }
+
+        /* 2. verify graph */
+        vxmONERROR(vxoBinaryGraph_VerifyGraph(graph));
+
+        /* 3. calculate NBG size */
         vxmONERROR(vxoBinaryGraph_GetNBGSize(graph, size));
-        vxInfo("Calculate NBG size : %d bytes\n", (vx_uint32)(*size));
     }
     else if (buffer != VX_NULL)
     {

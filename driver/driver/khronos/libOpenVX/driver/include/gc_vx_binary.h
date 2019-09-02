@@ -535,6 +535,7 @@ typedef struct _vx_binary_save_s
     vx_uint32                                generateNBGToMemory;
     vx_ptr                                   NBGBuffer;
     vx_uint32                                *NBGSize;
+    vx_uint32                                NBGFileSize;
 }
 vx_binary_save_s, *vx_binary_save;
 
