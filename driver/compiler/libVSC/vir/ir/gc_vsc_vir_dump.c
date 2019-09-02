@@ -2168,8 +2168,7 @@ _DumpOperand(
         )
     {
         /* dump precision info, mediump is default */
-        if (!VIR_Shader_IsCL(Dumper->Shader) &&
-            !VIR_Operand_isIntrinsic(Operand) &&
+        if (!VIR_Operand_isIntrinsic(Operand) &&
             !VIR_Operand_isParameters(Operand))
         {
             VERIFY_OK(

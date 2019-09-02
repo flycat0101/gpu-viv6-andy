@@ -5504,6 +5504,34 @@ _GetBaseTypeOrFieldSymbol(
     return type;
 }
 
+gctINT
+VIR_Type_GetComponentTypeByteSize(
+    IN  VIR_Shader *    Shader,
+    IN  VIR_Type *      Type
+    )
+{
+    gctINT              size = -1;
+
+    if (VIR_Type_isPrimitive(Type))
+    {
+        size = VIR_GetTypeSize(VIR_GetTypeComponentType(VIR_Type_GetIndex(Type)));
+    }
+    else if (VIR_Type_isArray(Type))
+    {
+        while (VIR_Type_isArray(Type))
+        {
+            Type = VIR_Shader_GetTypeFromId(Shader, VIR_Type_GetBaseTypeId(Type));
+        }
+
+        if (VIR_Type_isPrimitive(Type))
+        {
+            size = VIR_GetTypeSize(VIR_GetTypeComponentType(VIR_Type_GetIndex(Type)));
+        }
+    }
+
+    return size;
+}
+
 gctUINT
 VIR_Type_GetTypeByteSize(
     IN  VIR_Shader *    Shader,

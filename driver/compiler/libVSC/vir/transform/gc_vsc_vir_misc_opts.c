@@ -5189,7 +5189,8 @@ vscVIR_ConvertVirtualInstructions(
 
 static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* operand)
 {
-    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    gctBOOL             bIsOCL = VIR_Shader_IsCL(shader);
 
     gcmASSERT(operand);
 
@@ -5197,6 +5198,7 @@ static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* op
     {
         return errCode;
     }
+
     switch(VIR_Operand_GetOpKind(operand))
     {
         case VIR_OPND_SYMBOL:
@@ -5207,8 +5209,20 @@ static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* op
         {
             VIR_Symbol* sym = VIR_Operand_GetSymbol(operand);
 
-            gcmASSERT(VIR_Operand_GetPrecision(operand) != VIR_PRECISION_DEFAULT
-                                 || VIR_Shader_IsCL(shader));
+            if (bIsOCL)
+            {
+                gctINT componentSize = VIR_Type_GetComponentTypeByteSize(shader,
+                                                                         VIR_Shader_GetTypeFromId(shader, VIR_Operand_GetTypeId(operand)));
+
+                if (VIR_Operand_GetPrecision(operand) == VIR_PRECISION_DEFAULT && componentSize >= 4)
+                {
+                    VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
+                }
+
+                break;
+            }
+
+            gcmASSERT(VIR_Operand_GetPrecision(operand) != VIR_PRECISION_DEFAULT || bIsOCL);
             if (!(VIR_Symbol_isSampler(sym) &&
                   gcoOS_StrCmp(VIR_Shader_GetSymNameString(shader, sym), "#BaseSamplerSym") == gcvSTATUS_OK))
             {
@@ -5216,7 +5230,7 @@ static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* op
                 {
                     gcmASSERT((VIR_Symbol_GetCurrPrecision(sym) != VIR_PRECISION_ANY &&
                                VIR_Symbol_GetCurrPrecision(sym) != VIR_PRECISION_DEFAULT)
-                              || VIR_Shader_IsCL(shader));
+                              || bIsOCL);
 
                     VIR_Operand_SetPrecision(operand, VIR_Symbol_GetCurrPrecision(sym));
                 }
@@ -5224,7 +5238,7 @@ static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* op
                 {
                     gcmASSERT(VIR_Symbol_GetPrecision(sym) == VIR_Operand_GetPrecision(operand) ||
                               VIR_Symbol_GetPrecision(sym) == VIR_PRECISION_ANY
-                              || VIR_Shader_IsCL(shader));
+                              || bIsOCL);
 
                 }
             }
@@ -5260,6 +5274,19 @@ static VSC_ErrCode vscVIR_PrecisionUpdateSrc(VIR_Shader* shader, VIR_Operand* op
         case VIR_OPND_IMMEDIATE:
         case VIR_OPND_CONST:
         case VIR_OPND_ADDRESS_OF:
+            if (bIsOCL)
+            {
+                gctINT componentSize = VIR_Type_GetComponentTypeByteSize(shader,
+                                                                         VIR_Shader_GetTypeFromId(shader, VIR_Operand_GetTypeId(operand)));
+
+                if (VIR_Operand_GetPrecision(operand) == VIR_PRECISION_DEFAULT && componentSize >= 4)
+                {
+                    VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
+                }
+
+                break;
+            }
+
             gcmASSERT(VIR_Operand_GetPrecision(operand) == VIR_PRECISION_HIGH);
             break;
         case VIR_OPND_NAME:
@@ -5282,11 +5309,23 @@ static VSC_ErrCode vscVIR_PrecisionUpdateDst(VIR_Instruction* inst)
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_Operand* dst = VIR_Inst_GetDest(inst);
     VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
+    VIR_Shader* pShader = VIR_Inst_GetShader(inst);
+    gctBOOL bIsOCL = VIR_Shader_IsCL(pShader);
 
     if(VIR_OPCODE_ExpectedResultPrecision(opcode))
     {
-        gcmASSERT(VIR_Operand_GetPrecision(dst) != VIR_PRECISION_DEFAULT
-            || VIR_Shader_IsCL(VIR_Inst_GetShader(inst)));
+        gcmASSERT(VIR_Operand_GetPrecision(dst) != VIR_PRECISION_DEFAULT || bIsOCL);
+
+        if (bIsOCL)
+        {
+            gctINT componentSize = VIR_Type_GetComponentTypeByteSize(pShader,
+                                                                     VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(dst)));
+
+            if (VIR_Operand_GetPrecision(dst) == VIR_PRECISION_DEFAULT && componentSize >= 4)
+            {
+                VIR_Operand_SetPrecision(dst, VIR_PRECISION_HIGH);
+            }
+        }
 
         if(VIR_Operand_GetPrecision(dst) == VIR_PRECISION_ANY)
         {
@@ -5312,11 +5351,11 @@ static VSC_ErrCode vscVIR_PrecisionUpdateDst(VIR_Instruction* inst)
 
 static VSC_ErrCode _PrecisionUpdate(VIR_Shader* pShader, VIR_Dumper* dumper)
 {
-    VSC_ErrCode errCode = VSC_ERR_NONE;
-    VIR_FuncIterator func_iter;
-    VIR_FunctionNode* func_node;
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_FuncIterator    func_iter;
+    VIR_FunctionNode*   func_node;
 
-    if(!VIR_Shader_IsFS(pShader) ||
+    if (!(VIR_Shader_IsFS(pShader) || VIR_Shader_IsCL(pShader)) ||
         VIR_Shader_IsVulkan(pShader) ||
         VIR_Shader_IsDesktopGL(pShader))
     {
@@ -6702,13 +6741,11 @@ DEF_SH_NECESSITY_CHECK(VIR_Shader_CheckDual16able)
     VSC_COMPILER_CONFIG     *compCfg = &pPassWorker->pCompilerParam->cfg;
     VIR_Shader              *Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
 
-    VIR_Shader_SetDual16Mode(Shader, gcvFALSE);
-
     /* only fragment shader can be dual16 shader,
     ** and exclude OpenVG shader due to precision issue
     */
     if (!compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportDual16 ||
-        (VIR_Shader_GetKind(Shader) != VIR_SHADER_FRAGMENT)       ||
+        (!VIR_Shader_IsFS(Shader) && !VIR_Shader_IsCL(Shader))    ||
         VIR_Shader_IsDesktopGL(Shader)                            ||
         VIR_Shader_IsVulkan(Shader)                               ||
         VIR_Shader_IsOpenVG(Shader)                               ||
@@ -6821,6 +6858,11 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
     gctBOOL                 isAppConformance = (compCfg->ctx.appNameId == gcvPATCH_GTFES30 || compCfg->ctx.appNameId == gcvPATCH_DEQP);
     VSC_HW_CONFIG*          pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     gctBOOL                 bHasOneConstFix = pHwCfg->hwFeatureFlags.noOneConstLimit;
+    gctSTRING               runKernelName = VSC_OPTN_DUAL16Options_GetKernelName(options);
+    gctUINT                 strlen = (runKernelName != gcvNULL) ? gcoOS_StrLen(runKernelName, gcvNULL) : 0;
+    VIR_NameId              nameId = VIR_Shader_GetKernelNameId(Shader);
+
+    VIR_Shader_SetDual16Mode(Shader, gcvFALSE);
 
     if (dual16Mode == DUAL16_AUTO_BENCH)
     {
@@ -6837,6 +6879,31 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
         case gcvPATCH_ANGRYBIRDS:
             break;
         default:
+            return errCode;
+        }
+    }
+
+    /* support triangle test for dual16 */
+    if(!VSC_OPTN_InRange(VIR_Shader_GetId(Shader), VSC_OPTN_DUAL16Options_BeforeShader(options), VSC_OPTN_DUAL16Options_AfterShader(options)))
+    {
+        if(VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
+        {
+            VIR_Dumper* dumper = pPassWorker->basePassWorker.pDumper;
+            VIR_LOG(dumper, "dual16 skip shader(%d) NOT in option (as %d bs %d)\n", VIR_Shader_GetId(Shader),
+                    VSC_OPTN_DUAL16Options_AfterShader(options), VSC_OPTN_DUAL16Options_BeforeShader(options));
+            VIR_LOG_FLUSH(dumper);
+        }
+        return errCode;
+    }
+
+    /* check kernel name if option controlled */
+    if (nameId != VIR_INVALID_ID && runKernelName != gcvNULL)
+    {
+        gctSTRING funcName = VIR_Shader_GetStringFromId(Shader, VIR_Shader_GetKernelNameId(Shader));
+
+        if (!((gcoOS_StrLen(funcName, gcvNULL) == strlen) &&
+              gcmIS_SUCCESS(gcoOS_StrNCmp(funcName, runKernelName, strlen))))
+        {
             return errCode;
         }
     }
@@ -6939,6 +7006,26 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                 {
                     VIR_LOG(dumper, "inst not supported by dual16.\n", i);
                     VIR_LOG_FLUSH(dumper);
+                }
+                if (!dual16NotSupported && !needRunSingleT)
+                {
+                    if (VIR_Inst_GetOpcode(pInst) == (VIR_OpCode)VSC_OPTN_DUAL16Options_GetSkipOpcode(options))
+                    {
+                        needRunSingleT = gcvTRUE;
+                        if (VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
+                        {
+                            VIR_LOG(dumper, "inst not run dual16 because option (skipopcode:%d).\n", VSC_OPTN_DUAL16Options_GetSkipOpcode(options));
+                        }
+                    }
+                    else if (!VSC_OPTN_InRange(VIR_Inst_GetId(pInst), VSC_OPTN_DUAL16Options_GetBeforeInst(options), VSC_OPTN_DUAL16Options_GetAfterInst(options)))
+                    {
+                        needRunSingleT = gcvTRUE;
+                        if (VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
+                        {
+                            VIR_LOG(dumper, "inst (%d) not run dual16 because not in the range of option (al %d, bl %d).\n", VIR_Inst_GetId(pInst),
+                                    VSC_OPTN_DUAL16Options_GetAfterInst(options), VSC_OPTN_DUAL16Options_GetBeforeInst(options));
+                        }
+                    }
                 }
                 gcmASSERT(VIR_OP_MAXOPCODE > opcode);
                 codeInfo.codeCounter[(gctINT)opcode]++;
