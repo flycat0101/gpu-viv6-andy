@@ -3119,7 +3119,6 @@ static VSC_ErrCode _RemoveRedundantExpressions(VIR_VECTORIZER_INFO* pVectorizerI
     gctUINT                    firstRegNo, firstSeedRegNo, regNoRange, seedRegNoRange;
     gctUINT                    i;
     VIR_Swizzle                channelSwizzle, origSwizzle, currentSwizzle, newSwizzle;
-    VIR_Swizzle*               pOrigSwizzle;
     VIR_GENERAL_DU_ITERATOR    duIter;
     VIR_USAGE*                 pUsage;
     VIR_Instruction*           pUsageInst;
@@ -3205,12 +3204,7 @@ static VSC_ErrCode _RemoveRedundantExpressions(VIR_VECTORIZER_INFO* pVectorizerI
             ** in this situation, we need to use the pre-process swizzle to do the swizzle checking/mapping,
             ** otherwise we may mess up the swizzle.
             */
-            pOrigSwizzle=gcvNULL;
-            if (vscHTBL_DirectTestAndGet(pVectorizerInfo->pRedundantExpressionHashTable, (void *)pUsageOpnd, (void **)&pOrigSwizzle))
-            {
-                origSwizzle=(VIR_Swizzle)(gctUINT32)(pOrigSwizzle);
-            }
-            else
+            if (!vscHTBL_DirectTestAndGet(pVectorizerInfo->pRedundantExpressionHashTable, (void *)pUsageOpnd, (void **)&origSwizzle))
             {
                 origSwizzle = VIR_Operand_GetSwizzle(pUsageOpnd);
                 vscHTBL_DirectSet(pVectorizerInfo->pRedundantExpressionHashTable, (void *)pUsageOpnd, (void *)(gctUINTPTR_T)origSwizzle);
