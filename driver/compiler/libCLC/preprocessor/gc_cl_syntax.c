@@ -142,6 +142,30 @@ ppoPREPROCESSOR_Group(ppoPREPROCESSOR PP,
 
     do
     {
+        if (IfSectionType == ppvIFSECTION_INCLUDE)
+        {
+            gcmONERROR(
+                PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace)
+                );
+
+            if(ntoken->type == ppvTokenType_EOF)
+            {
+                gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+                gcmFOOTER();
+                return status;
+            }
+            else
+            {
+                gcmONERROR(
+                    ppoINPUT_STREAM_UnGetToken(PP, &PP->inputStream, ntoken)
+                    );
+
+                gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+                ntoken = gcvNULL;
+
+            }
+        }
+
         gcmONERROR(ppoPREPROCESSOR_PassEmptyLine(PP));
 
         gcmONERROR(
@@ -1890,7 +1914,7 @@ ppoPREPROCESSOR_ReadHeaderFile(
     gcmVERIFY_OK(gcoOS_GetPos(Os, file, &count));
 
     source = gcvNULL;
-    gcmONERROR(cloCOMPILER_Allocate(PP->compiler, count + 1, (gctPOINTER *) &source));
+    gcmONERROR(cloCOMPILER_Allocate(PP->compiler, count + 2, (gctPOINTER *) &source));
 
     if (!gcmIS_SUCCESS(status))
     {
@@ -1919,8 +1943,9 @@ ppoPREPROCESSOR_ReadHeaderFile(
         return gcvFALSE;
     }
 
-    source[count] = '\0';
-    *SourceSize = count;
+    source[count] = ppvCHAR_EOF;
+    source[count+1] = '\0';
+    *SourceSize = count + 1;
     *Source = source;
 
 OnError:
@@ -2002,7 +2027,7 @@ ppoPREPROCESSOR_Include(ppoPREPROCESSOR PP)
         tmpbis->base.node.next = (void*)gcvNULL;
         tmp_is->base.node.next = (void*)tmpbis;
     }
-    status = ppoPREPROCESSOR_Group(PP, ppvIFSECTION_NONE);
+    status = ppoPREPROCESSOR_Group(PP, ppvIFSECTION_INCLUDE);
 
 OnError:
     if (ntoken1 != gcvNULL)

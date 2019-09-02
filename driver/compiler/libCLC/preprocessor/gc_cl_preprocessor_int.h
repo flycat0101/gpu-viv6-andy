@@ -107,7 +107,8 @@ typedef enum _ppeIFSECTION_TYPE
     ppvIFSECTION_IF         = 1,
     ppvIFSECTION_ELSE       = 2,
     ppvIFSECTION_ELIF       = 3,
-    ppvIFSECTION_ENDIF      = 4
+    ppvIFSECTION_ENDIF      = 4,
+    ppvIFSECTION_INCLUDE    = 5
 }ppeIFSECTION_TYPE;
 
 /******************************************************************************\
