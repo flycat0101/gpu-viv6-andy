@@ -87,8 +87,6 @@ static struct _gcsPLATFORM_OPERATIONS default_ops =
 #define MAX_PCIE_DEVICE 4
 #define MAX_PCIE_BAR    6
 
-#define DEFAULT_AXI_SRAM_SIZE 0x400000
-
 typedef struct _gcsBARINFO
 {
     gctPHYS_ADDR_T base;
@@ -284,10 +282,10 @@ _GetGPUPhysical(
     gctPHYS_ADDR_T sram_gpu_base = pcie_platform->pcie_info[0].sram_gpu_bases[0];
     uint32_t sram_size = pcie_platform->pcie_info[0].sram_sizes[0];
 
-    if (!sram_size)
+    /* TODO: We should always set axi sram size by insmod parameters, never from feature database. */
+    if (!sram_size && Platform->dev && Platform->dev->extSRAMSizes[0])
     {
-        /* TODO: We should always set axi sram size by insmod parameters. */
-        sram_size = DEFAULT_AXI_SRAM_SIZE;
+        sram_size = Platform->dev->extSRAMSizes[0];
     }
 
     if (sram_base != gcvINVALID_PHYSICAL_ADDRESS && sram_gpu_base != gcvINVALID_PHYSICAL_ADDRESS && sram_size)

@@ -293,6 +293,9 @@ struct _gcsPLATFORM
     const char *name;
     gcsPLATFORM_OPERATIONS* ops;
 
+    /* TODO: Remove AXI-SRAM size from feature database. */
+    gckDEVICE dev;
+
     /* PLATFORM specific flags */
     gctUINT32  flagBits;
 

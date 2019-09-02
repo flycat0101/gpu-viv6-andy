@@ -1503,6 +1503,8 @@ gckGALDEVICE_Construct(
     memset(device, 0, sizeof(struct _gckGALDEVICE));
 
     device->platform = Platform;
+    device->platform->dev = gcvNULL;
+
     device->args = *Args;
 
     /* Clear irq lines. */
@@ -1595,6 +1597,8 @@ gckGALDEVICE_Construct(
 
     /* Construct the gckDEVICE object for os independent core management. */
     gcmkONERROR(gckDEVICE_Construct(device->os, &device->device));
+
+    device->platform->dev = device->device;
 
     if (device->irqLines[gcvCORE_MAJOR] != -1)
     {
