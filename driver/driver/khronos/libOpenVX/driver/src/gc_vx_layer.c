@@ -57,16 +57,19 @@ vx_char* loadSources(const vx_char *filename, vx_size *programSize)
     if (pFile != NULL && programSize)
     {
         vx_size size = 0;
+        vx_int32 fileSz = 0;
         /* obtain file size:*/
         if (-1 == fseek(pFile, 0, SEEK_END))
         {
             goto OnError;
         }
-        size = ftell(pFile);
-        if (-1 == size)
+        fileSz = ftell(pFile);
+        if (-1 == fileSz)
         {
            goto OnError;
         }
+
+        size = (vx_size)fileSz;
 
         rewind(pFile);
 
