@@ -4104,7 +4104,7 @@ VX_INTERNAL_API vx_status vxoGraph_AllocateContiguousMemory(vx_graph graph)
         {
             gcoOS_ZeroMemory(*context->Logical, SumTotalKernelBufferSize);
             context->CurrentContigousSize = SumTotalKernelBufferSize;
-            gcoOS_CPUPhysicalToGPUPhysical(CpuPhysicalAddr, &GpuPhysicalAddr);
+            gcoOS_CPUPhysicalToGPUPhysical((gctPHYS_ADDR_T)CpuPhysicalAddr, (gctPHYS_ADDR_T *)&GpuPhysicalAddr);
             gcmVERIFY_OK(gcoVX_SetRemapAddress((vx_uint32)GpuPhysicalAddr, (vx_uint32)GpuPhysicalAddr + SumTotalKernelBufferSize, gcvVX_OCB_REMAP));
 
             break;
