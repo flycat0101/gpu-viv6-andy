@@ -2127,7 +2127,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM_padTensor(vx_ten
     vxoTensor_GetTensorSize(*orgTensor, &orgTensorSize);
     tensorData      = vxAllocateAndZeroMemory(orgTensorSize);
 
-    vxoTensor_GetTensorSize(*orgTensor, &padTensorSize);
+    vxoTensor_GetTensorSize(*padTensor, &padTensorSize);
     padTensorData   = vxAllocateAndZeroMemory(padTensorSize);
 
     /* firstly, set pad value to all of the new memory, and then copy the valid data into it*/
