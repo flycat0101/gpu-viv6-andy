@@ -1643,12 +1643,6 @@ typedef struct _gcOPTIMIZER_OPTION
      */
     gctBOOL     CLUseVIRCodeGen;
 
-    /* CLC use new preprocessor:
-     *
-     *   VC_OPTION=-USECLNEWPP:0|1
-    */
-    gctBOOL    UseCLNewPP;
-
     /* Enable register pack in old compiler:
 
         VC_OPTION=-PACKREG:0|1
@@ -1771,7 +1765,6 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_VIRCGStart()         (gcmGetOptimizerOption()->_vircgStart)
 #define gcmOPT_VIRCGEnd()           (gcmGetOptimizerOption()->_vircgEnd)
 #define gcmOPT_CLUseVIRCodeGen()    (gcmGetOptimizerOption()->CLUseVIRCodeGen)
-#define gcmOPT_UseCLNewPreprocessor() (gcmGetOptimizerOption()->UseCLNewPP)
 #define gcmOPT_DriverVIRPath()      (gcmGetOptimizerOption()->DriverVIRPath)
 #define gcmOPT_CreateDefaultUBO()   (gcmGetOptimizerOption()->createDefaultUBO)
 #define gcmOPT_PatchShader()        (gcmGetOptimizerOption()->patchShader)

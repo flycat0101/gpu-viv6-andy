@@ -396,12 +396,6 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      */
     gcvTRUE, /* CLUseVIRCodeGen; */
 
-    /* CLC use new preprocessor:
-     *
-     *   VC_OPTION=-USECLNEWPP:0|1
-     */
-    gcvTRUE, /* UseCLNewPreprocessor; */
-
     /* Enable register pack in old compiler:
      *   VC_OPTION=-PACKREG:0|1
     */

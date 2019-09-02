@@ -29279,30 +29279,6 @@ gcGetOptionFromEnv(
                 }
             }
 
-             /* CLC use new preprocessor:
-              *
-              *   VC_OPTION=-USECLNEWPP:0|1
-              *
-              */
-            gcoOS_StrStr(p, "-USECLNEWPP:", &pos);
-            if (pos)
-            {
-                gctINT value=-1;
-                pos += sizeof("-USECLNEWPP:") -1;
-                gcoOS_StrToInt(pos, &value);
-
-                if (value == 0)
-                {
-                    /* CLC use llvm preprocessor */
-                    Option->UseCLNewPP = gcvFALSE;
-                }
-                else if (value == 1)
-                {
-                    /* CLC use new preprocessor */
-                    Option->UseCLNewPP = gcvTRUE;
-                }
-            }
-
              /* Create default Uniform Block Object to encapsulate uniforms
               * This is done to enable the use of load instruction to get
               * the uniforms from memory
