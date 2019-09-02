@@ -9770,11 +9770,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
 
     gcmHEADER_ARG("graph=%p", graph);
 
-    vxmONERROR(vxoBinaryGraph_InputsOutputs(graph, inputTable, &inputNum, outputTable, &outputNum));
-    if ((inputNum == 0) || (outputNum == 0))
+    if ((graph->inputCount == 0) || (graph->outputCount == 0))
     {
-        vxError("fail to get input/output table inputNum: %d, outputNum: %d \n", inputNum, outputNum);
-        vxmONERROR(VX_FAILURE);
+        vxmONERROR(vxoBinaryGraph_InputsOutputs(graph, inputTable, &inputNum, outputTable, &outputNum));
+        if ((inputNum == 0) || (outputNum == 0))
+        {
+            vxError("fail to get input/output table inputNum: %d, outputNum: %d \n", inputNum, outputNum);
+            vxmONERROR(VX_FAILURE);
+        }
     }
 
     /* set input for node */
@@ -10120,7 +10123,7 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
 
     INITIALIZE_STRUCT(md5Ctx);
 
-    /*1. get graph toplogy and nodes parameter info */
+    /* get graph toplogy and nodes parameter info */
     toplogyInfo = vxoBinaryGraph_GetToplogyParameters(graph, &toplogyInfoSize);
     if ((toplogyInfoSize <= 0) || (toplogyInfo == VX_NULL))
     {
@@ -10128,7 +10131,7 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
         vxmONERROR(VX_FAILURE);
     }
 
-    /*2. find weightTensor for generating key to match graph binary */
+    /* find weightTensor for generating key to match graph binary */
     vxmONERROR(vxoBinaryGraph_FindNodeIndexForWeight(graph, &nodeIndex));
     if (nodeIndex >= 0)
     {
@@ -10148,7 +10151,7 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
         }
     }
 
-    /*3. generate a key */
+    /* generate a key */
     gcsHASH_MD5Init(&md5Ctx);
     gcsHASH_MD5Update(&md5Ctx, toplogyInfo, toplogyInfoSize);
     gcsHASH_MD5Update(&md5Ctx, weightLogical, weightSize);
@@ -10160,7 +10163,7 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
     }
     gcoOS_StrCatSafe(base, KEY_LENGTH_BYTE * 2 + 4, ".nb");
 
-    /*4. search this binary name in ENV  VIV_VX_CACHE_BINARY_GRAPH_DIR */
+    /* search this binary name in ENV  VIV_VX_CACHE_BINARY_GRAPH_DIR */
     if (vxoBinaryGraph_SearchInSystem(binaryName))
     {
         vxInfo("loading graph binary to run...\n");
@@ -10168,24 +10171,22 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
     }
     else
     {
-        /* binary doesn't exist, generate graph binary */
+        /* binary doesn't exist, generate binary graph */
         vxInfo("generate graph binary: %s\n", binaryName);
         goto SaveBin;
     }
 
-    /*5. load graph binary file and create vx_kernel */
+    /* load binary graph file and create vx_kernel */
     kernel = vxImportKernelFromURL(context, VX_VIVANTE_IMPORT_KERNEL_FROM_FILE, binaryName);
     vxmONERROR_NULLPTR(kernel);
     binaryLoad = (vx_binary_loader_s*)kernel->base.reserved;
 
-    /*6. create vx_node for the graph binary kernel */
+    /* create vx_node for the binary graph kernel */
     node = vxCreateGenericNode(graph, kernel);
     vxmONERROR_NULLPTR(node);
 
-    /*7. set input & output parameters for node */
     vxmONERROR(vxoBinaryGraph_SetInputOutput(graph, binaryLoad, node));
 
-    /*8. remove all nodes that created by user */
     for (i = 0; i < nodeCount; i++)
     {
         vxoNode_RemoveFromGraph(&nodeTable[0]);
@@ -10195,6 +10196,7 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
     if ((vx_false_e == vxoBinaryGraph_HasBinaryInGraph(graph)) || (graph->nodeCount > 1))
     {
         vxError("%s[%d]: remove node fail: %d\n", __FUNCTION__, __LINE__, graph->nodeCount);
+        vxmONERROR(VX_FAILURE);
     }
 
     if (toplogyInfo != VX_NULL)
@@ -10206,7 +10208,6 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
     return;
 
 SaveBin:
-    /* remove graph binary that has not been used for the longest time from the cache dircectory */
     vxoBinaryGraph_RemoveUnusedFile();
 
     /* open binaryName file for saving binary */
