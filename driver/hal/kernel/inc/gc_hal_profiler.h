@@ -670,12 +670,17 @@ extern "C" {
 #define   MODULE_HOST_INTERFACE0_COUNTER_NUM              0x9
 #define   MODULE_HOST_INTERFACE1_COUNTER_NUM              0x7
 #define   MODULE_GPUL2_CACHE_COUNTER_NUM                  0xE
-#define   TOTAL_PROBE_NUMBER (MODULE_FRONT_END_COUNTER_NUM + MODULE_VERTEX_SHADER_COUNTER_NUM + MODULE_PRIMITIVE_ASSEMBLY_COUNTER_NUM \
-                              + MODULE_SETUP_COUNTER_NUM + MODULE_RASTERIZER_COUNTER_NUM + MODULE_PIXEL_SHADER_COUNTER_NUM \
-                              + MODULE_TEXTURE_COUNTER_NUM + MODULE_PIXEL_ENGINE_COUNTER_NUM + MODULE_MEMORY_CONTROLLER_COLOR_COUNTER_NUM \
-                              + MODULE_MEMORY_CONTROLLER_DEPTH_COUNTER_NUM + MODULE_HOST_INTERFACE0_COUNTER_NUM + MODULE_HOST_INTERFACE1_COUNTER_NUM \
-                              + MODULE_GPUL2_CACHE_COUNTER_NUM)
+#define   MODULE_PROBE_NUMBER (MODULE_FRONT_END_COUNTER_NUM + MODULE_VERTEX_SHADER_COUNTER_NUM + MODULE_PRIMITIVE_ASSEMBLY_COUNTER_NUM \
+                               + MODULE_SETUP_COUNTER_NUM + MODULE_RASTERIZER_COUNTER_NUM + MODULE_PIXEL_SHADER_COUNTER_NUM \
+                               + MODULE_TEXTURE_COUNTER_NUM + MODULE_PIXEL_ENGINE_COUNTER_NUM + MODULE_MEMORY_CONTROLLER_COLOR_COUNTER_NUM \
+                               + MODULE_MEMORY_CONTROLLER_DEPTH_COUNTER_NUM + MODULE_HOST_INTERFACE0_COUNTER_NUM + MODULE_HOST_INTERFACE1_COUNTER_NUM \
+                               + MODULE_GPUL2_CACHE_COUNTER_NUM)
 
+#define   EXT_MODULE_NEURAL_NET_COUNTER_NUM               0x18
+#define   EXT_MODULE_TENSOR_PROCESSOR_COUNTER_NUM         0x20
+#define   EXT_MODULE_PROBE_NUMBER (EXT_MODULE_NEURAL_NET_COUNTER_NUM + EXT_MODULE_TENSOR_PROCESSOR_COUNTER_NUM)
+
+#define   TOTAL_PROBE_NUMBER (MODULE_PROBE_NUMBER + EXT_MODULE_PROBE_NUMBER)
 
 #ifdef ANDROID
 #define DEFAULT_PROFILE_FILE_NAME   "/sdcard/vprofiler.vpd"
@@ -831,6 +836,14 @@ typedef enum _gceCOUNTER
     gcvCOUNTER_COUNT
 }
 gceCOUNTER;
+
+typedef enum _gceEXTCOUNTER
+{
+    gcvEXTCOUNTER_NEURAL_NET,
+    gcvEXTCOUNTER_TENSOR_PROCESSOR,
+    gcvEXTCOUNTER_COUNT
+}
+gceEXTCOUNTER;
 
 /* Mask definations for overflow indicator of TP */
 typedef enum _gceTPCOUNTER_OVERFLOW
@@ -997,36 +1010,59 @@ typedef struct _gcsPROFILER_COUNTERS_PART1
 
     /* TP */
     gctUINT32       tp_layer_id;
+    gctUINT32       tp_layer_id_overflow;
     gctUINT32       tp_total_busy_cycle;
+    gctUINT32       tp_total_busy_cycle_overflow;
     gctUINT32       tp_total_read_bandwidth_ddr;
+    gctUINT32       tp_total_read_bandwidth_ddr_overflow;
     gctUINT32       tp_total_write_bandwidth_ddr;
+    gctUINT32       tp_total_write_bandwidth_ddr_overflow;
     gctUINT32       tp_total_read_bandwidth_sram;
+    gctUINT32       tp_total_read_bandwidth_sram_overflow;
     gctUINT32       tp_total_write_bandwidth_sram;
+    gctUINT32       tp_total_write_bandwidth_sram_overflow;
     gctUINT32       tp_total_read_bandwidth_ocb;
+    gctUINT32       tp_total_read_bandwidth_ocb_overflow;
     gctUINT32       tp_total_write_bandwidth_ocb;
+    gctUINT32       tp_total_write_bandwidth_ocb_overflow;
     gctUINT32       tp_fc_pix_count;
     gctUINT32       tp_fc_zero_skip_count;
     gctUINT32       tp_fc_pix_count_overflow;
+    gctUINT32       tp_fc_zero_skip_count_overflow;
     gctUINT32       tp_fc_coef_count;
     gctUINT32       tp_fc_coef_zero_count;
-    gctUINT32       tp_counter_overflow;
+    gctUINT32       tp_fc_coef_count_overflow;
+    gctUINT32       tp_fc_coef_zero_count_overflow;
     gctUINT32       tp_total_idle_cycle_core[4];
+    gctUINT32       tp_total_idle_cycle_core_overflows[4];
     gctUINT32       tp_total_idle_cycle_core_overflow;
+    gctUINT32       tp_counter_overflow;
 
     /* NN */
     gctUINT32       nn_layer_id;
     gctUINT32       nn_instr_info;
     gctUINT32       nn_total_busy_cycle;
+    gctUINT32       nn_total_busy_cycle_overflow;
     gctUINT32       nn_total_read_cycle_ddr;
+    gctUINT32       nn_total_read_cycle_ddr_overflow;
     gctUINT32       nn_total_read_bandwidth_ddr;
+    gctUINT32       nn_total_read_bandwidth_ddr_overflow;
     gctUINT32       nn_total_write_cycle_ddr;
+    gctUINT32       nn_total_write_cycle_ddr_overflow;
     gctUINT32       nn_total_write_bandwidth_ddr;
+    gctUINT32       nn_total_write_bandwidth_ddr_overflow;
     gctUINT32       nn_total_read_cycle_sram;
+    gctUINT32       nn_total_read_cycle_sram_overflow;
     gctUINT32       nn_total_write_cycle_sram;
+    gctUINT32       nn_total_write_cycle_sram_overflow;
     gctUINT32       nn_total_mac_cycle;
+    gctUINT32       nn_total_mac_cycle_overflow;
     gctUINT32       nn_total_mac_count;
+    gctUINT32       nn_total_mac_count_overflow;
     gctUINT32       nn_zero_coef_skip_count;
+    gctUINT32       nn_zero_coef_skip_count_overflow;
     gctUINT32       nn_non_zero_coef_count;
+    gctUINT32       nn_non_zero_coef_count_overflow;
     gctUINT32       nn_counter_overflow;
     gctUINT32       nn_total_idle_cycle_core[32];
 }
