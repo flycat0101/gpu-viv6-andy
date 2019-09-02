@@ -37,7 +37,7 @@ EXTRA_INCVPATH += $(driver_root)/hal/os/linux/user
 EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libkernel/libovx12
 ifeq ($(USE_VXC_BINARY),1)
-EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libkernel/libovx12/${GPU_CONFIG}
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libkernel/libovx12/$(GPU_CONFIG)
 endif
 
 # from libCL (trunk/driver/khronos/libCL/makefile.linux)

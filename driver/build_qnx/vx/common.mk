@@ -36,6 +36,11 @@ EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libarchmodel/include
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/include
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/kernels
+ifeq ($(USE_VXC_BINARY),1)
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libkernel/libnngpu
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libkernel/libnnvxc
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libkernel/libovx12
+endif
 
 # from libCL (trunk/driver/khronos/libCL/makefile.linux)
 # Core
