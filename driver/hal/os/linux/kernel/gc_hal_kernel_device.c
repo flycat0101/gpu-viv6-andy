@@ -1598,6 +1598,8 @@ gckGALDEVICE_Construct(
     /* Construct the gckDEVICE object for os independent core management. */
     gcmkONERROR(gckDEVICE_Construct(device->os, &device->device));
 
+    device->device->showSRAMMapInfo = Args->showArgs;
+
     device->platform->dev = device->device;
 
     if (device->irqLines[gcvCORE_MAJOR] != -1)

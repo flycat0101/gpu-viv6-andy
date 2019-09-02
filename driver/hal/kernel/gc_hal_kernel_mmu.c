@@ -3136,11 +3136,14 @@ gckMMU_SetupSRAM(
                 /* Map the internal SRAM. */
                 if (needMapInternalSRAM)
                 {
-                    gcmkPRINT("Galcore Info: MMU mapped core%d SRAM base=0x%llx size=0x%x",
-                        i,
-                        reservedBase,
-                        reservedSize
-                        );
+                    if (Device->showSRAMMapInfo)
+                    {
+                        gcmkPRINT("Galcore Info: MMU mapped core%d SRAM base=0x%llx size=0x%x",
+                            i,
+                            reservedBase,
+                            reservedSize
+                            );
+                    }
 
                     /*
                      * Default gpu virtual base = 0.
@@ -3210,13 +3213,15 @@ gckMMU_SetupSRAM(
                 kernel->extSRAMBaseAddresses[i] = Device->extSRAMBaseAddresses[i];
                 Hardware->options.extSRAMSizes[i] = Device->extSRAMSizes[i];
 
-                gcmkPRINT("Galcore Info: MMU mapped external shared SRAM[%d] CPU base=0x%llx GPU virtual address=0x%x size=0x%x",
-                    i,
-                    Device->extSRAMBases[i],
-                    kernel->extSRAMBaseAddresses[i],
-                    Device->extSRAMSizes[i]
-                    );
-
+                if (Device->showSRAMMapInfo)
+                {
+                    gcmkPRINT("Galcore Info: MMU mapped external shared SRAM[%d] CPU base=0x%llx GPU virtual address=0x%x size=0x%x",
+                        i,
+                        Device->extSRAMBases[i],
+                        kernel->extSRAMBaseAddresses[i],
+                        Device->extSRAMSizes[i]
+                        );
+                }
             }
         }
 
@@ -3268,12 +3273,15 @@ gckMMU_SetupSRAM(
                 }
             }
 
-            gcmkPRINT("Galcore Info: MMU mapped core %d SRAM[%d] hardware virtual address=0x%x size=0x%x",
-                Hardware->core,
-                i,
-                kernel->sRAMBaseAddresses[i],
-                kernel->sRAMSizes[i]
-                );
+            if (Device->showSRAMMapInfo)
+            {
+                gcmkPRINT("Galcore Info: MMU mapped core %d SRAM[%d] hardware virtual address=0x%x size=0x%x",
+                    Hardware->core,
+                    i,
+                    kernel->sRAMBaseAddresses[i],
+                    kernel->sRAMSizes[i]
+                    );
+            }
         }
     }
 

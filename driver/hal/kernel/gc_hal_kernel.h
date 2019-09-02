@@ -1404,6 +1404,9 @@ typedef struct _gcsDEVICE
     /* GPU/VIP virtual address of external SRAMs. */
     gctUINT32                   extSRAMBaseAddresses[gcvSRAM_EXT_COUNT];
 
+    /* Show SRAM mapping info or not. */
+    gctUINT                     showSRAMMapInfo;
+
     /* Mutex to make sure stuck dump for multiple cores doesn't interleave. */
     gctPOINTER                  stuckDumpMutex;
 

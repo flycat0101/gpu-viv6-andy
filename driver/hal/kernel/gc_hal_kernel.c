@@ -5191,6 +5191,7 @@ gckDEVICE_Construct(
     gcmkONERROR(gckOS_CreateMutex(Os, &device->commitMutex));
 
     device->os = Os;
+    device->showSRAMMapInfo = 0;
 
     *Device = device;
 
