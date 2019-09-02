@@ -494,10 +494,10 @@ vx_bool calcFitZdp3N(vx_context context,vx_uint32 inputX, vx_uint32 inputY, vx_u
     if (poolingSize > 1)
         return vx_false_e;
 
-    if (((inputX % 64) == 0) || ((inputX % 16) == 0))
-        return vx_false_e;
+    if ((inputX % 64) == 0)
+        return vx_false_e; /*if inputX align to 64, don't need to do 64xN reshap*/
 
-    if (sliceSize % 64 == 0)
+    if ((sliceSize % 64) == 0)
     {
         /* do 64xN rehape */
         vx_uint32 tempX = 64 * 1;
@@ -514,14 +514,17 @@ vx_bool calcFitZdp3N(vx_context context,vx_uint32 inputX, vx_uint32 inputY, vx_u
             }
         }
 
-        if ((tempX < maxInImageXSize) && (tempY < maxInImageYSize) && (tempY != inputY))
+        if ((tempX < maxInImageXSize) && (tempY < maxInImageYSize))
         {
             *fitN = tempY;
             return vx_true_e;
         }
     }
 
-    if (sliceSize % 16 == 0)
+    if ((inputX % 16) == 0)
+       return vx_false_e; /*if inputX align to 16, don't need to do 16xN reshap*/
+
+    if ((sliceSize % 16) == 0)
     {
         /* do 16xN rehape */
         vx_uint32 tempX = 16 * 1;
@@ -538,7 +541,7 @@ vx_bool calcFitZdp3N(vx_context context,vx_uint32 inputX, vx_uint32 inputY, vx_u
             }
         }
 
-        if ((tempX < maxInImageXSize) && (tempY < maxInImageYSize) && (tempY != inputY))
+        if ((tempX < maxInImageXSize) && (tempY < maxInImageYSize))
         {
             *fitN = tempY;
             return vx_true_e;
