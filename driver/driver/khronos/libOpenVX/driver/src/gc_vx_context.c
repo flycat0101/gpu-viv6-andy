@@ -2958,6 +2958,11 @@ VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_
     case VX_NN_TP_PARALLEL:
         return (!context->options.enableSwtilingPhase1 && context->options.enableNNTPParallel) ? vx_true_e : vx_false_e;
 
+
+        /*if feature ready, add it*/
+    case VX_TP_FEATURE_FP32_BIAS:
+        return vx_false_e;
+
     default:
         return vx_false_e;
     }
