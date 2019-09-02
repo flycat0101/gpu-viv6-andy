@@ -155,7 +155,7 @@ VX_PRIVATE_API vx_string vxoLoadSource(vx_char *filename, vx_size *programSize)
             goto OnError;
         }
         size = ftell(pFile);
-        if (-1 == size)
+        if (-1 == (vx_int32)size)
         {
            goto OnError;
         }
