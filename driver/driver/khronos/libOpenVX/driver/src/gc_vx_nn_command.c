@@ -1985,8 +1985,8 @@ void _fill_TP_MAX_POOLING_Command(
             info_array[i].vx_tp_general_cmd_split_info.inImageXSize = 1;
             info_array[i].vx_tp_general_cmd_split_info.inImageYSize = outXSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageZSize = outYSize * split_sizes[i];
-            info_array[i].vx_tp_general_cmd_split_info.inImageStride = poolingStride * inputElemSize;
-            info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inXSize * poolingStride * inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.inImageStride = poolingStride;
+            info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inXSize * poolingStride;
             info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
             info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
             info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = 0;
@@ -5717,7 +5717,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
             cmdBufTPtr = cmdBufPtr = (vx_uint8_ptr)command_buffer->logical + NNE_COMMAND_SIZE * i;
 
             vxMemCopy(&info.vx_nn_tp_cmd_info, &sinfo[i].vx_nn_general_cmd_split_info, sizeof(struct _vx_nn_general_cmd_split_info));
-
+            memset(cmdBufTPtr, 0, NNE_COMMAND_SIZE);
             gcoVX_ProgrammCrossEngine((void*)&info, gcvVX_ACCELERATOR_NN, (void*)&context->options, (vx_uint32_ptr*)&cmdBufTPtr);
 
 #if gcdDUMP
@@ -5768,7 +5768,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
 
             cmdBufPhys = command_buffer->physical + TP_COMMAND_SIZE * i;
             cmdBufTPtr = cmdBufPtr = (vx_uint8_ptr)command_buffer->logical + TP_COMMAND_SIZE * i;
-
+            memset(cmdBufPtr, 0, TP_COMMAND_SIZE);
             if (parameter->tpType == TP_SINGLE_FC)
             {
                 vxMemCopy(&info.vx_nn_tp_cmd_info, &sinfo[i].vx_tp_fc_cmd_split_info, sizeof(struct _vx_tp_fc_cmd_split_info));
