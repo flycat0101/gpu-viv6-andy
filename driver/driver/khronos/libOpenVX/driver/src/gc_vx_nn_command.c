@@ -1958,7 +1958,7 @@ void _fill_TP_TRANSPOSE_Command(
         {
             info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
             info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
-            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inYSize * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inYSize * split_offsets[i] * outputElemSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = inYSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = split_sizes[i];
@@ -1992,8 +1992,8 @@ void _fill_TP_TRANSPOSE_Command(
         else if (value_cmd_ptr->e32[0] == 3)
         {
             info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x1;
-            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * split_offsets[i];
-            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inZSize * inXSize * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * split_offsets[i] * inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inZSize * inXSize * split_offsets[i] * outputElemSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = split_sizes[i];
             info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = inZSize;
@@ -2027,8 +2027,8 @@ void _fill_TP_TRANSPOSE_Command(
         else if (value_cmd_ptr->e32[0] == 4)
         {
             info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x1;
-            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * split_offsets[i];
-            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inZSize * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * split_offsets[i] * inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inZSize * split_offsets[i] * outputElemSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = split_sizes[i];
             info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = inZSize;
@@ -2062,8 +2062,8 @@ void _fill_TP_TRANSPOSE_Command(
         else if (value_cmd_ptr->e32[0] == 5)
         {
             info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x1;
-            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * split_offsets[i];
-            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inXSize * inZSize * split_offsets[i];
+            info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inXSize * split_offsets[i] * inputElemSize;
+            info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + inXSize * inZSize * split_offsets[i] * outputElemSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = split_sizes[i];
             info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = inZSize;
