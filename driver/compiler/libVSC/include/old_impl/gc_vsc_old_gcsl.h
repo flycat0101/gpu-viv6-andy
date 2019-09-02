@@ -115,11 +115,13 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.30 for saving source string on 03/26/2019 */
 /* bump up version to 1.31 for saving some flags in hints on 04/17/2019 */
 /* bump up version to 1.32 for saving some flags in hints on 04/25/2019 */
+/* bump up version to 1.33 for saving the shader source for OCL on 07/15/2019 */
+#define gcdSL_SHADER_BINARY_BEFORE_SAVING_SHADER_SOURCE_FOR_OCL gcmCC(0, 0, 1, 33)
 
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 32)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 33)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 32)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 33)
 
 typedef union _gcsValue
 {
