@@ -50,6 +50,11 @@ ppoPREPROCESSOR_AddSdkDirToPath(ppoPREPROCESSOR PP)
     gcoOS_StrCatSafe(path, _cldBUFFER_MAX, "/include/CL/");
 
     status = ppoPREPROCESSOR_AddHeaderFilePathToList(PP, path);
+    if (status == gcvSTATUS_SKIP)
+    {
+        status = cloCOMPILER_Free(PP->compiler, path);
+        return status;
+    }
     if (gcmIS_ERROR(status))
     {
         return status;
@@ -69,6 +74,11 @@ ppoPREPROCESSOR_AddSdkDirToPath(ppoPREPROCESSOR PP)
     gcoOS_StrCatSafe(path1, _cldBUFFER_MAX, "/inc/CL/");
 
     status = ppoPREPROCESSOR_AddHeaderFilePathToList(PP, path1);
+    if (status == gcvSTATUS_SKIP)
+    {
+        status = cloCOMPILER_Free(PP->compiler, path1);
+        return status;
+    }
     if (gcmIS_ERROR(status))
         return status;
 
@@ -95,7 +105,7 @@ ppoPREPROCESSOR_AddHeaderFilePathToList(
         while (headerFilePathNode != gcvNULL)
         {
             if (gcmIS_SUCCESS(gcoOS_StrCmp(Path, headerFilePathNode->headerFilePath)))
-                return gcvSTATUS_OK;
+                return gcvSTATUS_SKIP;
             headerFilePathNode = (void*)headerFilePathNode->base.node.next;
         }
     }
@@ -1977,7 +1987,11 @@ gctCONST_STRING  Options
     fileNamePath = (gctCHAR *)pointer;
 
     gcmVERIFY_OK(gcoOS_StrCopySafe(fileNamePath, 2, "."));
-    ppoPREPROCESSOR_AddHeaderFilePathToList(PP, fileNamePath);
+    status = ppoPREPROCESSOR_AddHeaderFilePathToList(PP, fileNamePath);
+    if (status == gcvSTATUS_SKIP)
+    {
+        status = cloCOMPILER_Free(PP->compiler, fileNamePath);
+    }
     if (gcmIS_ERROR(status))
     {
         return status;
@@ -2032,7 +2046,11 @@ gctCONST_STRING  Options
                 path = pointer;
 
                 gcoOS_StrCopySafe(path, pathLen + 1, pos);
-                ppoPREPROCESSOR_AddHeaderFilePathToList(PP, path);
+                status = ppoPREPROCESSOR_AddHeaderFilePathToList(PP, path);
+                if (status == gcvSTATUS_SKIP)
+                {
+                    status = cloCOMPILER_Free(PP->compiler, path);
+                }
                 if (gcmIS_ERROR(status))
                 {
                     return status;
