@@ -257,6 +257,7 @@ struct __vkBlitResRec
             VkDeviceSize offset;
             uint32_t rowLength;
             uint32_t imgHeight;
+            uint32_t sliceSize;
         } buf;
     } u;
 

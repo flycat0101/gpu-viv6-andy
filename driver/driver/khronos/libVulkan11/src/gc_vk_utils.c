@@ -1140,7 +1140,7 @@ void __vk_utils_insertCopyCmdRes(
         {
             cmdRes.u.buf.pBuffer = srcRes->u.buf.pBuffer;
             cmdRes.u.buf.offset  = srcRes->u.buf.offset;
-            cmdRes.u.buf.range   = VK_WHOLE_SIZE;
+            cmdRes.u.buf.range   = srcRes->u.buf.sliceSize;
 
             gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_blit_input_buffer=%d",
                                cmdBuf->obj.id, cmdRes.u.buf.pBuffer->obj.id);
@@ -1170,7 +1170,7 @@ void __vk_utils_insertCopyCmdRes(
         {
             cmdRes.u.buf.pBuffer = dstRes->u.buf.pBuffer;
             cmdRes.u.buf.offset  = dstRes->u.buf.offset;
-            cmdRes.u.buf.range   = VK_WHOLE_SIZE;
+            cmdRes.u.buf.range   = dstRes->u.buf.sliceSize;
 
             gcoOS_PrintStrSafe(cmdRes.tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_blit_output_buffer=%d",
                                cmdBuf->obj.id, cmdRes.u.buf.pBuffer->obj.id);

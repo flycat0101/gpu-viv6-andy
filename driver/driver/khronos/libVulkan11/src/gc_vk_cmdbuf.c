@@ -2415,6 +2415,7 @@ OnError:
             __VK_ASSERT(pDstImg->createInfo.format == VK_FORMAT_S8_UINT || pDstImg->createInfo.format == VK_FORMAT_D24_UNORM_S8_UINT);
             srcSliceBytes = ((srcWidth / fmtInfo->blockSize.width) * 8 / 8) * (srcHeight / fmtInfo->blockSize.height);
         }
+        srcRes.u.buf.sliceSize  = srcSliceBytes;
 
         for (il = 0; il < dstLayers; il++)
         {
@@ -2667,6 +2668,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImageToBuffer(
             __VK_ASSERT(pSrcImg->createInfo.format == VK_FORMAT_S8_UINT || pSrcImg->createInfo.format == VK_FORMAT_D24_UNORM_S8_UINT);
             dstSliceBytes = ((dstWidth / fmtInfo->blockSize.width) * 8 / 8) * (dstHeight / fmtInfo->blockSize.height);
         }
+        dstRes.u.buf.sliceSize  = dstSliceBytes;
 
         for (il = 0; il < srcLayers; il++)
         {
