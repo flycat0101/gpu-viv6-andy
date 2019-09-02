@@ -116,11 +116,12 @@ BEGIN_EXTERN_C()
 
 /* bump up version to 1.34 for workGroupSizeFactor into the binary on 07/18/2019 */
 /* bump up version to 1.35 for saving the full graphics shaders into the binary on 08/08/2019 */
+/* bump up version to 1.36 for saving ubo array index into the binary on 08/09/2019 */
 
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 35)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 36)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 35)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 36)
 
 typedef union _gcsValue
 {
@@ -2358,6 +2359,9 @@ typedef struct _gcBINARY_UNIFORM_BLOCK
 
     /* Index of the uniform to keep the base address. */
     gctINT16                        index;
+
+    /* Index of the uniform to keep the base address. */
+    gctINT16                        arrayIndex;
 
     /* Length of the uniform block name. */
     gctINT16                        nameLength;

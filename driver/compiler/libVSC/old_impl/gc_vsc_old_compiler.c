@@ -8667,6 +8667,7 @@ gcSHADER_Load(
                        return gcvSTATUS_INVALID_DATA;
                    }
                    SetUBIndex(uniformBlock, binaryUniformBlock->index);
+                   SetUBArrayIndex(uniformBlock, binaryUniformBlock->arrayIndex);
                    SetUBMemoryLayout(uniformBlock, (gceINTERFACE_BLOCK_LAYOUT_ID)binaryUniformBlock->memoryLayout);
                    SetUBBlockSize(uniformBlock, binaryUniformBlock->blockSize);
 
@@ -11123,6 +11124,7 @@ gcSHADER_Save(
             binary->nextSibling = GetUBNextSibling(uniformBlock);
             binary->prevSibling = GetUBPrevSibling(uniformBlock);
             binary->index = GetUBIndex(uniformBlock);
+            binary->arrayIndex = GetUBArrayIndex(uniformBlock);
 
             binary->nameLength = (gctINT16) uniformBlock->nameLength;
 
