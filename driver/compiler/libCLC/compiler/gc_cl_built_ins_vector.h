@@ -66,6 +66,12 @@ static clsBUILTIN_FUNCTION    VectorBuiltinFunctions[] =
     {clvEXTENSION_VIV_VX,    "vstore8",          T_VOID, 3, {T_HALF8_PACKED, T_SIZE_T, T_HALF_PACKED}, {0, 0, 1}, {0, 1, 0}, 1, 1},
     {clvEXTENSION_VIV_VX,    "vstore16",         T_VOID, 3, {T_HALF16_PACKED, T_SIZE_T, T_HALF_PACKED}, {0, 0, 1}, {0, 1, 0}, 1, 1},
 
+    {clvEXTENSION_CL_KHR_FP16,    "vload2",   T_HALF2, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_CL_KHR_FP16,    "vload3",   T_HALF3, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_CL_KHR_FP16,    "vload4",   T_HALF4, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_CL_KHR_FP16,    "vload8",   T_HALF8, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+    {clvEXTENSION_CL_KHR_FP16,    "vload16",  T_HALF16, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+
     {clvEXTENSION_NONE,    "vload2",          T_FLOAT2, 2, {T_SIZE_T, T_FLOAT}, {0, 1}, {1, 0}, 1},
     {clvEXTENSION_NONE,    "vload3",          T_FLOAT3, 2, {T_SIZE_T, T_FLOAT}, {0, 1}, {1, 0}, 1},
     {clvEXTENSION_NONE,    "vload4",          T_FLOAT4, 2, {T_SIZE_T, T_FLOAT}, {0, 1}, {1, 0}, 1},
@@ -133,6 +139,12 @@ static clsBUILTIN_FUNCTION    VectorBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "vloada_half4",    T_FLOAT4, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
     {clvEXTENSION_NONE,    "vloada_half8",    T_FLOAT8, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
     {clvEXTENSION_NONE,    "vloada_half16",   T_FLOAT16, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
+
+    {clvEXTENSION_CL_KHR_FP16,    "vstore2",   T_VOID, 3, {T_HALF2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_CL_KHR_FP16,    "vstore3",   T_VOID, 3, {T_HALF3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_CL_KHR_FP16,    "vstore4",   T_VOID, 3, {T_HALF4, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_CL_KHR_FP16,    "vstore8",   T_VOID, 3, {T_HALF8, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_CL_KHR_FP16,    "vstore16",  T_VOID, 3, {T_HALF16, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
 
     {clvEXTENSION_NONE,    "vstore2",          T_VOID, 3, {T_FLOAT2, T_SIZE_T, T_FLOAT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
     {clvEXTENSION_NONE,    "vstore3",          T_VOID, 3, {T_FLOAT3, T_SIZE_T, T_FLOAT}, {0, 0, 1}, {0, 1, 0}, 1, 1},

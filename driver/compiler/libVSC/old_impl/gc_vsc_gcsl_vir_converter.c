@@ -23,6 +23,9 @@
 #include "vir/lower/gc_vsc_vir_hl_2_ml.h"
 #include "vir/lower/gc_vsc_vir_lower_common_func.h"
 
+/* treat half as float in OCL until either VIR or HW has full support of HALF data type */
+#define _GC_OCL_TREAT_HALF_AS_FLOAT   1
+
 #define OPCODE_TEXBIAS      (VIR_OP_TEXLD)
 #define OPCODE_TEXBIAS_U    (VIR_OP_TEXLD)
 #define EXTERN_TEXBIAS      (1)
@@ -480,11 +483,15 @@ _ResolveNameClash(
     OUT VIR_NameId *NewNameId
     );
 
+#define _gcmTreatHalfAsFloat(Shader) \
+    (_GC_OCL_TREAT_HALF_AS_FLOAT && VIR_Shader_IsCL(Shader) && !VIR_Shader_HasVivVxExtension(Shader))
+
 static VIR_TypeId
 _ConvScalarFormatToVirVectorTypeId(
     IN gcSL_FORMAT Format,
     IN gctUINT Components,
-    IN gctBOOL Packed
+    IN gctBOOL Packed,
+    IN gctBOOL TreatHalfAsFloat
     )
 {
     switch (Format)
@@ -536,8 +543,23 @@ _ConvScalarFormatToVirVectorTypeId(
                 return VIR_TYPE_FLOAT16_P8;
             }
         }
-        else
+        else if(TreatHalfAsFloat)
         {
+            switch (Components)
+            {
+            case 1: return VIR_TYPE_FLOAT32;
+            case 2: return VIR_TYPE_FLOAT_X2;
+            case 3: return VIR_TYPE_FLOAT_X3;
+            case 4: return VIR_TYPE_FLOAT_X4;
+            case 8: return VIR_TYPE_FLOAT_X8;
+            case 16: return VIR_TYPE_FLOAT_X16;
+            case 32: return VIR_TYPE_FLOAT_X32;
+
+            default:
+                return VIR_TYPE_FLOAT_X4;
+            }
+        }
+        else {
             switch (Components)
             {
             case 1: return VIR_TYPE_FLOAT16;
@@ -2175,7 +2197,7 @@ _GetTrueUniformArraySize(
                 dim = Uniform->arrayLengthList[index - 1];
             }
             else dim = arraySize;
-            *TypeId = _ConvScalarFormatToVirVectorTypeId(format, components, gcvFALSE);
+            *TypeId = _ConvScalarFormatToVirVectorTypeId(format, components, gcvFALSE, _gcmTreatHalfAsFloat(VirShader));
             arraySize /= dim;
         }
     }
@@ -2566,7 +2588,8 @@ _ConvShaderUniformIdx2Vir(
 
                 baseTypeId = _ConvScalarFormatToVirVectorTypeId(GetFormatBasicType(GetUniformFormat(uniform)),
                                                                 GetUniformVectorSize(uniform) ? GetUniformVectorSize(uniform) : 1,
-                                                                gcvFALSE);
+                                                                gcvFALSE,
+                                                                _gcmTreatHalfAsFloat(VirShader));
 
                 if (nameOffset != -1)
                 {
@@ -5271,7 +5294,10 @@ _GetVirRegId(
                                           VIR_SYM_VIRREG,
                                           Index,
                                           VIR_Shader_GetTypeFromId(VirShader,
-                                          _ConvScalarFormatToVirVectorTypeId(Format, Components, Packed)),
+                                          _ConvScalarFormatToVirVectorTypeId(Format,
+                                                                             Components,
+                                                                             Packed,
+                                                                             _gcmTreatHalfAsFloat(VirShader))),
                                           VIR_STORAGE_UNKNOWN,
                                           &virRegId);
         CHECK_ERROR(virErrCode, "Failed to add virtual register symbol");
@@ -5301,7 +5327,8 @@ _GetVirRegId(
                 gcmASSERT(VirRegMapArr[Index].components);
                 typeId = _ConvScalarFormatToVirVectorTypeId(Format,
                                                             VirRegMapArr[Index].components,
-                                                            VirRegMapArr[Index].packed);
+                                                            VirRegMapArr[Index].packed,
+                                                            _gcmTreatHalfAsFloat(VirShader));
                 VIR_Symbol_SetTypeId(variable, typeId);
             }
             else {
@@ -5322,7 +5349,8 @@ _GetVirRegId(
                 gcmASSERT(VirRegMapArr[Index].components);
                 typeId = _ConvScalarFormatToVirVectorTypeId(Format,
                                                             VirRegMapArr[Index].components,
-                                                            VirRegMapArr[Index].packed);
+                                                            VirRegMapArr[Index].packed,
+                                                            _gcmTreatHalfAsFloat(VirShader));
             }
         }
         else if (!VIR_Symbol_GetVregVariable(sym)) {
@@ -5330,7 +5358,8 @@ _GetVirRegId(
             {
                 typeId = _ConvScalarFormatToVirVectorTypeId(Format,
                                                             Components,
-                                                            Packed);
+                                                            Packed,
+                                                            _gcmTreatHalfAsFloat(VirShader));
                 VIR_Symbol_SetTypeId(sym, typeId);
             }
         }
@@ -5581,7 +5610,8 @@ _ConvSource2VirOperand(
         }
         typeId = _ConvScalarFormatToVirVectorTypeId(srcFormat,
                                                     components,
-                                                    packed);
+                                                    packed,
+                                                    _gcmTreatHalfAsFloat(VirShader));
 
         mode = gcmSL_SOURCE_GET(source, Indexed);
         if (mode != gcSL_NOT_INDEXED) {
@@ -5665,7 +5695,8 @@ _ConvSource2VirOperand(
             }
             typeId = _ConvScalarFormatToVirVectorTypeId(srcFormat,
                                                         components,
-                                                        packed);
+                                                        packed,
+                                                        _gcmTreatHalfAsFloat(VirShader));
         }
 
         mode = gcmSL_SOURCE_GET(source, Indexed);
@@ -5850,7 +5881,7 @@ _ConvSource2VirOperand(
         else {
             components = _gcComputeSymComponentCount(sym, opcode, enable, swizzle);
         }
-        typeId = _ConvScalarFormatToVirVectorTypeId(srcFormat, components, packed);
+        typeId = _ConvScalarFormatToVirVectorTypeId(srcFormat, components, packed, _gcmTreatHalfAsFloat(VirShader));
 
         /* update temp variable type if src operand using more components, like following case
          * virreg type of "temp(12)" is created according to enable component which is 1 but the usage is used as vec4
@@ -6352,7 +6383,8 @@ _ConvCode2VirInstruction(
             virEnable = _ConvEnable2Vir(enable);
             typeId = _ConvScalarFormatToVirVectorTypeId(format,
                                                         components,
-                                                        packed);
+                                                        packed,
+                                                        gcvFALSE);
 
             if (arg->qualifier == gcvFUNCTION_OUTPUT )
             {
@@ -6824,6 +6856,12 @@ _ConvCode2VirInstruction(
                     VIR_Precision  destPrecision = _gcmConvPrecision2Vir(gcmSL_TARGET_GET(Code->temp, Precision));
                     VIR_Symbol      *sym, *varSym = gcvNULL;
                     gctUINT virRegComponents;
+                    gctBOOL treatHalfAsFloat = _gcmTreatHalfAsFloat(VirShader);
+
+                    if(opcode == gcSL_STORE || opcode == gcSL_STORE1 || opcode == gcSL_LOAD)
+                    {
+                       treatHalfAsFloat = gcvFALSE;
+                    }
 
                     gcSHADER_UpdateTempRegCount(Shader, Code->tempIndex );
                     enable = gcmSL_TARGET_GET(Code->temp, Enable);
@@ -6853,7 +6891,8 @@ _ConvCode2VirInstruction(
                     virEnable = _ConvEnable2Vir(enable);
                     typeId = _ConvScalarFormatToVirVectorTypeId(format,
                                                                 components,
-                                                                packed);
+                                                                packed,
+                                                                treatHalfAsFloat);
 
                     if (mode != gcSL_NOT_INDEXED)
                     {
@@ -8920,7 +8959,9 @@ _SetConvType(
         }
         else components = _GetEnableComponentCount(VIR_Operand_GetEnable(dest));
         typeId = _ConvScalarFormatToVirVectorTypeId((gcSL_FORMAT)VIR_Operand_GetImmediateUint(conv0Inst->src[1]),
-                                                     components, gcvFALSE);
+                                                     components,
+                                                     gcvFALSE,
+                                                     gcvFALSE);
         VIR_Operand_SetTypeId(Opnd, typeId);
     }
     return gcvTRUE;
