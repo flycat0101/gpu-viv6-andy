@@ -2446,15 +2446,15 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_computeQuantAttribute(vx_enum qua
     if(quantType == VX_QUANT_AFFINE_SCALE)
     {
         vx_uint32 drange = 255;
-        maxValue = max(maxValue, 0);
-        minValue = min(minValue, 0);
+        maxValue = gcmMAX(maxValue, 0);
+        minValue = gcmMIN(minValue, 0);
         local_scale = (maxValue - minValue)/drange;
-        local_zp    = min(255, max(0, (vx_int32)roundRTZ(0 - minValue/ *scale)));
+        local_zp    = gcmMIN(255, gcmMAX(0, (vx_int32)roundRTZ(0 - minValue/ *scale)));
     }
     else if(quantType == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         minValue = (vx_float32)fabs(minValue);
-        maxValue = max(maxValue, minValue);
+        maxValue = gcmMAX(maxValue, minValue);
         if(maxValue <= 0.0)
         {
             vxInfo("can not compute quant attribute");
