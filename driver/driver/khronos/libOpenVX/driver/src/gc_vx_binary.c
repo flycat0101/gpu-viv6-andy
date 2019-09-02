@@ -962,6 +962,7 @@ OnError:
     return status;
 }
 
+#if LOAD_WHOLE_BINARY_TO_BUFFER
 VX_PRIVATE_API gctUINT getFileSize(
     gctFILE df
     )
@@ -975,6 +976,7 @@ VX_PRIVATE_API gctUINT getFileSize(
     gcmFOOTER_ARG("0x%x", length);
     return length;
 }
+#endif
 
 VX_PRIVATE_API gctSIZE_T loadBinaryEntry(
     vx_binary_loader_s *binLoad
@@ -1037,6 +1039,7 @@ OnError:
     return 0;
 }
 
+#if LOAD_WHOLE_BINARY_TO_BUFFER
 VX_PRIVATE_API gctSIZE_T loadBinaryWhole(
     vx_binary_loader_s *binLoad
     )
@@ -1056,6 +1059,7 @@ VX_PRIVATE_API gctSIZE_T loadBinaryWhole(
     gcmFOOTER_ARG("0x%x", readSize);
     return readSize;
 }
+#endif
 
 /*
 aculater layer count in import binary graph mode.
