@@ -4105,9 +4105,11 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_multiTranspose(vx_graph graph)
             if(!invalidChild)
             {
                 transposeNodes[0] = node;
-                transposeNodes[1] = nodeTable[sameTranspose[0]];
-                transposeCnt = 2;
-                vxoGraphOptimization_multiTranspose_mergeTransposes(transposeNodes, transposeCnt);
+                transposeCnt++;
+                for(i = 0; i < childTcnt; i++)
+                    transposeNodes[transposeCnt++] = nodeTable[sameTranspose[i]];
+                if(transposeCnt > 1)
+                    vxoGraphOptimization_multiTranspose_mergeTransposes(transposeNodes, transposeCnt);
             }
 
             if(sameTranspose)
