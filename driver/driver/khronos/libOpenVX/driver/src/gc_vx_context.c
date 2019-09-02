@@ -1021,13 +1021,6 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     gcoOS_GetEnv(gcvNULL, "VIV_VX_OPS_DUMP_PATH", &context->options.enableOpsDebugInfo);
 
     envctrl = gcvNULL;
-    context->options.enableMemOptimization = 1;
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_MEM_OPTIMIZATION", &envctrl)) && envctrl)
-    {
-        context->options.enableMemOptimization = atoi(envctrl);
-    }
-
-    envctrl = gcvNULL;
     context->options.tpCoreCount = context->nnConfig.fixedFeature.tpCoreCount;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_TP_CORE_COUNT", &envctrl)) && envctrl)
     {

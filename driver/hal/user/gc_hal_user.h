@@ -3040,7 +3040,6 @@ typedef struct _vx_drv_option
     gctUINT enableVIPDEC400;
     gctUINT enableCacheBinaryGraph;
     gctSTRING enableOpsDebugInfo;
-    gctUINT enableMemOptimization;
     gctUINT tpCoreCount;
     gctUINT tpLiteCoreCount;
     gctUINT enableForce64BitsBiasNN;

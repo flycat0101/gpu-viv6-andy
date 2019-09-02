@@ -14863,26 +14863,10 @@ VX_INTERNAL_CALLBACK_API void vxoWeightsBiasesBase_Destructor(vx_reference ref)
         wbBase->zrlTpFcPtr = VX_NULL;
     }
 
-    if (ref->context->options.enableMemOptimization)
+    if (wbBase->reshuffleWeightPtr != VX_NULL)
     {
-        if (wbBase->reshuffleWeightPtr != VX_NULL)
-        {
-            vxFree(wbBase->reshuffleWeightPtr);
-            wbBase->reshuffleWeightPtr = VX_NULL;
-        }
-    }
-    else
-    {
-        if (wbBase->weightPtr != VX_NULL)
-        {
-            vxFree(wbBase->weightPtr);
-            wbBase->weightPtr = VX_NULL;
-        }
-        if (wbBase->biasPtr != VX_NULL)
-        {
-            vxFree(wbBase->biasPtr);
-            wbBase->biasPtr = VX_NULL;
-        }
+        vxFree(wbBase->reshuffleWeightPtr);
+        wbBase->reshuffleWeightPtr = VX_NULL;
     }
 
     if (wbBase->origWeight != VX_NULL)
@@ -14925,32 +14909,25 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
     vxmASSERT(context);
     vxmASSERT(wb_base);
 
-    if (context->options.enableMemOptimization)
+    if (wb_base->reshuffleWeightPtr)
     {
-        if (wb_base->reshuffleWeightPtr)
-        {
-            weight_ptr = wb_base->reshuffleWeightPtr;
-        }
-        else
-        {
-            vx_uint32 size = 0;
-            size = wb_base->weights_sizes[0] * wb_base->weights_sizes[1] * wb_base->weights_sizes[2] * wb_base->weights_sizes[3] *
-                   vxDataType_GetSize((vx_type_e)wb_base->weights_data_format);;
-            Weight_Cpuptr = (vx_uint8_ptr)vxAllocate(size);
-            if (Weight_Cpuptr == VX_NULL)
-            {
-                status = VX_ERROR_NO_MEMORY;
-                goto exit;
-            }
-
-            vxoTensor_GetTensorViewMemory(wb_base->origWeight, (gctPOINTER*)(&Weight_Gpuptr), VX_NULL);
-            vxMemCopy(Weight_Cpuptr, Weight_Gpuptr, size);
-            weight_ptr = Weight_Cpuptr;
-        }
+        weight_ptr = wb_base->reshuffleWeightPtr;
     }
     else
     {
-        weight_ptr = wb_base->weightPtr;
+        vx_uint32 size = 0;
+        size = wb_base->weights_sizes[0] * wb_base->weights_sizes[1] * wb_base->weights_sizes[2] * wb_base->weights_sizes[3] *
+               vxDataType_GetSize((vx_type_e)wb_base->weights_data_format);;
+        Weight_Cpuptr = (vx_uint8_ptr)vxAllocate(size);
+        if (Weight_Cpuptr == VX_NULL)
+        {
+            status = VX_ERROR_NO_MEMORY;
+            goto exit;
+        }
+
+        vxoTensor_GetTensorViewMemory(wb_base->origWeight, (gctPOINTER*)(&Weight_Gpuptr), VX_NULL);
+        vxMemCopy(Weight_Cpuptr, Weight_Gpuptr, size);
+        weight_ptr = Weight_Cpuptr;
     }
 
     wb = (vx_weights_biases_parameter)vxoReference_Create(context, VX_TYPE_WEIGHTS_BIASES_PARAMETER, VX_REF_INTERNAL, &context->base);
@@ -15197,6 +15174,7 @@ vx_status vxoWeightsBiases_Compress(
     vx_uint8_ptr zrlTmpPtr = VX_NULL, minZeroRunLenTPFC = wb_base->zrlTpFcPtr;
     vx_uint8_ptr weight_ptr = VX_NULL, Weight_Gpuptr = VX_NULL, Weight_Cpuptr = VX_NULL;
     vx_uint32_ptr bias_ptr = VX_NULL, Bias_Gpuptr = VX_NULL, Bias_Cpuptr = VX_NULL;
+    vx_uint32 size = 0;
 
     vxmASSERT(context);
     vxmASSERT(wb);
@@ -15204,48 +15182,39 @@ vx_status vxoWeightsBiases_Compress(
 
     if (WB_MEM_SIZE_INDEX(wb, 0) > 0) return status;
 
-    if (context->options.enableMemOptimization)
+    if (WB_BASE(wb)->reshuffleWeightPtr != VX_NULL)
     {
-        vx_uint32 size = 0;
-        if (WB_BASE(wb)->reshuffleWeightPtr != VX_NULL)
-        {
-            weight_ptr = WB_BASE(wb)->reshuffleWeightPtr;
-        }
-        else
-        {
-            size = wb_base->weights_sizes[0] * wb_base->weights_sizes[1] * wb_base->weights_sizes[2] * wb_base->weights_sizes[3] *
-                   vxDataType_GetSize((vx_type_e)wb_base->weights_data_format);;
-            Weight_Cpuptr = (vx_uint8_ptr)vxAllocate(size);
-            if (Weight_Cpuptr == VX_NULL)
-            {
-                status = VX_ERROR_NO_MEMORY;
-                goto exit;
-            }
-
-            vxoTensor_GetTensorViewMemory(wb_base->origWeight, (gctPOINTER*)(&Weight_Gpuptr), VX_NULL);
-            vxMemCopy(Weight_Cpuptr, Weight_Gpuptr, size);
-            weight_ptr = Weight_Cpuptr;
-        }
-
-        if (WB_BIAS_TENSOR(wb))
-        {
-            size = wb_base->weights_sizes[3] * vxDataType_GetSize((vx_type_e)wb_base->biases_data_format);
-            Bias_Cpuptr = (vx_uint32_ptr)vxAllocate(size);
-            if (Bias_Cpuptr == VX_NULL)
-            {
-                status = VX_ERROR_NO_MEMORY;
-                goto exit;
-            }
-
-            vxoTensor_GetTensorViewMemory(WB_BIAS_TENSOR(wb), (gctPOINTER*)(&Bias_Gpuptr), VX_NULL);
-            vxMemCopy(Bias_Cpuptr, Bias_Gpuptr, size);
-            bias_ptr = Bias_Cpuptr;
-        }
+        weight_ptr = WB_BASE(wb)->reshuffleWeightPtr;
     }
     else
     {
-        weight_ptr = wb_base->weightPtr;
-        bias_ptr = wb_base->biasPtr;
+        size = wb_base->weights_sizes[0] * wb_base->weights_sizes[1] * wb_base->weights_sizes[2] * wb_base->weights_sizes[3] *
+               vxDataType_GetSize((vx_type_e)wb_base->weights_data_format);;
+        Weight_Cpuptr = (vx_uint8_ptr)vxAllocate(size);
+        if (Weight_Cpuptr == VX_NULL)
+        {
+            status = VX_ERROR_NO_MEMORY;
+            goto exit;
+        }
+
+        vxoTensor_GetTensorViewMemory(wb_base->origWeight, (gctPOINTER*)(&Weight_Gpuptr), VX_NULL);
+        vxMemCopy(Weight_Cpuptr, Weight_Gpuptr, size);
+        weight_ptr = Weight_Cpuptr;
+    }
+
+    if (WB_BIAS_TENSOR(wb))
+    {
+        size = wb_base->weights_sizes[3] * vxDataType_GetSize((vx_type_e)wb_base->biases_data_format);
+        Bias_Cpuptr = (vx_uint32_ptr)vxAllocate(size);
+        if (Bias_Cpuptr == VX_NULL)
+        {
+            status = VX_ERROR_NO_MEMORY;
+            goto exit;
+        }
+
+        vxoTensor_GetTensorViewMemory(WB_BIAS_TENSOR(wb), (gctPOINTER*)(&Bias_Gpuptr), VX_NULL);
+        vxMemCopy(Bias_Cpuptr, Bias_Gpuptr, size);
+        bias_ptr = Bias_Cpuptr;
     }
 
     vxmASSERT(weight_ptr != VX_NULL);
@@ -15699,26 +15668,10 @@ void vxoWeightsBiases_Clear(vx_weights_biases_parameter wb)
 
     vxmASSERT(wbBase);
 
-    if (wb->base.context->options.enableMemOptimization)
+    if (wbBase->reshuffleWeightPtr != VX_NULL)
     {
-        if (wbBase->reshuffleWeightPtr != VX_NULL)
-        {
-            vxFree(wbBase->reshuffleWeightPtr);
-            wbBase->reshuffleWeightPtr = VX_NULL;
-        }
-    }
-    else
-    {
-        if (wbBase->weightPtr != VX_NULL)
-        {
-            vxFree(wbBase->weightPtr);
-            wbBase->weightPtr = VX_NULL;
-        }
-        if (wbBase->biasPtr != VX_NULL)
-        {
-            vxFree(wbBase->biasPtr);
-            wbBase->biasPtr = VX_NULL;
-        }
+        vxFree(wbBase->reshuffleWeightPtr);
+        wbBase->reshuffleWeightPtr = VX_NULL;
     }
 
     if (wbBase->origWeight != VX_NULL)
@@ -16210,122 +16163,8 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
     weightCount = wb_base->weights_sizes[0] * wb_base->weights_sizes[1];
     filterTotalCount = wb_base->weights_sizes[3];
 
-    if (context->options.enableMemOptimization)
-    {
-        /* reshuffle weight data and save in wb_base->reshuffleWeightPtr if kernel stride > 1 */
-        vxoWeightsBiases_Reshuffle(wb_base);
-    }
-    else
-    {
-        gctPOINTER weightBase           = VX_NULL;
-        vx_uint8_ptr startWeightDataPtr = VX_NULL;
-        gctPOINTER biasBase             = VX_NULL;
-
-        /* Get weights & bias base memory */
-        vxoTensor_GetTensorViewMemory(weights, &weightBase, VX_NULL);
-        startWeightDataPtr = (vx_uint8*)weightBase;
-
-        /* If need reshuffle? */
-        if (((strideX > 1) || (strideY > 1)) && (weightDims[0] != 1 || weightDims[1] != 1))
-        {
-            /* do reshuffle*/
-            vx_uint32 alignWeightWidth = vxnneAlignWithStride(weightDims[0], strideX);
-            vx_uint32 alignWeightHeight = vxnneAlignWithStride(weightDims[1], strideY);
-            vx_uint32 depth = weightDims[2];
-            vx_nn_reshuffle_s src = {NULL, alignWeightWidth, alignWeightHeight, depth, weightDims[3] * 1, (vx_type_e)TENSOR_DATA_TYPE(weights)};
-            vx_nn_reshuffle_s dst = {NULL, wb_base->weights_sizes[0], wb_base->weights_sizes[1], wb_base->weights_sizes[2], wb_base->weights_sizes[3]*1, (vx_type_e)wb_base->weights_data_format};
-            vx_uint32 x, y, z, w;
-            vx_uint32 orgXSize = weightDims[0], orgYSize = weightDims[1], orgZSize = depth;
-            vx_uint32 weightItemCount = weightCount * sliceCount * filterTotalCount;
-
-            {
-                convertedWeightData = vxAllocateAndZeroMemory(weightItemCount * weightSize);
-            }
-
-            /* Allocate temp buffer for weight data */
-            {
-                weightData = vxAllocateAndZeroMemory(weightItemCount * weightSize);
-            }
-
-            if (convertedWeightData == VX_NULL || weightData == VX_NULL)
-            {
-                status = VX_ERROR_NO_MEMORY;
-                goto exit;
-            }
-
-            for (w = 0; w < src.wSize; w++)
-            {
-                for (z = 0; z < src.zSize; z++)
-                {
-                    /* convert float32 to float16 and fill edge with 0 */
-                    for (y = 0; y < src.ySize; y++)
-                    {
-                        for (x = 0; x < src.xSize; x++)
-                        {
-                            vx_uint32 orgOffsetSize = (w * orgZSize * orgYSize * orgXSize + z * orgYSize * orgXSize + y * orgXSize + x) * weightSize;
-                            vx_uint32 fpOffsetSize = (w * src.zSize * src.ySize * src.xSize + z * src.ySize * src.xSize + y * src.xSize + x) * weightSize;
-                            vx_uint32 zero = (TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE) ? TENSOR_TF_ZEROPOINT(weights) : 0;
-                            vx_uint8 *converted, *orig;
-
-                            converted = (vx_uint8*)convertedWeightData + fpOffsetSize;
-
-                            if ((x > orgXSize - 1) || (y > orgYSize - 1))
-                            {
-                                _DataGeneralConvert((void*)&zero, (void*)converted, weightSize, weightSize);
-                            }
-                            else
-                            {
-                                orig = startWeightDataPtr + orgOffsetSize;
-                                _DataGeneralConvert((void*)orig, (void*)converted, weightSize, weightSize);
-                            }
-                        }
-                    }
-                }
-            }
-
-            /*reshuffle kernel data*/
-            src.data   = convertedWeightData;
-            dst.data   = weightData;
-            reshuffleData(&src, strideX, strideY, &dst);
-
-            /* re-wrap weight buffer */
-            weightBase = weightData;
-
-            {
-                vxFree(convertedWeightData);
-            }
-
-            convertedWeightData = VX_NULL;
-        }
-
-        if (biases) vxoTensor_GetTensorViewMemory(biases, &biasBase, VX_NULL);
-
-        /* Save original weight/bias data for sw-tiling */
-        {
-            vx_uint32 size;
-
-            size = wb_base->weights_sizes[0] * wb_base->weights_sizes[1] * wb_base->weights_sizes[2] * wb_base->weights_sizes[3] *
-                   vxDataType_GetSize((vx_type_e)wb_base->weights_data_format);;
-            wb_base->weightPtr = (vx_uint8_ptr)vxAllocate(size);
-            if (wb_base->weightPtr == VX_NULL)
-            {
-                status = VX_ERROR_NO_MEMORY;
-                goto exit;
-            }
-            vxMemCopy(wb_base->weightPtr, weightBase, size);
-
-            size = wb_base->weights_sizes[3] * vxDataType_GetSize((vx_type_e)wb_base->biases_data_format);
-            wb_base->biasPtr = (vx_uint32_ptr)vxAllocate(size);
-            if (wb_base->biasPtr == VX_NULL)
-            {
-                status = VX_ERROR_NO_MEMORY;
-                goto exit;
-            }
-            if (biases != VX_NULL)
-                vxMemCopy(wb_base->biasPtr, biasBase, size);
-        }
-    }
-
+    /* reshuffle weight data and save in wb_base->reshuffleWeightPtr if kernel stride > 1 */
+    vxoWeightsBiases_Reshuffle(wb_base);
     weight_bias = vxoWeightsBiases_Create(context,
                                           wb_base,
                                           wb_base->weights_sizes,
