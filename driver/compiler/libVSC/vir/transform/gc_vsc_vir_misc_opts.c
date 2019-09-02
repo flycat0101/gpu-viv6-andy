@@ -10006,6 +10006,7 @@ _UpdateWorkGroupIdForMultiGPU(
     gctUINT                 i, defIdx = 0;
     VIR_DEF*                pDef;
     gctBOOL                 bUseLocalMemory = (VIR_Shader_GetShareMemorySize(pShader) > 0);
+    gctBOOL                 bUpdateGlobalId = gcvFALSE;
 
     /* Find the workGroupId and globalInvocationId. */
     for (i = 0; i < VIR_IdList_Count(pAttrIdLists); i++)
@@ -10022,7 +10023,7 @@ _UpdateWorkGroupIdForMultiGPU(
         {
             pWorkGroupIdSym = pSym;
         }
-        else if (VIR_Symbol_GetName(pSym) == VIR_NAME_GLOBAL_INVOCATION_ID)
+        else if (bUpdateGlobalId && VIR_Symbol_GetName(pSym) == VIR_NAME_GLOBAL_INVOCATION_ID)
         {
             pGlobalIdSym = pSym;
         }

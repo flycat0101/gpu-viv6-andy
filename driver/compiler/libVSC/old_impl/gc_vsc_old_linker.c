@@ -18061,6 +18061,7 @@ _gcCalculateWorkGroupIdForMultiGPU(
     gctINT                  mainStartIdx = 0;
     gctUINT32               newWorkGroupIdTempIndex = 0, newGlobalIdTempIndex = 0;
     gctBOOL                 bCheckWorkGroupId = gcvFALSE, bCheckGlobalId = gcvFALSE;
+    gctBOOL                 bUpdateGlobalId = gcvFALSE;
 
     /* Find WorkGroupID/globalInvocationId, if not found, just bail out. */
     for (i = 0; i < Shader->attributeCount; i++)
@@ -18073,7 +18074,8 @@ _gcCalculateWorkGroupIdForMultiGPU(
         {
             workGroupIdAttr = attr;
         }
-        else if (attr &&
+        else if (bUpdateGlobalId &&
+                 attr &&
                  GetATTRNameLength(attr) < 0 &&
                  GetATTRNameLength(attr) == gcSL_GLOBAL_INVOCATION_ID)
         {
