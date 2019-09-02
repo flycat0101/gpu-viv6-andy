@@ -540,9 +540,7 @@ vcsHKCMP_Symbol(const char *Str1, const char *Str2)
         case VIR_SYM_LABEL:
         case VIR_SYM_IOBLOCK:
             /* these symbols are the same if they have the same name */
-            return VIR_Symbol_GetName(sym1) == VIR_Symbol_GetName(sym2) &&
-                   VIR_Symbol_GetStorageClass(sym1) == VIR_Symbol_GetStorageClass(sym2) &&
-                   VIR_Symbol_GetKind(sym1) == VIR_Symbol_GetKind(sym2);
+            return VIR_Symbol_GetName(sym1) == VIR_Symbol_GetName(sym2);
         case VIR_SYM_FIELD:
             /* name and enclosing type must be the same */
             return VIR_Symbol_GetName(sym1) == VIR_Symbol_GetName(sym2) &&
