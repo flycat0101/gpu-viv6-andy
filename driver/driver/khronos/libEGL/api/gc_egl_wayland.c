@@ -334,6 +334,9 @@ __registry_handle_global(void *data, struct wl_registry *registry, uint32_t name
                        const char *interface, uint32_t version)
 {
     __WLEGLDisplay display = data;
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    char *p;
+#endif
 
     if (strcmp(interface, "wl_viv") == 0 && display)
     {
@@ -342,11 +345,15 @@ __registry_handle_global(void *data, struct wl_registry *registry, uint32_t name
     }
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
     else if (strcmp(interface, "zwp_linux_explicit_synchronization_v1") == 0) {
-        display->use_explicit_sync = 1;
-        display->explicit_sync = wl_registry_bind(
-            registry, name,
-            &zwp_linux_explicit_synchronization_v1_interface, 1);
-        wl_proxy_set_queue((struct wl_proxy *)display->explicit_sync, display->wl_queue);
+        p = getenv("WL_EGL_CLIENT_FENCE");
+        if((p == gcvNULL) || (p[0] != '0'))
+        {
+            display->use_explicit_sync = 1;
+            display->explicit_sync = wl_registry_bind(
+                registry, name,
+                &zwp_linux_explicit_synchronization_v1_interface, 1);
+            wl_proxy_set_queue((struct wl_proxy *)display->explicit_sync, display->wl_queue);
+        }
     }
 #endif
 }
@@ -512,8 +519,15 @@ __wl_egl_display_destroy(__WLEGLDisplay display)
 
     pthread_mutex_unlock(&__wl_egl_surface_mutex);
 
-
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    if(display->explicit_sync)
+    {
+        zwp_linux_explicit_synchronization_v1_destroy(display->explicit_sync);
+        display->explicit_sync = gcvNULL;
+    }
+#else
     __wl_egl_roundtrip_queue(display->wl_dpy, display->wl_queue);
+#endif
 
 #if (WAYLAND_VERSION_MAJOR >= 1) && (WAYLAND_VERSION_MINOR >= 13)
     wl_proxy_wrapper_destroy(display->wrap_dpy);
@@ -814,6 +828,9 @@ __wl_egl_buffer_destroy(__WLEGLSurface egl_surface, __WLEGLBuffer buffer)
         memcpy(wrapper, buffer, sizeof(*buffer));
 
         callback = wl_display_sync(display->wrap_dpy);
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+        buffer->buffer_release = gcvNULL;
+#endif
         wl_proxy_set_queue((struct wl_proxy *)callback, egl_surface->wl_queue);
         wl_callback_add_listener(callback, &__buffer_callback_listener, wrapper);
         buffer->info.surface = gcvNULL;
@@ -1286,10 +1303,22 @@ __wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
 
     egl_surface->indequeue = 1;
 
-
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    /*Some vulkan case use EGL windows, so move the surface_sync creatation
+      from _ConnectWindow, because one surface only can create one sync object.
+    */
+    if(egl_surface->surface_sync == gcvNULL
+        && egl_surface->display->use_explicit_sync == 1)
+    {
+        egl_surface->surface_sync =
+            zwp_linux_explicit_synchronization_v1_get_synchronization(
+                  egl_surface->display->explicit_sync, window->surface);
+        wl_proxy_set_queue((struct wl_proxy *) egl_surface->surface_sync, egl_surface->wl_queue);
+    }
+#else
     /* Try to read and dispatch some events. */
-    wl_display_dispatch_queue_pending(wl_dpy, wl_queue);
-
+    __wl_egl_dispatch_queue(wl_dpy, wl_queue, 1);
+#endif
     if (egl_surface->nr_buffers > 1)
     {
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
@@ -1298,6 +1327,11 @@ __wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
         while (buffer->state != BUFFER_STATE_FREE && ret != -1)
         {
             ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 100);
+        }
+        if(ret == -1)
+        {
+            gcmPRINT("Cannot find a free back buffer");
+            return NULL;
         }
         if (buffer->release_fence_fd > 0)
         {
@@ -1849,20 +1883,6 @@ _ConnectWindow(
 
     gcmASSERT(Surface->renderTargetFormat != gcvSURF_UNKNOWN);
     __wl_egl_surface_set_format(egl_surface, gcvSURF_BITMAP, Surface->renderTargetFormat);
- #ifdef gcdUSE_ZWP_SYNCHRONIZATION
-    if(egl_surface->display != gcvNULL
-        && egl_surface->surface_sync == gcvNULL
-        && egl_surface->display->use_explicit_sync == 1)
-    {
-        egl_surface->surface_sync =
-            zwp_linux_explicit_synchronization_v1_get_synchronization(
-                  egl_surface->display->explicit_sync, window->surface);
-        if (!egl_surface->surface_sync)
-        {
-            gcmPRINT("zwp_linux_explicit_synchronization_v1_get_synchronization failed");
-        }
-    }
-#endif
 
     if (egl_surface->wl_queue == gcvNULL)
     {
@@ -1950,6 +1970,14 @@ _BindWindow(
         do
         {
             EGLBoolean formatSupported = EGL_FALSE;
+            gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
+
+            gcoHAL_GetHardwareType(gcvNULL, &hwType);
+            if (hwType == gcvHARDWARE_VG)
+            {
+                /* 2D VG does not support direct rendering */
+                break;
+            }
 
             if (Surface->config.samples > 1)
             {
@@ -2306,13 +2334,15 @@ buffer_fenced_release(void *data,
 {
     __WLEGLBuffer buffer = data;
 
-    assert(release == buffer->buffer_release);
     assert(buffer->release_fence_fd == -1);
 
     buffer->state = BUFFER_STATE_FREE;
     buffer->release_fence_fd = fence;
-    zwp_linux_buffer_release_v1_destroy(buffer->buffer_release);
-    buffer->buffer_release = NULL;
+    if(buffer->buffer_release)
+    {
+        zwp_linux_buffer_release_v1_destroy(buffer->buffer_release);
+        buffer->buffer_release = NULL;
+    }
 }
 
 static void
@@ -2321,12 +2351,14 @@ buffer_immediate_release(void *data,
 {
     __WLEGLBuffer buffer = data;
 
-    assert(release == buffer->buffer_release);
     assert(buffer->release_fence_fd == -1);
 
     buffer->state = BUFFER_STATE_FREE;
-    zwp_linux_buffer_release_v1_destroy(buffer->buffer_release);
-    buffer->buffer_release = NULL;
+    if(buffer->buffer_release)
+    {
+        zwp_linux_buffer_release_v1_destroy(buffer->buffer_release);
+        buffer->buffer_release = NULL;
+    }
 }
 
 static const struct zwp_linux_buffer_release_v1_listener buffer_release_listener = {
@@ -2348,6 +2380,8 @@ _PostWindowBackBufferFence(
     __WLEGLSurface egl_surface = window->driver_private;
     __WLEGLDisplay display = egl_surface->display;
     int fence_fd = -1;
+    gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
+    gcoHAL_GetHardwareType(gcvNULL, &hwType);
 
     if (__wl_egl_window_validate(window))
     {
@@ -2358,10 +2392,19 @@ _PostWindowBackBufferFence(
 
     /* Set display to window. */
     egl_surface = window->driver_private;
-    if(create_fence(Display, &fence_fd))
+    if(hwType != gcvHARDWARE_VG && display->use_explicit_sync)
     {
-        return EGL_FALSE;
+        if(create_fence(Display, &fence_fd))
+        {
+            return EGL_FALSE;
+        }
     }
+    else
+    {
+        /*Commit true for 2D VG hardware or non explicit sync*/
+        gcoHAL_Commit(gcvNULL, gcvTRUE);
+    }
+
     if (display->use_explicit_sync)
     {
         if(egl_surface->client_fence_fd > 0)
