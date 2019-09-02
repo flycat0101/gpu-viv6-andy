@@ -6160,7 +6160,8 @@ gctBOOL _CheckAlwaysInlineFunction(
     IN OUT VIR_Shader      *pShader,
     IN  VSC_HW_CONFIG      *pHwCfg,
     IN gctBOOL              bNeedToCutDownWorkGroupSize,
-    IN OUT VIR_Function    *pFunc
+    IN OUT VIR_Function    *pFunc,
+    INOUT gctBOOL          *pHasFuncNeedToForceInline
     )
 {
     gctBOOL                 canSrc0OfImgRelatedBeTemp = pHwCfg->hwFeatureFlags.canSrc0OfImgLdStBeTemp;
@@ -6174,6 +6175,10 @@ gctBOOL _CheckAlwaysInlineFunction(
 
     if (bNeedToCutDownWorkGroupSize)
     {
+        if (pHasFuncNeedToForceInline)
+        {
+            *pHasFuncNeedToForceInline = gcvTRUE;
+        }
         return gcvTRUE;
     }
 
@@ -6353,25 +6358,16 @@ VSC_ErrCode _CheckAlwaysInlineFunctions(
         /* If this function is set before, then it means all its caller have been marked too. */
         if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_ALWAYSINLINE))
         {
-            if (pHasFuncNeedToForceInline)
-            {
-                *pHasFuncNeedToForceInline = gcvTRUE;
-            }
             continue;
         }
 
-        alwaysInline = _CheckAlwaysInlineFunction(pShader, pHwCfg, bNeedToCutDownWorkGroupSize, pFunc);
+        alwaysInline = _CheckAlwaysInlineFunction(pShader, pHwCfg, bNeedToCutDownWorkGroupSize, pFunc, pHasFuncNeedToForceInline);
 
         /* Mark this function and all its caller functions. */
         if (alwaysInline)
         {
             errCode = _MarkFunctionAndAllCallerFunctions(pShader, pFunc);
             ON_ERROR(errCode, "mark function and all its caller functions.");
-
-            if (pHasFuncNeedToForceInline)
-            {
-                *pHasFuncNeedToForceInline = gcvTRUE;
-            }
         }
     }
 
