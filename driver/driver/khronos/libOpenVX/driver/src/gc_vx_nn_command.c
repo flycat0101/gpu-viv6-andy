@@ -4814,10 +4814,9 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                             baseF16 = base << 6;
                             pwlLUTBase[base] = baseF16;
                         }
-                        pwlLUTBase[0x1F0] = 0x7c00;         /* Half float positive infinity. */
-                        for (base = 0x1F1; base < 0x200; base++)
+                        for (base = 0x1F0; base < 0x200; base++)
                         {
-                            pwlLUTBase[base] = 0x7e00;      /* Half float positive NaN. */
+                            pwlLUTBase[base] = 0x7bff;      /* Half float positive infinity clamp to max. */
                         }
                         for (base = 0x200; base < 0x400; base++)
                         {
@@ -4835,10 +4834,9 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                             baseF21 = base << 11;
                             pwlLUTBaseEx[base] = baseF21;
                         }
-                        pwlLUTBaseEx[0x1F0] = 0xf8000;         /* Half float positive infinity. */
-                        for (base = 0x1F1; base < 0x200; base++)
+                        for (base = 0x1F0; base < 0x200; base++)
                         {
-                            pwlLUTBaseEx[base] = 0xfc000;      /* Half float positive NaN. */
+                            pwlLUTBaseEx[base] = 0xf7fff;      /* Half float positive infinity clamp to max. */
                         }
                         for (base = 0x200; base < 0x400; base++)
                         {
@@ -4871,16 +4869,13 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                             pwlValue = baseF32 * scale;
                             pwlLUTBase[base] = Fp32toFp16(pwlValue);
                         }
-                        pwlLUTBase[0x1F0] = 0x7c00;         /* Half float positive infinity. */
-                        pwlLUTBase[0x3F0] = 0xfc00;         /* Half float negative infinity. */
-                        /* NaN in, NaN out. */
-                        for (base = 0x1F1; base < 0x200; base++)
+                        for (base = 0x1F0; base < 0x200; base++)
                         {
-                            pwlLUTBase[base] = 0x7e00;      /* Half float positive NaN. */
+                            pwlLUTBase[base] = 0x7bff;      /* Half float positive infinity clamp to max. */
                         }
-                        for (base = 0x3F1; base < 0x400; base++)
+                        for (base = 0x3F0; base < 0x400; base++)
                         {
-                            pwlLUTBase[base] = 0xfe00;      /* Half float negative NaN. */
+                            pwlLUTBase[base] = 0xfbff;      /* Half float negative infinity clamp to max. */
                         }
                     }
                     else
@@ -4906,16 +4901,13 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                             pwlValue = baseF32 * scale;
                             pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                         }
-                        pwlLUTBaseEx[0x1F0] = 0xf8000;          /* Half float positive infinity. */
-                        pwlLUTBaseEx[0x3F0] = 0x1f8000;         /* Half float negative infinity. */
-                        /* NaN in, NaN out. */
-                        for (base = 0x1F1; base < 0x200; base++)
+                        for (base = 0x1F0; base < 0x200; base++)
                         {
-                            pwlLUTBaseEx[base] = 0xfc000;      /* Half float positive NaN. */
+                            pwlLUTBaseEx[base] = 0xf7fff;      /* Half float positive infinity clamp to max. */
                         }
-                        for (base = 0x3F1; base < 0x400; base++)
+                        for (base = 0x3F0; base < 0x400; base++)
                         {
-                            pwlLUTBaseEx[base] = 0x1fc000;      /* Half float negative NaN. */
+                            pwlLUTBaseEx[base] = 0x1f7fff;      /* Half float negative infinity clamp to max. */
                         }
                     }
                     break;
