@@ -978,7 +978,11 @@ VX_PRIVATE_API gctSIZE_T loadBinaryEntry(
     vx_uint32 LCDEntryOffsetPos = 0;
     gctSIZE_T readSize = 0;
     vx_status status = VX_SUCCESS;
+    vx_uint32 verison[2] = {0};
     gcmHEADER_ARG("binLoad=%p", binLoad);
+
+    gcoOS_Seek(gcvNULL, binLoad->dFile, 4, gcvFILE_SEEK_SET);
+    gcoOS_Read(gcvNULL, binLoad->dFile, sizeof(vx_uint32), verison, &readSize);
 
     LCDEntryOffsetPos = sizeof(vx_binary_header_s) + sizeof(vx_binary_memory_pool_info_s)
                             + sizeof(vx_binary_axi_sram_info_s)
@@ -988,6 +992,11 @@ VX_PRIVATE_API gctSIZE_T loadBinaryEntry(
                             + sizeof(vx_binary_entry_s)/*opeartionTable*/
                             + sizeof(vx_binary_entry_s); /*LCDTable*/
 
+    if (verison[0] < 0x00010003)
+    {
+        LCDEntryOffsetPos -= sizeof(vx_binary_feature_database_s);
+    }
+    readSize = 0;
 
     gcoOS_Seek(gcvNULL, binLoad->dFile, LCDEntryOffsetPos, gcvFILE_SEEK_SET);
     gcoOS_Read(gcvNULL, binLoad->dFile, sizeof(vx_uint32), array, &readSize);
