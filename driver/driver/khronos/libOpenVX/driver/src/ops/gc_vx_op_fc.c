@@ -39,17 +39,6 @@ extern vx_status vxnneOperation_AddReference(
     vx_reference                  reference,
     vxnne_operation_reference_e   refType
     );
-extern vx_tensor
-vxoTensor_CreateTensorExt(
-    vx_context context,
-    vx_graph graph,
-    const vx_tensor_create_params_t* tensor_create_params,
-    vx_uint32 * strides,
-    vx_view_region_s * viewRegion,
-    vx_tensor_buffer_s * tensorBuffer,
-    vx_bool is_virtual,
-    vx_reference_kind_e kind
-);
 
 vx_status vxoFC_NN_Trans_Initialize(
     vxnne_tp_operation operation_tp,
@@ -440,7 +429,7 @@ vx_status vxoFCOperation_Initialize(
                 params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
             }
 
-            aligned_tensor = vxoTensor_CreateTensorExt(context, node->graph, &params, strides, VX_NULL, VX_NULL, vx_true_e, VX_REF_INTERNAL);
+            aligned_tensor = vxoTensor_CreateTensorWithStrides(context, node->graph, &params, strides, vx_true_e);
             if (!aligned_tensor)
             {
                 vxError("%s() - %d: Failed to create tensor.", __FUNCTION__, __LINE__);

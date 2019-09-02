@@ -1921,6 +1921,9 @@ typedef struct _vx_tensor_t
 
     vx_int8                                 fixedPointPos;
 
+    vx_enum                                 dataFormat;
+    vx_uint32                               elementSize;
+
     vx_float32                              scale;
     vx_int32                                zeroPoint;
     vx_enum                                 quantFormat;

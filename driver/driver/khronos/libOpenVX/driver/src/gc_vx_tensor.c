@@ -404,17 +404,16 @@ vxoTensor_Create(
         tensor->fixedPointPos = tensor_create_params->quant_data.dfp.fixed_point_pos;
     }
 
+    elementSize = vxoTensor_GetDataSizeByFormat(tensor_create_params->data_format);
+    if (!elementSize) goto OnError;
+
     if (!(tensorType & VX_TENSOR_SHARED))
     {
         tensor->tensorBuffer = (vx_tensor_buffer_s *)vxAllocateAndZeroMemory(sizeof(vx_tensor_buffer_s));
         if (tensor->tensorBuffer == VX_NULL) goto OnError;
 
-        elementSize = vxoTensor_GetDataSizeByFormat(tensor_create_params->data_format);
-        if (!elementSize) goto OnError;
-
-        tensor->tensorBuffer->elementSize = elementSize;
-        tensor->tensorBuffer->dataFormat = tensor_create_params->data_format;
-
+        tensor->tensorBuffer->elementSize = tensor->elementSize = elementSize;
+        tensor->tensorBuffer->dataFormat = tensor->dataFormat = tensor_create_params->data_format;
 
         if (tensor->quantFormat == VX_QUANT_AFFINE_SCALE)
         {
@@ -477,10 +476,13 @@ vxoTensor_Create(
         for (i = 0; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
         {
             tensor->dims[i] = viewRegion != VX_NULL ? viewRegion->viewEnds[i] - viewRegion->viewStarts[i] : uSizes[i];
-            tensor->strides[i] = strides != VX_NULL ? strides[i] : i ? uSizes[i-1] * tensor->strides[i-1] : tensorBuffer->elementSize;
+            tensor->strides[i] = strides != VX_NULL ? strides[i] : i ? uSizes[i-1] * tensor->strides[i-1] : elementSize;
             tensor->viewRegion.viewStarts[i] = 0;
             tensor->viewRegion.viewEnds[i] = uSizes[i];
         }
+
+        tensor->dataFormat = tensor_create_params->data_format;
+        tensor->elementSize = elementSize;
 
         tensor->tensorBuffer = tensorBuffer;
         tensor->isVirtual = vx_false_e;
@@ -509,7 +511,7 @@ vxoTensor_Create(
 
     tensor->tensorBuffer->bufRefCount++;
 
-    tensor->tensorBuffer->roundingMode = ((tensor->tensorBuffer->dataFormat == VX_TYPE_INT8) || (tensor->tensorBuffer->dataFormat == VX_TYPE_INT16))
+    tensor->tensorBuffer->roundingMode = ((tensor->dataFormat == VX_TYPE_INT8) || (tensor->dataFormat == VX_TYPE_INT16))
                                          ? VX_NN_ROUNDING_MODE_RTNE : VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING;
 
     if (tensor->base.context->options.nnRoundingMode)
@@ -900,18 +902,16 @@ vxoTensor_CopyTensorPatch(
     )
 {
     vx_uint32 usrElemSize, totalSize;
-    vx_tensor_buffer_s * dim;
     gctPOINTER logical;
     gcmHEADER_ARG("tensor=%p, view=%p, user_addr=%p, user_ptr=%p, usage=0x%x", tensor, view, user_addr, user_ptr, usage);
 
     usrElemSize = user_addr->dimStridesUser[0];
-    dim = tensor->tensorBuffer;
 
     vxoTensor_GetTensorBaseMemory(tensor, (vx_uint8_ptr*)&logical, VX_NULL);
 
     if (view == VX_NULL &&
         !tensor->isViewed &&
-        usrElemSize == dim->elementSize &&
+        usrElemSize == tensor->elementSize &&
         vxoTensor_ViewRegionIsEqualAddressing(&tensor->viewRegion, user_addr))
     {
         /* Quick path for full tensor copy */
@@ -944,7 +944,7 @@ vxoTensor_CopyTensorPatch(
          *       Initialize it to tensor format if same size.
          *       Otherwise init it to float32 or float16 first.
          */
-        if (usrElemSize == dim->elementSize) usrDataFormat = TENSOR_DATA_TYPE(tensor);
+        if (usrElemSize == tensor->elementSize) usrDataFormat = TENSOR_DATA_TYPE(tensor);
         else if (usrElemSize == 4) usrDataFormat = VX_TYPE_FLOAT32;
         else if (usrElemSize == 2) usrDataFormat = VX_TYPE_FLOAT16;
         else
@@ -3202,44 +3202,6 @@ _CreateTensor(
     return tensor;
 }
 
-vx_tensor
-vxoTensor_CreateTensorExt(
-    vx_context context,
-    vx_graph graph,
-    const vx_tensor_create_params_t* tensor_create_params,
-    vx_uint32 * strides,
-    vx_view_region_s * viewRegion,
-    vx_tensor_buffer_s * tensorBuffer,
-    vx_bool is_virtual,
-    vx_reference_kind_e kind
-)
-{
-
-    vx_tensor tensor;
-
-    tensor = vxoTensor_Create(
-        context,
-        tensor_create_params,
-        strides,
-        viewRegion,
-        tensorBuffer,
-        0,
-        is_virtual ? VX_TENSOR_VIRTUAL : VX_TENSOR_NORMAL,
-        kind
-    );
-
-    if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) return VX_NULL;
-
-    if (is_virtual)
-    {
-        tensor->base.scope = (vx_reference)graph;
-        TENSOR_GRAPH(tensor) = graph;
-        graph->virtTensorNum++;
-    }
-
-    return tensor;
-}
-
 VX_INTERNAL_API vx_tensor
 vxoTensor_CreateTensor(
     vx_context context,
@@ -3260,6 +3222,38 @@ vxoTensor_CreateTensorEx(
     )
 {
     return _CreateTensor(context, graph, tensor_create_params, is_virtual, VX_REF_EXTERNAL);
+}
+
+VX_INTERNAL_API vx_tensor
+vxoTensor_CreateTensorWithStrides(
+    vx_context context,
+    vx_graph graph,
+    const vx_tensor_create_params_t* tensor_create_params,
+    vx_uint32 * strides,
+    vx_bool is_virtual
+    )
+{
+    vx_tensor tensor = vxoTensor_Create(
+                            context,
+                            tensor_create_params,
+                            strides,
+                            VX_NULL,
+                            VX_NULL,
+                            0,
+                            is_virtual ? VX_TENSOR_VIRTUAL : VX_TENSOR_NORMAL,
+                            VX_REF_INTERNAL
+                            );
+
+    if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) return VX_NULL;
+
+    if (is_virtual)
+    {
+        tensor->base.scope = (vx_reference)graph;
+        TENSOR_GRAPH(tensor) = graph;
+        graph->virtTensorNum++;
+    }
+
+    return tensor;
 }
 
 VX_INTERNAL_API vx_status
@@ -3797,5 +3791,77 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetTensorAttribute(vx_tensor tensor, vx_enu
     gcmFOOTER_NO();
     return VX_SUCCESS;
 }
+
+VX_INTERNAL_API vx_tensor vxoTensor_ReformatTensor(vx_tensor tensor, vx_enum format)
+{
+    vx_uint32 i, newDims[VX_CONTEXT_TENSOR_MAX_DIMENSION], offset = 0, fSize;
+    vx_context context = GET_CONTEXT(tensor);
+    vx_tensor_create_params_t tensor_create_params;
+
+    if (!vxoTensor_IsValidTensor(tensor))
+    {
+        return VX_NULL;
+    }
+
+    if (format == tensor->dataFormat)
+    {
+        return tensor;
+    }
+
+    if (!vxoTensor_DataFormatIsSupported(format))
+    {
+        return VX_NULL;
+    }
+
+    fSize = vxoTensor_GetDataSizeByFormat(format);
+
+    if (tensor->isViewed)
+    {
+        offset = vxoTensor_CalculateDimOffsetByStarts(tensor, TENSOR_VIEW_STARTS(tensor));
+    }
+
+    for (i = 0; i < tensor->dimCount; i++)
+    {
+        newDims[i] = TENSOR_VIEW_SIZE_INDEX(tensor, i);
+    }
+
+    if (fSize > tensor->tensorBuffer->elementSize)
+    {
+        vx_uint32 multiple = fSize / tensor->tensorBuffer->elementSize;
+        vxmASSERT(fSize % tensor->tensorBuffer->elementSize == 0);
+        vxmASSERT(newDims[0] % multiple == 0);
+        newDims[0] /= multiple;
+    }
+    else
+    {
+        vxmASSERT(tensor->tensorBuffer->elementSize % fSize == 0);
+        newDims[0] *= tensor->tensorBuffer->elementSize / fSize;
+    }
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = tensor->dimCount;
+    tensor_create_params.sizes = newDims;
+    tensor_create_params.data_format = format;
+    tensor_create_params.quant_format = TENSOR_QUANT_TYPE(tensor);
+    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(tensor);
+    }
+    else
+    {
+        tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(tensor);
+        tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(tensor);
+    }
+
+    return vxoTensor_Create(context,
+                            &tensor_create_params,
+                            VX_NULL,
+                            VX_NULL,
+                            tensor->tensorBuffer,
+                            tensor->baseAddressOffset + offset,
+                            tensor->isVirtual ? VX_TENSOR_SHARED | VX_TENSOR_VIRTUAL : VX_TENSOR_SHARED,
+                            VX_REF_EXTERNAL);
+}
+
 
 

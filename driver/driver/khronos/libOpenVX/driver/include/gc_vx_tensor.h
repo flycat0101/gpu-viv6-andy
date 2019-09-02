@@ -39,7 +39,7 @@ EXTERN_C_BEGIN
     (tensor)->tensorBuffer->memory.dims[0]
 
 #define TENSOR_DATA_TYPE(tensor) \
-    (tensor)->tensorBuffer->dataFormat
+    (tensor)->dataFormat
 
 #define TENSOR_POS(tensor) \
     (tensor)->fixedPointPos
@@ -54,7 +54,7 @@ EXTERN_C_BEGIN
     (tensor)->zeroPoint
 
 #define TENSOR_DATA_SIZE(tensor) \
-    (tensor)->tensorBuffer->elementSize
+    (tensor)->elementSize
 
 #define TENSOR_ROUNDING_MODE(tensor) \
     (tensor)->tensorBuffer->roundingMode
@@ -343,6 +343,22 @@ vxoCopyTensorPatch(
     vx_enum usage,
     vx_enum user_mem_type
     );
+
+VX_INTERNAL_API vx_tensor
+vxoTensor_CreateTensorWithStrides(
+    vx_context context,
+    vx_graph graph,
+    const vx_tensor_create_params_t* tensor_create_params,
+    vx_uint32 * strides,
+    vx_bool is_virtual
+    );
+
+VX_INTERNAL_API vx_tensor
+vxoTensor_ReformatTensor(
+    vx_tensor tensor,
+    vx_enum format
+    );
+
 EXTERN_C_END
 
 #endif /* __GC_VX_TENSOR_H__*/
