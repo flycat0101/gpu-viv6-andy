@@ -812,6 +812,11 @@ __vkDeviceMemory* __vkGetPushConstantsMem(
     __vkCommandBuffer *cmdBuf,
     uint32_t size
     );
+
+VkBool32 __vkDoImageFill(
+    VkCommandBuffer commandBuffer,
+    VkImage srcImage
+    );
 #endif /* __gc_vk_cmdbuf_h__ */
 
 

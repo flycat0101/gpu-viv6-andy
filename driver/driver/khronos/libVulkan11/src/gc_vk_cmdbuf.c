@@ -1385,9 +1385,18 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdResolveImage(
     uint32_t ir, il;
     __vkImage *pSrcImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, srcImage);
     __vkImage *pDstImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, dstImage);
-    __vkDevContext *devCtx = ((__vkCommandBuffer*)commandBuffer)->devCtx;
+    __vkCommandBuffer *cmdBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandBuffer*, commandBuffer);
+    __vkDevContext *devCtx = cmdBuffer->devCtx;
     VkResult result = VK_SUCCESS;
     VkBool32 rawCopy = VK_FALSE;
+
+    /*if the HW can't support 256byte per cacheline, it can't support 128bpp MSAA*/
+    if (pSrcImage->formatInfo.bitsPerBlock == 128 &&
+        !devCtx->database->CACHE128B256BPERLINE)
+    {
+        if (__vkDoImageFill(commandBuffer, dstImage))
+            return;
+    }
 
     for (ir = 0; ir < regionCount; ++ir)
     {
@@ -3443,6 +3452,87 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdDispatchBase(
     __vk_utils_insertComputeCmdRes(commandBuffer, VK_NULL_HANDLE);
 #endif
     __VK_VERIFY_OK((*devCtx->chipFuncs->Dispatch)(commandBuffer, baseGroupX, baseGroupY, baseGroupZ, groupCountX, groupCountY, groupCountZ));
+}
+
+VkBool32 __vkDoImageFill(
+    VkCommandBuffer commandBuffer,
+    VkImage dstImage
+    )
+{
+    __vkCommandBuffer *cmdBuf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandBuffer*, commandBuffer);
+    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
+    __vkImage *dstImg = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, dstImage);
+
+    if (!pip)
+    {
+        return VK_FALSE;
+    }
+    else
+    {
+        uint32_t width = dstImg->createInfo.extent.width;
+        uint32_t height = dstImg->createInfo.extent.height;
+        uint32_t layerCount = dstImg->createInfo.arrayLayers;
+        uint32_t layerSize = width * height * (dstImg->formatInfo.bitsPerBlock >> 3);
+        uint32_t pixelDataSize = layerCount * layerSize;
+        VkBuffer srcBuffer = 0;
+        __vkBuffer *srcbuf = VK_NULL_HANDLE;
+        VkDeviceMemory bufMem = 0;
+        VkResult result = VK_SUCCESS;
+
+        const VkBufferCreateInfo bufferParams =
+        {
+            VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            VK_NULL_HANDLE,
+            0u,
+            pixelDataSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_SHARING_MODE_EXCLUSIVE,
+            0u,
+            0u,
+        };
+
+        const VkMemoryAllocateInfo allocInfo  =
+        {
+            VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            VK_NULL_HANDLE,
+            pixelDataSize,
+            0,
+        };
+
+        const VkBufferImageCopy copyRegion  =
+        {
+            0u,
+            width,
+            height,
+            {
+                VK_IMAGE_ASPECT_COLOR_BIT,
+                0u,
+                0u,
+                layerCount,
+            },
+            { 0, 0, 0 },
+            {width, height, dstImg->createInfo.extent.depth}
+        };
+
+        __vk_CreateBuffer((VkDevice)(cmdBuf->devCtx), &bufferParams, VK_NULL_HANDLE, &srcBuffer);
+
+        srcbuf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, srcBuffer);
+        __VK_ONERROR(__vk_AllocateMemory((VkDevice)(cmdBuf->devCtx), &allocInfo, VK_NULL_HANDLE, &bufMem));
+        srcbuf->memory = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory*, bufMem);
+
+        cmdBuf->devCtx->chipFuncs->tweakCopy(commandBuffer, dstImage, srcBuffer);
+
+        __vk_CmdCopyBufferToImage(commandBuffer, srcBuffer, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+        return VK_TRUE;
+
+OnError:
+        if (bufMem)
+        {
+            __vk_FreeMemory((VkDevice)(cmdBuf->devCtx), bufMem, VK_NULL_HANDLE);
+        }
+        return VK_FALSE;
+    }
 }
 
 

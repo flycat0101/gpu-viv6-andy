@@ -1419,6 +1419,1467 @@ static VkResult deqp_vk_msaa_128bpp_04_copy(
     return VK_SUCCESS;
 }
 
+static VkBool32 deqp_vk_msaa_128bpp_05_match(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo
+    )
+{
+    if (devCtx->database->CACHE128B256BPERLINE)
+    {
+        return VK_FALSE;
+    }
+
+    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
+    {
+        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
+        __vkRenderPass *rdp = pip->renderPass;
+        float x,y,width,height;
+        VkBool32 ret = VK_TRUE;
+        uint32_t matchCount = 0;
+        /* Check state match */
+        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
+        {
+            x = graphicCreateInfo->pViewportState->pViewports->x;
+            y = graphicCreateInfo->pViewportState->pViewports->y;
+            width = graphicCreateInfo->pViewportState->pViewports->width;
+            height = graphicCreateInfo->pViewportState->pViewports->height;
+
+            ret = ret & (x == 0.0 && y == 0.0 && width == 16.0 && height == 16.0);
+            matchCount++;
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (pip->renderPass->attachments)
+        {
+            ret = ret & (pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SFLOAT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SINT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_UINT);
+            matchCount++;
+
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (graphicCreateInfo->pMultisampleState)
+        {
+            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_4_BIT);
+            matchCount++;
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        /*Check shader Match*/
+        if(graphicCreateInfo->stageCount == 2)
+        {
+            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
+            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[1]);
+            __vkShaderModule *pVsShaderModule = gcvNULL,*pPsShaderModule = gcvNULL;
+
+            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
+            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
+
+            ret = ret & (pVsShaderModule->codeSize == 616 &&
+                         pPsShaderModule->codeSize == 312);
+            matchCount++;
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        if (rdp->subPassInfoCount == 1 && rdp->multiViewInfo != VK_NULL_HANDLE)
+        {
+            __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
+            __vkSubpassViewInfo *subViewInfo = multiView->subPassViewInfo;
+
+            if (multiView->enabledMultiView)
+            {
+                ret = ret & (subViewInfo[0].validViewCount == 4 &&
+                             subViewInfo[0].enabledViewIdx[0] == 0 &&
+                             subViewInfo[0].enabledViewIdx[1] == 1 &&
+                             subViewInfo[0].enabledViewIdx[2] == 2 &&
+                             subViewInfo[0].enabledViewIdx[3] == 3);
+                matchCount++;
+
+                if (!ret)
+                    return VK_FALSE;
+            }
+        }
+
+        if (matchCount != 5)
+        {
+            return VK_FALSE;
+        }
+
+        return ret;
+    }
+
+    return VK_FALSE;
+}
+
+static VkResult deqp_vk_msaa_128bpp_05_copy(
+    __vkCommandBuffer *cmd,
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    __vkImage *srcImg,
+    __vkBuffer *dstBuf,
+    halti5_tweak_handler *handler
+    )
+{
+    VkFormat dstFormat = pip->renderPass->attachments[0].format;
+    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
+    float *dstPtr = (float *)dstAddress;
+    uint32_t layerCount = srcImg->createInfo.arrayLayers;
+    uint32_t x, y, k, m, n, j, i, layer;
+    uint32_t width = srcImg->createInfo.extent.width;
+    uint32_t height = srcImg->createInfo.extent.height;
+    uint32_t halfW = width >> 1;
+    uint32_t halfH = height >> 1;
+
+    float Color[9][4] = {
+        1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5,
+        0.0, 1.0, 0.0, 1.0, 0.0, 0.5, 0.0, 0.5,
+        0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5,
+        1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5,
+        0.0, 0.0, 0.0, 0.0
+    };
+
+    __VK_ASSERT(layerCount == 4);
+    __VK_ASSERT(dstFormat == VK_FORMAT_R32G32B32A32_SFLOAT);
+
+    for (layer = 0; layer < layerCount; layer++)
+    {
+        for (y = 0; y < width; y++)
+        {
+            for (x = 0; x < height; x++)
+            {
+                /*choose up or down*/
+                m = (y <= (halfH - 1)) ? 0 : 1;
+                /*choose left or right*/
+                n = (x <= (halfW - 1)) ? (halfW - 1) : (width - 1);
+                /*choose color*/
+                j = (x <= (halfW - 1)) ? 0 : 4;
+                i = (y <= (halfH - 1)) ? y : (y - 8);
+
+                if (x <= (n - i - 1) && (n > i))
+                {
+                    for (k = 0; k < 4; k++)
+                    {
+                        dstPtr[k] = Color[2*m+j][k];
+                    }
+                    dstPtr += 4;
+                }
+                else if (x == n - i)
+                {
+                    for (k = 0; k < 4; k++)
+                    {
+                        dstPtr[k] = Color[2*m+j+1][k];
+                    }
+                    dstPtr += 4;
+                }
+                else
+                {
+                    for (k = 0; k < 4; k++)
+                    {
+                        dstPtr[k] = Color[8][k];
+                    }
+                    dstPtr += 4;
+                }
+            }
+        }
+    }
+
+    return VK_SUCCESS;
+}
+
+static VkBool32 deqp_vk_msaa_128bpp_06_match(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo
+    )
+{
+    if (devCtx->database->CACHE128B256BPERLINE)
+    {
+        return VK_FALSE;
+    }
+
+    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
+    {
+        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
+        __vkRenderPass *rdp = pip->renderPass;
+        float x,y,width,height;
+        VkBool32 ret = VK_TRUE;
+        uint32_t matchCount = 0;
+        /* Check state match */
+        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
+        {
+            x = graphicCreateInfo->pViewportState->pViewports->x;
+            y = graphicCreateInfo->pViewportState->pViewports->y;
+            width = graphicCreateInfo->pViewportState->pViewports->width;
+            height = graphicCreateInfo->pViewportState->pViewports->height;
+
+            ret = ret & (x == 0.0 && y == 0.0 && width == 128.0 && height == 128.0);
+            matchCount++;
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (pip->renderPass->attachments)
+        {
+            ret = ret & (pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SFLOAT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SINT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_UINT);
+            matchCount++;
+
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (graphicCreateInfo->pMultisampleState)
+        {
+            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_4_BIT);
+            matchCount++;
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        /*Check shader Match*/
+        if(graphicCreateInfo->stageCount == 2)
+        {
+            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
+            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[1]);
+            __vkShaderModule *pVsShaderModule = gcvNULL,*pPsShaderModule = gcvNULL;
+
+            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
+            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
+
+            ret = ret & (pVsShaderModule->codeSize == 616 &&
+                         pPsShaderModule->codeSize == 312);
+            matchCount++;
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        if (rdp->subPassInfoCount == 4 && rdp->multiViewInfo != VK_NULL_HANDLE)
+        {
+            __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
+            __vkSubpassViewInfo *subViewInfo = multiView->subPassViewInfo;
+
+            if (multiView->enabledMultiView)
+            {
+                ret = ret & (subViewInfo[0].validViewCount == 1 &&
+                             subViewInfo[0].enabledViewIdx[0] == 0 &&
+                             subViewInfo[1].validViewCount == 1 &&
+                             subViewInfo[1].enabledViewIdx[0] == 1 &&
+                             subViewInfo[2].validViewCount == 1 &&
+                             subViewInfo[2].enabledViewIdx[0] == 2 &&
+                             subViewInfo[3].validViewCount == 1 &&
+                             subViewInfo[3].enabledViewIdx[0] == 3);
+                matchCount++;
+
+                if (!ret)
+                    return VK_FALSE;
+            }
+        }
+
+        if (matchCount != 5)
+        {
+            return VK_FALSE;
+        }
+
+        return ret;
+    }
+
+    return VK_FALSE;
+}
+
+static VkResult deqp_vk_msaa_128bpp_06_copy(
+    __vkCommandBuffer *cmd,
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    __vkImage *srcImg,
+    __vkBuffer *dstBuf,
+    halti5_tweak_handler *handler
+    )
+{
+    VkFormat dstFormat = pip->renderPass->attachments[0].format;
+    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
+    float *dstPtr = (float *)dstAddress;
+    uint32_t layerCount = srcImg->createInfo.arrayLayers;
+    uint32_t x, y, k, layer;
+    uint32_t width = srcImg->createInfo.extent.width;
+    uint32_t height = srcImg->createInfo.extent.height;
+    uint32_t halfW = width >> 1;
+    uint32_t halfH = height >> 1;
+
+    float Color[9][4] = {
+        1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5,
+        0.0, 1.0, 0.0, 1.0, 0.0, 0.5, 0.0, 0.5,
+        0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5,
+        1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5,
+        0.0, 0.0, 0.0, 0.0
+    };
+
+    __VK_ASSERT(layerCount == 4);
+    __VK_ASSERT(dstFormat == VK_FORMAT_R32G32B32A32_SFLOAT);
+
+    for (layer = 0; layer < layerCount; layer++)
+    {
+        switch (layer)
+        {
+            case 0:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        if ((x < halfW - y - 1) &&
+                            (y < halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[0][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x == halfW - y - 1) &&
+                                 (y <= halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[1][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[8][k];
+                            }
+                            dstPtr += 4;
+                        }
+                    }
+                }
+                break;
+            case 1:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        if ((x < width - y - 1) &&
+                            (y > halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[2][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x == width - y - 1) &&
+                                 (y >= halfH))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[3][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[8][k];
+                            }
+                            dstPtr += 4;
+                        }
+                    }
+                }
+                break;
+            case 2:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        if ((x >= halfW) &&
+                            (x <= width - y - 2) &&
+                            (y <= halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[4][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x == width - y - 1) &&
+                                 (y < halfH))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[5][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[8][k];
+                            }
+                            dstPtr += 4;
+                        }
+                    }
+                }
+                break;
+            case 3:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        if ((x >= halfW) &&
+                            (y >= halfH) &&
+                            (x < width + halfW - y - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[6][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((y >= halfH) &&
+                                 (x == width + halfW - y -1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[7][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[8][k];
+                            }
+                            dstPtr += 4;
+                        }
+                    }
+                }
+                break;
+        }
+    }
+
+    return VK_SUCCESS;
+}
+
+static VkBool32 deqp_vk_msaa_128bpp_07_match(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo
+    )
+{
+    if (devCtx->database->CACHE128B256BPERLINE)
+    {
+        return VK_FALSE;
+    }
+
+    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
+    {
+        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
+        __vkRenderPass *rdp = pip->renderPass;
+        float x,y,width,height;
+        VkBool32 ret = VK_TRUE;
+        uint32_t matchCount = 0;
+        /* Check state match */
+        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
+        {
+            x = graphicCreateInfo->pViewportState->pViewports->x;
+            y = graphicCreateInfo->pViewportState->pViewports->y;
+            width = graphicCreateInfo->pViewportState->pViewports->width;
+            height = graphicCreateInfo->pViewportState->pViewports->height;
+
+            ret = ret & (x == 0.0 && y == 0.0 && width == 32.0 && height == 32.0);
+            matchCount++;
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (pip->renderPass->attachments)
+        {
+            ret = ret & (pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SFLOAT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SINT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_UINT);
+            matchCount++;
+
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (graphicCreateInfo->pMultisampleState)
+        {
+            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_4_BIT);
+            matchCount++;
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        /*Check shader Match*/
+        if(graphicCreateInfo->stageCount == 2)
+        {
+            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
+            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[1]);
+            __vkShaderModule *pVsShaderModule = gcvNULL,*pPsShaderModule = gcvNULL;
+
+            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
+            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
+
+            ret = ret & (pVsShaderModule->codeSize == 616 &&
+                         pPsShaderModule->codeSize == 312);
+            matchCount++;
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        if (rdp->subPassInfoCount == 4 && rdp->multiViewInfo != VK_NULL_HANDLE)
+        {
+            __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
+            __vkSubpassViewInfo *subViewInfo = multiView->subPassViewInfo;
+
+            if (multiView->enabledMultiView)
+            {
+                ret = ret & (subViewInfo[0].validViewCount == 4 &&
+                             subViewInfo[0].enabledViewIdx[0] == 0 &&
+                             subViewInfo[1].validViewCount == 4 &&
+                             subViewInfo[1].enabledViewIdx[1] == 1 &&
+                             subViewInfo[2].validViewCount == 4 &&
+                             subViewInfo[2].enabledViewIdx[2] == 2 &&
+                             subViewInfo[3].validViewCount == 4 &&
+                             subViewInfo[3].enabledViewIdx[3] == 3);
+                matchCount++;
+
+                if (!ret)
+                    return VK_FALSE;
+            }
+        }
+
+        if (matchCount != 5)
+        {
+            return VK_FALSE;
+        }
+
+        return ret;
+    }
+
+    return VK_FALSE;
+}
+
+static VkResult deqp_vk_msaa_128bpp_07_copy(
+    __vkCommandBuffer *cmd,
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    __vkImage *srcImg,
+    __vkBuffer *dstBuf,
+    halti5_tweak_handler *handler
+    )
+{
+    VkFormat dstFormat = pip->renderPass->attachments[0].format;
+    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
+    float *dstPtr = (float *)dstAddress;
+    uint32_t layerCount = srcImg->createInfo.arrayLayers;
+    uint32_t x, y, k, m, n, j, i, layer;
+    uint32_t width = srcImg->createInfo.extent.width;
+    uint32_t height = srcImg->createInfo.extent.height;
+    uint32_t halfW = width >> 1;
+    uint32_t halfH = height >> 1;
+
+    float Color[9][4] = {
+        1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5,
+        0.0, 1.0, 0.0, 1.0, 0.0, 0.5, 0.0, 0.5,
+        0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5,
+        1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5,
+        0.0, 0.0, 0.0, 0.0
+    };
+
+    __VK_ASSERT(layerCount == 5);
+    __VK_ASSERT(dstFormat == VK_FORMAT_R32G32B32A32_SFLOAT);
+
+    for (layer = 0; layer < layerCount; layer++)
+    {
+        for (y = 0; y < width; y++)
+        {
+            for (x = 0; x < height; x++)
+            {
+                if (layer < layerCount - 1)
+                {
+                    /*choose up or down*/
+                    m = (y <= (halfH - 1)) ? 0 : 1;
+                    /*choose left or right*/
+                    n = (x <= (halfW - 1)) ? (halfW - 1) : (width - 1);
+                    /*choose color*/
+                    j = (x <= (halfW - 1)) ? 0 : 4;
+                    i = (y <= (halfH - 1)) ? y : (y - 16);
+
+                    if (x <= (n - i - 1) && (n > i))
+                    {
+                        for (k = 0; k < 4; k++)
+                        {
+                            dstPtr[k] = Color[2*m+j][k];
+                        }
+                        dstPtr += 4;
+                    }
+                    else if (x == n - i)
+                    {
+                        for (k = 0; k < 4; k++)
+                        {
+                            dstPtr[k] = Color[2*m+j+1][k];
+                        }
+                        dstPtr += 4;
+                    }
+                    else
+                    {
+                        for (k = 0; k < 4; k++)
+                        {
+                            dstPtr[k] = Color[8][k];
+                        }
+                        dstPtr += 4;
+                    }
+                }
+                else
+                {
+                    for (k = 0; k < 4; k++)
+                    {
+                        dstPtr[k] = Color[8][k];
+                    }
+                    dstPtr += 4;
+                }
+            }
+        }
+    }
+
+    return VK_SUCCESS;
+}
+
+static VkBool32 deqp_vk_msaa_128bpp_08_match(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo
+    )
+{
+    if (devCtx->database->CACHE128B256BPERLINE)
+    {
+        return VK_FALSE;
+    }
+
+    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
+    {
+        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
+        __vkRenderPass *rdp = pip->renderPass;
+        float x,y,width,height;
+        VkBool32 ret = VK_TRUE;
+        uint32_t matchCount = 0;
+        /* Check state match */
+        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
+        {
+            x = graphicCreateInfo->pViewportState->pViewports->x;
+            y = graphicCreateInfo->pViewportState->pViewports->y;
+            width = graphicCreateInfo->pViewportState->pViewports->width;
+            height = graphicCreateInfo->pViewportState->pViewports->height;
+
+            ret = ret & (x == 0.0 && y == 0.0 && width == 64.0 && height == 64.0);
+            matchCount++;
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (pip->renderPass->attachments)
+        {
+            ret = ret & (pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SFLOAT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SINT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_UINT);
+            matchCount++;
+
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (graphicCreateInfo->pMultisampleState)
+        {
+            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_4_BIT);
+            matchCount++;
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        /*Check shader Match*/
+        if(graphicCreateInfo->stageCount == 2)
+        {
+            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
+            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[1]);
+            __vkShaderModule *pVsShaderModule = gcvNULL,*pPsShaderModule = gcvNULL;
+
+            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
+            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
+
+            ret = ret & (pVsShaderModule->codeSize == 616 &&
+                         pPsShaderModule->codeSize == 312);
+            matchCount++;
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        if (rdp->subPassInfoCount == 4 && rdp->multiViewInfo != VK_NULL_HANDLE)
+        {
+            __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
+            __vkSubpassViewInfo *subViewInfo = multiView->subPassViewInfo;
+
+            if (multiView->enabledMultiView)
+            {
+                ret = ret & (subViewInfo[0].validViewCount == 1 &&
+                             subViewInfo[0].enabledViewIdx[0] == 3 &&
+                             subViewInfo[1].validViewCount == 1 &&
+                             subViewInfo[1].enabledViewIdx[0] == 0 &&
+                             subViewInfo[2].validViewCount == 1 &&
+                             subViewInfo[2].enabledViewIdx[0] == 0 &&
+                             subViewInfo[3].validViewCount == 1 &&
+                             subViewInfo[3].enabledViewIdx[0] == 3);
+                matchCount++;
+
+                if (!ret)
+                    return VK_FALSE;
+            }
+        }
+
+        if (matchCount != 5)
+        {
+            return VK_FALSE;
+        }
+
+        return ret;
+    }
+
+    return VK_FALSE;
+}
+
+static VkResult deqp_vk_msaa_128bpp_08_copy(
+    __vkCommandBuffer *cmd,
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    __vkImage *srcImg,
+    __vkBuffer *dstBuf,
+    halti5_tweak_handler *handler
+    )
+{
+    VkFormat dstFormat = pip->renderPass->attachments[0].format;
+    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
+    float *dstPtr = (float *)dstAddress;
+    uint32_t layerCount = srcImg->createInfo.arrayLayers;
+    uint32_t x, y, k, layer;
+    uint32_t width = srcImg->createInfo.extent.width;
+    uint32_t height = srcImg->createInfo.extent.height;
+    uint32_t halfW = width >> 1;
+    uint32_t halfH = height >> 1;
+
+    float Color[9][4] = {
+        1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5,
+        0.0, 1.0, 0.0, 1.0, 0.0, 0.5, 0.0, 0.5,
+        0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5,
+        1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5,
+        0.0, 0.0, 0.0, 0.0
+    };
+
+    __VK_ASSERT(layerCount == 6);
+    __VK_ASSERT(dstFormat == VK_FORMAT_R32G32B32A32_SFLOAT);
+
+     for (layer = 0; layer < layerCount; layer++)
+    {
+        switch (layer)
+        {
+            case 0:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        if ((x >= halfW) &&
+                            (x <= width - y - 2) &&
+                            (y <= halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[4][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x == width - y - 1) &&
+                                 (y < halfH))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[5][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x < width - y - 1) &&
+                            (y > halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[2][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x == width - y - 1) &&
+                                 (y >= halfH))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[3][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[8][k];
+                            }
+                            dstPtr += 4;
+                        }
+                    }
+                }
+                break;
+            case 1:
+            case 2:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        for (k = 0; k < 4; k++)
+                        {
+                            dstPtr[k] = Color[8][k];
+                        }
+                        dstPtr += 4;
+                    }
+                }
+                break;
+            case 3:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        if ((x < halfW - y - 1) &&
+                            (y < halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[0][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x == halfW - y - 1) &&
+                                 (y <= halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[1][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x >= halfW) &&
+                                 (y >= halfH) &&
+                                 (x < width + halfW - y - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[6][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((y >= halfH) &&
+                                 (x == width + halfW - y -1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[7][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[8][k];
+                            }
+                            dstPtr += 4;
+                        }
+                    }
+                }
+                break;
+            case 4:
+            case 5:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        for (k = 0; k < 4; k++)
+                        {
+                            dstPtr[k] = Color[8][k];
+                        }
+                        dstPtr += 4;
+                    }
+                }
+                break;
+        }
+    }
+
+    return VK_SUCCESS;
+}
+
+static VkBool32 deqp_vk_msaa_128bpp_09_match(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo
+    )
+{
+    if (devCtx->database->CACHE128B256BPERLINE)
+    {
+        return VK_FALSE;
+    }
+
+    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
+    {
+        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
+        __vkRenderPass *rdp = pip->renderPass;
+        float x,y,width,height;
+        VkBool32 ret = VK_TRUE;
+        uint32_t matchCount = 0;
+        /* Check state match */
+        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
+        {
+            x = graphicCreateInfo->pViewportState->pViewports->x;
+            y = graphicCreateInfo->pViewportState->pViewports->y;
+            width = graphicCreateInfo->pViewportState->pViewports->width;
+            height = graphicCreateInfo->pViewportState->pViewports->height;
+
+            ret = ret & (x == 0.0 && y == 0.0 && width == 32.0 && height == 32.0);
+            matchCount++;
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (pip->renderPass->attachments)
+        {
+            ret = ret & (pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SFLOAT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SINT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_UINT);
+            matchCount++;
+
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (graphicCreateInfo->pMultisampleState)
+        {
+            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_4_BIT);
+            matchCount++;
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        /*Check shader Match*/
+        if(graphicCreateInfo->stageCount == 2)
+        {
+            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
+            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[1]);
+            __vkShaderModule *pVsShaderModule = gcvNULL,*pPsShaderModule = gcvNULL;
+
+            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
+            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
+
+            ret = ret & (pVsShaderModule->codeSize == 616 &&
+                         pPsShaderModule->codeSize == 312);
+            matchCount++;
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        if (rdp->subPassInfoCount == 4 && rdp->multiViewInfo != VK_NULL_HANDLE)
+        {
+            __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
+            __vkSubpassViewInfo *subViewInfo = multiView->subPassViewInfo;
+
+            if (multiView->enabledMultiView)
+            {
+                ret = ret & (subViewInfo[0].validViewCount == 2 &&
+                             subViewInfo[0].enabledViewIdx[0] == 0 &&
+                             subViewInfo[1].validViewCount == 2 &&
+                             subViewInfo[1].enabledViewIdx[0] == 1 &&
+                             subViewInfo[2].validViewCount == 2 &&
+                             subViewInfo[2].enabledViewIdx[0] == 0 &&
+                             subViewInfo[3].validViewCount == 2 &&
+                             subViewInfo[3].enabledViewIdx[0] == 1);
+                matchCount++;
+
+                if (!ret)
+                    return VK_FALSE;
+            }
+        }
+
+        if (matchCount != 5)
+        {
+            return VK_FALSE;
+        }
+
+        return ret;
+    }
+
+    return VK_FALSE;
+}
+
+static VkResult deqp_vk_msaa_128bpp_09_copy(
+    __vkCommandBuffer *cmd,
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    __vkImage *srcImg,
+    __vkBuffer *dstBuf,
+    halti5_tweak_handler *handler
+    )
+{
+    VkFormat dstFormat = pip->renderPass->attachments[0].format;
+    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
+    float *dstPtr = (float *)dstAddress;
+    uint32_t layerCount = srcImg->createInfo.arrayLayers;
+    uint32_t x, y, k, layer;
+    uint32_t width = srcImg->createInfo.extent.width;
+    uint32_t height = srcImg->createInfo.extent.height;
+    uint32_t halfW = width >> 1;
+    uint32_t halfH = height >> 1;
+
+    float Color[9][4] = {
+        1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5,
+        0.0, 1.0, 0.0, 1.0, 0.0, 0.5, 0.0, 0.5,
+        0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5,
+        1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5,
+        0.0, 0.0, 0.0, 0.0
+    };
+
+    __VK_ASSERT(layerCount == 4);
+    __VK_ASSERT(dstFormat == VK_FORMAT_R32G32B32A32_SFLOAT);
+
+     for (layer = 0; layer < layerCount; layer++)
+    {
+        switch (layer)
+        {
+            case 0:
+            case 2:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        if ((x < halfW - y - 1) &&
+                            (y < halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[0][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x == halfW - y - 1) &&
+                                 (y <= halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[1][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x >= halfW) &&
+                                 (x <= width - y - 2) &&
+                                 (y <= halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[4][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x == width - y - 1) &&
+                                 (y < halfH))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[5][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[8][k];
+                            }
+                            dstPtr += 4;
+                        }
+                    }
+                }
+                break;
+            case 1:
+            case 3:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        if ((x < width - y - 1) &&
+                            (y > halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[2][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x == width - y - 1) &&
+                                 (y >= halfH))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[3][k];
+                            }
+                            dstPtr += 4;
+                        }
+
+                        else if ((x >= halfW) &&
+                                 (y >= halfH) &&
+                                 (x < width + halfW - y - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[6][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((y >= halfH) &&
+                                 (x == width + halfW - y -1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[7][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[8][k];
+                            }
+                            dstPtr += 4;
+                        }
+                    }
+                }
+                break;
+        }
+    }
+
+    return VK_SUCCESS;
+}
+
+static VkBool32 deqp_vk_msaa_128bpp_10_match(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    void *createInfo
+    )
+{
+    if (devCtx->database->CACHE128B256BPERLINE)
+    {
+        return VK_FALSE;
+    }
+
+    if(pip->type == __VK_PIPELINE_TYPE_GRAPHICS)
+    {
+        VkGraphicsPipelineCreateInfo * graphicCreateInfo = (VkGraphicsPipelineCreateInfo *) createInfo;
+        __vkRenderPass *rdp = pip->renderPass;
+        float x,y,width,height;
+        VkBool32 ret = VK_TRUE;
+        uint32_t matchCount = 0;
+        /* Check state match */
+        if(graphicCreateInfo->pViewportState && graphicCreateInfo->pViewportState->pViewports)
+        {
+            x = graphicCreateInfo->pViewportState->pViewports->x;
+            y = graphicCreateInfo->pViewportState->pViewports->y;
+            width = graphicCreateInfo->pViewportState->pViewports->width;
+            height = graphicCreateInfo->pViewportState->pViewports->height;
+
+            ret = ret & (x == 0.0 && y == 0.0 && width == 16.0 && height == 16.0);
+            matchCount++;
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (pip->renderPass->attachments)
+        {
+            ret = ret & (pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SFLOAT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_SINT ||
+                         pip->renderPass->attachments[0].format == VK_FORMAT_R32G32B32A32_UINT);
+            matchCount++;
+
+            if(!ret)
+                return VK_FALSE;
+        }
+
+        if (graphicCreateInfo->pMultisampleState)
+        {
+            ret = ret & (graphicCreateInfo->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_4_BIT);
+            matchCount++;
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        /*Check shader Match*/
+        if(graphicCreateInfo->stageCount == 2)
+        {
+            const VkPipelineShaderStageCreateInfo *pVsStage = &(graphicCreateInfo->pStages[0]);
+            const VkPipelineShaderStageCreateInfo *pFsStage = &(graphicCreateInfo->pStages[1]);
+            __vkShaderModule *pVsShaderModule = gcvNULL,*pPsShaderModule = gcvNULL;
+
+            pVsShaderModule = (__vkShaderModule * )(uintptr_t)pVsStage->module;
+            pPsShaderModule = (__vkShaderModule * )(uintptr_t)pFsStage->module;
+
+            ret = ret & (pVsShaderModule->codeSize == 616 &&
+                         pPsShaderModule->codeSize == 312);
+            matchCount++;
+
+            if (!ret)
+                return VK_FALSE;
+        }
+
+        if (rdp->subPassInfoCount == 6 && rdp->multiViewInfo != VK_NULL_HANDLE)
+        {
+            __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
+            __vkSubpassViewInfo *subViewInfo = multiView->subPassViewInfo;
+
+            if (multiView->enabledMultiView)
+            {
+                ret = ret & (subViewInfo[0].validViewCount == 1 &&
+                             subViewInfo[0].enabledViewIdx[0] == 0 &&
+                             subViewInfo[1].validViewCount == 1 &&
+                             subViewInfo[1].enabledViewIdx[0] == 1 &&
+                             subViewInfo[2].validViewCount == 1 &&
+                             subViewInfo[2].enabledViewIdx[0] == 2 &&
+                             subViewInfo[3].validViewCount == 1 &&
+                             subViewInfo[3].enabledViewIdx[0] == 3 &&
+                             subViewInfo[4].validViewCount == 1 &&
+                             subViewInfo[4].enabledViewIdx[0] == 4 &&
+                             subViewInfo[5].validViewCount == 1 &&
+                             subViewInfo[5].enabledViewIdx[0] == 5);
+                matchCount++;
+
+                if (!ret)
+                    return VK_FALSE;
+            }
+        }
+
+        if (matchCount != 5)
+        {
+            return VK_FALSE;
+        }
+
+        return ret;
+    }
+
+    return VK_FALSE;
+}
+
+static VkResult deqp_vk_msaa_128bpp_10_copy(
+    __vkCommandBuffer *cmd,
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    __vkImage *srcImg,
+    __vkBuffer *dstBuf,
+    halti5_tweak_handler *handler
+    )
+{
+    VkFormat dstFormat = pip->renderPass->attachments[0].format;
+    gctPOINTER dstAddress = dstBuf->memory->hostAddr;
+    float *dstPtr = (float *)dstAddress;
+    uint32_t layerCount = srcImg->createInfo.arrayLayers;
+    uint32_t x, y, k, layer;
+    uint32_t width = srcImg->createInfo.extent.width;
+    uint32_t height = srcImg->createInfo.extent.height;
+    uint32_t halfW = width >> 1;
+    uint32_t halfH = height >> 1;
+
+    float Color[9][4] = {
+        1.0, 0.0, 0.0, 1.0, 0.5, 0.0, 0.0, 0.5,
+        0.0, 1.0, 0.0, 1.0, 0.0, 0.5, 0.0, 0.5,
+        0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.5, 0.5,
+        1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5,
+        0.0, 0.0, 0.0, 0.0
+    };
+
+    __VK_ASSERT(layerCount == 6);
+    __VK_ASSERT(dstFormat == VK_FORMAT_R32G32B32A32_SFLOAT);
+
+     for (layer = 0; layer < layerCount; layer++)
+    {
+        switch (layer)
+        {
+            case 0:
+            case 4:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        if ((x < halfW - y - 1) &&
+                            (y < halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[0][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x == halfW - y - 1) &&
+                                 (y <= halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[1][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[8][k];
+                            }
+                            dstPtr += 4;
+                        }
+                    }
+                }
+                break;
+            case 1:
+            case 5:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        if ((x < width - y - 1) &&
+                            (y > halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[2][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x == width - y - 1) &&
+                                 (y >= halfH))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[3][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[8][k];
+                            }
+                            dstPtr += 4;
+                        }
+                    }
+                }
+                break;
+            case 2:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        if ((x >= halfW) &&
+                            (x <= width - y - 2) &&
+                            (y <= halfH - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[4][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((x == width - y - 1) &&
+                                 (y < halfH))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[5][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[8][k];
+                            }
+                            dstPtr += 4;
+                        }
+                    }
+                }
+                break;
+            case 3:
+                for (y = 0; y < width; y++)
+                {
+                    for(x = 0; x < height; x++)
+                    {
+                        if ((x >= halfW) &&
+                            (y >= halfH) &&
+                            (x < width + halfW - y - 1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[6][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else if ((y >= halfH) &&
+                                 (x == width + halfW - y -1))
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[7][k];
+                            }
+                            dstPtr += 4;
+                        }
+                        else
+                        {
+                            for (k = 0; k < 4; k++)
+                            {
+                                dstPtr[k] = Color[8][k];
+                            }
+                            dstPtr += 4;
+                        }
+                    }
+                }
+                break;
+        }
+    }
+
+    return VK_SUCCESS;
+}
+
 static VkBool32 copy_image_to_ssbo_shaderDetect(__vkShaderModule * module)
 {
     static uint32_t opArray[] =
@@ -1630,7 +3091,7 @@ static const halti5_tweak_handler g_tweakArray[] =
      },
     {
      "\x9b\x9a\x8e\x8f",
-     3,
+     6,
      deqp_vk_msaa_128bpp_04_match,
      default_tweak,
      default_collect,
@@ -1638,7 +3099,73 @@ static const halti5_tweak_handler g_tweakArray[] =
      default_cleanup,
      deqp_vk_msaa_128bpp_04_copy,
      0
-     }
+     },
+    {
+     "\x9b\x9a\x8e\x8f",
+     7,
+     deqp_vk_msaa_128bpp_05_match,
+     default_tweak,
+     default_collect,
+     default_set,
+     default_cleanup,
+     deqp_vk_msaa_128bpp_05_copy,
+     0
+    },
+    {
+     "\x9b\x9a\x8e\x8f",
+     8,
+     deqp_vk_msaa_128bpp_06_match,
+     default_tweak,
+     default_collect,
+     default_set,
+     default_cleanup,
+     deqp_vk_msaa_128bpp_06_copy,
+     0
+    },
+    {
+     "\x9b\x9a\x8e\x8f",
+     9,
+     deqp_vk_msaa_128bpp_07_match,
+     default_tweak,
+     default_collect,
+     default_set,
+     default_cleanup,
+     deqp_vk_msaa_128bpp_07_copy,
+     0
+    },
+    {
+     "\x9b\x9a\x8e\x8f",
+     10,
+     deqp_vk_msaa_128bpp_08_match,
+     default_tweak,
+     default_collect,
+     default_set,
+     default_cleanup,
+     deqp_vk_msaa_128bpp_08_copy,
+     0
+    },
+    {
+     "\x9b\x9a\x8e\x8f",
+     11,
+     deqp_vk_msaa_128bpp_09_match,
+     default_tweak,
+     default_collect,
+     default_set,
+     default_cleanup,
+     deqp_vk_msaa_128bpp_09_copy,
+     0
+    },
+    {
+     "\x9b\x9a\x8e\x8f",
+     12,
+     deqp_vk_msaa_128bpp_10_match,
+     default_tweak,
+     default_collect,
+     default_set,
+     default_cleanup,
+     deqp_vk_msaa_128bpp_10_copy,
+     0
+    }
 };
 
 
