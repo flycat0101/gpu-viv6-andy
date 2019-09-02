@@ -2434,22 +2434,24 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertBatchFCtoConv(vx_graph gra
 VX_INTERNAL_API vx_status vxoGraphOptimization_computeQuantAttribute(vx_enum quantType, vx_float32 maxValue, vx_float32 minValue,
                                                                  vx_int8 *fixedPointPos, vx_int32 *zeroPoint, vx_float32 * scale)
 {
-    vx_float32 local_scale = 0;
-    vx_int32 local_zp = 0;
-    vx_int8 local_pos = 0;
-
     gcmHEADER_ARG("quantType=%d, maxValue=%f, minValue=%f, fixedPointPos=%p, zeroPoint=%p, scale=%p",
         quantType, maxValue, minValue, fixedPointPos, zeroPoint, scale);
     if(quantType == VX_QUANT_AFFINE_SCALE)
     {
         vx_uint32 drange = 255;
+
+        gcmASSERT(fixedPointPos);
+        gcmASSERT(scale);
+
         maxValue = gcmMAX(maxValue, 0);
         minValue = gcmMIN(minValue, 0);
-        local_scale = (maxValue - minValue)/drange;
-        local_zp    = gcmMIN(255, gcmMAX(0, (vx_int32)roundRTNE(0 - minValue/ local_scale)));
+        *scale = (maxValue - minValue)/drange;
+        *zeroPoint = gcmMIN(255, gcmMAX(0, (vx_int32)roundRTNE(0 - minValue/ *scale)));
     }
     else if(quantType == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
+        gcmASSERT(fixedPointPos);
+
         minValue = (vx_float32)fabs(minValue);
         maxValue = gcmMAX(maxValue, minValue);
         if(maxValue <= 0.0)
@@ -2457,15 +2459,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_computeQuantAttribute(vx_enum qua
             vxInfo("can not compute quant attribute");
             return VX_ERROR_INVALID_PARAMETERS;
         }
-        local_pos= (vx_int8) gcmMIN(12, QUANT_BIT_WIDTH - ceilf((float)gcoMATH_Log2(maxValue) + 1));
+        *fixedPointPos = (vx_int8) gcmMIN(12, QUANT_BIT_WIDTH - ceilf((float)gcoMATH_Log2(maxValue) + 1));
     }
-
-    if(fixedPointPos)
-        *fixedPointPos = local_pos;
-    if(zeroPoint)
-        *zeroPoint = local_zp;
-    if(scale)
-        *scale = local_scale;
 
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
