@@ -325,6 +325,7 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_TENSOR_ABS = 65,
     VXNNE_KERNEL_TENSOR_TRANSCENDENTAL = 66,
     VXNNE_KERNEL_TENSOR_MUL_SAT_RTE = 67,
+    VXNNE_KERNEL_CONVOLUTION_1X1 = 68,
     VXNNE_KERNEL_FIXED_COUNT,
 };
 
@@ -3661,6 +3662,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
+    vx_bool                 enable_cast_format,
     vx_tensor               input,
     vx_tensor               weight,
     vx_tensor               bias,
@@ -3712,6 +3714,7 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
+    vx_bool                 enable_cast_format,
     vx_tensor               input,
     vx_tensor               weights,
     vx_tensor               bias,
@@ -3971,6 +3974,17 @@ vxnne_shader_executable vxnneGetGPUReverseShaderExecutable(
     vx_tensor               output,
     vx_uint32               axsisNum,
     vx_uint32*              axsis
+    );
+
+vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_bool                 enable_cast_format,
+    vx_tensor               input,
+    vx_tensor               weight,
+    vx_tensor               bias,
+    vx_tensor               output
     );
 #ifdef __cplusplus
 }

@@ -61,3 +61,16 @@ __kernel void gpuTensor2Row_Quant8
         xx = 0;
     } while (yy < yRange);
 }
+
+__kernel void gpuTensor2Row_8Bits_K1S1
+    (
+    __read_only  image2d_t input,
+    __write_only image2d_t output
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+
+    uint4 src0 = read_imageui(input, coord.xy);
+
+    write_imageui(output, coord.yx, src0);
+}

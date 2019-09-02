@@ -39,11 +39,40 @@ __kernel void gpuTensorAdd_Quant8
     float inPixel0, inPixel1, outPixel;
 
     src0 = read_imageui(input0, coord);
-    inPixel0 = (convert_int(src0.x)-zpIn0)*scaleIn0;
+    inPixel0 = convert_int(src0.x-zpIn0)*scaleIn0;
     src1 = read_imageui(input1, coord);
-    inPixel1 = (convert_int(src1.x)-zpIn1)*scaleIn1;
+    inPixel1 = convert_int(src1.x-zpIn1)*scaleIn1;
     outPixel = inPixel0 + inPixel1;
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
+    write_imageui(output, coord, dst);
+}
+
+__kernel void gpuTensorAdd_Quant8_2D_4X
+    (
+    __read_only     image2d_t input0,
+    __read_only     image2d_t input1,
+    __write_only    image2d_t output,
+    float           scaleIn0,
+    float           scaleIn1,
+    float           scaleOut,
+    float           zpIn0,
+    float           zpIn1,
+    float           zpOut
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    uint4 src0, src1, dst = {0.0};
+    float4 inPixel0, inPixel1, outPixel;
+
+    src0 = read_imageui(input0, coord);
+    src1 = read_imageui(input1, coord);
+
+    inPixel0 = convert_float4(src0) * scaleIn0 - zpIn0;
+    inPixel1 = convert_float4(src1) * scaleIn1 - zpIn1;
+
+    outPixel = inPixel0 + inPixel1 + zpOut + 0.5;
+
+    dst = convert_uint4(outPixel);
     write_imageui(output, coord, dst);
 }
 
@@ -88,9 +117,9 @@ __kernel void gpuTensorSub_Quant8
     float inPixel0, inPixel1, outPixel;
 
     src0 = read_imageui(input0, coord);
-    inPixel0 = (convert_int(src0.x)-zpIn0)*scaleIn0;
+    inPixel0 = convert_int(src0.x-zpIn0)*scaleIn0;
     src1 = read_imageui(input1, coord);
-    inPixel1 = (convert_int(src1.x)-zpIn1)*scaleIn1;
+    inPixel1 = convert_int(src1.x-zpIn1)*scaleIn1;
     outPixel = inPixel0 - inPixel1;
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
     write_imageui(output, coord, dst);
@@ -137,9 +166,9 @@ __kernel void gpuTensorMul_Quant8
     float inPixel0, inPixel1, outPixel;
 
     src0 = read_imageui(input0, coord);
-    inPixel0 = (convert_int(src0.x)-zpIn0)*scaleIn0;
+    inPixel0 = convert_int(src0.x-zpIn0)*scaleIn0;
     src1 = read_imageui(input1, coord);
-    inPixel1 = (convert_int(src1.x)-zpIn1)*scaleIn1;
+    inPixel1 = convert_int(src1.x-zpIn1)*scaleIn1;
     outPixel = inPixel0 * inPixel1;
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
     write_imageui(output, coord, dst);
@@ -186,9 +215,9 @@ __kernel void gpuTensorDiv_Quant8
     float inPixel0, inPixel1, outPixel;
 
     src0 = read_imageui(input0, coord);
-    inPixel0 = (convert_int(src0.x)-zpIn0)*scaleIn0;
+    inPixel0 = convert_int(src0.x-zpIn0)*scaleIn0;
     src1 = read_imageui(input1, coord);
-    inPixel1 = (convert_int(src1.x)-zpIn1)*scaleIn1;
+    inPixel1 = convert_int(src1.x-zpIn1)*scaleIn1;
     outPixel = inPixel0 / inPixel1;
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
     write_imageui(output, coord, dst);

@@ -4238,7 +4238,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, co
             }
             else
             {
-                shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &node->kernelAttributes.borderMode, input, w_x, bias, VX_NN_ACTIVATION_NONE, fc_output);
+                shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &node->kernelAttributes.borderMode, vx_false_e, input, w_x, bias, VX_NN_ACTIVATION_NONE, fc_output);
             }
 
             if (!shaderExecutable)
