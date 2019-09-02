@@ -3860,7 +3860,7 @@ VX_INTERNAL_API vx_tensor vxoTensor_ReformatTensor(vx_tensor tensor, vx_enum for
                             tensor->tensorBuffer,
                             tensor->baseAddressOffset + offset,
                             tensor->isVirtual ? VX_TENSOR_SHARED | VX_TENSOR_VIRTUAL : VX_TENSOR_SHARED,
-                            VX_REF_EXTERNAL);
+                            VX_REF_INTERNAL);
 }
 
 
