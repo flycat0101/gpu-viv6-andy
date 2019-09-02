@@ -1227,7 +1227,7 @@ vx_float64 _calcComputeCycleCount(
     )
 {
     vx_uint32 tmp, pipeLatency;
-    vx_int32 dpAmount;
+    /*vx_int32 dpAmount;*/
     vx_uint32 dpKX, dpKY, dpKZ;
     vx_float64 accumCycle, tile3DComputeCycle, bottomTile3DComputeCycle;
     vx_float64 dpNonZeroRatio = 1.0;
@@ -1340,7 +1340,7 @@ vx_float64 _calcComputeCycleCount(
         dpKX = (vx_uint32)ceilf((vx_float32)kx / selected_xydp_x);
         dpKY = (vx_uint32)ceilf((vx_float32)ky / selected_xydp_y);
         dpKZ = kz;
-        dpAmount = selected_xydp_x * selected_xydp_y;
+        /*dpAmount = selected_xydp_x * selected_xydp_y;*/
         numOfPruneGroupsInDpn = (vx_uint32)ceilf((vx_float32)selected_xydp_x * selected_xydp_y / xydpVectorPruneAmount);
         numOfDpnInImgBuf = (vx_uint32)ceilf((vx_float32)kx / selected_xydp_x) * (vx_uint32)ceilf((vx_float32)ky / selected_xydp_y);
 
@@ -1358,14 +1358,14 @@ vx_float64 _calcComputeCycleCount(
             if (single_port_acc_buffer)
             {
                 dpKZ = (vx_uint32)ceilf((vx_float32)kz / (2 * selected_zdp)) * 2;
-                dpAmount = 2 * selected_zdp;
+                /*dpAmount = 2 * selected_zdp;*/
                 numOfPruneGroupsInDpn = (vx_uint32)ceilf((vx_float32)2 * selected_zdp / zdpVectorPruneAmount);
                 numOfDpnInImgBuf = 2;
             }
             else
             {
                 dpKZ = (vx_uint32)ceilf((vx_float32)kz / selected_zdp);
-                dpAmount = selected_zdp;
+                /*dpAmount = selected_zdp;*/
                 numOfPruneGroupsInDpn = (vx_uint32)ceilf((vx_float32)selected_zdp / zdpVectorPruneAmount);
                 numOfDpnInImgBuf = 1;
             }
@@ -1373,7 +1373,7 @@ vx_float64 _calcComputeCycleCount(
         else
         {
             dpKZ = kz;
-            dpAmount = 1;
+            /*dpAmount = 1;*/
             numOfPruneGroupsInDpn = 1;
             numOfDpnInImgBuf = 1;
         }

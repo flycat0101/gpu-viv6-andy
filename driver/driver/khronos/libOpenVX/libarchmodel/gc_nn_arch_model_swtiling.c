@@ -1877,7 +1877,6 @@ static void _split_segment(
     {
         if ((split_array[i] || (i == (segment_last + 1))) && (i > segment_first))
         {
-            vx_int32 bestCostSWTilingType = getBestCostSWTilingTypeInfo(archModel, prev_split, i - 1);
             {
                 vx_int32 segStart, segEnd;
                 _split_segment_loop(context, archModel, prev_split, i - 1, x_array, y_array, z_array);
