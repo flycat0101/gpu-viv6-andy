@@ -210,7 +210,7 @@ __kernel void gpuConv2D_1x1_Quant8_2D
         sum = in3Pixel * wPixel.wwww + sum;
     } while (coord.x < input_width);
 
-    dst = convert_uint4(sum * uint8Scale + zpOut + 0.5f);
+    dst = convert_uint4(sum * uint8Scale + zpOut);
     coord.xy = coord.ww + (int2)(1, 2);
     write_imageui(output, coord.wz, dst.xxxx);
     write_imageui(output, coord.xz, dst.yyyy);
@@ -268,7 +268,7 @@ __kernel void gpuConv2D_1x1_Quant8_2D_4X
         sum = in3Pixel * wPixel.wwww + sum;
     } while (coord.x < input_width);
 
-    dst = convert_uint4(sum * uint8Scale + zpOut + 0.5f);
+    dst = convert_uint4(sum * uint8Scale + zpOut);
     write_imageui(output, coord.wz, dst);
 }
 
@@ -403,10 +403,10 @@ __kernel void gpuConv2D_1x1_Quant32_2D
     for (int i = 0; i < 8; i+=4)
     {
         uint4 dst0, dst1, dst2, dst3, dst;
-        dst0 = convert_uint4(sum_array[i + 0] * uint8Scale + zpOut + 0.5f);
-        dst1 = convert_uint4(sum_array[i + 1] * uint8Scale + zpOut + 0.5f);
-        dst2 = convert_uint4(sum_array[i + 2] * uint8Scale + zpOut + 0.5f);
-        dst3 = convert_uint4(sum_array[i + 3] * uint8Scale + zpOut + 0.5f);
+        dst0 = convert_uint4(sum_array[i + 0] * uint8Scale + zpOut);
+        dst1 = convert_uint4(sum_array[i + 1] * uint8Scale + zpOut);
+        dst2 = convert_uint4(sum_array[i + 2] * uint8Scale + zpOut);
+        dst3 = convert_uint4(sum_array[i + 3] * uint8Scale + zpOut);
 
         dst0 = dst0 > 255 ? 255 : dst0;
         dst1 = dst1 > 255 ? 255 : dst1;
@@ -434,6 +434,504 @@ __kernel void gpuConv2D_1x1_Quant32_2D
     }
 
 }
+
+__kernel void gpuConv2D_1x1_Quant32_8x4_4x4_2D
+    (
+    image2d_t input,
+    image2d_t weights,
+    image2d_t bias,
+    int input_width,
+    float uint8Scale,
+    int zpIn,
+    float zpWeight,
+    float zpOut,
+    image2d_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int4 coord = (int4)(0, x, y, y);
+    float4 inPixel[16], w0Pixel, w1Pixel, w2Pixel, w3Pixel;
+    float4 sum, sum_array[4];
+    uint4 inTmp[16], w0Temp, w1Temp, w2Temp, w3Temp;
+
+    sum = convert_float4(read_imagei(bias, coord.zx));
+    sum_array[0] = sum.xxxx;
+    sum_array[1] = sum.yyyy;
+    sum_array[2] = sum.zzzz;
+    sum_array[3] = sum.wwww;
+
+    coord.w += 1;
+    do
+    {
+        coord.x >>= 2;
+        w0Temp = read_imageui(weights, coord.xz);
+        w1Temp = read_imageui(weights, coord.xw);
+        coord.zw += (int2)(2, 2);
+        w2Temp = read_imageui(weights, coord.xz);
+        w3Temp = read_imageui(weights, coord.xw);
+        coord.x <<= 2;
+        coord.zw = coord.zx + (int2)(-2, 1);
+
+        inTmp[0] = read_imageui(input, coord.yx);
+        inTmp[1] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[2] = read_imageui(input, coord.yx);
+        inTmp[3] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[4] = read_imageui(input, coord.yx);
+        inTmp[5] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[6] = read_imageui(input, coord.yx);
+        inTmp[7] = read_imageui(input, coord.yw);
+        coord.xw = coord.xz + (int2)(2, 1);
+
+        uint4 w0Data, w1Data, w2Data, w3Data;
+        uint4 bits = (uint4)(8, 8, 8, 8);
+        uint4 cfg = (uint4)(0, 8, 16, 24);
+
+        w0Data = viv_bitfieldExtract(w0Temp.xxxx, cfg, bits);
+        w1Data = viv_bitfieldExtract(w0Temp.yyyy, cfg, bits);
+        w0Pixel = convert_float4(w0Data) - zpWeight;
+        w1Pixel = convert_float4(w1Data) - zpWeight;
+
+        inPixel[0] = convert_float4(inTmp[0]);
+        inPixel[1] = convert_float4(inTmp[1]);
+        inPixel[2] = convert_float4(inTmp[2]);
+        inPixel[3] = convert_float4(inTmp[3]);
+        inPixel[4] = convert_float4(inTmp[4]);
+        inPixel[5] = convert_float4(inTmp[5]);
+        inPixel[6] = convert_float4(inTmp[6]);
+        inPixel[7] = convert_float4(inTmp[7]);
+        sum_array[0] = inPixel[0] * w0Pixel.xxxx + sum_array[0];
+        sum_array[0] = inPixel[1] * w0Pixel.yyyy + sum_array[0];
+        sum_array[0] = inPixel[2] * w0Pixel.zzzz + sum_array[0];
+        sum_array[0] = inPixel[3] * w0Pixel.wwww + sum_array[0];
+        sum_array[0] = inPixel[4] * w1Pixel.xxxx + sum_array[0];
+        sum_array[0] = inPixel[5] * w1Pixel.yyyy + sum_array[0];
+        sum_array[0] = inPixel[6] * w1Pixel.zzzz + sum_array[0];
+        sum_array[0] = inPixel[7] * w1Pixel.wwww + sum_array[0];
+
+        w0Data = viv_bitfieldExtract(w1Temp.xxxx, cfg, bits);
+        w1Data = viv_bitfieldExtract(w1Temp.yyyy, cfg, bits);
+        w0Pixel = convert_float4(w0Data) - zpWeight;
+        w1Pixel = convert_float4(w1Data) - zpWeight;
+
+        sum_array[1] = inPixel[0] * w0Pixel.xxxx + sum_array[1];
+        sum_array[1] = inPixel[1] * w0Pixel.yyyy + sum_array[1];
+        sum_array[1] = inPixel[2] * w0Pixel.zzzz + sum_array[1];
+        sum_array[1] = inPixel[3] * w0Pixel.wwww + sum_array[1];
+        sum_array[1] = inPixel[4] * w1Pixel.xxxx + sum_array[1];
+        sum_array[1] = inPixel[5] * w1Pixel.yyyy + sum_array[1];
+        sum_array[1] = inPixel[6] * w1Pixel.zzzz + sum_array[1];
+        sum_array[1] = inPixel[7] * w1Pixel.wwww + sum_array[1];
+
+        w0Data = viv_bitfieldExtract(w2Temp.xxxx, cfg, bits);
+        w1Data = viv_bitfieldExtract(w2Temp.yyyy, cfg, bits);
+        w0Pixel = convert_float4(w0Data) - zpWeight;
+        w1Pixel = convert_float4(w1Data) - zpWeight;
+
+        sum_array[2] = inPixel[0] * w0Pixel.xxxx + sum_array[2];
+        sum_array[2] = inPixel[1] * w0Pixel.yyyy + sum_array[2];
+        sum_array[2] = inPixel[2] * w0Pixel.zzzz + sum_array[2];
+        sum_array[2] = inPixel[3] * w0Pixel.wwww + sum_array[2];
+        sum_array[2] = inPixel[4] * w1Pixel.xxxx + sum_array[2];
+        sum_array[2] = inPixel[5] * w1Pixel.yyyy + sum_array[2];
+        sum_array[2] = inPixel[6] * w1Pixel.zzzz + sum_array[2];
+        sum_array[2] = inPixel[7] * w1Pixel.wwww + sum_array[2];
+
+        w0Data = viv_bitfieldExtract(w3Temp.xxxx, cfg, bits);
+        w1Data = viv_bitfieldExtract(w3Temp.yyyy, cfg, bits);
+        w0Pixel = convert_float4(w0Data) - zpWeight;
+        w1Pixel = convert_float4(w1Data) - zpWeight;
+
+        sum_array[3] = inPixel[0] * w0Pixel.xxxx + sum_array[3];
+        sum_array[3] = inPixel[1] * w0Pixel.yyyy + sum_array[3];
+        sum_array[3] = inPixel[2] * w0Pixel.zzzz + sum_array[3];
+        sum_array[3] = inPixel[3] * w0Pixel.wwww + sum_array[3];
+        sum_array[3] = inPixel[4] * w1Pixel.xxxx + sum_array[3];
+        sum_array[3] = inPixel[5] * w1Pixel.yyyy + sum_array[3];
+        sum_array[3] = inPixel[6] * w1Pixel.zzzz + sum_array[3];
+        sum_array[3] = inPixel[7] * w1Pixel.wwww + sum_array[3];
+
+    } while (coord.x < input_width);
+
+    coord.y >>= 2;
+
+    for (int i = 0; i < 4; i ++)
+    {
+        uint4 dst0, dst1, dst2, dst3, dst;
+        dst0 = convert_uint4(sum_array[i] * uint8Scale + zpOut + 0.5f);
+
+        dst0 = dst0 > 255 ? 255 : dst0;
+
+        vxc_uchar16 t0, t;
+        _viv_asm(COPY, t0, dst0, 16);
+        t.s0123 = t0.s048c;
+
+        _viv_asm(COPY, dst, t, 16);
+
+        write_imageui(output, coord.yz, dst.xxxx);
+        coord.z ++;
+    }
+}
+
+__kernel void gpuConv2D_1x1_Quant32_16x4_4x4_2D
+    (
+    image2d_t input,
+    image2d_t weights,
+    image2d_t bias,
+    int input_width,
+    float uint8Scale,
+    int zpIn,
+    float zpWeight,
+    float zpOut,
+    image2d_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int4 coord = (int4)(0, x, y, y);
+    float4 inPixel[16], w0Pixel, w1Pixel, w2Pixel, w3Pixel;
+    float4 sum, sum_array[4];
+    uint4 inTmp[16], w0Temp, w1Temp, w2Temp, w3Temp;
+
+    sum = convert_float4(read_imagei(bias, coord.zx));
+    sum_array[0] = sum.xxxx;
+    sum_array[1] = sum.yyyy;
+    sum_array[2] = sum.zzzz;
+    sum_array[3] = sum.wwww;
+
+    coord.w += 1;
+    do
+    {
+        coord.x >>= 2;
+        w0Temp = read_imageui(weights, coord.xz);
+        w1Temp = read_imageui(weights, coord.xw);
+        coord.zw += (int2)(2, 2);
+        w2Temp = read_imageui(weights, coord.xz);
+        w3Temp = read_imageui(weights, coord.xw);
+        coord.x <<= 2;
+        coord.zw = coord.zx + (int2)(-2, 1);
+
+        inTmp[0] = read_imageui(input, coord.yx);
+        inTmp[1] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[2] = read_imageui(input, coord.yx);
+        inTmp[3] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[4] = read_imageui(input, coord.yx);
+        inTmp[5] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[6] = read_imageui(input, coord.yx);
+        inTmp[7] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[8] = read_imageui(input, coord.yx);
+        inTmp[9] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[10] = read_imageui(input, coord.yx);
+        inTmp[11] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[12] = read_imageui(input, coord.yx);
+        inTmp[13] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[14] = read_imageui(input, coord.yx);
+        inTmp[15] = read_imageui(input, coord.yw);
+        coord.xw = coord.xz + (int2)(2, 1);
+
+        uint4 w0Data, w1Data, w2Data, w3Data;
+        uint4 bits = (uint4)(8, 8, 8, 8);
+        uint4 cfg = (uint4)(0, 8, 16, 24);
+
+        w0Data = viv_bitfieldExtract(w0Temp.xxxx, cfg, bits);
+        w1Data = viv_bitfieldExtract(w0Temp.yyyy, cfg, bits);
+        w2Data = viv_bitfieldExtract(w0Temp.zzzz, cfg, bits);
+        w3Data = viv_bitfieldExtract(w0Temp.wwww, cfg, bits);
+        w0Pixel = convert_float4(w0Data) - zpWeight;
+        w1Pixel = convert_float4(w1Data) - zpWeight;
+        w2Pixel = convert_float4(w2Data) - zpWeight;
+        w3Pixel = convert_float4(w3Data) - zpWeight;
+
+        inPixel[0] = convert_float4(inTmp[0]);
+        inPixel[1] = convert_float4(inTmp[1]);
+        inPixel[2] = convert_float4(inTmp[2]);
+        inPixel[3] = convert_float4(inTmp[3]);
+        inPixel[4] = convert_float4(inTmp[4]);
+        inPixel[5] = convert_float4(inTmp[5]);
+        inPixel[6] = convert_float4(inTmp[6]);
+        inPixel[7] = convert_float4(inTmp[7]);
+        inPixel[8] = convert_float4(inTmp[8]);
+        inPixel[9] = convert_float4(inTmp[9]);
+        inPixel[10] = convert_float4(inTmp[10]);
+        inPixel[11] = convert_float4(inTmp[11]);
+        inPixel[12] = convert_float4(inTmp[12]);
+        inPixel[13] = convert_float4(inTmp[13]);
+        inPixel[14] = convert_float4(inTmp[14]);
+        inPixel[15] = convert_float4(inTmp[15]);
+        sum_array[0] = inPixel[0] * w0Pixel.xxxx + sum_array[0];
+        sum_array[0] = inPixel[1] * w0Pixel.yyyy + sum_array[0];
+        sum_array[0] = inPixel[2] * w0Pixel.zzzz + sum_array[0];
+        sum_array[0] = inPixel[3] * w0Pixel.wwww + sum_array[0];
+        sum_array[0] = inPixel[4] * w1Pixel.xxxx + sum_array[0];
+        sum_array[0] = inPixel[5] * w1Pixel.yyyy + sum_array[0];
+        sum_array[0] = inPixel[6] * w1Pixel.zzzz + sum_array[0];
+        sum_array[0] = inPixel[7] * w1Pixel.wwww + sum_array[0];
+        sum_array[0] = inPixel[8]  * w2Pixel.xxxx + sum_array[0];
+        sum_array[0] = inPixel[9]  * w2Pixel.yyyy + sum_array[0];
+        sum_array[0] = inPixel[10] * w2Pixel.zzzz + sum_array[0];
+        sum_array[0] = inPixel[11] * w2Pixel.wwww + sum_array[0];
+        sum_array[0] = inPixel[12] * w3Pixel.xxxx + sum_array[0];
+        sum_array[0] = inPixel[13] * w3Pixel.yyyy + sum_array[0];
+        sum_array[0] = inPixel[14] * w3Pixel.zzzz + sum_array[0];
+        sum_array[0] = inPixel[15] * w3Pixel.wwww + sum_array[0];
+
+        w0Data = viv_bitfieldExtract(w1Temp.xxxx, cfg, bits);
+        w1Data = viv_bitfieldExtract(w1Temp.yyyy, cfg, bits);
+        w2Data = viv_bitfieldExtract(w1Temp.zzzz, cfg, bits);
+        w3Data = viv_bitfieldExtract(w1Temp.wwww, cfg, bits);
+        w0Pixel = convert_float4(w0Data) - zpWeight;
+        w1Pixel = convert_float4(w1Data) - zpWeight;
+        w2Pixel = convert_float4(w2Data) - zpWeight;
+        w3Pixel = convert_float4(w3Data) - zpWeight;
+
+        sum_array[1] = inPixel[0] * w0Pixel.xxxx + sum_array[1];
+        sum_array[1] = inPixel[1] * w0Pixel.yyyy + sum_array[1];
+        sum_array[1] = inPixel[2] * w0Pixel.zzzz + sum_array[1];
+        sum_array[1] = inPixel[3] * w0Pixel.wwww + sum_array[1];
+        sum_array[1] = inPixel[4] * w1Pixel.xxxx + sum_array[1];
+        sum_array[1] = inPixel[5] * w1Pixel.yyyy + sum_array[1];
+        sum_array[1] = inPixel[6] * w1Pixel.zzzz + sum_array[1];
+        sum_array[1] = inPixel[7] * w1Pixel.wwww + sum_array[1];
+        sum_array[1] = inPixel[8]  * w2Pixel.xxxx + sum_array[1];
+        sum_array[1] = inPixel[9]  * w2Pixel.yyyy + sum_array[1];
+        sum_array[1] = inPixel[10] * w2Pixel.zzzz + sum_array[1];
+        sum_array[1] = inPixel[11] * w2Pixel.wwww + sum_array[1];
+        sum_array[1] = inPixel[12] * w3Pixel.xxxx + sum_array[1];
+        sum_array[1] = inPixel[13] * w3Pixel.yyyy + sum_array[1];
+        sum_array[1] = inPixel[14] * w3Pixel.zzzz + sum_array[1];
+        sum_array[1] = inPixel[15] * w3Pixel.wwww + sum_array[1];
+
+        w0Data = viv_bitfieldExtract(w2Temp.xxxx, cfg, bits);
+        w1Data = viv_bitfieldExtract(w2Temp.yyyy, cfg, bits);
+        w2Data = viv_bitfieldExtract(w2Temp.zzzz, cfg, bits);
+        w3Data = viv_bitfieldExtract(w2Temp.wwww, cfg, bits);
+        w0Pixel = convert_float4(w0Data) - zpWeight;
+        w1Pixel = convert_float4(w1Data) - zpWeight;
+        w2Pixel = convert_float4(w2Data) - zpWeight;
+        w3Pixel = convert_float4(w3Data) - zpWeight;
+
+        sum_array[2] = inPixel[0] * w0Pixel.xxxx + sum_array[2];
+        sum_array[2] = inPixel[1] * w0Pixel.yyyy + sum_array[2];
+        sum_array[2] = inPixel[2] * w0Pixel.zzzz + sum_array[2];
+        sum_array[2] = inPixel[3] * w0Pixel.wwww + sum_array[2];
+        sum_array[2] = inPixel[4] * w1Pixel.xxxx + sum_array[2];
+        sum_array[2] = inPixel[5] * w1Pixel.yyyy + sum_array[2];
+        sum_array[2] = inPixel[6] * w1Pixel.zzzz + sum_array[2];
+        sum_array[2] = inPixel[7] * w1Pixel.wwww + sum_array[2];
+        sum_array[2] = inPixel[8]  * w2Pixel.xxxx + sum_array[2];
+        sum_array[2] = inPixel[9]  * w2Pixel.yyyy + sum_array[2];
+        sum_array[2] = inPixel[10] * w2Pixel.zzzz + sum_array[2];
+        sum_array[2] = inPixel[11] * w2Pixel.wwww + sum_array[2];
+        sum_array[2] = inPixel[12] * w3Pixel.xxxx + sum_array[2];
+        sum_array[2] = inPixel[13] * w3Pixel.yyyy + sum_array[2];
+        sum_array[2] = inPixel[14] * w3Pixel.zzzz + sum_array[2];
+        sum_array[2] = inPixel[15] * w3Pixel.wwww + sum_array[2];
+
+        w0Data = viv_bitfieldExtract(w3Temp.xxxx, cfg, bits);
+        w1Data = viv_bitfieldExtract(w3Temp.yyyy, cfg, bits);
+        w2Data = viv_bitfieldExtract(w3Temp.zzzz, cfg, bits);
+        w3Data = viv_bitfieldExtract(w3Temp.wwww, cfg, bits);
+        w0Pixel = convert_float4(w0Data) - zpWeight;
+        w1Pixel = convert_float4(w1Data) - zpWeight;
+        w2Pixel = convert_float4(w2Data) - zpWeight;
+        w3Pixel = convert_float4(w3Data) - zpWeight;
+
+        sum_array[3] = inPixel[0] * w0Pixel.xxxx + sum_array[3];
+        sum_array[3] = inPixel[1] * w0Pixel.yyyy + sum_array[3];
+        sum_array[3] = inPixel[2] * w0Pixel.zzzz + sum_array[3];
+        sum_array[3] = inPixel[3] * w0Pixel.wwww + sum_array[3];
+        sum_array[3] = inPixel[4] * w1Pixel.xxxx + sum_array[3];
+        sum_array[3] = inPixel[5] * w1Pixel.yyyy + sum_array[3];
+        sum_array[3] = inPixel[6] * w1Pixel.zzzz + sum_array[3];
+        sum_array[3] = inPixel[7] * w1Pixel.wwww + sum_array[3];
+        sum_array[3] = inPixel[8]  * w2Pixel.xxxx + sum_array[3];
+        sum_array[3] = inPixel[9]  * w2Pixel.yyyy + sum_array[3];
+        sum_array[3] = inPixel[10] * w2Pixel.zzzz + sum_array[3];
+        sum_array[3] = inPixel[11] * w2Pixel.wwww + sum_array[3];
+        sum_array[3] = inPixel[12] * w3Pixel.xxxx + sum_array[3];
+        sum_array[3] = inPixel[13] * w3Pixel.yyyy + sum_array[3];
+        sum_array[3] = inPixel[14] * w3Pixel.zzzz + sum_array[3];
+        sum_array[3] = inPixel[15] * w3Pixel.wwww + sum_array[3];
+
+    } while (coord.x < input_width);
+
+    coord.y >>= 2;
+
+    for (int i = 0; i < 4; i ++)
+    {
+        uint4 dst0, dst1, dst2, dst3, dst;
+        dst0 = convert_uint4(sum_array[i] * uint8Scale + zpOut);
+
+        dst0 = dst0 > 255 ? 255 : dst0;
+
+        vxc_uchar16 t0, t;
+        _viv_asm(COPY, t0, dst0, 16);
+        t.s0123 = t0.s048c;
+
+        _viv_asm(COPY, dst, t, 16);
+
+        write_imageui(output, coord.yz, dst.xxxx);
+        coord.z ++;
+    }
+}
+
+__kernel void gpuConv2D_1x1_Quant32_8x8_4x8_2D
+    (
+    image2d_t input,
+    image2d_t weights,
+    image2d_t bias,
+    int input_width,
+    float uint8Scale,
+    int zpIn,
+    float zpWeight,
+    float zpOut,
+    image2d_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int4 coord = (int4)(0, x, y, y);
+    float4 inPixel[16], w0Pixel, w1Pixel, w2Pixel, w3Pixel;
+    float4 sum, sum_array[8];
+    uint4 inTmp[16], wTemp[8];
+
+    sum = convert_float4(read_imagei(bias, coord.zx));
+    coord.w += 4;
+    sum_array[0] = sum.xxxx;
+    sum_array[1] = sum.yyyy;
+    sum_array[2] = sum.zzzz;
+    sum_array[3] = sum.wwww;
+
+    sum = convert_float4(read_imagei(bias, coord.wx));
+    sum_array[4] = sum.xxxx;
+    sum_array[5] = sum.yyyy;
+    sum_array[6] = sum.zzzz;
+    sum_array[7] = sum.wwww;
+
+    coord.w = coord.z + 1;
+    do
+    {
+        coord.x >>= 2;
+        wTemp[0] = read_imageui(weights, coord.xz);
+        wTemp[1] = read_imageui(weights, coord.xw);
+        coord.zw += (int2)(2, 2);
+        wTemp[2] = read_imageui(weights, coord.xz);
+        wTemp[3] = read_imageui(weights, coord.xw);
+        coord.zw += (int2)(2, 2);
+        wTemp[4] = read_imageui(weights, coord.xz);
+        wTemp[5] = read_imageui(weights, coord.xw);
+        coord.zw += (int2)(2, 2);
+        wTemp[6] = read_imageui(weights, coord.xz);
+        wTemp[7] = read_imageui(weights, coord.xw);
+        coord.x <<= 2;
+        coord.zw = coord.zx + (int2)(-6, 1);
+
+        inTmp[0] = read_imageui(input, coord.yx);
+        inTmp[1] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[2] = read_imageui(input, coord.yx);
+        inTmp[3] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[4] = read_imageui(input, coord.yx);
+        inTmp[5] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[6] = read_imageui(input, coord.yx);
+        inTmp[7] = read_imageui(input, coord.yw);
+        coord.xw = coord.xz + (int2)(2, 1);
+
+        uint4 w0Data, w1Data, w2Data, w3Data;
+        uint4 bits = (uint4)(8, 8, 8, 8);
+        uint4 cfg = (uint4)(0, 8, 16, 24);
+
+        w0Data = viv_bitfieldExtract(wTemp[0].xxxx, cfg, bits);
+        w1Data = viv_bitfieldExtract(wTemp[0].yyyy, cfg, bits);
+        w0Pixel = convert_float4(w0Data) - zpWeight;
+        w1Pixel = convert_float4(w1Data) - zpWeight;
+
+        inPixel[0] = convert_float4(inTmp[0]);
+        inPixel[1] = convert_float4(inTmp[1]);
+        inPixel[2] = convert_float4(inTmp[2]);
+        inPixel[3] = convert_float4(inTmp[3]);
+        inPixel[4] = convert_float4(inTmp[4]);
+        inPixel[5] = convert_float4(inTmp[5]);
+        inPixel[6] = convert_float4(inTmp[6]);
+        inPixel[7] = convert_float4(inTmp[7]);
+
+        sum_array[0] = inPixel[0] * w0Pixel.xxxx + sum_array[0];
+        sum_array[0] = inPixel[1] * w0Pixel.yyyy + sum_array[0];
+        sum_array[0] = inPixel[2] * w0Pixel.zzzz + sum_array[0];
+        sum_array[0] = inPixel[3] * w0Pixel.wwww + sum_array[0];
+        sum_array[0] = inPixel[4] * w1Pixel.xxxx + sum_array[0];
+        sum_array[0] = inPixel[5] * w1Pixel.yyyy + sum_array[0];
+        sum_array[0] = inPixel[6] * w1Pixel.zzzz + sum_array[0];
+        sum_array[0] = inPixel[7] * w1Pixel.wwww + sum_array[0];
+
+        for (int i = 1; i < 8; i++)
+        {
+            w0Data = viv_bitfieldExtract(wTemp[i].xxxx, cfg, bits);
+            w1Data = viv_bitfieldExtract(wTemp[i].yyyy, cfg, bits);
+            w0Pixel = convert_float4(w0Data) - zpWeight;
+            w1Pixel = convert_float4(w1Data) - zpWeight;
+
+            sum_array[i] = inPixel[0] * w0Pixel.xxxx  + sum_array[i];
+            sum_array[i] = inPixel[1] * w0Pixel.yyyy  + sum_array[i];
+            sum_array[i] = inPixel[2] * w0Pixel.zzzz  + sum_array[i];
+            sum_array[i] = inPixel[3] * w0Pixel.wwww  + sum_array[i];
+            sum_array[i] = inPixel[4] * w1Pixel.xxxx  + sum_array[i];
+            sum_array[i] = inPixel[5] * w1Pixel.yyyy  + sum_array[i];
+            sum_array[i] = inPixel[6] * w1Pixel.zzzz  + sum_array[i];
+            sum_array[i] = inPixel[7] * w1Pixel.wwww  + sum_array[i];
+        }
+    } while (coord.x < input_width);
+
+    coord.y >>= 2;
+
+    for (int i = 0; i < 8; i += 4)
+    {
+        uint4 dst0, dst1, dst2, dst3, dst;
+        dst0 = convert_uint4(sum_array[i + 0] * uint8Scale + zpOut);
+        dst1 = convert_uint4(sum_array[i + 1] * uint8Scale + zpOut);
+        dst2 = convert_uint4(sum_array[i + 2] * uint8Scale + zpOut);
+        dst3 = convert_uint4(sum_array[i + 3] * uint8Scale + zpOut);
+
+        dst0 = dst0 > 255 ? 255 : dst0;
+        dst1 = dst1 > 255 ? 255 : dst1;
+        dst2 = dst2 > 255 ? 255 : dst2;
+        dst3 = dst3 > 255 ? 255 : dst3;
+
+        vxc_uchar16 t0, t1, t2, t3, t;
+        _viv_asm(COPY, t0, dst0, 16);
+        _viv_asm(COPY, t1, dst1, 16);
+        _viv_asm(COPY, t2, dst2, 16);
+        _viv_asm(COPY, t3, dst3, 16);
+        t.s0123 = t0.s048c;
+        t.s4567 = t1.s048c;
+        t.s89ab = t2.s048c;
+        t.scdef = t3.s048c;
+
+        _viv_asm(COPY, dst, t, 16);
+
+        write_imageui(output, coord.yz, dst.xxxx);
+        coord.z ++;
+        write_imageui(output, coord.yz, dst.yyyy);
+        coord.z ++;
+        write_imageui(output, coord.yz, dst.zzzz);
+        coord.z ++;
+        write_imageui(output, coord.yz, dst.wwww);
+        coord.z ++;
+    }
+}
+
 
 __kernel void gpuConv2D_1x1_Quant32_2D_4X
     (
@@ -612,10 +1110,10 @@ __kernel void gpuConv2D_1x1_Quant32_2D_4X
     for (int i = 0; i < 16; i+=4)
     {
         uint4 dst0, dst1, dst2, dst3, dst;
-        dst0 = convert_uint4(sum_array[i + 0] * uint8Scale + zpOut + 0.5f);
-        dst1 = convert_uint4(sum_array[i + 1] * uint8Scale + zpOut + 0.5f);
-        dst2 = convert_uint4(sum_array[i + 2] * uint8Scale + zpOut + 0.5f);
-        dst3 = convert_uint4(sum_array[i + 3] * uint8Scale + zpOut + 0.5f);
+        dst0 = convert_uint4(sum_array[i + 0] * uint8Scale + zpOut);
+        dst1 = convert_uint4(sum_array[i + 1] * uint8Scale + zpOut);
+        dst2 = convert_uint4(sum_array[i + 2] * uint8Scale + zpOut);
+        dst3 = convert_uint4(sum_array[i + 3] * uint8Scale + zpOut);
 
         dst0 = dst0 > 255 ? 255 : dst0;
         dst1 = dst1 > 255 ? 255 : dst1;
@@ -636,5 +1134,99 @@ __kernel void gpuConv2D_1x1_Quant32_2D_4X
 
         write_imageui(output, coord.yz, dst);
         coord.z ++;
+    }
+}
+
+__kernel void gpuConv2D_1x1_Quant32_4x8_2D_4S
+    (
+    image2d_t input,
+    image2d_t weights,
+    image2d_t bias,
+    int input_width,
+    float uint8Scale,
+    int zpIn,
+    float zpWeight,
+    float zpOut,
+    image2d_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int4 coord = (int4)(0, x, y, y);
+    float4 inPixel[16], w0Pixel, w1Pixel, w2Pixel, w3Pixel;
+    float4 sum, sum_array[8];
+    uint4 inTmp[16], wTemp[8];
+
+    sum = convert_float4(read_imagei(bias, coord.zx));
+    coord.w += 4;
+    sum_array[0] = sum.xxxx;
+    sum_array[1] = sum.yyyy;
+    sum_array[2] = sum.zzzz;
+    sum_array[3] = sum.wwww;
+
+    sum = convert_float4(read_imagei(bias, coord.wx));
+    sum_array[4] = sum.xxxx;
+    sum_array[5] = sum.yyyy;
+    sum_array[6] = sum.zzzz;
+    sum_array[7] = sum.wwww;
+
+    coord.w = coord.z + 1;
+    do
+    {
+        wTemp[0] = read_imageui(weights, coord.xz);
+        wTemp[1] = read_imageui(weights, coord.xw);
+        coord.zw += (int2)(2, 2);
+        wTemp[2] = read_imageui(weights, coord.xz);
+        wTemp[3] = read_imageui(weights, coord.xw);
+        coord.zw += (int2)(2, 2);
+        wTemp[4] = read_imageui(weights, coord.xz);
+        wTemp[5] = read_imageui(weights, coord.xw);
+        coord.zw += (int2)(2, 2);
+        wTemp[6] = read_imageui(weights, coord.xz);
+        wTemp[7] = read_imageui(weights, coord.xw);
+        coord.zw = coord.zx + (int2)(-6, 1);
+
+        inTmp[0] = read_imageui(input, coord.yx);
+        inTmp[1] = read_imageui(input, coord.yw);
+        coord.xw += (int2)(2, 2);
+        inTmp[2] = read_imageui(input, coord.yx);
+        inTmp[3] = read_imageui(input, coord.yw);
+        coord.xw = coord.xz + (int2)(2, 1);
+
+        w0Pixel = convert_float4(wTemp[0]) - zpWeight;
+
+        inPixel[0] = convert_float4(inTmp[0]);
+        inPixel[1] = convert_float4(inTmp[1]);
+        inPixel[2] = convert_float4(inTmp[2]);
+        inPixel[3] = convert_float4(inTmp[3]);
+
+        sum_array[0] = inPixel[0] * w0Pixel.xxxx + sum_array[0];
+        sum_array[0] = inPixel[1] * w0Pixel.yyyy + sum_array[0];
+        sum_array[0] = inPixel[2] * w0Pixel.zzzz + sum_array[0];
+        sum_array[0] = inPixel[3] * w0Pixel.wwww + sum_array[0];
+
+        for (int i = 1; i < 8; i++)
+        {
+            w0Pixel = convert_float4(wTemp[i]) - zpWeight;
+
+            sum_array[i] = inPixel[0] * w0Pixel.xxxx  + sum_array[i];
+            sum_array[i] = inPixel[1] * w0Pixel.yyyy  + sum_array[i];
+            sum_array[i] = inPixel[2] * w0Pixel.zzzz  + sum_array[i];
+            sum_array[i] = inPixel[3] * w0Pixel.wwww  + sum_array[i];
+        }
+    } while (coord.x < input_width);
+
+    coord.xw = coord.yy + (int2)(1, 2);
+    for (int i = 0; i < 8; i ++)
+    {
+        uint4 dst;
+        dst = convert_uint4(sum_array[i] * uint8Scale + zpOut);
+
+        write_imageui(output, coord.yz, dst.xxxx);
+        write_imageui(output, coord.xz, dst.yyyy);
+        write_imageui(output, coord.wz, dst.zzzz);
+        coord.y += 3;
+        write_imageui(output, coord.yz, dst.wwww);
+        coord.yz += (int2)(-3, 1);
     }
 }

@@ -16737,7 +16737,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     && (paddingTop == paddingBottom && paddingTop == 0)
                     && biases != NULL
                     && (CHECK_LIFETIME_IS_STATIC(weights) || TENSOR_QUANT_TYPE(inputs) != VX_QUANT_AFFINE_SCALE)
-                    && ((inputWidth * inputHeight % CONV2D_ALIGN_SIZE4 == 0) || (input_size % CONV2D_ALIGN_SIZE16 != 0) || TENSOR_QUANT_TYPE(inputs) != VX_QUANT_AFFINE_SCALE)
+                    /*&& ((inputWidth * inputHeight % CONV2D_ALIGN_SIZE4 == 0) || (input_size % CONV2D_ALIGN_SIZE16 != 0) || TENSOR_QUANT_TYPE(inputs) != VX_QUANT_AFFINE_SCALE)*/
                     )
                 {
                     enable_conv2d_1x1 = vx_true_e;
@@ -16922,6 +16922,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                 else
                 {
                     vx_bool   enable_tensor_cast  = vx_false_e;
+                    vx_bool   enable_ofm_gt_xy    = vx_false_e;
                     vx_tensor weights_rs          = NULL;
                     vx_tensor weights_new         = NULL;
 
@@ -16937,7 +16938,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                      && TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8
                      )
                     {
-                        enable_tensor_cast = vx_true_e;
+                        if (inputWidth * inputHeight < inputDepth
+                          && (inputWidth * inputHeight % CONV2D_ALIGN_SIZE16 != 0))
+                            enable_ofm_gt_xy = vx_true_e;
+                        else
+                            enable_tensor_cast = vx_true_e;
                     }
                     else
                     {
@@ -17050,7 +17055,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     }
                     else
                     {
-                        if (enable_cast_gemm)
+                        if (enable_cast_gemm || enable_ofm_gt_xy)
                         {
                             vx_tensor t = NULL;
 
@@ -17074,7 +17079,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     {
                         if (enable_conv2d_1x1)
                         {
-                            if (enable_tensor_cast)
+                            if (enable_tensor_cast || enable_ofm_gt_xy)
                             {
                                 vx_tensor t = NULL;
 
