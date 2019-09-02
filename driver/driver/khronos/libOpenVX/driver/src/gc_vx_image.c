@@ -2873,23 +2873,15 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
                     }
                     else
                     {
-                        vx_bool sucess = vx_false_e;
-
                         vxoMemory_FreeWrappedMemory(context, &image->memory);
+                        vxmASSERT(!image->memory.allocated);
                         for (p = 0; p < image->planeCount; p++)
                         {
                             /* offset is non zero if this is a subimage of some image */
                             ptr = (vx_uint8*)new_ptrs[p];
                             image->memory.logicals[p] = ptr;
                         }
-                        sucess = vxoMemory_WrapUserMemory(context, &image->memory);
-                        if(sucess)
-                        {
-                            for(p = 0; p < image->planeCount; p++)
-                            {
-                                gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
-                            }
-                        }
+                        vxoMemory_WrapUserMemory(context, &image->memory);
                     }
                 }
                 else

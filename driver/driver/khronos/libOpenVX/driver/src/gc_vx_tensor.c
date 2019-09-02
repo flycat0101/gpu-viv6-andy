@@ -3557,6 +3557,7 @@ VX_INTERNAL_API vx_bool vxoTensro_WrapUserMemory(vx_tensor tensor)
     vx_bool status = vx_false_e;
     gcmHEADER_ARG("tensor=%p", tensor);
 
+    vxmASSERT(!tensor->tensorBuffer->memory.allocated);
     status = vxoMemory_WrapUserMemory(tensor->base.context, &tensor->tensorBuffer->memory);
 
     if(status == vx_false_e)
@@ -3588,7 +3589,6 @@ VX_INTERNAL_API vx_bool vxoTensro_WrapUserMemory(vx_tensor tensor)
     else
     {
         tensor->useInternalMem = vx_false_e;
-        gcoOS_CacheFlush(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0],tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -3709,16 +3709,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* co
             {
                 if(tensor->useInternalMem == vx_false_e)
                 {
-                    vx_bool sucess = vx_false_e;
-
                     vxoTensor_FreeWrappedMemory(tensor);
                     /* offset is non zero if this is a subimage of some image */
                     tensor->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)new_ptrs;
-                    sucess = vxoTensro_WrapUserMemory(tensor);
-                    if(sucess)
-                    {
-                        gcoOS_CacheFlush(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
-                    }
+                    vxoTensro_WrapUserMemory(tensor);
                     vxInfo("memory.logicals = %#llx", tensor->tensorBuffer->memory.logicals[0]);
                 }
                 else
