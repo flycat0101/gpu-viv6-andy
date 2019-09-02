@@ -22719,11 +22719,12 @@ vx_status vxnneExecuteSCYUV2RGBScale(struct _vxnne_operation_s *operation)
 
     vx_image image = scaleOperation->inputs;
     vx_tensor output = scaleOperation->outputs;
-    vx_float32 r_mean = scaleOperation->r_mean->value->f32;
-    vx_float32 g_mean = scaleOperation->g_mean->value->f32;
-    vx_float32 b_mean = scaleOperation->b_mean->value->f32;
-    vx_float32 rgb_scale = scaleOperation->rgb_scale->value->f32;
-    vx_bool y_only = scaleOperation->y_only->value->b;
+
+    vx_float32 r_mean = ((vx_scalar)operation->layer->node->paramTable[2])->value->f32;
+    vx_float32 g_mean = ((vx_scalar)operation->layer->node->paramTable[3])->value->f32;
+    vx_float32 b_mean = ((vx_scalar)operation->layer->node->paramTable[4])->value->f32;
+    vx_float32 rgb_scale = ((vx_scalar)operation->layer->node->paramTable[5])->value->f32;
+    vx_bool y_only = ((vx_scalar)operation->layer->node->paramTable[6])->value->b;
 
     vx_rectangle_t rect = scaleOperation->rect;
     vx_uint32 scale_x = scaleOperation->x_scale;
