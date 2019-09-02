@@ -2786,6 +2786,7 @@ IN gctBOOL IsConst
 
 static void
 _GetGenTypeCandidateType(
+IN cloCOMPILER Compiler,
 IN clsNAME *GenTypeParam,
 IN clsDECL *RefDecl,
 IN OUT clsDECL *CandidateType
@@ -2858,17 +2859,19 @@ IN OUT clsDECL *CandidateType
         break;
 
    case clvTYPE_F_GEN:
-        if(!clmDECL_IsFloat(RefDecl) ||
-           (RefDecl->dataType->elementType == clvTYPE_HALF &&
-            GenTypeParam->u.variableInfo.builtinSpecific.s.isConvertibleType)) {
-           _clmInitGenType(clvTYPE_FLOAT,
-                           clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
-                           CandidateType->dataType);
+        if(!cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_CL_KHR_FP16) &&
+           (!clmDECL_IsFloat(RefDecl) ||
+            (RefDecl->dataType->elementType == clvTYPE_HALF &&
+            GenTypeParam->u.variableInfo.builtinSpecific.s.isConvertibleType))) {
+            _clmInitGenType(clvTYPE_FLOAT,
+                            clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
+                            CandidateType->dataType);
         }
         break;
 
    case clvTYPE_GEN:
         if(RefDecl->dataType->elementType == clvTYPE_HALF &&
+           !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_CL_KHR_FP16) &&
            GenTypeParam->u.variableInfo.builtinSpecific.s.isConvertibleType) {
            _clmInitGenType(clvTYPE_FLOAT,
                            clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
@@ -2893,7 +2896,6 @@ IN OUT clsNAME **RefParamName
   clsDECL lDecl[1];
   clsDECL *paramDecl;
   clsDECL *rDecl;
-  clsDECL refDecl[1];
   clsDATA_TYPE dataType[1];
   clsDATA_TYPE *refDataType = gcvNULL;
   cltELEMENT_TYPE refElementType = clvTYPE_VOID;
@@ -2911,24 +2913,6 @@ IN OUT clsNAME **RefParamName
   }
   paramDecl = &ParamName->decl;
   rDecl = &Argument->decl;
-  if (rDecl->dataType->elementType == clvTYPE_HALF &&
-      !clmDECL_IsPointerType(rDecl) && !clmDECL_IsArray(rDecl) &&
-      ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) {
-      gctINT resultType;
-      resultType = clGetVectorTerminalToken(clvTYPE_FLOAT,
-                                            clmDATA_TYPE_vectorSize_GET(rDecl->dataType));
-
-      if(resultType) {
-          status = cloCOMPILER_CreateDecl(Compiler,
-                                          resultType,
-                                          rDecl->dataType->u.generic,
-                                          rDecl->dataType->accessQualifier,
-                                          rDecl->dataType->addrSpaceQualifier,
-                                          refDecl);
-          if (gcmIS_ERROR(status)) return status;
-          rDecl = refDecl;
-      }
-  }
   if(clmDECL_IsScalar(rDecl) &&
      (clmDECL_IsScalar(paramDecl) || !ParamName->u.variableInfo.builtinSpecific.s.hasGenType)) {
       ParamName->u.variableInfo.effectiveDecl = ParamName->decl;
@@ -2941,6 +2925,10 @@ IN OUT clsNAME **RefParamName
                   && ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) {
               if(clmDECL_IsIntegerType(rDecl)
                  && clmDECL_IsCompatibleIntegerType(paramDecl)) {  /*implicit integer conversion */
+                   return gcvTRUE;
+              }
+              else if(clmDECL_IsHalfType(rDecl)
+                 && clmDECL_IsFloatingType(paramDecl)) {  /*implicit half type to float conversion */
                    return gcvTRUE;
               }
               else if(clmDECL_IsArithmeticType(paramDecl)
@@ -2971,7 +2959,8 @@ IN OUT clsNAME **RefParamName
   clmDECL_Initialize(lDecl, dataType, &paramDecl->array, paramDecl->ptrDscr, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
   if(clmDECL_IsGenType(paramDecl)) {
      if(refDataType == gcvNULL) {
-        _GetGenTypeCandidateType(ParamName,
+        _GetGenTypeCandidateType(Compiler,
+                                 ParamName,
                                  rDecl,
                                  lDecl);
         updateRefDataType = gcvTRUE;
