@@ -1082,24 +1082,6 @@ vxoMemoryPool_GetStackStatus(
     }
 }
 
-VX_PRIVATE_API vx_memory
-vxoMemoryPool_GetStackHeadTailMem(
-    vx_mempool_stack stack,
-    vx_enum position
-    )
-{
-    if (position == VX_MEMPOOL_STACK_HAS_HEAD && !stack->first)
-    {
-        return stack->buffer[stack->first].memory;
-    }
-    else if (position == VX_MEMPOOL_STACK_HAS_TAIL && stack->last != stack->count + 1)
-    {
-        return stack->buffer[stack->last].memory;
-    }
-
-    return VX_NULL;
-}
-
 VX_PRIVATE_API vx_uint32
 vxoMemoryPool_GetStackId(
     vx_mempool_stack stack,
