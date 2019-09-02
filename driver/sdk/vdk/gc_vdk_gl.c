@@ -290,6 +290,12 @@ vdkLoadTGA(
         fseek(File, tga.IDLength, SEEK_SET);
     }
 
+    /* Validate the bytes. */
+    if (0 >= bytes)
+    {
+        return NULL;
+    }
+
     /* Allocate the bits. */
     bits = (unsigned char *) malloc(bytes);
     /* Initialize the bits */
