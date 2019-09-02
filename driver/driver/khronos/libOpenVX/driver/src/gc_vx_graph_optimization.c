@@ -4119,7 +4119,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_multiTranspose(vx_graph graph)
             while(vxoGraphOptimization_getKernelType(node) == OP_TRANSPOSE && transposeCnt < 6)
             {
                 transposeNodes[transposeCnt++] = node;
-                if(node->numChildren > 1)
+                if(node->numChildren != 1)
                     break;
                 node = nodeTable[node->childNodes[0]];
 
