@@ -583,6 +583,12 @@ static VkResult halti2_helper_convertHwRsDesc(
         bFakeFormat = gcvTRUE;
     }
 
+    if (__vk_GetVkFormatInfo((VkFormat) vkFormat)->category == __VK_FMT_CATEGORY_UINT ||
+        __vk_GetVkFormatInfo((VkFormat) vkFormat)->category == __VK_FMT_CATEGORY_SINT)
+    {
+        downsampleMode = gcvMSAA_DOWNSAMPLE_SAMPLE;
+    }
+
     hwRsDesc->hwFormat       = format;
     hwRsDesc->downSampleMode = downsampleMode;
     hwRsDesc->flipRB         = flipRB;
@@ -1646,7 +1652,17 @@ VkResult halti2_copyImageWithRS(
  0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))));
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1))))))) << (0 ?
+ 1:1))) | (((gctUINT32) ((gctUINT32) (srcRsDesc.downSampleMode) & ((gctUINT32) ((((1 ?
+ 1:1) - (0 ?
+ 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1))));
 
     /*  RS and PE cache is shared on some chip, need flush PE cache befor trigger RS. */
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E03, VK_FALSE, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
