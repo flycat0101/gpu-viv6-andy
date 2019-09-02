@@ -226,6 +226,9 @@ vxoTensor_CalculateMaxMemorySize(
         if (TENSOR_VIEW_SIZE_INDEX(tensor, i) != 1) break;
     }
 
+    if (i == -1)
+        i = 0;
+
     return TENSOR_STRIDE_INDEX(tensor, i) * TENSOR_VIEW_SIZE_INDEX(tensor, i);
 }
 
