@@ -6172,7 +6172,7 @@ gctBOOL _CheckAlwaysInlineFunction(
         return gcvFALSE;
     }
 
-    if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_HAS_BARRIER) && bNeedToCutDownWorkGroupSize)
+    if (bNeedToCutDownWorkGroupSize)
     {
         return gcvTRUE;
     }
