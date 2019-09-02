@@ -1987,6 +1987,8 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateNNCommands(
         ReplaceOperationCmmd1xN(&inputInfo, &outputInfo, convOperation->weights_biases);
     }
 
+    vxmASSERT(convOperation->weights_biases->wb_base->hw_depth_wise || (WB_KERNEL_Z(convOperation->weights_biases) == inputInfo.depth));
+
     if (operationCommand->cmdInfo.tilingParam.kernelsPerCore == 0)
     {
         /*ab, ddr->ddr path*/
@@ -3795,35 +3797,52 @@ vx_status vxnneCalculateConvTilingParam(
 
         if (info[i].output.height == 0 ) continue;
 
-        if (conv_op->weights_biases->wb_base->do_zdp_opt &&
-            context->options.do1xnAfterSwtiling)
+        if (context->options.do1xnAfterSwtiling)
         {
-            vx_uint32 fitN = 1;
-            vx_bool doZdpOpt = vx_false_e;
-
-            if (inputDims[1] == TENSOR_SIZE_INDEX(conv_op->orig_inputs, 1))
+            if (conv_op->weights_biases->wb_base->do_zdp_opt)
             {
-                doZdpOpt = calcFitZdp3N(context,
-                                        inputDims[0],
-                                        inputDims[1],
-                                        &fitN,
-                                        1,
-                                        conv_op->weights_biases->wb_base->pooling_size_x);
+                vx_uint32 fitN = 1;
+                vx_bool doZdpOpt = vx_false_e;
 
-                if (doZdpOpt)
+                if (inputDims[1] == TENSOR_SIZE_INDEX(conv_op->orig_inputs, 1))
                 {
-                    /* Need reshape input[x, y, kz] --> [x*y/fitN, fitN, kz] */
-                    /* Need reshape output[x, y, vz] --> [x*y/fitN, fitN, vz] */
-                    inputDims[0] = inputDims[0] * inputDims[1] / fitN;
-                    inputDims[1] = fitN;
+                    doZdpOpt = calcFitZdp3N(context,
+                                            inputDims[0],
+                                            inputDims[1],
+                                            &fitN,
+                                            1,
+                                            conv_op->weights_biases->wb_base->pooling_size_x);
 
-                    outputDims[0]= outputDims[0] * outputDims[1] / fitN;
-                    outputDims[1] = fitN;
+                    if (doZdpOpt)
+                    {
+                        /* Need reshape input[x, y, kz] --> [x*y/fitN, fitN, kz] */
+                        /* Need reshape output[x, y, vz] --> [x*y/fitN, fitN, vz] */
+                        inputDims[0] = inputDims[0] * inputDims[1] / fitN;
+                        inputDims[1] = fitN;
+
+                        outputDims[0]= outputDims[0] * outputDims[1] / fitN;
+                        outputDims[1] = fitN;
+                    }
                 }
+
+                conv_op->weights_biases->wb_base->do_zdp_opt = doZdpOpt;
+
             }
+            else if (conv_op->weights_biases->wb_base->do_1xN)
+            {
+                vx_uint32 fitN = calcFit1xN(context, TENSOR_SIZE_INDEX(conv_op->inputs, 2), inputDims[0], inputDims[1]);
 
-            conv_op->weights_biases->wb_base->do_zdp_opt = doZdpOpt;
+                /* Need reshape input[x, y, kz] --> [x*y, fitN, kz/fitN] */
+                /* Need reshape output[x, y, vz] --> [x*y, 1, vz] */
+                /* Need reshape weight[1, 1, kz, vz] --> [1, fitN, kz/fitN, vz] */
 
+                inputDims[0] *= inputDims[1];
+                inputDims[1] = fitN;
+                inputDims[2] /= fitN;
+
+                outputDims[0] *= outputDims[1];
+                outputDims[1] = 1;
+            }
         }
 
         memset(&perf, 0, sizeof(vx_arch_perf_s));
