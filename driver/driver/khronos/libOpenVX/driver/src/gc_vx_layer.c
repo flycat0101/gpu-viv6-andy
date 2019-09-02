@@ -15114,12 +15114,12 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             char kernelName[100];
             if (kernelSize_x < 17 && useImage2DFlag)
             {
-                if (kernelSize_x == 3 && stride_x == 1 && is_use_k3_fast)
+                if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Integer16_3_S1");
                     set_order_uniform = vx_true_e;
                 }
-                else if (kernelSize_x == 3 && stride_x == 2 && is_use_k3_fast)
+                else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Integer16_3_S2");
                     set_order_uniform = vx_true_e;
@@ -15135,12 +15135,12 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             }
             else if (kernelSize_x < 17 && !useImage2DFlag && dilation_x == 1 && dilation_y == 1)
             {
-                if (kernelSize_x == 3 && stride_x == 1 && is_use_k3_fast)
+                if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Tensor_Integer16_3_S1");
                     set_order_uniform = vx_true_e;
                 }
-                else if (kernelSize_x == 3 && stride_x == 2 && is_use_k3_fast)
+                else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Tensor_Integer16_3_S2");
                     set_order_uniform = vx_true_e;
@@ -15163,12 +15163,12 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             char kernelName[100];
             if (kernelSize_x < 17 && useImage2DFlag)
             {
-                if (kernelSize_x == 3 && stride_x == 1 && is_use_k3_fast)
+                if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Integer8_3_S1");
                     set_order_uniform_u8 = vx_true_e;
                 }
-                else if (kernelSize_x == 3 && stride_x == 2 && is_use_k3_fast)
+                else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Integer8_3_S2");
                     set_order_uniform_u8 = vx_true_e;
@@ -15184,12 +15184,12 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             }
             else if (kernelSize_x < 17 && !useImage2DFlag && dilation_x == 1 && dilation_y == 1)
             {
-                if (kernelSize_x == 3 && stride_x == 1 && is_use_k3_fast)
+                if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Tensor_Integer8_3_S1");
                     set_order_uniform_u8 = vx_true_e;
                 }
-                else if (kernelSize_x == 3 && stride_x == 2 && is_use_k3_fast)
+                else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Tensor_Integer8_3_S2");
                     set_order_uniform_u8 = vx_true_e;
@@ -15237,7 +15237,7 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
                 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000000, 0x00000000 // Constant
             };
 
-            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2RowOrder0K3_2x8", 1, uniTensor2RowOrder0K3_2x8);
+            status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2RowOrder0K3_2x8", 1, uniTensor2RowOrder0K3_2x8);
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2RowOrder2K3_2x8", 1, uniTensor2RowOrder2K3_2x8);
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2RowOrder4K3_2x8", 1, uniTensor2RowOrder4K3_2x8);
             if (set_order_uniform_u8)
@@ -26588,7 +26588,7 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
         }
         else
         {
-            printf("error input axis %d when useImage2DFlag is true [%s,%d]\n",axis, __FILE__,__LINE__);
+            vxError("error input axis %d when useImage2DFlag is true [%s,%d]\n",axis, __FILE__,__LINE__);
             status |= VX_FAILURE;
         }
         line_align                      = depth / 4 * 4;
