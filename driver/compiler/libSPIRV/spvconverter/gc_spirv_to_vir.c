@@ -433,7 +433,7 @@ static VIR_Enable virEnable [] =
     VIR_ENABLE_W
 };
 
-static VIR_Enable virEnableCompact [] =
+VIR_Enable virEnableCompact [] =
 {
     VIR_ENABLE_XYZW,
     VIR_ENABLE_X,
