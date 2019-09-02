@@ -1602,12 +1602,12 @@ _fill_TP_RESHUFFLE_Command_EX(
         if (optimization_for_1x1_conv)
         {
             /* Optimize reshuffle for 1x1 conv. */
-            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = out_pitch_x * out_pitch_y * in_size_z;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = outSliceSize * outZSize / (stride_x * stride_y);
             info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = stride_x;
             info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
             info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = out_size_x;
             info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 1;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = out_pitch_x * out_pitch_y * in_size_z;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outSliceSize * outZSize / (stride_x * stride_y);
             info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = stride_y;
             info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
             info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = out_size_x;
