@@ -10205,19 +10205,500 @@ OnError:
     return;
 }
 
+VX_PRIVATE_API vx_status vxoBinaryGraph_GetSHParamSize(
+    vx_graph graph,
+    vx_reference *shParams,
+    vx_uint32 paramNum,
+    vx_uint32 *size
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 i = 0, j =0;
+    vx_uint32 totalSize = 0;
+    vx_enum allocType = VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR;
+
+    for (i = 0; i < paramNum; i++)
+    {
+        vx_reference ref = shParams[i];
+
+        for (j = 0; j < graph->inputCount; j++)
+        {
+            if (ref == graph->inputs[j])
+            {
+                continue;
+            }
+        }
+        if (j != graph->inputCount) continue;
+
+        for (j = 0; j < graph->outputCount; j++)
+        {
+            if (ref == graph->outputs[j])
+            {
+                continue;
+            }
+        }
+        if (j != graph->inputCount) continue;
+
+        if (ref->type == VX_TYPE_IMAGE)
+        {
+            vx_image image = (vx_image)ref;
+            allocType = vxoMemory_GetType(&image->memory);
+            if (allocType == VXNNE_MEM_POOL_TYPE_ORIG_DDR)
+            {
+                gcsVX_IMAGE_INFO imageInfo;
+                gcoVX_Kernel_Context kernelContext; /* not useful, just fulfill the interface */
+                gcoOS_MemFill((gctPOINTER*)(&kernelContext), 0, sizeof(gcoVX_Kernel_Context));
+                gcfVX_GetImageInfo(&kernelContext, image, &imageInfo, 1);
+                totalSize += (vx_uint32)imageInfo.bytes;
+            }
+        }
+        else if (ref->type == VX_TYPE_ARRAY)
+        {
+            vx_array array = (vx_array)ref;
+            allocType = vxoMemory_GetType(&array->memory);
+            if (allocType == VXNNE_MEM_POOL_TYPE_ORIG_DDR)
+            {
+                totalSize += (vx_uint32)array->memory.sizes[0];
+            }
+        }
+        else if (ref->type == VX_TYPE_SCALAR)
+        {
+            totalSize += 64;/* alignement to 64 bytes */
+        }
+    }
+
+    *size = totalSize;
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
+    vx_graph graph,
+    vx_uint32 *size
+    )
+{
+    #define NN_STATES_SIZE          0X40 /* alignment to 64bytes */
+    #define TP_STATES_SIZE          0X40
+    #define SC_STATES_SIZE          0X40
+    #define SH_STATES_SIZE          0XD7
+    vx_status status = VX_SUCCESS;
+    vx_context context = graph->base.context;
+    vxnne_execution_layer executionLayer = graph->layer;
+    vx_uint32 i = 0;
+    vxnne_operation_command operationCommand = VX_NULL;
+    vxnne_operation operation = VX_NULL;
+    vx_node node = VX_NULL;
+    vx_uint32 KernelStreamSize = 0;
+    vx_uint32 operationCount = 0;
+    vx_uint32 nnCount = 0;
+    vx_uint32 tpCount = 0;
+    vx_uint32 shCount = 0;
+    vx_uint32 swCount = 0;
+    vx_uint32 scCount = 0;
+    vx_uint32 layerParamCount = 0;
+    vx_uint32 patchCount = 0;
+    vx_uint32 lcdtCount = 0;
+    vx_uint32 operationSize = 0;
+    vx_uint32 lcdtSize = 0;
+    vx_uint32 nnSize = 0;
+    vx_uint32 tpSize = 0;
+    vx_uint32 shSize = 0;
+    vx_uint32 swSize = 0;
+    vx_uint32 layerParamSize = 0;
+    vx_uint32 patchSize = 0;
+    vx_uint32 totalSize = 0;
+    vx_uint32 lcdSize = 0;
+    vx_uint32 statesSize = 0;
+    vx_uint32 shIntrSize = 0;
+    vx_uint32 shShareMemSize = 0;
+    vx_uint32 shParaSize = 0;
+
+    for (i = 0; i < executionLayer->opIndicesNum; i++)
+    {
+        operationCommand = &executionLayer->opIndices[i];
+        operation = operationCommand->operation;
+        node = operation->layer->node;
+
+        if (operation->target == VXNNE_OPERATION_TARGET_NN)
+        {
+            vx_weights_biases_parameter weights_biases = operationCommand->cmdInfo.wb;
+            vx_uint32 ksDataSize = 0;
+            vx_uint32 tempCount = 0;
+
+            vxmASSERT(weights_biases != VX_NULL);
+
+            ksDataSize = (vx_uint32)WB_MEM_SIZE_INDEX(weights_biases, 0);
+            ksDataSize = gcmALIGN(ksDataSize, 64);
+
+            KernelStreamSize += ksDataSize;
+
+            if (context->nnConfig.fixedFeature.nnCoreCount > 0)
+            {
+                tempCount = context->nnConfig.fixedFeature.nnCoreCount;
+            }
+            else
+            {
+                tempCount = 1;
+            }
+
+            operationCount += tempCount;
+            nnCount += tempCount;
+            lcdtCount += tempCount * 2;
+            patchCount += tempCount * 7;
+        }
+        else if (operation->target == VXNNE_OPERATION_TARGET_TP)
+        {
+            vx_op_param parameter = &operationCommand->operation->parameter;
+            vx_uint32 ksDataSize = 0;
+            vx_uint32 tempCount = 0;
+
+            if (context->nnConfig.fixedFeature.tpCoreCount > 0)
+            {
+                tempCount = context->nnConfig.fixedFeature.tpCoreCount;
+            }
+            else
+            {
+                tempCount = 1;
+            }
+
+            operationCount += tempCount;
+            tpCount += tempCount;
+            lcdtCount += tempCount * 3;
+            patchCount += tempCount * 8;
+
+            if (parameter->data_buff != VX_NULL)
+            {
+                vx_size size_tensor = 0;
+                vxoTensor_GetTensorWholeSize(parameter->data_buff, &size_tensor);
+                ksDataSize = (vx_uint32)size_tensor;
+            }
+            else if (parameter->tpType == TP_SINGLE_FC && parameter->other_ref != VX_NULL)
+            {
+                vx_uint32 j = 0;
+                vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter)parameter->other_ref;
+
+                if (weights_biases->slice_num == 0)
+                {
+                    vxError("fail to get NBG size, tp weights_biases sclice num is 0\n");
+                    vxmONERROR(VX_ERROR_INVALID_VALUE);
+                }
+
+                for (j = 0; j < weights_biases->slice_num; j++)
+                {
+                    ksDataSize += (vx_uint32)WB_STREAM_SIZE_INDEX(weights_biases, j) + 64;
+                }
+
+                if (ksDataSize == 0)
+                {
+                    vxError("fail to get NBG size, tp kernel stream size is 0\n");
+                    vxmONERROR(VX_ERROR_INVALID_VALUE);
+                }
+            }
+
+            ksDataSize = gcmALIGN(ksDataSize, 64);
+
+            KernelStreamSize += ksDataSize;
+
+            lcdtCount += operationCount * 2;
+            patchCount += operationCount * 7;
+        }
+        else if (operation->target == VXNNE_OPERATION_TARGET_SH)
+        {
+            vxnne_shader_operation shaderOperation  = (vxnne_shader_operation)operation;
+            gcsSURF_NODE_PTR instMemNode = VX_NULL;
+            gcsSURF_NODE_PTR sharedMemNode = VX_NULL;
+            vx_shader kernelShader = VX_NULL;
+            gcsHINT_PTR hints = VX_NULL;
+            vx_reference *shParams = VX_NULL;
+
+            operationCount += 1;
+            shCount += 1;
+
+            if (operation->operatorType == VXNNE_OPERATOR_USER_VXC)
+            {
+                gctUINT currentShaderID = 0;
+
+                vxmONERROR(vxoProgramKernel_GetCurrentShaderID(node, &currentShaderID));
+                kernelShader = node->kernel->kernelShader[currentShaderID];
+
+                shParams = shaderOperation->shaderExecutable->params;
+
+                lcdtCount += 3 + node->kernel->signature.paramCount;
+                patchCount += 1 + node->kernel->signature.paramCount;
+            }
+            else
+            {
+                kernelShader = shaderOperation->shaderExecutable->kernelShader;
+
+                shParams = shaderOperation->shaderExecutable->param;
+
+                lcdtCount += 3 + shaderOperation->shaderExecutable->paramNum;
+                patchCount += 1 + shaderOperation->shaderExecutable->paramNum;
+            }
+
+            hints = kernelShader->states.programState.hints;
+            instMemNode = (gcsSURF_NODE_PTR)hints->shaderVidNodes.instVidmemNode[gceSGSK_FRAGMENT_SHADER];
+            if (VX_NULL != instMemNode)
+            {
+                shIntrSize += (vx_uint32)instMemNode->size;
+            }
+
+            sharedMemNode = (gcsSURF_NODE_PTR)hints->shaderVidNodes.sharedMemVidMemNode;
+            if (VX_NULL != sharedMemNode)
+            {
+                shShareMemSize += (vx_uint32)sharedMemNode->size;
+            }
+
+            vxmONERROR(vxoBinaryGraph_GetSHParamSize(graph, shParams, shaderOperation->shaderExecutable->paramNum, &shParaSize));
+
+        }
+        else if (operation->target == VXNNE_OPERATION_TARGET_SC)
+        {
+            operationCount += 1;
+            scCount += 1;
+            patchCount += 3;
+            lcdtCount += 6;
+        }
+        else if (operation->target == VXNNE_OPERATION_TARGET_SW)
+        {
+            operationCount += 1;
+            swCount += 1;
+            layerParamCount += node->kernel->signature.paramCount;
+            lcdtCount += node->kernel->signature.paramCount;
+        }
+    }
+
+    operationSize = sizeof(vx_binary_operation_info_s) * operationCount;
+    lcdtSize = sizeof(vx_binary_loadingdata_table_info_s) * lcdtCount;
+    nnSize = NNE_COMMAND_SIZE * nnCount;
+    tpSize = TP_COMMAND_SIZE * tpCount;
+    shSize = sizeof(vx_uint32) * shCount;
+    patchSize = sizeof(vx_binary_patch_info_s) * patchCount;
+    swSize = sizeof(vx_uint32) * swCount;
+    layerParamSize = sizeof(vx_binary_layer_parameter_s) * layerParamCount;
+
+    statesSize = nnCount * NN_STATES_SIZE + tpCount * TP_STATES_SIZE + scCount * SC_STATES_SIZE + shCount * SH_STATES_SIZE;
+    lcdSize = KernelStreamSize + statesSize + shShareMemSize + shIntrSize + shParaSize;
+
+    totalSize = operationSize + lcdtSize + nnSize + tpSize + shSize + patchSize
+                + swSize + layerParamSize + lcdSize;
+
+    *size = totalSize;
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoBinaryGraph_VerifyGraph(
+    vx_graph graph
+    )
+{
+    vx_status status = VX_SUCCESS;
+    gcoHARDWARE savedHardware = gcvNULL;
+    gctUINT32 savedCoreIndex = 0;
+    gceHARDWARE_TYPE savedHardwareType = gcvHARDWARE_INVALID;
+    gctBOOL switched = gcvFALSE;
+    vx_bool first = ((graph->verified == vx_false_e) && (graph->reverify == vx_false_e)) ? vx_true_e : vx_false_e;
+
+    if (graph->verified)
+    {
+        vxError("%s[%d]: graph has been verified\n", __FUNCTION__, __LINE__);
+        return VX_SUCCESS;
+    }
+
+    vxAcquireMutex(graph->base.lock);
+
+    if(graph->parentGraph == gcvNULL)
+    {
+        gcmONERROR(gcoVX_SwitchContext(graph->deviceID, &savedHardware, &savedHardwareType, &savedCoreIndex));
+        switched = gcvTRUE;
+    }
+
+    vxmONERROR(vxoGraph_UserKernelPreprocess(graph, first));
+
+    vxmONERROR(vxoGraph_VerifyAllNodeParameters(graph));
+
+    vxmONERROR(vxoGraph_VerifyAllNodeWriteDependencies(graph));
+
+    vxmONERROR(vxoGraph_RetrieveTopology(graph));
+
+    if (graph->base.context->options.enableGraphAdapter)
+    {
+        vxmONERROR(vxoGraph_Adapter(graph));
+    }
+
+    vxmONERROR(vxoGraph_AllocateAllMemoryObjects(graph));
+
+    vxmONERROR(vxoGraph_DetectAllHeadNodes(graph));
+
+    vxmONERROR(vxoGraph_DetectAllTailNodes(graph));
+
+    vxmONERROR(vxoBinaryGraph_GetGraphInputOutput(graph));
+
+    vxmONERROR(vxoGraphOptimization(graph));
+
+    vxmONERROR(vxoGraph_DetectCycle(graph));;
+
+    vxmONERROR(vxoGraph_DetectUnvisitedNodes(graph));
+
+    vxmONERROR(vxoGraph_VerifyAllNodesByTarget(graph));
+
+    vxoGraph_GenerateAllNodeIndexTable(graph);
+
+    vxmONERROR(vxoGraph_InitializeAllNodeKernels(graph));
+
+    vxmONERROR(vxoGraph_CaculateCostFactors(graph));
+
+    vxoGraph_GenerateOperationTable(graph);
+
+    if (graph->layer != NULL)
+    {
+        vxoGraph_GenerateOpParentChild(graph);
+
+        if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_TP_PARALLEL))
+        {
+            vxoGraphParallel_AnalyzeOperationsBefore(graph);
+        }
+
+        if (graph->base.context->options.collectPerfType == COLLECT_PERF_ESTIMATE)
+        {
+            vxoGraph_PredictPerf(graph);
+        }
+
+        vxmONERROR(vxoGraph_VerifyTiling(graph));
+
+        vxmONERROR(vxoGraph_VerifyVirtualBuffer(graph));
+    }
+
+    if(switched)
+    {
+        gcoVX_RestoreContext(savedHardware,savedHardwareType,savedCoreIndex);
+    }
+
+    vxReleaseMutex(graph->base.lock);
+
+    graph->reverify = vx_false_e;
+    graph->verified = vx_true_e;
+    graph->status   = VX_GRAPH_STATE_VERIFIED;
+
+    return status;
+
+OnError:
+    graph->reverify = vx_false_e;
+    graph->verified = vx_false_e;
+    graph->status   = VX_GRAPH_STATE_UNVERIFIED;
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoBinaryGraph_GeneratNBG(
+    vx_graph graph
+    )
+{
+    vx_status status = VX_SUCCESS;
+    gcoHARDWARE savedHardware = gcvNULL;
+    gctUINT32 savedCoreIndex = 0;
+    gceHARDWARE_TYPE savedHardwareType = gcvHARDWARE_INVALID;
+    gctBOOL switched = gcvFALSE;
+
+    vxAcquireMutex(graph->base.lock);
+
+    if(graph->parentGraph == gcvNULL)
+    {
+        gcmONERROR(gcoVX_SwitchContext(graph->deviceID, &savedHardware, &savedHardwareType, &savedCoreIndex));
+        switched = gcvTRUE;
+    }
+
+    vxmONERROR(vxoBinaryGraph_SaveBinaryEntrance(graph));
+
+    vxmONERROR(vxnneExecutionLayer_GenerateCommands(graph->base.context, &graph->layer->base));
+
+    if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_TP_PARALLEL))
+    {
+        vxoGraphParallel_AnalyzeOperationsAfter(graph);
+    }
+
+    vxoGraph_VerifyOperationSync(graph);
+
+    if(switched)
+    {
+        gcoVX_RestoreContext(savedHardware,savedHardwareType,savedCoreIndex);
+    }
+
+    vxReleaseMutex(graph->base.lock);
+
+OnError:
+    return status;
+}
+
 VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
     vx_graph graph,
     vx_size *size
     )
 {
     vx_status status = VX_SUCCESS;
+    vx_uint32 nbEntranceSize = 0;
+    vx_uint32 nbIOSize = 0;
+    vx_uint32 layeSize = 0;
+    vx_uint32 sectionsSize = 0;
+    vx_uint32 inputCount = 0;
+    vx_uint32 outputCount = 0;
+    vx_uint32 totalSize = 0;
 
-    if (0 == graph->nodeCount)
+    /* 1. verify graph */
+    vxmONERROR(vxoBinaryGraph_VerifyGraph(graph));
+
+    /* 2. enrtance size */
+    nbEntranceSize = sizeof(vx_binary_header_s) + sizeof(vx_binary_memory_pool_info_s) +
+                     sizeof(vx_binary_axi_sram_info_s) + sizeof(vx_binary_entrance_info_s);
+
+    /* 3. input and output table size */
+    if ((graph->inputCount == 0) || (graph->outputCount == 0))
     {
-        vxError("%s[%d]: nodeCount is %d, nodeTable is NULL\n", __FUNCTION__, __LINE__, graph->nodeCount);
+        vx_reference inputTableRef[VX_MAX_NN_INOUT_PARAM_COUNT];
+        vx_reference outputTableRef[VX_MAX_NN_INOUT_PARAM_COUNT];
+
+        vxmONERROR(vxoBinaryGraph_InputsOutputs(graph, inputTableRef, &inputCount,
+                                                outputTableRef, &outputCount));
+    }
+
+    if (graph->inputCount && graph->inputs)
+    {
+        nbIOSize += sizeof(vx_binary_input_output_info_s) * graph->inputCount;
+    }
+    else if (inputCount > 0)
+    {
+        nbIOSize += sizeof(vx_binary_input_output_info_s) * inputCount;
+    }
+    else
+    {
+        vxError("%s[%d]: failed to get input count %d\n", __FUNCTION__, __LINE__, inputCount);
         vxmONERROR(VX_FAILURE);
     }
 
+    if (graph->outputCount && graph->outputs)
+    {
+        nbIOSize += sizeof(vx_binary_input_output_info_s) * graph->outputCount;
+    }
+    else if (outputCount > 0)
+    {
+        nbIOSize += sizeof(vx_binary_input_output_info_s) * outputCount;
+    }
+    else
+    {
+        vxError("%s[%d]: failed to get output count %d\n", __FUNCTION__, __LINE__, outputCount);
+        vxmONERROR(VX_FAILURE);
+    }
+
+    /* 4. layer size */
+    layeSize = sizeof(vx_binary_layers_info_s) * graph->nodeCount;
+
+    /* 5. other sections size */
+    vxmONERROR(vxoBinaryGraph_GetSectionsSize(graph, &sectionsSize));
+
+    totalSize = nbEntranceSize + nbIOSize + layeSize + sectionsSize;
+
+    *size = (vx_size)totalSize;
 
 OnError:
     return status;
@@ -10235,19 +10716,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GenerateNBG(
     vx_uint32 enableDumpNBG = 0;
     gctSTRING envctrl = gcvNULL;
 
-    if (context->options.enableCacheBinaryGraph)
-    {
-        vxError("%s[%d]: not support this feature when cache binary graph enabled\n", __FUNCTION__, __LINE__);
-        vxmONERROR(VX_ERROR_NOT_SUPPORTED);
-    }
-
-    if (vx_true_e == vxoBinaryGraph_HasBinaryInGraph(graph))
-    {
-        /* bypass the network if it import from binary graph */
-        vxError("%s[%d]: has binary in graph\n", __FUNCTION__, __LINE__);
-        vxmONERROR(VX_ERROR_NOT_SUPPORTED);
-    }
-
     graph->binarySave = (vx_binary_save)vxAllocateAndZeroMemory(sizeof(vx_binary_save_s));
     if (VX_NULL == graph->binarySave)
     {
@@ -10261,7 +10729,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GenerateNBG(
     graph->binarySave->NBGBuffer = buffer;
     graph->binarySave->NBGSize = &nbgSize;
 
-    vxmONERROR(vxVerifyGraph(graph));
+    vxmONERROR(vxoBinaryGraph_GeneratNBG(graph));
 
     vxmONERROR(vxProcessGraph(graph));
 
@@ -10285,6 +10753,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GenerateNBG(
         gcmVERIFY_OK(gcoOS_Close(gcvNULL, binarySaveFile));
     }
 
+    vxInfo("Actual NBG size : %d bytes\n", nbgSize);
+
 OnError:
     context->options.enableSaveBinary = 0;
     vxoBinaryGraph_unInitial(graph);
@@ -10295,6 +10765,7 @@ OnError:
 VX_API_ENTRY vx_status VX_API_CALL vxGenerateNBG(vx_graph graph, void *buffer, vx_size *size)
 {
     vx_status status = VX_SUCCESS;
+    vx_context context =graph->base.context;
     gcmHEADER_ARG("graph=%p, buffer=%p, size=%p", graph, buffer, size);
     gcmDUMP_API("$VX vxGenerateNBG: graph=%p, buffer=%p, size=%p", graph, buffer, size);
 
@@ -10304,9 +10775,29 @@ VX_API_ENTRY vx_status VX_API_CALL vxGenerateNBG(vx_graph graph, void *buffer, v
         vxmONERROR(VX_FAILURE);
     }
 
-    if ((buffer == VX_NULL) && (size != VX_NULL))
+    if (vx_true_e == vxoBinaryGraph_HasBinaryInGraph(graph))
+    {
+        /* bypass the network if it import from binary graph */
+        vxError("%s[%d]: has binary in graph, can't genereate NBG\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_ERROR_NOT_SUPPORTED);
+    }
+
+    if (context->options.enableCacheBinaryGraph)
+    {
+        vxError("%s[%d]: not support this feature when cache binary graph enabled\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_ERROR_NOT_SUPPORTED);
+    }
+
+    if (0 == graph->nodeCount)
+    {
+        vxError("%s[%d]: nodeCount is %d\n", __FUNCTION__, __LINE__, graph->nodeCount);
+        vxmONERROR(VX_FAILURE);
+    }
+
+    if (((buffer == VX_NULL) && (size != VX_NULL)) || (graph->verified == vx_false_e))
     {
         vxmONERROR(vxoBinaryGraph_GetNBGSize(graph, size));
+        vxInfo("Calculate NBG size : %d bytes\n", (vx_uint32)(*size));
     }
     else if (buffer != VX_NULL)
     {

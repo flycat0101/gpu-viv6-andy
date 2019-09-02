@@ -5346,7 +5346,7 @@ OnError:
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph)
+VX_INTERNAL_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph)
 {
 #define MAX_PARALLEL_OUTPUT_NUMBER 36
     vxnne_execution_layer layer = graph->layer;
@@ -5884,7 +5884,7 @@ do \
     } \
 } while(0)
 
-VX_PRIVATE_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
+VX_INTERNAL_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph)
 {
     vx_uint32 i = 0, j = 0, k, start = 0;
     vxnne_execution_layer layer = graph->layer;
@@ -7445,7 +7445,7 @@ VX_PRIVATE_API vx_status vxoGraph_PostMetaFormatData(vx_node node, vx_reference 
 }
 
 
-VX_PRIVATE_API vx_status vxoGraph_UserKernelPreprocess(vx_graph graph, vx_bool first)
+VX_INTERNAL_API vx_status vxoGraph_UserKernelPreprocess(vx_graph graph, vx_bool first)
 {
     vx_uint32 nodeIndex;
     gcmHEADER_ARG("graph=%p", graph);
@@ -7504,7 +7504,8 @@ VX_PRIVATE_API vx_status vxoGraph_UserKernelPreprocess(vx_graph graph, vx_bool f
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
-VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph)
+
+VX_INTERNAL_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph)
 {
     vx_uint32 nodeIndex, paramIndex;
     gcmHEADER_ARG("graph=%p", graph);
@@ -7725,7 +7726,7 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodeWriteDependencies(vx_graph graph)
+VX_INTERNAL_API vx_status vxoGraph_VerifyAllNodeWriteDependencies(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 nodeIndex, paramIndex;
@@ -7779,7 +7780,7 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodeWriteDependencies(vx_graph graph)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoGraph_AllocateAllMemoryObjects(vx_graph graph)
+VX_INTERNAL_API vx_status vxoGraph_AllocateAllMemoryObjects(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 nodeIndex, paramIndex;
@@ -8320,7 +8321,7 @@ VX_PRIVATE_API vx_status vxoGraph_AdapterFindParams(vx_graph graph, vx_internal_
 
 extern vx_status vxoNode_ConvertDims(vx_int32_ptr dims, vx_uint32_ptr org_dims, vx_uint32 count, vx_bool dimsto4);
 
-VX_PRIVATE_API vx_status vxoGraph_Adapter(vx_graph graph)
+VX_INTERNAL_API vx_status vxoGraph_Adapter(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
     vx_bool opt = vx_false_e;
@@ -8464,7 +8465,7 @@ exit:
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoGraph_DetectCycle(vx_graph graph)
+VX_INTERNAL_API vx_status vxoGraph_DetectCycle(vx_graph graph)
 {
     vx_uint32                   nodeIndex;
     vx_graph_traverse_info_s    traverseInfo;
@@ -8493,7 +8494,7 @@ VX_PRIVATE_API vx_status vxoGraph_DetectCycle(vx_graph graph)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoGraph_DetectUnvisitedNodes(vx_graph graph)
+VX_INTERNAL_API vx_status vxoGraph_DetectUnvisitedNodes(vx_graph graph)
 {
     vx_uint32 nodeIndex;
 
@@ -8517,7 +8518,7 @@ VX_PRIVATE_API vx_status vxoGraph_DetectUnvisitedNodes(vx_graph graph)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodesByTarget(vx_graph graph)
+VX_INTERNAL_API vx_status vxoGraph_VerifyAllNodesByTarget(vx_graph graph)
 {
     vx_uint32 nodeIndex;
     gcmHEADER_ARG("graph=%p", graph);
@@ -8560,7 +8561,7 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodesByTarget(vx_graph graph)
 #define OVX12_VXC_LIB_NAME "libOvx12VXCBinary.so"
 #define NNGPU_LIB_NAME "libNNGPUBinary.so"
 #endif
-VX_PRIVATE_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
+VX_INTERNAL_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
 {
     vx_uint32 nodeIndex;
     gcmHEADER_ARG("graph=%p", graph);
@@ -8662,7 +8663,7 @@ VX_PRIVATE_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoGraph_CaculateCostFactors(vx_graph graph)
+VX_INTERNAL_API vx_status vxoGraph_CaculateCostFactors(vx_graph graph)
 {
     vx_uint32 nodeIndex, paramIndex;
     gcmHEADER_ARG("graph=%p", graph);
@@ -9128,7 +9129,7 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyNodeSync(vx_graph graph)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API void vxoGraph_VerifyOperationSync(vx_graph graph)
+VX_INTERNAL_API void vxoGraph_VerifyOperationSync(vx_graph graph)
 {
     vx_uint32 i;
     vx_uint32 syncPattern;

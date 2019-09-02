@@ -1156,6 +1156,15 @@ VX_API_ENTRY vx_status VX_API_CALL vxIdentifyGraphInputsAndOutputs(vx_graph grap
                                                                    vx_uint32 num_of_outputs,
                                                                    vx_reference *outputs);
 
+/*! \brief Get the size of binary graph and generate binary graph into buffer.
+ * \param [in] graph The graph.
+ * \param [in] buffer Generate binary graph into buffer if *size value is the size of actual NBG.
+ * \param [in] size Get the size of binary graph if buffer is NULL.
+ * \return A <tt>\ref vx_status</tt> value.
+ * \ingroup group_graph
+ */
+VX_API_ENTRY vx_status VX_API_CALL vxGenerateNBG(vx_graph graph, void *buffer, vx_size *size);
+
 /*==============================================================================
  NODE
  =============================================================================*/

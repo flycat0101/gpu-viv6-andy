@@ -53,6 +53,45 @@ VX_INTERNAL_API vx_status vxoMultiGpu_FreeMemory(vx_node node);
 
 VX_INTERNAL_API vx_status vxoMultiGPU_SplitOperation(vx_node node, vxnne_operation srcOperation);
 
+/* statement functions for generating binary graph online */
+VX_INTERNAL_API vx_status vxoGraph_UserKernelPreprocess(vx_graph graph, vx_bool first);
+
+VX_INTERNAL_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_VerifyAllNodeWriteDependencies(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_Adapter(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_AllocateAllMemoryObjects(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_DetectCycle(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_DetectUnvisitedNodes(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_VerifyAllNodesByTarget(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_CaculateCostFactors(vx_graph graph);
+
+VX_INTERNAL_API void vxoGraph_GenerateOperationTable(vx_graph graph);
+
+VX_INTERNAL_API void vxoGraph_GenerateOpParentChild(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraph_VerifyVirtualBuffer(vx_graph graph);
+
+VX_INTERNAL_API void vxoGraph_GenerateAllNodeIndexTable(vx_graph graph);
+
+VX_INTERNAL_API vx_status vxoGraphParallel_AnalyzeOperationsAfter(vx_graph graph);
+
+VX_INTERNAL_API void vxoGraph_VerifyOperationSync(vx_graph graph);
+
 EXTERN_C_END
 
 #endif /* __GC_VX_GRAPH_H__ */
