@@ -53,27 +53,40 @@ vx_char* loadSources(const vx_char *filename, vx_size *programSize)
     gcmHEADER_ARG("filename=%s, programSize=%p", filename, programSize);
 
     pFile = fopen(filename, "rb");
+
     if (pFile != NULL && programSize)
     {
-        vx_int32 size = 0;
+        vx_size size = 0;
         /* obtain file size:*/
-        fseek(pFile, 0, SEEK_END);
-        *programSize = ftell(pFile);
+        if (-1 == fseek(pFile, 0, SEEK_END))
+        {
+            goto OnError;
+        }
+        size = ftell(pFile);
+        if (-1 == size)
+        {
+           goto OnError;
+        }
+
         rewind(pFile);
 
-        size = (int)(*programSize + 1);
-        programSource = (char*)vxAllocateAndZeroMemory(sizeof(char)*(size));
+        programSource = (char*)vxAllocateAndZeroMemory(sizeof(char)*(size + 1));
         if (programSource == NULL)
         {
-            fclose(pFile);
+            if (pFile) fclose(pFile);
             vxFree(programSource);
             gcmFOOTER_NO();
             return NULL;
         }
 
-        fread(programSource, sizeof(char), *programSize, pFile);
-        programSource[*programSize] = '\0';
-        fclose(pFile);
+        if (fread(programSource, sizeof(char), size, pFile) != size)
+        {
+            goto OnError;
+        }
+
+        programSource[size] = '\0';
+        *programSize = size;
+        if (pFile) fclose(pFile);
     }
     else
     {
@@ -83,6 +96,12 @@ vx_char* loadSources(const vx_char *filename, vx_size *programSize)
 
     gcmFOOTER_ARG("programSource=%s", programSource);
     return programSource;
+OnError:
+    if (pFile)
+        fclose(pFile);
+
+    gcmFOOTER_NO();
+    return NULL;
 }
 
 vx_status getFilePath(const char subfix[], char path[])
