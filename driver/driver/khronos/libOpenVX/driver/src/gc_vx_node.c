@@ -348,7 +348,13 @@ VX_INTERNAL_API vx_bool vxoNode_Adapter(vx_graph graph, vx_node node, vx_uint32 
 
                 if (node->kernel->signature.directionTable[index] == VX_INPUT && instatic)
                 {
-                    vxoTensor_AllocateMemory(virt_tensor);
+                    if (vxoTensor_AllocateMemory(virt_tensor) != VX_SUCCESS)
+                    {
+                        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+                        if (parameters[1]) vxReleaseScalar((vx_scalar*)&parameters[1]);
+                        gcmFOOTER_NO();
+                        return vx_false_e;
+                    }
 
                     if (type == VX_ADAPTER_CWHN_TO_WHCN)
                     {
@@ -372,18 +378,19 @@ VX_INTERNAL_API vx_bool vxoNode_Adapter(vx_graph graph, vx_node node, vx_uint32 
                 }
 
                 if(virt_tensor != VX_NULL)
+                {
                     vxSetTensorAttribute(virt_tensor, VX_TENSOR_VALUE, &TENSOR_VALUED(tensor), sizeof(vx_bool));
 
-                if (ref->type == VX_TYPE_OBJECT_ARRAY)
-                {
-                    ((vx_object_array)ref)->itemsTable[i] = (vx_reference)virt_tensor;
-                    vxoReference_Increment(&virt_tensor->base, VX_REF_INTERNAL);
-                }
-                else
-                    vxoNode_SetParameter(node, index, (vx_reference)virt_tensor);
+                    if (ref->type == VX_TYPE_OBJECT_ARRAY)
+                    {
+                        ((vx_object_array)ref)->itemsTable[i] = (vx_reference)virt_tensor;
+                        vxoReference_Increment(&virt_tensor->base, VX_REF_INTERNAL);
+                    }
+                    else
+                        vxoNode_SetParameter(node, index, (vx_reference)virt_tensor);
 
-                if(virt_tensor != VX_NULL)
                     vxoTensor_ReleaseTensor(&virt_tensor);
+                }
 
                 vxReleaseScalar((vx_scalar*)&parameters[1]);
                 opt = vx_true_e;

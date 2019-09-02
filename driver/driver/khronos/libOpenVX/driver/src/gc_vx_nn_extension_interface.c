@@ -25061,6 +25061,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcatIndefiniteLayer_Deinitializer(vx
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = NULL;
     }
 
     return VX_SUCCESS;
@@ -25091,6 +25092,7 @@ vx_status VX_CALLBACK vxnneUserNode_Deinitializer(vx_node node, const vx_referen
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = NULL;
     }
 
     return VX_SUCCESS;
