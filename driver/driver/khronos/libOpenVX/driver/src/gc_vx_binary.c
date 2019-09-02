@@ -8961,7 +8961,18 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     binarySave->currLoadingDataTableOffset = currPos;
 
     currPos += binarySave->loadingDataCount * sizeof(vx_binary_loadingdata_table_info_s);
+
+    if (1 == binarySave->generateNBGToMemory)
+    {
+        vx_uint8_ptr pos =  (vx_uint8_ptr)binarySave->NBGBuffer + currPos;
+        vx_uint64 address = gcmPTR_TO_UINT64(pos);
+        vx_uint64 alignAddress = gcmALIGN_SAFE(address, 64);
+        vx_uint32 diff = (vx_uint32)(alignAddress - address);
+        currPos += diff;
+    }
+
     currPos = gcmALIGN(currPos, SH_COMMAND_ALIGN_SIZE); /* for DDR-less project alignment */
+
     binarySave->currLoadingDataOffset = binarySave->loadingDataStartOffset = currPos;
 
     /* save network binary header info*/
