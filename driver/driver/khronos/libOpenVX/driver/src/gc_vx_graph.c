@@ -3107,7 +3107,7 @@ VX_PRIVATE_API vx_status InitializeABSegmentCommands(
         opCommand->inputTile.yStride  = TENSOR_STRIDE_INDEX(opInfo.input, 1);
         opCommand->inputTile.zStride  = TENSOR_STRIDE_INDEX(opInfo.input, 2);
 
-        opCommand->inputTile.sRAM                    = block->memParam[bufferID].inputMemory[0].allocType & VXNNE_MEM_POOL_TYPE_SRAM ? vx_true_e : vx_false_e;
+        opCommand->inputTile.sRAM                    = block->memParam[bufferID].inputMemory[0].allocType & VXNNE_MEM_POOL_TYPE_SRAM;
 
         if (opCommand->inputTile.sRAM)
         {
@@ -3138,7 +3138,7 @@ VX_PRIVATE_API vx_status InitializeABSegmentCommands(
         opCommand->outputTile.yStride   = TENSOR_STRIDE_INDEX(opInfo.output, 1);
         opCommand->outputTile.zStride   = TENSOR_STRIDE_INDEX(opInfo.output, 2);
 
-        opCommand->outputTile.sRAM                    = block->memParam[bufferID].outputMemory[0].allocType & VXNNE_MEM_POOL_TYPE_SRAM ? vx_true_e : vx_false_e;
+        opCommand->outputTile.sRAM                    = block->memParam[bufferID].outputMemory[0].allocType & VXNNE_MEM_POOL_TYPE_SRAM;
         if (opCommand->outputTile.sRAM)
         {
             vxoTensor_GetTensorViewOffset(opInfo.output, &offset);
@@ -3288,7 +3288,7 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
                         opCommand->cmdInfo.padLeft      = tilingInfo[i].padLeft;
                         opCommand->cmdInfo.padTop       = tilingInfo[i].padTop;
 
-                        opCommand->inputTile.sRAM        = block->memParam[bufferID].inputMemory[0].allocType & VXNNE_MEM_POOL_TYPE_SRAM ? vx_true_e : vx_false_e;
+                        opCommand->inputTile.sRAM        = block->memParam[bufferID].inputMemory[0].allocType & VXNNE_MEM_POOL_TYPE_SRAM;
 
                         if (opCommand->inputTile.sRAM)
                         {
@@ -3352,7 +3352,7 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
                         opCommand->cmdInfo.convWidth        = tilingInfo[i].convWidth;
                         opCommand->cmdInfo.convHeight       = tilingInfo[i].convHeight;
 
-                        opCommand->outputTile.sRAM        = block->memParam[bufferID].outputMemory[0].allocType & VXNNE_MEM_POOL_TYPE_SRAM ? vx_true_e : vx_false_e;
+                        opCommand->outputTile.sRAM        = block->memParam[bufferID].outputMemory[0].allocType & VXNNE_MEM_POOL_TYPE_SRAM;
 
                         if (opCommand->outputTile.sRAM)
                         {

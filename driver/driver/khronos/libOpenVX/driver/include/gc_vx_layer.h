@@ -563,7 +563,7 @@ typedef struct _vxnne_tiling_rect_s
     vx_uint32   xStride;
     vx_uint32   yStride;
     vx_uint32   zStride;
-    vx_bool     sRAM;
+    vx_uint32   sRAM;
     vx_uint32   physical;
     gctPOINTER  logical;
     gctPOINTER  logicalBase;
@@ -715,7 +715,7 @@ typedef struct _vxnne_tensor_info_s
     gctUINT32        yStride;
     gctUINT32        zStride;
     gctUINT32        circleBufferSize;
-    gctBOOL          sRAM;
+    gctUINT32        sRAM;
     vx_uint32        memoryPhysicalBase;
     vx_uint32        memorySize;
     gctPOINTER       memoryLogicalBase;

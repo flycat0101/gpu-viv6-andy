@@ -3914,11 +3914,11 @@ vx_status vxnneOperation_InitializeCommand(
         return VX_SUCCESS;
     }
 
-    input->sRAM = vx_false_e;
+    input->sRAM = 0;
     input->circleBufferSize = 0;
     input->circularBufEndAddrPlus1 = 0xFFFFFFFF;
 
-    output->sRAM = vx_false_e;
+    output->sRAM = 0;
     output->circleBufferSize = 0;
     output->circularBufEndAddrPlus1 = 0xFFFFFFFF;
 
