@@ -1206,12 +1206,7 @@ typedef struct _VSC_OPTN_DUAL16OPTIONS
 
     gctFLOAT percentage;
     gctFLOAT halfDepPercentage;
-    gctUINT32 before_shader;
-    gctUINT32 after_shader;
-    gctINT   skipOpcode;
-    gctUINT   before_line;
-    gctUINT   after_line;
-    gctSTRING kernelName;
+
 } VSC_OPTN_DUAL16Options;
 
 #define VSC_OPTN_DUAL16Options_GetPercentage(option)        ((option)->percentage)
@@ -1219,24 +1214,6 @@ typedef struct _VSC_OPTN_DUAL16OPTIONS
 
 #define VSC_OPTN_DUAL16Options_GetHalfDepPercentage(option)        ((option)->halfDepPercentage)
 #define VSC_OPTN_DUAL16Options_SetHalfDepPercentage(option, p)     ((option)->halfDepPercentage = (p))
-
-#define VSC_OPTN_DUAL16Options_BeforeShader(option)          ((option)->before_shader)
-#define VSC_OPTN_DUAL16Options_SetBeforeShader(option,t)       ((option)->before_shader = (t))
-
-#define VSC_OPTN_DUAL16Options_AfterShader(option)          ((option)->after_shader)
-#define VSC_OPTN_DUAL16Options_SetAfterShader(option,t)       ((option)->after_shader = (t))
-
-#define VSC_OPTN_DUAL16Options_GetSkipOpcode(option)         ((option)->skipOpcode)
-#define VSC_OPTN_DUAL16Options_SetSkipOpcode(option, s)         ((option)->skipOpcode = (s))
-
-#define VSC_OPTN_DUAL16Options_GetBeforeInst(option)         ((option)->before_line)
-#define VSC_OPTN_DUAL16Options_SetBeforeInst(option, s)       ((option)->before_line = (s))
-
-#define VSC_OPTN_DUAL16Options_GetAfterInst(option)         ((option)->after_line)
-#define VSC_OPTN_DUAL16Options_SetAfterInst(option, s)       ((option)->after_line = (s))
-
-#define VSC_OPTN_DUAL16Options_GetKernelName(option)         ((option)->kernelName)
-#define VSC_OPTN_DUAL16Options_SetKernelName(option, s)      ((option)->kernelName = (s))
 
 #define VSC_OPTN_DUAL16Options_GetTrace(option)             VSC_OPTN_GetTrace(&(option)->optnBase)
 #define VSC_OPTN_DUAL16Options_SetTrace(option, t)          VSC_OPTN_SetTrace(&(option)->optnBase, (t))

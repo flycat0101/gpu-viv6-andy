@@ -5935,12 +5935,6 @@ VIR_Symbol* VIR_SymAliasTable_GetAlias(
     IN VIR_Symbol               *Sym
     );
 
-gctINT
-VIR_Type_GetComponentTypeByteSize(
-    IN  VIR_Shader *    Shader,
-    IN  VIR_Type *      Type
-    );
-
 gctUINT
 VIR_Type_GetTypeByteSize(
     IN  VIR_Shader *    Shader,
