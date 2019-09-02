@@ -2127,10 +2127,10 @@ void _fill_TP_TRANSPOSE_Command(
             info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = pnum > 4 ? distances[4] : 0;
             info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = split_count > 1 && pnum == 5 ? split_sizes[i] : pnum > 4 ? dims[4] : 1;
             info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = pnum > 5 ? distances[5] : 0;
-
-            info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
-            info_array[i].vx_tp_general_cmd_split_info.last = 1;
         }
+
+        info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
+        info_array[i].vx_tp_general_cmd_split_info.last = 1;
     }
 }
 
