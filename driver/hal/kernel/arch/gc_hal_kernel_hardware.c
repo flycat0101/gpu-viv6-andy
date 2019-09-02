@@ -9946,8 +9946,7 @@ gckHARDWARE_SetPowerState(
              * global OFF, IDLE or SUSPEND.
              */
             status = gckOS_TryAcquireSemaphore(os, Hardware->globalSemaphore);
-
-            if (status != gcvSTATUS_TIMEOUT)
+            if (status != gcvSTATUS_TIMEOUT && Hardware->isLastPowerGlobal)
             {
                 gcmkPRINT("%s: global state error", __FUNCTION__);
             }
@@ -9963,6 +9962,7 @@ gckHARDWARE_SetPowerState(
 
     /* Save the new power state. */
     Hardware->chipPowerState = state;
+    Hardware->isLastPowerGlobal = global;
 
 #if gcdDVFS
     if (state == gcvPOWER_ON && Hardware->kernel->dvfs)

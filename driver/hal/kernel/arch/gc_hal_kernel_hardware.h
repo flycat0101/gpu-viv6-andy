@@ -197,6 +197,7 @@ struct _gckHARDWARE
     gctBOOL                     clockState;
     gctBOOL                     powerState;
     gctPOINTER                  globalSemaphore;
+    gctBOOL                     isLastPowerGlobal;
 
     /* Wait Link FE only. */
     gctUINT32                   lastWaitLink;
