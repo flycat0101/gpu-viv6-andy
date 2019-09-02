@@ -4277,7 +4277,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     {
         case TP_RESHUFFLE:
         {
-            if ((vx_uint32)parameter->pad_y_top == -1)
+            if ((vx_int32)parameter->pad_y_top == -1)
             {
                 /*
                  * SWTiling subimage uses -1 of pad_y_top to
