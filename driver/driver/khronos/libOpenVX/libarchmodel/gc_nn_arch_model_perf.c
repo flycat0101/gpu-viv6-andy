@@ -432,7 +432,8 @@ vx_status showArchPerformance(
     }
 
     if (op->target == VXNNE_OPERATION_TARGET_SH ||
-        op->target == VXNNE_OPERATION_TARGET_SW)
+        op->target == VXNNE_OPERATION_TARGET_SW ||
+        op->target == VXNNE_OPERATION_TARGET_SC)
     {
         return VX_SUCCESS;
     }
