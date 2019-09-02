@@ -99,10 +99,13 @@ _GenExtension(
     extensions[VEGL_EXTID_KHR_no_config_context].enabled = EGL_TRUE;
 
     if (Display->platform->platform == EGL_PLATFORM_FB_VIV ||
+        Display->platform->platform == EGL_PLATFORM_GBM_VIV ||
         Display->platform->platform == EGL_PLATFORM_WAYLAND_VIV)
     {
         extensions[VEGL_EXTID_EXT_buffer_age].enabled          = EGL_TRUE;
         extensions[VEGL_EXTID_KHR_partial_update].enabled      = EGL_TRUE;
+        extensions[VEGL_EXTID_EXT_swap_buffers_with_damage].enabled = EGL_TRUE;
+        extensions[VEGL_EXTID_KHR_swap_buffers_with_damage].enabled = EGL_TRUE;
     }
 #endif
 
