@@ -26874,10 +26874,11 @@ vxnne_shader_executable vxnneGetTensorCropShaderExecutable(
 
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}};
     vx_reference  parameters[2]         = {(vx_reference)input, (vx_reference)output};
-    vx_uint32     dims                  = TENSOR_DIM_NUM(input);
-    vx_uint32     width                 = TENSOR_VIEW_SIZE_INDEX(input, 0);
-    vx_uint32     height                = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
-    vx_uint32     depth                 = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
+    vx_uint32     dims                  = TENSOR_DIM_NUM(output);
+    vx_uint32     width                 = TENSOR_VIEW_SIZE_INDEX(output, 0);
+    vx_uint32     height                = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(output, 1) : 1;
+    vx_uint32     depth                 = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
+    vx_uint32     input_depth           = TENSOR_DIM_NUM(input) > 2 ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
     vx_enum       inputFormat           = TENSOR_DATA_TYPE(input);
     vx_enum       outputFormat          = TENSOR_DATA_TYPE(output);
     vx_float32    scaleIn               = 1.0;
@@ -26897,7 +26898,7 @@ vxnne_shader_executable vxnneGetTensorCropShaderExecutable(
 
     borderMode->mode = VX_BORDER_REPLICATE;
 
-    if (depth == 1)
+    if (input_depth == 1)
     {
         useImage2DFlag = vx_true_e;
     }

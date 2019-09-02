@@ -8460,7 +8460,12 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
 
         if (input_width != output_width)
         {
-            if (context->nnConfig.fixedFeature.shaderCoreCount > 2)
+            if (context->nnConfig.fixedFeature.shaderCoreCount > 4)
+            {
+                execution_parameters.localWorkSize[0]  = 2;
+                execution_parameters.localWorkSize[1]  = 16;
+            }
+            else if (context->nnConfig.fixedFeature.shaderCoreCount > 2)
             {
                 execution_parameters.localWorkSize[0]  = 1;
                 execution_parameters.localWorkSize[1]  = 2;
@@ -8473,7 +8478,12 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
         }
         else if (enable_cast_format )
         {
-            if (context->nnConfig.fixedFeature.shaderCoreCount > 2)
+            if (context->nnConfig.fixedFeature.shaderCoreCount > 4)
+            {
+                execution_parameters.localWorkSize[0]  = 2;
+                execution_parameters.localWorkSize[1]  = 16;
+            }
+            else if (context->nnConfig.fixedFeature.shaderCoreCount > 2)
             {
                 execution_parameters.localWorkSize[0]  = 1;
                 execution_parameters.localWorkSize[1]  = 8;
@@ -8488,7 +8498,12 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
         {
             if (width * height < depth)
             {
-                if (context->nnConfig.fixedFeature.shaderCoreCount > 2)
+                if (context->nnConfig.fixedFeature.shaderCoreCount > 4)
+                {
+                    execution_parameters.localWorkSize[0]  = 2;
+                    execution_parameters.localWorkSize[1]  = 16;
+                }
+                else if (context->nnConfig.fixedFeature.shaderCoreCount > 2)
                 {
                     execution_parameters.localWorkSize[0]  = 1;
                     execution_parameters.localWorkSize[1]  = 2;
