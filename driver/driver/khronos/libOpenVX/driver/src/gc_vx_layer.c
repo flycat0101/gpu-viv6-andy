@@ -2003,8 +2003,8 @@ vxnne_shader_executable vxnneGetFloorShaderExecutable(
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "output_offset_asymmetric", 1, &output_offset_asymmetric);
         }
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvertInt32toUint8_2x8", 1, uniConvertInt32toUint8_2x8);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvertFstFp16Fp32_4x4", 1, &uniConvertFstFp16Fp32_4x4);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvertSecFp16Fp32_4x4", 1, &uniConvertSecFp16Fp32_4x4);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvertFstFp16Fp32_4x4", 1, uniConvertFstFp16Fp32_4x4);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvertSecFp16Fp32_4x4", 1, uniConvertSecFp16Fp32_4x4);
 
         if (status != VX_SUCCESS) goto OnError;
     }
@@ -2712,7 +2712,6 @@ vxnne_shader_executable vxnneGetBatch2SpaceShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
     vx_tensor               stride,
-    vx_tensor               pad,
     vx_scalar               outc,
     vx_tensor               output)
 {

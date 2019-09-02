@@ -4718,7 +4718,7 @@ VX_PRIVATE_API vx_status vxnneConvolutionReluPoolingInitializer(
                                     && (kx != 1 || ky != 1));
             if(shExe_flag && padMode_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
             {
-                vxnne_shader_executable shaderExecutable;
+                vxnne_shader_executable shaderExecutable = VX_NULL;
                 vx_tensor                outTensor = NULL;
                 if(outTensor == NULL)
                 {
@@ -4861,7 +4861,8 @@ VX_PRIVATE_API vx_status vxnneConvolutionReluPoolingInitializer(
 
         if(shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
+
             shaderExecutable = vxnneTensorConvFormatShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_CONVFORMAT, &node->kernelAttributes.borderMode, interTensor, convertTensor);
 
             if (!shaderExecutable)
@@ -5953,7 +5954,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_Initializer(vx_node node, c
 
    if(useShadeExe && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
    {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         if (dims == 2) batchCount = 1;
 
@@ -6280,7 +6281,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
         {
             if (shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)) )
             {
-                vxnne_shader_executable shaderExecutable;
+                vxnne_shader_executable shaderExecutable = VX_NULL;
                 vx_tensor input      = NULL;
                 vx_tensor output     = NULL;
 
@@ -6289,11 +6290,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
 
                 if(node->base.context->evisNoInst.supportEVIS)
                 {
-                    shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
+                    if (input && output)
+                        shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
                 }
                 else
                 {
-                    shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
+                    if (input && output)
+                        shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
                 }
 
                 if (input) vxoTensor_ReleaseTensor(&input);
@@ -6472,7 +6475,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReverse_Initializer(vx_node node
         else if(dataFormat_flag && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)
             && numOfAxis < 4 && axFlag)
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
             vx_uint32 axis[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {8, 8, 8, 8, 8, 8};
             for (i = 0; i <numOfAxis; i++)
             {
@@ -7806,7 +7809,7 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
 
     vx_node                 node         = layer->node;
     vx_context              context      = vxGetContext((vx_reference)node);
-    vxnne_shader_executable shaderExecutable;
+    vxnne_shader_executable shaderExecutable = VX_NULL;
     vx_scalar               type_s       = VX_NULL;
     vx_scalar               norm_size_s  = VX_NULL;
     vx_scalar               alpha_s      = VX_NULL;
@@ -9326,7 +9329,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedLayer_Initializer(vx_nod
 
     if (enable_shader && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
@@ -9571,7 +9574,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
     }
     else if(shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
         vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
         vx_uint32  reshpTensor_Dims           = 2;
         vx_tensor input      = NULL;
@@ -9651,7 +9654,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
     }
     else if(img2DSize < IMG_MAX_WIDTH && func_v == VX_NN_ACTIVATION_SOFTRELU && support_dataType[0] && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         shaderExecutable = vxnneGetActivationSoftReluShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION_SOFTRELU, &node->kernelAttributes.borderMode, inputs, outputs);
 
@@ -9878,7 +9881,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNLeakyReluLayer_Initializer(vx_node nod
     }
     else if(shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         shaderExecutable = vxnneGetLeakyReluShaderExecutable(node->base.context, VXNNE_KERNEL_NN_LEAKY, &node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
 
@@ -10079,7 +10082,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPReluLayer_Initializer(vx_node node, c
 
     if(shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         shaderExecutable = vxnneGetPReluShaderExecutable(node->base.context, VXNNE_KERNEL_PRELU, &node->kernelAttributes.borderMode, inputs, alpha, outputs);
 
@@ -10351,7 +10354,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
 
     if (shExe_flag && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER))
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
         vx_uint32  sizes[]          = {1, 1, 1, 1};
         vx_uint32  dims             = 2;
         vx_float32 inputScale       = 1.0f;
@@ -10860,7 +10863,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorAdd_Initializer(vx_node node, co
     }
     else if (shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)) &&  !swExe_flag)
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
@@ -11101,7 +11104,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSub_Initializer(vx_node node, co
 
     if (shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)) && !swExe_flag)
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
         if(node->base.context->evisNoInst.supportEVIS)
         {
             if (enable_2d_tensor)
@@ -11350,7 +11353,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMul_Initializer(vx_node node, co
 
     if (shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)) && !swExe_flag)
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
@@ -11558,7 +11561,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorDiv_Initializer(vx_node node, co
 
     if (shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)) && !swExe_flag)
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
@@ -11844,7 +11847,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
 
         if (shExe_copy_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
             vx_tensor src          = NULL;
             vx_tensor dst          = NULL;
             vx_uint32 sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION];
@@ -11857,11 +11860,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
 
             if(node->base.context->evisNoInst.supportEVIS)
             {
-                shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, src, dst);
+                if (src && dst)
+                    shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, src, dst);
             }
             else
             {
-                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, src, dst);
+                if (src && dst)
+                    shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, src, dst);
             }
 
             if (src) vxoTensor_ReleaseTensor(&src);
@@ -13184,7 +13189,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd_cpu(vx_node n
         // 1. gpu softmax process
         if (enable_gpu_soft_max && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
             // reshap tensor objs from dim(4) to dim(3)
             vx_tensor rs_score = NULL, rs_socreBufferTensor = NULL;
             vx_bool rs_score_flag               = (vx_bool)(score->dimCount             == 4);
@@ -13274,7 +13279,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd_cpu(vx_node n
         }
         if (enable_gpu_regression && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
             vx_type_e in_img_format     = (vx_type_e)TENSOR_DATA_TYPE(img_info);
             vx_int8 in_img_fp           = TENSOR_POS(img_info);
             vx_uint32 min_size_v    = min_size->value->u32;
@@ -13576,7 +13581,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
         // 1. gpu softmax process
         if (enable_gpu_soft_max && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
             // reshap tensor objs from dim(4) to dim(3)
             vx_tensor rs_score = NULL, rs_socreBufferTensor = NULL;
             vx_bool rs_score_flag               = (vx_bool)(score->dimCount             == 4);
@@ -13665,7 +13670,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
         }
         if (enable_gpu_regression && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
             vx_type_e in_img_format     = (vx_type_e)TENSOR_DATA_TYPE(img_info);
             vx_int8 in_img_fp           = TENSOR_POS(img_info);
             vx_uint32 min_size_v    = min_size->value->u32;
@@ -13798,7 +13803,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
 
         if (enable_gpu_sort && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
             vx_tensor rs_proposalTensor = NULL;
             if (proposalTensor != NULL)
             {
@@ -13893,7 +13898,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
         }
         if(enable_gpu_nms && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
             vx_tensor rs_proposalTensor = NULL;
             if (proposalTensor != NULL)
             {
@@ -13970,7 +13975,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer_shd(vx_node node,
         }
         if (enable_gpu_retrive && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
             vx_tensor rs_proposalTensor = NULL, rs_roi_output = NULL, rs_score_output = NULL;
             if (proposalTensor != NULL)
             {
@@ -14408,7 +14413,7 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
             vxnneIsTPSupportFormat(context, input_data, VX_NULL, outputs) &&
             (roisFormat == VX_TYPE_FLOAT16))
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
             vx_uint32 num, size, maxpool, poolx, pooly, poolz;
             vx_op_param_s conv = {0};
             vx_tensor tmpTensor = VX_NULL;
@@ -14606,7 +14611,7 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
 
             if (shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
             {
-                vxnne_shader_executable shaderExecutable;
+                vxnne_shader_executable shaderExecutable = VX_NULL;
                 vx_bool enable_relu = relu ? relu->value->b : vx_false_e;
 
                 if (shExe_flag0 || shExe_flag1 || shExe_flag2 || shExe_flag3)
@@ -16584,7 +16589,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                 vx_int32  strideX       = (stridesX != VX_NULL) ? (stridesX->value->n32) : (vxoNNExternsionConvlutionRound((vx_float32)(inputWidth + paddingLeft + paddingRight - k_w) / (outputWidth - 1), downScaleSizeRoundingValue));
                 vx_int32  strideY       = (stridesY != VX_NULL) ? (stridesY->value->n32) : (vxoNNExternsionConvlutionRound((vx_float32)(inputHeight + paddingTop + paddingBottom - k_h) / (outputHeight - 1), downScaleSizeRoundingValue));
                 vx_bool   enableAlign4  = vx_false_e;
-                vxnne_shader_executable shaderExecutable;
+                vxnne_shader_executable shaderExecutable = VX_NULL;
                 vx_tensor_create_params_t tensor_create_params;
                 vx_tensor    newBiases                      = NULL;
                 vx_tensor    weights_new_rs                 = NULL;
@@ -17280,7 +17285,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(v
         dataformat_flag[1]        = (vx_bool)(inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8);
         dataformat_flag[2]        = (vx_bool)(inputFormat == VX_TYPE_INT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT8);
         dataformat_flag[3]        = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16);
-        depthwiseConv_shader_flag = (vx_bool)(dataformat_flag[0] || dataformat_flag[1] || dataformat_flag[2] || dataformat_flag[3]);
+        depthwiseConv_shader_flag = (vx_bool) ((dataformat_flag[0] || dataformat_flag[1] || dataformat_flag[2] || dataformat_flag[3]) && biases);
 
         if (depthwiseConv_shader_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
@@ -17631,7 +17636,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNReorgLayer_Initializer(vx_node node, c
         {
             vx_scalar outc_s   = vxCreateScalar(node->base.context, VX_TYPE_UINT32, &input_depth);
 
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
 
             shaderExecutable = vxnneGetReorgShaderExecutable(node->base.context, VXNNE_KERNEL_REORG, &node->kernelAttributes.borderMode,
                                                                  inputs, stride_s, outc_s, outputs);
@@ -18931,7 +18936,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
     {
     case gcoNNE_DECONV_MODE_SHADER:
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
             shaderExecutable = vxnneDeConvolutionShaderExecutable(node->base.context, VXNNE_KERNEL_DECONVOLUTION, &node->kernelAttributes.borderMode,
                 inputs,
                 weights,
@@ -19639,7 +19644,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNL2NormalizeLayer_Initializer(vx_node n
 
     if (enableShader && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
         vx_uint32 dim                  = 4;
         vx_uint32 tmp_sizes[4]         = {1, 1, 1, 1};
         vx_tensor_create_params_t      tensor_create_params;
@@ -20880,7 +20885,7 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
                 inputs, block_size_s, pad, outc_s, outputs, pad_list);
         else if(type == VX_REORG_BATCH_TO_SPACE_ND)
             shaderExecutable = vxnneGetBatch2SpaceShaderExecutable(context, VXNNE_KERNEL_REORG2, &node->kernelAttributes.borderMode,
-                inputs, block_size_s, pad, outc_s, outputs);
+                inputs, block_size_s, outc_s, outputs);
     }
     else
     {
@@ -21269,7 +21274,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorRounding_Initializer(vx_node node,
     if (dataFormat_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER))
         && rounding == VX_NN_DS_SIZE_ROUNDING_FLOOR)
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
@@ -21482,7 +21487,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHashLUT_Initializer(vx_node node, const 
 
     if (dataFormat_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
@@ -22039,7 +22044,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReshape_Initializer(vx_node node, const 
     }
     else if (shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)) )
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
         vx_tensor input      = NULL;
         vx_tensor output     = NULL;
         vx_uint32 sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION];
@@ -22052,11 +22057,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReshape_Initializer(vx_node node, const 
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
-            shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
+            if (input && output)
+                shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
         }
         else
         {
-            shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
+            if (input && output)
+                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
         }
 
         if (input) vxoTensor_ReleaseTensor(&input);
@@ -22407,7 +22414,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorScale_Initializer(vx_node node, co
 
     if(useShadeExe && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         if (type == VX_INTERPOLATION_BILINEAR)
         {
@@ -23347,7 +23354,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer2_Initializer(vx_node node, 
 
     if(useShadeExe && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         if(node->base.context->evisNoInst.supportEVIS)
         {
@@ -23539,7 +23546,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLUT2_Initializer(vx_node node, const vx_
 
     if (dataFormat_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
         if(node->base.context->evisNoInst.supportEVIS)
         {
             shaderExecutable = vxnneGetEmbeddingLUTShaderExecutable(node->base.context, VXNNE_KERNEL_EMBEDDINGLUT,
@@ -24271,11 +24278,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoAdapter_Initializer(vx_node node, const 
 
                 if(node->base.context->evisNoInst.supportEVIS)
                 {
-                    shaderExecutable = vxnneTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src, pPerm, num, dst);
+                    if (src && dst)
+                        shaderExecutable = vxnneTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src, pPerm, num, dst);
                 }
                 else
                 {
-                    shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src, pPerm, num, dst);
+                    if (src && dst)
+                        shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src, pPerm, num, dst);
                 }
 
                 if (!shaderExecutable)
@@ -24306,7 +24315,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoAdapter_Initializer(vx_node node, const 
         {
             vxnne_shader_executable shaderExecutable = VX_NULL;
 
-            shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, temp_tensor[0], temp_tensor[1]);
+            if (temp_tensor[0] && temp_tensor[1])
+                shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, temp_tensor[0], temp_tensor[1]);
 
             if (!shaderExecutable)
             {
@@ -24729,7 +24739,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcatIndefiniteLayer_Initializer(vx_n
     }
     else if (enable_SHExe)
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
         vx_uint32 i          = 0;
         vx_uint32 w         = TENSOR_VIEW_SIZE_INDEX(output_s, 0);
         vx_uint32 h         = TENSOR_VIEW_SIZE_INDEX(output_s, 1);
@@ -25067,7 +25077,7 @@ vx_status vxnneWrapUserNode(
 
     if (userNodeType == VXNNE_USER_NODE_TYPE_VXC)
     {
-        vxnne_shader_executable shaderExecutable;
+        vxnne_shader_executable shaderExecutable = VX_NULL;
 
         shaderExecutable = vxnneGetUserShaderExecutable(node->base.context,
                                                         node->kernel,
@@ -25731,6 +25741,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
             vx_uint32 pad_x_left          = 0;
             vx_uint32 pad_y_top           = 0;
             vx_uint32 batch               = new_sizes[3];
+
+            if (stride_s && poolSizeX && poolSizeY)
+            {
+                if (stride_s)  vxReleaseScalar(&stride_s);
+                if (poolSizeX) vxReleaseScalar(&poolSizeX);
+                if (poolSizeY) vxReleaseScalar(&poolSizeY);
+                goto exit;
+            }
 
             if(node->base.context->evisNoInst.supportEVIS)
             {
@@ -26760,7 +26778,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSqueeze_Initializer(vx_node node
     {
         if (shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
         {
-            vxnne_shader_executable shaderExecutable;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
             vx_tensor  src          = NULL;
             vx_tensor  dst          = NULL;
             vx_uint32 sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION];

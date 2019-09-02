@@ -2952,7 +2952,6 @@ vxnne_shader_executable vxnneGetBatch2SpaceShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
     vx_tensor               stride,
-    vx_tensor               pad,
     vx_scalar               outc,
     vx_tensor               output
     );
