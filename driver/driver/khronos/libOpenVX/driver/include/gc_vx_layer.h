@@ -2005,6 +2005,8 @@ typedef struct _vxnne_yuv2rgb_scale_operation_s
     vx_uint16                        y_init_error;
     vx_uint16                        x_init_int_error;
     vx_uint16                        y_init_int_error;
+    vx_uint32                        output_y_start;
+    vx_uint32                        output_y_end;
     vx_tensor                        outputs;
 }
 vxnne_yuv2rgb_scale_operation_s, * vxnne_yuv2rgb_scale_operation;

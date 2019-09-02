@@ -20428,30 +20428,18 @@ VX_PRIVATE_API vx_status vxnneOperation_ExecuteYUVScalerCommand(vx_node node, vx
 
     for (i = 0; i < splitCount; i++)
     {
-        vx_uint32 outputDim = 0;
-        vx_uint32 outputSizeStart[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
-        vx_uint32 outputSizeEnd[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
-        vx_tensor_view outputView = 0;
-        vx_tensor outputTensor = VX_NULL;
+        vx_uint32 outputSizeStart, outputSizeEnd;
 
-        vxmONERROR(vxQueryTensor(scaleOp->outputs, VX_TENSOR_DIMS, outputSizeEnd, sizeof(outputSizeEnd)));
-        vxmONERROR(vxQueryTensor(scaleOp->outputs, VX_TENSOR_NUMBER_OF_DIMS, &outputDim, sizeof(outputDim)));
+        outputSizeStart = outputStarts[i];
+        outputSizeEnd = outputStarts[i] + outputSizes[i];
 
-        /* split output y-axis */
-        outputSizeStart[1] = outputStarts[i];
-        outputSizeEnd[1] = outputStarts[i] + outputSizes[i];
-
-        outputView = vxCreateTensorView(node->base.context, outputSizeStart, outputSizeEnd, (vx_uint8)outputDim);
-        outputTensor  = vxoTensor_CreateTensorFromView(scaleOp->outputs, outputView);
-        if (outputView != VX_NULL) vxReleaseTensorView(&outputView);
-
-        SCOperation.base.references[VX_MULTIVIP_OUTPUT_TENSOR_REFERENCE] = (vx_reference)outputTensor;
-        SCOperation.outputs = outputTensor;
-        SCOperation.base.outputs[0] = (vx_reference)outputTensor;
+        SCOperation.outputs = scaleOp->outputs;
         SCOperation.rect.start_y = inputStarts[i];
         SCOperation.rect.end_y = SCOperation.rect.start_y + inputSizes[i];
         SCOperation.y_init_error = inputInitErrors[i];
         SCOperation.y_init_int_error = inputInitIntErrors[i];
+        SCOperation.output_y_start = outputSizeStart;
+        SCOperation.output_y_end = outputSizeEnd;
 
         SCOperation.base.gpuId = i;
         SCOperation.base.mGpuSync = i == splitCount - 1 ? vx_true_e : vx_false_e;
@@ -23262,7 +23250,7 @@ vx_status vxnneExecuteSCYUV2RGBScale(struct _vxnne_operation_s *operation)
     vx_uint32 input_hstride_y = image->memory.strides[0][VX_DIM_Y];
 
     vx_uint32 output_width  = TENSOR_VIEW_SIZE_INDEX(output, 0);
-    vx_uint32 output_height = TENSOR_VIEW_SIZE_INDEX(output, 1);
+    vx_uint32 output_height = scaleOperation->output_y_end - scaleOperation->output_y_start;
     vx_uint32 output_stride = TENSOR_STRIDE_INDEX(output, 1);
 
     vx_uint32 output_bits_size = TENSOR_DATA_SIZE(output) * 8;
@@ -23273,7 +23261,7 @@ vx_status vxnneExecuteSCYUV2RGBScale(struct _vxnne_operation_s *operation)
     vx_uint32 out_tf_zp       = TENSOR_TF_ZEROPOINT(output);
     vx_float32 out_tf_scale   = TENSOR_TF_SCALE(output);
 
-    vx_uint32 input_rect_width, input_rect_height, input_width, input_height;
+    vx_uint32 input_rect_width, input_rect_height, input_width, input_height, offset;
 
     vx_uint8 post_shift;
     vx_int32 c0 = 0, c1 = 0, c2 = 0, c3 = 0, c4 = 0, c5 = 0, c6 = 0, c7 = 0;
@@ -23392,9 +23380,10 @@ vx_status vxnneExecuteSCYUV2RGBScale(struct _vxnne_operation_s *operation)
     input_address_v = image->memory.physicals[2] + vxComputePlaneOffset(image, rect.start_x, rect.start_y, 2);
 
     vxoTensor_GetTensorViewMemory(output, VX_NULL, &output_address);
-    output_address_r = output_address;
-    output_address_g = output_address + TENSOR_STRIDE_INDEX(output, 2) * 1;
-    output_address_b = output_address + TENSOR_STRIDE_INDEX(output, 2) * 2;
+    offset = scaleOperation->output_y_start * TENSOR_STRIDE_INDEX(output, 1);
+    output_address_r = output_address + offset;
+    output_address_g = output_address + offset + TENSOR_STRIDE_INDEX(output, 2) * 1;
+    output_address_b = output_address + offset + TENSOR_STRIDE_INDEX(output, 2) * 2;
 
     {
         vx_float32 min = 0;
