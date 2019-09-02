@@ -10213,6 +10213,16 @@ vxnne_shader_executable vxnneGetNormalizationUint8ShaderExecutable(
             0x00010001, 0x00000000, 0x00010001, 0x00000000, 0x00010001, 0x00000000, 0x00010001, 0x00000000 // Constant
         };
 
+        vx_uint32 uniConvertHalftoFp16_2x8[16] = {
+            0x11111111, // TCfg
+            0x11110000, // ASelt
+            0x06040200, 0x06040200, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+        };
+
         execution_parameters.globalWorkOffset[0] = 0;
         execution_parameters.globalWorkOffset[1] = 0;
         execution_parameters.globalWorkOffset[2] = 0;
@@ -10280,7 +10290,10 @@ vxnne_shader_executable vxnneGetNormalizationUint8ShaderExecutable(
         }
         else//generic
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_AcrossMapsGenUint8toUint8", borderMode);
+            if(outputFormat == VX_TYPE_UINT8)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_AcrossMapsGenUint8toUint8", borderMode);
+            else if(outputFormat == VX_TYPE_FLOAT16)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_AcrossMapsGenUint8toFp16", borderMode);
             if (!shaderExecutable) goto OnError;
 
             status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniUint8SubZPtoFp32Lo_dp4x4", 1, uniUint8SubZPtoFp32Lo_dp4x4);
@@ -10293,6 +10306,9 @@ vxnne_shader_executable vxnneGetNormalizationUint8ShaderExecutable(
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "nsz_div2_acrgen", 1, &nszDiv2);
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "alphaNszGen", 1, &alpha_nsz);
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "bias", 1, &bias);
+
+            if(outputFormat == VX_TYPE_FLOAT16)
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvertHalftoFp16_2x8", 1, uniConvertHalftoFp16_2x8);
             if (status != VX_SUCCESS) goto OnError;
         }
     }

@@ -7841,7 +7841,7 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     vx_enum    outputFormat              = TENSOR_DATA_TYPE(outputs);
     vx_bool    sammap_flag               = vx_false_e;
     vx_bool    acrossmap_flag            = vx_false_e;
-    vx_bool    dataformat_flag[5]        = {vx_false_e};
+    vx_bool    dataformat_flag[6]        = {vx_false_e};
     vx_bool    norm_config[3]            = {vx_false_e};
     vx_bool    generic_flag              = vx_false_e;
     vx_bool    isuint8_flag              = vx_false_e;
@@ -7862,8 +7862,10 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     dataformat_flag[2] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8);
     dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
     dataformat_flag[4] = (vx_bool)(inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32);
-    isuint8_flag       = (vx_bool)(acrossmap_flag && dataformat_flag[2]);
-    generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3]));
+    dataformat_flag[5] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16);
+    isuint8_flag       = (vx_bool)(acrossmap_flag && (dataformat_flag[2] || dataformat_flag[5]));
+    generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3])
+                                    ||(acrossmap_flag && dataformat_flag[5]));
     norm_shader_flag   = (vx_bool)((sammap_flag && norm_config[0] && dataformat_flag[0])
                                 || (acrossmap_flag && norm_config[0] && dataformat_flag[0])
                                 || (acrossmap_flag && norm_config[1] && dataformat_flag[0])
@@ -8106,7 +8108,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_Initializer(vx_node node, 
     vx_enum    output_format              = TENSOR_DATA_TYPE(outputs);
     vx_bool    sammap_flag                = vx_false_e;
     vx_bool    acrossmap_flag             = vx_false_e;
-    vx_bool    dataformat_flag[5]         = {vx_false_e};
+    vx_bool    dataformat_flag[6]         = {vx_false_e};
     vx_bool    norm_config[3]             = {vx_false_e};
     vx_bool    generic_flag               = vx_false_e;
     vx_bool    isuint8_flag               = vx_false_e;
@@ -8152,11 +8154,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_Initializer(vx_node node, 
     dataformat_flag[2] = (vx_bool)(input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_UINT8);
     dataformat_flag[3] = (vx_bool)(input_format == VX_TYPE_FLOAT16 && output_format == VX_TYPE_FLOAT16);
     dataformat_flag[4] = (vx_bool)(input_format == VX_TYPE_FLOAT32 && output_format == VX_TYPE_FLOAT32);
+    dataformat_flag[5] = (vx_bool)(input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_FLOAT16);
     isuint8_flag       = (vx_bool)((acrossmap_flag && norm_config[0] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[2] && dataformat_flag[2]));
     generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3])
-                                    || (dataformat_flag[1]));
+                                    || (dataformat_flag[1])
+                                    || (acrossmap_flag && dataformat_flag[5]));
     norm_shader_flag   = (vx_bool)((sammap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[0])
@@ -8251,7 +8255,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Initializer(vx_node 
     vx_enum    output_format              = TENSOR_DATA_TYPE(outputs);
     vx_bool    sammap_flag                = vx_false_e;
     vx_bool    acrossmap_flag             = vx_false_e;
-    vx_bool    dataformat_flag[5]         = {vx_false_e};
+    vx_bool    dataformat_flag[6]         = {vx_false_e};
     vx_bool    norm_config[3]             = {vx_false_e};
     vx_bool    generic_flag               = vx_false_e;
     vx_bool    isuint8_flag               = vx_false_e;
@@ -8297,11 +8301,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Initializer(vx_node 
     dataformat_flag[2] = (vx_bool)(input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_UINT8);
     dataformat_flag[3] = (vx_bool)(input_format == VX_TYPE_FLOAT16 && output_format == VX_TYPE_FLOAT16);
     dataformat_flag[4] = (vx_bool)(input_format == VX_TYPE_FLOAT32 && output_format == VX_TYPE_FLOAT32);
+    dataformat_flag[5] = (vx_bool)(input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_FLOAT16);
     isuint8_flag       = (vx_bool)((acrossmap_flag && norm_config[0] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[2] && dataformat_flag[2]));
     generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3])
-                                    || (dataformat_flag[1]));
+                                    || (dataformat_flag[1])
+                                    || (acrossmap_flag && dataformat_flag[5]));
     norm_shader_flag   = (vx_bool)((sammap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[0])
