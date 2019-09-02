@@ -8604,7 +8604,7 @@ __glChipShaderBinary(
             break;
         }
 
-        if ((vertexShader == gcvNULL) && (fragmentShader == gcvNULL) && (computeShader == gcvNULL)
+        if ((vertexShader == gcvNULL) && (fragmentShader == gcvNULL) && (computeShader == gcvNULL))
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
