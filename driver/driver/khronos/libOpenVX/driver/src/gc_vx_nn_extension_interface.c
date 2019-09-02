@@ -1828,7 +1828,14 @@ vx_status vxnneShaderExecutable_SetParametersAttributes(vxnne_shader_executable 
 
 vx_status vxnneShaderExecutable_SetExecutionParameters(vxnne_shader_executable shaderExecutable, vx_kernel_execution_parameters_t *shaderParam)
 {
+    vx_uint32 i;
+
     shaderExecutable->shaderParam = *shaderParam;
+
+    for (i = 0; i < shaderExecutable->shaderParam.workDim; i++)
+    {
+        shaderExecutable->shaderParam.globalWorkScale[i] = gcmMAX(1, shaderExecutable->shaderParam.globalWorkScale[i]);
+    }
 
     return VX_SUCCESS;
 }
