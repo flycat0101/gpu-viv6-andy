@@ -3782,6 +3782,7 @@ vx_status vxnneCalculateConvTilingParam(
     vxnne_tiling_info                         info,
     vx_uint8                                  inputSRAM,
     vx_uint8                                  outputSRAM,
+    vx_bool_e                                 swtilingSubImage,
     vx_uint32                                 count,
     vx_uint32                                 vipSize
     )
@@ -3854,7 +3855,7 @@ vx_status vxnneCalculateConvTilingParam(
         perf.swTilingInfo.origOutY = TENSOR_SIZE_INDEX(conv_op->outputs, 1);
         perf.swTilingInfo.srcBuf = inputSRAM ;
         perf.swTilingInfo.dstBuf = outputSRAM;
-        perf.swTilingInfo.kernelBuf = SW_TILING_FROM_VIP_SRAM;
+        perf.swTilingInfo.kernelBuf = swtilingSubImage ? SW_TILING_FROM_VIP_SRAM : SW_TILING_FROM_DDR;
         perf.swTilingInfo.outImageStride = conv_op->outputs->strides[1];
         perf.swTilingInfo.outImageSlice = conv_op->outputs->strides[1] * info[i].output.height;
         calculateArchPerfFromWB(context,

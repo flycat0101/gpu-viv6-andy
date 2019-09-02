@@ -2148,6 +2148,7 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                                                         tilingsInfo,
                                                         requestList->inputMemory[0]->allocType == VXNNE_MEM_POOL_TYPE_SRAM  ? SW_TILING_FROM_AXI_SRAM : MemPoolTypeToPerfType(requestList->inputMemory[0]->allocType),
                                                         requestList->outputMemory[0]->allocType == VXNNE_MEM_POOL_TYPE_SRAM ? SW_TILING_FROM_AXI_SRAM : MemPoolTypeToPerfType(requestList->outputMemory[0]->allocType),
+                                                        vx_false_e,
                                                         j,
                                                         graph->base.context->vipSRAM.size);
 
@@ -2299,6 +2300,7 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
                     tilingInfo,
                     MemPoolTypeToPerfType(requestList[i].inputMemory[0]->allocType),
                     MemPoolTypeToPerfType(requestList[i].outputMemory[0]->allocType),
+                    vx_true_e,
                     segment->segmentInfo.tiling.tileYCount,
                     graph->base.context->vipSRAM.size);
 
@@ -3945,6 +3947,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                                                            tilingsInfo,
                                                            SW_TILING_FROM_DDR,
                                                            SW_TILING_FROM_DDR,
+                                                           vx_false_e,
                                                            j,
                                                            graph->base.context->vipSRAM.size);
 

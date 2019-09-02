@@ -2595,6 +2595,7 @@ vx_status vxnneCalculateConvTilingParam(
     vxnne_tiling_info                         info,
     vx_uint8                                  inputSRAM,
     vx_uint8                                  outputSRAM,
+    vx_bool_e                                 swtilingSubImage,
     vx_uint32                                 count,
     vx_uint32                                 vipSize
     );
