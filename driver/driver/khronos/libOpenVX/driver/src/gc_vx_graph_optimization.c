@@ -2091,14 +2091,105 @@ VX_PRIVATE_API vx_tensor vxoGraphOptimization_GetPermuteTensor(vx_graph graph, v
     return vxCreateVirtualTensor2(graph, &p, sizeof(p));
 }
 
+/*
+ *    pad orgTensor to padTensor,
+ *    if rowOrCol is 0, pad the row of orgTensor,
+ *    if rowOrCol is 1, pad the col of orgTensor,
+ *    offset means the pad size for left or top
+ */
+VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM_padTensor(vx_tensor *orgTensor, vx_tensor *padTensor, vx_uint32 *offset)
+{
+    vx_uint32   i = 0;
+    vx_uint32   orgTensorSize = 0, padTensorSize = 0;
+    vx_uint32   padValue = 0;
+    vx_ptr      padp = (vx_ptr)&padValue;
+    vx_ptr      tensorData       = VX_NULL;
+    vx_ptr      padTensorData    = VX_NULL;
+    vx_size     start[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+    vx_size     end[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+
+    gcmHEADER_ARG("org=%p, padTensor=%p, offset=%p", orgTensor, padTensor, offset);
+
+    orgTensorSize   = vxoGraphOptimization_getTensorSize(*orgTensor);
+    tensorData      = vxAllocateAndZeroMemory(orgTensorSize);
+
+    padTensorSize   = vxoGraphOptimization_getTensorSize(*padTensor);
+    padTensorData   = vxAllocateAndZeroMemory(padTensorSize);
+
+    /* firstly, set pad value to all of the new memory, and then copy the valid data into it*/
+
+    /*get the pad value if the quantization is assymetric, or use the default value 0*/
+    if(TENSOR_QUANT_TYPE(*orgTensor) == VX_QUANT_AFFINE_SCALE)
+    {
+        switch (TENSOR_DATA_TYPE(*orgTensor))
+        {
+        case VX_TYPE_UINT16:
+        case VX_TYPE_INT16:
+            *(vx_int16*)padp = (vx_int8)TENSOR_TF_ZEROPOINT(*orgTensor);
+            break;
+        case VX_TYPE_UINT8:
+        case VX_TYPE_INT8:
+            *(vx_int8*)padp = (vx_int8)TENSOR_TF_ZEROPOINT(*orgTensor);
+            break;
+        default:
+            vxError("invalid tensor\n");
+            break;
+        }
+    }
+
+    if(TENSOR_DATA_SIZE(*orgTensor) == 1)
+    {
+        memset(padTensorData, *(vx_uint8 *)padp, padTensorSize);
+    }
+    else if(TENSOR_DATA_SIZE(*orgTensor) == 2)
+    {
+        for(i = 0; i < padTensorSize / TENSOR_DATA_SIZE(*padTensor); i++)
+            *((vx_uint16 *)padTensorData + i) = *(vx_uint16 *)padp;
+    }
+    else
+    {
+        vxError("do not process the tensor whose's data size > 2\n");
+        assert(0);
+        return VX_FAILURE;
+    }
+    vxoGraphOptimization_copyConstData2tensor(padTensorData, padTensor, VX_WRITE_ONLY);
+
+    /*read raw data from tensor, and pad them and put them into new tensor*/
+
+    vxoGraphOptimization_copyConstData2tensor(tensorData, orgTensor, VX_READ_ONLY);
+
+    /*use the tensorview to copy data into the right position*/
+    memset(start, 0, sizeof(start));
+    for(i = 0; i < TENSOR_DIM_NUM(*orgTensor); i++){
+        start[i] = offset[i];
+        end[i] = TENSOR_SIZE_INDEX(*orgTensor, i) + offset[i];
+    }
+
+
+    {
+        vx_size stride[6];
+        for(i = 0; i < TENSOR_DIM_NUM(*orgTensor); i++){
+            stride[i] = TENSOR_STRIDE_INDEX(*orgTensor, i);
+        }
+    CHECK_STATUS(vxCopyTensorPatch(*padTensor,TENSOR_DIM_NUM(*padTensor), start, end,
+        stride, tensorData, VX_WRITE_ONLY, VX_MEMORY_TYPE_HOST));
+    }
+
+    if(tensorData)      vxFree(tensorData);
+    if(padTensorData)   vxFree(padTensorData);
+
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
+}
+
 VX_PRIVATE_API vx_tensor vxoGraphOptimization_WAR_convert1x1x1weight(vx_tensor weight)
 {
     vx_tensor bigWeight = weight;
     vx_uint32 dimsCount = TENSOR_DIM_NUM(weight);
     vx_uint32 *orgDims = TENSOR_SIZES(weight);
-    vx_uint8 *dstTensorAddress = VX_NULL;
-    vx_uint8 *srcTensorAddress = VX_NULL;
     vx_uint32 *dims = VX_NULL;
+
+
     gcmHEADER_ARG("weight=%p", weight);
 
     if(TENSOR_DIM_NUM(weight) >= 3 && (
@@ -2110,50 +2201,27 @@ VX_PRIVATE_API vx_tensor vxoGraphOptimization_WAR_convert1x1x1weight(vx_tensor w
         dims[1] = 2;
         {
             vx_tensor_create_params_t param  = { dimsCount, dims, TENSOR_DATA_TYPE(weight), TENSOR_QUANT_TYPE(weight), { {0}}};
-            param.quant_data.affine.scale     = TENSOR_TF_SCALE(weight);
-            param.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(weight);
+            if(TENSOR_QUANT_TYPE(weight) == VX_QUANT_AFFINE_SCALE)
+            {
+                param.quant_data.affine.scale     = TENSOR_TF_SCALE(weight);
+                param.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(weight);
+            }
+            else{
+                param.quant_data.dfp.fixed_point_pos = TENSOR_POS(weight);
+            }
+
             bigWeight = vxCreateTensor2(vxGetContext((vx_reference)weight), &param, sizeof(vx_tensor_create_params_t));
             vxoTensor_AllocateMemory(bigWeight);
         }
 
-        vxoTensor_GetTensorBatchArrayViewMemory(weight, 0, (gctPOINTER *)&srcTensorAddress, VX_NULL);
-        vxoTensor_GetTensorBatchArrayViewMemory(bigWeight, 0, (gctPOINTER *)&dstTensorAddress, VX_NULL);
-
-        memset(dstTensorAddress, 0, TENSOR_STRIDE_INDEX(bigWeight, dimsCount));
+        if(dims)
+            vxFree(dims);
         {
-            vx_uint32 batchIdx;
-            vx_uint32 rowIdx;
-            vx_uint32 colIdx;
-
-            vx_uint16 *dstTensorAddress2 = (TENSOR_DATA_SIZE(weight) == 1? VX_NULL: (vx_uint16 *)dstTensorAddress);
-            vx_uint16 *srcTensorAddress2 = (TENSOR_DATA_SIZE(weight) == 1? VX_NULL: (vx_uint16 *)srcTensorAddress);
-
-            for(batchIdx = 0; batchIdx < orgDims[3]; batchIdx++)
-            {
-                vx_uint32 dstBatchOffset = batchIdx  * TENSOR_STRIDE_INDEX(bigWeight,3);
-                vx_uint32 srcBatchOffset = batchIdx  * TENSOR_STRIDE_INDEX(weight,3);
-
-                for(rowIdx = 0; rowIdx < dims[1]; rowIdx += 2)
-                {
-                    vx_uint32 dstRowOffset = rowIdx * TENSOR_STRIDE_INDEX(bigWeight, 1);
-                    vx_uint32 srcRowOffset = (rowIdx / 2) * TENSOR_STRIDE_INDEX(weight, 1);
-                    for(colIdx = 0; colIdx < dims[0]; colIdx += 2)
-                    {
-                        if(TENSOR_DATA_SIZE(weight) == 1)
-                        dstTensorAddress[dstBatchOffset + dstRowOffset + colIdx * TENSOR_STRIDE_INDEX(bigWeight, 0) ] =
-                            srcTensorAddress[srcBatchOffset + srcRowOffset + (colIdx / 2) * TENSOR_STRIDE_INDEX(weight, 0) ];
-                        else
-                        dstTensorAddress2[dstBatchOffset + dstRowOffset + colIdx * TENSOR_STRIDE_INDEX(bigWeight, 0) ] =
-                            srcTensorAddress2[srcBatchOffset + srcRowOffset + (colIdx / 2) * TENSOR_STRIDE_INDEX(weight, 0) ];
-                    }
-                }
-            }
+            vx_uint32 offsetView[VX_CONTEXT_TENSOR_MAX_DIMENSION] ;
+            memset(offsetView, 0, sizeof(offsetView));
+            vxoGraphOptimization_transformConvNxM_padTensor(&weight, &bigWeight, offsetView);
         }
     }
-
-    if(dims)
-        vxFree(dims);
-
     gcmFOOTER_ARG("bigWeight=%p", bigWeight);
     return bigWeight;
 }
@@ -3374,97 +3442,6 @@ VX_INTERNAL_API void vxoGraphOptimization_transformConvNxM_padData(vx_tensor *pa
     }
     gcmFOOTER_NO();
 }
-/*
- *    pad orgTensor to padTensor,
- *    if rowOrCol is 0, pad the row of orgTensor,
- *    if rowOrCol is 1, pad the col of orgTensor,
- *    offset means the pad size for left or top
- */
-VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM_padTensor(vx_tensor *orgTensor, vx_tensor *padTensor, vx_uint32 rowOrCol, vx_uint32 offset)
-{
-    vx_uint32   i = 0;
-    vx_uint32   orgTensorSize = 0, padTensorSize = 0;
-    vx_uint32   padValue = 0;
-    vx_ptr      padp = (vx_ptr)&padValue;
-    vx_ptr      tensorData       = VX_NULL;
-    vx_ptr      padTensorData    = VX_NULL;
-    vx_size     start[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-    vx_size     end[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-
-    gcmHEADER_ARG("org=%p, padTensor=%p, rowOrCol=%d, offset=%d", orgTensor, padTensor, rowOrCol, offset);
-
-    orgTensorSize   = vxoGraphOptimization_getTensorSize(*orgTensor);
-    tensorData      = vxAllocateAndZeroMemory(orgTensorSize);
-
-    padTensorSize   = vxoGraphOptimization_getTensorSize(*padTensor);
-    padTensorData   = vxAllocateAndZeroMemory(padTensorSize);
-
-    /* firstly, set pad value to all of the new memory, and then copy the valid data into it*/
-
-    /*get the pad value if the quantization is assymetric, or use the default value 0*/
-    if(TENSOR_QUANT_TYPE(*orgTensor) == VX_QUANT_AFFINE_SCALE)
-    {
-        switch (TENSOR_DATA_TYPE(*orgTensor))
-        {
-        case VX_TYPE_UINT16:
-        case VX_TYPE_INT16:
-            *(vx_int16*)padp = (vx_int8)TENSOR_TF_ZEROPOINT(*orgTensor);
-            break;
-        case VX_TYPE_UINT8:
-        case VX_TYPE_INT8:
-            *(vx_int8*)padp = (vx_int8)TENSOR_TF_ZEROPOINT(*orgTensor);
-            break;
-        default:
-            vxError("invalid tensor\n");
-            break;
-        }
-    }
-
-    if(TENSOR_DATA_SIZE(*orgTensor) == 1)
-    {
-        memset(padTensorData, *(vx_uint8 *)padp, padTensorSize);
-    }
-    else if(TENSOR_DATA_SIZE(*orgTensor) == 2)
-    {
-        for(i = 0; i < padTensorSize / TENSOR_DATA_SIZE(*padTensor); i++)
-            *((vx_uint16 *)padTensorData + i) = *(vx_uint16 *)padp;
-    }
-    else
-    {
-        vxError("do not process the tensor whose's data size > 2\n");
-        assert(0);
-        return VX_FAILURE;
-    }
-    vxoGraphOptimization_copyConstData2tensor(padTensorData, padTensor, VX_WRITE_ONLY);
-
-    /*read raw data from tensor, and pad them and put them into new tensor*/
-
-    vxoGraphOptimization_copyConstData2tensor(tensorData, orgTensor, VX_READ_ONLY);
-
-    /*use the tensorview to copy data into the right position*/
-    memset(start, 0, sizeof(start));
-    for(i = 0; i < TENSOR_DIM_NUM(*orgTensor); i++){
-        end[i] = TENSOR_SIZE_INDEX(*orgTensor, i);
-    }
-
-    start[rowOrCol] = offset;
-    end[rowOrCol]   += offset;
-
-    {
-        vx_size stride[6];
-        for(i = 0; i < TENSOR_DIM_NUM(*orgTensor); i++){
-            stride[i] = TENSOR_STRIDE_INDEX(*orgTensor, i);
-        }
-    CHECK_STATUS(vxCopyTensorPatch(*padTensor,TENSOR_DIM_NUM(*padTensor), start, end,
-        stride, tensorData, VX_WRITE_ONLY, VX_MEMORY_TYPE_HOST));
-    }
-
-    if(tensorData)      vxFree(tensorData);
-    if(padTensorData)   vxFree(padTensorData);
-
-    gcmFOOTER_ARG("%d", VX_SUCCESS);
-    return VX_SUCCESS;
-}
 
 VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM(vx_graph graph)
 {
@@ -3527,9 +3504,20 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM(vx_graph graph)
                 padedWeight = vxCreateTensor2(((vx_reference)graph)->context, &p, sizeof(p));
             }
             vxoTensor_AllocateMemory(padedWeight);
-            vxoGraphOptimization_transformConvNxM_padTensor(&weightNxM, &padedWeight, padIndex, totalPad/2);
-            TENSOR_DATA_LIFETIME(padedWeight) = VX_TENSOR_LIFE_TIME_STATIC;
 
+            {
+                vx_uint32 offsetView[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+                for(i = 0; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
+                {
+                    offsetView[i] = 0;
+                    if(i == padIndex)
+                    {
+                        offsetView[i] = totalPad/2;
+                    }
+                }
+                vxoGraphOptimization_transformConvNxM_padTensor(&weightNxM, &padedWeight, offsetView);
+                TENSOR_DATA_LIFETIME(padedWeight) = VX_TENSOR_LIFE_TIME_STATIC;
+            }
             {
             vx_tensor weight, bias;
             vx_size dilation[2];
@@ -4789,6 +4777,51 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteSqueeze(vx_graph graph)
     return VX_SUCCESS;
 }
 
+
+VX_INTERNAL_API vx_status vxoGraphOptimization_war1x1x1weight(vx_graph graph)
+{
+    vx_int32 nodeIndex;
+    vx_int32 nodeCount = graph->nodeCount;
+    vx_node* nodeTable = graph->nodeTable;
+
+    gcmHEADER_ARG("graph=%p", graph);
+    vxmASSERT(graph);
+
+    for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)
+    {
+        vx_node node = nodeTable[nodeIndex];
+
+        if(node->merged)
+            continue;
+        if(node->kernel->enumeration == VX_KERNEL_CONVOLUTION_LAYER)
+        {
+            vx_tensor weight = (vx_tensor)node->paramTable[1];
+            vx_tensor newWeight = NULL;
+
+            if(weight == NULL || TENSOR_DATA_LIFETIME(weight) != VX_TENSOR_LIFE_TIME_STATIC)
+                continue;
+
+            if(TENSOR_SIZE_INDEX(weight, 0) != 1 ||
+                TENSOR_SIZE_INDEX(weight, 1) != 1 ||
+                TENSOR_SIZE_INDEX(weight, 2) != 1)
+                continue;
+
+            newWeight = vxoGraphOptimization_WAR_convert1x1x1weight(weight);
+            if(NULL == newWeight)
+                continue;
+            TENSOR_DATA_LIFETIME(newWeight) = TENSOR_DATA_LIFETIME(weight);
+            TENSOR_VALUED(newWeight) = TENSOR_VALUED(weight);
+
+            vxoNode_SetParameter(node, 1, (vx_reference)newWeight);
+            vxReleaseTensor(&newWeight);
+        }
+    }
+
+    OPTIMIZATION_RESLUT();
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
+}
+
 VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
@@ -4829,6 +4862,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 
         if(context->options.enableGraphPadConv)
             vxoGraphOptimization_padConv(graph);
+
+        if(context->options.enableGraphWar1x1x1weight)
+            vxoGraphOptimization_war1x1x1weight(graph);
 
         if(context->options.enableGraphMerge)
             vxmONERROR(vxoGraphOptimization_LayerMerge(graph));

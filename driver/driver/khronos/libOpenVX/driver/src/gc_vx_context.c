@@ -460,6 +460,14 @@ VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, 
     }
 
     pos = gcvNULL;
+    if(gcoOS_StrStr(envctrl, "-war1x1x1weight:", &pos) && pos)
+    {
+        pos += sizeof("-war1x1x1weight:") - 1;
+        context->options.enableGraphWar1x1x1weight = atoi(pos);
+    }
+
+
+    pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-WAR", &pos) && pos)
     {
         pos += sizeof("-WAR") -1;
@@ -956,6 +964,7 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     context->options.enableGraphPadConv = 1;
     context->options.enableGraphDeleteRelu = 1;
     context->options.enableGraphDeleteSqueeze = 1;
+    context->options.enableGraphWar1x1x1weight = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_GRAPH_TRANSFORM", &envctrl)) && envctrl)
     {
         vxoContext_FetchOptionsForTransferGraph(context, envctrl);
