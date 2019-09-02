@@ -12373,6 +12373,9 @@ void calculateWeightBiasTPBufferRelatedSize(
     vx_uint32 rsvWeightCount = 0, nonZeroCount = 0;
     vx_context context = vxGetContext((vx_reference)wb);
 
+    if(bias_format == VX_TYPE_INT64)
+        biasSize = 4;
+
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_COMPRESSION_ENHANCEMENT))
     {
         calcTPKernelBufferSizeHuffman(wb, sliceCount, filterCount, wb->wb_base->weights_sizes[2], weight_format, skip_value, weight_base_ptr, index);
@@ -12464,7 +12467,7 @@ void calculateWeightBiasTPBufferRelatedSize(
         wb->slice_array[index].non_zero_count = nonZeroCount;
         wb->slice_array[index].kernel_stream_size = kernelBufferSize;
         wb->slice_array[index].kernel_orig_size = slice_count * filter_count * (vx_uint32)vxDataType_GetSize(weight_format) +
-                                                  filter_count * (vx_uint32)vxDataType_GetSize(bias_format);
+            filter_count * biasSize;
 
         *min_kernel_buf_size = kernelBufferSize;
     }
