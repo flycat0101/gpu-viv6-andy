@@ -1428,7 +1428,7 @@ static VkResult halti5_program_blit_const(
     pU[0] = params->uClearValue0[0];
     pU[1] = params->uClearValue0[1];
     pU[2] = params->uClearValue0[2];
-    pU[2] = params->uClearValue0[3];
+    pU[3] = params->uClearValue0[3];
 
     pU += 4;
     pU[0] = params->uClearValue1[0];
