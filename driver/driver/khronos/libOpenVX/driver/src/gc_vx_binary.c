@@ -3831,6 +3831,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Write(
     {   /* write NBG file */
         gcoOS_Seek(gcvNULL, binarySave->binarySaveFile, offset, gcvFILE_SEEK_SET);
         gcoOS_Write(gcvNULL, binarySave->binarySaveFile, size, data);
+        gcoOS_Flush(gcvNULL, binarySave->binarySaveFile);
     }
 
     return VX_SUCCESS;
@@ -5030,6 +5031,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_unInitial(
         gcoOS_Flush(gcvNULL, binarySave->binarySaveFile);
         gcmVERIFY_OK(gcoOS_Close(gcvNULL, binarySave->binarySaveFile));
         binarySave->binarySaveFile = VX_NULL;
+        vxInfo("network binary graph file has been closed\n");
     }
 
     if (graph->binarySave != VX_NULL)
@@ -5038,7 +5040,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_unInitial(
         graph->binarySave = VX_NULL;
     }
 
-    vxInfo("network binary graph file has been closed\n");
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
@@ -5497,14 +5498,74 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                 }
                 else
                 {
-                    vxmASSERT(0);
-                    vxError("fail to search axi sram end address in init command buffer\n");
-                    vxmONERROR(VX_ERROR_INVALID_VALUE);
+                    vx_uint32 offset[20] = {0};
+                    ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)initBuffer,
+                                          context->binaryGraphInitSize[deviceID]/gcmSIZEOF(gctUINT32),
+                                          0x08010e50, offset, vx_true_e);
+                    if (ret == 1)
+                    {
+                        patchInfo.offset = offset[0] + sizeof(vx_uint32);
+                        patchInfo.type                = VX_BINARY_PATCH_TYPE_COMMAND;
+                        patchInfo.sourceType          = VX_BINARY_SOURCE_AXI_SRAM;
+                        patchInfo.index               = -1;
+                        patchInfo.originalBaseAddress = axiSRAMPhysical;
+                        patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
+                        vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
+                        patchCount++;
+                    }
+                    else
+                    {
+                        vxError("fail to search AXI-SRAM address in init command buffer\n");
+                        vxmONERROR(VX_ERROR_INVALID_VALUE);
+                    }
                 }
             }
             else
             {
-                vxError("%s[%d]: search multi result for AXI-SRAM address in initialize command\n", __FUNCTION__, __LINE__);
+                vx_uint32 offset[20] = {0};
+                vx_uint32 pathLocal = 0;
+                ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)initBuffer,
+                                          context->binaryGraphInitSize[deviceID]/gcmSIZEOF(gctUINT32),
+                                          0x08010e4f, offset, vx_true_e);
+                if (ret == 1)
+                {
+                    pathLocal = offset[0] + sizeof(vx_uint32);
+                    /*1.1 patch start remap address */
+                    patchInfo.offset = pathLocal;
+                    patchInfo.type                = VX_BINARY_PATCH_TYPE_COMMAND;
+                    patchInfo.sourceType          = VX_BINARY_SOURCE_AXI_SRAM;
+                    patchInfo.index               = -1;
+                    patchInfo.originalBaseAddress = axiSRAMPhysical;
+                    patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
+                    indexOfFirstPatch = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
+                    patchCount++;
+
+                    /*1.2 patch end remap address */
+                    ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)initBuffer,
+                                          context->binaryGraphInitSize[deviceID]/gcmSIZEOF(gctUINT32),
+                                          axiSRAMPhysicalEnd, offsetArray, vx_true_e);
+                    if (ret == 1)
+                    {
+                        patchInfo.offset = offsetArray[0];
+                        patchInfo.type                = VX_BINARY_PATCH_TYPE_COMMAND;
+                        patchInfo.sourceType          = VX_BINARY_SOURCE_AXI_SRAM;
+                        patchInfo.index               = -1;
+                        patchInfo.originalBaseAddress = axiSRAMPhysical;
+                        patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
+                        vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
+                        patchCount++;
+                    }
+                    else
+                    {
+                        vxError("fail to search AXI-SRAM address in init command buffer\n");
+                        vxmONERROR(VX_ERROR_INVALID_VALUE);
+                    }
+                }
+                else
+                {
+                    vxError("fail to search AXI-SRAM address in init command buffer\n");
+                    vxmONERROR(VX_ERROR_INVALID_VALUE);
+                }
             }
         }
 
@@ -5515,7 +5576,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
 
             ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)initBuffer,
                                                 context->binaryGraphInitSize[deviceID]/gcmSIZEOF(gctUINT32),
-                                                vipSRAMPhysical, offsetArray, vx_false_e);
+                                                vipSRAMPhysical, offsetArray, vx_true_e);
             if (ret == 1)
             {   /* The VIP-SRAM need to be patched */
                 /*1.1 patch start remap address */
@@ -5530,9 +5591,28 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
             }
             else
             {
-                vxmASSERT(0);
+                vx_uint32 offset[20] = {0};
                 vxError("fail to search VIP-SRAM map address in init command buffer\n");
-                vxmONERROR(VX_ERROR_INVALID_VALUE);
+                ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)initBuffer,
+                                                context->binaryGraphInitSize[deviceID]/gcmSIZEOF(gctUINT32),
+                                                0x08010e4e, offset, vx_true_e);
+                if (ret == 1)
+                {
+                    /*1.1 patch start remap address */
+                    patchInfo.offset = offset[0] + sizeof(vx_uint32);
+                    patchInfo.type                = VX_BINARY_PATCH_TYPE_COMMAND;
+                    patchInfo.sourceType          = VX_BINARY_SOURCE_VIP_SRAM;
+                    patchInfo.index               = -1;
+                    patchInfo.originalBaseAddress = vipSRAMPhysical;
+                    patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
+                    indexOfFirstPatch = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
+                    patchCount++;
+                }
+                else
+                {
+                    vxError("fail to search VIP-SRAM address in init command buffer\n");
+                    vxmONERROR(VX_ERROR_INVALID_VALUE);
+                }
             }
         }
 
@@ -6855,7 +6935,7 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
             ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)cmdLogicalAddress,
                                           cmdSize / gcmSIZEOF(gctUINT32),
                                           ((gctUINT32)ksDataPhysical) >> 6,
-                                          offsetArray, vx_false_e);
+                                          offsetArray, vx_true_e);
             if (1 == ret)
             {
                 patchInfo.offset = offsetArray[0];
@@ -6882,7 +6962,7 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
             ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)cmdLogicalAddress,
                                            cmdSize / gcmSIZEOF(gctUINT32),
                                            (gctUINT32)ksDataPhysical,
-                                           offsetArray, vx_false_e);
+                                           offsetArray, vx_true_e);
             if (1 == ret)
             {
                 patchInfo.offset = offsetArray[0];
