@@ -3856,8 +3856,9 @@ vx_status vxnneCalculateConvTilingParam(
         perf.swTilingInfo.srcBuf = inputSRAM ;
         perf.swTilingInfo.dstBuf = outputSRAM;
         perf.swTilingInfo.kernelBuf = swtilingSubImage ? SW_TILING_FROM_VIP_SRAM : SW_TILING_FROM_DDR;
-        perf.swTilingInfo.outImageStride = conv_op->outputs->strides[1];
-        perf.swTilingInfo.outImageSlice = conv_op->outputs->strides[1] * info[i].output.height;
+        /* original output tensor might be reshaped, use reshaped sized to calc imageStride and imageSlice */
+        perf.swTilingInfo.outImageStride = outputDims[0];
+        perf.swTilingInfo.outImageSlice = outputDims[0] * outputDims[1];
         calculateArchPerfFromWB(context,
                                 &perf,
                                 conv_op->weights_biases,
