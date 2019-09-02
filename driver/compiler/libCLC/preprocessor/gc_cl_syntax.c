@@ -1581,6 +1581,7 @@ gceSTATUS ppoPREPROCESSOR_Error(ppoPREPROCESSOR PP)
         return ppoPREPROCESSOR_ToEOL(PP);
     }
 }
+
 /******************************************************************************\
 Pragma
 \******************************************************************************/
@@ -1650,6 +1651,10 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
             {
                 Extension = clvEXTENSION_VIV_CMPLX;
             }
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_viv_vx_extension")))
+            {
+                Extension = clvEXTENSION_VIV_VX;
+            }
             else
             {
             }
@@ -1696,7 +1701,17 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
                         Enable));
                 if (Enable)
                 {
-                    ppoPREPROCESSOR_addMacroDef_Int(PP, ntoken->poolString, "1");
+                    if (Extension == clvEXTENSION_VIV_VX)
+                    {
+                        status = ppoPREPROCESSOR_addMacroDef_Int(PP, "_VIV_VX_EXTENSION", "1");
+                        status = ppoPREPROCESSOR_AddSdkDirToPath(PP);
+                        if (gcmIS_ERROR(status))
+                            return status;
+                    }
+                    else
+                    {
+                        ppoPREPROCESSOR_addMacroDef_Int(PP, ntoken->poolString, "1");
+                    }
                 }
                 else
                 {

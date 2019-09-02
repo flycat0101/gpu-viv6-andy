@@ -1011,6 +1011,9 @@ ppoPREPROCESSOR_FreeHeaderFilePathList(
 gceSTATUS
 ppoWriteBufferToFile(ppoPREPROCESSOR PP);
 
+gceSTATUS
+ppoPREPROCESSOR_AddSdkDirToPath(ppoPREPROCESSOR PP);
+
 #include "gc_cl_macro_expand.h"
 
 #endif /* __gc_cl_preprocessor_int_h_ */

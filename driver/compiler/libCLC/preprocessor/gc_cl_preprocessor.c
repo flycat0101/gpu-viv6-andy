@@ -19,6 +19,70 @@
 **    Header File Related Function
 **
 */
+
+/* Add <SDK_DIR> to header file search path */
+static gctBOOL _IsSdkPathAdded = gcvFALSE;
+
+gceSTATUS
+ppoPREPROCESSOR_AddSdkDirToPath(ppoPREPROCESSOR PP)
+{
+    gceSTATUS    status  = gcvSTATUS_OK;
+    char* env = gcvNULL;
+    gctUINT len;
+    gctSTRING path, path1;
+    gctPOINTER pointer = gcvNULL;
+
+    if (_IsSdkPathAdded)
+        return status;
+    _IsSdkPathAdded = gcvTRUE;
+
+    gcoOS_GetEnv(gcvNULL, "VIVANTE_SDK_DIR", &env);
+    if (!env)
+        return status;
+
+    len = gcoOS_StrLen(env, gcvNULL);
+
+    status = cloCOMPILER_ZeroMemoryAllocate(
+                                            PP->compiler,
+                                            _cldBUFFER_MAX,
+                                            &pointer
+                                            );
+    if (gcmIS_ERROR(status))
+    {
+        return status;
+    }
+    path = pointer;
+    gcoOS_StrCopySafe(path, len + 1, env);
+    gcoOS_StrCatSafe(path, _cldBUFFER_MAX, "/include/CL/");
+
+    status = ppoPREPROCESSOR_AddHeaderFilePathToList(PP, path);
+    if (gcmIS_ERROR(status))
+    {
+        return status;
+    }
+
+    len = gcoOS_StrLen(env, gcvNULL);
+
+    status = cloCOMPILER_ZeroMemoryAllocate(
+                                            PP->compiler,
+                                            _cldBUFFER_MAX,
+                                            &pointer
+                                            );
+    if (gcmIS_ERROR(status))
+    {
+        return status;
+    }
+    path1 = pointer;
+    gcoOS_StrCopySafe(path1, len + 1, env);
+    gcoOS_StrCatSafe(path1, _cldBUFFER_MAX, "/inc/CL/");
+
+    status = ppoPREPROCESSOR_AddHeaderFilePathToList(PP, path1);
+    if (gcmIS_ERROR(status))
+        return status;
+
+    return status;
+}
+
 gceSTATUS
 ppoPREPROCESSOR_AddHeaderFilePathToList(
     IN ppoPREPROCESSOR PP,
@@ -2075,7 +2139,6 @@ gctCONST_STRING  Options
             }
             else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-viv-vx-extension", sizeof("cl-viv-vx-extension")-1))
             {
-                char* env = gcvNULL;
                 status = cloCOMPILER_EnableExtension(PP->compiler,
                                                      clvEXTENSION_VIV_VX,
                                                      gcvTRUE);
@@ -2085,54 +2148,10 @@ gctCONST_STRING  Options
                 if(gcmIS_ERROR(status)) return status;
 
                 /* Add <SDK_DIR> to header file search path */
-                gcoOS_GetEnv(gcvNULL, "VIVANTE_SDK_DIR", &env);
-                if(env)
-                {
-                    gctUINT len;
-                    gctSTRING path, path1;
+                status = ppoPREPROCESSOR_AddSdkDirToPath(PP);
+                if (gcmIS_ERROR(status))
+                    return status;
 
-                    len = gcoOS_StrLen(env, gcvNULL);
-
-                    status = cloCOMPILER_ZeroMemoryAllocate(
-                                                            PP->compiler,
-                                                            _cldFILENAME_MAX,
-                                                            &pointer
-                                                            );
-                    if (gcmIS_ERROR(status))
-                    {
-                        return status;
-                    }
-                    path = pointer;
-                    gcoOS_StrCopySafe(path, len + 1, env);
-                    gcoOS_StrCatSafe(path, _cldFILENAME_MAX, "/include/CL/");
-
-                    status = ppoPREPROCESSOR_AddHeaderFilePathToList(PP, path);
-                    if (gcmIS_ERROR(status))
-                    {
-                        return status;
-                    }
-
-                    len = gcoOS_StrLen(env, gcvNULL);
-
-                    status = cloCOMPILER_ZeroMemoryAllocate(
-                                                            PP->compiler,
-                                                            _cldFILENAME_MAX,
-                                                            &pointer
-                                                            );
-                    if (gcmIS_ERROR(status))
-                    {
-                        return status;
-                    }
-                    path1 = pointer;
-                    gcoOS_StrCopySafe(path1, len + 1, env);
-                    gcoOS_StrCatSafe(path1, _cldFILENAME_MAX, "/inc/CL/");
-
-                    status = ppoPREPROCESSOR_AddHeaderFilePathToList(PP, path1);
-                    if (gcmIS_ERROR(status))
-                    {
-                        return status;
-                    }
-                }
                 pos += (sizeof("cl-viv-vx-extension")-1);
             }
             else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-fast-relaxed-math", sizeof("cl-fast-relaxed-math")-1))
