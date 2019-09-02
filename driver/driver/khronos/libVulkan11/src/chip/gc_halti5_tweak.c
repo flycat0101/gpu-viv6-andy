@@ -1528,7 +1528,9 @@ static VkResult deqp_vk_msaa_128bpp_05_copy(
     halti5_tweak_handler *handler
     )
 {
+#if (defined(DEBUG)||defined(_DEBUG))
     VkFormat dstFormat = pip->renderPass->attachments[0].format;
+#endif
     gctPOINTER dstAddress = dstBuf->memory->hostAddr;
     float *dstPtr = (float *)dstAddress;
     uint32_t layerCount = srcImg->createInfo.arrayLayers;
@@ -1706,7 +1708,9 @@ static VkResult deqp_vk_msaa_128bpp_06_copy(
     halti5_tweak_handler *handler
     )
 {
+#if (defined(DEBUG)||defined(_DEBUG))
     VkFormat dstFormat = pip->renderPass->attachments[0].format;
+#endif
     gctPOINTER dstAddress = dstBuf->memory->hostAddr;
     float *dstPtr = (float *)dstAddress;
     uint32_t layerCount = srcImg->createInfo.arrayLayers;
@@ -1987,7 +1991,9 @@ static VkResult deqp_vk_msaa_128bpp_07_copy(
     halti5_tweak_handler *handler
     )
 {
+#if (defined(DEBUG)||defined(_DEBUG))
     VkFormat dstFormat = pip->renderPass->attachments[0].format;
+#endif
     gctPOINTER dstAddress = dstBuf->memory->hostAddr;
     float *dstPtr = (float *)dstAddress;
     uint32_t layerCount = srcImg->createInfo.arrayLayers;
@@ -2176,7 +2182,9 @@ static VkResult deqp_vk_msaa_128bpp_08_copy(
     halti5_tweak_handler *handler
     )
 {
+#if (defined(DEBUG)||defined(_DEBUG))
     VkFormat dstFormat = pip->renderPass->attachments[0].format;
+#endif
     gctPOINTER dstAddress = dstBuf->memory->hostAddr;
     float *dstPtr = (float *)dstAddress;
     uint32_t layerCount = srcImg->createInfo.arrayLayers;
@@ -2453,7 +2461,9 @@ static VkResult deqp_vk_msaa_128bpp_09_copy(
     halti5_tweak_handler *handler
     )
 {
+#if (defined(DEBUG)||defined(_DEBUG))
     VkFormat dstFormat = pip->renderPass->attachments[0].format;
+#endif
     gctPOINTER dstAddress = dstBuf->memory->hostAddr;
     float *dstPtr = (float *)dstAddress;
     uint32_t layerCount = srcImg->createInfo.arrayLayers;
@@ -2709,7 +2719,9 @@ static VkResult deqp_vk_msaa_128bpp_10_copy(
     halti5_tweak_handler *handler
     )
 {
+#if (defined(DEBUG)||defined(_DEBUG))
     VkFormat dstFormat = pip->renderPass->attachments[0].format;
+#endif
     gctPOINTER dstAddress = dstBuf->memory->hostAddr;
     float *dstPtr = (float *)dstAddress;
     uint32_t layerCount = srcImg->createInfo.arrayLayers;
