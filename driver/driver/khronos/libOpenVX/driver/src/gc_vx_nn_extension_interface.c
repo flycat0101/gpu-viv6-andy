@@ -9383,7 +9383,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedLayer_Initializer(vx_nod
         vx_tensor weights_rs = NULL;
 
         if ((inputDims % 16 == 0) && input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && biases
-            && node->base.context->evisNoInst.supportEVIS == FALSE)
+            && node->base.context->evisNoInst.supportEVIS == vx_false_e)
         {
             enable_cast_format = vx_true_e;
 
