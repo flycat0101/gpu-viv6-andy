@@ -6741,11 +6741,12 @@ DEF_SH_NECESSITY_CHECK(VIR_Shader_CheckDual16able)
     VSC_COMPILER_CONFIG     *compCfg = &pPassWorker->pCompilerParam->cfg;
     VIR_Shader              *Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
 
-    /* only fragment shader can be dual16 shader,
+    /* only fragment shader or ocl with VC_OPTION=DUAL16:num>0 can be dual16 shader,
     ** and exclude OpenVG shader due to precision issue
     */
     if (!compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportDual16 ||
-        (!VIR_Shader_IsFS(Shader) && !VIR_Shader_IsCL(Shader))    ||
+        (!VIR_Shader_IsFS(Shader) &&
+         !(VIR_Shader_IsCL(Shader) && gcGetDualFP16Mode(compCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2)))    ||
         VIR_Shader_IsDesktopGL(Shader)                            ||
         VIR_Shader_IsVulkan(Shader)                               ||
         VIR_Shader_IsOpenVG(Shader)                               ||
