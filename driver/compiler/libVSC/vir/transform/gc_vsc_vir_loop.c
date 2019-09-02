@@ -34,26 +34,6 @@ static void _CommonFreeList(VSC_UNI_LIST* pList, VSC_MM* pMM)
     vscUNILST_Finalize(pList);
 }
 
-struct VIR_LOOPINFOMGR
-{
-    VIR_LoopOpts*                   loopOpts;
-    gctUINT                         nextLoopId;
-    VSC_UNI_LIST                    loopInfos;
-};
-
-#define VIR_LoopInfoMgr_GetLoopOpts(lim)                ((lim)->loopOpts)
-#define VIR_LoopInfoMgr_SetLoopOpts(lim, l)             ((lim)->loopOpts = (l))
-#define VIR_LoopInfoMgr_GetShader(lim)                  VIR_LoopOpts_GetShader(VIR_LoopInfoMgr_GetLoopOpts(lim))
-#define VIR_LoopInfoMgr_GetFunc(lim)                    VIR_LoopOpts_GetFunc(VIR_LoopInfoMgr_GetLoopOpts(lim))
-#define VIR_LoopInfoMgr_GetNextLoopId(lim)              ((lim)->nextLoopId)
-#define VIR_LoopInfoMgr_SetNextLoopId(lim, n)           ((lim)->nextLoopId = (n))
-#define VIR_LoopInfoMgr_IncNextLoopId(lim)              ((lim)->nextLoopId++)
-#define VIR_LoopInfoMgr_GetLoopInfos(lim)               (&(lim)->loopInfos)
-#define VIR_LoopInfoMgr_GetLoopInfoCount(lim)           (vscUNILST_GetNodeCount(VIR_LoopInfoMgr_GetLoopInfos(lim)))
-#define VIR_LoopInfoMgr_GetMM(lim)                      VIR_LoopOpts_GetMM(VIR_LoopInfoMgr_GetLoopOpts(lim))
-#define VIR_LoopInfoMgr_GetOptions(lim)                 VIR_LoopOpts_GetOptions(VIR_LoopInfoMgr_GetLoopOpts(lim))
-#define VIR_LoopInfoMgr_GetDumper(lim)                  VIR_LoopOpts_GetDumper(VIR_LoopInfoMgr_GetLoopOpts(lim))
-
 /************************************************************************************/
 /* VIR_LoopInfo related code */
 /************************************************************************************/
@@ -1054,38 +1034,6 @@ _VIR_LoopInfo_GetLowerNeighbour(
 
 }
 
-typedef enum VIR_LOOPINFO_BBITERATOR_TYPE
-{
-    VIR_LoopInfo_BBIterator_Type_Arbitrary,
-    VIR_LoopInfo_BBIterator_Type_BreadthFirst,
-    VIR_LoopInfo_BBIterator_Type_DepthFirst,
-    VIR_LoopInfo_BBIterator_Type_IRSequence,
-    VIR_LoopInfo_BBIterator_Type_CoveringIRSequence,
-} VIR_LoopInfo_BBIterator_Type;
-
-typedef struct VIR_LOOPINFO_BBITERATOR
-{
-    VIR_LoopInfo*           loopInfo;
-    gctUINT                 bbCount;
-    VIR_BB**                bbArray;
-    gctUINT                 curIndex;
-    VSC_MM*                 mm;
-} VIR_LoopInfo_BBIterator;
-
-#define VIR_LoopInfo_BBIterator_GetLoopInfo(i)                  ((i)->loopInfo)
-#define VIR_LoopInfo_BBIterator_SetLoopInfo(i, l)               ((i)->loopInfo = (l))
-#define VIR_LoopInfo_BBIterator_GetBBCount(i)                   ((i)->bbCount)
-#define VIR_LoopInfo_BBIterator_SetBBCount(i, b)                ((i)->bbCount = (b))
-#define VIR_LoopInfo_BBIterator_GetBBArray(i)                   ((i)->bbArray)
-#define VIR_LoopInfo_BBIterator_SetBBArray(i, b)                ((i)->bbArray = (b))
-#define VIR_LoopInfo_BBIterator_GetCurIndex(i)                  ((i)->curIndex)
-#define VIR_LoopInfo_BBIterator_SetCurIndex(i, c)               ((i)->curIndex = (c))
-#define VIR_LoopInfo_BBIterator_IncCurIndex(i)                  ((i)->curIndex += 1)
-#define VIR_LoopInfo_BBIterator_DecCurIndex(i)                  ((i)->curIndex -= 1)
-#define VIR_LoopInfo_BBIterator_GetCurBB(i)                     ((i)->curIndex != gcvMAXUINT32 && (i)->curIndex < (i)->bbCount ? (i)->bbArray[(i)->curIndex] : gcvNULL)
-#define VIR_LoopInfo_BBIterator_GetMM(i)                        ((i)->mm)
-#define VIR_LoopInfo_BBIterator_SetMM(i, m)                     ((i)->mm = (m))
-
 static VSC_ErrCode
 _VIR_LoopInfo_BBIterator_InitArbitrary(
     VIR_LoopInfo_BBIterator* iter
@@ -1354,8 +1302,8 @@ _VIR_LoopInfo_BBIterator_InitCoveringIRSequence(
     return errCode;
 }
 
-static VSC_ErrCode
-_VIR_LoopInfo_BBIterator_Init(
+VSC_ErrCode
+VIR_LoopInfo_BBIterator_Init(
     VIR_LoopInfo_BBIterator* iter,
     VIR_LoopInfo* loopInfo,
     VIR_LoopInfo_BBIterator_Type type
@@ -1400,16 +1348,16 @@ _VIR_LoopInfo_BBIterator_Init(
     return errCode;
 }
 
-static void
-_VIR_LoopInfo_BBIterator_Final(
+void
+VIR_LoopInfo_BBIterator_Final(
     VIR_LoopInfo_BBIterator* iter
     )
 {
     vscMM_Free(VIR_LoopInfo_BBIterator_GetMM(iter), VIR_LoopInfo_BBIterator_GetBBArray(iter));
 }
 
-static VIR_BB*
-_VIR_LoopInfo_BBIterator_First(
+VIR_BB*
+VIR_LoopInfo_BBIterator_First(
     VIR_LoopInfo_BBIterator* iter
     )
 {
@@ -1418,8 +1366,8 @@ _VIR_LoopInfo_BBIterator_First(
     return VIR_LoopInfo_BBIterator_GetCurBB(iter);
 }
 
-static VIR_BB*
-_VIR_LoopInfo_BBIterator_Next(
+VIR_BB*
+VIR_LoopInfo_BBIterator_Next(
     VIR_LoopInfo_BBIterator* iter
     )
 {
@@ -1448,14 +1396,14 @@ _VIR_LoopInfo_GetInstCount(
     VIR_BB* bb;
     gctUINT result = 0;
 
-    _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
-    for(bb = _VIR_LoopInfo_BBIterator_First(&bbIter);
+    VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
+    for(bb = VIR_LoopInfo_BBIterator_First(&bbIter);
         bb != gcvNULL;
-        bb = _VIR_LoopInfo_BBIterator_Next(&bbIter))
+        bb = VIR_LoopInfo_BBIterator_Next(&bbIter))
     {
         result += BB_GET_LENGTH(bb);
     }
-    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+    VIR_LoopInfo_BBIterator_Final(&bbIter);
 
     return result;
 }
@@ -1679,10 +1627,10 @@ _VIR_LoopInfo_CollectDefs(
 
     gcmASSERT(du);
 
-    _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
-    for(bb = _VIR_LoopInfo_BBIterator_First(&bbIter);
+    VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
+    for(bb = VIR_LoopInfo_BBIterator_First(&bbIter);
         bb != gcvNULL;
-        bb = _VIR_LoopInfo_BBIterator_Next(&bbIter))
+        bb = VIR_LoopInfo_BBIterator_Next(&bbIter))
     {
         VIR_Instruction* inst = BB_GET_START_INST(bb);
 
@@ -1704,7 +1652,7 @@ _VIR_LoopInfo_CollectDefs(
                 errCode = _VIR_LoopDU_AddDef(du, destSym, enable, inst);
                 if(errCode)
                 {
-                    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+                    VIR_LoopInfo_BBIterator_Final(&bbIter);
                     return errCode;
                 }
             }
@@ -1722,7 +1670,7 @@ _VIR_LoopInfo_CollectDefs(
                 errCode = _VIR_LoopDU_AddDef(du, src0Sym, enable, inst);
                 if(errCode)
                 {
-                    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+                    VIR_LoopInfo_BBIterator_Final(&bbIter);
                     return errCode;
                 }
                 if(VIR_OPCODE_isMemSt(opcode))
@@ -1744,7 +1692,7 @@ _VIR_LoopInfo_CollectDefs(
                 errCode = _VIR_LoopDU_AddDef(du, destSym, enable, inst);
                 if(errCode)
                 {
-                    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+                    VIR_LoopInfo_BBIterator_Final(&bbIter);
                     return errCode;
                 }
             }
@@ -1786,7 +1734,7 @@ _VIR_LoopInfo_CollectDefs(
             }
         }
     }
-    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+    VIR_LoopInfo_BBIterator_Final(&bbIter);
     VIR_LoopDU_SetValid(du);
 
     return errCode;
@@ -1878,10 +1826,10 @@ _VIR_LoopInfo_IsInstAllUsagesWithinLoop(
                 break;
             }
 
-            _VIR_LoopInfo_BBIterator_Init(&bbIter, pLoopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
-            for (pBB = _VIR_LoopInfo_BBIterator_First(&bbIter);
+            VIR_LoopInfo_BBIterator_Init(&bbIter, pLoopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
+            for (pBB = VIR_LoopInfo_BBIterator_First(&bbIter);
                  pBB != gcvNULL;
-                 pBB = _VIR_LoopInfo_BBIterator_Next(&bbIter))
+                 pBB = VIR_LoopInfo_BBIterator_Next(&bbIter))
             {
                 if (pUsageBB == pBB)
                 {
@@ -2125,15 +2073,15 @@ _VIR_LoopInfo_BuildLoopEndDominators(
         _CommonFreeList(VIR_LoopInfo_GetLoopEndDominatorSet(loopInfo), VIR_LoopInfo_GetMM(loopInfo));
     }
 
-    errCode = _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
+    errCode = VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
     if(errCode)
     {
         return errCode;
     }
 
-    for(bb = _VIR_LoopInfo_BBIterator_First(&bbIter);
+    for(bb = VIR_LoopInfo_BBIterator_First(&bbIter);
         bb != gcvNULL;
-        bb = _VIR_LoopInfo_BBIterator_Next(&bbIter))
+        bb = VIR_LoopInfo_BBIterator_Next(&bbIter))
     {
         /* new created bb from unrolling inner loop are dominators of outer loop exit */
         if((bb->domSet.bitCount == 0) || BB_IS_DOM(bb, loopEnd))
@@ -2146,7 +2094,7 @@ _VIR_LoopInfo_BuildLoopEndDominators(
         }
     }
 
-    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+    VIR_LoopInfo_BBIterator_Final(&bbIter);
 
     if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT))
     {
@@ -2171,10 +2119,10 @@ _VIR_LoopInfo_IdentifyBasicIVs(
     _VIR_LoopInfo_BuildLoopEndDominators(loopInfo);
     vscHTBL_Initialize(&definedSymbols, VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 256);
 
-    _VIR_LoopInfo_BBIterator_Init(&iter, loopInfo, VIR_LoopInfo_BBIterator_Type_DepthFirst);
-    for(bb = _VIR_LoopInfo_BBIterator_First(&iter);
+    VIR_LoopInfo_BBIterator_Init(&iter, loopInfo, VIR_LoopInfo_BBIterator_Type_DepthFirst);
+    for(bb = VIR_LoopInfo_BBIterator_First(&iter);
         bb != gcvNULL;
-        bb = _VIR_LoopInfo_BBIterator_Next(&iter))
+        bb = VIR_LoopInfo_BBIterator_Next(&iter))
     {
         VIR_Instruction* inst;
 
@@ -2458,7 +2406,7 @@ _VIR_LoopInfo_IdentifyBasicIVs(
             }
         }
     }
-    _VIR_LoopInfo_BBIterator_Final(&iter);
+    VIR_LoopInfo_BBIterator_Final(&iter);
     vscHTBL_Finalize(&definedSymbols);
 
     VIR_IVMgr_SetBasicIdentified(ivMgr, gcvTRUE);
@@ -2943,8 +2891,8 @@ _VIR_LoopInfo_ComputeLoopBody(
     }
 }
 
-static void
-_VIR_LoopOpts_ComputeLoopBodies(
+void
+VIR_LoopOpts_ComputeLoopBodies(
     VIR_LoopOpts* loopOpts
     )
 {
@@ -3032,8 +2980,8 @@ _VIR_LoopInfo_IncludesHead(
     return _VIR_LoopInfo_BBIsInLoop(loopInfo0, VIR_LoopInfo_GetLoopHead(loopInfo1));
 }
 
-static void
-_VIR_LoopOpts_ComputeLoopTree(
+void
+VIR_LoopOpts_ComputeLoopTree(
     VIR_LoopOpts* loopOpts
     )
 {
@@ -3185,8 +3133,8 @@ _VIR_LoopInfo_IdentifyBreakContinues(VIR_LoopInfo* loopInfo)
     }
 }
 
-static void
-_VIR_LoopOpts_IdentifyBreakContinues(VIR_LoopOpts* loopOpts)
+void
+VIR_LoopOpts_IdentifyBreakContinues(VIR_LoopOpts* loopOpts)
 {
     VIR_LoopInfoMgr* loopInfoMgr = VIR_LoopOpts_GetLoopInfoMgr(loopOpts);
     VIR_LoopInfo* loopInfo;
@@ -3418,7 +3366,7 @@ _VIR_LoopInfo_BuildBackBoneSet(
         _CommonFreeList(VIR_LoopInfo_GetBackBoneBBSet(loopInfo), VIR_LoopInfo_GetMM(loopInfo));
     }
 
-    errCode = _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
+    errCode = VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
     if(errCode)
     {
         return errCode;
@@ -3426,9 +3374,9 @@ _VIR_LoopInfo_BuildBackBoneSet(
 
     vscULIterator_Init(&breakBBIter, VIR_LoopInfo_GetBreakBBSet(loopInfo));
 
-    for(bb = _VIR_LoopInfo_BBIterator_First(&bbIter);
+    for(bb = VIR_LoopInfo_BBIterator_First(&bbIter);
         bb != gcvNULL;
-        bb = _VIR_LoopInfo_BBIterator_Next(&bbIter))
+        bb = VIR_LoopInfo_BBIterator_Next(&bbIter))
     {
         VSC_UNI_LIST_NODE_EXT* node;
         gctBOOL isBackBone = gcvTRUE;
@@ -3466,7 +3414,7 @@ _VIR_LoopInfo_BuildBackBoneSet(
         }
     }
 
-    _VIR_LoopInfo_BBIterator_Final(&bbIter);
+    VIR_LoopInfo_BBIterator_Final(&bbIter);
 
     if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(VIR_LoopInfo_GetOptions(loopInfo)), VSC_OPTN_LoopOptsOptions_TRACE_INVARIANT))
     {
@@ -3523,10 +3471,10 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
     gcmASSERT(du);
 
     /* initialize all instructions in loop to loop variant */
-    _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_BreadthFirst);
-    for(bb = _VIR_LoopInfo_BBIterator_First(&bbIter);
+    VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_BreadthFirst);
+    for(bb = VIR_LoopInfo_BBIterator_First(&bbIter);
         bb != gcvNULL;
-        bb = _VIR_LoopInfo_BBIterator_Next(&bbIter))
+        bb = VIR_LoopInfo_BBIterator_Next(&bbIter))
     {
         VIR_Instruction* inst = BB_GET_START_INST(bb);
 
@@ -3551,9 +3499,9 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
     do
     {
         repeat = gcvFALSE;
-        for(bb = _VIR_LoopInfo_BBIterator_First(&bbIter);
+        for(bb = VIR_LoopInfo_BBIterator_First(&bbIter);
             bb != gcvNULL;
-            bb = _VIR_LoopInfo_BBIterator_Next(&bbIter))
+            bb = VIR_LoopInfo_BBIterator_Next(&bbIter))
         {
             VIR_Instruction* inst = BB_GET_START_INST(bb);
 
@@ -4507,7 +4455,7 @@ _VIR_LoopInfo_CopyLoop(
     VSC_HASH_TABLE* childLoopInfoMap = vscHTBL_Create(VIR_LoopInfo_GetMM(loopInfo), vscHFUNC_Default, vscHKCMP_Default, 16);
 
     /* insert BBs */
-    for(bb = _VIR_LoopInfo_BBIterator_First(pBbIter); bb != gcvNULL; bb = _VIR_LoopInfo_BBIterator_Next(pBbIter))
+    for(bb = VIR_LoopInfo_BBIterator_First(pBbIter); bb != gcvNULL; bb = VIR_LoopInfo_BBIterator_Next(pBbIter))
     {
         VIR_Instruction*    bbInst;
         VIR_Instruction*    newBBInst;
@@ -4791,7 +4739,7 @@ _VIR_LoopInfo_StaticallyUnroll(
 
     gcmASSERT(copyCount > 0);
 
-    _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_CoveringIRSequence);
+    VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_CoveringIRSequence);
 
     for(i = 0; i < copyCount; i++)
     {
@@ -5189,7 +5137,7 @@ _VIR_LoopInfo_DynamicallyUnroll(
 
         gcmASSERT(factor >= 2);
 
-        _VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_CoveringIRSequence);
+        VIR_LoopInfo_BBIterator_Init(&bbIter, loopInfo, VIR_LoopInfo_BBIterator_Type_CoveringIRSequence);
 
         for(i = 0; i < factor; i++)
         {
@@ -5561,9 +5509,9 @@ VIR_LoopOpts_PerformOnFunction(
     if(VIR_LoopOpts_DetectNaturalLoops(loopOpts))
     {
         /* Compute the loop body and some other information, we need to call these after add a new loopInfo. */
-        _VIR_LoopOpts_ComputeLoopBodies(loopOpts);
-        _VIR_LoopOpts_ComputeLoopTree(loopOpts);
-        _VIR_LoopOpts_IdentifyBreakContinues(loopOpts);
+        VIR_LoopOpts_ComputeLoopBodies(loopOpts);
+        VIR_LoopOpts_ComputeLoopTree(loopOpts);
+        VIR_LoopOpts_IdentifyBreakContinues(loopOpts);
 
          /* if hwsuppoertPerCompDepForLS is false, register is shorten in RA pass, skip licm */
         if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetOpts(options), VSC_OPTN_LoopOptsOptions_OPTS_LOOP_INVARIANT))

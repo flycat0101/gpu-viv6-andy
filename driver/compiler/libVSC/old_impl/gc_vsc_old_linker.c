@@ -18768,7 +18768,7 @@ _gcConvertSharedMemoryBaseAddr(
     gcmONERROR(gcSHADER_AddSourceAttribute(Shader, groupIdAttr, gcSL_SWIZZLE_XXXX, 0));
 
     /* MOD temp5.x, temp4.x, #current_num_workgroup
-       we use 100 for #current_num_workgroup here. After register allocation, we change it to
+       we use a special value for #current_num_workgroup here. After register allocation, we change it to
        the real value. */
     tempIndex5 = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
     gcSHADER_AddVariableEx(Shader,
@@ -18783,7 +18783,7 @@ _gcConvertSharedMemoryBaseAddr(
         -1,
         -1,
         &workgroupIdIndex);
-    uintConstant[0] = 100;
+    uintConstant[0] = __INIT_VALUE_FOR_WORK_GROUP_INDEX__;
     constantPtr = (void *)uintConstant;
     gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOD, tempIndex5, gcSL_ENABLE_X, gcSL_UINT16, gcSHADER_PRECISION_MEDIUM, 0));
     gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex4, gcSL_SWIZZLE_XXXX, gcSL_UINT16, gcSHADER_PRECISION_MEDIUM));

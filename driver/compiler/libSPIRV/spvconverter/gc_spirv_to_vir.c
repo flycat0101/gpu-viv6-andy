@@ -6365,7 +6365,7 @@ static VSC_ErrCode __SpvInsertInstAtFuncBegin(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
         /* The src1 should be the number of concurrent workgroups, which will be known after register allocation */
-        constVal.uValue = 100;
+        constVal.uValue = __INIT_VALUE_FOR_WORK_GROUP_INDEX__;
         operand = VIR_Inst_GetSource(virInst, 1);
         VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT16, constVal);
         VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);

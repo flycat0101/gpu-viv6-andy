@@ -67,6 +67,27 @@ typedef struct VIR_LOOPOPTS
 #define VIR_LoopOpts_SetOuterLoopFirst(lo, b)             ((lo)->outerLoopFirst = (b))
 #define VIR_LoopOpts_GetOuterLoopFirst(lo)                ((lo)->outerLoopFirst)
 
+/* Loop info mgr. */
+struct VIR_LOOPINFOMGR
+{
+    VIR_LoopOpts*                   loopOpts;
+    gctUINT                         nextLoopId;
+    VSC_UNI_LIST                    loopInfos;
+};
+
+#define VIR_LoopInfoMgr_GetLoopOpts(lim)                ((lim)->loopOpts)
+#define VIR_LoopInfoMgr_SetLoopOpts(lim, l)             ((lim)->loopOpts = (l))
+#define VIR_LoopInfoMgr_GetShader(lim)                  VIR_LoopOpts_GetShader(VIR_LoopInfoMgr_GetLoopOpts(lim))
+#define VIR_LoopInfoMgr_GetFunc(lim)                    VIR_LoopOpts_GetFunc(VIR_LoopInfoMgr_GetLoopOpts(lim))
+#define VIR_LoopInfoMgr_GetNextLoopId(lim)              ((lim)->nextLoopId)
+#define VIR_LoopInfoMgr_SetNextLoopId(lim, n)           ((lim)->nextLoopId = (n))
+#define VIR_LoopInfoMgr_IncNextLoopId(lim)              ((lim)->nextLoopId++)
+#define VIR_LoopInfoMgr_GetLoopInfos(lim)               (&(lim)->loopInfos)
+#define VIR_LoopInfoMgr_GetLoopInfoCount(lim)           (vscUNILST_GetNodeCount(VIR_LoopInfoMgr_GetLoopInfos(lim)))
+#define VIR_LoopInfoMgr_GetMM(lim)                      VIR_LoopOpts_GetMM(VIR_LoopInfoMgr_GetLoopOpts(lim))
+#define VIR_LoopInfoMgr_GetOptions(lim)                 VIR_LoopOpts_GetOptions(VIR_LoopInfoMgr_GetLoopOpts(lim))
+#define VIR_LoopInfoMgr_GetDumper(lim)                  VIR_LoopOpts_GetDumper(VIR_LoopInfoMgr_GetLoopOpts(lim))
+
 /* Loop DU. */
 typedef struct VIR_LoopDU
 {
@@ -295,6 +316,76 @@ VIR_LoopOpts_DeleteLoopInfoMgr(
 gctBOOL
 VIR_LoopOpts_DetectNaturalLoops(
     VIR_LoopOpts* loopOpts
+    );
+
+void
+VIR_LoopOpts_ComputeLoopBodies(
+    VIR_LoopOpts* loopOpts
+    );
+
+void
+VIR_LoopOpts_ComputeLoopTree(
+    VIR_LoopOpts* loopOpts
+    );
+
+void
+VIR_LoopOpts_IdentifyBreakContinues(
+    VIR_LoopOpts* loopOpts
+    );
+
+/**************************loop info BB iterator**************************/
+typedef enum VIR_LOOPINFO_BBITERATOR_TYPE
+{
+    VIR_LoopInfo_BBIterator_Type_Arbitrary,
+    VIR_LoopInfo_BBIterator_Type_BreadthFirst,
+    VIR_LoopInfo_BBIterator_Type_DepthFirst,
+    VIR_LoopInfo_BBIterator_Type_IRSequence,
+    VIR_LoopInfo_BBIterator_Type_CoveringIRSequence,
+} VIR_LoopInfo_BBIterator_Type;
+
+typedef struct VIR_LOOPINFO_BBITERATOR
+{
+    VIR_LoopInfo*           loopInfo;
+    gctUINT                 bbCount;
+    VIR_BB**                bbArray;
+    gctUINT                 curIndex;
+    VSC_MM*                 mm;
+} VIR_LoopInfo_BBIterator;
+
+#define VIR_LoopInfo_BBIterator_GetLoopInfo(i)                  ((i)->loopInfo)
+#define VIR_LoopInfo_BBIterator_SetLoopInfo(i, l)               ((i)->loopInfo = (l))
+#define VIR_LoopInfo_BBIterator_GetBBCount(i)                   ((i)->bbCount)
+#define VIR_LoopInfo_BBIterator_SetBBCount(i, b)                ((i)->bbCount = (b))
+#define VIR_LoopInfo_BBIterator_GetBBArray(i)                   ((i)->bbArray)
+#define VIR_LoopInfo_BBIterator_SetBBArray(i, b)                ((i)->bbArray = (b))
+#define VIR_LoopInfo_BBIterator_GetCurIndex(i)                  ((i)->curIndex)
+#define VIR_LoopInfo_BBIterator_SetCurIndex(i, c)               ((i)->curIndex = (c))
+#define VIR_LoopInfo_BBIterator_IncCurIndex(i)                  ((i)->curIndex += 1)
+#define VIR_LoopInfo_BBIterator_DecCurIndex(i)                  ((i)->curIndex -= 1)
+#define VIR_LoopInfo_BBIterator_GetCurBB(i)                     ((i)->curIndex != gcvMAXUINT32 && (i)->curIndex < (i)->bbCount ? (i)->bbArray[(i)->curIndex] : gcvNULL)
+#define VIR_LoopInfo_BBIterator_GetMM(i)                        ((i)->mm)
+#define VIR_LoopInfo_BBIterator_SetMM(i, m)                     ((i)->mm = (m))
+
+VSC_ErrCode
+VIR_LoopInfo_BBIterator_Init(
+    VIR_LoopInfo_BBIterator* iter,
+    VIR_LoopInfo* loopInfo,
+    VIR_LoopInfo_BBIterator_Type type
+    );
+
+void
+VIR_LoopInfo_BBIterator_Final(
+    VIR_LoopInfo_BBIterator* iter
+    );
+
+VIR_BB*
+VIR_LoopInfo_BBIterator_First(
+    VIR_LoopInfo_BBIterator* iter
+    );
+
+VIR_BB*
+VIR_LoopInfo_BBIterator_Next(
+    VIR_LoopInfo_BBIterator* iter
     );
 
 gctBOOL

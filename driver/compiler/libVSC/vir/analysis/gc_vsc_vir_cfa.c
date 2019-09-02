@@ -477,7 +477,7 @@ static void _AssociateAnInstToBasicBlock(VIR_BASIC_BLOCK* pBasicBlock, VIR_Instr
         BB_FLAGS_SET_LLI(pBasicBlock);
     }
 
-    if (VIR_OPCODE_isBarrier(opCode))
+    if (VIR_Inst_IsHWBarrier(pInst))
     {
         BB_FLAGS_SET_HAS_BARRIER(pBasicBlock);
         if (pFunc)

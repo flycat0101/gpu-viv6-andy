@@ -1017,6 +1017,26 @@ VIR_Inst_UpdateResOpType(
     return errCode;
 }
 
+gctBOOL
+VIR_Inst_IsHWBarrier(
+    IN VIR_Instruction     *pInst
+    )
+{
+    VIR_OpCode              opCode = VIR_Inst_GetOpcode(pInst);
+
+    if (opCode == VIR_OP_BARRIER)
+    {
+        return gcvTRUE;
+    }
+    /* HW has logic to naturally insure memory access is in-order */
+    else if (opCode == VIR_OP_MEM_BARRIER)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvFALSE;
+}
+
 VSC_ErrCode
 VIR_Sampler_UpdateResOpBitFromSampledImage(
     IN VIR_Shader* Shader,
@@ -18103,7 +18123,8 @@ VIR_Shader_NeedToCutDownWorkGroupSize(
 
     if ((VIR_Shader_GetKind(pShader) == VIR_SHADER_COMPUTE) &&
         (VIR_Shader_GetMaxFreeRegCountPerThread(pShader, pHwCfg) <= minRegCount) &&
-        (pHwCfg->maxCoreCount == 1 || pHwCfg->maxCoreCount == 2))
+        (pHwCfg->maxCoreCount == 1 || pHwCfg->maxCoreCount == 2) &&
+        (pShader->shaderLayout.compute.workGroupSize[0] % 2 == 0))
     {
         return gcvTRUE;
     }

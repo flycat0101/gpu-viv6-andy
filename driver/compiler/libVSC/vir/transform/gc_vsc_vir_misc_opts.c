@@ -13,6 +13,7 @@
 
 #include "gc_vsc.h"
 #include "vir/transform/gc_vsc_vir_misc_opts.h"
+#include "vir/transform/gc_vsc_vir_loop.h"
 
 DEF_QUERY_PASS_PROP(vscVIR_RemoveNop)
 {
@@ -12292,6 +12293,1360 @@ OnError:
     return errCode;
 }
 
+/*-------------------------------------------Cut down workGroupSize-------------------------------------------*/
+typedef struct VSC_CUTDOWN_WORKGROUPSIZE
+{
+    VSC_MM*             pMM;
+    VSC_HW_CONFIG*      pHwCfg;
+    VIR_Shader*         pShader;
+    /* So far we can only support X dimension cutting down. */
+    gctUINT16           xFactor;
+    VSC_HASH_TABLE**    ppTempSet;
+    VSC_HASH_TABLE**    ppLabelSet;
+    VSC_HASH_TABLE**    ppJmpSet;
+    /* We don't need to duplication the initialized instructions. */
+    VIR_Instruction*    pInitializationStartInst;
+    VIR_Instruction*    pInitializationEndInst;
+
+    /* We need a loop to check that in/out flow. */
+    VIR_LoopOpts        loopOpts;
+
+    /* Multiple threads use the same conditional branch. */
+    VSC_HASH_TABLE*     pSameJmpBBSet;
+
+} VSC_CutDownWGS;
+
+static void
+_vscVIR_CutDownWorkGroupSize(
+    IN VSC_CutDownWGS*  pContext
+    )
+{
+    VIR_Shader*         pShader = pContext->pShader;
+    gctUINT16           xFactor = pContext->xFactor;
+
+    if (VIR_Shader_IsGlCompute(pShader))
+    {
+        pShader->shaderLayout.compute.workGroupSize[0] /= xFactor;
+    }
+    else
+    {
+        if (!VIR_Shader_IsWorkGroupSizeAdjusted(pShader) && pShader->shaderLayout.compute.workGroupSize[0] != 0)
+        {
+            pShader->shaderLayout.compute.workGroupSize[0] /= xFactor;
+        }
+        else
+        {
+            VIR_Shader_SetAdjustedWorkGroupSize(pShader, VIR_Shader_GetAdjustedWorkGroupSize(pShader) / xFactor);
+        }
+    }
+
+    /* Save the factor. */
+    VIR_Shader_SetWorkGroupSizeFactor(pShader, 0, xFactor);
+}
+
+static void
+_vscVIR_InitializeCutDownWGS(
+    IN VSC_CutDownWGS*  pContext,
+    IN VIR_DEF_USAGE_INFO* pDuInfo,
+    IN VSC_MM*          pMM,
+    IN VSC_HW_CONFIG*   pHwCfg,
+    IN VIR_Shader*      pShader,
+    IN VSC_OPTN_LoopOptsOptions *pLoopOptsOptions
+    )
+{
+    gctUINT             i;
+
+    gcoOS_ZeroMemory(pContext, sizeof(VSC_CutDownWGS));
+
+    pContext->pMM = pMM;
+    pContext->pHwCfg = pHwCfg;
+    pContext->pShader = pShader;
+    /* The xFactor is 2 by default. */
+    pContext->xFactor = 2;
+
+    pContext->ppTempSet = (VSC_HASH_TABLE**)vscMM_Alloc(pContext->pMM, pContext->xFactor * sizeof(VSC_HASH_TABLE*));
+    pContext->ppLabelSet = (VSC_HASH_TABLE**)vscMM_Alloc(pContext->pMM, pContext->xFactor * sizeof(VSC_HASH_TABLE*));
+    pContext->ppJmpSet = (VSC_HASH_TABLE**)vscMM_Alloc(pContext->pMM, pContext->xFactor * sizeof(VSC_HASH_TABLE*));
+
+    for (i = 0; i < pContext->xFactor; i++)
+    {
+        pContext->ppTempSet[i] = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM,
+                                                                 vscHFUNC_Default,
+                                                                 vscHKCMP_Default,
+                                                                 64);
+        pContext->ppLabelSet[i] = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM,
+                                                                 vscHFUNC_Default,
+                                                                 vscHKCMP_Default,
+                                                                 64);
+        pContext->ppJmpSet[i] = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM,
+                                                                 vscHFUNC_Default,
+                                                                 vscHKCMP_Default,
+                                                                 64);
+    }
+
+    pContext->pInitializationStartInst = gcvNULL;
+    pContext->pInitializationEndInst = gcvNULL;
+
+    /* Initialize the loopOpts. */
+    VIR_LoopOpts_Init(&pContext->loopOpts,
+                      pDuInfo,
+                      pShader,
+                      VIR_Shader_GetMainFunction(pShader),
+                      pLoopOptsOptions,
+                      VIR_Shader_GetDumper(pShader),
+                      pMM,
+                      pHwCfg);
+
+    pContext->pSameJmpBBSet = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM, vscHFUNC_Default, vscHKCMP_Default, 4);
+}
+
+static void
+_vscVIR_FinalizeCutDownWGS(
+    IN VSC_CutDownWGS*  pContext
+    )
+{
+    gctUINT             i;
+
+    if (pContext->ppTempSet)
+    {
+        for (i = 0; i < pContext->xFactor; i++)
+        {
+            vscHTBL_Destroy(pContext->ppTempSet[i]);
+        }
+        vscMM_Free(pContext->pMM, pContext->ppTempSet);
+    }
+
+    if (pContext->ppLabelSet)
+    {
+        for (i = 0; i < pContext->xFactor; i++)
+        {
+            /* destroy the hash table and free memory */
+            vscHTBL_Destroy(pContext->ppLabelSet[i]);
+        }
+        vscMM_Free(pContext->pMM, pContext->ppLabelSet);
+    }
+
+    if (pContext->ppJmpSet)
+    {
+        for (i = 0; i < pContext->xFactor; i++)
+        {
+            /* destroy the hash table and free memory */
+            vscHTBL_Destroy(pContext->ppJmpSet[i]);
+        }
+        vscMM_Free(pContext->pMM, pContext->ppJmpSet);
+    }
+
+    /* Finalize the loopOpts. */
+    VIR_LoopOpts_Final(&pContext->loopOpts);
+    vscHTBL_Destroy(pContext->pSameJmpBBSet);
+}
+
+static VSC_ErrCode
+vscVIR_DetectSingleLoopInfo(
+    IN VSC_CutDownWGS*  pContext,
+    IN VIR_LoopInfo*    pLoopInfo,
+    IN VSC_HASH_TABLE*  pSameJmpBBSet,
+    IN VSC_HASH_TABLE*  pLoopInfoWorkingSet,
+    IN VSC_HASH_TABLE*  pBBWorkingSet
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_LoopInfo_BBIterator bbIter = {gcvNULL, 0, gcvNULL, 0, gcvNULL};
+    VIR_BB*             pWorkingBB = gcvNULL;
+    VIR_BB*             pLoopHeadBB = VIR_LoopInfo_GetLoopHead(pLoopInfo);
+    VIR_BB*             pLoopEndBB = VIR_LoopInfo_GetLoopEnd(pLoopInfo);
+    VIR_BB*             pSuccBBOfLoopEnd = gcvNULL;
+    VIR_Instruction*    pInst = gcvNULL;
+    gctBOOL             bHasBarrier = gcvFALSE;
+    VSC_ADJACENT_LIST_ITERATOR  edgeIter, edgeIter2;
+    VIR_CFG_EDGE*       pEdge;
+    VIR_CFG_EDGE*       pEdge2;
+    VIR_Function*       pFunc = BB_GET_FUNC(pLoopHeadBB);
+
+    /* Skip the processed loop info. */
+    if (vscHTBL_DirectTestAndGet(pLoopInfoWorkingSet, (void *)pLoopInfo, gcvNULL))
+    {
+        return errCode;
+    }
+
+    /* Check child loop first. */
+    if(VIR_LoopInfo_GetChildLoopCount(pLoopInfo))
+    {
+        VSC_UL_ITERATOR         iter;
+        VSC_UNI_LIST_NODE_EXT*  pNode;
+
+        vscULIterator_Init(&iter, VIR_LoopInfo_GetChildLoopSet(pLoopInfo));
+        for (pNode = CAST_ULN_2_ULEN(vscULIterator_First(&iter));
+             pNode != gcvNULL;
+             pNode = CAST_ULN_2_ULEN(vscULIterator_Next(&iter)))
+        {
+            VIR_LoopInfo* pChildLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(pNode);
+
+            vscVIR_DetectSingleLoopInfo(pContext, pChildLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet);
+        }
+    }
+
+    /* Get the other successful BB of the loop end. */
+    VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, &pLoopEndBB->dgNode.succList);
+    for (pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
+         pEdge != gcvNULL;
+         pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter))
+    {
+        pWorkingBB = CFG_EDGE_GET_TO_BB(pEdge);
+        if (pWorkingBB != pLoopHeadBB)
+        {
+            pSuccBBOfLoopEnd = pWorkingBB;
+            break;
+        }
+    }
+    gcmASSERT(pSuccBBOfLoopEnd);
+
+    /* Check the left BB. */
+    VIR_LoopInfo_BBIterator_Init(&bbIter, pLoopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
+    for (pWorkingBB = VIR_LoopInfo_BBIterator_First(&bbIter);
+         pWorkingBB != gcvNULL;
+         pWorkingBB = VIR_LoopInfo_BBIterator_Next(&bbIter))
+    {
+        /* Skip the processed BB, they are handled in the child loop. */
+        if (vscHTBL_DirectTestAndGet(pBBWorkingSet, (void *)pWorkingBB, gcvNULL))
+        {
+            continue;
+        }
+
+        /* We need to go through all BBs. */
+        if (!bHasBarrier)
+        {
+            pInst = BB_GET_START_INST(pWorkingBB);
+            while (gcvTRUE)
+            {
+                if (VIR_Inst_IsHWBarrier(pInst))
+                {
+                    bHasBarrier = gcvTRUE;
+                    break;
+                }
+
+                if (pInst == BB_GET_END_INST(pWorkingBB))
+                {
+                    break;
+                }
+                pInst = VIR_Inst_GetNext(pInst);
+            };
+        }
+
+        vscHTBL_DirectSet(pBBWorkingSet, (void *)pWorkingBB, gcvNULL);
+    }
+
+    /*
+    ** Find the initialize jmp and the back jmp of this loop.
+    ** Note that the initialize jmp may be not existed("do{}while{}" statement), but the back jmp is always existed.
+    ** VIV:TODO: we also need to add all break/continue.
+    */
+    if (bHasBarrier)
+    {
+        gctBOOL     bHasInitJmp = gcvFALSE;
+
+        /* The initialize jmp should have the same successful list as the loop end. */
+        VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, &pLoopHeadBB->dgNode.predList);
+        for (pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
+             pEdge != gcvNULL;
+             pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter))
+        {
+            pWorkingBB = CFG_EDGE_GET_TO_BB(pEdge);
+
+            if (pWorkingBB != pLoopEndBB)
+            {
+                gctBOOL     bValid = gcvFALSE;
+
+                VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter2, &pWorkingBB->dgNode.succList);
+                for (pEdge2 = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter2);
+                     pEdge2 != gcvNULL;
+                     pEdge2 = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter2))
+                {
+                    if (CFG_EDGE_GET_TO_BB(pEdge2) == pSuccBBOfLoopEnd)
+                    {
+                        bValid = gcvTRUE;
+                        break;
+                    }
+                }
+
+                if (!bValid)
+                {
+                    continue;
+                }
+                bHasInitJmp = gcvTRUE;
+            }
+
+            vscHTBL_DirectSet(pSameJmpBBSet, (void *)pWorkingBB, gcvNULL);
+        }
+
+        /* If there is no initialized JMP, we need to create a fake one. */
+        if (!bHasInitJmp && VIR_Inst_GetOpcode(BB_GET_START_INST(pLoopHeadBB)) == VIR_OP_LABEL)
+        {
+            VIR_BB*             pNewBB = gcvNULL;
+            VIR_Instruction*    pNewLabelInst = gcvNULL;
+            VIR_Instruction*    pJmpInst = gcvNULL;
+            VIR_Label*          pOrigLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(BB_GET_START_INST(pLoopHeadBB)));
+            VIR_Label*          pLabel = gcvNULL;
+            VIR_Link*           pLink = gcvNULL;
+            VIR_Label*          pNewLabel = gcvNULL;
+
+            errCode = VIR_BB_InsertBBAfter(VIR_Inst_GetBasicBlock(VIR_Inst_GetPrev(BB_GET_START_INST(pLoopHeadBB))),
+                                           VIR_OP_NOP,
+                                           &pNewBB);
+            ON_ERROR(errCode, "Insert a new BB.");
+
+            errCode = VIR_Function_AddCopiedInstructionAfter(pFunc,
+                                                             BB_GET_START_INST(pLoopHeadBB),
+                                                             BB_GET_START_INST(pNewBB),
+                                                             gcvTRUE,
+                                                             &pNewLabelInst);
+            ON_ERROR(errCode, "Insert a new instruction.");
+            pNewLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(pNewLabelInst));
+
+            /* Update the label. */
+            VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, &pLoopHeadBB->dgNode.predList);
+            for (pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
+                 pEdge != gcvNULL;
+                 pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter))
+            {
+                pWorkingBB = CFG_EDGE_GET_TO_BB(pEdge);
+
+                if (pWorkingBB == pLoopEndBB)
+                {
+                    continue;
+                }
+
+                pJmpInst = BB_GET_END_INST(pWorkingBB);
+
+                if (!VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(pJmpInst)))
+                {
+                    continue;
+                }
+
+                pLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(pJmpInst));
+                if (pLabel != pOrigLabel)
+                {
+                    continue;
+                }
+
+                VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(pLabel), (gctUINTPTR_T)pJmpInst);
+                VIR_Operand_SetLabel(VIR_Inst_GetDest(pJmpInst), pNewLabel);
+                VIR_Function_NewLink(pFunc, &pLink);
+                VIR_Link_SetReference(pLink, (gctUINTPTR_T)pJmpInst);
+                VIR_Link_AddLink(VIR_Label_GetReferenceAddr(pNewLabel), pLink);
+            }
+
+            vscHTBL_DirectSet(pSameJmpBBSet, (void *)pLoopHeadBB, gcvNULL);
+        }
+    }
+
+    vscHTBL_DirectSet(pLoopInfoWorkingSet, (void *)pLoopInfo, gcvNULL);
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_vscVIR_AnalyzeMultiPathWithBarrier(
+    IN VSC_CutDownWGS*  pContext
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Shader*         pShader = pContext->pShader;
+    VIR_Function*       pFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_CONTROL_FLOW_GRAPH* pCfg = VIR_Function_GetCFG(pFunc);
+    VIR_Instruction*    pInst = gcvNULL;
+    VIR_Label*          pLabel = gcvNULL;
+    VIR_Instruction*    pLabelInst = gcvNULL;
+    VIR_Label*          pNewLabel = gcvNULL;
+    VIR_Instruction*    pNewLabelInst = gcvNULL;
+    VIR_Link*           pLink = gcvNULL;
+    VIR_BB*             pTargetBB = gcvNULL;
+    VIR_BB*             pJmpBB = gcvNULL;
+    VIR_BB*             pNewReturnBB = gcvNULL;
+    VIR_BB*             pExitBB = gcvNULL;
+    VSC_ADJACENT_LIST_ITERATOR  edgeIter;
+    VIR_CFG_EDGE*       pEdge;
+    VIR_CFG_EDGE_TYPE   edgeType = VIR_CFG_EDGE_TYPE_ALWAYS;
+
+    /* A temp WAR for Vulkan Sascha, will add a general path later. */
+    if (!(VIR_Shader_IsVulkan(pShader) && VIR_Shader_IsGlCompute(pShader)))
+    {
+        return errCode;
+    }
+
+    for (pInst = VIR_Function_GetInstStart(pFunc); pInst != gcvNULL; pInst = VIR_Inst_GetNext(pInst))
+    {
+        if (!VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(pInst)))
+        {
+            continue;
+        }
+
+        pLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(pInst));
+        pLabelInst = VIR_Label_GetDefInst(pLabel);
+        pJmpBB = VIR_Inst_GetBasicBlock(pInst);
+        pTargetBB = VIR_Inst_GetBasicBlock(pLabelInst);
+
+        if (BB_GET_LENGTH(pTargetBB) != 1)
+        {
+            continue;
+        }
+
+        /* Update the JMP BB. */
+        VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, &pJmpBB->dgNode.succList);
+        for (pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
+             pEdge != gcvNULL;
+             pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter))
+        {
+            if (CFG_EDGE_GET_TO_BB(pEdge) == pTargetBB)
+            {
+                edgeType = pEdge->type;
+                AJLST_REMOVE_EDGE(&pJmpBB->dgNode.succList, pEdge);
+                break;
+            }
+        }
+
+        /* Update the TARGET BB. */
+        VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, &pTargetBB->dgNode.predList);
+        for (pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
+             pEdge != gcvNULL;
+             pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter))
+        {
+            if (CFG_EDGE_GET_TO_BB(pEdge) == pJmpBB)
+            {
+                AJLST_REMOVE_EDGE(&pTargetBB->dgNode.predList, pEdge);
+                break;
+            }
+        }
+        /* Get the EXIT BB. */
+        VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, &pTargetBB->dgNode.succList);
+        for (pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
+             pEdge != gcvNULL;
+             pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter))
+        {
+            if (CFG_EDGE_GET_TO_BB(pEdge) == CFG_GET_EXIT_BB(pCfg))
+            {
+                pExitBB = CFG_GET_EXIT_BB(pCfg);
+                AJLST_REMOVE_EDGE(&pTargetBB->dgNode.succList, pEdge);
+                break;
+            }
+        }
+
+        if (pExitBB)
+        {
+            VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, &pExitBB->dgNode.predList);
+            for (pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
+                 pEdge != gcvNULL;
+                 pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter))
+            {
+                if (CFG_EDGE_GET_TO_BB(pEdge) == pTargetBB)
+                {
+                    AJLST_REMOVE_EDGE(&pExitBB->dgNode.predList, pEdge);
+                    break;
+                }
+            }
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
+        }
+
+        /* Insert a new BB after the RETURN BB and replace it. */
+        errCode = VIR_BB_InsertBBAfter(pTargetBB,
+                                       VIR_OP_LABEL,
+                                       &pNewReturnBB);
+        ON_ERROR(errCode, "Insert a new BB.");
+
+        /* Update the edge. */
+        errCode = vscVIR_AddEdgeToCFG(pCfg, pTargetBB, pNewReturnBB, VIR_CFG_EDGE_TYPE_ALWAYS);
+        ON_ERROR(errCode, "Add a new edge. ");
+
+        errCode = vscVIR_AddEdgeToCFG(pCfg, pJmpBB, pNewReturnBB, edgeType);
+        ON_ERROR(errCode, "Add a new edge. ");
+
+        errCode = vscVIR_AddEdgeToCFG(pCfg, pNewReturnBB, pExitBB, edgeType);
+        ON_ERROR(errCode, "Add a new edge. ");
+
+        /* Update the label. */
+        pNewLabelInst = BB_GET_START_INST(pNewReturnBB);
+        VIR_Inst_Copy(pNewLabelInst, pLabelInst, gcvFALSE);
+        pNewLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(pNewLabelInst));
+
+        VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(pLabel), (gctUINTPTR_T)pInst);
+
+        VIR_Operand_SetLabel(VIR_Inst_GetDest(pInst), pNewLabel);
+        VIR_Function_NewLink(pFunc, &pLink);
+        VIR_Link_SetReference(pLink, (gctUINTPTR_T)pInst);
+        VIR_Link_AddLink(VIR_Label_GetReferenceAddr(pNewLabel), pLink);
+
+        vscHTBL_DirectSet(pContext->pSameJmpBBSet, (void *)pNewReturnBB, gcvNULL);
+        break;
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_vscVIR_DetectBarrierWithinLoop(
+    IN VSC_CutDownWGS*  pContext
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VSC_HASH_TABLE*     pSameJmpBBSet = pContext->pSameJmpBBSet;
+    VSC_HASH_TABLE*     pLoopInfoWorkingSet = gcvNULL;
+    VSC_HASH_TABLE*     pBBWorkingSet = gcvNULL;
+    VIR_LoopOpts*       pLoopOpts = &pContext->loopOpts;
+    VIR_LoopInfoMgr*    pLoopInfoMgr = gcvNULL;
+    VIR_LoopInfo*       pLoopInfo = gcvNULL;
+    VSC_UL_ITERATOR     iter;
+
+    pLoopInfoWorkingSet = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM, vscHFUNC_Default, vscHKCMP_Default, 16);
+    pBBWorkingSet = (VSC_HASH_TABLE*)vscHTBL_Create(pContext->pMM, vscHFUNC_Default, vscHKCMP_Default, 16);
+
+    /* Initialize and detect all LOOPs. */
+    VIR_LoopOpts_NewLoopInfoMgr(pLoopOpts);
+    VIR_LoopOpts_DetectNaturalLoops(pLoopOpts);
+
+    /* Compute the loop body and some other information, we need to call these after add a new loopInfo. */
+    VIR_LoopOpts_ComputeLoopBodies(pLoopOpts);
+    VIR_LoopOpts_ComputeLoopTree(pLoopOpts);
+    VIR_LoopOpts_IdentifyBreakContinues(pLoopOpts);
+
+    /*
+    ** Find all loops with BARRIER, please note that if a child loop has BARRIER but the parent loop has no BARRIR,
+    ** only record the child loop.
+    */
+    pLoopInfoMgr = VIR_LoopOpts_GetLoopInfoMgr(pLoopOpts);
+    vscULIterator_Init(&iter, VIR_LoopInfoMgr_GetLoopInfos(pLoopInfoMgr));
+    for (pLoopInfo = (VIR_LoopInfo*)vscULIterator_First(&iter);
+         pLoopInfo != gcvNULL;
+         pLoopInfo = (VIR_LoopInfo*)vscULIterator_Next(&iter))
+    {
+        errCode = vscVIR_DetectSingleLoopInfo(pContext, pLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet);
+        ON_ERROR(errCode, "Detect single loop info.");
+    }
+
+OnError:
+    if (pLoopInfoWorkingSet)
+    {
+        vscHTBL_Destroy(pLoopInfoWorkingSet);
+    }
+
+    if (pBBWorkingSet)
+    {
+        vscHTBL_Destroy(pBBWorkingSet);
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode
+_vscVIR_MoveBarrierOutOfBB(
+    IN VSC_CutDownWGS*  pContext
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Shader*         pShader = pContext->pShader;
+    VIR_Function*       pMainFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_CONTROL_FLOW_GRAPH* pCfg = VIR_Function_GetCFG(pMainFunc);
+    VIR_Instruction*    pBarrierInst = gcvNULL;
+    VIR_Instruction*    pInst = gcvNULL;
+    VIR_Instruction*    pTempInst = gcvNULL;
+    VIR_Instruction*    pNewInst = gcvNULL;
+    VIR_BASIC_BLOCK*    pBarrierBB = gcvNULL;
+    VIR_BASIC_BLOCK*    pLeftBB = gcvNULL;
+    VIR_BASIC_BLOCK*    pCurrentBB = gcvNULL;
+
+    for (pInst = VIR_Function_GetInstStart(pMainFunc); pInst != gcvNULL; pInst = VIR_Inst_GetNext(pInst))
+    {
+        VSC_ADJACENT_LIST_ITERATOR   succEdgeIter;
+        VIR_CFG_EDGE*                pSuccEdge;
+
+        if (!VIR_Inst_IsHWBarrier(pInst))
+        {
+            continue;
+        }
+
+        pCurrentBB = VIR_Inst_GetBasicBlock(pInst);
+        pBarrierInst = pInst;
+
+        /* Merge the consecutive BARRIERs to one BARRIER. */
+        for (pInst = VIR_Inst_GetNext(pInst); pInst != gcvNULL; pInst = VIR_Inst_GetNext(pInst))
+        {
+            if (VIR_Inst_GetOpcode(pInst) == VIR_OP_NOP)
+            {
+                continue;
+            }
+
+            if (!VIR_Inst_IsHWBarrier(pInst))
+            {
+                break;
+            }
+            else
+            {
+                VIR_Function_ChangeInstToNop(pMainFunc, pInst);
+            }
+        }
+
+        /* Create a new BB to hold the BARRIER. */
+        errCode = VIR_BB_InsertBBAfter(pCurrentBB,
+                                       VIR_OP_NOP,
+                                       &pBarrierBB);
+        ON_ERROR(errCode, "Insert a new BB.");
+
+        /* Create a new BB to hold the left instructions. */
+        errCode = VIR_BB_InsertBBAfter(pBarrierBB,
+                                       VIR_OP_NOP,
+                                       &pLeftBB);
+        ON_ERROR(errCode, "Insert a new BB.");
+
+        /* Update the edges. */
+        errCode = vscVIR_AddEdgeToCFG(pCfg, pCurrentBB, pBarrierBB, VIR_CFG_EDGE_TYPE_ALWAYS);
+        ON_ERROR(errCode, "Add a new edge.");
+
+        errCode = vscVIR_AddEdgeToCFG(pCfg, pBarrierBB, pLeftBB, VIR_CFG_EDGE_TYPE_ALWAYS);
+        ON_ERROR(errCode, "Add a new edge.");
+
+        VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &pCurrentBB->dgNode.succList);
+        pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succEdgeIter);
+        for (; pSuccEdge != gcvNULL; pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succEdgeIter))
+        {
+            if (CFG_EDGE_GET_TO_BB(pSuccEdge) == pBarrierBB)
+            {
+                continue;
+            }
+            errCode = vscVIR_AddEdgeToCFG(pCfg, pLeftBB, CFG_EDGE_GET_TO_BB(pSuccEdge), CFG_EDGE_GET_TYPE(pSuccEdge));
+            ON_ERROR(errCode, "Add a new edge.");
+        }
+
+        VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &pLeftBB->dgNode.succList);
+        pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succEdgeIter);
+        for (; pSuccEdge != gcvNULL; pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succEdgeIter))
+        {
+            errCode = vscVIR_RemoveEdgeFromCFG(pCfg, pCurrentBB, CFG_EDGE_GET_TO_BB(pSuccEdge));
+            ON_ERROR(errCode, "Remove a new edge.");
+        }
+
+        /* Update the BB flags. */
+        BB_FLAGS_SET_HAS_BARRIER(pBarrierBB);
+        BB_FLAGS_RESET_HAS_BARRIER(pCurrentBB);
+
+        /* Copy the BARRIER to the BARRIER BB. */
+        errCode = VIR_Function_AddCopiedInstructionAfter(pMainFunc,
+                                                         pBarrierInst,
+                                                         BB_GET_END_INST(pBarrierBB),
+                                                         gcvTRUE,
+                                                         &pNewInst);
+        ON_ERROR(errCode, "Copy the BARRIER.");
+
+        /* Copy the left instructions to the left BB. */
+        pInst = VIR_Inst_GetNext(pBarrierInst);
+        while (gcvTRUE)
+        {
+            errCode = VIR_Function_AddCopiedInstructionAfter(pMainFunc,
+                                                             pInst,
+                                                             BB_GET_END_INST(pLeftBB),
+                                                             gcvTRUE,
+                                                             &pNewInst);
+            ON_ERROR(errCode, "Copy the BARRIER.");
+
+            if (VIR_Inst_IsHWBarrier(pNewInst))
+            {
+                BB_FLAGS_SET_HAS_BARRIER(pLeftBB);
+            }
+
+            if (pInst == BB_GET_END_INST(pCurrentBB))
+            {
+                break;
+            }
+            pInst = VIR_Inst_GetNext(pInst);
+        };
+
+        /* Remove all left instructions. */
+        pInst = pBarrierInst;
+        while (gcvTRUE)
+        {
+            pTempInst = VIR_Inst_GetNext(pInst);
+
+            if (pInst == BB_GET_END_INST(pCurrentBB))
+            {
+                errCode = VIR_Function_RemoveInstruction(pMainFunc, pInst);
+                ON_ERROR(errCode, "Remove a instruction.");
+
+                pInst = BB_GET_START_INST(pLeftBB);
+                break;
+            }
+
+            errCode = VIR_Function_RemoveInstruction(pMainFunc, pInst);
+            ON_ERROR(errCode, "Remove a instruction.");
+
+            pInst = pTempInst;
+        };
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_vscVIR_RecalculateBuiltinAttributes(
+    IN VSC_CutDownWGS*  pContext
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Shader*         pShader = pContext->pShader;
+    gctUINT16           xFactor = pContext->xFactor;
+    VSC_HASH_TABLE**    ppTempSet = pContext->ppTempSet;
+    gctUINT             i, j;
+    VIR_Symbol*         pIdSym[2] = { gcvNULL, gcvNULL };
+    VIR_Symbol*         pVirRegSym = gcvNULL;
+    VIR_Symbol*         pLocalIndex = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCALINVOCATIONINDEX);
+    VIR_VirRegId        newVirRegId = VIR_INVALID_ID;
+    VIR_SymId           newVirSymId = VIR_INVALID_ID;
+    VIR_Symbol*         pNewVirSym = gcvNULL;
+    VIR_Function*       pMainFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_Instruction*    pStartInst = VIR_Function_GetInstStart(pMainFunc);
+    VIR_Instruction*    pNewInst = gcvNULL;
+    VIR_Operand*        pNewOpnd = gcvNULL;
+    VIR_Instruction*    pInitializationStartInst = gcvNULL;
+    VIR_Instruction*    pInitializationEndInst = gcvNULL;
+
+    pIdSym[0] = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_LOCAL_INVOCATION_ID);
+    pIdSym[1] = VIR_Shader_FindSymbolById(pShader, VIR_SYM_VARIABLE, VIR_NAME_GLOBAL_INVOCATION_ID);
+
+    /*
+    ** Since HW can't support localIndex and compiler generates instruction to calculate it,
+    ** we need to find the last instruction to calculate the localIndex, and recalculate it from there.
+    */
+    if (pLocalIndex)
+    {
+    }
+
+    /*
+    ** Re-caculate the LocalInvocationId, GlobalInvocationId and LocalInvocationIndex:
+    **
+    **      LocalId_in_program0 = LocalId_in_hw * factor
+    **      LocalIdin_program1 = LocalId_in_hw * factor + 1
+    **
+    **      GlobalId_in_program0 = GlobalId_in_hw * factor
+    **      GlobalId_in_program1 = GlobalId_in_hw * factor + 1
+    **
+    **      LocalIndex_in_program0 = Z * I * J + Y * I + X * factor
+    **      LocalIndex_in_program1 = Z * I * J + Y * I + X * factor + 1
+    **
+    ** For LocalId/GlobalId:
+    **    1) For thread[0]: Id_in_hw = Id_in_hw * factor, so we can reuse the instruction set for thread[0].
+    **    2) For thread[1]~thread[Factor-1]: use new temp registers instread of attributes to save these builtin attributes,
+    **       and replace them in the instructions.
+    **
+    ** For LocalIndex:
+    **    We need to recalculate for all thread because the workGroupSize is changed.
+    */
+    for (i = 0; i < xFactor; i++)
+    {
+        for (j = 0; j < 2; j++)
+        {
+            if (pIdSym[j] != gcvNULL && !isSymUnused(pIdSym[j]))
+            {
+                /* For thread[0]: Id = Id * factor. */
+                if (i == 0)
+                {
+                    pVirRegSym = VIR_Shader_FindSymbolByTempIndex(pShader, VIR_Symbol_GetVariableVregIndex(pIdSym[j]));
+                    gcmASSERT(pVirRegSym != gcvNULL);
+
+                    errCode = VIR_Function_AddInstructionBefore(pMainFunc,
+                                                                VIR_OP_MUL,
+                                                                VIR_Symbol_GetTypeId(pIdSym[j]),
+                                                                pStartInst,
+                                                                gcvTRUE,
+                                                                &pNewInst);
+                    ON_ERROR(errCode, "Add new instruction.");
+                    if (pInitializationStartInst == gcvNULL)
+                    {
+                        pInitializationStartInst = pNewInst;
+                    }
+                    pInitializationEndInst = pNewInst;
+
+                    pNewOpnd = VIR_Inst_GetDest(pNewInst);
+                    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pVirRegSym));
+                    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
+
+                    pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+                    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pIdSym[j]));
+                    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
+
+                    pNewOpnd = VIR_Inst_GetSource(pNewInst, 1);
+                    VIR_Operand_SetImmediateUint(pNewOpnd, xFactor);
+                }
+                /* For thread[1]~thread[factor-1]: Id_temp = Id + i. */
+                else
+                {
+                    newVirRegId = VIR_Shader_NewVirRegId(pShader, 1);
+                    errCode = VIR_Shader_AddSymbol(pShader,
+                                                   VIR_SYM_VIRREG,
+                                                   newVirRegId,
+                                                   VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X3),
+                                                   VIR_STORAGE_UNKNOWN,
+                                                   &newVirSymId);
+                    ON_ERROR(errCode, "Add new symbol.");
+                    pNewVirSym = VIR_Shader_GetSymFromId(pShader, newVirSymId);
+
+                    /* mov, newTemp, index. */
+                    errCode = VIR_Function_AddInstructionBefore(pMainFunc,
+                                                                VIR_OP_MOV,
+                                                                VIR_Symbol_GetTypeId(pIdSym[j]),
+                                                                pStartInst,
+                                                                gcvTRUE,
+                                                                &pNewInst);
+                    ON_ERROR(errCode, "Add new instruction.");
+                    pInitializationEndInst = pNewInst;
+
+                    pNewOpnd = VIR_Inst_GetDest(pNewInst);
+                    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, newVirSymId);
+                    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_XYZ);
+
+                    pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+                    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pIdSym[j]));
+                    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
+
+                    /* add, newTemp.x, newTemp.x, 1*/
+                    errCode = VIR_Function_AddInstructionBefore(pMainFunc,
+                                                                VIR_OP_ADD,
+                                                                VIR_GetTypeComponentType(VIR_Symbol_GetTypeId(pIdSym[j])),
+                                                                pStartInst,
+                                                                gcvTRUE,
+                                                                &pNewInst);
+                    ON_ERROR(errCode, "Add new instruction.");
+                    pInitializationEndInst = pNewInst;
+
+                    pNewOpnd = VIR_Inst_GetDest(pNewInst);
+                    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, newVirSymId);
+                    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
+
+                    pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+                    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pIdSym[j]));
+                    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
+
+                    pNewOpnd = VIR_Inst_GetSource(pNewInst, 1);
+                    VIR_Operand_SetImmediateUint(pNewOpnd, i);
+
+                    vscHTBL_DirectSet(ppTempSet[i], pIdSym[j], (void*)pNewVirSym);
+                }
+            }
+        }
+
+        if (pLocalIndex != gcvNULL)
+        {
+        }
+    }
+
+    /* Save the instruction range of initialization. */
+    pContext->pInitializationStartInst = pInitializationStartInst;
+    pContext->pInitializationEndInst = pInitializationEndInst;
+
+OnError:
+    return errCode;
+}
+
+static gctBOOL
+_vscVIR_NeedToRemap(
+    IN VSC_CutDownWGS*      pContext,
+    IN VIR_Symbol*          pSymbol
+    )
+{
+    VIR_SymbolKind          symbolKind = VIR_Symbol_GetKind(pSymbol);
+    VIR_StorageClass        storageClass = VIR_Symbol_GetStorageClass(pSymbol);
+    VIR_NameId              nameId = VIR_Symbol_GetName(pSymbol);
+
+    /* Only check some builtin attributes and all temp registers. */
+    if (symbolKind != VIR_SYM_VARIABLE && symbolKind != VIR_SYM_VIRREG)
+    {
+        return gcvFALSE;
+    }
+
+    if (storageClass == VIR_STORAGE_INPUT)
+    {
+        if (nameId != VIR_NAME_LOCAL_INVOCATION_ID && nameId != VIR_NAME_GLOBAL_INVOCATION_ID)
+        {
+            return gcvFALSE;
+        }
+    }
+
+    return gcvTRUE;
+}
+
+static VSC_ErrCode
+_vscVIR_RemapOperand(
+    IN VSC_CutDownWGS*      pContext,
+    IN VIR_Instruction*     pInst,
+    IN VIR_Operand*         pOpnd,
+    IN gctBOOL              bIsDest,
+    IN VSC_HASH_TABLE*      pTempSet
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_Shader*             pShader = pContext->pShader;
+    VIR_Symbol*             pOpndSym = gcvNULL;
+    VIR_Symbol*             pVarSym = gcvNULL;
+    VIR_Symbol*             pRegSym = gcvNULL;
+    VIR_Symbol*             pMapVarSym = gcvNULL;
+    VIR_Symbol*             pMapRegSym = gcvNULL;
+    VIR_Symbol*             pMapSym = gcvNULL;
+    VIR_SymId               newSymId = VIR_INVALID_ID;
+    gctUINT                 i, regCount = 0, indexRange = 0;
+    VIR_VirRegId            regId;
+    VIR_TypeId              opndTypeId = VIR_Operand_GetTypeId(pOpnd);
+
+    /* Check symbol only. */
+    if (!(VIR_Operand_isSymbol(pOpnd) || VIR_Operand_isVirReg(pOpnd)))
+    {
+        return errCode;
+    }
+
+    /* Check if this symbol need to be remapped. */
+    pOpndSym = VIR_Operand_GetSymbol(pOpnd);
+    if (!_vscVIR_NeedToRemap(pContext, pOpndSym))
+    {
+        return errCode;
+    }
+
+    /* Check if this symbol is mapped before, if not, create a new one. */
+    if (!vscHTBL_DirectTestAndGet(pTempSet, (void *)(pOpndSym), (void **)(&pMapSym)))
+    {
+        /* Create a new symbol. */
+        if (VIR_Symbol_isVariable(pOpndSym))
+        {
+            pVarSym = pOpndSym;
+        }
+        else
+        {
+            pVarSym = VIR_Symbol_GetVregVariable(pOpndSym);
+            pRegSym = pOpndSym;
+        }
+
+        /* If this is a variable, add this variable and the related temp register. */
+        if (pVarSym != gcvNULL)
+        {
+            /* Add this variable. */
+            errCode = VIR_Shader_DuplicateVariableFromSymbol(pShader, pVarSym, &newSymId);
+            ON_ERROR(errCode, "Duplicate symbol.");
+
+            /* Save the variable mapping. */
+            pMapVarSym = VIR_Shader_GetSymFromId(pShader, newSymId);
+            vscHTBL_DirectSet(pTempSet, (void *)pVarSym, (void *)pMapVarSym);
+
+            /* Add the related temp register. */
+            regCount = VIR_Type_GetVirRegCount(pShader, VIR_Symbol_GetType(pVarSym), -1);
+            regId = VIR_Shader_NewVirRegId(pShader, regCount);
+            indexRange = regId + regCount;
+            VIR_Symbol_SetVariableVregIndex(pMapVarSym, regId);
+            VIR_Symbol_SetIndexRange(pMapVarSym, indexRange);
+
+            for (i = 0; i < regCount; i++)
+            {
+                errCode = VIR_Shader_AddSymbol(pShader,
+                                               VIR_SYM_VIRREG,
+                                               regId + i,
+                                               VIR_Type_GetRegIndexType(pShader, VIR_Symbol_GetType(pVarSym), regId),
+                                               VIR_STORAGE_UNKNOWN,
+                                               &newSymId);
+                ON_ERROR(errCode, "Add symbol failed.");
+
+                pMapRegSym = VIR_Shader_GetSymFromId(pShader, newSymId);
+                gcmASSERT(pMapRegSym);
+
+                VIR_Symbol_SetVregVariable(pMapRegSym, pMapVarSym);
+                VIR_Symbol_SetPrecision(pMapRegSym, VIR_Symbol_GetPrecision(pMapVarSym));
+                VIR_Symbol_SetIndexRange(pMapRegSym, indexRange);
+
+                /* Save the temp register mapping. */
+                errCode = VIR_Shader_GetVirRegSymByVirRegId(pShader, VIR_Symbol_GetVregIndex(pVarSym) + i, &newSymId);
+                ON_ERROR(errCode, "Get vir reg symbol.");
+
+                pRegSym = VIR_Shader_GetSymFromId(pShader, newSymId);
+
+                vscHTBL_DirectSet(pTempSet, (void *)pRegSym, (void *)pMapRegSym);
+            }
+
+            /* Set the correct mapping symbol. */
+            if (VIR_Symbol_isVariable(pOpndSym))
+            {
+                pMapSym = pMapVarSym;
+            }
+            else
+            {
+                if (!vscHTBL_DirectTestAndGet(pTempSet, (void *)pOpndSym, (void **)(&pMapSym)))
+                {
+                    gcmASSERT(gcvFALSE);
+                }
+            }
+        }
+        else
+        {
+            gcmASSERT(pRegSym);
+
+            regCount = VIR_Type_GetVirRegCount(pShader, VIR_Symbol_GetType(pRegSym), -1);
+            regId = VIR_Shader_NewVirRegId(pShader, regCount);
+            indexRange = regId + regCount;
+
+            errCode = VIR_Shader_AddSymbol(pShader,
+                                           VIR_SYM_VIRREG,
+                                           regId,
+                                           VIR_Symbol_GetType(pRegSym),
+                                           VIR_STORAGE_UNKNOWN,
+                                           &newSymId);
+            ON_ERROR(errCode, "Add symbol failed.");
+
+            pMapRegSym = VIR_Shader_GetSymFromId(pShader, newSymId);
+            gcmASSERT(pMapRegSym);
+
+            VIR_Symbol_SetPrecision(pMapRegSym, VIR_Symbol_GetPrecision(pRegSym));
+            VIR_Symbol_SetIndexRange(pMapRegSym, indexRange);
+
+            /* Save the temp register mapping. */
+            vscHTBL_DirectSet(pTempSet, (void *)pRegSym, (void *)pMapRegSym);
+
+            pMapSym = pMapRegSym;
+        }
+    }
+
+    /* Update the operand. */
+    VIR_Operand_SetSymbol(pOpnd, VIR_Inst_GetFunction(pInst), VIR_Symbol_GetIndex(pMapSym));
+    VIR_Operand_SetTypeId(pOpnd, opndTypeId);
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_vscVIR_DuplicateInstruction(
+    IN VSC_CutDownWGS*      pContext,
+    IN gctBOOL              bSameJmpBB,
+    IN gctBOOL              bLastInst,
+    IN VIR_Instruction*     pCopyFromInst,
+    IN VIR_Instruction*     pCurrentInstPos,
+    IN VSC_HASH_TABLE*      pTempSet,
+    IN VSC_HASH_TABLE*      pLabelSet,
+    IN VSC_HASH_TABLE*      pJmpSet,
+    IN VIR_Instruction**    ppNewInst
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_Function*           pFunc = VIR_Inst_GetFunction(pCopyFromInst);
+    VIR_Instruction*        pNewInst = gcvNULL;
+    VIR_OpCode              opCode = VIR_Inst_GetOpcode(pCopyFromInst);
+    gctUINT                 i;
+
+    errCode = VIR_Function_AddCopiedInstructionAfter(pFunc,
+                                                     pCopyFromInst,
+                                                     pCurrentInstPos,
+                                                     gcvTRUE,
+                                                     &pNewInst);
+    ON_ERROR(errCode, "copy instruction.");
+
+    /* Save the label mapping. */
+    if (opCode == VIR_OP_LABEL)
+    {
+        VIR_Label*  pOrigLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(pCopyFromInst));
+
+        vscHTBL_DirectSet(pLabelSet,
+                          VIR_Function_GetSymFromId(pFunc, pOrigLabel->sym),
+                          (void*)VIR_Operand_GetLabel(VIR_Inst_GetDest(pNewInst)));
+    }
+    else if (VIR_OPCODE_isBranch(opCode))
+    {
+        if (!(bSameJmpBB && bLastInst))
+        {
+            vscHTBL_DirectSet(pJmpSet,
+                              (void *)pNewInst,
+                              gcvNULL);
+        }
+    }
+
+    /* Remap the temp register. */
+    if (VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(pNewInst)))
+    {
+        errCode = _vscVIR_RemapOperand(pContext,
+                                       pNewInst,
+                                       VIR_Inst_GetDest(pNewInst),
+                                       gcvTRUE,
+                                       pTempSet);
+        ON_ERROR(errCode, "Remap operand.");
+    }
+
+    for (i = 0; i < VIR_Inst_GetSrcNum(pNewInst); i++)
+    {
+        errCode = _vscVIR_RemapOperand(pContext,
+                                       pNewInst,
+                                       VIR_Inst_GetSource(pNewInst, i),
+                                       gcvFALSE,
+                                       pTempSet);
+        ON_ERROR(errCode, "Remap operand.");
+    }
+
+    if (ppNewInst)
+    {
+        *ppNewInst = pNewInst;
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_vscVIR_DuplicateBBs(
+    IN VSC_CutDownWGS*      pContext,
+    IN VIR_Function*        pFunc,
+    IN VIR_BASIC_BLOCK*     pBB,
+    IN VIR_IdList*          pWorkingBBList
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VSC_MM*                 pMM = pContext->pMM;
+    VSC_HASH_TABLE*         pSameJmpBBSet = pContext->pSameJmpBBSet;
+    gctUINT                 i;
+    gctUINT16               factorIndex, xFactor = pContext->xFactor;
+    gctBOOL                 bHasBarrier = BB_FLAGS_HAS_BARRIER(pBB);
+    VIR_BASIC_BLOCK*        pCurrentWorkingBB = gcvNULL;
+    VIR_Instruction*        pCurrentWorkingInst = gcvNULL;
+    VIR_Instruction*        pOrigBBStartInst = BB_GET_START_INST(pBB);
+    VIR_Instruction*        pOrigBBEndInst = BB_GET_END_INST(pBB);
+    VIR_Instruction**       ppNewStartInst = gcvNULL;
+    VIR_Instruction**       ppNewEndInst = gcvNULL;
+
+    if (pWorkingBBList->count == 0)
+    {
+        return errCode;
+    }
+
+    /* Allocate the start/end instruction. */
+    ppNewStartInst = (VIR_Instruction **)vscMM_Alloc(pMM, (xFactor - 1) * sizeof(VIR_Instruction*));
+    ppNewEndInst = (VIR_Instruction **)vscMM_Alloc(pMM, (xFactor - 1) * sizeof(VIR_Instruction*));
+
+    /* Duplicate "factor-1" copies: Copy the instructions before BARRIER. */
+    for (factorIndex = 0; factorIndex < xFactor - 1; factorIndex++)
+    {
+        VSC_HASH_TABLE*     pTempSet = pContext->ppTempSet[factorIndex + 1];
+        VSC_HASH_TABLE*     pLabelSet = pContext->ppLabelSet[factorIndex + 1];
+        VSC_HASH_TABLE*     pJmpSet = pContext->ppJmpSet[factorIndex + 1];
+        VIR_Instruction*    pNewStartInst = gcvNULL;
+        VIR_Instruction*    pNewEndInst = gcvNULL;
+        VIR_Instruction*    pNewInst = gcvNULL;
+        gctBOOL             bSameJmpBB = gcvFALSE, bLastInst = gcvFALSE;
+
+        /* Add a NOP in the beginning, just easy to check. */
+        if (bHasBarrier)
+        {
+            errCode = VIR_Function_AddInstructionBefore(pFunc,
+                                                        VIR_OP_NOP,
+                                                        VIR_TYPE_UNKNOWN,
+                                                        pOrigBBStartInst,
+                                                        gcvTRUE,
+                                                        &pNewInst);
+        }
+        else
+        {
+            errCode = VIR_Function_AddInstructionAfter(pFunc,
+                                                       VIR_OP_NOP,
+                                                       VIR_TYPE_UNKNOWN,
+                                                       pOrigBBEndInst,
+                                                       gcvTRUE,
+                                                       &pNewInst);
+        }
+        ON_ERROR(errCode, "Add a NOP.");
+        pNewStartInst = pNewEndInst = pNewInst;
+
+        /* Start to copy the instructions. */
+        for (i = 0; i < VIR_IdList_Count(pWorkingBBList); i++)
+        {
+            pCurrentWorkingBB = CFG_GET_BB_BY_ID(VIR_Function_GetCFG(pFunc), VIR_IdList_GetId(pWorkingBBList, i));
+            pCurrentWorkingInst = BB_GET_START_INST(pCurrentWorkingBB);
+
+            bSameJmpBB = vscHTBL_DirectTestAndGet(pSameJmpBBSet, (void *)pCurrentWorkingBB, gcvNULL);
+
+            while (gcvTRUE)
+            {
+                /* We don't need to copy the initialized instructions. */
+                if (VIR_Inst_GetId(pCurrentWorkingInst) >= VIR_Inst_GetId(pContext->pInitializationStartInst)
+                    &&
+                    VIR_Inst_GetId(pCurrentWorkingInst) <= VIR_Inst_GetId(pContext->pInitializationEndInst))
+                {
+                    if (pCurrentWorkingInst == BB_GET_END_INST(pCurrentWorkingBB))
+                    {
+                        break;
+                    }
+
+                    pCurrentWorkingInst = VIR_Inst_GetNext(pCurrentWorkingInst);
+                    continue;
+                }
+
+                if ((pCurrentWorkingBB == pBB && pCurrentWorkingInst == pOrigBBEndInst)
+                    ||
+                    (pCurrentWorkingInst == BB_GET_END_INST(pCurrentWorkingBB)))
+                {
+                    bLastInst = gcvTRUE;
+                }
+                else
+                {
+                    bLastInst = gcvFALSE;
+                }
+
+                errCode = _vscVIR_DuplicateInstruction(pContext,
+                                                       bSameJmpBB,
+                                                       bLastInst,
+                                                       pCurrentWorkingInst,
+                                                       pNewEndInst,
+                                                       pTempSet,
+                                                       pLabelSet,
+                                                       pJmpSet,
+                                                       &pNewInst);
+                ON_ERROR(errCode, "Duplicate instruction");
+                pNewEndInst = pNewInst;
+
+                if (bLastInst)
+                {
+                    break;
+                }
+
+                pCurrentWorkingInst = VIR_Inst_GetNext(pCurrentWorkingInst);
+            }
+
+            if (bLastInst && bSameJmpBB)
+            {
+                VIR_OpCode      opCode = VIR_Inst_GetOpcode(pCurrentWorkingInst);
+
+                gcmASSERT(opCode == VIR_OP_NOP || VIR_OPCODE_isBranch(opCode) || opCode == VIR_OP_LABEL);
+
+                if (opCode == VIR_OP_NOP || VIR_OPCODE_isBranch(opCode))
+                {
+                    VIR_Function_ChangeInstToNop(pFunc, pCurrentWorkingInst);
+                }
+            }
+        }
+
+        ppNewStartInst[factorIndex] = pNewStartInst;
+        ppNewEndInst[factorIndex] = pNewEndInst;
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_vscVIR_CopyInstsAndRemapVariables(
+    IN VSC_CutDownWGS*      pContext
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VSC_MM*                 pMM = pContext->pMM;
+    VIR_Shader*             pShader = pContext->pShader;
+    VSC_HASH_TABLE*         pSameJmpBBSet = pContext->pSameJmpBBSet;
+    VIR_Function*           pFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_Instruction*        pInst = gcvNULL;
+    VIR_BASIC_BLOCK*        pBB;
+    VIR_BASIC_BLOCK*        pPrevBB;
+    VIR_IdList*             pWorkingBBList = gcvNULL;
+    gctBOOL                 bLastInst = gcvFALSE, bSameJmpBB = gcvFALSE;
+    gctUINT16               factorIndex, xFactor = pContext->xFactor;
+    VSC_HASH_ITERATOR       jmpInstIter;
+    VSC_DIRECT_HNODE_PAIR   jmpInstPair;
+
+    /* Create the  working List. */
+    VIR_IdList_Init(pMM, 8, &pWorkingBBList);
+
+    for (pInst = VIR_Function_GetInstStart(pFunc); pInst != gcvNULL; pInst = VIR_Inst_GetNext(pInst))
+    {
+        pBB = VIR_Inst_GetBasicBlock(pInst);
+        bLastInst = (BB_GET_END_INST(pBB) == VIR_Function_GetInstEnd(pFunc));
+        bSameJmpBB = vscHTBL_DirectTestAndGet(pSameJmpBBSet, (void *)pBB, gcvNULL);
+
+        if (bSameJmpBB)
+        {
+            /* Duplicate the existed BBs. */
+            if (VIR_IdList_Count(pWorkingBBList) > 0)
+            {
+                pPrevBB = CFG_GET_BB_BY_ID(VIR_Function_GetCFG(pFunc), VIR_IdList_GetId(pWorkingBBList, VIR_IdList_Count(pWorkingBBList) - 1));
+                errCode = _vscVIR_DuplicateBBs(pContext, pFunc, pPrevBB, pWorkingBBList);
+                ON_ERROR(errCode, "Duplicate basic blocks.");
+
+                pWorkingBBList->count = 0;
+            }
+
+            /* Duplicate this BB. */
+            VIR_IdList_Add(pWorkingBBList, BB_GET_ID(pBB));
+            errCode = _vscVIR_DuplicateBBs(pContext, pFunc, pBB, pWorkingBBList);
+            ON_ERROR(errCode, "Duplicate basic blocks.");
+
+            pWorkingBBList->count = 0;
+            if (bLastInst)
+            {
+                break;
+            }
+        }
+        else if (BB_FLAGS_HAS_BARRIER(pBB) || bLastInst)
+        {
+            if (!BB_FLAGS_HAS_BARRIER(pBB))
+            {
+                VIR_IdList_Add(pWorkingBBList, BB_GET_ID(pBB));
+            }
+            errCode = _vscVIR_DuplicateBBs(pContext, pFunc, pBB, pWorkingBBList);
+            ON_ERROR(errCode, "Duplicate basic blocks.");
+
+            pWorkingBBList->count = 0;
+            if (bLastInst)
+            {
+                break;
+            }
+        }
+        else
+        {
+            VIR_IdList_Add(pWorkingBBList, BB_GET_ID(pBB));
+        }
+
+        pInst = BB_GET_END_INST(pBB);
+    }
+
+    /* Update the label. */
+    for (factorIndex = 0; factorIndex < xFactor - 1; factorIndex++)
+    {
+        VSC_HASH_TABLE*     pLabelSet = pContext->ppLabelSet[factorIndex + 1];
+        VSC_HASH_TABLE*     pJmpSet = pContext->ppJmpSet[factorIndex + 1];
+        VIR_Label*          pLabel;
+        VIR_Link*           pLink;
+        VIR_Label*          pNewLabel = gcvNULL;
+
+        /* Clean the in/out of the BBs in the current loop. */
+        vscHTBLIterator_Init(&jmpInstIter, pJmpSet);
+        for (jmpInstPair = vscHTBLIterator_DirectFirst(&jmpInstIter);
+             IS_VALID_DIRECT_HNODE_PAIR(&jmpInstPair);
+             jmpInstPair = vscHTBLIterator_DirectNext(&jmpInstIter))
+        {
+            VIR_Instruction*pJmpInst = (VIR_Instruction *)VSC_DIRECT_HNODE_PAIR_FIRST(&jmpInstPair);
+            VIR_Function*   pFunc = VIR_Inst_GetFunction(pJmpInst);
+
+            gcmASSERT(VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(pJmpInst)));
+
+            pLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(pJmpInst));
+
+            if (vscHTBL_DirectTestAndGet(pLabelSet, (void *)(VIR_Function_GetSymFromId(pFunc, pLabel->sym)), (void **)(&pNewLabel)))
+            {
+                VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(pLabel), (gctUINTPTR_T)pJmpInst);
+
+                VIR_Operand_SetLabel(VIR_Inst_GetDest(pJmpInst), pNewLabel);
+                VIR_Function_NewLink(pFunc, &pLink);
+                VIR_Link_SetReference(pLink, (gctUINTPTR_T)pJmpInst);
+                VIR_Link_AddLink(VIR_Label_GetReferenceAddr(pNewLabel), pLink);
+            }
+        }
+    }
+
+OnError:
+    VIR_IdList_Finalize(pWorkingBBList);
+
+    return errCode;
+}
+
 DEF_SH_NECESSITY_CHECK(vscVIR_CutDownWorkGroupSize)
 {
     return gcvTRUE;
@@ -12303,20 +13658,75 @@ DEF_QUERY_PASS_PROP(vscVIR_CutDownWorkGroupSize)
 
     /* Only constant allocation is enable, we can check constant reg file read port limitation */
     pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_RA;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
 
     pPassProp->passFlag.resCreationReq.s.bNeedCg = gcvTRUE;
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
     pPassProp->passFlag.resCreationReq.s.bNeedWeb = gcvTRUE;
     pPassProp->passFlag.resCreationReq.s.bNeedLvFlow = gcvTRUE;
 
-    pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
+    /* We need to invalid cfg. */
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateCfg = gcvTRUE;
 }
 
 VSC_ErrCode vscVIR_CutDownWorkGroupSize(VSC_SH_PASS_WORKER* pPassWorker)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VSC_CutDownWGS      context;
+    VIR_Shader*         pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_DEF_USAGE_INFO* pDuInfo = pPassWorker->pDuInfo;
+    VSC_OPTN_LoopOptsOptions loopOptions;
 
+    memset(&loopOptions, 0, sizeof(VSC_OPTN_LoopOptsOptions));
+
+    VIR_Shader_RenumberInstId(pShader);
+
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "Before cut down workGroupSize.", pShader, gcvTRUE);
+    }
+
+    /* I: Initialize the working context. */
+    gcoOS_ZeroMemory(&context, gcmSIZEOF(VSC_CutDownWGS));
+    _vscVIR_InitializeCutDownWGS(&context,
+                                 pDuInfo,
+                                 pPassWorker->basePassWorker.pMM,
+                                 &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
+                                 pShader,
+                                 &loopOptions);
+
+    /* II: Cut down the workGroupSize. */
+    _vscVIR_CutDownWorkGroupSize(&context);
+
+    /* III: Move all BARRIERs to a single BB. */
+    errCode = _vscVIR_MoveBarrierOutOfBB(&context);
+    ON_ERROR(errCode, "Move BARRIERs out of BB.");
+
+    /* IV: Analyze multi-path with BARRIER. */
+    errCode = _vscVIR_AnalyzeMultiPathWithBarrier(&context);
+    ON_ERROR(errCode, "Analyze multi-path with BARRIER.");
+
+    /* V: Detect any BARRIERs within a loop. */
+    errCode = _vscVIR_DetectBarrierWithinLoop(&context);
+    ON_ERROR(errCode, "Detect BARRIER within the loop.");
+
+    /* VI: Re-caculate the builtin attributes. */
+    errCode = _vscVIR_RecalculateBuiltinAttributes(&context);
+    ON_ERROR(errCode, "Recalculate builtin attributes.");
+
+    /* VII: Copy instructions and remap all variables. */
+    errCode = _vscVIR_CopyInstsAndRemapVariables(&context);
+    ON_ERROR(errCode, "Copy instructions and remap variables.");
+
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "After cut down workGroupSize.", pShader, gcvTRUE);
+    }
+
+    VIR_Shader_RenumberInstId(pShader);
+
+OnError:
+    _vscVIR_FinalizeCutDownWGS(&context);
     return errCode;
 }
-
 

@@ -50,6 +50,7 @@ BEGIN_EXTERN_C()
 /* For OES. */
 #define _sldSharedVariableStorageBlockName  "#sh_sharedVar"
 #define _sldWorkGroupIdName                 "#sh_workgroupId"
+#define __INIT_VALUE_FOR_WORK_GROUP_INDEX__ 0x1234
 
 /* For OCL. */
 #define _sldLocalStorageAddressName         "#sh_local_address"

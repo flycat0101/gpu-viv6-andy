@@ -546,10 +546,6 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_OPCODE_isNonUniform(Opcode)         \
     ((Opcode) == VIR_OP_NONUNIFORM_ELECT)
 
-#define VIR_OPCODE_isBarrier(Opcode)            \
-    ((Opcode) == VIR_OP_BARRIER         ||      \
-     (Opcode) == VIR_OP_MEM_BARRIER)
-
 #define VIR_SymTable_MaxValidId(SymTable)   BT_GET_MAX_VALID_ID(SymTable)
 
 #define VIR_Function_GetLastInstId(Func)    ((Func)->_lastInstId)
@@ -5328,6 +5324,11 @@ VIR_Inst_GetEvisModiferOpnd(
 
 VSC_ErrCode
 VIR_Inst_UpdateResOpType(
+    IN VIR_Instruction     *pInst
+    );
+
+gctBOOL
+VIR_Inst_IsHWBarrier(
     IN VIR_Instruction     *pInst
     );
 

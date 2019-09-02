@@ -2170,9 +2170,11 @@ void _VIR_RA_LS_SetRegNoRange(
     VIR_RA_LS           *pRA,
     gctUINT             defIdx,
     gctUINT             firstRegNo,
-    gctUINT             regNoRange)
+    gctUINT             regNoRange,
+    gctBOOL             bFromDst)
 {
     VIR_RA_LS_Liverange     *pLR = _VIR_RA_LS_Def2LR(pRA, defIdx);
+
     if (pLR->firstRegNo > firstRegNo)
     {
         pLR->firstRegNo = firstRegNo;
@@ -2180,6 +2182,47 @@ void _VIR_RA_LS_SetRegNoRange(
     if (pLR->regNoRange < regNoRange)
     {
         pLR->regNoRange = regNoRange;
+    }
+
+    /*
+    ** We may generate some internal instructions whose DEST is a attribute(mostly we generate them to recalculate this attribute),
+    ** in this case, we need to copy the color from the attribute LR to the register LR.
+    */
+    if (bFromDst && pLR->colorFunc != VIR_RA_LS_ATTRIBUTE_FUNC)
+    {
+        VIR_Symbol*             pTempSym = gcvNULL;
+        VIR_Symbol*             pAttrSym = gcvNULL;
+        VIR_DEF_KEY             defKey;
+        gctUINT                 defIdx, webIdx;
+        VIR_RA_LS_Liverange*    pAttrLR = gcvNULL;
+        VIR_RA_HWReg_Color      hwColor;
+
+        pTempSym = VIR_Shader_FindSymbolByTempIndex(pRA->pShader, firstRegNo);
+
+        if (pTempSym &&
+            VIR_Symbol_GetVregVariable(pTempSym) &&
+            VIR_Symbol_isAttribute(VIR_Symbol_GetVregVariable(pTempSym)))
+        {
+            pLR->colorFunc = VIR_RA_LS_ATTRIBUTE_FUNC;
+
+            pAttrSym = VIR_Symbol_GetVregVariable(pTempSym);
+            defKey.pDefInst = VIR_INPUT_DEF_INST;
+            defKey.regNo = VIR_Symbol_GetVariableVregIndex(pAttrSym);
+            defKey.channel = VIR_CHANNEL_ANY;
+            defIdx = vscBT_HashSearch(&pRA->pLvInfo->pDuInfo->defTable, &defKey);
+
+            if (VIR_INVALID_DEF_INDEX != defIdx)
+            {
+                webIdx = _VIR_RA_LS_Def2Web(pRA, defIdx);
+                pAttrLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
+                hwColor = _VIR_RA_GetLRColor(pAttrLR);
+                if (!_VIR_RA_LS_IsInvalidLOWColor(hwColor))
+                {
+                    _VIR_RA_SetLRColor(pLR, _VIR_RA_Color_RegNo(hwColor), _VIR_RA_Color_Shift(hwColor));
+                    _VIR_RA_SetLRColorHI(pLR, _VIR_RA_Color_HIRegNo(hwColor), _VIR_RA_Color_HIShift(hwColor));
+                }
+            }
+        }
     }
 }
 
@@ -2959,7 +3002,7 @@ void _VIR_RA_LS_MarkDef(
                             }
                         }
 
-                        _VIR_RA_LS_SetRegNoRange(pRA, defIdx, firstRegNo, regNoRange);
+                        _VIR_RA_LS_SetRegNoRange(pRA, defIdx, firstRegNo, regNoRange, gcvTRUE);
 
                         _VIR_RA_LS_HandleMultiRegLR(pRA, pInst, defIdx);
 
@@ -3138,7 +3181,7 @@ void _VIR_RA_LS_MarkUse(
                 }
             }
 
-            _VIR_RA_LS_SetRegNoRange(pRA, defIdx, firstRegNo, regNoRange);
+            _VIR_RA_LS_SetRegNoRange(pRA, defIdx, firstRegNo, regNoRange, gcvFALSE);
             _VIR_RS_LS_MarkLRLive(pRA, defIdx, defEnableMask, posAfter, -1);
             _VIR_RS_LS_SetLiveLRVec(pRA, defIdx);
 
@@ -12226,13 +12269,20 @@ void _VIR_RA_LS_UpdateWorkgroupNum(
     VIR_Function    *mainFunc = VIR_Shader_GetMainFunction(pShader);
     VIR_InstIterator inst_iter;
     VIR_Instruction *inst;
-    gctBOOL         found = gcvFALSE;
+    gctUINT16       maxMatchCount = VIR_Shader_GetWorkGroupSizeFactor(pShader, 0), count = 0;
+
+    if (maxMatchCount == 0)
+    {
+        maxMatchCount = 1;
+    }
 
     VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(mainFunc));
     for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
         inst != gcvNULL;
         inst = (VIR_Instruction *)VIR_InstIterator_Next(&inst_iter))
     {
+        gctBOOL     bMatch = gcvFALSE;
+
         if (VIR_Inst_GetOpcode(inst) == VIR_OP_IMOD)
         {
             VIR_Operand *dest = VIR_Inst_GetDest(inst);
@@ -12242,22 +12292,41 @@ void _VIR_RA_LS_UpdateWorkgroupNum(
             {
                 gctSTRING name = VIR_Shader_GetSymNameString(pShader, sym);
 
-                if (strcmp(name, _sldWorkGroupIdName) == 0)
+                if (gcoOS_StrNCmp(name, _sldWorkGroupIdName, sizeof(_sldWorkGroupIdName)) == 0)
                 {
-                    found = gcvTRUE;
+                    bMatch = gcvTRUE;
                 }
             }
 
-            if (found)
+            if (!bMatch && VIR_Operand_isImm(VIR_Inst_GetSource(inst, 1)))
+            {
+                gctUINT specialValue = VIR_Operand_GetImmediateUint(VIR_Inst_GetSource(inst, 1));
+
+                if (specialValue == __INIT_VALUE_FOR_WORK_GROUP_INDEX__)
+                {
+                    bMatch = gcvTRUE;
+                }
+            }
+
+            if (bMatch)
             {
                 VIR_Operand_SetImmediateInt(VIR_Inst_GetSource(inst, 1), numWorkGroup);
-                break;
+                count++;
+
+                if (count == maxMatchCount)
+                {
+                    break;
+                }
             }
         }
     }
 
-    if (!found)
+    if (count != maxMatchCount)
     {
+        if (count != 0 && maxMatchCount != 1)
+        {
+            gcmASSERT(gcvFALSE);
+        }
         /* If the shared variable is not used in the shader, we could not find the
         mod instruction to change */
     }
