@@ -4082,7 +4082,7 @@ VX_INTERNAL_API vx_status vxoGraph_AllocateContiguousMemory(vx_graph graph)
     SumTotalKernelBufferSize = context->SumTotalKernelBufferSize;
     for (i = 0; i < graph->layer->base.num_operations; i++)
     {
-        if (gcmIS_SUCCESS((gcoVX_AllocateMemoryExAddAllocflag(&SumTotalKernelBufferSize, gcvSURF_VERTEX, 64, gcvALLOC_FLAG_CONTIGUOUS, context->Physical, context->Logical, (vx_uint32 *)&CpuPhysicalAddr, context->Node))))
+        if (gcmIS_SUCCESS((gcoVX_AllocateMemoryExAddAllocflag(&SumTotalKernelBufferSize, gcvSURF_VERTEX, 64, gcvALLOC_FLAG_CONTIGUOUS, context->Physical, (vx_ptr_ptr)context->Logical, (vx_uint32 *)&CpuPhysicalAddr, context->Node))))
         {
             gcoOS_ZeroMemory(*context->Logical, SumTotalKernelBufferSize);
             context->CurrentContigousSize = SumTotalKernelBufferSize;

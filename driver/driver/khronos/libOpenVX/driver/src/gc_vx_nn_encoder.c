@@ -14559,11 +14559,11 @@ vx_bool WeightBiasBufferAllocate(
         if (context->CurrentContigousSize >= size)
         {
             memory->physicals[0] = *context->Physical;
-            *context->Physical += size;
+            *context->Physical += (vx_uint32)size;
             memory->logicals[0] = (vx_uint8_ptr)(*context->Logical);
             (*context->Logical) = (*context->Logical) + size;
             memory->allocType = VXNNE_MEM_POOL_TYPE_ORIG_DDR;
-            context->CurrentContigousSize -= size;
+            context->CurrentContigousSize -= (vx_uint32)size;
             if (!vxCreateMutex(OUT &memory->writeLocks[0]))
             {
                 memory->writeLocks[0] = VX_NULL;
