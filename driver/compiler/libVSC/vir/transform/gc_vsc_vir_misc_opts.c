@@ -12893,25 +12893,26 @@ _vscVIR_DetectBarrierWithinLoop(
 
     /* Initialize and detect all LOOPs. */
     VIR_LoopOpts_NewLoopInfoMgr(pLoopOpts);
-    VIR_LoopOpts_DetectNaturalLoops(pLoopOpts);
-
-    /* Compute the loop body and some other information, we need to call these after add a new loopInfo. */
-    VIR_LoopOpts_ComputeLoopBodies(pLoopOpts);
-    VIR_LoopOpts_ComputeLoopTree(pLoopOpts);
-    VIR_LoopOpts_IdentifyBreakContinues(pLoopOpts);
-
-    /*
-    ** Find all loops with BARRIER, please note that if a child loop has BARRIER but the parent loop has no BARRIR,
-    ** only record the child loop.
-    */
-    pLoopInfoMgr = VIR_LoopOpts_GetLoopInfoMgr(pLoopOpts);
-    vscULIterator_Init(&iter, VIR_LoopInfoMgr_GetLoopInfos(pLoopInfoMgr));
-    for (pLoopInfo = (VIR_LoopInfo*)vscULIterator_First(&iter);
-         pLoopInfo != gcvNULL;
-         pLoopInfo = (VIR_LoopInfo*)vscULIterator_Next(&iter))
+    if (VIR_LoopOpts_DetectNaturalLoops(pLoopOpts))
     {
-        errCode = vscVIR_DetectSingleLoopInfo(pContext, pLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet);
-        ON_ERROR(errCode, "Detect single loop info.");
+        /* Compute the loop body and some other information, we need to call these after add a new loopInfo. */
+        VIR_LoopOpts_ComputeLoopBodies(pLoopOpts);
+        VIR_LoopOpts_ComputeLoopTree(pLoopOpts);
+        VIR_LoopOpts_IdentifyBreakContinues(pLoopOpts);
+
+        /*
+        ** Find all loops with BARRIER, please note that if a child loop has BARRIER but the parent loop has no BARRIR,
+        ** only record the child loop.
+        */
+        pLoopInfoMgr = VIR_LoopOpts_GetLoopInfoMgr(pLoopOpts);
+        vscULIterator_Init(&iter, VIR_LoopInfoMgr_GetLoopInfos(pLoopInfoMgr));
+        for (pLoopInfo = (VIR_LoopInfo*)vscULIterator_First(&iter);
+             pLoopInfo != gcvNULL;
+             pLoopInfo = (VIR_LoopInfo*)vscULIterator_Next(&iter))
+        {
+            errCode = vscVIR_DetectSingleLoopInfo(pContext, pLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet);
+            ON_ERROR(errCode, "Detect single loop info.");
+        }
     }
 
 OnError:
