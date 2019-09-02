@@ -9370,11 +9370,13 @@ IN cluCONSTANT_VALUE *ToValues
 
      case clvTYPE_FLOAT:
      case clvTYPE_HALF_PACKED:
+     case clvTYPE_HALF:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].floatValue = SourceValues[i].floatValue;
         }
         break;
-default:
+
+     default:
         gcmASSERT(0);
         return gcvSTATUS_INVALID_ARGUMENT;
      }
