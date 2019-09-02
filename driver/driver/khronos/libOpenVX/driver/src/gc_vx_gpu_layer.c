@@ -1305,6 +1305,21 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 goto OnError;
             }
         }
+        else if (inputFormat == VX_TYPE_INT16)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant16", borderMode);
+            if (!shaderExecutable)
+            {
+                goto OnError;
+            }
+
+            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 10);
+
+            if (status != VX_SUCCESS)
+            {
+                goto OnError;
+            }
+        }
     }
 
     if (enable_K1S1)
@@ -1891,6 +1906,56 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
         }
 
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 9);
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if(inputFormat == VX_TYPE_INT16)
+    {
+        vx_int8   srcFixedPointPos  = TENSOR_POS(input);
+        vx_int8   weiFixedPointPos  = TENSOR_POS(weights);
+        vx_int8   dstFixedPointPos  = TENSOR_POS(output);
+        vx_int32  postshift         = 0;
+        vx_float32   in_scale       = 0;
+
+        vx_reference parameters[6] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)cycle,
+                     (vx_reference)NULL, (vx_reference)output};
+
+        postshift = postshift - srcFixedPointPos;
+        postshift = postshift - weiFixedPointPos;
+        postshift = postshift + dstFixedPointPos;
+
+        if (postshift < 0)
+        {
+            in_scale = 1.0f / (vx_float32) (1 << -postshift);
+        }
+        else
+        {
+            in_scale = (vx_float32) (1 << postshift);
+        }
+
+        scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &in_scale);
+        parameters[4] = (vx_reference)scaleIn;
+
+        if (enable_adjust_biases)
+        {
+            if (enable_2d_img)
+            {
+                parameters[0]  = (vx_reference)inputs;
+                parameters[5]  = (vx_reference)outputs;
+
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant16_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant16", borderMode);
+            }
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant16_non_static", borderMode);
+        }
+        if (!shaderExecutable) goto OnError;
+
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 6);
         if (status != VX_SUCCESS) goto OnError;
     }
 
@@ -2689,6 +2754,8 @@ vxnne_shader_executable vxnneGetGPUSpace2DepthShaderExecutable(
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
     if (!((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+       || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+       || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
        || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
        || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32))
         )
@@ -2799,7 +2866,7 @@ vxnne_shader_executable vxnneGetGPUSpace2DepthShaderExecutable(
     {
         if (stride->value->u32 == 2)
         {
-            vx_reference  parameters[3] = {(vx_reference)input, (vx_reference)output};
+            vx_reference  parameters[2] = {(vx_reference)input, (vx_reference)output};
 
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Space2DepthFP32Block2", borderMode);
             if (!shaderExecutable) goto OnError;
@@ -2816,6 +2883,60 @@ vxnne_shader_executable vxnneGetGPUSpace2DepthShaderExecutable(
 
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
             if (status != VX_SUCCESS) goto OnError;
+        }
+    }
+    else if ((inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
+            || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16))
+    {
+        vx_int8   srcFixedPointPos  = TENSOR_POS(input);
+        vx_int8   dstFixedPointPos  = TENSOR_POS(output);
+        vx_int32  postshift         = 0;
+        vx_float32   in_scale       = 0;
+
+        postshift = postshift - srcFixedPointPos;
+        postshift = postshift + dstFixedPointPos;
+
+        if (postshift < 0)
+        {
+            in_scale = 1.0f / (vx_float32) (1 << -postshift);
+        }
+        else
+        {
+            in_scale = (vx_float32) (1 << postshift);
+        }
+        scale = vxCreateScalar(context, VX_TYPE_FLOAT32, &in_scale);
+
+        if (stride->value->u32 == 2)
+        {
+            vx_reference  parameters[3] = {(vx_reference)input, (vx_reference)scale, (vx_reference)output};
+
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Space2DepthQuant16Block2", borderMode);
+            if (!shaderExecutable)
+            {
+                goto OnError;
+            }
+
+            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
+            if (status != VX_SUCCESS)
+            {
+                goto OnError;
+            }
+        }
+        else
+        {
+            vx_reference  parameters[4] = {(vx_reference)input, (vx_reference)stride, (vx_reference)scale, (vx_reference)output};
+
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Space2DepthQuant16", borderMode);
+            if (!shaderExecutable)
+            {
+                goto OnError;
+            }
+
+            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+            if (status != VX_SUCCESS)
+            {
+                goto OnError;
+            }
         }
     }
 
@@ -5996,6 +6117,137 @@ vxnne_shader_executable vxnneGetGPUTensorElewiseShaderExecutable(
         else
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+
+            if (!shaderExecutable)
+            {
+                goto OnError;
+            }
+        }
+
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paramNum);
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if ((input0_format == VX_TYPE_INT8 && input1_format == VX_TYPE_INT8)
+            ||(input0_format == VX_TYPE_INT16 && input1_format == VX_TYPE_INT16))
+    {
+        vx_int8   srcFixedPointPos0 = TENSOR_POS(input0);
+        vx_int8   srcFixedPointPos1 = TENSOR_POS(input1);
+        vx_int8   dstFixedPointPos  = TENSOR_POS(output);
+        vx_float32   in_scale0      = 0;
+        vx_float32   in_scale1      = 0;
+        vx_float32   out_scale      = 0;
+
+        if (srcFixedPointPos0 >= 0)
+        {
+            in_scale0    = 1.0f / (vx_float32) (1 << srcFixedPointPos0);
+        }
+        else if (srcFixedPointPos0 < 0)
+        {
+            in_scale0    = (vx_float32)(1 << -srcFixedPointPos0);
+        }
+
+        if (srcFixedPointPos1 >= 0)
+        {
+            in_scale1    = 1.0f / (vx_float32) (1 << srcFixedPointPos1);
+        }
+        else if (srcFixedPointPos1 < 0)
+        {
+            in_scale1    = (vx_float32)(1 << -srcFixedPointPos1);
+        }
+
+        if (dstFixedPointPos >= 0)
+        {
+            out_scale = (vx_float32) (1 << dstFixedPointPos);
+        }
+        else if (dstFixedPointPos < 0)
+        {
+            out_scale = 1.0f / (vx_float32) (1 << -dstFixedPointPos);
+        }
+
+        scaleOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &out_scale);
+        scaleIn0 = vxCreateScalar(context, VX_TYPE_FLOAT32, &in_scale0);
+        scaleIn1 = vxCreateScalar(context, VX_TYPE_FLOAT32, &in_scale1);
+
+        parameters[paramNum++] = (vx_reference)scaleIn0;
+        parameters[paramNum++] = (vx_reference)scaleIn1;
+        parameters[paramNum++] = (vx_reference)scaleOut;
+        if (useImage2DFlag)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant16_2D_4X", borderMode);
+            if (!shaderExecutable)
+            {
+                goto OnError;
+            }
+
+            status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (status != VX_SUCCESS) goto OnError;
+
+            execution_parameters.globalWorkScale[0] = 4;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant16", borderMode);
+
+            if (!shaderExecutable)
+            {
+                goto OnError;
+            }
+        }
+
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paramNum);
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if ((input0_format == VX_TYPE_INT8 && input1_format == VX_TYPE_FLOAT16)
+            ||(input0_format == VX_TYPE_INT16 && input1_format == VX_TYPE_FLOAT16))
+    {
+        vx_int8   srcFixedPointPos0 = TENSOR_POS(input0);
+        vx_int8   dstFixedPointPos  = TENSOR_POS(output);
+        vx_float32   in_scale0      = 0;
+        vx_float32   out_scale      = 0;
+
+        if (srcFixedPointPos0 >= 0)
+        {
+            in_scale0    = 1.0f / (vx_float32) (1 << srcFixedPointPos0);
+        }
+        else if (srcFixedPointPos0 < 0)
+        {
+            in_scale0    = (vx_float32)(1 << -srcFixedPointPos0);
+        }
+
+        if (dstFixedPointPos >= 0)
+        {
+            out_scale = (vx_float32) (1 << dstFixedPointPos);
+        }
+        else if (dstFixedPointPos < 0)
+        {
+            out_scale = 1.0f / (vx_float32) (1 << -dstFixedPointPos);
+        }
+
+        scaleIn0 = vxCreateScalar(context, VX_TYPE_FLOAT32, &in_scale0);
+        scaleOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &out_scale);
+
+        parameters[paramNum++] = (vx_reference)scaleIn0;
+        parameters[paramNum++] = (vx_reference)scaleOut;
+        if (useImage2DFlag)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant16Fp16_2D_4X", borderMode);
+            if (!shaderExecutable)
+            {
+                goto OnError;
+            }
+
+            status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (status != VX_SUCCESS) goto OnError;
+
+            execution_parameters.globalWorkScale[0] = 4;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant16Fp16", borderMode);
 
             if (!shaderExecutable)
             {

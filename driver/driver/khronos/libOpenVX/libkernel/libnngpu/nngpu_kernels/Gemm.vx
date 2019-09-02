@@ -1294,3 +1294,123 @@ __kernel void gpuGemm_Quant32_2D_4S
     coord.y ++;
     write_imageui(output, coord.zy, dst.wwww);
 }
+
+__kernel void gpuGemm_Quant16_non_static
+    (
+    image2d_array_t input,
+    image2d_t weights,
+    image2d_t bias,
+    int input_width,
+    float int16Scale,
+    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in = (int4)(0, y, x, 0);
+    int4 coord = (int4)(0, z, 0, 0);
+    float4 sum = {0.0}, inPixel= {0.0}, wPixel= {0.0};
+    int4 dst = {0}, tmp0, tmp1;
+    int4 biasData;
+
+    biasData = convert_int(read_imagei(bias, coord.yw));
+    sum.x = biasData.x;
+
+    do
+    {
+        tmp1 = read_imagei(weights, coord.xy);
+        tmp0 = read_imagei(input, coord_in.xzyw);
+
+        coord_in.x += 1;
+        coord.x += 1;
+
+        wPixel.x = (convert_int(tmp1.x));
+        inPixel.x = (convert_int(tmp0.x));
+
+        sum += (inPixel * wPixel);
+    } while (coord_in.x < input_width);
+
+    dst.x = floor(sum.x * int16Scale + 0.5f);
+    write_imagei(output, (int4)(x, y, z, 0), dst);
+}
+
+__kernel void gpuGemm_Quant16
+    (
+    image2d_array_t input,
+    image2d_t weights,
+    image2d_t bias,
+    int input_width,
+    float int16Scale,
+    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in = (int4)(0, y, x, 0);
+    int4 coord = (int4)(0, z, 0, 0);
+    float4 inPixel, wPixel;
+    float sum;
+    int4 dst = {0}, tmp0, tmp1;
+    int4 biasData;
+
+    biasData = convert_int(read_imagei(bias, coord.yw));
+    sum = biasData.x;
+
+    do
+    {
+        tmp1 = read_imagei(weights, coord.xy);
+        tmp0 = read_imagei(input, coord_in.xzyw);
+
+        coord_in.x += 4;
+        coord.x += 4;
+
+        wPixel = convert_float4(tmp1);
+        inPixel = convert_float4(tmp0);
+
+        sum += dot(inPixel, wPixel);
+    } while (coord.x < input_width);
+
+    dst.x = floor(sum * int16Scale + 0.5f);
+    write_imagei(output, (int4)(x, y, z, 0), dst);
+}
+
+__kernel void gpuGemm_Quant16_2D
+    (
+    image2d_t input,
+    image2d_t weights,
+    image2d_t bias,
+    int input_width,
+    float int16Scale,
+    image2d_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(0, y, x, x);
+    float4 inPixel, wPixel;
+    float sum;
+    int4 dst = {0}, tmp0, tmp1;
+    int4 biasData;
+
+    biasData = convert_int(read_imagei(bias, coord.yx));
+    sum = biasData.x;
+
+    do
+    {
+        tmp1 = read_imagei(weights, coord.xy);
+        tmp0 = read_imagei(input, coord.xz);
+
+        coord.x += 4;
+
+        wPixel = convert_float4(tmp1);
+        inPixel = convert_float4(tmp0);
+
+        sum += dot(inPixel, wPixel);
+    } while (coord.x < input_width);
+
+    dst.x = floor(sum * int16Scale + 0.5f);
+    write_imagei(output, coord.wy, dst);
+}

@@ -62,6 +62,38 @@ __kernel void gpuTensor2Row_Quant8
     } while (yy < yRange);
 }
 
+__kernel void gpuTensor2Row_Quant16
+    (
+    image2d_array_t input, int strideX, int strideY, int padX, int padY, int kernelX, int kernelY,
+    int dilateX, int dilateY, image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int xx = 0, yy = 0;
+    int4 pixel;
+    int xRange = kernelX * dilateX;
+    int yRange = kernelY * dilateY;
+    int4 coord = (int4)(kernelX * kernelY * z, x, y, 0);
+    int4 coord_in = (int4)(x * strideX - padX, y * strideY - padY, z, 0);
+    int4 coord_in0 = coord_in;
+
+    do
+    {
+        do
+        {
+            coord_in0.xy = coord_in.xy + (int2)(xx, yy);
+            pixel = read_imagei(input, coord_in0);
+            write_imagei(output, coord, pixel);
+            coord.x ++;
+            xx += dilateX;
+        } while (xx < xRange);
+        yy += dilateY;
+        xx = 0;
+    } while (yy < yRange);
+}
+
 __kernel void gpuTensor2Row_8Bits_K1S1
     (
     __read_only  image2d_t input,

@@ -76,6 +76,108 @@ __kernel void gpuTensorAdd_Quant8_2D_4X
     write_imageui(output, coord, dst);
 }
 
+__kernel void gpuTensorAdd_Quant16
+    (
+    __read_only     image2d_array_t input0,
+    __read_only     image2d_array_t input1,
+    __write_only     image2d_array_t output,
+    float                            scaleIn0,
+    float                            scaleIn1,
+    float                            scaleOut
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    int4 src0, src1, dst = {0.0};
+    float inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    inPixel0 = src0.x*scaleIn0;
+    src1 = read_imagei(input1, coord);
+    inPixel1 = src1.x*scaleIn1;
+    outPixel = inPixel0 + inPixel1;
+    dst.x = floor(outPixel*scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
+__kernel void gpuTensorAdd_Quant16_2D_4X
+    (
+    __read_only     image2d_t input0,
+    __read_only     image2d_t input1,
+    __write_only    image2d_t output,
+    float           scaleIn0,
+    float           scaleIn1,
+    float           scaleOut
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    int4 src0, src1, dst = {0.0};
+    float4 inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    src1 = read_imagei(input1, coord);
+
+    inPixel0 = convert_float4(src0) * scaleIn0;
+    inPixel1 = convert_float4(src1) * scaleIn1;
+
+    outPixel = inPixel0 + inPixel1;
+
+    dst = convert_int4(outPixel * scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
+__kernel void gpuTensorAdd_Quant16Fp16
+    (
+    __read_only     image2d_array_t input0,
+    __read_only     image2d_array_t input1,
+    __write_only     image2d_array_t output,
+    float                            scaleIn0,
+    float                            scaleOut
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    int4 src0, dst = {0.0};
+    float4 src1;
+    float inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    inPixel0 = src0.x*scaleIn0;
+    src1 = read_imagef(input1, coord);
+    inPixel1 = src1.x;
+    outPixel = inPixel0 + inPixel1;
+    dst.x = floor(outPixel*scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
+__kernel void gpuTensorAdd_Quant16Fp16_2D_4X
+    (
+    __read_only     image2d_t input0,
+    __read_only     image2d_t input1,
+    __write_only    image2d_t output,
+    float           scaleIn0,
+    float           scaleOut
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    int4 src0, dst = {0.0};
+    float4 inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    inPixel1 = read_imagef(input1, coord);
+
+    inPixel0 = convert_float4(src0) * scaleIn0;
+
+    outPixel = inPixel0 + inPixel1;
+
+    dst = convert_int4(outPixel * scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
 /*tensor sub*/
 __kernel void gpuTensorSub_FP32
     (
@@ -123,6 +225,108 @@ __kernel void gpuTensorSub_Quant8
     outPixel = inPixel0 - inPixel1;
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
     write_imageui(output, coord, dst);
+}
+
+__kernel void gpuTensorSub_Quant16
+    (
+    __read_only     image2d_array_t input0,
+    __read_only     image2d_array_t input1,
+    __write_only     image2d_array_t output,
+    float                            scaleIn0,
+    float                            scaleIn1,
+    float                            scaleOut
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    int4 src0, src1, dst = {0.0};
+    float inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    inPixel0 = src0.x*scaleIn0;
+    src1 = read_imagei(input1, coord);
+    inPixel1 = src1.x*scaleIn1;
+    outPixel = inPixel0 - inPixel1;
+    dst.x = floor(outPixel*scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
+__kernel void gpuTensorSub_Quant16_2D_4X
+    (
+    __read_only     image2d_t input0,
+    __read_only     image2d_t input1,
+    __write_only    image2d_t output,
+    float           scaleIn0,
+    float           scaleIn1,
+    float           scaleOut
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    int4 src0, src1, dst = {0.0};
+    float4 inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    src1 = read_imagei(input1, coord);
+
+    inPixel0 = convert_float4(src0) * scaleIn0;
+    inPixel1 = convert_float4(src1) * scaleIn1;
+
+    outPixel = inPixel0 - inPixel1;
+
+    dst = convert_int4(outPixel * scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
+__kernel void gpuTensorSub_Quant16Fp16
+    (
+    __read_only     image2d_array_t input0,
+    __read_only     image2d_array_t input1,
+    __write_only     image2d_array_t output,
+    float                            scaleIn0,
+    float                            scaleOut
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    int4 src0, dst = {0.0};
+    float4 src1;
+    float inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    inPixel0 = src0.x*scaleIn0;
+    src1 = read_imagef(input1, coord);
+    inPixel1 = src1.x;
+    outPixel = inPixel0 - inPixel1;
+    dst.x = floor(outPixel*scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
+__kernel void gpuTensorSub_Quant16Fp16_2D_4X
+    (
+    __read_only     image2d_t input0,
+    __read_only     image2d_t input1,
+    __write_only    image2d_t output,
+    float           scaleIn0,
+    float           scaleOut
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    int4 src0, dst = {0.0};
+    float4 inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    inPixel1 = read_imagef(input1, coord);
+
+    inPixel0 = convert_float4(src0) * scaleIn0;
+
+    outPixel = inPixel0 - inPixel1;
+
+    dst = convert_int4(outPixel * scaleOut + 0.5);
+    write_imagei(output, coord, dst);
 }
 
 /*tensor mul*/
@@ -174,6 +378,108 @@ __kernel void gpuTensorMul_Quant8
     write_imageui(output, coord, dst);
 }
 
+__kernel void gpuTensorMul_Quant16
+    (
+    __read_only     image2d_array_t input0,
+    __read_only     image2d_array_t input1,
+    __write_only     image2d_array_t output,
+    float                            scaleIn0,
+    float                            scaleIn1,
+    float                            scaleOut
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    int4 src0, src1, dst = {0.0};
+    float inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    inPixel0 = src0.x*scaleIn0;
+    src1 = read_imagei(input1, coord);
+    inPixel1 = src1.x*scaleIn1;
+    outPixel = inPixel0 * inPixel1;
+    dst.x = floor(outPixel*scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
+__kernel void gpuTensorMul_Quant16_2D_4X
+    (
+    __read_only     image2d_t input0,
+    __read_only     image2d_t input1,
+    __write_only    image2d_t output,
+    float           scaleIn0,
+    float           scaleIn1,
+    float           scaleOut
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    int4 src0, src1, dst = {0.0};
+    float4 inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    src1 = read_imagei(input1, coord);
+
+    inPixel0 = convert_float4(src0) * scaleIn0;
+    inPixel1 = convert_float4(src1) * scaleIn1;
+
+    outPixel = inPixel0 * inPixel1;
+
+    dst = convert_int4(outPixel * scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
+__kernel void gpuTensorMul_Quant16Fp16
+    (
+    __read_only     image2d_array_t input0,
+    __read_only     image2d_array_t input1,
+    __write_only     image2d_array_t output,
+    float                            scaleIn0,
+    float                            scaleOut
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    int4 src0, dst = {0.0};
+    float4 src1;
+    float inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    inPixel0 = src0.x*scaleIn0;
+    src1 = read_imagef(input1, coord);
+    inPixel1 = src1.x;
+    outPixel = inPixel0 * inPixel1;
+    dst.x = floor(outPixel*scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
+__kernel void gpuTensorMul_Quant16Fp16_2D_4X
+    (
+    __read_only     image2d_t input0,
+    __read_only     image2d_t input1,
+    __write_only    image2d_t output,
+    float           scaleIn0,
+    float           scaleOut
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    int4 src0, dst = {0.0};
+    float4 inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    inPixel1 = read_imagef(input1, coord);
+
+    inPixel0 = convert_float4(src0) * scaleIn0;
+
+    outPixel = inPixel0 * inPixel1;
+
+    dst = convert_int4(outPixel * scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
 /*tensor div*/
 __kernel void gpuTensorDiv_FP32
     (
@@ -221,4 +527,106 @@ __kernel void gpuTensorDiv_Quant8
     outPixel = inPixel0 / inPixel1;
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
     write_imageui(output, coord, dst);
+}
+
+__kernel void gpuTensorDiv_Quant16
+    (
+    __read_only     image2d_array_t input0,
+    __read_only     image2d_array_t input1,
+    __write_only     image2d_array_t output,
+    float                            scaleIn0,
+    float                            scaleIn1,
+    float                            scaleOut
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    int4 src0, src1, dst = {0.0};
+    float inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    inPixel0 = src0.x*scaleIn0;
+    src1 = read_imagei(input1, coord);
+    inPixel1 = src1.x*scaleIn1;
+    outPixel = inPixel0 / inPixel1;
+    dst.x = floor(outPixel*scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
+__kernel void gpuTensorDiv_Quant16_2D_4X
+    (
+    __read_only     image2d_t input0,
+    __read_only     image2d_t input1,
+    __write_only    image2d_t output,
+    float           scaleIn0,
+    float           scaleIn1,
+    float           scaleOut
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    int4 src0, src1, dst = {0.0};
+    float4 inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    src1 = read_imagei(input1, coord);
+
+    inPixel0 = convert_float4(src0) * scaleIn0;
+    inPixel1 = convert_float4(src1) * scaleIn1;
+
+    outPixel = inPixel0 / inPixel1;
+
+    dst = convert_int4(outPixel * scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
+__kernel void gpuTensorDiv_Quant16Fp16
+    (
+    __read_only     image2d_array_t input0,
+    __read_only     image2d_array_t input1,
+    __write_only     image2d_array_t output,
+    float                            scaleIn0,
+    float                            scaleOut
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    int4 src0, dst = {0.0};
+    float4 src1;
+    float inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    inPixel0 = src0.x*scaleIn0;
+    src1 = read_imagef(input1, coord);
+    inPixel1 = src1.x;
+    outPixel = inPixel0 / inPixel1;
+    dst.x = floor(outPixel*scaleOut + 0.5);
+    write_imagei(output, coord, dst);
+}
+
+__kernel void gpuTensorDiv_Quant16Fp16_2D_4X
+    (
+    __read_only     image2d_t input0,
+    __read_only     image2d_t input1,
+    __write_only    image2d_t output,
+    float           scaleIn0,
+    float           scaleOut
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    int4 src0, dst = {0.0};
+    float4 inPixel0, inPixel1, outPixel;
+
+    src0 = read_imagei(input0, coord);
+    inPixel1 = read_imagef(input1, coord);
+
+    inPixel0 = convert_float4(src0) * scaleIn0;
+
+    outPixel = inPixel0 / inPixel1;
+
+    dst = convert_int4(outPixel * scaleOut + 0.5);
+    write_imagei(output, coord, dst);
 }
