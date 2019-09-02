@@ -15,6 +15,7 @@
 #include <gc_vx_nn_util.h>
 
 #define _GC_OBJ_ZONE            gcdZONE_VX_GRAPH
+#define QUANT_BIT_WIDTH         (8)
 
 static vx_uint32 optPhase = 1;
 
@@ -2435,6 +2436,43 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertBatchFCtoConv(vx_graph gra
     return VX_SUCCESS;
 }
 
+VX_INTERNAL_API vx_status vxoGraphOptimization_computeQuantAttribute(vx_enum quantType, vx_float32 maxValue, vx_float32 minValue,
+                                                                 vx_int8 *fixedPointPos, vx_int32 *zeroPoint, vx_float32 * scale)
+{
+    vx_float32 local_scale = 0;
+    vx_int32 local_zp = 0;
+    vx_int8 local_pos = 0;
+
+    if(quantType == VX_QUANT_AFFINE_SCALE)
+    {
+        vx_uint32 drange = 255;
+        maxValue = max(maxValue, 0);
+        minValue = min(minValue, 0);
+        local_scale = (maxValue - minValue)/drange;
+        local_zp    = min(255, max(0, (vx_int32)roundRTZ(0 - minValue/ *scale)));
+    }
+    else if(quantType == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        minValue = (vx_float32)fabs(minValue);
+        maxValue = max(maxValue, minValue);
+        if(maxValue <= 0.0)
+        {
+            vxInfo("can not compute quant attribute");
+            return VX_ERROR_INVALID_PARAMETERS;
+        }
+        local_pos= (vx_int8) gcmMIN(12, QUANT_BIT_WIDTH - ceilf((float)gcoMATH_Log2(maxValue) + 1));
+    }
+
+    if(fixedPointPos)
+        *fixedPointPos = local_pos;
+    if(zeroPoint)
+        *zeroPoint = local_zp;
+    if(scale)
+        *scale = local_scale;
+
+    return VX_SUCCESS;
+}
+
 VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(vx_tensor input, vx_uint32 weight_dims[4])
 {
     vx_uint32   i = 0;
@@ -2442,7 +2480,8 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
     vx_tensor   weight = VX_NULL;
     vx_uint32   weight_size = weight_dims[0] * weight_dims[1] * weight_dims[2];
     vx_int16    quantizedData = 0;
-    vx_float32 fill_data = 1.0f / (weight_dims[0]* weight_dims[1]);
+    vx_uint32   square = weight_dims[0] * weight_dims[1];
+    vx_float32  fill_data = 1.0f / square;
 
     vx_context context = vxGetContext((vx_reference)input);
 
@@ -2454,31 +2493,14 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
     parm.sizes = weight_dims;
     parm.quant_format = TENSOR_QUANT_TYPE(input);
 
-    if(TENSOR_DATA_TYPE(input) == VX_TYPE_UINT8 || TENSOR_DATA_TYPE(input) == VX_TYPE_UINT16)
+    if((square & (square - 1) ) == 0 && VX_QUANT_DYNAMIC_FIXED_POINT == TENSOR_QUANT_TYPE(input))
     {
-        parm.quant_format = VX_QUANT_AFFINE_SCALE;
-        parm.quant_data.affine.scale = (fill_data/255.0f);
-        parm.quant_data.affine.zeroPoint = 0;
-    }
-    else if(TENSOR_DATA_TYPE(input) == VX_TYPE_INT8 || TENSOR_DATA_TYPE(input) == VX_TYPE_INT16)
-    {
-        vx_uint32 square = weight_dims[0] * weight_dims[1];
-        parm.quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
-
-        if((square & (square - 1) ) == 0)
-            parm.quant_data.dfp.fixed_point_pos = -1 * (vx_int8)gcoMATH_Log2(fill_data);
-        else
-            parm.quant_data.dfp.fixed_point_pos = (vx_int8) gcmMIN(12, 8 - ceilf((float)gcoMATH_Log2(fill_data) + 1));
-    }
-    else if(TENSOR_DATA_TYPE(input) == VX_TYPE_FLOAT16 || TENSOR_DATA_TYPE(input) == VX_TYPE_FLOAT16)
-    {
-        parm.quant_format = 0;
-        parm.quant_data.dfp.fixed_point_pos = 0;
+        parm.quant_data.dfp.fixed_point_pos = -1 * (vx_int8)gcoMATH_Log2(fill_data);
     }
     else
     {
-        vxError("unknwon data type for avgPool2Conv\n");
-        assert(0);
+        vxoGraphOptimization_computeQuantAttribute(VX_QUANT_AFFINE_SCALE, fill_data, 0,
+            &parm.quant_data.dfp.fixed_point_pos, &parm.quant_data.affine.zeroPoint, &parm.quant_data.affine.scale);
     }
 
     weight = vxCreateTensor2(context, &parm, sizeof(parm));
