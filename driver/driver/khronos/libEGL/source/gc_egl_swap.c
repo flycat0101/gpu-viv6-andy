@@ -1777,6 +1777,9 @@ _SwapBuffersRegion(
     VEGLThreadData thread;
     VEGLDisplay dpy;
     VEGLPlatform platform;
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+    char *p;
+#endif
 
     do
     {
@@ -2036,8 +2039,23 @@ _SwapBuffersRegion(
             /* Send event. */
             gcoHAL_ScheduleEvent(gcvNULL, &iface);
 #endif
+
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+            p = getenv("WL_EGL_GBM_FENCE");
+            if((p != gcvNULL) && (p[0] == '0'))
+            {
+                gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
+            }
+            else
+            {
+                /* Commit-stall. */
+                gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
+            }
+#else
             /* Commit-stall. */
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
+#endif
+
             /* Post back buffer. */
             if (!platform->postWindowBackBuffer(dpy, draw,
                                                 &backBuffer,
