@@ -17,6 +17,8 @@
 
 #define NEW_LSTM_LAYER_PATH
 
+extern VX_INTERNAL_API vx_bool vxoNode_CheckF32Support(vx_node node);
+
 extern vx_status vxnneExecuteSWFullyConnected(struct _vxnne_operation_s *operation);
 extern vx_status vxnneOperation_TP_Deinitialize(vxnne_operation_s *operation);
 extern vx_status vxnneExecuteSWTensorCopy(struct _vxnne_operation_s *operation);
@@ -1130,7 +1132,6 @@ VX_PRIVATE_API vx_status vxnneExecuteSVDF_DepthWeightsTime(vx_tensor input, vx_t
 
     vx_int32 item_size = TENSOR_DATA_SIZE(input);
     vx_int32 input_w = TENSOR_SIZE_INDEX(input, 0);
-    /*vx_int32 input_h = TENSOR_SIZE_INDEX(input, 1);*/
 
     vx_int32 output_w = 0;
     vx_int32 output_h = 0;
@@ -1144,12 +1145,26 @@ VX_PRIVATE_API vx_status vxnneExecuteSVDF_DepthWeightsTime(vx_tensor input, vx_t
 
     for (i = 0; i < output_h; i++)
     {
-        for (j = 0; j < output_w; j += stride)
+        if (_IsSameType(input, output))
         {
-            if (j / stride == i)
-                memcpy(output_ptr + (j + i * output_w) * item_size, input_ptr + i * stride * item_size, stride * item_size);
-            else
-                memset(output_ptr + (j + i * output_w) * item_size, 0, stride * item_size);
+            for (j = 0; j < output_w; j += stride)
+            {
+                if (j / stride == i)
+                    memcpy(output_ptr + (j + i * output_w) * item_size, input_ptr + i * stride * item_size, stride * item_size);
+                else
+                    memset(output_ptr + (j + i * output_w) * item_size, 0, stride * item_size);
+            }
+        }
+        else
+        {
+            vx_int32 s = 0;
+            for (j = 0; j < output_w/stride; j ++)
+            {
+                for (s = 0; s < stride; s++)
+                {
+                    VX_SAVE_DATA_TO_TENSOR(output, (j == i)? VX_GET_DATA_FROM_TENSOR(input, j * stride + s) : 0, j * stride + i * output_w + s);
+                }
+            }
         }
     }
 
@@ -1222,14 +1237,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
         vx_op_param_s conv = { 0 };
         vx_tensor output_feature = VX_NULL, depth_weight_time = VX_NULL, input_fc = VX_NULL, state_in_fc = VX_NULL;
         vx_weights_biases_parameter weights_biases_feature = VX_NULL, weights_biases = VX_NULL;
-        vx_bool feature_sw = vx_false_e, state_map_sw = vx_false_e, time_sw = vx_false_e/*, rotation_sw = vx_true_e*/;
+        vx_bool feature_sw = vxoNode_CheckF32Support(node), state_map_sw = vxoNode_CheckF32Support(node), time_sw = vxoNode_CheckF32Support(node);
         /* step2, map result to state in */
         vx_int32 batch_size = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
         vx_int32 input_size = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
         vx_int32 rank = (ranks != VX_NULL) ? (vx_int32)VX_GET_DATA_FROM_TENSOR(ranks, 0) : 1;
         vx_int32 num_unit = TENSOR_VIEW_SIZE_INDEX(weights_feature, 1);
         vx_int32 memory_size = TENSOR_VIEW_SIZE_INDEX(recurrent_time, 0);
-        vx_bool aligned64 = ((batch_size > 1) && (input_size * TENSOR_DATA_SIZE(inputs)) % 64 == 0) ? vx_true_e : vx_false_e;
+        vx_bool aligned64 = (batch_size == 1 || ((batch_size > 1) && (input_size * TENSOR_DATA_SIZE(inputs)) % 64 == 0)) ? vx_true_e : vx_false_e;
 
         vx_tensor_create_params_t tensor_create_params;
         vx_int32 sizes[][4] = {
@@ -1270,6 +1285,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
         svdfLayer->base.temp_tensors[svdfLayer->base.num_temp_tensors++] = state_in_fc;
 
         vxnneExecuteSVDF_DepthWeightsTime(recurrent_time, depth_weight_time, rank);
+
+        feature_sw = (vxnneIsNNSupportFormat(node->base.context, input_fc, VX_NULL, output_feature) || aligned64)?vx_false_e:vx_true_e;
 
         if (feature_sw)
         {
@@ -1334,7 +1351,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
                 VX_NULL,
                 VX_NULL,
                 VX_NULL,
-                inputs,
+                input_fc,
                 weights_biases_feature,
                 0,
                 0,
@@ -1415,6 +1432,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
             memcpy(&svdfLayer->svdf_nn_operation[0].base.parameter, &conv, sizeof(vx_op_param_s));
         }
 
+        state_map_sw = (vxnneIsTPSupportFormat(node->base.context, output_feature, VX_NULL, state_in_fc))?vx_false_e:vx_true_e;
+
 
         /* step2, map result to state in */
         if (state_map_sw)
@@ -1477,7 +1496,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
             memcpy(&svdfLayer->svdf_tp_operation[count - 1].base.parameter, &conv, sizeof(vx_op_param_s));
         }
 
-        aligned64 = ((batch_size > 1) && (memory_size *  num_unit * TENSOR_DATA_SIZE(inputs)) % 64 == 0) ? vx_true_e : vx_false_e;
+        time_sw = (!vxnneIsNNSupportFormat(node->base.context, state_in_fc, VX_NULL, outputs) && !aligned64)?vx_true_e:vx_false_e;
 
         /* step3, state_in * weight_time */
         if (time_sw)
