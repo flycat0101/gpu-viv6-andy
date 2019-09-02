@@ -326,6 +326,7 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_TENSOR_TRANSCENDENTAL = 66,
     VXNNE_KERNEL_TENSOR_MUL_SAT_RTE = 67,
     VXNNE_KERNEL_CONVOLUTION_1X1 = 68,
+    VXNNE_KERNEL_TENSOR_COPYROI  = 69,
     VXNNE_KERNEL_FIXED_COUNT,
 };
 
@@ -1843,11 +1844,12 @@ vxnne_convolution_layer_s, *vxnne_convolution_layer;
 typedef struct _vxnne_depthwise_convolution_layer_s
 {
     vxnne_layer_s                                   base;
-    vxnne_operation                                 operations[1];
+    vxnne_operation                                 operations[2];
 
     vxnne_depthwise_convolution_operation_s         convolution_sw1_depthwise_operation;
     vxnne_convolution_operation_s                   convolution_nn_convolution_sw;
     vxnne_convolution_relu_pooling_operation_s      convolution_nn_convolution_nne;
+    vxnne_shader_operation_s                        depthwise_tensorcopy_sh_operation;
     vxnne_shader_operation_s                        depthwise_convolution_sh_operation;
 }
 vxnne_depthwise_convolution_layer_s, *vxnne_depthwise_convolution_layer;
@@ -3683,6 +3685,8 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_scalar               dilationY,
     vx_scalar               channel_multiplier,
     vx_scalar               downScaleSizeRounding,
+    vx_int32                strideXvalue,
+    vx_int32                strideYvalue,
     vx_tensor               outputs);
 
 vxnne_shader_executable vxnneGetGPUDepth2SpaceShaderExecutable(
@@ -3986,6 +3990,17 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
     vx_tensor               bias,
     vx_tensor               output
     );
+
+vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_scalar               inputXOffset,
+    vx_scalar               inputYOffset,
+    vx_scalar               outputXOffset,
+    vx_scalar               outputYOffset,
+    vx_tensor               input,
+    vx_tensor               output);
 #ifdef __cplusplus
 }
 #endif
