@@ -5534,7 +5534,7 @@ OnError:
     {
         /* error in cache graph binary mode, original path run network */
         status = VX_SUCCESS;
-        if (binarySave->binaryFileName != VX_NULL)
+        if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
             gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
         }
@@ -5588,7 +5588,7 @@ OnError:
     {
         /* error in cache graph binary mode, original path run network */
         status = VX_SUCCESS;
-        if (binarySave->binaryFileName != VX_NULL)
+        if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
             gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
         }
@@ -6322,7 +6322,7 @@ OnError:
     {
         /* error in cache graph binary mode, original path run network */
         status = VX_SUCCESS;
-        if (binarySave->binaryFileName != VX_NULL)
+        if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
             gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
         }
@@ -6858,7 +6858,7 @@ OnError:
     {
         /* error in cache graph binary mode, original path run network */
         status = VX_SUCCESS;
-        if (binarySave->binaryFileName != VX_NULL)
+        if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
             gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
         }
@@ -6916,7 +6916,7 @@ OnError:
     if ((node->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS))
     {
         status = VX_SUCCESS;
-        if (binarySave->binaryFileName != VX_NULL)
+        if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
             gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
         }
@@ -7015,7 +7015,7 @@ OnError:
     {
         /* error in cache graph binary mode, original path run network */
         status = VX_SUCCESS;
-        if (binarySave->binaryFileName != VX_NULL)
+        if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
             gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
         }
@@ -7179,7 +7179,7 @@ OnError:
     {
         /* error in cache graph binary mode, original path run network */
         status = VX_SUCCESS;
-        if (binarySave->binaryFileName != VX_NULL)
+        if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
             gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
         }
@@ -8817,7 +8817,7 @@ OnError:
     {
         /* error in cache graph binary mode, original path run network */
         status = VX_SUCCESS;
-        if (binarySave->binaryFileName != VX_NULL)
+        if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
             gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
         }
