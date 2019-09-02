@@ -23,7 +23,7 @@
 #define LOG_NDEBUG 1
 #include <ui/ANativeObjectBase.h>
 #include <sync/sync.h>
-#include <cutils/log.h>
+#include <log/log.h>
 
 #ifdef DRM_GRALLOC
 #   include <gralloc_handle.h>
