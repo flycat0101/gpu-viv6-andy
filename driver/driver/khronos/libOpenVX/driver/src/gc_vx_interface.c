@@ -165,7 +165,7 @@ VX_PRIVATE_API vx_string vxoLoadSource(vx_char *filename, vx_size *programSize)
         programSource = (char*)malloc(sizeof(char)*(size + 1));
         if (programSource)
         {
-            if (fread(programSource, sizeof(char), size, pFile) != *programSize)
+            if (fread(programSource, sizeof(char), size, pFile) != size)
             {
                 goto OnError;
             }
