@@ -7929,9 +7929,10 @@ gcChipGetProgramBinary_V0(
     GL_ASSERT(masterPgInstance);
 
     /* Get size of program binary. */
-    gcmONERROR(gcSaveProgram(masterPgInstance->savedBinaries[__GLSL_STAGE_VS],
-                             masterPgInstance->savedBinaries[__GLSL_STAGE_FS],
-                             masterPgInstance->programState, gcvNULL, (gctUINT32 *)&size));
+    gcmONERROR(gcSaveGraphicsProgram(masterPgInstance->savedBinaries,
+                                     masterPgInstance->programState,
+                                     gcvNULL,
+                                     (gctUINT32 *)&size));
 
     if (binary)
     {
@@ -7941,9 +7942,10 @@ gcChipGetProgramBinary_V0(
         }
 
         /* Save program binary. */
-        gcmONERROR(gcSaveProgram(masterPgInstance->savedBinaries[__GLSL_STAGE_VS],
-                                 masterPgInstance->savedBinaries[__GLSL_STAGE_FS],
-                                 masterPgInstance->programState, &binary, (gctUINT32 *)&size));
+        gcmONERROR(gcSaveGraphicsProgram(masterPgInstance->savedBinaries,
+                                         masterPgInstance->programState,
+                                         &binary,
+                                         (gctUINT32 *)&size));
 
     }
 
@@ -7981,6 +7983,7 @@ gcChipProgramBinary_V0(
     gceSHADER_SUB_FLAGS subFlags;
     __GLSLStage stage;
     gctUINT key;
+    gctUINT pipelineStageMask;
     gcSHADER_KIND shaderTypes[] =
     {
         gcSHADER_TYPE_VERTEX,
@@ -8017,27 +8020,36 @@ gcChipProgramBinary_V0(
        to increase historic ref count since it has been set to be perpetual */
     gcChipUtilsObjectAddRef(pgInstanceObj);
 
-    for (stage = __GLSL_STAGE_VS; stage <= __GLSL_STAGE_FS; ++stage)
+    pipelineStageMask = *(gctUINT32 *)((gctUINT8 *)binary + _gcdProgramBinaryHeaderSize);
+    for (stage = __GLSL_STAGE_VS; stage <= __GLSL_STAGE_CS; ++stage)
     {
-        if (stage != __GLSL_STAGE_VS && stage != __GLSL_STAGE_FS)
+        /* First we need to destroy all previous shader. */
+        if (masterPgInstance->binaries[stage])
+        {
+            gcmVERIFY_OK(gcSHADER_Destroy(masterPgInstance->binaries[stage]));
+            masterPgInstance->binaries[stage] = gcvNULL;
+        }
+
+        if (masterPgInstance->savedBinaries[stage])
+        {
+            gcmVERIFY_OK(gcSHADER_Destroy(masterPgInstance->savedBinaries[stage]));
+            masterPgInstance->savedBinaries[stage] = gcvNULL;
+        }
+
+        /* Skip the inactive stage. */
+        if (!(pipelineStageMask & (1 << stage)))
         {
             continue;
         }
-        if (masterPgInstance->binaries[stage] == gcvNULL)
-        {
-            gcmONERROR(gcSHADER_Construct(shaderTypes[stage], &masterPgInstance->binaries[stage]));
-        }
-        if (masterPgInstance->savedBinaries[stage] == gcvNULL)
-        {
-            gcmONERROR(gcSHADER_Construct(shaderTypes[stage], &masterPgInstance->savedBinaries[stage]));
-        }
+
+        gcmONERROR(gcSHADER_Construct(shaderTypes[stage], &masterPgInstance->binaries[stage]));
+        gcmONERROR(gcSHADER_Construct(shaderTypes[stage], &masterPgInstance->savedBinaries[stage]));
     }
 
-    gcmONERROR(gcLoadProgram((gctPOINTER)binary,
-                             (gctUINT32)length,
-                             masterPgInstance->binaries[__GLSL_STAGE_VS],
-                             masterPgInstance->binaries[__GLSL_STAGE_FS],
-                             gcvNULL));
+    gcmONERROR(gcLoadGraphicsProgram((gctPOINTER)binary,
+                                     (gctUINT32)length,
+                                     masterPgInstance->binaries,
+                                     gcvNULL));
 
     for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
     {
@@ -8468,6 +8480,7 @@ __glChipShaderBinary(
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     GLsizei     i;
     gcSHADER    shader         = gcvNULL;
+    gcSHADER    shaders[__GLSL_STAGE_FS + 1] = { gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL };
     gcSHADER    vertexShader   = gcvNULL;
     gcSHADER    fragmentShader = gcvNULL;
     gceSTATUS   status = gcvSTATUS_OK;
@@ -8562,12 +8575,13 @@ __glChipShaderBinary(
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
 
-        gcmONERROR(gcLoadProgram((gctPOINTER) binary,
-                                  length,
-                                  vertexShader,
-                                  fragmentShader,
-                                  gcvNULL));
+        shaders[__GLSL_STAGE_VS] = vertexShader;
+        shaders[__GLSL_STAGE_FS] = fragmentShader;
 
+        gcmONERROR(gcLoadGraphicsProgram((gctPOINTER) binary,
+                                         length,
+                                         shaders,
+                                         gcvNULL));
     }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);

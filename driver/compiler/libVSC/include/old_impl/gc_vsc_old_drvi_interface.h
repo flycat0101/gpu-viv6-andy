@@ -71,6 +71,16 @@ BEGIN_EXTERN_C()
 */
 #define __FULL_PROGRAM_BINARY_HEADER_SIZE__     (sizeof(gctUINT32) * 4) /* Full program binary file header size in bytes*/
 
+/** Program binary file header format: -
+       Word 1:  gcmCC('P', 'R', 'G', 'M') Program binary file signature
+       Word 2:  ('\od' '\od' '\od' '\od') od = octal digits; program binary file version
+       Word 3:  ('\E' '\S' '\0' '\0') or Language type
+                ('C' 'L' '\0' '\0')
+       Word 4: ('\0' '\0' '\10' '\0') chip model  e.g. gc800
+       Wor5: ('\1' '\3' '\6' '\4') chip version e.g. 4.6.3_rc1
+       Word 6: size of program binary file in bytes excluding this header */
+#define _gcdProgramBinaryHeaderSize   (6 * 4)  /*Program binary file header size in bytes*/
+
 #define __OCL_PRINTF_WRITE_SIG1__               gcmCC('C', 'L', '\0', '\0')
 #define __OCL_PRINTF_WRITE_SIG2__               gcmCC('P', 'R', 'I', 'N')
 
@@ -7937,21 +7947,48 @@ gceSTATUS gcSHADER_DynamicPatch(
     );
 
 /*******************************************************************************
-**                                gcSaveProgram
+**                                gcSaveGraphicsProgram
+********************************************************************************
+**
+**  Save pre-compiled shaders and pre-linked programs to a binary file.
+**
+**  INPUT:
+**
+**      gcSHADER* GraphicsShaders
+**          Pointer to graphics shader object.
+**
+**      gcsPROGRAM_STATE ProgramState
+**          Pointer to program state buffer.
+**
+**  OUTPUT:
+**
+**      gctPOINTER * Binary
+**          Pointer to a variable receiving the binary data to be saved.
+**
+**      gctUINT32 * BinarySize
+**          Pointer to a variable receiving the number of bytes inside 'Binary'.
+*/
+gceSTATUS
+gcSaveGraphicsProgram(
+    IN gcSHADER* GraphicsShaders,
+    IN gcsPROGRAM_STATE ProgramState,
+    OUT gctPOINTER * Binary,
+    OUT gctUINT32 * BinarySize
+    );
+
+/*******************************************************************************
+**                                gcSaveComputeProgram
 ********************************************************************************
 **
 **    Save pre-compiled shaders and pre-linked programs to a binary file.
 **
 **    INPUT:
 **
-**        gcSHADER VertexShader
-**            Pointer to vertex shader object.
-**
-**        gcSHADER FragmentShader
-**            Pointer to fragment shader object.
+**        gcSHADER ComputeShader
+**            Pointer to compute shader object.
 **
 **        gcsPROGRAM_STATE ProgramState
-**            Pointer to program state.
+**            Program state.
 **
 **    OUTPUT:
 **
@@ -7962,9 +7999,8 @@ gceSTATUS gcSHADER_DynamicPatch(
 **            Pointer to a variable receiving the number of bytes inside 'Binary'.
 */
 gceSTATUS
-gcSaveProgram(
-    IN gcSHADER VertexShader,
-    IN gcSHADER FragmentShader,
+gcSaveComputeProgram(
+    IN gcSHADER ComputeShader,
     IN gcsPROGRAM_STATE ProgramState,
     OUT gctPOINTER * Binary,
     OUT gctUINT32 * BinarySize
@@ -8003,7 +8039,7 @@ gcSaveCLSingleKernel(
 
 
 /*******************************************************************************
-**                                gcLoadProgram
+**                                gcLoadGraphicsProgram
 ********************************************************************************
 **
 **    Load pre-compiled shaders and pre-linked programs from a binary file.
@@ -8018,24 +8054,49 @@ gcSaveCLSingleKernel(
 **
 **    OUTPUT:
 **
-**        gcSHADER VertexShader
-**            Pointer to a vertex shader object.
-**
-**        gcSHADER FragmentShader
-**            Pointer to a fragment shader object.
+**      gcSHADER* GraphicsShaders
+**          Pointer to graphics shader object.
 **
 **        gcsPROGRAM_STATE *ProgramState
 **            Pointer to a variable receicing the program state.
 */
 gceSTATUS
-gcLoadProgram(
+gcLoadGraphicsProgram(
     IN gctPOINTER Binary,
     IN gctUINT32 BinarySize,
-    OUT gcSHADER VertexShader,
-    OUT gcSHADER FragmentShader,
+    IN OUT gcSHADER* GraphicsShaders,
     IN OUT gcsPROGRAM_STATE *ProgramState
     );
 
+/*******************************************************************************
+**                                gcLoadComputeProgram
+********************************************************************************
+**
+**    Load pre-compiled shaders and pre-linked programs from a binary file.
+**
+**    INPUT:
+**
+**        gctPOINTER Binary
+**            Pointer to the binary data loaded.
+**
+**        gctUINT32 BinarySize
+**            Number of bytes in 'Binary'.
+**
+**    OUTPUT:
+**
+**        gcSHADER ComputeShader
+**            Pointer to a compute shader object.
+**
+**        gcsPROGRAM_STATE *ProgramState
+**            Pointer to a variable receicing the program state.
+*/
+gceSTATUS
+gcLoadComputeProgram(
+    IN gctPOINTER Binary,
+    IN gctUINT32 BinarySize,
+    OUT gcSHADER ComputeShader,
+    IN OUT gcsPROGRAM_STATE *ProgramState
+    );
 
 /*******************************************************************************
 **                                gcLoadCLSingleKernel

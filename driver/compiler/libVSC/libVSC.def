@@ -38,12 +38,14 @@ EXPORTS
     ; gcSHADER
     gcOptimizeShader
     gcLinkShaders
-    gcSaveProgram
+    gcSaveGraphicsProgram
+	gcSaveComputeProgram
 	gcSaveCLSingleKernel
     gcLinkProgram
     gcLinkProgramPipeline
     gcValidateProgramPipeline
-    gcLoadProgram
+    gcLoadGraphicsProgram
+    gcLoadComputeProgram
 	gcLoadCLSingleKernel
     gcLinkKernel
     gcFreeProgramState
