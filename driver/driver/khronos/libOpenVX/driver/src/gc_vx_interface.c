@@ -154,23 +154,23 @@ VX_PRIVATE_API vx_string vxoLoadSource(vx_char *filename, vx_size *programSize)
         {
             goto OnError;
         }
-        *programSize = ftell(pFile);
-        if (-1 == *programSize)
+        size = ftell(pFile);
+        if (-1 == size)
         {
            goto OnError;
         }
 
         rewind(pFile);
 
-        size = (int)(*programSize + 1);
-        programSource = (char*)malloc(sizeof(char)*(size));
+        programSource = (char*)malloc(sizeof(char)*(size + 1));
         if (programSource)
         {
             if (fread(programSource, sizeof(char), *programSize, pFile) != *programSize)
             {
                 goto OnError;
             }
-            programSource[*programSize] = '\0';
+            programSource[size] = '\0';
+            *programSize = size;
         }
 
         fclose(pFile);
@@ -11502,6 +11502,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_convert_depth_Initialize(vx_node 
     vx_float32 offsetScale      = offset_sc->value->f32 * scale;
     vx_status status            = VX_FAILURE;
     char      kernelName[1024];
+    vx_uint32 offset = 0;
 
     gcmHEADER_ARG("node=%p, parameters=%p, num=0x%x", node, parameters, num);
 
@@ -11609,13 +11610,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_convert_depth_Initialize(vx_node 
     switch (input_format)
     {
     case VX_TYPE_INT8:
-        sprintf(kernelName, "_S8");
+        gcoOS_PrintStrSafe(kernelName, gcmSIZEOF(kernelName), &offset, "%s", "_S8");
         break;
     case VX_TYPE_UINT8:
-        sprintf(kernelName, "_U8");
+        gcoOS_PrintStrSafe(kernelName, gcmSIZEOF(kernelName), &offset, "%s", "_U8");
         break;
     case VX_TYPE_INT16:
-        sprintf(kernelName, "_S16");
+        gcoOS_PrintStrSafe(kernelName, gcmSIZEOF(kernelName), &offset, "%s", "_S16");
         break;
     default:
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
@@ -11626,13 +11627,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_convert_depth_Initialize(vx_node 
     switch (output_format)
     {
     case VX_TYPE_INT8:
-        sprintf(kernelName, "%stoS8", kernelName);
+        gcoOS_PrintStrSafe(kernelName, gcmSIZEOF(kernelName), &offset, "%s", "toS8");
         break;
     case VX_TYPE_UINT8:
-        sprintf(kernelName, "%stoU8", kernelName);
+        gcoOS_PrintStrSafe(kernelName, gcmSIZEOF(kernelName), &offset, "%s", "toU8");
         break;
     case VX_TYPE_INT16:
-        sprintf(kernelName, "%stoS16", kernelName);
+        gcoOS_PrintStrSafe(kernelName, gcmSIZEOF(kernelName), &offset, "%s", "toS16");
         break;
     default:
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
@@ -11643,10 +11644,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_convert_depth_Initialize(vx_node 
     switch (overflow_policy)
     {
     case VX_CONVERT_POLICY_SATURATE:
-        sprintf(kernelName, "%s_Sat_func", kernelName);
+        gcoOS_PrintStrSafe(kernelName, gcmSIZEOF(kernelName), &offset, "%s", "_Sat_func");
         break;
     case VX_CONVERT_POLICY_WRAP:
-        sprintf(kernelName, "%s_Warp_func", kernelName);
+        gcoOS_PrintStrSafe(kernelName, gcmSIZEOF(kernelName), &offset, "%s", "_Warp_func");
         break;
     default:
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
@@ -11654,7 +11655,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_convert_depth_Initialize(vx_node 
         break;
     }
 
-     vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, kernelName);
+    vxStrCopySafe(node->kernel->subname, VX_MAX_KERNEL_NAME, kernelName);
 
     shaderParam.globalWorkScale[0] = 8;
     shaderParam.globalWorkSize[0]  = (width + shaderParam.globalWorkScale[0] - 1) / shaderParam.globalWorkScale[0];
