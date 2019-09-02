@@ -2428,6 +2428,9 @@ int OvxExecutor::initalize(vx_context* context, pthread_mutex_t* mutex, const Mo
     else
         LOG(ERROR) << "mModel is not null!";
 
+    if (checkOperation(mModel) != vx_true_e)
+        return ANEURALNETWORKS_UNEXPECTED_NULL;
+
     setRunTimePoolInfosFromHidlMemories(poolInfos, mModel->pools);
 
     mMutex = mutex;
@@ -2438,15 +2441,20 @@ int OvxExecutor::initalize(vx_context* context, pthread_mutex_t* mutex, const Mo
 
     *mContext = vxCreateContext();
 
-    pthread_mutex_unlock(mMutex);
-
-    getGraph(poolInfos);
+    if (getGraph(poolInfos) != VX_SUCCESS)
+    {
+        return ANEURALNETWORKS_UNEXPECTED_NULL;
+    }
 
     if(vxVerifyGraph(mGraph) != VX_SUCCESS)
     {
         LOG(ERROR)<<"verify graph fail";
         nnAssert(0);
     }
+
+    mPreContext = *mContext;
+
+    pthread_mutex_unlock(mMutex);
 
     initalizeEnv();
     return ANEURALNETWORKS_NO_ERROR;
@@ -2477,6 +2485,8 @@ void syncIfNeed(Model model, std::vector<VxRunTimeReferenceInfo> infos)
 int OvxExecutor::run(const Model& model, const Request& request,
     const std::vector<VxRunTimePoolInfo>& requestPoolInfos) {
 
+    pthread_mutex_lock(mMutex);
+
     mModel = &model;
     mRequest = &request;
 
@@ -2486,7 +2496,7 @@ int OvxExecutor::run(const Model& model, const Request& request,
 
     double t1 = getTime();
 
-    vxProcessGraph(mGraph);
+    if (mGraph)vxProcessGraph(mGraph);
 
     double t2 = getTime();
 
@@ -2500,10 +2510,7 @@ int OvxExecutor::run(const Model& model, const Request& request,
         LOG(INFO)<<"time of copying  device to host: "<<(t3 - t2) * 1000<<"ms";
         }
 
-    if (*mContext != nullptr && *mContext != mPreContext)
-    {
-        mPreContext = *mContext;
-    }
+    pthread_mutex_unlock(mMutex);
 
 
     return ANEURALNETWORKS_NO_ERROR;
@@ -2581,6 +2588,9 @@ bool OvxExecutor::initializeRunTimeInfo(const std::vector<VxRunTimePoolInfo>& re
 
 bool OvxExecutor::deinitializeRunTimeInfo() {
 
+    if (!mPreContext)
+        return true;
+
     pthread_mutex_lock(mMutex);
 
     for (VxOperationInfo info : mOperationInfos)
@@ -2622,10 +2632,11 @@ bool OvxExecutor::deinitializeRunTimeInfo() {
         }
     }
 
-    if (mGraph && (mPreContext == vxGetContext((vx_reference)mGraph)))
+    if (mGraph && (mPreContext == vxGetContext((vx_reference)mGraph)) && (mPreContext != nullptr))
     {
-        vxReleaseGraph(&mGraph);
+        vx_graph graph = mGraph;
         mGraph = nullptr;
+        vxReleaseGraph(&graph);
     }
 
 #ifdef MULTI_CONTEXT

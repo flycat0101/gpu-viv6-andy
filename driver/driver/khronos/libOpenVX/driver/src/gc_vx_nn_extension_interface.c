@@ -15761,6 +15761,18 @@ enum
          TENSOR_PAD_ZERO_VALUE(tensor2) = TENSOR_PAD_ZERO_VALUE(tensor1); \
      }
 
+vx_status vxoNNDilationConvolutionLayer_Deinitialize(vxnne_layer layer)
+{
+    vxnne_convolution_layer   convolutionLayer = (vxnne_convolution_layer)layer;
+
+    vxnneExecutionLayer_Deinitialize(layer);
+
+    if (convolutionLayer->dynamic_operations)
+        gcoOS_Free(VX_NULL, convolutionLayer->dynamic_operations);
+
+    return VX_SUCCESS;
+}
+
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx_node node,
         vx_tensor inputs,
         vx_weights_biases_parameter weights_biases,
@@ -15963,7 +15975,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                             node,
                             vxmOPERATION_COUNT(convolutionLayer) + dilation_x * dilation_y,
                             convolutionLayer->dynamic_operations,
-                            VX_NULL);
+                            vxoNNDilationConvolutionLayer_Deinitialize);
 
     switch(mode)
     {

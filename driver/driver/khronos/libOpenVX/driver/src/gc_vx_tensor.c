@@ -3372,7 +3372,7 @@ _ReleaseMemory(
         return VX_ERROR_INVALID_REFERENCE;
     }
 
-    if (!tensor->alloced)
+    if (!tensor->alloced && !vxoTensor_MemoryIsAllocated(tensor))
     {
         gcmFOOTER_ARG("%d", status);
         return VX_SUCCESS;

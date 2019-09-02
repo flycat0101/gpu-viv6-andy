@@ -127,7 +127,9 @@ int OvxDevice::run() {
 bool OvxPreparedModel::initialize(vx_context* context, pthread_mutex_t* mutex) {
 
     mExecutor = new OvxExecutor();
-    mExecutor->initalize(context, mutex, &mModel, &mPoolInfos);
+    if (mExecutor->initalize(context, mutex, &mModel, &mPoolInfos) != ANEURALNETWORKS_NO_ERROR)
+        return false;
+    else
 
     return true;
 }

@@ -307,6 +307,27 @@ inline vx_bool checkValid(const Model* model, const vx_uint32 index)
     return (model->operands[index].dimensions.size() > 0 && model->operands[index].dimensions.data()[0] > 0)?vx_true_e:vx_false_e;
 }
 
+inline vx_bool checkOperation(const Model* model)
+{
+    for (vx_int32 i = 0; i < (vx_int32)model->operations.size(); i++)
+    {
+        Operation operation = model->operations[i];
+        const hidl_vec<uint32_t>& ins = operation.inputs;
+        const hidl_vec<uint32_t>& outs = operation.outputs;
+
+        if (operation.type == OperationType::ADD)
+        {
+            const vx_uint32* out_dims = model->operands[outs[0]].dimensions.data();
+            const vx_uint32* act_v = model->operands[ins[2]].dimensions.data();
+            if (((out_dims == nullptr) &&  (act_v == nullptr))
+            || ((out_dims && out_dims[0] == 0) && (act_v == nullptr))
+                )
+                return vx_false_e;
+        }
+    }
+    return vx_true_e;
+}
+
 }  /* anonymous namespace */
 
 } /* namespace nn */
