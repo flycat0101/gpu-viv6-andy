@@ -14840,7 +14840,7 @@ gcSHADER_LoadEx(
 
         binarySize = Shader->sourceLength;              /* the NULL terminated string length */
 
-        if (binarySize > 0 && shaderVersion >= gcdSL_SHADER_BINARY_BEFORE_SAVING_SHADER_SOURCE_FOR_OCL)
+        if (binarySize > 0)
         {
             gctUINT    i;
 
@@ -15312,9 +15312,11 @@ gcSHADER_SaveEx(
 
     /* Source string */
     bytes += sizeof(Shader->sourceLength);
-
-    /* Source code string */
-    bytes += Shader->sourceLength;
+    if (Shader->debugInfo)
+    {
+        /* Source code string */
+        bytes += Shader->sourceLength;
+    }
 
     /* For debugInfo */
     vscDISaveDebugInfo((VSC_DIContext * )(Shader->debugInfo), gcvNULL, &bytes);
@@ -16286,15 +16288,18 @@ gcSHADER_SaveEx(
     /* Source code string */
     gcoOS_MemCopy(buffer, &Shader->sourceLength, sizeof(Shader->sourceLength));
     buffer += sizeof(Shader->sourceLength);
-    bytes = Shader->sourceLength;
-    if (bytes > 0)
+    if (Shader->debugInfo)
     {
-        gctUINT i;
-        gcoOS_MemCopy(buffer, Shader->source, bytes);
-        /* encode source string */
-        for (i = 0; i < bytes; i++)
+        bytes = Shader->sourceLength;
+        if (bytes > 0)
         {
-            buffer[i] ^= SOURCE_ENCODE_CHAR;
+            gctUINT i;
+            gcoOS_MemCopy(buffer, Shader->source, bytes);
+            /* encode source string */
+            for (i = 0; i < bytes; i++)
+            {
+                buffer[i] ^= SOURCE_ENCODE_CHAR;
+            }
         }
     }
     buffer += bytes;
