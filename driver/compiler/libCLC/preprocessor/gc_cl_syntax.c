@@ -1708,7 +1708,6 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
                             status = ppoPREPROCESSOR_addMacroDef_Int(PP, "_VIV_VX_EXTENSION", "2");
                         else
                             status =  ppoPREPROCESSOR_addMacroDef_Int(PP, "_VIV_VX_EXTENSION", "1");
-                        status = ppoPREPROCESSOR_addMacroDef_Int(PP, "_VIV_VX_EXTENSION", "1");
                         status = ppoPREPROCESSOR_AddSdkDirToPath(PP);
                         if (gcmIS_ERROR(status))
                             return status;
