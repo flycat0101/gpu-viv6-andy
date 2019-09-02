@@ -2497,7 +2497,7 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
     }
     else
     {
-        vxoGraphOptimization_computeQuantAttribute(VX_QUANT_AFFINE_SCALE, fill_data, 0,
+        vxoGraphOptimization_computeQuantAttribute(TENSOR_QUANT_TYPE(input), fill_data, 0,
             &parm.quant_data.dfp.fixed_point_pos, &parm.quant_data.affine.zeroPoint, &parm.quant_data.affine.scale);
     }
 
