@@ -94,20 +94,6 @@ VX_PRIVATE_API void vxoGraphOptimization_getQuantizeParam(float dMax, float dMin
     *zp = (vx_int32)gcmMIN(255, gcmMAX(0, roundRTNE(0 - dMin/ *scale)));
 }
 
-VX_INTERNAL_API vx_uint32 vxoGraphOptimization_getTensorSize(vx_tensor org)
-{
-    vx_uint32 i = 0, size = 1;
-
-    gcmHEADER_ARG("org=%p", org);
-    vxmASSERT(org);
-
-    for(i = 0; i < TENSOR_DIM_NUM(org); i++)
-        size *= TENSOR_SIZE_INDEX(org, i);
-
-    gcmFOOTER_ARG("%d", size);
-    return size * TENSOR_DATA_SIZE(org);
-}
-
 VX_PRIVATE_API vx_tensor_create_params_t vxoGraphOptimization_createParamsForTensor(vx_uint32 dimNum, vx_uint32 *dims, vx_enum dataType,
                                                                                vx_enum quantType,vx_uint8 fixedPos, vx_int32 zp,
                                                                                vx_float32 scale)
@@ -2138,10 +2124,10 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM_padTensor(vx_ten
 
     gcmHEADER_ARG("org=%p, padTensor=%p, offset=%p", orgTensor, padTensor, offset);
 
-    orgTensorSize   = vxoGraphOptimization_getTensorSize(*orgTensor);
+    vxoTensor_GetTensorSize(*orgTensor, &orgTensorSize);
     tensorData      = vxAllocateAndZeroMemory(orgTensorSize);
 
-    padTensorSize   = vxoGraphOptimization_getTensorSize(*padTensor);
+    vxoTensor_GetTensorSize(*orgTensor, &padTensorSize);
     padTensorData   = vxAllocateAndZeroMemory(padTensorSize);
 
     /* firstly, set pad value to all of the new memory, and then copy the valid data into it*/
