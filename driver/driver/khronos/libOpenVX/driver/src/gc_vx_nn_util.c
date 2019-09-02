@@ -3843,6 +3843,7 @@ vx_status vxnneCalculateConvTilingParam(
                                 conv_op->weights_biases,
                                 inputDims,
                                 outputDims,
+                                TENSOR_DATA_TYPE(conv_op->outputs),
                                 offsets,
                                 1,
                                 perf.swTilingInfo.srcBuf, perf.swTilingInfo.dstBuf, perf.swTilingInfo.kernelBuf,

@@ -31,12 +31,14 @@ typedef struct _vx_general_info_s
     vx_uint32                                outz;
     vx_uint32                                stridex;
     vx_uint32                                stridey;
-    vx_uint32                                dataSize;
+    vx_uint32                                inputDataSize;
+    vx_uint32                                outputDataSize;
     vx_uint32                                poolingSize;
     vx_uint32                                poolingStride;
     vx_int32                                 xOffSet;
     vx_int32                                 yOffSet;
     vx_int32                                 inputDataFormat;
+    vx_int32                                 outputDataFormat;
     vx_int32                                 nnCores;
     vx_int32                                 convOutFifoDepth;
     vx_uint32                                kernelSize;
@@ -118,6 +120,7 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
     vx_weights_biases_parameter wb,
     vx_uint32 orig_input_dims[],
     vx_uint32 output_dims[],
+    vx_enum output_format,
     vx_int32* offsets,
     vx_int32 flush,
     vx_uint8 src_buf,

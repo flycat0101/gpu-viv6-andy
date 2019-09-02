@@ -52,9 +52,11 @@ struct _archModelOpInfo
     vx_uint32   pstride;
     vx_uint32   xpad;
     vx_uint32   ypad;
-    vx_uint32   dsize;
+    vx_uint32   inputDataSize;
+    vx_uint32   outputDataSize;
     vx_uint8    fcmd;
-    vx_enum     input_data_format;
+    vx_enum     inputDataFormat;
+    vx_enum     outputDataFormat;
     vx_uint32   nnCores;
     vx_weights_biases_parameter weight_bias;
     vx_arch_perf_s perf;
@@ -549,7 +551,7 @@ static vx_float64 _calc_cost(
     perf->info.kx   = opInfo->kx;
     perf->info.ky   = opInfo->ky;
     perf->info.kz   = opInfo->kz;
-    perf->info.inputDataFormat = opInfo->input_data_format;
+    perf->info.inputDataFormat = opInfo->inputDataFormat;
 
     /*save original input x/y/z*/
     perf->info.oinx = opInfo->inx;
@@ -567,7 +569,9 @@ static vx_float64 _calc_cost(
     perf->info.poolingStride = opInfo->pstride;
     perf->info.xOffSet = (-1) * opInfo->xpad;
     perf->info.yOffSet = (-1) * opInfo->ypad;
-    perf->info.dataSize = opInfo->dsize;
+    perf->info.inputDataSize = opInfo->inputDataSize;
+    perf->info.outputDataSize = opInfo->outputDataSize;
+    perf->info.outputDataFormat = opInfo->outputDataSize;
     perf->info.nnCores = opInfo->nnCores;
     if (opInfo->target == VXNNE_OPERATION_TARGET_TP && opInfo->op == VXNNE_OPERATOR_FULLYCONNECTED)
     {
@@ -655,9 +659,11 @@ static vx_uint32 _kernel_size_in_pixel(struct _archModelInfo *archModel, vx_int3
 {
     struct _archModelOpInfo * opInfo = archModel->opInfoArray[index];
     vx_float64 coefCompressionRatio = 0;
+    vx_float64 margin_ratio = 1.05;
     if (opInfo->weight_bias != NULL)
     {
         coefCompressionRatio = WB_COMPRESS_RATIO(opInfo->weight_bias);
+        margin_ratio = (1.25 - 1.05) * (1.0 - coefCompressionRatio) / (1.0 - 0.02) + 1.05;
     }
 
     if (opInfo->op == VXNNE_OPERATOR_DEPTH_WISE_CONV)
@@ -667,14 +673,14 @@ static vx_uint32 _kernel_size_in_pixel(struct _archModelInfo *archModel, vx_int3
             return (vx_uint32)(opInfo->kx
                       * opInfo->ky
                       * opInfo->oz
-                      * coefCompressionRatio + 0.5f);
+                      * coefCompressionRatio * margin_ratio + 0.5f);
         }
         else
         {
             return (vx_uint32)(opInfo->kx
                       * opInfo->ky
                       * ceilf((vx_float32)opInfo->oz / cores) * cores
-                      * coefCompressionRatio + 0.5f);
+                      * coefCompressionRatio * margin_ratio + 0.5f);
         }
     }
 
@@ -686,7 +692,7 @@ static vx_uint32 _kernel_size_in_pixel(struct _archModelInfo *archModel, vx_int3
                       * opInfo->ky
                       * opInfo->kz
                       * opInfo->oz
-                      * coefCompressionRatio * 1.05f + 0.5f);
+                      * coefCompressionRatio * margin_ratio * 1.05f + 0.5f);
         }
         else
         {
@@ -694,7 +700,7 @@ static vx_uint32 _kernel_size_in_pixel(struct _archModelInfo *archModel, vx_int3
                       * opInfo->ky
                       * opInfo->kz
                       * ceilf((vx_float32)opInfo->oz / cores) * cores
-                      * coefCompressionRatio * 1.05f + 0.5f);
+                      * coefCompressionRatio * margin_ratio * 1.05f + 0.5f);
         }
     }
     return 0;
@@ -2720,8 +2726,10 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->pstride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
                 opInfo[count]->xpad    = convOp->pad_x_left;
                 opInfo[count]->ypad    = convOp->pad_y_top;
-                opInfo[count]->input_data_format = TENSOR_DATA_TYPE(convOp->inputs);
-                opInfo[count]->dsize   = TENSOR_DATA_SIZE(convOp->inputs) * 8;
+                opInfo[count]->inputDataFormat = TENSOR_DATA_TYPE(convOp->inputs);
+                opInfo[count]->inputDataSize   = TENSOR_DATA_SIZE(convOp->inputs) * 8;
+                opInfo[count]->outputDataFormat = TENSOR_DATA_TYPE(convOp->outputs);
+                opInfo[count]->outputDataSize   = TENSOR_DATA_SIZE(convOp->outputs) * 8;
                 opInfo[count]->weight_bias = wb;
                 opInfo[count]->kx = wb->weights_sizes[0];
                 opInfo[count]->ky = wb->weights_sizes[1];
@@ -2763,9 +2771,9 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->upStreamLayerCount = operation->parentOpNum;
                 operation->segIndex = count;
 
-                if (opInfo[count]->input_data_format == VX_TYPE_INT16)
+                if (opInfo[count]->inputDataFormat == VX_TYPE_INT16)
                     opInfo[count]->nnCores = context->nnConfig.fixedFeature.nnCoreCountInt16;
-                else if (opInfo[count]->input_data_format == VX_TYPE_FLOAT16)
+                else if (opInfo[count]->inputDataFormat == VX_TYPE_FLOAT16)
                     opInfo[count]->nnCores = context->nnConfig.fixedFeature.nnCoreCountFloat16;
                 else
                     opInfo[count]->nnCores = context->nnConfig.fixedFeature.nnCoreCount;
@@ -2829,10 +2837,12 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->target  = operation->target;
                 opInfo[count]->psize   = operation->parameter.pool_size_x;
                 opInfo[count]->pstride = gcmMAX(1, operation->parameter.pool_stride);
-                opInfo[count]->input_data_format = TENSOR_DATA_TYPE(tpOp->input);
                 opInfo[count]->xpad    = tpOp->base.parameter.pad_x_left;
                 opInfo[count]->ypad    = tpOp->base.parameter.pad_y_top;
-                opInfo[count]->dsize = 8 * gcmMIN(TENSOR_DATA_SIZE(tpOp->input), TENSOR_DATA_SIZE(tpOp->output));
+                opInfo[count]->inputDataFormat = TENSOR_DATA_TYPE(tpOp->input);
+                opInfo[count]->inputDataSize = TENSOR_DATA_SIZE(tpOp->input) * 8;
+                opInfo[count]->outputDataFormat = TENSOR_DATA_TYPE(tpOp->output);
+                opInfo[count]->outputDataSize   = TENSOR_DATA_SIZE(tpOp->output) * 8;
                 opInfo[count]->weight_bias = VX_NULL;
                 opInfo[count]->kx = 1;
                 opInfo[count]->ky = 1;
@@ -2877,9 +2887,9 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 }
                 opInfo[count]->downStreamLayerCount = operation->childOpNum;
                 opInfo[count]->upStreamLayerCount = operation->parentOpNum;
-                if (opInfo[count]->input_data_format == VX_TYPE_INT16)
+                if (opInfo[count]->inputDataFormat == VX_TYPE_INT16)
                     opInfo[count]->nnCores = context->nnConfig.fixedFeature.nnCoreCountInt16;
-                else if (opInfo[count]->input_data_format == VX_TYPE_FLOAT16)
+                else if (opInfo[count]->inputDataFormat == VX_TYPE_FLOAT16)
                     opInfo[count]->nnCores = context->nnConfig.fixedFeature.nnCoreCountFloat16;
                 else
                     opInfo[count]->nnCores = context->nnConfig.fixedFeature.nnCoreCount;
@@ -2896,14 +2906,16 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                     vx_uint32 outDims = fcOp->output->dimCount;
 
                     wb = fcOp->weights_biases;
-                    opInfo[count]->dsize = TENSOR_DATA_SIZE(fcOp->input);
-                    opInfo[count]->input_data_format = TENSOR_DATA_TYPE(fcOp->input);
+                    opInfo[count]->inputDataSize = TENSOR_DATA_SIZE(fcOp->input) * 8;
+                    opInfo[count]->inputDataFormat = TENSOR_DATA_TYPE(fcOp->input);
                     opInfo[count]->inx = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 0);
                     opInfo[count]->iny = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 1);
                     opInfo[count]->inz = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 2);
                     opInfo[count]->origx = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 0);
                     opInfo[count]->origy = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 1);
 
+                    opInfo[count]->outputDataSize = TENSOR_DATA_SIZE(fcOp->output) * 8;
+                    opInfo[count]->outputDataFormat = TENSOR_DATA_TYPE(fcOp->output);
                     opInfo[count]->origoutx = TENSOR_VIEW_SIZE_INDEX(fcOp->output, 0);
                     opInfo[count]->origouty = TENSOR_VIEW_SIZE_INDEX(fcOp->output, 1);
                     opInfo[count]->oz = TENSOR_VIEW_SIZE_INDEX(fcOp->output, 2);
@@ -2935,8 +2947,10 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 {
                     vxnne_convolution_relu_pooling_operation fcOp = (vxnne_convolution_relu_pooling_operation)operation;
                     wb = fcOp->weights_biases;
-                    opInfo[count]->dsize = TENSOR_DATA_SIZE(fcOp->inputs);
-                    opInfo[count]->input_data_format = TENSOR_DATA_TYPE(fcOp->inputs);
+                    opInfo[count]->inputDataSize = TENSOR_DATA_SIZE(fcOp->inputs) * 8;
+                    opInfo[count]->inputDataFormat = TENSOR_DATA_TYPE(fcOp->inputs);
+                    opInfo[count]->outputDataSize = TENSOR_DATA_SIZE(fcOp->outputs) * 8;
+                    opInfo[count]->outputDataFormat = TENSOR_DATA_TYPE(fcOp->outputs);
                     opInfo[count]->inx = TENSOR_VIEW_SIZE_INDEX(fcOp->inputs, 0);
                     opInfo[count]->iny = TENSOR_VIEW_SIZE_INDEX(fcOp->inputs, 1);
                     opInfo[count]->inz = TENSOR_VIEW_SIZE_INDEX(fcOp->inputs, 2);
@@ -2959,7 +2973,6 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->target  = operation->target;
                 opInfo[count]->xpad    = WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * WB_PAD_LEFT(wb));
                 opInfo[count]->ypad    = WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) *  WB_PAD_TOP(wb));
-                opInfo[count]->dsize = vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb)) * 8;
                 opInfo[count]->weight_bias = wb;
                 opInfo[count]->kx = 1;
                 opInfo[count]->ky = 1;
@@ -3008,9 +3021,9 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->upStreamLayerCount = operation->parentOpNum;
                 operation->segIndex = count;
 
-                if (opInfo[count]->input_data_format == VX_TYPE_INT16)
+                if (opInfo[count]->inputDataFormat == VX_TYPE_INT16)
                     opInfo[count]->nnCores = context->nnConfig.fixedFeature.nnCoreCountInt16;
-                else if (opInfo[count]->input_data_format == VX_TYPE_FLOAT16)
+                else if (opInfo[count]->inputDataFormat == VX_TYPE_FLOAT16)
                     opInfo[count]->nnCores = context->nnConfig.fixedFeature.nnCoreCountFloat16;
                 else
                     opInfo[count]->nnCores = context->nnConfig.fixedFeature.nnCoreCount;

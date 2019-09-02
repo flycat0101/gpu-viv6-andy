@@ -26,6 +26,8 @@ static vx_uint32 _kernel_size_in_pixel_by_arch_perf(
     vx_bool full_chache_kernel_head_fix)
 {
     vx_float64 coefCompressionRatio = perf->coefCompressRatio;
+    vx_float64 margin_ratio = (1.25 - 1.05) * (1.0 - coefCompressionRatio) / (1.0 - 0.02) + 1.05;
+
     if (opType == VXNNE_OPERATOR_DEPTH_WISE_CONV)
     {
         if (full_chache_kernel_head_fix)
@@ -33,14 +35,14 @@ static vx_uint32 _kernel_size_in_pixel_by_arch_perf(
             return (vx_uint32)(perf->info.kx
                       * perf->info.ky
                       * perf->info.outz
-                      * coefCompressionRatio + 0.5f);
+                      * coefCompressionRatio * margin_ratio + 0.5f);
         }
         else
         {
             return (vx_uint32)(perf->info.kx
                       * perf->info.ky
                       * ceilf((vx_float32)perf->info.outz / perf->info.nnCores) * perf->info.nnCores
-                      * coefCompressionRatio + 0.5f);
+                      * coefCompressionRatio * margin_ratio + 0.5f);
         }
     }
 
@@ -54,7 +56,7 @@ static vx_uint32 _kernel_size_in_pixel_by_arch_perf(
                           * perf->info.ky
                           * perf->info.kz
                           * perf->info.outz
-                          * coefCompressionRatio * 1.05f + 0.5f);
+                          * coefCompressionRatio * margin_ratio * 1.05f + 0.5f);
             }
             else
             {
@@ -62,7 +64,7 @@ static vx_uint32 _kernel_size_in_pixel_by_arch_perf(
                           * perf->info.ky
                           * perf->info.kz
                           * ceilf((vx_float32)perf->info.outz / perf->info.nnCores) * perf->info.nnCores
-                          * coefCompressionRatio * 1.05f + 0.5f);
+                          * coefCompressionRatio * margin_ratio * 1.05f + 0.5f);
             }
         }
     }
@@ -105,7 +107,7 @@ static void _calcArchModelCacheMode(vx_context context, vx_arch_perf perf, vx_in
                 perf->swTilingInfo.origInY,
                 perf->info.xOffSet, perf->info.yOffSet,
                 perf->info.inx, perf->info.inx,
-                perf->info.dataSize,
+                perf->info.inputDataSize,
                 context->nnConfig.unifiedFeature.imageNotPackedInSram,
                 context->nnConfig.fixedFeature.equivalentVipsramWidthInByte);
 
@@ -222,8 +224,8 @@ static void _calcArchModelCacheMode(vx_context context, vx_arch_perf perf, vx_in
 
 
 static vx_int8 gOrigShowType = -1;
-static const vx_char *archModelVersion = "ARCHCTS@218716";
-static const vx_char *SWTilingVersion = "ARCHCTS@218716";
+static const vx_char *archModelVersion = "ARCHCTS@219176";
+static const vx_char *SWTilingVersion = "ARCHCTS@219176";
 vx_status showArchPerformance(
     vx_context context,
     vxnne_layer layer,
@@ -388,6 +390,10 @@ vx_status showArchPerformance(
             context->nnConfig.unifiedFeature.diffConditionForCachelineModePreFix
             );
 
+        vxInfo("CONVOUT_FIFO_DEPTH_FIX: %d\n",
+            context->nnConfig.unifiedFeature.convOutFifoDepthFix
+            );
+
         vxInfo("\n");
         gOrigShowType = (vx_int8)context->options.collectPerfType;
     }
@@ -483,10 +489,10 @@ vx_status showArchPerformance(
                     perf->swTilingInfo.origOutZ, perf->info.outz);
     }
 
-    vxInfo("KernelX: %d\nKernelY: %d\nKernelZ: %d\nPoolingSize: %d\nPoolingStride: %d\nDataSize: %d\nFP16: %d\n",
+    vxInfo("KernelX: %d\nKernelY: %d\nKernelZ: %d\nPoolingSize: %d\nPoolingStride: %d\nInputDataSize: %d\nOutputDataSize: %d\nFP16: %d\n",
             perf->info.kx, perf->info.ky, perf->info.kz,
             perf->info.poolingSize, perf->info.poolingStride,
-            perf->info.dataSize, perf->info.inputDataFormat == VX_TYPE_FLOAT16 ? 1 : 0);
+            perf->info.inputDataSize, perf->info.outputDataSize, perf->info.inputDataFormat == VX_TYPE_FLOAT16 ? 1 : 0);
 
     vxInfo("archModel_kernelSize: %u\nkernelSize: %u\n",
         _kernel_size_in_pixel_by_arch_perf(perf->opTarget, perf->opType, perf, context->nnConfig.unifiedFeature.fullCacheKernelHeadFix ? vx_true_e : vx_false_e),
@@ -875,6 +881,7 @@ static vx_float64 _calcKernelReadBandWidth(
     kernelReadBandWidth = ((kernelIdealCache + kernelHeaderReadBandWidth) * kernelRepeatRead) - (gcmMIN(kernelIdealCache, adjCacheSizeInPixel) * (kernelRepeatRead - 1));
     kernelReadBandWidth *= (data_size / 8);
     if (NULL != kernel_read_bw_tile0) *kernel_read_bw_tile0 = kernelReadBandWidthTile0;
+
     return kernelReadBandWidth;
 }
 
@@ -1449,7 +1456,8 @@ static vx_float64 _calcNNCycleCountBandWidth(
     vx_float64 image_compress_ratio,
     vx_uint32  cores,
     vx_uint32  brick_mode,
-    vx_uint32  data_size,
+    vx_uint32  input_data_size,
+    vx_uint32  output_data_size,
     vx_uint32  l2cache_size,
     vx_uint32  l2cache_width,
     vx_uint32  xydp_x,
@@ -1563,7 +1571,7 @@ static vx_float64 _calcNNCycleCountBandWidth(
         vipSramInImageSlice = in_image_slice;
     }
 
-    if (zdp > 1 && kx == 1 && ky == 1 && data_size == 8 && !zdp3_no_compress_fix)
+    if (zdp > 1 && kx == 1 && ky == 1 && input_data_size == 8 && !zdp3_no_compress_fix)
     {
         gcmASSERT(non_zero_ratio == 1);
         coef_compress_ratio = gcmMAX(1, coef_compress_ratio);
@@ -1576,7 +1584,7 @@ static vx_float64 _calcNNCycleCountBandWidth(
                                                kx, ky, kz, x, y, z, non_zero_ratio,
                                                xydp_x, xydp_y, zdp,
                                                float_xydp_x, float_xydp_y, float_zdp,
-                                               data_size, vector_prune,
+                                               input_data_size, vector_prune,
                                                interleave_mode, lanes_per_conv, coef_decode_perf,
                                                zrl_bits, is_depth_wise,
                                                vip_v7_16bit, fp16, conv1x1_half_performance, zxdp3_kernel_read_conflict_fix, single_port_acc_buffer, &refined_non_zero_ratio)
@@ -1584,12 +1592,12 @@ static vx_float64 _calcNNCycleCountBandWidth(
 
     vipKernelReadBW = _calcKernelReadBandWidth(tile_x, tile_y, kernel_per_core,
         kx, ky, kz, x, y, z, x, y,
-        cores, brick_mode, data_size,
+        cores, brick_mode, input_data_size,
         coef_compress_ratio, image_compress_ratio, 0, kernel_head_not_cached_fix, is_depth_wise, &kernelReadBWTile0);
 
     vipInImageReadBW = _calcImageReadBandWidth(tile_x, tile_y, kernel_per_core,
         kx, ky, kz, x, y, z, x, y,
-        cores, brick_mode, data_size,
+        cores, brick_mode, input_data_size,
         coef_compress_ratio, 1, 0, image_not_packed_in_sram, cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, is_depth_wise, equivalent_vip_sram_width_in_byte,
         vipSramInImageStride, vipSramInImageSlice, zdp, vipSramAccUnitSizeInByte, image_partial_cache, &imageReadBWVZGroup0);
 
@@ -1620,14 +1628,14 @@ static vx_float64 _calcNNCycleCountBandWidth(
     kernelFromDDR = kernel_buf == SW_TILING_FROM_DDR || (first_cmd && ((kernel_buf == SW_TILING_FROM_AXI_SRAM) || (kernel_buf == SW_TILING_FROM_VIP_SRAM)));
     kernelFromAXISram = (!first_cmd && (kernel_buf == SW_TILING_FROM_AXI_SRAM)) || (kernel_buf == SW_TILING_PERM_AXI_SRAM);
 
-    cacheSizeInPixel = (vx_float32)l2cache_size / (data_size / 8);
+    cacheSizeInPixel = (vx_float32)l2cache_size / (input_data_size / 8);
 
     if (kernelFromDDR && src_buf == SW_TILING_FROM_DDR)
     {
         vx_float64 ddrKernelReadBWTile0, ddrInImageReadBWVZGroup0;
         ddrReadBW = _calcReadBandWidth(tile_x, tile_y, kernel_per_core,
             kx, ky, kz, x, y, z, inx, iny,
-            cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio,
+            cores, brick_mode, input_data_size, coef_compress_ratio, image_compress_ratio,
             l2cache_size, (vx_bool)image_partial_cache, nn_cmd_size, image_not_packed_in_sram,
             kernel_head_not_cached_fix, cache_line_mode_disabled,
             async_copy_perf_fix, accurate_tile_bw, is_depth_wise, in_image_stride, in_image_slice, zdp, axiAccUnitSizeInByte,
@@ -1645,7 +1653,7 @@ static vx_float64 _calcNNCycleCountBandWidth(
     {
         ddrKernelReadBW = _calcKernelReadBandWidth(tile_x, tile_y, kernel_per_core,
             kx, ky, kz, x, y, z, x, y,
-            cores, brick_mode, data_size, coef_compress_ratio,
+            cores, brick_mode, input_data_size, coef_compress_ratio,
             image_compress_ratio, cacheSizeInPixel, kernel_head_not_cached_fix, is_depth_wise, &kernelReadBWTile0);
 
         bwCost = &nnCost[ARCH_MODEL_DDR_KERNEL_COST].readBW;
@@ -1679,7 +1687,7 @@ static vx_float64 _calcNNCycleCountBandWidth(
 
             cacheSizeInPixel = (cacheSizeInPixel - gcmMIN(kernelStorage, cacheSizeInPixel)) * data_read_from_sram;
             axiReadBW = _calcImageReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny,
-                cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, image_not_packed_in_sram,
+                cores, brick_mode, input_data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, image_not_packed_in_sram,
                 cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, is_depth_wise, equivalent_vip_sram_width_in_byte, in_image_stride, in_image_slice, zdp, axiAccUnitSizeInByte, image_partial_cache, &imageReadBWVZGroup0);
 
             bwCost = &nnCost[ARCH_MODEL_AXI_SRAM_COST].readBW;
@@ -1704,7 +1712,7 @@ static vx_float64 _calcNNCycleCountBandWidth(
         /*empty nnCost[ARCH_MODEL_DDR_KERNEL_COST].readBW */
 
         ddrInImageReadBW = _calcImageReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny,
-            cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, image_not_packed_in_sram,
+            cores, brick_mode, input_data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, image_not_packed_in_sram,
             cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, is_depth_wise, equivalent_vip_sram_width_in_byte, in_image_stride, in_image_slice, zdp, axiAccUnitSizeInByte, image_partial_cache, &imageReadBWVZGroup0);
 
         bwCost = &nnCost[ARCH_MODEL_DDR_IN_IMAGE_COST].readBW;
@@ -1728,15 +1736,15 @@ static vx_float64 _calcNNCycleCountBandWidth(
             if (image_not_packed_in_sram)
             {
                 imageIdealCache = ceilf(ceilf((vx_float32)intile_x * intile_y / 16) * 16 * kz / (equivalent_vip_sram_width_in_byte * 2))
-                                  * (equivalent_vip_sram_width_in_byte * 2) * data_size / 8;
+                                  * (equivalent_vip_sram_width_in_byte * 2) * input_data_size / 8;
             }
             else
             {
-                imageIdealCache = (vx_float32)intile_x * intile_y * kz * data_size / 8;
+                imageIdealCache = (vx_float32)intile_x * intile_y * kz * input_data_size / 8;
             }
             cacheSizeInPixel = (cacheSizeInPixel - gcmMIN(imageIdealCache, cacheSizeInPixel)) * data_read_from_sram;
             axiReadBW = _calcKernelReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, inx, iny, z, x, y,
-                cores, brick_mode, data_size, coef_compress_ratio,
+                cores, brick_mode, input_data_size, coef_compress_ratio,
                 image_compress_ratio, cacheSizeInPixel, kernel_head_not_cached_fix, is_depth_wise, &kernelReadBWTile0);
 
             bwCost = &nnCost[ARCH_MODEL_AXI_SRAM_COST].readBW;
@@ -1761,7 +1769,7 @@ static vx_float64 _calcNNCycleCountBandWidth(
         sizeForAXISram = data_read_from_sram * l2cache_size;
         axiReadBW = _calcReadBandWidth(tile_x, tile_y, kernel_per_core,
             kx, ky, kz, x, y, z, inx, iny,
-            cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, sizeForAXISram,
+            cores, brick_mode, input_data_size, coef_compress_ratio, image_compress_ratio, sizeForAXISram,
             (vx_bool)image_partial_cache, nn_cmd_size, image_not_packed_in_sram, kernel_head_not_cached_fix, cache_line_mode_disabled,
             async_copy_perf_fix, accurate_tile_bw, is_depth_wise, in_image_stride, in_image_slice, zdp, axiAccUnitSizeInByte, equivalent_vip_sram_width_in_byte, NULL, NULL, &kernelReadBWTile0, &imageReadBWVZGroup0, &nnCost[ARCH_MODEL_AXI_SRAM_COST].readBW);
     }
@@ -1770,7 +1778,7 @@ static vx_float64 _calcNNCycleCountBandWidth(
         cacheSizeInPixel = cacheSizeInPixel * data_read_from_sram;
         axiReadBW = _calcKernelReadBandWidth(tile_x, tile_y, kernel_per_core,
             kx, ky, kz, x, y, z, inx, iny,
-            cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel,
+            cores, brick_mode, input_data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel,
             kernel_head_not_cached_fix, is_depth_wise, &kernelReadBWTile0);
 
         bwCost = &nnCost[ARCH_MODEL_AXI_SRAM_COST].readBW;
@@ -1783,7 +1791,7 @@ static vx_float64 _calcNNCycleCountBandWidth(
     {
         cacheSizeInPixel = cacheSizeInPixel * data_read_from_sram;
         axiReadBW = _calcImageReadBandWidth(tile_x, tile_y, kernel_per_core, kx, ky, kz, x, y, z, inx, iny,
-            cores, brick_mode, data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, image_not_packed_in_sram,
+            cores, brick_mode, input_data_size, coef_compress_ratio, image_compress_ratio, cacheSizeInPixel, image_not_packed_in_sram,
             cache_line_mode_disabled, async_copy_perf_fix, accurate_tile_bw, is_depth_wise, equivalent_vip_sram_width_in_byte, in_image_stride, in_image_slice, zdp, axiAccUnitSizeInByte, image_partial_cache, &imageReadBWVZGroup0);
 
         bwCost = &nnCost[ARCH_MODEL_AXI_SRAM_COST].readBW;
@@ -1836,15 +1844,15 @@ static vx_float64 _calcNNCycleCountBandWidth(
     vipWriteBW = ddrReadBW;
     if (dst_buf == SW_TILING_FROM_DDR)
     {
-        ddrWriteBW = _calcWriteBandWidth(tile_x, tile_y, x, y, z, data_size, image_compress_ratio, usc_cache_size, pooling_stride, out_image_stride, out_image_slice, is_nn_write_without_usc);
+        ddrWriteBW = _calcWriteBandWidth(tile_x, tile_y, x, y, z, output_data_size, image_compress_ratio, usc_cache_size, pooling_stride, out_image_stride, out_image_slice, is_nn_write_without_usc);
     }
     else if (dst_buf == SW_TILING_FROM_AXI_SRAM)
     {
-        axiWriteBW = _calcWriteBandWidth(tile_x, tile_y, x, y, z, data_size, image_compress_ratio, usc_cache_size, pooling_stride, out_image_stride, out_image_slice, is_nn_write_without_usc);
+        axiWriteBW = _calcWriteBandWidth(tile_x, tile_y, x, y, z, output_data_size, image_compress_ratio, usc_cache_size, pooling_stride, out_image_stride, out_image_slice, is_nn_write_without_usc);
     }
     else
     {
-        vipWriteBW = vipWriteBW + _calcWriteBandWidth(tile_x, tile_y, x, y, z, data_size, 1, usc_cache_size, pooling_stride, out_image_stride, out_image_slice, is_nn_write_without_usc);
+        vipWriteBW = vipWriteBW + _calcWriteBandWidth(tile_x, tile_y, x, y, z, output_data_size, 1, usc_cache_size, pooling_stride, out_image_stride, out_image_slice, is_nn_write_without_usc);
     }
     axiBusWriteBW = ddrWriteBW + axiWriteBW;
 
@@ -1918,18 +1926,18 @@ static vx_float64 _calcNNCycleCountBandWidth(
         {
             vx_float32 slowInternalWriteBWLimit;
             vx_float64 slowInternalWriteCycleCount, slowCompCycleCount;
-            if (data_size == 16 || ((kx * ky * kz) > 512))
+            if (input_data_size == 16 || ((kx * ky * kz) > 512))
             {
                 tmp_internal_write_bw_limit = tmp_internal_write_bw_limit / 2;
             }
 
             slowInternalWriteBWLimit = gcmMIN(tmp_internal_write_bw_limit, (vx_float32)lanes_per_conv / zdpLoopCount);
-            slowInternalWriteCycleCount = ceilf((vx_float32)tile_x * tile_y / slowInternalWriteBWLimit) * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * z * (data_size * data_size) / (8 * 8);
-            slowCompCycleCount = computeCycleCount + ceilf((vx_float32)tile_x * tile_y / lanes_per_conv) * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * ceilf((vx_float32)z / cores) * (data_size * data_size) / (8 * 8);
+            slowInternalWriteCycleCount = ceilf((vx_float32)tile_x * tile_y / slowInternalWriteBWLimit) * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * z * (input_data_size * input_data_size) / (8 * 8);
+            slowCompCycleCount = computeCycleCount + ceilf((vx_float32)tile_x * tile_y / lanes_per_conv) * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * ceilf((vx_float32)z / cores) * (input_data_size * input_data_size) / (8 * 8);
             if (slowInternalWriteCycleCount > slowCompCycleCount)
             {
                 computeCycleCount = slowCompCycleCount;
-                internalWriteCycleCount = ceilf((vx_float32)tile_x * tile_y / tmp_internal_write_bw_limit) * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * z * (data_size * data_size) / (8 * 8);
+                internalWriteCycleCount = ceilf((vx_float32)tile_x * tile_y / tmp_internal_write_bw_limit) * ceilf((vx_float32)x / tile_x) * ceilf((vx_float32)y / tile_y) * z * (input_data_size * input_data_size) / (8 * 8);
             }
             else
             {
@@ -1938,7 +1946,7 @@ static vx_float64 _calcNNCycleCountBandWidth(
         }
         else
         {
-            internalWriteCycleCount = ceilf(1.0f * tile_x * interleave_mode / tmp_internal_write_bw_limit) * ceilf(1.0f * x / tile_x) * ceilf(1.0f * tile_y / interleave_mode) * ceilf(1.0f * y / tile_y) * z * data_size / 8;
+            internalWriteCycleCount = ceilf(1.0f * tile_x * interleave_mode / tmp_internal_write_bw_limit) * ceilf(1.0f * x / tile_x) * ceilf(1.0f * tile_y / interleave_mode) * ceilf(1.0f * y / tile_y) * z * input_data_size / 8;
         }
     }
 
@@ -2364,7 +2372,7 @@ vx_status calculateArchPerf(
 {
     /* version 0.29 - 0.50.5 */
     vx_uint32 numCores, tpCores, lanesPerConv, accuBuffDepth, adjustAccuBuffDepth, inputBuffDepth, inputBuffDepthForOneTile, l2CacheSize, l2CacheWidth, brickMode, swTiling, uscCacheSize, vip7Version, nnCmdSizeInBytes, tpCmdSizeInBytes;
-    vx_uint32 inXSize, inYSize, outZSize, kernelXSize, kernelYSize, kernelZSize, poolingSize, poolingStride, dataSize;
+    vx_uint32 inXSize, inYSize, outZSize, kernelXSize, kernelYSize, kernelZSize, poolingSize, poolingStride, inputDataSize, outputDataSize;
     vx_int32 xOffSet, yOffSet;
     vx_uint32 x, y, k;
     vx_uint32 tmpMaxOutTileYSize, tmpCovAccuMode, tmpCovMode, interleaveMode, cacheLineMode, maxInTileXSize, maxOutTileXSize, minOutTileXSize, minOutTileYSize;
@@ -2417,7 +2425,7 @@ vx_status calculateArchPerf(
     perf->info.poolingStride = !perf->info.poolingSize ? 1 : gcmMAX(1, perf->info.poolingStride);
     perf->info.poolingSize = gcmMAX(1, perf->info.poolingSize);
 
-    gcmASSERT(perf->info.kx && perf->info.inx && perf->info.dataSize);
+    gcmASSERT(perf->info.kx && perf->info.inx && perf->info.inputDataSize);
 
     if (!perf->calculated)
     {
@@ -2427,7 +2435,8 @@ vx_status calculateArchPerf(
         kernelZSize   = perf->info.kz;
         inXSize       = perf->info.inx;
         inYSize       = perf->info.iny;
-        dataSize      = perf->info.dataSize;
+        inputDataSize = perf->info.inputDataSize;
+        outputDataSize= perf->info.outputDataSize;
         poolingSize   = perf->info.poolingSize;
         poolingStride = perf->info.poolingStride;
         xOffSet       = perf->info.xOffSet;
@@ -2465,7 +2474,7 @@ vx_status calculateArchPerf(
         maxOutTileXSize = context->nnConfig.unifiedFeature.maxTileSize;
         inputBuffDepth = context->nnConfig.fixedFeature.nnInputBufferDepth;
         if ((context->nnConfig.derivedFeature.nnXYDPY >= 3) &&
-            (dataSize == 8) &&
+            (inputDataSize == 8) &&
             (kernelXSize != 1 && kernelYSize != 1))
         {
             /* XYDP9. */
@@ -2496,7 +2505,7 @@ vx_status calculateArchPerf(
         {
             adjustAccuBuffDepth = accuBuffDepth / 16;
         }
-        else if (!fp16 && dataSize == 16)
+        else if (!fp16 && inputDataSize == 16)
         {
             adjustAccuBuffDepth = isV8 ? (accuBuffDepth / 4) : (accuBuffDepth / 2);
         }
@@ -2520,7 +2529,7 @@ vx_status calculateArchPerf(
 
         swTiling = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE1) ? vx_true_e : vx_false_e;
 
-        vip7_16bit = (vip7Version && dataSize == 16) ? vx_true_e : vx_false_e;
+        vip7_16bit = (vip7Version && inputDataSize == 16) ? vx_true_e : vx_false_e;
         if (vip7_16bit)
         {
             maxOutTileXSize /= 2;
@@ -2685,7 +2694,7 @@ vx_status calculateArchPerf(
                                     vx_uint32 vipSramInimageStride = gcmMIN((x + kernelXSize - 1), inXSize);
                                     vx_uint32 vipSramInimageSlice = vipSramInimageStride * gcmMIN((y + kernelYSize - 1), inYSize);
                                     k = _calcNumOfKernel(x, y, outZSize, adjustAccuBuffDepth, numCores, interleaveMode,
-                                        zdp, kernelXSize, kernelYSize, isV8, dataSize, lanesPerConv, isDepthWise, kernelPerCoreLTOneThirdCoefFix, poolingStride);
+                                        zdp, kernelXSize, kernelYSize, isV8, inputDataSize, lanesPerConv, isDepthWise, kernelPerCoreLTOneThirdCoefFix, poolingStride);
                                     if (!context->nnConfig.unifiedFeature.coefDeltaCordOverFlowZRL8BitFix &&
                                         ((kernelXSize == 2 && kernelYSize == 2) ||
                                          (kernelXSize == 1 && kernelYSize == 2) ||
@@ -2696,7 +2705,7 @@ vx_status calculateArchPerf(
                                     }
                                     newRDBandWidth = _calcReadBandWidth(x, y, k, kernelXSize, kernelYSize, kernelZSize,
                                         inXSize, inYSize, outZSize, inSIXRefined, inSIYRefined,
-                                        numCores, brickMode, dataSize, coefCompressRatio, imageCompressRatio,
+                                        numCores, brickMode, inputDataSize, coefCompressRatio, imageCompressRatio,
                                         l2CacheSize, (vx_bool)imagePartialCache, nnCmdSizeInBytes, imageNotPackedInSram,
                                         fullCacheKernelHeadFix,
                                         context->nnConfig.unifiedFeature.cacheLineModeDisabled ? vx_true_e : vx_false_e,
@@ -2706,7 +2715,7 @@ vx_status calculateArchPerf(
                                         inImageStride, inImageSlice, zdp, axiAccUnitSizeInByte, equivalentVipSramWidthInByte, NULL, NULL, NULL, NULL, NULL);
                                     newNCRDBandWidth = _calcReadBandWidth(x, y, k, kernelXSize, kernelYSize, kernelZSize,
                                         inXSize, inYSize, outZSize, inSIXRefined, inSIYRefined,
-                                        numCores, brickMode, dataSize, coefCompressRatio, imageCompressRatio,
+                                        numCores, brickMode, inputDataSize, coefCompressRatio, imageCompressRatio,
                                         0, (vx_bool)imagePartialCache, nnCmdSizeInBytes, imageNotPackedInSram,
                                         fullCacheKernelHeadFix,
                                         context->nnConfig.unifiedFeature.cacheLineModeDisabled ? vx_true_e : vx_false_e,
@@ -2715,7 +2724,7 @@ vx_status calculateArchPerf(
                                         isDepthWise,
                                         vipSramInimageStride, vipSramInimageSlice, zdp, vipSramAccUnitSizeInByte, equivalentVipSramWidthInByte, NULL, NULL, NULL, NULL, NULL);
                                     newWTBandWidth = _calcWriteBandWidth(x, y, inXSize, inYSize, outZSize,
-                                        dataSize, imageCompressRatio, uscCacheSize, poolingStride, outImageStride, outImageSlice, isNNWriteWithoutUSC);
+                                        outputDataSize, imageCompressRatio, uscCacheSize, poolingStride, outImageStride, outImageSlice, isNNWriteWithoutUSC);
 
 #ifdef USE_LIB_NN_ARCH_PERF
                                     if (context->apm)
@@ -2734,7 +2743,8 @@ vx_status calculateArchPerf(
                                         inPerfParams.in_image_slice = inImageSlice;
                                         inPerfParams.out_image_slice = outImageSlice;
                                         inPerfParams.op_type = op_type;
-                                        inPerfParams.inDataBitSize = dataSize;
+                                        inPerfParams.inDataBitSize = inputDataSize;
+                                        /*inPerfParams.outDataBitSize = outputDataSize;*/
 
                                         cmdInfo->outImageXsize  = inXSize;
                                         cmdInfo->outImageYsize  = inYSize;
@@ -2783,7 +2793,7 @@ vx_status calculateArchPerf(
                                                                 inSIXRefined, inSIYRefined,
                                                                 poolingStride,
                                                                 coefNonZeroRatio, coefCompressRatio, imageCompressRatio,
-                                                                numCores, brickMode, dataSize,
+                                                                numCores, brickMode, inputDataSize, outputDataSize,
                                                                 l2CacheSize, l2CacheWidth,
                                                                 context->nnConfig.derivedFeature.nnXYDPX,
                                                                 context->nnConfig.derivedFeature.nnXYDPY,
@@ -2899,7 +2909,8 @@ vx_status calculateArchPerf(
                         inPerfParams.in_image_slice = inImageSlice;
                         inPerfParams.out_image_slice = outImageSlice;
                         inPerfParams.op_type = op_type;
-                        inPerfParams.inDataBitSize = dataSize;
+                        inPerfParams.inDataBitSize = inputDataSize;
+                        /*inPerfParams.outDataBitSize = outputDataSize;*/
 
                         cmdInfo->outImageXsize  = inXSize;
                         cmdInfo->outImageYsize  = inYSize;
@@ -2950,7 +2961,7 @@ vx_status calculateArchPerf(
                                                         inSIXRefined, inSIYRefined,
                                                         poolingStride,
                                                         coefNonZeroRatio, coefCompressRatio, imageCompressRatio,
-                                                        numCores, brickMode, dataSize,
+                                                        numCores, brickMode, inputDataSize, outputDataSize,
                                                         l2CacheSize, l2CacheWidth,
                                                         context->nnConfig.derivedFeature.nnXYDPX,
                                                         context->nnConfig.derivedFeature.nnXYDPY,
@@ -3046,7 +3057,8 @@ vx_status calculateArchPerf(
                     inPerfParams.in_image_slice  = inImageSlice;
                     inPerfParams.out_image_slice = outImageSlice;
                     inPerfParams.op_type         = op_type;
-                    inPerfParams.inDataBitSize   = dataSize;
+                    inPerfParams.inDataBitSize   = inputDataSize;
+                    /*inPerfParams.outDataBitSize   = outputDataSize;*/
 
                     cmdInfo->u.tpcmd.x   = inXSize;
                     cmdInfo->u.tpcmd.y   = inYSize;
@@ -3084,7 +3096,7 @@ vx_status calculateArchPerf(
                                                       tpCores, tpCmdSizeInBytes, poolingStride,
                                                       axiSramReadBWLimit, axiSramWriteBWLimit, axiSramTotalBWLimit,
                                                       axiBusReadBWLimit, axiBusWriteBWLimit, axiBusTotalBWLimit,
-                                                      l2CacheWidth, dataSize, swTiling, srcBuf, dstBuf, kernelBuf,
+                                                      l2CacheWidth, inputDataSize, swTiling, srcBuf, dstBuf, kernelBuf,
                                                       outstandingTransfer,
                                                       ddrLatency,
                                                       totalLatency,
@@ -3139,7 +3151,8 @@ vx_status calculateArchPerf(
                 inPerfParams.in_image_slice = inImageSlice;
                 inPerfParams.out_image_slice = outImageSlice;
                 inPerfParams.op_type = op_type;
-                inPerfParams.inDataBitSize = dataSize;
+                inPerfParams.inDataBitSize = inputDataSize;
+                /*inPerfParams.outDataBitSize = outputDataSize;*/
 
                 cmdInfo->outImageXsize  = inXSize;
                 cmdInfo->outImageYsize  = inYSize;
@@ -3192,7 +3205,7 @@ vx_status calculateArchPerf(
                                                            inSIXRefined, inSIYRefined,
                                                            poolingStride,
                                                            coefNonZeroRatio, coefCompressRatio, imageCompressRatio,
-                                                           numCores, brickMode, dataSize,
+                                                           numCores, brickMode, inputDataSize, outputDataSize,
                                                            l2CacheSize, l2CacheWidth,
                                                            context->nnConfig.derivedFeature.nnXYDPX,
                                                            context->nnConfig.derivedFeature.nnXYDPY,
@@ -3311,7 +3324,7 @@ VX_INTERNAL_API void calculateArchPerfFromTiling(
     vxnne_operator_e op_type)
 {
     vx_uint32 kernelXSize, kernelYSize, kernelZSize, poolingSize, poolingStride, strideX, strideY;
-    vx_int32 dataSize, xOffSet, yOffSet;
+    vx_int32 inputDataSize, outputDataSize, xOffSet, yOffSet;
     vx_op_param conv_cmd = &op_command->parameter;
     vx_bool axiSramOnlySWTiling = context->nnConfig.unifiedFeature.axiSramOnlySWTiling ? vx_true_e : vx_false_e;
 
@@ -3326,7 +3339,8 @@ VX_INTERNAL_API void calculateArchPerfFromTiling(
     poolingStride = !conv_cmd->pool_size_y ? 1 : gcmMAX(1, conv_cmd->pool_stride);
     poolingSize = gcmMAX(1, conv_cmd->pool_size_y);
 
-    dataSize = 8 * gcmMIN(TENSOR_DATA_SIZE(input), TENSOR_DATA_SIZE(output));
+    inputDataSize = 8 * TENSOR_DATA_SIZE(input);
+    outputDataSize = 8 * TENSOR_DATA_SIZE(output);
     strideX = op_type == VXNNE_OPERATOR_RESHUFFLE ? WB_STRIDE_X(wb) : 1;
     strideY = op_type == VXNNE_OPERATOR_RESHUFFLE ? WB_STRIDE_Y(wb) : 1;
 
@@ -3339,12 +3353,14 @@ VX_INTERNAL_API void calculateArchPerfFromTiling(
     perf->info.oinz = TENSOR_VIEW_SIZE_INDEX(input, 2);
     perf->info.stridex = strideX;
     perf->info.stridey = strideY;
-    perf->info.dataSize = dataSize;
+    perf->info.inputDataSize = inputDataSize;
+    perf->info.outputDataSize = outputDataSize;
     perf->info.poolingSize = poolingSize;
     perf->info.poolingStride = poolingStride;
     perf->info.xOffSet = xOffSet;
     perf->info.yOffSet = yOffSet;
     perf->info.inputDataFormat = TENSOR_DATA_TYPE(input);
+    perf->info.outputDataFormat = TENSOR_DATA_TYPE(output);
     perf->info.p3 = (poolingSize == 3) ? 1 : 0;
 
     perf->info.inx = op_type == VXNNE_OPERATOR_POOLING ? input_tiling->width : output_tiling->width;
@@ -3439,6 +3455,7 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
     vx_weights_biases_parameter wb,
     vx_uint32 orig_input_dims[],
     vx_uint32 output_dims[],
+    vx_enum output_format,
     vx_int32* offsets,
     vx_int32 flush,
     vx_uint8 src_buf,
@@ -3446,10 +3463,11 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
     vx_uint8 kernel_buf,
     vx_int32 cached_space,
     vxnne_operation_target_e op_target,
-    vxnne_operator_e op_type)
+    vxnne_operator_e op_type
+    )
 {
     vx_uint32 outXSize, outYSize, kernelXSize, kernelYSize, kernelZSize, poolingSize, poolingStride;
-    vx_int32 dataSize, xOffSet, yOffSet;
+    vx_int32 inputDataSize, outputDataSize, xOffSet, yOffSet;
 
     ComputeInputSize(
         output_dims[0],
@@ -3478,7 +3496,8 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
     poolingStride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
     xOffSet = offsets == VX_NULL ? WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * WB_PAD_LEFT(wb)) : offsets[0];
     yOffSet = offsets == VX_NULL ? WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) *  WB_PAD_TOP(wb)) : offsets[1];
-    dataSize = 8 * (vx_uint32)vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb));
+    inputDataSize = 8 * (vx_uint32)vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb));
+    outputDataSize = 8 * (vx_uint32)vxDataType_GetSize((vx_type_e)output_format);
 
     /********** left perf structure configuration **********/
     perf->info.kx = kernelXSize;
@@ -3504,7 +3523,8 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
     perf->info.outz = output_dims[2];
     perf->info.stridex = WB_STRIDE_X(wb);
     perf->info.stridey = WB_STRIDE_Y(wb);
-    perf->info.dataSize = dataSize;
+    perf->info.inputDataSize = inputDataSize;
+    perf->info.outputDataSize = outputDataSize;
     perf->info.poolingSize = poolingSize;
     perf->info.poolingStride = poolingStride;
     perf->info.xOffSet = xOffSet;

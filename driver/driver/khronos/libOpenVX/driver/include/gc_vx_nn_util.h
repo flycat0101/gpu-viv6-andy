@@ -399,6 +399,7 @@ void calculateArchPerfFromWB(
     vx_weights_biases_parameter wb,
     vx_uint32 orig_input_dims[],
     vx_uint32 output_dims[],
+    vx_enum output_format,
     vx_int32* offsets,
     vx_int32 flush,
     vx_uint8 src_buf,
