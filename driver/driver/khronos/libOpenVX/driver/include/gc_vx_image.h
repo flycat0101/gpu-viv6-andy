@@ -43,7 +43,7 @@ VX_INTERNAL_API void vxoImage_FreeWrappedMemory(vx_image image);
 
 VX_INTERNAL_API vx_image VX_API_CALL vxoImage_CreateImageFromInternalHandle(vx_context context, vx_df_image format, vx_imagepatch_addressing_t *addr, void **ptrs, vx_uint32 *phys);
 
-VX_INTERNAL_API vx_size VX_API_CALL vxComputeWholeImageSize(vx_image image, const vx_rectangle_t *rect, vx_uint32 plane_index);
+VX_INTERNAL_ENTRY vx_size VX_API_CALL vxComputeWholeImageSize(vx_image image, const vx_rectangle_t *rect, vx_uint32 plane_index);
 
 #define OVX_IMAGE_HW_MAX_WIDTH     65535
 #define OVX_IMAGE_HW_MAX_HEIGHT    65535

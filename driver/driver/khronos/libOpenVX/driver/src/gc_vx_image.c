@@ -310,8 +310,6 @@ VX_INTERNAL_API void vxoImage_Initialize(
 
     image->useInternalMem       = vx_true_e;
 
-    image->regionOffsetX        = 0;
-
     vxoImage_Dump(image);
 
     gcmFOOTER_NO();
@@ -466,8 +464,11 @@ VX_INTERNAL_API vx_bool vxoImage_WrapUserMemory(vx_image image)
                         size = (gctUINT32)abs(image->memory.strides[planeIndex][VX_DIM_CHANNEL]);
                     }
 
-                    dimIndex = 0;
-                    size = image->memory.strides[planeIndex][VX_DIM_Y] * image->memory.dims[planeIndex][VX_DIM_Y];
+                    for (dimIndex = 0; (vx_uint32)dimIndex < image->memory.dimCount; dimIndex++)
+                    {
+                        image->memory.strides[planeIndex][dimIndex] = (gctUINT32)size;
+                        size *= (gctUINT32)abs(image->memory.dims[planeIndex][dimIndex]);
+                    }
 
                     image->memory.sizes[planeIndex] = size;
                 }
@@ -602,7 +603,6 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromROI(vx_image image, const vx_
         subImage->region.start_y    = gcmMAX(image_rect.start_y, rect->start_y) - rect->start_y;
         subImage->region.end_x        = gcmMIN(image_rect.end_x, rect->end_x) - rect->start_x;
         subImage->region.end_y        = gcmMIN(image_rect.end_y, rect->end_y) - rect->start_y;
-        subImage->regionOffsetX       = rect->start_x + image->regionOffsetX;
     }
 
     vxMemCopy(&subImage->scales, &image->scales, sizeof(image->scales));
@@ -620,19 +620,6 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromROI(vx_image image, const vx_
 
         /* keep offset to allow vxSwapImageHandle update ROI pointers*/
         subImage->memory.offset[planeIndex]         = offset;
-
-        if (image->importType != VX_MEMORY_TYPE_NONE && image->useInternalMem == vx_false_e)
-        {
-            vx_rectangle_t rect;
-            vx_size size = 0;
-
-            rect.start_x = subImage->regionOffsetX;
-            rect.start_y = subImage->region.start_y;
-            rect.end_x   = subImage->region.end_x;
-            rect.end_y   = subImage->region.end_y;
-            size = vxComputeWholeImageSize(subImage, &rect, planeIndex);
-            subImage->memory.wrappedSize[planeIndex] = size;
-        }
     }
 
     subImage->useInternalMem = image->useInternalMem;
@@ -1143,7 +1130,6 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromChannel(vx_image image, vx_en
                 subimage->region.start_y = subimage->height;
                 subimage->region.end_x   = 0;
                 subimage->region.end_y   = 0;
-                subimage->regionOffsetX = 0;
 
                 vxoImage_Dump(subimage);
             }
@@ -1520,7 +1506,7 @@ VX_API_ENTRY vx_size VX_API_CALL vxComputeImagePatchSize(
     return pixelCount * pixelSize;
 }
 
-VX_INTERNAL_API vx_size VX_API_CALL vxComputeWholeImageSize(
+VX_INTERNAL_ENTRY vx_size VX_API_CALL vxComputeWholeImageSize(
         vx_image image, const vx_rectangle_t *rect, vx_uint32 plane_index)
 {
     if (!vxoImage_IsValid(image)) return 0;
@@ -2580,7 +2566,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapImagePatch(
             if((image->useInternalMem == vx_false_e) && ((usage == VX_READ_ONLY) || (usage == VX_READ_AND_WRITE)))
             {
                 {
-                    gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[plane_index], image->memory.logicals[plane_index], image->memory.wrappedSize[plane_index]);
+                    gcoOS_CacheInvalidate(gcvNULL, image->memory.wrappedNode[plane_index], image->memory.logicals[plane_index], image->memory.wrappedSize[plane_index]);
                 }
             }
             status = VX_SUCCESS;
@@ -2596,26 +2582,6 @@ exit:
     gcmFOOTER_ARG("%d", status);
     return status;
 } /* vxMapImagePatch() */
-
-VX_INTERNAL_API vx_status vxoImage_GetSubimageOffset(vx_image image, vx_uint32 planeIndex, vx_uint32*  offset)
-{
-    if (vxoImage_IsValid(image) != vx_true_e)
-        return VX_ERROR_INVALID_PARAMETERS;
-
-    if (image->parent != NULL)
-    {
-        if (vxoImage_IsValid(image->parent) == vx_true_e)
-        {
-            if ((vx_uint32) planeIndex < image->parent->memory.planeCount)
-            {
-                *offset += image->parent->memory.offset[planeIndex];
-            }
-            vxoImage_GetSubimageOffset(image->parent, planeIndex, offset);
-        }
-    }
-
-    return VX_SUCCESS;
-}
 
 VX_API_ENTRY vx_status VX_API_CALL vxUnmapImagePatch(vx_image image, vx_map_id map_id)
 {
@@ -2671,13 +2637,10 @@ VX_API_ENTRY vx_status VX_API_CALL vxUnmapImagePatch(vx_image image, vx_map_id m
                     {
                         vx_rectangle_t rect;
                         vx_size size = 0;
-                        vx_uint32 offset = image->memory.offset[p];
 
                         vxGetValidRegionImage(image, &rect);
-                        rect.start_x = image->regionOffsetX;
-                        size = vxComputeWholeImageSize(image, &rect, p);
-                        vxoImage_GetSubimageOffset(image, p, &offset);
-                        if(size > 0) gcoOS_MemCopy(image->memory.nodePtrs[p]->logical+offset, image->memory.logicals[p], size);
+                        size = vxComputeImagePatchSize(image, &rect, p);
+                        if(size > 0) gcoOS_MemCopy(image->memory.nodePtrs[p]->logical, image->memory.logicals[p], size);
                     }
                 }
             }
@@ -2808,78 +2771,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxGetValidRegionImage(vx_image image, vx_rect
     return VX_SUCCESS;
 }
 
-VX_INTERNAL_API vx_status vxoImage_SetSubimageUseInternalMem(vx_image image, vx_bool useInternalMemFlag)
-{
-    vx_uint32 p;
-
-    if (vxoImage_IsValid(image) != vx_true_e)
-        return VX_ERROR_INVALID_PARAMETERS;
-
-    for (p = 0; p < VX_MAX_REF_COUNT; p++)
-    {
-        if (image->subimages[p] != NULL && image->subimages[p]->parent == image)
-        {
-            if (vxoImage_IsValid(image->subimages[p]) == vx_true_e)
-            {
-                image->subimages[p]->useInternalMem = useInternalMemFlag;
-                vxoImage_SetSubimageUseInternalMem(image->subimages[p], useInternalMemFlag);
-            }
-        }
-    }
-
-    return VX_SUCCESS;
-}
-
-VX_INTERNAL_API vx_status vxoImage_SetSubimageWrappedNode(vx_image image, vx_uint32 planeIndex, vx_uint32 wrappedNode)
-{
-    vx_uint32 p;
-
-    if (vxoImage_IsValid(image) != vx_true_e)
-        return VX_ERROR_INVALID_PARAMETERS;
-
-    for (p = 0; p < VX_MAX_REF_COUNT; p++)
-    {
-        if (image->subimages[p] != NULL && image->subimages[p]->parent == image)
-        {
-            if (vxoImage_IsValid(image->subimages[p]) == vx_true_e)
-            {
-                if ((vx_uint32) planeIndex < image->subimages[p]->memory.planeCount)
-                {
-                    image->subimages[p]->memory.wrappedNode[planeIndex] = wrappedNode;
-                }
-                vxoImage_SetSubimageWrappedNode(image->subimages[p], planeIndex, wrappedNode);
-            }
-        }
-    }
-
-    return VX_SUCCESS;
-}
-
-VX_INTERNAL_API vx_status vxoImage_SetSubimageNodePtr(vx_image image, vx_uint32 planeIndex, gcsSURF_NODE_PTR  nodePtr)
-{
-    vx_uint32 p;
-
-    if (vxoImage_IsValid(image) != vx_true_e)
-        return VX_ERROR_INVALID_PARAMETERS;
-
-    for (p = 0; p < VX_MAX_REF_COUNT; p++)
-    {
-        if (image->subimages[p] != NULL && image->subimages[p]->parent == image)
-        {
-            if (vxoImage_IsValid(image->subimages[p]) == vx_true_e)
-            {
-                if ((vx_uint32) planeIndex < image->subimages[p]->memory.planeCount)
-                {
-                    image->subimages[p]->memory.nodePtrs[planeIndex] = nodePtr;
-                }
-                vxoImage_SetSubimageNodePtr(image->subimages[p], planeIndex, nodePtr);
-            }
-        }
-    }
-
-    return VX_SUCCESS;
-}
-
 VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const new_ptrs[], void* prev_ptrs[], vx_size num_planes)
 {
     vx_status status = VX_SUCCESS;
@@ -2919,7 +2810,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
                 {
                     if (image->useInternalMem == vx_false_e && image->memory.logicals[p] && image->memory.wrappedSize[p])
                     {
-                        gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+                        gcoOS_CacheInvalidate(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
                     }
                     prev_ptrs[p] = image->memory.logicals[p];
                 }
@@ -2997,64 +2888,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
                             for(p = 0; p < image->planeCount; p++)
                             {
                                 gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
-                                vxoImage_SetSubimageWrappedNode(image, p, image->memory.wrappedNode[p]);
-                            }
-                        }
-                        else
-                        {
-                            vx_uint32 planeIndex;
-
-                            image->memory.allocated = vx_true_e;
-
-                            image->useInternalMem = vx_true_e;
-
-                            vxoImage_SetSubimageUseInternalMem(image, vx_true_e);
-
-                            for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
-                            {
-                                /*if (image->memory.nodePtrs[planeIndex] == VX_NULL)*/
-                                {
-                                    vx_context context = vxGetContext((vx_reference)image);
-                                    gctUINT32_PTR logical = 0;
-                                    vx_uint32 size = sizeof(vx_uint8);
-                                    /*if (image->memory.sizes[planeIndex] == 0)*/
-                                    {
-                                        vx_uint32 dimIndex;
-
-                                        if (image->memory.strides[planeIndex][VX_DIM_CHANNEL] != 0)
-                                        {
-                                            size = (gctUINT32)abs(image->memory.strides[planeIndex][VX_DIM_CHANNEL]);
-                                        }
-
-                                        dimIndex = 0;
-                                        size = image->memory.strides[planeIndex][VX_DIM_Y] * image->memory.dims[planeIndex][VX_DIM_Y];
-
-                                        image->memory.sizes[planeIndex] = size;
-                                     }
-                                     if (gcvSTATUS_OK != gcoVX_AllocateMemory((gctUINT32)image->memory.sizes[planeIndex], (gctPOINTER*)&logical,
-                                            &image->memory.physicals[planeIndex],
-                                            &image->memory.nodePtrs[planeIndex]))
-                                     {
-                                         return vx_false_e;
-                                     }
-
-                                     context->memoryCount++;
-                                     ptr = (vx_uint8*)new_ptrs[planeIndex];
-                                     image->memory.logicals[planeIndex] = ptr;
-
-                                     if (image->memory.sizes[planeIndex] > 0)
-                                     {
-                                         gcoOS_MemCopy(logical, image->memory.logicals[planeIndex], image->memory.sizes[planeIndex]);
-                                     }
-                                 }
-                                 if (image->memory.writeLocks[planeIndex] == NULL)
-                                 {
-                                     if (!vxCreateMutex(OUT &image->memory.writeLocks[planeIndex]))
-                                     {
-                                         return vx_false_e;
-                                     }
-                                 }
-                                 vxoImage_SetSubimageNodePtr(image, planeIndex, image->memory.nodePtrs[planeIndex]);
                             }
                         }
                     }
