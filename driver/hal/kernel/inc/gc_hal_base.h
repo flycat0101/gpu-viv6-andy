@@ -121,7 +121,7 @@ typedef struct _gcsNN_FIXED_FEATURE
     gctUINT  nnCoreCountInt8;       /* total nn core count supporting int8 */
     gctUINT  nnCoreCountInt16;      /* total nn core count supporting int16 */
     gctUINT  nnCoreCountFloat16;    /* total nn core count supporting float16 */
-    gctUINT  nnCoreCountBFloat;     /* total nn core count supporting bfloat */
+    gctUINT  nnCoreCountBFloat16;    /* total nn core count supporting Bfloat16 */
     gctUINT  nnMadPerCore;
     gctUINT  nnInputBufferDepth;
     gctUINT  nnAccumBufferDepth;

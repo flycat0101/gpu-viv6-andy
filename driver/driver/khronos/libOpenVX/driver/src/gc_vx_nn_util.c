@@ -4465,11 +4465,8 @@ vx_bool vxnneIsNNSupportFormat(
         }
         break;
     case VX_TYPE_BFLOAT16:
-        if (1/*gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_BF16_ALU) &&
-            context->nnConfig.fixedFeature.nnCoreCountBFloat16 > 0*/)
+        if (context->nnConfig.fixedFeature.nnCoreCountBFloat16 > 0)
         {
-            /*TODO: */
-            context->nnConfig.fixedFeature.nnCoreCountBFloat16 = 6;
             isNNSupportFormat = vx_true_e;
         }
         break;

@@ -75,6 +75,10 @@ VX_INTERNAL_API vx_bool vxoGraphOptimization_nnHalSupport(vx_tensor inputTensor)
             context->nnConfig.fixedFeature.nnCoreCountInt8 > 0)
             nnSupportFormat = vx_true_e;
         break;
+    case VX_TYPE_BFLOAT16:
+        if (context->nnConfig.fixedFeature.nnCoreCountBFloat16 > 0)
+            nnSupportFormat = vx_true_e;
+        break;
     default:
         break;
     }
