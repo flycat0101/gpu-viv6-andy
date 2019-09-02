@@ -4132,6 +4132,209 @@ GLvoid GL_APIENTRY __GL_APINAME(PushClientAttrib)(GLbitfield mask)
 /*
 ** GL_VERSION_1_2
 */
+GLvoid GL_APIENTRY __GL_APINAME(ActiveTextureARB)(GLenum texture)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->ActiveTexture(gc, texture);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(ClientActiveTextureARB)(GLenum texture)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->ClientActiveTexture(gc, texture);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord1dARB)(GLenum target, GLdouble s)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord1d(gc, target, s);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord1dvARB)(GLenum target, const GLdouble *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord1dv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord1fARB)(GLenum target, GLfloat s)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord1f(gc, target, s);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord1fvARB)(GLenum target, const GLfloat *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord1fv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord1iARB)(GLenum target, GLint s)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord1i(gc, target, s);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord1ivARB)(GLenum target, const GLint *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord1iv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord1sARB)(GLenum target, GLshort s)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord1s(gc, target, s);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord1svARB)(GLenum target, const GLshort *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord1sv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord2dARB)(GLenum target, GLdouble s, GLdouble t)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord2d(gc, target, s, t);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord2dvARB)(GLenum target, const GLdouble *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord2dv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord2fARB)(GLenum target, GLfloat s, GLfloat t)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord2f(gc, target, s, t);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord2fvARB)(GLenum target, const GLfloat *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord2fv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord2iARB)(GLenum target, GLint s, GLint t)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord2i(gc, target, s, t);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord2ivARB)(GLenum target, const GLint *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord2iv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord2sARB)(GLenum target, GLshort s, GLshort t)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord2s(gc, target, s, t);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord2svARB)(GLenum target, const GLshort *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord2sv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord3dARB)(GLenum target, GLdouble s, GLdouble t, GLdouble r)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord3d(gc, target, s, t, r);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord3dvARB)(GLenum target, const GLdouble *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord3dv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord3fARB)(GLenum target, GLfloat s, GLfloat t, GLfloat r)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord3f(gc, target, s, t, r);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord3fvARB)(GLenum target, const GLfloat *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord3fv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord3iARB)(GLenum target, GLint s, GLint t, GLint r)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord3i(gc, target, s, t, r);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord3ivARB)(GLenum target, const GLint *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord3iv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord3sARB)(GLenum target, GLshort s, GLshort t, GLshort r)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord3s(gc, target, s, t, r);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord3svARB)(GLenum target, const GLshort *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord3sv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord4dARB)(GLenum target, GLdouble s, GLdouble t, GLdouble r, GLdouble q)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord4d(gc, target, s, t, r, q);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord4dvARB)(GLenum target, const GLdouble *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord4dv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord4fARB)(GLenum target, GLfloat s, GLfloat t, GLfloat r, GLfloat q)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord4f(gc, target, s, t, r, q);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord4fvARB)(GLenum target, const GLfloat *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord4fv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord4iARB)(GLenum target, GLint s, GLint t, GLint r, GLint q)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord4i(gc, target, s, t, r, q);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord4ivARB)(GLenum target, const GLint *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord4iv(gc, target, v);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord4sARB)(GLenum target, GLshort s, GLshort t, GLshort r, GLshort q)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord4s(gc, target, s, t, r, q);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiTexCoord4svARB)(GLenum target, const GLshort *v)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiTexCoord4sv(gc, target, v);
+}
 
 /*
 ** GL_VERSION_1_3
