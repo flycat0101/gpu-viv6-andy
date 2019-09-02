@@ -3827,7 +3827,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, co
         }
     }
 
-
+    nne_support = vx_false_e;
 
     if (nne_support)
     {
