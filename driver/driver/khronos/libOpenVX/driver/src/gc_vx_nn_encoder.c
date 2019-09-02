@@ -11370,7 +11370,7 @@ void fillinTPKernelBufferHuffman(
            if(bias_format == VX_TYPE_INT64)
             {
                 vx_int64  biasData64bits         = 0;
-                biasBitSize = 32;
+                biasBitSize = biasBitSize >= 32 ? 32: biasBitSize;
                 biasData64bits = bias_base_ptr == VX_NULL ? 0 : *((vx_int64 *)bias_base_ptr + filterIndex);
                 biasFloat32 = Int64toFp32(biasData64bits, wb->wb_base->biases_fixed_point_pos);
             }
@@ -11387,7 +11387,7 @@ void fillinTPKernelBufferHuffman(
             {
                 vx_int32 bias32;
                 vx_int64  biasData64bits         = 0;
-                biasBitSize = 32;
+                biasBitSize = biasBitSize >= 32 ? 32: biasBitSize;
                 biasData64bits = bias_base_ptr == VX_NULL ? 0 : *((vx_int64 *)bias_base_ptr + filterIndex);
                 bias32 = (biasData64bits >>16) & 0xFFFFFFFF;
                 writeBits(&kernelBufferPtr, &bitOffset, bias32, biasBitSize);
@@ -14443,7 +14443,7 @@ void fillinTPKernelBuffer(
            if(bias_format == VX_TYPE_INT64)
             {
                 vx_int64  biasData64bits         = 0;
-                biasBitSize = 32;
+                biasBitSize = biasBitSize >= 32 ? 32: biasBitSize;
                 biasData64bits = bias_base_ptr == VX_NULL ? 0 : *((vx_int64 *)bias_base_ptr + filterIndex);
                 biasFloat32 = Int64toFp32(biasData64bits, wb->wb_base->biases_fixed_point_pos);
             }
@@ -14460,7 +14460,7 @@ void fillinTPKernelBuffer(
             {
                 vx_int32 bias32;
                 vx_int64  biasData64bits         = 0;
-                biasBitSize = 32;
+                biasBitSize = biasBitSize >= 32 ? 32: biasBitSize;
                 biasData64bits = bias_base_ptr == VX_NULL ? 0 : *((vx_int64 *)bias_base_ptr + filterIndex);
                 bias32 = (biasData64bits >>16) & 0xFFFFFFFF;
                 writeBits(&kernelBufferPtr, &bitOffset, bias32, biasBitSize);
