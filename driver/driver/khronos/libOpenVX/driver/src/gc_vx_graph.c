@@ -3740,7 +3740,7 @@ vx_status DetectInImageNonZeroRatioFromConfig(
         else if (*s == ']')
         {
             buf[len] = '\0';
-            if (1 == index && len > 0)
+            if ((1 == index) && (len > 0))
             {
                 graph->layer->operations[abs_op_id]->imgNonZeroRatio = atof(buf);
             }
@@ -3757,14 +3757,22 @@ vx_status DetectInImageNonZeroRatioFromConfig(
             buf[len] = '\0';
             if (len > 0)
             {
-                abs_op_id = atoi(buf);
+                if (index == 0)
+                {
+                    abs_op_id = atoi(buf);
+                    index++;
+                }
+                else
+                {
+                    graph->layer->operations[abs_op_id]->imgNonZeroRatio = atof(buf);
+                    index = 0;
+                }
             }
             else
             {
                 vxInfo("ERROR: invalid input: %s\n", s);
                 goto OnError;
             }
-            index++;
             len = 0;
          }
          else if (isdigit(*s) || *s == '.')
