@@ -1103,8 +1103,8 @@ cloCOMPILER Compiler,
 gctINT TypeToken
 )
 {
-    if(cloCOMPILER_IsBasicTypePacked(Compiler) ||
-       cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+    if((cloCOMPILER_IsBasicTypePacked(Compiler) ||
+       cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))) {
         clsBUILTIN_DATATYPE_INFO *typeInfo;
 
         typeInfo = clGetBuiltinDataTypeInfo(TypeToken);
@@ -1119,20 +1119,125 @@ gctINT TypeToken
 }
 
 static gceSTATUS
+_CreateBuiltinFunction(
+IN cloCOMPILER Compiler,
+IN clsBUILTIN_FUNCTION * BuiltinFunction,
+IN gctBOOL *CheckForPacked
+)
+{
+    gceSTATUS    status = gcvSTATUS_OK;
+    gctUINT      j, k;
+    cltPOOL_STRING    symbolInPool;
+    clsNAME    *funcName = gcvNULL;
+    clsNAME    *paramName = gcvNULL;
+    clsDATA_TYPE *dataType;
+    gctINT     tok;
+    clsDECL    decl;
+    gctBOOL    convertedToPacked = gcvFALSE;
+
+    /* Create function name */
+    gcmONERROR(cloCOMPILER_AllocatePoolString(Compiler,
+                                              BuiltinFunction->symbol,
+                                              &symbolInPool));
+
+    /* convert basic vector type to packed if necessary */
+    tok = BuiltinFunction->returnType;
+    if(*CheckForPacked)
+    {
+        tok = _ConvVectorBasicTypeToPacked(Compiler,
+                                           tok);
+        if(tok != BuiltinFunction->returnType)
+        {
+           convertedToPacked = gcvTRUE;
+        }
+    }
+
+    gcmONERROR(cloCOMPILER_CreateDataType(Compiler,
+                                          tok,
+                                          gcvNULL,
+                                          clvQUALIFIER_NONE,
+                                          clvQUALIFIER_NONE,
+                                          &dataType));
+
+    clmDECL_Initialize(&decl, dataType, (clsARRAY *)0, gcvNULL, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
+    gcmONERROR(cloCOMPILER_CreateName(Compiler,
+                                      0,
+                                      0,
+                                      clvFUNC_NAME,
+                                      &decl,
+                                      symbolInPool,
+                                      gcvNULL,
+                                      (convertedToPacked && cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))
+                                      ? clvEXTENSION_VIV_VX : BuiltinFunction->extension,
+                                      &funcName));
+    funcName->u.funcInfo.hasGenType = clmDATA_TYPE_IsGenType(dataType);
+
+    gcmONERROR(cloCOMPILER_CreateNameSpace(Compiler,
+                                           &funcName->u.funcInfo.localSpace));
+
+    funcName->u.funcInfo.localSpace->scopeName = funcName;
+    funcName->u.funcInfo.localSpace->die = funcName->die;
+
+    for (j = 0; j < BuiltinFunction->paramCount; j++) {
+        /* convert basic vector type to packed if necessary */
+        tok = BuiltinFunction->paramTypes[j];
+        if(*CheckForPacked)
+        {
+             tok = _ConvVectorBasicTypeToPacked(Compiler,
+                                                tok);
+             if(tok != BuiltinFunction->paramTypes[j])
+             {
+                convertedToPacked = gcvTRUE;
+             }
+        }
+
+        /* Create parameter name */
+        gcmONERROR(cloCOMPILER_CreateDataType(Compiler,
+                                              tok,
+                                              gcvNULL,
+                                              clvQUALIFIER_NONE,
+                                              clvQUALIFIER_NONE,
+                                              &dataType));
+
+        clmDECL_Initialize(&decl, dataType, (clsARRAY *)0, gcvNULL, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
+        for(k = 0; k < BuiltinFunction->ptrLevels[j]; k++) {
+            gcmONERROR(clParseAddIndirectionOneLevel(Compiler,
+                                                     &decl.ptrDscr));
+        }
+
+        gcmONERROR(cloCOMPILER_CreateName(Compiler,
+                                          0,
+                                          0,
+                                          clvPARAMETER_NAME,
+                                          &decl,
+                                          "",
+                                          decl.ptrDscr,
+                                          clvEXTENSION_NONE,
+                                          &paramName));
+        paramName->u.variableInfo.builtinSpecific.s.isConvertibleType = BuiltinFunction->typeConvertible[j];
+        paramName->u.variableInfo.builtinSpecific.s.hasGenType = clmDATA_TYPE_IsGenType(dataType);
+    }
+    cloCOMPILER_PopCurrentNameSpace(Compiler, gcvNULL);
+    funcName->u.funcInfo.isFuncDef = gcvFALSE;
+    funcName->u.funcInfo.isInline = BuiltinFunction->isInline;
+    funcName->u.funcInfo.hasVarArg = BuiltinFunction->hasVarArg;
+    funcName->u.funcInfo.hasWriteArg = BuiltinFunction->hasWriteArg;
+    funcName->u.funcInfo.passArgByRef = BuiltinFunction->passArgByRef;
+    *CheckForPacked = convertedToPacked;
+OnError:
+    return status;
+}
+
+static gceSTATUS
 _LoadBuiltinFunctions(
 IN cloCOMPILER Compiler,
 IN gctUINT BuiltinFunctionCount,
 IN clsBUILTIN_FUNCTION * BuiltinFunctions
 )
 {
-    gceSTATUS    status = gcvSTATUS_OK;
-    gctUINT        i, j, k;
-    cltPOOL_STRING    symbolInPool;
-    clsNAME    *    funcName = gcvNULL;
-    clsNAME    *    paramName = gcvNULL;
-    clsDATA_TYPE *dataType;
-    gctINT tok;
-    clsDECL    decl;
+    gceSTATUS  status = gcvSTATUS_OK;
+    gctUINT    i;
+    gctBOOL    checkForPacked;
 
     gcmHEADER_ARG("Compiler=0x%x "
               "BuiltinFunctionCount=%u BuiltinFunctions=0x%x",
@@ -1144,86 +1249,21 @@ IN clsBUILTIN_FUNCTION * BuiltinFunctions
     gcmVERIFY_ARGUMENT(BuiltinFunctions);
 
     for (i = 0; i < BuiltinFunctionCount; i++) {
-        /* Create function name */
-        status = cloCOMPILER_AllocatePoolString(Compiler,
-                                                BuiltinFunctions[i].symbol,
-                                                &symbolInPool);
+        checkForPacked = gcvTRUE;
+        /* Create builtin function declarations */
+        status = _CreateBuiltinFunction(Compiler,
+                                        BuiltinFunctions + i,
+                                        &checkForPacked);
         if (gcmIS_ERROR(status)) break;
 
-        /* convert basic vector type to packed if necessary */
-        tok = _ConvVectorBasicTypeToPacked(Compiler,
-                                           BuiltinFunctions[i].returnType);
-
-        status = cloCOMPILER_CreateDataType(Compiler,
-                                            tok,
-                                            gcvNULL,
-                                            clvQUALIFIER_NONE,
-                                            clvQUALIFIER_NONE,
-                                            &dataType);
-        if (gcmIS_ERROR(status)) break;
-
-        clmDECL_Initialize(&decl, dataType, (clsARRAY *)0, gcvNULL, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
-        status = cloCOMPILER_CreateName(Compiler,
-                                        0,
-                                        0,
-                                        clvFUNC_NAME,
-                                        &decl,
-                                        symbolInPool,
-                                        gcvNULL,
-                                        BuiltinFunctions[i].extension,
-                                        &funcName);
-        if (gcmIS_ERROR(status)) break;
-        funcName->u.funcInfo.hasGenType = clmDATA_TYPE_IsGenType(dataType);
-
-        status = cloCOMPILER_CreateNameSpace(Compiler,
-                                             &funcName->u.funcInfo.localSpace);
-
-        if (gcmIS_ERROR(status)) break;
-        funcName->u.funcInfo.localSpace->scopeName = funcName;
-        funcName->u.funcInfo.localSpace->die = funcName->die;
-
-        for (j = 0; j < BuiltinFunctions[i].paramCount; j++) {
-            /* convert basic vector type to packed if necessary */
-            tok = _ConvVectorBasicTypeToPacked(Compiler,
-                                               BuiltinFunctions[i].paramTypes[j]);
-
-            /* Create parameter name */
-            status = cloCOMPILER_CreateDataType(Compiler,
-                                                tok,
-                                                gcvNULL,
-                                                clvQUALIFIER_NONE,
-                                                clvQUALIFIER_NONE,
-                                                &dataType);
+        if (checkForPacked)
+        {
+            checkForPacked = gcvFALSE;
+            status = _CreateBuiltinFunction(Compiler,
+                                            BuiltinFunctions + i,
+                                            &checkForPacked);
             if (gcmIS_ERROR(status)) break;
-
-            clmDECL_Initialize(&decl, dataType, (clsARRAY *)0, gcvNULL, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
-            for(k = 0; k < BuiltinFunctions[i].ptrLevels[j]; k++) {
-                status = clParseAddIndirectionOneLevel(Compiler,
-                                                       &decl.ptrDscr);
-                if(gcmIS_ERROR(status))break;
-            }
-            if(gcmIS_ERROR(status))break;
-
-            status = cloCOMPILER_CreateName(Compiler,
-                                            0,
-                                            0,
-                                            clvPARAMETER_NAME,
-                                            &decl,
-                                            "",
-                                            decl.ptrDscr,
-                                            clvEXTENSION_NONE,
-                                            &paramName);
-            if (gcmIS_ERROR(status)) break;
-            paramName->u.variableInfo.builtinSpecific.s.isConvertibleType = BuiltinFunctions[i].typeConvertible[j];
-            paramName->u.variableInfo.builtinSpecific.s.hasGenType = clmDATA_TYPE_IsGenType(dataType);
         }
-        if (gcmIS_ERROR(status)) break;
-        cloCOMPILER_PopCurrentNameSpace(Compiler, gcvNULL);
-        funcName->u.funcInfo.isFuncDef = gcvFALSE;
-        funcName->u.funcInfo.isInline = BuiltinFunctions[i].isInline;
-        funcName->u.funcInfo.hasVarArg = BuiltinFunctions[i].hasVarArg;
-        funcName->u.funcInfo.hasWriteArg = BuiltinFunctions[i].hasWriteArg;
-        funcName->u.funcInfo.passArgByRef = BuiltinFunctions[i].passArgByRef;
     }
     gcmFOOTER();
     return status;
@@ -3382,6 +3422,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtzCode},
     {"convert_ushort",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtzCode},
     {"convert_float",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_FloatDefaultCode},
+    {"convert_half",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_FloatDefaultCode},
 
     {"convert_char_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rteCode},
     {"convert_uchar_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rteCode},
@@ -3392,6 +3433,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rteCode},
     {"convert_ushort_rte", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rteCode},
     {"convert_float_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rteCode},
+    {"convert_half_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rteCode},
 
     {"convert_char_rtz",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtzCode},
     {"convert_uchar_rtz",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtzCode},
@@ -3402,6 +3444,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short_rtz",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtzCode},
     {"convert_ushort_rtz", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtzCode},
     {"convert_float_rtz",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtzCode},
+    {"convert_half_rtz",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rteCode},
 
     {"convert_char_rtp",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtpCode},
     {"convert_uchar_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtpCode},
@@ -3412,6 +3455,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtpCode},
     {"convert_ushort_rtp", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtpCode},
     {"convert_float_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtpCode},
+    {"convert_half_rtp",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rteCode},
 
     {"convert_char_rtn",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtnCode},
     {"convert_uchar_rtn",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtnCode},
@@ -3422,6 +3466,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short_rtn",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtnCode},
     {"convert_ushort_rtn", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtnCode},
     {"convert_float_rtn",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtnCode},
+    {"convert_half_rtn",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rteCode},
 
     /* Conversion functions - saturated mode */
     {"convert_char_sat",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_sat_rtzCode},
@@ -3480,6 +3525,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short2",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtzCode},
     {"convert_ushort2",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtzCode},
     {"convert_float2",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_FloatDefaultCode},
+    {"convert_half2",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_FloatDefaultCode},
 
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     {"convert_char2_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rteCode},
@@ -3491,6 +3537,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short2_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rteCode},
     {"convert_ushort2_rte", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rteCode},
     {"convert_float2_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rteCode},
+    {"convert_half2_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rteCode},
 #else
     {"convert_char2_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rteCode},
     {"convert_uchar2_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rteCode},
@@ -3501,6 +3548,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short2_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rteCode},
     {"convert_ushort2_rte", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rteCode},
     {"convert_float2_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rteCode},
+    {"convert_half2_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rteCode},
 #endif
 
     {"convert_char2_rtz",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtzCode},
@@ -3512,6 +3560,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short2_rtz",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtzCode},
     {"convert_ushort2_rtz", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtzCode},
     {"convert_float2_rtz",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtzCode},
+    {"convert_half2_rtz",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtzCode},
 
     {"convert_char2_rtp",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtpCode},
     {"convert_uchar2_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtpCode},
@@ -3523,8 +3572,10 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ushort2_rtp", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtpCode},
 #if _DO_NOT_USE_CONV_FOR_FLOATN_RTP_RTN_EXPLICIT_CONVERT_FUNCTION
     {"convert_float2_rtp",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert2_rtpCode},
+    {"convert_half2_rtp",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert2_rtpCode},
 #else
     {"convert_float2_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtpCode},
+    {"convert_half2_rtp",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtpCode},
 #endif
 
     {"convert_char2_rtn",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtnCode},
@@ -3537,8 +3588,10 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ushort2_rtn", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtnCode},
 #if _DO_NOT_USE_CONV_FOR_FLOATN_RTP_RTN_EXPLICIT_CONVERT_FUNCTION
     {"convert_float2_rtn",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtnCode},
+    {"convert_half2_rtn",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtnCode},
 #else
     {"convert_float2_rtn",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert2_rtnCode},
+    {"convert_half2_rtn",  gcvFALSE,    gcvFALSE,   gcvNULL,  _GenConvert2_rtnCode},
 #endif
 
     /* Conversion functions - saturated mode 2 */
@@ -3608,6 +3661,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short3",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtzCode},
     {"convert_ushort3",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtzCode},
     {"convert_float3",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_FloatDefaultCode},
+    {"convert_half3",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_FloatDefaultCode},
 
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     {"convert_char3_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rteCode},
@@ -3619,6 +3673,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short3_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rteCode},
     {"convert_ushort3_rte", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rteCode},
     {"convert_float3_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rteCode},
+    {"convert_half3_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rteCode},
 #else
     {"convert_char3_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rteCode},
     {"convert_uchar3_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rteCode},
@@ -3629,6 +3684,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short3_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rteCode},
     {"convert_ushort3_rte", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rteCode},
     {"convert_float3_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rteCode},
+    {"convert_half3_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rteCode},
 #endif
 
     {"convert_char3_rtz",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtzCode},
@@ -3640,6 +3696,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short3_rtz",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtzCode},
     {"convert_ushort3_rtz", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtzCode},
     {"convert_float3_rtz",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtzCode},
+    {"convert_half3_rtz",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtzCode},
 
     {"convert_char3_rtp",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtpCode},
     {"convert_uchar3_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtpCode},
@@ -3651,8 +3708,10 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ushort3_rtp", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtpCode},
 #if _DO_NOT_USE_CONV_FOR_FLOATN_RTP_RTN_EXPLICIT_CONVERT_FUNCTION
     {"convert_float3_rtp",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert3_rtpCode},
+    {"convert_half3_rtp",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert3_rtpCode},
 #else
     {"convert_float3_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtpCode},
+    {"convert_half3_rtp",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtpCode},
 #endif
 
     {"convert_char3_rtn",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtnCode},
@@ -3665,8 +3724,10 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ushort3_rtn", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtnCode},
 #if _DO_NOT_USE_CONV_FOR_FLOATN_RTP_RTN_EXPLICIT_CONVERT_FUNCTION
     {"convert_float3_rtn",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert3_rtnCode},
+    {"convert_half3_rtn",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert3_rtnCode},
 #else
     {"convert_float3_rtn",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtnCode},
+    {"convert_half3_rtn",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert3_rtnCode},
 #endif
 
     /* Conversion functions - saturated mode 3 */
@@ -3736,6 +3797,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short4",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rtzCode},
     {"convert_ushort4",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rtzCode},
     {"convert_float4",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_FloatDefaultCode},
+    {"convert_half4",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_FloatDefaultCode},
 
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     {"convert_char4_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rteCode},
@@ -3747,6 +3809,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short4_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rteCode},
     {"convert_ushort4_rte", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rteCode},
     {"convert_float4_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rteCode},
+    {"convert_half4_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rteCode},
 #else
     {"convert_char4_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rteCode},
     {"convert_uchar4_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rteCode},
@@ -3757,6 +3820,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short4_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rteCode},
     {"convert_ushort4_rte", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rteCode},
     {"convert_float4_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rteCode},
+    {"convert_half4_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rteCode},
 #endif
 
     {"convert_char4_rtz",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rtzCode},
@@ -3779,8 +3843,10 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ushort4_rtp", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rtpCode},
 #if _DO_NOT_USE_CONV_FOR_FLOATN_RTP_RTN_EXPLICIT_CONVERT_FUNCTION
     {"convert_float4_rtp",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert4_rtpCode},
+    {"convert_half4_rtp",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert4_rtpCode},
 #else
     {"convert_float4_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rtpCode},
+    {"convert_half4_rtp",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rtpCode},
 #endif
 
     {"convert_char4_rtn",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rtnCode},
@@ -3793,8 +3859,10 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ushort4_rtn", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rtnCode},
 #if _DO_NOT_USE_CONV_FOR_FLOATN_RTP_RTN_EXPLICIT_CONVERT_FUNCTION
     {"convert_float4_rtn",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert4_rtnCode},
+    {"convert_half4_rtn",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert4_rtnCode},
 #else
     {"convert_float4_rtn",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rtnCode},
+    {"convert_half4_rtn",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert4_rtnCode},
 #endif
 
     /* Conversion functions - saturated mode 4 */
@@ -3864,6 +3932,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short8",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtzCode},
     {"convert_ushort8",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtzCode},
     {"convert_float8",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_FloatDefaultCode},
+    {"convert_half8",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_FloatDefaultCode},
 
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     {"convert_char8_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rteCode},
@@ -3875,6 +3944,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short8_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rteCode},
     {"convert_ushort8_rte", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rteCode},
     {"convert_float8_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rteCode},
+    {"convert_half8_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rteCode},
 #else
     {"convert_char8_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rteCode},
     {"convert_uchar8_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rteCode},
@@ -3885,6 +3955,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short8_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rteCode},
     {"convert_ushort8_rte", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rteCode},
     {"convert_float8_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rteCode},
+    {"convert_half8_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rteCode},
 #endif
 
     {"convert_char8_rtz",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtzCode},
@@ -3896,6 +3967,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short8_rtz",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtzCode},
     {"convert_ushort8_rtz", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtzCode},
     {"convert_float8_rtz",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtzCode},
+    {"convert_half8_rtz",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtzCode},
 
     {"convert_char8_rtp",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtpCode},
     {"convert_uchar8_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtpCode},
@@ -3907,8 +3979,10 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ushort8_rtp", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtpCode},
 #if _DO_NOT_USE_CONV_FOR_FLOATN_RTP_RTN_EXPLICIT_CONVERT_FUNCTION
     {"convert_float8_rtp",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert8_rtpCode},
+    {"convert_half8_rtp",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert8_rtpCode},
 #else
     {"convert_float8_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtpCode},
+    {"convert_half8_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtpCode},
 #endif
 
     {"convert_char8_rtn",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtnCode},
@@ -3921,8 +3995,10 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ushort8_rtn", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtnCode},
 #if _DO_NOT_USE_CONV_FOR_FLOATN_RTP_RTN_EXPLICIT_CONVERT_FUNCTION
     {"convert_float8_rtn",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert8_rtnCode},
+    {"convert_half8_rtn",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert8_rtnCode},
 #else
     {"convert_float8_rtn",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtnCode},
+    {"convert_half8_rtn",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert8_rtnCode},
 #endif
 
     /* Conversion functions - saturated mode 8 */
@@ -3992,6 +4068,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short16",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtzCode},
     {"convert_ushort16",     gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtzCode},
     {"convert_float16",      gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_FloatDefaultCode},
+    {"convert_half16",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_FloatDefaultCode},
 
 #if _DO_NOT_USE_CONV_FOR_RTNE_EXPLICIT_CONVERT_FUNCTION
     {"convert_char16_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rteCode},
@@ -4003,6 +4080,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short16_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rteCode},
     {"convert_ushort16_rte", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rteCode},
     {"convert_float16_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rteCode},
+    {"convert_half16_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rteCode},
 #else
     {"convert_char16_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rteCode},
     {"convert_uchar16_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rteCode},
@@ -4013,6 +4091,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short16_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rteCode},
     {"convert_ushort16_rte", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rteCode},
     {"convert_float16_rte",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rteCode},
+    {"convert_half16_rte",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rteCode},
 #endif
 
     {"convert_char16_rtz",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtzCode},
@@ -4024,6 +4103,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short16_rtz",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtzCode},
     {"convert_ushort16_rtz", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtzCode},
     {"convert_float16_rtz",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtzCode},
+    {"convert_half16_rtz",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtzCode},
 
     {"convert_char16_rtp",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtpCode},
     {"convert_uchar16_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtpCode},
@@ -4035,8 +4115,10 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ushort16_rtp", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtpCode},
 #if _DO_NOT_USE_CONV_FOR_FLOATN_RTP_RTN_EXPLICIT_CONVERT_FUNCTION
     {"convert_float16_rtp",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert16_rtpCode},
+    {"convert_half16_rtp",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert16_rtpCode},
 #else
     {"convert_float16_rtp",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtpCode},
+    {"convert_half16_rtp",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtpCode},
 #endif
 
     {"convert_char16_rtn",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtnCode},
@@ -4049,8 +4131,10 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ushort16_rtn", gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtnCode},
 #if _DO_NOT_USE_CONV_FOR_FLOATN_RTP_RTN_EXPLICIT_CONVERT_FUNCTION
     {"convert_float16_rtn",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert16_rtnCode},
+    {"convert_half16_rtn",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert16_rtnCode},
 #else
     {"convert_float16_rtn",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtnCode},
+    {"convert_half16_rtn",   gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert16_rtnCode},
 #endif
 
     /* Conversion functions - saturated mode 16 */
@@ -4120,6 +4204,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short2",      gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtzCode},
     {"convert_ushort2",     gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtzCode},
     {"convert_float2",      gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_FloatDefaultCode},
+    {"convert_half2",       gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_halfDefaultCode},
 
     {"convert_char2_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rteCode},
     {"convert_uchar2_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rteCode},
@@ -4130,6 +4215,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short2_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rteCode},
     {"convert_ushort2_rte", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rteCode},
     {"convert_float2_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rteCode},
+    {"convert_half2_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rteCode},
 
     {"convert_char2_rtz",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtzCode},
     {"convert_uchar2_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtzCode},
@@ -4140,6 +4226,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short2_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtzCode},
     {"convert_ushort2_rtz", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtzCode},
     {"convert_float2_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtzCode},
+    {"convert_half2_rtz",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtzCode},
 
     {"convert_char2_rtp",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtpCode},
     {"convert_uchar2_rtp",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtpCode},
@@ -4150,6 +4237,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short2_rtp",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtpCode},
     {"convert_ushort2_rtp", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtpCode},
     {"convert_float2_rtp",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert2_rtpCode},
+    {"convert_half2_rtp",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert2_rtpCode},
 
     {"convert_char2_rtn",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtnCode},
     {"convert_uchar2_rtn",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtnCode},
@@ -4160,6 +4248,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short2_rtn",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtnCode},
     {"convert_ushort2_rtn", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtnCode},
     {"convert_float2_rtn",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtnCode},
+    {"convert_half2_rtn",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_rtnCode},
 
     /* Conversion functions - saturated mode 2 */
     {"convert_char2_sat",       gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert2_sat_rtzCode},
@@ -4217,6 +4306,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short3",      gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtzCode},
     {"convert_ushort3",     gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtzCode},
     {"convert_float3",      gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_FloatDefaultCode},
+    {"convert_half3",       gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_halfDefaultCode},
 
     {"convert_char3_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rteCode},
     {"convert_uchar3_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rteCode},
@@ -4227,6 +4317,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short3_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rteCode},
     {"convert_ushort3_rte", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rteCode},
     {"convert_float3_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rteCode},
+    {"convert_half3_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rteCode},
 
     {"convert_char3_rtz",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtzCode},
     {"convert_uchar3_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtzCode},
@@ -4237,6 +4328,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short3_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtzCode},
     {"convert_ushort3_rtz", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtzCode},
     {"convert_float3_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtzCode},
+    {"convert_half3_rtz",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtzCode},
 
     {"convert_char3_rtp",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtpCode},
     {"convert_uchar3_rtp",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtpCode},
@@ -4247,6 +4339,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short3_rtp",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtpCode},
     {"convert_ushort3_rtp", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtpCode},
     {"convert_float3_rtp",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtpCode},
+    {"convert_half3_rtp",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtpCode},
 
     {"convert_char3_rtn",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtnCode},
     {"convert_uchar3_rtn",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtnCode},
@@ -4257,6 +4350,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short3_rtn",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtnCode},
     {"convert_ushort3_rtn", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_rtnCode},
     {"convert_float3_rtn",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert3_rtnCode},
+    {"convert_half3_rtn",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert3_rtnCode},
 
     /* Conversion functions - saturated mode 3 */
     {"convert_char3_sat",       gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert3_sat_rtzCode},
@@ -4314,6 +4408,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short4",      gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtzCode},
     {"convert_ushort4",     gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtzCode},
     {"convert_float4",      gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_FloatDefaultCode},
+    {"convert_half4",       gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_halfDefaultCode},
 
     {"convert_char4_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rteCode},
     {"convert_uchar4_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rteCode},
@@ -4324,6 +4419,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short4_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rteCode},
     {"convert_ushort4_rte", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rteCode},
     {"convert_float4_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rteCode},
+    {"convert_half4_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rteCode},
 
     {"convert_char4_rtz",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtzCode},
     {"convert_uchar4_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtzCode},
@@ -4333,7 +4429,8 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ulong4_rtz",  gcvFALSE,    gcvFALSE,  gcvNULL, _GenConvert4_rtzCode},
     {"convert_short4_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtzCode},
     {"convert_ushort4_rtz", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtzCode},
-    {"convert_float4_rtz",  gcvFALSE,    gcvTRUE,  gcvNULL, _GenConvertFloat4_rtzCode},
+    {"convert_float4_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtzCode},
+    {"convert_half4_rtz",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtzCode},
 
     {"convert_char4_rtp",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtpCode},
     {"convert_uchar4_rtp",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtpCode},
@@ -4343,7 +4440,8 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ulong4_rtp",  gcvFALSE,    gcvFALSE,  gcvNULL, _GenConvert4_rtpCode},
     {"convert_short4_rtp",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtpCode},
     {"convert_ushort4_rtp", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtpCode},
-    {"convert_float4_rtp",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert4_rtpCode},
+    {"convert_float4_rtp",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtpCode},
+    {"convert_half4_rtp",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtpCode},
 
     {"convert_char4_rtn",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtnCode},
     {"convert_uchar4_rtn",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtnCode},
@@ -4354,6 +4452,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short4_rtn",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtnCode},
     {"convert_ushort4_rtn", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_rtnCode},
     {"convert_float4_rtn",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert4_rtnCode},
+    {"convert_half4_rtn",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert4_rtnCode},
 
     /* Conversion functions - saturated mode 4 */
     {"convert_char4_sat",       gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert4_sat_rtzCode},
@@ -4410,7 +4509,8 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_ulong8",      gcvFALSE,    gcvFALSE,  gcvNULL, _GenConvert8_rtzCode},
     {"convert_short8",      gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtzCode},
     {"convert_ushort8",     gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtzCode},
-    {"convert_float8",      gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_FloatDefaultCode},
+    {"convert_float8",      gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtzCode},
+    {"convert_half8",       gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtzCode},
 
     {"convert_char8_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rteCode},
     {"convert_uchar8_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rteCode},
@@ -4421,6 +4521,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short8_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rteCode},
     {"convert_ushort8_rte", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rteCode},
     {"convert_float8_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rteCode},
+    {"convert_half8_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rteCode},
 
     {"convert_char8_rtz",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtzCode},
     {"convert_uchar8_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtzCode},
@@ -4431,6 +4532,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short8_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtzCode},
     {"convert_ushort8_rtz", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtzCode},
     {"convert_float8_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtzCode},
+    {"convert_half8_rtz",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtzCode},
 
     {"convert_char8_rtp",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtpCode},
     {"convert_uchar8_rtp",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtpCode},
@@ -4441,6 +4543,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short8_rtp",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtpCode},
     {"convert_ushort8_rtp", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtpCode},
     {"convert_float8_rtp",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert8_rtpCode},
+    {"convert_half8_rtp",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert8_rtpCode},
 
     {"convert_char8_rtn",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtnCode},
     {"convert_uchar8_rtn",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtnCode},
@@ -4451,6 +4554,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short8_rtn",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtnCode},
     {"convert_ushort8_rtn", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_rtnCode},
     {"convert_float8_rtn",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert8_rtnCode},
+    {"convert_half8_rtn",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert8_rtnCode},
 
     /* Conversion functions - saturated mode 8 */
     {"convert_char8_sat",       gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert8_sat_rtzCode},
@@ -4508,6 +4612,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short16",      gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtzCode},
     {"convert_ushort16",     gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtzCode},
     {"convert_float16",      gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_FloatDefaultCode},
+    {"convert_half16",       gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_halfDefaultCode},
 
     {"convert_char16_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rteCode},
     {"convert_uchar16_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rteCode},
@@ -4518,6 +4623,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short16_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rteCode},
     {"convert_ushort16_rte", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rteCode},
     {"convert_float16_rte",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rteCode},
+    {"convert_half16_rte",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rteCode},
 
     {"convert_char16_rtz",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtzCode},
     {"convert_uchar16_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtzCode},
@@ -4528,6 +4634,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short16_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtzCode},
     {"convert_ushort16_rtz", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtzCode},
     {"convert_float16_rtz",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtzCode},
+    {"convert_half16_rtz",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtzCode},
 
     {"convert_char16_rtp",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtpCode},
     {"convert_uchar16_rtp",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtpCode},
@@ -4538,6 +4645,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short16_rtp",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtpCode},
     {"convert_ushort16_rtp", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtpCode},
     {"convert_float16_rtp",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert16_rtpCode},
+    {"convert_half16_rtp",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert16_rtpCode},
 
     {"convert_char16_rtn",   gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtnCode},
     {"convert_uchar16_rtn",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtnCode},
@@ -4548,6 +4656,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"convert_short16_rtn",  gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtnCode},
     {"convert_ushort16_rtn", gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_rtnCode},
     {"convert_float16_rtn",  gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert16_rtnCode},
+    {"convert_half16_rtn",   gcvFALSE,    gcvTRUE,    gcvNULL, _GenConvert16_rtnCode},
 
     /* Conversion functions - saturated mode 16 */
     {"convert_char16_sat",       gcvFALSE,    gcvTRUE,   gcvNULL, _GenConvert16_sat_rtzCode},
@@ -4664,9 +4773,11 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"read_imagef",                 gcvTRUE,       gcvFALSE,       gcvNULL, _GenReadImageFCode},
     {"read_imagei",                 gcvTRUE,       gcvFALSE,       gcvNULL, _GenReadImageICode},
     {"read_imageui",                gcvTRUE,       gcvFALSE,       gcvNULL, _GenReadImageUICode},
+    {"read_imageh",                 gcvTRUE,       gcvFALSE,       gcvNULL, _GenReadImageFCode},
     {"write_imagef",                gcvTRUE,       gcvFALSE,       gcvNULL, _GenWriteImageFCode},
     {"write_imagei",                gcvTRUE,       gcvFALSE,       gcvNULL, _GenWriteImageICode},
     {"write_imageui",               gcvTRUE,       gcvFALSE,       gcvNULL, _GenWriteImageUICode},
+    {"write_imageh",                gcvTRUE,       gcvFALSE,       gcvNULL, _GenWriteImageFCode},
     {"get_image_width",             gcvTRUE,       gcvFALSE,       gcvNULL, _GenGetImageWidthCode},
     {"get_image_height",            gcvTRUE,       gcvFALSE,       gcvNULL, _GenGetImageHeightCode},
     {"get_image_depth",             gcvTRUE,       gcvFALSE,       gcvNULL, _GenGetImageDepthCode},

@@ -86,6 +86,9 @@ static clsBUILTIN_FUNCTION    ImageBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "read_imagef",         T_FLOAT4, 2, {T_IMAGE1D_BUFFER_T, T_INT}, {0, 0}, {0, 1}, 1},
     {clvEXTENSION_NONE,    "read_imagei",         T_INT4, 2, {T_IMAGE1D_BUFFER_T, T_INT}, {0, 0}, {0, 1}, 1},
     {clvEXTENSION_NONE,    "read_imageui",        T_UINT4, 2, {T_IMAGE1D_BUFFER_T, T_INT}, {0, 0}, {0, 1}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "read_imageh",     T_HALF4, 3, {T_IMAGE2D_T, T_SAMPLER_T, T_INT2}, {0, 0, 0}, {0, 0, 1}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "read_imageh",     T_HALF4, 2, {T_IMAGE2D_T, T_INT2}, {0, 0}, {0, 1}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "read_imageh",     T_HALF4, 3, {T_IMAGE2D_T, T_SAMPLER_T, T_FLOAT2}, {0, 0, 0}, {0, 0, 1}, 1},
 #else
     {clvEXTENSION_NONE,    "read_imagef",         T_FLOAT4, 3, {T_IMAGE2D_T, T_SAMPLER_T, T_INT2}, {0, 0, 0}, {0, 0, 1}, 0},
     {clvEXTENSION_NONE,    "read_imagef",         T_FLOAT4, 3, {T_IMAGE2D_T, T_SAMPLER_T, T_FLOAT2}, {0, 0, 0}, {0, 0, 1}, 0},
@@ -134,7 +137,8 @@ static clsBUILTIN_FUNCTION    ImageBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "write_imagef",        T_VOID, 3, {T_IMAGE1D_ARRAY_T, T_INT2, T_FLOAT4}, {0, 0, 0}, {0, 0, 1}, 1},
     {clvEXTENSION_NONE,    "write_imagei",        T_VOID, 3, {T_IMAGE1D_ARRAY_T, T_INT2, T_INT4}, {0, 0, 0}, {0, 0, 1}, 1},
     {clvEXTENSION_NONE,    "write_imageui",       T_VOID, 3, {T_IMAGE1D_ARRAY_T, T_INT2, T_UINT4}, {0, 0, 0}, {0, 0, 1}, 1},
-
+    {clvEXTENSION_CL_KHR_FP16, "write_imageh",    T_VOID, 3, {T_IMAGE2D_T, T_INT2, T_HALF4}, {0, 0, 0}, {0, 0, 1}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "write_imageh",    T_VOID, 3, {T_IMAGE2D_ARRAY_T, T_INT4, T_HALF4}, {0, 0, 0}, {0, 0, 1}, 1},
 #else
     {clvEXTENSION_NONE,    "write_imagef",        T_VOID, 3, {T_IMAGE2D_T, T_INT2, T_FLOAT4}, {0, 0, 0}, {0, 0, 1}, 0},
     {clvEXTENSION_NONE,    "write_imagei",        T_VOID, 3, {T_IMAGE2D_T, T_INT2, T_INT4}, {0, 0, 0}, {0, 0, 1}, 0},
@@ -151,6 +155,8 @@ static clsBUILTIN_FUNCTION    ImageBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "write_imagef",        T_VOID, 3, {T_IMAGE1D_ARRAY_T, T_INT2, T_FLOAT4}, {0, 0, 0}, {0, 0, 1}, 0},
     {clvEXTENSION_NONE,    "write_imagei",        T_VOID, 3, {T_IMAGE1D_ARRAY_T, T_INT2, T_INT4}, {0, 0, 0}, {0, 0, 1}, 0},
     {clvEXTENSION_NONE,    "write_imageui",       T_VOID, 3, {T_IMAGE1D_ARRAY_T, T_INT2, T_UINT4}, {0, 0, 0}, {0, 0, 1}, 0},
+    {clvEXTENSION_CL_KHR_FP16, "write_imageh",    T_VOID, 3, {T_IMAGE2D_T, T_INT2, T_HALF4}, {0, 0, 0}, {0, 0, 1}, 0},
+    {clvEXTENSION_CL_KHR_FP16, "write_imageh",    T_VOID, 3, {T_IMAGE2D_ARRAY_T, T_INT4, T_HALF4}, {0, 0, 0}, {0, 0, 1}, 0},
 #endif
     {clvEXTENSION_NONE,    "get_image_width",     T_INT, 1, {T_IMAGE2D_T}, {0}, {0}, 1},
     {clvEXTENSION_NONE,    "get_image_width",     T_INT, 1, {T_IMAGE3D_T}, {0}, {0}, 1},
@@ -298,6 +304,7 @@ _GenOldWriteImageCode(
     clsIOPERAND iOperand[1];
     clsLOPERAND lOperand[1];
     cleOPCODE   opcode;
+    clsGEN_CODE_DATA_TYPE dataType = OperandsParameters[2].rOperands[0].dataType;
 
     if (clmIsElementTypeImage3D(clmGEN_CODE_elementType_GET(OperandsParameters[0].rOperands[0].dataType)))
     {
@@ -314,7 +321,24 @@ _GenOldWriteImageCode(
     gcmASSERT(OperandCount == 3);
     gcmASSERT(OperandsParameters);
 
-    clsIOPERAND_New(Compiler, iOperand, OperandsParameters[2].rOperands[0].dataType);
+    if (clmIsElementTypeFloating(dataType.elementType))
+    {
+        dataType.elementType = clvTYPE_FLOAT;
+    }
+    else if (clmIsElementTypeSigned(dataType.elementType))
+    {
+        dataType.elementType = clvTYPE_INT;
+    }
+    else if (clmIsElementTypeUnsigned(dataType.elementType))
+    {
+        dataType.elementType = clvTYPE_UINT;
+    }
+    else
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    clsIOPERAND_New(Compiler, iOperand, dataType);
     clsLOPERAND_InitializeUsingIOperand(lOperand, iOperand);
     status = clGenAssignCode(Compiler,
                              PolynaryExpr->exprBase.base.lineNo,
