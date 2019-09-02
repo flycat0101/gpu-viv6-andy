@@ -3379,26 +3379,8 @@ VX_INTERNAL_API void calculateArchPerfFromTiling(
     {
         perf->swTilingInfo.outImageStride = output->strides[1];
         perf->swTilingInfo.outImageSlice = output->strides[1] * output_tiling->height;
-
-        ComputeInputSize(
-            perf->swTilingInfo.origOutX,
-            WB_KERNEL_X(wb),
-            WB_PAD_LEFT(wb),
-            WB_PAD_RIGHT(wb),
-            WB_POOLING_SIZE_X(wb),
-            WB_POOLING_STRIDE(wb),
-            &perf->swTilingInfo.origInX,
-            1);
-
-        ComputeInputSize(
-            perf->swTilingInfo.origOutY,
-            WB_KERNEL_Y(wb),
-            WB_PAD_TOP(wb),
-            WB_PAD_BOTTOM(wb),
-            WB_POOLING_SIZE_Y(wb),
-            WB_POOLING_STRIDE(wb),
-            &perf->swTilingInfo.origInY,
-            1);
+        perf->swTilingInfo.origInX = perf->info.inx;
+        perf->swTilingInfo.origInY = perf->info.iny;
     }
     else
     {
