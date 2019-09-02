@@ -2537,6 +2537,7 @@ static  clsVecCompSelType _BuiltinPackedVectorTypes[] =
 static const gctUINT  _BuiltinPackedVectorTypeCount = sizeof(_BuiltinPackedVectorTypes) / sizeof(clsVecCompSelType);
 
 
+#if gcdDEBUG
 static gctBOOL
 _IsBuiltinVecTypeInfoSorted(
 IN cloCOMPILER Compiler
@@ -2562,6 +2563,7 @@ IN cloCOMPILER Compiler
    }
    return gcvTRUE;
 }
+#endif
 
 void
 cloIR_InitializeVecCompSelTypes(IN cloCOMPILER Compiler)
@@ -2665,12 +2667,17 @@ IN gctINT8 NumComponents
    if(clmIsElementTypePacked(ElementType) && !clmIsElementTypePackedGenType(ElementType)) {
        gctINT index;
        index = ElementType - _BuiltinPackedVectorTypes[0].elementType;
-
-       gcmASSERT(index >= 0 && (gctUINT)index < _BuiltinPackedVectorTypeCount);
+       if (!(index >= 0 && (gctUINT)index < _BuiltinPackedVectorTypeCount))
+       {
+           gcmASSERT(gcvFALSE);
+       }
        vectorSel = _BuiltinPackedVectorTypes + index;
    }
    else {
-       gcmASSERT((gctUINT)ElementType < _BuiltinVectorTypeCount);
+       if (!((gctUINT)ElementType < _BuiltinVectorTypeCount))
+       {
+           gcmASSERT(gcvFALSE);
+       }
        vectorSel = _BuiltinVectorTypes + ElementType;
    }
 
@@ -2728,8 +2735,10 @@ IN gctBOOL IsConst
 
    if(clmIsElementTypePacked(HighRank)) {
        index = HighRank - _BuiltinPackedVectorTypes[0].elementType;
-
-       gcmASSERT(index >= 0 && (gctUINT)index < _BuiltinPackedVectorTypeCount);
+       if (!(index >= 0 && (gctUINT)index < _BuiltinPackedVectorTypeCount))
+       {
+           gcmASSERT(gcvFALSE);
+       }
        typeInfo = clGetBuiltinDataTypeInfo((_BuiltinPackedVectorTypes + index)->compSel[0]);
        highRank = typeInfo->dataType.elementType;
    }
@@ -2737,8 +2746,10 @@ IN gctBOOL IsConst
 
    if(clmIsElementTypePacked(LowRank)) {
        index = LowRank - _BuiltinPackedVectorTypes[0].elementType;
-
-       gcmASSERT(index >= 0 && (gctUINT)index < _BuiltinPackedVectorTypeCount);
+       if (!(index >= 0 && (gctUINT)index < _BuiltinPackedVectorTypeCount))
+       {
+           gcmASSERT(gcvFALSE);
+       }
        typeInfo = clGetBuiltinDataTypeInfo((_BuiltinPackedVectorTypes + index)->compSel[0]);
        lowRank = typeInfo->dataType.elementType;
    }
@@ -8781,7 +8792,10 @@ OUT cloIR_CONSTANT * ResultConstant
     }
 
     /* Change to the result constant */
-    gcmASSERT((gctUINT)Constant->exprBase.decl.dataType->elementType <  _BuiltinVectorTypeCount);
+    if (!((gctUINT)Constant->exprBase.decl.dataType->elementType <  _BuiltinVectorTypeCount))
+    {
+        gcmASSERT(gcvFALSE);
+    }
     resultType = clGetVectorTerminalToken(Constant->exprBase.decl.dataType->elementType,
                                           ComponentSelection->components);
 

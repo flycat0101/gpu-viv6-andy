@@ -392,25 +392,6 @@ __SpvOpCode2VIRCop(
     return virCop;
 }
 
-static void __SpvCopyLastSwizzle(INOUT VIR_Swizzle * swizzle, IN gctUINT lastIndex)
-{
-    VIR_Swizzle lastSwizzle;
-    gctUINT i;
-
-    gcmASSERT((lastIndex <= 4) && (lastIndex >= 0));
-
-    if (lastIndex == 4 || lastIndex == 0) return;
-
-    /* get last swizzle */
-    lastSwizzle = 0x3 & ((*swizzle) >> ((lastIndex - 1) * 2));
-
-    /* copy the last swizzle */
-    for (i = lastIndex; i < 4; i++)
-    {
-        *swizzle |= lastSwizzle << (i * 2);
-    }
-}
-
 static VIR_Swizzle
 __SpvConstIndexToVIRSwizzle(
     IN gctUINT index
@@ -1390,15 +1371,6 @@ static VSC_ErrCode __SpvFillVirSymWithSymSpv(gcSPV spv, VIR_Symbol * sym, VIR_Sh
     VIR_Symbol_SetFlagsExt(sym, symFlagExt);
 
     return virErrCode;
-}
-
-static void __SpvSetSymVectorOffset(
-    IN gcSPV spv,
-    IN SpvId ResultId,
-    IN VIR_Operand *Operand
-    )
-{
-
 }
 
 static gctBOOL
@@ -3485,6 +3457,7 @@ static VSC_ErrCode __SpvInsertInstruction2(gcSPV spv, VIR_Shader * virShader, VI
     return virErrCode;
 }
 
+#if !SPV_NEW_FUNCPARAM
 static VSC_ErrCode __SpvInsertInstruction(gcSPV spv, VIR_Shader * virShader, VIR_Function * virFunction,
                                           SpvInsertLocation loc, VIR_Instruction * inst,
                                           VIR_OpCode op, SpvId src, SpvId dst)
@@ -3561,6 +3534,7 @@ static VSC_ErrCode __SpvInsertInstruction(gcSPV spv, VIR_Shader * virShader, VIR
 
     return virErrCode;
 }
+#endif
 
 static const gctUINT spvVecMagicBase[] =
 {
@@ -4294,7 +4268,10 @@ VSC_ErrCode __SpvEmitType(gcSPV spv, VIR_Shader * virShader)
     case SpvOpTypeVector:
         SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultId) = spv->operands[0];
         SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId) = spv->operands[1];
-        gcmASSERT(SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId) < sizeof(virEnableCompact)/sizeof(virEnableCompact[0]));
+        if (!(SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId) < sizeof(virEnableCompact)/sizeof(virEnableCompact[0])))
+        {
+            gcmASSERT(gcvFALSE);
+        }
         magicOffset = __GetMagicOffsetByTypeId(SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultId)));
 
         virTypeId = virVector[spvVecMagicBase[SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId)] + magicOffset];
@@ -5118,30 +5095,6 @@ VSC_ErrCode __SpvEmitUndef(gcSPV spv, VIR_Shader * virShader)
     return virErrCode;
 }
 
-static SpvId __SpvFindIdFromConstValue(gcSPV spv, gctUINT value)
-{
-    SpvId targetId = SPV_INVALID_ID;
-    gctUINT i;
-
-    for (i = 0; i < spv->bound; i++)
-    {
-        if (SPV_ID_TYPE(i) == SPV_ID_TYPE_CONST)
-        {
-            if (SPV_ID_TYPE_IS_INTEGER(SPV_ID_CST_SPV_TYPE(i)) ||
-                SPV_ID_TYPE_IS_UNSIGNEDINTEGER(SPV_ID_CST_SPV_TYPE(i)) ||
-                SPV_ID_TYPE_IS_FLOAT(SPV_ID_CST_SPV_TYPE(i)))
-            {
-                if (SPV_ID_VIR_CONST(i).scalarVal.uValue == value)
-                {
-                    targetId = i;
-                    break;
-                }
-            }
-        }
-    }
-
-    return targetId;
-}
 
 VSC_ErrCode __SpvEmitSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
 {
@@ -11513,163 +11466,6 @@ VSC_ErrCode __SpvEmitDecorator(gcSPV spv, VIR_Shader * virShader)
         SPV_CACHED_INST_COUNT()++;
     }
 
-    return VSC_ERR_NONE;
-}
-
-/* Operand function, only use these function to special place,
-most operand handled in __SpvAddxxxx, it's more direct and easy */
-static VSC_ErrCode __SpvOperandId(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandOptionalId(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandVariableIds(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandVariableLiterals(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandVariableLiteralId(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandLiteralNumber(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandLiteralString(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandSource(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandExecutionModel(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandAddressing(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandExecutionMode(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandStorage(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandDimensionality(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandSamplerAddressingMode(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandSamplerFilterMode(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandFPRoundingMode(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandLinkageType(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandAccessQualifier(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandFuncParamAttr(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandDecoration(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandBuiltIn(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandSelect(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandLoop(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandFunction(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandMemorySemantics(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandMemoryAccess(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandExecutionScope(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandGroupOperation(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandKernelEnqueueFlags(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandKernelProfilingInfo(gcSPV spv, VIR_Shader * virShader)
-{
-    return VSC_ERR_NONE;
-}
-
-static VSC_ErrCode __SpvOperandOpcode(gcSPV spv, VIR_Shader * virShader)
-{
     return VSC_ERR_NONE;
 }
 

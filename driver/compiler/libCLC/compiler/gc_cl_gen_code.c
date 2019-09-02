@@ -190,6 +190,7 @@
     } while (gcvFALSE)
 
 /* Array to mark each opcode on its operation begin component-wise or not */
+#if _SPLIT_PACKED_TYPE_GT_16_BYTES
 static gctBOOL _IsOpcodeComponentWise[] =
 {
     /* clvOPCODE_INVALID = 0 */ gcvFALSE,
@@ -415,6 +416,7 @@ static gctBOOL _IsOpcodeComponentWise[] =
     /* clvOPCODE_BYTE_REVERSAL */ gcvTRUE,
 };
 char _checkIsOpcodeComponentWiseSize[sizeof(_IsOpcodeComponentWise)/sizeof(_IsOpcodeComponentWise[0]) == clvOPCODE_MAXOPCODE];
+#endif
 
 static gctBOOL
 _AreElementTypeSame(
@@ -3961,111 +3963,6 @@ IN gcVARIABLE   Variable
     return status;
 }
 
-static gceSTATUS
-_SetUniformQualifiers(
-IN cloCOMPILER Compiler,
-IN clsNAME *Name,
-IN cltQUALIFIER AccessQualifier,
-IN cltQUALIFIER AddrSpaceQualifier,
-IN cltQUALIFIER StorageQualifier,
-IN gcVARIABLE   Variable
-)
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcSHADER shader;
-    gctINT arrayStride;
-
-    cltQUALIFIER accessQualifier = AccessQualifier;
-    cltQUALIFIER addrSpaceQualifier = AddrSpaceQualifier;
-    cltQUALIFIER storageQualifier = StorageQualifier;
-
-    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &shader));
-
-    gcmASSERT(Variable);
-    arrayStride = clsDECL_GetByteSize(Compiler, &Name->decl);
-    arrayStride /= GetVariableKnownArraySize(Variable);
-
-    SetVariableArrayStride(Variable, arrayStride);
-    if (clmNAME_VariableHasMemoryOffset(Name))
-    {
-        SetVariableOffset(Variable, clmNAME_VariableMemoryOffset_GET(Name));
-    }
-    if(storageQualifier & clvSTORAGE_QUALIFIER_EXTERN) {
-        /* set shader to have extern variables */
-        SetShaderHasExternVariable(shader, gcvTRUE);
-        SetVariableIsExtern(Variable);
-    }
-    else if(storageQualifier & clvSTORAGE_QUALIFIER_STATIC) {
-        SetVariableIsStatic(Variable);
-    }
-    if(addrSpaceQualifier == clvQUALIFIER_NONE ||
-       addrSpaceQualifier == clvQUALIFIER_PRIVATE ||
-       addrSpaceQualifier == clvQUALIFIER_LOCAL) {
-        SetVariableIsLocal(Variable);
-    }
-    if(Name->u.variableInfo.hostEndian) {
-        SetVariableIsHostEndian(Variable);
-    }
-    if(clmDECL_IsPointerType(&Name->decl)) {
-        clsTYPE_QUALIFIER *typeQualifier;
-        clsTYPE_QUALIFIER *prev;
-
-        SetVariableIsPointer(Variable);
-        FOR_EACH_SLINK_NODE(Name->decl.ptrDscr, clsTYPE_QUALIFIER, prev, typeQualifier) {
-            if(typeQualifier->type == T_EOF)break;
-            switch (typeQualifier->type) {
-            case T_CONSTANT:
-            case T_GLOBAL:
-                addrSpaceQualifier = typeQualifier->qualifier;
-                break;
-
-            case T_UNIFORM:
-                accessQualifier = typeQualifier->qualifier;
-                break;
-
-            case T_LOCAL:
-                addrSpaceQualifier = typeQualifier->qualifier;
-                break;
-
-            case T_PRIVATE:
-                addrSpaceQualifier = typeQualifier->qualifier;
-                break;
-
-            case T_CONST:
-                accessQualifier = typeQualifier->qualifier;
-                break;
-
-            case T_STATIC:
-                storageQualifier = typeQualifier->qualifier;
-                break;
-
-            case T_EXTERN:
-                storageQualifier = typeQualifier->qualifier;
-                break;
-
-            case T_RESTRICT:
-                storageQualifier = typeQualifier->qualifier;
-                break;
-
-            case T_VOLATILE:
-                storageQualifier = typeQualifier->qualifier;
-                break;
-
-            default:
-                accessQualifier = typeQualifier->qualifier;
-                break;
-            }
-        }
-        status = gcSHADER_UpdateVariable(shader,
-                                         GetVariableIndex(Variable),
-                                         gcvVARIABLE_UPDATE_TYPE_QUALIFIER,
-                                         clConvToShaderTypeQualifier(accessQualifier) |
-                                         clConvToShaderTypeQualifier(addrSpaceQualifier) |
-                                         clConvStorageQualifierToShaderTypeQualifier(storageQualifier));
-        if (gcmIS_ERROR(status)) return status;
-    }
-    return status;
-}
 
 static gceSTATUS
 _AllocLogicalRegOrArray(
