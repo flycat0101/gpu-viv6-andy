@@ -222,8 +222,8 @@ static void _calcArchModelCacheMode(vx_context context, vx_arch_perf perf, vx_in
 
 
 static vx_int8 gOrigShowType = -1;
-static const vx_char *archModelVersion = "ARCHCTS@217601";
-static const vx_char *SWTilingVersion = "ARCHCTS@217601";
+static const vx_char *archModelVersion = "ARCHCTS@218716";
+static const vx_char *SWTilingVersion = "ARCHCTS@218716";
 vx_status showArchPerformance(
     vx_context context,
     vxnne_layer layer,
@@ -1115,7 +1115,7 @@ static vx_float64 _calcWriteBandWidth(
     vx_uint32 out_image_slice,
     vx_bool is_nn_write_without_usc)
 {
-    vx_float32 ppc, poolX, poolY, poolTileX, poolTileY, hGap, vGap;
+    vx_float32 ppc, poolX, poolY, poolTileX, poolTileY, hGap, vGap, hGapSubImg, vGapSubImg;
     vx_float64 cacheSizeInPixel;
     vx_float64 allTilesBW, rowTilesBW, tileBW, writeBW;
 
@@ -1130,7 +1130,20 @@ static vx_float64 _calcWriteBandWidth(
     poolTileX = (vx_float32)tile_x / pooling_stride;
     poolTileY = (vx_float32)tile_y / pooling_stride;
 
-    allTilesBW = _calcUnalignedBW((vx_float64)out_image_slice * z, ppc) * image_compress_ratio;
+    hGapSubImg = out_image_stride - poolX;
+    vGapSubImg = out_image_slice - poolY * out_image_stride + hGapSubImg;
+    if (vGapSubImg < ppc)
+    {
+        allTilesBW = _calcUnalignedBW((double)out_image_slice * z, ppc) * image_compress_ratio;
+    }
+    else if (hGapSubImg < ppc)
+    {
+        allTilesBW = _calcUnalignedBW((double)poolY * out_image_stride - hGapSubImg, ppc) * z * image_compress_ratio;
+    }
+    else
+    {
+        allTilesBW = _calcUnalignedBW((double)poolX, ppc) * poolY * z * image_compress_ratio;
+    }
     if (( (((vx_uint32)(out_image_stride * poolTileY) % (vx_uint32)ppc) == 0) || (((vx_uint32)ppc % (vx_uint32)(out_image_stride * poolTileY)) == 0))
         && (poolTileX == poolX)
         && ((out_image_slice % (vx_uint32)ppc) == 0))
