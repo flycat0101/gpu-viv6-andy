@@ -1389,7 +1389,7 @@ VX_INTERNAL_API vx_bool vxoBinaryGraph_HasBinaryInGraph(
 
 /* this is for generating binary graph
    vxoNode_SetParameter() to change graph input buffer.
-   generate graph binary using the lastest input buffer.
+   generate binary graph using the lastest input buffer.
 */
 VX_INTERNAL_API vx_status vxoBinaryGraph_UpdataIOPhsicalTable(
     vx_node node,
@@ -1497,7 +1497,7 @@ OnError:
 }
 
 /*
-    import graph binary support multiple input/output buffer
+    import binary graph support multiple input/output buffer
 */
 VX_INTERNAL_API vx_status vxoBinaryGraph_SetParameter(
     vx_node node,
@@ -1876,7 +1876,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchNN(
 
                     if (binLoad->context->options.enableNNLayerDump)
                     {
-                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate graph binary\n",
+                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
                                 __FUNCTION__, __LINE__, nnPatchData->sourceType);
                     }
                 }
@@ -1901,7 +1901,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchNN(
 
                     if (binLoad->context->options.enableNNLayerDump)
                     {
-                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate graph binary\n",
+                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
                                 __FUNCTION__, __LINE__, nnPatchData->sourceType);
                     }
                 }
@@ -1926,7 +1926,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchNN(
 
                     if (binLoad->context->options.enableNNLayerDump)
                     {
-                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate graph binary\n",
+                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
                                 __FUNCTION__, __LINE__, nnPatchData->sourceType);
                     }
                 }
@@ -2213,7 +2213,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchTP(
 
                     if (binLoad->context->options.enableNNLayerDump)
                     {
-                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate graph binary\n",
+                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
                                 __FUNCTION__, __LINE__, tpPatchData->sourceType);
                     }
                 }
@@ -2238,7 +2238,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchTP(
 
                     if (binLoad->context->options.enableNNLayerDump)
                     {
-                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate graph binary\n",
+                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
                                 __FUNCTION__, __LINE__, tpPatchData->sourceType);
                     }
                 }
@@ -2263,7 +2263,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchTP(
 
                     if (binLoad->context->options.enableNNLayerDump)
                     {
-                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate graph binary\n",
+                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
                                 __FUNCTION__, __LINE__, tpPatchData->sourceType);
                     }
                 }
@@ -2644,7 +2644,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
 
                 if (binLoad->context->options.enableNNLayerDump)
                 {
-                    vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate graph binary\n",
+                    vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
                             __FUNCTION__, __LINE__, shPatchData->sourceType);
                 }
             }
@@ -2665,7 +2665,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
 
                 if (binLoad->context->options.enableNNLayerDump)
                 {
-                    vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate graph binary\n",
+                    vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
                             __FUNCTION__, __LINE__, shPatchData->sourceType);
                 }
             }
@@ -2686,7 +2686,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
 
                 if (binLoad->context->options.enableNNLayerDump)
                 {
-                    vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate graph binary\n",
+                    vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
                             __FUNCTION__, __LINE__, shPatchData->sourceType);
                 }
             }
@@ -2963,7 +2963,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
                     *memAddr = node->binLoadMem->pool.physical + (*memAddr - scPatchData->originalBaseAddress);
                     if (binLoad->context->options.enableNNLayerDump)
                     {
-                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate graph binary\n",
+                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
                                 __FUNCTION__, __LINE__, scPatchData->sourceType);
                     }
                 }
@@ -2975,7 +2975,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
                     *memAddr =  (*memAddr - scPatchData->originalBaseAddress) + binLoad->context->axiSRAM.physical;
                     if (binLoad->context->options.enableNNLayerDump)
                     {
-                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate graph binary\n",
+                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
                                 __FUNCTION__, __LINE__, scPatchData->sourceType);
                     }
                 }
@@ -2987,7 +2987,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
                     *memAddr =  (*memAddr - scPatchData->originalBaseAddress) + binLoad->context->vipSRAM.physical - VX_VIP_SRAM_IMAGE_STREAM_SIZE;
                     if (binLoad->context->options.enableNNLayerDump)
                     {
-                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate graph binary\n",
+                        vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
                                 __FUNCTION__, __LINE__, scPatchData->sourceType);
                     }
                 }
@@ -4722,7 +4722,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Initialize(
 
     if (fileName == VX_NULL)
     {
-        /* save graph binary for VIPlite*/
+        /* save binary graph for VIPlite*/
         char dumpFile[BINARY_FILE_NAME_MAX_SIZE];
         vx_uint32 offset = 0;
         if (networkBinaryPath == VX_NULL)
@@ -5461,6 +5461,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
     vx_binary_save_s *binarySave = graph->binarySave;
     vx_ptr initBuffer = VX_NULL;
     vx_status status = VX_SUCCESS;
+    vx_uint32 first = 0;
     vx_uint32 stateLCDTIndex = 0;
 
     gcmHEADER_ARG("graph=%p", graph);
@@ -5482,6 +5483,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
     if ((initBuffer != VX_NULL) && (context->binaryGraphInitSize[deviceID] > 0))
     {
         vx_uint32 indexOfFirstPatch = 0, patchCount = 0;
+        vx_uint32 indexTemp = 0;
         vx_uint32 offsetArray[20] = {0};
         vx_int32 ret = 0;
         vx_binary_patch_info_s patchInfo;
@@ -5504,8 +5506,13 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                 patchInfo.index               = -1;
                 patchInfo.originalBaseAddress = axiSRAMPhysical;
                 patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
-                indexOfFirstPatch = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
+                indexTemp = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
                 patchCount++;
+                if (first == 0)
+                {
+                    indexOfFirstPatch = indexTemp;
+                    first = 1;
+                }
 
                 /*1.2 patch end remap address */
                 ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)initBuffer,
@@ -5563,8 +5570,13 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                     patchInfo.index               = -1;
                     patchInfo.originalBaseAddress = axiSRAMPhysical;
                     patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
-                    indexOfFirstPatch = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
+                    indexTemp = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
                     patchCount++;
+                    if (first == 0)
+                    {
+                        indexOfFirstPatch = indexTemp;
+                        first = 1;
+                    }
 
                     /*1.2 patch end remap address */
                     ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)initBuffer,
@@ -5612,8 +5624,13 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                 patchInfo.index               = -1;
                 patchInfo.originalBaseAddress = vipSRAMPhysical;
                 patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
-                indexOfFirstPatch = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
+                indexTemp = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
                 patchCount++;
+                if (first == 0)
+                {
+                    indexOfFirstPatch = indexTemp;
+                    first = 1;
+                }
             }
             else
             {
@@ -5631,8 +5648,13 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                     patchInfo.index               = -1;
                     patchInfo.originalBaseAddress = vipSRAMPhysical;
                     patchInfo.transformation      = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
-                    indexOfFirstPatch = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
+                    indexTemp = vxoBinaryGraph_SavePatchEntry(graph, (void *)&patchInfo);
                     patchCount++;
+                    if (first == 0)
+                    {
+                        indexOfFirstPatch = indexTemp;
+                        first = 1;
+                    }
                 }
                 else
                 {
@@ -5671,7 +5693,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
 OnError:
     if ((graph->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS))
     {
-        /* error in cache graph binary mode, original path run network */
+        /* error in cache binary graph mode, original path run network */
         status = VX_SUCCESS;
         if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
@@ -5725,7 +5747,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveEndOperation(
 OnError:
     if ((graph->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS))
     {
-        /* error in cache graph binary mode, original path run network */
+        /* error in cache binary graph mode, original path run network */
         status = VX_SUCCESS;
         if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
@@ -6459,7 +6481,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
 OnError:
     if ((node->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS))
     {
-        /* error in cache graph binary mode, original path run network */
+        /* error in cache binary graph mode, original path run network */
         status = VX_SUCCESS;
         if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
@@ -7108,7 +7130,7 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
 OnError:
     if ((node->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS))
     {
-        /* error in cache graph binary mode, original path run network */
+        /* error in cache binary graph mode, original path run network */
         status = VX_SUCCESS;
         if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
@@ -7265,7 +7287,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveNNTPStates(
 OnError:
     if ((node->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS))
     {
-        /* error in cache graph binary mode, original path run network */
+        /* error in cache binary graph mode, original path run network */
         status = VX_SUCCESS;
         if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
@@ -7429,14 +7451,14 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
 OnError:
     if ((graph->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS))
     {
-        /* error in cache graph binary mode, original path run network */
+        /* error in cache binary graph mode, original path run network */
         status = VX_SUCCESS;
         if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
             gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
         }
     }
-    /* save graph binary done, destructor all resource */
+    /* save binary graph done, destructor all resource */
     vxoBinaryGraph_unInitial(graph);
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -7486,7 +7508,7 @@ OnError:
 }
 
 /*
-save graph binary entrance table.
+save binary graph entrance table.
 such as Header, entrance, input data, output data, layers.
 */
 VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
@@ -8419,7 +8441,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
         }
         else
         {
-            /* For now, we don't support SW operations in graph binary */
+            /* For now, we don't support SW operations in binary graph */
             vxError("fail to generate binary, not support this operation target\n");
             vxmASSERT(0);
             vxmONERROR(VX_ERROR_NOT_SUPPORTED);
@@ -8428,10 +8450,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
 
     if (context->binaryGraphInitBuffer != VX_NULL)
     {
-        binarySave->initOperationCount = 1; /* A graph binary only one INIT operation */
+        binarySave->initOperationCount = 1; /* A binary graph only one INIT operation */
         binarySave->loadingDataCount += binarySave->initOperationCount;
         binarySave->patchCount += 2; /* patch start/end remap addres for AXI-SRAM or VIP-SRAM */
     }
+
+    binarySave->patchCount += 10; /* patch initialize commands */
 
     binarySave->endOperationCount = 1;
     binarySave->loadingDataCount += binarySave->endOperationCount;
@@ -9090,7 +9114,7 @@ OnError:
 
     if ((context->options.enableSaveBinary == 0) && (status != VX_SUCCESS))
     {
-        /* error in cache graph binary mode, original path run network */
+        /* error in cache binary graph mode, original path run network */
         status = VX_SUCCESS;
         if (gcoOS_StrCmp(binarySave->binaryFileName, "0") != gcvSTATUS_OK)
         {
@@ -9622,7 +9646,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RemoveUnusedFile()
                     gcoOS_Stat(gcvNULL, fileName, &statBuffer);
                     totalSize += (vx_uint32)statBuffer.st_size;
                     if (((vx_uint64)statBuffer.st_atime < accTime) || (0 == accTime))
-                    {   /* get the graph binary that was not used for the longest time */
+                    {
                         accTime = (vx_uint64)statBuffer.st_atime;
                         changeTime =  (vx_uint64)statBuffer.st_ctime;
                         gcoOS_StrCopySafe(oldFileName, BINARY_FILE_NAME_MAX_SIZE, fileName);
@@ -9641,9 +9665,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RemoveUnusedFile()
 
         if ((fileCount >= maxCacheCount) || ((totalSize) / 1024 > maxCacheSizeKB))
         {
-            /* remove the graph binary from cache directory */
+            /* remove the binary graph from cache directory */
             gcoOS_Remove(gcvNULL, oldFileName);
-            vxInfo("remove graph binary file: %s, fileCount: %d, totalSize: %d\n", oldFileName, fileCount, totalSize);
+            vxInfo("remove binary graph file: %s, fileCount: %d, totalSize: %d\n", oldFileName, fileCount, totalSize);
         }
         else
         {
@@ -9793,7 +9817,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
 
         if (graph->inputCount != binaryLoad->fixed.header.inputCount)
         {
-            vxError("%s[%d]: graph binary no output error, %d\n", __FUNCTION__, __LINE__, graph->inputCount);
+            vxError("%s[%d]: binary graph no output error, %d\n", __FUNCTION__, __LINE__, graph->inputCount);
             vxmONERROR(VX_FAILURE);
         }
     }
@@ -9905,7 +9929,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
 
         if (node->numParameters != binaryLoad->fixed.header.inputCount)
         {
-            vxError("%s[%d]: error: graph binary no input numParameters: %d\n",
+            vxError("%s[%d]: error: binary graph no input numParameters: %d\n",
                     __FUNCTION__, __LINE__, node->numParameters);
             vxmONERROR(VX_FAILURE);
         }
@@ -9928,7 +9952,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
 
         if (graph->outputCount != binaryLoad->fixed.header.outputCount)
         {
-            vxError("%s[%d]: graph binary no output error, %d\n", __FUNCTION__, __LINE__, graph->outputCount);
+            vxError("%s[%d]: binary graph no output error, %d\n", __FUNCTION__, __LINE__, graph->outputCount);
             vxmONERROR(VX_FAILURE);
         }
     }
@@ -10014,7 +10038,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
                 }
                 else
                 {
-                    vxError("graph binary cann't support this data type as output, %d\n", inputTable[j]->type);
+                    vxError("binary graph cann't support this data type as output, %d\n", inputTable[j]->type);
                     vxmONERROR(VX_FAILURE);
                 }
             }
@@ -10023,7 +10047,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
 
     if (node->numParameters != (binaryLoad->fixed.header.inputCount + binaryLoad->fixed.header.outputCount))
     {
-        vxError("%s[%d]: graph binary no output error, %d\n", __FUNCTION__, __LINE__, node->numParameters);
+        vxError("%s[%d]: binary graph no output error, %d\n", __FUNCTION__, __LINE__, node->numParameters);
         vxmONERROR(VX_FAILURE);
     }
 
@@ -10072,8 +10096,8 @@ VX_INTERNAL_API void vxoBinaryGraph_ReleaseCache(
     return;
 }
 
-/* cache graph binary to VIV_VX_CACHE_BINARY_GRAPH_DIR
-   or import graph binary from VIV_VX_CACHE_BINARY_GRAPH_DIR
+/* cache binary graph to VIV_VX_CACHE_BINARY_GRAPH_DIR
+   or import binary graph from VIV_VX_CACHE_BINARY_GRAPH_DIR
 */
 VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
     vx_graph graph
@@ -10133,7 +10157,6 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
         vxmONERROR(VX_FAILURE);
     }
 
-    /* find weightTensor for generating key to match graph binary */
     vxmONERROR(vxoBinaryGraph_FindNodeIndexForWeight(graph, &nodeIndex));
     if (nodeIndex >= 0)
     {
@@ -10168,13 +10191,13 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
     /* search this binary name in ENV  VIV_VX_CACHE_BINARY_GRAPH_DIR */
     if (vxoBinaryGraph_SearchInSystem(binaryName))
     {
-        vxInfo("loading graph binary to run...\n");
+        vxInfo("loading binary graph to run...\n");
         vxInfo("binary path: %s\n", binaryName);
     }
     else
     {
         /* binary doesn't exist, generate binary graph */
-        vxInfo("generate graph binary: %s\n", binaryName);
+        vxInfo("generate binary graph: %s\n", binaryName);
         goto SaveBin;
     }
 
@@ -10215,7 +10238,7 @@ SaveBin:
     /* open binaryName file for saving binary */
     if ((vxoBinaryGraph_Initialize(graph, binaryName)) != VX_SUCCESS)
     {
-        vxError("%s[%d]: fail to initial graph binary\n", __FUNCTION__, __LINE__);
+        vxError("%s[%d]: fail to initial binary graph\n", __FUNCTION__, __LINE__);
     }
 
     if (toplogyInfo != VX_NULL)
