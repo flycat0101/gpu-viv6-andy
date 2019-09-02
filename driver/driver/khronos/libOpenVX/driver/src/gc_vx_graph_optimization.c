@@ -2876,21 +2876,6 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_TensorAdd2Conv_copyData2WeightAndB
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoGraphOptimization_TensorAdd2Conv_perpareQuantizedWeightAndBias(vx_tensor *weight, vx_tensor *bias, vx_tensor tensorIn[2],
-                                                                                            vx_uint32 coreNum, vx_int32 factor)
-{
-    perpareQuantizedWeightAndBiasFunc getWB[2] = {
-        vxoGraphOptimization_TensorAdd2Conv_copyData2WeightAndBias_dfp,
-        vxoGraphOptimization_TensorAdd2Conv_copyData2WeightAndBias_asymmetic
-    };
-
-    vxoGraphOptimization_TensorAdd2Conv_createQuantizedWeightAndBias(weight, bias, tensorIn, coreNum);
-
-    getWB[TENSOR_QUANT_TYPE(tensorIn[0]) - 1](weight, bias, tensorIn, coreNum, factor);
-
-    return VX_SUCCESS;
-}
-
 VX_PRIVATE_API vx_status vxoGraphOptimization_TensorAdd2Conv_computeCoreNum(vx_uint32 size, vx_uint32 *core)
 {
     vx_uint32 i = 0, thresold = 1024 * 1024;
