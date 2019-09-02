@@ -30,6 +30,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short",      T_SHORT,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort",     T_USHORT, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float",      T_FLOAT,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half",       T_HALF,   1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char_rte",   T_CHAR,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar_rte",  T_UCHAR,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -40,6 +41,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short_rte",  T_SHORT,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort_rte", T_USHORT, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float_rte",  T_FLOAT,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half_rte",   T_HALF,   1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char_rtz",   T_CHAR,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar_rtz",  T_UCHAR,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -50,6 +52,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short_rtz",  T_SHORT,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort_rtz", T_USHORT, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float_rtz",  T_FLOAT,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half_rtz",   T_HALF,   1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char_rtp",   T_CHAR,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar_rtp",  T_UCHAR,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -60,6 +63,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short_rtp",  T_SHORT,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort_rtp", T_USHORT, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float_rtp",  T_FLOAT,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half_rtp",   T_HALF,   1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char_rtn",   T_CHAR,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar_rtn",  T_UCHAR,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -70,6 +74,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short_rtn",  T_SHORT,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort_rtn", T_USHORT, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float_rtn",  T_FLOAT,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half_rtn",   T_HALF,   1, {T_GENTYPE}, {0}, {0}, 1},
 
     /* Saturated mode */
     {clvEXTENSION_NONE,    "convert_char_sat",       T_CHAR,   1, {T_GENTYPE}, {0}, {0}, 1},
@@ -127,6 +132,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short2",      T_SHORT2,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort2",     T_USHORT2, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float2",      T_FLOAT2,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half2",       T_HALF2,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char2_rte",   T_CHAR2,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar2_rte",  T_UCHAR2,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -137,6 +143,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short2_rte",  T_SHORT2,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort2_rte", T_USHORT2, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float2_rte",  T_FLOAT2,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half2_rte",       T_HALF2,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char2_rtz",   T_CHAR2,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar2_rtz",  T_UCHAR2,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -147,6 +154,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short2_rtz",  T_SHORT2,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort2_rtz", T_USHORT2, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float2_rtz",  T_FLOAT2,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half2_rtz",       T_HALF2,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char2_rtp",   T_CHAR2,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar2_rtp",  T_UCHAR2,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -157,6 +165,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short2_rtp",  T_SHORT2,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort2_rtp", T_USHORT2, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float2_rtp",  T_FLOAT2,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half2_rtp",       T_HALF2,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char2_rtn",   T_CHAR2,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar2_rtn",  T_UCHAR2,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -167,6 +176,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short2_rtn",  T_SHORT2,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort2_rtn", T_USHORT2, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float2_rtn",  T_FLOAT2,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half2_rtz",       T_HALF2,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     /* Saturated mode 2 */
     {clvEXTENSION_NONE, "convert_char2_sat",       T_CHAR2,   1, {T_GENTYPE}, {0}, {0}, 1},
@@ -224,6 +234,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short3",      T_SHORT3,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort3",     T_USHORT3, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float3",      T_FLOAT3,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_float3",       T_HALF3,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char3_rte",   T_CHAR3,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar3_rte",  T_UCHAR3,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -234,6 +245,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short3_rte",  T_SHORT3,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort3_rte", T_USHORT3, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float3_rte",  T_FLOAT3,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_float3_rte",       T_HALF3,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char3_rtz",   T_CHAR3,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar3_rtz",  T_UCHAR3,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -244,6 +256,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short3_rtz",  T_SHORT3,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort3_rtz", T_USHORT3, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float3_rtz",  T_FLOAT3,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_float3_rtz",       T_HALF3,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char3_rtp",   T_CHAR3,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar3_rtp",  T_UCHAR3,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -254,6 +267,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short3_rtp",  T_SHORT3,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort3_rtp", T_USHORT3, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float3_rtp",  T_FLOAT3,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_float3_rtp",       T_HALF3,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char3_rtn",   T_CHAR3,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar3_rtn",  T_UCHAR3,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -264,6 +278,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short3_rtn",  T_SHORT3,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort3_rtn", T_USHORT3, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float3_rtn",  T_FLOAT3,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_float3_rtn",       T_HALF3,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     /* Saturated mode 3 */
     {clvEXTENSION_NONE, "convert_char3_sat",       T_CHAR3,   1, {T_GENTYPE}, {0}, {0}, 1},
@@ -321,6 +336,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short4",      T_SHORT4,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort4",     T_USHORT4, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float4",      T_FLOAT4,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half4",       T_HALF4,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char4_rte",   T_CHAR4,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar4_rte",  T_UCHAR4,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -331,6 +347,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short4_rte",  T_SHORT4,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort4_rte", T_USHORT4, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float4_rte",  T_FLOAT4,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half4_rte",       T_HALF4,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char4_rtz",   T_CHAR4,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar4_rtz",  T_UCHAR4,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -341,6 +358,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short4_rtz",  T_SHORT4,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort4_rtz", T_USHORT4, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float4_rtz",  T_FLOAT4,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half4_rtz",       T_HALF4,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char4_rtp",   T_CHAR4,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar4_rtp",  T_UCHAR4,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -351,6 +369,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short4_rtp",  T_SHORT4,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort4_rtp", T_USHORT4, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float4_rtp",  T_FLOAT4,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half4_rtp",       T_HALF4,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char4_rtn",   T_CHAR4,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar4_rtn",  T_UCHAR4,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -361,6 +380,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short4_rtn",  T_SHORT4,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort4_rtn", T_USHORT4, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float4_rtn",  T_FLOAT4,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half4_rtn",       T_HALF4,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     /* Saturated mode 4 */
     {clvEXTENSION_NONE, "convert_char4_sat",       T_CHAR4,   1, {T_GENTYPE}, {0}, {0}, 1},
@@ -418,6 +438,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short8",      T_SHORT8,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort8",     T_USHORT8, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float8",      T_FLOAT8,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half8",       T_HALF8,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char8_rte",   T_CHAR8,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar8_rte",  T_UCHAR8,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -428,6 +449,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short8_rte",  T_SHORT8,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort8_rte", T_USHORT8, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float8_rte",  T_FLOAT8,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half8_rte",       T_HALF8,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char8_rtz",   T_CHAR8,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar8_rtz",  T_UCHAR8,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -438,6 +460,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short8_rtz",  T_SHORT8,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort8_rtz", T_USHORT8, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float8_rtz",  T_FLOAT8,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half8_rtz",       T_HALF8,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char8_rtp",   T_CHAR8,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar8_rtp",  T_UCHAR8,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -448,6 +471,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short8_rtp",  T_SHORT8,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort8_rtp", T_USHORT8, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float8_rtp",  T_FLOAT8,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half8_rtp",       T_HALF8,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char8_rtn",   T_CHAR8,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar8_rtn",  T_UCHAR8,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -458,6 +482,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short8_rtn",  T_SHORT8,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort8_rtn", T_USHORT8, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float8_rtn",  T_FLOAT8,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half8_rtn",       T_HALF8,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     /* Saturated mode 8 */
     {clvEXTENSION_NONE, "convert_char8_sat",       T_CHAR8,   1, {T_GENTYPE}, {0}, {0}, 1},
@@ -515,6 +540,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short16",      T_SHORT16,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort16",     T_USHORT16, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float16",      T_FLOAT16,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half16",       T_HALF16,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char16_rte",   T_CHAR16,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar16_rte",  T_UCHAR16,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -525,6 +551,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short16_rte",  T_SHORT16,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort16_rte", T_USHORT16, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float16_rte",  T_FLOAT16,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half16_rte",       T_HALF16,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char16_rtz",   T_CHAR16,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar16_rtz",  T_UCHAR16,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -535,6 +562,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short16_rtz",  T_SHORT16,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort16_rtz", T_USHORT16, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float16_rtz",  T_FLOAT16,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half16_rtz",       T_HALF16,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char16_rtp",   T_CHAR16,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar16_rtp",  T_UCHAR16,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -545,6 +573,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short16_rtp",  T_SHORT16,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort16_rtp", T_USHORT16, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float16_rtp",  T_FLOAT16,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half16_rtp",       T_HALF16,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     {clvEXTENSION_NONE, "convert_char16_rtn",   T_CHAR16,   1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_uchar16_rtn",  T_UCHAR16,  1, {T_GENTYPE}, {0}, {0}, 1},
@@ -555,6 +584,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
     {clvEXTENSION_NONE, "convert_short16_rtn",  T_SHORT16,  1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_ushort16_rtn", T_USHORT16, 1, {T_GENTYPE}, {0}, {0}, 1},
     {clvEXTENSION_NONE, "convert_float16_rtn",  T_FLOAT16,  1, {T_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_CL_KHR_FP16, "convert_half16_rtn",       T_HALF16,  1, {T_GENTYPE}, {0}, {0}, 1},
 
     /* Saturated mode 16 */
     {clvEXTENSION_NONE, "convert_char16_sat",       T_CHAR16,   1, {T_GENTYPE}, {0}, {0}, 1},
