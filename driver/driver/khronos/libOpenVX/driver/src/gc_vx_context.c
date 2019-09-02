@@ -548,6 +548,10 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
         "VIV_VX_ENABLE_TP_TENSOR_STRIDED_SLICE",
         "VIV_VX_ENABLE_TP_TENSOR_SVDF_MAP",
     };
+    vx_bool isV8 = (context->nnConfig.derivedFeature.nnXYDPX == 0
+                   && context->nnConfig.derivedFeature.nnXYDPY == 0)
+                   ? vx_true_e : vx_false_e;
+
     gcmHEADER_ARG("context=%p", context);
 
     /* Enable driver TP path by default if HW has this feature */
@@ -916,7 +920,7 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     }
 
     envctrl = gcvNULL;
-    context->options.do1xnAfterSwtiling = 1;
+    context->options.do1xnAfterSwtiling = isV8 ? 0 : 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DO_1XN_AFTER_SWTILING", &envctrl)) && envctrl)
     {
         context->options.do1xnAfterSwtiling = atoi(envctrl);
