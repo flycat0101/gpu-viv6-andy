@@ -17436,6 +17436,7 @@ VIR_Operand_Check4Dual16(
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_OpCode opCode = VIR_Inst_GetOpcode(VirInst);
     VIR_Shader* shader = VIR_Inst_GetShader(VirInst);
 
     gcmASSERT(isHighPrecisionOperand && isHighPrecisionOperand && isVec2orless);
@@ -17563,18 +17564,31 @@ VIR_Operand_Check4Dual16(
                     }
 
                     /*
-                    ** If source1 of a 3D IMG instruction is a temp register, we can't enable DUAL16 because
-                    ** the base address is saved in z channel of source1.
+                    ** To enable DUAL16:
+                    **  1) The SRC0 of a 2D/3D IMG instruction can't be a temp register.
+                    **  2) The SRC1 of a 3D IMG instruction can't be a temp register.
                     */
-                    if (VIR_OPCODE_is3DImageRelated(VIR_Inst_GetOpcode(VirInst)) && VIR_Inst_GetSource(VirInst, 1) == Operand)
+                    if (VIR_OPCODE_isImgLd(opCode) || VIR_OPCODE_isImgSt(opCode) || VIR_OPCODE_isImgAddr(opCode))
                     {
                         VIR_OperandInfo opndInfo;
 
-                        VIR_Operand_GetOperandInfo(VirInst, Operand, &opndInfo);
-
-                        if (opndInfo.isVreg)
+                        if (VIR_Inst_GetSource(VirInst, 0) == Operand)
                         {
-                            *isDual16NotSupported = gcvTRUE;
+                            VIR_Operand_GetOperandInfo(VirInst, Operand, &opndInfo);
+
+                            if (opndInfo.isVreg)
+                            {
+                                *isDual16NotSupported = gcvTRUE;
+                            }
+                        }
+                        else if (VIR_OPCODE_is3DImageRelated(opCode) && VIR_Inst_GetSource(VirInst, 1) == Operand)
+                        {
+                            VIR_Operand_GetOperandInfo(VirInst, Operand, &opndInfo);
+
+                            if (opndInfo.isVreg)
+                            {
+                                *isDual16NotSupported = gcvTRUE;
+                            }
                         }
                     }
                 }
