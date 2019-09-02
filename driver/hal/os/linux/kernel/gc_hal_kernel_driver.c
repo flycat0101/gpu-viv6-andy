@@ -1125,15 +1125,6 @@ static int __devinit gpu_probe(struct platform_device *pdev)
     /* Update module param because drv_init() uses them directly. */
     _SyncModuleParam(&moduleParam);
 
-    for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
-    {
-        if (extSRAMBases[i] != gcvINVALID_PHYSICAL_ADDRESS && !extSRAMSizes[i])
-        {
-            printk("Error! External SRAM base set, but size not set.\n");
-            return -1;
-        }
-    }
-
     ret = drv_init();
 
     if (!ret)
