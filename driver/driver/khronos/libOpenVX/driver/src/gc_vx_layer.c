@@ -27254,7 +27254,7 @@ vxnne_shader_executable vxnneGetPReluShaderExecutable(
 
         if (enable_image_2d)
         {
-            if (srcFixPointPos > dstFixPointPos)
+            if (srcFixPointPos >= dstFixPointPos)
             {
                 vx_uint8  postshift      = gcmMIN(srcFixPointPos - dstFixPointPos, MAX_POST_SHIFT_BITS);
 
@@ -27399,7 +27399,7 @@ vxnne_shader_executable vxnneGetPReluShaderExecutable(
 
         if (enable_image_2d)
         {
-            if (srcFixPointPos > dstFixPointPos)
+            if (srcFixPointPos >= dstFixPointPos)
             {
                 vx_uint8  postshift      = gcmMIN(srcFixPointPos - dstFixPointPos, MAX_POST_SHIFT_BITS);
 
