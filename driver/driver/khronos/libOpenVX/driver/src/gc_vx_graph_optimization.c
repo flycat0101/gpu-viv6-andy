@@ -2444,6 +2444,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_computeQuantAttribute(vx_enum qua
     vx_int32 local_zp = 0;
     vx_int8 local_pos = 0;
 
+    gcmHEADER_ARG("quantType=%d, maxValue=%f, minValue=%f, fixedPointPos=%p, zeroPoint=%p, scale=%p",
+        quantType, maxValue, minValue, fixedPointPos, zeroPoint, scale);
     if(quantType == VX_QUANT_AFFINE_SCALE)
     {
         vx_uint32 drange = 255;
@@ -2471,6 +2473,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_computeQuantAttribute(vx_enum qua
     if(scale)
         *scale = local_scale;
 
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
