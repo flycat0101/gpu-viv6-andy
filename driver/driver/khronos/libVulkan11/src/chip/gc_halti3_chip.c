@@ -1107,8 +1107,10 @@ VkResult halti3_program_copy_src_img(
     if (srcRes->isImage)
     {
         static __vkImageView tmpImgView;
+        static VkExtent3D srcSize;
         static __vkFormatInfo tmpFormatInfo;
         __vkImage *pSrcImg = srcRes->u.img.pImage;
+        const __vkFormatInfo *fmtInfo = gcvNULL;
 
         params->srcOffset = srcRes->u.img.offset;
         params->srcExtent = srcRes->u.img.extent;
@@ -1132,6 +1134,31 @@ VkResult halti3_program_copy_src_img(
 
         tmpImgView.formatInfo = &tmpFormatInfo;
         imgView = &tmpImgView;
+
+        fmtInfo = &srcRes->u.img.pImage->formatInfo;
+
+
+        if (params->rawCopy && fmtInfo->compressed)
+        {
+            VkExtent2D rect = fmtInfo->blockSize;
+
+            params->srcOffset.x      = params->srcOffset.x / rect.width;
+            params->srcOffset.y      = params->srcOffset.y / rect.height;
+            params->srcExtent.width  = gcmALIGN_NP2(params->srcExtent.width, rect.width)  / rect.width;
+            params->srcExtent.height = gcmALIGN_NP2(params->srcExtent.height, rect.height) / rect.height;
+
+            srcSize.width  = gcmALIGN_NP2(srcRes->u.img.extent.width, rect.width ) / rect.width;
+            srcSize.height = gcmALIGN_NP2(srcRes->u.img.extent.height, rect.height) / rect.height;
+            srcSize.depth  = srcRes->u.img.extent.depth;
+
+            if (fmtInfo->bitsPerBlock == 128)
+            {
+                params->srcOffset.x *= 2;
+                params->srcExtent.width *= 2;
+                srcSize.width *= 2;
+            }
+            pBufSize = &srcSize;
+        }
     }
     else
     {
@@ -1366,9 +1393,8 @@ VkResult halti3_program_copy_dst_img(
         tmpImgView.createInfo.subresourceRange.baseArrayLayer = dstRes->u.img.subRes.arrayLayer;
         tmpImgView.createInfo.subresourceRange.layerCount = 1;
 
-        __VK_MEMCOPY(&tmpFormatInfo, &pDstImg->formatInfo, sizeof(tmpFormatInfo));
+        __VK_MEMCOPY(&tmpFormatInfo, __vk_GetVkFormatInfo(params->dstFormat), sizeof(tmpFormatInfo));
 
-        tmpFormatInfo.residentImgFormat = params->dstFormat;
 
         tmpImgView.formatInfo = &tmpFormatInfo;
         imgView = &tmpImgView;
@@ -1380,6 +1406,7 @@ VkResult halti3_program_copy_dst_img(
         static __vkBufferView tmpBufView;
         static VkExtent3D dstSize;
         __vkImage *pSrcImg = srcRes->u.img.pImage;
+        const __vkFormatInfo *fmtInfo = gcvNULL;
 
         params->dstOffset.x = params->dstOffset.y = params->dstOffset.z = 0;
 
@@ -1398,9 +1425,31 @@ VkResult halti3_program_copy_dst_img(
         bufView = &tmpBufView;
 
         params->dstExtent = srcRes->u.img.extent;
+        fmtInfo = __vk_GetVkFormatInfo(pSrcImg->createInfo.format);
+
         dstSize.width  = dstRes->u.buf.rowLength != 0 ? dstRes->u.buf.rowLength : srcRes->u.img.extent.width;
         dstSize.height = dstRes->u.buf.imgHeight != 0 ? dstRes->u.buf.imgHeight : srcRes->u.img.extent.height;
         dstSize.depth  = srcRes->u.img.extent.depth;
+
+        if (params->rawCopy && pSrcImg->formatInfo.compressed)
+        {
+            VkExtent2D rect = fmtInfo->blockSize;
+
+            params->dstOffset.x      = params->dstOffset.x / rect.width;
+            params->dstOffset.y      = params->dstOffset.y / rect.height;
+            params->dstExtent.width  = gcmALIGN_NP2(params->dstExtent.width, rect.width)  / rect.width;
+            params->dstExtent.height = gcmALIGN_NP2(params->dstExtent.height, rect.height) / rect.height;
+
+            dstSize.width  = gcmALIGN_NP2(dstSize.width, rect.width ) / rect.width;
+            dstSize.height = gcmALIGN_NP2(dstSize.height, rect.height) / rect.height;
+
+            if (fmtInfo->bitsPerBlock == 128)
+            {
+                dstSize.width *= 2;
+                params->dstExtent.width *= 2;
+                params->dstOffset.x *= 2;
+            }
+        }
 
         pBufSize = &dstSize;
     }

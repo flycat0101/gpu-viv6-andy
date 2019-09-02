@@ -2615,6 +2615,10 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         {
             alignment = 256;
         }
+        else if (img->formatInfo.compressed)
+        {
+            alignment = img->formatInfo.bitsPerBlock / 8;
+        }
         else
         {
             /* alignment should be 16(pixels) * byte per pixels for tiled surface, and HW require minimum 64 bytes align*/
@@ -2648,7 +2652,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
         for (level = 0; level < pCreateInfo->mipLevels; ++level)
         {
             __vkImageLevel *pLevel = &img->pImgLevels[level];
-            VkDeviceSize   alignedSlice;
 
             if (isCompatiableBppImage)
             {
@@ -2679,8 +2682,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
             pLevel->stride    = (pLevel->alignedW / img->formatInfo.blockSize.width)  * img->formatInfo.bitsPerBlock / 8;
             pLevel->stride    = pLevel->stride / pLevel->partCount;
             pLevel->sliceSize = (pLevel->alignedH / img->formatInfo.blockSize.height) * pLevel->stride;
-            alignedSlice      = gcmALIGN(pLevel->sliceSize, alignment);
-            pLevel->partSize  = alignedSlice * pLevel->requestD;
+            pLevel->sliceSize = gcmALIGN(pLevel->sliceSize, alignment);
+            pLevel->partSize  = pLevel->sliceSize * pLevel->requestD;
             pLevel->size      = pLevel->partSize * pLevel->partCount;
 
             pLevel->offset    = totalBytes;

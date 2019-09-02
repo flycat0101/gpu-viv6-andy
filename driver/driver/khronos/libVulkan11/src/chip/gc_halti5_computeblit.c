@@ -2120,6 +2120,7 @@ static uint32_t halti5_detect_blit_kind(
     __vkImage *pSrcImg, *pDstImg;
     const __vkFormatInfo *fmtInfo = gcvNULL;
     __vkDevContext *devCtx = cmdBuf->devCtx;
+    VkBool32 bAlign = VK_TRUE;
 
     if (!srcRes->isImage && !dstRes->isImage)
     {
@@ -2145,6 +2146,20 @@ static uint32_t halti5_detect_blit_kind(
             (pSrcImg->createInfo.format == VK_FORMAT_A8B8G8R8_SRGB_PACK32)))
         {
             srcFormat = pSrcImg->createInfo.format;
+        }
+
+        /* for compressed image, when do copy to buffer, it is R16G16B16A16 format, it must be tile align */
+        if (pSrcImg->formatInfo.compressed)
+        {
+            VkExtent2D rect = pSrcImg->formatInfo.blockSize;
+            uint32_t   width  = pSrcImg->createInfo.extent.width;
+            uint32_t   height = pSrcImg->createInfo.extent.height;
+
+
+            width  = gcmALIGN_NP2(width, rect.width ) / rect.width;
+            height = gcmALIGN_NP2(height, rect.height) / rect.height;
+
+            bAlign = ((height | width) & 0x3) == 0; /* 4 * 4 tile align */
         }
     }
     else
@@ -2636,10 +2651,24 @@ static uint32_t halti5_detect_blit_kind(
             switch (dstCategory)
             {
             case __VK_FMT_CATEGORY_SINT:
-                kind = HALTI5_BLIT_2D_SINT;
+                if (bAlign)
+                {
+                    kind = HALTI5_BLIT_2D_SINT;
+                }
+                else
+                {
+                    kind = HALTI5_BLIT_COPY_2D_SINT;
+                }
                 break;
             case __VK_FMT_CATEGORY_UINT:
-                kind = HALTI5_BLIT_2D_UINT;
+                if (bAlign)
+                {
+                    kind = HALTI5_BLIT_2D_UINT;
+                }
+                else
+                {
+                    kind = HALTI5_BLIT_COPY_2D_UINT;
+                }
                 break;
             default:
                 {
