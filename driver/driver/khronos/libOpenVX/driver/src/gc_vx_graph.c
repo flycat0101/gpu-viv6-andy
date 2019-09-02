@@ -2146,8 +2146,8 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                 status = vxnneCalculateConvTilingParam(graph->base.context,
                                                         convOperation,
                                                         tilingsInfo,
-                                                        SW_TILING_FROM_DDR,
-                                                        SW_TILING_FROM_DDR,
+                                                        requestList->inputMemory[0]->allocType == VXNNE_MEM_POOL_TYPE_SRAM  ? SW_TILING_FROM_AXI_SRAM : MemPoolTypeToPerfType(requestList->inputMemory[0]->allocType),
+                                                        requestList->outputMemory[0]->allocType == VXNNE_MEM_POOL_TYPE_SRAM ? SW_TILING_FROM_AXI_SRAM : MemPoolTypeToPerfType(requestList->outputMemory[0]->allocType),
                                                         j,
                                                         graph->base.context->vipSRAM.size);
 
