@@ -1437,6 +1437,9 @@ ppoBYTE_INPUT_STREAM_UnGetChar_Phase_0(IN    ppoPREPROCESSOR PP)
 
     if((bis->src[bis->curpos] == '\n') && (bis->inputStringNumber >= 0))
     {
+        /* /r/n has been chagned to /n in phase_1, so we need to unget two chars for /r/n */
+        if (bis->src[bis->curpos - 1] == '\r')
+            --(bis->curpos);
         --(PP->currentSourceFileLineNumber);
     }
 
