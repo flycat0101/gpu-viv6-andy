@@ -13505,7 +13505,7 @@ clGenGenericCode1(
                Opcode = clvOPCODE_CONV;
                srcType = IOperand->dataType;
            }
-
+           srcType = gcGetComponentDataType(srcType);
            if(clmIsElementTypePacked(IOperand->dataType.elementType)) {
                status = clEmitConvCode(Compiler,
                                        LineNo,
