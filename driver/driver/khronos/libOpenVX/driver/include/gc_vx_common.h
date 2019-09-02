@@ -1836,6 +1836,8 @@ typedef struct _vx_image
 
     vx_rectangle_t                          region;
 
+    vx_int32                                regionOffsetX;
+
     vx_enum                                 importType;
 
     vx_image                                subimages[VX_MAX_REF_COUNT];

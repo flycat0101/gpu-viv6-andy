@@ -237,8 +237,10 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
             {
                 size = (gctUINT32)abs(memory->strides[planeIndex][VX_DIM_CHANNEL]);
             }
+
             dimIndex = 0;
             size = memory->strides[planeIndex][VX_DIM_Y] * memory->dims[planeIndex][VX_DIM_Y];
+
             memory->sizes[planeIndex] = size;
         }
 
@@ -249,14 +251,15 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
         desc.physical = gcvINVALID_PHYSICAL_ADDRESS;
         desc.size     = (gctUINT32)memory->sizes[planeIndex];
 
-        memory->wrappedSize[planeIndex] = memory->sizes[planeIndex];
+        /*page size alignment for CPU*/
+        if(desc.logical & 0xfff || desc.size & 0xfff ) goto ErrorExit;
 
         /* Map the host ptr to a vidmem node. */
         status = gcoHAL_WrapUserMemory(&desc,
                               gcvVIDMEM_TYPE_BITMAP,
                               &memory->wrappedNode[planeIndex]);
 
-        if (gcmIS_ERROR(status)) goto ErrorExit;
+        if (gcmIS_ERROR(status)) {planeIndex++; goto ErrorExit;}
 
         /* Get the physical address. */
         status = gcoHAL_LockVideoMemory(memory->wrappedNode[planeIndex],
@@ -265,7 +268,7 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
                                &memory->physicals[planeIndex],
                                gcvNULL);
 
-        if (gcmIS_ERROR(status)) goto ErrorExit;
+        if (gcmIS_ERROR(status)) {planeIndex++; goto ErrorExit;}
 
         if (!vxCreateMutex(OUT &memory->writeLocks[planeIndex]))
         {
@@ -273,6 +276,7 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
             planeIndex++;
             goto ErrorExit;
         }
+        memory->wrappedSize[planeIndex] = memory->sizes[planeIndex];
     }
 
     memory->allocated = vx_true_e;
@@ -287,6 +291,8 @@ ErrorExit:
     {
         if (memory->wrappedNode[planeIndex] != 0)
         {
+            gcoOS_CacheFlush(gcvNULL, memory->wrappedNode[planeIndex], memory->logicals[planeIndex], memory->wrappedSize[planeIndex]);
+
             gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
                             memory->wrappedNode[planeIndex],
                             gcvVIDMEM_TYPE_BITMAP,
@@ -305,6 +311,7 @@ ErrorExit:
         }
 
         memory->sizes[planeIndex] = 0;
+        memory->wrappedSize[planeIndex] = 0;
     }
 
     memory->allocated = vx_false_e;
@@ -321,12 +328,12 @@ VX_INTERNAL_API vx_bool vxoMemory_FreeWrappedMemory(vx_context context, vx_memor
     vxmASSERT(context);
     vxmASSERT(memory);
 
-    if (!memory->allocated)
-    {
-        gcmFOOTER_ARG("%d", vx_true_e);
-        return vx_true_e;
-    }
     vxoMemory_Dump(memory);
+
+    for(planeIndex = 0; planeIndex < memory->planeCount; planeIndex++)
+    {
+        gcoOS_CacheFlush(gcvNULL, memory->wrappedNode[planeIndex], memory->logicals[planeIndex], memory->wrappedSize[planeIndex]);
+    }
 
     for (planeIndex = 0; planeIndex < memory->planeCount; planeIndex++)
     {
@@ -354,6 +361,9 @@ VX_INTERNAL_API vx_bool vxoMemory_FreeWrappedMemory(vx_context context, vx_memor
     }
 
     memory->allocated = vx_false_e;
+
+    if (memory->wrapFlag == gcvALLOC_FLAG_USERMEMORY || memory->wrapFlag == gcvALLOC_FLAG_DMABUF)
+         gcfVX_Flush(gcvTRUE);
 
     gcmFOOTER_ARG("%d", vx_true_e);
     return vx_true_e;
