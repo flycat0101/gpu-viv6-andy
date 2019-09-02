@@ -1008,7 +1008,6 @@ VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
 VSC_ErrCode VSC_IL_TopDownInline(
     VIR_Inliner       *pInliner)
 {
-
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
     VIR_CALL_GRAPH      *pCG = VSC_IL_GetCallGraph(pInliner);
     VIR_Dumper          *pDumper = VSC_IL_GetDumper(pInliner);

@@ -177,6 +177,13 @@ typedef struct _VIR_BB_REACH_RELATION
 
 #define VIR_BB_FLAG_HavingLLI          0x1
 
+typedef enum _VIR_BB_FLAG
+{
+    VIR_BBFLAG_NONE                     = 0x0000,
+    VIR_BBFLAG_HAS_LLI                  = 0x0001,
+    VIR_BBFLAG_HAS_BARRIER              = 0x0002,
+} VIR_BB_FLAG;
+
 struct _VIR_BASIC_BLOCK
 {
     /* Graph node. It must be put at FIRST place!!!! */
@@ -229,7 +236,7 @@ struct _VIR_BASIC_BLOCK
     VIR_BB_REACH_RELATION     globalReachSet;
 
     /* BB flags */
-    gctUINT32                 flags;
+    VIR_BB_FLAG               flags;
 };
 
 #define BB_GET_ID(pBB)          ((pBB)->dgNode.id)
@@ -249,9 +256,12 @@ struct _VIR_BASIC_BLOCK
 #define BB_SET_START_INST(pBB, pInst)  ((pBB)->pStartInst = (pInst))
 #define BB_SET_END_INST(pBB, pInst)    ((pBB)->pEndInst = (pInst))
 
-#define BB_FLAGS_GET_LLI(pBB)         ((pBB)->flags & VIR_BB_FLAG_HavingLLI)
-#define BB_FLAGS_SET_LLI(pBB)         ((pBB)->flags |= VIR_BB_FLAG_HavingLLI)
-#define BB_FLAGS_RESET_LLI(pBB)       ((pBB)->flags &= ~((gctUINT32)VIR_BB_FLAG_HavingLLI))
+#define BB_FLAGS_GET_LLI(pBB)           ((pBB)->flags & VIR_BBFLAG_HAS_LLI)
+#define BB_FLAGS_SET_LLI(pBB)           ((pBB)->flags |= VIR_BBFLAG_HAS_LLI)
+#define BB_FLAGS_RESET_LLI(pBB)         ((pBB)->flags &= ~((gctUINT32)VIR_BBFLAG_HAS_LLI))
+#define BB_FLAGS_HAS_BARRIER(pBB)       ((pBB)->flags & VIR_BBFLAG_HAS_BARRIER)
+#define BB_FLAGS_SET_HAS_BARRIER(pBB)   ((pBB)->flags |= VIR_BBFLAG_HAS_BARRIER)
+#define BB_FLAGS_RESET_HAS_BARRIER(pBB) ((pBB)->flags &= ~((gctUINT32)VIR_BBFLAG_HAS_BARRIER))
 
 #define BB_GET_IDOM(pBB)        (((VIR_DOM_TREE_NODE *)((pBB)->pDomTreeNode->treeNode.pParentNode))->pOwnerBB)
 #define BB_GET_IPDOM(pBB)       (((VIR_DOM_TREE_NODE *)((pBB)->pPostDomTreeNode->treeNode.pParentNode))->pOwnerBB)

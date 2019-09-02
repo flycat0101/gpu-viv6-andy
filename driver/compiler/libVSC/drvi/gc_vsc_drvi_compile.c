@@ -804,6 +804,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_Shader*         pShader = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
     gctBOOL             bRAEnabled = VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(pShPassMnger->basePM.pOptions, 0));
+    VSC_PRELL_PASS_DATA preLLPassData = { gcvFALSE };
     VSC_CPP_PASS_DATA   cppPassData = { VSC_CPP_NONE, gcvTRUE };
     VSC_IL_PASS_DATA    ilPassData = { 3, gcvFALSE };
 
@@ -820,8 +821,21 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     CALL_SH_PASS(vscVIR_RecordInstructionStatus, 0, gcvNULL);
 
     /* Call (schedule) passes of LL by ourselves */
-    CALL_SH_PASS(vscVIR_PreprocessLLShader, 0, gcvNULL);
+    CALL_SH_PASS(vscVIR_PreprocessLLShader, 0, &preLLPassData);
+
+    /* If some functions are marked as FORCE_INLINED after pre-LL, we need to enable IL. */
+    if (preLLPassData.bHasFuncNeedToForceInline)
+    {
+        VSC_OPTN_ILOptions* pInlineOptions = VSC_OPTN_Options_GetInlinerOptions(pShPassMnger->basePM.pOptions, 0);
+
+        if (!VSC_OPTN_ILOptions_GetSwitchOn(pInlineOptions))
+        {
+            VSC_OPTN_ILOptions_SetSwitchOn(pInlineOptions, gcvTRUE);
+            ilPassData.bCheckAlwaysInlineOnly = gcvTRUE;
+        }
+    }
     CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &ilPassData);
+
     CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_SCPP_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VIR_LoopOpts_PerformOnShader, 0, gcvNULL);

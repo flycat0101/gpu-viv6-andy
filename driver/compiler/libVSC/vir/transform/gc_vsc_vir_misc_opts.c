@@ -12,6 +12,7 @@
 
 
 #include "gc_vsc.h"
+#include "vir/transform/gc_vsc_vir_misc_opts.h"
 
 DEF_QUERY_PASS_PROP(vscVIR_RemoveNop)
 {
@@ -6157,6 +6158,7 @@ OnError:
 gctBOOL _CheckAlwaysInlineFunction(
     IN OUT VIR_Shader      *pShader,
     IN  VSC_HW_CONFIG      *pHwCfg,
+    IN gctBOOL              bNeedToCutDownWorkGroupSize,
     IN OUT VIR_Function    *pFunc
     )
 {
@@ -6167,6 +6169,11 @@ gctBOOL _CheckAlwaysInlineFunction(
     if (VIR_Function_GetInstCount(pFunc) == 0)
     {
         return gcvFALSE;
+    }
+
+    if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_HAS_BARRIER) && bNeedToCutDownWorkGroupSize)
+    {
+        return gcvTRUE;
     }
 
     VIR_InstIterator_Init(&instIter, &pFunc->instList);
@@ -6316,7 +6323,8 @@ OnError:
 
 VSC_ErrCode _CheckAlwaysInlineFunctions(
     IN OUT VIR_Shader      *pShader,
-    IN  VSC_HW_CONFIG      *pHwCfg
+    IN  VSC_HW_CONFIG      *pHwCfg,
+    INOUT gctBOOL          *pHasFuncNeedToForceInline
     )
 {
     VSC_ErrCode                 errCode = VSC_ERR_NONE;
@@ -6324,6 +6332,7 @@ VSC_ErrCode _CheckAlwaysInlineFunctions(
     VIR_FunctionNode           *func_node;
     VIR_Function               *pFunc;
     gctBOOL                     alwaysInline = gcvFALSE;
+    gctBOOL                     bNeedToCutDownWorkGroupSize = VIR_Shader_NeedToCutDownWorkGroupSize(pShader, pHwCfg);
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
 
@@ -6343,16 +6352,25 @@ VSC_ErrCode _CheckAlwaysInlineFunctions(
         /* If this function is set before, then it means all its caller have been marked too. */
         if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_ALWAYSINLINE))
         {
+            if (pHasFuncNeedToForceInline)
+            {
+                *pHasFuncNeedToForceInline = gcvTRUE;
+            }
             continue;
         }
 
-        alwaysInline = _CheckAlwaysInlineFunction(pShader, pHwCfg, pFunc);
+        alwaysInline = _CheckAlwaysInlineFunction(pShader, pHwCfg, bNeedToCutDownWorkGroupSize, pFunc);
 
         /* Mark this function and all its caller functions. */
         if (alwaysInline)
         {
             errCode = _MarkFunctionAndAllCallerFunctions(pShader, pFunc);
             ON_ERROR(errCode, "mark function and all its caller functions.");
+
+            if (pHasFuncNeedToForceInline)
+            {
+                *pHasFuncNeedToForceInline = gcvTRUE;
+            }
         }
     }
 
@@ -6483,6 +6501,7 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_Shader* pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VSC_HW_CONFIG* pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     gctBOOL bInvalidCfg = gcvFALSE;
+    gctBOOL     bHasFuncNeedToForceInline = gcvFALSE;
 
     /* Convert integer to float, if hardware doesn't support integer */
     if (!pHwCfg->hwFeatureFlags.hasHalti0)
@@ -6530,7 +6549,7 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
     }
 
     /* Check if a function is ALWAYSINLINE. */
-    errCode = _CheckAlwaysInlineFunctions(pShader, pHwCfg);
+    errCode = _CheckAlwaysInlineFunctions(pShader, pHwCfg, &bHasFuncNeedToForceInline);
     ON_ERROR(errCode, "Check always inline functions");
 
     /* Change all scalar vector constant source into immediate. */
@@ -6545,6 +6564,11 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "After preprocess LL", pShader, gcvTRUE);
+    }
+
+    if (pPassWorker->basePassWorker.pPassSpecificData != gcvNULL)
+    {
+        (*(VSC_PRELL_PASS_DATA *)pPassWorker->basePassWorker.pPassSpecificData).bHasFuncNeedToForceInline = bHasFuncNeedToForceInline;
     }
 
 OnError:

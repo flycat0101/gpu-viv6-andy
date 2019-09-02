@@ -18,6 +18,11 @@
 
 BEGIN_EXTERN_C()
 
+typedef struct _VSC_PRELL_PASS_DATA
+{
+    gctBOOL                     bHasFuncNeedToForceInline;
+} VSC_PRELL_PASS_DATA;
+
 VSC_ErrCode vscVIR_RemoveNop(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_RemoveNop);
 DECLARE_SH_NECESSITY_CHECK(vscVIR_RemoveNop);

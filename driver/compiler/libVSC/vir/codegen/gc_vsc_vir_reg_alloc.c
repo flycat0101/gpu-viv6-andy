@@ -12739,22 +12739,6 @@ _VIR_RA_UpdateBaseOperOfSpecialLoadStore(
     return retErrCode;
 }
 
-static gctBOOL
-_VIR_RA_NeedToCutDownWorkGroupSize(
-    VIR_RA_LS           *pRA)
-{
-    VIR_Shader          *pShader = pRA->pShader;
-    gctUINT             minRegCount = 3;
-
-    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_COMPUTE &&
-        VIR_Shader_GetMaxFreeRegCountPerThread(pShader, pRA->pHwCfg) <= minRegCount)
-    {
-        return gcvTRUE;
-    }
-
-    return gcvFALSE;
-}
-
 static void
 _VIR_RA_ClearColorPool(
     VIR_RA_LS           *pRA,
@@ -13107,7 +13091,7 @@ OnError:
         &&
         pPassWorker->basePassWorker.pPassSpecificData != gcvNULL)
     {
-        *((gctBOOL*)pPassWorker->basePassWorker.pPassSpecificData) = _VIR_RA_NeedToCutDownWorkGroupSize(&ra);
+        *((gctBOOL*)pPassWorker->basePassWorker.pPassSpecificData) = VIR_Shader_NeedToCutDownWorkGroupSize(pShader, pHwCfg);
     }
 
     _VIR_RA_LS_Final(&ra);

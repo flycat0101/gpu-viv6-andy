@@ -546,6 +546,10 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_OPCODE_isNonUniform(Opcode)         \
     ((Opcode) == VIR_OP_NONUNIFORM_ELECT)
 
+#define VIR_OPCODE_isBarrier(Opcode)            \
+    ((Opcode) == VIR_OP_BARRIER         ||      \
+     (Opcode) == VIR_OP_MEM_BARRIER)
+
 #define VIR_SymTable_MaxValidId(SymTable)   BT_GET_MAX_VALID_ID(SymTable)
 
 #define VIR_Function_GetLastInstId(Func)    ((Func)->_lastInstId)
@@ -4470,6 +4474,7 @@ typedef enum _VIR_FUNCTIONFLAG
   VIR_FUNCFLAG_LINKED_LIB               = 0x200000, /* This function is coming from linked library */
   VIR_FUNCFLAG_HAS_GOTO                 = 0x400000, /* This function has goto branch */
   VIR_FUNCFLAG_HAS_CALL_OP              = 0x800000, /* Call the other functions within this function. */
+  VIR_FUNCFLAG_HAS_BARRIER              = 0x1000000, /* This function uses BARRIER. */
 } VIR_FunctionFlag;
 
 typedef struct _VIR_KERNELPROPERTY
@@ -7530,6 +7535,12 @@ VIR_Shader_GetTempRegSpillAddrUniform(
 
 gctUINT
 VIR_Shader_GetMaxFreeRegCountPerThread(
+    VIR_Shader      *pShader,
+    VSC_HW_CONFIG   *pHwCfg
+    );
+
+gctUINT
+VIR_Shader_NeedToCutDownWorkGroupSize(
     VIR_Shader      *pShader,
     VSC_HW_CONFIG   *pHwCfg
     );

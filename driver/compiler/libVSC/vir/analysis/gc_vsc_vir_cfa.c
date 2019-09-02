@@ -463,15 +463,27 @@ static VIR_BASIC_BLOCK* _AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCfg)
 
 static void _AssociateAnInstToBasicBlock(VIR_BASIC_BLOCK* pBasicBlock, VIR_Instruction* pInst)
 {
+    VIR_OpCode      opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Function*   pFunc = VIR_Inst_GetFunction(pInst);
+
     VIR_Inst_SetBasicBlock(pInst, pBasicBlock);
     pBasicBlock->instCount ++;
 
-    if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(pInst)) ||
-        VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(pInst)) ||
-        VIR_OPCODE_isImgLd(VIR_Inst_GetOpcode(pInst)) ||
-        VIR_OPCODE_isAttrLd(VIR_Inst_GetOpcode(pInst)))
+    if (VIR_OPCODE_isTexLd(opCode) ||
+        VIR_OPCODE_isMemLd(opCode) ||
+        VIR_OPCODE_isImgLd(opCode) ||
+        VIR_OPCODE_isAttrLd(opCode))
     {
         BB_FLAGS_SET_LLI(pBasicBlock);
+    }
+
+    if (VIR_OPCODE_isBarrier(opCode))
+    {
+        BB_FLAGS_SET_HAS_BARRIER(pBasicBlock);
+        if (pFunc)
+        {
+            VIR_Function_SetFlag(pFunc, VIR_FUNCFLAG_HAS_BARRIER);
+        }
     }
 }
 

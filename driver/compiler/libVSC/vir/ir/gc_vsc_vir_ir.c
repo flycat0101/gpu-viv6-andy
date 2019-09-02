@@ -18093,6 +18093,24 @@ VIR_Shader_GetMaxFreeRegCountPerThread(
     return maxFreeReg;
 }
 
+gctUINT
+VIR_Shader_NeedToCutDownWorkGroupSize(
+    VIR_Shader      *pShader,
+    VSC_HW_CONFIG   *pHwCfg
+    )
+{
+    gctUINT         minRegCount = 3;
+
+    if ((VIR_Shader_GetKind(pShader) == VIR_SHADER_COMPUTE) &&
+        (VIR_Shader_GetMaxFreeRegCountPerThread(pShader, pHwCfg) <= minRegCount) &&
+        (pHwCfg->maxCoreCount == 1 || pHwCfg->maxCoreCount == 2))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
 gctBOOL
 VIR_Shader_CalcMaxRegBasedOnWorkGroupSize(
     VIR_Shader      *pShader
