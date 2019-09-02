@@ -904,8 +904,6 @@ VX_INTERNAL_API vx_status ComputeMNEx(
         vipSRAMsize -= outputSize;
     }
 
-    if (((vx_int32)vipSRAMsize) <= 0) return VX_FAILURE;
-
     if (sRamIn == VXNNE_MEM_POOL_TYPE_AXI_SRAM)
     {
         axiSRAMsize -= inputSize;
@@ -916,7 +914,9 @@ VX_INTERNAL_API vx_status ComputeMNEx(
         axiSRAMsize -= outputSize;
     }
 
-    if (((vx_int32)axiSRAMsize) <= 0) return VX_FAILURE;
+    if ((((vx_int32)axiSRAMsize) <= 0 && !phase3) ||
+        (((vx_int32)vipSRAMsize) <= 0 && phase3))
+        return VX_FAILURE;
 
 
     for (i = start + count - 1; i >= start; i--)
