@@ -1778,7 +1778,7 @@ _SwapBuffersRegion(
     VEGLDisplay dpy;
     VEGLPlatform platform;
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
-    char *p;
+    gctSTRING p = NULL;
 #endif
 
     do
@@ -2041,7 +2041,7 @@ _SwapBuffersRegion(
 #endif
 
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
-            p = getenv("WL_EGL_GBM_FENCE");
+            gcoOS_GetEnv(NULL,"WL_EGL_GBM_FENCE",&p);
             if((p != gcvNULL) && (p[0] == '0'))
             {
                 gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
