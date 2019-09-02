@@ -20610,6 +20610,40 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
 
             vxInfo("execution time:%10d us\n", opertorExcuteTime);
 
+            /* Calculate non-zero ratio, only for TP target */
+            if (operation->layer->node->base.context->options.enableNNLayerDump
+               && (operation->target == VXNNE_OPERATION_TARGET_TP)
+               && (operation->operatorType == VXNNE_OPERATOR_FULLYCONNECTED))
+            {
+                /* for non-zero ratio calculate */
+                vx_tensor  calNonZeroRatioinputs = NULL;
+                vx_uint32 inputSize = 0, index = 0,inputZeroCount = 0;
+                vx_float32 inputNonZeroRatio = 0.0;
+                vx_uint8_ptr inputAddress = NULL;
+
+                calNonZeroRatioinputs = (vx_tensor)operation->inputs[0];
+                vxoTensor_GetTensorSize(calNonZeroRatioinputs, &inputSize);
+                /*vxInfo("tensor input size is:%d, zero point is %d.\n", inputSize,calNonZeroRatioinputs->zeroPoint);*/
+
+                vxoTensor_GetTensorBatchArrayViewMemory(calNonZeroRatioinputs,operation->currBatchIndex,(gctPOINTER *)&inputAddress,NULL);
+                /* find out zero count */
+                if(inputSize != 0)
+                {
+                    /* calculate zero count */
+                    for(index = 0; index< inputSize; index++)
+                    {
+                        if(inputAddress[index] == calNonZeroRatioinputs->zeroPoint)
+                            inputZeroCount++;
+                    }
+                    /*vxInfo("tensor zero count is:%d.\n", inputZeroCount);*/
+
+                    inputNonZeroRatio = 1.0f * (inputSize - inputZeroCount) / inputSize;
+                    vxInfo("==layer_id: %d abs_op_id: %d imageNonZeroRatio: %.07f\n", operation->layer->node->id, operation->absoluteOperationID, inputNonZeroRatio);
+
+                    /* clear input Zero count */
+                    inputZeroCount = 0;
+                }
+            }
 #if VIVANTE_PROFILER
             vxoProfiler_End((vx_reference)executionLayer->graph);
 #endif

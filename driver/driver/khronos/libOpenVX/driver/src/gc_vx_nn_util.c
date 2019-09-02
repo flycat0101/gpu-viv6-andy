@@ -2201,6 +2201,10 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateTPCommands(
         input  = tpOperation->input;
         output = tpOperation->output;
         wb     = tpOperation->weights_biases;
+        if (wb)
+        {
+            perf.imageNonZeroRatio = tpOperation->base.imgNonZeroRatio;
+        }
 
         calculateArchPerfFromTiling(context,
                                     tpOperation->base.layer,

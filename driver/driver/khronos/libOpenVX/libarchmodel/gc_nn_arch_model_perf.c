@@ -2576,7 +2576,10 @@ vx_status calculateArchPerf(
                 perf->coefNonZeroRatio  = WB_NON_ZERO_RATIO(wb);
                 perf->coefCompressRatio = WB_COMPRESS_RATIO(wb);
                 perf->imageCompressRatio = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_VIP_DEC400) ? 0.700000000000000f : 1.0f;
-                perf->imageNonZeroRatio  = 0.300000000000000;
+                if (perf->imageNonZeroRatio == 0)
+                {
+                    perf->imageNonZeroRatio  = 0.300000000000000;
+                }
             }
             else
             {

@@ -595,6 +595,12 @@ static vx_float64 _calc_cost(
     perf->info.nextKY = ((vx_uint32)(index + 1) < archModel->totalOpCount) ? archModel->opInfoArray[index + 1]->ky : 0;
     if ((opInfo->target != VXNNE_OPERATION_TARGET_TP || opInfo->op == VXNNE_OPERATOR_FULLYCONNECTED) && opInfo->weight_bias)
         perf->info.kernelSize = (vx_uint32)(gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(opInfo->weight_bias, 0), CACHE_ALIGNMENT_SIZE));
+
+    if ((opInfo->target == VXNNE_OPERATION_TARGET_TP) && (opInfo->op == VXNNE_OPERATOR_FULLYCONNECTED))
+    {
+        perf->imageNonZeroRatio = opInfo->opt->imgNonZeroRatio;
+    }
+
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE1))
     {
         vx_uint32 repeatePerFrame = 1;

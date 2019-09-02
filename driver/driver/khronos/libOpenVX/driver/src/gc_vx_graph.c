@@ -3720,6 +3720,74 @@ OnError:
     return status;
 }
 
+vx_status DetectInImageNonZeroRatioFromConfig(
+    vx_graph graph,
+    char * config
+    )
+{
+    char *s = config;
+    char buf[32];
+    int index = 0, len = 0, abs_op_id = 0;
+
+    s = config;
+    while (s && *s != '\0')
+    {
+        if (*s == '[')
+        {
+            len = 0;
+            index = 0;
+        }
+        else if (*s == ']')
+        {
+            buf[len] = '\0';
+            if (1 == index && len > 0)
+            {
+                graph->layer->operations[abs_op_id]->imgNonZeroRatio = atof(buf);
+            }
+            else
+            {
+                vxInfo("ERROR: invalid input: %s\n", s);
+                goto OnError;
+            }
+            len = 0;
+            index = 0;
+        }
+        else if (*s == ',')
+        {
+            buf[len] = '\0';
+            if (len > 0)
+            {
+                abs_op_id = atoi(buf);
+            }
+            else
+            {
+                vxInfo("ERROR: invalid input: %s\n", s);
+                goto OnError;
+            }
+            index++;
+            len = 0;
+         }
+         else if (isdigit(*s) || *s == '.')
+         {
+             buf[len++] = *s;
+         }
+         else if (*s == ' ' || *s == '\t')
+         {
+         }
+         else
+         {
+             vxInfo("ERROR: invalid input: %s\n", s);
+             goto OnError;
+         }
+         s++;
+    }
+
+    return VX_SUCCESS;
+
+OnError:
+    return VX_FAILURE;
+}
+
 VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
 {
     vx_uint32 i = 0, j = 0, k = 0;
@@ -9398,11 +9466,17 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyGraph(vx_graph graph)
 
     if (graph->layer != NULL)
     {
+        char *envConfig = NULL;
         vxoGraph_GenerateOpParentChild(graph);
 
         if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_TP_PARALLEL))
         {
             vxoGraphParallel_AnalyzeOperationsBefore(graph);
+        }
+
+        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_IN_IMAGE_NON_ZERO_RATIO_CONFIG", &envConfig)) && envConfig)
+        {
+            vxmONERROR(DetectInImageNonZeroRatioFromConfig(graph, envConfig));
         }
 
         if (graph->base.context->options.collectPerfType == COLLECT_PERF_ESTIMATE)

@@ -491,6 +491,7 @@ typedef struct _vxnne_operation_s
     vx_uint32                       segIndex;
 
     vx_uint32                       absoluteOperationID;
+    vx_float64                      imgNonZeroRatio;
     vx_uint32                       gpuId;
     vx_bool                         mGpuSync;
     struct _vxnne_operation_s*      mGpuNext;
