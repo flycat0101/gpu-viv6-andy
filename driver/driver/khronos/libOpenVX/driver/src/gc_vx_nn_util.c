@@ -4106,7 +4106,6 @@ vx_bool checkImageCacheMode(
     vx_uint32 nnCoreCount
     )
 {
-    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER3DTILE_BUBBLE_FIX))
     {
         if (gcmCEIL(((vx_float32)outImageZSize / (kernelsPerCore * nnCoreCount))) == 1)
         {
