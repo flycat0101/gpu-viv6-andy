@@ -1393,8 +1393,9 @@ VkResult halti3_program_copy_dst_img(
         tmpImgView.createInfo.subresourceRange.baseArrayLayer = dstRes->u.img.subRes.arrayLayer;
         tmpImgView.createInfo.subresourceRange.layerCount = 1;
 
-        __VK_MEMCOPY(&tmpFormatInfo, __vk_GetVkFormatInfo(params->dstFormat), sizeof(tmpFormatInfo));
+        __VK_MEMCOPY(&tmpFormatInfo, &pDstImg->formatInfo, sizeof(tmpFormatInfo));
 
+        tmpFormatInfo.residentImgFormat = params->dstFormat;
 
         tmpImgView.formatInfo = &tmpFormatInfo;
         imgView = &tmpImgView;
