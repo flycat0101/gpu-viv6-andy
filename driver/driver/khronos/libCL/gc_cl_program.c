@@ -402,6 +402,8 @@ clCreateProgramWithBinary(
 
     program->binary = (gctUINT8_PTR) binary;
 
+    doPatchCreateProgram( program );
+
     if (ErrcodeRet)
     {
         *ErrcodeRet = CL_SUCCESS;

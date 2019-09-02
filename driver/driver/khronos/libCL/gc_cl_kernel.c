@@ -315,6 +315,24 @@ void doPatchCreateProgram(cl_program Program )
             }
         }
     }
+    else if(Program->binary)
+    {
+        gcSHADER binary = (gcSHADER)Program->binary;
+
+        if(binary->source)
+        {
+            gctINT i ;
+            for(i = 1 ; i < gcmSIZEOF(cl_patch_array) / gcmSIZEOF(cl_patch_array[0]) ; ++i)
+            {
+                gctINT searIndex = 0;
+                if(clfFindString(cl_patch_array[i].encrypted, binary->source, cl_patch_array[i].matchEncryptedStr, &searIndex))
+                {
+                    Program->patchIndex = i;
+                    break;
+                }
+            }
+        }
+    }
 }
 
 /*called when clCreateKernel */
