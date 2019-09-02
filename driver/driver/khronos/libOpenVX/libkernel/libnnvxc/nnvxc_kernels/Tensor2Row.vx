@@ -81,6 +81,257 @@ tensor2row_integer16_1_8(1, 1 - 1)
     tensor2row_integer16_9_16(15, 15 - 9)
     tensor2row_integer16_9_16(16, 16 - 9)
 
+_viv_uniform VXC_512Bits uniTensor2RowOrder0K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder1K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder2K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder3K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder4K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder5K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder6K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder7K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder8K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder9K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder10K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder11K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder12K3_2x8;
+_viv_uniform VXC_512Bits uniTensor2RowOrder13K3_2x8;
+#define tensor2row_K3_write0(index, orderUniform, write_fun)  \
+    VXC_DP2x8(vec, pixel[0], pixel[1], VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0), orderUniform); \
+    write_fun(dst, coord, vec, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \
+    coord.x += 6;  \
+    write_fun(dst, coord, pixel[2], VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0)); \
+    i++; \
+    if (i >= loop) \
+    { \
+        return; \
+    } \
+    coord.y++; \
+    coord.x -= 6;
+#define tensor2row_K3_write(index, orderUniform, write_fun)  \
+    VXC_DP2x8(vec, pixel[0], pixel[1], VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0), orderUniform); \
+    write_fun(dst, coord, vec, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0)); \
+    coord.x += 6;  \
+    VXC_DP2x8(vec, pixel[2], pixel[2], VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0), orderUniform); \
+    write_fun(dst, coord, vec, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0)); \
+    i++; \
+    if (i >= loop) \
+    { \
+        return; \
+    } \
+    coord.y++; \
+    coord.x -= 6;
+__kernel void tensor2row_Integer16_3_S1
+    (
+    __read_only  image2d_array_t src,
+    __write_only image2d_array_t dst
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in0 = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0);
+    int2 coord = (int2)(kernelSizeXY * z, y * outputWidth + x);
+    int  i, loop;
+    vxc_short8 pixel[3], vec;
+    loop = (outputWidth - get_global_id(0)) > 6 ? 6 : outputWidth - get_global_id(0);
+    VXC_ReadImage2DArray(pixel[0], src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[1], src, coord_in0, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[2], src, coord_in0, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    i = 0;
+    tensor2row_K3_write0(0, uniTensor2RowOrder0K3_2x8, VXC_WriteImage)
+    tensor2row_K3_write(1, uniTensor2RowOrder1K3_2x8, VXC_WriteImage)
+    tensor2row_K3_write(2, uniTensor2RowOrder2K3_2x8, VXC_WriteImage)
+    tensor2row_K3_write(3, uniTensor2RowOrder3K3_2x8, VXC_WriteImage)
+    tensor2row_K3_write(4, uniTensor2RowOrder4K3_2x8, VXC_WriteImage)
+    tensor2row_K3_write(5, uniTensor2RowOrder5K3_2x8, VXC_WriteImage)
+}
+ __kernel void tensor2row_Tensor_Integer16_3_S1
+    (
+    __read_only  image2d_array_t src,
+    __write_only image2d_array_t dst
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in0 = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0);
+    int4 coord = (int4)(kernelSizeXY * z, x, y, 0);
+    int  i, loop;
+    vxc_short8 pixel[3], vec;
+    loop = (outputWidth - get_global_id(0)) > 6 ? 6 : outputWidth - get_global_id(0);
+    VXC_ReadImage2DArray(pixel[0], src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[1], src, coord_in0, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[2], src, coord_in0, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    i = 0;
+    tensor2row_K3_write0(0, uniTensor2RowOrder0K3_2x8, VXC_WriteImage2DArray)
+    tensor2row_K3_write(1, uniTensor2RowOrder1K3_2x8, VXC_WriteImage2DArray)
+    tensor2row_K3_write(2, uniTensor2RowOrder2K3_2x8, VXC_WriteImage2DArray)
+    tensor2row_K3_write(3, uniTensor2RowOrder3K3_2x8, VXC_WriteImage2DArray)
+    tensor2row_K3_write(4, uniTensor2RowOrder4K3_2x8, VXC_WriteImage2DArray)
+    tensor2row_K3_write(5, uniTensor2RowOrder5K3_2x8, VXC_WriteImage2DArray)
+}
+__kernel void tensor2row_Integer8_3_S1
+    (
+    __read_only  image2d_array_t src,
+    __write_only image2d_array_t dst
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in0 = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0);
+    int2 coord = (int2)(kernelSizeXY * z, y * outputWidth + x);
+    int  i, loop;
+    vxc_char16 pixel[3], vec;
+    loop = (outputWidth - get_global_id(0)) > 14 ? 14 : outputWidth - get_global_id(0);
+    VXC_ReadImage2DArray(pixel[0], src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[1], src, coord_in0, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[2], src, coord_in0, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    i = 0;
+    tensor2row_K3_write0(0, uniTensor2RowOrder0K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(1,  uniTensor2RowOrder1K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(2,  uniTensor2RowOrder2K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(3,  uniTensor2RowOrder3K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(4,  uniTensor2RowOrder4K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(5,  uniTensor2RowOrder5K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(6,  uniTensor2RowOrder6K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(7,  uniTensor2RowOrder7K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(8,  uniTensor2RowOrder8K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(9,  uniTensor2RowOrder9K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(10, uniTensor2RowOrder10K3_2x8, VXC_WriteImage)
+    tensor2row_K3_write(11, uniTensor2RowOrder11K3_2x8, VXC_WriteImage)
+    tensor2row_K3_write(12, uniTensor2RowOrder12K3_2x8, VXC_WriteImage)
+    tensor2row_K3_write(13, uniTensor2RowOrder13K3_2x8, VXC_WriteImage)
+}
+__kernel void tensor2row_Tensor_Integer8_3_S1
+    (
+    __read_only  image2d_array_t src,
+    __write_only image2d_array_t dst
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in0 = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0);
+    int4 coord = (int4)(kernelSizeXY * z, x, y, 0);
+    int  i, loop;
+    vxc_char16 pixel[3], vec;
+    loop = (outputWidth - get_global_id(0)) > 14 ? 14 : outputWidth - get_global_id(0);
+    VXC_ReadImage2DArray(pixel[0], src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[1], src, coord_in0, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[2], src, coord_in0, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    i = 0;
+    tensor2row_K3_write0(0, uniTensor2RowOrder0K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(1,  uniTensor2RowOrder1K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(2,  uniTensor2RowOrder2K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(3,  uniTensor2RowOrder3K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(4,  uniTensor2RowOrder4K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(5,  uniTensor2RowOrder5K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(6,  uniTensor2RowOrder6K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(7,  uniTensor2RowOrder7K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(8,  uniTensor2RowOrder8K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(9,  uniTensor2RowOrder9K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(10, uniTensor2RowOrder10K3_2x8, VXC_WriteImage2DArray)
+    tensor2row_K3_write(11, uniTensor2RowOrder11K3_2x8, VXC_WriteImage2DArray)
+    tensor2row_K3_write(12, uniTensor2RowOrder12K3_2x8, VXC_WriteImage2DArray)
+    tensor2row_K3_write(13, uniTensor2RowOrder13K3_2x8, VXC_WriteImage2DArray)
+}
+__kernel void tensor2row_Integer16_3_S2
+    (
+    __read_only  image2d_array_t src,
+    __write_only image2d_array_t dst
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in0 = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0);
+    int2 coord = (int2)(kernelSizeXY * z, y * outputWidth + x);
+    int  i, loop;
+    vxc_short8 pixel[3], vec;
+    loop = (outputWidth - get_global_id(0)) > 3 ? 3 : outputWidth - get_global_id(0);
+    VXC_ReadImage2DArray(pixel[0], src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[1], src, coord_in0, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[2], src, coord_in0, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    i = 0;
+    tensor2row_K3_write0(0, uniTensor2RowOrder0K3_2x8, VXC_WriteImage)
+    tensor2row_K3_write(2,  uniTensor2RowOrder2K3_2x8, VXC_WriteImage)
+    tensor2row_K3_write(4,  uniTensor2RowOrder4K3_2x8, VXC_WriteImage)
+}
+ __kernel void tensor2row_Tensor_Integer16_3_S2
+    (
+    __read_only  image2d_array_t src,
+    __write_only image2d_array_t dst
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in0 = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0);
+    int4 coord = (int4)(kernelSizeXY * z, x, y, 0);
+    int  i, loop;
+    vxc_short8 pixel[3], vec;
+    loop = (outputWidth - get_global_id(0)) > 3 ? 3 : outputWidth - get_global_id(0);
+    VXC_ReadImage2DArray(pixel[0], src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[1], src, coord_in0, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[2], src, coord_in0, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    i = 0;
+    tensor2row_K3_write0(0, uniTensor2RowOrder0K3_2x8, VXC_WriteImage2DArray)
+    tensor2row_K3_write(2,  uniTensor2RowOrder2K3_2x8, VXC_WriteImage2DArray)
+    tensor2row_K3_write(4,  uniTensor2RowOrder4K3_2x8, VXC_WriteImage2DArray)
+}
+__kernel void tensor2row_Integer8_3_S2
+    (
+    __read_only  image2d_array_t src,
+    __write_only image2d_array_t dst
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in0 = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0);
+    int2 coord = (int2)(kernelSizeXY * z, y * outputWidth + x);
+    int  i, loop;
+    vxc_char16 pixel[3], vec;
+    loop = (outputWidth - get_global_id(0)) > 7 ? 7 : outputWidth - get_global_id(0);
+    VXC_ReadImage2DArray(pixel[0], src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[1], src, coord_in0, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[2], src, coord_in0, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    i = 0;
+    tensor2row_K3_write0(0, uniTensor2RowOrder0K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(2,  uniTensor2RowOrder2K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(4,  uniTensor2RowOrder4K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(6,  uniTensor2RowOrder6K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(8,  uniTensor2RowOrder8K3_2x8,  VXC_WriteImage)
+    tensor2row_K3_write(10, uniTensor2RowOrder10K3_2x8, VXC_WriteImage)
+    tensor2row_K3_write(12, uniTensor2RowOrder12K3_2x8, VXC_WriteImage)
+}
+__kernel void tensor2row_Tensor_Integer8_3_S2
+    (
+    __read_only  image2d_array_t src,
+    __write_only image2d_array_t dst
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord_in0 = (int4)(x * strideXY.x - padding_xy.x, y * strideXY.y - padding_xy.y, z, 0);
+    int4 coord = (int4)(kernelSizeXY * z, x, y, 0);
+    int  i, loop;
+    vxc_char16 pixel[3], vec;
+    loop = (outputWidth - get_global_id(0)) > 7 ? 7 : outputWidth - get_global_id(0);
+    VXC_ReadImage2DArray(pixel[0], src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[1], src, coord_in0, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(pixel[2], src, coord_in0, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+    i = 0;
+    tensor2row_K3_write0(0, uniTensor2RowOrder0K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(2,  uniTensor2RowOrder2K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(4,  uniTensor2RowOrder4K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(6,  uniTensor2RowOrder6K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(8,  uniTensor2RowOrder8K3_2x8,  VXC_WriteImage2DArray)
+    tensor2row_K3_write(10, uniTensor2RowOrder10K3_2x8, VXC_WriteImage2DArray)
+    tensor2row_K3_write(12, uniTensor2RowOrder12K3_2x8, VXC_WriteImage2DArray)
+}
     __kernel void tensor2row_Integer16_Generic
     (
     image2d_array_t src,
