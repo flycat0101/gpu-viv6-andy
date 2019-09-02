@@ -1919,8 +1919,8 @@ void _fill_TP_TRANSPOSE_Command(
 
         if (value_cmd_ptr->e32[0] == 1)
         {
-            vx_uint32 inTileXSize = 8;
-            vx_uint32 inTileYSize = 32;
+            vx_uint32 inTileXSize = gcmMIN(8, inXSize);
+            vx_uint32 inTileYSize = gcmMIN(32, inYSize);
             info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
             info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
             info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i];
