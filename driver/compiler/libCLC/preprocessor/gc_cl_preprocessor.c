@@ -21,8 +21,6 @@
 */
 
 /* Add <SDK_DIR> to header file search path */
-static gctBOOL _IsSdkPathAdded = gcvFALSE;
-
 gceSTATUS
 ppoPREPROCESSOR_AddSdkDirToPath(ppoPREPROCESSOR PP)
 {
@@ -31,10 +29,6 @@ ppoPREPROCESSOR_AddSdkDirToPath(ppoPREPROCESSOR PP)
     gctUINT len;
     gctSTRING path, path1;
     gctPOINTER pointer = gcvNULL;
-
-    if (_IsSdkPathAdded)
-        return status;
-    _IsSdkPathAdded = gcvTRUE;
 
     gcoOS_GetEnv(gcvNULL, "VIVANTE_SDK_DIR", &env);
     if (!env)
@@ -60,8 +54,6 @@ ppoPREPROCESSOR_AddSdkDirToPath(ppoPREPROCESSOR PP)
     {
         return status;
     }
-
-    len = gcoOS_StrLen(env, gcvNULL);
 
     status = cloCOMPILER_ZeroMemoryAllocate(
                                             PP->compiler,
@@ -96,6 +88,19 @@ ppoPREPROCESSOR_AddHeaderFilePathToList(
     /* Verify the arguments. */
     gcmASSERT(PP && Path);
 
+    /* check if the same path has been added to avoid repeated path */
+    if (PP && PP->headerFilePathList != gcvNULL)
+    {
+        headerFilePathNode = PP->headerFilePathList;
+        while (headerFilePathNode != gcvNULL)
+        {
+            if (gcmIS_SUCCESS(gcoOS_StrCmp(Path, headerFilePathNode->headerFilePath)))
+                return gcvSTATUS_OK;
+            headerFilePathNode = (void*)headerFilePathNode->base.node.next;
+        }
+    }
+
+    headerFilePathNode = gcvNULL;
     status = cloCOMPILER_ZeroMemoryAllocate(
                                             PP->compiler,
                                             sizeof(struct _ppoHEADERFILEPATH),
