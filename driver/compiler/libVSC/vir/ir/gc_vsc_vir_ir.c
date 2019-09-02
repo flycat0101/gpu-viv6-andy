@@ -17561,6 +17561,22 @@ VIR_Operand_Check4Dual16(
                         *isVec2orless = ((VIR_GetTypeComponents(VIR_Symbol_GetTypeId(sym)) <= 2) &&
                                          (VIR_GetTypeComponents(typeId) <= 2));
                     }
+
+                    /*
+                    ** If source1 of a 3D IMG instruction is a temp register, we can't enable DUAL16 because
+                    ** the base address is saved in z channel of source1.
+                    */
+                    if (VIR_OPCODE_is3DImageRelated(VIR_Inst_GetOpcode(VirInst)) && VIR_Inst_GetSource(VirInst, 1) == Operand)
+                    {
+                        VIR_OperandInfo opndInfo;
+
+                        VIR_Operand_GetOperandInfo(VirInst, Operand, &opndInfo);
+
+                        if (opndInfo.isVreg)
+                        {
+                            *isDual16NotSupported = gcvTRUE;
+                        }
+                    }
                 }
                 break;
             case VIR_SYM_LABEL:

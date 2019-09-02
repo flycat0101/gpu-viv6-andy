@@ -335,13 +335,21 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
      (Opcode) == VIR_OP_VX_IMG_STORE_3D)
 
 /* IMG_READ or IMG_LOAD */
-#define VIR_OPCODE_isImgSt(Opcode)           \
-    (VIR_OPCODE_isImgWrite(Opcode)       ||  \
+#define VIR_OPCODE_isImgSt(Opcode)          \
+    (VIR_OPCODE_isImgWrite(Opcode)       || \
      VIR_OPCODE_isImgStore(Opcode))
 
 /* IMD_ADDR opcodes. */
 #define VIR_OPCODE_isImgAddr(Opcode)        \
     ((Opcode) == VIR_OP_IMG_ADDR        ||  \
+     (Opcode) == VIR_OP_IMG_ADDR_3D)
+
+/* 3D image related opcodes. */
+#define VIR_OPCODE_is3DImageRelated(Opcode) \
+    ((Opcode) == VIR_OP_IMG_STORE_3D    ||  \
+     (Opcode) == VIR_OP_IMG_LOAD_3D     ||  \
+     (Opcode) == VIR_OP_VX_IMG_STORE_3D ||  \
+     (Opcode) == VIR_OP_VX_IMG_LOAD_3D  ||  \
      (Opcode) == VIR_OP_IMG_ADDR_3D)
 
 /* image-related opcodes. */
