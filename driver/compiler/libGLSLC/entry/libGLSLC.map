@@ -1,6 +1,7 @@
 {
 	global:
         gcInitializeCompiler;
+        gcInitializeCompilerCaps;
         gcFinalizeCompiler;
 	gcCompileShader;
 	gcSetClientApiVersion;

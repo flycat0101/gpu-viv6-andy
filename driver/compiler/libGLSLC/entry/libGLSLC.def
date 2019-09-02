@@ -15,6 +15,7 @@ LIBRARY libGLSLC
 
 EXPORTS
 	gcInitializeCompiler
+    gcInitializeCompilerCaps
 	gcFinalizeCompiler
 	gcCompileShader
 	gcSetClientApiVersion

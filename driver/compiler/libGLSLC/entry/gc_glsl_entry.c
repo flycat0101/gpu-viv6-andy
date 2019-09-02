@@ -631,6 +631,26 @@ OnError:
 }
 
 gceSTATUS
+gcInitializeCompilerCaps(
+    IN gcsGLSLCaps *Caps
+    )
+{
+    gcsGLSLCaps *glslCaps = gcGetGLSLCaps();
+    if (Caps)
+    {
+        *glslCaps = *Caps;
+
+        if (glslCaps->extensions == gcvNULL)
+        {
+            glslCaps->extensions = __DEFAULT_GLSL_EXTENSION_STRING__;
+        }
+    }
+
+    return gcvSTATUS_OK;
+
+}
+
+gceSTATUS
 gcSetClientApiVersion(
     IN gceAPI ApiVersion
     )

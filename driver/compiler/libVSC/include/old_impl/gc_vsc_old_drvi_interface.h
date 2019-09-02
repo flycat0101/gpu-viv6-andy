@@ -7393,6 +7393,11 @@ gcInitializeCompiler(
     IN gcsGLSLCaps *Caps
     );
 
+gceSTATUS
+gcInitializeCompilerCaps(
+    IN gcsGLSLCaps *Caps
+    );
+
 /*******************************************************************************
 **                              gcFinalizeCompiler
 ********************************************************************************
