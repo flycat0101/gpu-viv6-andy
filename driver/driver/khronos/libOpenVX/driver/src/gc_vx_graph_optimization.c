@@ -210,12 +210,17 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
 
                 if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) == 0)
                 {
-                    if(weightX == weightY || weightX == 1  ||  /*tempically pad 1xN to NxN kernel because of terrible arch*/
-                        vxoGraphOptimization_isV8((vx_reference)weight))
+                    if(!(vxoGraphOptimization_isV8((vx_reference)weight)) &&
+                        (weightX == weightY || weightX == 1 )/*tempically pad 1xN to NxN kernel because of terrible arch*/
+                        )
                     {
                         nodeOpType = OP_CONVOLUTION;
                     }
-                    else if(vxoGraphOptimization_nnHalSupport(weight) && (strideX == 1) && (strideY == 1) )
+                    else if((vxoGraphOptimization_isV8((vx_reference)weight)) && (weightX * weightY != 2) )
+                    {
+                        nodeOpType = OP_CONVOLUTION;
+                    }
+                    else if(vxoGraphOptimization_nnHalSupport(weight) /*&& (strideX == 1) && (strideY == 1) */)
                     {
                         nodeOpType = OP_CONVOLUTION_NxM;
                     }
@@ -4816,7 +4821,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
         if(context->options.enableGraphConvertConv2Fc)
             vxoGraphOptimization_conv2fc(graph);
 
-        if(context->options.enableTransformNMConv && !vxoGraphOptimization_isV8((vx_reference)graph))
+        if(context->options.enableTransformNMConv)
             vxoGraphOptimization_transformConvNxM(graph);
 
         if(context->options.enableGraphSwaplayer)
