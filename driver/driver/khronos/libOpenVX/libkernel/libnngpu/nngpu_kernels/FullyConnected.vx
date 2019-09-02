@@ -242,7 +242,7 @@ __kernel void gpuFullyConnected_VecFP32(
     int y = get_global_id(1);
     int4 coord       = (int4)(x, y, 0, 0);
     int inputSize    = get_image_width(weights);
-    float4 src0, src1, tmpSum;
+    float4 src0, src1, tmpSum = {0.0};
     float4 dst = {0.0}, tmp;
 
     tmp = read_imagef(bias, coord.xz);

@@ -12066,6 +12066,24 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
                 batchCount2 = width;
                 num2 = 3;
             }
+            else if (pPerm[0] == 1 && pPerm[1] == 2 && pPerm[2] == 0 && width < IMG_MAX_WIDTH && height * depth < IMG_MAX_WIDTH)
+            {
+                size[0] = width;
+                size[1] = height * depth;
+                size[2] = 1;
+                size[3] = batch;
+                dims    = TENSOR_DIM_NUM(input);
+                src = vxoTensor_ReshapeTensor(input, size, dims);
+
+                size[0] = height * depth;
+                size[1] = width;
+                size[2] = 1;
+                size[3] = batch;
+                dims    = TENSOR_DIM_NUM(input);
+                dst = vxoTensor_ReshapeTensor(output, size, dims);
+
+                num = 2;
+            }
 
             if (src && dst)
             {
