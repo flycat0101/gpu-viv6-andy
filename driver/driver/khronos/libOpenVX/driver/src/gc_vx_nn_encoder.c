@@ -14864,7 +14864,7 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
     vx_size minKernelBufferSize[MAX_ZGROUP_COUNT*MAX_KZGROUP_COUNT];
     vx_uint8_ptr zrlTmpPtr = VX_NULL;
     vx_uint32 kzNum = 0, zNum = 0, oneFilterSize = 0, weightSize = 0, i = 0, j = 0, kzoffset = 0;
-    vx_uint8_ptr weight_ptr = VX_NULL;
+    vx_uint8_ptr weight_ptr = VX_NULL, Weight_Gpuptr = VX_NULL, Weight_Cpuptr = VX_NULL;
 
     vxmASSERT(context);
     vxmASSERT(wb_base);
@@ -14877,7 +14877,19 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
         }
         else
         {
-            vxoTensor_GetTensorViewMemory(wb_base->origWeight, (gctPOINTER*)(&weight_ptr), VX_NULL);
+            vx_uint32 size = 0;
+            size = wb_base->weights_sizes[0] * wb_base->weights_sizes[1] * wb_base->weights_sizes[2] * wb_base->weights_sizes[3] *
+                   vxDataType_GetSize((vx_type_e)wb_base->weights_data_format);;
+            Weight_Cpuptr = (vx_uint8_ptr)vxAllocate(size);
+            if (Weight_Cpuptr == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                goto exit;
+            }
+
+            vxoTensor_GetTensorViewMemory(wb_base->origWeight, (gctPOINTER*)(&Weight_Gpuptr), VX_NULL);
+            vxMemCopy(Weight_Cpuptr, Weight_Gpuptr, size);
+            weight_ptr = Weight_Cpuptr;
         }
     }
     else
@@ -15062,6 +15074,12 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
             woffset += oneFilterSize * filterCount;
         }
 
+        if (Weight_Cpuptr != VX_NULL)
+        {
+            vxFree(Weight_Cpuptr);
+            Weight_Cpuptr = VX_NULL;
+        }
+
         wb->non_zero_ratio = gcmMIN(1.0f, (vx_float64)nzcount / acount);
         if ((wb->weights_sizes[0] == 1 && wb->weights_sizes[1] == 1
         && (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) || vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6))
@@ -15121,8 +15139,8 @@ vx_status vxoWeightsBiases_Compress(
     vx_uint32 oneFilterSize, weightSize, i, j, kzoffset, sliceCount, filterCount;
     vx_weights_biases_parameter_base wb_base = wb->wb_base;
     vx_uint8_ptr zrlTmpPtr = VX_NULL, minZeroRunLenTPFC = wb_base->zrlTpFcPtr;
-    vx_uint8_ptr weight_ptr = VX_NULL;
-    vx_uint32_ptr bias_ptr = VX_NULL;
+    vx_uint8_ptr weight_ptr = VX_NULL, Weight_Gpuptr = VX_NULL, Weight_Cpuptr = VX_NULL;
+    vx_uint32_ptr bias_ptr = VX_NULL, Bias_Gpuptr = VX_NULL, Bias_Cpuptr = VX_NULL;
 
     vxmASSERT(context);
     vxmASSERT(wb);
@@ -15132,18 +15150,40 @@ vx_status vxoWeightsBiases_Compress(
 
     if (context->options.enableMemOptimization)
     {
+        vx_uint32 size = 0;
         if (WB_BASE(wb)->reshuffleWeightPtr != VX_NULL)
         {
             weight_ptr = WB_BASE(wb)->reshuffleWeightPtr;
         }
         else
         {
-            vxoTensor_GetTensorViewMemory(WB_WEIGHT_TENSOR(wb), (gctPOINTER*)(&weight_ptr), VX_NULL);
+            size = wb_base->weights_sizes[0] * wb_base->weights_sizes[1] * wb_base->weights_sizes[2] * wb_base->weights_sizes[3] *
+                   vxDataType_GetSize((vx_type_e)wb_base->weights_data_format);;
+            Weight_Cpuptr = (vx_uint8_ptr)vxAllocate(size);
+            if (Weight_Cpuptr == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                goto exit;
+            }
+
+            vxoTensor_GetTensorViewMemory(wb_base->origWeight, (gctPOINTER*)(&Weight_Gpuptr), VX_NULL);
+            vxMemCopy(Weight_Cpuptr, Weight_Gpuptr, size);
+            weight_ptr = Weight_Cpuptr;
         }
 
         if (WB_BIAS_TENSOR(wb))
         {
-            vxoTensor_GetTensorViewMemory(WB_BIAS_TENSOR(wb), (gctPOINTER*)(&bias_ptr), VX_NULL);
+            size = wb_base->weights_sizes[3] * vxDataType_GetSize((vx_type_e)wb_base->biases_data_format);
+            Bias_Cpuptr = (vx_uint32_ptr)vxAllocate(size);
+            if (Bias_Cpuptr == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                goto exit;
+            }
+
+            vxoTensor_GetTensorViewMemory(WB_BIAS_TENSOR(wb), (gctPOINTER*)(&Bias_Gpuptr), VX_NULL);
+            vxMemCopy(Bias_Cpuptr, Bias_Gpuptr, size);
+            bias_ptr = Bias_Cpuptr;
         }
     }
     else
@@ -15470,6 +15510,17 @@ vx_status vxoWeightsBiases_Compress(
         }
     }
     vxReleaseMutex(wb->memory.writeLocks[0]);
+
+    if (Weight_Cpuptr != VX_NULL)
+    {
+        vxFree(Weight_Cpuptr);
+        Weight_Cpuptr = VX_NULL;
+    }
+    if (Bias_Cpuptr != VX_NULL)
+    {
+        vxFree(Bias_Cpuptr);
+        Bias_Cpuptr = VX_NULL;
+    }
 
 #if gcdDUMP
     gcmDUMP(gcvNULL, "#[weights and biases]\n");
