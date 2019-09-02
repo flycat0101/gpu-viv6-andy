@@ -14939,6 +14939,7 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
     vx_reference parameters[2]     = {(vx_reference)input, (vx_reference)output};
     vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
     vx_bool      useImage2DFlag    = (vx_bool)(outputWidth * outputHeight < IMG_MAX_WIDTH);
+    vx_bool      is_use_k3_fast    = vx_true_e;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -14949,14 +14950,26 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
     if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT16)
     {
         borderMode->constant_value.S16 = 0;
+        if ((padding_x > 0)  && ((width + padding_x) < 8))
+        {
+            is_use_k3_fast = vx_false_e;
+        }
     }
     else if (inputFormat == VX_TYPE_INT8)
     {
         borderMode->constant_value.U8 = 0;
+        if ((padding_x > 0)  && ((width + padding_x) < 16))
+        {
+            is_use_k3_fast = vx_false_e;
+        }
     }
     else if (inputFormat == VX_TYPE_UINT8)
     {
         borderMode->constant_value.U8 = (vx_uint8)TENSOR_TF_ZEROPOINT(input);
+        if ((padding_x > 0)  && ((width + padding_x) < 16))
+        {
+            is_use_k3_fast = vx_false_e;
+        }
     }
 
     if (kernelSize_x == 1 && kernelSize_y == 1 && stride_x == 1 && stride_y == 1
@@ -15101,12 +15114,12 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             char kernelName[100];
             if (kernelSize_x < 17 && useImage2DFlag)
             {
-                if (kernelSize_x == 3 && stride_x == 1)
+                if (kernelSize_x == 3 && stride_x == 1 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Integer16_3_S1");
                     set_order_uniform = vx_true_e;
                 }
-                else if (kernelSize_x == 3 && stride_x == 2)
+                else if (kernelSize_x == 3 && stride_x == 2 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Integer16_3_S2");
                     set_order_uniform = vx_true_e;
@@ -15122,12 +15135,12 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             }
             else if (kernelSize_x < 17 && !useImage2DFlag && dilation_x == 1 && dilation_y == 1)
             {
-                if (kernelSize_x == 3 && stride_x == 1)
+                if (kernelSize_x == 3 && stride_x == 1 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Tensor_Integer16_3_S1");
                     set_order_uniform = vx_true_e;
                 }
-                else if (kernelSize_x == 3 && stride_x == 2)
+                else if (kernelSize_x == 3 && stride_x == 2 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Tensor_Integer16_3_S2");
                     set_order_uniform = vx_true_e;
@@ -15150,19 +15163,19 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             char kernelName[100];
             if (kernelSize_x < 17 && useImage2DFlag)
             {
-                if (kernelSize_x == 3 && stride_x == 1)
+                if (kernelSize_x == 3 && stride_x == 1 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Integer8_3_S1");
                     set_order_uniform_u8 = vx_true_e;
                 }
-                else if (kernelSize_x == 3 && stride_x == 2)
+                else if (kernelSize_x == 3 && stride_x == 2 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Integer8_3_S2");
                     set_order_uniform_u8 = vx_true_e;
                 }
                 else
                 {
-                sprintf(kernelName, "_Integer8_%d", kernelSize_x);
+                    sprintf(kernelName, "_Integer8_%d", kernelSize_x);
                 }
             }
             else if (kernelSize_x > 16 && useImage2DFlag)
@@ -15171,12 +15184,12 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             }
             else if (kernelSize_x < 17 && !useImage2DFlag && dilation_x == 1 && dilation_y == 1)
             {
-                if (kernelSize_x == 3 && stride_x == 1)
+                if (kernelSize_x == 3 && stride_x == 1 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Tensor_Integer8_3_S1");
                     set_order_uniform_u8 = vx_true_e;
                 }
-                else if (kernelSize_x == 3 && stride_x == 2)
+                else if (kernelSize_x == 3 && stride_x == 2 && is_use_k3_fast)
                 {
                     sprintf(kernelName, "_Tensor_Integer8_3_S2");
                     set_order_uniform_u8 = vx_true_e;
@@ -21531,6 +21544,7 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_int32      sizes[4]                   = {1, 1, 1, 1};
     vx_uint32     maxWorkGroupSize           = 8;
     char *programSources = NULL;
+    vx_bool      is_use_k3_fast    = vx_true_e;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, inputs=%p, outputs=%p",
          context, kernelEnum, borderMode, inputs, outputs);
@@ -21654,10 +21668,27 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     execution_parameters.globalWorkScale[0]  = 1;
     execution_parameters.globalWorkScale[1]  = 1;
     execution_parameters.globalWorkScale[2]  = 1;
+
+    if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT16)
+    {
+        if ((padLeftv > 0)  && ((input_width + padLeftv) < 8))
+        {
+            is_use_k3_fast = vx_false_e;
+        }
+    }
+    else if (inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_UINT8)
+    {
+        if ((padLeftv > 0)  && ((input_width + padLeftv) < 16))
+        {
+            is_use_k3_fast = vx_false_e;
+        }
+    }
+
     if ((1 == stride || 2 == stride)
        && (3 == kernel_width)
        && (3 == kernel_height)
-       && (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_INT16))
+       && (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_INT16)
+       && is_use_k3_fast)
     {
         vx_uint32 uniSumOrderShort4_2x8[16] = {
             0x11111111, // TCfg
@@ -21840,7 +21871,8 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     else if ((1 == stride || 2 == stride)
             && (3 == kernel_width)
             && (3 == kernel_height)
-            && (inputFormat == VX_TYPE_UINT8))
+            && (inputFormat == VX_TYPE_UINT8)
+            && is_use_k3_fast)
     {
         vx_uint32 packZPin      = (inputZP << 16) | inputZP;
         vx_uint32 packZPwe      = (weightZP << 16) | weightZP;
