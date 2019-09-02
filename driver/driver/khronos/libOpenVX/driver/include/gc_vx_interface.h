@@ -1087,7 +1087,6 @@ static vx_param_description_s internlkernel_gradientMxN_F16_params[] = {
     {VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_OPTIONAL, vx_false_e},
 };
 
-VX_PRIVATE_API vx_status VX_CALLBACK vxoGradientMxN_Validate(vx_node node, const vx_reference parameters[], vx_uint32 num, vx_meta_format metas[]);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoGradientMxN_F16_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SobelMxNF16(vx_node node, const vx_reference *parameters, vx_uint32 num);
@@ -1310,8 +1309,6 @@ static vx_param_description_s internalkernel_copy_image_params[] = {
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_CopyImage(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_kernel_description_s internalkernel_copy_image = {
     VX_KERNEL_INTERNAL_COPY_IMAGE,
     "vivante.internal.copy_image",
@@ -1336,8 +1333,6 @@ static vx_param_description_s internalkernel_fast9corners_strength_params[] = {
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Fast9CornersStrength(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_kernel_description_s internalkernel_Fast9Corners_Strength = {
     VX_KERNEL_INTERNAL_FAST9CORNERS_STRENGTH,
     "vivante.internal.fast9corners_strength",
@@ -1360,8 +1355,6 @@ static vx_param_description_s internalkernel_fast9corners_nonmax_params[] = {
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Fast9CornersNonMax(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_kernel_description_s internalKernel_Fast9Corners_NonMax = {
     VX_KERNEL_INTERNAL_FAST9CORNERS_NONMAX,
     "vivante.internal.fast9corners_nonmax",
@@ -1479,8 +1472,6 @@ static vx_param_description_s internalkernel_minmax_get_location_params[] = {
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_MinMaxGetLocation(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
-VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_kernel_description_s internalKernel_MinMaxGetLocation = {
     VX_KERNEL_INTERNAL_GET_LOCATION,
     "vivante.internal.minmax.getlocation",
