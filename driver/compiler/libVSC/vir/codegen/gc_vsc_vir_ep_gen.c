@@ -2454,6 +2454,11 @@ static SHS_PRIV_CONSTANT_KIND _MapUniformKindToPrivConstKind(VIR_Shader* pShader
         bOCLOnly = gcvTRUE;
         break;
 
+    case VIR_UNIFORM_GLOBAL_INVOCATION_ID_OFFSET:
+        privConstKind = SHS_PRIV_CONSTANT_KIND_GLOBAL_INVOCATION_ID_OFFSET;
+        bOCLOnly = gcvTRUE;
+        break;
+
     case VIR_UNIFORM_TEMP_REG_SPILL_MEM_ADDRESS:
         if (VIR_Shader_IsEnableMultiGPU(pShader))
         {

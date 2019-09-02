@@ -55,6 +55,7 @@ BEGIN_EXTERN_C()
 #define _sldLocalStorageAddressName         "#sh_local_address"
 #define _sldWorkGroupCountName              "#workGroupCount"
 #define _sldWorkGroupIdOffsetName           "#workGroupIdOffset"
+#define _sldGlobalIdOffsetName              "#globalIdOffset"
 
 /* Shared use. */
 #define _sldLocalMemoryAddressName          "#sh_localMemoryAddress"

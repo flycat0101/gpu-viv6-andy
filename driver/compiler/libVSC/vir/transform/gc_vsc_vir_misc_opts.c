@@ -9993,10 +9993,12 @@ _UpdateWorkGroupIdForMultiGPU(
     VIR_AttributeIdList*    pAttrIdLists = VIR_Shader_GetAttributes(pShader);
     VIR_UniformIdList*      pUniformIdList = VIR_Shader_GetUniforms(pShader);
     VIR_SymId               symId = VIR_INVALID_ID;
-    VIR_SymId               workGroupIdOffsetSymId = VIR_INVALID_ID;
+    VIR_SymId               workGroupIdOffsetSymId = VIR_INVALID_ID, globalIdOffsetSymId = VIR_INVALID_ID;
     VIR_Symbol*             pSym = gcvNULL;
     VIR_Symbol*             pWorkGroupIdSym = gcvNULL;
     VIR_Symbol*             pWorkGroupIdOffsetSym = gcvNULL;
+    VIR_Symbol*             pGlobalIdSym = gcvNULL;
+    VIR_Symbol*             pGlobalIdOffsetSym = gcvNULL;
     VIR_Function*           pMainFunc = VIR_Shader_GetMainFunction(pShader);
     VIR_NameId              nameId = VIR_INVALID_ID;
     VIR_Instruction*        pNewAddInst = gcvNULL;
@@ -10005,7 +10007,7 @@ _UpdateWorkGroupIdForMultiGPU(
     VIR_DEF*                pDef;
     gctBOOL                 bUseLocalMemory = (VIR_Shader_GetShareMemorySize(pShader) > 0);
 
-    /* Find the workGroupId. */
+    /* Find the workGroupId and globalInvocationId. */
     for (i = 0; i < VIR_IdList_Count(pAttrIdLists); i++)
     {
         symId = VIR_IdList_GetId(pAttrIdLists, i);
@@ -10019,10 +10021,19 @@ _UpdateWorkGroupIdForMultiGPU(
         if (VIR_Symbol_GetName(pSym) == VIR_NAME_WORK_GROUP_ID)
         {
             pWorkGroupIdSym = pSym;
+        }
+        else if (VIR_Symbol_GetName(pSym) == VIR_NAME_GLOBAL_INVOCATION_ID)
+        {
+            pGlobalIdSym = pSym;
+        }
+
+        if (pWorkGroupIdSym != gcvNULL && pGlobalIdSym != gcvNULL)
+        {
             break;
         }
     }
-    if (!pWorkGroupIdSym)
+
+    if (pWorkGroupIdSym == gcvNULL && pGlobalIdSym == gcvNULL)
     {
         return errCode;
     }
@@ -10036,167 +10047,290 @@ _UpdateWorkGroupIdForMultiGPU(
         {
             pWorkGroupIdOffsetSym = pSym;
             workGroupIdOffsetSymId = VIR_Symbol_GetIndex(pWorkGroupIdOffsetSym);
+        }
+        else if (pSym && VIR_Symbol_GetUniformKind(pSym) == VIR_UNIFORM_GLOBAL_INVOCATION_ID_OFFSET)
+        {
+            pGlobalIdOffsetSym = pSym;
+            globalIdOffsetSymId = VIR_Symbol_GetIndex(pGlobalIdOffsetSym);
+        }
+
+        if (pWorkGroupIdOffsetSym != gcvNULL && pGlobalIdOffsetSym != gcvNULL)
+        {
             break;
         }
     }
-    if (pWorkGroupIdOffsetSym)
+
+    if (!((pWorkGroupIdSym != gcvNULL && pWorkGroupIdOffsetSym == gcvNULL)
+         ||
+         (pGlobalIdSym != gcvNULL && pGlobalIdOffsetSym == gcvNULL)))
     {
         return errCode;
     }
 
-    errCode = VIR_Shader_AddString(pShader,
-                                    _sldWorkGroupIdOffsetName,
-                                    &nameId);
-
-    errCode = VIR_Shader_AddSymbol(pShader,
-                                    VIR_SYM_UNIFORM,
-                                    nameId,
-                                    VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X3),
-                                    VIR_STORAGE_UNKNOWN,
-                                    &workGroupIdOffsetSymId);
-    ON_ERROR(errCode, "Add workGroupIdOffset uniform. ");
-
-    pWorkGroupIdOffsetSym = VIR_Shader_GetSymFromId(pShader, workGroupIdOffsetSymId);
-    VIR_Symbol_SetFlag(pWorkGroupIdOffsetSym, VIR_SYMFLAG_COMPILER_GEN);
-    VIR_Symbol_SetPrecision(pWorkGroupIdOffsetSym, VIR_PRECISION_HIGH);
-    VIR_Symbol_SetUniformKind(pWorkGroupIdOffsetSym, VIR_UNIFORM_WORK_GROUP_ID_OFFSET);
-    VIR_Symbol_SetAddrSpace(pWorkGroupIdOffsetSym, VIR_AS_CONSTANT);
-    VIR_Symbol_SetTyQualifier(pWorkGroupIdOffsetSym, VIR_TYQUAL_CONST);
-
-    /* Insert a ADD instruction: workGroupId = workGroupId + workGroupOffset. */
-    /*
-    ** If this shader don't use LocalMemory, insert this ADD in the beginning of the shader,
-    ** if no, insert this ADD after the local memory address calculation.
-    */
-    if (bUseLocalMemory)
+    /* Create workGroupIdOffset. */
+    if (pWorkGroupIdSym != gcvNULL && pWorkGroupIdOffsetSym == gcvNULL)
     {
-        VIR_InstIterator    inst_iter;
-        VIR_Instruction*    pInst;
-        VIR_Instruction*    pInsertPosInst = gcvNULL;
-        VIR_OperandInfo     opndInfo;
+        errCode = VIR_Shader_AddString(pShader,
+                                       _sldWorkGroupIdOffsetName,
+                                       &nameId);
 
-        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(VIR_Shader_GetMainFunction(pShader)));
-        for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
-             pInst != gcvNULL;
-             pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_UNIFORM,
+                                       nameId,
+                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X3),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &workGroupIdOffsetSymId);
+        ON_ERROR(errCode, "Add workGroupIdOffset uniform. ");
+
+        pWorkGroupIdOffsetSym = VIR_Shader_GetSymFromId(pShader, workGroupIdOffsetSymId);
+        VIR_Symbol_SetFlag(pWorkGroupIdOffsetSym, VIR_SYMFLAG_COMPILER_GEN);
+        VIR_Symbol_SetPrecision(pWorkGroupIdOffsetSym, VIR_PRECISION_HIGH);
+        VIR_Symbol_SetUniformKind(pWorkGroupIdOffsetSym, VIR_UNIFORM_WORK_GROUP_ID_OFFSET);
+        VIR_Symbol_SetAddrSpace(pWorkGroupIdOffsetSym, VIR_AS_CONSTANT);
+        VIR_Symbol_SetTyQualifier(pWorkGroupIdOffsetSym, VIR_TYQUAL_CONST);
+
+        /* Insert a ADD instruction: workGroupId = workGroupId + workGroupOffset. */
+        /*
+        ** If this shader don't use LocalMemory, insert this ADD in the beginning of the shader,
+        ** if no, insert this ADD after the local memory address calculation.
+        */
+        if (bUseLocalMemory)
         {
-            if (VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(pInst)))
-            {
-                VIR_Operand_GetOperandInfo(pInst, VIR_Inst_GetDest(pInst), &opndInfo);
+            VIR_InstIterator    inst_iter;
+            VIR_Instruction*    pInst;
+            VIR_Instruction*    pInsertPosInst = gcvNULL;
+            VIR_OperandInfo     opndInfo;
 
-                if (opndInfo.isVreg && opndInfo.u1.virRegInfo.virReg == VIR_OCL_LocalMemoryAddressRegIndex)
+            VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(VIR_Shader_GetMainFunction(pShader)));
+            for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+                 pInst != gcvNULL;
+                 pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+            {
+                if (VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(pInst)))
                 {
-                    pInsertPosInst = pInst;
-                    break;
+                    VIR_Operand_GetOperandInfo(pInst, VIR_Inst_GetDest(pInst), &opndInfo);
+
+                    if (opndInfo.isVreg && opndInfo.u1.virRegInfo.virReg == VIR_OCL_LocalMemoryAddressRegIndex)
+                    {
+                        pInsertPosInst = pInst;
+                        break;
+                    }
                 }
             }
-        }
 
-        if (pInsertPosInst)
-        {
-            errCode = VIR_Function_AddInstructionAfter(pMainFunc,
-                                                       VIR_OP_ADD,
-                                                       VIR_TYPE_UINT_X3,
-                                                       pInsertPosInst,
-                                                       gcvTRUE,
-                                                       &pNewAddInst);
-            ON_ERROR(errCode, "Insert a ADD instruction.");
+            if (pInsertPosInst)
+            {
+                errCode = VIR_Function_AddInstructionAfter(pMainFunc,
+                                                           VIR_OP_ADD,
+                                                           VIR_TYPE_UINT_X3,
+                                                           pInsertPosInst,
+                                                           gcvTRUE,
+                                                           &pNewAddInst);
+                ON_ERROR(errCode, "Insert a ADD instruction.");
+            }
+            else
+            {
+                gcmASSERT(gcvFALSE);
+
+                errCode = VIR_Function_PrependInstruction(pMainFunc,
+                                                          VIR_OP_ADD,
+                                                          VIR_TYPE_UINT_X3,
+                                                          &pNewAddInst);
+                ON_ERROR(errCode, "Insert a ADD instruction.");
+            }
         }
         else
         {
-            gcmASSERT(gcvFALSE);
-
             errCode = VIR_Function_PrependInstruction(pMainFunc,
                                                       VIR_OP_ADD,
                                                       VIR_TYPE_UINT_X3,
                                                       &pNewAddInst);
             ON_ERROR(errCode, "Insert a ADD instruction.");
         }
+
+        /* Set DEST. */
+        pNewOpnd = VIR_Inst_GetDest(pNewAddInst);
+        VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pWorkGroupIdSym));
+        VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_XYZ);
+
+        /* Set SRC0. */
+        pNewOpnd = VIR_Inst_GetSource(pNewAddInst, 0);
+        VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pWorkGroupIdSym));
+        VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
+
+        /* Set SRC1. */
+        pNewOpnd = VIR_Inst_GetSource(pNewAddInst, 1);
+        VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, workGroupIdOffsetSymId);
+        VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
+
+        /* Add a new def. */
+        vscVIR_AddNewDef(pDuInfo,
+                         pNewAddInst,
+                         VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
+                         1,
+                         VIR_ENABLE_XYZ,
+                         VIR_HALF_CHANNEL_MASK_FULL,
+                         gcvNULL,
+                         gcvNULL);
+
+        /* Add source0 usage. */
+        vscVIR_AddNewUsageToDef(pDuInfo,
+                                VIR_INPUT_DEF_INST,
+                                pNewAddInst,
+                                VIR_Inst_GetSource(pNewAddInst, VIR_Operand_Src0),
+                                gcvFALSE,
+                                VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
+                                1,
+                                VIR_ENABLE_XYZ,
+                                VIR_HALF_CHANNEL_MASK_FULL,
+                                gcvNULL);
+
+        /* Add a new def for all its usages(channel XYZ). */
+        defIdx = vscVIR_FindFirstDefIndex(pDuInfo, VIR_Symbol_GetVregIndex(pWorkGroupIdSym));
+        while (VIR_INVALID_DEF_INDEX != defIdx)
+        {
+            pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
+            gcmASSERT(pDef);
+
+            if (pDef->defKey.channel < VIR_CHANNEL_W && pDef->defKey.pDefInst == VIR_INPUT_DEF_INST)
+            {
+                duIter.pDuInfo = pDuInfo;
+                duIter.bSameBBOnly = gcvFALSE;
+                duIter.defKey.pDefInst = pDef->defKey.pDefInst;
+                duIter.defKey.regNo = VIR_Symbol_GetVregIndex(pWorkGroupIdSym);
+                duIter.defKey.channel = pDef->defKey.channel;
+                VSC_DU_ITERATOR_INIT(&(duIter.duIter), &pDef->duChain);
+
+                for (pUsage = vscVIR_GeneralDuIterator_First(&duIter);
+                     pUsage != gcvNULL;
+                     pUsage = vscVIR_GeneralDuIterator_Next(&duIter))
+                {
+                    pUsageInst = pUsage->usageKey.pUsageInst;
+                    pUsageOpnd = pUsage->usageKey.pOperand;
+
+                    vscVIR_AddNewUsageToDef(pDuInfo,
+                                            pNewAddInst,
+                                            pUsageInst,
+                                            pUsageOpnd,
+                                            gcvFALSE,
+                                            VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
+                                            1,
+                                            (VIR_Enable)(VIR_ENABLE_X << pDef->defKey.channel),
+                                            VIR_HALF_CHANNEL_MASK_FULL,
+                                            gcvNULL);
+                }
+            }
+
+            /* Get next def with same regNo */
+            defIdx = pDef->nextDefIdxOfSameRegNo;
+        }
     }
-    else
+
+    /* Create globalInvocationIdOffset. */
+    if (pGlobalIdSym != gcvNULL && pGlobalIdOffsetSym == gcvNULL)
     {
+        errCode = VIR_Shader_AddString(pShader,
+                                       _sldGlobalIdOffsetName,
+                                       &nameId);
+
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_UNIFORM,
+                                       nameId,
+                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X3),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &globalIdOffsetSymId);
+        ON_ERROR(errCode, "Add globalIdOffset uniform. ");
+
+        pGlobalIdOffsetSym = VIR_Shader_GetSymFromId(pShader, globalIdOffsetSymId);
+        VIR_Symbol_SetFlag(pGlobalIdOffsetSym, VIR_SYMFLAG_COMPILER_GEN);
+        VIR_Symbol_SetPrecision(pGlobalIdOffsetSym, VIR_PRECISION_HIGH);
+        VIR_Symbol_SetUniformKind(pGlobalIdOffsetSym, VIR_UNIFORM_GLOBAL_INVOCATION_ID_OFFSET);
+        VIR_Symbol_SetAddrSpace(pGlobalIdOffsetSym, VIR_AS_CONSTANT);
+        VIR_Symbol_SetTyQualifier(pGlobalIdOffsetSym, VIR_TYQUAL_CONST);
+
+        /* Insert a ADD instruction: globalInvocationId = globalInvocationId + globalInvocationIdOffset. */
         errCode = VIR_Function_PrependInstruction(pMainFunc,
                                                   VIR_OP_ADD,
                                                   VIR_TYPE_UINT_X3,
                                                   &pNewAddInst);
         ON_ERROR(errCode, "Insert a ADD instruction.");
-    }
 
-    /* Set DEST. */
-    pNewOpnd = VIR_Inst_GetDest(pNewAddInst);
-    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pWorkGroupIdSym));
-    VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_XYZ);
+        /* Set DEST. */
+        pNewOpnd = VIR_Inst_GetDest(pNewAddInst);
+        VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pGlobalIdSym));
+        VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_XYZ);
 
-    /* Set SRC0. */
-    pNewOpnd = VIR_Inst_GetSource(pNewAddInst, 0);
-    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pWorkGroupIdSym));
-    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
+        /* Set SRC0. */
+        pNewOpnd = VIR_Inst_GetSource(pNewAddInst, 0);
+        VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, VIR_Symbol_GetIndex(pGlobalIdSym));
+        VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
 
-    /* Set SRC1. */
-    pNewOpnd = VIR_Inst_GetSource(pNewAddInst, 1);
-    VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, workGroupIdOffsetSymId);
-    VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
+        /* Set SRC1. */
+        pNewOpnd = VIR_Inst_GetSource(pNewAddInst, 1);
+        VIR_Operand_SetSymbol(pNewOpnd, pMainFunc, globalIdOffsetSymId);
+        VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZZ);
 
-    /* Add a new def. */
-    vscVIR_AddNewDef(pDuInfo,
-                     pNewAddInst,
-                     VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
-                     1,
-                     VIR_ENABLE_XYZ,
-                     VIR_HALF_CHANNEL_MASK_FULL,
-                     gcvNULL,
-                     gcvNULL);
+        /* Add a new def. */
+        vscVIR_AddNewDef(pDuInfo,
+                         pNewAddInst,
+                         VIR_Symbol_GetVregIndex(pGlobalIdSym),
+                         1,
+                         VIR_ENABLE_XYZ,
+                         VIR_HALF_CHANNEL_MASK_FULL,
+                         gcvNULL,
+                         gcvNULL);
 
-    /* Add source0 usage. */
-    vscVIR_AddNewUsageToDef(pDuInfo,
-                            VIR_INPUT_DEF_INST,
-                            pNewAddInst,
-                            VIR_Inst_GetSource(pNewAddInst, VIR_Operand_Src0),
-                            gcvFALSE,
-                            VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
-                            1,
-                            VIR_ENABLE_XYZ,
-                            VIR_HALF_CHANNEL_MASK_FULL,
-                            gcvNULL);
+        /* Add source0 usage. */
+        vscVIR_AddNewUsageToDef(pDuInfo,
+                                VIR_INPUT_DEF_INST,
+                                pNewAddInst,
+                                VIR_Inst_GetSource(pNewAddInst, VIR_Operand_Src0),
+                                gcvFALSE,
+                                VIR_Symbol_GetVregIndex(pGlobalIdSym),
+                                1,
+                                VIR_ENABLE_XYZ,
+                                VIR_HALF_CHANNEL_MASK_FULL,
+                                gcvNULL);
 
-    /* Add a new def for all its usages(channel XYZ). */
-    defIdx = vscVIR_FindFirstDefIndex(pDuInfo, VIR_Symbol_GetVregIndex(pWorkGroupIdSym));
-    while (VIR_INVALID_DEF_INDEX != defIdx)
-    {
-        pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
-        gcmASSERT(pDef);
-
-        if (pDef->defKey.channel < VIR_CHANNEL_W && pDef->defKey.pDefInst == VIR_INPUT_DEF_INST)
+        /* Add a new def for all its usages(channel XYZ). */
+        defIdx = vscVIR_FindFirstDefIndex(pDuInfo, VIR_Symbol_GetVregIndex(pGlobalIdSym));
+        while (VIR_INVALID_DEF_INDEX != defIdx)
         {
-            duIter.pDuInfo = pDuInfo;
-            duIter.bSameBBOnly = gcvFALSE;
-            duIter.defKey.pDefInst = pDef->defKey.pDefInst;
-            duIter.defKey.regNo = VIR_Symbol_GetVregIndex(pWorkGroupIdSym);
-            duIter.defKey.channel = pDef->defKey.channel;
-            VSC_DU_ITERATOR_INIT(&(duIter.duIter), &pDef->duChain);
+            pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
+            gcmASSERT(pDef);
 
-            for (pUsage = vscVIR_GeneralDuIterator_First(&duIter);
-                 pUsage != gcvNULL;
-                 pUsage = vscVIR_GeneralDuIterator_Next(&duIter))
+            if (pDef->defKey.channel < VIR_CHANNEL_W && pDef->defKey.pDefInst == VIR_INPUT_DEF_INST)
             {
-                pUsageInst = pUsage->usageKey.pUsageInst;
-                pUsageOpnd = pUsage->usageKey.pOperand;
+                duIter.pDuInfo = pDuInfo;
+                duIter.bSameBBOnly = gcvFALSE;
+                duIter.defKey.pDefInst = pDef->defKey.pDefInst;
+                duIter.defKey.regNo = VIR_Symbol_GetVregIndex(pGlobalIdSym);
+                duIter.defKey.channel = pDef->defKey.channel;
+                VSC_DU_ITERATOR_INIT(&(duIter.duIter), &pDef->duChain);
 
-                vscVIR_AddNewUsageToDef(pDuInfo,
-                                        pNewAddInst,
-                                        pUsageInst,
-                                        pUsageOpnd,
-                                        gcvFALSE,
-                                        VIR_Symbol_GetVregIndex(pWorkGroupIdSym),
-                                        1,
-                                        (VIR_Enable)(VIR_ENABLE_X << pDef->defKey.channel),
-                                        VIR_HALF_CHANNEL_MASK_FULL,
-                                        gcvNULL);
+                for (pUsage = vscVIR_GeneralDuIterator_First(&duIter);
+                     pUsage != gcvNULL;
+                     pUsage = vscVIR_GeneralDuIterator_Next(&duIter))
+                {
+                    pUsageInst = pUsage->usageKey.pUsageInst;
+                    pUsageOpnd = pUsage->usageKey.pOperand;
+
+                    vscVIR_AddNewUsageToDef(pDuInfo,
+                                            pNewAddInst,
+                                            pUsageInst,
+                                            pUsageOpnd,
+                                            gcvFALSE,
+                                            VIR_Symbol_GetVregIndex(pGlobalIdSym),
+                                            1,
+                                            (VIR_Enable)(VIR_ENABLE_X << pDef->defKey.channel),
+                                            VIR_HALF_CHANNEL_MASK_FULL,
+                                            gcvNULL);
+                }
             }
-        }
 
-        /* Get next def with same regNo */
-        defIdx = pDef->nextDefIdxOfSameRegNo;
+            /* Get next def with same regNo */
+            defIdx = pDef->nextDefIdxOfSameRegNo;
+        }
     }
 
     /* Set the flag. */

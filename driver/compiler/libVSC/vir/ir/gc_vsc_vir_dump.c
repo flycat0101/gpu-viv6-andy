@@ -464,6 +464,8 @@ _GetUniformKindString(
         return "workGroupCount";
     case VIR_UNIFORM_WORK_GROUP_ID_OFFSET:
         return "workGroupIdOffset";
+    case VIR_UNIFORM_GLOBAL_INVOCATION_ID_OFFSET:
+        return "globalInvocationIdOffset";
     case  VIR_UNIFORM_PRINTF_ADDRESS:
         return "printf_address";
     case VIR_UNIFORM_WORKITEM_PRINTF_BUFFER_SIZE:

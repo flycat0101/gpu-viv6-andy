@@ -3400,6 +3400,7 @@ _MapNonSamplerUniforms(
         case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
         case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
         case gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET:
+        case gcSHADER_VAR_CATEGORY_GLOBAL_INVOCATION_ID_OFFSET:
             break;
 
         case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
@@ -3579,6 +3580,7 @@ _MapNonSamplerUniforms(
                 case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
                 case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
                 case gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET:
+                case gcSHADER_VAR_CATEGORY_GLOBAL_INVOCATION_ID_OFFSET:
                     break;
 
                 case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
@@ -3747,6 +3749,7 @@ _CalcUniformCount(
         case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
         case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
         case gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET:
+        case gcSHADER_VAR_CATEGORY_GLOBAL_INVOCATION_ID_OFFSET:
             break;
 
         case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
@@ -3940,6 +3943,7 @@ _MapUniforms(
             case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
             case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
             case gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET:
+            case gcSHADER_VAR_CATEGORY_GLOBAL_INVOCATION_ID_OFFSET:
                 break;
 
             case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:
@@ -22716,6 +22720,7 @@ _GenerateStates(
                         case gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT:
                         case gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT:
                         case gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET:
+                        case gcSHADER_VAR_CATEGORY_GLOBAL_INVOCATION_ID_OFFSET:
                             break;
 
                         case gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS:

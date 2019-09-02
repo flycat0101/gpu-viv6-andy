@@ -1034,6 +1034,7 @@ typedef enum _gcSHADER_VAR_CATEGORY
     gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT, /* the number of concurrent work thread. */
     gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT, /* the number of concurrent work group. */
     gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET, /* the workGroupId offset, for multi-GPU only. */
+    gcSHADER_VAR_CATEGORY_GLOBAL_INVOCATION_ID_OFFSET, /* the globalId offset, for multi-GPU only. */
     gcSHADER_VAR_CATEGORY_VIEW_INDEX,
 }
 gcSHADER_VAR_CATEGORY;
@@ -1370,6 +1371,7 @@ gceUNIFORM_FLAGS;
 #define isUniformWorkThreadCount(u)         ((u)->_varCategory == gcSHADER_VAR_CATEGORY_WORK_THREAD_COUNT)
 #define isUniformWorkGroupCount(u)          ((u)->_varCategory == gcSHADER_VAR_CATEGORY_WORK_GROUP_COUNT)
 #define isUniformWorkGroupIdOffset(u)       ((u)->_varCategory == gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET)
+#define isUniformGlobalInvocationIdOffset(u)((u)->_varCategory == gcSHADER_VAR_CATEGORY_GLOBAL_INVOCATION_ID_OFFSET)
 #define isUniformViewIndex(u)               ((u)->_varCategory == gcSHADER_VAR_CATEGORY_VIEW_INDEX)
 
 #define isUniformBasicType(u)               (isUniformNormal((u))                   || \
@@ -1383,7 +1385,8 @@ gceUNIFORM_FLAGS;
                                              isUniformGlImageForImaget((u))         || \
                                              isUniformWorkThreadCount((u))          || \
                                              isUniformWorkGroupCount((u))           || \
-                                             isUniformWorkGroupIdOffset((u)))
+                                             isUniformWorkGroupIdOffset((u))        || \
+                                             isUniformGlobalInvocationIdOffset((u)))
 
 #define isUniformSampler(u)                 (isUniformNormal(u) && (gcmType_Kind(GetUniformType(u)) == gceTK_SAMPLER))
 

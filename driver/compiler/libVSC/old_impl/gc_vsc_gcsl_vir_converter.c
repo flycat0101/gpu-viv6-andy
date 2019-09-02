@@ -1325,6 +1325,10 @@ _ConvUniformKind2Vir(
         virUniformKind = VIR_UNIFORM_WORK_GROUP_ID_OFFSET;
         break;
 
+    case gcSHADER_VAR_CATEGORY_GLOBAL_INVOCATION_ID_OFFSET:
+        virUniformKind = VIR_UNIFORM_GLOBAL_INVOCATION_ID_OFFSET;
+        break;
+
     default:
         gcmASSERT(gcvFALSE);
         break;

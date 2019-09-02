@@ -3516,6 +3516,30 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                                                       &workGroupIdOffsetUniform));
                     virUniform->gcslIndex = workGroupIdOffsetIndex;
                 }
+                else if(VIR_Symbol_GetUniformKind(virUniformSym) == VIR_UNIFORM_GLOBAL_INVOCATION_ID_OFFSET)
+                {
+                    gctINT16 globalIdOffsetIndex;
+                    gcUNIFORM globalIdOffsetUniform;
+
+                    /* Create globalInvocationId. */
+                    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+                                                      VIR_Shader_GetSymNameString(VirShader, virUniformSym),
+                                                      gcSHADER_UINT_X3,
+                                                      gcSHADER_PRECISION_HIGH,
+                                                      -1,
+                                                      -1,
+                                                      -1,
+                                                      0,
+                                                      gcvNULL,
+                                                      gcSHADER_VAR_CATEGORY_GLOBAL_INVOCATION_ID_OFFSET,
+                                                      0,
+                                                      -1,
+                                                      -1,
+                                                      gcIMAGE_FORMAT_DEFAULT,
+                                                      &globalIdOffsetIndex,
+                                                      &globalIdOffsetUniform));
+                    virUniform->gcslIndex = globalIdOffsetIndex;
+                }
                 else if(VIR_Symbol_GetUniformKind(virUniformSym) == VIR_UNIFORM_VIEW_INDEX)
                 {
                     gctINT16 viewIndexIndex;

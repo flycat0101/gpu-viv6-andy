@@ -18056,12 +18056,13 @@ _gcCalculateWorkGroupIdForMultiGPU(
 {
     gceSTATUS               status = gcvSTATUS_OK;
     gctUINT                 i, j, origLastInstruction = Shader->lastInstruction;
-    gcUNIFORM               uniform, workGroupIdOffsetUniform = gcvNULL;
-    gcATTRIBUTE             attr, workGroupIdAttr = gcvNULL;
+    gcUNIFORM               uniform, workGroupIdOffsetUniform = gcvNULL, globalIdOffsetUniform = gcvNULL;
+    gcATTRIBUTE             attr, workGroupIdAttr = gcvNULL, globalIdAttr = gcvNULL;
     gctINT                  mainStartIdx = 0;
-    gctUINT32               newWorkGroupIdTempIndex;
+    gctUINT32               newWorkGroupIdTempIndex = 0, newGlobalIdTempIndex = 0;
+    gctBOOL                 bCheckWorkGroupId = gcvFALSE, bCheckGlobalId = gcvFALSE;
 
-    /* Find WorkGroupID, if not found, just bail out. */
+    /* Find WorkGroupID/globalInvocationId, if not found, just bail out. */
     for (i = 0; i < Shader->attributeCount; i++)
     {
         attr = Shader->attributes[i];
@@ -18071,10 +18072,21 @@ _gcCalculateWorkGroupIdForMultiGPU(
             GetATTRNameLength(attr) == gcSL_WORK_GROUP_ID)
         {
             workGroupIdAttr = attr;
+        }
+        else if (attr &&
+                 GetATTRNameLength(attr) < 0 &&
+                 GetATTRNameLength(attr) == gcSL_GLOBAL_INVOCATION_ID)
+        {
+            globalIdAttr = attr;
+        }
+
+        if (workGroupIdAttr != gcvNULL && globalIdAttr != gcvNULL)
+        {
             break;
         }
     }
-    if (workGroupIdAttr == gcvNULL)
+
+    if (workGroupIdAttr == gcvNULL && globalIdAttr == gcvNULL)
     {
         return status;
     }
@@ -18086,61 +18098,132 @@ _gcCalculateWorkGroupIdForMultiGPU(
         if (uniform && isUniformWorkGroupIdOffset(uniform))
         {
             workGroupIdOffsetUniform = uniform;
+        }
+        else if (uniform && isUniformGlobalInvocationIdOffset(uniform))
+        {
+            globalIdOffsetUniform = uniform;
+        }
+
+        if (workGroupIdOffsetUniform != gcvNULL && globalIdOffsetUniform != gcvNULL)
+        {
             break;
         }
     }
-    if (workGroupIdOffsetUniform)
+
+    if (!((workGroupIdAttr != gcvNULL && workGroupIdOffsetUniform == gcvNULL)
+         ||
+         (globalIdAttr != gcvNULL && globalIdOffsetUniform == gcvNULL)))
     {
         return status;
     }
 
-    /* Create workGroupIdOffset. */
-    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
-                                      _sldWorkGroupIdOffsetName,
-                                      gcSHADER_UINT_X3,
-                                      gcSHADER_PRECISION_HIGH,
-                                      -1,
-                                      -1,
-                                      -1,
-                                      0,
-                                      gcvNULL,
-                                      gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET,
-                                      0,
-                                      -1,
-                                      -1,
-                                      gcIMAGE_FORMAT_DEFAULT,
-                                      gcvNULL,
-                                      &workGroupIdOffsetUniform));
+    if (workGroupIdAttr != gcvNULL && workGroupIdOffsetUniform == gcvNULL)
+    {
+        /* Create workGroupIdOffset. */
+        gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+                                          _sldWorkGroupIdOffsetName,
+                                          gcSHADER_UINT_X3,
+                                          gcSHADER_PRECISION_HIGH,
+                                          -1,
+                                          -1,
+                                          -1,
+                                          0,
+                                          gcvNULL,
+                                          gcSHADER_VAR_CATEGORY_WORK_GROUP_ID_OFFSET,
+                                          0,
+                                          -1,
+                                          -1,
+                                          gcIMAGE_FORMAT_DEFAULT,
+                                          gcvNULL,
+                                          &workGroupIdOffsetUniform));
 
-    /* Create a new temp register to save the workGroupId. */
-    newWorkGroupIdTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X4);
+        /* Create a new temp register to save the workGroupId. */
+        newWorkGroupIdTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X4);
 
-    /* Find the main function entry. */
-    gcmONERROR(gcSHADER_FindMainFunction(Shader, &mainStartIdx, gcvNULL));
+        /* Find the main function entry. */
+        gcmONERROR(gcSHADER_FindMainFunction(Shader, &mainStartIdx, gcvNULL));
 
-    /* Compute group index :
-        newWorkGroupId = workGroupIdAttr
-        newWorkGroupId.xyz = newWorkGroupId.xyz + workGroupIdOffset.xyz
-    */
-    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainStartIdx, 2, gcvTRUE, gcvTRUE));
-    Shader->instrIndex = (mainStartIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
-    Shader->lastInstruction = (mainStartIdx == 0) ? 0 : mainStartIdx - 1;
+        /* Compute group index :
+            newWorkGroupId = workGroupIdAttr
+            newWorkGroupId.xyz = newWorkGroupId.xyz + workGroupIdOffset.xyz
+        */
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainStartIdx, 2, gcvTRUE, gcvTRUE));
+        Shader->instrIndex = (mainStartIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
+        Shader->lastInstruction = (mainStartIdx == 0) ? 0 : mainStartIdx - 1;
 
-    /* MOV newWorkGroupId, workGroupIdAttr */
-    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOV, newWorkGroupIdTempIndex, gcSL_ENABLE_XYZW, gcSL_UINT32, gcSHADER_PRECISION_HIGH, 0));
-    gcmONERROR(gcSHADER_AddSourceAttributeFormatted(Shader, workGroupIdAttr, gcSL_SWIZZLE_XYZW, 0, gcSL_UINT32));
+        /* MOV newWorkGroupId, workGroupIdAttr */
+        gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOV, newWorkGroupIdTempIndex, gcSL_ENABLE_XYZW, gcSL_UINT32, gcSHADER_PRECISION_HIGH, 0));
+        gcmONERROR(gcSHADER_AddSourceAttributeFormatted(Shader, workGroupIdAttr, gcSL_SWIZZLE_XYZW, 0, gcSL_UINT32));
 
-    /* ADD newWorkGroupId.xyz, workGroupIdAttr.xyz, workGroupIdOffset.xyz */
-    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_ADD, newWorkGroupIdTempIndex, gcSL_ENABLE_XYZ, gcSL_UINT32, gcSHADER_PRECISION_HIGH, 0));
-    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, newWorkGroupIdTempIndex, gcSL_SWIZZLE_XYZZ, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
-    gcmONERROR(gcSHADER_AddSourceUniformFormatted(Shader, workGroupIdOffsetUniform, gcSL_SWIZZLE_XYZZ, 0, gcSL_UINT32));
+        /* ADD newWorkGroupId.xyz, workGroupIdAttr.xyz, workGroupIdOffset.xyz */
+        gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_ADD, newWorkGroupIdTempIndex, gcSL_ENABLE_XYZ, gcSL_UINT32, gcSHADER_PRECISION_HIGH, 0));
+        gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, newWorkGroupIdTempIndex, gcSL_SWIZZLE_XYZZ, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+        gcmONERROR(gcSHADER_AddSourceUniformFormatted(Shader, workGroupIdOffsetUniform, gcSL_SWIZZLE_XYZZ, 0, gcSL_UINT32));
 
-    Shader->lastInstruction = origLastInstruction + 2;
+        Shader->lastInstruction = origLastInstruction + 2;
 
-    /* Replace all workGroupIdAttr with newWorkGroupId. */
+        bCheckWorkGroupId = gcvTRUE;
+    }
+
+    if (globalIdAttr != gcvNULL && globalIdOffsetUniform == gcvNULL)
+    {
+        /* Create globalIdOffset. */
+        gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+                                          _sldGlobalIdOffsetName,
+                                          gcSHADER_UINT_X3,
+                                          gcSHADER_PRECISION_HIGH,
+                                          -1,
+                                          -1,
+                                          -1,
+                                          0,
+                                          gcvNULL,
+                                          gcSHADER_VAR_CATEGORY_GLOBAL_INVOCATION_ID_OFFSET,
+                                          0,
+                                          -1,
+                                          -1,
+                                          gcIMAGE_FORMAT_DEFAULT,
+                                          gcvNULL,
+                                          &globalIdOffsetUniform));
+
+        /* Create a new temp register to save the globalId. */
+        newGlobalIdTempIndex = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X4);
+
+        /* Find the main function entry. */
+        gcmONERROR(gcSHADER_FindMainFunction(Shader, &mainStartIdx, gcvNULL));
+
+        /* Compute group index :
+            newGlobalId = globalIdAttr
+            newGlobalId.xyz = newGlobalId.xyz + globalIdOffset.xyz
+        */
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainStartIdx, 2, gcvTRUE, gcvTRUE));
+        Shader->instrIndex = (mainStartIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
+        Shader->lastInstruction = (mainStartIdx == 0) ? 0 : mainStartIdx - 1;
+
+        /* MOV newGlobalId, globalIdAttr */
+        gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOV, newGlobalIdTempIndex, gcSL_ENABLE_XYZW, gcSL_UINT32, gcSHADER_PRECISION_HIGH, 0));
+        gcmONERROR(gcSHADER_AddSourceAttributeFormatted(Shader, globalIdAttr, gcSL_SWIZZLE_XYZW, 0, gcSL_UINT32));
+
+        /* ADD newGlobalId.xyz, globalIdAttr.xyz, globalIdOffset.xyz */
+        gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_ADD, newGlobalIdTempIndex, gcSL_ENABLE_XYZ, gcSL_UINT32, gcSHADER_PRECISION_HIGH, 0));
+        gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, newGlobalIdTempIndex, gcSL_SWIZZLE_XYZZ, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+        gcmONERROR(gcSHADER_AddSourceUniformFormatted(Shader, globalIdOffsetUniform, gcSL_SWIZZLE_XYZZ, 0, gcSL_UINT32));
+
+        Shader->lastInstruction = origLastInstruction + 2;
+
+        bCheckGlobalId = gcvTRUE;
+    }
+
+    /* Replace all workGroupIdAttr/globalIdAttr with newWorkGroupId/newGlobalId. */
     for (i = 0; i < Shader->lastInstruction; i++)
     {
-        if ((Shader->code[i].tempIndex == newWorkGroupIdTempIndex)
+        if ((bCheckWorkGroupId && Shader->code[i].tempIndex == newWorkGroupIdTempIndex)
+            &&
+            (gcmSL_OPCODE_GET(Shader->code[i].opcode, Opcode) == gcSL_MOV || gcmSL_OPCODE_GET(Shader->code[i].opcode, Opcode) == gcSL_ADD))
+        {
+            continue;
+        }
+
+        if ((bCheckGlobalId && Shader->code[i].tempIndex == newGlobalIdTempIndex)
             &&
             (gcmSL_OPCODE_GET(Shader->code[i].opcode, Opcode) == gcSL_MOV || gcmSL_OPCODE_GET(Shader->code[i].opcode, Opcode) == gcSL_ADD))
         {
@@ -18163,14 +18246,18 @@ _gcCalculateWorkGroupIdForMultiGPU(
                 continue;
             }
 
-            if (gcmSL_INDEX_GET(*pSourceIndex, Index) != workGroupIdAttr->index)
+            if (gcmSL_INDEX_GET(*pSourceIndex, Index) == workGroupIdAttr->index)
             {
-                continue;
+                *pSource      = gcmSL_SOURCE_SET(*pSource, Type, gcSL_TEMP);
+                *pSource      = gcmSL_SOURCE_SET(*pSource, Indexed, gcSL_NOT_INDEXED);
+                *pSourceIndex = gcmSL_INDEX_SET(*pSourceIndex, Index, newWorkGroupIdTempIndex);
             }
-
-            *pSource      = gcmSL_SOURCE_SET(*pSource, Type, gcSL_TEMP);
-            *pSource      = gcmSL_SOURCE_SET(*pSource, Indexed, gcSL_NOT_INDEXED);
-            *pSourceIndex = gcmSL_INDEX_SET(*pSourceIndex, Index, newWorkGroupIdTempIndex);
+            else if (gcmSL_INDEX_GET(*pSourceIndex, Index) == globalIdAttr->index)
+            {
+                *pSource      = gcmSL_SOURCE_SET(*pSource, Type, gcSL_TEMP);
+                *pSource      = gcmSL_SOURCE_SET(*pSource, Indexed, gcSL_NOT_INDEXED);
+                *pSourceIndex = gcmSL_INDEX_SET(*pSourceIndex, Index, newGlobalIdTempIndex);
+            }
         }
     }
 
