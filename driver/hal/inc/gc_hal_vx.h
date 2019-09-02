@@ -265,6 +265,17 @@ gcoVX_AllocateMemoryEx(
     OUT gcsSURF_NODE_PTR *  Node
     );
 
+gceSTATUS
+gcoVX_AllocateMemoryExAddAllocflag(
+    IN OUT gctUINT *        Bytes,
+    IN  gceSURF_TYPE        Type,
+    IN  gctUINT32           alignment,
+    IN  gctUINT32           allocflag,
+    OUT gctUINT32 *         Physical,
+    OUT gctPOINTER *        Logical,
+    OUT gctUINT32 * CpuPhysicalAddress,
+    OUT gcsSURF_NODE_PTR *  Node
+    );
 
 gceSTATUS
 gcoVX_FreeMemoryEx(

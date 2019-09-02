@@ -3869,7 +3869,7 @@ vx_status vxnneCalculateConvTilingParam(
                                 perf.swTilingInfo.srcBuf, perf.swTilingInfo.dstBuf, perf.swTilingInfo.kernelBuf,
                                 vipSize,
                                 VXNNE_OPERATION_TARGET_NN,
-                                VXNNE_OPERATOR_CONVOLUTION);
+                                conv_op->base.operatorType);
 
         info[i].tilingParam.outImageTileXSize = perf.resultInfo.outImageTileXSize;
         info[i].tilingParam.outImageTileYSize = perf.resultInfo.outImageTileYSize;

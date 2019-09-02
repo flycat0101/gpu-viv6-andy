@@ -1363,6 +1363,11 @@ typedef struct _vx_context
 #endif
     vx_ptr_ptr                              binaryGraphInitBuffer;
     vx_uint32_ptr                           binaryGraphInitSize;
+    vx_uint32                               SumTotalKernelBufferSize;
+    vx_uint32                               CurrentContigousSize;
+    vx_uint8_ptr*                           Logical;
+    vx_uint32_ptr                           Physical;
+    gcsSURF_NODE_PTR*                       Node;
 }
 vx_context_s;
 

@@ -1148,6 +1148,102 @@ OnError:
 }
 
 gceSTATUS
+gcoVX_AllocateMemoryExAddAllocflag(
+    IN OUT gctUINT *        Bytes,
+    IN  gceSURF_TYPE        Type,
+    IN  gctUINT32           alignment,
+    IN  gctUINT32           allocflag,
+    OUT gctUINT32 *         Physical,
+    OUT gctPOINTER *        Logical,
+    OUT gctUINT32 * CpuPhysicalAddress,
+    OUT gcsSURF_NODE_PTR *  Node
+    )
+{
+    gceSTATUS status;
+    gctUINT bytes;
+    gcsSURF_NODE_PTR node = gcvNULL;
+    gctPOINTER pointer = gcvNULL;
+    gctPOINTER logical = gcvNULL;
+    gctUINT32  physical = 0;
+    gcmHEADER_ARG("*Bytes=%lu", *Bytes);
+
+    /* memory allocat/release no need to gcoVX_VerifyHardware()); */
+    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SH_IMAGE_LD_LAST_PIXEL_FIX))
+    {
+        /* Allocate extra 15 bytes to avoid cache overflow */
+        bytes = gcmALIGN(*Bytes + 15, 64);
+    }
+    else
+    {
+        bytes = gcmALIGN(*Bytes, 64);
+    }
+
+    /* By default, align it to 64 byte */
+    if (alignment == 0)
+    {
+        alignment = 64;
+    }
+
+    gcmASSERT(Node);
+
+    /* Allocate node. */
+    gcmONERROR(gcoOS_Allocate(gcvNULL,
+                              gcmSIZEOF(gcsSURF_NODE),
+                              &pointer));
+
+    node = (gcsSURF_NODE_PTR)pointer;
+
+    gcmONERROR(gcsSURF_NODE_Construct(
+        node,
+        bytes,
+        alignment,
+        Type,
+        allocflag,
+        gcvPOOL_DEFAULT
+        ));
+
+    /* Lock the buffer. */
+    gcmONERROR(gcoHARDWARE_LockAddCpuPhysicalAddr(node,
+                                &physical,
+                                &logical, CpuPhysicalAddress));
+
+    /* Return allocated number of bytes. */
+    if (Bytes)
+    {
+        *Bytes = bytes;
+    }
+    if (Logical)
+    {
+        *Logical = logical;
+    }
+    if (Physical)
+    {
+        *Physical = physical;
+    }
+
+    memory_size += bytes;
+
+    /* Return node. */
+    *Node = node;
+
+    /* Success. */
+    gcmFOOTER_ARG("*Bytes=%lu *Physical=0x%x *Logical=0x%x *CpuPhysicalAddress=0x%x *Node=0x%x",
+                  *Bytes, *Physical, *Logical, *CpuPhysicalAddress, *Node);
+    return gcvSTATUS_OK;
+
+OnError:
+
+    /* Return the status. */
+    if(node != gcvNULL)
+    {
+        gcoOS_Free(gcvNULL, node);
+        node = gcvNULL;
+    }
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcoVX_AllocateMemoryEx(
     IN OUT gctUINT *        Bytes,
     IN  gceSURF_TYPE        Type,

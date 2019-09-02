@@ -873,11 +873,28 @@ gcoHARDWARE_Lock(
     OUT gctPOINTER * Memory
     );
 
+gceSTATUS
+gcoHARDWARE_LockAddCpuPhysicalAddr(
+    IN gcsSURF_NODE_PTR Node,
+    OUT gctUINT32 * Address,
+    OUT gctPOINTER * Memory,
+    OUT gctUINT32 * CpuPhysicalAddress
+);
+
 /* Unlock a surface. */
 gceSTATUS
 gcoHARDWARE_Unlock(
     IN gcsSURF_NODE_PTR Node,
     IN gceSURF_TYPE Type
+    );
+
+gceSTATUS
+gcoHARDWARE_LockExAddCpuPhysicalAddr(
+    IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE Engine,
+    OUT gctUINT32 * Address,
+    OUT gctPOINTER * Memory,
+    OUT gctUINT32 * CpuPhysicalAddress
     );
 
 gceSTATUS
@@ -3026,6 +3043,7 @@ typedef struct _vx_drv_option
     gctUINT tpCoreCount;
     gctUINT tpLiteCoreCount;
     gctUINT enableForce64BitsBiasNN;
+    gctUINT enableAllocateContigousMemForKernel;
 }
 vx_drv_option;
 

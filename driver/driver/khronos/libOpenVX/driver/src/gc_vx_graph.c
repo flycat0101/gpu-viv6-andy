@@ -4053,6 +4053,51 @@ OnError:
     return status;
 }
 
+VX_INTERNAL_API vx_status vxoGraph_AllocateContiguousMemory(vx_graph graph)
+{
+    vxnne_execution_layer layer = VX_NULL;
+    vxnne_operation_info_s opInfo;
+    vx_uint32 i, SumTotalKernelBufferSize;
+    vx_uint64 CpuPhysicalAddr, GpuPhysicalAddr;
+    vx_context context = vxGetContext((vx_reference)graph);
+
+    gcmHEADER_ARG("graph=%p", graph);
+
+    if (!graph->layer)
+    {
+        gcmFOOTER_ARG("%d", VX_SUCCESS);
+        return VX_SUCCESS;
+    }
+    layer = (vxnne_execution_layer)graph->layer;
+
+    for(i = 0; i < graph->layer->base.num_operations; i++)
+    {
+        vxnneOperation_GetInfo(graph->layer->operations[i], &opInfo);
+        context->SumTotalKernelBufferSize += (opInfo.weightsBiases ?  GetEsitimateWBSize(opInfo.weightsBiases) : 0);
+    }
+
+    context->Node = (gcsSURF_NODE_PTR *)vxAllocate(sizeof(gcsSURF_NODE));
+    context->Physical = (gctUINT32 *)vxAllocate(sizeof(gctUINT32));
+    context->Logical = (vx_uint8_ptr *)vxAllocate(sizeof(vx_uint8_ptr));
+    SumTotalKernelBufferSize = context->SumTotalKernelBufferSize;
+    for (i = 0; i < graph->layer->base.num_operations; i++)
+    {
+        if (gcmIS_SUCCESS((gcoVX_AllocateMemoryExAddAllocflag(&SumTotalKernelBufferSize, gcvSURF_VERTEX, 64, gcvALLOC_FLAG_CONTIGUOUS, context->Physical, context->Logical, (vx_uint32 *)&CpuPhysicalAddr, context->Node))))
+        {
+            gcoOS_ZeroMemory(*context->Logical, SumTotalKernelBufferSize);
+            context->CurrentContigousSize = SumTotalKernelBufferSize;
+            gcoOS_CPUPhysicalToGPUPhysical(CpuPhysicalAddr, &GpuPhysicalAddr);
+            gcmVERIFY_OK(gcoVX_SetRemapAddress((vx_uint32)GpuPhysicalAddr, (vx_uint32)GpuPhysicalAddr + SumTotalKernelBufferSize, gcvVX_OCB_REMAP));
+
+            break;
+        }
+        vxnneOperation_GetInfo(graph->layer->operations[graph->layer->base.num_operations - i - 1], &opInfo);
+        SumTotalKernelBufferSize -= (opInfo.weightsBiases ?  GetEsitimateWBSize(opInfo.weightsBiases) : 0);
+    }
+
+    return VX_SUCCESS;
+}
+
 VX_INTERNAL_API vx_uint32 BatchPipelined(vxnne_operation* operations, vx_int32 num)
 {
     if (num >= 3 &&
@@ -9278,6 +9323,7 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyGraph(vx_graph graph)
 
     vx_bool first = ((graph->verified == vx_false_e) && (graph->reverify == vx_false_e)) ? vx_true_e : vx_false_e;
 
+    vx_context context = vxGetContext((vx_reference)graph);
     gcmHEADER_ARG("graph=%p", graph);
 
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_ERROR_INVALID_REFERENCE;
@@ -9359,6 +9405,11 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyGraph(vx_graph graph)
         if (graph->base.context->options.collectPerfType == COLLECT_PERF_ESTIMATE)
         {
             vxoGraph_PredictPerf(graph);
+        }
+
+        if (context->options.enableAllocateContigousMemForKernel)
+        {
+            vxmONERROR(vxoGraph_AllocateContiguousMemory(graph));
         }
 
         vxmONERROR(vxoGraph_VerifyTiling(graph));

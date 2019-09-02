@@ -16866,6 +16866,143 @@ OnError:
 **          Logical address of the surface.
 */
 gceSTATUS
+gcoHARDWARE_LockExAddCpuPhysicalAddr(
+    IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE Engine,
+    OUT gctUINT32 * Address,
+    OUT gctPOINTER * Memory,
+    OUT gctUINT32 * CpuPhysicalAddress
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gceHARDWARE_TYPE type;
+
+    gcmHEADER_ARG("Node=0x%x Engine=0x%x, Address=0x%x Memory=0x%x CpuPhysicalAddress=0x%x",
+                  Node, Engine, Address, Memory, CpuPhysicalAddress);
+
+    gcmGETCURRENTHARDWARE(type);
+
+    if (Node->lockCounts[type][Engine] == 0)
+    {
+        gcsHAL_INTERFACE iface;
+        gctUINT32 handle = Node->u.normal.node;
+        gctBOOL cacheable = Node->u.normal.cacheable;
+
+        if (Node->pool == gcvPOOL_USER)
+        {
+            gctPHYS_ADDR_T physical;
+
+            physical = Node->u.wrapped.physical;
+
+            if (physical != gcvINVALID_PHYSICAL_ADDRESS)
+            {
+                gcoHARDWARE hardware = gcvNULL;
+                gcmGETHARDWARE(hardware);
+
+                physical -= hardware->baseAddr;
+
+                gcoOS_CPUPhysicalToGPUPhysical(physical, &physical);
+            }
+
+            /*
+            ** Although we want to treat user memory in the same way as video memory,
+            ** user memory still has some distinguishing feature to allow some optimization.
+            */
+            if (handle == 0)
+            {
+                /*
+                ** Some software access only surface has no kernel video node.
+                ** Since 'physical' is only for one hardware, it can't be used by other hardware type.
+                */
+                gcmASSERT(Node->logical != gcvNULL);
+
+                gcsSURF_NODE_SetHardwareAddress(Node, (gctUINT32) physical + (gctUINT32) Node->bufferOffset);
+            }
+            else
+            if (gcoHARDWARE_IsFlatMapped(gcvNULL, physical))
+            {
+                /*
+                ** If physical address is in flat mapping range of current hardware,
+                ** use physical address as hardware address instead of lock in kernel.
+                */
+
+                gcsSURF_NODE_SetHardwareAddress(Node, (gctUINT32) physical + (gctUINT32) Node->bufferOffset);
+
+                handle = 0;
+
+                Node->valid = gcvTRUE;
+            }
+
+            Node->u.wrapped.lockedInKernel[type] = handle ? gcvTRUE : gcvFALSE;
+
+            cacheable = gcvFALSE;
+        }
+
+        if (handle)
+        {
+            /* Fill in the kernel call structure. */
+            iface.engine = Engine;
+            iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
+            iface.u.LockVideoMemory.node = handle;
+            iface.u.LockVideoMemory.cacheable = cacheable;
+
+            gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+            if (CpuPhysicalAddress != gcvNULL)
+            {
+                gcmASSERT(iface.u.LockVideoMemory.physicalAddress < 0x100000000);
+                *CpuPhysicalAddress = (gctUINT32)iface.u.LockVideoMemory.physicalAddress;
+            }
+
+            /* Validate the node. */
+            Node->valid = gcvTRUE;
+
+            if (Node->pool != gcvPOOL_USER)
+            {
+                Node->lockedInKernel = gcvTRUE;
+            }
+
+            /* Store hardware address. */
+            gcsSURF_NODE_SetHardwareAddress(Node, iface.u.LockVideoMemory.address + (gctUINT32) Node->bufferOffset);
+
+            /* Store logical address. */
+            Node->logical = gcmUINT64_TO_PTR(iface.u.LockVideoMemory.memory + Node->bufferOffset);
+
+            gcmDUMP(gcvNULL, "#[lock 0x%08X]", iface.u.LockVideoMemory.address + (gctUINT32)Node->bufferOffset);
+        }
+    }
+
+    if ((Node->lockCounts[type][Engine] == 0)
+     && (type == gcvHARDWARE_2D || type == gcvHARDWARE_3D2D)
+    )
+    {
+        gctUINT32 address;
+
+        gcmGETHARDWAREADDRESS(*Node, address);
+        gcmDUMP_ADD_MEMORY_INFO(address, Node->logical, gcvINVALID_PHYSICAL_ADDRESS, Node->size);
+    }
+
+    /* Increment the lock count per hardware type. */
+    Node->lockCounts[type][Engine]++;
+
+    /* Set the result. */
+    if (Address != gcvNULL)
+    {
+        gcsSURF_NODE_GetHardwareAddress(Node, Address, gcvNULL, gcvNULL, gcvNULL);
+    }
+
+    if (Memory != gcvNULL)
+    {
+        *Memory = Node->logical;
+    }
+
+OnError:
+    /* Return status. */
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcoHARDWARE_LockEx(
     IN gcsSURF_NODE_PTR Node,
     IN gceENGINE Engine,
@@ -17521,6 +17658,17 @@ OnError:
 **      gctPOINTER * Memory
 **          Logical address of the surface.
 */
+gceSTATUS
+gcoHARDWARE_LockAddCpuPhysicalAddr(
+    IN gcsSURF_NODE_PTR Node,
+    OUT gctUINT32 * Address,
+    OUT gctPOINTER * Memory,
+    OUT gctUINT32 * CpuPhysicalAddress
+    )
+{
+    return gcoHARDWARE_LockExAddCpuPhysicalAddr(Node, gcvENGINE_RENDER, Address, Memory, CpuPhysicalAddress);
+}
+
 gceSTATUS
 gcoHARDWARE_Lock(
     IN gcsSURF_NODE_PTR Node,

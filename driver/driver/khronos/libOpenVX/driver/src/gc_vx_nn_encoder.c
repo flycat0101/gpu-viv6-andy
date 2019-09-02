@@ -14554,9 +14554,32 @@ vx_bool WeightBiasBufferAllocate(
     if (memory->allocated) return vx_true_e;
 
     size += WB_MEM_HEAD_OFFSET(weight_bias);
-
-    if (!vxoMemory_AllocateSize(context, memory, size)) return vx_false_e;
-
+    if (context->options.enableAllocateContigousMemForKernel)
+    {
+        if (context->CurrentContigousSize >= size)
+        {
+            memory->physicals[0] = *context->Physical;
+            *context->Physical += size;
+            memory->logicals[0] = (vx_uint8_ptr)(*context->Logical);
+            (*context->Logical) = (*context->Logical) + size;
+            memory->allocType = VXNNE_MEM_POOL_TYPE_ORIG_DDR;
+            context->CurrentContigousSize -= size;
+            if (!vxCreateMutex(OUT &memory->writeLocks[0]))
+            {
+                memory->writeLocks[0] = VX_NULL;
+            }
+        }
+        else
+        {
+            if (!vxoMemory_AllocateSize(context, memory, size))
+                return vx_false_e;
+        }
+    }
+    else
+    {
+        if (!vxoMemory_AllocateSize(context, memory, size))
+            return vx_false_e;
+    }
     memory->allocated = vx_true_e;
 
     weight_bias->memory_size = size;

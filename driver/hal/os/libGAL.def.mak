@@ -1032,6 +1032,7 @@ EXPORTS
 	gcoVX_QueryHWChipInfo
     gcoVX_FlushCache
     gcoVX_AllocateMemoryEx
+    gcoVX_AllocateMemoryExAddAllocflag
     gcoVX_FreeMemoryEx
     gcoVX_GetMemorySize
     gcoVX_ZeroMemorySize
