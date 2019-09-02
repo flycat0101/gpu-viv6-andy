@@ -5453,33 +5453,27 @@ _FlushMultiTargetAlpha(
                 gceBLEND_FUNCTION trgFuncColor = Hardware->PEStates->alphaStates.trgFuncColor[i];
                 gceBLEND_FUNCTION trgFuncAlpha = Hardware->PEStates->alphaStates.trgFuncAlpha[i];
 
-                gctBOOL srcAlphaOneNoRead = trgFuncAlpha == gcvBLEND_INV_SOURCE_ALPHA &&
-                                            trgFuncColor == gcvBLEND_INV_SOURCE_ALPHA &&
-                                            (srcFuncAlpha < gcvBLEND_TARGET_COLOR || srcFuncAlpha > gcvBLEND_INV_TARGET_ALPHA) &&
-                                            (srcFuncColor < gcvBLEND_TARGET_COLOR || srcFuncColor > gcvBLEND_INV_TARGET_ALPHA) &&
-                                            (trgFuncAlpha < gcvBLEND_TARGET_COLOR || trgFuncAlpha > gcvBLEND_INV_TARGET_ALPHA) &&
-                                            (trgFuncColor < gcvBLEND_TARGET_COLOR || trgFuncColor > gcvBLEND_INV_TARGET_ALPHA);
 
-                gctBOOL srcAlphaZeroNoRead = trgFuncAlpha == gcvBLEND_SOURCE_ALPHA &&
-                                             trgFuncColor == gcvBLEND_SOURCE_ALPHA &&
+                gctBOOL srcAlphaOneNoRead = trgFuncAlpha == gcvBLEND_INV_SOURCE_ALPHA && trgFuncColor == gcvBLEND_INV_SOURCE_ALPHA &&
+                                            (srcFuncAlpha < gcvBLEND_TARGET_COLOR || srcFuncAlpha > gcvBLEND_INV_TARGET_ALPHA) &&
+                                            (srcFuncColor < gcvBLEND_TARGET_COLOR || srcFuncColor > gcvBLEND_INV_TARGET_ALPHA);
+
+
+                gctBOOL srcAlphaZeroNoRead = trgFuncAlpha == gcvBLEND_SOURCE_ALPHA && trgFuncColor == gcvBLEND_SOURCE_ALPHA &&
                                              (srcFuncAlpha < gcvBLEND_TARGET_COLOR || srcFuncAlpha > gcvBLEND_INV_TARGET_ALPHA) &&
-                                             (srcFuncColor < gcvBLEND_TARGET_COLOR || srcFuncColor > gcvBLEND_INV_TARGET_ALPHA) &&
-                                             (trgFuncAlpha < gcvBLEND_TARGET_COLOR || trgFuncAlpha > gcvBLEND_INV_TARGET_ALPHA) &&
-                                             (trgFuncColor < gcvBLEND_TARGET_COLOR || trgFuncColor > gcvBLEND_INV_TARGET_ALPHA);
+                                             (srcFuncColor < gcvBLEND_TARGET_COLOR || srcFuncColor > gcvBLEND_INV_TARGET_ALPHA);
+
 
                 gctBOOL srcColorAlphaOneNoRead = (trgFuncAlpha == gcvBLEND_INV_SOURCE_ALPHA || trgFuncAlpha == gcvBLEND_INV_SOURCE_COLOR)&&
                                                  (trgFuncColor == gcvBLEND_INV_SOURCE_ALPHA ||  trgFuncColor == gcvBLEND_INV_SOURCE_COLOR) &&
                                                  (srcFuncAlpha < gcvBLEND_TARGET_COLOR || srcFuncAlpha > gcvBLEND_INV_TARGET_ALPHA) &&
-                                                 (srcFuncColor < gcvBLEND_TARGET_COLOR || srcFuncColor > gcvBLEND_INV_TARGET_ALPHA) &&
-                                                 (trgFuncAlpha < gcvBLEND_TARGET_COLOR || trgFuncAlpha > gcvBLEND_INV_TARGET_ALPHA) &&
-                                                 (trgFuncColor < gcvBLEND_TARGET_COLOR || trgFuncColor > gcvBLEND_INV_TARGET_ALPHA);
+                                                 (srcFuncColor < gcvBLEND_TARGET_COLOR || srcFuncColor > gcvBLEND_INV_TARGET_ALPHA);
+
 
                 gctBOOL srcColorAlphaZeroNoRead = (trgFuncAlpha == gcvBLEND_SOURCE_ALPHA || trgFuncAlpha == gcvBLEND_SOURCE_COLOR)&&
                                                   (trgFuncColor == gcvBLEND_SOURCE_ALPHA || trgFuncColor == gcvBLEND_SOURCE_COLOR) &&
                                                   (srcFuncAlpha < gcvBLEND_TARGET_COLOR || srcFuncAlpha > gcvBLEND_INV_TARGET_ALPHA) &&
-                                                  (srcFuncColor < gcvBLEND_TARGET_COLOR || srcFuncColor > gcvBLEND_INV_TARGET_ALPHA) &&
-                                                  (trgFuncAlpha < gcvBLEND_TARGET_COLOR || trgFuncAlpha > gcvBLEND_INV_TARGET_ALPHA) &&
-                                                  (trgFuncColor < gcvBLEND_TARGET_COLOR || trgFuncColor > gcvBLEND_INV_TARGET_ALPHA);
+                                                  (srcFuncColor < gcvBLEND_TARGET_COLOR || srcFuncColor > gcvBLEND_INV_TARGET_ALPHA);
 
                 if (srcAlphaOneNoRead)
                 {
