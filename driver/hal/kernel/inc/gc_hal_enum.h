@@ -677,7 +677,7 @@ typedef enum _gceOPTION
     gcvOPTION_OVX_USE_MULTI_DEVICES,
     gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_256B,
 #endif
-    gcvOPTION_NO_Y_INVERT = 60,
+
     /* Insert option above this comment only */
     gcvOPTION_COUNT                     /* Not a OPTION*/
 }

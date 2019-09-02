@@ -266,7 +266,6 @@ _FillInOptions(
     gcOptions[gcvOPTION_OCL_ASYNC_BLT] = gcvTRUE;
     gcOptions[gcvOPTION_OCL_IN_THREAD] = gcvTRUE;
     gcOptions[gcvOPTION_COMPRESSION_DEC400] = gcvTRUE;
-    gcOptions[gcvOPTION_NO_Y_INVERT] = gcvFALSE;
     gcOptions[gcvOPTION_OCL_VIR_SHADER] = gcvTRUE;
     gcOptions[gcvOPTION_OCL_USE_MULTI_DEVICES] = gcvFALSE;
 
@@ -386,14 +385,6 @@ _FillInOptions(
         if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "0")))
         {
             gcOptions[gcvOPTION_OVX_ENABLE_NN_STRIDE] = gcvFALSE;
-        }
-    }
-
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_NO_Y_INVERT", &envctrl)) && envctrl)
-    {
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
-        {
-            gcOptions[gcvOPTION_NO_Y_INVERT] = gcvTRUE;
         }
     }
 
