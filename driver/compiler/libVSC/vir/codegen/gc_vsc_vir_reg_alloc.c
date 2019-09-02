@@ -8997,33 +8997,6 @@ _VIR_RA_LS_SpillAddrComputation(
     /* use baseRegister's scratch channel */
     _VIR_RA_LS_SetHWRegForBaseRegister(pRA, atomicAddInst->dest, pRA->scratchChannel);
     VIR_Operand_SetEnable(atomicAddInst->dest, VIR_ENABLE_X);
-    if (pRA->needBoundsCheck)
-    {
-        /* MOV  baseRegister.xyz, uSymSpillMemAddr.xyz */
-        retErrCode = VIR_Function_AddInstructionAfter(pFunc,
-                                                      VIR_OP_MOV,
-                                                      VIR_TYPE_UINT_X3,
-                                                      atomicAddInst,
-                                                      gcvTRUE,
-                                                      &movInst);
-        if (retErrCode != VSC_ERR_NONE) return retErrCode;
-
-        /* src0 - uSymSpillMemAddr.xyz */
-        VIR_Operand_SetOpKind(movInst->src[VIR_Operand_Src0], VIR_OPND_SYMBOL);
-        VIR_Operand_SetSym(movInst->src[VIR_Operand_Src0], uSymSpillMemAddr);
-        VIR_Operand_SetTypeId(movInst->src[VIR_Operand_Src0], VIR_TYPE_UINT_X3);
-        VIR_Operand_SetSwizzle(movInst->src[VIR_Operand_Src0], VIR_SWIZZLE_XYZZ);
-
-        /* dest */
-        VIR_Operand_SetTempRegister(movInst->dest,
-                                    pFunc,
-                                    pRA->baseAddrSymId,
-                                    VIR_TYPE_UINT_X3);
-        gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
-        /* use baseRegister.x */
-        _VIR_RA_LS_SetHWRegForBaseRegister(pRA, movInst->dest, 0);
-        VIR_Operand_SetEnable(movInst->dest, VIR_ENABLE_XYZ);
-    }
 
     /*
     ** For a CS, swathing is disabled now, so we need to reset the index to 0 for a new swath. */
@@ -9129,6 +9102,78 @@ _VIR_RA_LS_SpillAddrComputation(
     /* use baseRegister.x */
     _VIR_RA_LS_SetHWRegForBaseRegister(pRA, addInst->dest, 0);
     VIR_Operand_SetEnable(addInst->dest, VIR_ENABLE_X);
+
+    if (pRA->needBoundsCheck)
+    {
+        VIR_Instruction*    pAddInst = gcvNULL;
+        VIR_Operand*        pOpnd = gcvNULL;
+
+        /* MOV  baseRegister.y, baseRegister.x */
+        retErrCode = VIR_Function_AddInstructionAfter(pFunc,
+                                                      VIR_OP_MOV,
+                                                      VIR_TYPE_UINT32,
+                                                      addInst,
+                                                      gcvTRUE,
+                                                      &movInst);
+        if (retErrCode != VSC_ERR_NONE) return retErrCode;
+
+        /* dest */
+        pOpnd = VIR_Inst_GetDest(movInst);
+        VIR_Operand_SetTempRegister(pOpnd,
+                                    pFunc,
+                                    pRA->baseAddrSymId,
+                                    VIR_TYPE_UINT32);
+        gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
+        /* use baseRegister.y */
+        _VIR_RA_LS_SetHWRegForBaseRegister(pRA, pOpnd, 0);
+        VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_Y);
+
+        /* src0 */
+        pOpnd = VIR_Inst_GetSource(movInst, 0);
+        VIR_Operand_SetTempRegister(pOpnd,
+                                    pFunc,
+                                    pRA->baseAddrSymId,
+                                    VIR_TYPE_UINT32);
+        gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
+        /* use baseRegister.x */
+        _VIR_RA_LS_SetHWRegForBaseRegister(pRA, pOpnd, 0);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+
+        /* ADD  baseRegister.z, baseRegister.x, sizeof(spill) */
+        retErrCode = VIR_Function_AddInstructionAfter(pFunc,
+                                                      VIR_OP_ADD,
+                                                      VIR_TYPE_UINT32,
+                                                      movInst,
+                                                      gcvTRUE,
+                                                      &pAddInst);
+        if (retErrCode != VSC_ERR_NONE) return retErrCode;
+
+        /* dest */
+        pOpnd = VIR_Inst_GetDest(pAddInst);
+        VIR_Operand_SetTempRegister(pOpnd,
+                                    pFunc,
+                                    pRA->baseAddrSymId,
+                                    VIR_TYPE_UINT32);
+        gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
+        /* use baseRegister.z */
+        _VIR_RA_LS_SetHWRegForBaseRegister(pRA, pOpnd, 0);
+        VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_Z);
+
+        /* src0 */
+        pOpnd = VIR_Inst_GetSource(pAddInst, 0);
+        VIR_Operand_SetTempRegister(pOpnd,
+                                    pFunc,
+                                    pRA->baseAddrSymId,
+                                    VIR_TYPE_UINT32);
+        gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
+        /* use baseRegister.x */
+        _VIR_RA_LS_SetHWRegForBaseRegister(pRA, pOpnd, 0);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+
+        /* src1 */
+        pOpnd = VIR_Inst_GetSource(pAddInst, 1);
+        VIR_Operand_SetImmediateUint(pOpnd, pRA->spillOffset);
+    }
 
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
         VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
