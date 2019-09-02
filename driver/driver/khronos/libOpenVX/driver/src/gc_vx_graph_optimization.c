@@ -108,6 +108,45 @@ VX_INTERNAL_API vx_uint32 vxoGraphOptimization_getTensorSize(vx_tensor org)
     return size * TENSOR_DATA_SIZE(org);
 }
 
+VX_PRIVATE_API vx_tensor_create_params_t vxoGraphOptimization_createParamsForTensor(vx_uint32 dimNum, vx_uint32 *dims, vx_enum dataType,
+                                                                               vx_enum quantType,vx_uint8 fixedPos, vx_int32 zp,
+                                                                               vx_float32 scale)
+{
+    vx_tensor_create_params_t p;
+
+    gcmHEADER_ARG("dimNum=%d, dims=%p, dataType=%d, quantType=%d, fixedPos=%d, zp=%d, scale=%f",
+        dimNum, dims, dataType, quantType, fixedPos, zp, scale);
+    INITIALIZE_STRUCT(p);
+
+    p.num_of_dims= dimNum;
+    p.sizes = dims;
+    p.data_format = dataType;
+    p.quant_format = quantType;
+    if(quantType == VX_QUANT_AFFINE_SCALE)
+    {
+        p.quant_data.affine.scale = scale;
+        p.quant_data.affine.zeroPoint = zp;
+    }
+    else
+    {
+        p.quant_data.dfp.fixed_point_pos = fixedPos;
+    }
+    gcmFOOTER_NO();
+    return p;
+}
+
+VX_PRIVATE_API vx_tensor_create_params_t vxoGraphOptimization_cloneParamsFromTensor(vx_tensor tensor)
+{
+    vx_tensor_create_params_t p;
+
+    gcmHEADER_ARG("tensor=%p", tensor);
+    p = vxoGraphOptimization_createParamsForTensor(TENSOR_DIM_NUM(tensor), TENSOR_SIZES(tensor), TENSOR_DATA_TYPE(tensor),
+        TENSOR_QUANT_TYPE(tensor), TENSOR_POS(tensor), TENSOR_TF_ZEROPOINT(tensor), TENSOR_TF_SCALE(tensor));
+
+    gcmFOOTER_NO();
+    return p;
+}
+
 VX_PRIVATE_API vx_tensor vxoGraphOptimization_cloneTensor(vx_tensor tensor, vx_graph graph)
 {
     vx_tensor cloneTensor = NULL;
@@ -115,20 +154,7 @@ VX_PRIVATE_API vx_tensor vxoGraphOptimization_cloneTensor(vx_tensor tensor, vx_g
 
     gcmHEADER_ARG("tensor=%p", tensor);
 
-    INITIALIZE_STRUCT(p);
-    p.data_format                       = TENSOR_DATA_TYPE(tensor);
-    p.sizes                             = TENSOR_SIZES(tensor);
-    p.num_of_dims                       = TENSOR_DIM_NUM(tensor);
-    p.quant_format                      = TENSOR_QUANT_TYPE(tensor);
-    if(TENSOR_QUANT_TYPE(tensor) == VX_QUANT_AFFINE_SCALE)
-    {
-        p.quant_data.affine.scale           = TENSOR_TF_SCALE(tensor);
-        p.quant_data.affine.zeroPoint       = TENSOR_TF_ZEROPOINT(tensor);
-    }
-    else
-    {
-        p.quant_data.dfp.fixed_point_pos    = TENSOR_POS(tensor);
-    }
+    p = vxoGraphOptimization_cloneParamsFromTensor(tensor);
 
     if(vxoTensor_IsVirtualTensor(tensor))
         cloneTensor = vxCreateVirtualTensor2(graph, &p, sizeof(p));
@@ -1071,13 +1097,8 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_WAR7_getAlignedTensor(vx_context 
     if(flag_16x16)
         alignedTendorDims[1] = 16;
 
-    gcoOS_MemFill(&param, 0, sizeof(vx_tensor_create_params_t));
-    param.num_of_dims = TENSOR_DIM_NUM(orginTensor);
+    param = vxoGraphOptimization_cloneParamsFromTensor(orginTensor);
     param.sizes = alignedTendorDims;
-    param.data_format = TENSOR_DATA_TYPE(orginTensor);
-    param.quant_format = TENSOR_QUANT_TYPE(orginTensor);
-    param.quant_data.affine.scale = TENSOR_TF_SCALE(orginTensor);
-    param.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(orginTensor);
 
     alignedTensor = vxCreateTensor2(context, &param, sizeof(param));
     CHECK_NULL(alignedTensor);
@@ -2089,23 +2110,10 @@ VX_PRIVATE_API vx_tensor vxoGraphOptimization_GetPermuteTensor(vx_graph graph, v
         TENSOR_SIZE_INDEX(orginalTensor,1),
         TENSOR_SIZE_INDEX(orginalTensor,0)};
 
-    vx_tensor_create_params_t p;
-    gcmHEADER_ARG("graph=%p, orginalTensor=%p", graph, orginalTensor);
+    vx_tensor_create_params_t p = vxoGraphOptimization_createParamsForTensor(3, permuterTensorDims, TENSOR_DATA_TYPE(orginalTensor),
+        TENSOR_QUANT_TYPE(orginalTensor), TENSOR_POS(orginalTensor), TENSOR_TF_ZEROPOINT(orginalTensor), TENSOR_TF_SCALE(orginalTensor));
 
-    gcoOS_MemFill(&p, 0, sizeof(vx_tensor_create_params_t));
-    p.num_of_dims= 3;
-    p.sizes = permuterTensorDims;
-    p.data_format = TENSOR_DATA_TYPE(orginalTensor);
-    p.quant_format = TENSOR_QUANT_TYPE(orginalTensor);
-    if(TENSOR_QUANT_TYPE(orginalTensor) == VX_QUANT_AFFINE_SCALE)
-    {
-        p.quant_data.affine.scale = TENSOR_TF_SCALE(orginalTensor);
-        p.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(orginalTensor);
-    }
-    else
-    {
-        p.quant_data.dfp.fixed_point_pos = TENSOR_POS(orginalTensor);
-    }
+    gcmHEADER_ARG("graph=%p, orginalTensor=%p", graph, orginalTensor);
 
     gcmFOOTER_NO();
     return vxCreateVirtualTensor2(graph, &p, sizeof(p));
@@ -2715,19 +2723,9 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_TensorAdd2Conv_createWeight(vx_con
     vx_uint32 wDims[4] = {1,1,2 * coreNum,coreNum};
     vx_tensor_create_params_t weight_p;
     gcmHEADER_ARG("context=%p, weight=%p, coreNum=0x%x, dataTYpe=0x%x, quantType=0x%x, scale=%f, zp=0x%x, dfpos=0x%x", context, weight, coreNum, dataTYpe, quantType, scale, zp, dfpos);
-    INITIALIZE_STRUCT(weight_p);
-    weight_p.data_format = dataTYpe;
-    weight_p.num_of_dims = 4;
-    weight_p.sizes = wDims;
-    weight_p.quant_format = quantType;
-    if(quantType == VX_QUANT_AFFINE_SCALE)
-    {
-        weight_p.quant_data.affine.scale = scale;
-        weight_p.quant_data.affine.zeroPoint = zp;
-    }
-    else{
-        weight_p.quant_data.dfp.fixed_point_pos = dfpos;
-    }
+
+    weight_p = vxoGraphOptimization_createParamsForTensor(4, wDims, dataTYpe, quantType, dfpos, zp, scale);
+
     *weight = vxCreateTensor2(context,&weight_p, sizeof(weight_p));
     CHECK_NULL(*weight);
 
@@ -2778,14 +2776,8 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_TensorAdd2Conv_createBias_asymmeti
     vx_uint32 bDims[1] = {coreNum};
     float biasScale = TENSOR_TF_SCALE(*weight) * TENSOR_TF_SCALE(tensorIn[0]);
 
-    vx_tensor_create_params_t bias_p;
-    INITIALIZE_STRUCT(bias_p);
-    bias_p.data_format = VX_TYPE_INT32;
-    bias_p.num_of_dims = 1;
-    bias_p.sizes = bDims;
-    bias_p.quant_format = VX_QUANT_AFFINE_SCALE;
-    bias_p.quant_data.affine.scale = biasScale;
-    bias_p.quant_data.affine.zeroPoint = 0;
+    vx_tensor_create_params_t bias_p = vxoGraphOptimization_createParamsForTensor(1, bDims, VX_TYPE_INT32, VX_QUANT_AFFINE_SCALE,
+        0, 0, biasScale);
 
     *bias = vxCreateTensor2(context, &bias_p, sizeof(bias_p));
 
@@ -2866,14 +2858,7 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_TensorAdd2Conv_createQuantizedWeig
         vx_uint32 bDims[1] = {coreNum};
         float biasScale = TENSOR_TF_SCALE(*weight) * TENSOR_TF_SCALE(tensorIn[0]);
 
-        vx_tensor_create_params_t bias_p;
-        INITIALIZE_STRUCT(bias_p);
-        bias_p.data_format = VX_TYPE_INT32;
-        bias_p.num_of_dims = 1;
-        bias_p.sizes = bDims;
-        bias_p.quant_format = VX_QUANT_AFFINE_SCALE;
-        bias_p.quant_data.affine.scale = biasScale;
-        bias_p.quant_data.affine.zeroPoint = 0;
+        vx_tensor_create_params_t bias_p = vxoGraphOptimization_createParamsForTensor(1, bDims, VX_TYPE_INT32, VX_QUANT_AFFINE_SCALE, 0, 0, biasScale);
 
         *bias = vxCreateTensor2(context, &bias_p, sizeof(bias_p));
     }
@@ -3529,22 +3514,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM(vx_graph graph)
             dims[padIndex] = dims[1 - padIndex];
 
             {
-                vx_tensor_create_params_t p;
-                INITIALIZE_STRUCT(p);
-                p.data_format = TENSOR_DATA_TYPE(weightNxM);
-                p.num_of_dims = TENSOR_DIM_NUM(weightNxM);
+                vx_tensor_create_params_t p = vxoGraphOptimization_cloneParamsFromTensor(weightNxM);
                 p.sizes = dims;
-                p.quant_format = TENSOR_QUANT_TYPE(weightNxM);
-                if(TENSOR_QUANT_TYPE(weightNxM) == VX_QUANT_AFFINE_SCALE)
-                {
-                    p.quant_data.affine.scale = TENSOR_TF_SCALE(weightNxM);
-                    p.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(weightNxM);
-                }
-                else
-                {
-                    p.quant_data.dfp.fixed_point_pos = TENSOR_POS(weightNxM);
-                }
-
                 padedWeight = vxCreateTensor2(((vx_reference)graph)->context, &p, sizeof(p));
             }
             vxoTensor_AllocateMemory(padedWeight);
