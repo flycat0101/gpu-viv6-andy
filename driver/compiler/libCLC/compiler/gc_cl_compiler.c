@@ -1513,7 +1513,7 @@ cloCOMPILER_Compile(
         Compiler->binary = gcvNULL;
 
         /* copy the source code to shader binary when debug option is on */
-        if (StringCount == 1 && (*Binary)->debugInfo)
+        if (StringCount == 1 && gcmOPT_EnableDebugDumpALL())
         {
             (*Binary)->sourceLength = (gctUINT)gcoOS_StrLen(Strings[0], gcvNULL) + 1;
             gcoOS_StrDup(gcvNULL, Strings[0], &(*Binary)->source);
