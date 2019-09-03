@@ -67,6 +67,7 @@
 #include "vxc_bin_TensorMul.h"
 #include "vxc_bin_TensorMulSatRTE.h"
 #include "vxc_bin_TensorPad.h"
+#include "vxc_bin_TensorPad2.h"
 #include "vxc_bin_TensorScale.h"
 #include "vxc_bin_TensorStridedSlice.h"
 #include "vxc_bin_TensorTR.h"
