@@ -291,18 +291,6 @@ static GLint complement3bitshifted(GLint x) {
     return complement3bitshifted_table[x];
 }
 
-static GLint complement3bitshifted_slow(GLint x) {
-    if (x & 4)
-        /* Note: shift is arithmetic. */
-        return ((x & 3) - 4) << 3;
-    return x << 3;
-}
-
-static GLint complement3bit(GLint x) {
-    if (x & 4)
-        return ((x & 3) - 4);
-    return x;
-}
 
 /* Clamp an integer value in the range -255 to 511 to the the range 0 to 255. */
 static GLubyte vivClamp0To255(GLint x) {
