@@ -732,7 +732,7 @@ VkResult halti5_draw(
 {
     __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
     __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
-    __vkRenderPass *rdp = pip->renderPass;
+    __vkRenderPass *rdp = cmdBuf->bindInfo.renderPass.rdp;
     __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
     __vkSubpassViewInfo *subPassView = VK_NULL_HANDLE;
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
@@ -5618,7 +5618,7 @@ VkResult halti5_setRenderTargets(
     __vkRenderSubPassInfo *subPass = cmdBuf->bindInfo.renderPass.subPass;
     __vkFramebuffer *fb = cmdBuf->bindInfo.renderPass.fb;
     __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
-    __vkRenderPass *rdp = pip->renderPass;
+    __vkRenderPass *rdp = cmdBuf->bindInfo.renderPass.rdp;
     uint32_t i;
     __vkImage *rtImage = VK_NULL_HANDLE, *dsImage = VK_NULL_HANDLE;
     __vkImageView *rtImageView, *dsImageView;
