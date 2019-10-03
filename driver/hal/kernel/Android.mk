@@ -24,33 +24,33 @@ include $(CLEAR_VARS)
 
 GALCORE_OUT := $(TARGET_OUT_INTERMEDIATES)/GALCORE_OBJ
 GALCORE := \
-    $(GALCORE_OUT)/galcore.ko
+	$(GALCORE_OUT)/galcore.ko
 
 KERNELENVSH := $(GALCORE_OUT)/kernelenv.sh
 $(KERNELENVSH):
-   rm -rf $(KERNELENVSH)
-   echo 'export KERNEL_DIR=$(KERNEL_DIR)' > $(KERNELENVSH)
-   echo 'export CROSS_COMPILE=$(CROSS_COMPILE)' >> $(KERNELENVSH)
-   echo 'export ARCH_TYPE=$(ARCH_TYPE)' >> $(KERNELENVSH)
+	rm -rf $(KERNELENVSH)
+	echo 'export KERNEL_DIR=$(KERNEL_DIR)' > $(KERNELENVSH)
+	echo 'export CROSS_COMPILE=$(CROSS_COMPILE)' >> $(KERNELENVSH)
+	echo 'export ARCH_TYPE=$(ARCH_TYPE)' >> $(KERNELENVSH)
 
 GALCORE_LOCAL_PATH := $(LOCAL_PATH)
 
 $(GALCORE): $(KERNELENVSH)
-    @cd $(AQROOT)
-    source $(KERNELENVSH); $(MAKE) -f Kbuild -C $(AQROOT) \
-        AQROOT=$(abspath $(AQROOT)) \
-        AQARCH=$(abspath $(AQARCH)) \
-        AQVGARCH=$(abspath $(AQVGARCH)) \
-        ARCH_TYPE=$(ARCH_TYPE) \
-        DEBUG=$(DEBUG) \
-        VIVANTE_ENABLE_DRM=$(DRM_GRALLOC) \
-        VIVANTE_ENABLE_2D=$(VIVANTE_ENABLE_2D) \
-        VIVANTE_ENABLE_3D=$(VIVANTE_ENABLE_3D) \
-        VIVANTE_ENABLE_VG=$(VIVANTE_ENABLE_VG) \
-        cp $(GALCORE_LOCAL_PATH)/../../galcore.ko $(GALCORE)
+	@cd $(AQROOT)
+	source $(KERNELENVSH); $(MAKE) -f Kbuild -C $(AQROOT) \
+		AQROOT=$(abspath $(AQROOT)) \
+		AQARCH=$(abspath $(AQARCH)) \
+		AQVGARCH=$(abspath $(AQVGARCH)) \
+		ARCH_TYPE=$(ARCH_TYPE) \
+		DEBUG=$(DEBUG) \
+		VIVANTE_ENABLE_DRM=$(DRM_GRALLOC) \
+		VIVANTE_ENABLE_2D=$(VIVANTE_ENABLE_2D) \
+		VIVANTE_ENABLE_3D=$(VIVANTE_ENABLE_3D) \
+		VIVANTE_ENABLE_VG=$(VIVANTE_ENABLE_VG); \
+		cp $(GALCORE_LOCAL_PATH)/../../galcore.ko $(GALCORE)
 
 LOCAL_PREBUILT_MODULE_FILE := \
-   $(GALCORE)
+	$(GALCORE)
 
 LOCAL_GENERATED_SOURCES := \
 	$(AQREG) \
