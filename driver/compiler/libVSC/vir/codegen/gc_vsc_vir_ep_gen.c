@@ -3633,9 +3633,9 @@ static VSC_IMAGE_FORMAT _GetImageFormat(VIR_Shader* pShader,
             /* If there is no image format information in shader, compiler uses 16bit as the default value. */
             if (imageFormat == VSC_IMAGE_FORMAT_NONE)
             {
-                if (VIR_TypeId_isImageDataFloat(VIR_Type_GetIndex(pVirUniformSymType)))
+                if (VIR_TypeId_isImageDataUnSignedInteger(VIR_Type_GetIndex(pVirUniformSymType)))
                 {
-                    imageFormat = VSC_IMAGE_FORMAT_RGBA16F;
+                    imageFormat = VSC_IMAGE_FORMAT_RGBA16UI;
                 }
                 else if (VIR_TypeId_isImageDataSignedInteger(VIR_Type_GetIndex(pVirUniformSymType)))
                 {
@@ -3643,8 +3643,7 @@ static VSC_IMAGE_FORMAT _GetImageFormat(VIR_Shader* pShader,
                 }
                 else
                 {
-                    gcmASSERT(VIR_TypeId_isImageDataUnSignedInteger(VIR_Type_GetIndex(pVirUniformSymType)));
-                    imageFormat = VSC_IMAGE_FORMAT_RGBA16UI;
+                    imageFormat = VSC_IMAGE_FORMAT_RGBA16F;
                 }
             }
             break;
@@ -4390,14 +4389,14 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* p
     else
     {
         pUtbEntry->hwMappings[stageIdx].u.s.hwLoc.samplerMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
-
-        /* Set texture size */
-        _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
-                                    gcvNULL,
-                                    gcvNULL,
-                                    &pUtbEntry->utbBinding,
-                                    pSep);
     }
+
+    /* Set texture size */
+    _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
+                                gcvNULL,
+                                gcvNULL,
+                                &pUtbEntry->utbBinding,
+                                pSep);
 
     pUtbEntry->activeStageMask |= pResAllocEntry->bUse ? (1 << stageIdx) : 0;
     pUtbEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);
