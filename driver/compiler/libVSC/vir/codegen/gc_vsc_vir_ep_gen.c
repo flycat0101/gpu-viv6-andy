@@ -608,11 +608,13 @@ static void _FillIoRegChannel(VIR_Shader* pShader,
 static gctBOOL _CheckOutputAsStreamOutput(VIR_Shader* pShader,
                                           VIR_Symbol* pVirIoSym,
                                           gctBOOL bGross,
+                                          gctUINT* thisArrayCount,
+                                          gctUINT* thisArrayFirstPos,
                                           gctUINT* pVirSoSeqIndex,
                                           gctUINT* pGlobalExpandedSeqIndex,
                                           gctUINT* pLocalExpandedSeqIndex)
 {
-    gctUINT                    outputIdx, soOutputCount, thisSoIoRegCount;
+    gctUINT                    outputIdx, thisSoIoRegCount;
     gctUINT                    localExpandedSeqIdx, globalExpandedSeqIndex = 0;
     VIR_Symbol*                pSoSym;
     gctBOOL                    bIsStreamOutput = gcvFALSE;
@@ -634,11 +636,9 @@ static gctBOOL _CheckOutputAsStreamOutput(VIR_Shader* pShader,
 
     if (pShader->transformFeedback.varyings)
     {
-        soOutputCount = VIR_IdList_Count(pShader->transformFeedback.varyings);
-
-        if (soOutputCount > 0)
+        if (*thisArrayCount > 0)
         {
-            for (outputIdx = 0; outputIdx < soOutputCount; outputIdx ++)
+            for (outputIdx = *thisArrayFirstPos; outputIdx < *thisArrayFirstPos + *thisArrayCount; outputIdx ++)
             {
                 pSoSym = VIR_Shader_GetSymFromId(pShader,
                                     VIR_IdList_GetId(pShader->transformFeedback.varyings, outputIdx));
@@ -695,6 +695,55 @@ static gctBOOL _CheckOutputAsStreamOutput(VIR_Shader* pShader,
     return bIsStreamOutput;
 }
 
+static void _FindStreamOutputArrayInfo(VIR_Shader* pShader,
+                                       VIR_Symbol* pVirIoSym,
+                                       gctUINT* thisArrayCount,
+                                       gctUINT* thisArrayPos
+                                       )
+{
+    gctUINT symIdx = 0, ioIdx = 0, soOutputCount = 0;
+    gctUINT aArrayCount = 0, bArrayCount = 0, arrayPos = 0;
+    VIR_Symbol * sym;
+
+    soOutputCount = VIR_IdList_Count(pShader->transformFeedback.varyings);
+    /* Search the pVirIoSym position in pShader->transformFeedback.varyings */
+    for (symIdx = 0; symIdx < soOutputCount; symIdx ++)
+    {
+        sym = VIR_Shader_GetSymFromId(pShader,VIR_IdList_GetId(pShader->transformFeedback.varyings, symIdx));
+        if (VIR_Symbol_GetVregIndex(pVirIoSym) == VIR_Symbol_GetVregIndex(sym))
+        {
+            break;
+        }
+    }
+
+    for (ioIdx = 0; ioIdx < symIdx; ioIdx ++)
+    {
+        sym = VIR_Shader_GetSymFromId(pShader,VIR_IdList_GetId(pShader->transformFeedback.varyings, ioIdx));
+        if (isSymbeBeEndOfInterleavedBuffer(sym))
+        {
+            aArrayCount = 0;
+            arrayPos ++;
+        }
+        else
+        {
+            aArrayCount ++;
+        }
+    }
+
+    for (ioIdx = symIdx; ioIdx < soOutputCount; ioIdx ++)
+    {
+        sym = VIR_Shader_GetSymFromId(pShader,VIR_IdList_GetId(pShader->transformFeedback.varyings, ioIdx));
+        bArrayCount ++;
+        if (isSymbeBeEndOfInterleavedBuffer(sym))
+        {
+            break;
+        }
+    }
+
+    *thisArrayCount = aArrayCount + bArrayCount;
+    *thisArrayPos = arrayPos;
+}
+
 static gctBOOL _NeedToCollectThisIO(VIR_Shader* pShader,
                                     VIR_Symbol* pSymbol
                                     )
@@ -718,7 +767,7 @@ static VSC_ErrCode _CollectPerExeObjIoMappingToSEP(VIR_Shader* pShader,
     gctUINT                    virSoSeqIndex = 0, firstVirRegNo, globalExpandedSoSeqIdx = 0, localExpandedSoSeqIdx = 0;
     gctUINT                    maxIoIdx = NOT_ASSIGNED, thisMaxIoIdx, ioIdx, thisIoRegCount;
     gctUINT                    nonShiftIoIdx, hwRegLocShift = 0;
-    VIR_Symbol*                pVirIoSym, *pVregSym;
+    VIR_Symbol*                pVirIoSym, *pVregSym, *sym;
     VIR_Type*                  pVirIoType;
     SHADER_IO_REG_MAPPING*     pThisIoRegMapping;
     SHADER_IO_CHANNEL_MAPPING* pThisIoChannelMapping;
@@ -727,6 +776,8 @@ static VSC_ErrCode _CollectPerExeObjIoMappingToSEP(VIR_Shader* pShader,
     SHADER_IO_MODE             thisRegIoMode;
     SHADER_IO_MEM_ALIGN        ioMemAlign;
     gctBOOL                    bHasActiveModeIo = gcvFALSE, bVirIoStreamOutput, bIoStreamOutput;
+    gctUINT                    thisArrayPos = 0, thisArrayCount = 0, soOutputCount = 0, symIdx = 0 ;
+    gctUINT                    thisArrayFirstPos = 0, *arrayFirstPos = gcvNULL, idx = 0, pos = 0;
 
     virIoCount = VIR_IdList_Count(pIoIdLsts);
 
@@ -778,6 +829,41 @@ static VSC_ErrCode _CollectPerExeObjIoMappingToSEP(VIR_Shader* pShader,
             vscInitializeIoRegMapping(&pOutExeObjIoMapping->pIoRegMapping[ioIdx]);
         }
 
+        /* For xfb interleaved mode (has N * "gl_NextBuffer" in varying array),
+           For example:
+                xfb_varyings[] = {variable_1, variable_2, gl_NextBuffer,
+                                  variable_3, variable_4, variable_5, variable_6, gl_NextBuffer,
+                                  variable_7};
+                xfb_mode = "Interleaved Mode";
+
+            variable_1 and variable_2 in the first array (buffer), arrayFirstPos[0] is 0.
+            variable_3, variable_4, variable_5 and variable_6 in the second array (buffer), arrayFirstPos[1] is 2.
+            variable_7 in a array (buffer), arrayFirstPos[2] is 6.
+        */
+
+        if (pShader->transformFeedback.varyings)
+        {
+            soOutputCount = VIR_IdList_Count(pShader->transformFeedback.varyings);
+
+            if (gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctUINT) * soOutputCount,
+                               (gctPOINTER*)&arrayFirstPos) != gcvSTATUS_OK)
+            {
+                return VSC_ERR_OUT_OF_MEMORY;
+            }
+            gcoOS_ZeroMemory(arrayFirstPos, gcmSIZEOF(gctUINT) * soOutputCount);
+
+            for (symIdx = 0; symIdx < soOutputCount; symIdx ++)
+            {
+                sym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pShader->transformFeedback.varyings, symIdx));
+                if (isSymbeBeEndOfInterleavedBuffer(sym) == gcvTRUE && symIdx < (soOutputCount - 1))
+                {
+                    idx ++;
+                    arrayFirstPos[idx] = pos + 1;
+                }
+                pos ++;
+            }
+        }
+
         for (virIoIdx = 0; virIoIdx < virIoCount; virIoIdx ++)
         {
             pVirIoSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pIoIdLsts, virIoIdx));
@@ -785,7 +871,7 @@ static VSC_ErrCode _CollectPerExeObjIoMappingToSEP(VIR_Shader* pShader,
             thisIoRegCount = VIR_Symbol_GetVirIoRegCount(pShader, pVirIoSym);
             firstVirRegNo = VIR_Symbol_GetVregIndex(pVirIoSym);
             compCount = VIR_GetTypeComponents(pVirIoType->_base);
-            bVirIoStreamOutput = bInputMapping ? gcvFALSE : _CheckOutputAsStreamOutput(pShader, pVirIoSym, gcvTRUE, gcvNULL, gcvNULL, gcvNULL);
+            bVirIoStreamOutput = bInputMapping ? gcvFALSE : _CheckOutputAsStreamOutput(pShader, pVirIoSym, gcvTRUE, &soOutputCount, &arrayFirstPos[0], gcvNULL, gcvNULL, gcvNULL);
 
             gcmASSERT(compCount <= CHANNEL_NUM && compCount > 0);
 
@@ -821,9 +907,28 @@ static VSC_ErrCode _CollectPerExeObjIoMappingToSEP(VIR_Shader* pShader,
                     bIoStreamOutput = gcvFALSE;
                     if (bVirIoStreamOutput)
                     {
+                        /* For xfb interleaved mode (has N * "gl_NextBuffer" in varying array),
+                           For example:
+                               xfb_varyings[] = {variable_1, variable_2, gl_NextBuffer,
+                                                 variable_3, variable_4, variable_5, variable_6, gl_NextBuffer,
+                                                 variable_7};
+                               xfb_mode = "Interleaved Mode";
+
+                               variable_1 and variable_2 in the same array (buffer), thisArrayCount is 2.
+                               variable_3, variable_4, variable_5 and variable_6 in the same array (buffer), thisArrayCount is 4.
+                               variable_7 in a array (buffer), thisArrayCount is 1.
+
+                            for "variable_5", thisArrayCount is 4, thisArrayPos is 1, thisArrayPos is point to variable_3.
+                            so, in function "_CheckOutputAsStreamOutput", to find globalExpandedSoSeqIdx in the corresponding array.
+                            for "variable_5", globalExpandedSoSeqIdx is 2.
+                        */
+                        _FindStreamOutputArrayInfo(pShader, pVregSym, &thisArrayCount, &thisArrayPos);
+                        thisArrayFirstPos = arrayFirstPos[thisArrayPos];
                         bIoStreamOutput = _CheckOutputAsStreamOutput(pShader,
                                                                      pVregSym,
                                                                      gcvFALSE,
+                                                                     &thisArrayCount,
+                                                                     &thisArrayFirstPos,
                                                                      &virSoSeqIndex,
                                                                      &globalExpandedSoSeqIdx,
                                                                      &localExpandedSoSeqIdx);
@@ -836,7 +941,7 @@ static VSC_ErrCode _CollectPerExeObjIoMappingToSEP(VIR_Shader* pShader,
                             {
                                 if (pShader->transformFeedback.bufferMode == VIR_FEEDBACK_INTERLEAVED)
                                 {
-                                    pThisIoRegMapping->soStreamBufferSlot = 0;
+                                    pThisIoRegMapping->soStreamBufferSlot = thisArrayPos;
                                     pThisIoRegMapping->soSeqInStreamBuffer = globalExpandedSoSeqIdx;
                                 }
                                 else
@@ -974,6 +1079,11 @@ static VSC_ErrCode _CollectPerExeObjIoMappingToSEP(VIR_Shader* pShader,
         }
 
         pOutExeObjIoMapping->ioMode = bHasActiveModeIo ? SHADER_IO_MODE_ACTIVE : SHADER_IO_MODE_PASSIVE;
+    }
+
+    if (pShader->transformFeedback.varyings && arrayFirstPos)
+    {
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, arrayFirstPos));
     }
 
     return VSC_ERR_NONE;

@@ -4106,6 +4106,7 @@ typedef struct _gcsTFBVarying
     gctBOOL   isWholeTFBed;
     gctBOOL   isArray;
     gcOUTPUT  output;
+    gctBOOL   bEndOfInterleavedBuffer;
 } gcsTFBVarying;
 
 typedef struct _gcBINARY_TFBVarying

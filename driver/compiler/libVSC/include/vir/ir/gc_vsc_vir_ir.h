@@ -3028,6 +3028,9 @@ typedef enum VIR_SYMFLAGEXT
     VIR_SYMFLAGEXT_NONE                         = 0x00000000, /* no flag */
     VIR_SYMFLAGEXT_NOPERSPECTIVE                = 0x00000001, /* noperspective */
 
+    /* TransformFeedback next buffer flag */
+    VIR_SYMFLAGEXT_ENDOFINTERLEAVEDBUF          = 0x00000010,
+
     /* Uniform flags. */
     VIR_SYMUNIFORMFLAGEXT_WITHIN_IN_RES_LAYOUT  = 0x00001000, /* within the resource layout. */
 } VIR_SymFlagExt;
@@ -3036,6 +3039,7 @@ typedef enum VIR_SYMFLAGEXT
 #define isSymInactive(sym)                      (((sym)->flags & VIR_SYMFLAG_INACTIVE) != 0)
 #define isSymFlat(sym)                          (((sym)->flags & VIR_SYMFLAG_FLAT) != 0)
 #define isSymNoperspective(sym)                 (((sym)->flagsExt & VIR_SYMFLAGEXT_NOPERSPECTIVE) != 0)
+#define isSymbeBeEndOfInterleavedBuffer(sym)    (((sym)->flagsExt & VIR_SYMFLAGEXT_ENDOFINTERLEAVEDBUF) != 0)
 #define isSymInvariant(sym)                     (((sym)->flags & VIR_SYMFLAG_INVARIANT) != 0)
 #define isSymField(sym)                         (((sym)->flags & VIR_SYMFLAG_IS_FIELD) != 0)
 #define isSymLocal(sym)                         (((sym)->flags & VIR_SYMFLAG_LOCAL) != 0)

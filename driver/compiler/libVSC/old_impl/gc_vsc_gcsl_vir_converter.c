@@ -7801,6 +7801,9 @@ gcSHADER_Conv2VIR(
             }
             /* it must find the match */
             gcmASSERT(sym != gcvNULL);
+            sym->flagsExt = (Shader->transformFeedback.varyings[i].bEndOfInterleavedBuffer == gcvTRUE
+                        ? VIR_SYMFLAGEXT_ENDOFINTERLEAVEDBUF
+                        : VIR_SYMFLAGEXT_NONE);
         }
 
         if (Shader->transformFeedback.bufferMode == gcvFEEDBACK_INTERLEAVED)

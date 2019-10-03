@@ -33426,8 +33426,8 @@ gcSHADER_SetTransformFeedbackVarying(
     )
 {
     gceSTATUS status;
-    gctUINT32 i, j;
-    gctUINT32*  nameIndex;
+    gctUINT32 i, j, nameIndex[4]= {0};
+    gctINT varyingCount = -1;
 
     gcmHEADER_ARG("Shader=0x%x Count=%u Varyings=0x%x BufferMode=%d",
                   Shader, Count, Varyings, BufferMode);
@@ -33452,37 +33452,50 @@ gcSHADER_SetTransformFeedbackVarying(
     }
 
     /* Allocate a new array of varying object pointers. */
-    gcmONERROR(gcoOS_Allocate(gcvNULL,
-                              gcmSIZEOF(gcsTFBVarying) * Count,
-                              (gctPOINTER*)&Shader->transformFeedback.varyings));
-    gcoOS_ZeroMemory(Shader->transformFeedback.varyings, gcmSIZEOF(gcsTFBVarying) * Count);
-
-    Shader->transformFeedback.varyingCount = Count;
-    Shader->transformFeedback.bufferMode = BufferMode;
-
-    status = gcoOS_Allocate(gcvNULL,
-                    gcmSIZEOF(gctUINT32) * 4,
-                    (gctPOINTER *)&nameIndex);
-    gcoOS_ZeroMemory(nameIndex, gcmSIZEOF(gctUINT32) * 4);
-
+    varyingCount = Count;
     for (i = 0; i < Count; i++)
     {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(Varyings[i],"gl_NextBuffer")))
+        {
+            varyingCount --;
+        }
+    }
 
-        gctUINT32   nameLen;
+    gcmONERROR(gcoOS_Allocate(gcvNULL,
+                              gcmSIZEOF(gcsTFBVarying) * varyingCount,
+                              (gctPOINTER*)&Shader->transformFeedback.varyings));
+    gcoOS_ZeroMemory(Shader->transformFeedback.varyings, gcmSIZEOF(gcsTFBVarying) * varyingCount);
+
+    Shader->transformFeedback.varyingCount = varyingCount;
+    Shader->transformFeedback.bufferMode = BufferMode;
+
+    varyingCount = -1;
+    for (i = 0; i < Count; i++)
+    {
+        gctUINT32   nameLen = 0;
         gctBOOL     found  = gcvFALSE;
         gcOUTPUT    output = gcvNULL;
         gctINT      index  = -1;
         gctCHAR     variableAddName[24];
 
-        Shader->transformFeedback.varyings[i].isArray = gcvFALSE;
+        varyingCount ++;
+        while (gcmIS_SUCCESS(gcoOS_StrCmp(Varyings[i],"gl_NextBuffer")))
+        {
+            /*
+               if current varying is "gl_nextBuffer", set the previous varying.bEndOfInterleavedBuffer is true,
+               which means that the later variables need to store in next buffer.
+             */
+            Shader->transformFeedback.varyings[varyingCount - 1].bEndOfInterleavedBuffer = gcvTRUE;
+            i ++;
+        }
 
-
-
+        Shader->transformFeedback.varyings[varyingCount].isArray = gcvFALSE;
+        Shader->transformFeedback.varyings[varyingCount].bEndOfInterleavedBuffer = gcvFALSE;
         if (gcmIS_SUCCESS(gcoOS_StrNCmp(Varyings[i], "gl_", sizeof("gl_")-1)))
         {
             if (gcShaderIsDesktopGL(Shader))
             {
-                /* Check TransformFeedback variables, for GL only. */
+                /* Check transformfeedback variables, for GL only. */
                 gctUINT32       newTempIndex = 0;
                 gctUINT32       varyingNameLength = 4;
                 const gctSTRING varyingName[4] =
@@ -33520,9 +33533,9 @@ gcSHADER_SetTransformFeedbackVarying(
                                         gcSHADER_PRECISION_HIGH);
                     gcSHADER_GetOutput(Shader, Shader->outputCount - 1, &output);
 
-                    Shader->transformFeedback.varyings[i].output = output;
-                    Shader->transformFeedback.varyings[i].arraySize = output->arraySize;
-                    Shader->transformFeedback.varyings[i].isWholeTFBed = gcvTRUE;
+                    Shader->transformFeedback.varyings[varyingCount].output = output;
+                    Shader->transformFeedback.varyings[varyingCount].arraySize = output->arraySize;
+                    Shader->transformFeedback.varyings[varyingCount].isWholeTFBed = gcvTRUE;
                 }
             }
 
@@ -33537,9 +33550,9 @@ gcSHADER_SetTransformFeedbackVarying(
                         output = Shader->outputs[j];
                         if (Shader->outputs[j]->nameLength == (gctINT) kind)
                         {
-                            Shader->transformFeedback.varyings[i].output = output;
-                            Shader->transformFeedback.varyings[i].arraySize = output->arraySize;
-                            Shader->transformFeedback.varyings[i].isWholeTFBed = gcvTRUE;
+                            Shader->transformFeedback.varyings[varyingCount].output = output;
+                            Shader->transformFeedback.varyings[varyingCount].arraySize = output->arraySize;
+                            Shader->transformFeedback.varyings[varyingCount].isWholeTFBed = gcvTRUE;
                             found = gcvTRUE;
                             break;
                         }
@@ -33586,14 +33599,14 @@ gcSHADER_SetTransformFeedbackVarying(
                _findNameDotAndBracket(outputName, &outputDot, &outputBracket);
                if (gcmIS_SUCCESS(gcoOS_StrCmp(output->name, Varyings[i])))
                {
-                   Shader->transformFeedback.varyings[i].output = output;
+                   Shader->transformFeedback.varyings[varyingCount].output = output;
                    /* If output is array, whole array will be outputed */
-                   Shader->transformFeedback.varyings[i].arraySize = output->arraySize;
-                   Shader->transformFeedback.varyings[i].isWholeTFBed = gcvTRUE;
+                   Shader->transformFeedback.varyings[varyingCount].arraySize = output->arraySize;
+                   Shader->transformFeedback.varyings[varyingCount].isWholeTFBed = gcvTRUE;
 
                    if (gcmOUTPUT_isArray(output))
                    {
-                       Shader->transformFeedback.varyings[i].isArray = gcvTRUE;
+                       Shader->transformFeedback.varyings[varyingCount].isArray = gcvTRUE;
                    }
                    found = gcvTRUE;
                    break;
@@ -33633,14 +33646,14 @@ gcSHADER_SetTransformFeedbackVarying(
                    if (gcmIS_SUCCESS(gcoOS_StrNCmp(Varyings[i], output->name, varyingNameLength)) &&
                        (output->name[varyingNameLength] == '.' || output->name[varyingNameLength] == '['))
                    {
-                       Shader->transformFeedback.varyings[i].output = output;
+                       Shader->transformFeedback.varyings[varyingCount].output = output;
                        /* If output is array, whole array will be outputed */
-                       Shader->transformFeedback.varyings[i].arraySize = output->arraySize;
-                       Shader->transformFeedback.varyings[i].isWholeTFBed = gcvTRUE;
+                       Shader->transformFeedback.varyings[varyingCount].arraySize = output->arraySize;
+                       Shader->transformFeedback.varyings[varyingCount].isWholeTFBed = gcvTRUE;
 
                        if (gcmOUTPUT_isArray(output))
                        {
-                           Shader->transformFeedback.varyings[i].isArray = gcvTRUE;
+                           Shader->transformFeedback.varyings[varyingCount].isArray = gcvTRUE;
                        }
                        found = gcvTRUE;
                        break;
@@ -33653,10 +33666,10 @@ gcSHADER_SetTransformFeedbackVarying(
                    /* handle output array */
                    if (index == output->arrayIndex)
                    {
-                       Shader->transformFeedback.varyings[i].output = output;
+                       Shader->transformFeedback.varyings[varyingCount].output = output;
                        /* Only one element of an array will be outputed */
-                       Shader->transformFeedback.varyings[i].arraySize = 1;
-                       Shader->transformFeedback.varyings[i].isWholeTFBed = gcvFALSE;
+                       Shader->transformFeedback.varyings[varyingCount].arraySize = 1;
+                       Shader->transformFeedback.varyings[varyingCount].isWholeTFBed = gcvFALSE;
                        found = gcvTRUE;
                        break;
                    }
@@ -33685,14 +33698,14 @@ gcSHADER_SetTransformFeedbackVarying(
                            gcoOS_StrStr(output->name, ".", &dot1);
                            if (dot1 != gcvNULL && gcmIS_SUCCESS(gcoOS_StrCmp(dot1, varyingDot)))
                            {
-                               Shader->transformFeedback.varyings[i].output = output;
+                               Shader->transformFeedback.varyings[varyingCount].output = output;
                                /* If output is array, whole array will be outputed */
-                               Shader->transformFeedback.varyings[i].arraySize = output->arraySize;
-                               Shader->transformFeedback.varyings[i].isWholeTFBed = gcvTRUE;
+                               Shader->transformFeedback.varyings[varyingCount].arraySize = output->arraySize;
+                               Shader->transformFeedback.varyings[varyingCount].isWholeTFBed = gcvTRUE;
 
                                if (gcmOUTPUT_isArray(output))
                                {
-                                   Shader->transformFeedback.varyings[i].isArray = gcvTRUE;
+                                   Shader->transformFeedback.varyings[varyingCount].isArray = gcvTRUE;
                                }
                                found = gcvTRUE;
                                break;
@@ -33706,10 +33719,10 @@ gcSHADER_SetTransformFeedbackVarying(
                                /* handle output array */
                                if (index == output->arrayIndex)
                                {
-                                   Shader->transformFeedback.varyings[i].output = output;
+                                   Shader->transformFeedback.varyings[varyingCount].output = output;
                                    /* Only one element of an array will be outputed */
-                                   Shader->transformFeedback.varyings[i].arraySize = 1;
-                                   Shader->transformFeedback.varyings[i].isWholeTFBed = gcvFALSE;
+                                   Shader->transformFeedback.varyings[varyingCount].arraySize = 1;
+                                   Shader->transformFeedback.varyings[varyingCount].isWholeTFBed = gcvFALSE;
                                    found = gcvTRUE;
                                    break;
                                }
@@ -33746,7 +33759,7 @@ gcSHADER_SetTransformFeedbackVarying(
                                       (gctPOINTER*)&s));
             gcoOS_MemCopy(s, name, origNameLen);
             s[origNameLen] = '\0';
-            Shader->transformFeedback.varyings[i].name = s;
+            Shader->transformFeedback.varyings[varyingCount].name = s;
             if (index >= 0)
             {
                 gctUINT offset = origNameLen;
@@ -33758,9 +33771,10 @@ gcSHADER_SetTransformFeedbackVarying(
                              "[%d]",
                              output->arrayIndex));
             }
-            Shader->transformFeedback.varyings[i].name[nameLen - 1] = '\0';
+            Shader->transformFeedback.varyings[varyingCount].name[nameLen - 1] = '\0';
         }
     }
+    Shader->transformFeedback.varyings[varyingCount].bEndOfInterleavedBuffer = gcvTRUE;
 
 OnError:
     if (gcmIS_ERROR(status))
@@ -33769,9 +33783,9 @@ OnError:
         {
             for (i = 0; i < Shader->transformFeedback.varyingCount; ++i)
             {
-                if (Shader->transformFeedback.varyings[i].name)
+                if (Shader->transformFeedback.varyings[varyingCount].name)
                 {
-                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Shader->transformFeedback.varyings[i].name));
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Shader->transformFeedback.varyings[varyingCount].name));
                 }
             }
             gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Shader->transformFeedback.varyings));
@@ -33986,7 +34000,7 @@ gcSHADER_GetTransformFeedbackVaryingStride(
     OUT gctUINT32 * Stride
     )
 {
-    gctUINT32 i, stride = 0, numBytes;
+    gctUINT32 i, numBytes, bufNum = 0;
     gcOUTPUT varying;
 
     gcmHEADER_ARG("Shader=0x%x", Shader);
@@ -33998,13 +34012,17 @@ gcSHADER_GetTransformFeedbackVaryingStride(
               Shader->type == gcSHADER_TYPE_GEOMETRY);
     gcmASSERT(Stride);
 
-    *Stride = 0;
     if (!Shader->transformFeedback.varyingCount) {
         gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
         return gcvSTATUS_INVALID_DATA;
     }
 
-    for (i = 0; i < Shader->transformFeedback.varyingCount; i++) {
+    for (i = 0; i < Shader->transformFeedback.varyingCount; i++)
+    {
+        if ((i > 0) && (Shader->transformFeedback.varyings[i - 1].bEndOfInterleavedBuffer == gcvTRUE))
+        {
+            bufNum ++;
+        }
         varying = Shader->transformFeedback.varyings[i].output;
         numBytes = _gcConvShaderTypeToBytes(varying->origType);
 
@@ -34012,11 +34030,8 @@ gcSHADER_GetTransformFeedbackVaryingStride(
         {
             numBytes *= Shader->transformFeedback.varyings[i].arraySize;
         }
-
-        stride += numBytes;
+        Stride[bufNum] += numBytes;
     }
-
-    *Stride = stride;
 
     gcmFOOTER_ARG("*Stride=%u", *Stride);
     return gcvSTATUS_OK;
