@@ -2570,8 +2570,8 @@ gcoBUFFER_Commit(
                 /* Convert core index in this hardware to global core index. */
                 gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, i, &coreIndex));
 
-                ctx = Contexts ? Contexts[i] : context;
-                delta = StateDeltas ? StateDeltas[i] : StateDelta;
+                ctx = Contexts ? Contexts[coreIndex] : context;
+                delta = StateDeltas ? StateDeltas[coreIndex] : StateDelta;
 
                 if (commandBufferMirrors)
                 {

@@ -185,6 +185,10 @@ gcoHARDWAREVX_CommitCmd(
     OUT gctUINT32*          pCmdBytes
     )
 {
+
+#if gcdENABLE_3D
+    gctUINT32 coreIndex;
+#endif
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if (gcdENABLE_3D || gcdENABLE_2D)
@@ -204,9 +208,11 @@ gcoHARDWAREVX_CommitCmd(
 #if gcdENABLE_3D
     if (Hardware->deltas)
     {
-        for (i = 1; i < Hardware->config->coreCount; i++)
+        for (i = 1; i < Hardware->config->gpuCoreCount; i++)
         {
-            gcoHARDWARE_CopyDelta(Hardware->deltas[Hardware->localCoreIndexs[i]], Hardware->delta);
+            gcoHARDWARE_QueryCoreIndex(Hardware, i, &coreIndex);
+
+            gcoHARDWARE_CopyDelta(Hardware->deltas[coreIndex], Hardware->delta);
         }
     }
 #endif
@@ -253,15 +259,19 @@ gcoHARDWAREVX_CommitCmd(
 #if gcdENABLE_3D
     if (Hardware->deltas)
     {
-        for (i = 0; i < Hardware->config->coreCount; i++)
+        for (i = 0; i < Hardware->config->gpuCoreCount; i++)
         {
-            /* Update deltas for all cores bound to this hardware. */
-            _UpdateDelta(Hardware, Hardware->localCoreIndexs[i]);
+            /* Update deltas for all GPUs bound to this hardware. */
+            gcoHARDWARE_QueryCoreIndex(Hardware, i, &coreIndex);
+
+            _UpdateDelta(Hardware, coreIndex);
         }
 
-        /* Delta list for the first core is updated in _UpdateDelta,
+        /* Delta list for the first GPU is updated in _UpdateDelta,
         *  update Hardware->delta to the current one. */
-        Hardware->delta = Hardware->deltas[Hardware->localCoreIndexs[0]];
+        gcoHARDWARE_QueryCoreIndex(Hardware, 0, &coreIndex);
+
+        Hardware->delta = Hardware->deltas[coreIndex];
     }
 #endif
 
@@ -35536,7 +35546,7 @@ gcoHARDWAREVX_TriggerAccelerator(
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, cmdBuffer);
 
     stateDelta = stateDelta; /* Keep the compiler happy. */
-    gpuCount = Hardware->config->coreCount;
+    gpuCount = Hardware->config->gpuCoreCount;
 
     if (gpuCount > 1)
     {
@@ -38807,7 +38817,7 @@ gcoHARDWAREVX_YUV2RGBScale(
 
     stateDelta = stateDelta; /* Keep the compiler happy. */
 
-    gpuCount = Hardware->config->coreCount;
+    gpuCount = Hardware->config->gpuCoreCount;
     if (gpuCount > 1)
     {
         { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?

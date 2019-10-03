@@ -633,11 +633,10 @@ gcoHAL_ConstructEx(
 
         for (i = 0; i < hal->chipCount; i++)
         {
-            hal->hwTypes[i] = iface.u.ChipInfo.types[i];
-            hal->coreIndexs[i] = iface.u.ChipInfo.coreIndexs[i];
+            hal->chipTypes[i] = iface.u.ChipInfo.types[i];
             hal->chipIDs[i] = iface.u.ChipInfo.ids[i];
 
-            switch (hal->hwTypes[i])
+            switch (hal->chipTypes[i])
             {
             case gcvHARDWARE_3D:
                 hal->is3DAvailable = gcvTRUE;
@@ -652,9 +651,6 @@ gcoHAL_ConstructEx(
                 hal->hybrid2D = gcvTRUE;
                 break;
 
-            case gcvHARDWARE_VIP:
-                hal->isVIPAvailable = gcvTRUE;
-                break;
             default:
                 break;
             }
@@ -663,7 +659,6 @@ gcoHAL_ConstructEx(
         hal->defaultHwType = hal->separated2D ? gcvHARDWARE_2D
                            : hal->hybrid2D ? gcvHARDWARE_3D2D
                            : hal->is3DAvailable ? gcvHARDWARE_3D
-                           : hal->isVIPAvailable ? gcvHARDWARE_3D
                            : gcvHARDWARE_VG;
 
         hal->isGpuBenchSmoothTriangle = gcvFALSE;

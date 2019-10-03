@@ -2378,7 +2378,7 @@ _Commit(
         }
 
         /* Determine the objects. */
-        kernel = Device->coreInfoArray[subCommit->coreId].kernel;
+        kernel = Device->map[HwType].kernels[subCommit->coreId];
         if (Engine == gcvENGINE_BLT)
         {
             command  = kernel->asyncCommand;
@@ -2437,7 +2437,7 @@ _Commit(
 
     subCommit = &Commit->subCommit;
     userPtr = gcvNULL;
-    kernel = Device->coreInfoArray[subCommit->coreId].kernel;
+    kernel = Device->map[HwType].kernels[subCommit->coreId];
 
     if (!kernel->hardware->options.gpuProfiler || !kernel->profileEnable)
     {
@@ -2481,7 +2481,7 @@ _Commit(
             }
         }
 
-        kernel = Device->coreInfoArray[subCommit->coreId].kernel;
+        kernel = Device->map[HwType].kernels[subCommit->coreId];
 
         if ((kernel->hardware->options.gpuProfiler == gcvTRUE) &&
             (kernel->profileEnable == gcvTRUE))
@@ -5331,8 +5331,6 @@ gckDEVICE_ChipInfo(
         {
             Interface->u.ChipInfo.types[i] = info[i].type;
             Interface->u.ChipInfo.ids[i] = info[i].chipID;
-
-            Interface->u.ChipInfo.coreIndexs[i] = info[i].core;
         }
 
         Interface->u.ChipInfo.count = Device->coreNum;
@@ -5401,11 +5399,14 @@ gckDEVICE_SetTimeOut(
 #if gcdGPU_TIMEOUT
     gckKERNEL kernel;
     gctUINT i;
-    gcsCORE_INFO *info = Device->coreInfoArray;
+    gceHARDWARE_TYPE type = Interface->hardwareType;
+    gcsCORE_LIST *coreList;
 
-    for (i = 0; i < Device->coreNum; i++)
+    coreList = &Device->map[type];
+
+    for (i = 0; i < coreList->num; i++)
     {
-        kernel = info[i].kernel;
+        kernel = coreList->kernels[i];
 
         kernel->timeOut = Interface->u.SetTimeOut.timeOut;
     }
@@ -5423,6 +5424,7 @@ gckDEVICE_Dispatch(
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
     gckKERNEL kernel;
+    gceHARDWARE_TYPE type = Interface->hardwareType;
     gctUINT32 coreIndex = Interface->coreIndex;
 
     switch (Interface->command)
@@ -5452,7 +5454,8 @@ gckDEVICE_Dispatch(
     else
     {
         /* Need go through gckKERNEL dispatch. */
-        kernel = Device->coreInfoArray[coreIndex].kernel;
+        kernel = Device->map[type].kernels[coreIndex];
+
 
 #if gcdENABLE_VG
         if (kernel->vg)

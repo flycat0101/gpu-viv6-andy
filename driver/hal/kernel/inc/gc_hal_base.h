@@ -1007,24 +1007,6 @@ gcoHAL_GetCurrentCoreIndex(
     );
 
 gceSTATUS
-gcoHAL_ConvertCoreIndexGlobal(
-    IN gcoHAL Hal,
-    IN gceHARDWARE_TYPE Type,
-    IN gctUINT32 CoreCount,
-    IN gctUINT32 *LocalCoreIndexs,
-    OUT gctUINT32 *GlobalCoreIndexs
-    );
-
-gceSTATUS
-gcoHAL_ConvertCoreIndexLocal(
-    IN gcoHAL Hal,
-    IN gceHARDWARE_TYPE Type,
-    IN gctUINT32 CoreCount,
-    IN gctUINT32 *GlobalCoreIndexs,
-    OUT gctUINT32 *LocalCoreIndexs
-    );
-
-gceSTATUS
 gcoHAL_SelectChannel(
     IN gcoHAL Hal,
     IN gctBOOL Priority,

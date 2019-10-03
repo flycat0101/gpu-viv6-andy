@@ -3028,7 +3028,7 @@ static gceSTATUS gcoHARDWARE_FlushStates(
         gcmONERROR(gcoHARDWARE_FlushVtxDataCache(Hardware, Memory));
     }
 
-    if (Hardware->multiGPURenderingModeDirty && (Hardware->config->coreCount > 1))
+    if (Hardware->multiGPURenderingModeDirty && (Hardware->config->gpuCoreCount > 1))
     {
         /* TODO: select optimum rendering mode for different statemetn */
         gcmONERROR(gcoHARDWARE_FlushMultiGPURenderingMode(Hardware, Memory, gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_128x64));
@@ -5131,7 +5131,7 @@ _InternalTFBSwitch(
         }
 
         /* Switch to single GPU mode */
-        if (Hardware->config->coreCount > 1)
+        if (Hardware->config->gpuCoreCount > 1)
         {
             gcoHARDWARE_MultiGPUSync(Hardware, &memory);
             { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -5205,7 +5205,7 @@ _InternalTFBSwitch(
 
 
         /* Resume to multiple GPU mode */
-        if (Hardware->config->coreCount > 1)
+        if (Hardware->config->gpuCoreCount > 1)
         {
             { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?

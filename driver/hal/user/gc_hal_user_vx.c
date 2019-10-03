@@ -42,7 +42,7 @@ static gctBOOL Is_HistogramKernel(gctUINT32 kernel) {
 
 typedef struct _gcoVX
 {
-    gcoHARDWARE hardwares[gcdMAX_MAJOR_CORE_COUNT];
+    gcoHARDWARE hardwares[gcdMAX_3DGPU_COUNT];
     gctUINT32   coreCount;
 } _gcoVX;
 
@@ -67,7 +67,7 @@ gceSTATUS gcoVX_Construct(OUT gcoVX * VXObj )
 
     gcoOS_ZeroMemory(vxObj, gcmSIZEOF(struct _gcoVX));
     gcmONERROR(gcoVX_QueryDeviceCount(&vxObj->coreCount, gcvNULL));
-    gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_VIP));
+    gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
     for(i = 0; i < vxObj->coreCount; i++)
     {
@@ -190,9 +190,6 @@ gcoVX_Initialize(vx_evis_no_inst_s *evisNoInst)
     gcmHEADER();
 
     gcmONERROR(gcoOS_GetTLS(&__tls__));
-
-    __tls__->currentType = gcvHARDWARE_VIP;
-
     if(__tls__->engineVX == gcvNULL)
     {
         gcmONERROR(gcoVX_Construct(&__tls__->engineVX));
@@ -710,7 +707,7 @@ gcoVX_AllocateMemory(
 
     gcmHEADER_ARG("Size=%u Logical=%p", Size);
 
-    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_VIP);
+    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
 
     gcmONERROR(gcoVX_AllocateMemoryEx(&size, gcvSURF_VERTEX, gcvPOOL_DEFAULT, 64, Physical, Logical, Node));
 
@@ -749,10 +746,9 @@ gcoVX_LoadKernelShader(
     gcmHEADER_ARG("StateBufferSize=%u StateBuffer=0x%x Hints=0x%x",
                   ProgramState.stateBufferSize, ProgramState.stateBuffer, ProgramState.hints);
 
-
     gcmASSERT(gcoVX_VerifyHardware());
     /* Set the hardware type. */
-    gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_VIP));
+    gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
     /* Switch to the 3D pipe. */
     gcmONERROR(gcoHARDWARE_SelectPipe(gcvNULL, gcvPIPE_3D, gcvNULL));
@@ -993,9 +989,14 @@ gcoVX_QueryDeviceCount(
     }
 
     queriedOnce = gcvTRUE;
-    gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_VIP, &gpuCount, chipIDs);
+    gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D, &gpuCount, chipIDs);
 
-    gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_VIP, &mode, &coreIndex);
+    if (gpuCount == 0)
+    {
+        gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D2D, &gpuCount, chipIDs);
+    }
+
+    gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_3D, &mode, &coreIndex);
 
     if(mode == gcvMULTI_GPU_MODE_COMBINED)      /*Combined Mode*/
     {
@@ -1387,8 +1388,6 @@ gcoVX_SwitchContext(
 
     gcmONERROR(gcoOS_GetTLS(&tls));
 
-    tls->currentType = gcvHARDWARE_VIP;
-
     if(tls->engineVX == gcvNULL)
     {
         gcmONERROR(gcoVX_Construct(&tls->engineVX));
@@ -1402,7 +1401,7 @@ gcoVX_SwitchContext(
     gcmONERROR(gcoHARDWARE_Set3DHardware(tls->engineVX->hardwares[DeviceID]));
     gcoHARDWARE_QueryCoreIndex(tls->engineVX->hardwares[DeviceID], 0, &coreIndex);
 
-    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_VIP ); /*Note! setHardwareType will QueryMultiGPUAffinityConfig and reset CoreIndex*/
+    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D ); /*Note! setHardwareType will QueryMultiGPUAffinityConfig and reset CoreIndex*/
     gcoHAL_SetCoreIndex(gcvNULL, coreIndex);
 
 OnError:
@@ -1450,8 +1449,6 @@ gctBOOL gcoVX_VerifyHardware()  /* Verify VX not use the default hardware*/
     gcmHEADER();
 
     gcmONERROR(gcoOS_GetTLS(&tls));
-
-    tls->currentType = gcvHARDWARE_VIP;
 
     if(tls->currentHardware != tls->defaultHardware)
     {
@@ -1501,8 +1498,6 @@ gcoVX_CaptureInitState(
     gcmHEADER();
     gcmONERROR(gcoOS_GetTLS( &tls));
 
-    tls->currentType = gcvHARDWARE_VIP;
-
     for (i = 0; i < deviceCount; i++)
     {
         gcoHARDWAREVX_CaptureInitState(tls->engineVX->hardwares[i], CaptureBuffer[i],
@@ -1528,8 +1523,6 @@ gcoVX_SetRemapAddress(
     gcmHEADER();
 
     gcmONERROR(gcoOS_GetTLS( &tls));
-
-    tls->currentType = gcvHARDWARE_VIP;
 
     if(tls->engineVX == gcvNULL)
     {
@@ -1574,46 +1567,37 @@ gcoVX_CreateHW(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcoHARDWARE  hardware = gcvNULL;
-    gctUINT      perDeviceCoreCount;
+    gctUINT      perDeviceGpuCount;
     gctUINT      DeviceCount;
-    gctUINT32    localCoreIndexs[gcdMAX_MAJOR_CORE_COUNT] = {0, 1, 2, 3, 4, 5, 6, 7};
-    gctUINT32    coreIndexs[gcdMAX_MAJOR_CORE_COUNT];
+    gctUINT32    gpuCoreIndexs[]={0, 1, 2, 3, 4, 5, 6, 7};
     gctBOOL      changed = gcvFALSE;
     gceHARDWARE_TYPE preType = gcvHARDWARE_INVALID ;
-    gctUINT32    preCoreIndex;
+    gctUINT32        preCoreIndex;
     gceMULTI_GPU_MODE  mode;
     gctUINT32 mainCoreIndex;
     gcmHEADER_ARG("DeviceId=%d", DeviceId);
 
     gcmVERIFY_OK(gcoHAL_GetHardwareType(gcvNULL, &preType));
     gcmVERIFY_OK(gcoHAL_GetCurrentCoreIndex(gcvNULL, &preCoreIndex));
-    gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_VIP));
+    gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
-    gcmVERIFY_OK(gcoVX_QueryDeviceCount(&DeviceCount, &perDeviceCoreCount));
+    gcmVERIFY_OK(gcoVX_QueryDeviceCount(&DeviceCount, &perDeviceGpuCount));
 
-    if(DeviceCount == 1 && perDeviceCoreCount == 1) /*Special deal with independent mode*/
+    if(DeviceCount == 1 && perDeviceGpuCount == 1) /*Special deal with independent mode*/
     {
-         gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_VIP, &mode, &mainCoreIndex);
+         gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_3D, &mode, &mainCoreIndex);
 
-         localCoreIndexs[0] = mainCoreIndex;
+         gpuCoreIndexs[0] = mainCoreIndex;
     }
-
-    gcmONERROR(gcoHAL_ConvertCoreIndexGlobal(gcPLS.hal,
-                                             gcvHARDWARE_VIP,
-                                             perDeviceCoreCount,
-                                             &localCoreIndexs[DeviceId * perDeviceCoreCount],
-                                             coreIndexs));
-
-    gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndexs[0]));
+    gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, gpuCoreIndexs[DeviceId * perDeviceGpuCount]));
 
     changed = gcvTRUE;
     gcmONERROR(gcoHARDWARE_ConstructEx(gcPLS.hal,
                                        gcvFALSE,
                                        gcvFALSE,
-                                       gcvHARDWARE_VIP,
-                                       perDeviceCoreCount,
-                                       &localCoreIndexs[DeviceId * perDeviceCoreCount],
-                                       coreIndexs,
+                                       gcvHARDWARE_3D,
+                                       perDeviceGpuCount,
+                                       &gpuCoreIndexs[DeviceId*perDeviceGpuCount],
                                        &hardware));
 
     /* gcoHARDWARE_SetMultiGPUMode(hardware,gcvMULTI_GPU_MODE_INDEPENDENT); */
@@ -1687,8 +1671,6 @@ gceSTATUS gcoVX_GetEvisNoInstFeatureCap(
     gcoHARDWARE hardware;
 
     gcmONERROR(gcoOS_GetTLS(&tls));
-
-    tls->currentType = gcvHARDWARE_VIP;
 
     if(tls->engineVX == gcvNULL)
     {

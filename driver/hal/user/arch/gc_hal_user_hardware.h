@@ -38,7 +38,7 @@ extern "C" {
 
 #define gcmENABLE3DCORE(Memory, CoreId) \
 { \
-    if (Hardware->config->coreCount > 1) \
+    if (Hardware->config->gpuCoreCount > 1) \
     { \
     *Memory++ = gcmSETFIELDVALUE(0, GCCMD_CHIP_ENABLE_COMMAND, OPCODE, CHIP_ENABLE) \
               | CoreId; \
@@ -271,7 +271,7 @@ typedef struct _gcsHARDWARE_CONFIG
 #endif
     gctUINT32                   pixelPipes;
     gctUINT32                   resolvePipes;
-    gctUINT32                   coreCount;
+    gctUINT32                   gpuCoreCount;
     gctUINT32                   clusterCount;
     gctINT32                    clusterMaxID;
     gctINT32                    clusterMinID;
@@ -874,6 +874,9 @@ struct _gcoHARDWARE
     /* Hardware is robust and automatically do OOB check */
     gctBOOL                     robust;
 
+    /* Core array. */
+    gceCORE                     core[4];
+
     /* Handle of gckCONTEXT object. */
     gctUINT32                   context;
 
@@ -1147,12 +1150,11 @@ struct _gcoHARDWARE
 
     gctPOINTER                  featureDatabase;
 
-    /* Chip ID of multiple cores. */
+    /* Chip ID of multiple GPUs. */
     gctUINT                     chipIDs[gcvCORE_COUNT];
 
-    /* Core Index of multiple cores. */
+    /* Core Index of multiple GPUs. */
     gctUINT                     coreIndexs[gcvCORE_COUNT];
-    gctUINT                     localCoreIndexs[gcvCORE_COUNT];
 
     gceHARDWARE_TYPE            constructType;
 

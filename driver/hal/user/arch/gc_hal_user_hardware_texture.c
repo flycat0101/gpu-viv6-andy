@@ -7630,7 +7630,7 @@ gcoHARDWARE_ProgramTexture(
 
 
             if (Hardware->config->chipModel == gcv700
-                || Hardware->config->coreCount > 1
+                || Hardware->config->gpuCoreCount > 1
                 )
             {
                 /* Flush the L2 cache as well. */
