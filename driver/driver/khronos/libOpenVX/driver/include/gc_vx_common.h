@@ -1576,6 +1576,8 @@ typedef struct _vx_graph
 
     vx_bool                                 reverify;
 
+    vx_bool                                 reprocess;
+
     vx_bool                                 dirty;
 
     vx_bool                                 Initilized;

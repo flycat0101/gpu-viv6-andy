@@ -702,14 +702,19 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
     }
 
     if (node->graph->verified &&
-        ((node->numParents && node->numChildren) ||
-         (!node->kernel->kernelShader &&
-          (!vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER) || node->kernel->enumeration != VX_KERNEL_NN_YUV2RGB_SCALE))) &&
-        (node->kernel->enumeration != VX_KERNEL_IMPORT_FROM_FILE))
+        !node->kernel->kernelShader &&
+        (!vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER) ||
+         node->kernel->enumeration != VX_KERNEL_NN_YUV2RGB_SCALE || node->numParents) &&
+        node->kernel->enumeration != VX_KERNEL_IMPORT_FROM_FILE)
     {
-        /* Only VXC/YUVScaler header/tail node support change parameters without re-verify */
+        /* Only VXC header/tail node and scaler header node supports change parameters without re-verify */
         node->graph->reverify = vx_true_e;
         node->graph->verified = vx_false_e;
+    }
+    else if (node->graph->verified &&
+             node->kernel->enumeration == VX_KERNEL_NN_YUV2RGB_SCALE && !node->numParents)
+    {
+        node->graph->reprocess = vx_true_e;
     }
 
     if (node->paramTable[index] != VX_NULL && node->paramTable[index]->delay != VX_NULL)
@@ -784,6 +789,12 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
 
                         node->graph->commandBuffer[node->patchLocation[index][planeIndx]]
                                 = image->memory.physicals[planeIndx];
+
+                       if (image->importType == VX_MEMORY_TYPE_HOST && image->useInternalMem == vx_false_e &&
+                           image->memory.logicals[planeIndx] && image->memory.wrappedSize[planeIndx])
+                       {
+                           gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[planeIndx], image->memory.logicals[planeIndx], image->memory.wrappedSize[planeIndx]);
+                       }
                     }
                 }
             }

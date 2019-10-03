@@ -20261,6 +20261,17 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
 
         operation = executionLayer->operations[executionLayer->opIndices[i].operationID];
 
+        if (executionLayer->graph->verified == vx_false_e && executionLayer->graph->base.context->options.enableGraphCommandBuffer == vx_true_e &&
+            i == 0 && operation->target == VXNNE_OPERATION_TARGET_SC)
+        {
+            continue;
+        }
+        else if (executionLayer->graph->verified == vx_true_e && executionLayer->graph->base.context->options.enableGraphCommandBuffer == vx_true_e &&
+                 executionLayer->graph->reprocess == vx_true_e && (i != 0 || operation->target != VXNNE_OPERATION_TARGET_SC))
+        {
+            continue;
+        }
+
         vxnneMultiChannel_SetCurrentChannel(operation->target);
 
         vxnneMultiChannel_ApplySyncMode(executionLayer->opIndices[i].waitMode, executionLayer->opIndices[i].semaWaitHandle);
