@@ -292,7 +292,7 @@ static VkResult waylandGetPhysicalDeviceSurfaceCapabilities(
     pSurfaceCapabilities->maxImageCount           = 8;
     pSurfaceCapabilities->currentExtent           = VIV_EXTENT;
     pSurfaceCapabilities->minImageExtent          = (VkExtent2D){1, 1};
-    pSurfaceCapabilities->maxImageExtent          = (VkExtent2D){4096, 4096};
+    pSurfaceCapabilities->maxImageExtent          = VIV_EXTENT;
     pSurfaceCapabilities->maxImageArrayLayers     = 1;
     pSurfaceCapabilities->supportedTransforms     = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     pSurfaceCapabilities->currentTransform        = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
@@ -512,6 +512,7 @@ static VkResult __CreateImageBuffer(
     __vkWaylandImageBuffer *imageBuffer
     )
 {
+    uint32_t alignedWidth;
     VkImageCreateInfo imgInfo;
     VkMemoryAllocateInfo memAlloc;
     VkResult result = VK_SUCCESS;
@@ -523,12 +524,14 @@ static VkResult __CreateImageBuffer(
     imageBuffer->resolveTargetMemory = VK_NULL_HANDLE;
     imageBuffer->resolveFd = -1;
 
+    alignedWidth = (sc->imageExtent.width + 15) & ~15;
+
     /* Create the swap chain render target images */
     __VK_MEMZERO(&imgInfo, sizeof(VkImageCreateInfo));
     imgInfo.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imgInfo.imageType     = VK_IMAGE_TYPE_2D;
     imgInfo.format        = sc->imageFormat;
-    imgInfo.extent.width  = sc->imageExtent.width;
+    imgInfo.extent.width  = alignedWidth;
     imgInfo.extent.height = sc->imageExtent.height;
     imgInfo.extent.depth  = 1;
     imgInfo.mipLevels     = 1;
@@ -554,7 +557,7 @@ static VkResult __CreateImageBuffer(
     imgInfo.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imgInfo.imageType     = VK_IMAGE_TYPE_2D;
     imgInfo.format        = sc->imageFormat;
-    imgInfo.extent.width  = sc->imageExtent.width;
+    imgInfo.extent.width  = alignedWidth;
     imgInfo.extent.height = sc->imageExtent.height;
     imgInfo.extent.depth  = 1;
     imgInfo.mipLevels     = 1;
@@ -576,7 +579,6 @@ static VkResult __CreateImageBuffer(
     __VK_ONERROR(__vk_BindImageMemory(sc->device, imageBuffer->resolveTarget, imageBuffer->resolveTargetMemory, 0));
 
     {
-        uint32_t alignedWidth;
         int32_t stride;
         gceSURF_FORMAT format;
         gcsSURF_NODE *surfNode;
@@ -587,8 +589,6 @@ static VkResult __CreateImageBuffer(
 
         image = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->resolveTarget);
         surfNode = &image->memory->node;
-
-        alignedWidth  = (sc->imageExtent.width + 15) & ~15;
 
         switch (sc->imageFormat)
         {
