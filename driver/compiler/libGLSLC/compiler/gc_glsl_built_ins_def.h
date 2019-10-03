@@ -2578,10 +2578,10 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_HALTI,     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    3, {T_USAMPLER3D,    T_VEC3, T_IVEC3}, {0}, {0}},
     {slvEXTENSION_HALTI,     "textureOffset", gcvNULL, _GenTextureOffsetCode,      T_UVEC4,    3, {T_USAMPLER2DARRAY,    T_VEC3, T_IVEC2}, {0}, {0}},
 
-    {slvEXTENSION_HALTI,     "textureOffset",  gcvNULL, _GenTextureCode,         T_FLOAT,    3, {T_SAMPLER1DSHADOW,    T_VEC3, T_INT}, {0}, {0}},
-    {slvEXTENSION_HALTI,     "textureOffset",  gcvNULL, _GenTextureCode,         T_FLOAT,    4, {T_SAMPLER1DSHADOW,    T_VEC3, T_INT, T_FLOAT}, {0}, {0}},
-    {slvEXTENSION_HALTI,     "textureOffset",  gcvNULL, _GenTextureCode,         T_FLOAT,    3, {T_SAMPLER1DARRAYSHADOW, T_VEC3, T_INT}, {0}, {0}},
-    {slvEXTENSION_HALTI,     "textureOffset",  gcvNULL, _GenTextureCode,         T_FLOAT,    4, {T_SAMPLER1DARRAYSHADOW, T_VEC3, T_INT, T_FLOAT}, {0}, {0}},
+    {slvEXTENSION_HALTI,     "textureOffset",  gcvNULL, _GenTextureOffsetCode,     T_FLOAT,    3, {T_SAMPLER1DSHADOW,    T_VEC3, T_INT}, {0}, {0}},
+    {slvEXTENSION_HALTI,     "textureOffset",  gcvNULL, _GenTextureOffsetCode,     T_FLOAT,    4, {T_SAMPLER1DSHADOW,    T_VEC3, T_INT, T_FLOAT}, {0}, {0}},
+    {slvEXTENSION_HALTI,     "textureOffset",  gcvNULL, _GenTextureOffsetCode,     T_FLOAT,    3, {T_SAMPLER1DARRAYSHADOW, T_VEC3, T_INT}, {0}, {0}},
+    {slvEXTENSION_HALTI,     "textureOffset",  gcvNULL, _GenTextureOffsetCode,     T_FLOAT,    4, {T_SAMPLER1DARRAYSHADOW, T_VEC3, T_INT, T_FLOAT}, {0}, {0}},
 
     {slvEXTENSION_HALTI,     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_VEC4,     3, {T_SAMPLER2D,    T_VEC3, T_IVEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,     "textureProjOffset", gcvNULL, _GenTextureProjOffsetCode,  T_VEC4,     3, {T_SAMPLER2D,    T_VEC4, T_IVEC2}, {0}, {0}},
