@@ -2641,7 +2641,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
     gctUINT32 i;
 
     gceSTATUS    status = gcvSTATUS_OK;
-    gctUINT32    gpuCoreCount;
+    gctUINT32    coreCount;
     gcsRECT     *renderWindow = gcvNULL;
     gctUINT32   control;
     gcoSURF surface = Hardware->PEStates->colorStates.target[0].surface
@@ -2655,7 +2655,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
 
     gcmHEADER_ARG("Hardware=0x%x Memory=0x%x", Hardware, Memory);
 
-    gpuCoreCount = Hardware->config->gpuCoreCount;
+    coreCount = Hardware->config->coreCount;
 
     hints = Hardware->SHStates->programState.hints;
 
@@ -2713,18 +2713,18 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
 
             gcmVERIFY_OK(
                 gcoOS_AllocateMemory(gcvNULL,
-                                     sizeof(gcsRECT) * gpuCoreCount,
+                                     sizeof(gcsRECT) * coreCount,
                                      (gctPOINTER *)&renderWindow));
 
             if (mode == gcvMULTI_GPU_RENDERING_MODE_SPLIT_WIDTH)
             {
-                for (i = 0; i < gpuCoreCount; i++)
+                for (i = 0; i < coreCount; i++)
                 {
                     if (i == 0)
                     {
                         renderWindow[i].left   = 0;
                         renderWindow[i].top    = 0;
-                        renderWindow[i].right  = gcmALIGN(surface->alignedW / gpuCoreCount, 64);
+                        renderWindow[i].right  = gcmALIGN(surface->alignedW / coreCount, 64);
                         renderWindow[i].bottom = surface->alignedH;
                     }
                     else
@@ -2732,9 +2732,9 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
                         renderWindow[i].left   = renderWindow[i - 1].right;
                         renderWindow[i].top    = 0;
                         renderWindow[i].right  =
-                            (i == (gpuCoreCount - 1)) ? surface->alignedW
+                            (i == (coreCount - 1)) ? surface->alignedW
                                                       : (gcmALIGN(surface->alignedW
-                                                         / gpuCoreCount, 64)
+                                                         / coreCount, 64)
                                                         * (i + 1));
                         renderWindow[i].bottom = surface->alignedH;
                     }
@@ -2742,14 +2742,14 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
             }
             else if (mode == gcvMULTI_GPU_RENDERING_MODE_SPLIT_HEIGHT)
             {
-                for (i = 0; i < gpuCoreCount; i++)
+                for (i = 0; i < coreCount; i++)
                 {
                     if (i == 0)
                     {
                         renderWindow[i].left   = 0;
                         renderWindow[i].top    = 0;
                         renderWindow[i].right  = surface->alignedW;
-                        renderWindow[i].bottom = gcmALIGN(surface->alignedH / gpuCoreCount, 64);
+                        renderWindow[i].bottom = gcmALIGN(surface->alignedH / coreCount, 64);
                     }
                     else
                     {
@@ -2757,8 +2757,8 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
                         renderWindow[i].top    = renderWindow[i - 1].bottom;
                         renderWindow[i].right  = surface->alignedW;
                         renderWindow[i].bottom =
-                            (i == (gpuCoreCount - 1)) ? surface->alignedH
-                                                      : (gcmALIGN(surface->alignedH / gpuCoreCount, 64)
+                            (i == (coreCount - 1)) ? surface->alignedH
+                                                      : (gcmALIGN(surface->alignedH / coreCount, 64)
                                                         * (i + 1));
                     }
                 }
@@ -2767,7 +2767,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
             control = 0x1;
 
             /* Set render windows for each 3D core. */
-            for (i = 0; i < gpuCoreCount; i++)
+            for (i = 0; i < coreCount; i++)
             {
                 { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -2957,7 +2957,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
     if (control != 0x1)
     {
         gctBOOL blockSetConfig = Hardware->features[gcvFEATURE_MULTI_CORE_BLOCK_SET_CONFIG];
-        if (!blockSetConfig || (blockSetConfig && gpuCoreCount == 4) )
+        if (!blockSetConfig || (blockSetConfig && coreCount == 4) )
         {
             /* Flat map set[i] to core[i]. */
             control |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -2966,7 +2966,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
  ~0U : (~(~0U << ((1 ?
  6:4) - (0 ?
  6:4) + 1))))))) << (0 ?
- 6:4))) | (((gctUINT32) ((gctUINT32) (gpuCoreCount - 1) & ((gctUINT32) ((((1 ?
+ 6:4))) | (((gctUINT32) ((gctUINT32) (coreCount - 1) & ((gctUINT32) ((((1 ?
  6:4) - (0 ?
  6:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 6:4) - (0 ? 6:4) + 1))))))) << (0 ? 6:4)))
@@ -3012,7 +3012,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
  ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1))))))) << (0 ? 23:23)))
                      ;
         }
-        else if (gpuCoreCount == 8)
+        else if (coreCount == 8)
         {
             gcmASSERT(Hardware->features[gcvFEATURE_MULTI_CORE_BLOCK_SET_CONFIG2]);
             /* Flat map set[i] to core[i]. */
@@ -3109,7 +3109,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
  ~0U : (~(~0U << ((1 ? 31:24) - (0 ? 31:24) + 1))))))) << (0 ? 31:24)));
 
         }
-        else if (gpuCoreCount == 2)
+        else if (coreCount == 2)
         {
             gctUINT32 mapping[4][2][2] =
             {
@@ -3310,7 +3310,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
  6:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 6:4) - (0 ? 6:4) + 1))))))) << (0 ? 6:4)));
 
-            for (i = 0; i < gpuCoreCount; i++)
+            for (i = 0; i < coreCount; i++)
             {
                 gctUINT32 chipID = gcmTO_CHIP_ID(i);
                 control |= mapping[chipID][i][0];
@@ -3515,14 +3515,14 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
 
             control |= mappingForFirstCore[chipID];
 
-            for (i = 1; i < gpuCoreCount; i++)
+            for (i = 1; i < coreCount; i++)
             {
                 chipID = gcmTO_CHIP_ID(i);
 
                 control |= mappingForNextTwoCores[chipID][i-1];
             }
 
-            gcmASSERT(gpuCoreCount == 3);
+            gcmASSERT(coreCount == 3);
         }
     }
 
@@ -8885,7 +8885,7 @@ gcoHARDWARE_FlushTarget(
     }
 
     if ((Hardware->patchID == gcvPATCH_DEQP || Hardware->patchID == gcvPATCH_GTFES30) &&
-       (Hardware->config->gpuCoreCount > 1 && Hardware->config->chipModel == gcv7000) &&
+       (Hardware->config->coreCount > 1 && Hardware->config->chipModel == gcv7000) &&
        (Hardware->XFBDirty->s.cmdDirty || (Hardware->XFBStates->status == gcvXFB_Enabled)))
     {
          destinationRead = 0x0;
@@ -18453,13 +18453,13 @@ gcoHARDWARE_SetQuery(
                         ));
                 }
 
-                if (Hardware->config->gpuCoreCount > 1)
+                if (Hardware->config->coreCount > 1)
                 {
                     gctUINT i;
                     gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
 
                     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
-                    for (i = 0; i < Hardware->config->gpuCoreCount; ++i)
+                    for (i = 0; i < Hardware->config->coreCount; ++i)
                     {
                         { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -18659,7 +18659,7 @@ gcoHARDWARE_SetQuery(
             if (Type == gcvQUERY_OCCLUSION)
             {
                 gctUINT32 oqSlot;
-                gctUINT32 gpuCount = Hardware->config->gpuCoreCount;
+                gctUINT32 gpuCount = Hardware->config->coreCount;
                 gctUINT32 clusterIDWidth = 0;
 
                 gcmONERROR(gcoHARDWARE_QueryCluster(Hardware, gcvNULL, gcvNULL, gcvNULL, &clusterIDWidth));
@@ -23124,7 +23124,7 @@ gcoHARDWARE_FlushXfb(
     if (Hardware->XFBDirty->s.cmdDirty)
     {
         /* Switch to single GPU mode */
-        if (Hardware->config->gpuCoreCount > 1)
+        if (Hardware->config->coreCount > 1)
         {
             gcoHARDWARE_MultiGPUSync(Hardware, &memory);
             { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -23351,7 +23351,7 @@ gcoHARDWARE_FlushXfb(
         }
 
         /* Resume to multiple GPU mode */
-        if (Hardware->config->gpuCoreCount > 1)
+        if (Hardware->config->coreCount > 1)
         {
             { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -23685,9 +23685,9 @@ gcoHARDWARE_SetProbeCmd(
         break;
     }
 
-    for (i = 0; i < Hardware->config->gpuCoreCount; ++i)
+    for (i = 0; i < Hardware->config->coreCount; ++i)
     {
-        if (Hardware->config->gpuCoreCount > 1)
+        if (Hardware->config->coreCount > 1)
         {
             { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -24222,7 +24222,7 @@ gcoHARDWARE_SetProbeCmd(
         }
     }
 
-    if (Hardware->config->gpuCoreCount > 1)
+    if (Hardware->config->coreCount > 1)
     {
         { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?

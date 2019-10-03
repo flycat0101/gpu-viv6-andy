@@ -197,7 +197,6 @@ static gceSTATUS _LoadStates(
 
     /* Check address range. */
     gcmASSERT(Hardware->maxState == 0 || (Address + Count < Hardware->maxState));
-
     /* Cast the pointers. */
     source = (gctUINT32_PTR) Data;
 
@@ -2956,20 +2955,18 @@ _QueryCoreCount(
 
     gcmGETCURRENTHARDWARE(type);
 
-    if (type == gcvHARDWARE_3D2D || type == gcvHARDWARE_3D)
+    if (type == gcvHARDWARE_3D2D || type == gcvHARDWARE_3D || type == gcvHARDWARE_VIP)
     {
-        gcoHAL_QueryCoreCount(gcvNULL, type, &Config->gpuCoreCount, Hardware->chipIDs);
+        gcoHAL_QueryCoreCount(gcvNULL, type, &Config->coreCount, Hardware->chipIDs);
 
-        if (Config->gpuCoreCount == 0)
+        if (Config->coreCount == 0 && (type == gcvHARDWARE_3D2D || type == gcvHARDWARE_3D))
         {
             type = type == gcvHARDWARE_3D2D
                  ? gcvHARDWARE_3D
                  : gcvHARDWARE_3D2D
                  ;
 
-            gcoHAL_QueryCoreCount(gcvNULL, type, &Config->gpuCoreCount, Hardware->chipIDs);
-
-            gcmASSERT(Config->gpuCoreCount);
+            gcoHAL_QueryCoreCount(gcvNULL, type, &Config->coreCount, Hardware->chipIDs);
         }
     }
 }
@@ -3052,7 +3049,7 @@ _FillInConfigTable(
 
     Config->pixelPipes             = featureDatabase->NumPixelPipes;
     Config->resolvePipes           = featureDatabase->NumResolvePipes;
-    Config->gpuCoreCount           = featureDatabase->CoreCount;
+    Config->coreCount              = featureDatabase->CoreCount;
 
     /* Multiple core information may be not reported by feature bit, try to get it from gcoHAL */
     _QueryCoreCount(Hardware, Config);
@@ -5281,7 +5278,8 @@ OnError:
 static gceSTATUS
 _Attach(
     IN gcoHARDWARE Hardware,
-    IN gctUINT Core
+    IN gctUINT localCoreIndex,
+    IN gctUINT CoreIndex
     )
 {
     gceSTATUS status;
@@ -5296,7 +5294,7 @@ _Attach(
     /* FIXME: Convert core index in this gcoHARDWARE to gloabl core index.
     * For now, they are same.
     */
-    gcoHAL_SetCoreIndex(gcvNULL, Core);
+    gcoHAL_SetCoreIndex(gcvNULL, CoreIndex);
     coreIndexChanged = gcvTRUE;
 
     iface.ignoreTLS = gcvFALSE;
@@ -5321,8 +5319,8 @@ _Attach(
     coreIndexChanged = gcvFALSE;
 
     /* Store the allocated context buffer object. */
-    hardware->contexts[Core] = iface.u.Attach.context;
-    gcmASSERT(hardware->contexts[Core] != 0);
+    hardware->contexts[localCoreIndex] = iface.u.Attach.context;
+    gcmASSERT(hardware->contexts[localCoreIndex] != 0);
 
     /* Store the number of states in the context. */
     hardware->maxState = (gctUINT32) iface.u.Attach.maxState;
@@ -5354,20 +5352,20 @@ _Attach(
             _AllocateDelta(hardware, &delta);
 
             /* Append to the list. */
-            if (hardware->deltas[Core] == gcvNULL)
+            if (hardware->deltas[localCoreIndex] == gcvNULL)
             {
                 delta->prev     = gcmPTR_TO_UINT64(delta);
                 delta->next     = gcmPTR_TO_UINT64(delta);
-                hardware->deltas[Core] = delta;
+                hardware->deltas[localCoreIndex] = delta;
             }
             else
             {
-                delta->next = gcmPTR_TO_UINT64(hardware->deltas[Core]);
-                delta->prev = hardware->deltas[Core]->prev;
+                delta->next = gcmPTR_TO_UINT64(hardware->deltas[localCoreIndex]);
+                delta->prev = hardware->deltas[localCoreIndex]->prev;
 
-                prev = gcmUINT64_TO_PTR(hardware->deltas[Core]->prev);
+                prev = gcmUINT64_TO_PTR(hardware->deltas[localCoreIndex]->prev);
                 prev->next = gcmPTR_TO_UINT64(delta);
-                hardware->deltas[Core]->prev = gcmPTR_TO_UINT64(delta);
+                hardware->deltas[localCoreIndex]->prev = gcmPTR_TO_UINT64(delta);
 
             }
 
@@ -5503,8 +5501,9 @@ gcoHARDWARE_ConstructEx(
     IN gctBOOL ThreadDefault,
     IN gctBOOL Robust,
     IN gceHARDWARE_TYPE Type,
-    IN gctUINT32    AttachGpuCount,
-    IN gctUINT32    CoreIndexs[],
+    IN gctUINT32 AttachCoreCount,
+    IN gctUINT32 LocalCoreIndexs[],
+    IN gctUINT32 GlobalCoreIndexs[],
     OUT gcoHARDWARE * Hardware
     )
 {
@@ -6366,7 +6365,7 @@ gcoHARDWARE_ConstructEx(
     gcmONERROR(_SetSpecialHint(hardware));
 #endif
     gcmONERROR(_FillInConfigTable(hardware, hardware->config));
-    gcmASSERT(AttachGpuCount <= hardware->config->gpuCoreCount);
+    gcmASSERT(AttachCoreCount <= hardware->config->coreCount);
 
     gcmVERIFY_OK(_FillInFeatureTable(hardware, hardware->features));
 
@@ -6425,7 +6424,7 @@ gcoHARDWARE_ConstructEx(
     hardware->prevProgramBarrierUsed = gcvFALSE;
     hardware->previousPEDepth = gcvTRUE;
 
-    if (hardware->config->gpuCoreCount > 1)
+    if (hardware->config->coreCount > 1)
     {
         /* Set the default multi GPU rendering mode. */
         hardware->gpuRenderingMode = gcvMULTI_GPU_RENDERING_MODE_INVALID;
@@ -6484,9 +6483,9 @@ gcoHARDWARE_ConstructEx(
     /* 2D independent HW doesn't need context. */
     if (type != gcvHARDWARE_2D)
     {
-        gctUINT i;
         gctUINT coreCount;
-        coreCount = hardware->deltasCount = hardware->config->gpuCoreCount;
+        coreCount = hardware->deltasCount = hardware->config->coreCount;
+
         gcmONERROR(gcoOS_Allocate(
             gcvNULL,
             gcmSIZEOF(gcsSTATE_DELTA_PTR) * coreCount,
@@ -6503,10 +6502,11 @@ gcoHARDWARE_ConstructEx(
 
         gcoOS_ZeroMemory(hardware->contexts, gcmSIZEOF(gctUINT32) * coreCount);
 
-        for (i = 0; i < AttachGpuCount; i++) /* only create for AttachGpuCount cores */
+        for (i = 0; i < AttachCoreCount; i++) /* only create for AttachCoreCount cores */
         {
-            gcmONERROR(_Attach(hardware, CoreIndexs[i]));
+            gcmONERROR(_Attach(hardware, LocalCoreIndexs[i], GlobalCoreIndexs[i]));
         }
+
 
         gcmONERROR(_AllocateDelta(hardware, &hardware->tempDelta));
     }
@@ -6763,20 +6763,9 @@ gcoHARDWARE_ConstructEx(
     gcmONERROR(_InitializeFlatMappingRange(hardware));
 
 #if gcdENABLE_3D
-    hardware->config->gpuCoreCount = AttachGpuCount;
-    mode = AttachGpuCount == 1 ? gcvMULTI_GPU_MODE_INDEPENDENT : gcvMULTI_GPU_MODE_COMBINED;
+    hardware->config->coreCount = AttachCoreCount;
+    mode = AttachCoreCount == 1 ? gcvMULTI_GPU_MODE_INDEPENDENT : gcvMULTI_GPU_MODE_COMBINED;
     hardware->gpuMode = mode;
-
-    /* Multi-GPUs mode has been set, now determine the coreIndex of GPUs
-    ** bound to the gcoHARDWARE object. */
-
-    {
-        /* Bind the following GPUs. */
-        for (i = 0; i < hardware->config->gpuCoreCount; i++)
-        {
-            hardware->coreIndexs[i] = CoreIndexs[i];
-        }
-    }
 
     /* Now binding relationship between GPUs and the gcoHARDWARE object
     *  is setup.
@@ -6791,12 +6780,17 @@ gcoHARDWARE_ConstructEx(
 
     if (type != gcvHARDWARE_2D)
     {
-        gctUINT coreIndex;
+        /* Multi-cores mode has been set, now determine the coreIndexs
+        ** bound to the gcoHARDWARE object according to the hardware type.*/
+        for (i = 0; i < hardware->config->coreCount; i++)
+        {
+            hardware->coreIndexs[i] = GlobalCoreIndexs[i];
+            hardware->localCoreIndexs[i] = LocalCoreIndexs[i];
+        }
 
         /* Specify delta and context for main core. */
-        gcoHARDWARE_QueryCoreIndex(hardware, 0, &coreIndex);
-        hardware->delta = hardware->deltas[coreIndex];
-        hardware->context = hardware->contexts[coreIndex];
+        hardware->delta = hardware->deltas[hardware->localCoreIndexs[0]];
+        hardware->context = hardware->contexts[hardware->localCoreIndexs[0]];
     }
 #endif
 
@@ -6906,64 +6900,67 @@ gcoHARDWARE_Construct(
 {
     gceSTATUS         status = gcvSTATUS_OK;
     gceHARDWARE_TYPE  type;
-    gctUINT32         attachGpuCount;
+    gctUINT32         attachCoreCount;
     gceMULTI_GPU_MODE mode;
     gctUINT32         currentCoreIndex;
-    gctUINT32         gpuCoreCount ;
-    gctUINT           coreIndexs[gcdMAX_3DGPU_COUNT] = {0, 1, 2, 3, 4, 5, 6, 7};
+    gctUINT32         coreCount ;
+    gctUINT           localCoreIndexs[gcdMAX_MAJOR_CORE_COUNT] = {0, 1, 2, 3, 4, 5, 6, 7};
+    gctUINT32         coreIndexs[gcdMAX_MAJOR_CORE_COUNT];
     gctUINT           chipIDs[32];
     gcmGETCURRENTHARDWARE(type);
 
-
-    /* Get real Gpu count */
-    if (type == gcvHARDWARE_3D2D || type == gcvHARDWARE_3D)
+    /* Get real core count */
+    if (type == gcvHARDWARE_3D2D || type == gcvHARDWARE_3D || type == gcvHARDWARE_VIP)
     {
-        gcoHAL_QueryCoreCount(gcvNULL, type, &gpuCoreCount, chipIDs);
+        gcoHAL_QueryCoreCount(gcvNULL, type, &coreCount, chipIDs);
 
-        if (gpuCoreCount == 0)
+        if (coreCount == 0 && (type == gcvHARDWARE_3D2D || type == gcvHARDWARE_3D))
         {
             type = type == gcvHARDWARE_3D2D
                  ? gcvHARDWARE_3D
                  : gcvHARDWARE_3D2D
                  ;
 
-            gcoHAL_QueryCoreCount(gcvNULL, type, &gpuCoreCount, chipIDs);
+            gcoHAL_QueryCoreCount(gcvNULL, type, &coreCount, chipIDs);
 
-            gcmASSERT(gpuCoreCount);
+            gcmASSERT(coreCount);
         }
 
         gcmVERIFY_OK(gcoHAL_QueryMultiGPUAffinityConfig(type, &mode, &currentCoreIndex));
 
         if(mode == gcvMULTI_GPU_MODE_COMBINED) /*combined mode */
         {
-            attachGpuCount = gpuCoreCount;
+            attachCoreCount = coreCount;
         }
         else  /*independent mode */
         {
-            attachGpuCount = 1;
-            coreIndexs[0] = currentCoreIndex;
+            attachCoreCount = 1;
 
-            if(coreIndexs[0] >= gpuCoreCount)
+            if(currentCoreIndex >= coreCount)
             {
                 gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
             }
+
+            localCoreIndexs[0] = currentCoreIndex;
         }
+
+        gcmONERROR(gcoHAL_ConvertCoreIndexGlobal(gcPLS.hal,
+                                                 type,
+                                                 attachCoreCount,
+                                                 localCoreIndexs,
+                                                 coreIndexs));
     }
     else  /*gcvHARDWARE_2D */
     {
-        gpuCoreCount = 1;
-        attachGpuCount = 1;
+        attachCoreCount = 1;
     }
 
-
-
-    gcmONERROR(gcoHARDWARE_ConstructEx(Hal, ThreadDefault ,Robust, type, attachGpuCount, coreIndexs, Hardware));
+    gcmONERROR(gcoHARDWARE_ConstructEx(Hal, ThreadDefault, Robust, type, attachCoreCount, localCoreIndexs, coreIndexs, Hardware));
 
     return status;
 
 OnError:
     return status;
-
 }
 
 
@@ -7320,10 +7317,10 @@ gceSTATUS gcoHARDWARE_Destroy(
 #if gcdENABLE_3D
     if (Hardware->contexts)
     {
-         gcoHAL_GetCurrentCoreIndex(gcvNULL, &coreIndex);
+        gcoHAL_GetCurrentCoreIndex(gcvNULL, &coreIndex);
         _QueryCoreCount(Hardware,Hardware->config);
 
-        for (i = 0; i < Hardware->config->gpuCoreCount; i++)
+        for (i = 0; i < Hardware->config->coreCount; i++)
         {
             /* Detach the process. */
             if (Hardware->contexts[i] != 0)
@@ -7335,7 +7332,7 @@ gceSTATUS gcoHARDWARE_Destroy(
                /* FIXME: Convert core index in this gcoHARDWARE to gloabl core index.
                 * For now, they are same.
                 */
-                gcoHAL_SetCoreIndex(gcvNULL, i);
+                gcoHAL_SetCoreIndex(gcvNULL, Hardware->coreIndexs[i]);
                 coreIndexChanged = gcvTRUE;
 
                 gcmONERROR(gcoOS_DeviceControl(
@@ -7834,7 +7831,7 @@ gcoHARDWARE_LoadCtrlStateNEW_GPU0(
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
 
     /* Switch to single GPU0 mode */
-    if (Hardware->config->gpuCoreCount > 1)
+    if (Hardware->config->coreCount > 1)
     {
         { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -7907,7 +7904,7 @@ gcoHARDWARE_LoadCtrlStateNEW_GPU0(
 
 
     /* Resume to multiple GPU mode */
-    if (Hardware->config->gpuCoreCount > 1)
+    if (Hardware->config->coreCount > 1)
     {
         { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -8837,7 +8834,7 @@ _SendHWFence(
 
     if (SyncAndFlush)
     {
-        if (Hardware->config->gpuCoreCount <= 1)
+        if (Hardware->config->coreCount <= 1)
         {
             gcoHARDWARE_FlushCache(gcvNULL, (gctPOINTER *)&memory);
         }
@@ -10494,9 +10491,6 @@ gcoHARDWARE_Commit(
 #if (gcdENABLE_3D || gcdENABLE_2D)
     gctUINT i;
 #endif
-#if gcdENABLE_3D
-    gctUINT32 coreIndex;
-#endif
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if (gcdENABLE_3D || gcdENABLE_2D)
@@ -10515,11 +10509,9 @@ gcoHARDWARE_Commit(
 #if gcdENABLE_3D
     if (Hardware->deltas)
     {
-        for (i = 1; i < Hardware->config->gpuCoreCount; i++)
+        for (i = 1; i < Hardware->config->coreCount; i++)
         {
-            gcoHARDWARE_QueryCoreIndex(Hardware, i, &coreIndex);
-
-            gcoHARDWARE_CopyDelta(Hardware->deltas[coreIndex], Hardware->delta);
+            gcoHARDWARE_CopyDelta(Hardware->deltas[Hardware->localCoreIndexs[i]], Hardware->delta);
         }
     }
 #endif
@@ -10582,19 +10574,15 @@ gcoHARDWARE_Commit(
 #if gcdENABLE_3D
     if (Hardware->deltas)
     {
-        for (i = 0; i < Hardware->config->gpuCoreCount; i++)
+        for (i = 0; i < Hardware->config->coreCount; i++)
         {
-            /* Update deltas for all GPUs bound to this hardware. */
-            gcoHARDWARE_QueryCoreIndex(Hardware, i, &coreIndex);
-
-            _UpdateDelta(Hardware, coreIndex);
+            /* Update deltas for all cores bound to this hardware. */
+            _UpdateDelta(Hardware, Hardware->localCoreIndexs[i]);
         }
 
-        /* Delta list for the first GPU is updated in _UpdateDelta,
+        /* Delta list for the first core is updated in _UpdateDelta,
         *  update Hardware->delta to the current one. */
-        gcoHARDWARE_QueryCoreIndex(Hardware, 0, &coreIndex);
-
-        Hardware->delta = Hardware->deltas[coreIndex];
+        Hardware->delta = Hardware->deltas[Hardware->localCoreIndexs[0]];
     }
 #endif
 
@@ -12240,7 +12228,7 @@ static gceSTATUS _Tile420Surface(
     ** Set tiler configuration.
     */
 
-    if (Hardware->config->gpuCoreCount > 1)
+    if (Hardware->config->coreCount > 1)
     {
         /* Sync between GPUs */
         gcoHARDWARE_MultiGPUSync(Hardware, &memory);
@@ -12984,7 +12972,7 @@ static gceSTATUS _Tile420Surface(
 };
 
 
-    if (Hardware->config->gpuCoreCount > 1)
+    if (Hardware->config->coreCount > 1)
     {
         /* Enable all 3D GPUs. */
         { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -17785,7 +17773,7 @@ gcoHARDWARE_CallEvent(
 
 #if gcdIN_QUEUE_RECORD_LIMIT
     if ((Hardware->engine[engine].queue->recordCount >= gcdIN_QUEUE_RECORD_LIMIT) &&
-        ((Hardware->config->gpuCoreCount <= 1)
+        ((Hardware->config->coreCount <= 1)
 #if gcdENABLE_3D
      || !(Hardware->specialHint & gcvHINT_BIT_2)
 #endif
@@ -20226,7 +20214,7 @@ gcoHARDWARE_FlushPipe(
 
 #if gcdENABLE_3D
     if (Hardware->config->chipModel == gcv700
-        || Hardware->config->gpuCoreCount > 1
+        || Hardware->config->coreCount > 1
        )
     {
         /* Flush the L2 cache. */
@@ -23664,7 +23652,7 @@ gcoHARDWARE_FillFromTileStatus(
     }
 #endif
 
-    if (Hardware->config->gpuCoreCount == 1)
+    if (Hardware->config->coreCount == 1)
     {
         gcmONERROR(gcoHARDWARE_Semaphore(
             Hardware, gcvWHERE_RASTER, gcvWHERE_PIXEL,
@@ -23673,7 +23661,7 @@ gcoHARDWARE_FillFromTileStatus(
             ));
     }
 
-    if (Hardware->config->gpuCoreCount > 1)
+    if (Hardware->config->coreCount > 1)
     {
         gcmASSERT(!Hardware->features[gcvFEATURE_BLT_ENGINE]
                   || Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
@@ -24376,7 +24364,7 @@ gcoHARDWARE_FillFromTileStatus(
         }
     }
 
-    if (Hardware->config->gpuCoreCount > 1)
+    if (Hardware->config->coreCount > 1)
     {
         /* Enable all 3D GPUs. */
         { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -24444,7 +24432,7 @@ gcoHARDWARE_FillFromTileStatus(
         gcmONERROR(gcoHARDWARE_MultiGPUSync(Hardware, &memory));
     }
 
-    if (Hardware->config->gpuCoreCount == 1)
+    if (Hardware->config->coreCount == 1)
     {
         gcmONERROR(gcoHARDWARE_Semaphore(
             Hardware, gcvWHERE_RASTER, gcvWHERE_PIXEL,
@@ -30476,7 +30464,7 @@ gcoHARDWARE_MultiGPUSync(
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
     gcmVERIFY_ARGUMENT(Hardware->constructType != gcvHARDWARE_2D);
 
-    if (Hardware->config->gpuCoreCount <= 1)
+    if (Hardware->config->coreCount <= 1)
     {
         gcmFOOTER();
         return status;
@@ -30484,11 +30472,11 @@ gcoHARDWARE_MultiGPUSync(
 
     if (Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V3])
     {
-        gcmONERROR(_MultiGPUSyncV3(Hardware, Hardware->config->gpuCoreCount, Hardware->chipIDs, Memory));
+        gcmONERROR(_MultiGPUSyncV3(Hardware, Hardware->config->coreCount, Hardware->chipIDs, Memory));
     }
     else if (Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V2])
     {
-        gcmONERROR(_MultiGPUSyncV2(Hardware, Hardware->config->gpuCoreCount, Hardware->chipIDs, Memory));
+        gcmONERROR(_MultiGPUSyncV2(Hardware, Hardware->config->coreCount, Hardware->chipIDs, Memory));
     }
     else
     {
@@ -31165,7 +31153,7 @@ gceSTATUS gcoHARDWARE_FlushL2Cache(
 
     gcmHEADER_ARG("Hardware=0x%x", Hardware);
 
-    if (Hardware->config->gpuCoreCount > 1)
+    if (Hardware->config->coreCount > 1)
     {
         gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
 
@@ -32034,7 +32022,7 @@ gcoHARDWARE_ProgramResolve(
     /* Reserve space in the command buffer. */
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
 
-    if (Hardware->config->gpuCoreCount > 1)
+    if (Hardware->config->coreCount > 1)
     {
         gcmASSERT(!Hardware->features[gcvFEATURE_BLT_ENGINE]
                   || Hardware->features[gcvFEATURE_PE_TILE_CACHE_FLUSH_FIX]);
@@ -32511,7 +32499,7 @@ gcoHARDWARE_ProgramResolve(
                 0x05AE, memory[-1]);
     }
 
-    if (Hardware->config->gpuCoreCount > 1)
+    if (Hardware->config->coreCount > 1)
     {
         /* Enable all 3D GPUs. */
         { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -32658,16 +32646,26 @@ gcoHARDWARE_GetContext(
     OUT gctUINT32 * Context
 )
 {
-    gctUINT32 curCoreIndex;
+    gctUINT32 curCoreIndex, localCoreIndex;
     gceSTATUS status = gcvSTATUS_OK;
+    gceHARDWARE_TYPE type;
 
     gcmHEADER();
 
     gcmGETHARDWARE(Hardware);
 
+    gcmGETCURRENTHARDWARE(type);
+
     gcoHAL_GetCurrentCoreIndex(gcvNULL, &curCoreIndex);
 
-    *Context = Hardware->contexts[curCoreIndex];
+    gcmONERROR(gcoHAL_ConvertCoreIndexLocal(gcPLS.hal,
+                                            type,
+                                            1,
+                                            &curCoreIndex,
+                                            &localCoreIndex
+                                            ));
+
+    *Context = Hardware->contexts[localCoreIndex];
 
 OnError:
     gcmFOOTER();
@@ -36147,7 +36145,7 @@ gcoHARDWARE_SetMultiGPUMode(
     if (MultiGPUMode == gcvMULTI_GPU_MODE_INDEPENDENT)
     {
         /* Use one core in indepdent mode. */
-        Hardware->config->gpuCoreCount = 1;
+        Hardware->config->coreCount = 1;
     }
 
     /* Success. */

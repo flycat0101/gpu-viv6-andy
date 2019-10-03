@@ -1036,6 +1036,72 @@ OnError:
     return status;
 }
 
+gceSTATUS
+gcoHAL_ConvertCoreIndexGlobal(
+    IN gcoHAL Hal,
+    IN gceHARDWARE_TYPE Type,
+    IN gctUINT32 CoreCount,
+    IN gctUINT32 *LocalCoreIndexs,
+    OUT gctUINT32 *GlobalCoreIndexs
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT i, j = 0;
+    gctUINT local = 0;
+
+    gcmHEADER_ARG("Hal=0x%08X Type=%d, CoreCount=%d", Hal, Type, CoreCount);
+
+    gcmVERIFY_ARGUMENT(Hal != gcvNULL);
+    gcmVERIFY_ARGUMENT(CoreCount > 0);
+    gcmVERIFY_ARGUMENT(LocalCoreIndexs != gcvNULL);
+    gcmVERIFY_ARGUMENT(GlobalCoreIndexs != gcvNULL);
+
+    for (i = 0; i < CoreCount; i++)
+    {
+        for (; j < gcvCORE_COUNT; j++)
+        {
+            if (Type == Hal->hwTypes[j] && local++ == LocalCoreIndexs[i])
+            {
+                GlobalCoreIndexs[i] = Hal->coreIndexs[j++];
+                break;
+            }
+        }
+    }
+
+    Hal->globalCoreOffsets[Type] = GlobalCoreIndexs[0] - LocalCoreIndexs[0];
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoHAL_ConvertCoreIndexLocal(
+    IN gcoHAL Hal,
+    IN gceHARDWARE_TYPE Type,
+    IN gctUINT32 CoreCount,
+    IN gctUINT32 *GlobalCoreIndexs,
+    OUT gctUINT32 *LocalCoreIndexs
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT i;
+
+    gcmHEADER_ARG("Hal=0x%08X Type=%d, CoreCount=%d", Hal, Type, CoreCount);
+
+    gcmVERIFY_ARGUMENT(Hal != gcvNULL);
+    gcmVERIFY_ARGUMENT(CoreCount > 0);
+    gcmVERIFY_ARGUMENT(LocalCoreIndexs != gcvNULL);
+    gcmVERIFY_ARGUMENT(GlobalCoreIndexs != gcvNULL);
+
+    for (i = 0; i < CoreCount; i++)
+    {
+        LocalCoreIndexs[i] = GlobalCoreIndexs[i] - Hal->globalCoreOffsets[Type];
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
 
 gceSTATUS
 gcoHAL_QueryChipCount(
@@ -1133,7 +1199,7 @@ gcoHAL_QueryCoreCount(
 
     for (i = 0; i < gcdCHIP_COUNT; i++)
     {
-        if (gcPLS.hal->chipTypes[i] == Type)
+        if (gcPLS.hal->hwTypes[i] == Type)
         {
             /* Get chip ID of nth GPU of this Type. */
             ChipIDs[*Count] = gcPLS.hal->chipIDs[i];
@@ -1213,7 +1279,7 @@ _GetHardwareType(
     if (Chip >= gcdCHIP_COUNT)
         return gcvHARDWARE_INVALID;
 
-    return gcPLS.hal->chipTypes[Chip];
+    return gcPLS.hal->hwTypes[Chip];
 }
 
 gceSTATUS
@@ -1243,6 +1309,7 @@ gcoHAL_QueryChipLimits(
     case gcvHARDWARE_3D2D:
     case gcvHARDWARE_3D:
     case gcvHARDWARE_2D:
+    case gcvHARDWARE_VIP:
         gcmONERROR(gcoHARDWARE_QueryChipIdentity(
             gcvNULL, &chipModel,
             gcvNULL));
@@ -1437,7 +1504,7 @@ gcoHAL_QueryMultiGPUAffinityConfig(
 
     gcmASSERT(Mode && CoreIndex);
 
-    if (Type != gcvHARDWARE_3D && Type != gcvHARDWARE_3D2D)
+    if (Type != gcvHARDWARE_3D && Type != gcvHARDWARE_3D2D && Type != gcvHARDWARE_VIP)
     {
         mode = *Mode = gcvMULTI_GPU_MODE_COMBINED;
         *CoreIndex = 0 ;

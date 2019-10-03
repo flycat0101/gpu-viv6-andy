@@ -1646,8 +1646,9 @@ gcoCL_CreateHW(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcoHARDWARE  hardware = gcvNULL;
-    gctUINT      gpuCountPerDevice, deviceCount;
-    gctUINT32    gpuCoreIndexs[]={0, 1, 2, 3, 4, 5, 6, 7};
+    gctUINT      coreCountPerDevice, deviceCount;
+    gctUINT32    localCoreIndexs[gcdMAX_MAJOR_CORE_COUNT] = {0, 1, 2, 3, 4, 5, 6, 7};
+    gctUINT32    coreIndexs[gcdMAX_MAJOR_CORE_COUNT];
     gceMULTI_GPU_MODE  mode;
     gctUINT32 mainCoreIndex;
     gcmDECLARE_SWITCHVARS;
@@ -1655,24 +1656,31 @@ gcoCL_CreateHW(
     gcmSWITCH_TO_DEFAULT();
     gcoHAL_SetHardwareType(gcvNULL,gcvHARDWARE_3D);
 
-    gcmONERROR(gcoCL_QueryDeviceCount(&deviceCount, &gpuCountPerDevice));
+    gcmONERROR(gcoCL_QueryDeviceCount(&deviceCount, &coreCountPerDevice));
 
-     if(deviceCount == 1 && gpuCountPerDevice == 1) /*Special deal with independent mode*/
+    if (deviceCount == 1 && coreCountPerDevice == 1) /*Special deal with independent mode*/
     {
          gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_3D, &mode, &mainCoreIndex);
 
-         gpuCoreIndexs[0] = mainCoreIndex;
+         localCoreIndexs[0] = mainCoreIndex;
     }
 
-    gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, gpuCoreIndexs[DeviceId * gpuCountPerDevice]));
+    gcmONERROR(gcoHAL_ConvertCoreIndexGlobal(gcPLS.hal,
+                                             gcvHARDWARE_3D,
+                                             coreCountPerDevice,
+                                             &localCoreIndexs[DeviceId * coreCountPerDevice],
+                                             coreIndexs));
 
+
+    gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndexs[0]));
 
     gcmONERROR(gcoHARDWARE_ConstructEx(gcPLS.hal,
                                        gcvFALSE,
                                        gcvFALSE,
                                        gcvHARDWARE_3D,
-                                       gpuCountPerDevice,
-                                       &gpuCoreIndexs[DeviceId * gpuCountPerDevice],
+                                       coreCountPerDevice,
+                                       &localCoreIndexs[DeviceId * coreCountPerDevice],
+                                       coreIndexs,
                                        &hardware));
 
     if (gcoHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_MCFE))

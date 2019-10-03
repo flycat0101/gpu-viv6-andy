@@ -5088,7 +5088,7 @@ gcoHARDWARE_QueryCommandBuffer(
         {
             gcmGETHARDWARE(Hardware);
 
-            if (Hardware->config->gpuCoreCount == 1)
+            if (Hardware->config->coreCount == 1)
             {
                 /* Reserve space for Link(). */
                 *ReservedTail = 8;
@@ -5096,7 +5096,7 @@ gcoHARDWARE_QueryCommandBuffer(
             else
             {
                 /* Reserve space for ChipEnable, Link for each core. */
-                *ReservedTail = (8 + 8) * Hardware->config->gpuCoreCount;
+                *ReservedTail = (8 + 8) * Hardware->config->coreCount;
             }
 
             if (Hardware->features[gcvFEATURE_FENCE_64BIT])
@@ -5116,7 +5116,7 @@ gcoHARDWARE_QueryCommandBuffer(
         }
     }
 
-    mGpuModeSwitchBytes = Hardware->config->gpuCoreCount > 1 ?
+    mGpuModeSwitchBytes = Hardware->config->coreCount > 1 ?
                           4 * gcmSIZEOF(gctUINT32) : 0;
 
     if (ReservedUser != gcvNULL)
@@ -5139,7 +5139,7 @@ gcoHARDWARE_QueryCommandBuffer(
         }
         else
         {
-            if (Hardware->config->gpuCoreCount > 1)
+            if (Hardware->config->coreCount > 1)
             {
                 gcoHARDWARE_QueryMultiGPUSyncLength(Hardware, &mGpuSyncBytes);
                 *ReservedUser += mGpuSyncBytes;
@@ -5147,7 +5147,7 @@ gcoHARDWARE_QueryCommandBuffer(
 
             if (!gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_COMPUTE_ONLY))
             {
-                if (Hardware->config->gpuCoreCount > 1)
+                if (Hardware->config->coreCount > 1)
                 {
                     gcoHARDWARE_QueryMultiGPUCacheFlushLength(Hardware, &gpuFlushBytes);
                 }
@@ -5179,9 +5179,9 @@ gcoHARDWARE_QueryCommandBuffer(
                     (profileVXmode != gcvNULL && gcoOS_StrCmp(profileVXmode, "0") == gcvSTATUS_LARGER) ||
                     (profileCLmode != gcvNULL && gcoOS_StrCmp(profileCLmode, "0") == gcvSTATUS_LARGER)))
                 {
-                    if (Hardware->config->gpuCoreCount > 1)
+                    if (Hardware->config->coreCount > 1)
                     {
-                        *ReservedUser += (Hardware->config->gpuCoreCount * (2 * gcmSIZEOF(gctUINT32) + gcdRESERVED_PAUSE_PROBE_LENGTH)
+                        *ReservedUser += (Hardware->config->coreCount * (2 * gcmSIZEOF(gctUINT32) + gcdRESERVED_PAUSE_PROBE_LENGTH)
                                          + 2 * gcmSIZEOF(gctUINT32));
                     }
                     else
@@ -7113,7 +7113,7 @@ gcoHARDWARE_Query3DCoreCount(
 
     gcmGETHARDWARE(Hardware);
 
-    *Count = Hardware->config->gpuCoreCount;
+    *Count = Hardware->config->coreCount;
 
 OnError:
     gcmFOOTER();
@@ -7300,7 +7300,7 @@ gcoHARDWARE_QueryMultiGPUSyncLength(
 
     gcmGETHARDWARE(Hardware);
 
-    coreCount = Hardware->config->gpuCoreCount;
+    coreCount = Hardware->config->coreCount;
     if (Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V3])
     {
         *Bytes =  (4 + (coreCount - 2) * 8 + 4 * 2 ) * gcmSIZEOF(gctUINT32);
@@ -7349,7 +7349,7 @@ gcoHARDWARE_QueryMultiGPUCacheFlushLength(
 
     gcmGETHARDWARE(Hardware);
 
-    gcmASSERT(Hardware->config->gpuCoreCount > 1);
+    gcmASSERT(Hardware->config->coreCount > 1);
 
     *Bytes = ((4 + 4) /* two pair of semaphore-stall */
            +  (2 + 2) /* flush c/z/shL$ and flush vst */
