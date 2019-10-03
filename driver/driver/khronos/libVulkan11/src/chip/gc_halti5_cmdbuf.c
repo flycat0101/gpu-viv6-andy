@@ -9745,6 +9745,7 @@ VkResult halti5_bindDescriptors(
      const VkImageMemoryBarrier* pImageMemoryBarriers
      )
  {
+     uint32_t *pCmdBuffer, *pCmdBufferBegin;
      __vkDevContext *devCtx = ((__vkCommandBuffer *)commandBuffer)->devCtx;
      halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
      uint32_t i;
@@ -9977,7 +9978,12 @@ VkResult halti5_bindDescriptors(
                 requestSize += 2;
             }
         }
-        if (devCtx->database->MultiCoreSemaphoreStallV2)
+
+        if (devCtx->database->MULTICORE_SEMAPHORESTALL_V3)
+        {
+            requestSize += 1;
+        }
+        else if (devCtx->database->MultiCoreSemaphoreStallV2)
         {
             requestSize += devCtx->chipInfo->gpuCoreCount * 10 - 2;
         }
@@ -10001,22 +10007,23 @@ VkResult halti5_bindDescriptors(
 
     if (requestSize)
     {
-        __vk_CmdAquireBuffer(commandBuffer, requestSize, &states);
+        uint32_t cmd[4096] = { 0 };
+        pCmdBuffer = pCmdBufferBegin = cmd;
 
         if (hwFlushState != 0)
         {
-            __vkCmdLoadSingleHWState(&states, 0x0E03, VK_FALSE, hwFlushState);
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E03, VK_FALSE, hwFlushState);
         }
 
         if (hwFlushVST != 0)
         {
-            __vkCmdLoadSingleHWState(&states, 0x0E03, VK_FALSE, hwFlushVST);
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E03, VK_FALSE, hwFlushVST);
         }
 
         /* Sync between GPUs */
         if (multiGpuSync)
         {
-            halti5_setMultiGpuSync((VkDevice)devCtx, &states, VK_NULL_HANDLE);
+            halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
         }
         else if (stallFE || stallRA)
         {
@@ -10124,7 +10131,7 @@ VkResult halti5_bindDescriptors(
 
             if (needLockBlt)
             {
-                __vkCmdLoadSingleHWState(&states, 0x502E, VK_FALSE,
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x502E, VK_FALSE,
                     ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
@@ -10138,7 +10145,7 @@ VkResult halti5_bindDescriptors(
 
                 if (devCtx->database->MULTI_CLUSTER)
                 {
-                    __vkCmdLoadSingleHWState(&states, 0x50CE, VK_FALSE,
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE,
                         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:0) - (0 ?
  7:0) + 1) == 32) ?
@@ -10153,11 +10160,11 @@ VkResult halti5_bindDescriptors(
                 }
             }
 
-            __vkCmdLoadSingleHWState(&states, 0x0E02, VK_FALSE, stallDestination);
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E02, VK_FALSE, stallDestination);
 
             if (stallFE)
             {
-                *(*&states)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10166,18 +10173,18 @@ VkResult halti5_bindDescriptors(
  31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));*(*&states)++ = (stallDestination);
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));*(*&pCmdBuffer)++ = (stallDestination);
 ;
 
             }
             else
             {
-                __VK_STALL_RA(&states, stallDestination);
+                __VK_STALL_RA(&pCmdBuffer, stallDestination);
             }
 
             if (needLockBlt)
             {
-                __vkCmdLoadSingleHWState(&states, 0x502E, VK_FALSE,
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x502E, VK_FALSE,
                     ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
@@ -10191,6 +10198,11 @@ VkResult halti5_bindDescriptors(
             }
         }
 
+        requestSize = (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+        __VK_ASSERT(requestSize <= 4096);
+
+        __vk_CmdAquireBuffer(commandBuffer, requestSize, &states);
+        __VK_MEMCOPY(states, cmd, requestSize * sizeof(uint32_t));
         __vk_CmdReleaseBuffer(commandBuffer, requestSize);
     }
 
@@ -10259,7 +10271,11 @@ VkResult halti5_bindDescriptors(
                 }
             }
 
-            if (devCtx->database->MultiCoreSemaphoreStallV2)
+            if (devCtx->database->MULTICORE_SEMAPHORESTALL_V3)
+            {
+                requestSize += 1;
+            }
+            else if (devCtx->database->MultiCoreSemaphoreStallV2)
             {
                 requestSize += devCtx->chipInfo->gpuCoreCount * 10 - 2;
             }
@@ -10283,17 +10299,18 @@ VkResult halti5_bindDescriptors(
 
         if (requestSize)
         {
-            __vk_CmdAquireBuffer(commandBuffer, requestSize, &states);
+            uint32_t cmd[4096] = { 0 };
+            pCmdBuffer = pCmdBufferBegin = cmd;
 
             if (hwFlushState != 0)
             {
-                __vkCmdLoadSingleHWState(&states, 0x0E03, VK_FALSE, hwFlushState);
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E03, VK_FALSE, hwFlushState);
             }
 
             /* Sync between GPUs */
             if (multiGpuSync)
             {
-                halti5_setMultiGpuSync((VkDevice)devCtx, &states, VK_NULL_HANDLE);
+                halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
             }
             else if (stallFE )
             {
@@ -10401,7 +10418,7 @@ VkResult halti5_bindDescriptors(
 
                 if (needLockBlt)
                 {
-                    __vkCmdLoadSingleHWState(&states, 0x502E, VK_FALSE,
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x502E, VK_FALSE,
                         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
@@ -10415,7 +10432,7 @@ VkResult halti5_bindDescriptors(
 
                     if (devCtx->database->MULTI_CLUSTER)
                     {
-                        __vkCmdLoadSingleHWState(&states, 0x50CE, VK_FALSE,
+                        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x50CE, VK_FALSE,
                             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:0) - (0 ?
  7:0) + 1) == 32) ?
@@ -10430,11 +10447,11 @@ VkResult halti5_bindDescriptors(
                     }
                 }
 
-                __vkCmdLoadSingleHWState(&states, 0x0E02, VK_FALSE, stallDestination);
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E02, VK_FALSE, stallDestination);
 
                 if (stallFE)
                 {
-                    *(*&states)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10443,18 +10460,18 @@ VkResult halti5_bindDescriptors(
  31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));*(*&states)++ = (stallDestination);
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));*(*&pCmdBuffer)++ = (stallDestination);
 ;
 
                 }
                 else
                 {
-                    __VK_STALL_RA(&states, stallDestination);
+                    __VK_STALL_RA(&pCmdBuffer, stallDestination);
                 }
 
                 if (needLockBlt)
                 {
-                    __vkCmdLoadSingleHWState(&states, 0x502E, VK_FALSE,
+                    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x502E, VK_FALSE,
                         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
@@ -10468,6 +10485,11 @@ VkResult halti5_bindDescriptors(
                 }
             }
 
+            requestSize = (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+            __VK_ASSERT(requestSize <= 4096);
+
+            __vk_CmdAquireBuffer(commandBuffer, requestSize, &states);
+            __VK_MEMCOPY(states, cmd, requestSize * sizeof(uint32_t));
             __vk_CmdReleaseBuffer(commandBuffer, requestSize);
         }
     }
