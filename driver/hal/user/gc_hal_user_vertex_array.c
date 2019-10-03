@@ -1899,7 +1899,14 @@ gceSTATUS gcoVERTEXARRAY_MergeClientStreams(IN gcsVERTEXARRAY_BUFOBJ_PTR Streams
                     if (first->divisor == streamPtr->divisor)
                     {
                         /* Merge streams */
-                        lastAttr->next = streamPtr->attributePtr;
+                        if (lastAttr != gcvNULL)
+                        {
+                            lastAttr->next = streamPtr->attributePtr;
+                        }
+                        else
+                        {
+                            lastAttr = streamPtr->attributePtr;
+                        }
 
                         /* Update last attribute */
                         while ((lastAttr != gcvNULL) && (lastAttr->next != gcvNULL))
