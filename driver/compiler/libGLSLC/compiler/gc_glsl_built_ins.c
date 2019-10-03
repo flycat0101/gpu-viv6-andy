@@ -3726,6 +3726,7 @@ _GenTextureCode(
     case slvTYPE_SAMPLERCUBESHADOW:
     case slvTYPE_SAMPLERCUBEARRAYSHADOW:
     case slvTYPE_SAMPLER1DSHADOW:
+    case slvTYPE_SAMPLER2DRECTSHADOW:
         genCode = _GenTextureShadowCode;
         break;
 
@@ -3890,6 +3891,7 @@ _GenTextureProjCode(
         break;
 
     case slvTYPE_SAMPLER2DSHADOW:
+    case slvTYPE_SAMPLER2DRECTSHADOW:
         genCode = _GenTextureShadowProjCode;
         break;
 
@@ -3990,6 +3992,7 @@ _GetSamplerCoordComponentCount(
     case slvTYPE_SAMPLER2D:
     case slvTYPE_SAMPLERCUBE:
     case slvTYPE_SAMPLER2DSHADOW:
+    case slvTYPE_SAMPLER2DRECTSHADOW:
     case slvTYPE_SAMPLER2DARRAY:
     case slvTYPE_SAMPLER2DARRAYSHADOW:
     case slvTYPE_SAMPLERCUBESHADOW:
