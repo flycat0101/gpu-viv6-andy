@@ -3716,6 +3716,7 @@ vxnne_shader_executable vxnneGetEmbeddingLUTShaderExecutable(
 
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
     vx_reference  parameters[3]              = {(vx_reference)input, (vx_reference)value, (vx_reference)output};
+    vx_enum       inputFormat                = TENSOR_DATA_TYPE(input);
     vx_enum       valueFormat                = TENSOR_DATA_TYPE(value);
     vx_enum       outputFormat               = TENSOR_DATA_TYPE(output);
     vx_float32    input_scale                = TENSOR_TF_SCALE(value);
@@ -3733,11 +3734,14 @@ vxnne_shader_executable vxnneGetEmbeddingLUTShaderExecutable(
     vx_uint32     vw                         = TENSOR_VIEW_SIZE_INDEX(value, 0);
     vx_uint32     oDims                      = TENSOR_DIM_NUM(output);
     vx_uint32     ow                         = TENSOR_VIEW_SIZE_INDEX(output, 0);
+    vx_uint32     oh                         = TENSOR_VIEW_SIZE_INDEX(output, 1);
+    vx_uint32     oc                         = oDims < 3 ? 1 : TENSOR_VIEW_SIZE_INDEX(output, 2);
     vx_tensor     input_rs                   = NULL;
     vx_tensor     value_rs                   = NULL;
     vx_tensor     output_rs                  = NULL;
     vx_int32      rs_sizes[4]                = {1, 1, 1, 1};
     vx_bool       isSameFlg                  = vx_false_e;
+    vx_uint32     outWidth                   = vw * vh;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -3777,9 +3781,27 @@ vxnne_shader_executable vxnneGetEmbeddingLUTShaderExecutable(
         parameters[1] = (vx_reference)value_rs;
     }
 
+    if (vDims == 3)
+    {
+        outWidth = vw * vh;
+        rs_sizes[0] = outWidth;
+        rs_sizes[1] = vc;
+        value_rs = vxoTensor_ReshapeTensor(value, rs_sizes, 2);
+        parameters[1] = (vx_reference)value_rs;
+    }
+
     if (oDims == 1)
     {
         rs_sizes[0] = ow;
+        rs_sizes[1] = 1;
+        output_rs = vxoTensor_ReshapeTensor(output, rs_sizes, 2);
+        parameters[2] = (vx_reference)output_rs;
+    }
+
+    if (oDims == 3)
+    {
+        rs_sizes[0] = ow;
+        rs_sizes[1] = oh * oc;
         output_rs = vxoTensor_ReshapeTensor(output, rs_sizes, 2);
         parameters[2] = (vx_reference)output_rs;
     }
@@ -3794,9 +3816,9 @@ vxnne_shader_executable vxnneGetEmbeddingLUTShaderExecutable(
         || (valueFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16))
         execution_parameters.globalWorkScale[0]  = 8;
 
-    execution_parameters.globalWorkSize[0]   = gcmALIGN((vw  + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
-    execution_parameters.globalWorkSize[1]   = (vh + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
-    execution_parameters.globalWorkSize[2]   = (input_count + execution_parameters.globalWorkScale[2] - 1) / execution_parameters.globalWorkScale[2];
+    execution_parameters.globalWorkSize[0]   = gcmALIGN((outWidth  + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
+    execution_parameters.globalWorkSize[1]   = (input_count + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
+    execution_parameters.globalWorkSize[2]   = 1;
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
 
@@ -3883,6 +3905,16 @@ vxnne_shader_executable vxnneGetEmbeddingLUTShaderExecutable(
             0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
         };
 
+        vx_uint32 UniFP16toFP32Lo4_dp4x4[16] = {
+            0x01010101, // TCfg
+            0x00000000, // ASelt
+            0x00010000, 0x00030002, // ABin
+            0x02020202, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000 // Constant
+        };
+
         if ((valueFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
             && isSameFlg)
         {
@@ -3907,8 +3939,19 @@ vxnne_shader_executable vxnneGetEmbeddingLUTShaderExecutable(
         }
         else if (valueFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_fp16", borderMode);
-            if (!shaderExecutable) goto OnError;
+            if(inputFormat == VX_TYPE_FLOAT16)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_fp16fp16", borderMode);
+                if (!shaderExecutable) goto OnError;
+
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "UniFP16toFP32Lo4_dp4x4", 1, UniFP16toFP32Lo4_dp4x4);
+                if (status != VX_SUCCESS) goto OnError;
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_fp16", borderMode);
+                if (!shaderExecutable) goto OnError;
+            }
         }
         else
         {
