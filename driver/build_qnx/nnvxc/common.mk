@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="OpenVX nnvxc libraries"
 endef
 
-NAME=libnnvxc
+NAME=libNNVXCBinary
 
 
 include $(qnx_build_dir)/common.mk
