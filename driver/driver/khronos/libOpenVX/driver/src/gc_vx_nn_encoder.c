@@ -11292,14 +11292,14 @@ void calcTPKernelBufferSizeHuffman(
                 /*Hit the end bitsteam of core, add dummy stage process the next*/
                 kernelBitSize += 3;
                 kernelBitSize += 2;
-                kernelBitSize += 7;
+                kernelBitSize += 8;
 
                 if (wb->huffmanConfig[index].bit16Flag)
                     kernelBitSize += 8;
 
                 for (j = 0; j < 2*THROUGHPUT; j++)
                 {
-                    kernelBitSize += 3;
+                    kernelBitSize += 8;
                 }
                 break;
             }
