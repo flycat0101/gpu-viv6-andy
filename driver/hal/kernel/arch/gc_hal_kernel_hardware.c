@@ -1765,8 +1765,6 @@ _SetHardwareOptions(
     gctBOOL featureTS = gckHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_TESSELLATION) ? gcvTRUE : gcvFALSE;
     gctUINT32 featureL1CacheSize = database->L1CacheSize;
     gctUINT32 featureUSCMaxPages = database->USC_MAX_PAGES;
-    gctBOOL featureGS = gckHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_GEOMETRY_SHADER) ? gcvTRUE : gcvFALSE;
-    gctBOOL featureUSCFullCacheFix = gckHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_USC_FULLCACHE_FIX) ? gcvTRUE : gcvFALSE;
 
 
     status = gckOS_QueryOption(Hardware->os, "powerManagement", &data);
@@ -1797,36 +1795,9 @@ _SetHardwareOptions(
         options->enableMMU = gcvFALSE;
     }
 
-    {    Hardware->options.uscAttribCacheRatio = 0x2;
-       if (featureUSC)    {        if (featureSeparateLS)        {            Hardware->options.uscL1CacheRatio = 0x0;
-        }        else        {            gctUINT L1cacheSize;
-                       if (featureComputeOnly)            {                L1cacheSize = featureL1CacheSize;
-            }            else            {                gctUINT attribBufSizeInKB;
-                if (featureTS)                {                    gcmkASSERT(featureGS);
-                    featureGS = featureGS;
-                    attribBufSizeInKB = 42;
-                }                else                {                    gcmkASSERT(!featureGS);
-                    attribBufSizeInKB = 8;
-                }                if (attribBufSizeInKB < featureUSCMaxPages)                {                    L1cacheSize = featureUSCMaxPages - attribBufSizeInKB;
-                }                else                {                    attribBufSizeInKB -= 2;
-                    L1cacheSize = 2;
-                }            }            gcmkASSERT(L1cacheSize);
-            if (L1cacheSize >= featureL1CacheSize)            {                Hardware->options.uscL1CacheRatio = 0x0;
-                gcmkASSERT(featureUSCFullCacheFix);
-                featureUSCFullCacheFix = featureUSCFullCacheFix;
-            }            else            {                static const gctINT s_uscCacheRatio[] =                {                    100000,                    50000,                    25000,                    12500,                    62500,                    3125,                    75000,                    0,                };
-                gctINT maxL1cacheSize = L1cacheSize * 100000;
-                gctINT delta = 2147483647;
-                gctINT i = 0;
-                gctINT curIndex = -1;
-                for (;
- i < gcmCOUNTOF(s_uscCacheRatio);
- ++i)                {                    gctINT curL1cacheSize = featureL1CacheSize * s_uscCacheRatio[i];
-                                     if ((maxL1cacheSize >= curL1cacheSize) &&                        ((maxL1cacheSize - curL1cacheSize) < delta))                    {                        curIndex = i;
-                        delta = maxL1cacheSize - curL1cacheSize;
-                    }                }                gcmkASSERT(-1 != curIndex);
-                Hardware->options.uscL1CacheRatio = curIndex;
-            }        }    }};
+    gcmCONFIGUSC2(gcmk, featureUSC, featureSeparateLS, featureComputeOnly, featureTS,
+                 featureL1CacheSize, featureUSCMaxPages,
+                 Hardware->options.uscAttribCacheRatio, Hardware->options.uscL1CacheRatio);
 
     status = gckOS_QueryOption(Hardware->os, "smallBatch", &data);
     options->smallBatch = (data != 0);

@@ -2857,7 +2857,7 @@ _InitializeContextBuffer(
 #if gcdENABLE_3D
     gctBOOL halti0, halti1, halti2, halti3, halti4, halti5;
     gctUINT i;
-    gctUINT vertexUniforms, fragmentUniforms, vsConstBase, psConstBase, constMax;
+    gctUINT vertexUniforms, fragmentUniforms;
     gctBOOL unifiedUniform;
     gctBOOL hasGS, hasTS;
     gctBOOL genericAttrib;
@@ -2955,39 +2955,14 @@ _InitializeContextBuffer(
     }
 
     /* Query how many uniforms can support. */
-    {if (Context->hardware->identity.numConstants > 256){    unifiedUniform = gcvTRUE;
-if (smallBatch){    vsConstBase  = 0xD000;
-    psConstBase  = 0xD000;
-}else if (halti5){    vsConstBase  = 0xD000;
-    psConstBase  = 0xD800;
-}else{    vsConstBase  = 0xC000;
-    psConstBase  = 0xC000;
-}if ((Context->hardware->identity.chipModel == gcv880) && ((Context->hardware->identity.chipRevision & 0xfff0) == 0x5120)){    vertexUniforms   = 512;
-    fragmentUniforms   = 64;
-    constMax     = 576;
-}else{    vertexUniforms   = gcmMIN(512, Context->hardware->identity.numConstants - 64);
-    fragmentUniforms   = gcmMIN(512, Context->hardware->identity.numConstants - 64);
-    constMax     = Context->hardware->identity.numConstants;
-}}else if (Context->hardware->identity.numConstants == 256){    if (Context->hardware->identity.chipModel == gcv2000 && (Context->hardware->identity.chipRevision == 0x5118 || Context->hardware->identity.chipRevision == 0x5140))    {        unifiedUniform = gcvFALSE;
-        vsConstBase  = 0x1400;
-        psConstBase  = 0x1C00;
-        vertexUniforms   = 256;
-        fragmentUniforms   = 64;
-        constMax     = 320;
-    }    else    {        unifiedUniform = gcvFALSE;
-        vsConstBase  = 0x1400;
-        psConstBase  = 0x1C00;
-        vertexUniforms   = 256;
-        fragmentUniforms   = 256;
-        constMax     = 512;
-    }}else{    unifiedUniform = gcvFALSE;
-    vsConstBase  = 0x1400;
-    psConstBase  = 0x1C00;
-    vertexUniforms   = 168;
-    fragmentUniforms   = 64;
-    constMax     = 232;
-}};
-
+    gcmCONFIGUREUNIFORMS2(Context->hardware->identity.chipModel,
+                         Context->hardware->identity.chipRevision,
+                         halti5,
+                         smallBatch,
+                         Context->hardware->identity.numConstants,
+                         unifiedUniform,
+                         vertexUniforms,
+                         fragmentUniforms);
 
 #if !gcdENABLE_UNIFIED_CONSTANT
     if (Context->hardware->identity.numConstants > 256)
@@ -4145,12 +4120,6 @@ if (smallBatch){    vsConstBase  = 0xD000;
     /* Save size for buffer. **************************************************/
 
     Context->totalSize = index * gcmSIZEOF(gctUINT32);
-
-#if gcdENABLE_3D
-    psConstBase = psConstBase;
-    vsConstBase = vsConstBase;
-    constMax = constMax;
-#endif
 
     /* Success. */
     gcmkFOOTER_NO();
