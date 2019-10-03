@@ -2085,12 +2085,26 @@ gcoHARDWARE_BindIndex(
     {
     case gcvINDEX_8:
         Hardware->FEStates->indexFormat = 0x0;
-        Hardware->FEStates->restartElement = 0xFF;
+        if(Hardware->currentApi == gcvAPI_OPENGL)
+        {
+            Hardware->FEStates->restartElement = RestartElement;
+        }
+        else
+        {
+            Hardware->FEStates->restartElement = RestartElement & 0xFF;
+        }
         break;
 
     case gcvINDEX_16:
         Hardware->FEStates->indexFormat = 0x1;
-        Hardware->FEStates->restartElement = 0xFFFF;
+        if(Hardware->currentApi == gcvAPI_OPENGL)
+        {
+            Hardware->FEStates->restartElement = RestartElement;
+        }
+        else
+        {
+            Hardware->FEStates->restartElement = RestartElement & 0xFFFF;
+        }
 
         if (Hardware->bigEndian)
         {
@@ -2102,7 +2116,14 @@ gcoHARDWARE_BindIndex(
         if (Hardware->features[gcvFEATURE_FE20_BIT_INDEX])
         {
             Hardware->FEStates->indexFormat = 0x2;
-            Hardware->FEStates->restartElement = 0xFFFFFFFF;
+            if(Hardware->currentApi == gcvAPI_OPENGL)
+            {
+                Hardware->FEStates->restartElement = RestartElement;
+            }
+            else
+            {
+                Hardware->FEStates->restartElement = RestartElement & 0xFFFFFFFF;
+            }
 
             if (Hardware->bigEndian)
             {
@@ -22807,15 +22828,15 @@ gcoHARDWARE_SetXfbCmd(
 
     case gcvXFBCMD_RESUME:
         gcmASSERT(Memory == gcvNULL);
-        if (Hardware->XFBStates->status == gcvXFB_Paused)
+        /*
+        ** Core level check can ensure current status is paused.
+        ** For multi TFB objects, if the previous object is ended, the next object may still be paused.
+        ** So setting following status and command forcibly.
+        */
         {
+            Hardware->XFBStates->status = gcvXFB_Paused;
+            Hardware->XFBStates->statusInCmd = gcvXFB_Paused;
             Hardware->XFBStates->cmd = gcvXFBCMD_RESUME;
-        }
-        else
-        {
-            gcmASSERT(Hardware->XFBStates->status == gcvXFB_Disabled);
-            gcmASSERT(Hardware->XFBStates->statusInCmd == gcvXFB_Disabled);
-            Hardware->XFBStates->cmd = gcvXFBCMD_BEGIN;
         }
 
         Hardware->XFBDirty->s.cmdDirty = gcvTRUE;
