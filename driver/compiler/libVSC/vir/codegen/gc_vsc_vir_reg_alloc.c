@@ -7857,6 +7857,9 @@ _VIR_RA_LS_InsertSpill(
                                 VIR_Operand_GetTypeId(pOpnd));
     if(retErrCode != VSC_ERR_NONE) return retErrCode;
 
+    /* HW can't support FP16 directly, it converts FP16 to FP32, so we need to use UINT16. */
+    VIR_Operand_SetTypeId(newInst->dest, VIR_TypeId_ConvertFP16Type(pShader, VIR_Operand_GetTypeId(pOpnd)));
+
     for (i = 0 ; i < VIR_RA_LS_DATA_REG_NUM; i++)
     {
         if (!pRA->dataRegisterUsed[i])
@@ -7972,6 +7975,9 @@ _VIR_RA_LS_InsertSpillForDest(
                                 VIR_Operand_GetSymbolId_(pOpnd),
                                 VIR_Operand_GetTypeId(pOpnd));
     if(retErrCode != VSC_ERR_NONE) return retErrCode;
+
+    /* HW can't support FP16 directly, it converts FP16 to FP32, so we need to use UINT16. */
+    VIR_Operand_SetTypeId(newInst->dest, VIR_TypeId_ConvertFP16Type(pShader, VIR_Operand_GetTypeId(pOpnd)));
 
     for (i = 0 ; i < VIR_RA_LS_DATA_REG_NUM; i++)
     {
@@ -8251,6 +8257,9 @@ _VIR_RA_LS_InsertFill(
     newOpnd =  VIR_Inst_GetSource(newInst, VIR_Operand_Src2);
     VIR_Operand_Copy(newOpnd, pOpnd);
     VIR_Operand_Change2Src(newOpnd);
+
+    /* HW can't support FP16 directly, it converts FP16 to FP32, so we need to use UINT16. */
+    VIR_Operand_SetTypeId(newOpnd, VIR_TypeId_ConvertFP16Type(pShader, VIR_Operand_GetTypeId(newOpnd)));
 
     /*
     ** Since we use the symbol's type to compute the offset and use the SRC2's type as the InstType,
@@ -8693,6 +8702,10 @@ _VIR_RA_LS_InsertSpill_LDARR(
                                 symId,
                                 VIR_Operand_GetTypeId(pOpnd));
     if(retErrCode != VSC_ERR_NONE) return retErrCode;
+
+    /* HW can't support FP16 directly, it converts FP16 to FP32, so we need to use UINT16. */
+    VIR_Operand_SetTypeId(newInst->dest, VIR_TypeId_ConvertFP16Type(pShader, VIR_Operand_GetTypeId(pOpnd)));
+
     /* destination is always dataRegister[0] */
     _VIR_RA_MakeColor(pRA->dataRegister[0], 0, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->dest, curColor);
@@ -8807,6 +8820,9 @@ _VIR_RA_LS_InsertFill_STARR(
                                 pInst->src[VIR_Operand_Src1],
                                 newInst,
                                 newOpnd);
+
+    /* HW can't support FP16 directly, it converts FP16 to FP32, so we need to use UINT16. */
+    VIR_Operand_SetTypeId(newOpnd, VIR_TypeId_ConvertFP16Type(pShader, VIR_Operand_GetTypeId(newOpnd)));
 
     VIR_Operand_GetOperandInfo(newInst, newOpnd, &operandInfo);
 
