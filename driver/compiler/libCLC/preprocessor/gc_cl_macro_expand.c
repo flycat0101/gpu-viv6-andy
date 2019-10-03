@@ -857,11 +857,13 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList_MergePastingTokenName(
     newSize = gcoOS_StrLen(InHead->poolString, gcvNULL);
     gcmONERROR(gcoOS_StrCatSafe(newString,256,InHead->poolString));
 
-    newSize += gcoOS_StrLen(tmprplst->poolString, gcvNULL);
-    if(newSize + 1 > 256)
-        return gcvSTATUS_TOO_COMPLEX;
-
-    gcmONERROR(gcoOS_StrCatSafe(newString,256,tmprplst->poolString));
+    if (tmprplst)
+    {
+        newSize += gcoOS_StrLen(tmprplst->poolString, gcvNULL);
+        if(newSize + 1 > 256)
+            return gcvSTATUS_TOO_COMPLEX;
+        gcmONERROR(gcoOS_StrCatSafe(newString,256,tmprplst->poolString));
+    }
 
     status = cloCOMPILER_AllocatePoolString(PP->compiler,
         newString,
