@@ -3195,6 +3195,16 @@ gckOS_FreePagedMemory(
             gcmkONERROR(gcvSTATUS_GENERIC_IO);
         }
     }
+    else if (node->type == gcvPHYSICAL_TYPE_MEMPOOL)
+    {
+        rc = drv_mempool_free(node->kernelLogical);
+        if (rc == -1)
+        {
+            gcmkPRINT("[VIV]: %s:%d: mem pool free failed.\n", __FUNCTION__, __LINE__);
+
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+    }
     else if (node->type != gcvPHYSICAL_TYPE_WRAPPED_MEMORY)
     {
         gcmkPRINT("[VIV]: %s:%d: invalid type: %d.\n", __FUNCTION__, __LINE__, node->type);
