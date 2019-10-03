@@ -1090,7 +1090,7 @@ static void __vki_InitializePhysicalDevicePorperties(
     phyDev->phyDevProp.limits.maxClipDistances                                = 0;
     phyDev->phyDevProp.limits.maxCullDistances                                = 0;
     phyDev->phyDevProp.limits.maxCombinedClipAndCullDistances                 = 0;
-    phyDev->phyDevProp.limits.discreteQueuePriorities                         = 1;
+    phyDev->phyDevProp.limits.discreteQueuePriorities                         = 2;
     phyDev->phyDevProp.limits.pointSizeGranularity                            = 0.125f;
     phyDev->phyDevProp.limits.pointSizeRange[0]                               = 1.0f;
     phyDev->phyDevProp.limits.pointSizeRange[1]                               = 64.0f;
