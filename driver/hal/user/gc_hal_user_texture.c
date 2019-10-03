@@ -347,7 +347,7 @@ static gceSTATUS _uploadBlitBlt(
         /* set the usage.*/
         rlvArgs.uArgs.v2.bUploadTex = gcvTRUE;
 
-        gcmERR_BREAK(gcoHARDWARE_3DBlitBlt(gcvNULL, &srcView, &dstView, &rlvArgs));
+        gcmERR_BREAK(gcoHARDWARE_3DBlitBlt(gcvNULL, &srcView, &dstView, &rlvArgs, gcvFALSE));
     } while (gcvFALSE);
 
     if (srcSurf)

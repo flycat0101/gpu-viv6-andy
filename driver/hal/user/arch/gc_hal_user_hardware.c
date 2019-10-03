@@ -15811,7 +15811,7 @@ gcoHARDWARE_ResolveRect(
         gcmONERROR(gcoHARDWARE_AdjustCacheMode(Hardware, srcSurf));
 
         Args->uArgs.v2.engine = gcvENGINE_RENDER;
-        if (gcvSTATUS_OK == gcoHARDWARE_3DBlitBlt(Hardware, SrcView, DstView, Args))
+        if (gcvSTATUS_OK == gcoHARDWARE_3DBlitBlt(Hardware, SrcView, DstView, Args, gcvFALSE))
         {
             gcmFOOTER_NO();
             return gcvSTATUS_OK;
@@ -16632,7 +16632,7 @@ gcoHARDWARE_PreserveRects(
             rlvArgs.uArgs.v2.rectSize.y  = Rects[i].bottom - Rects[i].top;
 
             /* Go through all rectangles. */
-            gcmONERROR(gcoHARDWARE_3DBlitBlt(Hardware, SrcView, DstView, &rlvArgs));
+            gcmONERROR(gcoHARDWARE_3DBlitBlt(Hardware, SrcView, DstView, &rlvArgs, gcvFALSE));
         }
     }
     else
@@ -27392,7 +27392,7 @@ gcmSETCTRLSTATE(stateDelta, reserve, memory, 0x0594, ((((gctUINT32) (0)) & ~(((g
                     {
                         blitView.firstSlice = i;
                         blitView.numSlices = 1;
-                        gcmONERROR(gcoHARDWARE_3DBlitBlt(Hardware, &blitView, &blitView, &rlvArgs));
+                        gcmONERROR(gcoHARDWARE_3DBlitBlt(Hardware, &blitView, &blitView, &rlvArgs, gcvFALSE));
                     }
                 }
             }

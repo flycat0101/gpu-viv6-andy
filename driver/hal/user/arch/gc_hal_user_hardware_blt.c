@@ -1778,6 +1778,8 @@ OnError:
 **      gcsSURF_RESOLVE_ARGS *Args
 **          Pointer to the resolve arguments.
 **
+**      gctBOOL forceSingle
+**          Force single gpu or single cluster
 **  OUTPUT:
 **
 **      Nothing
@@ -1787,7 +1789,8 @@ gcoHARDWARE_3DBlitBlt(
     IN gcoHARDWARE Hardware,
     IN gcsSURF_VIEW *SrcView,
     IN gcsSURF_VIEW *DstView,
-    IN gcsSURF_RESOLVE_ARGS *Args
+    IN gcsSURF_RESOLVE_ARGS *Args,
+    IN gctBOOL forceSingle
     )
 {
     gceSTATUS   status;
@@ -1830,8 +1833,6 @@ gcoHARDWARE_3DBlitBlt(
     gctUINT32 gpuCount = 0;
     gctUINT32 clusterCount = 0;
     gctUINT32 clusterMask = 0;
-    /*force single gpu or single cluster*/
-    gctBOOL forceSingle = gcvFALSE;
     gcsSURF_FORMAT_INFO_PTR fmtInfo = &srcSurf->formatInfo;
     gctUINT srcWidth  = srcSurf->allocedW / srcSurf->sampleInfo.x;
     gctUINT srcHeight = srcSurf->allocedH / srcSurf->sampleInfo.y;

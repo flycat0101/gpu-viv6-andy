@@ -7667,7 +7667,7 @@ _3DBlitBltRect(
         gcmONERROR(gcoHARDWARE_DisableTileStatus(gcvNULL, DstView, gcvTRUE));
     }
 
-    gcmONERROR(gcoHARDWARE_3DBlitBlt(gcvNULL, SrcView, DstView, Args));
+    gcmONERROR(gcoHARDWARE_3DBlitBlt(gcvNULL, SrcView, DstView, Args, gcvFALSE));
 
 OnError:
     gcmFOOTER();

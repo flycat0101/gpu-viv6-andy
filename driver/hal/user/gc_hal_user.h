@@ -2727,7 +2727,8 @@ gcoHARDWARE_3DBlitBlt(
     IN gcoHARDWARE Hardware,
     IN gcsSURF_VIEW *SrcView,
     IN gcsSURF_VIEW *DstView,
-    IN gcsSURF_RESOLVE_ARGS *Args
+    IN gcsSURF_RESOLVE_ARGS *Args,
+    IN gctBOOL forceSingle
     );
 
 gceSTATUS
