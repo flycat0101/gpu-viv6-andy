@@ -246,7 +246,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNSplitCommandInfo(
     vx_uint32 zcount = 1;
     vx_uint32 count = 0;
     vx_nn_cmd_split_info_u * sinfoArray;
-    vx_uint32 x_sizes[MAX_NN_SPLIT_XY_NUM], x_offsets[MAX_NN_SPLIT_XY_NUM], y_sizes[MAX_NN_SPLIT_XY_NUM], y_offsets[MAX_NN_SPLIT_XY_NUM], z_offsets[MAX_NN_SPLIT_XY_NUM], z_size[MAX_NN_SPLIT_XY_NUM];
+    vx_uint32 x_sizes[MAX_NN_SPLIT_XY_NUM] = {0}, x_offsets[MAX_NN_SPLIT_XY_NUM] = {0}, y_sizes[MAX_NN_SPLIT_XY_NUM] = {0}, y_offsets[MAX_NN_SPLIT_XY_NUM] = {0}, z_offsets[MAX_NN_SPLIT_XY_NUM] = {0}, z_size[MAX_NN_SPLIT_XY_NUM] = {0};
     vx_enum inDataFormat = input->dataFormat;
     vx_enum outDataFormat = output->dataFormat;
 
