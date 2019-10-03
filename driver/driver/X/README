@@ -20,7 +20,7 @@ Vivante 6.2.4 and later driver releases fully support the DRI3 framework. The DR
 support is included in the Vivante kernel driver galcore.ko. The Vivante DRI3 user-mode
 library libdrm.so source code is included in the directory
 
-    libdrm-2.4.66/...
+    libdrm-2.4.xx/...
 
 To build X11 drivers for the DRI3 framework, set the following environment variables as:
 

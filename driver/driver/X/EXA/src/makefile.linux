@@ -97,8 +97,8 @@ endif
 LFLAGS += -L$(SDK_DIR)/drivers -lGAL -lm -ldl -Wl,-soname -Wl,vivante_drv.so
 
 ifeq ($(X11_DRI3),1)
-CFLAGS += -I$(AQROOT)/driver/X/libdrm-2.4.66/include/drm \
-          -I$(AQROOT)/driver/X/libdrm-2.4.66/vivante
+CFLAGS += -I$(AQROOT)/driver/X/libdrm-2.4.91/include/drm \
+          -I$(AQROOT)/driver/X/libdrm-2.4.91/vivante
 LFLAGS += -ldrm -ldrm_vivante
 else
 CFLAGS += -I$(ROOTFS_USR)/include/libdrm

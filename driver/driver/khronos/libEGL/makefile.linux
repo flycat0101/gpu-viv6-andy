@@ -64,8 +64,8 @@ endif
 ifeq ($(X11_DRI3),1)
   INCLUDE += -I$(X11_ARM_DIR)/include \
              -I$(X11_ARM_DIR)/include/X11/extensions \
-             -I$(AQROOT)/driver/X/libdrm-2.4.66/include/drm \
-             -I$(AQROOT)/driver/X/libdrm-2.4.66/vivante
+             -I$(AQROOT)/driver/X/libdrm-2.4.91/include/drm \
+             -I$(AQROOT)/driver/X/libdrm-2.4.91/vivante
 endif
 
 ifeq ($(EGL_API_FB),1)
