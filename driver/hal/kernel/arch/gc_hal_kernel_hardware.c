@@ -880,7 +880,7 @@ _PowerStateTimerFunc(
 {
     gckHARDWARE hardware = (gckHARDWARE)Data;
 
-    gckHARDWARE_SetPowerState(hardware, hardware->nextPowerState);
+    gcmkVERIFY_OK(gckHARDWARE_SetPowerState(hardware, hardware->nextPowerState));
 }
 
 static gceSTATUS
