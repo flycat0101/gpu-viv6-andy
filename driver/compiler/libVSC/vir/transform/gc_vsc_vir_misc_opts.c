@@ -2389,7 +2389,7 @@ static VSC_ErrCode _GetLowerUpperVirRegSymId(VSC_MM* pMM,
         gctBOOL                 bCompareInst = gcvFALSE, bCompareInstAlsoFirstDef = gcvFALSE;
         gctBOOL                 bFoundForThisDefSrc = gcvFALSE;
         VIR_SymId               workingRegSymId = VIR_INVALID_ID;
-        VIR_SymId               compareSymIds[2] = { VIR_INVALID_ID, VIR_INVALID_ID };
+        VIR_SymId               compareSymIds[VIR_MAX_SRC_NUM] = { VIR_INVALID_ID, VIR_INVALID_ID, VIR_INVALID_ID, VIR_INVALID_ID, VIR_INVALID_ID };
 
         if (VIR_IS_SPECIAL_INST(pDefInst))
         {

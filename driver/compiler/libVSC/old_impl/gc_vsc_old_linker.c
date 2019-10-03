@@ -14616,6 +14616,7 @@ _gcCreateConstantUBO(
 
     if(Shader->constUniformBlockIndex != -1) return gcvSTATUS_OK;
 
+    gcoOS_ZeroMemory(blockInfo, sizeof(blockInfo[0]));
     blockInfo->varCategory = gcSHADER_VAR_CATEGORY_BLOCK;
     blockInfo->format = gcSL_FLOAT;
     blockInfo->firstChild = -1;

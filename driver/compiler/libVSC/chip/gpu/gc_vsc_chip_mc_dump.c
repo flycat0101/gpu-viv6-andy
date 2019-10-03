@@ -233,6 +233,7 @@ static void _DumpOpcode(gctUINT baseOpcode, gctUINT extOpcode, VSC_DUMPER* pDump
         "vx_scatter",
         "vx_atomic_s",
     };
+    static gctUINT visionExtOpcodeCount = sizeof(_strVisionExtOpcode)/sizeof(char *);
 
     static const char * _strAuxOpcode[] =
     {
@@ -293,9 +294,13 @@ static void _DumpOpcode(gctUINT baseOpcode, gctUINT extOpcode, VSC_DUMPER* pDump
         {
             vscDumper_PrintStrSafe(pDumper, "%s", _strAuxOpcode[extOpcode - MC_AUXILIARY_OP_CODE_OFFSET]);
         }
-        else
+        else if (extOpcode < visionExtOpcodeCount)
         {
             vscDumper_PrintStrSafe(pDumper, "%s", _strVisionExtOpcode[extOpcode]);
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
         }
     }
     else if (baseOpcode >= MC_AUXILIARY_OP_CODE_OFFSET)

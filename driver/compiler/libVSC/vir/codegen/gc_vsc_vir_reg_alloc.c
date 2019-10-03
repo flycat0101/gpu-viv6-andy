@@ -7777,7 +7777,7 @@ _VIR_RA_LS_SetHWRegForBaseRegister(
     )
 {
     VSC_ErrCode         retErrCode = VSC_ERR_NONE;
-    VIR_RA_HWReg_Color  curColor;
+    VIR_RA_HWReg_Color  curColor = {0, 0, 0, 0, 0};
     VIR_Shader*         pShader = VIR_RA_LS_GetShader(pRA);
 
     gcmASSERT(pRA->baseRegister != VIR_INVALID_ID);
@@ -8146,7 +8146,7 @@ _VIR_RA_LS_InsertFill(
 
     VIR_Instruction     *newInst = gcvNULL;
     VIR_SymId           symId;
-    VIR_RA_HWReg_Color  curColor;
+    VIR_RA_HWReg_Color  curColor = {0, 0, 0, 0, 0};
     VIR_Operand         *newOpnd = gcvNULL;
 
     gctBOOL             needToReloadDest = gcvFALSE;
