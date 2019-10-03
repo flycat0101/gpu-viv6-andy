@@ -519,7 +519,7 @@ static VkResult halti5_draw_validate(
     )
 {
     __vkCmdBindInfo *bindInfo = &cmdBuf->bindInfo;
-    __vkRenderPass *rdp = bindInfo->pipeline.graphics->renderPass;
+    __vkRenderPass *rdp = bindInfo->renderPass.rdp;
     VkBool32 enableView = rdp->usedMultiView;
 
     VkResult result = VK_SUCCESS;
@@ -1233,7 +1233,7 @@ VkResult halti5_drawIndexed(
     __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
     __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
-    __vkRenderPass *rdp = pip->renderPass;
+    __vkRenderPass *rdp = cmdBuf->bindInfo.renderPass.rdp;
     __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
     __vkSubpassViewInfo *subPassView = VK_NULL_HANDLE;
     uint32_t drawCommand, drawCount;
@@ -2841,7 +2841,7 @@ static VkResult halti5_drawIndirect_common(
     __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
     __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
     halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
-    __vkRenderPass *rdp = pip->renderPass;
+    __vkRenderPass *rdp = cmdBuf->bindInfo.renderPass.rdp;
     __vkRenderPassMultiViewInfo *multiView = rdp->multiViewInfo;
     __vkSubpassViewInfo *subPassView = VK_NULL_HANDLE;
     uint32_t drawCommand;
