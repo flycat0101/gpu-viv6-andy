@@ -826,14 +826,22 @@ typedef struct _vxnne_operation_command_s
     vx_op_param_s                parameter;
 }vxnne_operation_command_s;
 
-#define MAX_SWAP_HANDLE 1024
+#define MAX_SWAP_HANDLE 128
 
 typedef struct _vx_swapHandel
 {
     vx_reference     ref;
     vx_uint32        orgAddress;             /*original address of tensor or image*/
     vx_uint32*       cmdAddr[MAX_SWAP_HANDLE];/* NN or TP cmd address of tensor*/
-    vx_uint32        offset[MAX_SWAP_HANDLE];/*tensor or image input/output offset*/
+
+    union
+    {
+        vx_uint32    offset[MAX_SWAP_HANDLE];/*tensor or image input/output offset*/
+        vx_uint32    nodeTable[MAX_SWAP_HANDLE];
+    }u;
+
+    vx_uint32        cmdCount;
+    vx_bool          isSH;
 }
 vx_swapHandel;
 

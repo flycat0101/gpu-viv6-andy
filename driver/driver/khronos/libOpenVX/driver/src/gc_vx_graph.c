@@ -9677,6 +9677,25 @@ VX_PRIVATE_API void vxoGraph_GeneratePatchLocForInputs(vx_graph graph)
 
             switch (node->paramTable[j]->type)
             {
+
+            case VX_TYPE_TENSOR:
+                {
+                    vx_tensor tensor = (vx_tensor)node->paramTable[j];
+                    vx_uint32 commandSizeInUint = graph->commandBufferSizeInByte / 4;
+                    vx_uint32 physical = tensor->tensorBuffer->memory.physicals[0];
+                    vx_uint32 location = 0;
+                    for (location = 0; location < commandSizeInUint; location++)
+                    {
+                        if (physical == graph->commandBuffer[location])
+                            break;
+                    }
+                    if (location == commandSizeInUint)
+                        location = 0;
+                    node->patchLocation[j][0] = location;
+
+                    break;
+                }
+
             case VX_TYPE_IMAGE:
                 {
                     vx_uint32 planeIndx = 0;
@@ -10693,7 +10712,6 @@ OnError:
 VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
-    vx_bool isSwaped = vx_false_e;
     vx_uint32 i;
     gcmHEADER_ARG("graph=%p", graph);
 
@@ -10731,9 +10749,9 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 
         vxoGraph_BeginProcess(graph);
 
-        isSwaped = vxo_updateSwapHandle(graph);
+        vxo_updateSwapHandle(graph);
 
-        if (!isSwaped && graph->commandBuffer)
+        if (graph->commandBuffer)
         {
             if (graph->scalerHead)
             {
