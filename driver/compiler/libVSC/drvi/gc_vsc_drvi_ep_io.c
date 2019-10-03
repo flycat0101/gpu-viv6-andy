@@ -482,7 +482,9 @@ _vscEP_Buffer_SaveConstHwLocMapping(
         break;
     }
 
-    VSC_IO_writeUint(pIoBuf, pConstHwLocMapping->hwLoc.memAddr.offsetInConstantArray);
+    VSC_IO_writeUint(pIoBuf, pConstHwLocMapping->hwLoc.memAddr.constantOffsetKind);
+    VSC_IO_writeUint(pIoBuf, pConstHwLocMapping->hwLoc.memAddr.constantOffset);
+    VSC_IO_writeUint(pIoBuf, pConstHwLocMapping->hwLoc.memAddr.componentSizeInByte);
 
     VSC_IO_writeUint(pIoBuf, pConstHwLocMapping->validHWChannelMask);
     VSC_IO_writeUint(pIoBuf, pConstHwLocMapping->firstValidHwChannel);
@@ -2851,7 +2853,9 @@ _vscEP_Buffer_LoadConstHwLocMapping(
         break;
     }
 
-    VSC_IO_readUint(pIoBuf, &pConstHwLocMapping->hwLoc.memAddr.offsetInConstantArray);
+    VSC_IO_readUint(pIoBuf, (gctUINT *)&pConstHwLocMapping->hwLoc.memAddr.constantOffsetKind);
+    VSC_IO_readUint(pIoBuf, &pConstHwLocMapping->hwLoc.memAddr.constantOffset);
+    VSC_IO_readUint(pIoBuf, &pConstHwLocMapping->hwLoc.memAddr.componentSizeInByte);
 
     VSC_IO_readUint(pIoBuf, &pConstHwLocMapping->validHWChannelMask);
     VSC_IO_readUint(pIoBuf, &pConstHwLocMapping->firstValidHwChannel);

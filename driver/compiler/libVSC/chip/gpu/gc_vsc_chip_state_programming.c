@@ -821,7 +821,9 @@ static VSC_ErrCode _AllocVidMemForCrSpill(VSC_CHIP_STATES_PROGRAMMER* pStatesPgm
         gctUINT32 physical = NOT_ASSIGNED;
 
         pSpillData = (gctUINT*)vscMM_Alloc(&pStatesPgmer->pmp.mmWrapper, crSpillSize);
-        * pCrSpillMemSize = crSpillSize;
+        memset(pSpillData, 0, crSpillSize);
+
+        *pCrSpillMemSize = crSpillSize;
 
         for (i = 0; i < pPrivUavEntry->memData.ctcCount; i ++)
         {
@@ -830,20 +832,46 @@ static VSC_ErrCode _AllocVidMemForCrSpill(VSC_CHIP_STATES_PROGRAMMER* pStatesPgm
             gcmASSERT(pCTC->hwConstantLocation.hwAccessMode == SHADER_HW_ACCESS_MODE_MEMORY);
             gcmASSERT(pCTC->hwConstantLocation.hwLoc.memAddr.hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_UAV);
 
-            if (pCTC->hwConstantLocation.validHWChannelMask == WRITEMASK_ALL)
+            if (pCTC->hwConstantLocation.hwLoc.memAddr.constantOffsetKind == SHADER_CONSTANT_OFFSET_IN_ARRAY)
             {
-                memcpy(pSpillData + pCTC->hwConstantLocation.hwLoc.memAddr.offsetInConstantArray,
-                       pCTC->constantValue,
-                       4 * CHANNEL_NUM);
-            }
-            else
-            {
-                for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+                if (pCTC->hwConstantLocation.validHWChannelMask == WRITEMASK_ALL)
                 {
-                    if (pCTC->hwConstantLocation.validHWChannelMask & (1 << channel))
+                    memcpy(pSpillData + pCTC->hwConstantLocation.hwLoc.memAddr.constantOffset,
+                           pCTC->constantValue,
+                           4 * CHANNEL_NUM);
+                }
+                else
+                {
+                    for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
                     {
-                        *(pSpillData + pCTC->hwConstantLocation.hwLoc.memAddr.offsetInConstantArray + channel) =
-                                                                                       pCTC->constantValue[channel];
+                        if (pCTC->hwConstantLocation.validHWChannelMask & (1 << channel))
+                        {
+                            *(pSpillData + pCTC->hwConstantLocation.hwLoc.memAddr.constantOffset + channel) = pCTC->constantValue[channel];
+                        }
+                    }
+                }
+            }
+            else if (pCTC->hwConstantLocation.hwLoc.memAddr.constantOffsetKind == SHADER_CONSTANT_OFFSET_IN_BYTE)
+            {
+                gctUINT8*   pData = (gctUINT8 *)pSpillData + pCTC->hwConstantLocation.hwLoc.memAddr.constantOffset;
+
+                if (pCTC->hwConstantLocation.validHWChannelMask == WRITEMASK_ALL &&
+                    pCTC->hwConstantLocation.hwLoc.memAddr.componentSizeInByte == 4)
+                {
+                    memcpy(pData,
+                           pCTC->constantValue,
+                           pCTC->hwConstantLocation.hwLoc.memAddr.componentSizeInByte * CHANNEL_NUM);
+                }
+                else
+                {
+                    for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+                    {
+                        if (pCTC->hwConstantLocation.validHWChannelMask & (1 << channel))
+                        {
+                            memcpy((void *)(pData + channel * pCTC->hwConstantLocation.hwLoc.memAddr.componentSizeInByte),
+                                   (void *)&pCTC->constantValue[channel],
+                                   pCTC->hwConstantLocation.hwLoc.memAddr.componentSizeInByte);
+                        }
                     }
                 }
             }

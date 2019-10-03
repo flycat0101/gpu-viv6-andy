@@ -281,7 +281,7 @@ void _PrintConstantMapping(SHADER_CONSTANT_MAPPING* pConstantMapping, VIR_Shader
         }
         else
         {
-            vscDumper_PrintStrSafe(pDumper, "m@%d = {", pCTC->hwConstantLocation.hwLoc.memAddr.offsetInConstantArray);
+            vscDumper_PrintStrSafe(pDumper, "m@%d = {", pCTC->hwConstantLocation.hwLoc.memAddr.constantOffset);
         }
 
         for (i = 0; i < CHANNEL_NUM; i ++)

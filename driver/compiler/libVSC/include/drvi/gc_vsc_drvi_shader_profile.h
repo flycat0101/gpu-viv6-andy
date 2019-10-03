@@ -654,6 +654,12 @@ SHADER_IO_MAPPING;
    They are used to update constant values
 */
 
+typedef enum SHADER_CONSTANT_OFFSET_KIND
+{
+    SHADER_CONSTANT_OFFSET_IN_BYTE      = 0,
+    SHADER_CONSTANT_OFFSET_IN_ARRAY     = 1,
+} SHADER_CONSTANT_OFFSET_KIND;
+
 typedef struct _SHADER_CONSTANT_HW_LOCATION_MAPPING SHADER_CONSTANT_HW_LOCATION_MAPPING;
 struct _SHADER_CONSTANT_HW_LOCATION_MAPPING
 {
@@ -674,16 +680,17 @@ struct _SHADER_CONSTANT_HW_LOCATION_MAPPING
            1. For non-CTC spilled mem, currently, memory layout is designed to 4-tuples based as
               constant register,that means every element of scalar/vec2~4 array will be put into
               separated room of 4-tuples. With such layout design, we can support both DX1x cb#/icb#
-              and GL named uniform block. So offsetInConstantArray must be at 4-tuples alignment.
+              and GL named uniform block. So offset must be at 4-tuples alignment.
 
               But GL named uniform block has more loose layout requirement based on spec (for example,
               there could be no padding between any pair of GL type of data, but it is unfriendly
               for DX), so HW may design a different layout requirement for constant buffer, or directly
               use similar ld as GPGPU uses. If so, we should re-design followings and their users.
 
-           2. For CTC spilled mem, first channel might be started at any location (offsetInConstantArray
-              does not need to be at 4-tuples alignment), and at this case, firstValidHwChannel must
-              be started at X-channel which is located at offsetInConstantArray.
+           2. For CTC spilled mem, first channel might be started at any location, even might be started
+              at part of one channle(FP16/UINT16/INT16), so we can't use offset in array, we need
+              to use offset in byte directly. And in this case, firstValidHwChannel must
+              be started at X-channel which is located at constantOffset.
         */
         struct
         {
@@ -712,7 +719,9 @@ struct _SHADER_CONSTANT_HW_LOCATION_MAPPING
             } memBase;
 
             /* At channel boundary. See CAUTION!! */
-            gctUINT                                  offsetInConstantArray;
+            SHADER_CONSTANT_OFFSET_KIND              constantOffsetKind;
+            gctUINT                                  constantOffset;
+            gctUINT                                  componentSizeInByte;
         } memAddr;
     } hwLoc;
 

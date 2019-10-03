@@ -1460,7 +1460,7 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
                                 initializerPtr = &pVirUniform->u.initializer;
                             }
                             baseTypeSize = VIR_GetTypeSize(VIR_GetTypeComponentType(VIR_Type_GetIndex(pBaseType)));
-                            for(arrElemIdx = 0; arrElemIdx < arraySize; arrElemIdx++)
+                            for (arrElemIdx = 0; arrElemIdx < arraySize; arrElemIdx++)
                             {
                                 pThisVirCTCVal = (VIR_Const*)VIR_GetSymFromId(&pShader->constTable, initializerPtr[arrElemIdx]);
 
@@ -1469,7 +1469,9 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
                                 vscInitializeCTC(pThisCTC);
                                 pThisCTC->hwConstantLocation.hwAccessMode = SHADER_HW_ACCESS_MODE_MEMORY;
                                 pThisCTC->hwConstantLocation.hwLoc.memAddr.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_UAV;
-                                pThisCTC->hwConstantLocation.hwLoc.memAddr.offsetInConstantArray = (VIR_Uniform_GetOffset(pVirUniform) + arrElemIdx * baseTypeSize)/ 4;
+                                pThisCTC->hwConstantLocation.hwLoc.memAddr.constantOffsetKind = SHADER_CONSTANT_OFFSET_IN_BYTE;
+                                pThisCTC->hwConstantLocation.hwLoc.memAddr.constantOffset = VIR_Uniform_GetOffset(pVirUniform) + arrElemIdx * baseTypeSize;
+                                pThisCTC->hwConstantLocation.hwLoc.memAddr.componentSizeInByte = baseTypeSize;
 
                                 /* Copy CTC now */
                                 for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
