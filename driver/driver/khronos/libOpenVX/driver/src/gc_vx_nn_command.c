@@ -1875,7 +1875,7 @@ void _fill_TP_TRANSPOSE_Command(
             info_array[i].vx_tp_general_cmd_split_info.inTileYInc     = 1;
             info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc    = 1;
             info_array[i].vx_tp_general_cmd_split_info.outLoop0Count  = inZSize;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc    = inZSize * inXSize;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc    = inZSize * inYSize;
             info_array[i].vx_tp_general_cmd_split_info.outLoop1Count  = inXSize;
             info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset  = 0;
             info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc    = inZSize;
