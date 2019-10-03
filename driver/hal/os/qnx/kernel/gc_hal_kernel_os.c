@@ -3023,61 +3023,81 @@ gckOS_AllocatePagedMemory(
     gcmkONERROR(drv_physical_allocate_node(&node));
     nodeAllocated = gcvTRUE;
 
-    fd = drv_create_shm_object();
-    if (fd == -1) {
-        gcmkPRINT("[VIV]: %s:%d, shm_open failed. error %s\n",
-            __FUNCTION__, __LINE__, strerror(errno));
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "shm_open failed. error %s", strerror( errno ) );
-        gcmkONERROR(gcvSTATUS_GENERIC_IO);
+    if (Flag & gcvALLOC_FLAG_4GB_ADDR)
+    {
+        gctPHYS_ADDR_T physical;
+
+        drv_mempool_alloc_contiguous(*Bytes, &physical, &node->kernelLogical);
+
+        if (node->kernelLogical == gcvNULL)
+        {
+            gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
+        }
+
+        node->type            = gcvPHYSICAL_TYPE_MEMPOOL;
+        node->contiguous      = gcvTRUE;
+        node->bytes           = *Bytes;
+        node->physicalAddress = physical;
+        node->pageCount       = _GetPageCount(node->kernelLogical, node->bytes);
     }
+    else
+    {
+        fd = drv_create_shm_object();
+        if (fd == -1) {
+            gcmkPRINT("[VIV]: %s:%d, shm_open failed. error %s\n",
+                __FUNCTION__, __LINE__, strerror(errno));
+            slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "shm_open failed. error %s", strerror( errno ) );
+            gcmkONERROR(gcvSTATUS_GENERIC_IO);
+        }
 #if defined(IMX6X) || defined(IMX8X) || defined(IMX)
-    /* Special flags for this shm, to make it write combine (or bufferable). */
-    /* Virtual memory doesn't need to be physically contiguous. */
-    /* Allocations would be page aligned. */
-    rc = shm_ctl(fd,
-                 shm_ctl_flags,
-                  0,
-                 bytes);
-    if (rc == -1) {
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "shm_ctl failed. error %s", strerror( errno ) );
-        close(fd);
-        gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
-    }
-#else /* fallback: it is for OMAP4/5, LAZYWRITE causes lock-ups. */
-    /* Virtual memory doesn't need to be physically contiguous. */
-    /* Allocations would be page aligned. */
-    rc = shm_ctl(fd,
-                 shm_ctl_flags,
-                  0,
-                 Bytes);
-    if (rc == -1) {
-        slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "shm_ctl failed. error %s", strerror( errno ) );
-        close(fd);
-        gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
-    }
+        /* Special flags for this shm, to make it write combine (or bufferable). */
+        /* Virtual memory doesn't need to be physically contiguous. */
+        /* Allocations would be page aligned. */
+        rc = shm_ctl(fd,
+                     shm_ctl_flags,
+                      0,
+                     bytes);
+        if (rc == -1) {
+            slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "shm_ctl failed. error %s", strerror( errno ) );
+            close(fd);
+            gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
+        }
+#else   /* fallback: it is for OMAP4/5, LAZYWRITE causes lock-ups. */
+        /* Virtual memory doesn't need to be physically contiguous. */
+        /* Allocations would be page aligned. */
+        rc = shm_ctl(fd,
+                     shm_ctl_flags,
+                      0,
+                     Bytes);
+        if (rc == -1) {
+            slogf(_SLOGC_GRAPHICS_GL, _SLOG_ERROR, "shm_ctl failed. error %s", strerror( errno ) );
+            close(fd);
+            gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
+        }
 #endif
 
-    /* Setup the node structure. */
-    node->type       = gcvPHYSICAL_TYPE_PAGED_MEMORY;
-    node->fd         = fd;
-    node->contiguous = Flag & gcvALLOC_FLAG_CONTIGUOUS;
-    node->bytes      = bytes;
-    node->pageCount  = gcmALIGN(bytes, __PAGESIZE) / __PAGESIZE;
+        /* Setup the node structure. */
+        node->type       = gcvPHYSICAL_TYPE_PAGED_MEMORY;
+        node->fd         = fd;
+        node->contiguous = Flag & gcvALLOC_FLAG_CONTIGUOUS;
+        node->bytes      = bytes;
+        node->pageCount  = gcmALIGN(bytes, __PAGESIZE) / __PAGESIZE;
 
-    node->physicals  = gcvNULL;
+        node->physicals  = gcvNULL;
 
-    node->kernelLogical = mmap64(gcvNULL, bytes, PROT_READ | PROT_WRITE | PROT_NOCACHE,
-                         MAP_SHARED, fd, 0);
+        node->kernelLogical = mmap64(gcvNULL, bytes, PROT_READ | PROT_WRITE | PROT_NOCACHE,
+                             MAP_SHARED, fd, 0);
 
-    if (node->kernelLogical == MAP_FAILED)
-    {
-        gcmkONERROR(gcvSTATUS_GENERIC_IO);
+        if (node->kernelLogical == MAP_FAILED)
+        {
+            gcmkONERROR(gcvSTATUS_GENERIC_IO);
+        }
+
+        gcmkONERROR(_CreateNodePhysicalArray(Os, node));
+
+        munmap(node->kernelLogical, bytes);
+        node->kernelLogical = gcvNULL;
     }
-
-    gcmkONERROR(_CreateNodePhysicalArray(Os, node));
-
-    munmap(node->kernelLogical, bytes);
-    node->kernelLogical = gcvNULL;
 
     /* Use the node as the handle for the physical memory just allocated. */
     *Physical = (gctPHYS_ADDR)node;

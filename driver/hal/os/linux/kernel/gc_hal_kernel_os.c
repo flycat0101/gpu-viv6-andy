@@ -3089,6 +3089,7 @@ gckOS_AllocatePagedMemory(
     gctSIZE_T bytes;
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
     gckALLOCATOR allocator;
+    gctBOOL zoneDMA32 = gcvFALSE;
 
     gcmkHEADER_ARG("Os=%p Flag=%x *Bytes=0x%zx", Os, Flag, *Bytes);
 
@@ -3105,6 +3106,17 @@ gckOS_AllocatePagedMemory(
     if (mdl == gcvNULL)
     {
         gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
+    }
+
+#if defined(CONFIG_ZONE_DMA32)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+    zoneDMA32 = gcvTRUE;
+#endif
+#endif
+
+    if ((Flag & gcvALLOC_FLAG_4GB_ADDR) && !zoneDMA32)
+    {
+        Flag &= ~gcvALLOC_FLAG_4GB_ADDR;
     }
 
     /* Walk all allocators. */

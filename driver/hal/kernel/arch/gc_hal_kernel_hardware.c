@@ -14803,11 +14803,7 @@ _PrepareFunctions(
         mode = gcvMMU_MODE_4K;
 #endif
 
-#if defined(CONFIG_ZONE_DMA32)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
         flags |= gcvALLOC_FLAG_4GB_ADDR;
-#endif
-#endif
 
 #if gcdENABLE_CACHEABLE_COMMAND_BUFFER
         flags |= gcvALLOC_FLAG_CACHEABLE;
