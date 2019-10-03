@@ -3894,6 +3894,107 @@ VIR_Shader_GenSimpleAssignment(
     return errCode;
 }
 
+    VSC_ErrCode
+VIR_Shader_GenVectorAssignment(
+    IN OUT  VIR_Shader*     pShader,
+    IN  VIR_Function*       pFunction,
+    IN  VIR_Instruction*    pInst,
+    IN  VIR_SymId           DestSymId,
+    IN  VIR_SymbolKind      DestOffsetKind,
+    IN  VIR_SymId           DestOffset,
+    IN  VIR_SymbolKind      SourceSymKind,
+    IN  VIR_SymId           SourceSymId,
+    IN  gctUINT             StartChannel
+    )
+{
+    VSC_ErrCode             errCode   = VSC_ERR_NONE;
+    VIR_TypeId              constituentTypeId;
+    VIR_Instruction*        pMovInst;
+    VIR_Operand*            pNewOpnd;
+    VIR_Enable              enable = VIR_ENABLE_NONE;
+    VIR_Swizzle             swizzle;
+    gctUINT                 i, channelCount;
+    VIR_Const*              pConst;
+    VIR_Symbol*             pSym;
+
+    if (SourceSymKind == VIR_SYM_CONST)
+    {
+        pConst = VIR_Shader_GetConstFromId(pShader, SourceSymId);
+        constituentTypeId = pConst->type;
+    }
+    else
+    {
+        pSym = VIR_Shader_GetSymFromId(pShader, SourceSymId);
+        constituentTypeId = VIR_Symbol_GetTypeId(pSym);
+    }
+    channelCount = VIR_GetTypeComponents(constituentTypeId);
+
+    /* MOV instruction */
+    if (pInst != gcvNULL)
+    {
+        errCode = VIR_Function_AddInstructionBefore(pFunction,
+                                                    VIR_OP_MOV,
+                                                    constituentTypeId,
+                                                    pInst,
+                                                    gcvTRUE,
+                                                    &pMovInst);
+        CHECK_ERROR(errCode, "Add instruction failed.");
+    }
+    else
+    {
+        errCode = VIR_Function_AddInstruction(pFunction,
+                                              VIR_OP_MOV,
+                                              constituentTypeId,
+                                              &pMovInst);
+        CHECK_ERROR(errCode, "Add instruction failed.");
+    }
+
+    /* Set DEST. */
+    pNewOpnd = VIR_Inst_GetDest(pMovInst);
+    VIR_Operand_SetSymbol(pNewOpnd, pFunction, DestSymId);
+    VIR_Operand_SetTypeId(pNewOpnd, constituentTypeId);
+    /* Set the enable. */
+    for (i = StartChannel; i < StartChannel + channelCount; i++)
+    {
+        enable = (VIR_Enable)(enable | (VIR_ENABLE_X << i));
+    }
+    VIR_Operand_SetEnable(pNewOpnd, enable);
+
+    /* Set the offset. */
+    if (DestOffsetKind == VIR_SYM_CONST)
+    {
+        if (DestOffset != 0)
+        {
+            VIR_Operand_SetIsConstIndexing(pNewOpnd, gcvTRUE);
+            VIR_Operand_SetRelIndexingImmed(pNewOpnd, DestOffset);
+        }
+    }
+    else
+    {
+        VIR_Operand_SetRelIndexing(pNewOpnd, DestOffset);
+        VIR_Operand_SetRelAddrMode(pNewOpnd, VIR_INDEXED_X);
+    }
+
+    /* Set SOURCE0. */
+    pNewOpnd = VIR_Inst_GetSource(pMovInst, VIR_Operand_Src0);
+    VIR_Operand_SetTypeId(pNewOpnd, constituentTypeId);
+    if (SourceSymKind == VIR_SYM_CONST)
+    {
+        pConst = VIR_Shader_GetConstFromId(pShader, SourceSymId);
+        VIR_Operand_SetConst(pNewOpnd, pConst->type, SourceSymId);
+    }
+    else
+    {
+        VIR_Operand_SetSymbol(pNewOpnd, pFunction, SourceSymId);
+    }
+    swizzle = VIR_TypeId_Conv2Swizzle(constituentTypeId);
+    /* Set the swizzle. */
+    swizzle = VIR_Swizzle_SwizzleWShiftEnable(swizzle, enable);
+    VIR_Operand_SetSwizzle(pNewOpnd, swizzle);
+
+    return errCode;
+}
+
 static gctBOOL
 _IsSimpleConstruct(
     IN OUT  VIR_Shader     *Shader,
@@ -4483,23 +4584,34 @@ VIR_Shader_CompositeConstruct(
     */
     if (_IsSimpleConstruct(Shader, type))
     {
+        gctUINT StartChannel = 0;
+
         for (i = 0; i < CompositeSymLength; i++)
         {
-            errCode = VIR_Shader_GenSimpleAssignment(Shader,
-                Function,
-                Inst,
-                SymId,
-                VIR_GetTypeComponentType(VIR_Type_GetIndex(type)),
-                VIR_SYM_CONST,
-                0,
-                CompositeSymKind[i],
-                CompositeSymId[i],
-                VIR_SYM_CONST,
-                0,
-                (destTypeKind == VIR_TY_VECTOR) ? i : 0,
-                0,
-                0);
-            CHECK_ERROR(errCode, "VIR_Shader_GenSimpleAssignment");
+            errCode = VIR_Shader_GenVectorAssignment(Shader,
+                                                     Function,
+                                                     Inst,
+                                                     SymId,
+                                                     VIR_SYM_CONST,
+                                                     0,
+                                                     CompositeSymKind[i],
+                                                     CompositeSymId[i],
+                                                     StartChannel);
+            CHECK_ERROR(errCode, "Gen vector assignment error.");
+
+            if (i != CompositeSymLength - 1)
+            {
+                if (CompositeSymKind[i] == VIR_SYM_CONST)
+                {
+                    VIR_Const*  pConst = VIR_Shader_GetConstFromId(Shader, CompositeSymId[i]);
+                    StartChannel += VIR_GetTypeComponents(pConst->type);
+                }
+                else
+                {
+                    VIR_Symbol* pSym = VIR_Shader_GetSymFromId(Shader, CompositeSymId[i]);
+                    StartChannel += VIR_GetTypeComponents(VIR_Symbol_GetTypeId(pSym));
+                }
+            }
         }
     }
     else

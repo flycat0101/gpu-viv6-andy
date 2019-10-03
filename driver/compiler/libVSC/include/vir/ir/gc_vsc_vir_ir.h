@@ -5758,6 +5758,19 @@ VIR_Shader_GenSimpleAssignment(
     );
 
 VSC_ErrCode
+VIR_Shader_GenVectorAssignment(
+    IN OUT  VIR_Shader*     pShader,
+    IN  VIR_Function*       pFunction,
+    IN  VIR_Instruction*    pInst,
+    IN  VIR_SymId           DestSymId,
+    IN  VIR_SymbolKind      DestOffsetKind,
+    IN  VIR_SymId           DestOffset,
+    IN  VIR_SymbolKind      SourceSymKind,
+    IN  VIR_SymId           SourceSymId,
+    IN  gctUINT             StartChannel
+    );
+
+VSC_ErrCode
 VIR_Shader_GenMatrixAssignment(
     IN OUT  VIR_Shader     *Shader,
     IN  VIR_Function       *Function,

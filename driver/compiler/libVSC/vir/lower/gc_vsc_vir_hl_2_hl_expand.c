@@ -4678,6 +4678,7 @@ _SplitStructMemoryAssignment(
     VIR_Id                       fieldId;
     VIR_Type                    *fieldType;
     VIR_TypeId                   fieldTypeId;
+    VIR_Type                    *fieldBaseType;
     VIR_FieldInfo               *fieldInfo = gcvNULL;
     VIR_Enable                   enable;
     gctUINT                      destRegOffset = 0;
@@ -4703,6 +4704,13 @@ _SplitStructMemoryAssignment(
         fieldInfo = VIR_Symbol_GetFieldInfo(fieldSymbol);
         fieldType = VIR_Symbol_GetType(fieldSymbol);
         fieldTypeId = VIR_Type_GetIndex(fieldType);
+        fieldBaseType = fieldType;
+
+        /* Both a matrix and a matrix array have the matrix stride, so we need to get the base type. */
+        while (VIR_Type_isArray(fieldBaseType))
+        {
+            fieldBaseType = VIR_Shader_GetTypeFromId(Shader, VIR_Type_GetBaseTypeId(fieldBaseType));
+        }
 
         newOffset.uValue = VIR_FieldInfo_GetOffset(VIR_Symbol_GetFieldInfo(fieldSymbol));
 
@@ -4757,7 +4765,8 @@ _SplitStructMemoryAssignment(
         newOperand = VIR_Inst_GetSource(newInst, 0);
         VIR_Operand_Copy(newOperand, BaseAddr);
 
-        if (VIR_Type_isMatrix(fieldType))
+        /* Set the matrix stride if the filed symbol is a matrix. */
+        if (VIR_Type_isMatrix(fieldBaseType))
         {
             VIR_Operand_SetMatrixStride(newOperand, VIR_FieldInfo_GetMatrixStride(fieldInfo));
         }

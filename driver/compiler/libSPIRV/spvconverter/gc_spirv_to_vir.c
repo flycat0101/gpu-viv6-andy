@@ -5141,6 +5141,7 @@ VSC_ErrCode __SpvEmitSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
     case SpvOpLogicalNotEqual:
     case SpvOpSelect:
     case SpvOpIEqual:
+    case SpvOpINotEqual:
     case SpvOpULessThan:
     case SpvOpSLessThan:
     case SpvOpUGreaterThan:
