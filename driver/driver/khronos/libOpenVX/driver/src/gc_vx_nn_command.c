@@ -1372,7 +1372,7 @@ void _fill_TP_RESHUFFLE_Command(
             info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outSliceSize * outZSize / (stride_x * stride_y);
             info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = stride_y;
             info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = out_size_x;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = out_pitch_x;
             info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = out_size_y;
             info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 1;
             info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
@@ -3920,6 +3920,7 @@ _CalculateSplitSizes(vxnne_tensor_info input,
                      vxnne_tensor_sub_block output_splits
                      )
 {
+#define MAX_TP_SPLIT_XY_NUM 32
     vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter)parameter->other_ref;
     vx_uint32 stride_x = 1, stride_y = 1;
     vx_bool optimization_for_1x1_conv = vx_false_e;
@@ -3928,17 +3929,12 @@ _CalculateSplitSizes(vxnne_tensor_info input,
     vx_uint32 output_element_size = vxnneGetTypeSize(output->dataFormat);
     vx_uint32 input_pitch_x = input->yStride / input_element_size;
     vx_uint32 input_pitch_y = input->zStride / input->yStride;
-    vx_uint32 output_center_unit_size_x = 0, output_center_unit_size_y = 0, output_unit_z;
-    vx_uint32 output_remainder_size_x = 0, output_remainder_size_y = 0, output_remainder_z;
     vx_uint32 output_pitch_x = output->yStride / output_element_size;
     vx_uint32 output_pitch_y = output->zStride / output->yStride;
     vx_uint32 inferred_input_size_x, inferred_input_size_y;
-    vx_uint32 output_left_unit_size_x = 0;
-    vx_uint32 output_right_unit_size_x = 0;
-    vx_uint32 output_top_unit_size_y = 0;
-    vx_uint32 output_bottom_unit_size_y = 0;
     vx_uint32 pad_left, pad_right, pad_top, pad_bottom;
     vx_uint32 index, last_x_index, last_y_index, last_z_index;
+    vx_uint32 x_sizes[MAX_TP_SPLIT_XY_NUM], x_offsets[MAX_TP_SPLIT_XY_NUM], y_sizes[MAX_TP_SPLIT_XY_NUM], y_offsets[MAX_TP_SPLIT_XY_NUM], z_sizes[MAX_TP_SPLIT_XY_NUM], z_offsets[MAX_TP_SPLIT_XY_NUM];
 
     if (weights_biases)
     {
@@ -3961,76 +3957,9 @@ _CalculateSplitSizes(vxnne_tensor_info input,
     pad_bottom = (inferred_input_size_y > parameter->pad_y_top + input->height) ?
                  inferred_input_size_y - (parameter->pad_y_top + input->height) : 0;
 
-    output_center_unit_size_x = output->width / div_x;
-    output_remainder_size_x = output->width % div_x;
-    if ((vx_int32)((output_center_unit_size_x +  (output_remainder_size_x ? 1 : 0)) * stride_x) <= (vx_int32)pad_left)
-    {
-        output_left_unit_size_x = (pad_left + 1 + stride_x - 1) / stride_x;
-    }
-    else
-    {
-        output_left_unit_size_x = output_center_unit_size_x + (output_remainder_size_x ? 1 : 0);
-    }
-
-    if (div_x == 2)
-    {
-        vxmASSERT(pad_right < output->width * stride_x / 2);
-        output_right_unit_size_x = output->width - output_left_unit_size_x;
-
-        output_center_unit_size_x = 0;
-        output_remainder_size_x = 0;
-    }
-    else if (div_x > 2)
-    {
-        if (output_center_unit_size_x * stride_x <= pad_right)
-        {
-            output_right_unit_size_x = (pad_right + 1 + stride_x - 1) / stride_x;
-        }
-        else
-        {
-            output_right_unit_size_x = output_center_unit_size_x;
-        }
-
-        output_center_unit_size_x = (output->width - output_left_unit_size_x - output_right_unit_size_x) / (div_x - 2);
-        output_remainder_size_x = (output->width - output_left_unit_size_x - output_right_unit_size_x) % (div_x - 2);
-    }
-
-    output_center_unit_size_y = output->height / div_y;
-    output_remainder_size_y = output->height % div_y;
-    if ((vx_int32)((output_center_unit_size_y +  (output_remainder_size_y ? 1 : 0)) * stride_y) <= (vx_int32)pad_top)
-    {
-        output_top_unit_size_y = (pad_top + 1 + stride_y - 1) / stride_y;
-    }
-    else
-    {
-        output_top_unit_size_y = output_center_unit_size_y + (output_remainder_size_y ? 1 : 0);
-    }
-
-    if (div_y == 2)
-    {
-        vxmASSERT(pad_bottom < output->height * stride_y / 2);
-        output_bottom_unit_size_y = output->height - output_top_unit_size_y;
-
-        output_center_unit_size_y = 0;
-        output_remainder_size_y = 0;
-    }
-    else if (div_y > 2)
-    {
-        if (output_center_unit_size_y * stride_y <= pad_bottom)
-        {
-            output_bottom_unit_size_y = (pad_bottom + 1 + stride_y - 1) / stride_y;
-        }
-        else
-        {
-            output_bottom_unit_size_y = output_center_unit_size_y;
-        }
-
-        output_center_unit_size_y = (output->height - output_top_unit_size_y - output_bottom_unit_size_y) / (div_y - 2);
-        output_remainder_size_y = (output->height - output_top_unit_size_y - output_bottom_unit_size_y) % (div_y - 2);
-    }
-
-    output_unit_z = (output->depth / stride_x / stride_y) / div_z;
-    output_remainder_z = (output->depth / stride_x / stride_y) % div_z;
+    calculateSplitSize(output->width, div_x, x_sizes, x_offsets);
+    calculateSplitSize(output->height, div_y, y_sizes, y_offsets);
+    calculateSplitSize(output->depth / stride_x / stride_y, div_z, z_sizes, z_offsets);
 
     for (z = 0; z < div_z; z++)
     {
@@ -4048,89 +3977,46 @@ _CalculateSplitSizes(vxnne_tensor_info input,
                 {
                     input_splits[index].offset_x = 0;
                     input_splits[index].pad_left = pad_left;
-
-                    output_splits[index].offset_x = 0;
-                    output_splits[index].size_x = output_left_unit_size_x;
+                    input_splits[index].size_x = x_sizes[x] * stride_x - pad_left;
                 }
                 else
                 {
                     input_splits[index].offset_x = input_splits[last_x_index].offset_x +
                                                    input_splits[last_x_index].size_x;
                     input_splits[index].pad_left = 0;
+                    input_splits[index].size_x = x_sizes[x] * stride_x;
 
-                    output_splits[index].offset_x = output_splits[last_x_index].offset_x +
-                                                    output_splits[last_x_index].size_x;
-                    if (x + 1== div_x)
-                    {
-                        output_splits[index].size_x = output_right_unit_size_x;
-                    }
-                    else
-                    {
-                        output_splits[index].size_x = output_center_unit_size_x + ((x - 1 < output_remainder_size_x) ? 1 : 0);
-                    }
                 }
 
                 if (x + 1 == div_x)
-                {
-                    /* Last block on X axis. */
-                    input_splits[index].pad_right = pad_right;
-                    vxmASSERT(input->width > input_splits[index].offset_x);
                     input_splits[index].size_x = input->width - input_splits[index].offset_x;
-                }
-                else
-                {
-                    input_splits[index].pad_right = 0;
-                    vxmASSERT(output_splits[index].size_x * stride_x > input_splits[index].pad_left);
-                    input_splits[index].size_x = output_splits[index].size_x * stride_x -
-                                                 input_splits[index].pad_left;
-                }
 
+                output_splits[index].offset_x = x_offsets[x];
+                output_splits[index].size_x = x_sizes[x];
                 input_splits[index].pitch_x = input_pitch_x;
                 output_splits[index].pitch_x = output_pitch_x;
 
-                /* Split on Y axis. */
+
                 if (y == 0)
                 {
                     input_splits[index].offset_y = 0;
                     input_splits[index].pad_top = pad_top;
-
-                    output_splits[index].offset_y = 0;
-                    output_splits[index].size_y = output_top_unit_size_y;
+                    input_splits[index].size_y = y_sizes[y] * stride_y - pad_top;
                 }
                 else
                 {
                     input_splits[index].offset_y = input_splits[last_y_index].offset_y +
                                                    input_splits[last_y_index].size_y;
                     input_splits[index].pad_top = 0;
+                    input_splits[index].size_y = y_sizes[y] * stride_y;
 
-                    output_splits[index].offset_y = output_splits[last_y_index].offset_y +
-                                                    output_splits[last_y_index].size_y;
-
-                    if (y + 1 == div_y)
-                    {
-                        output_splits[index].size_y = output_bottom_unit_size_y;
-                    }
-                    else
-                    {
-                        output_splits[index].size_y = output_center_unit_size_y + ((y - 1 < output_remainder_size_y) ? 1 : 0);
-                    }
                 }
 
                 if (y + 1 == div_y)
-                {
-                    /* Last block on Y axis. */
-                    input_splits[index].pad_bottom = pad_bottom;
-                    vxmASSERT(input->height > input_splits[index].offset_y);
                     input_splits[index].size_y = input->height - input_splits[index].offset_y;
-                }
-                else
-                {
-                    input_splits[index].pad_bottom = 0;
-                    vxmASSERT(output_splits[index].size_y * stride_y > input_splits[index].pad_top);
-                    input_splits[index].size_y = output_splits[index].size_y * stride_y -
-                                                 input_splits[index].pad_top;
-                }
 
+                output_splits[index].offset_y = y_offsets[y];
+                output_splits[index].size_y = y_sizes[y];
                 input_splits[index].pitch_y = input_pitch_y;
                 output_splits[index].pitch_y = output_pitch_y;
 
@@ -4152,12 +4038,11 @@ _CalculateSplitSizes(vxnne_tensor_info input,
                     }
                     else
                     {
-                        output_splits[index].offset_z = output_splits[last_z_index].offset_z +
-                                                        output_splits[last_z_index].size_z;
+                        output_splits[index].offset_z = z_offsets[z] * stride_x * stride_y;
                     }
                 }
 
-                output_splits[index].size_z = (output_unit_z + ((z < output_remainder_z) ? 1 : 0)) * stride_x * stride_y;
+                output_splits[index].size_z = z_sizes[z] * stride_x * stride_y;
 
                 if (z + 1 == div_z)
                 {
