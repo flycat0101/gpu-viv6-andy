@@ -6619,7 +6619,7 @@ gcoHARDWARE_QueryShaderCapsEx(
 
     if (LocalMemSize != gcvNULL)
     {
-        *LocalMemSize = Hardware->config->localStorageSizeInKbyte * 1024;
+        *LocalMemSize = Hardware->config->localStorageSizeInKbyte * 1024ULL;
     }
 
     if (AddressBits != gcvNULL)
