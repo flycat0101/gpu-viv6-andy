@@ -4389,7 +4389,7 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
                                                    gctUINT stageIdx,
                                                    SHADER_EXECUTABLE_PROFILE* pSep)
 {
-    PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY* pUtbEntry = gcvNULL;
+    PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY* pIaEntry = gcvNULL;
     gctUINT                               i, iaEntryIndex, channel, hwChannel;
     SHADER_CONSTANT_HW_LOCATION_MAPPING*  pHwDirectAddrBase;
     gctBOOL                               bIsSampler = gcvFALSE;
@@ -4398,38 +4398,38 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
     {
         if (_CheckTwoResBindingsAreSame(&pIaTable->pIaEntries[i].iaBinding, &pResAllocEntry->resBinding))
         {
-            pUtbEntry = &pIaTable->pIaEntries[i];
+            pIaEntry = &pIaTable->pIaEntries[i];
             break;
         }
     }
 
-    if (pUtbEntry == gcvNULL)
+    if (pIaEntry == gcvNULL)
     {
-        pUtbEntry = _enlargeInputAttachmentEntryRoom(pIaTable, 1, &iaEntryIndex);
-        memset(pUtbEntry, 0, sizeof(PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY));
-        pUtbEntry->iaEntryIndex = iaEntryIndex;
-        memcpy(&pUtbEntry->iaBinding, &pResAllocEntry->resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
+        pIaEntry = _enlargeInputAttachmentEntryRoom(pIaTable, 1, &iaEntryIndex);
+        memset(pIaEntry, 0, sizeof(PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY));
+        pIaEntry->iaEntryIndex = iaEntryIndex;
+        memcpy(&pIaEntry->iaBinding, &pResAllocEntry->resBinding, sizeof(VSC_SHADER_RESOURCE_BINDING));
     }
-    pUtbEntry->activeStageMask |= pResAllocEntry->bUse ? (1 << stageIdx) : 0;
-    pUtbEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);
+    pIaEntry->activeStageMask |= pResAllocEntry->bUse ? (1 << stageIdx) : 0;
+    pIaEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);
     if (pResAllocEntry->resFlag & VIR_SRE_FLAG_TREAT_IA_AS_SAMPLER)
     {
-        pUtbEntry->hwMappings[stageIdx].uavMapping.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER;
+        pIaEntry->hwMappings[stageIdx].uavMapping.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER;
         bIsSampler = gcvTRUE;
     }
     else
     {
-        pUtbEntry->hwMappings[stageIdx].uavMapping.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR;
+        pIaEntry->hwMappings[stageIdx].uavMapping.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR;
     }
-    pUtbEntry->hwMappings[stageIdx].uavMapping.accessMode = SHADER_UAV_ACCESS_MODE_TYPE;
+    pIaEntry->hwMappings[stageIdx].uavMapping.accessMode = SHADER_UAV_ACCESS_MODE_TYPE;
 
     /* Alloc direct mem addr constant reg location mapping */
     if (gcoOS_Allocate(gcvNULL, sizeof(SHADER_CONSTANT_HW_LOCATION_MAPPING),
-                       (gctPOINTER*)&pUtbEntry->hwMappings[stageIdx].uavMapping.hwLoc.pHwDirectAddrBase) != gcvSTATUS_OK)
+                       (gctPOINTER*)&pIaEntry->hwMappings[stageIdx].uavMapping.hwLoc.pHwDirectAddrBase) != gcvSTATUS_OK)
     {
         return VSC_ERR_OUT_OF_MEMORY;
     }
-    pHwDirectAddrBase = pUtbEntry->hwMappings[stageIdx].uavMapping.hwLoc.pHwDirectAddrBase;
+    pHwDirectAddrBase = pIaEntry->hwMappings[stageIdx].uavMapping.hwLoc.pHwDirectAddrBase;
     vscInitializeCnstHwLocMapping(pHwDirectAddrBase);
 
     /* Fill direct mem base addr constant reg */
@@ -4439,9 +4439,9 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
 
     if (bIsSampler)
     {
-        pUtbEntry->hwMappings[stageIdx].uavMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
+        pIaEntry->hwMappings[stageIdx].uavMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
 
-        _SetResOpBits(pShader, &pUtbEntry->iaBinding, &pUtbEntry->pResOpBits);
+        _SetResOpBits(pShader, &pIaEntry->iaBinding, &pIaEntry->pResOpBits);
     }
     else
     {
@@ -4456,8 +4456,8 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
 
     if (bIsSampler)
     {
-        _AddExtraSamplerArray(&pUtbEntry->hwMappings[stageIdx].ppExtraSamplerArray,
-                              &pUtbEntry->iaBinding,
+        _AddExtraSamplerArray(&pIaEntry->hwMappings[stageIdx].ppExtraSamplerArray,
+                              &pIaEntry->iaBinding,
                               pShader,
                               pSep,
                               gcvFALSE,
@@ -4467,22 +4467,22 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
                               0);
 
         /* Set textureSize/lodMinMax */
-        _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
-                                    pUtbEntry->pLodMinMax[stageIdx],
-                                    pUtbEntry->pLevelsSamples[stageIdx],
-                                    &pUtbEntry->iaBinding,
+        _AddTextureSizeAndLodMinMax(pIaEntry->pTextureSize[stageIdx],
+                                    pIaEntry->pLodMinMax[stageIdx],
+                                    pIaEntry->pLevelsSamples[stageIdx],
+                                    &pIaEntry->iaBinding,
                                     pSep);
     }
     else
     {
         /* Set image size */
-        _AddImageSize(&pUtbEntry->pImageSize[stageIdx],
-                      &pUtbEntry->iaBinding,
+        _AddImageSize(&pIaEntry->pImageSize[stageIdx],
+                      &pIaEntry->iaBinding,
                       pSep);
 
         /* Extra image layer */
-        _AddPrivateImageUniform(&pUtbEntry->pExtraLayer[stageIdx],
-                                &pUtbEntry->iaBinding,
+        _AddPrivateImageUniform(&pIaEntry->pExtraLayer[stageIdx],
+                                &pIaEntry->iaBinding,
                                 pSep,
                                 SHS_PRIV_MEM_KIND_EXTRA_UAV_LAYER);
     }

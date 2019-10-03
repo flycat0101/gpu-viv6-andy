@@ -2051,6 +2051,90 @@ static VSC_ErrCode _SetResOpBitsForSampler(VIR_Shader *pShader,
                                        index);
 }
 
+static gctBOOL _SetResOpBitsForImage(
+    VIR_DEF_USAGE_INFO* pDuInfo,
+    VIR_Shader*         pShader,
+    VIR_Instruction*    pInst,
+    VIR_Operand*        pSrcOpnd,
+    VIR_RES_OP_TYPE     resOpType
+    )
+{
+    VIR_Symbol*         pSrcSym = VIR_Operand_GetSymbol(pSrcOpnd);
+    VIR_Uniform*        pUniformSym = gcvNULL;
+    VIR_OperandInfo     opndInfo;
+    gctUINT             index;
+
+    /* Skip non-symbol operand. */
+    if (!VIR_Operand_isSymbol(pSrcOpnd))
+    {
+        return gcvFALSE;
+    }
+
+    /* Update the ResOpBit for a uniform operand. */
+    if (VIR_Symbol_isSampler(pSrcSym) || VIR_Symbol_isImage(pSrcSym))
+    {
+        pUniformSym = VIR_Symbol_GetUniformPointer(pShader, pSrcSym);
+
+        if (VIR_Operand_GetRelAddrMode(pSrcOpnd) != VIR_INDEXED_NONE)
+        {
+            index = NOT_ASSIGNED;
+        }
+        else
+        {
+            index = VIR_Operand_GetMatrixConstIndex(pSrcOpnd) + VIR_Operand_GetRelIndexing(pSrcOpnd);
+        }
+
+        VIR_Uniform_UpdateResOpBits(pShader, pUniformSym, resOpType, index);
+        return gcvTRUE;
+    }
+
+    /* If the operand is a temp register, find its DEF. */
+    VIR_Operand_GetOperandInfo(pInst, pSrcOpnd, &opndInfo);
+    if (opndInfo.isVreg)
+    {
+        VIR_GENERAL_UD_ITERATOR     udIter;
+        VIR_DEF*                    pDef = gcvNULL;
+        VIR_Instruction*            pDefInst = gcvNULL;
+        VIR_OpCode                  defOpCode;
+        VIR_Operand*                pCandidateImageOpnd = gcvNULL;
+        gctBOOL                     bFound = gcvFALSE;
+
+        vscVIR_InitGeneralUdIterator(&udIter, pDuInfo, pInst, pSrcOpnd, gcvFALSE, gcvFALSE);
+        for (pDef = vscVIR_GeneralUdIterator_First(&udIter);
+             pDef != gcvNULL;
+             pDef = vscVIR_GeneralUdIterator_Next(&udIter))
+        {
+            pDefInst = pDef->defKey.pDefInst;
+
+            if (VIR_IS_IMPLICIT_DEF_INST(pDefInst))
+            {
+                continue;
+            }
+
+            if (pDefInst == pInst)
+            {
+                continue;
+            }
+
+            defOpCode = VIR_Inst_GetOpcode(pDefInst);
+
+            if (defOpCode == VIR_OP_MOV || defOpCode == VIR_OP_ADD || defOpCode == VIR_OP_MAD ||
+                defOpCode == VIR_OP_IMG_ADDR || defOpCode == VIR_OP_IMG_ADDR_3D)
+            {
+                pCandidateImageOpnd = VIR_Inst_GetSource(pDefInst, 0);
+
+                bFound = _SetResOpBitsForImage(pDuInfo, pShader, pDefInst, pCandidateImageOpnd, resOpType);
+                if (bFound)
+                {
+                    return gcvTRUE;
+                }
+            }
+        }
+    }
+
+    return gcvFALSE;
+}
+
 VSC_ErrCode _markEndOfBBFlag(
     VSC_SH_PASS_WORKER* pPassWorker
     )
@@ -2430,12 +2514,16 @@ VSC_ErrCode vscVIR_PostCGCleanup(
     )
 {
     VSC_ErrCode         status = VSC_ERR_NONE;
-    VIR_Shader          *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
-    VIR_Dumper          *pDumper = pPassWorker->basePassWorker.pDumper;
+    VIR_Shader*         pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_Dumper*         pDumper = pPassWorker->basePassWorker.pDumper;
     VIR_FuncIterator    func_iter;
     VIR_FunctionNode*   func_node;
     VIR_Instruction*    instGetSamplerIdx = gcvNULL;
-    VSC_HW_CONFIG       *pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VSC_HW_CONFIG*      pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VIR_DEF_USAGE_INFO* pDuInfo = pPassWorker->pDuInfo;
+    gctBOOL             bSupportImgLdSt = VIR_Shader_SupportImgLdSt(pShader, pHwCfg, gcvFALSE);
+    /* So far only vulkan driver needs to check the resource opcode type. */
+    gctBOOL             bNeedToCheckResOp = VIR_Shader_IsVulkan(pShader);
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -2453,6 +2541,7 @@ VSC_ErrCode vscVIR_PostCGCleanup(
         {
             gctBOOL bGenInst = gcvFALSE;
             gctBOOL bFP16Changed = gcvFALSE;
+            VIR_OpCode opCode = VIR_Inst_GetOpcode(inst);
 
             if (VIR_Shader_isDual16Mode(pShader))
             {
@@ -2469,8 +2558,7 @@ VSC_ErrCode vscVIR_PostCGCleanup(
                 }
 
                 /* correctly setting dest/src1 for conv/i2i instruction  */
-                if (VIR_Inst_GetOpcode(inst) == VIR_OP_CONV ||
-                    VIR_Inst_GetOpcode(inst) == VIR_OP_I2I)
+                if (opCode == VIR_OP_CONV || opCode == VIR_OP_I2I)
                 {
                     _changeConvDataType(inst);
                 }
@@ -2484,15 +2572,41 @@ VSC_ErrCode vscVIR_PostCGCleanup(
                 WARNING_REPORT(VSC_ERR_INVALID_DATA, "Modify some FP16 instructions, be careful.");
             }
 
-            if (VIR_Inst_GetOpcode(inst) == VIR_OP_GET_SAMPLER_IDX)
+            if (opCode == VIR_OP_GET_SAMPLER_IDX)
             {
                 instGetSamplerIdx = inst;
             }
-            else if (VIR_Inst_GetResOpType(inst) != VIR_RES_OP_TYPE_UNKNOWN &&
-                     VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(inst)))
+
+            /* Check the resource opcode type. */
+            if (bNeedToCheckResOp)
             {
-                _SetResOpBitsForSampler(pShader, inst, instGetSamplerIdx);
-                instGetSamplerIdx = gcvNULL;
+                if (VIR_Inst_GetResOpType(inst) != VIR_RES_OP_TYPE_UNKNOWN &&
+                    VIR_OPCODE_isTexLd(opCode))
+                {
+                    _SetResOpBitsForSampler(pShader, inst, instGetSamplerIdx);
+                    instGetSamplerIdx = gcvNULL;
+                }
+                else if ((VIR_OPCODE_isImgLd(opCode) || VIR_OPCODE_isImgSt(opCode))
+                         ||
+                         (!bSupportImgLdSt && (VIR_OPCODE_isMemLd(opCode) || VIR_OPCODE_isMemSt(opCode))))
+                {
+                    VIR_RES_OP_TYPE resOpType = VIR_RES_OP_TYPE_UNKNOWN;
+
+                    if (VIR_OPCODE_isImgLd(opCode) || VIR_OPCODE_isImgSt(opCode))
+                    {
+                        resOpType = VIR_RES_OP_TYPE_IMAGE_OP;
+                    }
+                    else if (VIR_OPCODE_isMemLd(opCode) || VIR_OPCODE_isMemSt(opCode))
+                    {
+                        resOpType = VIR_RES_OP_TYPE_LOAD_STORE;
+                    }
+                    else
+                    {
+                        gcmASSERT(gcvFALSE);
+                    }
+
+                    _SetResOpBitsForImage(pDuInfo, pShader, inst, VIR_Inst_GetSource(inst, 0), resOpType);
+                }
             }
 
             if (bGenInst)
