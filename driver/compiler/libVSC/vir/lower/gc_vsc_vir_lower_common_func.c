@@ -52,6 +52,15 @@ VIR_Lower_Initialize(
 }
 
 gctBOOL
+VIR_Lower_InstSupportFP16(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return VIR_Shader_CapabilityFP16(Context->shader);
+}
+
+gctBOOL
 VIR_Lower_HasHalti4(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst

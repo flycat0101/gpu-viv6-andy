@@ -12173,6 +12173,7 @@ static gceSTATUS __SpvConstructAndInitializeVIRShader(
     {
         VIR_Shader_SetFlagExt1(*virShader, VIR_SHFLAG_EXT1_DISABLE_IR_DUMP);
     }
+    VIR_Shader_SetFlagExt1(*virShader, VIR_SHFLAG_EXT1_CAPABILITY_FP16);
 
     {
         VIR_Function       *function;

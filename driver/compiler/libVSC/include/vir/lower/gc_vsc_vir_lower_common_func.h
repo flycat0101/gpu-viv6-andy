@@ -432,6 +432,12 @@ VIR_Lower_IsNotCLShader(
     );
 
 gctBOOL
+VIR_Lower_InstSupportFP16(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
 VIR_Lower_HasHalti4(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
