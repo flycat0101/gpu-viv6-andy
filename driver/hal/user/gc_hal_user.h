@@ -2733,7 +2733,8 @@ gceSTATUS
 gcoHARDWARE_3DBlitTileFill(
     IN gcoHARDWARE Hardware,
     IN gceENGINE Engine,
-    IN gcsSURF_VIEW *DstView
+    IN gcsSURF_VIEW *DstView,
+    IN gctBOOL forceSingle
     );
 
 gceSTATUS

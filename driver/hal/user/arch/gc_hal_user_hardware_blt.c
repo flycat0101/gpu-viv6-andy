@@ -6355,6 +6355,8 @@ OnError:
 **      gcs3DBLIT_INFO_PTR Info
 **          Pointer to the 3DBLIT arguements.
 **
+**      gctBOOL forceSingle
+**          Force single gpu or single cluster
 **  OUTPUT:
 **
 **      Nothing
@@ -6363,7 +6365,8 @@ gceSTATUS
 gcoHARDWARE_3DBlitTileFill(
     IN gcoHARDWARE Hardware,
     IN gceENGINE Engine,
-    IN gcsSURF_VIEW *DstView
+    IN gcsSURF_VIEW *DstView,
+    IN gctBOOL forceSingle
     )
 {
     gceSTATUS status;
@@ -6381,8 +6384,6 @@ gcoHARDWARE_3DBlitTileFill(
     gctUINT gpuCount = 0;
     gctUINT clusterMask = 0;
     gctUINT clusterCount = 0;
-    /*force single gpu or single cluster*/
-    gctBOOL forceSingle = gcvFALSE;
 
     /* Define state buffer variables. */
     gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);

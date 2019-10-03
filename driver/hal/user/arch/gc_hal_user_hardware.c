@@ -23443,7 +23443,7 @@ gcoHARDWARE_FillFromTileStatus(
 
     if (Hardware->features[gcvFEATURE_BLT_ENGINE])
     {
-        gcmONERROR(gcoHARDWARE_3DBlitTileFill(Hardware, gcvENGINE_RENDER, SurfView));
+        gcmONERROR(gcoHARDWARE_3DBlitTileFill(Hardware, gcvENGINE_RENDER, SurfView, gcvFALSE));
 
         gcmFOOTER();
         return status;
