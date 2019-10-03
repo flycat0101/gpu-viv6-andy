@@ -1209,7 +1209,7 @@ gcoTEXTURE_UploadSub(
     if ((XOffset + Width > map->width) || (YOffset + Height > map->height))
     {
         /* Requested upload does not match the mip map. */
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        gcmERR_RETURN(gcvSTATUS_INVALID_ARGUMENT);
     }
 
     /* Convert face into index. */
@@ -1228,7 +1228,7 @@ gcoTEXTURE_UploadSub(
             if (index >= map->depth)
             {
                 /* The specified slice is outside the allocated texture. */
-                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                gcmERR_RETURN(gcvSTATUS_INVALID_ARGUMENT);
             }
             break;
         case gcvTEXTURE_2D:
@@ -1237,7 +1237,7 @@ gcoTEXTURE_UploadSub(
             if (index != 0)
             {
                 /* The specified slice is outside the allocated texture. */
-                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                gcmERR_RETURN(gcvSTATUS_INVALID_ARGUMENT);
             }
             break;
 
@@ -1257,7 +1257,7 @@ gcoTEXTURE_UploadSub(
         if (index >= map->faces)
         {
             /* The specified face is outside the allocated texture faces. */
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            gcmERR_RETURN(gcvSTATUS_INVALID_ARGUMENT);
         }
         break;
 
@@ -1273,7 +1273,7 @@ gcoTEXTURE_UploadSub(
     texView.firstSlice = index;
 
     /* Lock the surface. */
-    gcmONERROR(gcoSURF_Lock(map->surface, address, memory));
+    gcmERR_RETURN(gcoSURF_Lock(map->surface, address, memory));
 
     if (map->surface->hasStencilComponent)
     {
@@ -1420,7 +1420,7 @@ gcoTEXTURE_UploadSub(
 
 OnError:
     /* Unlock the surface. */
-    if (memory[0] && map)
+    if (memory[0] && map && map->surface)
     {
         gcmVERIFY_OK(gcoSURF_Unlock(map->surface, memory[0]));
     }
