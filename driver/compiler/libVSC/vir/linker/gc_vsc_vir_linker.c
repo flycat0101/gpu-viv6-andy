@@ -6935,11 +6935,9 @@ VIR_Lib_UpdateImageFormat(
 {
     VSC_ErrCode                     errCode = VSC_ERR_NONE;
     gctUINT                         virUniformIdx;
-    gctUINT                         resArraySize;
     VIR_Symbol*                     pVirUniformSym;
     VIR_Uniform*                    pVirUniform;
     VIR_UniformIdList*              pVirUniformLsts = VIR_Shader_GetUniforms(pShader);
-    VIR_Type*                       pVirUniformSymType;
     VIR_ImageFormat                 imageFormat = (VIR_ImageFormat)pImageFormatInfo->imageFormat;
 
     for (virUniformIdx = 0; virUniformIdx < VIR_IdList_Count(pVirUniformLsts); virUniformIdx ++)
@@ -6952,17 +6950,8 @@ VIR_Lib_UpdateImageFormat(
             continue;
         }
 
-        resArraySize = 1;
-        pVirUniformSymType = VIR_Symbol_GetType(pVirUniformSym);
-        while (VIR_Type_isArray(pVirUniformSymType))
-        {
-            resArraySize *= VIR_Type_GetArrayLength(pVirUniformSymType);
-            pVirUniformSymType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pVirUniformSymType));
-        }
-
         if (VIR_Symbol_GetDescriptorSet(pVirUniformSym) == pImageFormatInfo->set &&
-            VIR_Symbol_GetBinding(pVirUniformSym) == pImageFormatInfo->binding &&
-            resArraySize == pImageFormatInfo->arraySize)
+            VIR_Symbol_GetBinding(pVirUniformSym) == pImageFormatInfo->binding)
         {
             gcmASSERT(VIR_Symbol_GetImageFormat(pVirUniformSym) != imageFormat);
 

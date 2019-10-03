@@ -154,7 +154,7 @@ typedef struct _VSC_LIB_LINK_IMAGE_FORMAT
 {
     gctUINT                         set;
     gctUINT                         binding;
-    gctUINT                         arraySize;
+    gctUINT                         arrayIndex;
     VSC_IMAGE_FORMAT                imageFormat;
 } VSC_LIB_LINK_IMAGE_FORMAT;
 
