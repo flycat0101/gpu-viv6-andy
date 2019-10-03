@@ -1904,6 +1904,11 @@ gckVIDMEM_Free(
                  node != gcvNULL && node->VidMem.nextFree == gcvNULL;
                  node = node->VidMem.next) ;
 
+            if (node == gcvNULL)
+            {
+                gcmkONERROR(gcvSTATUS_INVALID_DATA);
+            }
+
             /* Insert this node in the free list. */
             Node->VidMem.nextFree = node;
             Node->VidMem.prevFree = node->VidMem.prevFree;
