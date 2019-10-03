@@ -196,7 +196,7 @@ hex_fractional_constant				{hexadecimal_constant}"."{hexadecimal_digit}+
 unsigned_suffix					[uU]
 long_suffix					[lL]
 long_long_suffix				ll|LL
-floating_suffix					[fFlL]
+floating_suffix					[fFlLhH]
 int_precision					{long_suffix}|{long_long_suffix}
 integer_suffix					{unsigned_suffix}{int_precision}?|{int_precision}{unsigned_suffix}?
 exponent_part					[eE]{sign}?{digit_sequence}

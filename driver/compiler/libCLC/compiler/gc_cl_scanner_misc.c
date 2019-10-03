@@ -1937,6 +1937,9 @@ OUT gctBOOL *IsUnsigned
 
 static gctSTRING
 _ScanFloatConstantType(
+IN cloCOMPILER Compiler,
+IN gctUINT LineNo,
+IN gctUINT StringNo,
 IN gctSTRING ConstStr,
 IN gctINT *Type
 )
@@ -1959,6 +1962,21 @@ IN gctINT *Type
        case 'l':
        case 'L':
           type = T_DOUBLE;
+          break;
+
+       case 'h':
+       case 'H':
+          if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_CL_KHR_FP16))
+          {
+              type = T_HALF;
+          }
+          else
+          {
+              gcmVERIFY_OK(cloCOMPILER_Report(Compiler, LineNo, StringNo,
+                                              clvREPORT_ERROR,
+                                              "floating suffix : '%c' not supported",
+                                              ch));
+          }
           break;
        }
      }
@@ -2129,7 +2147,7 @@ OUT clsLexToken * Token
     Token->lineNo    = LineNo;
     Token->stringNo    = StringNo;
 
-    endPtr = _ScanFloatConstantType(Text, &Token->type);
+    endPtr = _ScanFloatConstantType(Compiler, LineNo, StringNo, Text, &Token->type);
     if(endPtr) {
       saveChr = *endPtr;
       *endPtr = '\0';
