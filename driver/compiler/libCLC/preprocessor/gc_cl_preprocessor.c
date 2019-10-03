@@ -2109,7 +2109,7 @@ gctCONST_STRING  Options
                         break;
                     }
 
-                    if (currentChar == '=')
+                    if (currentChar == '=' && !hasVauleStr)
                     {
                         hasVauleStr = gcvTRUE;
                         j = i; /* save the index of "=" */

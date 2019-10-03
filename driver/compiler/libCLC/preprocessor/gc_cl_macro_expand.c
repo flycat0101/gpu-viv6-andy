@@ -857,16 +857,11 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList_MergePastingTokenName(
     newSize = gcoOS_StrLen(InHead->poolString, gcvNULL);
     gcmONERROR(gcoOS_StrCatSafe(newString,256,InHead->poolString));
 
-    while(tmprplst)
-    {
-        newSize += gcoOS_StrLen(tmprplst->poolString, gcvNULL);
-        if(newSize + 1 > 256)
-            return gcvSTATUS_TOO_COMPLEX;
+    newSize += gcoOS_StrLen(tmprplst->poolString, gcvNULL);
+    if(newSize + 1 > 256)
+        return gcvSTATUS_TOO_COMPLEX;
 
-        gcmONERROR(gcoOS_StrCatSafe(newString,256,tmprplst->poolString));
-
-        tmprplst = (ppoTOKEN)tmprplst->inputStream.base.node.prev;
-    }
+    gcmONERROR(gcoOS_StrCatSafe(newString,256,tmprplst->poolString));
 
     status = cloCOMPILER_AllocatePoolString(PP->compiler,
         newString,
@@ -938,6 +933,8 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
     gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 
     gctBOOL pasting = gcvFALSE;
+
+    gctBOOL skip_ws_in_pasting = gcvFALSE;
 
     gctBOOL supportPasting = gcvTRUE;
 
@@ -1033,14 +1030,22 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
 
                 if(pasting)
                 {
+                    /* find the previous non ws token */
+                    ppoTOKEN tmp = *End;
+                    while(tmp->poolString == PP->keyword->ws)
+                    {
+                        tmp = (ppoTOKEN)tmp->inputStream.base.node.next;
+                    }
                     status = ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList_MergePastingTokenName(
-                        PP,
-                        (*End),
-                        tmphead,
-                        &(*End)->poolString
-                        );
+                             PP,
+                             tmp,
+                             tmpend,
+                             &(tmp->poolString)
+                             );
+                    *End = tmp;
 
                     pasting = gcvFALSE;
+                    skip_ws_in_pasting = gcvFALSE;
                 }
                 else
                 {
@@ -1073,8 +1078,30 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
             }/*not found in argv*/
             else
             {
-                if (pasting)
+                if (skip_ws_in_pasting)
+                {
+                    /* find the previous non ws token */
+                    ppoTOKEN tmp = *End;
+                    while(tmp->poolString == PP->keyword->ws)
+                    {
+                        tmp = (ppoTOKEN)tmp->inputStream.base.node.next;
+                    }
+                    status = ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList_MergePastingTokenName(
+                             PP,
+                             tmp,
+                             replacement_list,
+                             &(tmp->poolString)
+                             );
+                    *End = tmp;
+                    replacement_list = (ppoTOKEN)replacement_list->inputStream.base.node.prev;
                     pasting = gcvFALSE;
+                    skip_ws_in_pasting = gcvFALSE;
+                    continue;
+                }
+                else if (pasting)
+                {
+                    pasting = gcvFALSE;
+                }
                 gcmTRACE(
                     gcvLEVEL_VERBOSE,
                     "ME : replacementList node: %s,inputStream not a formal arg.",
@@ -1085,14 +1112,21 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
         {
             if(pasting)
             {
-                status = ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList_MergePastingTokenName(
-                    PP,
-                    (*End),
-                    replacement_list,
-                    &(*End)->poolString
-                    );
-
-                pasting = gcvFALSE;
+                /* skip the whitespace after ## */
+                if (replacement_list->poolString != PP->keyword->ws)
+                {
+                    status = ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList_MergePastingTokenName(
+                             PP,
+                             (*End),
+                             replacement_list,
+                             &(*End)->poolString
+                             );
+                    pasting = gcvFALSE;
+                }
+                else
+                {
+                    skip_ws_in_pasting = gcvTRUE;
+                }
                 replacement_list = (ppoTOKEN)replacement_list->inputStream.base.node.prev;
                 continue;
             }
