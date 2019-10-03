@@ -13,6 +13,8 @@
 
 #include <math.h>
 #include "gc_es_context.h"
+
+
 /*
 ** Return the number of bytes per element, based on the element type
 ** Supports packed pixels as described in the specification, i.e.
@@ -678,6 +680,7 @@ GLvoid __glLoadPackModes(__GLcontext *gc, __GLpixelSpanInfo *spanInfo)
     }
 }
 
+
 /*
 ** Internal image processing routine.  Used by GetTexImage to transfer from
 ** internal texture image to the user.  Used by TexImage[12]D to transfer
@@ -694,3 +697,1408 @@ GLvoid __glGenericPickCopyImage(__GLcontext *gc, __GLpixelSpanInfo *spanInfo,
                               GLboolean applyPixelTransfer)
 {
 }
+
+/* Get component and mask info from format */
+GLboolean __glGetComponentAndMaskFromFormat(GLenum format, GLubyte* components, GLubyte* mask)
+{
+    switch (format)
+    {
+        case GL_RED:
+            *components = 1;
+            mask[0] = 1;
+            break;
+        case GL_GREEN:
+            *components = 1;
+            mask[1] = 2;
+            break;
+        case GL_BLUE:
+            *components = 1;
+            mask[0] = 3;
+            break;
+        case GL_ALPHA:
+            *components = 1;
+            mask[0] = 4;
+            break;
+        case GL_RG:
+            *components = 2;
+            mask[0] = 1;
+            mask[1] = 2;
+            break;
+        case GL_LUMINANCE:
+        case GL_RGB:
+            *components = 3;
+            mask[0] = 1;
+            mask[1] = 2;
+            mask[2] = 3;
+            break;
+        case GL_BGR:
+            *components = 3;
+            mask[0] = 3;
+            mask[1] = 2;
+            mask[2] = 1;
+            break;
+        case GL_LUMINANCE_ALPHA:
+        case GL_INTENSITY:
+        case GL_RGBA:
+            *components = 4;
+            mask[0] = 1;
+            mask[1] = 2;
+            mask[2] = 3;
+            mask[3] = 4;
+            break;
+        case GL_BGRA:
+            *components = 4;
+            mask[0] = 3;
+            mask[1] = 2;
+            mask[2] = 1;
+            mask[3] = 4;
+            break;
+        default:
+            return GL_TRUE;
+    }
+    return GL_FALSE;
+}
+
+GLboolean __glInitTransferInfo(__GLcontext *gc,
+                                GLsizei width,
+                                GLsizei height,
+                                GLsizei depth,
+                                __GLpixelTransferInfo *transferInfo,
+                                GLenum baseFmt,
+                                GLenum srcType,
+                                GLenum dstType)
+{
+    transferInfo->scale.r = gc->state.pixel.transferMode.r_scale;
+    transferInfo->scale.g = gc->state.pixel.transferMode.g_scale;
+    transferInfo->scale.b = gc->state.pixel.transferMode.b_scale;
+    transferInfo->scale.a = gc->state.pixel.transferMode.a_scale;
+    transferInfo->bias.r = gc->state.pixel.transferMode.r_bias;
+    transferInfo->bias.g = gc->state.pixel.transferMode.g_bias;
+    transferInfo->bias.b = gc->state.pixel.transferMode.b_bias;
+    transferInfo->bias.a = gc->state.pixel.transferMode.a_bias;
+
+    transferInfo->width = width;
+    transferInfo->height = height;
+    transferInfo->depth = depth;
+    transferInfo->numOfPixel = width * height * depth;
+    if(0 == transferInfo->numOfPixel)
+    {
+        __GL_EXIT();
+    }
+
+    transferInfo->applyGenericScaleBias = __glNeedScaleBias(gc, &(transferInfo->scale), &(transferInfo->bias));
+
+    transferInfo->srcType = srcType;
+    transferInfo->dstType = dstType;
+    if((GL_FALSE == transferInfo->applyGenericScaleBias) && (transferInfo->srcType == transferInfo->dstType))
+    {
+        /* No need do pixel operation */
+        transferInfo->applyPixelTransfer = GL_FALSE;
+        __GL_EXIT();
+    }
+    else
+    {
+        transferInfo->applyPixelTransfer = GL_TRUE;
+    }
+
+    transferInfo->baseFormat = baseFmt;
+    transferInfo->srcSizeOfPixel = __glPixelSize(gc, transferInfo->baseFormat, transferInfo->srcType);
+    GL_ASSERT(0 != transferInfo->srcSizeOfPixel);
+
+    transferInfo->dstSizeOfPixel = __glPixelSize(gc, transferInfo->baseFormat, transferInfo->dstType);
+    GL_ASSERT(0 != transferInfo->dstSizeOfPixel);
+
+    if(GL_TRUE == __glGetComponentAndMaskFromFormat(transferInfo->baseFormat, &(transferInfo->compNumber), &(transferInfo->compMask[0])))
+    {
+        __GL_EXIT();
+    }
+    transferInfo->numOfComponents = transferInfo->compNumber * transferInfo->numOfPixel;
+
+    return GL_TRUE;
+
+OnExit:
+    return GL_FALSE;
+}
+
+
+#define gcdUINT_MAX(n)                  ((gctUINT)(((gctUINT64)1 << (n)) - 1))
+#define gcdGET_FIELD(data, start, bits) (((data) >> (start)) & (~(~0U << bits)))
+
+
+#define __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(offset, start, bits) \
+    {\
+        *((GLfloat *)tmpBuf+i+offset) = (GLfloat)gcdGET_FIELD(tmpUint32, start, bits) / (GLfloat)gcdUINT_MAX(bits);\
+    }
+
+#define __GL_CONVERT_SIGNED_2_FLOAT(srcType, maxValue) \
+    {\
+        *((GLfloat *)tmpBuf+i) = (GLfloat)(*((srcType *)buf+i) * 2 + 1) / (GLfloat)(maxValue);\
+    }
+
+#define __GL_CONVERT_UNSIGNED_2_FLOAT(srcType, maxValue) \
+    {\
+        *((GLfloat *)tmpBuf+i) = (GLfloat)(*((srcType *)buf+i)) / (GLfloat)(maxValue);\
+    }
+
+#define __GL_CONVERT_HALF_FLOAT_2_FLOAT() \
+    {\
+        tmpUint32 = gcoMATH_Float16ToFloat(*((GLushort *)buf+i));\
+        *((GLfloat *)tmpBuf+i) = *(GLfloat *)&tmpUint32;\
+    }
+
+#define __GL_CONVERT_UNSIGNED_L_2_RGB(srcType, maxValue)\
+    {\
+        readOffset = (3 == components) ? i : 2*i;\
+        if(3 == j)\
+        {\
+            *((GLfloat *)tmpBuf+components*i+j) =  (GLfloat)(*((srcType *)buf+readOffset+1)) / (GLfloat)(maxValue);\
+        }\
+        else\
+        {\
+            *((GLfloat *)tmpBuf+components*i+j) = (GLfloat)(*((srcType *)buf+readOffset)) / (GLfloat)(maxValue);\
+        }\
+    }
+
+#define __GL_CONVERT_SIGNED_L_2_RGB(srcType, maxValue) \
+    {\
+        readOffset = (3 == components) ? i : 2*i;\
+        if(3 == j)\
+        {\
+            *((GLfloat *)tmpBuf+components*i+j) = (GLfloat)(*((srcType *)buf+readOffset+1) * 2 + 1) / (GLfloat)(maxValue);\
+        }\
+        else\
+        {\
+            *((GLfloat *)tmpBuf+components*i+j) = (GLfloat)(*((srcType *)buf+readOffset) * 2 + 1) / (GLfloat)(maxValue);\
+        }\
+    }
+
+#define __GL_CONVERT_FLOAT_L_2_RGB()\
+    {\
+        readOffset = (3 == components) ? i : 2*i;\
+        if(3 == j)\
+        {\
+            *((GLfloat *)tmpBuf+components*i+j) = *((GLfloat*)buf+readOffset+1);\
+        }\
+        else\
+        {\
+            *((GLfloat *)tmpBuf+components*i+j) = *((GLfloat*)buf+readOffset);\
+        }\
+    }
+
+#define __GL_CONVERT_HALF_FLOAT_L_2_RGB()\
+    {\
+        readOffset = (3 == components) ? i : 2*i;\
+        if(3 == j)\
+        {\
+            *((GLfloat *)tmpBuf+components*i+j) = (GLfloat)gcoMATH_Float16ToFloat(*((GLushort *)buf+readOffset+1));\
+        }\
+        else\
+        {\
+            *((GLfloat *)tmpBuf+components*i+j) = (GLfloat)gcoMATH_Float16ToFloat(*((GLushort *)buf+readOffset));\
+        }\
+    }
+
+#define __GL_CONVERT_SIGNED_I_2_RGBA(srcType, maxValue) \
+    {\
+        *((GLfloat *)tmpBuf+components*i+j) = (GLfloat)(*((srcType *)buf+i) * 2 + 1) / (GLfloat)(maxValue);\
+    }
+
+#define __GL_CONVERT_UNSIGNED_I_2_RGBA(srcType, maxValue)\
+    {\
+        *((GLfloat *)tmpBuf+components*i+j) =  (GLfloat)(*((srcType *)buf+i)) / (GLfloat)(maxValue);\
+    }
+
+#define __GL_CONVERT_FLOAT_I_2_RGBA()\
+    {\
+        *((GLfloat *)tmpBuf+components*i+j) = *((GLfloat*)buf+i);\
+    }
+
+#define __GL_CONVERT_HALF_FLOAT_I_2_RGBA()\
+    {\
+        *((GLfloat *)tmpBuf+components*i+j) = (GLfloat)gcoMATH_Float16ToFloat(*((GLushort *)buf+i));\
+    }
+
+#define __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(offset, start, bits) \
+    {\
+        tmpUint32 &= (GLuint)(((GLuint)(*((GLfloat *)tmpBuf+i+offset) * (GLfloat)(gcdUINT_MAX(bits))) & gcdUINT_MAX(bits)) << start);\
+    }
+
+#define __GL_FINALCONVERSION_2_SIGNED(dstType, maxValue) \
+    {\
+        *((dstType *)outBuf+i) = (dstType)(((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue) - 1) / 2);\
+    }
+
+#define __GL_FINALCONVERSION_2_UNSIGNED(dstType, maxValue) \
+    {\
+        *((dstType *)outBuf+i) = (dstType)((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue));\
+    }
+
+#define __GL_FINALCONVERSION_2_HALF_FLOAT() \
+    {\
+        *((GLushort *)outBuf+i) = gcoMATH_FloatToFloat16(*((GLuint *)tmpBuf+i));\
+    }
+
+#define __GL_L_FINALCONVERSION_2_UNSIGNED(dstType, maxValue) \
+    {\
+        writeOffset = (3 == components) ? (i/components) : ((i/components)*2);\
+        *((dstType *)outBuf+writeOffset) = (dstType)((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue));\
+        if(4 == components)\
+        {\
+            *((dstType *)outBuf+writeOffset+1) = (dstType)((*((GLfloat *)tmpBuf+i+3)) * (GLfloat)(maxValue));\
+        }\
+    }
+
+#define __GL_L_FINALCONVERSION_2_SIGNED(dstType, maxValue) \
+    {\
+        writeOffset = (3 == components) ? (i/components) : ((i/components)*2);\
+        *((dstType *)outBuf+writeOffset) = (dstType)(((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue)-1)/2);\
+        if(4 == components)\
+        {\
+            *((dstType *)outBuf+writeOffset+1) = (dstType)(((*((GLfloat *)tmpBuf+i+3)) * (GLfloat)(maxValue)-1)/2);\
+        }\
+    }
+
+#define __GL_L_FINALCONVERSION_2_FLOAT() \
+    {\
+        writeOffset = (3 == components) ? (i/components) : ((i/components)*2);\
+        *((GLfloat *)outBuf+writeOffset) = *((GLfloat *)tmpBuf+i);\
+        if(4 == components)\
+        {\
+            *((GLfloat *)outBuf+writeOffset+1) = *((GLfloat *)tmpBuf+i+3);\
+        }\
+    }
+
+#define __GL_L_FINALCONVERSION_2_HALF_FLOAT() \
+    {\
+        writeOffset = (3 == components) ? (i/components) : ((i/components)*2);\
+        *((GLushort *)outBuf+writeOffset) = (GLushort)gcoMATH_FloatToFloat16(*((GLuint *)tmpBuf+i));\
+        if(4 == components)\
+        {\
+            *((GLushort *)outBuf+writeOffset+1) = (GLushort)gcoMATH_FloatToFloat16(*((GLuint *)tmpBuf+i+3));\
+        }\
+    }
+
+#define __GL_I_FINALCONVERSION_2_UNSIGNED(dstType, maxValue) \
+    {\
+        *((dstType *)outBuf+i/components) = (dstType)((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue));\
+    }
+
+#define __GL_I_FINALCONVERSION_2_SIGNED(dstType, maxValue) \
+    {\
+        *((dstType *)outBuf+i/components) = (dstType)(((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue)-1)/2);\
+    }
+
+#define __GL_I_FINALCONVERSION_2_FLOAT() \
+    {\
+        *((GLfloat *)outBuf+i/components) = *((GLfloat *)tmpBuf+i);\
+    }
+
+#define __GL_I_FINALCONVERSION_2_HALF_FLOAT() \
+    {\
+        *((GLushort *)outBuf+i/components) = (GLushort)gcoMATH_FloatToFloat16(*((GLuint *)tmpBuf+i));\
+    }
+
+GLvoid __glCheckSpcecialType(GLenum baseFmt, GLenum *srcType, GLenum dstType)
+{
+    switch(*srcType)
+    {
+        case GL_UNSIGNED_BYTE_3_3_2:
+        case GL_UNSIGNED_BYTE_2_3_3_REV:
+        case GL_UNSIGNED_SHORT_5_6_5:
+        case GL_UNSIGNED_SHORT_5_6_5_REV:
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+            if((GL_RGB != baseFmt) && (GL_RGB_INTEGER != baseFmt) && (GL_BGR != baseFmt) && (GL_BGR_INTEGER != baseFmt))
+            {
+                *srcType = dstType;
+            }
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4:
+        case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+        case GL_UNSIGNED_SHORT_5_5_5_1:
+        case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+        case GL_UNSIGNED_INT_8_8_8_8:
+        case GL_UNSIGNED_INT_8_8_8_8_REV:
+        case GL_UNSIGNED_INT_10_10_10_2:
+        case GL_UNSIGNED_INT_2_10_10_10_REV:
+            if((GL_RGBA != baseFmt) && (GL_RGBA_INTEGER != baseFmt) && (GL_BGRA != baseFmt) && (GL_BGRA_INTEGER != baseFmt))
+            {
+                *srcType = dstType;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+GLboolean __glCheckSpecialFormat(GLenum internalFormat, GLenum format, GLenum* type)
+{
+    switch(format)
+    {
+        case GL_RED_INTEGER_EXT:
+        case GL_BLUE_INTEGER_EXT:
+        case GL_GREEN_INTEGER_EXT:
+        case GL_ALPHA_INTEGER_EXT:
+        case GL_RGB_INTEGER_EXT:
+        case GL_RGBA_INTEGER_EXT:
+        case GL_BGR_INTEGER_EXT:
+        case GL_BGRA_INTEGER_EXT:
+        case GL_LUMINANCE_INTEGER_EXT:
+        case GL_LUMINANCE_ALPHA_INTEGER_EXT:
+            switch (internalFormat)
+            {
+                case GL_RGBA32UI_EXT:
+                case GL_RGBA16UI_EXT:
+                case GL_RGBA8UI_EXT:
+                case GL_RGB32UI_EXT:
+                case GL_RGB16UI_EXT:
+                case GL_RGB10_A2UI:
+                case GL_RGB8UI_EXT:
+                case GL_RG32UI:
+                case GL_RG16UI:
+                case GL_RG8UI:
+                case GL_R32UI:
+                case GL_R16UI:
+                case GL_R8UI:
+                case GL_LUMINANCE32UI_EXT:
+                case GL_LUMINANCE16UI_EXT:
+                case GL_LUMINANCE8UI_EXT:
+                case GL_LUMINANCE_ALPHA32UI_EXT:
+                case GL_LUMINANCE_ALPHA16UI_EXT:
+                case GL_LUMINANCE_ALPHA8UI_EXT:
+                case GL_INTENSITY32UI_EXT:
+                case GL_INTENSITY16UI_EXT:
+                case GL_INTENSITY8UI_EXT:
+                    //format is INTEGER
+                    if (*type == GL_INT){
+                        *type = GL_UNSIGNED_INT;
+                    }
+                    else if(*type == GL_SHORT){
+                        *type = GL_UNSIGNED_SHORT;
+                    }
+                    else if(*type == GL_BYTE){
+                        *type = GL_UNSIGNED_BYTE;
+                    }
+                    break;
+                case GL_RGBA32I_EXT:
+                case GL_RGBA16I_EXT:
+                case GL_RGBA8I_EXT:
+                case GL_RGB32I_EXT:
+                case GL_RGB16I_EXT:
+                case GL_RGB8I_EXT:
+                case GL_RG32I:
+                case GL_RG16I:
+                case GL_RG8I:
+                case GL_R32I:
+                case GL_R16I:
+                case GL_R8I:
+                case GL_LUMINANCE32I_EXT:
+                case GL_LUMINANCE16I_EXT:
+                case GL_LUMINANCE8I_EXT:
+                case GL_LUMINANCE_ALPHA32I_EXT:
+                case GL_LUMINANCE_ALPHA16I_EXT:
+                case GL_LUMINANCE_ALPHA8I_EXT:
+                case GL_INTENSITY32I_EXT:
+                case GL_INTENSITY16I_EXT:
+                case GL_INTENSITY8I_EXT:
+                    //format is INTEGER
+                    if (*type == GL_UNSIGNED_INT){
+                        *type = GL_INT;
+                    }
+                    else if(*type == GL_UNSIGNED_SHORT){
+                        *type = GL_SHORT;
+                    }
+                    else if(*type == GL_UNSIGNED_BYTE){
+                        *type = GL_BYTE;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            return GL_TRUE;
+        case GL_COLOR_INDEX:
+        case GL_STENCIL_INDEX:
+        case GL_DEPTH_STENCIL:
+        case GL_DEPTH_COMPONENT:
+            return GL_TRUE;
+        default:
+            break;
+    }
+    return GL_FALSE;
+}
+
+GLboolean __glConvertL2RGB(GLenum type,GLsizei numOfPixel, GLubyte components,GLfloat* tmpBuf, const GLvoid* buf)
+{
+    GLsizei i = 0, j = 0, readOffset = 0;
+    switch (type)
+    {
+        case GL_BYTE:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_SIGNED_L_2_RGB(GLbyte, __glMaxUbyte);
+                }
+            }
+            break;
+        case GL_SHORT:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_SIGNED_L_2_RGB(GLshort, __glMaxUshort);
+                }
+            }
+            break;
+        case GL_INT:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_SIGNED_L_2_RGB(GLint, __glMaxUint);
+                }
+            }
+            break;
+        case GL_UNSIGNED_BYTE:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_UNSIGNED_L_2_RGB(GLubyte, __glMaxUbyte);
+                }
+            }
+            break;
+        case GL_UNSIGNED_SHORT:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_UNSIGNED_L_2_RGB(GLushort, __glMaxUshort);
+                }
+            }
+            break;
+        case GL_UNSIGNED_INT:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_UNSIGNED_L_2_RGB(GLuint, __glMaxUint);
+                }
+            }
+            break;
+        case GL_FLOAT:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_FLOAT_L_2_RGB();
+                }
+            }
+            break;
+        case GL_HALF_FLOAT:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_HALF_FLOAT_L_2_RGB();
+                }
+            }
+            break;
+
+        default:
+            return GL_TRUE;
+    }
+    return GL_FALSE;
+}
+
+GLboolean __glConvertI2RGBA(GLenum type,GLsizei numOfPixel, GLubyte components,GLfloat* tmpBuf, const GLvoid* buf)
+{
+    GLsizei i = 0, j = 0;
+    switch (type)
+    {
+        case GL_BYTE:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_SIGNED_I_2_RGBA(GLbyte, __glMaxUbyte);
+                }
+            }
+            break;
+        case GL_SHORT:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_SIGNED_I_2_RGBA(GLshort, __glMaxUshort);
+                }
+            }
+            break;
+        case GL_INT:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_SIGNED_I_2_RGBA(GLint, __glMaxUint);
+                }
+            }
+            break;
+        case GL_UNSIGNED_BYTE:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_UNSIGNED_I_2_RGBA(GLubyte, __glMaxUbyte);
+                }
+            }
+            break;
+        case GL_UNSIGNED_SHORT:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_UNSIGNED_I_2_RGBA(GLushort, __glMaxUshort);
+                }
+            }
+            break;
+        case GL_UNSIGNED_INT:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_UNSIGNED_I_2_RGBA(GLuint, __glMaxUint);
+                }
+            }
+            break;
+        case GL_FLOAT:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_FLOAT_I_2_RGBA();
+                }
+            }
+            break;
+        case GL_HALF_FLOAT:
+            for(i=0; i<numOfPixel; i++)
+            {
+                for(j=0; j<components; j++)
+                {
+                    __GL_CONVERT_HALF_FLOAT_I_2_RGBA();
+                }
+            }
+            break;
+
+        default:
+            return GL_TRUE;
+    }
+    return GL_FALSE;
+}
+
+GLboolean __glConvert2Float(GLenum type,GLsizei numOfComponent, GLubyte components,GLfloat* tmpBuf, const GLvoid* buf)
+{
+    GLsizei i = 0;
+    GLuint tmpUint32 = 0;
+
+    switch (type)
+    {
+        case GL_BYTE:
+            for(i=0; i<numOfComponent; i++)
+            {
+                __GL_CONVERT_SIGNED_2_FLOAT(GLbyte, __glMaxUbyte);
+            }
+            break;
+        case GL_SHORT:
+            for(i=0; i<numOfComponent; i++)
+            {
+                __GL_CONVERT_SIGNED_2_FLOAT(GLshort, __glMaxUshort);
+            }
+            break;
+        case GL_INT:
+            for(i=0; i<numOfComponent; i++)
+            {
+                __GL_CONVERT_SIGNED_2_FLOAT(GLint, __glMaxUint);
+            }
+            break;
+        case GL_UNSIGNED_BYTE:
+            for(i=0; i<numOfComponent; i++)
+            {
+                __GL_CONVERT_UNSIGNED_2_FLOAT(GLubyte, __glMaxUbyte);
+            }
+            break;
+        case GL_UNSIGNED_SHORT:
+            for(i=0; i<numOfComponent; i++)
+            {
+                __GL_CONVERT_UNSIGNED_2_FLOAT(GLushort, __glMaxUshort);
+            }
+            break;
+        case GL_UNSIGNED_INT:
+            for(i=0; i<numOfComponent; i++)
+            {
+                __GL_CONVERT_UNSIGNED_2_FLOAT(GLuint, __glMaxUint);
+            }
+            break;
+        case GL_FLOAT:
+            gcoOS_MemCopy(tmpBuf, buf, numOfComponent * sizeof(GLfloat));
+            break;
+        case GL_HALF_FLOAT:
+            for(i=0; i<numOfComponent; i++)
+            {
+                __GL_CONVERT_HALF_FLOAT_2_FLOAT();
+            }
+            break;
+        case GL_UNSIGNED_BYTE_3_3_2:
+            GL_ASSERT(3 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                tmpUint32 = (GLuint)(*(GLubyte*)buf+(i/components));
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(0, 5, 3);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(1, 2, 3);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(2, 0, 2);
+            }
+            break;
+        case GL_UNSIGNED_BYTE_2_3_3_REV:
+            GL_ASSERT(3 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                tmpUint32 = (GLuint)(*(GLubyte*)buf+(i/components));
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(0, 0, 3);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(1, 3, 3);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(2, 6, 2);
+            }
+            break;
+        case GL_UNSIGNED_SHORT_5_6_5:
+            GL_ASSERT(3 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                tmpUint32 = (GLuint)(*(GLushort*)buf+(i/components));
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(0, 11, 5);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(1, 5,  6);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(2, 0,  5);
+            }
+            break;
+        case GL_UNSIGNED_SHORT_5_6_5_REV:
+            GL_ASSERT(3 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                tmpUint32 = (GLuint)(*(GLushort*)buf+(i/components));
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(0, 0,  5);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(1, 5,  6);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(2, 11, 5);
+            }
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4:
+            GL_ASSERT(4 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                tmpUint32 = (GLuint)(*(GLushort*)buf+(i/components));
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(0, 12, 4);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(1, 8,  4);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(2, 4,  4);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(3, 0,  4);
+            }
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+            GL_ASSERT(4 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                tmpUint32 = (GLuint)(*(GLushort*)buf+(i/components));
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(0, 0,  4);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(1, 4,  4);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(2, 8,  4);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(3, 12, 4);
+            }
+            break;
+        case GL_UNSIGNED_SHORT_5_5_5_1:
+            GL_ASSERT(4 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                tmpUint32 = (GLuint)(*(GLushort*)buf+(i/components));
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(0, 11, 5);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(1, 6,  5);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(2, 1,  5);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(3, 0,  1);
+            }
+            break;
+        case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+            GL_ASSERT(4 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                tmpUint32 = (GLuint)(*(GLushort*)buf+(i/components));
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(0, 0,  5);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(1, 5,  5);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(2, 10, 5);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(3, 15, 1);
+            }
+            break;
+        case GL_UNSIGNED_INT_8_8_8_8:
+            GL_ASSERT(4 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                tmpUint32 = (GLuint)(*(GLuint*)buf+(i/components));
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(0, 24, 8);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(1, 16, 8);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(2, 8,  8);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(3, 0,  8);
+            }
+            break;
+        case GL_UNSIGNED_INT_8_8_8_8_REV:
+            GL_ASSERT(4 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                tmpUint32 = (GLuint)(*(GLuint*)buf+(i/components));
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(0, 0,  8);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(1, 8,  8);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(2, 16, 8);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(3, 24, 8);
+            }
+            break;
+        case GL_UNSIGNED_INT_10_10_10_2:
+            GL_ASSERT(4 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                tmpUint32 = (GLuint)(*(GLuint*)buf+(i/components));
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(0, 22, 10);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(1, 12, 10);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(2, 2,  10);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(3, 0,  2);
+            }
+            break;
+        case GL_UNSIGNED_INT_2_10_10_10_REV:
+            GL_ASSERT(4 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                tmpUint32 = (GLuint)(*(GLuint*)buf+(i/components));
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(0, 0,  10);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(1, 10, 10);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(2, 20, 10);
+                __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(3, 30, 2);
+            }
+            break;
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+            GL_ASSERT(3 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                GLuint or=0, og=0, ob=0;
+                tmpUint32 = (GLuint)(*(GLuint*)buf+(i/components));
+
+                or = gcoMATH_Float11ToFloat(gcdGET_FIELD(tmpUint32, 0, 11));
+                og = gcoMATH_Float11ToFloat(gcdGET_FIELD(tmpUint32, 11, 11));
+                ob = gcoMATH_Float10ToFloat(gcdGET_FIELD(tmpUint32, 22, 10));
+
+                *((GLfloat *)tmpBuf+i) = *(GLfloat*)&or;
+                *((GLfloat *)tmpBuf+i+1) = *(GLfloat*)&og;
+                *((GLfloat *)tmpBuf+i+2) = *(GLfloat*)&ob;
+            }
+            break;
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+            GL_ASSERT(3 == components);
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                const GLuint mBits = 9;      /* mantissa bits */
+                const GLuint eBias = 15;     /* max allowed bias exponent */
+                GLfloat scale =0.0;
+
+                tmpUint32 = (GLuint)(*(GLuint*)buf+(i/components));
+                scale = gcoMATH_Power(2.0f, (GLfloat)gcdGET_FIELD(tmpUint32, 27, 5) - eBias - mBits);
+
+                *((GLfloat *)tmpBuf+i) = (GLfloat)gcdGET_FIELD(tmpUint32, 0,  9) * scale;
+                *((GLfloat *)tmpBuf+i+1) = (GLfloat)gcdGET_FIELD(tmpUint32, 9,  9) * scale;
+                *((GLfloat *)tmpBuf+i+2) = (GLfloat)gcdGET_FIELD(tmpUint32, 18, 9) * scale;
+             }
+            break;
+
+        default:
+            return GL_TRUE;
+    }
+    return GL_FALSE;
+}
+
+GLvoid __glScaleAndBias(GLsizei numOfComponent, GLubyte components, GLfloat* tmpBuf, GLfloat rgbaScale[4], GLfloat rgbaBias[4], GLubyte mask[4])
+{
+    int i, j;
+
+    for(i = 0; i < numOfComponent; ){
+        for(j = 0; j < components; j++)
+        {
+            *(tmpBuf+i) = *(tmpBuf+i) * rgbaScale[mask[j]-1];
+            *(tmpBuf+i) = *(tmpBuf+i) + rgbaBias[mask[j]-1];
+            i++;
+        }
+    }
+}
+
+GLvoid __glClamp2ZeroOne(GLsizei numOfComponent, GLubyte components, GLfloat* tmpBuf)
+{
+    int i, j;
+    for(i = 0; i < numOfComponent; ){
+        for(j = 0; j < components; j++)
+        {
+            *(tmpBuf+i) = gcmCLAMP(*(tmpBuf+i), __glZero, __glOne);
+            i++;
+        }
+    }
+}
+
+GLint _FloorLog2(GLfloat val)
+{
+    GLint exp = 0;
+    gctUINT64 base = 1;
+
+    while (val >= (GLfloat)base)
+    {
+        base = (gctUINT64)1 << (++exp);
+    }
+
+    return exp - 1;
+}
+
+
+GLvoid __glFinalConversionForL(GLenum interType, GLenum* type, GLsizei numOfComponent, GLubyte components, GLfloat* tmpBuf, GLvoid * outBuf)
+{
+    GLsizei i = 0, writeOffset = 0;
+
+    switch (interType)
+    {
+        case GL_BYTE:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_L_FINALCONVERSION_2_SIGNED(GLbyte, __glMaxUbyte);
+            }
+            break;
+        case GL_SHORT:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_L_FINALCONVERSION_2_SIGNED(GLshort, __glMaxUshort);
+            }
+            break;
+        case GL_INT:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_L_FINALCONVERSION_2_SIGNED(GLint, __glMaxUint);
+            }
+        case GL_UNSIGNED_BYTE:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_L_FINALCONVERSION_2_UNSIGNED(GLubyte, __glMaxUbyte);
+            }
+            break;
+        case GL_UNSIGNED_SHORT:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_L_FINALCONVERSION_2_UNSIGNED(GLushort, __glMaxUshort);
+            }
+            break;
+        case GL_UNSIGNED_INT:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_L_FINALCONVERSION_2_UNSIGNED(GLuint, __glMaxUint);
+            }
+            break;
+        case GL_FLOAT:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_L_FINALCONVERSION_2_FLOAT();
+            }
+            break;
+        case GL_HALF_FLOAT:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_L_FINALCONVERSION_2_HALF_FLOAT();
+            }
+            break;
+
+        default:
+            return;
+    }
+
+    /* Change type after convert data from tmpBuf to outBuf */
+    *type = interType;
+}
+
+GLvoid __glFinalConversionForI(GLenum interType, GLenum* type, GLsizei numOfComponent, GLubyte components, GLfloat* tmpBuf, GLvoid * outBuf)
+{
+    GLsizei i = 0;
+
+    switch (interType)
+    {
+        case GL_BYTE:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_I_FINALCONVERSION_2_SIGNED(GLbyte, __glMaxUbyte);
+            }
+            break;
+        case GL_SHORT:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_I_FINALCONVERSION_2_SIGNED(GLshort, __glMaxUshort);
+            }
+            break;
+        case GL_INT:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_I_FINALCONVERSION_2_SIGNED(GLint, __glMaxUint);
+            }
+        case GL_UNSIGNED_BYTE:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_I_FINALCONVERSION_2_UNSIGNED(GLubyte, __glMaxUbyte);
+            }
+            break;
+        case GL_UNSIGNED_SHORT:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_I_FINALCONVERSION_2_UNSIGNED(GLushort, __glMaxUshort);
+            }
+            break;
+        case GL_UNSIGNED_INT:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_I_FINALCONVERSION_2_UNSIGNED(GLuint, __glMaxUint);
+            }
+            break;
+        case GL_FLOAT:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_I_FINALCONVERSION_2_FLOAT();
+            }
+            break;
+        case GL_HALF_FLOAT:
+            for(i=0; i<numOfComponent; i+=components)
+            {
+                __GL_I_FINALCONVERSION_2_HALF_FLOAT();
+            }
+            break;
+
+        default:
+            return;
+    }
+
+    /* Change type after convert data from tmpBuf to outBuf */
+    *type = interType;
+}
+
+GLvoid __glFinalConversion(GLenum interType, GLenum* type, GLsizei numOfComponent, GLubyte components, GLfloat* tmpBuf, GLvoid * outBuf)
+{
+    int i;
+    GLuint tmpUint32 = 0;
+
+    /* Add convert to L */
+
+    switch (interType)
+    {
+        case GL_BYTE:
+            for(i = 0; i < numOfComponent; i++)
+            {
+                __GL_FINALCONVERSION_2_SIGNED(GLbyte, __glMaxUbyte);
+            }
+            break;
+        case GL_SHORT:
+            for(i = 0; i < numOfComponent; i++)
+            {
+                __GL_FINALCONVERSION_2_SIGNED(GLshort, __glMaxUshort);
+            }
+            break;
+        case GL_INT:
+            for(i = 0; i < numOfComponent; i++)
+            {
+                __GL_FINALCONVERSION_2_SIGNED(GLint, __glMaxUint);
+            }
+            break;
+        case GL_UNSIGNED_BYTE:
+            for(i = 0; i < numOfComponent; i++)
+            {
+                __GL_FINALCONVERSION_2_UNSIGNED(GLubyte, __glMaxUbyte);
+            }
+            break;
+        case GL_UNSIGNED_SHORT:
+            for(i = 0; i < numOfComponent; i++)
+            {
+                __GL_FINALCONVERSION_2_UNSIGNED(GLushort, __glMaxUshort);
+            }
+            break;
+        case GL_UNSIGNED_INT:
+            for(i = 0; i < numOfComponent; i++)
+            {
+                __GL_FINALCONVERSION_2_UNSIGNED(GLuint, __glMaxUint);
+            }
+            break;
+        case GL_FLOAT:
+            gcoOS_MemCopy(outBuf, tmpBuf, numOfComponent * sizeof(GLfloat));
+            break;
+        case GL_HALF_FLOAT:
+            for(i = 0; i < numOfComponent; i++)
+            {
+                __GL_FINALCONVERSION_2_HALF_FLOAT();
+            }
+            break;
+        case GL_UNSIGNED_BYTE_3_3_2:
+            GL_ASSERT(3 == components);
+            for(i = 0; i < numOfComponent; i+=components)
+            {
+                tmpUint32 = 0;
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(0, 5, 3);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 2, 3);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 0, 2);
+                *((GLubyte *)outBuf + (i/components)) = (GLubyte)(tmpUint32 & gcdUINT_MAX(8));
+            }
+            break;
+        case GL_UNSIGNED_BYTE_2_3_3_REV:
+            GL_ASSERT(3 == components);
+            for(i = 0; i < numOfComponent; i+=components)
+            {
+                tmpUint32 = 0;
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(0, 0, 3);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 3, 3);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 6, 2);
+                *((GLubyte *)outBuf + (i/components)) = (GLubyte)(tmpUint32 & gcdUINT_MAX(8));
+            }
+            break;
+        case GL_UNSIGNED_SHORT_5_6_5:
+            GL_ASSERT(3 == components);
+            for(i = 0; i < numOfComponent; i+=components)
+            {
+                tmpUint32 = 0;
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(0, 11, 5);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 5,  6);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 0,  5);
+                *((GLushort *)outBuf + (i/components)) = (GLushort)(tmpUint32 & gcdUINT_MAX(16));
+            }
+            break;
+        case GL_UNSIGNED_SHORT_5_6_5_REV:
+            GL_ASSERT(3 == components);
+            for(i = 0; i < numOfComponent; i+=components)
+            {
+                tmpUint32 = 0;
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(0, 0,  5);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 5,  6);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 11, 5);
+                *((GLushort *)outBuf + (i/components)) = (GLushort)(tmpUint32 & gcdUINT_MAX(16));
+            }
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4:
+            GL_ASSERT(4 == components);
+            for(i = 0; i < numOfComponent; i+=components)
+            {
+                tmpUint32 = 0;
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(0, 12, 4);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 8,  4);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 4,  4);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(3, 0,  4);
+                *((GLushort *)outBuf + (i/components)) = (GLushort)(tmpUint32 & gcdUINT_MAX(16));
+            }
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+            GL_ASSERT(4 == components);
+            for(i = 0; i < numOfComponent; i+=components)
+            {
+                tmpUint32 = 0;
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(0, 0,  4);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 4,  4);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 8,  4);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(3, 12, 4);
+                *((GLushort *)outBuf + (i/components)) = (GLushort)(tmpUint32 & gcdUINT_MAX(16));
+            }
+            break;
+        case GL_UNSIGNED_SHORT_5_5_5_1:
+            GL_ASSERT(4 == components);
+            for(i = 0; i < numOfComponent; i+=components)
+            {
+                tmpUint32 = 0;
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(0, 11, 5);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 6,  5);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 1,  5);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(3, 0,  1);
+                *((GLushort *)outBuf + (i/components)) = (GLushort)(tmpUint32 & gcdUINT_MAX(16));
+            }
+            break;
+        case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+            GL_ASSERT(4 == components);
+            for(i = 0; i < numOfComponent; i+=components)
+            {
+                tmpUint32 = 0;
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(0, 0,  5);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 5,  5);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 10, 5);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(3, 15, 1);
+                *((GLushort *)outBuf + (i/components)) = (GLushort)(tmpUint32 & gcdUINT_MAX(16));
+            }
+            break;
+        case GL_UNSIGNED_INT_8_8_8_8:
+            GL_ASSERT(4 == components);
+            for(i = 0; i < numOfComponent; i+=components)
+            {
+                tmpUint32 = 0;
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(0, 24, 8);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 16, 8);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 8,  8);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(3, 0,  8);
+                *((GLuint *)outBuf + (i/components)) = (GLuint)(tmpUint32 & gcdUINT_MAX(16));
+            }
+            break;
+        case GL_UNSIGNED_INT_8_8_8_8_REV:
+            GL_ASSERT(4 == components);
+            for(i = 0; i < numOfComponent; i+=components)
+            {
+                tmpUint32 = 0;
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(0, 0,  8);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 8,  8);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 16, 8);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(3, 24, 8);
+                *((GLuint *)outBuf + (i/components)) = (GLuint)(tmpUint32 & gcdUINT_MAX(16));
+            }
+            break;
+        case GL_UNSIGNED_INT_10_10_10_2:
+            GL_ASSERT(4 == components);
+            for(i = 0; i < numOfComponent; i+=components)
+            {
+                tmpUint32 = 0;
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(0, 22, 10);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 12, 10);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 2,  10);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(3, 0,  2);
+                *((GLuint *)outBuf + (i/components)) = (GLuint)(tmpUint32 & gcdUINT_MAX(16));
+            }
+            break;
+        case GL_UNSIGNED_INT_2_10_10_10_REV:
+            GL_ASSERT(4 == components);
+            for(i = 0; i < numOfComponent; i+=components)
+            {
+                tmpUint32 = 0;
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(0, 0,  10);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 10, 10);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 20, 10);
+                __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(3, 30, 2);
+                *((GLuint *)outBuf + (i/components)) = (GLuint)(tmpUint32 & gcdUINT_MAX(16));
+            }
+            break;
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+            GL_ASSERT(3 == components);
+            for(i = 0; i<numOfComponent; i+=components)
+            {
+                GLshort r=0,g=0,b=0;
+
+                r = (GLushort)gcoMATH_FloatToFloat11((GLuint)*((GLfloat*)tmpBuf+i));
+                g = (GLushort)gcoMATH_FloatToFloat11((GLuint)*((GLfloat*)tmpBuf+i+1));
+                b = (GLushort)gcoMATH_FloatToFloat10((GLuint)*((GLfloat*)tmpBuf+i+2));
+
+                *((GLuint *)outBuf + (i/components)) = (b << 22) | (g << 11) | r;
+            }
+            break;
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+            GL_ASSERT(3 == components);
+            for(i = 0; i<numOfComponent; i+=components)
+            {
+                const GLint mBits = 9;
+                const GLint eBits = 5;
+                const GLint eBias = 15;
+                const GLint eMax  = gcdUINT_MAX(eBits);
+                const GLfloat sharedExpMax = gcdUINT_MAX(mBits)* (1 << (eMax - eBias)) / (GLfloat)(1 << mBits);
+
+                GLfloat rc   = gcmCLAMP(*((GLfloat *)tmpBuf+i), 0.0f, sharedExpMax);
+                GLfloat gc   = gcmCLAMP(*((GLfloat *)tmpBuf+i+1), 0.0f, sharedExpMax);
+                GLfloat bc   = gcmCLAMP(*((GLfloat *)tmpBuf+i+2), 0.0f, sharedExpMax);
+                GLfloat maxc = gcoMATH_MAX(rc, gcoMATH_MAX(gc, bc));
+
+                GLint expp  = gcoMATH_MAX(-eBias - 1, _FloorLog2(maxc)) + 1 + eBias;
+                GLfloat scale = (gctFLOAT)gcoMATH_Power(2.0f, (gctFLOAT)(expp - eBias - mBits));
+                GLint maxs  = (GLint)(maxc / scale + 0.5f);
+
+                GLuint exps = (maxs == (1 << mBits)) ? (GLuint)(expp + 1) : (GLuint)expp;
+                GLuint rs = gcmMIN((GLuint)(rc / scale + 0.5f), gcdUINT_MAX(9));
+                GLuint gs = gcmMIN((GLuint)(gc / scale + 0.5f), gcdUINT_MAX(9));
+                GLuint bs = gcmMIN((GLuint)(bc / scale + 0.5f), gcdUINT_MAX(9));
+
+                *((GLuint *)outBuf + (i/components)) = rs | (gs << 9) | (bs << 18) | (exps << 27);
+            }
+            break;
+
+        default:
+            return;
+    }
+
+    /* Change type after convert data from tmpBuf to outBuf */
+    *type = interType;
+}
+
+
+/* A GenericPixelTransfer function template*/
+GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
+                                        __GLpixelTransferInfo *transferInfo,
+                                        GLenum *type)
+{
+    GLfloat *tmpBuf = gcvNULL;
+    GLenum baseFormat = transferInfo->baseFormat;
+
+    if((gcvNULL == transferInfo->srcImage) || (0 == transferInfo->numOfComponents))
+    {
+        __GL_EXIT();
+    }
+
+    tmpBuf = (GLfloat *)(*gc->imports.malloc)(gc, transferInfo->numOfComponents * sizeof(GLfloat));
+    if(gcvNULL == tmpBuf)
+    {
+        __GL_EXIT();
+    }
+
+    if((baseFormat == GL_LUMINANCE) || (baseFormat == GL_LUMINANCE_ALPHA))
+    {
+        if(__glConvertL2RGB(transferInfo->srcType, transferInfo->numOfPixel, transferInfo->compNumber, tmpBuf, transferInfo->srcImage))
+        {
+            __GL_EXIT();
+        }
+    }
+    else if(baseFormat == GL_INTENSITY)
+    {
+        if(__glConvertI2RGBA(transferInfo->srcType, transferInfo->numOfPixel, transferInfo->compNumber, tmpBuf, transferInfo->srcImage))
+        {
+            __GL_EXIT();
+        }
+    }
+    else
+    {
+        if(__glConvert2Float(transferInfo->srcType, transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, transferInfo->srcImage))
+        {
+            __GL_EXIT();
+        }
+    }
+
+    /* Scale, Bias, Clamp */
+    if(transferInfo->applyGenericScaleBias)
+    {
+        __glScaleAndBias(transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, (GLfloat *)(&(transferInfo->scale)), (GLfloat *)(&(transferInfo->bias)), &(transferInfo->compMask[0]));
+    }
+    __glClamp2ZeroOne(transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf);
+
+
+    if((baseFormat == GL_LUMINANCE) || (baseFormat == GL_LUMINANCE_ALPHA))
+    {
+        __glFinalConversionForL(transferInfo->dstType, type, transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, (GLvoid *)(transferInfo->dstImage));
+    }
+    else if(baseFormat == GL_INTENSITY)
+    {
+        __glFinalConversionForI(transferInfo->dstType, type, transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, (GLvoid *)(transferInfo->dstImage));
+    }
+    else
+    {
+        __glFinalConversion(transferInfo->dstType, type, transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, (GLvoid *)(transferInfo->dstImage));
+    }
+
+OnExit:
+    if(tmpBuf != gcvNULL){
+        (*gc->imports.free)(gc, (void*)tmpBuf);
+        tmpBuf = gcvNULL;
+    }
+}
+
+
+/* A GenericPixelTransfer function template*/
+GLvoid __glGenericPixelTransfer(__GLcontext *gc,
+                                GLsizei width,
+                                GLsizei height,
+                                GLsizei depth,
+                                __GLformatInfo *formatInfo,
+                                GLenum format,
+                                GLenum *type,
+                                const GLvoid *buf,
+                                __GLpixelTransferInfo *transferInfo,
+                                GLenum pixelTransferOperations)
+{
+    GLint internalFormat = 0;
+    GLvoid *interBuf = gcvNULL;
+    GLenum baseFmt = 0;
+    GLenum inType = 0;
+    GLenum outType = 0;
+
+    if((gcvNULL == buf) || (gcvNULL == formatInfo) || (gcvNULL == transferInfo))
+    {
+        __GL_EXIT();
+    }
+
+    if(pixelTransferOperations == __GL_TexImage)// Tex
+    {
+        internalFormat = formatInfo->glFormat;
+        baseFmt = format;
+        inType = *type;
+        outType = formatInfo->dataType;
+
+        /* When format is integer/index/depth/stencil */
+        if(__glCheckSpecialFormat(internalFormat, baseFmt, type))
+        {
+            __GL_EXIT();
+        }
+
+        if(GL_FALSE == __glInitTransferInfo(gc, width, height, depth, transferInfo, baseFmt, inType, outType))
+        {
+            __GL_EXIT();
+        }
+
+        interBuf  = (gc->imports.malloc)(gc, transferInfo->numOfPixel * transferInfo->dstSizeOfPixel);
+        if(gcvNULL == interBuf)
+        {
+            __GL_EXIT();
+        }
+        transferInfo->srcImage = buf;
+        transferInfo->dstImage = interBuf;
+        transferInfo->dstNeedFree = GL_TRUE;
+
+        __glGenericPixelTransferSub(gc, transferInfo, type);
+    }
+    else if(pixelTransferOperations == __GL_ReadPixelsPre)// Read
+    {
+        internalFormat = formatInfo->glFormat;
+        baseFmt = format;
+        inType = formatInfo->dataType;
+        outType = *type;
+
+        /* When format is integer/index/depth/stencil */
+        if(__glCheckSpecialFormat(internalFormat, baseFmt, type))
+        {
+            __GL_EXIT();
+        }
+
+        __glCheckSpcecialType(baseFmt, &inType, outType);
+
+        if(GL_FALSE == __glInitTransferInfo(gc, width, height, depth, transferInfo, baseFmt, inType, outType))
+        {
+            __GL_EXIT();
+        }
+
+        interBuf = (gc->imports.malloc)(gc, transferInfo->numOfPixel * transferInfo->srcSizeOfPixel);
+        if(gcvNULL == interBuf)
+        {
+            __GL_EXIT();
+        }
+        transferInfo->srcImage = interBuf;
+        transferInfo->srcNeedFree = GL_TRUE;
+        transferInfo->dstImage = buf;
+        *type = transferInfo->srcType;
+        return;
+    }
+    else if(pixelTransferOperations == __GL_ReadPixels)
+    {
+        if(GL_FALSE == transferInfo->applyPixelTransfer)
+        {
+            __GL_EXIT();
+        }
+
+        __glGenericPixelTransferSub(gc, transferInfo, type);
+    }
+
+OnExit:
+    if(gcvNULL == interBuf)
+    {
+        if(pixelTransferOperations == __GL_TexImage)
+        {
+            transferInfo->srcImage = buf;
+            transferInfo->dstImage = buf;
+        }
+        else if (pixelTransferOperations == __GL_ReadPixelsPre)
+        {
+            transferInfo->srcImage = buf;
+            transferInfo->dstImage = buf;
+            transferInfo->applyPixelTransfer = GL_FALSE;
+        }
+    }
+}
+

@@ -336,6 +336,7 @@ typedef enum __GLchipUbUsageRec
 typedef struct __GLchipUniformTypeInfoRec
 {
     gcSHADER_TYPE   halType;        /* Compiler defined type */
+    gctUINT         components;      /* e.g. 4 components each row */
     GLenum          glType;         /* GL defined type */
     gctSIZE_T       size;           /* Size in bytes */
 } __GLchipUniformTypeInfo;
@@ -916,7 +917,7 @@ struct __GLchipSLProgramRec
 
     /* Transform feedback Varyings */
     gctSIZE_T                           xfbMaxNameLen;
-    gctUINT                             xfbStride;   /* for interleaved mode */
+    gctUINT*                            xfbStride;   /* for interleaved mode */
     GLuint                              xfbCount;
     __GLchipSLXfbVarying*               xfbVaryings;
 

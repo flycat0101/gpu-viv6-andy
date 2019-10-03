@@ -83,7 +83,7 @@ typedef struct __GLbufferObjectRec
     GLsizeiptr mapLength;
     GLvoid *mapPointer;
     GLbitfield accessFlags;
-    GLuint     accessOES;   /* OES_mapbuffer has different requirement */
+    GLuint     access;
 
     /* List of VAO that this buffer object is attached to */
     __GLimageUser *vaoList;

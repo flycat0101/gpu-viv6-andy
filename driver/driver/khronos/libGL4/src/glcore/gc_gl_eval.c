@@ -1429,6 +1429,11 @@ GLvoid APIENTRY __glim_EvalMesh1(__GLcontext *gc, GLenum mode, GLint low, GLint 
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
+    if (gc->conditionalRenderDiscard)
+    {
+        return;
+    }
+
     __GL_VERTEX_BUFFER_FLUSH(gc);
 
     switch (mode)
@@ -1460,6 +1465,11 @@ GLvoid APIENTRY __glim_EvalMesh2(__GLcontext *gc, GLenum mode,
                                GLint lowV, GLint highV)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
+
+    if (gc->conditionalRenderDiscard)
+    {
+        return;
+    }
 
     __GL_VERTEX_BUFFER_FLUSH(gc);
 

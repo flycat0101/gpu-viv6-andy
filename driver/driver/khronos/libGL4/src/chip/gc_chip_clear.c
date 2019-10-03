@@ -741,12 +741,23 @@ __glChipClearBuffer(
 #ifdef OPENGL40
         {
             GLuint i;
-            for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
+            switch (buffer)
             {
-                if (chipCtx->drawRtViews[i].surf)
+            case GL_COLOR:
+                for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
                 {
-                    gcmONERROR(gcoSURF_Clear(&chipCtx->drawRtViews[i], &clearArg));
+                    if (chipCtx->drawRtViews[i].surf)
+                    {
+                        gcmONERROR(gcoSURF_Clear(&chipCtx->drawRtViews[i], &clearArg));
+                    }
                 }
+                break;
+            case GL_DEPTH:
+            case GL_STENCIL:
+                gcmONERROR(gcoSURF_Clear(surfView, &clearArg));
+                break;
+            default:
+                break;
             }
         }
 #else

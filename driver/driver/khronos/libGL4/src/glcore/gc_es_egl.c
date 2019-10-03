@@ -82,7 +82,7 @@ GLvoid __eglFree(GLvoid *ptr)
 
 static void __eglDestroyThreadArea(void *thrArea)
 {
-    __GLthreadPriv *esThrArea = thrArea;
+    __GLthreadPriv *esThrArea = (__GLthreadPriv *)thrArea;
 
     /* Destroy 3d blit state */
     if (esThrArea->p3DBlitState)
@@ -155,7 +155,7 @@ void __eglDestruct(void)
 
 static void* veglCreateContext_es3(void *thrData, gctINT ClientVersion, VEGLimports *Imports, gctPOINTER SharedContext)
 {
-    __GLcontext *gc = __glCreateContext((GLint)ClientVersion, Imports, SharedContext);
+    __GLcontext *gc = (__GLcontext *)__glCreateContext((GLint)ClientVersion, Imports, SharedContext);
 
     return gc;
 }

@@ -75,6 +75,44 @@
      (gc)->state.pixel.transferMode.mapColor ||         \
      (gc)->transform.color->matrix.matrixType != __GL_MT_IDENTITY)
 
+#define __GL_PIXELTRANSFER_ENABLED(gc)            \
+    ((gc)->state.pixel.transferMode.r_scale != __glOne  ||   \
+     (gc)->state.pixel.transferMode.g_scale != __glOne  ||   \
+     (gc)->state.pixel.transferMode.b_scale != __glOne  ||   \
+     (gc)->state.pixel.transferMode.a_scale != __glOne  ||   \
+     (gc)->state.pixel.transferMode.r_bias  != __glZero ||   \
+     (gc)->state.pixel.transferMode.g_bias  != __glZero ||   \
+     (gc)->state.pixel.transferMode.b_bias  != __glZero ||   \
+     (gc)->state.pixel.transferMode.a_bias  != __glZero)
+
+#define __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo)            \
+    {transferInfo.scale.r = (gc)->state.pixel.transferMode.r_scale;\
+     transferInfo.scale.g = (gc)->state.pixel.transferMode.g_scale;\
+     transferInfo.scale.b = (gc)->state.pixel.transferMode.b_scale;\
+     transferInfo.scale.a = (gc)->state.pixel.transferMode.a_scale;\
+     transferInfo.bias.r  = (gc)->state.pixel.transferMode.r_bias;\
+     transferInfo.bias.g  = (gc)->state.pixel.transferMode.g_bias;\
+     transferInfo.bias.b  = (gc)->state.pixel.transferMode.b_bias;\
+     transferInfo.bias.a  = (gc)->state.pixel.transferMode.a_bias;\
+     (gc)->state.pixel.transferMode.r_scale = __glOne;    \
+     (gc)->state.pixel.transferMode.g_scale = __glOne;    \
+     (gc)->state.pixel.transferMode.b_scale = __glOne;    \
+     (gc)->state.pixel.transferMode.a_scale = __glOne;    \
+     (gc)->state.pixel.transferMode.r_bias  = __glZero;   \
+     (gc)->state.pixel.transferMode.g_bias  = __glZero;   \
+     (gc)->state.pixel.transferMode.b_bias  = __glZero;   \
+     (gc)->state.pixel.transferMode.a_bias  = __glZero;}
+
+#define __GL_REVERT_SCALE_BIAS(gc,transferInfo)            \
+    {(gc)->state.pixel.transferMode.r_scale = transferInfo.scale.r;\
+     (gc)->state.pixel.transferMode.g_scale = transferInfo.scale.g;\
+     (gc)->state.pixel.transferMode.b_scale = transferInfo.scale.b;\
+     (gc)->state.pixel.transferMode.a_scale = transferInfo.scale.a;\
+     (gc)->state.pixel.transferMode.r_bias  = transferInfo.bias.r;\
+     (gc)->state.pixel.transferMode.g_bias  = transferInfo.bias.g;\
+     (gc)->state.pixel.transferMode.b_bias  = transferInfo.bias.b;\
+     (gc)->state.pixel.transferMode.a_bias  = transferInfo.bias.a;}
+
 #define __GL_PIXELTRANSFER_ENABLED_DEPTH(gc)            \
     ((gc)->state.pixel.transferMode.d_scale != 1.0 ||   \
      (gc)->state.pixel.transferMode.d_bias != 0.0)
@@ -419,11 +457,59 @@ typedef struct __GLpixelMachineRec {
     spanInfo->srcLinesPerSpan = 1;                    \
 }
 
+typedef struct __GLpixelTransferInfoRec{
+    /*
+    ** Public info.
+    */
+    GLint width, height, depth;
+    GLint numOfPixel;               /* Total number of pixels */
+    GLint numOfComponents;          /* Total number of components */
+
+    GLenum baseFormat;
+    GLubyte compNumber;             /* Get component number from base format */
+    GLubyte compMask[4];            /* R G B A at postion 0 1 2 3, values 1 2 3 4 represent components sequence */
+
+    __GLcolor scale;                /* NOT implemented. non pix xfer scale*/
+    __GLcolor bias;                 /* NOT implemented. non pix xfer bias*/
+
+    GLboolean applyPixelTransfer;   /* apply pixel transfer operations */
+    GLboolean applyGenericScaleBias;/* apply non pix xfer scale and bias.*/
+
+    /*
+    ** Generic source info.
+    */
+    GLenum srcType;                 /* Form of source image */
+    GLboolean srcPackedComp;        /* Speicial type, such as ushort565 */
+    GLuint srcSizeOfPixel;
+
+    const GLvoid *srcImage;         /* The source image */
+    GLboolean srcNeedFree;
+
+    /*
+    ** Generic destination info.
+    */
+    GLenum dstType;                 /* Form of destination image */
+    GLboolean dstPackedComp;        /* Speicial type, such as ushort565 */
+    GLuint dstSizeOfPixel;
+
+    const GLvoid *dstImage;         /* The destination image */
+    GLboolean dstNeedFree;
+}__GLpixelTransferInfo;
+
+typedef enum __GLPixelTransferOperations {
+    __GL_TexImage = 0,
+    __GL_ReadPixels,
+    __GL_ReadPixelsPre,
+    __GL_CopyPixels
+} __GLPixelTransferOperations;
 
 extern GLboolean __glNeedScaleBias(__GLcontext *gc, __GLcolor *scale, __GLcolor *bias);
 extern GLvoid __glLoadUnpackModes(__GLcontext *gc, __GLpixelSpanInfo *spanInfo);
 extern GLvoid __glLoadPackModes(__GLcontext *gc, __GLpixelSpanInfo *spanInfo);
-
+extern GLvoid __glGenericPixelTransfer(__GLcontext *gc, GLsizei width, GLsizei height,  GLsizei depth, __GLformatInfo *formatInfo, GLenum format, GLenum *type, const GLvoid *buf, __GLpixelTransferInfo *transferInfo, GLenum pixelTransferOperations);
+extern __GLformatInfo* __glGetFormatInfo(GLenum internalFormat);
+extern GLuint __glPixelSize(__GLcontext *gc, GLenum format, GLenum type);
+extern GLboolean __glCheckSpecialFormat(GLenum internalFormat, GLenum format, GLenum* type);
 
 /*data types which aren't defined by spec. but supported by Vivante internal*/
 #define __GL_UNSIGNED_BYTE_4_4_REV_VIVPRIV                   0x1FFFF

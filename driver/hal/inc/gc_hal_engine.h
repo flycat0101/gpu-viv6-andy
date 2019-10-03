@@ -2673,6 +2673,7 @@ typedef struct _gcsVERTEXARRAY_INDEX_INFO
     gctSIZE_T        count;
     gceINDEX_TYPE    indexType;
     gctPOINTER       indexMemory;
+    gctUINT          restartElement;
 
     union _gcsVERTEXARRAY_INDEX_INFO_UNION
     {

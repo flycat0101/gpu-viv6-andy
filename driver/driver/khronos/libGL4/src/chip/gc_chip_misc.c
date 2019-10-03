@@ -60,7 +60,8 @@ __glChipBeginQuery(
     }
 
 
-    if ((queryObj->target == GL_ANY_SAMPLES_PASSED) ||
+    if ((queryObj->target == GL_SAMPLES_PASSED)||
+        (queryObj->target == GL_ANY_SAMPLES_PASSED) ||
         (queryObj->target == GL_ANY_SAMPLES_PASSED_CONSERVATIVE))
     {
         if (chipQuery->queryHeader == gcvNULL)
@@ -874,18 +875,23 @@ __glChipCheckXFBBufSizes(
 
     if (programObj->bindingInfo.xfbMode == GL_INTERLEAVED_ATTRIBS)
     {
-        endBytes = program->xfbStride * (count + xfbObj->offset);
+        GLuint index;
 
-        bufSize = (gctUINT)pXfbBindingPoints[0].bufSize;
-        /* (bufsize == 0) indicates the whole buffer */
-        if (!bufSize)
+        for (index = 0; index < programObj->nextBufferCount + 1; ++index)
         {
-            bufSize = (gctUINT)pXfbBindingPoints[0].boundBufObj->size;
-        }
+            endBytes = program->xfbStride[index] * (count + xfbObj->offset);
 
-        if (bufSize < endBytes)
-        {
-            ret = GL_FALSE;
+            bufSize = (gctUINT)pXfbBindingPoints[index].bufSize;
+            /* (bufsize == 0) indicates the whole buffer */
+            if (!bufSize)
+            {
+                bufSize = (gctUINT)pXfbBindingPoints[index].boundBufObj->size;
+            }
+
+            if (bufSize < endBytes)
+            {
+                ret = GL_FALSE;
+            }
         }
     }
     else

@@ -3495,3 +3495,462 @@ gcChipDecompress_EAC_11bitToR16F(
     return decompressed;
 }
 
+/*************************************************************************
+** RGTC Decompress
+*************************************************************************/
+
+/* Decode 64-bits of Unsigned RGTC (COMPRESSED_RED_RGTC1) to 128 bits of RED8. */
+static void
+gcChipDecodeRGTC1(
+    IN gctSIZE_T Width,
+    IN gctSIZE_T Height,
+    IN gctSIZE_T Stride,
+    IN const GLubyte * Data,
+    OUT GLubyte * Output
+    )
+{
+    GLubyte reds[8];
+    gctSIZE_T x, y;
+    GLushort bits = 0;
+    GLint n, bitsStart;
+
+    /* Data (8 bytes): red0; red1; bits0; bits1; bits2; bits3; bits4; bits5 */
+
+    /* Decode RED 0: RED0 = red0 */
+    reds[0] = *Data;
+
+    /* Decode RED 1: RED1 = red1 */
+    reds[1] = *(Data + 1);
+
+    /* Interpolate RED 2 through RED 7. */
+    if (reds[0] > reds[1])
+    {
+        reds[2] = (6 * reds[0] + 1 * reds[1]) / 7;
+        reds[3] = (5 * reds[0] + 2 * reds[1]) / 7;
+        reds[4] = (4 * reds[0] + 3 * reds[1]) / 7;
+        reds[5] = (3 * reds[0] + 4 * reds[1]) / 7;
+        reds[6] = (2 * reds[0] + 5 * reds[1]) / 7;
+        reds[7] = (1 * reds[0] + 6 * reds[1]) / 7;
+    }
+    else
+    {
+        reds[2] = (4 * reds[0] + 1 * reds[1]) / 5;
+        reds[3] = (3 * reds[0] + 2 * reds[1]) / 5;
+        reds[4] = (2 * reds[0] + 3 * reds[1]) / 5;
+        reds[5] = (1 * reds[0] + 4 * reds[1]) / 5;
+        /* RED MIN */
+        reds[6] = 0x00;
+        /* RED MAX */
+        reds[7] = 0xFF;
+    }
+
+    /* Walk all lines. */
+    for (y = 0, n = 0, bitsStart = 2; y < Height; y++)
+    {
+        /* Walk all pixels. 3 bits per control code. */
+        for (x = 0; x < Width; x++, bits >>= 3, n -= 3, Output += 1)
+        {
+            /* Test if we have enough bits in the accumulator. */
+            if (n < 3)
+            {
+                /* Load another chunk of bits in the accumulator. */
+                bits |= Data[bitsStart++] << n;
+                n += 8;
+            }
+
+            /* Copy the color. */
+            *Output = reds[bits & 0x7];
+        }
+
+        /* Next line. */
+        Output += Stride - Width * 1;
+    }
+}
+
+/* Decode 64-bits of Signed RGTC (COMPRESSED_SIGNED_RED_RGTC1) to 128 bits of RED8. */
+static void
+gcChipDecodeSignedRGTC1(
+    IN gctSIZE_T Width,
+    IN gctSIZE_T Height,
+    IN gctSIZE_T Stride,
+    IN const GLubyte * Data,
+    OUT GLubyte * Output
+    )
+{
+    GLfloat reds[8];
+    gctSIZE_T x, y;
+    GLushort bits = 0;
+    GLint n, bitsStart;
+
+    /* Data (8 bytes): red0; red1; bits0; bits1; bits2; bits3; bits4; bits5 */
+
+    /* Decode RED 0: map signed red0 (-128, 127) to unsigned red (0, 255) */
+    reds[0] = *Data + 128.0f;
+
+    /* Decode RED 1: map signed red1 (-128, 127) to unsigned red (0, 255) */
+    reds[1] = *(Data + 1) + 128.0f;
+
+    /* Interpolate RED 2 through RED 7. */
+    if (reds[0] > reds[1])
+    {
+        reds[2] = (6 * reds[0] + 1 * reds[1]) / 7.0f;
+        reds[3] = (5 * reds[0] + 2 * reds[1]) / 7.0f;
+        reds[4] = (4 * reds[0] + 3 * reds[1]) / 7.0f;
+        reds[5] = (3 * reds[0] + 4 * reds[1]) / 7.0f;
+        reds[6] = (2 * reds[0] + 5 * reds[1]) / 7.0f;
+        reds[7] = (1 * reds[0] + 6 * reds[1]) / 7.0f;
+    }
+    else
+    {
+        reds[2] = (4 * reds[0] + 1 * reds[1]) / 5.0f;
+        reds[3] = (3 * reds[0] + 2 * reds[1]) / 5.0f;
+        reds[4] = (2 * reds[0] + 3 * reds[1]) / 5.0f;
+        reds[5] = (1 * reds[0] + 4 * reds[1]) / 5.0f;
+        /* RED MIN */
+        reds[6] = 0x00;
+        /* RED MAX */
+        reds[7] = 0xFF;
+    }
+
+    /* Walk all lines. */
+    for (y = 0, n = 0, bitsStart = 2; y < Height; y++)
+    {
+        /* Walk all pixels. 3 bits per control code. */
+        for (x = 0; x < Width; x++, bits >>= 3, n -= 3, Output += 1)
+        {
+            /* Test if we have enough bits in the accumulator. */
+            if (n < 3)
+            {
+                /* Load another chunk of bits in the accumulator. */
+                bits |= Data[bitsStart++] << n;
+                n += 8;
+            }
+
+            /* Copy the color. */
+            *Output = (GLubyte)reds[bits & 0x7];
+        }
+
+        /* Next line. */
+        Output += Stride - Width * 1;
+    }
+}
+
+/* Decode 128-bits of Unsigned RGTC (COMPRESSED_RG_RGTC2) to 256 bits of RG8. */
+static void
+gcChipDecodeRGTC2(
+    IN gctSIZE_T Width,
+    IN gctSIZE_T Height,
+    IN gctSIZE_T Stride,
+    IN const GLubyte * Data,
+    OUT GLubyte * Output
+    )
+{
+    GLfloat reds[8];
+    GLfloat greens[8];
+    gctSIZE_T x, y;
+    GLushort redBits = 0;
+    GLushort greenBits = 0;
+    GLint n, redBitsStart, greenBitsStart;
+
+    /* Data (16 bytes): red0;   red1;   bits0; bits1; bits2; bits3; bits4; bits5; */
+    /*                  green0; green1; bits0; bits1; bits2; bits3; bits4; bits5; */
+
+    /* Decode RED 0: RED0 = red0 */
+    reds[0] = *Data;
+
+    /* Decode RED 1: RED1 = red1 */
+    reds[1] = *(Data + 1);
+
+    /* Decode GREEN 0: GREEN0 = green0 */
+    greens[0] = *(Data + 8);
+
+    /* Decode GREEN 1: GREEN1 = green1 */
+    greens[1] = *(Data + 9);
+
+    /* Interpolate RED 2 through RED 7. */
+    if (reds[0] > reds[1])
+    {
+        reds[2] = (6 * reds[0] + 1 * reds[1]) / 7.0f;
+        reds[3] = (5 * reds[0] + 2 * reds[1]) / 7.0f;
+        reds[4] = (4 * reds[0] + 3 * reds[1]) / 7.0f;
+        reds[5] = (3 * reds[0] + 4 * reds[1]) / 7.0f;
+        reds[6] = (2 * reds[0] + 5 * reds[1]) / 7.0f;
+        reds[7] = (1 * reds[0] + 6 * reds[1]) / 7.0f;
+    }
+    else
+    {
+        reds[2] = (4 * reds[0] + 1 * reds[1]) / 5.0f;
+        reds[3] = (3 * reds[0] + 2 * reds[1]) / 5.0f;
+        reds[4] = (2 * reds[0] + 3 * reds[1]) / 5.0f;
+        reds[5] = (1 * reds[0] + 4 * reds[1]) / 5.0f;
+        /* RED MIN */
+        reds[6] = 0x00;
+        /* RED MAX */
+        reds[7] = 0xFF;
+    }
+
+    /* Interpolate GREEN 2 through GREEN 7. */
+    if (greens[0] > greens[1])
+    {
+        greens[2] = (6 * greens[0] + 1 * greens[1]) / 7.0f;
+        greens[3] = (5 * greens[0] + 2 * greens[1]) / 7.0f;
+        greens[4] = (4 * greens[0] + 3 * greens[1]) / 7.0f;
+        greens[5] = (3 * greens[0] + 4 * greens[1]) / 7.0f;
+        greens[6] = (2 * greens[0] + 5 * greens[1]) / 7.0f;
+        greens[7] = (1 * greens[0] + 6 * greens[1]) / 7.0f;
+    }
+    else
+    {
+        greens[2] = (4 * greens[0] + 1 * greens[1]) / 5.0f;
+        greens[3] = (3 * greens[0] + 2 * greens[1]) / 5.0f;
+        greens[4] = (2 * greens[0] + 3 * greens[1]) / 5.0f;
+        greens[5] = (1 * greens[0] + 4 * greens[1]) / 5.0f;
+        /* GREEN MIN */
+        greens[6] = 0x00;
+        /* GREEN MAX */
+        greens[7] = 0xFF;
+    }
+
+    /* Walk all lines. */
+    for (y = 0, n = 0, redBitsStart = 2, greenBitsStart = 10; y < Height; y++)
+    {
+        /* Walk all pixels. 3 bits per control code. */
+        for (x = 0; x < Width; x++, redBits >>= 3, greenBits >>= 3, n -= 3, Output += 2)
+        {
+            /* Test if we have enough bits in the accumulator. */
+            if (n < 3)
+            {
+                /* Load another chunk of bits in the accumulator. */
+                redBits |= Data[redBitsStart++] << n;
+                greenBits |= Data[greenBitsStart++] << n;
+                n += 8;
+            }
+
+            /* Copy the color. */
+            *Output = (GLubyte)reds[redBits & 0x7];
+            *(Output+1) = (GLubyte)greens[greenBits & 0x7];
+        }
+
+        /* Next line. */
+        Output += Stride - Width * 2;
+    }
+}
+
+
+/* Decode 128-bits of Signed RGTC (COMPRESSED_SIGNED_RG_RGTC2) to 256 bits of RG8. */
+static void
+gcChipDecodeSignedRGTC2(
+    IN gctSIZE_T Width,
+    IN gctSIZE_T Height,
+    IN gctSIZE_T Stride,
+    IN const GLubyte * Data,
+    OUT GLubyte * Output
+    )
+{
+    GLfloat reds[8];
+    GLfloat greens[8];
+    gctSIZE_T x, y;
+    GLushort redBits = 0;
+    GLushort greenBits = 0;
+    GLint n, redBitsStart, greenBitsStart;
+
+    /* Data (16 bytes): red0;   red1;   bits0; bits1; bits2; bits3; bits4; bits5; */
+    /*                  green0; green1; bits0; bits1; bits2; bits3; bits4; bits5; */
+
+    /* Decode RED 0: RED0 = red0 */
+    reds[0] = *Data + 128.0f;
+
+    /* Decode RED 1: RED1 = red1 */
+    reds[1] = *(Data + 1) + 128.0f;
+
+    /* Decode GREEN 0: GREEN0 = green0 */
+    greens[0] = *(Data + 8) + 128.0f;
+
+    /* Decode GREEN 1: GREEN1 = green1 */
+    greens[1] = *(Data + 9) + 128.0f;
+
+    /* Interpolate RED 2 through RED 7. */
+    if (reds[0] > reds[1])
+    {
+        reds[2] = (6 * reds[0] + 1 * reds[1]) / 7.0f;
+        reds[3] = (5 * reds[0] + 2 * reds[1]) / 7.0f;
+        reds[4] = (4 * reds[0] + 3 * reds[1]) / 7.0f;
+        reds[5] = (3 * reds[0] + 4 * reds[1]) / 7.0f;
+        reds[6] = (2 * reds[0] + 5 * reds[1]) / 7.0f;
+        reds[7] = (1 * reds[0] + 6 * reds[1]) / 7.0f;
+    }
+    else
+    {
+        reds[2] = (4 * reds[0] + 1 * reds[1]) / 5.0f;
+        reds[3] = (3 * reds[0] + 2 * reds[1]) / 5.0f;
+        reds[4] = (2 * reds[0] + 3 * reds[1]) / 5.0f;
+        reds[5] = (1 * reds[0] + 4 * reds[1]) / 5.0f;
+        /* RED MIN */
+        reds[6] = 0x00;
+        /* RED MAX */
+        reds[7] = 0xFF;
+    }
+
+    /* Interpolate GREEN 2 through GREEN 7. */
+    if (greens[0] > greens[1])
+    {
+        greens[2] = (6 * greens[0] + 1 * greens[1]) / 7.0f;
+        greens[3] = (5 * greens[0] + 2 * greens[1]) / 7.0f;
+        greens[4] = (4 * greens[0] + 3 * greens[1]) / 7.0f;
+        greens[5] = (3 * greens[0] + 4 * greens[1]) / 7.0f;
+        greens[6] = (2 * greens[0] + 5 * greens[1]) / 7.0f;
+        greens[7] = (1 * greens[0] + 6 * greens[1]) / 7.0f;
+    }
+    else
+    {
+        greens[2] = (4 * greens[0] + 1 * greens[1]) / 5.0f;
+        greens[3] = (3 * greens[0] + 2 * greens[1]) / 5.0f;
+        greens[4] = (2 * greens[0] + 3 * greens[1]) / 5.0f;
+        greens[5] = (1 * greens[0] + 4 * greens[1]) / 5.0f;
+        /* GREEN MIN */
+        greens[6] = 0x00;
+        /* GREEN MAX */
+        greens[7] = 0xFF;
+    }
+
+    /* Walk all lines. */
+    for (y = 0, n = 0, redBitsStart = 2, greenBitsStart = 10; y < Height; y++)
+    {
+        /* Walk all pixels. 3 bits per control code. */
+        for (x = 0; x < Width; x++, redBits >>= 3, greenBits >>= 3, n -= 3, Output += 2)
+        {
+            /* Test if we have enough bits in the accumulator. */
+            if (n < 3)
+            {
+                /* Load another chunk of bits in the accumulator. */
+                redBits |= Data[redBitsStart++] << n;
+                greenBits |= Data[greenBitsStart++] << n;
+                n += 8;
+            }
+
+            /* Copy the color. */
+            *Output = (GLubyte)reds[redBits & 0x7];
+            *(Output+1) = (GLubyte)greens[greenBits & 0x7];
+        }
+
+        /* Next line. */
+        Output += Stride - Width * 2;
+    }
+}
+
+/* Decompress a RGTC texture. */
+GLvoid*
+gcChipDecompressRGTC(
+    IN  __GLcontext* gc,
+    IN  gctSIZE_T Width,
+    IN  gctSIZE_T Height,
+    IN  gctSIZE_T ImageSize,
+    IN  const void * Data,
+    IN  GLenum InternalFormat,
+    OUT gceSURF_FORMAT *Format,
+    OUT gctSIZE_T* pRowStride
+    )
+{
+    GLubyte * pixels = gcvNULL;
+    GLubyte * line;
+    const GLubyte * data;
+    gctSIZE_T x, y, stride;
+    gctSIZE_T bpp;
+
+    gcmHEADER_ARG("gc=0x%x Width=%d Height=%d ImageSize=%d Data=0x%x InternalFormat=0x%04x Format=0x%x pRowStride=0x%x",
+                   gc, Width, Height, ImageSize, Data, InternalFormat, Format, pRowStride);
+
+    /* Determine bytes per pixel. */
+    bpp = ((InternalFormat == GL_COMPRESSED_RG_RGTC2) || (InternalFormat == GL_COMPRESSED_SIGNED_RG_RGTC2)) ? 4 : 2;
+
+    /* Allocate the decompressed memory. */
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, Width * Height * bpp, (gctPOINTER*)&pixels)))
+    {
+        gcmFOOTER_ARG("return=0x%x", gcvNULL);
+        return gcvNULL;
+    }
+
+    /* Initialize the variables. */
+    stride = Width * bpp;
+    data   = Data;
+
+    /* Walk all lines, 4 lines per block. */
+    for (y = 0, line = pixels; y < Height; y += 4, line += stride * 4)
+    {
+        GLubyte * p = line;
+
+        /* Walk all pixels, 4 pixels per block. */
+        for (x = 0; x < Width; x += 4)
+        {
+            /* Dispatch on format. */
+            switch (InternalFormat)
+            {
+            case GL_COMPRESSED_RED_RGTC1:
+
+                /* Decompress one color block. */
+                gcChipDecodeRGTC1(__GL_MIN(Width - x, 4), __GL_MIN(Height - y, 4),
+                                         stride, data, p);
+
+                /* 8 bytes per block. */
+                data      += 8;
+                ImageSize -= 8;
+                *Format = gcvSURF_R8;
+                *pRowStride = Width * 4;
+                break;
+
+            case GL_COMPRESSED_SIGNED_RED_RGTC1:
+
+                /* Decompress one color block. */
+                gcChipDecodeSignedRGTC1(__GL_MIN(Width - x, 4), __GL_MIN(Height - y, 4),
+                                         stride, data, p);
+
+                /* 8 bytes per block. */
+                data      += 8;
+                ImageSize -= 8;
+                *Format = gcvSURF_R8;
+                *pRowStride = Width * 4;
+                break;
+
+            case GL_COMPRESSED_RG_RGTC2:
+
+                /* Decompress one color block. */
+                gcChipDecodeRGTC2(__GL_MIN(Width - x, 4), __GL_MIN(Height - y, 4),
+                                         stride, data, p);
+
+                /* 16 bytes per block. */
+                data      += 16;
+                ImageSize -= 16;
+                *Format = gcvSURF_RG16;
+                *pRowStride = Width * 4;
+                break;
+
+            case GL_COMPRESSED_SIGNED_RG_RGTC2:
+
+                /* Decompress one color block. */
+                gcChipDecodeSignedRGTC2(__GL_MIN(Width - x, 4), __GL_MIN(Height - y, 4),
+                                         stride, data, p);
+
+                /* 16 bytes per block. */
+                data      += 16;
+                ImageSize -= 16;
+                *Format = gcvSURF_RG16;
+                *pRowStride = Width * 4;
+                break;
+
+            default:
+                /* unknown format */
+                GL_ASSERT(GL_FALSE);
+                break;
+            }
+
+            /* Next block. */
+            p += 4 * bpp;
+        }
+    }
+
+    /* Return pointer to decompressed data. */
+    gcmFOOTER_ARG("return=0x%x", pixels);
+    return pixels;
+}
+
+

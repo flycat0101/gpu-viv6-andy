@@ -487,6 +487,13 @@ typedef struct __GLprimBoundStateRec
     GLfloat maxW;
 } __GLprimBoundState;
 
+typedef struct __GLPrimRestartStateRec
+{
+    GLuint restartElement;
+}
+__GLPrimRestartState;
+
+
 /* Record the last samper2TexUnit mapping */
 typedef struct __GLprogramStateRec
 {
@@ -512,6 +519,7 @@ typedef struct __GLattributeRec {
     __GLprogramState program;
     __GLimageState image;
     __GLprimBoundState primBound;
+    __GLPrimRestartState primRestart;
 #ifdef OPENGL40
     __GLRasterPosState rasterPos;
     __GLpointState point;

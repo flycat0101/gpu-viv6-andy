@@ -207,7 +207,7 @@ GLvoid __glInitConstantDefault(__GLdeviceConstants *constants)
     constants->textureBufferOffsetAlignment = 256;
 
 #ifdef OPENGL40
-    constants->numberOfClipPlanes = 6;
+    constants->numberOfClipPlanes = 8;
     constants->maxModelViewStackDepth = 32;
     constants->maxProjectionStackDepth = 16;
     constants->maxTextureStackDepth = 16;
@@ -615,6 +615,11 @@ __GL_INLINE GLvoid __glInitPrimBoundingState(__GLcontext *gc)
     gc->state.primBound.maxY = 1.0f;
     gc->state.primBound.maxZ = 1.0f;
     gc->state.primBound.maxW = 1.0f;
+}
+
+__GL_INLINE GLvoid __glInitPrimRestartState(__GLcontext *gc)
+{
+    gc->state.primRestart.restartElement = 0xFFFFFFFF;
 }
 
 
@@ -1196,6 +1201,7 @@ GLvoid __glInitContextState(__GLcontext *gc)
     gc->flags = __GL_CONTEXT_UNINITIALIZED;
     gc->invalidCommonCommit = gcvTRUE;
     gc->invalidDrawCommit = gcvTRUE;
+    gc->conditionalRenderDiscard = gcvFALSE;
 /* some init functions should be isolated from ES3, TO DO */
     __glInitCurrentState(gc);
 #ifdef OPENGL40
@@ -1238,6 +1244,7 @@ GLvoid __glInitContextState(__GLcontext *gc)
     __glInitImageState(gc);
     __glInitDebugState(gc);
     __glInitPrimBoundingState(gc);
+    __glInitPrimRestartState(gc);
 
     __glBitmaskInitAllOne(&gc->texUnitAttrDirtyMask, gc->constants.shaderCaps.maxCombinedTextureImageUnits);
 

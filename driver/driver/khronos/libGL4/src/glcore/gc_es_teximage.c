@@ -526,6 +526,7 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_R8_SNORM:
         case GL_R8I:
         case GL_R8UI:
+        case GL_R16:
         case GL_R16I:
         case GL_R16UI:
         case GL_R16F:
@@ -661,7 +662,7 @@ GLboolean __glCheckTexImgFmtArg(__GLcontext *gc,
 
     if (invalid)
     {
-        __GL_ERROR_RET_VAL(GL_INVALID_ENUM, GL_FALSE);
+        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
     }
 
     return GL_TRUE;
@@ -1008,6 +1009,20 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
 
             if(format == GL_DEPTH_COMPONENT)
                 goto bad_operation;
+
+            switch(format){
+                case GL_RED_INTEGER_EXT:
+                case GL_BLUE_INTEGER_EXT:
+                case GL_GREEN_INTEGER_EXT:
+                case GL_ALPHA_INTEGER_EXT:
+                case GL_RGB_INTEGER_EXT:
+                case GL_RGBA_INTEGER_EXT:
+                case GL_BGR_INTEGER_EXT:
+                case GL_BGRA_INTEGER_EXT:
+                case GL_LUMINANCE_INTEGER_EXT:
+                case GL_LUMINANCE_ALPHA_INTEGER_EXT:
+                     goto bad_operation;
+            }
 
             break;
         case GL_R11F_G11F_B10F_EXT:
@@ -1990,6 +2005,7 @@ GLboolean __glCheckCompressedTexImgFmt(__GLcontext *gc, GLint internalFormat)
         case GL_COMPRESSED_SIGNED_LUMINANCE_LATC1_EXT:
         case GL_COMPRESSED_LUMINANCE_ALPHA_LATC2_EXT:
         case GL_COMPRESSED_SIGNED_LUMINANCE_ALPHA_LATC2_EXT:
+
         case GL_COMPRESSED_RED_RGTC1_EXT:
         case GL_COMPRESSED_SIGNED_RED_RGTC1_EXT:
         case GL_COMPRESSED_RED_GREEN_RGTC2_EXT:
@@ -2055,6 +2071,9 @@ GLsizei __glCompressedTexImageSize(GLint lods, GLint internalFormat, GLint width
     case GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2:
     case GL_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2:
 
+    case GL_COMPRESSED_RED_RGTC1_EXT:
+    case GL_COMPRESSED_SIGNED_RED_RGTC1_EXT:
+
     case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
     case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
         blockWidth = 4;
@@ -2066,6 +2085,9 @@ GLsizei __glCompressedTexImageSize(GLint lods, GLint internalFormat, GLint width
     case  GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC:
     case GL_COMPRESSED_RG11_EAC:
     case GL_COMPRESSED_SIGNED_RG11_EAC:
+
+    case GL_COMPRESSED_RED_GREEN_RGTC2_EXT:
+    case GL_COMPRESSED_SIGNED_RED_GREEN_RGTC2_EXT:
 
     case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:
     case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
@@ -2539,10 +2561,7 @@ GLboolean __glSetMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint 
             break;
 #ifdef OPENGL40
         case GL_UNSIGNED_SHORT:
-#if (defined(_DEBUG) || defined(DEBUG))
-            gcoOS_Print("TO DO: transfer RGBA16 to RGBA8.\n");
-#endif
-            formatInfo = &__glFormatInfoTable[__GL_FMT_RGBA8];
+            formatInfo = &__glFormatInfoTable[__GL_FMT_RGBA16];
             requestedFormat = GL_RGBA16;
             break;
 #endif
@@ -2613,6 +2632,7 @@ GLboolean __glSetMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint 
     mipmap->formatInfo = formatInfo;
     mipmap->compressed = formatInfo->compressed;
     mipmap->baseFormat = formatInfo->baseFormat;
+    mipmap->internalFormat = internalFormat;
     mipmap->requestedFormat = requestedFormat;
 
     mipmap->width  = width;
@@ -2942,6 +2962,49 @@ __GL_INLINE GLvoid __glForceGenerateMipmap(__GLcontext* gc)
 }
 #endif
 
+
+void __glClearProxyTextureState(__GLcontext *gc,
+                                     __GLtextureObject* tex,
+                                     GLint face,
+                                     GLint level)
+{
+    __GLmipMapLevel *faceMipmap;
+    __GLformatInfo *formatInfo;
+
+    gc->error = 0x0;
+
+    faceMipmap = &tex->faceMipmap[face][level];
+    formatInfo = faceMipmap->formatInfo;
+
+    faceMipmap->width = 0;
+    faceMipmap->height = 0;
+    faceMipmap->depth = 0;
+    faceMipmap->arrays = 0;
+    faceMipmap->internalFormat = GL_RGBA;
+    formatInfo->redSize = 0;
+    formatInfo->greenSize = 0;
+    formatInfo->blueSize = 0;
+    formatInfo->alphaSize = 0;
+    formatInfo->depthSize = 0;
+    formatInfo->stencilSize = 0;
+    formatInfo->sharedSize = 0;
+    formatInfo->redType = 0;
+    formatInfo->greenType = 0;
+    formatInfo->blueType = 0;
+    formatInfo->alphaType = 0;
+    formatInfo->depthType = 0;
+    formatInfo->compressed = 0;
+
+    tex->samples = 0;
+    tex->fixedSampleLocations = 0;
+
+    tex->bufObj = gcvNULL;
+    tex->bufOffset = 0;
+    tex->bufSize = 0;
+    faceMipmap->border = 0;
+}
+
+
 GLvoid GL_APIENTRY __glim_TexImage3D(__GLcontext *gc,
                                      GLenum target,
                                      GLint lod,
@@ -2958,14 +3021,26 @@ GLvoid GL_APIENTRY __glim_TexImage3D(__GLcontext *gc,
     GLuint mipHintDirty = 0;
     __GLtextureObject *tex;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
+    __GLpixelTransferInfo transferInfo;
 
     __GL_HEADER();
+
+    memset(&transferInfo, 0 ,sizeof(__GLpixelTransferInfo));
 
     __GL_TEXIMAGE3D_GET_OBJECT();
 
     /* Check arguments */
     if (!__glCheckTexImgArgs(gc, tex, lod, width, height, depth, border))
     {
+        /*
+        * Add special handing for proxy texture.
+        * Clear texture state and reset gc->error when target is proxy texture.
+        */
+        if((GL_PROXY_TEXTURE_3D == target) || (GL_PROXY_TEXTURE_2D_ARRAY == target)
+            || (GL_PROXY_TEXTURE_CUBE_MAP_ARRAY == target))
+        {
+            __glClearProxyTextureState(gc, tex, 0, lod);
+        }
         __GL_EXIT();
     }
 
@@ -3006,7 +3081,10 @@ GLvoid GL_APIENTRY __glim_TexImage3D(__GLcontext *gc,
         __GL_EXIT();
     }
 
-    if (!(*gc->dp.texImage3D)(gc, tex, lod, buf))
+    __glGenericPixelTransfer(gc, width, height, depth, (tex->faceMipmap[0][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
+    (tex->faceMipmap[0][lod]).type = type;
+
+    if (!(*gc->dp.texImage3D)(gc, tex, lod, transferInfo.dstImage))
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -3020,6 +3098,10 @@ GLvoid GL_APIENTRY __glim_TexImage3D(__GLcontext *gc,
     tex->seqNumber++;
 
 OnExit:
+    if((GL_TRUE == transferInfo.dstNeedFree) && (gcvNULL != transferInfo.dstImage)){
+        (*gc->imports.free)(gc, (void*)transferInfo.dstImage);
+        transferInfo.dstImage = gcvNULL;
+    }
     __GL_FOOTER();
 }
 
@@ -3039,8 +3121,11 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
     GLuint mipHintDirty = 0;
     __GLtextureObject *tex;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
+    __GLpixelTransferInfo transferInfo;
 
     __GL_HEADER();
+
+    memset(&transferInfo, 0 ,sizeof(__GLpixelTransferInfo));
 
     /* Get the texture object and face */
     __GL_TEXIMAGE2D_GET_OBJECT();
@@ -3048,6 +3133,15 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
     /* Check arguments */
     if (!__glCheckTexImgArgs(gc, tex, lod, width, height, 1, border))
     {
+        /*
+        * Add special handing for proxy texture.
+        * Clear texture state and reset gc->error when target is proxy texture.
+        */
+        if((GL_PROXY_TEXTURE_2D == target) || (GL_PROXY_TEXTURE_1D_ARRAY == target)
+            || (GL_PROXY_TEXTURE_CUBE_MAP == target) || (GL_PROXY_TEXTURE_RECTANGLE == target))
+        {
+            __glClearProxyTextureState(gc, tex, face, lod);
+        }
         __GL_EXIT();
     }
 
@@ -3087,7 +3181,10 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
         __GL_EXIT();
     }
 
-    if (!(*gc->dp.texImage2D)(gc, tex, face, lod, buf))
+    __glGenericPixelTransfer(gc, width, height, 1, (tex->faceMipmap[face][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
+    (tex->faceMipmap[face][lod]).type = type;
+
+    if (!(*gc->dp.texImage2D)(gc, tex, face, lod, transferInfo.dstImage))
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -3099,7 +3196,7 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
     __glSetTexImageDirtyBit(gc, tex, __GL_TEX_IMAGE_CONTENT_CHANGED_BIT | mipHintDirty);
 
 #if gcdFORCE_MIPMAP
-    if (target == GL_TEXTURE_2D && lod == 0 && buf != gcvNULL)
+    if (target == GL_TEXTURE_2D && lod == 0 && transferInfo.dstImage != gcvNULL)
     {
         __glForceGenerateMipmap(gc);
     }
@@ -3108,12 +3205,17 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
     tex->seqNumber++;
 
 OnExit:
+    if((GL_TRUE == transferInfo.dstNeedFree) && (gcvNULL != transferInfo.dstImage)){
+        (*gc->imports.free)(gc, (void*)transferInfo.dstImage);
+        transferInfo.dstImage = gcvNULL;
+    }
     __GL_FOOTER();
 }
 
 #ifdef OPENGL40
 GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
                                   __GLtextureObject *tex,
+                                  GLenum target,
                                   GLsizei levels,
                                   GLenum internalformat,
                                   GLsizei width,
@@ -3122,6 +3224,7 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
                                   GLsizei samples)
 {
     GLsizei maxSize = __GL_MAX(width, height);
+    GLenum errorCode = GL_NO_ERROR;
 
     if (!tex)
     {
@@ -3130,14 +3233,16 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
 
     if (width < 0 || height < 0 || depth < 0)
     {
-        __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
+        errorCode = GL_INVALID_VALUE;
+        __GL_ERROR_EXIT2();
     }
 
     if (__GL_TEXTURE_2D_MS_ARRAY_INDEX == tex->targetIndex)
     {
          if (depth > (GLsizei)gc->constants.maxTextureArraySize)
         {
-            __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
+            errorCode = GL_INVALID_VALUE;
+            __GL_ERROR_EXIT2();
         }
     }
     else
@@ -3147,7 +3252,8 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
 
     if (maxSize > (GLsizei)gc->constants.maxTextureSize)
     {
-        __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
+        errorCode = GL_INVALID_VALUE;
+        __GL_ERROR_EXIT2();
     }
 
     switch (internalformat)
@@ -3160,6 +3266,7 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
     case GL_BGRA_EXT:
     case GL_SRGB8_ALPHA8:
     case GL_RGB10_A2:
+    case GL_RGBA16:
     case GL_RGBA16F:
     case GL_RGBA32F:
     /* RGB NORM */
@@ -3174,11 +3281,13 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
     /* RG NORM */
     case GL_RG8:
     case GL_RG8_SNORM:
+    case GL_RG16:
     case GL_RG16F:
     case GL_RG32F:
     /* R NORM */
     case GL_R8:
     case GL_R8_SNORM:
+    case GL_R16:
     case GL_R16F:
     case GL_R32F:
     /* unsized internal format */
@@ -3188,7 +3297,8 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
     case GL_RGB:
         if (samples > (GLsizei)gc->constants.maxSamplesInteger)
         {
-            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+            errorCode = GL_INVALID_OPERATION;
+            __GL_ERROR_EXIT2();
         }
         break;
     /* RGBA INTEGER */
@@ -3222,21 +3332,25 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
     case GL_R32I:
         if (samples > (GLsizei)gc->constants.maxSamplesInteger)
         {
-            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+            errorCode = GL_INVALID_OPERATION;
+            __GL_ERROR_EXIT2();
         }
         break;
 
 
     /* DEPTH STENCIL */
+    case GL_DEPTH_COMPONENT:
     case GL_DEPTH_COMPONENT16:
     case GL_DEPTH_COMPONENT24:
     case GL_DEPTH_COMPONENT32F:
+    case GL_DEPTH_STENCIL:
     case GL_DEPTH24_STENCIL8:
     case GL_DEPTH32F_STENCIL8:
     case GL_STENCIL_INDEX8:
         if (samples > (GLsizei)gc->constants.maxSamples)
         {
-            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+            errorCode = GL_INVALID_OPERATION;
+            __GL_ERROR_EXIT2();
         }
         break;
 
@@ -3245,6 +3359,21 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
     default:
     /*according to spec, an INVALID_ENUM error is generated if internalformat is one of the unsized base internal formats*/
         __GL_ERROR_RET_VAL(GL_INVALID_ENUM, GL_FALSE);
+    }
+
+    /*
+    * Add special handing for proxy texture. If errorCode is NO_ERROR, continue to judge formatSamples,
+    * else, clear texture state and return FALSE when target is proxy, or set error and return FALSE when target isn't proxy.
+    */
+OnError:
+    if(GL_NO_ERROR != errorCode)
+    {
+        if((GL_PROXY_TEXTURE_2D_MULTISAMPLE == target) || (GL_PROXY_TEXTURE_2D_MULTISAMPLE_ARRAY == target))
+        {
+            __glClearProxyTextureState(gc, tex, 0, 0);
+            __GL_ERROR_RET_VAL(GL_NO_ERROR, GL_FALSE);
+        }
+        __GL_ERROR_RET_VAL(errorCode, GL_FALSE);
     }
 
     if ((tex->targetIndex == __GL_TEXTURE_2D_MS_INDEX) ||
@@ -3293,8 +3422,11 @@ GLvoid GL_APIENTRY __glim_TexImage1D( __GLcontext *gc,
     GLuint mipHintDirty = 0;
     __GLtextureObject *tex;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
+    __GLpixelTransferInfo transferInfo;
 
     __GL_HEADER();
+
+    memset(&transferInfo, 0 ,sizeof(__GLpixelTransferInfo));
 
     /* Get the texture object and face */
     __GL_TEXIMAGE1D_GET_OBJECT();
@@ -3302,6 +3434,14 @@ GLvoid GL_APIENTRY __glim_TexImage1D( __GLcontext *gc,
     /* Check arguments */
     if (!__glCheckTexImgArgs(gc, tex, lod, width, 1 + border*2, 1 + border*2, border))
     {
+        /*
+        * Add special handing for proxy texture.
+        * Clear texture state and reset gc->error when target is proxy texture.
+        */
+        if(GL_PROXY_TEXTURE_1D == target)
+        {
+            __glClearProxyTextureState(gc, tex, face, lod);
+        }
         __GL_EXIT();
     }
 
@@ -3341,7 +3481,10 @@ GLvoid GL_APIENTRY __glim_TexImage1D( __GLcontext *gc,
         __GL_EXIT();
     }
 
-    if (!(*gc->dp.texImage1D)(gc, tex, lod, buf))
+    __glGenericPixelTransfer(gc, width, 1, 1, (tex->faceMipmap[face][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
+    (tex->faceMipmap[face][lod]).type = type;
+
+    if (!(*gc->dp.texImage1D)(gc, tex, lod, transferInfo.dstImage))
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -3355,6 +3498,10 @@ GLvoid GL_APIENTRY __glim_TexImage1D( __GLcontext *gc,
     tex->seqNumber++;
 
 OnExit:
+    if((GL_TRUE == transferInfo.dstNeedFree) && (gcvNULL != transferInfo.dstImage)){
+        (*gc->imports.free)(gc, (void*)transferInfo.dstImage);
+        transferInfo.dstImage = gcvNULL;
+    }
     __GL_FOOTER();
 
 }
@@ -3376,8 +3523,11 @@ GLvoid GL_APIENTRY __glim_TexSubImage1D(__GLcontext *gc,
     GLuint mipHintDirty = 0;
     __GLtextureObject *tex;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
+    __GLpixelTransferInfo transferInfo;
 
     __GL_HEADER();
+
+    memset(&transferInfo, 0 ,sizeof(__GLpixelTransferInfo));
 
     /* Get the texture object and face */
     __GL_TEXSUBIMAGE1D_GET_OBJECT();
@@ -3417,9 +3567,11 @@ GLvoid GL_APIENTRY __glim_TexSubImage1D(__GLcontext *gc,
         __GL_EXIT();
     }
 
+    __glGenericPixelTransfer(gc, width, 1, 1, (tex->faceMipmap[face][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
+
     tex->faceMipmap[face][lod].format = format;
     tex->faceMipmap[face][lod].type   = type;
-    if (!(*gc->dp.texSubImage1D)(gc, tex, lod, xoffset, width, buf))
+    if (!(*gc->dp.texSubImage1D)(gc, tex, lod, xoffset, width, transferInfo.dstImage))
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -3430,6 +3582,10 @@ GLvoid GL_APIENTRY __glim_TexSubImage1D(__GLcontext *gc,
     tex->seqNumber++;
 
 OnExit:
+    if((GL_TRUE == transferInfo.dstNeedFree) && (gcvNULL != transferInfo.dstImage)){
+        (*gc->imports.free)(gc, (void*)transferInfo.dstImage);
+        transferInfo.dstImage = gcvNULL;
+    }
     __GL_FOOTER();
 }
 
@@ -3446,6 +3602,11 @@ GLvoid APIENTRY __glim_CopyTexImage1D(__GLcontext *gc,
     GLuint activeUnit;
     __GLtextureObject *tex;
     GLboolean retVal;
+    __GLformatInfo* texFormatInfo = gcvNULL;
+    __GLformatInfo* rtFormatInfo = gcvNULL;
+    GLvoid* data = gcvNULL;
+    GLuint nBytes = 0;
+    GLboolean needPixelTransfer = __GL_PIXELTRANSFER_ENABLED(gc);
 
     __GL_HEADER();
 
@@ -3471,11 +3632,49 @@ GLvoid APIENTRY __glim_CopyTexImage1D(__GLcontext *gc,
 
     __glEvaluateDrawableChange(gc, __GL_BUFFER_READ_BIT);
 
+    texFormatInfo = __glGetFormatInfo(internalFormat);
+
+    if (__GL_FMT_MAX == texFormatInfo->drvFormat)
+    {
+        __GL_EXIT();
+    }
+
+    if (READ_FRAMEBUFFER_BINDING_NAME == 0)
+    {
+        rtFormatInfo = gc->drawablePrivate->rtFormatInfo;
+    }
+    else
+    {
+        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
+        rtFormatInfo = __glGetFramebufferFormatInfo(gc, readFBO, readFBO->readBuffer);
+    }
+
+    /* While internalformat is GL_DEPTH24_STENCIL8/GL_DEPTH32F_STENCIL8/GL_DEPTH_STENCIL, rtFormatInfo maybe NULL, regard as texFormatInfo. */
+    if (!rtFormatInfo)
+    {
+        rtFormatInfo = texFormatInfo;
+    }
+
     if (__glCopyTexBegin(gc))
     {
         __glCopyTexValidateState(gc);
 
-        retVal = (*gc->dp.copyTexImage1D)(gc, tex, lod, x, y);
+        /* If need to do PixelTransfer, using ReadPixels and Tex[Sub]Image*D to simulate copyTex[Sub]Image*D */
+        if((texFormatInfo->dataType != rtFormatInfo->dataType || needPixelTransfer) && !__glCheckSpecialFormat(internalFormat, texFormatInfo->dataFormat, &texFormatInfo->dataType))
+        {
+            __GLpixelTransferInfo transferInfo;
+            nBytes = __glPixelSize(gc, texFormatInfo->dataFormat, texFormatInfo->dataType);
+            data = (*gc->imports.malloc)(gc, width * 1 * nBytes);
+            (*gc->immedModeDispatch.ReadPixels)(gc, x, y, width, 1, texFormatInfo->dataFormat, texFormatInfo->dataType, data);
+            __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo);
+            (*gc->immedModeDispatch.TexImage1D)(gc, target, lod, internalFormat, width, border, texFormatInfo->dataFormat, texFormatInfo->dataType, data);
+            __GL_REVERT_SCALE_BIAS(gc,transferInfo);
+            retVal = !(GLboolean)(*gc->dp.getError)(gc);
+        }
+        else
+        {
+            retVal = (*gc->dp.copyTexImage1D)(gc, tex, lod, x, y);
+        }
 
         __glCopyTexEnd(gc, tex, lod);
 
@@ -3491,6 +3690,11 @@ GLvoid APIENTRY __glim_CopyTexImage1D(__GLcontext *gc,
     }
 
 OnExit:
+    if(data)
+    {
+        (*gc->imports.free)(gc, data);
+        data = gcvNULL;
+    }
     __GL_FOOTER();
 
 }
@@ -3508,6 +3712,11 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage1D(__GLcontext *gc,
     GLuint activeUnit;
     __GLtextureObject *tex;
     GLboolean retVal;
+    __GLformatInfo* texFormatInfo = gcvNULL;
+    __GLformatInfo* rtFormatInfo = gcvNULL;
+    GLvoid* data = gcvNULL;
+    GLuint nBytes = 0;
+    GLboolean needPixelTransfer = __GL_PIXELTRANSFER_ENABLED(gc);
 
     __GL_HEADER();
 
@@ -3531,11 +3740,49 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage1D(__GLcontext *gc,
 
     __glEvaluateDrawableChange(gc, __GL_BUFFER_READ_BIT);
 
+    texFormatInfo = __glGetFormatInfo(tex->faceMipmap[face][lod].requestedFormat);
+
+    if (__GL_FMT_MAX == texFormatInfo->drvFormat)
+    {
+        __GL_EXIT();
+    }
+
+    if (READ_FRAMEBUFFER_BINDING_NAME == 0)
+    {
+        rtFormatInfo = gc->drawablePrivate->rtFormatInfo;
+    }
+    else
+    {
+        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
+        rtFormatInfo = __glGetFramebufferFormatInfo(gc, readFBO, readFBO->readBuffer);
+    }
+
+    /* While internalformat is GL_DEPTH24_STENCIL8/GL_DEPTH32F_STENCIL8/GL_DEPTH_STENCIL, rtFormatInfo maybe NULL, regard as texFormatInfo. */
+    if (!rtFormatInfo)
+    {
+        rtFormatInfo = texFormatInfo;
+    }
+
     if (__glCopyTexBegin(gc))
     {
         __glCopyTexValidateState(gc);
 
-        retVal = (*gc->dp.copyTexSubImage1D)(gc, tex, lod, x, y, width,xoffset);
+        /* If need to do PixelTransfer, using ReadPixels and Tex[Sub]Image*D to simulate copyTex[Sub]Image*D */
+        if((texFormatInfo->dataType != rtFormatInfo->dataType || needPixelTransfer) && !__glCheckSpecialFormat(tex->faceMipmap[face][lod].requestedFormat, texFormatInfo->dataFormat, &texFormatInfo->dataType))
+        {
+            __GLpixelTransferInfo transferInfo;
+            nBytes = __glPixelSize(gc, texFormatInfo->dataFormat, texFormatInfo->dataType);
+            data = (*gc->imports.malloc)(gc, width * 1 * nBytes);
+            (*gc->immedModeDispatch.ReadPixels)(gc, x, y, width, 1, texFormatInfo->dataFormat, texFormatInfo->dataType, data);
+            __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo);
+            (*gc->immedModeDispatch.TexSubImage1D)(gc, target, lod, xoffset, width, texFormatInfo->dataFormat, texFormatInfo->dataType, data);
+            __GL_REVERT_SCALE_BIAS(gc,transferInfo);
+            retVal = !(GLboolean)(*gc->dp.getError)(gc);
+        }
+        else
+        {
+            retVal = (*gc->dp.copyTexSubImage1D)(gc, tex, lod, x, y, width,xoffset);
+        }
 
         __glCopyTexEnd(gc, tex, lod);
 
@@ -3550,6 +3797,11 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage1D(__GLcontext *gc,
     }
 
 OnExit:
+    if(data)
+    {
+        (*gc->imports.free)(gc, data);
+        data = gcvNULL;
+    }
     __GL_FOOTER();
 
 }
@@ -3579,7 +3831,7 @@ GLvoid GL_APIENTRY __glim_CompressedTexImage1D(__GLcontext *gc,
 
     if (imageSize < 0)
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
     }
 
     /* Check for paletted texture */
@@ -3597,13 +3849,13 @@ GLvoid GL_APIENTRY __glim_CompressedTexImage1D(__GLcontext *gc,
     case GL_PALETTE8_RGBA8_OES:
         if (lod > 0)
         {
-            __GL_ERROR_RET(GL_INVALID_VALUE);
+            __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
         }
         lod = -lod;
         /* If number of lods exceeded the size allowed one */
         if (lod > (GLint)__glFloorLog2(__GL_MAX(width, 1)))
         {
-            __GL_ERROR_RET(GL_INVALID_VALUE);
+            __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
         }
         level = 0;
         isPalette = GL_TRUE;
@@ -3867,6 +4119,10 @@ GLvoid GL_APIENTRY __glim_TexImage2DMultisample(__GLcontext *gc,
 
     switch (target)
     {
+    case GL_PROXY_TEXTURE_2D_MULTISAMPLE:
+        tex = &gc->texture.proxyTextures[__GL_TEXTURE_2D_MS_INDEX];
+        tex->arrays = 1;
+        break;
     case GL_TEXTURE_2D_MULTISAMPLE:
         tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_MS_INDEX];
         tex->arrays = 1;
@@ -3876,7 +4132,7 @@ GLvoid GL_APIENTRY __glim_TexImage2DMultisample(__GLcontext *gc,
     }
 
     /* Check arguments */
-    if (!__glCheckTexMultisampleArgs(gc, tex, 1, internalformat, width, height, 1, samples))
+    if (!__glCheckTexMultisampleArgs(gc, tex, target, 1, internalformat, width, height, 1, samples))
     {
         __GL_EXIT();
     }
@@ -3924,6 +4180,10 @@ GLvoid GL_APIENTRY __glim_TexImage3DMultisample(__GLcontext *gc,
 
     switch (target)
     {
+    case GL_PROXY_TEXTURE_2D_MULTISAMPLE_ARRAY:
+        tex = &gc->texture.proxyTextures[__GL_TEXTURE_2D_MS_ARRAY_INDEX];
+        tex->arrays = 1;
+        break;
     case GL_TEXTURE_2D_MULTISAMPLE_ARRAY:
         tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_MS_ARRAY_INDEX];
         tex->arrays = depth;
@@ -3933,7 +4193,7 @@ GLvoid GL_APIENTRY __glim_TexImage3DMultisample(__GLcontext *gc,
     }
 
     /* Check arguments */
-    if (!__glCheckTexMultisampleArgs(gc, tex, 1, internalformat, width, height, depth, samples))
+    if (!__glCheckTexMultisampleArgs(gc, tex, target, 1, internalformat, width, height, depth, samples))
     {
         __GL_EXIT();
     }
@@ -3989,8 +4249,11 @@ GLvoid GL_APIENTRY __glim_TexSubImage3D(__GLcontext *gc,
     __GLtextureObject *tex;
     GLuint activeUnit = gc->state.texture.activeTexIndex;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
+    __GLpixelTransferInfo transferInfo;
 
     __GL_HEADER();
+
+    memset(&transferInfo, 0 ,sizeof(__GLpixelTransferInfo));
 
     switch (target)
     {
@@ -4007,7 +4270,7 @@ GLvoid GL_APIENTRY __glim_TexSubImage3D(__GLcontext *gc,
             break;
         }
     default:
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        __GL_ERROR_RET_STACK(GL_INVALID_ENUM);
     }
 
     /* Check arguments */
@@ -4045,10 +4308,12 @@ GLvoid GL_APIENTRY __glim_TexSubImage3D(__GLcontext *gc,
         __GL_EXIT();
     }
 
+    __glGenericPixelTransfer(gc, width, height, depth, (tex->faceMipmap[0][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
+
     tex->faceMipmap[0][lod].format = format;
     tex->faceMipmap[0][lod].type   = type;
 
-    if (!(*gc->dp.texSubImage3D)(gc, tex, lod, xoffset, yoffset, zoffset, width, height, depth, buf))
+    if (!(*gc->dp.texSubImage3D)(gc, tex, lod, xoffset, yoffset, zoffset, width, height, depth, transferInfo.dstImage))
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -4058,6 +4323,10 @@ GLvoid GL_APIENTRY __glim_TexSubImage3D(__GLcontext *gc,
     __glSetTexImageDirtyBit(gc, tex, __GL_TEX_IMAGE_CONTENT_CHANGED_BIT | mipHintDirty);
 
 OnExit:
+    if((GL_TRUE == transferInfo.dstNeedFree) && (gcvNULL != transferInfo.dstImage)){
+        (*gc->imports.free)(gc, (void*)transferInfo.dstImage);
+        transferInfo.dstImage = gcvNULL;
+    }
     __GL_FOOTER();
     return;
 }
@@ -4078,8 +4347,11 @@ GLvoid GL_APIENTRY __glim_TexSubImage2D(__GLcontext *gc,
     GLuint mipHintDirty = 0;
     __GLtextureObject *tex;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
+    __GLpixelTransferInfo transferInfo;
 
     __GL_HEADER();
+
+    memset(&transferInfo, 0 ,sizeof(__GLpixelTransferInfo));
 
     /* Get the texture object and face */
     __GL_TEXSUBIMAGE2D_GET_OBJECT();
@@ -4119,10 +4391,12 @@ GLvoid GL_APIENTRY __glim_TexSubImage2D(__GLcontext *gc,
         __GL_EXIT();
     }
 
+    __glGenericPixelTransfer(gc, width, height, 1, (tex->faceMipmap[face][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
+
     tex->faceMipmap[face][lod].format = format;
     tex->faceMipmap[face][lod].type   = type;
 
-    if (!(*gc->dp.texSubImage2D)(gc, tex, face, lod, xoffset, yoffset, width, height, buf))
+    if (!(*gc->dp.texSubImage2D)(gc, tex, face, lod, xoffset, yoffset, width, height, transferInfo.dstImage))
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -4133,6 +4407,10 @@ GLvoid GL_APIENTRY __glim_TexSubImage2D(__GLcontext *gc,
     tex->seqNumber++;
 
 OnExit:
+    if((GL_TRUE == transferInfo.dstNeedFree) && (gcvNULL != transferInfo.dstImage)){
+        (*gc->imports.free)(gc, (void*)transferInfo.dstImage);
+        transferInfo.dstImage = gcvNULL;
+    }
     __GL_FOOTER();
 }
 
@@ -4156,6 +4434,11 @@ GLvoid GL_APIENTRY __glim_CopyTexImage2D(__GLcontext *gc,
     GLuint activeUnit;
     __GLtextureObject *tex;
     GLboolean retVal;
+    __GLformatInfo* texFormatInfo = gcvNULL;
+    __GLformatInfo* rtFormatInfo = gcvNULL;
+    GLvoid* data = gcvNULL;
+    GLuint nBytes = 0;
+    GLboolean needPixelTransfer = __GL_PIXELTRANSFER_ENABLED(gc);
 
     __GL_HEADER();
 
@@ -4183,11 +4466,49 @@ GLvoid GL_APIENTRY __glim_CopyTexImage2D(__GLcontext *gc,
 
     __glEvaluateDrawableChange(gc, __GL_BUFFER_READ_BIT);
 
+    texFormatInfo = __glGetFormatInfo(internalFormat);
+
+    if (__GL_FMT_MAX == texFormatInfo->drvFormat)
+    {
+        __GL_EXIT();
+    }
+
+    if (READ_FRAMEBUFFER_BINDING_NAME == 0)
+    {
+        rtFormatInfo = gc->drawablePrivate->rtFormatInfo;
+    }
+    else
+    {
+        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
+        rtFormatInfo = __glGetFramebufferFormatInfo(gc, readFBO, readFBO->readBuffer);
+    }
+
+    /* While internalformat is GL_DEPTH24_STENCIL8/GL_DEPTH32F_STENCIL8/GL_DEPTH_STENCIL, rtFormatInfo maybe NULL, regard as texFormatInfo. */
+    if (!rtFormatInfo)
+    {
+        rtFormatInfo = texFormatInfo;
+    }
+
     if (__glCopyTexBegin(gc))
     {
         __glCopyTexValidateState(gc);
 
-        retVal = (*gc->dp.copyTexImage2D)(gc, tex, face, lod, x, y);
+        /* If need to do PixelTransfer, using ReadPixels and Tex[Sub]Image*D to simulate copyTex[Sub]Image*D */
+        if((texFormatInfo->dataType != rtFormatInfo->dataType || needPixelTransfer) && !__glCheckSpecialFormat(internalFormat, texFormatInfo->dataFormat, &texFormatInfo->dataType))
+        {
+            __GLpixelTransferInfo transferInfo;
+            nBytes = __glPixelSize(gc, texFormatInfo->dataFormat, texFormatInfo->dataType);
+            data = (*gc->imports.malloc)(gc, width * height * nBytes);
+            (*gc->immedModeDispatch.ReadPixels)(gc, x, y, width, height, texFormatInfo->dataFormat, texFormatInfo->dataType, data);
+            __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo);
+            (*gc->immedModeDispatch.TexImage2D)(gc, target, lod, internalFormat, width, height, border, texFormatInfo->dataFormat, texFormatInfo->dataType, data);
+            __GL_REVERT_SCALE_BIAS(gc,transferInfo);
+            retVal = !(GLboolean)(*gc->dp.getError)(gc);
+        }
+        else
+        {
+            retVal = (*gc->dp.copyTexImage2D)(gc, tex, face, lod, x, y);
+        }
 
         __glCopyTexEnd(gc, tex, lod);
 
@@ -4203,6 +4524,11 @@ GLvoid GL_APIENTRY __glim_CopyTexImage2D(__GLcontext *gc,
     }
 
 OnExit:
+    if(data)
+    {
+        (*gc->imports.free)(gc, data);
+        data = gcvNULL;
+    }
     __GL_FOOTER();
 }
 
@@ -4225,6 +4551,11 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage3D(__GLcontext *gc,
     __GLtextureObject *tex;
     GLboolean retVal;
     GLuint activeUnit = gc->state.texture.activeTexIndex;
+    __GLformatInfo* texFormatInfo = gcvNULL;
+    __GLformatInfo* rtFormatInfo = gcvNULL;
+    GLvoid* data = gcvNULL;
+    GLuint nBytes = 0;
+    GLboolean needPixelTransfer = __GL_PIXELTRANSFER_ENABLED(gc);
 
     __GL_HEADER();
 
@@ -4240,7 +4571,7 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage3D(__GLcontext *gc,
         tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_ARRAY_INDEX];
         break;
     default:
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        __GL_ERROR_RET_STACK(GL_INVALID_ENUM);
     }
 
     /* Check arguments */
@@ -4260,11 +4591,49 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage3D(__GLcontext *gc,
 
     __glEvaluateDrawableChange(gc, __GL_BUFFER_READ_BIT);
 
+    texFormatInfo = __glGetFormatInfo(tex->faceMipmap[0][lod].requestedFormat);
+
+    if (__GL_FMT_MAX == texFormatInfo->drvFormat)
+    {
+        __GL_EXIT();
+    }
+
+    if (READ_FRAMEBUFFER_BINDING_NAME == 0)
+    {
+        rtFormatInfo = gc->drawablePrivate->rtFormatInfo;
+    }
+    else
+    {
+        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
+        rtFormatInfo = __glGetFramebufferFormatInfo(gc, readFBO, readFBO->readBuffer);
+    }
+
+    /* While internalformat is GL_DEPTH24_STENCIL8/GL_DEPTH32F_STENCIL8/GL_DEPTH_STENCIL, rtFormatInfo maybe NULL, regard as texFormatInfo. */
+    if (!rtFormatInfo)
+    {
+        rtFormatInfo = texFormatInfo;
+    }
+
     if (__glCopyTexBegin(gc))
     {
         __glCopyTexValidateState(gc);
 
-        retVal =  (*gc->dp.copyTexSubImage3D)(gc, tex, lod, x, y, width, height, xoffset, yoffset, zoffset);
+        /* If need to do PixelTransfer, using ReadPixels and Tex[Sub]Image*D to simulate copyTex[Sub]Image*D */
+        if((texFormatInfo->dataType != rtFormatInfo->dataType || needPixelTransfer) && !__glCheckSpecialFormat(tex->faceMipmap[0][lod].requestedFormat, texFormatInfo->dataFormat, &texFormatInfo->dataType))
+        {
+            __GLpixelTransferInfo transferInfo;
+            nBytes = __glPixelSize(gc, texFormatInfo->dataFormat, texFormatInfo->dataType);
+            data = (*gc->imports.malloc)(gc, width * height * nBytes);
+            (*gc->immedModeDispatch.ReadPixels)(gc, x, y, width, height, texFormatInfo->dataFormat, texFormatInfo->dataType, data);
+            __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo);
+            (*gc->immedModeDispatch.TexSubImage3D)(gc, target, lod, xoffset, yoffset, zoffset, width, height, 1, texFormatInfo->dataFormat, texFormatInfo->dataType, data);
+            __GL_REVERT_SCALE_BIAS(gc,transferInfo);
+            retVal = !(GLboolean)(*gc->dp.getError)(gc);
+        }
+        else
+        {
+            retVal =  (*gc->dp.copyTexSubImage3D)(gc, tex, lod, x, y, width, height, xoffset, yoffset, zoffset);
+        }
 
         __glCopyTexEnd(gc, tex, lod);
 
@@ -4275,6 +4644,11 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage3D(__GLcontext *gc,
     }
 
 OnExit:
+    if(data)
+    {
+        (*gc->imports.free)(gc, data);
+        data = gcvNULL;
+    }
     __GL_FOOTER();
 }
 
@@ -4293,6 +4667,11 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage2D(__GLcontext *gc,
     GLuint activeUnit;
     __GLtextureObject *tex;
     GLboolean retVal;
+    __GLformatInfo* texFormatInfo = gcvNULL;
+    __GLformatInfo* rtFormatInfo = gcvNULL;
+    GLvoid* data = gcvNULL;
+    GLuint nBytes = 0;
+    GLboolean needPixelTransfer = __GL_PIXELTRANSFER_ENABLED(gc);
 
     __GL_HEADER();
 
@@ -4316,11 +4695,49 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage2D(__GLcontext *gc,
 
     __glEvaluateDrawableChange(gc, __GL_BUFFER_READ_BIT);
 
+    texFormatInfo = __glGetFormatInfo(tex->faceMipmap[face][lod].requestedFormat);
+
+    if (__GL_FMT_MAX == texFormatInfo->drvFormat)
+    {
+        __GL_EXIT();
+    }
+
+    if (READ_FRAMEBUFFER_BINDING_NAME == 0)
+    {
+        rtFormatInfo = gc->drawablePrivate->rtFormatInfo;
+    }
+    else
+    {
+        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
+        rtFormatInfo = __glGetFramebufferFormatInfo(gc, readFBO, readFBO->readBuffer);
+    }
+
+    /* While internalformat is GL_DEPTH24_STENCIL8/GL_DEPTH32F_STENCIL8/GL_DEPTH_STENCIL, rtFormatInfo maybe NULL, regard as texFormatInfo. */
+    if (!rtFormatInfo)
+    {
+        rtFormatInfo = texFormatInfo;
+    }
+
     if (__glCopyTexBegin(gc))
     {
         __glCopyTexValidateState(gc);
 
-        retVal = (*gc->dp.copyTexSubImage2D)(gc, tex, face, lod, x, y, width, height, xoffset, yoffset);
+        /* If need to do PixelTransfer, using ReadPixels and Tex[Sub]Image*D to simulate copyTex[Sub]Image*D */
+        if((texFormatInfo->dataType != rtFormatInfo->dataType || needPixelTransfer) && !__glCheckSpecialFormat(tex->faceMipmap[face][lod].requestedFormat, texFormatInfo->dataFormat, &texFormatInfo->dataType))
+        {
+            __GLpixelTransferInfo transferInfo;
+            nBytes = __glPixelSize(gc, texFormatInfo->dataFormat, texFormatInfo->dataType);
+            data = (*gc->imports.malloc)(gc, width * height * nBytes);
+            (*gc->immedModeDispatch.ReadPixels)(gc, x, y, width, height, texFormatInfo->dataFormat, texFormatInfo->dataType, data);
+            __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo);
+            (*gc->immedModeDispatch.TexSubImage2D)(gc, target, lod, xoffset, yoffset, width, height, texFormatInfo->dataFormat, texFormatInfo->dataType, data);
+            __GL_REVERT_SCALE_BIAS(gc,transferInfo);
+            retVal = !(GLboolean)(*gc->dp.getError)(gc);
+        }
+        else
+        {
+            retVal = (*gc->dp.copyTexSubImage2D)(gc, tex, face, lod, x, y, width, height, xoffset, yoffset);
+        }
 
         __glCopyTexEnd(gc, tex, lod);
 
@@ -4335,6 +4752,11 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage2D(__GLcontext *gc,
     }
 
 OnExit:
+    if(data)
+    {
+        (*gc->imports.free)(gc, data);
+        data = gcvNULL;
+    }
     __GL_FOOTER();
 }
 
@@ -4480,7 +4902,7 @@ GLvoid GL_APIENTRY __glim_CompressedTexImage2D(__GLcontext *gc,
 
     if (imageSize < 0)
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
     }
 
     /* Check for paletted texture */
@@ -4498,13 +4920,13 @@ GLvoid GL_APIENTRY __glim_CompressedTexImage2D(__GLcontext *gc,
     case GL_PALETTE8_RGBA8_OES:
         if (lod > 0)
         {
-            __GL_ERROR_RET(GL_INVALID_VALUE);
+            __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
         }
         lod = -lod;
         /* If number of lods exceeded the size allowed one */
         if (lod > (GLint)__glFloorLog2(__GL_MAX(width, height)))
         {
-            __GL_ERROR_RET(GL_INVALID_VALUE);
+            __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
         }
         level = 0;
         isPalette = GL_TRUE;
@@ -4816,30 +5238,11 @@ GLvoid GL_APIENTRY __glim_GenerateMipmap(__GLcontext *gc, GLenum target)
     baseLevel = tex->params.baseLevel;
     baseMipmap = &tex->faceMipmap[0][baseLevel];
 
-    switch (baseMipmap->requestedFormat)
-    {
-    case GL_ALPHA:
-    case GL_LUMINANCE:
-    case GL_LUMINANCE_ALPHA:
-    case GL_RGB5_A1:
-    case GL_RGBA4:
-    case GL_RGBA:
-    case GL_RGB:
-    case GL_RGB565:
-        break;
-    default:
-        if (!baseMipmap->formatInfo->filterable ||
-            !baseMipmap->formatInfo->renderable ||
-            /* Only color-renderable format are allowed. */
-            baseMipmap->formatInfo->baseFormat == GL_DEPTH_COMPONENT ||
-            baseMipmap->formatInfo->baseFormat == GL_DEPTH_STENCIL ||
-            baseMipmap->formatInfo->baseFormat == GL_STENCIL
-           )
-        {
-            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-        }
-        break;
-    }
+    /*
+    ** In ES32 spec, GenerateMiamap need unsized internal format or sized internal format
+    ** that is both color-renderable and texture-filterable, else, there is an error
+    ** INVALID_OPERATION. But, this restriction is not mentioned in GL40 spec.
+    */
 
     width  = baseMipmap->width;
     height = baseMipmap->height;
@@ -6103,7 +6506,7 @@ GLvoid GL_APIENTRY __glim_TexBuffer(__GLcontext *gc, GLenum target, GLenum inter
 
     if (target != GL_TEXTURE_BUFFER_EXT)
     {
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        __GL_ERROR_RET_STACK(GL_INVALID_ENUM);
     }
 
     if (!__glGetTBOFmt(gc, internalformat, &type, &format, &bppPerTexel))
@@ -6123,7 +6526,7 @@ GLvoid GL_APIENTRY __glim_TexBuffer(__GLcontext *gc, GLenum target, GLenum inter
 
     if ((buffer != 0) && (!bufObj))
     {
-        __GL_ERROR_RET(GL_INVALID_OPERATION);
+        __GL_ERROR_RET_STACK(GL_INVALID_OPERATION);
     }
 
     size = (GLint)bufObj->size;
@@ -6180,7 +6583,7 @@ GLvoid GL_APIENTRY __glim_TexBufferRange(__GLcontext *gc, GLenum target, GLenum 
 
     if (target != GL_TEXTURE_BUFFER_EXT)
     {
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        __GL_ERROR_RET_STACK(GL_INVALID_ENUM);
     }
 
     if (!__glGetTBOFmt(gc, internalformat, &type, &format, &bppPerTexel))
@@ -6200,17 +6603,17 @@ GLvoid GL_APIENTRY __glim_TexBufferRange(__GLcontext *gc, GLenum target, GLenum 
 
     if ((buffer != 0) && (!bufObj))
     {
-        __GL_ERROR_RET(GL_INVALID_OPERATION);
+        __GL_ERROR_RET_STACK(GL_INVALID_OPERATION);
     }
 
     if ((offset < 0) || (size <= 0) || ((offset + size) > bufObj->size))
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
     }
 
     if ((offset % gc->constants.textureBufferOffsetAlignment) != 0)
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
     }
 
     /* Already bound with same setting*/
@@ -6531,7 +6934,7 @@ GLvoid GL_APIENTRY __glim_BindImageTexture(__GLcontext *gc, GLuint unit, GLuint 
 
     if (unit >= gc->constants.shaderCaps.maxImageUnit)
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
     }
 
     imageUnit = &gc->state.image.imageUnit[unit];
@@ -6827,7 +7230,7 @@ GLvoid GL_APIENTRY __glim_GetTexImage(__GLcontext *gc, GLenum target, GLint leve
                 break;
             }
         default:
-            __GL_ERROR_RET(GL_INVALID_ENUM);
+            __GL_ERROR_RET_STACK(GL_INVALID_ENUM);
         }
 
     if (!tex)
@@ -6838,7 +7241,7 @@ GLvoid GL_APIENTRY __glim_GetTexImage(__GLcontext *gc, GLenum target, GLint leve
     /* Check lod, width, height */
     if (level < 0 || level > maxLod)
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
     }
 
     if (!__glCheckTexImgTypeArg(gc, tex, type))

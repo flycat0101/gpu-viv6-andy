@@ -2781,43 +2781,6 @@ gcChipPatch19(
     gctINT* index
     )
 {
-    gcUNIFORM unit2;
-    gcATTRIBUTE texcoord0;
-    gcSHADER shader = gcvNULL;
-    gceSTATUS status = gcvSTATUS_OK;
-    __GLshaderObject *fragShaderObj = progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader;
-    gctUINT32_PTR compilerVersion = gcvNULL;
-
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
-
-    gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_FRAGMENT, &shader));
-
-    gcmONERROR(gcSHADER_GetCompilerVersion(fragShaderObj->shaderInfo.hBinary, &compilerVersion));
-    gcmONERROR(gcSHADER_SetCompilerVersion(shader, compilerVersion));
-
-    gcmONERROR(gcSHADER_AddAttribute(shader, "out_texcoord0", gcSHADER_FLOAT_X2, 1, gcvTRUE, gcSHADER_SHADER_DEFAULT, gcSHADER_PRECISION_MEDIUM, &texcoord0));
-    gcmONERROR(gcSHADER_AddUniform(shader, "texture_unit2", gcSHADER_SAMPLER_2D, 1, gcSHADER_PRECISION_LOW, &unit2));
-    gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_TEXLD, 1, gcSL_ENABLE_X, gcSL_FLOAT, gcSHADER_PRECISION_LOW, 0));
-    gcmONERROR(gcSHADER_AddSourceUniform(shader, unit2, gcSL_SWIZZLE_XYZW, 0));
-    gcmONERROR(gcSHADER_AddSourceAttribute(shader, texcoord0, gcSL_SWIZZLE_XYYY, 0));
-    gcmONERROR(gcSHADER_AddOpcodeConditional(shader, gcSL_KILL, gcSL_LESS, 0, 0));
-    gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, 1, gcSL_SWIZZLE_XXXX, gcSL_FLOAT, gcSHADER_PRECISION_LOW));
-    gcmONERROR(gcSHADER_AddSourceConstant(shader, 0.5));
-    gcmONERROR(gcSHADER_AddOutput(shader, "#Color", gcSHADER_FLOAT_X4, 1, 1, gcSHADER_PRECISION_MEDIUM));
-    gcmONERROR(gcSHADER_Pack(shader));
-
-OnError:
-    if (gcmIS_SUCCESS(status))
-    {
-        gcmVERIFY_OK(gcSHADER_Destroy(fragShaderObj->shaderInfo.hBinary));
-        fragShaderObj->shaderInfo.hBinary = shader;
-    }
-    else if (shader)
-    {
-        gcmVERIFY_OK(gcSHADER_Destroy(shader));
-    }
-
-    gcmFOOTER();
 }
 
 static void
@@ -8785,38 +8748,7 @@ gcChipPatch2152(
     gctINT* index
     )
 {
-    gcSHADER shader = gcvNULL;
-    gceSTATUS status;
-    __GLshaderObject *fragShaderObj = progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shader;
-    gctUINT32_PTR compilerVersion = gcvNULL;
-
-    do
-    {
-        gcUNIFORM unit0;
-        gcATTRIBUTE texcoord0;
-
-        gcmERR_BREAK(gcSHADER_Construct(gcSHADER_TYPE_FRAGMENT, &shader));
-
-        gcmERR_BREAK(gcSHADER_GetCompilerVersion(fragShaderObj->shaderInfo.hBinary, &compilerVersion));
-        gcmERR_BREAK(gcSHADER_SetCompilerVersion(shader, compilerVersion));
-
-        gcmERR_BREAK(gcSHADER_AddAttribute(shader, "varTexcoordColor", gcSHADER_FLOAT_X2, 1, gcvTRUE, gcSHADER_SHADER_DEFAULT, gcSHADER_PRECISION_MEDIUM, &texcoord0));
-        gcmERR_BREAK(gcSHADER_AddUniform(shader, "uniSampler2DColor", gcSHADER_SAMPLER_2D, 1, gcSHADER_PRECISION_MEDIUM, &unit0));
-        gcmERR_BREAK(gcSHADER_AddOpcode(shader, gcSL_TEXLD, 1, gcSL_ENABLE_XYZ, gcSL_FLOAT, gcSHADER_PRECISION_MEDIUM, 0));
-        gcmERR_BREAK(gcSHADER_AddSourceUniform(shader, unit0, gcSL_SWIZZLE_XYZW, 0));
-        gcmERR_BREAK(gcSHADER_AddSourceAttribute(shader, texcoord0, gcSL_SWIZZLE_XYYY, 0));
-        gcmERR_BREAK(gcSHADER_AddOutput(shader, "#Color", gcSHADER_FLOAT_X4, 1, 1, gcSHADER_PRECISION_MEDIUM));
-        gcmERR_BREAK(gcSHADER_Pack(shader));
-
-        gcmERR_BREAK(gcSHADER_Destroy(fragShaderObj->shaderInfo.hBinary));
-        fragShaderObj->shaderInfo.hBinary = shader;
-        shader = gcvNULL;
-    } while (GL_FALSE);
-
-    if (shader)
-    {
-        gcmVERIFY_OK(gcSHADER_Destroy(shader));
-    }
+    return;
 }
 
 static void

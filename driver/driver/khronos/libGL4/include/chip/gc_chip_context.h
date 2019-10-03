@@ -271,6 +271,7 @@ typedef struct __GLchipInstantDrawRec
     GLint           positionIndex;
 
     gctBOOL         primitiveRestart;
+    gctUINT         restartElement;
 } __GLchipInstantDraw;
 
 typedef struct __GLchipHalRtSlotInfoRec
@@ -998,6 +999,18 @@ gcChipDecompressETC1(
 
 extern GLvoid*
 gcChipDecompressDXT(
+    IN  __GLcontext *gc,
+    IN  gctSIZE_T Width,
+    IN  gctSIZE_T Height,
+    IN  gctSIZE_T ImageSize,
+    IN  const void *Data,
+    IN  GLenum InternalFormat,
+    OUT gceSURF_FORMAT *Format,
+    OUT gctSIZE_T* pRowStride
+    );
+
+extern GLvoid*
+gcChipDecompressRGTC(
     IN  __GLcontext *gc,
     IN  gctSIZE_T Width,
     IN  gctSIZE_T Height,

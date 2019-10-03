@@ -250,7 +250,7 @@ struct __GLmipMapLevelRec
     GLint requestedFormat;
 
     /* internal format */
-    GLint interalFormat;
+    GLint internalFormat;
 
     /* Base internal format */
     GLenum baseFormat;
@@ -737,6 +737,22 @@ typedef struct __GLtextureMachineRec
         if (__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled) \
         {\
             tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_ARRAY_INDEX]; \
+            tex->arrays = depth; \
+        break; \
+        } \
+        __GL_ERROR_RET(GL_INVALID_ENUM); \
+    case GL_PROXY_TEXTURE_2D_ARRAY: \
+        tex = &gc->texture.proxyTextures[__GL_TEXTURE_2D_ARRAY_INDEX]; \
+        tex->arrays = depth; \
+        break; \
+    case GL_PROXY_TEXTURE_3D: \
+        tex = &gc->texture.proxyTextures[__GL_TEXTURE_3D_INDEX]; \
+        tex->arrays = 1; \
+        break; \
+    case GL_PROXY_TEXTURE_CUBE_MAP_ARRAY: \
+        if (__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled) \
+        {\
+            tex = &gc->texture.proxyTextures[__GL_TEXTURE_CUBEMAP_ARRAY_INDEX]; \
             tex->arrays = depth; \
         break; \
         } \

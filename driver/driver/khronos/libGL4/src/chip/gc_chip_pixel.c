@@ -746,6 +746,8 @@ GLvoid resetAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
     pDispatchTable->Disable(gc, GL_CLIP_PLANE3);
     pDispatchTable->Disable(gc, GL_CLIP_PLANE4);
     pDispatchTable->Disable(gc, GL_CLIP_PLANE5);
+    pDispatchTable->Disable(gc, GL_CLIP_DISTANCE6);
+    pDispatchTable->Disable(gc, GL_CLIP_DISTANCE7);
     pDispatchTable->ActiveTexture(gc, GL_TEXTURE0);
     pDispatchTable->Enable(gc, GL_TEXTURE_2D);
     pDispatchTable->ActiveTexture(gc, GL_TEXTURE1);
@@ -1212,6 +1214,8 @@ GLboolean __glChipBitmaps(__GLcontext *gc, GLsizei width, GLsizei height, GLfloa
         pDispatchTable->Disable(gc, GL_CLIP_PLANE3);
         pDispatchTable->Disable(gc, GL_CLIP_PLANE4);
         pDispatchTable->Disable(gc, GL_CLIP_PLANE5);
+        pDispatchTable->Disable(gc, GL_CLIP_DISTANCE6);
+        pDispatchTable->Disable(gc, GL_CLIP_DISTANCE7);
         pDispatchTable->Enable(gc, GL_ALPHA_TEST);
         pDispatchTable->AlphaFunc(gc, GL_GREATER, 0);
 
@@ -1409,6 +1413,8 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     pDispatchTable->Disable(gc, GL_CLIP_PLANE3);
     pDispatchTable->Disable(gc, GL_CLIP_PLANE4);
     pDispatchTable->Disable(gc, GL_CLIP_PLANE5);
+    pDispatchTable->Disable(gc, GL_CLIP_DISTANCE6);
+    pDispatchTable->Disable(gc, GL_CLIP_DISTANCE7);
 
     /* Texture initialization */
     pDispatchTable->GenTextures(gc, 1, &texture);   /* Create a texture*/
@@ -1761,6 +1767,9 @@ typedef struct
     d->stencil = (GLuint)(s->stencil) & 0xff; \
     d->depth = s->depth \
 
+#define CONVERT_STENCIL_ONLY(dstDataType, D32F_S8_1_G32R32F) \
+    *d = (GLuint)(s->stencil) & 0xff; \
+
 #define CONVERT_DEPTH_ONLY(dstDataType, D32F_S8_1_G32R32F) \
     *d = (dstDataType)(s->depth) \
 
@@ -1800,7 +1809,8 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
 
     gceSTATUS status = gcvSTATUS_OK;
 
-    srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readDepthView, GL_TRUE);
+    srcView = chipCtx->readDepthView.surf ? gcChipFboSyncFromShadowSurface(gc, &chipCtx->readDepthView, GL_TRUE):
+        gcChipFboSyncFromShadowSurface(gc, &chipCtx->readStencilView, GL_TRUE);
 
     if (srcView.surf == gcvNULL)
     {
@@ -2001,11 +2011,26 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
             dstStride = width * 4;
             CONVERT_DEPTH_PIXELS(gctFLOAT, D32F_S8_1_G32R32F, CONVERT_DEPTH_ONLY);
             break;
+        case GL_UNSIGNED_INT:
+            dstStride = width * 8;
+            CONVERT_DEPTH_PIXELS(gctUINT32, D32F_S8_1_G32R32F, CONVERT_STENCIL_ONLY);
+            break;
         default:
             break;
         }
         break;
-
+    case gcvSURF_S8:
+        switch(type)
+        {
+        case GL_UNSIGNED_INT:
+            dstMax = 0;
+            srcMax = ((1 << 8) - 1);
+            srcShift = 0;
+            dstStride = width;
+            CONVERT_DEPTH_PIXELS(gctUINT32, gctUINT32, CONVERT_NONE);
+        default:
+            break;
+        }
     default:
         break;
     }
@@ -2156,6 +2181,9 @@ __glChipReadPixels(
     case GL_UNSIGNED_SHORT:
         switch (format)
         {
+        case GL_RGBA:
+            wrapformat = gcvSURF_A16B16G16R16;
+            break;
         case GL_RGBA_INTEGER:
             wrapformat = gcvSURF_A16B16G16R16UI;
             break;

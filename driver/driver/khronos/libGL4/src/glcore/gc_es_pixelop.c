@@ -282,7 +282,7 @@ GLvoid GL_APIENTRY __glim_DrawBuffers(__GLcontext *gc, GLsizei n, const GLenum *
     {
         __GLframebufferObject *drawFBO = gc->frameBuffer.drawFramebufObj;
 
-        if ((gcvNULL == bufs) && !(gc->constants.majorVersion == 3 && gc->constants.minorVersion >= 1))
+        if (gcvNULL == bufs)
         {
             __GL_ERROR_EXIT(GL_INVALID_OPERATION);
         }
@@ -457,7 +457,9 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
 
     if (READ_FRAMEBUFFER_BINDING_NAME)
     {
-        if ((mode == GL_BACK) || (mode > __GL_COLOR_ATTACHMENTn))
+        if ((mode == GL_BACK) || (mode == GL_FRONT) || (mode == GL_LEFT) || (mode == GL_RIGHT) ||
+            (mode == GL_FRONT_LEFT)||(mode == GL_FRONT_RIGHT) ||(mode == GL_BACK_LEFT)||(mode == (GL_BACK_RIGHT))||
+            (mode > __GL_COLOR_ATTACHMENTn))
         {
             __GL_ERROR_EXIT(GL_INVALID_OPERATION);
         }
@@ -814,27 +816,6 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
         __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
     }
 #else
-    if (READ_FRAMEBUFFER_BINDING_NAME != 0 && gc->frameBuffer.readFramebufObj->fbIntMask)
-    {
-        switch(format)
-        {
-        case GL_RED_INTEGER_EXT:
-        case GL_GREEN_INTEGER_EXT:
-        case GL_BLUE_INTEGER_EXT:
-        case GL_ALPHA_INTEGER_EXT:
-        case GL_RGB_INTEGER_EXT:
-        case GL_RGBA_INTEGER_EXT:
-        case GL_BGR_INTEGER_EXT:
-        case GL_BGRA_INTEGER_EXT:
-        case GL_LUMINANCE_INTEGER_EXT:
-        case GL_LUMINANCE_ALPHA_INTEGER_EXT:
-          break;
-        default:
-            __glSetError(gc, GL_INVALID_OPERATION);
-            return GL_FALSE;
-        }
-    }
-
     switch (format)
     {
       case GL_STENCIL_INDEX:
@@ -900,7 +881,7 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
              return GL_FALSE;
           }
 
-          if (!gc->frameBuffer.readFramebufObj->fbIntMask)
+          if ((!gc->frameBuffer.readFramebufObj->fbIntMask)||(READ_FRAMEBUFFER_BINDING_NAME == 0))
           {
              __glSetError(gc, GL_INVALID_OPERATION);
              return GL_FALSE;
@@ -1054,18 +1035,43 @@ GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei 
 {
     GLboolean retVal;
     __GLbufferObject *packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
+    __GLpixelTransferInfo transferInfo;
+    __GLformatInfo *formatInfo;
 
     __GL_HEADER();
+
+    memset(&transferInfo, 0 ,sizeof(__GLpixelTransferInfo));
 
     if (!__glCheckReadPixelArgs(gc, width, height, format, type))
     {
         __GL_EXIT();
     }
 
+    /* Check if framebuffer is complete */
+    if (READ_FRAMEBUFFER_BINDING_NAME == 0)
+    {
+        formatInfo = gc->drawablePrivate->rtFormatInfo;
+    }
+    else
+    {
+        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
+        formatInfo = __glGetFramebufferFormatInfo(gc, readFBO, readFBO->readBuffer);
+    }
+
+    if (formatInfo != gcvNULL)
+    {
+        __glGenericPixelTransfer(gc, width, height, 1, formatInfo, format, &type, pixels, &transferInfo, __GL_ReadPixelsPre);
+    }
+    else
+    {
+        transferInfo.srcImage = pixels;
+        transferInfo.applyPixelTransfer = GL_FALSE;
+    }
+
     /* The image is from pack buffer object? */
     if (packBufObj)
     {
-        if (!__glCheckPBO(gc, &gc->clientState.pixel.packModes, packBufObj, width, height, 0, format, type, pixels))
+        if (!__glCheckPBO(gc, &gc->clientState.pixel.packModes, packBufObj, width, height, 0, format, type, transferInfo.srcImage))
         {
             __GL_EXIT();
         }
@@ -1073,11 +1079,11 @@ GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei 
 
     __glEvaluateDrawableChange(gc, __GL_BUFFER_READ_BIT);
 
-    if (GL_TRUE == __glReadPixelsBegin(gc, x, y, width, height, format, type, pixels))
+    if (GL_TRUE == __glReadPixelsBegin(gc, x, y, width, height, format, type, (GLvoid*)transferInfo.srcImage))
     {
         __glReadPixelsValidateState(gc);
 
-        retVal = (*gc->dp.readPixels)(gc, x, y, width, height, format, type, (GLubyte*)pixels);
+        retVal = (*gc->dp.readPixels)(gc, x, y, width, height, format, type, (GLubyte*)transferInfo.srcImage);
 
         __glReadPixelsEnd(gc);
 
@@ -1087,7 +1093,16 @@ GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei 
         }
     }
 
+    if ((GL_TRUE == transferInfo.applyPixelTransfer) && (formatInfo != gcvNULL))
+    {
+        __glGenericPixelTransfer(gc, width, height, 1, formatInfo, format, &type, pixels, &transferInfo, __GL_ReadPixels);
+    }
+
 OnExit:
+    if((GL_TRUE == transferInfo.srcNeedFree) && (gcvNULL != transferInfo.srcImage)){
+        (*gc->imports.free)(gc, (void*)transferInfo.srcImage);
+        transferInfo.srcImage = gcvNULL;
+    }
     __GL_FOOTER();
 }
 
@@ -1263,6 +1278,10 @@ GLvoid APIENTRY __glim_DrawBuffer(__GLcontext *gc, GLenum mode)
 GLvoid APIENTRY __glim_Accum(__GLcontext *gc, GLenum op, GLfloat value)
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
+
+    if (gc->conditionalRenderDiscard){
+        return;
+    }
 
     if (!gc->modes.haveAccumBuffer) {
         __glSetError(gc, GL_INVALID_OPERATION);
@@ -1772,6 +1791,10 @@ GLvoid APIENTRY __glim_DrawPixels(__GLcontext *gc, GLsizei width, GLsizei height
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
+    if(gc->conditionalRenderDiscard){
+        return;
+    }
+
     if (!__glCheckDrawPixelArgs(gc, width, height, format, type)) {
         return;
     }
@@ -1812,6 +1835,10 @@ GLvoid APIENTRY __glim_CopyPixels(__GLcontext *gc, GLint x, GLint y, GLsizei wid
 {
     GLenum format;
     __GL_SETUP_NOT_IN_BEGIN(gc);
+
+    if(gc->conditionalRenderDiscard){
+        return;
+    }
 
     if(READ_FRAMEBUFFER_BINDING_NAME != 0)
     {
@@ -1906,6 +1933,10 @@ GLvoid APIENTRY __glim_Bitmap(__GLcontext *gc, GLsizei w, GLsizei h, GLfloat xOr
     GLuint unpackBuffer;
     __GLbufferObject *bufObj = NULL;
     __GL_SETUP_NOT_IN_BEGIN(gc);
+
+    if (gc->conditionalRenderDiscard){
+        return;
+    }
 
     if ((w < 0) || (h < 0)) {
         __glSetError(gc, GL_INVALID_VALUE);

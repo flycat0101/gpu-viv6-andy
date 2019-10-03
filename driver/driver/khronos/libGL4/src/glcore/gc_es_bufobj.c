@@ -66,7 +66,7 @@ GLvoid __glInitBufferObject(__GLcontext *gc, __GLbufferObject *bufObj, GLuint na
 {
     bufObj->bindCount           = 0;
     bufObj->accessFlags         = 0;
-    bufObj->accessOES           = GL_WRITE_ONLY_OES;
+    bufObj->access           = GL_READ_WRITE;
     bufObj->bufferMapped        = GL_FALSE;
     bufObj->mapPointer          = gcvNULL;
     bufObj->mapOffset           = 0;
@@ -397,8 +397,8 @@ GLvoid __glGetBufferParameteri64v(__GLcontext *gc, GLenum target, GLenum pname, 
     case GL_BUFFER_ACCESS_FLAGS:
         *params = (GLint64)bufObj->accessFlags;
         break;
-    case GL_BUFFER_ACCESS_OES:
-        *params = (GLint64)bufObj->accessOES;
+    case GL_BUFFER_ACCESS:
+        *params = (GLint64)bufObj->access;
         break;
     case GL_BUFFER_MAPPED:
         *params = (GLint64)bufObj->bufferMapped;
@@ -1139,6 +1139,15 @@ GLvoid* GL_APIENTRY __glim_MapBufferRange(__GLcontext *gc, GLenum target, GLintp
     }
     bufObj->accessFlags = access;
 
+    if((access & (GL_MAP_READ_BIT|GL_MAP_WRITE_BIT)) == GL_MAP_READ_BIT)
+        bufObj->access =  GL_READ_ONLY;
+
+    if((access & (GL_MAP_READ_BIT|GL_MAP_WRITE_BIT)) == GL_MAP_WRITE_BIT)
+        bufObj->access =  GL_WRITE_ONLY;
+
+    if((access & (GL_MAP_READ_BIT|GL_MAP_WRITE_BIT)) == (GL_MAP_READ_BIT|GL_MAP_WRITE_BIT))
+        bufObj->access = GL_READ_WRITE;
+
 OnError:
     __GL_FOOTER();
     return result;
@@ -1192,7 +1201,8 @@ GLvoid* GL_APIENTRY __glim_MapBuffer(__GLcontext *gc, GLenum target, GLenum acce
     {
         __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
     }
-    bufObj->accessOES = access;
+    bufObj->access = access;
+    bufObj->accessFlags = accessFlag;
 
 OnError:
     __GL_FOOTER();

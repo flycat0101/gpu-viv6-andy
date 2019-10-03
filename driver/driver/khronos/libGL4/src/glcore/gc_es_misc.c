@@ -376,6 +376,8 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
     case GL_CLIP_PLANE3:
     case GL_CLIP_PLANE4:
     case GL_CLIP_PLANE5:
+    case GL_CLIP_DISTANCE6:
+    case GL_CLIP_DISTANCE7:
         capOffset = cap - GL_CLIP_PLANE0;
         __GL_VERTEX_BUFFER_FLUSH(gc);
         if (val == GL_TRUE) {
@@ -578,8 +580,11 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
         break;
 
     case GL_PRIMITIVE_RESTART:
-        /* Add the code to run glcts*/
-//        GL_ASSERT(0);
+        if (es->primitiveRestart ^ val)
+        {
+            es->primitiveRestart = val;
+            __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_PRIMITIVE_RESTART_BIT);
+        }
         break;
 
     case GL_DEPTH_CLAMP:
@@ -683,16 +688,20 @@ GLboolean GL_APIENTRY __glim_IsEnabled(__GLcontext *gc, GLenum cap)
 
 #ifdef OPENGL40
     case GL_ALPHA_TEST:
-        return es->colorBuffer.alphaTest;
+        ret = es->colorBuffer.alphaTest;
+        break;
 
     case GL_COLOR_MATERIAL:
-        return es->lighting.colorMaterial;
+        ret = es->lighting.colorMaterial;
+        break;
 
     case GL_FOG:
-        return es->fog;
+        ret = es->fog;
+        break;
 
     case GL_LIGHTING:
-        return es->lighting.lighting;
+        ret = es->lighting.lighting;
+        break;
 
     case GL_LIGHT0:
     case GL_LIGHT1:
@@ -704,34 +713,42 @@ GLboolean GL_APIENTRY __glim_IsEnabled(__GLcontext *gc, GLenum cap)
     case GL_LIGHT7:
         {
             GLint capOffset = cap - GL_LIGHT0;
-            return es->lighting.light[capOffset];
+            ret = es->lighting.light[capOffset];
+            break;
         }
 
     case GL_POLYGON_STIPPLE:
-        return es->polygon.stipple;
+        ret = es->polygon.stipple;
+        break;
 
     case GL_TEXTURE_GEN_S:
     case GL_TEXTURE_GEN_T:
     case GL_TEXTURE_GEN_R:
     case GL_TEXTURE_GEN_Q:
         cap = __GL_EVAL2D_INDEX(cap);
-        return es->eval.map2[cap];
+        ret = es->eval.map2[cap];
+        break;
 
     case GL_TEXTURE_1D:
-        return es->texUnits[gc->state.texture.activeTexIndex].texture1D;
+        ret = es->texUnits[gc->state.texture.activeTexIndex].texture1D;
+        break;
 
     case GL_TEXTURE_2D:
-        return es->texUnits[gc->state.texture.activeTexIndex].texture2D;
+        ret = es->texUnits[gc->state.texture.activeTexIndex].texture2D;
+        break;
 
     case GL_TEXTURE_3D:
-        return es->texUnits[gc->state.texture.activeTexIndex].texture3D;
+        ret = es->texUnits[gc->state.texture.activeTexIndex].texture3D;
+        break;
 
     case GL_TEXTURE_CUBE_MAP:
-        return es->texUnits[gc->state.texture.activeTexIndex].textureCubeMap;
+        ret = es->texUnits[gc->state.texture.activeTexIndex].textureCubeMap;
+        break;
 
 #if GL_ARB_texture_rectangle
     case GL_TEXTURE_RECTANGLE_ARB:
-        return es->texUnits[gc->state.texture.activeTexIndex].textureRec;
+        ret = es->texUnits[gc->state.texture.activeTexIndex].textureRec;
+        break;
 #endif
     case GL_CLIP_PLANE0:
     case GL_CLIP_PLANE1:
@@ -739,9 +756,12 @@ GLboolean GL_APIENTRY __glim_IsEnabled(__GLcontext *gc, GLenum cap)
     case GL_CLIP_PLANE3:
     case GL_CLIP_PLANE4:
     case GL_CLIP_PLANE5:
+    case GL_CLIP_DISTANCE6:
+    case GL_CLIP_DISTANCE7:
         {
             GLint capOffset = cap - GL_CLIP_PLANE0;
-            return (es->transform.clipPlanesMask & (1 << capOffset)) != 0;
+            ret = (es->transform.clipPlanesMask & (1 << capOffset)) != 0;
+            break;
         }
 
     case GL_MAP1_COLOR_4:
@@ -754,7 +774,8 @@ GLboolean GL_APIENTRY __glim_IsEnabled(__GLcontext *gc, GLenum cap)
     case GL_MAP1_VERTEX_3:
     case GL_MAP1_VERTEX_4:
         cap = __GL_EVAL1D_INDEX(cap);
-        return es->eval.map1[cap];
+        ret = es->eval.map1[cap];
+        break;
 
     case GL_MAP2_COLOR_4:
     case GL_MAP2_NORMAL:
@@ -766,52 +787,72 @@ GLboolean GL_APIENTRY __glim_IsEnabled(__GLcontext *gc, GLenum cap)
     case GL_MAP2_VERTEX_3:
     case GL_MAP2_VERTEX_4:
         cap = __GL_EVAL1D_INDEX(cap);
-        return es->eval.map2[cap];
+        ret = es->eval.map2[cap];
+        break;
 
     case GL_AUTO_NORMAL:
-        return es->eval.autonormal;
+        ret = es->eval.autonormal;
+        break;
 
     case GL_NORMALIZE:
-        return es->transform.normalize;
+        ret = es->transform.normalize;
+        break;
 
     case GL_MULTISAMPLE:
-        return es->multisample.multisampleOn;
+        ret = es->multisample.multisampleOn;
+        break;
 
     case GL_COLOR_SUM:
-        return es->colorSum;
+        ret = es->colorSum;
+        break;
 
     case GL_LINE_SMOOTH:
-        return es->line.smooth;
+        ret = es->line.smooth;
+        break;
 
     case GL_LINE_STIPPLE:
-        return es->line.stippleRequested;
+        ret = es->line.stippleRequested;
+        break;
 
     case GL_INDEX_LOGIC_OP:
-        return es->colorBuffer.indexLogicOp;
+        ret = es->colorBuffer.indexLogicOp;
+        break;
 
     case GL_COLOR_LOGIC_OP:
-        return es->colorBuffer.colorLogicOp;
+        ret = es->colorBuffer.colorLogicOp;
+        break;
 
     case GL_RESCALE_NORMAL:
-        return es->transform.rescaleNormal;
+        ret = es->transform.rescaleNormal;
+        break;
 
     case GL_VERTEX_PROGRAM_POINT_SIZE:
-        return es->program.vpPointSize;
+        ret = es->program.vpPointSize;
+        break;
 
     case GL_VERTEX_PROGRAM_TWO_SIDE:
-        return es->program.vpTwoSize;
+        ret = es->program.vpTwoSize;
+        break;
 
     case GL_POLYGON_OFFSET_POINT:
-        return es->polygon.polygonOffsetPoint;
+        ret = es->polygon.polygonOffsetPoint;
+        break;
 
     case GL_POLYGON_OFFSET_LINE:
-        return es->polygon.polygonOffsetLine;
+        ret = es->polygon.polygonOffsetLine;
+        break;
 
     case GL_POLYGON_SMOOTH:
-        return es->polygon.smooth;
+        ret = es->polygon.smooth;
+        break;
 
     case GL_SAMPLE_ALPHA_TO_ONE:
-        return es->multisample.alphaToOne;
+        ret = es->multisample.alphaToOne;
+        break;
+
+    case  GL_PRIMITIVE_RESTART:
+        ret = es->primitiveRestart;
+        break;
 #endif
 
     default:
@@ -869,6 +910,11 @@ GLvoid GL_APIENTRY __glim_Clear(__GLcontext *gc, GLbitfield mask)
     GLboolean retVal;
 
     __GL_HEADER();
+
+    if (gc->conditionalRenderDiscard)
+    {
+        __GL_EXIT();
+    }
 
     if (mask & ~(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT))
     {
@@ -998,6 +1044,11 @@ GLvoid GL_APIENTRY __glim_ClearBufferfi(__GLcontext *gc, GLenum buffer, GLint dr
 
     __GL_HEADER();
 
+    if (gc->conditionalRenderDiscard)
+    {
+        __GL_EXIT();
+    }
+
     if ((buffer != GL_DEPTH_STENCIL))
     {
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
@@ -1030,6 +1081,7 @@ GLvoid GL_APIENTRY __glim_ClearBufferfi(__GLcontext *gc, GLenum buffer, GLint dr
         }
     }
 
+OnExit:
 OnError:
     __GL_FOOTER();
 }
@@ -1037,6 +1089,11 @@ OnError:
 GLvoid GL_APIENTRY __glim_ClearBufferiv(__GLcontext *gc, GLenum buffer, GLint drawbuffer, const GLint* value)
 {
     __GL_HEADER();
+
+    if (gc->conditionalRenderDiscard)
+    {
+        __GL_EXIT();
+    }
 
     if (buffer == GL_DEPTH)
     {
@@ -1050,6 +1107,7 @@ GLvoid GL_APIENTRY __glim_ClearBufferiv(__GLcontext *gc, GLenum buffer, GLint dr
 
     __glClearBuffer(gc, buffer, drawbuffer,(GLvoid*)value, GL_INT);
 
+OnExit:
 OnError:
     __GL_FOOTER();
 }
@@ -1058,6 +1116,11 @@ GLvoid GL_APIENTRY __glim_ClearBufferuiv(__GLcontext *gc, GLenum buffer, GLint d
 {
     __GL_HEADER();
 
+    if (gc->conditionalRenderDiscard)
+    {
+        __GL_EXIT();
+    }
+
     if (buffer != GL_COLOR)
     {
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
@@ -1065,6 +1128,7 @@ GLvoid GL_APIENTRY __glim_ClearBufferuiv(__GLcontext *gc, GLenum buffer, GLint d
 
     __glClearBuffer(gc, buffer, drawbuffer,(GLvoid*)value, GL_UNSIGNED_INT);
 
+OnExit:
 OnError:
     __GL_FOOTER();
 }
@@ -1072,6 +1136,11 @@ OnError:
 GLvoid GL_APIENTRY __glim_ClearBufferfv(__GLcontext *gc, GLenum buffer, GLint drawbuffer, const GLfloat* value)
 {
     __GL_HEADER();
+
+    if (gc->conditionalRenderDiscard)
+    {
+        __GL_EXIT();
+    }
 
     if (buffer == GL_STENCIL)
     {
@@ -1085,6 +1154,7 @@ GLvoid GL_APIENTRY __glim_ClearBufferfv(__GLcontext *gc, GLenum buffer, GLint dr
 
     __glClearBuffer(gc, buffer, drawbuffer,(GLvoid*)value, GL_FLOAT);
 
+OnExit:
 OnError:
     __GL_FOOTER();
 }
@@ -2963,20 +3033,97 @@ GLvoid GL_APIENTRY __glim_DepthRange(__GLcontext *gc, GLclampd near_val, GLclamp
 {
 }
 
-/* GL_VERSION_1_5 */
-GLvoid GL_APIENTRY __glim_GetQueryObjectiv(__GLcontext *gc, GLuint id, GLenum pname, GLint *params)
-{
-}
 /* GL_VERSION_3_0 */
 GLvoid GL_APIENTRY __glim_BeginConditionalRender(__GLcontext *gc, GLuint id, GLenum mode)
 {
+    __GLqueryObject *queryObj;
+    GLuint queryIdx;
+
+    __GL_HEADER();
+
+    queryObj = (__GLqueryObject *)__glGetObject(gc, gc->query.noShare, id);
+
+    /* If id is not the name of an existing query object, return error*/
+    if (queryObj == gcvNULL)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
+    /* If id is the name of a query object with a target other than GL_SAMPLES_PASSED or GL_ANY_SAMPLES_PASSED, return error*/
+    if((queryObj->target != GL_SAMPLES_PASSED ) && (queryObj->target != GL_ANY_SAMPLES_PASSED))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+
+    /* Where id is the name of a query currently in progress, return error*/
+    for (queryIdx = __GL_QUERY_ANY_SAMPLES_PASSED; queryIdx < __GL_QUERY_LAST; ++queryIdx)
+    {
+        if (gc->query.currQuery[queryIdx] &&
+            !(gc->query.currQuery[queryIdx]->flag & __GL_OBJECT_IS_DELETED) &&
+            gc->query.currQuery[queryIdx]->name == id)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
+    }
+
+    /* If glBeginConditionalRender is called while conditional rendering is active, return error*/
+    if(gc->conditionalRenderDiscard == GL_TRUE)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+
+    /* If mode is not one of the accepted tokens. */
+    switch(mode)
+    {
+        case GL_QUERY_WAIT:
+        case GL_QUERY_BY_REGION_WAIT:
+            while (!queryObj->resultAvailable)
+            {
+                (*gc->dp.getQueryObject)(gc, GL_QUERY_RESULT, queryObj);
+            }
+            break;
+        case GL_QUERY_NO_WAIT:
+        case GL_QUERY_BY_REGION_NO_WAIT:
+            break;
+
+        default:
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+            return;
+    }
+
+    if(queryObj->count == 0)
+    {
+        gc->conditionalRenderDiscard = GL_TRUE;
+    }
+
+OnError:
+    __GL_FOOTER();
 }
 GLvoid GL_APIENTRY __glim_EndConditionalRender(__GLcontext *gc)
 {
+    __GL_HEADER();
+
+    /* If glEndConditionalRender is called while conditional rendering is not in progress, return error */
+    if(gc->conditionalRenderDiscard == GL_FALSE)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+
+     gc->conditionalRenderDiscard = GL_FALSE;
+
+OnError:
+    __GL_FOOTER();
 }
 /* GL_VERSION_3_1 */
 GLvoid GL_APIENTRY __glim_PrimitiveRestartIndex(__GLcontext *gc, GLuint index)
 {
+    __GL_HEADER();
+
+    gc->state.primRestart.restartElement = index;
+
+    __GL_FOOTER();
+
+    return;
 }
 
 /* GL_VERSION_3_2 */
@@ -3143,21 +3290,6 @@ GLvoid GL_APIENTRY __glim_GetProgramStageiv(__GLcontext *gc, GLuint program, GLe
 {
 }
 GLvoid GL_APIENTRY __glim_PatchParameterfv(__GLcontext *gc, GLenum pname, const GLfloat *values)
-{
-}
-GLvoid GL_APIENTRY __glim_DrawTransformFeedback(__GLcontext *gc, GLenum mode, GLuint id)
-{
-}
-GLvoid GL_APIENTRY __glim_DrawTransformFeedbackStream(__GLcontext *gc, GLenum mode, GLuint id, GLuint stream)
-{
-}
-GLvoid GL_APIENTRY __glim_BeginQueryIndexed(__GLcontext *gc, GLenum target, GLuint index, GLuint id)
-{
-}
-GLvoid GL_APIENTRY __glim_EndQueryIndexed(__GLcontext *gc, GLenum target, GLuint index)
-{
-}
-GLvoid GL_APIENTRY __glim_GetQueryIndexediv(__GLcontext *gc, GLenum target, GLuint index, GLenum pname, GLint *params)
 {
 }
 

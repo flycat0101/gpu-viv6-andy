@@ -110,6 +110,7 @@ GLboolean __glInitProgramObject(__GLcontext *gc, __GLprogramObject *programObjec
     programObject->xfbVaryingNum = 0;
     programObject->ppXfbVaryingNames = gcvNULL;
     programObject->xfbRefCount = 0;
+    programObject->nextBufferCount = 0;
 
     programObject->maxSampler = 0;
     programObject->maxUnit = 0;
@@ -343,12 +344,38 @@ GLvoid __glBindTransformFeedback(__GLcontext *gc, GLuint id)
     gc->xfb.dirtyState |= __GL_XFB_DIRTY_OBJECT;
 }
 
+GLvoid __glDrawTransformFeedbackStream(__GLcontext *gc, GLenum mode, GLuint id, GLuint stream)
+{
+    __GLxfbObject *xfbObj = gc->xfb.boundXfbObj;
+
+    if (mode != GL_POINTS && mode != GL_LINE_STRIP && mode != GL_LINE_LOOP
+        && mode != GL_LINES && mode != GL_LINE_STRIP_ADJACENCY && mode != GL_LINES_ADJACENCY
+        && mode != GL_TRIANGLE_STRIP && mode != GL_TRIANGLE_FAN && mode != GL_TRIANGLES
+        && mode != GL_TRIANGLE_STRIP_ADJACENCY && mode != GL_TRIANGLES_ADJACENCY && mode != GL_PATCHES)
+    {
+        __GL_ERROR_RET(GL_INVALID_ENUM);
+    }
+
+    if (xfbObj->name != id)
+    {
+        __GL_ERROR_RET(GL_INVALID_VALUE);
+    }
+    else if (!xfbObj->end)
+    {
+        __GL_ERROR_RET(GL_INVALID_OPERATION);
+    }
+
+    //VIV TODO: Count set to the number of vertices captured on vertex stream.
+
+    __glim_DrawArrays(gc, mode, 0, xfbObj->vertices);
+}
 
 GLvoid __glInitXfbObject(__GLcontext *gc, __GLxfbObject *xfbObj, GLuint name)
 {
     xfbObj->name = name;
     xfbObj->active = GL_FALSE;
     xfbObj->paused = GL_FALSE;
+    xfbObj->end = GL_FALSE;
     xfbObj->primMode = 0;
     xfbObj->offset = 0;
     xfbObj->vertices = 0;
@@ -1106,6 +1133,25 @@ GLvoid GL_APIENTRY __glim_LinkProgram(__GLcontext *gc,  GLuint program)
         }
   #endif
 
+    }
+
+    /* Exception handling for repeated varying of xfb*/
+    if(programObject->xfbVaryingNum > 1){
+        GLuint i,j;
+        for(i = 0; i < programObject->xfbVaryingNum; i++){
+            if(strcmp(programObject->ppXfbVaryingNames[i], "gl_SkipComponents1") && strcmp(programObject->ppXfbVaryingNames[i], "gl_SkipComponents2") &&
+               strcmp(programObject->ppXfbVaryingNames[i], "gl_SkipComponents3") && strcmp(programObject->ppXfbVaryingNames[i], "gl_SkipComponents4") &&
+               strcmp(programObject->ppXfbVaryingNames[i], "gl_NextBuffer"))
+            {
+                for(j = i + 1; j < programObject->xfbVaryingNum; j++){
+                    if(!strcmp(programObject->ppXfbVaryingNames[i], programObject->ppXfbVaryingNames[j])){
+                        strncpy(programObject->programInfo.infoLog, "repeated varying of xfb", __GLSL_LOG_INFO_SIZE);
+                        programObject->programInfo.linkedStatus = GL_FALSE;
+                        __GL_EXIT();
+                    }
+                }
+             }
+        }
     }
 
     programObject->programInfo.codeSeq++;
@@ -4044,6 +4090,7 @@ GLvoid GL_APIENTRY __glim_EndTransformFeedback(__GLcontext *gc)
     --xfbObj->programObj->xfbRefCount;
     xfbObj->programObj = gcvNULL;
     xfbObj->primMode = 0;
+    xfbObj->end = GL_TRUE;
 
     if (xfbObj->flags & __GL_OBJECT_IS_DELETED)
     {
@@ -4096,11 +4143,43 @@ OnError:
     __GL_FOOTER();
 }
 
+GLvoid GL_APIENTRY __glim_DrawTransformFeedback(__GLcontext *gc, GLenum mode, GLuint id)
+{
+    __GL_HEADER();
+
+    __glDrawTransformFeedbackStream(gc, mode, id, 0);
+
+    /* VIV TODO: need to refine and implement more operations for stream */
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_DrawTransformFeedbackStream(__GLcontext *gc, GLenum mode, GLuint id, GLuint stream)
+{
+    __GL_HEADER();
+
+    if(stream > gc->constants.shaderCaps.maxVertStreams)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
+    __glDrawTransformFeedbackStream(gc, mode, id, stream);
+
+    /* VIV TODO: need to refine and implement more operations for stream */
+
+OnError:
+    __GL_FOOTER();
+}
+
 GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint program, GLsizei count,
                                                     const GLchar* const* varyings, GLenum bufferMode)
 {
     GLuint i;
     __GLprogramObject *programObject;
+    GLint nextBufferCount = 0;
+    GLuint invalidIdentifierCount = 0;
+    GLboolean* invalidPos = gcvNULL;
+    GLuint dstPos = 0;
 
     __GL_HEADER();
 
@@ -4116,6 +4195,76 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
         break;
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
+    }
+
+    if(count < 0)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
+    if(bufferMode != GL_INTERLEAVED_ATTRIBS)
+    {
+        for (i = 0; i < (GLuint)count; i++)
+        {
+            if (!strcmp(varyings[i], "gl_SkipComponents1") || !strcmp(varyings[i], "gl_SkipComponents2") ||
+               !strcmp(varyings[i], "gl_SkipComponents3") || !strcmp(varyings[i], "gl_SkipComponents4") ||
+               !strcmp(varyings[i], "gl_NextBuffer"))
+            {
+                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+            }
+        }
+    }
+
+    invalidPos = (GLboolean*)(*gc->imports.malloc)(gc, count*sizeof(GLboolean));
+
+    if(bufferMode == GL_INTERLEAVED_ATTRIBS && count > 0)
+    {
+        for (i = 0; i < (GLuint)count; i++)
+        {
+            if (!strcmp(varyings[i], "gl_NextBuffer"))
+            {
+                //varyings start as gl_NextBuffer
+                if(i == invalidIdentifierCount)
+                {
+                    invalidPos[i] = GL_TRUE;
+                    invalidIdentifierCount++;
+                }
+                else
+                {
+                    nextBufferCount += 1;
+                }
+            }
+        }
+
+        /*
+        ** 1.All of varyings are gl_NextBuffer.
+        ** 2.GL_INVALID_OPERATION is generated if the number of "gl_NextBuffer" names in varyings
+        ** is greater than or equal to the limit GL_MAX_TRANSFORM_FEEDBACK_BUFFERS.
+        */
+        if(invalidIdentifierCount == (GLuint)count || (invalidIdentifierCount + nextBufferCount) >= gc->constants.shaderCaps.maxXfbBuffers)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
+
+        //varyings end as gl_NextBuffer
+        for (i = (GLuint)count - 1; i >= 0; i--)
+        {
+            if (!strcmp(varyings[i], "gl_NextBuffer"))
+            {
+                invalidIdentifierCount++;
+                nextBufferCount--;
+                invalidPos[i] = GL_TRUE;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    if(!(nextBufferCount < (GLint)gc->constants.shaderCaps.maxXfbSeparateAttribs))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
 
     programObject = (__GLprogramObject*)__glGetObject(gc, gc->shaderProgram.spShared, program);
@@ -4142,21 +4291,33 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
     programObject->ppXfbVaryingNames = gcvNULL;
 
     programObject->xfbMode       = bufferMode;
-    programObject->xfbVaryingNum = count;
+    programObject->xfbVaryingNum = count - invalidIdentifierCount;
+    programObject->nextBufferCount = nextBufferCount;
 
-    if (count > 0)
+    if (programObject->xfbVaryingNum > 0)
     {
-        programObject->ppXfbVaryingNames = (GLchar**)(*gc->imports.malloc)(gc, count*sizeof(GLchar*));
+        programObject->ppXfbVaryingNames = (GLchar**)(*gc->imports.malloc)(gc, programObject->xfbVaryingNum*sizeof(GLchar*));
     }
 
     for (i = 0; i < (GLuint)count; i++)
     {
-        GLuint nameLen = (GLuint)strlen(varyings[i]) + 1;
-        programObject->ppXfbVaryingNames[i] = (GLchar*)(*gc->imports.malloc)(gc, nameLen);
-        strcpy(programObject->ppXfbVaryingNames[i], varyings[i]);
+        GLuint nameLen = 0;
+        if(invalidPos[i])
+        {
+            continue;
+        }
+        nameLen = (GLuint)strlen(varyings[i]) + 1;
+        programObject->ppXfbVaryingNames[dstPos] = (GLchar*)(*gc->imports.malloc)(gc, nameLen);
+        strcpy(programObject->ppXfbVaryingNames[dstPos], varyings[i]);
+        dstPos++;
     }
 
 OnError:
+    if(invalidPos)
+    {
+        (*gc->imports.free)(gc, invalidPos);
+        invalidPos = gcvNULL;
+    }
     __GL_FOOTER();
 }
 
@@ -4573,6 +4734,11 @@ GLvoid GL_APIENTRY __glim_DispatchCompute(__GLcontext *gc, GLuint num_groups_x, 
 {
     __GL_HEADER();
 
+    if (gc->conditionalRenderDiscard)
+    {
+        __GL_EXIT();
+    }
+
     if (num_groups_x > gc->constants.shaderCaps.maxWorkGroupCount[0] ||
         num_groups_y > gc->constants.shaderCaps.maxWorkGroupCount[1] ||
         num_groups_z > gc->constants.shaderCaps.maxWorkGroupCount[2])
@@ -4588,6 +4754,7 @@ GLvoid GL_APIENTRY __glim_DispatchCompute(__GLcontext *gc, GLuint num_groups_x, 
 
     __glDispatchCompute(gc);
 
+OnExit:
 OnError:
     __GL_FOOTER();
 }
@@ -4597,6 +4764,11 @@ GLvoid GL_APIENTRY __glim_DispatchComputeIndirect(__GLcontext *gc, GLintptr indi
     __GLbufferObject *indirectObj = gc->bufferObject.generalBindingPoint[__GL_DISPATCH_INDIRECT_BUFFER_INDEX].boundBufObj;
 
     __GL_HEADER();
+
+    if (gc->conditionalRenderDiscard)
+    {
+        __GL_EXIT();
+    }
 
     if (!indirectObj || indirectObj->bufferMapped)
     {
@@ -4626,6 +4798,7 @@ GLvoid GL_APIENTRY __glim_DispatchComputeIndirect(__GLcontext *gc, GLintptr indi
 
     __glDispatchCompute(gc);
 
+OnExit:
 OnError:
     __GL_FOOTER();
 }
@@ -5164,7 +5337,7 @@ GLvoid GL_APIENTRY __glim_UseProgramStages(__GLcontext *gc, GLuint pipeline, GLb
 
     if (stages != GL_ALL_SHADER_BITS && (stages & ~(allowedStages)))
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
     }
 
     if (program)
@@ -5173,15 +5346,15 @@ GLvoid GL_APIENTRY __glim_UseProgramStages(__GLcontext *gc, GLuint pipeline, GLb
         progObj = (__GLprogramObject *)__glGetObject(gc, gc->shaderProgram.spShared, program);
         if (!progObj)
         {
-            __GL_ERROR_RET(GL_INVALID_VALUE);
+            __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
         }
         else if (progObj->objectInfo.objectType != __GL_PROGRAM_OBJECT_TYPE)
         {
-            __GL_ERROR_RET(GL_INVALID_OPERATION);
+            __GL_ERROR_RET_STACK(GL_INVALID_OPERATION);
         }
         else if (!progObj->bindingInfo.isSeparable || !progObj->programInfo.linkedStatus)
         {
-            __GL_ERROR_RET(GL_INVALID_OPERATION);
+            __GL_ERROR_RET_STACK(GL_INVALID_OPERATION);
         }
     }
     else

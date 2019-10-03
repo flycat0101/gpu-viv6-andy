@@ -1763,7 +1763,7 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
         break;
 
     case GL_TEXTURE_SAMPLES:
-        params[0] = tex->samplesUsed;
+        params[0] = tex->samples;
         break;
 
     case GL_TEXTURE_FIXED_SAMPLE_LOCATIONS:
@@ -1772,7 +1772,7 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
 
     case GL_TEXTURE_INTERNAL_FORMAT:
 #ifdef OPENGL40
-        params[0] = faceMipmap->requestedFormat;
+        params[0] = faceMipmap->internalFormat;
 #else
         params[0] = formatInfo->glFormat;
 #endif
@@ -1942,7 +1942,7 @@ GLvoid GL_APIENTRY __glim_ActiveTexture(__GLcontext *gc, GLenum texture)
     if ((texture > (GL_TEXTURE0 + gc->constants.shaderCaps.maxCombinedTextureImageUnits - 1)) ||
         (texture < GL_TEXTURE0))
     {
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        __GL_ERROR_RET_STACK(GL_INVALID_ENUM);
     }
 
     texture = texture - GL_TEXTURE0;
@@ -2750,7 +2750,7 @@ GLvoid GL_APIENTRY __glim_GenSamplers(__GLcontext *gc, GLsizei count, GLuint* sa
 
     if (count < 0)
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_RET_STACK(GL_INVALID_VALUE);
     }
 
     if (NULL == samplers)
@@ -3001,7 +3001,7 @@ GLvoid GL_APIENTRY __glim_TexParameterIiv(__GLcontext *gc, GLenum target, GLenum
             break;
         }
     default:
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        __GL_ERROR_RET_STACK(GL_INVALID_ENUM);
     }
 
     if (pname == GL_TEXTURE_BORDER_COLOR_EXT)

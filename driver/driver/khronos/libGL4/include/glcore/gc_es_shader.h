@@ -248,10 +248,11 @@ typedef struct __GLprogramObjectRec
     ** Transform Feedback info
     */
     GLuint xfbRefCount;
-    /* The 3 variable was specified before link */
+    /* The 4 variable was specified before link */
     GLenum xfbMode;
     GLuint xfbVaryingNum;
     GLchar **ppXfbVaryingNames;
+    GLuint nextBufferCount;
 
     GLuint maxSampler;
     GLuint maxUnit;
@@ -404,6 +405,7 @@ typedef struct __GLshaderProgramMachineRec
 #define __GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS  64
 #define __GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_COMPONENTS     64
 #define __GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS        4
+#define __GL_MAX_TRANSFORM_FEEDBACK_BUFFERS                 4
 
 #define __GL_MAX_XFBOBJ_LINEAR_TABLE_SIZE           1024
 #define __GL_DEFAULT_XFBOBJ_LINEAR_TABLE_SIZE       256
@@ -414,6 +416,7 @@ typedef struct __GLxfbObjectRec
     GLuint    name;
     GLboolean active;
     GLboolean paused;
+    GLboolean end;
     GLenum    primMode;
 
     /* Offset in vertices to write from beginning of each bound buffer */

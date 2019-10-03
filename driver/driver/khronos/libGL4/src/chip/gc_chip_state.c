@@ -1270,6 +1270,8 @@ gcChipSetTextureParameters(
         {
             halTexture->maxLevel = gc->texture.units[unit].maxLevelUsed;
         }
+
+        halTexture->lodBias = tex->params.sampler.lodBias + gc->state.texture.texUnits[unit].lodBias;
     }
     else
     {
@@ -3946,23 +3948,26 @@ gcChipValidateXFB(
 
         if (progObj->bindingInfo.xfbMode == GL_INTERLEAVED_ATTRIBS)
         {
-            if (__glBitmaskTest(&bindingDirty, 0))
+            for (i = 0; i < progObj->nextBufferCount + 1; i++)
             {
-                xfbBindingPoint = &pBindingPoints[0];
-                GL_ASSERT(xfbBindingPoint->boundBufObj);
+                if (__glBitmaskTestAndClear(&bindingDirty, i))
+                {
+                    xfbBindingPoint = &pBindingPoints[i];
+                    GL_ASSERT(xfbBindingPoint->boundBufObj);
 
-                bufInfo = (__GLchipVertexBufferInfo*)(xfbBindingPoint->boundBufObj->privateData);
-                gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, &physical, gcvNULL));
-                physical += (gctUINT32)xfbBindingPoint->bufOffset;
+                    bufInfo = (__GLchipVertexBufferInfo*)(xfbBindingPoint->boundBufObj->privateData);
+                    gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, &physical, gcvNULL));
+                    physical += (gctUINT32)xfbBindingPoint->bufOffset;
 
-                sizeRange = (xfbBindingPoint->bufSize == 0) ?
-                                (gctUINT32)(bufInfo->size - xfbBindingPoint->bufOffset) :
-                                (gctUINT32)xfbBindingPoint->bufSize;
+                    sizeRange = (xfbBindingPoint->bufSize == 0) ?
+                                    (gctUINT32)(bufInfo->size - xfbBindingPoint->bufOffset) :
+                                    (gctUINT32)xfbBindingPoint->bufSize;
 
-                gcmONERROR(gco3D_SetXfbBuffer(chipCtx->engine,
-                        0, physical, chipProg->xfbStride, sizeRange));
+                    gcmONERROR(gco3D_SetXfbBuffer(chipCtx->engine,
+                            i, physical, chipProg->xfbStride[i], sizeRange));
 
-                gcmONERROR(gcoBUFOBJ_Unlock(bufInfo->bufObj));
+                    gcmONERROR(gcoBUFOBJ_Unlock(bufInfo->bufObj));
+                }
             }
         }
         else
@@ -4030,25 +4035,33 @@ gcChipValidateXFB(
 
                 if (vsProgrObj->bindingInfo.xfbMode == GL_INTERLEAVED_ATTRIBS)
                 {
+                    GLuint index;
+                    __GLprogramObject *progObj = __glGetLastNonFragProgram(gc);
+
                     GL_ASSERT(pgInstance->xfbBufferCount == 1);
 
-                    if (pgInstance->xfbBufferUniforms[0])
+                    for (index = 0; index < progObj->nextBufferCount + 1; ++index)
                     {
-                        xfbBindingPoint = &pBindingPoints[0];
+                        if (pgInstance->xfbBufferUniforms[index])
+                        {
+                            xfbBindingPoint = &pBindingPoints[index];
 
-                        GL_ASSERT(xfbBindingPoint->boundBufObj);
+                            GL_ASSERT(xfbBindingPoint->boundBufObj);
 
-                        bufInfo = (__GLchipVertexBufferInfo*)(xfbBindingPoint->boundBufObj->privateData);
-                        gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, &physical, gcvNULL));
-                        physical += xfbObj->offset * vsProgram->xfbStride;
+                            bufInfo = (__GLchipVertexBufferInfo*)(xfbBindingPoint->boundBufObj->privateData);
+                            gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, &physical, gcvNULL));
+                            physical += xfbObj->offset * vsProgram->xfbStride[index];
 
-                        gcmONERROR(gcChipFlushSingleUniform(gc,
-                                                            vsProgram,
-                                                            pgInstance->xfbBufferUniforms[0],
-                                                            (GLvoid*)&physical));
+                            gcmONERROR(gcChipFlushSingleUniform(gc,
+                                                                vsProgram,
+                                                                pgInstance->xfbBufferUniforms[index],
+                                                                (GLvoid*)&physical));
 
-                        gcmONERROR(gcoBUFOBJ_Unlock(bufInfo->bufObj));
+                            gcmONERROR(gcoBUFOBJ_Unlock(bufInfo->bufObj));
+                        }
                     }
+
+
                 }
                 else
                 {
@@ -4619,6 +4632,13 @@ gcChipSetReadBuffers(
     {
         gctUINT width, height;
         gcmONERROR(gcoSURF_GetSize(rtView->surf, &width, &height, gcvNULL));
+        chipCtx->readRTWidth  = (gctSIZE_T)width;
+        chipCtx->readRTHeight = (gctSIZE_T)height;
+    }
+    else if(dView->surf == sView->surf)
+    {
+        gctUINT width, height;
+        gcmONERROR(gcoSURF_GetSize(dView->surf, &width, &height, gcvNULL));
         chipCtx->readRTWidth  = (gctSIZE_T)width;
         chipCtx->readRTHeight = (gctSIZE_T)height;
     }

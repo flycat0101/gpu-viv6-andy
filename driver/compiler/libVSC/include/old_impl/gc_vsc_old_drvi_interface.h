@@ -1913,6 +1913,7 @@ typedef struct _gcsGLSLCaps
 
     gctUINT maxVertAttributes;
     gctUINT maxUserVertAttributes;
+    gctUINT maxVertStreams;
     gctUINT maxBuildInVertAttributes;
     gctUINT maxVaryingVectors;
     gctUINT maxVertOutVectors;
@@ -1984,6 +1985,7 @@ typedef struct _gcsGLSLCaps
     gctUINT maxXfbInterleavedComponents;
     gctUINT maxXfbSeparateComponents;
     gctUINT maxXfbSeparateAttribs;
+    gctUINT maxXfbBuffers;
 
     gctUINT maxProgErrStrLen;
 

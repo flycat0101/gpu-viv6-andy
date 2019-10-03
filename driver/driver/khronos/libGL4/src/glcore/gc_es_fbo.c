@@ -571,6 +571,16 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
     case GL_RGB10_A2:
     case GL_RGBA12:
     case GL_RGBA16:
+    case GL_R32F:    /* R32F is a renderbuffer internalformat as GL30~40's spec */
+    case GL_ALPHA16:
+    case GL_RGB16F:
+    case GL_RG16F:
+    case GL_R16F:
+    case GL_RG8:
+    case GL_R8:
+    case GL_RG32F:
+    case GL_SRGB8_ALPHA8:
+    case GL_SRGB8:  /* Add color-renderbuffer internalformat as GL30~40's spec */
         /* depth-renderable */
     case GL_DEPTH_COMPONENT:
     case GL_DEPTH_COMPONENT16:
@@ -628,9 +638,7 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
             __GL_ERROR_EXIT(GL_INVALID_ENUM);
         }
         break;
-    case GL_RGB16F_ARB:
     case GL_ALPHA32F_ARB:
-    case GL_ALPHA16F_ARB:
     case GL_LUMINANCE32F_ARB:
     case GL_LUMINANCE16F_ARB:
     case GL_LUMINANCE_ALPHA32F_ARB:
@@ -725,6 +733,21 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
 #endif
+    }
+
+    switch(internalformat)
+    {
+    case GL_RG32F:
+        internalformat = GL_RG16F;
+        break;
+    case GL_RGB32F:
+        internalformat = GL_RGB16F;
+        break;
+    case GL_RGBA32F:
+        internalformat = GL_RGBA16F;
+        break;
+    default:
+        break;
     }
 
     formatInfo = __glGetFormatInfo(internalformat);
@@ -1601,7 +1624,7 @@ GLvoid GL_APIENTRY __glim_FramebufferTexture2D(__GLcontext *gc, GLenum target, G
 
         if (texObj->targetIndex != targetIdx)
         {
-            __GL_ERROR_RET(GL_INVALID_OPERATION);
+            __GL_ERROR_RET_STACK(GL_INVALID_OPERATION);
         }
 
         if (level >= (GLint)gc->constants.maxNumTextureLevels || level < 0)
@@ -2020,6 +2043,11 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
 
     __GL_HEADER();
 
+    if (gc->conditionalRenderDiscard)
+    {
+        __GL_EXIT();
+    }
+
     if (mask == 0)
     {
         /* Ignore it */
@@ -2039,7 +2067,7 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
 
     if (GL_LINEAR == filter && (mask & (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT)))
     {
-        __GL_ERROR_RET(GL_INVALID_OPERATION);
+        __GL_ERROR_RET_STACK(GL_INVALID_OPERATION);
     }
 
     /* If either draw or read frame buffer is not complete.
@@ -2157,16 +2185,7 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
                     {
                         bHaveDrawbuffer = GL_TRUE;
 
-                        /* Surface of named drawFBO must be different than default readFBO */
-                        if (readFBO->name && readAttachPoint &&
-                            (readAttachPoint->objType == drawAttachPoint->objType) &&
-                            (readAttachPoint->objName == drawAttachPoint->objName) &&
-                            (readAttachPoint->level   == drawAttachPoint->level) &&
-                            (readAttachPoint->face    == drawAttachPoint->face) &&
-                            (readAttachPoint->layer   == drawAttachPoint->layer))
-                        {
-                            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-                        }
+    /* GL_INVALID_OPERATION is generated if the source and destination buffers are identical in OES, but not in GL4.*/
                     }
                 }
             }
@@ -2215,11 +2234,8 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
                     bHaveDrawbuffer = GL_TRUE;
                 }
 
-                /* Surface of default drawFBO must be different than named readFBO */
-                if ((0 == readFBO->name) && (readHandle == drawable->rtHandles[0]))
-                {
-                    __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-                }
+    /* GL_INVALID_OPERATION is generated if the source and destination buffers are identical in OES, but not in GL4.*/
+
 #endif
 
                 dstFixOrFloat = GL_TRUE;
@@ -2289,17 +2305,8 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
             drawAttachPoint = &drawFBO->attachPoint[__GL_DEPTH_ATTACHMENT_POINT_INDEX];
             if (drawAttachPoint->objName)
             {
-                /* Surface of named drawFBO must be different than default readFBO */
-                if (readFBO->name &&
-                    (readAttachPoint->objType == drawAttachPoint->objType) &&
-                    (readAttachPoint->objName == drawAttachPoint->objName) &&
-                    (readAttachPoint->level   == drawAttachPoint->level) &&
-                    (readAttachPoint->face    == drawAttachPoint->face) &&
-                    (readAttachPoint->layer   == drawAttachPoint->layer))
-                {
-                    __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-                }
 
+    /* GL_INVALID_OPERATION is generated if the source and destination buffers are identical in OES, but not in GL4.*/
                 drawFormatInfo = __glGetFramebufferFormatInfo(gc, drawFBO, GL_DEPTH_ATTACHMENT);
             }
             else
@@ -2311,12 +2318,7 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
         {
             if (drawable->depthHandle)
             {
-                /* Surface of default drawFBO must be different than named readFBO */
-                if ((0 == readFBO->name) && (readable->depthHandle == drawable->depthHandle))
-                {
-                    __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-                }
-
+    /* GL_INVALID_OPERATION is generated if the source and destination buffers are identical in OES, but not in GL4.*/
                 drawFormatInfo = drawable->dsFormatInfo;
             }
             else
@@ -2363,17 +2365,7 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
             drawAttachPoint = &drawFBO->attachPoint[__GL_STENCIL_ATTACHMENT_POINT_INDEX];
             if (drawAttachPoint->objName)
             {
-                /* Surface of named drawFBO must be different than default readFBO */
-                if (readFBO->name &&
-                    (readAttachPoint->objType == drawAttachPoint->objType) &&
-                    (readAttachPoint->objName == drawAttachPoint->objName) &&
-                    (readAttachPoint->level   == drawAttachPoint->level) &&
-                    (readAttachPoint->face    == drawAttachPoint->face) &&
-                    (readAttachPoint->layer   == drawAttachPoint->layer))
-                {
-                    __GL_ERROR_EXIT(GL_STENCIL_BUFFER_BIT);
-                }
-
+    /* GL_INVALID_OPERATION is generated if the source and destination buffers are identical in OES, but not in GL4.*/
                 drawFormatInfo = __glGetFramebufferFormatInfo(gc, drawFBO, GL_STENCIL_ATTACHMENT);
             }
             else
@@ -2386,12 +2378,7 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
         {
             if (drawable->stencilHandle)
             {
-                /* Surface of default drawFBO must be different than named readFBO */
-                if ((0 == readFBO->name) && (readable->stencilHandle == drawable->stencilHandle))
-                {
-                    __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-                }
-
+    /* GL_INVALID_OPERATION is generated if the source and destination buffers are identical in OES, but not in GL4.*/
                 drawFormatInfo = drawable->dsFormatInfo;
             }
             else
@@ -2408,51 +2395,34 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
     }
 
     /* If draw samples are not zero, set error and return */
+#ifdef OPENGL40
+    if (drawFBO->name ? (drawFBO->fbSamples > 1 && (readFBO->fbSamples != 0 && drawFBO->fbSamples != readFBO->fbSamples)) : (drawable->modes.samples > 1 && (readable->modes.samples != 0 && readable->modes.samples > 1)))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+#else
     if (drawFBO->name ? drawFBO->fbSamples > 1 : drawable->modes.samples > 1)
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
+#endif
 
-    /* If read samples are not zero, bounds and format need match */
-    if (readFBO->name ? readFBO->fbSamples > 1 : readable->modes.samples > 1)
+    /*If the dimensions of the source and destination rectangles is not identical, set error and return */
+     if ((readFBO->name ? readFBO->fbSamples > 1: readable->modes.samples > 1) || (drawFBO->name ? drawFBO->fbSamples > 1 : drawable->modes.samples > 1))
     {
-        /* If bounds region not equal, set error and return */
-        if ((srcX0 != dstX0) || (srcY0 != dstY0) ||
-            (srcX1 != dstX1) || (srcY1 != dstY1))
+        if ((abs(srcX1 - srcX0) != abs(dstX1 - dstX0)) || (abs(srcY1 - srcY0) != abs(dstY1 - dstY0)))
         {
             __GL_ERROR_EXIT(GL_INVALID_OPERATION);
         }
-
-        if (mask & GL_COLOR_BUFFER_BIT)
-        {
-            /* If format not equal, set error and return */
-            readFormatInfo = readFBO->name
-                           ? __glGetFramebufferFormatInfo(gc, readFBO, readFBO->readBuffer)
-                           : readable->rtFormatInfo;
-
-            if (drawFBO->name)
-            {
-                for (i = 0; i < drawFBO->drawBufferCount; i++)
-                {
-                    drawFormatInfo = __glGetFramebufferFormatInfo(gc, drawFBO, drawFBO->drawBuffers[i]);
-                    if ((readFormatInfo != gcvNULL) && (drawFormatInfo != gcvNULL) &&
-                        (drawFormatInfo->glFormat != readFormatInfo->glFormat))
-                    {
-                        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-                    }
-                }
-            }
-            else
-            {
-                drawFormatInfo = drawable->rtFormatInfo;
-                if ((readFormatInfo != gcvNULL) && (drawFormatInfo != gcvNULL) &&
-                    (drawFormatInfo->glFormat != readFormatInfo->glFormat))
-                {
-                    __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-                }
-            }
-        }
     }
+
+    /* GL_INVALID_OPERATION is generated if GL_SAMPLE_BUFFERS for the read buffer is greater than zero and the formats
+    ** of draw and read buffers are not identical, or the source and destination rectangles are not defined with the
+    ** same (X0, Y0) and (X1, Y1) bounds in OES, but not in GL4.
+    */
+    /* From GL4 spec:if the color formats of the read and draw buffers do not match, and mask includes COLOR_BUFFER_BIT,
+    ** pixel groups are converted to match the destination formats, which allows read and dram buffers have different formats.
+    */
 
     /* Check whether need to reverse the copy rect */
     if (srcX0 > srcX1)
@@ -3174,7 +3144,7 @@ GLvoid GLAPIENTRY __glim_FramebufferTexture1D(__GLcontext *gc,  GLenum target, G
 
         if (texObj->targetIndex != targetIdx)
         {
-            __GL_ERROR_RET(GL_INVALID_OPERATION);
+            __GL_ERROR_RET_STACK(GL_INVALID_OPERATION);
         }
 
     }
@@ -3260,7 +3230,7 @@ GLvoid GLAPIENTRY __glim_FramebufferTexture3D(__GLcontext *gc,  GLenum target, G
         }
         if (texObj->targetIndex != targetIdx)
         {
-            __GL_ERROR_RET(GL_INVALID_OPERATION);
+            __GL_ERROR_RET_STACK(GL_INVALID_OPERATION);
         }
     }
     else

@@ -321,6 +321,7 @@ gcChipComputeWlimitArg(
         gco3D_SetWPlaneLimitF(chipCtx->engine, 10.0f);
         gco3D_SetWClipEnable(chipCtx->engine, gcvTRUE);
         chipCtx->wLimitSettled = gcvTRUE;
+        gcmFOOTER();
         return status;
     }
 
@@ -780,6 +781,7 @@ gcChipComputeWlimitByVertex(
         gco3D_SetWPlaneLimitF(chipCtx->engine, 0.5f);
         gco3D_SetWClipEnable(chipCtx->engine, gcvTRUE);
         chipCtx->wLimitSettled = gcvTRUE;
+        gcmFOOTER();
         return gcvSTATUS_OK;
     }
 
@@ -1025,7 +1027,8 @@ OnError:
     indexInfo.count = instantDraw->count; \
     indexInfo.indexType = instantDraw->indexType; \
     indexInfo.u.es30.indexBuffer = instantDraw->indexBuffer; \
-    indexInfo.indexMemory = instantDraw->indexMemory
+    indexInfo.indexMemory = instantDraw->indexMemory; \
+    indexInfo.restartElement = instantDraw->restartElement
 
 __GL_INLINE gceSTATUS
 gcChipSetVertexArrayBindBegin(
@@ -4711,6 +4714,7 @@ gcChipValidateDrawPath(
             defaultInstant->attributes = chipCtx->attributeArray;
             defaultInstant->positionIndex = chipCtx->positionIndex;
             defaultInstant->primitiveRestart = gc->state.enables.primitiveRestart;
+            defaultInstant->restartElement = gc->state.primRestart.restartElement;
 
             /* Is it an indexed draw? */
             if (gc->vertexArray.indexCount == 0)
@@ -8901,6 +8905,9 @@ __glChipDrawBegin(
             __GLprogramObject *gsProgObj = gc->shaderProgram.activeProgObjs[__GLSL_STAGE_GS];
             __GLchipSLProgram *gsProgram = chipCtx->activePrograms[__GLSL_STAGE_GS];
             GLboolean legalPrimType = GL_FALSE;
+            __GLxfbObject *xfbObj = gc->xfb.boundXfbObj;
+            GLuint numPrims = 0;
+            GLuint numVerts = 0;
 
             if (gsProgram)
             {
@@ -8975,6 +8982,34 @@ __glChipDrawBegin(
                 {
                     __GLES_PRINT("ES30:skip draw because of invalid GS program instance");
                     break;
+                }
+
+                if (xfbObj->active && !xfbObj->paused)
+                {
+                    switch (gsInputType)
+                    {
+                    case GL_POINTS:
+                        numPrims = gsProgObj->bindingInfo.gsOutVertices;
+                        numVerts = numPrims;
+                        break;
+                    case GL_LINES:
+                        numPrims = (gsProgObj->bindingInfo.gsOutVertices / 2);
+                        numVerts = numPrims * 2;
+                        break;
+                    case GL_TRIANGLES:
+                        numPrims = (gsProgObj->bindingInfo.gsOutVertices / 3);
+                        numVerts = numPrims * 3;
+                        break;
+                    }
+
+                    xfbObj->vertices += numVerts;
+                }
+            }
+            else
+            {
+                if (xfbObj->active && !xfbObj->paused)
+                {
+                    xfbObj->vertices += (GLuint)(gc->vertexArray.end - gc->vertexArray.start);
                 }
             }
         }
@@ -9337,6 +9372,7 @@ __glChipDrawEnd(
     {
         gcoSURF surface = gcvNULL;
         gctUINT8 enable;
+        GLuint i = 0;
         /* Now, __SURF_DRAWABLE_UPDATE almost used for system drawable. The optimization
            just for swapming and clearming system drawable. If fbo need the same optimization
            method, need more code to support.*/
@@ -9345,9 +9381,12 @@ __glChipDrawEnd(
                | ((gctUINT8) gc->state.raster.colorMask[0].blueMask  << 2)
                | ((gctUINT8) gc->state.raster.colorMask[0].alphaMask << 3);
 
-        if (chipCtx->drawRtViews[0].surf && enable)
+        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
         {
-            gcoSURF_SetFlags(chipCtx->drawRtViews[0].surf, gcvSURF_FLAG_CONTENT_UPDATED, gcvTRUE);
+            if (chipCtx->drawRtViews[i].surf && enable)
+            {
+                gcoSURF_SetFlags(chipCtx->drawRtViews[i].surf, gcvSURF_FLAG_CONTENT_UPDATED, gcvTRUE);
+            }
         }
 
         /*. Set the flag of depth.*/

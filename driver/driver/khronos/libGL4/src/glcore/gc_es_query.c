@@ -381,6 +381,8 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
     case GL_CLIP_PLANE3:
     case GL_CLIP_PLANE4:
     case GL_CLIP_PLANE5:
+    case GL_CLIP_DISTANCE6:
+    case GL_CLIP_DISTANCE7:
     case GL_LIGHT0:
     case GL_LIGHT1:
     case GL_LIGHT2:
@@ -810,6 +812,9 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         break;
     case GL_FOG_HINT:
         *ip++ = gc->state.hints.fog;
+        break;
+    case GL_TEXTURE_COMPRESSION_HINT:
+        *ip++ = gc->state.hints.textureCompressionHint;
         break;
     case GL_LIST_BASE:
         *ip++ = gc->state.list.listBase;
@@ -1526,6 +1531,8 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
     case GL_MAX_DRAW_BUFFERS:
         *ip++ = gc->constants.shaderCaps.maxDrawBuffers;
         break;
+    case GL_DRAW_BUFFER:
+        sq = GL_DRAW_BUFFER0;
     case GL_DRAW_BUFFER0:
     case GL_DRAW_BUFFER1:
     case GL_DRAW_BUFFER2:
@@ -1588,6 +1595,11 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
 
     case GL_MAX_VERTEX_ATTRIBS:
         *ip++ = gc->constants.shaderCaps.maxUserVertAttributes;
+        break;
+
+    case GL_MAX_VERTEX_STREAMS:
+        //According to Cmodel macro cmdMAX_TFB_STREAMS.
+        *ip++ = gc->constants.shaderCaps.maxVertStreams;
         break;
 
     case GL_MAX_VERTEX_OUTPUT_COMPONENTS:
@@ -1664,6 +1676,13 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         break;
     case GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS:
         *ip++ = gc->constants.shaderCaps.maxXfbSeparateAttribs;
+        break;
+    case GL_MAX_TRANSFORM_FEEDBACK_BUFFERS:
+        /*
+        ** According to Cmodel: Currently we only have 4 buffer, but reserve up to 16 buffers.
+        ** Same as gcdMAX_XFB_BUFFERS.
+        */
+        *ip++ = gc->constants.shaderCaps.maxXfbBuffers;
         break;
 
     case GL_UNIFORM_BUFFER_BINDING:
@@ -2085,6 +2104,10 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->constants.textureBufferOffsetAlignment;
         break;
 
+    case GL_PRIMITIVE_RESTART_INDEX:
+        *ip++ = gc->state.primRestart.restartElement;
+        break;
+
     default:
         __GL_ERROR_RET(GL_INVALID_ENUM);
     }
@@ -2126,7 +2149,7 @@ GLvoid GL_APIENTRY __glim_GetDoublev(__GLcontext *gc, GLenum pname, GLdouble *pa
 {
     __GL_HEADER();
 
-    __glDoGet(gc, pname, params, __GL_FLOAT32, "glGetDoublev");
+    __glDoGet(gc, pname, params, __GL_FLOAT64, "glGetDoublev");
 
     __GL_FOOTER();
 
@@ -2526,7 +2549,7 @@ const GLubyte * GL_APIENTRY __glim_GetString(__GLcontext *gc, GLenum name)
     case GL_SHADING_LANGUAGE_VERSION:
         return (GLubyte*)gc->constants.GLSLVersion;
     case GL_EXTENSIONS:
-        return (GLubyte*)gc->constants.extensions;
+        /* glGetString can't support GL_EXTENSIONS */
     default:
         __GL_ERROR_RET_VAL(GL_INVALID_ENUM, gcvNULL);
     }
@@ -2566,7 +2589,124 @@ const GLubyte* GL_APIENTRY __glim_GetStringi(__GLcontext *gc, GLenum name, GLuin
     return (const GLubyte*)curExt->name;
 }
 
-static GLvoid __glEndQuery(__GLcontext *gc, GLuint targetIndex)
+static GLvoid __glBeginQueryIndexed(__GLcontext *gc, GLenum target, GLuint index, GLuint id)
+{
+    __GLqueryObject *queryObj;
+    GLuint targetIndex, queryIdx;
+    GLboolean retVal;
+
+    if (id == 0)
+    {
+        __GL_ERROR_RET(GL_INVALID_OPERATION);
+    }
+
+    switch (target)
+    {
+#ifdef OPENGL40
+    case GL_SAMPLES_PASSED:
+        targetIndex = __GL_QUERY_OCCLUSION;
+        break;
+    case GL_TIME_ELAPSED_EXT:
+        if (!__glExtension[__GL_EXTID_EXT_timer_query].bEnabled)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+        targetIndex = __GL_QUERY_TIME_ELAPSED;
+        break;
+#endif
+    case GL_ANY_SAMPLES_PASSED:
+        targetIndex = __GL_QUERY_ANY_SAMPLES_PASSED;
+        break;
+    case GL_ANY_SAMPLES_PASSED_CONSERVATIVE:
+        targetIndex = __GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE;
+        break;
+    case GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN:
+        targetIndex = __GL_QUERY_XFB_PRIMITIVES_WRITTEN;
+        break;
+    case GL_PRIMITIVES_GENERATED_EXT:
+        if (__glExtension[__GL_EXTID_EXT_geometry_shader].bEnabled)
+        {
+            targetIndex = __GL_QUERY_PRIMITIVES_GENERATED;
+            break;
+        }
+    default:
+        __GL_ERROR_RET(GL_INVALID_ENUM);
+    }
+
+    /*
+    ** Another query is already in progress with the same target.
+    ** note: GL_ANY_SAMPLES_PASSED and GL_ANY_SAMPLES_PASSED_CONSERVATIVE alias to the same target for this purposes.
+    */
+    if (gc->query.currQuery[targetIndex] ||
+        (targetIndex == __GL_QUERY_ANY_SAMPLES_PASSED && gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE]) ||
+        (targetIndex == __GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE && gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED])
+#ifdef OPENGL40
+        || (gc->query.currQuery[__GL_QUERY_OCCLUSION] && (gc->query.currQuery[__GL_QUERY_OCCLUSION]->name == id)) ||
+        (gc->query.currQuery[__GL_QUERY_TIME_ELAPSED] && (gc->query.currQuery[__GL_QUERY_TIME_ELAPSED]->name == id))
+#endif
+       )
+    {
+        __GL_ERROR_RET(GL_INVALID_OPERATION);
+    }
+
+    /* Where id is the name of a query currently in progress */
+    for (queryIdx = __GL_QUERY_ANY_SAMPLES_PASSED; queryIdx < __GL_QUERY_LAST; ++queryIdx)
+    {
+        if (gc->query.currQuery[queryIdx] &&
+            !(gc->query.currQuery[queryIdx]->flag & __GL_OBJECT_IS_DELETED) &&
+            gc->query.currQuery[queryIdx]->name == id)
+        {
+            __GL_ERROR_RET(GL_INVALID_OPERATION);
+        }
+    }
+
+    if (!__glIsNameDefined(gc, gc->query.noShare, id))
+    {
+        __GL_ERROR_RET(GL_INVALID_OPERATION);
+    }
+
+    queryObj = (__GLqueryObject *)__glGetObject(gc, gc->query.noShare, id);
+
+    if (queryObj == gcvNULL)
+    {
+        /*
+        ** If this is the first time this name has been bound,
+        ** then create a new texture object and initialize it.
+        */
+        queryObj = (__GLqueryObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLqueryObject));
+        if (queryObj == gcvNULL)
+        {
+            __GL_ERROR_RET(GL_OUT_OF_MEMORY);
+        }
+
+        queryObj->name = id;
+
+        /* Add this __GLoccluQueryObject to the "gc->occluQuery.noShare" structure. */
+        __glAddObject(gc, gc->query.noShare, id, queryObj);
+    }
+
+    /* If id refers to an existing query object whose type does not match target. */
+    if (queryObj->target != 0 && queryObj->target != target)
+    {
+        __GL_ERROR_RET(GL_INVALID_OPERATION);
+    }
+
+    queryObj->target = target;
+    queryObj->count = 0;
+    queryObj->resultAvailable = GL_FALSE;
+    queryObj->active = GL_TRUE;
+    gc->query.currQuery[targetIndex] = queryObj;
+
+    /* Notify DP to begin query on the query object */
+    retVal = (*gc->dp.beginQuery)(gc, queryObj);
+
+    if (!retVal)
+    {
+        __GL_ERROR((*gc->dp.getError)(gc));
+    }
+}
+
+static GLvoid __glEndQueryIndexed(__GLcontext *gc, GLuint targetIndex, GLuint index)
 {
     __GLqueryObject *queryObj;
     GLboolean retVal;
@@ -2598,6 +2738,61 @@ static GLvoid __glEndQuery(__GLcontext *gc, GLuint targetIndex)
     {
         __glDeleteQueryObj(gc, queryObj);
     }
+}
+
+static GLvoid __glGetQueryIndexediv(__GLcontext *gc, GLenum target, GLuint index, GLenum pname, GLint *params)
+{
+    __GLqueryObject *queryObj;
+    GLuint targetIndex ;
+
+    switch (target)
+    {
+    case GL_ANY_SAMPLES_PASSED:
+#ifdef OPENGL40
+    case GL_SAMPLES_PASSED:
+        targetIndex = __GL_QUERY_OCCLUSION;
+#endif
+        targetIndex = __GL_QUERY_ANY_SAMPLES_PASSED;
+        break;
+    case GL_ANY_SAMPLES_PASSED_CONSERVATIVE:
+        targetIndex = __GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE;
+        break;
+    case GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN:
+        targetIndex = __GL_QUERY_XFB_PRIMITIVES_WRITTEN;
+        break;
+    case GL_PRIMITIVES_GENERATED_EXT:
+        if (__glExtension[__GL_EXTID_EXT_geometry_shader].bEnabled)
+        {
+            targetIndex = __GL_QUERY_PRIMITIVES_GENERATED;
+            break;
+        }
+    default:
+        __GL_ERROR_RET(GL_INVALID_ENUM);
+    }
+
+    queryObj = gc->query.currQuery[targetIndex];
+
+    switch (pname)
+    {
+    case GL_CURRENT_QUERY:
+        if (queryObj && queryObj->active)
+        {
+            *params = queryObj->name;
+        }
+        else
+        {
+            *params = 0;
+        }
+        break;
+#ifdef OPENGL40
+    case GL_QUERY_COUNTER_BITS:
+        *params = gc->constants.numberofQueryCounterBits;
+        return;
+#endif
+    default:
+        __GL_ERROR_RET(GL_INVALID_ENUM);
+    }
+
 }
 
 GLvoid GL_APIENTRY __glim_GenQueries(__GLcontext *gc, GLsizei n, GLuint *ids)
@@ -2662,121 +2857,37 @@ GLboolean GL_APIENTRY __glim_IsQuery(__GLcontext *gc, GLuint id)
 
 GLvoid GL_APIENTRY __glim_BeginQuery(__GLcontext *gc, GLenum target, GLuint id)
 {
-    __GLqueryObject *queryObj;
-    GLuint targetIndex, queryIdx;
-    GLboolean retVal;
-
     __GL_HEADER();
 
-    if (id == 0)
+    __glBeginQueryIndexed(gc, target, 0, id);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_BeginQueryIndexed(__GLcontext *gc, GLenum target, GLuint index, GLuint id)
+{
+    __GL_HEADER();
+
+    if((target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN || target == GL_PRIMITIVES_GENERATED)
+        && (index < 0 || index > gc->constants.shaderCaps.maxVertStreams))
     {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    switch (target)
+    if((target == GL_SAMPLES_PASSED || target == GL_ANY_SAMPLES_PASSED || target == GL_TIME_ELAPSED)
+        && (index != 0))
     {
-#ifdef OPENGL40
-    case GL_SAMPLES_PASSED:
-        targetIndex = __GL_QUERY_OCCLUSION;
-        break;
-    case GL_TIME_ELAPSED_EXT:
-        if (!__glExtension[__GL_EXTID_EXT_timer_query].bEnabled)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_ENUM);
-        }
-        targetIndex = __GL_QUERY_TIME_ELAPSED;
-        break;
-#endif
-    case GL_ANY_SAMPLES_PASSED:
-        targetIndex = __GL_QUERY_ANY_SAMPLES_PASSED;
-        break;
-    case GL_ANY_SAMPLES_PASSED_CONSERVATIVE:
-        targetIndex = __GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE;
-        break;
-    case GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN:
-        targetIndex = __GL_QUERY_XFB_PRIMITIVES_WRITTEN;
-        break;
-    case GL_PRIMITIVES_GENERATED_EXT:
-        if (__glExtension[__GL_EXTID_EXT_geometry_shader].bEnabled)
-        {
-            targetIndex = __GL_QUERY_PRIMITIVES_GENERATED;
-            break;
-        }
-    default:
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
+    if(target == GL_ANY_SAMPLES_PASSED_CONSERVATIVE)
+    {
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
-    /*
-    ** Another query is already in progress with the same target.
-    ** note: GL_ANY_SAMPLES_PASSED and GL_ANY_SAMPLES_PASSED_CONSERVATIVE alias to the same target for this purposes.
-    */
-    if (gc->query.currQuery[targetIndex] ||
-        (targetIndex == __GL_QUERY_ANY_SAMPLES_PASSED && gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE]) ||
-        (targetIndex == __GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE && gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED])
-#ifdef OPENGL40
-        || (gc->query.currQuery[__GL_QUERY_OCCLUSION] && (gc->query.currQuery[__GL_QUERY_OCCLUSION]->name == id)) ||
-        (gc->query.currQuery[__GL_QUERY_TIME_ELAPSED] && (gc->query.currQuery[__GL_QUERY_TIME_ELAPSED]->name == id))
-#endif
-       )
-    {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-    }
+    __glBeginQueryIndexed(gc, target, index, id);
 
-    /* Where id is the name of a query currently in progress */
-    for (queryIdx = __GL_QUERY_ANY_SAMPLES_PASSED; queryIdx < __GL_QUERY_LAST; ++queryIdx)
-    {
-        if (gc->query.currQuery[queryIdx] &&
-            !(gc->query.currQuery[queryIdx]->flag & __GL_OBJECT_IS_DELETED) &&
-            gc->query.currQuery[queryIdx]->name == id)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-        }
-    }
-
-    if (!__glIsNameDefined(gc, gc->query.noShare, id))
-    {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-    }
-
-    queryObj = (__GLqueryObject *)__glGetObject(gc, gc->query.noShare, id);
-
-    if (queryObj == gcvNULL)
-    {
-        /*
-        ** If this is the first time this name has been bound,
-        ** then create a new texture object and initialize it.
-        */
-        queryObj = (__GLqueryObject *)(*gc->imports.calloc)(gc, 1, sizeof(__GLqueryObject));
-        if (queryObj == gcvNULL)
-        {
-            __GL_ERROR_EXIT(GL_OUT_OF_MEMORY);
-        }
-
-        queryObj->name = id;
-
-        /* Add this __GLoccluQueryObject to the "gc->occluQuery.noShare" structure. */
-        __glAddObject(gc, gc->query.noShare, id, queryObj);
-    }
-
-    /* If id refers to an existing query object whose type does not match target. */
-    if (queryObj->target != 0 && queryObj->target != target)
-    {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-    }
-
-    queryObj->target = target;
-    queryObj->count = 0;
-    queryObj->resultAvailable = GL_FALSE;
-    queryObj->active = GL_TRUE;
-    gc->query.currQuery[targetIndex] = queryObj;
-
-    /* Notify DP to begin query on the query object */
-    retVal = (*gc->dp.beginQuery)(gc, queryObj);
-
-    if (!retVal)
-    {
-        __GL_ERROR((*gc->dp.getError)(gc));
-    }
+    /* VIV TODO: need to refine and implement more operations for index */
 
 OnError:
     __GL_FOOTER();
@@ -2790,6 +2901,16 @@ GLvoid GL_APIENTRY __glim_EndQuery(__GLcontext *gc, GLenum target)
 
     switch (target)
     {
+    case GL_SAMPLES_PASSED:
+        targetIndex = __GL_QUERY_OCCLUSION;
+        break;
+    case GL_TIME_ELAPSED:
+        if (!__glExtension[__GL_EXTID_EXT_timer_query].bEnabled)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+        targetIndex = __GL_QUERY_TIME_ELAPSED;
+        break;
     case GL_ANY_SAMPLES_PASSED:
         targetIndex = __GL_QUERY_ANY_SAMPLES_PASSED;
         break;
@@ -2809,7 +2930,61 @@ GLvoid GL_APIENTRY __glim_EndQuery(__GLcontext *gc, GLenum target)
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
-    __glEndQuery(gc, targetIndex);
+    __glEndQueryIndexed(gc, targetIndex, 0);
+
+OnError:
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_EndQueryIndexed(__GLcontext *gc, GLenum target, GLuint index)
+{
+    GLuint targetIndex;
+
+    __GL_HEADER();
+
+    if((target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN || target == GL_PRIMITIVES_GENERATED)
+        && (index < 0 || index > gc->constants.shaderCaps.maxVertStreams))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
+    if((target == GL_SAMPLES_PASSED || target == GL_ANY_SAMPLES_PASSED || target == GL_TIME_ELAPSED)
+        && (index != 0))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
+    switch (target)
+    {
+    case GL_SAMPLES_PASSED:
+        targetIndex = __GL_QUERY_OCCLUSION;
+        break;
+    case GL_TIME_ELAPSED:
+        if (!__glExtension[__GL_EXTID_EXT_timer_query].bEnabled)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+        targetIndex = __GL_QUERY_TIME_ELAPSED;
+        break;
+    case GL_ANY_SAMPLES_PASSED:
+        targetIndex = __GL_QUERY_ANY_SAMPLES_PASSED;
+        break;
+    case GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN:
+        targetIndex = __GL_QUERY_XFB_PRIMITIVES_WRITTEN;
+        break;
+    case GL_PRIMITIVES_GENERATED_EXT:
+        if (__glExtension[__GL_EXTID_EXT_geometry_shader].bEnabled)
+        {
+            targetIndex = __GL_QUERY_PRIMITIVES_GENERATED;
+            break;
+        }
+    default:
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
+    }
+
+    __glEndQueryIndexed(gc, targetIndex, index);
+
+    /* VIV TODO: need to refine and implement more operations for index */
 
 OnError:
     __GL_FOOTER();
@@ -2817,58 +2992,26 @@ OnError:
 
 GLvoid GL_APIENTRY __glim_GetQueryiv(__GLcontext *gc, GLenum target, GLenum pname, GLint *params)
 {
-    __GLqueryObject *queryObj;
-    GLuint targetIndex ;
-
     __GL_HEADER();
 
-    switch (target)
+    __glGetQueryIndexediv(gc, target, 0, pname, params);
+
+    __GL_FOOTER();
+}
+
+GLvoid GL_APIENTRY __glim_GetQueryIndexediv(__GLcontext *gc, GLenum target, GLuint index, GLenum pname, GLint *params)
+{
+    __GL_HEADER();
+
+    if((target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN || target == GL_PRIMITIVES_GENERATED)
+        && (index < 0 || index >= gc->constants.shaderCaps.maxVertStreams))
     {
-    case GL_ANY_SAMPLES_PASSED:
-#ifdef OPENGL40
-    case GL_SAMPLES_PASSED:
-        targetIndex = __GL_QUERY_OCCLUSION;
-#endif
-        targetIndex = __GL_QUERY_ANY_SAMPLES_PASSED;
-        break;
-    case GL_ANY_SAMPLES_PASSED_CONSERVATIVE:
-        targetIndex = __GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE;
-        break;
-    case GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN:
-        targetIndex = __GL_QUERY_XFB_PRIMITIVES_WRITTEN;
-        break;
-    case GL_PRIMITIVES_GENERATED_EXT:
-        if (__glExtension[__GL_EXTID_EXT_geometry_shader].bEnabled)
-        {
-            targetIndex = __GL_QUERY_PRIMITIVES_GENERATED;
-            break;
-        }
-    default:
-        __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    queryObj = gc->query.currQuery[targetIndex];
+    __glGetQueryIndexediv(gc, target, index, pname, params);
 
-    switch (pname)
-    {
-    case GL_CURRENT_QUERY:
-        if (queryObj && queryObj->active)
-        {
-            *params = queryObj->name;
-        }
-        else
-        {
-            *params = 0;
-        }
-        break;
-#ifdef OPENGL40
-    case GL_QUERY_COUNTER_BITS:
-        *params = gc->constants.numberofQueryCounterBits;
-        return;
-#endif
-    default:
-        __GL_ERROR_EXIT(GL_INVALID_ENUM);
-    }
+    /* VIV TODO: need to refine and implement more operations for index */
 
 OnError:
     __GL_FOOTER();
@@ -2894,7 +3037,8 @@ __GL_INLINE GLboolean __glGetQueryObjectiv(__GLcontext *gc, GLuint id, GLenum pn
             (*gc->dp.getQueryObject)(gc, pname, queryObj);
         }
 
-        if ((queryObj->target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN) ||
+        if ((queryObj->target == GL_SAMPLES_PASSED)||
+            (queryObj->target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN) ||
             (queryObj->target == GL_PRIMITIVES_GENERATED_EXT))
         {
             *params = queryObj->count;
@@ -2952,6 +3096,36 @@ OnError:
     __GL_FOOTER();
 }
 
+GLvoid GL_APIENTRY __glim_GetQueryObjectiv(__GLcontext *gc, GLuint id, GLenum pname, GLint *params)
+{
+    GLint64 result = 0;
+
+    __GL_HEADER();
+
+    switch (pname)
+    {
+    case GL_QUERY_RESULT:
+    case GL_QUERY_RESULT_AVAILABLE:
+        break;
+    default:
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
+    }
+
+    if (__glGetQueryObjectiv(gc, id, pname, &result) == GL_FALSE)
+    {
+        __GL_EXIT();
+    }
+
+    /* Make sure result can convert from INT64 to INT safely */
+    GL_ASSERT((result >= __glMinInt) && (result <= __glMaxInt));
+
+    *params = (GLint)result;
+
+OnExit:
+OnError:
+    __GL_FOOTER();
+}
+
 GLboolean __glDeleteQueryObj(__GLcontext *gc, __GLqueryObject *queryObj)
 {
     if (queryObj->active)
@@ -3002,7 +3176,7 @@ GLvoid __glFreeQueryState(__GLcontext *gc)
     {
         if (gc->query.currQuery[targetIdx])
         {
-            __glEndQuery(gc, targetIdx);
+            __glEndQueryIndexed(gc, targetIdx, 0);
         }
     }
 

@@ -439,42 +439,9 @@ gcChipInitExtension(
 
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
-    /* OES Extensions for context 2.0 */
-    __glExtension[__GL_EXTID_OES_compressed_ETC1_RGB8_texture].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_compressed_paletted_texture].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_EGL_image].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_depth24].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_depth32].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_element_index_uint].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_fbo_render_mipmap].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_fragment_precision_high].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_rgb8_rgba8].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_texture_npot].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_vertex_half_float].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_depth_texture].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_depth_texture_cube_map].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_packed_depth_stencil].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_standard_derivatives].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_get_program_binary].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_mapbuffer].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_EGL_sync].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_vertex_array_object].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_required_internalformat].bEnabled = GL_TRUE;
-    __glExtension[__GL_EXTID_OES_surfaceless_context].bEnabled = GL_TRUE;
-
-#ifdef ANDROID
-    __glExtension[__GL_EXTID_OES_EGL_image_external].bEnabled = GL_TRUE;
-#endif
-
     if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_BORDER_CLAMP) == gcvSTATUS_TRUE)
     {
         __glExtension[__GL_EXTID_EXT_texture_border_clamp].bEnabled = gcvTRUE;
-        __glExtension[__GL_EXTID_OES_texture_border_clamp].bEnabled = gcvTRUE;
-    }
-
-    if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_VERTEX_10_10_10_2) == gcvSTATUS_TRUE)
-    {
-        __glExtension[__GL_EXTID_OES_vertex_type_10_10_10_2].bEnabled = GL_TRUE;
     }
 
     if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_DXT) == gcvSTATUS_TRUE)
@@ -514,41 +481,18 @@ gcChipInitExtension(
         }
     }
 
-    if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PSIO_INTERLOCK) == gcvSTATUS_TRUE)
-    {
-        __glExtension[__GL_EXTID_EXT_shader_framebuffer_fetch].bEnabled = GL_TRUE;
-    }
 
     /* extension enabled only for context 3.0 and later */
     if (constants->majorVersion >= 3)
     {
-        __glExtension[__GL_EXTID_OES_texture_half_float].bEnabled = GL_TRUE;
-        __glExtension[__GL_EXTID_OES_texture_float].bEnabled = GL_TRUE;
-
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MSAA_SHADING) == gcvSTATUS_TRUE)
-        {
-            __glExtension[__GL_EXTID_OES_sample_shading].bEnabled = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_sample_variables].bEnabled = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_sample_variables].bGLSL    = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_shader_multisample_interpolation].bEnabled = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_shader_multisample_interpolation].bGLSL    = gcvTRUE;
-        }
-
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_BLT_ENGINE) == gcvSTATUS_TRUE)
         {
             __glExtension[__GL_EXTID_EXT_copy_image].bEnabled = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_copy_image].bEnabled = gcvTRUE;
-        }
-
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_STENCIL_TEXTURE) == gcvSTATUS_TRUE)
-        {
-            __glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled = GL_TRUE;
         }
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SEPARATE_RT_CTRL) == gcvSTATUS_TRUE)
         {
             __glExtension[__GL_EXTID_EXT_draw_buffers_indexed].bEnabled = GL_TRUE;
-            __glExtension[__GL_EXTID_OES_draw_buffers_indexed].bEnabled = GL_TRUE;
         }
 
         if (chipCtx->patchId == gcvPATCH_GTFES30 || chipCtx->patchId == gcvPATCH_DEQP)
@@ -567,11 +511,6 @@ gcChipInitExtension(
             }
         }
 
-        if (chipCtx->chipFeature.haltiLevel > __GL_CHIP_HALTI_LEVEL_2)
-        {
-            __glExtension[__GL_EXTID_OES_shader_image_atomic].bEnabled = GL_TRUE;
-        }
-
         __glFormatInfoTable[__GL_FMT_RGB10_A2].renderable = GL_TRUE;
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SECURITY) == gcvSTATUS_TRUE)
@@ -585,8 +524,6 @@ gcChipInitExtension(
         constants->majorVersion > 3)
     {
         __glExtension[__GL_EXTID_KHR_blend_equation_advanced].bEnabled = GL_TRUE;
-        __glExtension[__GL_EXTID_OES_texture_storage_multisample_2d_array].bEnabled = GL_TRUE;
-        __glExtension[__GL_EXTID_OES_shader_image_atomic].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_KHR_debug].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_KHR_robustness].bEnabled = GL_TRUE;
 
@@ -594,14 +531,11 @@ gcChipInitExtension(
         {
             __glExtension[__GL_EXTID_EXT_geometry_shader].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_EXT_geometry_point_size].bEnabled = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_geometry_shader].bEnabled = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_geometry_point_size].bEnabled = gcvTRUE;
         }
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_CUBEMAP_ARRAY) == gcvSTATUS_TRUE)
         {
             __glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled = gcvTRUE;
         }
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_ADVANCED_SH_INST) == gcvSTATUS_TRUE)
@@ -611,9 +545,6 @@ gcChipInitExtension(
             __glExtension[__GL_EXTID_EXT_shader_io_blocks].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_EXT_shader_implicit_conversions].bEnabled = gcvTRUE;
 
-            __glExtension[__GL_EXTID_OES_gpu_shader5].bEnabled = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_gpu_shader5].bGLSL = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_shader_io_blocks].bEnabled = gcvTRUE;
         }
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MULTIDRAW_INDIRECT) == gcvSTATUS_TRUE)
@@ -625,8 +556,6 @@ gcChipInitExtension(
         {
             __glExtension[__GL_EXTID_EXT_texture_buffer].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_EXT_texture_buffer].bGLSL = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_texture_buffer].bEnabled = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_texture_buffer].bGLSL = gcvTRUE;
         }
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TESSELLATION) == gcvSTATUS_TRUE)
@@ -634,21 +563,15 @@ gcChipInitExtension(
             __glExtension[__GL_EXTID_EXT_tessellation_shader].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_EXT_tessellation_point_size].bEnabled = gcvTRUE;
 
-            __glExtension[__GL_EXTID_OES_tessellation_shader].bEnabled = gcvTRUE;
-            __glExtension[__GL_EXTID_OES_tessellation_point_size].bEnabled = gcvTRUE;
-
             /* Enable these extensions when TS is on to make Android CTS happy */
             __glExtension[__GL_EXTID_ANDROID_extension_pack_es31a].bEnabled = GL_TRUE;
             __glExtension[__GL_EXTID_EXT_primitive_bounding_box].bEnabled = GL_TRUE;
             __glExtension[__GL_EXTID_EXT_primitive_bounding_box].bGLSL    = GL_TRUE;
-            __glExtension[__GL_EXTID_OES_primitive_bounding_box].bEnabled = GL_TRUE;
-            __glExtension[__GL_EXTID_OES_primitive_bounding_box].bGLSL    = GL_TRUE;
         }
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DRAW_ELEMENTS_BASE_VERTEX) == gcvSTATUS_TRUE)
         {
             __glExtension[__GL_EXTID_EXT_draw_elements_base_vertex].bEnabled = GL_TRUE;
-            __glExtension[__GL_EXTID_OES_draw_elements_base_vertex].bEnabled = GL_TRUE;
         }
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_ROBUSTNESS) == gcvSTATUS_TRUE)
@@ -1245,8 +1168,7 @@ __glChipGetDeviceConstants(
                                                      shaderCaps->maxGsUniformBlocks),
                                                      shaderCaps->maxCmptUniformBlocks);
 
-    shaderCaps->maxUniformBufferBindings = isEs31 ? __GL_MAX(shaderCaps->maxCombinedUniformBlocks, 36)
-                                                  : shaderCaps->maxCombinedUniformBlocks;
+    shaderCaps->maxUniformBufferBindings = shaderCaps->maxCombinedUniformBlocks;
 
     /* In basic machine unit */
     shaderCaps->maxUniformBlockSize = 65536;
@@ -1311,6 +1233,7 @@ __glChipGetDeviceConstants(
     shaderCaps->maxXfbInterleavedComponents = __GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS;
     shaderCaps->maxXfbSeparateComponents = __GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_COMPONENTS;
     shaderCaps->maxXfbSeparateAttribs = __GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS;
+    shaderCaps->maxXfbBuffers = __GL_MAX_TRANSFORM_FEEDBACK_BUFFERS;
 
     constants->numShaderBinaryFormats = __GL_TABLE_SIZE(__glShaderBinaryFormats_viv);
     constants->pShaderBinaryFormats = __glShaderBinaryFormats_viv;
@@ -1397,7 +1320,8 @@ __glChipGetDeviceConstants(
         gctUINT maxElementIndex;
         gctUINT unifiedUniforms = 0;
         gctUINT minVertUniforms = (constants->majorVersion < 3) ? 128 : 256;
-        gctUINT minFragUniforms = (constants->majorVersion < 3) ?  16 : (isEs31 ? 256 : 224);
+        /* Fix as GL's spec */
+        gctUINT minFragUniforms = (constants->majorVersion < 3) ?  16 : 256;
         gctUINT minCmptUniforms = (constants->majorVersion < 3 && constants->minorVersion < 1) ? 0 : 128;
         gctUINT minTcsUniforms  = tsAvailable ? 256 : 0;
         gctUINT minTesUniforms  = tsAvailable ? 256 : 0;
@@ -1425,6 +1349,8 @@ __glChipGetDeviceConstants(
         constants->maxVertexAttribStride = __GL_MAX(constants->maxVertexAttribStride, 2048);
         shaderCaps->maxVertAttributes = shaderCaps->maxBuildInVertAttributes +
                                         shaderCaps->maxUserVertAttributes;
+        /* Max vertex streams for TFB according to cmdMAX_TFB_STREAMS */
+        shaderCaps->maxVertStreams = 4;
         /* vertex attribute limits */
         constants->maxVertexAttribBindings = shaderCaps->maxUserVertAttributes;
         /* The caps appears from ES3.1, the minimal value is 2047. */
@@ -1437,7 +1363,12 @@ __glChipGetDeviceConstants(
                                             &shaderCaps->maxDrawBuffers,
                                             &constants->maxSamples));
 
+
+#ifdef OPENGL40
+        shaderCaps->maxDrawBuffers = __GL_MAX(shaderCaps->maxDrawBuffers / 2, 8);
+#else
         shaderCaps->maxDrawBuffers = __GL_MAX(shaderCaps->maxDrawBuffers / 2, 4);
+#endif
         if (shaderCaps->maxDrawBuffers > __GL_MAX_DRAW_BUFFERS)
         {
             __GLES_PRINT("ERROR: please define __GL_MAX_DRAW_BUFFERS no less than %d\n", shaderCaps->maxDrawBuffers);

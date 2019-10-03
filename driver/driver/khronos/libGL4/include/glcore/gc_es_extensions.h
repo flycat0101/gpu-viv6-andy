@@ -142,6 +142,11 @@ typedef enum
     __GL_EXTID_ARB_window_pos,
     __GL_EXTID_ARB_texture_compression,
     __GL_EXTID_ARB_multitexture,
+
+    __GL_EXTID_ARB_texture_storage,
+    __GL_EXTID_ARB_get_program_binary,
+    __GL_EXTID_ARB_internalformat_query,
+    __GL_EXTID_ARB_texture_multisample,
 #endif
 
     __GL_EXTID_EXT_LAST,

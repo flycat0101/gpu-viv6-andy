@@ -98,7 +98,7 @@ typedef struct __glsMATRIX
 #define glvMAX_TEXTURES                     8
 
 /* Maximum number of clip planes. */
-#define glvMAX_CLIP_PLANES                  6
+#define glvMAX_CLIP_PLANES                  8
 
 /* Maximum number of lights. */
 #define glvMAX_LIGHTS                       8

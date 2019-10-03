@@ -1995,6 +1995,11 @@ GLvoid __glSwitchToInconsistentFormat(__GLcontext *gc)
 
 GLvoid APIENTRY __glim_Begin(__GLcontext *gc, GLenum mode)
 {
+    if (gc->conditionalRenderDiscard)
+    {
+        return;
+    }
+
     if (mode > GL_TRIANGLE_STRIP_ADJACENCY_EXT)
     {
         __glSetError(gc,GL_INVALID_ENUM);
@@ -2031,6 +2036,11 @@ GLvoid APIENTRY __glim_Begin(__GLcontext *gc, GLenum mode)
 
 GLvoid APIENTRY __glim_End(__GLcontext *gc )
 {
+    if (gc->conditionalRenderDiscard)
+    {
+        return;
+    }
+
     if (gc->input.inconsistentFormat == GL_FALSE)
     {
         gc->input.primitiveFormat = gc->input.preVertexFormat;

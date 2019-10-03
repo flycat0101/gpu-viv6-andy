@@ -369,6 +369,9 @@ typedef enum
     __GL_FMT_COMPRESSED_SRGB_ALPHA_S3TC_DXT1,
     __GL_FMT_COMPRESSED_SRGB_ALPHA_S3TC_DXT3,
     __GL_FMT_COMPRESSED_SRGB_ALPHA_S3TC_DXT5,
+    __GL_FMT_R16,
+    __GL_FMT_RG16,
+    __GL_FMT_RGB16,
 #endif
 
     __GL_FMT_MAX,
@@ -476,7 +479,11 @@ typedef struct __GLformatInfoRec
 /*
 ** Index for Back buffers, must be no less than GL reported caps
 */
+#ifdef OPENGL40
+#define __GL_MAX_DRAW_BUFFERS               8
+#else
 #define __GL_MAX_DRAW_BUFFERS               4
+#endif
 
 #define __GL_MAX_DRAW_BUFFERS_GL4
 

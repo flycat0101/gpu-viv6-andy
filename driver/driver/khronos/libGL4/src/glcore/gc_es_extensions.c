@@ -143,6 +143,18 @@ __GLextension __glExtension[] =
     {__GL_EXTID_ARB_window_pos, "GL_ARB_window_pos", GL_TRUE, GL_FALSE},
     {__GL_EXTID_ARB_texture_compression, "GL_ARB_texture_compression", GL_TRUE, GL_FALSE},
     {__GL_EXTID_ARB_multitexture, "GL_ARB_multitexture", GL_TRUE, GL_FALSE},
+
+    /* Fix: KHR-GL**.gpu_shader5_gl.*(GL30/31/32/33/40), add glTexStorage2D */
+    {__GL_EXTID_ARB_texture_storage, "GL_ARB_texture_storage", GL_TRUE, GL_FALSE},
+
+    /* Fix: GTF-GL40.gtf40.GLCoverage.CoverageGL40, add glProgramParameteri support in OpenGL 4.0*/
+    {__GL_EXTID_ARB_get_program_binary, "GL_ARB_get_program_binary", GL_TRUE, GL_FALSE},
+
+    /* Fix: GTF-GL40.gtf30.GL3Tests.framebuffer_blit.framebuffer_blit_error_blitframebuffer_multisampled_framebuffers_different_sample_count, add glGetInternalformativ support in OpenGL 4.0*/
+    {__GL_EXTID_ARB_internalformat_query, "GL_ARB_internalformat_query", GL_TRUE, GL_FALSE},
+
+    /*Fix: GTF-GL30.gtf21.GL3Tests.proxy_textures.proxy_textures_valid, add glTexImage2DMultisample support in OpenGL 4.0*/
+    {__GL_EXTID_ARB_texture_multisample, "GL_ARB_texture_multisample", GL_TRUE, GL_FALSE},
 #endif
 
     {__GL_EXTID_EXT_LAST, gcvNULL, GL_FALSE, GL_FALSE}

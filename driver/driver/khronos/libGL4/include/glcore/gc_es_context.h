@@ -1205,6 +1205,7 @@ struct __GLcontextRec
     GLbitfield swpDirtyState[__GL_DIRTY_ATTRS_END];
 
      GLenum renderMode;
+     GLboolean conditionalRenderDiscard;
     __GLvertexMachine input;
     __GLfeedbackMachine feedback;
     __GLvertexStreamMachine vertexStreams;
@@ -1292,6 +1293,12 @@ extern GLvoid __glSetError(__GLcontext *gc, GLenum code);
     goto OnError;
 
 #define __GL_ERROR_RET(err)             \
+    __glSetError(gc, err);              \
+    return;
+
+/* Pop stack before return, or will waste stack */
+#define __GL_ERROR_RET_STACK(err)             \
+    __GL_FOOTER();                      \
     __glSetError(gc, err);              \
     return;
 

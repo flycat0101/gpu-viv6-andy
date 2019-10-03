@@ -1062,7 +1062,16 @@ __glChipIsFramebufferComplete(
         ** And our HW indeed didn't support it. But we already claimed supporting OES_stencilx
         ** extension and need pass conform test, so we should allow the case.
         */
-        if (gc->apiVersion == __GL_API_VERSION_ES30 && depthObjSet && stencilObjSet)
+        /* The OpenGL spec only requires
+        ** "when both depth and stencil attachments are present, implementations are only
+        ** required to support framebuffer objects where both attachments refer to the same image."
+        ** Thus, it is accepatable for an implementation returning GL_FRAMEBUFFER_UNSUPPORTED.
+        */
+        if ((gc->apiVersion == __GL_API_VERSION_ES30
+#ifdef OPENGL40
+            || gc->apiVersion >= __GL_API_VERSION_OGL30
+#endif
+            ) && depthObjSet && stencilObjSet)
         {
             if ((depthObjType != stencilObjType) ||
                 (depthObjName != stencilObjName))
@@ -1147,323 +1156,6 @@ OnExit:
 
     gcmFOOTER_ARG("return=%d", ret);
     return ret;
-}
-
-/********************************************************************
-**
-**  _BlitFramebufferResolve
-**
-**  Function to use resolve to do the framebuffer blit.
-**  This is the fast path and first choice when do blit.
-**  But it will be limited by scaling or other features.
-**
-**  Parameters: The framebuffer blit arguments
-**  Return Value: Blit successful
-**
-********************************************************************/
-__GL_INLINE gceSTATUS
-gcChipBlitFramebufferResolve(
-    __GLcontext *gc,
-    GLint srcX0,
-    GLint srcY0,
-    GLint srcX1,
-    GLint srcY1,
-    GLint dstX0,
-    GLint dstY0,
-    GLint dstX1,
-    GLint dstY1,
-    GLbitfield *mask,
-    GLboolean  xReverse,
-    GLboolean  yReverse,
-    GLenum     filter
-    )
-{
-    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-
-
-    GLint srcWidth  = 0;
-    GLint srcHeight = 0;
-    GLint dstWidth  = 0;
-    GLint dstHeight = 0;
-    gcsSURF_VIEW pixelPlaneView = {gcvNULL, 0, 1};
-    gcsSURF_RESOLVE_ARGS rlvArgs = {0};
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmHEADER_ARG("gc=0x%x srcX0=%d srcY0=%d srcX1=%d srcY1=%d dstX0=%d dstY0=%d "
-                  "dstX1=%d desY1=%d mask=0x%x xReverse=%d yReverse=%d filter=0x%04x",
-                   gc, srcX0, srcY0, srcX1, srcY1, dstX0, dstX1, dstY1,
-                   mask, xReverse, yReverse, filter);
-
-    /* Resolve cannot support scissor test with rect */
-    if (gc->state.enables.scissorTest)
-    {
-        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-    }
-
-    /* Resolve does not support x reverse */
-    if (xReverse || yReverse)
-    {
-        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-    }
-
-    /* Resolve cannot support scale */
-    if (((srcX1 - srcX0) != (dstX1 - dstX0)) ||
-        ((srcY1 - srcY0) != (dstY1 - dstY0)))
-    {
-        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-    }
-
-    rlvArgs.version = gcvHAL_ARG_VERSION_V2;
-    rlvArgs.uArgs.v2.srcOrigin.x = __GL_MAX(0, srcX0);
-    rlvArgs.uArgs.v2.srcOrigin.y = __GL_MAX(0, srcY0);
-    rlvArgs.uArgs.v2.dstOrigin.x = __GL_MAX(0, dstX0);
-    rlvArgs.uArgs.v2.dstOrigin.y = __GL_MAX(0, dstY0);
-    rlvArgs.uArgs.v2.numSlices = 1;
-
-    if (*mask & GL_COLOR_BUFFER_BIT)
-    {
-        GLuint i;
-
-        gcmONERROR(gcoSURF_GetSize(chipCtx->readRtView.surf, (gctUINT*)&srcWidth, (gctUINT*)&srcHeight, NULL));
-        gcmONERROR(gcChipFboSyncFromMasterSurface(gc, &chipCtx->readRtView, GL_TRUE));
-        /* Get pixel plan for msaa source */
-        gcmONERROR(gcChipUtilGetPixelPlane(gc, &chipCtx->readRtView, &pixelPlaneView));
-
-        rlvArgs.uArgs.v2.rectSize.x  = __GL_MIN(srcWidth,  (srcX1 - srcX0));
-        rlvArgs.uArgs.v2.rectSize.y  = __GL_MIN(srcHeight, (srcY1 - srcY0));
-
-        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
-        {
-            gcsSURF_VIEW rtView = {chipCtx->drawRtViews[i].surf, chipCtx->drawRtViews[i].firstSlice, chipCtx->drawRtViews[i].numSlices};
-            if (rtView.surf)
-            {
-                /* Set up the dst surface and rect */
-                gcmONERROR(gcoSURF_GetSize(rtView.surf, (gctUINT*)&dstWidth, (gctUINT*)&dstHeight, NULL));
-                gcmONERROR(gcChipFboSyncFromMasterSurface(gc, &rtView, GL_FALSE));
-
-                if (rlvArgs.uArgs.v2.rectSize.x != __GL_MIN(dstWidth,  (dstX1 - dstX0)) ||
-                    rlvArgs.uArgs.v2.rectSize.y != __GL_MIN(dstHeight, (dstY1 - dstY0))
-                   )
-                {
-                    gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-                }
-
-                /* If the read framebuffer is layered (see section 9.8), pixel values are read from layer zero.
-                ** If the draw framebuffer is layered, pixel values are written to layer zero.
-                ** If both read and draw framebuffers are layered, the blit operation is still performed only on layer zero.
-                */
-                pixelPlaneView.numSlices = rtView.numSlices = 1;
-                gcmONERROR(gcoSURF_ResolveRect(&pixelPlaneView, &rtView, &rlvArgs));
-            }
-        }
-        /* Destroy pixel plane if needed */
-        gcmONERROR(gcChipUtilDestroyPixelPlane(gc, &chipCtx->readRtView, &pixelPlaneView));
-
-        *mask &= ~GL_COLOR_BUFFER_BIT;
-    }
-
-    if (*mask & (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT))
-    {
-        gceSURF_FORMAT readFmt, drawFmt;
-        gcsSURF_VIEW *readDsView = chipCtx->readDepthView.surf ? &chipCtx->readDepthView : &chipCtx->readStencilView;
-        gcsSURF_VIEW *drawDsView = chipCtx->drawDepthView.surf ? &chipCtx->drawDepthView : &chipCtx->drawStencilView;
-        gctUINT drawDsNumSlice = chipCtx->drawDepthView.surf ? chipCtx->drawDepthView.numSlices : chipCtx->drawStencilView.numSlices;
-
-        /* If both read/draw are valid, they must be same. */
-        GL_ASSERT(!(chipCtx->readDepthView.surf && chipCtx->readStencilView.surf) ||
-                    chipCtx->readDepthView.surf == chipCtx->readStencilView.surf);
-        GL_ASSERT(!(chipCtx->drawDepthView.surf && chipCtx->drawStencilView.surf) ||
-                    chipCtx->drawDepthView.surf == chipCtx->drawStencilView.surf);
-
-        /* Resolve in fact cannot do depth-only/stencil-only copy for packed ds format */
-        gcmONERROR(gcoSURF_GetFormat(readDsView->surf, gcvNULL, &readFmt));
-        gcmONERROR(gcoSURF_GetFormat(drawDsView->surf, gcvNULL, &drawFmt));
-
-        if ((readFmt == gcvSURF_D24S8 || readFmt == gcvSURF_D24S8_1_A8R8G8B8) &&
-            (drawFmt == gcvSURF_D24S8 || drawFmt == gcvSURF_D24S8_1_A8R8G8B8) &&
-            (!(*mask & GL_DEPTH_BUFFER_BIT) || !(*mask & GL_STENCIL_BUFFER_BIT))
-            )
-        {
-            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-        }
-
-        /* Blit from read depth buffer to draw depth buffer */
-        /* Consider stencil and depth sharing same surface */
-        if (readDsView->surf && drawDsView->surf)
-        {
-            gcmONERROR(gcoSURF_GetSize(readDsView->surf, (gctUINT*)&srcWidth, (gctUINT*)&srcHeight, NULL));
-            gcmONERROR(gcChipFboSyncFromMasterSurface(gc, readDsView, GL_TRUE));
-            /* Get Pixel Plane if source is msaa surface */
-            gcmONERROR(gcChipUtilGetPixelPlane(gc, readDsView, &pixelPlaneView));
-
-            rlvArgs.uArgs.v2.rectSize.x = __GL_MIN(srcWidth,  (srcX1 - srcX0));
-            rlvArgs.uArgs.v2.rectSize.y = __GL_MIN(srcHeight, (srcY1 - srcY0));
-
-            gcmONERROR(gcoSURF_GetSize(drawDsView->surf, (gctUINT*)&dstWidth, (gctUINT*)&dstHeight, NULL));
-            gcmONERROR(gcChipFboSyncFromMasterSurface(gc, drawDsView, GL_FALSE));
-
-            if (rlvArgs.uArgs.v2.rectSize.x != __GL_MIN(dstWidth,  (dstX1 - dstX0)) ||
-                rlvArgs.uArgs.v2.rectSize.y != __GL_MIN(dstHeight, (dstY1 - dstY0))
-               )
-            {
-                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-            }
-
-            /* If the read framebuffer is layered (see section 9.8), pixel values are read from layer zero.
-            ** If the draw framebuffer is layered, pixel values are written to layer zero.
-            ** If both read and draw framebuffers are layered, the blit operation is still performed only on layer zero.
-            */
-            pixelPlaneView.numSlices = drawDsView->numSlices = 1;
-
-            gcmONERROR(gcoSURF_ResolveRect(&pixelPlaneView, drawDsView, &rlvArgs));
-
-            /* Destroy pixel plane if needed */
-            gcmONERROR(gcChipUtilDestroyPixelPlane(gc, readDsView, &pixelPlaneView));
-
-            /* restore the numSlice for drawDsView*/
-            drawDsView->numSlices = drawDsNumSlice;
-        }
-
-        /*
-        ** Clear stencil bit also, as it's always same buffer.
-        ** We don't support blit depth or stencil only case.
-        */
-        *mask &= ~(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-    }
-
-OnError:
-    gcmFOOTER();
-    return status;
-}
-
-/********************************************************************
-**
-**  _BlitFramebuffer3Dblit
-**
-**  Function to use 3dblit to do the framebuffer blit.
-**  Only called when resolve blit failed.
-**  Support 3dblit should cover all the cases.
-**
-**  Parameters: The framebuffer blit arguments
-**  Return Value: Blit successful
-**
-********************************************************************/
-__GL_INLINE gceSTATUS
-gcChipBlitFramebuffer3Dblit(
-    __GLcontext *gc,
-    GLint srcX0,
-    GLint srcY0,
-    GLint srcX1,
-    GLint srcY1,
-    GLint dstX0,
-    GLint dstY0,
-    GLint dstX1,
-    GLint dstY1,
-    GLbitfield *mask,
-    GLboolean   xReverse,
-    GLboolean   yReverse,
-    GLenum      filter
-    )
-{
-    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    gscSURF_BLITDRAW_BLIT blitArgs;
-    gcsSURF_VIEW masterView = {gcvNULL, 0, 1};
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmHEADER_ARG("gc=0x%x srcX0=%d srcY0=%d srcX1=%d srcY1=%d dstX0=%d dstY0=%d "
-                  "dstX1=%d desY1=%d mask=0x%x xReverse=%d yReverse=%d filter=0x%04x",
-                   gc, srcX0, srcY0, srcX1, srcY1, dstX0, dstX1, dstY1,
-                   mask, xReverse, yReverse, filter);
-
-    /* Do not clip the src/dst rect here, otherwise, scale factor will be changed.
-    ** Draw simulation will let HW do the clipping.
-    */
-    __GL_MEMZERO(&blitArgs, sizeof(blitArgs));
-
-    blitArgs.scissorEnabled = gc->state.enables.scissorTest;
-    blitArgs.scissor.left   = gc->state.scissor.scissorX;
-    blitArgs.scissor.right  = gc->state.scissor.scissorX + gc->state.scissor.scissorWidth;
-    blitArgs.scissor.top    = gc->state.scissor.scissorY;
-    blitArgs.scissor.bottom = gc->state.scissor.scissorY + gc->state.scissor.scissorHeight;
-
-    if (chipCtx->drawYInverted)
-    {
-        GLint temp = blitArgs.scissor.top;
-        blitArgs.scissor.top = (gctINT32)(chipCtx->drawRTHeight - blitArgs.scissor.bottom);
-        blitArgs.scissor.bottom = (gctINT32)(chipCtx->drawRTHeight - temp);
-    }
-
-    blitArgs.srcRect.left   = srcX0;
-    blitArgs.srcRect.top    = srcY0;
-    blitArgs.srcRect.right  = srcX1;
-    blitArgs.srcRect.bottom = srcY1;
-    blitArgs.dstRect.left   = dstX0;
-    blitArgs.dstRect.top    = dstY0;
-    blitArgs.dstRect.right  = dstX1;
-    blitArgs.dstRect.bottom = dstY1;
-    blitArgs.filterMode     = gcChipUtilConvertFilter(filter);;
-    blitArgs.xReverse       = xReverse;
-    blitArgs.yReverse       = yReverse;
-
-    if (*mask & GL_COLOR_BUFFER_BIT)
-    {
-        GLuint i;
-        gcsSURF_VIEW shadowView = {gcvNULL, 0, 1};
-        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
-
-        /* For INT/UINT src/dst, 3DBlit doesn't have shader to support the blit yet.
-        ** No need to check dst, for GLcore guarantees them matched.
-        */
-        if (readFBO->name)
-        {
-            GLuint rAttachPointMask = 0x1 << __glMapAttachmentToIndex(readFBO->readBuffer);
-
-            if ((rAttachPointMask & readFBO->fbIntMask) || (rAttachPointMask & readFBO->fbUIntMask))
-            {
-                gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-            }
-        }
-
-        masterView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
-
-        if (!masterView.surf || ((masterView.surf->tiling == gcvMULTI_SUPERTILED) && (chipCtx->chipFeature.indirectRTT)))
-        {
-            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-        }
-
-        /* Get usable texture if needed */
-        gcmONERROR(gcChipUtilGetShadowTexView(gc, &masterView, &shadowView));
-
-        GL_ASSERT((shadowView.surf != chipCtx->readRtView.surf) || (chipCtx->readRtView.firstSlice == 0));
-
-        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
-        {
-            if (chipCtx->drawRtViews[i].surf)
-            {
-                GL_ASSERT(chipCtx->drawRtViews[i].firstSlice == 0);
-
-                gcmONERROR(gcChipFboSyncFromMasterSurface(gc, &chipCtx->drawRtViews[i], GL_FALSE));
-                gcmONERROR(gcoSURF_DrawBlit(&shadowView, &chipCtx->drawRtViews[i], &blitArgs));
-            }
-        }
-
-        *mask &= ~GL_COLOR_BUFFER_BIT;
-
-        /* Release shadow texture if needed */
-        gcmONERROR(gcChipUtilReleaseShadowTex(gc, &masterView, &shadowView));
-    }
-
-    /*
-    ** FIXME: Actually 3Dblit can't support depth/stencil blit for now.
-    */
-    if (*mask & (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT))
-    {
-        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-    }
-
-OnError:
-    gcmFOOTER();
-    return status;
 }
 
 /********************************************************************
@@ -1622,6 +1314,357 @@ gcChipBlitFramebufferSoftware(
             /* Destroy pixel plane if needed */
             gcmONERROR(gcChipUtilDestroyPixelPlane(gc, readDsView, &pixelPlaneView));
         }
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+/********************************************************************
+**
+**  _BlitFramebufferResolve
+**
+**  Function to use resolve to do the framebuffer blit.
+**  This is the fast path and first choice when do blit.
+**  But it will be limited by scaling or other features.
+**
+**  Parameters: The framebuffer blit arguments
+**  Return Value: Blit successful
+**
+********************************************************************/
+__GL_INLINE gceSTATUS
+gcChipBlitFramebufferResolve(
+    __GLcontext *gc,
+    GLint srcX0,
+    GLint srcY0,
+    GLint srcX1,
+    GLint srcY1,
+    GLint dstX0,
+    GLint dstY0,
+    GLint dstX1,
+    GLint dstY1,
+    GLbitfield *mask,
+    GLboolean  xReverse,
+    GLboolean  yReverse,
+    GLenum     filter
+    )
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
+
+    GLint srcWidth  = 0;
+    GLint srcHeight = 0;
+    GLint dstWidth  = 0;
+    GLint dstHeight = 0;
+    gcsSURF_VIEW pixelPlaneView = {gcvNULL, 0, 1};
+    gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("gc=0x%x srcX0=%d srcY0=%d srcX1=%d srcY1=%d dstX0=%d dstY0=%d "
+                  "dstX1=%d desY1=%d mask=0x%x xReverse=%d yReverse=%d filter=0x%04x",
+                   gc, srcX0, srcY0, srcX1, srcY1, dstX0, dstX1, dstY1,
+                   mask, xReverse, yReverse, filter);
+
+    /* Resolve cannot support scissor test with rect */
+    if (gc->state.enables.scissorTest)
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /* Resolve does not support x reverse */
+    if (xReverse || yReverse)
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /* Resolve cannot support scale */
+    if (((srcX1 - srcX0) != (dstX1 - dstX0)) ||
+        ((srcY1 - srcY0) != (dstY1 - dstY0)))
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+    rlvArgs.uArgs.v2.srcOrigin.x = __GL_MAX(0, srcX0);
+    rlvArgs.uArgs.v2.srcOrigin.y = __GL_MAX(0, srcY0);
+    rlvArgs.uArgs.v2.dstOrigin.x = __GL_MAX(0, dstX0);
+    rlvArgs.uArgs.v2.dstOrigin.y = __GL_MAX(0, dstY0);
+    rlvArgs.uArgs.v2.numSlices = 1;
+
+    if (*mask & GL_COLOR_BUFFER_BIT)
+    {
+        GLuint i;
+
+        gcmONERROR(gcoSURF_GetSize(chipCtx->readRtView.surf, (gctUINT*)&srcWidth, (gctUINT*)&srcHeight, NULL));
+        gcmONERROR(gcChipFboSyncFromMasterSurface(gc, &chipCtx->readRtView, GL_TRUE));
+        /* Get pixel plan for msaa source */
+        gcmONERROR(gcChipUtilGetPixelPlane(gc, &chipCtx->readRtView, &pixelPlaneView));
+
+        rlvArgs.uArgs.v2.rectSize.x  = __GL_MIN(srcWidth,  (srcX1 - srcX0));
+        rlvArgs.uArgs.v2.rectSize.y  = __GL_MIN(srcHeight, (srcY1 - srcY0));
+
+        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
+        {
+            gcsSURF_VIEW rtView = {chipCtx->drawRtViews[i].surf, chipCtx->drawRtViews[i].firstSlice, chipCtx->drawRtViews[i].numSlices};
+            if (rtView.surf)
+            {
+                if(rtView.surf->isMsaa)
+                {
+                    /*
+                    ** Destination framebuffer is MSAA, using CPUBlit to solve it.
+                    ** VIV: TODO: 3DBlit do not support destMSAA.
+                    */
+                    status = gcChipBlitFramebufferSoftware(gc,
+                                                        srcX0, srcY0, srcX1, srcY1,
+                                                        dstX0, dstY0, dstX1, dstY1,
+                                                        mask,
+                                                        xReverse,
+                                                        yReverse,
+                                                        filter);
+                }
+                else
+                {
+                    /* Set up the dst surface and rect */
+                    gcmONERROR(gcoSURF_GetSize(rtView.surf, (gctUINT*)&dstWidth, (gctUINT*)&dstHeight, NULL));
+                    gcmONERROR(gcChipFboSyncFromMasterSurface(gc, &rtView, GL_FALSE));
+
+                    if (rlvArgs.uArgs.v2.rectSize.x != __GL_MIN(dstWidth,  (dstX1 - dstX0)) ||
+                        rlvArgs.uArgs.v2.rectSize.y != __GL_MIN(dstHeight, (dstY1 - dstY0))
+                       )
+                    {
+                        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+                    }
+
+                    /* If the read framebuffer is layered (see section 9.8), pixel values are read from layer zero.
+                    ** If the draw framebuffer is layered, pixel values are written to layer zero.
+                    ** If both read and draw framebuffers are layered, the blit operation is still performed only on layer zero.
+                    */
+                    pixelPlaneView.numSlices = rtView.numSlices = 1;
+                    gcmONERROR(gcoSURF_ResolveRect(&pixelPlaneView, &rtView, &rlvArgs));
+                }
+            }
+        }
+        /* Destroy pixel plane if needed */
+        gcmONERROR(gcChipUtilDestroyPixelPlane(gc, &chipCtx->readRtView, &pixelPlaneView));
+
+        *mask &= ~GL_COLOR_BUFFER_BIT;
+    }
+
+    if (*mask & (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT))
+    {
+        gceSURF_FORMAT readFmt, drawFmt;
+        gcsSURF_VIEW *readDsView = chipCtx->readDepthView.surf ? &chipCtx->readDepthView : &chipCtx->readStencilView;
+        gcsSURF_VIEW *drawDsView = chipCtx->drawDepthView.surf ? &chipCtx->drawDepthView : &chipCtx->drawStencilView;
+        gctUINT drawDsNumSlice = chipCtx->drawDepthView.surf ? chipCtx->drawDepthView.numSlices : chipCtx->drawStencilView.numSlices;
+
+        /* If both read/draw are valid, they must be same. */
+        GL_ASSERT(!(chipCtx->readDepthView.surf && chipCtx->readStencilView.surf) ||
+                    chipCtx->readDepthView.surf == chipCtx->readStencilView.surf);
+        GL_ASSERT(!(chipCtx->drawDepthView.surf && chipCtx->drawStencilView.surf) ||
+                    chipCtx->drawDepthView.surf == chipCtx->drawStencilView.surf);
+
+        /* Resolve in fact cannot do depth-only/stencil-only copy for packed ds format */
+        gcmONERROR(gcoSURF_GetFormat(readDsView->surf, gcvNULL, &readFmt));
+        gcmONERROR(gcoSURF_GetFormat(drawDsView->surf, gcvNULL, &drawFmt));
+
+        if ((readFmt == gcvSURF_D24S8 || readFmt == gcvSURF_D24S8_1_A8R8G8B8) &&
+            (drawFmt == gcvSURF_D24S8 || drawFmt == gcvSURF_D24S8_1_A8R8G8B8) &&
+            (!(*mask & GL_DEPTH_BUFFER_BIT) || !(*mask & GL_STENCIL_BUFFER_BIT))
+            )
+        {
+            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+        }
+
+        /* Blit from read depth buffer to draw depth buffer */
+        /* Consider stencil and depth sharing same surface */
+        if (readDsView->surf && drawDsView->surf)
+        {
+            if(drawDsView->surf->isMsaa)
+            {
+                /*
+                ** Destination framebuffer is MSAA, using CPUBlit to solve it.
+                ** VIV: TODO: 3DBlit do not support destMSAA.
+                */
+                status = gcChipBlitFramebufferSoftware(gc,
+                                                    srcX0, srcY0, srcX1, srcY1,
+                                                    dstX0, dstY0, dstX1, dstY1,
+                                                    mask,
+                                                    xReverse,
+                                                    yReverse,
+                                                    filter);
+            }
+            else
+            {
+                gcmONERROR(gcoSURF_GetSize(readDsView->surf, (gctUINT*)&srcWidth, (gctUINT*)&srcHeight, NULL));
+                gcmONERROR(gcChipFboSyncFromMasterSurface(gc, readDsView, GL_TRUE));
+                /* Get Pixel Plane if source is msaa surface */
+                gcmONERROR(gcChipUtilGetPixelPlane(gc, readDsView, &pixelPlaneView));
+
+                rlvArgs.uArgs.v2.rectSize.x = __GL_MIN(srcWidth,  (srcX1 - srcX0));
+                rlvArgs.uArgs.v2.rectSize.y = __GL_MIN(srcHeight, (srcY1 - srcY0));
+
+                gcmONERROR(gcoSURF_GetSize(drawDsView->surf, (gctUINT*)&dstWidth, (gctUINT*)&dstHeight, NULL));
+                gcmONERROR(gcChipFboSyncFromMasterSurface(gc, drawDsView, GL_FALSE));
+
+                if (rlvArgs.uArgs.v2.rectSize.x != __GL_MIN(dstWidth,  (dstX1 - dstX0)) ||
+                    rlvArgs.uArgs.v2.rectSize.y != __GL_MIN(dstHeight, (dstY1 - dstY0))
+                   )
+                {
+                    gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                }
+
+                /* If the read framebuffer is layered (see section 9.8), pixel values are read from layer zero.
+                ** If the draw framebuffer is layered, pixel values are written to layer zero.
+                ** If both read and draw framebuffers are layered, the blit operation is still performed only on layer zero.
+                */
+                pixelPlaneView.numSlices = drawDsView->numSlices = 1;
+
+                gcmONERROR(gcoSURF_ResolveRect(&pixelPlaneView, drawDsView, &rlvArgs));
+
+                /* Destroy pixel plane if needed */
+                gcmONERROR(gcChipUtilDestroyPixelPlane(gc, readDsView, &pixelPlaneView));
+
+                /* restore the numSlice for drawDsView*/
+                drawDsView->numSlices = drawDsNumSlice;
+            }
+        }
+
+        /*
+        ** Clear stencil bit also, as it's always same buffer.
+        ** We don't support blit depth or stencil only case.
+        */
+        *mask &= ~(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+/********************************************************************
+**
+**  _BlitFramebuffer3Dblit
+**
+**  Function to use 3dblit to do the framebuffer blit.
+**  Only called when resolve blit failed.
+**  Support 3dblit should cover all the cases.
+**
+**  Parameters: The framebuffer blit arguments
+**  Return Value: Blit successful
+**
+********************************************************************/
+__GL_INLINE gceSTATUS
+gcChipBlitFramebuffer3Dblit(
+    __GLcontext *gc,
+    GLint srcX0,
+    GLint srcY0,
+    GLint srcX1,
+    GLint srcY1,
+    GLint dstX0,
+    GLint dstY0,
+    GLint dstX1,
+    GLint dstY1,
+    GLbitfield *mask,
+    GLboolean   xReverse,
+    GLboolean   yReverse,
+    GLenum      filter
+    )
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gscSURF_BLITDRAW_BLIT blitArgs;
+    gcsSURF_VIEW masterView = {gcvNULL, 0, 1};
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("gc=0x%x srcX0=%d srcY0=%d srcX1=%d srcY1=%d dstX0=%d dstY0=%d "
+                  "dstX1=%d desY1=%d mask=0x%x xReverse=%d yReverse=%d filter=0x%04x",
+                   gc, srcX0, srcY0, srcX1, srcY1, dstX0, dstX1, dstY1,
+                   mask, xReverse, yReverse, filter);
+
+    /* Do not clip the src/dst rect here, otherwise, scale factor will be changed.
+    ** Draw simulation will let HW do the clipping.
+    */
+    __GL_MEMZERO(&blitArgs, sizeof(blitArgs));
+
+    blitArgs.scissorEnabled = gc->state.enables.scissorTest;
+    blitArgs.scissor.left   = gc->state.scissor.scissorX;
+    blitArgs.scissor.right  = gc->state.scissor.scissorX + gc->state.scissor.scissorWidth;
+    blitArgs.scissor.top    = gc->state.scissor.scissorY;
+    blitArgs.scissor.bottom = gc->state.scissor.scissorY + gc->state.scissor.scissorHeight;
+
+    if (chipCtx->drawYInverted)
+    {
+        GLint temp = blitArgs.scissor.top;
+        blitArgs.scissor.top = (gctINT32)(chipCtx->drawRTHeight - blitArgs.scissor.bottom);
+        blitArgs.scissor.bottom = (gctINT32)(chipCtx->drawRTHeight - temp);
+    }
+
+    blitArgs.srcRect.left   = srcX0;
+    blitArgs.srcRect.top    = srcY0;
+    blitArgs.srcRect.right  = srcX1;
+    blitArgs.srcRect.bottom = srcY1;
+    blitArgs.dstRect.left   = dstX0;
+    blitArgs.dstRect.top    = dstY0;
+    blitArgs.dstRect.right  = dstX1;
+    blitArgs.dstRect.bottom = dstY1;
+    blitArgs.filterMode     = gcChipUtilConvertFilter(filter);;
+    blitArgs.xReverse       = xReverse;
+    blitArgs.yReverse       = yReverse;
+
+    if (*mask & GL_COLOR_BUFFER_BIT)
+    {
+        GLuint i;
+        gcsSURF_VIEW shadowView = {gcvNULL, 0, 1};
+        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
+
+        /* For INT/UINT src/dst, 3DBlit doesn't have shader to support the blit yet.
+        ** No need to check dst, for GLcore guarantees them matched.
+        */
+        if (readFBO->name)
+        {
+            GLuint rAttachPointMask = 0x1 << __glMapAttachmentToIndex(readFBO->readBuffer);
+
+            if ((rAttachPointMask & readFBO->fbIntMask) || (rAttachPointMask & readFBO->fbUIntMask))
+            {
+                gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+            }
+        }
+
+        masterView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
+
+        if (!masterView.surf || ((masterView.surf->tiling == gcvMULTI_SUPERTILED) && (chipCtx->chipFeature.indirectRTT)))
+        {
+            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+        }
+
+        /* Get usable texture if needed */
+        gcmONERROR(gcChipUtilGetShadowTexView(gc, &masterView, &shadowView));
+
+        GL_ASSERT((shadowView.surf != chipCtx->readRtView.surf) || (chipCtx->readRtView.firstSlice == 0));
+
+        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
+        {
+            if (chipCtx->drawRtViews[i].surf)
+            {
+                GL_ASSERT(chipCtx->drawRtViews[i].firstSlice == 0);
+
+                gcmONERROR(gcChipFboSyncFromMasterSurface(gc, &chipCtx->drawRtViews[i], GL_FALSE));
+                gcmONERROR(gcoSURF_DrawBlit(&shadowView, &chipCtx->drawRtViews[i], &blitArgs));
+            }
+        }
+
+        *mask &= ~GL_COLOR_BUFFER_BIT;
+
+        /* Release shadow texture if needed */
+        gcmONERROR(gcChipUtilReleaseShadowTex(gc, &masterView, &shadowView));
+    }
+
+    /*
+    ** FIXME: Actually 3Dblit can't support depth/stencil blit for now.
+    */
+    if (*mask & (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT))
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
 OnError:
@@ -2006,6 +2049,7 @@ __glChipRenderbufferStorage(
 
     if (chipRBO == gcvNULL)
     {
+        gcmFOOTER();
         return GL_FALSE;
     }
 

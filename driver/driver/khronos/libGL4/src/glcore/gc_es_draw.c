@@ -387,6 +387,12 @@ GLint __glCalcTexMaxLevelUsed(__GLcontext *gc, __GLtextureObject *texObj, GLenum
     GLint maxLevelUsed;
     GLint base = texObj->params.baseLevel;
 
+    /* Rectangular texture target has only one mipmap level, can't do mipmap */
+    if(texObj->targetIndex == __GL_TEXTURE_RECTANGLE_INDEX)
+    {
+        return base;
+    }
+
     /* Check whether need mipmap */
     switch (texObj->params.mipHint)
     {
@@ -1816,6 +1822,12 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
 GLvoid  __glDrawPrimitive(__GLcontext *gc, GLenum mode)
 {
     ENTERFUNC_TM()
+
+    if (gc->conditionalRenderDiscard)
+    {
+        LEAVEFUNC_TM();
+        return;
+    }
 
     if (mode != gc->vertexArray.primMode)
     {

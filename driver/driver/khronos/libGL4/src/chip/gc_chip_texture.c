@@ -783,6 +783,11 @@ gcChipUtilGetImageFormat(
             imageFormat = gcvSURF_R5G5B5A1;
             break;
 
+        case GL_UNSIGNED_INT_10_10_10_2:
+            bpp = 32;
+            imageFormat = gcvSURF_R10G10B10A2;
+            break;
+
         case GL_UNSIGNED_INT_2_10_10_10_REV:
             bpp = 32;
             imageFormat = gcvSURF_A2B10G10R10;
@@ -893,6 +898,11 @@ gcChipUtilGetImageFormat(
         case GL_BYTE:
             bpp = 8;
             imageFormat = gcvSURF_R8_SNORM;
+            break;
+
+        case GL_UNSIGNED_SHORT:
+            bpp = 16;
+            imageFormat = gcvSURF_R16;
             break;
 
         case GL_HALF_FLOAT:
@@ -1160,6 +1170,7 @@ static gceSTATUS setTextureWrapperFormat(
         texInfo->combineFlow.argSwizzle = gcSL_SWIZZLE_XXXX;
         break;
 
+    case GL_RED_GREEN_VIVPRIV:
     case GL_RG:
         texInfo->combineFlow.targetEnable = gcSL_ENABLE_XY;
         texInfo->combineFlow.tempEnable = gcSL_ENABLE_XY;
@@ -1691,6 +1702,29 @@ gcChipResidentTextureLevel(
                     GL_ASSERT(!__GL_IS_TEXTURE_ARRAY(texObj->targetIndex));
 
                     pixels = gcChipDecompressDXT(gc,
+                                                 (gctSIZE_T)mipmap->width,
+                                                 (gctSIZE_T)mipmap->height,
+                                                 (gctSIZE_T)mipmap->compressedSize,
+                                                 buf,
+                                                 mipmap->requestedFormat,
+                                                 &srcImageFormat,
+                                                 &rowStride);
+                    compressed = GL_FALSE;
+                    needClean = GL_TRUE;
+                }
+                else
+                {
+                    pixels = buf;
+                }
+                break;
+            case GL_COMPRESSED_RED_RGTC1_EXT:
+            case GL_COMPRESSED_SIGNED_RED_RGTC1_EXT:
+            case GL_COMPRESSED_RED_GREEN_RGTC2_EXT:
+            case GL_COMPRESSED_SIGNED_RED_GREEN_RGTC2_EXT:
+
+                if (needDecompress)
+                {
+                    pixels = gcChipDecompressRGTC(gc,
                                                  (gctSIZE_T)mipmap->width,
                                                  (gctSIZE_T)mipmap->height,
                                                  (gctSIZE_T)mipmap->compressedSize,
@@ -3777,6 +3811,7 @@ gcChipCompressedTexSubImage(
                 {
                     gcmONERROR(gcvSTATUS_INVALID_ADDRESS);
                 }
+
             }
             break;
 
@@ -4631,6 +4666,9 @@ typedef struct
 #define CONVERT_DEPTH_ONLY(dstDataType, D32F_S8_1_G32R32F) \
     *d = (dstDataType)(s->depth) \
 
+#define CONVERT_STENCIL_ONLY(dstDataType, D32F_S8_1_G32R32F) \
+    *d = (GLuint)(s->stencil) & 0xff; \
+
 #define CONVERT_DEPTH_PIXELS(dstDataType, srcDataType, convertFunc) \
     do \
         { \
@@ -5001,6 +5039,10 @@ __glChipGetTexImage(
                 case GL_FLOAT:
                     dstStride = width * 4;
                     CONVERT_DEPTH_PIXELS(gctFLOAT, D32F_S8_1_G32R32F, CONVERT_DEPTH_ONLY);
+                    break;
+                case GL_UNSIGNED_INT:
+                    dstStride = width * 4;
+                    CONVERT_DEPTH_PIXELS(gctUINT32, D32F_S8_1_G32R32F, CONVERT_STENCIL_ONLY);
                     break;
                 default:
                     break;
@@ -6473,7 +6515,7 @@ __glChipCreateEglImageTexture(
     eglImage->u.texture.height  = height;
     eglImage->u.texture.object  = texInfo->object;
     eglImage->u.texture.format  = mipmap->format;
-    eglImage->u.texture.internalFormat = mipmap->interalFormat;
+    eglImage->u.texture.internalFormat = mipmap->internalFormat;
     eglImage->u.texture.type = mipmap->type;
 
     gcmONERROR(gcoSURF_SetResolvability(texView.surf, gcvFALSE));
@@ -7295,7 +7337,7 @@ gcChipInitializeSampler(
             setAlphaScale(chipCtx, sampler, &tes->alphaScale, glvFLOAT);
 
             /* right now if one of them is enabled, texture gen will be enabled. */
-            sampler->genEnable = (es->texGen[0] | (es->texGen[1] << 1) | (es->texGen[2] << 2) | (es->texGen[3] << 3));
+            sampler->genEnable = (es->texGen[0] || (es->texGen[1] << 1) || (es->texGen[2] << 2) || (es->texGen[3] << 3));
             /* Update the hash key. */
             glmSETHASH_4BITS(hashTexCoordGenEnable, sampler->genEnable, i);
 

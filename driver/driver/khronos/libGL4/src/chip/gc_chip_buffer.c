@@ -194,16 +194,20 @@ static __GLchipFmtMapInfo __glChipFmtMapInfo[__GL_FMT_MAX + 1] =
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_SIGNED_LUMINANCE_LATC1 */
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_LUMINANCE_ALPHA_LATC2 */
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_SIGNED_LUMINANCE_ALPHA_LATC2 */
-    __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_RED_RGTC1 */
-    __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_SIGNED_RED_RGTC1 */
-    __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_RED_GREEN_RGTC2 */
-    __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_SIGNED_RED_GREEN_RGTC2 */
+
+    /* RGTC format need be converted ALWAYS */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_WITH_FLAGS(gcvSURF_R8, __GL_CHIP_FMTFLAGS_FMT_DIFF_CORE_REQ), /* __GL_FMT_COMPRESSED_RED_RGTC1 */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_WITH_FLAGS(gcvSURF_R8, __GL_CHIP_FMTFLAGS_FMT_DIFF_CORE_REQ),  /* __GL_FMT_COMPRESSED_SIGNED_RED_RGTC1 */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_WITH_FLAGS(gcvSURF_RG16, __GL_CHIP_FMTFLAGS_FMT_DIFF_CORE_REQ),  /* __GL_FMT_COMPRESSED_RED_GREEN_RGTC2 */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_WITH_FLAGS(gcvSURF_RG16, __GL_CHIP_FMTFLAGS_FMT_DIFF_CORE_REQ),  /* __GL_FMT_COMPRESSED_SIGNED_RED_GREEN_RGTC2 */
+
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_RGBA8888_SIGNED */
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_SRGB_ALPHA */
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_SRGB_S3TC_DXT1 */
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_SRGB_ALPHA_S3TC_DXT1 */
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_SRGB_ALPHA_S3TC_DXT3 */
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_SRGB_ALPHA_S3TC_DXT5 */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_R16),             /* __GL_FMT_R16 */
 #endif
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN)        /* __GL_FMT_MAX */
 };
@@ -999,11 +1003,11 @@ __glChipUnMapBufferObject(
             switch (targetIndex)
             {
             case __GL_ARRAY_BUFFER_INDEX:
-                mapWrite = (bufObj->accessFlags & GL_MAP_WRITE_BIT || bufObj->accessOES == GL_WRITE_ONLY_OES);
+                mapWrite = (bufObj->accessFlags & GL_MAP_WRITE_BIT || bufObj->access == GL_WRITE_ONLY);
                 break;
 
             case __GL_ELEMENT_ARRAY_BUFFER_INDEX:
-                mapWrite = (bufObj->accessFlags & GL_MAP_WRITE_BIT || bufObj->accessOES == GL_WRITE_ONLY_OES);
+                mapWrite = (bufObj->accessFlags & GL_MAP_WRITE_BIT || bufObj->access == GL_WRITE_ONLY);
                 if (mapWrite)
                 {
                     gcoBUFOBJ_SetDirty(bufInfo->bufObj);
@@ -1043,7 +1047,7 @@ __glChipUnMapBufferObject(
     bufObj->mapOffset    = 0;
     bufObj->mapLength    = 0;
     bufObj->accessFlags  = 0;
-    bufObj->accessOES    = GL_WRITE_ONLY_OES;
+    bufObj->access    = GL_READ_WRITE;
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
