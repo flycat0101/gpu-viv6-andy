@@ -2763,7 +2763,11 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
             if (gcmIS_ERROR(status)) goto OnError;
             gcoOS_ZeroMemory(checkArray, gcmSIZEOF(vx_memory) * graph->layer->base.num_operations * MAX_INOUT_NUM);
             status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(vx_uint32) * graph->layer->base.num_operations, (gctPOINTER*)&checkCount);
-            if (gcmIS_ERROR(status)) goto OnError;
+            if (gcmIS_ERROR(status))
+            {
+                gcoOS_FreeMemory(gcvNULL, checkArray);
+                goto OnError;
+            }
             gcoOS_ZeroMemory(checkCount, gcmSIZEOF(vx_uint32) * graph->layer->base.num_operations);
 
             for (ii = block->start; ii < block->start+block->count; ii++)

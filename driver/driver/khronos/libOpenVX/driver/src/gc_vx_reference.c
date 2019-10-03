@@ -74,6 +74,7 @@ ErrorExit:
     {
         if (ref->lock != VX_NULL)
         {
+            vxoReference_Decrement(ref, kind);
             vxDestroyMutex(ref->lock);
         }
         vxFree(ref);

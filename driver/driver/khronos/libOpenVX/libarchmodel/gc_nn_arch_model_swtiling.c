@@ -242,7 +242,11 @@ struct _archModelSplitInfo * initArchModelSplitInfo(vx_uint32 operationCount)
         gcmSIZEOF(struct _archModelSplitInfo),
         (gctPOINTER *)&splitInfo
         );
-    if (gcmIS_ERROR(status)) goto error;
+    if (gcmIS_ERROR(status))
+    {
+        return NULL;
+    }
+
     memset(splitInfo, 0, gcmSIZEOF(struct _archModelSplitInfo));
 
     status = gcoOS_Allocate(
@@ -358,7 +362,7 @@ struct _archModelSplitInfo * initArchModelSplitInfo(vx_uint32 operationCount)
     return splitInfo;
 
 error:
-    if (splitInfo != NULL) deInitArchModelSplitInfo(splitInfo, operationCount);
+    deInitArchModelSplitInfo(splitInfo, operationCount);
     vxInfo("ERROR: initArchModelSplitInfo() return out-of-memory\n");
     return NULL;
 }
