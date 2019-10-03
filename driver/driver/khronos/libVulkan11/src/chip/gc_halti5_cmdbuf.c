@@ -3729,6 +3729,24 @@ VkResult halti5_dispatch(
         data[0] = x; data[1] = y; data[2] = z;
         __vkCmdLoadBatchHWStates(&pCmdBuffer, chipCmptPipeline->numberOfWorkGroup.hwRegAddress, VK_FALSE, 3, data);
     }
+
+     /* fill value for UBO and program default UBO address */
+    if (chipCmptPipeline->defaultBuffer.bUsed)
+    {
+        uint32_t physical;
+        __vkBuffer *defaultBuf =  __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, chipCmptPipeline->defaultUbo);
+        uint32_t offset = chipCmptPipeline->offset;
+        __VK_ASSERT(chipCmptPipeline->defaultBuffer.hwRegCount != 0 && chipCmptPipeline->defaultBuffer.hwRegCount <= 4);
+
+        data[0] = x; data[1] = y; data[2] = z;
+        gcoOS_MemCopy((gctPOINTER)((uint8_t *)defaultBuf->memory->hostAddr + offset), data, 3 * sizeof(gctUINT32));
+
+        physical = defaultBuf->memory->devAddr;
+        physical += (uint32_t)(defaultBuf->memOffset);
+
+        __vkCmdLoadSingleHWState(&pCmdBuffer, chipCmptPipeline->defaultBuffer.hwRegAddress, VK_FALSE, physical);
+    }
+
     __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0248, VK_FALSE, 0xBADABEEB);
     __VK_DEBUG_ONLY(})

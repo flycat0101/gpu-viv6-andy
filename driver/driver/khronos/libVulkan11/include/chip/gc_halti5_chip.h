@@ -763,6 +763,11 @@ typedef struct
     halti5_pipeline chipPipeline;
 
     halti5_priv_const numberOfWorkGroup;
+
+    VkBuffer defaultUbo;
+    /*save the member's offset in default UBO*/
+    uint32_t offset;
+    halti5_priv_const defaultBuffer;
 } halti5_computePipeline;
 
 /* Halti5 Chip function prototypes */
