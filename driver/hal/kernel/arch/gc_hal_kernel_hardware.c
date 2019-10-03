@@ -13935,7 +13935,7 @@ gckHARDWARE_DumpGPUState(
     }
 
     /* Record control. */
-    gckOS_ReadRegisterEx(os, core, 0x0, &oldControl);
+    gcmkONERROR(gckOS_ReadRegisterEx(os, core, 0x0, &oldControl));
 
     for (pipe = 0; pipe < maxNumOfPipes; pipe++)
     {
