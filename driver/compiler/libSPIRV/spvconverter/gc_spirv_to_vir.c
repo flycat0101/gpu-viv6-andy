@@ -433,15 +433,6 @@ static VIR_Enable virEnable [] =
     VIR_ENABLE_W
 };
 
-VIR_Enable virEnableCompact [] =
-{
-    VIR_ENABLE_XYZW,
-    VIR_ENABLE_X,
-    VIR_ENABLE_XY,
-    VIR_ENABLE_XYZ,
-    VIR_ENABLE_XYZW,
-};
-
 static VIR_Swizzle virSwizzleCompact [] =
 {
     VIR_SWIZZLE_XYZW,
@@ -4268,7 +4259,9 @@ VSC_ErrCode __SpvEmitType(gcSPV spv, VIR_Shader * virShader)
     case SpvOpTypeVector:
         SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultId) = spv->operands[0];
         SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId) = spv->operands[1];
-        if (!(SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId) < sizeof(virEnableCompact)/sizeof(virEnableCompact[0])))
+        if (SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId) != 2 && SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId) != 3 &&
+            SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId) != 4 && SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId) != 8 &&
+            SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId) != 16 && SPV_ID_TYPE_VEC_COMP_NUM(spv->resultId) != 32)
         {
             gcmASSERT(gcvFALSE);
         }
