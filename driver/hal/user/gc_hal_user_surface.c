@@ -5072,7 +5072,8 @@ _ComputeClear(
              Surface->clearBitMaskUpper[LayerIndex] = clearBitMask32;
              break;
 
-         case gcvSURF_A8_SRGB8: /* 24-bit RGB with alpha channel. */
+        case gcvSURF_X8_SRGB8: /* 24-bit RGB without alpha channel. */
+        case gcvSURF_A8_SRGB8: /* 24-bit RGB with alpha channel. */
              gcmASSERT(LayerIndex == 0);
              clearValueType = (gceVALUE_TYPE)   (ClearArgs->color.valueType   |
                                                 gcvVALUE_FLAG_UNSIGNED_DENORM |

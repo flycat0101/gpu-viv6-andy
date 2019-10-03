@@ -1899,6 +1899,9 @@ _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
     case gcvSURF_B10G11R11F_1_A8R8G8B8:
         return _ReadPixelFrom_B10G11R11;
 
+    case gcvSURF_X8_SRGB8:
+        return _ReadPixelFrom_X8R8G8B8;
+
     default:
         gcmASSERT(0);
     }
