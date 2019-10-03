@@ -22326,6 +22326,41 @@ gcSHADER_GetOutputIndexByOutput(
     gcmFOOTER_ARG("*Output=0x%x", *Output);
     return gcvSTATUS_OK;
 }
+
+gceSTATUS
+gcSHADER_GetBuiltInOutputByKind(
+    IN gcSHADER Shader,
+    IN gctUINT32 Kind,
+    OUT gcOUTPUT * Output
+    )
+{
+    gctUINT32 idx;
+
+    gcmHEADER_ARG("Shader=0x%x Name=%s", Shader, Name);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Shader, gcvOBJ_SHADER);
+    gcmDEBUG_VERIFY_ARGUMENT(Output != gcvNULL);
+
+    *Output = gcvNULL;
+    for (idx = 0; idx < Shader->outputCount; idx++)
+    {
+        gcOUTPUT output = Shader->outputs[idx];
+
+        if ((gctUINT32)output->nameLength == Kind)
+        {
+            break;
+        }
+    }
+
+    if (idx < Shader->outputCount)
+        *Output = Shader->outputs[idx];
+
+    /* Success. */
+    gcmFOOTER_ARG("*Output=0x%x", *Output);
+    return gcvSTATUS_OK;
+}
+
 #endif
 
 /*******************************************************************************
@@ -33426,28 +33461,81 @@ gcSHADER_SetTransformFeedbackVarying(
 
     for (i = 0; i < Count; i++) {
         gctUINT32 nameLen;
-        gctBOOL found = gcvFALSE;
-        gcOUTPUT output = gcvNULL;
-        gctINT    index   = -1;
+        gctBOOL   found  = gcvFALSE;
+        gcOUTPUT  output = gcvNULL;
+        gctINT    index  = -1;
 
         Shader->transformFeedback.varyings[i].isArray = gcvFALSE;
 
-        if (gcmIS_SUCCESS(gcoOS_StrNCmp(Varyings[i], "gl_", sizeof("gl_")-1))) { /* check for built-ins */
-           gctUINT32 kind;
+        if (gcmIS_SUCCESS(gcoOS_StrNCmp(Varyings[i], "gl_", sizeof("gl_")-1)))
+        {
+            if (gcShaderIsDesktopGL(Shader))
+            {
+                /* Check transformfeedback variables, for GL only. */
+                gctUINT32       newTempIndex = 0;
+                gctUINT32       varyingNameLength = 4;
+                const gctSTRING varyingName[4] =
+                        { "gl_SkipComponents1", "gl_SkipComponents2", "gl_SkipComponents3", "gl_SkipComponents4"};
+                const gctSTRING variableName[4] =
+                        { "#SkipComponents1", "#SkipComponents2", "#SkipComponents3", "#SkipComponents4"};
+                const gcSHADER_TYPE varyingType[4] =
+                        { gcSHADER_FLOAT_X1, gcSHADER_FLOAT_X2, gcSHADER_FLOAT_X3, gcSHADER_FLOAT_X4};
 
-           gcSHADER_GetBuiltinNameKind(Shader, Varyings[i], &kind);
-           if (kind != gcSL_NONBUILTINGNAME) {
-               for (j = 0; j < Shader->outputCount; j++) {
-                  output = Shader->outputs[j];
-                  if (Shader->outputs[j]->nameLength == (gctINT) kind) {
-                     Shader->transformFeedback.varyings[i].output = output;
-                     Shader->transformFeedback.varyings[i].arraySize = output->arraySize;
-                     Shader->transformFeedback.varyings[i].isWholeTFBed = gcvTRUE;
-                     found = gcvTRUE;
-                     break;
-                  }
-               }
-           }
+                for (j = 0; j < varyingNameLength; j++)
+                {
+                    if (gcoOS_StrLen(Varyings[i], gcvNULL) == gcoOS_StrLen(varyingName[j], gcvNULL)
+                        &&
+                        gcmIS_SUCCESS(gcoOS_StrCmp(Varyings[i], varyingName[j])))
+                    {
+                        found = gcvTRUE;
+                        break;
+                    }
+                }
+
+                if (found)
+                {
+                    gctUINT32 kind = 0;
+                    gcSHADER_GetBuiltinNameKind(Shader, variableName[i], &kind);
+                    gcSHADER_GetBuiltInOutputByKind(Shader, kind, &output);
+
+                    if (output == gcvNULL)
+                    {
+                        newTempIndex = gcSHADER_NewTempRegs(Shader, 1, varyingType[j]);
+                        gcSHADER_AddOutput(Shader,
+                                           variableName[i],
+                                           varyingType[j],
+                                           1,
+                                           newTempIndex,
+                                           gcSHADER_PRECISION_HIGH);
+                        gcSHADER_GetOutput(Shader, Shader->outputCount - 1, &output);
+                    }
+
+                    Shader->transformFeedback.varyings[i].output = output;
+                    Shader->transformFeedback.varyings[i].arraySize = output->arraySize;
+                    Shader->transformFeedback.varyings[i].isWholeTFBed = gcvTRUE;
+                }
+            }
+
+            if (!found)
+            {
+                gctUINT32 kind;
+                gcSHADER_GetBuiltinNameKind(Shader, Varyings[i], &kind);
+                if (kind != gcSL_NONBUILTINGNAME)
+                {
+                    for (j = 0; j < Shader->outputCount; j++)
+                    {
+                        output = Shader->outputs[j];
+                        if (Shader->outputs[j]->nameLength == (gctINT) kind)
+                        {
+                            Shader->transformFeedback.varyings[i].output = output;
+                            Shader->transformFeedback.varyings[i].arraySize = output->arraySize;
+                            Shader->transformFeedback.varyings[i].isWholeTFBed = gcvTRUE;
+                            found = gcvTRUE;
+                            break;
+                        }
+                    }
+                }
+            }
         }
         else {
            gctCONST_STRING varyingDot     = gcvNULL;
