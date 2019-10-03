@@ -5384,7 +5384,7 @@ static VkResult halti5_pip_process_priv_const(
                             gcoOS_MemCopy((gctPOINTER)((uint8_t *)defaultBuf->memory->hostAddr + offset), chipModule->sampleLocations, 16 * sizeof(gctFLOAT));
                             break;
                         case SHS_PRIV_CONSTANT_KIND_ENABLE_MULTISAMPLE_BUFFERS:
-                            gcoOS_MemCopy((gctPOINTER)((uint8_t *)defaultBuf->memory->hostAddr + offset), &enableMultisample, sizeof(UINT32));
+                            gcoOS_MemCopy((gctPOINTER)((uint8_t *)defaultBuf->memory->hostAddr + offset), &enableMultisample, sizeof(gctUINT32));
                             break;
 
                         default:
@@ -6751,7 +6751,7 @@ VkResult halti5_destroyPipeline(
 
     __VK_SET_ALLOCATIONCB(&pip->memCb);
 
-    if (chipGfxPipeline)
+    if (pip->type == __VK_PIPELINE_TYPE_GRAPHICS && chipGfxPipeline)
     {
         if (chipGfxPipeline->defaultUbo)
         {
