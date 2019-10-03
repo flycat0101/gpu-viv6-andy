@@ -3148,7 +3148,7 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
     vx_uint32     outputZPValue    = TENSOR_TF_ZEROPOINT(output);
     vx_float32    inputScaleValue  = TENSOR_TF_SCALE(input);
     vx_float32    weightScaleValue = TENSOR_TF_SCALE(weights);
-    vx_float32    outputScaleValue = (vx_float32)1.0/TENSOR_TF_SCALE(output);
+    vx_float32    outputScaleValue = 1.0f;
     vx_uint32     sizes[4]         = {1, 1, 1, 1};
     vx_uint32     inputSize        = 0;
     vx_uint32     batch            = 0;
@@ -3162,6 +3162,24 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
     vx_scalar     cycle            = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
+
+    if (TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        vx_int8 dstFixPointPos    = TENSOR_POS(output);
+        if (dstFixPointPos >= 0)
+        {
+            outputScaleValue = (vx_float32) (1 << dstFixPointPos);
+        }
+        else if (dstFixPointPos < 0)
+        {
+            outputScaleValue = 1.0f / (vx_float32) (1 << -dstFixPointPos);
+        }
+    }
+    else if (TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
+    {
+        outputScaleValue   = 1.0f / TENSOR_TF_SCALE(output);
+        outputZPValue = TENSOR_TF_ZEROPOINT(output);
+    }
 
     input_dims = TENSOR_DIM_NUM(input);
     switch(input_dims)
@@ -3312,7 +3330,9 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
             goto OnError;
         }
     }
-    else if (input_format == VX_TYPE_UINT8 &&  weights_format ==  VX_TYPE_UINT8 && output_format == VX_TYPE_UINT8)
+    else if (input_format == VX_TYPE_UINT8 &&  weights_format ==  VX_TYPE_UINT8 &&
+            ((output_format == VX_TYPE_UINT8) || (output_format == VX_TYPE_INT32) || (output_format == VX_TYPE_INT16) ||
+            (output_format == VX_TYPE_FLOAT32) || (output_format == VX_TYPE_FLOAT16)))
     {
         scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &inputScaleValue);
         scaleWeight = vxCreateScalar(context, VX_TYPE_FLOAT32, &weightScaleValue);
@@ -3328,20 +3348,58 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
                                             (vx_reference)inZP, (vx_reference)weightZP, (vx_reference)outZP,
                                             (vx_reference)output_rs};
 
-            if(inputSize % 4 == 0)
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_VecQuant8", borderMode);
-            else
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
-            if (!shaderExecutable)
+            vx_enum bias_format = TENSOR_DATA_TYPE(bias_rs);
+            if (bias_format != VX_TYPE_INT32)
             {
+                vxError("FC OCL not support bias format: %d\n", bias_format);
                 goto OnError;
             }
 
-            if(inputSize % 4 == 0)
+            if ((output_format == VX_TYPE_FLOAT16) || (output_format == VX_TYPE_FLOAT32))
             {
-                status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                if (status != VX_SUCCESS) goto OnError;
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_AffineToFP", borderMode);
+
+                if (!shaderExecutable)
+                {
+                    goto OnError;
+                }
+            }
+            else if ((output_format == VX_TYPE_INT16) || (output_format == VX_TYPE_INT32))
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_AffineToDFP", borderMode);
+
+                if (!shaderExecutable)
+                {
+                    goto OnError;
+                }
+            }
+            else if (output_format == VX_TYPE_UINT8)
+            {
+                if(inputSize % 4 == 0)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_VecQuant8", borderMode);
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+                }
+
+                if (!shaderExecutable)
+                {
+                    goto OnError;
+                }
+
+                if(inputSize % 4 == 0)
+                {
+                    status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+                    status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+                    if (status != VX_SUCCESS) goto OnError;
+                }
+            }
+            else
+            {
+                vxError("FC OCL path doesn't support this output data type: %d\n", output_format);
+                vxmASSERT(0);
             }
 
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 10);

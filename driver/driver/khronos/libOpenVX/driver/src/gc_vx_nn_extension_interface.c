@@ -9350,7 +9350,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedLayer_Initializer(vx_nod
         supportDataFormat0 = (vx_bool)((input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_FLOAT32) && output_dataformat == VX_TYPE_FLOAT16) ||
                                         (input_dataformat == VX_TYPE_FLOAT32 && weight_dataformat == VX_TYPE_FLOAT32 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_FLOAT32) && output_dataformat == VX_TYPE_FLOAT32));
         supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_UINT8);
-        enable_shader      = (supportDataFormat0 || supportDataFormat3);
+        supportDataFormat2 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) &&
+                                      ((output_dataformat == VX_TYPE_INT32) || (output_dataformat == VX_TYPE_FLOAT32) || (output_dataformat == VX_TYPE_FLOAT16)));
+        enable_shader      = (supportDataFormat0 || supportDataFormat3 || supportDataFormat2);
     }
 
     gcoOS_Allocate(gcvNULL, sizeof(vxnne_fully_connected_relu_layer_s), (gctPOINTER*)&fullyConnectedLayer);
@@ -9378,7 +9380,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedLayer_Initializer(vx_nod
         vx_tensor weights_rs = NULL;
 
         if ((inputDims % 16 == 0) && input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && biases
-            && node->base.context->evisNoInst.supportEVIS == vx_false_e)
+            && node->base.context->evisNoInst.supportEVIS == vx_false_e && (output_dataformat  == VX_TYPE_UINT8))
         {
             enable_cast_format = vx_true_e;
 

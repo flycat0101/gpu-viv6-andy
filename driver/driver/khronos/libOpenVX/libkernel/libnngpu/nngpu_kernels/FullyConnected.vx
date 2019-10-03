@@ -123,6 +123,98 @@ __kernel void gpuFullyConnected_Quant8(
     write_imageui(output, coord.xy, dst);
 }
 
+__kernel void gpuFullyConnected_AffineToDFP(
+    __read_only image2d_t      input,
+    __read_only image2d_t      weights,
+    __read_only image2d_t      bias,
+    float                      scaleIn,
+    float                      scaleWeight,
+    float                      scaleOut,
+    int                        zpIn,
+    int                        zpWeight,
+    int                        zpOut,
+    __write_only image2d_t     output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int4 coord = (int4)(x, y, 0, 0);
+    int inputSize = get_image_width(weights);
+    int sum = 0, src0 = 0, src1 = 0;
+    uint4 tmp0, tmp1;
+    int4 biasData;
+    int4 dst = {0};
+    float4 biasfp;
+    float sumfp = 0.0;
+
+    biasData = convert_int(read_imagei(bias, coord.xz));
+    biasfp = convert_float4(biasData);
+
+    for (; coord.z < inputSize;)
+    {
+        tmp0 = read_imageui(input, coord.zy);
+        tmp1 = read_imageui(weights, coord.zx);
+        coord.z++;
+        src0 = tmp0.x - zpIn;
+        src1 = tmp1.x - zpWeight;
+
+        sum += src0 * src1;
+    }
+
+    sumfp = convert_float(sum);
+
+    sumfp += biasfp.x;
+
+    dst.x = floor(sumfp * scaleIn * scaleWeight * scaleOut + zpOut + 0.5);
+
+    write_imagei(output, coord.xy, dst);
+}
+
+__kernel void gpuFullyConnected_AffineToFP(
+    __read_only image2d_t      input,
+    __read_only image2d_t      weights,
+    __read_only image2d_t      bias,
+    float                      scaleIn,
+    float                      scaleWeight,
+    float                      scaleOut,
+    int                        zpIn,
+    int                        zpWeight,
+    int                        zpOut,
+    __write_only image2d_t     output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int4 coord = (int4)(x, y, 0, 0);
+    int inputSize = get_image_width(weights);
+    int sum = 0, src0 = 0, src1 = 0;
+    uint4 tmp0, tmp1;
+    int4 biasData;
+    float4 dst = {0};
+    float4 biasfp;
+    float sumfp = 0.0;
+
+    biasData = convert_int(read_imagei(bias, coord.xz));
+    biasfp = convert_float4(biasData);
+
+    for (; coord.z < inputSize;)
+    {
+        tmp0 = read_imageui(input, coord.zy);
+        tmp1 = read_imageui(weights, coord.zx);
+        coord.z++;
+        src0 = tmp0.x - zpIn;
+        src1 = tmp1.x - zpWeight;
+
+        sum += src0 * src1;
+    }
+
+    sumfp = convert_float(sum);
+
+    sumfp += biasfp.x;
+
+    dst.x = floor(sumfp * scaleIn * scaleWeight + 0.5);
+
+    write_imagef(output, coord.xy, dst);
+}
+
 __kernel void gpuFullyConnected_VecQuant8Nobias(
     __read_only image2d_t      input,
     __read_only image2d_t      weights,
@@ -331,3 +423,4 @@ __kernel void gpuFullyConnected_Quant32_2D(
     dst.x = floor(sum * uint8_scale + zpOut + 0.5);
     write_imageui(output, coord.xy, dst);
 }
+
