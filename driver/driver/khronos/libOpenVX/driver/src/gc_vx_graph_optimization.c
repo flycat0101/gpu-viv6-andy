@@ -148,6 +148,10 @@ VX_PRIVATE_API vx_tensor vxoGraphOptimization_cloneTensor(vx_tensor tensor, vx_g
         cloneTensor = vxCreateTensor2(graph->base.context, &p, sizeof(p));
     CHECK_NULL(cloneTensor);
 
+    TENSOR_VALUED(cloneTensor)          = TENSOR_VALUED(tensor);
+    TENSOR_PRECISION(cloneTensor)       = TENSOR_PRECISION(tensor);
+    TENSOR_DATA_LIFETIME(cloneTensor)   = TENSOR_DATA_LIFETIME(tensor);
+
     gcmFOOTER_ARG("clone tensor = %p", cloneTensor);
     return cloneTensor;
 }
@@ -2224,6 +2228,8 @@ VX_PRIVATE_API vx_tensor vxoGraphOptimization_WAR_convert1x1x1weight(vx_tensor w
         orgDims[0] == 1 && orgDims[1]== 1 && orgDims[2]== 1))
     {
         dims = (vx_uint32 *)vxAllocateAndZeroMemory(dimsCount * sizeof(vx_uint32));
+        CHECK_NULL(dims);
+
         vxMemCopy(dims, orgDims, dimsCount * sizeof(vx_uint32));
         dims[0] = 2;
         dims[1] = 2;
@@ -3469,7 +3475,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_transformConvNxM(vx_graph graph)
         if(vxoGraphOptimization_getKernelType(node) == OP_CONVOLUTION_NxM)
         {
             vx_uint32 i = 0;
-            vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+            vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
             vx_tensor weightNxM     = (vx_tensor)node->paramTable[1];
             vx_tensor padedWeight   = VX_NULL;
 
@@ -3988,8 +3994,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_multiTranspose(vx_graph graph)
     for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)
     {
         vx_int32 transposeCnt = 0;
+        vx_uint32 tnodeMax = 5;
         vx_node node = nodeTable[nodeIndex];
-        vx_node transposeNodes[6];
+        vx_node *transposeNodes;
 
         if(node->merged)
             continue;
@@ -4006,7 +4013,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_multiTranspose(vx_graph graph)
 
             node = nodeTable[node->parentNodes[0]];
         }
-
+        tnodeMax = gcmMAX(tnodeMax, node->numChildren + 1);
+        transposeNodes = (vx_node*)vxAllocateAndZeroMemory(sizeof(vx_node) * tnodeMax);
+        CHECK_NULL(transposeNodes);
 
         if(node->numChildren > 1)
         {
@@ -4111,6 +4120,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_multiTranspose(vx_graph graph)
                 vxoGraphOptimization_multiTranspose_mergeTransposes(transposeNodes, transposeCnt);
             }
         }
+
+        vxFree(transposeNodes );
     }
 
     REMOVE_MERGED_NODE_FROM_GRAPH();
@@ -4687,8 +4698,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
                     scale = (max - min) / 255;
                     break;
                 }
-            default:
-                break;
             }
 
             /*if quantization attribute is changed, and then the child's input has to be update.
