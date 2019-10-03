@@ -1698,6 +1698,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
 
         if (enable_adjust_biases)
         {
+            enable_small_kernel = vx_false_e;
             if ((output_width % ALIGN_SIZE4 == 0) && enable_small_kernel == vx_false_e)
                 enable_four_pixel = vx_true_e;
 
