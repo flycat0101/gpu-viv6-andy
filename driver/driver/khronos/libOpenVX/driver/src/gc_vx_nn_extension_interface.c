@@ -6988,7 +6988,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad_Initializer(vx_node node, co
         conv.pad_x_right = padRight->value->n32;
         conv.pad_y_bottom = padBottom->value->n32;
         conv.pad_mode = padModeVal;
-        conv.pad_const = (vx_int32)padConst->value->n32;
+        conv.pad_const = TENSOR_PAD_ZERO_VALUE(src);
         conv.pool_size_x = conv.pool_size_y = 0;
         conv.pool_stride = 1;
         conv.enable_relu = vx_false_e;
@@ -7166,7 +7166,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad2_Initializer(vx_node node, c
         conv.pad_x_right = pad_base[1];
         conv.pad_y_bottom = pad_base[3];
         conv.pad_mode = padMode->value->e;
-        conv.pad_const = padConst != VX_NULL ? (vx_int32)padConst->value->n32 : 0;
+        conv.pad_const = TENSOR_PAD_ZERO_VALUE(src);
         conv.pool_size_x = conv.pool_size_y = 0;
         conv.pool_stride = 1;
         conv.enable_relu = vx_false_e;
