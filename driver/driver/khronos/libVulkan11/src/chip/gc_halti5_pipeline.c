@@ -5490,6 +5490,9 @@ OnError:
             {
                 __vk_FreeMemory((VkDevice)(uintptr_t)devCtx, (VkDeviceMemory)(uintptr_t)buf->memory, gcvNULL);
             }
+
+            __vk_DestroyBuffer((VkDevice)(uintptr_t)devCtx, chipGfxPipeline->defaultUbo, VK_NULL_HANDLE);
+            chipGfxPipeline->defaultUbo = VK_NULL_HANDLE;
         }
     }
 
@@ -6763,6 +6766,9 @@ VkResult halti5_destroyPipeline(
             {
                 __vk_FreeMemory((VkDevice)(uintptr_t)devCtx, (VkDeviceMemory)(uintptr_t)buf->memory, gcvNULL);
             }
+
+            __vk_DestroyBuffer((VkDevice)(uintptr_t)devCtx, chipGfxPipeline->defaultUbo, VK_NULL_HANDLE);
+            chipGfxPipeline->defaultUbo = VK_NULL_HANDLE;
         }
     }
 
