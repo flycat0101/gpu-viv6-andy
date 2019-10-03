@@ -10925,9 +10925,9 @@ OnError:
     }
 
     vxError("%s[%d]: Process Graph fail!\n", __FUNCTION__, __LINE__);
-    vxAddLogEntry(&graph->base, VX_FAILURE, "%s[%d]: Process Graph fail!\n", __FUNCTION__, __LINE__);
-    gcmFOOTER_ARG("%d", VX_FAILURE);
-    return VX_FAILURE;
+    vxAddLogEntry(&graph->base, status, "%s[%d]: Process Graph fail!\n", __FUNCTION__, __LINE__);
+    gcmFOOTER_ARG("%d", status);
+    return status;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxAddParameterToGraph(vx_graph graph, vx_parameter param)
