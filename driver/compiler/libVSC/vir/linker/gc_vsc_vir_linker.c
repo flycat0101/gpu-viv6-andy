@@ -7349,6 +7349,7 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
 
         /* Construct the lib link entry. */
         gcoOS_ZeroMemory(&libLinkEntry, sizeof(VSC_SHADER_LIB_LINK_ENTRY));
+        libLinkEntry.applyLevel = VSC_SHLEVEL_Post_Medium;
         libLinkEntry.hShaderLib = pIntrinsicLib;
         libLinkEntry.pTempHashTable = gcvNULL;
         libLinkEntry.libSpecializationConstantCount = 0;

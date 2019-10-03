@@ -5342,7 +5342,7 @@ static gctBOOL _InitializeShLibLinkTable(VSC_BASE_LINKER_HELPER* pBaseLinkHelper
     {
         for (i = 0; i < pPgLibLinkTable->progLinkEntryCount; i ++)
         {
-            thisShLevel = VIR_Shader_GetLevel((((VIR_Shader*)pPgLibLinkTable->pProgLibLinkEntries[i].shLibLinkEntry.hShaderLib)));
+            thisShLevel = (VIR_ShLevel)pPgLibLinkTable->pProgLibLinkEntries[i].shLibLinkEntry.applyLevel;
 
             expectedShLevel = vscMAX(thisShLevel, maxShLevelAmongLinkLibs);
 
@@ -5362,7 +5362,9 @@ static gctBOOL _InitializeShLibLinkTable(VSC_BASE_LINKER_HELPER* pBaseLinkHelper
             expectedShLevel = vscMAX(expectedShLevel,
                               VIR_Shader_GetLevel(((VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[shStage])));
 
-            if (thisShLevel < expectedShLevel)
+            if (thisShLevel < expectedShLevel
+                &&
+                pPgLibLinkTable->pProgLibLinkEntries[i].shLibLinkEntry.hShaderLib)
             {
                 compParam.hShader = pPgLibLinkTable->pProgLibLinkEntries[i].shLibLinkEntry.hShaderLib;
                 memcpy(&compParam.cfg, &pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg, sizeof(VSC_COMPILER_CONFIG));
@@ -5435,7 +5437,7 @@ static VIR_ShLevel _GetMaximumShaderLevelAmongLinkLibs(VSC_PROG_LIB_LINK_TABLE* 
 
     for (i = 0; i < pPgLibLinkTable->progLinkEntryCount; i ++)
     {
-        thisShLevel = VIR_Shader_GetLevel((((VIR_Shader*)pPgLibLinkTable->pProgLibLinkEntries[i].shLibLinkEntry.hShaderLib)));
+        thisShLevel = (VIR_ShLevel)pPgLibLinkTable->pProgLibLinkEntries[i].shLibLinkEntry.applyLevel;
 
         if (thisShLevel > maxShLevel)
         {

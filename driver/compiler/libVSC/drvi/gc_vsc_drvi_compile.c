@@ -999,7 +999,7 @@ static VSC_ErrCode _DoHLPreCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
     /* Do lib link */
     if (pShPassMnger->pCompilerParam->pShLibLinkTable)
     {
-        libShLevel = VIR_Shader_GetLevel((VIR_Shader*)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].hShaderLib);
+        libShLevel = (VIR_ShLevel)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].applyLevel;
 
         if (libShLevel == VIR_SHLEVEL_Pre_High)
         {
@@ -1022,9 +1022,7 @@ static VSC_ErrCode _DoMLPreCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
     /* Do lib link */
     if (pShPassMnger->pCompilerParam->pShLibLinkTable)
     {
-        libShLevel = pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].hShaderLib ?
-            VIR_Shader_GetLevel((VIR_Shader*)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].hShaderLib) :
-            VIR_SHLEVEL_Pre_Medium;
+        libShLevel = (VIR_ShLevel)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].applyLevel;
 
         if (libShLevel == VIR_SHLEVEL_Pre_Medium)
         {
@@ -1047,7 +1045,7 @@ static VSC_ErrCode _DoLLPreCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
     /* Do lib link */
     if (pShPassMnger->pCompilerParam->pShLibLinkTable)
     {
-        libShLevel = VIR_Shader_GetLevel((VIR_Shader*)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].hShaderLib);
+        libShLevel = (VIR_ShLevel)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].applyLevel;
 
         if (libShLevel == VIR_SHLEVEL_Pre_Low)
         {
@@ -1070,7 +1068,7 @@ static VSC_ErrCode _DoMCPreCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
     /* Do lib link */
     if (pShPassMnger->pCompilerParam->pShLibLinkTable)
     {
-        libShLevel = VIR_Shader_GetLevel((VIR_Shader*)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].hShaderLib);
+        libShLevel = (VIR_ShLevel)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].applyLevel;
 
         if (libShLevel == VIR_SHLEVEL_Pre_Machine)
         {
@@ -1093,7 +1091,7 @@ static VSC_ErrCode _DoHLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
     /* Do lib link */
     if (pShPassMnger->pCompilerParam->pShLibLinkTable)
     {
-        libShLevel = VIR_Shader_GetLevel((VIR_Shader*)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].hShaderLib);
+        libShLevel = (VIR_ShLevel)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].applyLevel;
 
         if (libShLevel == VIR_SHLEVEL_Post_High)
         {
@@ -1118,9 +1116,7 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
     /* Do lib link */
     if (pShPassMnger->pCompilerParam->pShLibLinkTable)
     {
-        libShLevel = pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].hShaderLib ?
-            VIR_Shader_GetLevel((VIR_Shader*)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].hShaderLib) :
-            VIR_SHLEVEL_Post_Medium;
+        libShLevel = (VIR_ShLevel)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].applyLevel;
 
         if (libShLevel == VIR_SHLEVEL_Post_Medium)
         {
@@ -1182,9 +1178,9 @@ static VSC_ErrCode _DoLLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_LL);
 
     /* Do lib link */
-    if (pShPassMnger->pCompilerParam->pShLibLinkTable && pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].hShaderLib)
+    if (pShPassMnger->pCompilerParam->pShLibLinkTable)
     {
-        libShLevel = VIR_Shader_GetLevel((VIR_Shader*)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].hShaderLib);
+        libShLevel = (VIR_ShLevel)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].applyLevel;
 
         if (libShLevel == VIR_SHLEVEL_Post_Low)
         {
@@ -1205,10 +1201,9 @@ static VSC_ErrCode _DoMCPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_MC);
 
     /* Do lib link */
-    if (pShPassMnger->pCompilerParam->pShLibLinkTable &&
-        pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].hShaderLib)
+    if (pShPassMnger->pCompilerParam->pShLibLinkTable)
     {
-        libShLevel = VIR_Shader_GetLevel((VIR_Shader*)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].hShaderLib);
+        libShLevel = (VIR_ShLevel)pShPassMnger->pCompilerParam->pShLibLinkTable->pShLibLinkEntries[0].applyLevel;
 
         if (libShLevel == VIR_SHLEVEL_Post_Machine)
         {
@@ -1454,7 +1449,7 @@ static VSC_ErrCode _PreprocessLinkLibs(VSC_SHADER_COMPILER_PARAM* pCompilerParam
     /* Get maximum shader level among these libs */
     for (i = 0; i < pShLibLinkTable->shLinkEntryCount; i ++)
     {
-        thisShLevel = VIR_Shader_GetLevel((((VIR_Shader*)pShLibLinkTable->pShLibLinkEntries[i].hShaderLib)));
+        thisShLevel = (VIR_ShLevel)pShLibLinkTable->pShLibLinkEntries[i].applyLevel;
 
         if (thisShLevel > maxShLevel)
         {
@@ -1465,14 +1460,16 @@ static VSC_ErrCode _PreprocessLinkLibs(VSC_SHADER_COMPILER_PARAM* pCompilerParam
     /* Compile libs to expected shader level */
     for (i = 0; i < pShLibLinkTable->shLinkEntryCount; i ++)
     {
-        thisShLevel = VIR_Shader_GetLevel((((VIR_Shader*)pShLibLinkTable->pShLibLinkEntries[i].hShaderLib)));
+        thisShLevel = (VIR_ShLevel)pShLibLinkTable->pShLibLinkEntries[i].applyLevel;
 
         expectedShLevel = vscMAX(thisShLevel, maxShLevel);
 
         /* We need make sure shader level of lib is not smaller than start shader level of main shader */
         expectedShLevel = vscMAX(expectedShLevel, VIR_Shader_GetLevel((VIR_Shader*)pCompilerParam->hShader));
 
-        if (thisShLevel < expectedShLevel)
+        if (thisShLevel < expectedShLevel
+            &&
+            pShLibLinkTable->pShLibLinkEntries[i].hShaderLib)
         {
             compParam.hShader = pShLibLinkTable->pShLibLinkEntries[i].hShaderLib;
             memcpy(&compParam.cfg, &pCompilerParam->cfg, sizeof(VSC_COMPILER_CONFIG));

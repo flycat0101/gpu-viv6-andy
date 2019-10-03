@@ -5916,6 +5916,7 @@ static VkResult halti5_pip_build_gfxshaders(
                 if (patchMask & (1 << j))
                 {
                     vsclinkEntries[linkEntryIdx].mainShaderStageBits = VSC_SHADER_STAGE_BIT_PS;
+                    vsclinkEntries[linkEntryIdx].shLibLinkEntry.applyLevel = VSC_SHLEVEL_Post_Medium;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPointCount = 1;
@@ -5936,6 +5937,7 @@ static VkResult halti5_pip_build_gfxshaders(
         {
             vsclinkEntries[linkEntryIdx].mainShaderStageBits = VSC_SHADER_STAGE_BIT_PS;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPointCount = 1;
+            vsclinkEntries[linkEntryIdx].shLibLinkEntry.applyLevel = VSC_SHLEVEL_Post_Medium;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_FRONTFACING_CCW;
@@ -5946,6 +5948,7 @@ static VkResult halti5_pip_build_gfxshaders(
         {
             vsclinkEntries[linkEntryIdx].mainShaderStageBits = VSC_SHADER_STAGE_BIT_PS;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPointCount = 1;
+            vsclinkEntries[linkEntryIdx].shLibLinkEntry.applyLevel = VSC_SHLEVEL_Post_Medium;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_FRONTFACING_ALWAY_FRONT;
@@ -7108,6 +7111,8 @@ VkResult halti5_patch_pipeline(
                                 VSC_RES_OP_BIT opTypeBits = 0;
                                 VSC_RES_ACT_BIT actBits = 0;
                                 uint32_t subType;
+
+                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.applyLevel = VSC_SHLEVEL_Post_Medium;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_RESOURCE;

@@ -34,6 +34,26 @@ typedef struct _VSC_LIB_SPECIALIZATION_CONSTANT
     VSC_SHADER_DATA_TYPE              type;
 }VSC_LIB_SPECIALIZATION_CONSTANT;
 
+/* Copy from VIR_ShLevel. */
+/* Any modification here, please do the corresponding change for VIR_ShLevel. */
+typedef enum _VSC_SH_LEVEL
+{
+    VSC_SHLEVEL_Unknown         = 0,
+
+    VSC_SHLEVEL_Pre_High        = 1,
+    VSC_SHLEVEL_Post_High       = 2,
+
+    VSC_SHLEVEL_Pre_Medium      = 3,
+    VSC_SHLEVEL_Post_Medium     = 4,
+
+    VSC_SHLEVEL_Pre_Low         = 5,
+    VSC_SHLEVEL_Post_Low        = 6,
+
+    VSC_SHLEVEL_Pre_Machine     = 7,
+    VSC_SHLEVEL_Post_Machine    = 8,
+    VSC_SHLEVEL_COUNT           = 9,
+} VSC_SH_LEVEL;
+
 typedef enum _VSC_LIB_LINK_TYPE
 {
     /* A general lib link at call site function */
@@ -141,7 +161,6 @@ typedef struct _VSC_SAMPLER_INFO
     gctCONST_STRING                 name;           /* sampler variable name */
 } VSC_SAMPLER_INFO;
 
-
 typedef struct _VSC_LIB_LINK_IMAGE_READ_WRITE
 {
     gctUINT                         imageCount;
@@ -181,8 +200,12 @@ typedef struct _VSC_LIB_LINK_POINT
 
 typedef struct _VSC_SHADER_LIB_LINK_ENTRY
 {
+    /* Which level this link entry should be applied. */
+    VSC_SH_LEVEL                      applyLevel;
+
     /* Lib shader */
     SHADER_HANDLE                     hShaderLib;
+
     /* vreg map from libShader to the current shader */
     void*                             pTempHashTable;
 

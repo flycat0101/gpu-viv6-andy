@@ -4827,6 +4827,7 @@ typedef struct _VIR_CONTEXT
                                      * in one program */
 } VIR_Context;
 
+/* Any modification here, please do the corresponding change for VIR_ShLevel. */
 typedef enum _VIR_SH_LEVEL
 {
     VIR_SHLEVEL_Unknown         = 0,
