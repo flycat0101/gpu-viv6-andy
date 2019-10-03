@@ -2276,7 +2276,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
 
             case VSC_SHADER_RESOURCE_TYPE_UNIFORM_TEXEL_BUFFER:
             {
-                if (VIR_Uniform_IsTreatTexelBufferAsImg(pUniform))
+                if (VIR_Uniform_IsTreatTexelBufferAsImg(pUniform) || VIR_Uniform_isImage(pUniform))
                 {
                     retValue = _VIR_CG_MapNonSamplerUniforms(pShader,
                         pHwConfig,
