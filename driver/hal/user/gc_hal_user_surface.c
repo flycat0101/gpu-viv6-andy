@@ -6740,7 +6740,7 @@ _3DBlitClearTileStatus(
     gcmGETHARDWAREADDRESS(surf->tileStatusNode, clearInfo.destAddress);
     clearInfo.destAddress += SurfView->firstSlice * surf->tileStatusSliceSize;
 
-    gcmONERROR(gcoHARDWARE_3DBlitClear(gcvNULL, gcvENGINE_RENDER, &tsView, &clearInfo, &origin, &rectSize));
+    gcmONERROR(gcoHARDWARE_3DBlitClear(gcvNULL, gcvENGINE_RENDER, &tsView, &clearInfo, &origin, &rectSize, gcvFALSE));
 
 OnError:
     gcmFOOTER();
