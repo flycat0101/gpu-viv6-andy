@@ -3609,12 +3609,15 @@ gcoSTREAM_DynamicCacheAttributesEx(
         cache = &Stream->cache[(Stream->cacheCurrent) % gcdSTREAM_CACHE_COUNT];
     }
 
-    gcmASSERT(cache->dynamicNode);
-
     /* Allocate data form the cache. */
     offset         = cache->offset;
     cache->offset += TotalBytes;
     cache->free   -= TotalBytes;
+
+    if (!cache->dynamicNode)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
 
     gcmGETHARDWAREADDRESS(*(cache->dynamicNode), address);
 
