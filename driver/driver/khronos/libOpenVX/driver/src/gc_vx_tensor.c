@@ -384,7 +384,10 @@ vxoTensor_Create(
         context, tensor_create_params, strides, viewRegion, tensorBuffer, baseOffset, tensorType, kind);
     if (tensor_create_params == VX_NULL) goto OnError;
 
-    gcoOS_MemCopy(uSizes, tensor_create_params->sizes, VX_CONTEXT_TENSOR_MAX_DIMENSION * sizeof(vx_uint32));
+    if (tensor_create_params->num_of_dims > VX_CONTEXT_TENSOR_MAX_DIMENSION || tensor_create_params->num_of_dims < 1)
+        goto OnError;
+
+    gcoOS_MemCopy(uSizes, tensor_create_params->sizes, tensor_create_params->num_of_dims * sizeof(vx_uint32));
 
     tensor = (vx_tensor)vxoReference_Create(context, VX_TYPE_TENSOR, kind, &context->base);
     if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) goto OnError;
@@ -972,6 +975,12 @@ vxoTensor_CopyTensorPatch(
         }
 
         tensorLogic = (vx_uint8_ptr)logical + offset;
+
+        if (TENSOR_DIM_NUM(tensor) > VX_CONTEXT_TENSOR_MAX_DIMENSION || TENSOR_DIM_NUM(tensor) < 1)
+        {
+            gcmFOOTER_NO();
+            return VX_ERROR_INVALID_DIMENSION;
+        }
 
         if (usage == VX_READ_ONLY)
         {

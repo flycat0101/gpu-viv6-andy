@@ -5650,10 +5650,16 @@ VX_INTERNAL_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph grap
             for (j = ecount-1; (vx_int32)j >= 0; j--)
             {
                 if (operation->absoluteOperationID > entrys[j]->absoluteOperationID)
+                {
                     break;
+                }
                 else
+                {
+                    if (j == MAX_PARALLEL_OUTPUT_NUMBER - 1) return VX_FAILURE;
                     entrys[j+1] = entrys[j];
+                }
             }
+            if (j == MAX_PARALLEL_OUTPUT_NUMBER - 1) return VX_FAILURE;
             entrys[j+1] = operation;
             ecount++;
             operation->opDepth = 1;
