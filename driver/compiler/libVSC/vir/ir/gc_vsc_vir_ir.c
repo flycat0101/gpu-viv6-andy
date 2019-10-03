@@ -9572,6 +9572,30 @@ VIR_Shader_GetCUBO(
     return virErrCode;
 }
 
+gctBOOL
+VIR_Shader_SupportImgLdSt(
+    IN VIR_Shader*      pShader,
+    IN VSC_HW_CONFIG*   pHwCfg,
+    IN gctBOOL          bForGraphics
+    )
+{
+    gctBOOL             bSupportImgLdSt = gcvFALSE;
+
+    /* Check if chip can support IMG_LOAD/IMG_STORE. */
+    bSupportImgLdSt = pHwCfg->hwFeatureFlags.supportImgAddr;
+
+    /* For halti5 chips, if they don't have USC_GOS_ADDR_FIX feature, then they can't use IMG_LOAD/IMG_STORE for vs/ts/gs/ps. */
+    if (bSupportImgLdSt &&
+        pHwCfg->hwFeatureFlags.hasHalti5 &&
+        !pHwCfg->hwFeatureFlags.hasUscGosAddrFix &&
+        (bForGraphics || (pShader && VIR_Shader_IsGraphics(pShader))))
+    {
+        bSupportImgLdSt = gcvFALSE;
+    }
+
+    return bSupportImgLdSt;
+}
+
 /* setters */
 void
 VIR_Symbol_SetName(

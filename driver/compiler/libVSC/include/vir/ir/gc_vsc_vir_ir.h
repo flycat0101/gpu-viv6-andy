@@ -6300,6 +6300,13 @@ VIR_Shader_Dump(
     IN gctBOOL          PrintHeaderFooter
     );
 
+gctBOOL
+VIR_Shader_SupportImgLdSt(
+    IN VIR_Shader*      pShader,
+    IN VSC_HW_CONFIG*   pHwCfg,
+    IN gctBOOL          bForGraphics
+    );
+
 /* setters */
 void
 VIR_Symbol_SetName(

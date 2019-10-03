@@ -224,7 +224,7 @@ _CreateIntrinsicLib(
     gctBOOL     supportMSShading = gcoOS_StrStr(GetGLExtensionString(), "GL_OES_shader_multisample_interpolation", gcvNULL);
     gctBOOL     supportSamplerBuffer = gcoOS_StrStr(GetGLExtensionString(), "GL_EXT_texture_buffer", gcvNULL);
     gctBOOL     supportImgAddr = pHwCfg->hwFeatureFlags.supportImgAddr;
-    gctBOOL     supportImgInst = supportImgAddr;
+    gctBOOL     bSupportImgLdSt = VIR_Shader_SupportImgLdSt(gcvNULL, pHwCfg, forGraphics);
     gctBOOL     needAtomicPatch = (pHwCfg->hwFeatureFlags.supportUSC) && (!pHwCfg->hwFeatureFlags.hasUSCAtomicFix2);
     VIR_Shader* virIntrinsicLibrary = gcvNULL;
     VIR_Shader** virIntrinsicLibraryPtr = gcvNULL;
@@ -617,16 +617,7 @@ _CreateIntrinsicLib(
         gcLibGetLod,
     };
 
-    /* For halti5 chips, if they don't have USC_GOS_ADDR_FIX feature, then they can't use IMG_LOAD/IMG_STORE for vs/ts/gs/ps. */
-    if (supportImgInst &&
-        pHwCfg->hwFeatureFlags.hasHalti5 &&
-        !pHwCfg->hwFeatureFlags.hasUscGosAddrFix &&
-        forGraphics)
-    {
-        supportImgInst = gcvFALSE;
-    }
-
-    if (supportImgAddr && !supportImgInst)
+    if (supportImgAddr && !bSupportImgLdSt)
     {
         ImageLib[0] = gcLibImageAddr_halti4;
     }
@@ -638,7 +629,7 @@ _CreateIntrinsicLib(
     }
 
     /* select intrinsic library and lib file name based on whether support ImgInst */
-    if (supportImgInst)
+    if (bSupportImgLdSt)
     {
         virIntrinsicLibraryPtr = &virGLUseImgInstIntrinsicLibrary;
         virLibName = virImgInstLibName;
@@ -799,7 +790,7 @@ _CreateIntrinsicLib(
         }
 
         /* imageLoad/imageStore. */
-        if (supportImgInst)
+        if (bSupportImgLdSt)
         {
             stringNum = sizeof(ImageLib_hati4) / sizeof(gctSTRING);
             for (i = 0; i < stringNum; i++)
@@ -2080,26 +2071,14 @@ _IntrisicImageRelatedFuncName(
     VIR_TypeId       fixedTypeId = TypeId;
     VIR_TypeId       imageTypeId = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pImageSym));
     VIR_ImageFormat  imageFormat = VIR_Symbol_GetImageFormat(pImageSym);
-    gctBOOL          useImgInst = gcvFALSE;
-
-    /* Check if chip can support IMG_LOAD/IMG_STORE. */
-    useImgInst = pHwCfg->hwFeatureFlags.supportImgAddr;
-
-    /* For halti5 chips, if they don't have USC_GOS_ADDR_FIX feature, then they can't use IMG_LOAD/IMG_STORE for vs/ts/gs/ps. */
-    if (useImgInst &&
-        pHwCfg->hwFeatureFlags.hasHalti5 &&
-        !pHwCfg->hwFeatureFlags.hasUscGosAddrFix &&
-        VIR_Shader_IsGraphics(pShader))
-    {
-        useImgInst = gcvFALSE;
-    }
+    gctBOOL          bSupportImgLdSt = VIR_Shader_SupportImgLdSt(pShader, pHwCfg, gcvFALSE);
 
     /* Convert the image type if needed. */
     if (VIR_TypeId_isImageDepth(fixedTypeId))
     {
         fixedTypeId = _ConvDepthImageTypeToNonDepthImageType(fixedTypeId, imageFormat);
     }
-    if (!useImgInst || VIR_TypeId_isImageSubPassData(fixedTypeId))
+    if (!bSupportImgLdSt || VIR_TypeId_isImageSubPassData(fixedTypeId))
     {
         fixedTypeId = _ConvImageTypeId(fixedTypeId, imageFormat);
     }
@@ -2107,7 +2086,7 @@ _IntrisicImageRelatedFuncName(
     gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__,
         VIR_Shader_GetTypeNameString(pShader, VIR_Shader_GetTypeFromId(pShader, fixedTypeId)));
 
-    if (useImgInst)
+    if (bSupportImgLdSt)
     {
         /* whether can support 128 bpp image. */
         if (!pHwCfg->hwFeatureFlags.support128BppImage)
