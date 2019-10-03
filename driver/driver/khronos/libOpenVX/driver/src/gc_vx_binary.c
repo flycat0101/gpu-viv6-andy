@@ -8536,6 +8536,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
             if (!isSupport)
             {
                 vxError("fail to generate binary, because not support this software operation\n");
+                vxError("layer name: %s\n", operation->layer->name);
+                vxError("operation name: %s\n", operation->layer->node->kernel->name);
                 vxmASSERT(0);
                 vxmONERROR(VX_ERROR_NOT_SUPPORTED);
             }
@@ -10527,10 +10529,12 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
 
     lcdTensorsPhysical = (vx_uint32*)vxAllocateAndZeroMemory(sizeof(vx_uint32) * VX_MAX_TEMP_TENSORS);
 
+    patchCount += 10;
+
     if ((context->binaryGraphInitBuffer[deviceID] != VX_NULL) && (context->binaryGraphInitSize[deviceID] > 0))
     {
         operationCount = 2; /* initialize and end */
-        patchCount = 3; /* SRAM */
+        patchCount = 2; /* SRAM */
         lcdtCount = operationCount;
         KernelStreamSize += gcmALIGN_NP2_SAFE(context->binaryGraphInitSize[deviceID], 64);
         KernelStreamSize += 0X40;
@@ -10573,10 +10577,23 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
             operationCount += tempCount;
             nnCount += tempCount;
             lcdtCount += tempCount * 2;
-            patchCount += tempCount * 7;
 
             input = nnConvOperation->inputs;
             output = nnConvOperation->outputs;
+
+            patchCount += tempCount * 4;
+            if ((operationCommand->inputTile.circularBufEndAddrPlus1 != 0xFFFFFFFF) &&
+                (operationCommand->inputTile.circularBufEndAddrPlus1 != 0) &&
+                (operationCommand->inputTile.circularBufEndAddrPlus1 != 0xCDCDCDCD))
+            {
+                patchCount += tempCount;
+            }
+            if ((operationCommand->outputTile.circularBufEndAddrPlus1 != 0xFFFFFFFF) &&
+                (operationCommand->outputTile.circularBufEndAddrPlus1 != 0) &&
+                (operationCommand->outputTile.circularBufEndAddrPlus1 != 0xCDCDCDCD))
+            {
+                patchCount += tempCount;
+            }
         }
         else if (operation->target == VXNNE_OPERATION_TARGET_TP)
         {
@@ -10602,8 +10619,35 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
 
             operationCount += tempCount;
             tpCount += tempCount;
-            lcdtCount += tempCount * 3;
-            patchCount += tempCount * 8;
+            lcdtCount += tempCount;
+            patchCount += tempCount * 3;
+
+            if (tpOperation->base.parameter.data_buff != VX_NULL)
+            {
+                lcdtCount += tempCount;
+                patchCount += tempCount;
+            }
+
+            if ((tpOperation->base.operatorType != VXNNE_OPERATOR_RESHUFFLE) && tpOperation->weights_biases)
+            {
+                /* lcd: ks */
+                lcdtCount += tempCount;
+                patchCount += tempCount;
+            }
+
+            /* patch image circular buffer end address */
+            if ((operationCommand->inputTile.circularBufEndAddrPlus1 != 0xFFFFFFFF) &&
+                (operationCommand->inputTile.circularBufEndAddrPlus1 != 0) &&
+                (operationCommand->inputTile.circularBufEndAddrPlus1 != 0xCDCDCDCD))
+            {
+                patchCount += tempCount;
+            }
+            if ((operationCommand->outputTile.circularBufEndAddrPlus1 != 0xFFFFFFFF) &&
+                (operationCommand->outputTile.circularBufEndAddrPlus1 != 0) &&
+                (operationCommand->outputTile.circularBufEndAddrPlus1 != 0xCDCDCDCD))
+            {
+                patchCount += tempCount;
+            }
 
             if (parameter->data_buff != VX_NULL)
             {
@@ -10637,9 +10681,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
             ksDataSize = gcmALIGN_NP2_SAFE(ksDataSize, 64);
 
             KernelStreamSize += ksDataSize;
-
-            lcdtCount += operationCount * 2;
-            patchCount += operationCount * 7;
 
             input = tpOperation->input;
             output = tpOperation->output;
@@ -10735,7 +10776,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
                     lcdTensorsPhysical[lcdTensorsPhyIndex] = physical;
                     lcdTensorsPhyIndex++;
                     lcdTensorSize += (vx_uint32)tensorSize;
-                    lcdtCount++;
+                    lcdtCount += 1;
+                    patchCount += 1;
                 }
             }
         }
@@ -10762,7 +10804,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
                     lcdTensorsPhysical[lcdTensorsPhyIndex] = physical;
                     lcdTensorsPhyIndex++;
                     lcdTensorSize += (vx_uint32)tensorSize;
-                    lcdtCount++;
+                    lcdtCount += 1;
+                    patchCount += 1;
                 }
             }
         }
@@ -10785,10 +10828,16 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
     statesSize = nnCount * NN_STATES_SIZE + tpCount * TP_STATES_SIZE + scCount * SC_STATES_SIZE + shCount * SH_STATES_SIZE;
     lcdSize = KernelStreamSize + statesSize + shShareMemSize + shIntrSize + shParaSize + lcdTensorSize;
 
+    vxInfo("KernelStreamSize: 0x%x, statesSize: 0x%x, shShareMemSize: 0x%x, shIntrSize: 0x%x, shParaSize: 0x%x, lcdTensorSize: 0x%x\n",
+            KernelStreamSize, statesSize, shShareMemSize, shIntrSize, shParaSize, lcdTensorSize);
+
     totalSize = operationSize + lcdtSize + nnSize + tpSize + shSize + patchSize
                 + swSize + layerParamSize + lcdSize;
 
     *size = totalSize + SH_COMMAND_ALIGN_SIZE;
+
+    vxInfo("NBG: operationSize: 0x%x, nnSize: 0x%x, tpSize: 0x%x, shSize: 0x%x, swSize: 0x%x, layerParamSize: 0x%x, lcdtSize: 0x%x, patchSize: 0x%x, lcdSize 0x%x\n",
+            operationSize, nnSize, tpSize, shSize, swSize, layerParamSize, lcdtSize, patchSize, lcdSize);
 
 OnError:
     if (lcdTensorsPhysical != VX_NULL)
@@ -11079,6 +11128,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
         vxError("inputOutputSize: %d, sectionsSize: %d\n", inputOutputSize, sectionsSize);
         vxmONERROR(VX_FAILURE);
     }
+
+    vxInfo("NBG: entranceSize: 0x%x, nbIOSize: 0x%x, layeSize: 0x%x\n", nbEntranceSize, nbIOSize, layeSize);
+    vxInfo("NBG: inputoutput size: 0x%x\n", inputOutputSize);
 
     totalSize = nbEntranceSize + nbIOSize + layeSize + sectionsSize - inputOutputSize;
 
