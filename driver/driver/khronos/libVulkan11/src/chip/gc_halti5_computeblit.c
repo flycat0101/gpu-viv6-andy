@@ -3382,6 +3382,12 @@ VkResult halti5_computeBlit(
 
     }
 
+    /*when treat the src image as the texture, need flush the texture data cache*/
+    if (blitKind <= HALTI5_BLIT_2LAYERS_IMG_TO_BUF)
+    {
+        halti5_flushCache((VkDevice)devCtx, &scatch, VK_NULL_HANDLE, HW_CACHE_TEXTURE_DATA);
+    }
+
     if (devCtx->database->SMALLBATCH && devCtx->pPhyDevice->phyDevConfig.options.smallBatch)
     {
         __VK_ONERROR(halti5_addAllocationForCompute(&scatch, blitProg));
