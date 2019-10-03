@@ -3927,6 +3927,100 @@ vx_status vxnneCalculateConvTilingParam(
     return VX_SUCCESS;
 }
 
+vx_weights_biases_parameter GetMinWeightBiases(
+    vx_weights_biases_parameter wbTable[],
+    vx_uint32                   count
+    )
+{
+    vx_uint32 i, minID = 0;
+    vx_weights_biases_parameter minWB = VX_NULL;
+
+    for(i = 0; i < count; i++)
+    {
+        if(wbTable[i] && wbTable[i]->memory.sizes[0] < (minWB ? minWB->memory.sizes[0] : ~0u))
+        {
+            minWB = wbTable[i];
+            minID = i;
+        }
+    }
+
+    wbTable[minID] = VX_NULL;
+
+    return minWB;
+
+}
+
+VX_INTERNAL_API vx_status vxnnePreLoadWeightsBiases(
+    vx_context context,
+    vx_graph   graph,
+    vx_uint32  size
+    )
+{
+    vx_status  status = VX_SUCCESS;
+    vx_uint32  i = 0, nnCount = 0;
+    vxnne_convolution_relu_pooling_operation convOperation;
+    vx_weights_biases_parameter weightBiases, *wbTable = VX_NULL;
+    gctUINT8   *logical, *endAddrPlusOne;
+    vx_uint32  physical;
+
+    vxmASSERT ((vx_int32)size >= 0 && !(size & (PRELOAD_WB_ALIGNMENT - 1)));
+
+    if (size == 0 || context->axiSRAM[graph->deviceID].logical == VX_NULL) goto OnError;
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, graph->layer->base.num_operations * sizeof(vx_weights_biases_parameter), (gctPOINTER*)&wbTable)))
+    {
+        status = VX_ERROR_NO_MEMORY;
+        goto OnError;
+    }
+
+    status = vxnneSRAM_Allocate(&context->axiSRAM[graph->deviceID], size, (gctPOINTER*)&logical, &physical);
+    if (status != VX_SUCCESS) goto OnError;
+
+    endAddrPlusOne = logical + size;
+
+    for (i = 0; i < graph->layer->base.num_operations; i++)
+    {
+        if (graph->layer->operations[i]->target == VXNNE_OPERATION_TARGET_NN)
+        {
+            convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[i];
+            weightBiases = convOperation->swtWeightBiases ? convOperation->swtWeightBiases : convOperation->weights_biases;
+
+            wbTable[nnCount++] = weightBiases;
+        }
+    }
+
+    for(i = 0; i < nnCount; i++)
+    {
+        weightBiases = GetMinWeightBiases(wbTable, nnCount);
+        vxmASSERT(weightBiases && weightBiases->memory.sizes[0] > 0);
+        vxmASSERT(!((gctSIZE_T)logical & (PRELOAD_WB_ALIGNMENT - 1)));
+        vxmASSERT(!(physical & (PRELOAD_WB_ALIGNMENT - 1)));
+
+        if (weightBiases->memory.sizes[0] > (vx_size)size) break;
+
+        vxmASSERT(logical + weightBiases->memory.sizes[0] <= endAddrPlusOne);
+
+        gcoOS_MemCopy(logical, WB_MEM_LOGICAL_ADDR_INDEX(weightBiases, 0), weightBiases->memory.sizes[0]);
+
+        /* change the DDR address to AXI address*/
+        weightBiases->memory.physicals[0] = physical;
+
+        logical += gcmALIGN_NP2(weightBiases->memory.sizes[0], PRELOAD_WB_ALIGNMENT);
+        physical += (vx_uint32)gcmALIGN_NP2(weightBiases->memory.sizes[0], PRELOAD_WB_ALIGNMENT);
+
+        size -= (vx_uint32)gcmALIGN_NP2(weightBiases->memory.sizes[0], PRELOAD_WB_ALIGNMENT);
+    }
+
+OnError:
+
+    if (wbTable)
+    {
+        gcoOS_Free(gcvNULL, wbTable);
+    }
+
+    return status;
+}
+
 vx_status vxnneOperation_InitializeCommand(
     vx_context context,
     vx_graph graph,

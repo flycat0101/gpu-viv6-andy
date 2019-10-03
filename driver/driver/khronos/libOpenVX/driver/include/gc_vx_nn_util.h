@@ -470,6 +470,12 @@ void alignTensorChannelToTransposeChannel(
     vx_uint32 transposeChannel
     );
 
+vx_status vxnnePreLoadWeightsBiases(
+    vx_context context,
+    vx_graph   graph,
+    vx_uint32  size
+    );
+
 #endif
 
 

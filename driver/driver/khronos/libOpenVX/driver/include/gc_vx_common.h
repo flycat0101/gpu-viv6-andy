@@ -199,7 +199,7 @@
 
 #define NN_KS_PARTIAL_CACHE_DATA_UNIT          0
 #define CACHE_ALIGNMENT_SIZE                128
-
+#define PRELOAD_WB_ALIGNMENT                64
 #define VX_MAX_MEM_REQUEST_INPUT            64
 #define VX_MAX_MEM_REQUEST_OUTPUT           32
 #define VX_MAX_MEM_PARAM                     2
@@ -1636,6 +1636,7 @@ typedef struct _vx_graph
 
     vx_uint32                               deviceID; /*the Device CoreId to run this graph*/
     vx_uint32                               graphID; /*graph ID in this owner context */
+    vx_uint32                               peakAxiSramUsedSize;
 }
 vx_graph_s;
 

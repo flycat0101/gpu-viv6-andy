@@ -869,7 +869,7 @@ VX_PRIVATE_API vx_uint32  GetEsitimateWBSize(
     return gcmALIGN_NP2((vx_uint32)((weightSize + biasSize) * EstimateRatio + 0.5f), CACHE_ALIGNMENT_SIZE);
 }
 
-VX_INTERNAL_API vx_status ComputeMNEx(
+VX_INTERNAL_API vx_bool ComputeMNEx(
     vxnne_execution_layer   layer,
     vx_int32                start,
     vx_uint32               count,
@@ -877,8 +877,7 @@ VX_INTERNAL_API vx_status ComputeMNEx(
     vx_uint32*              outM,
     vx_uint32*              axiSRAMUsed,
     vx_uint32*              vipSRAMUsed,
-    vx_uint32               sRamIn,
-    vx_uint32               sRamOut
+    vx_enum                 memType
     )
 {
     vx_int32 i;
@@ -889,7 +888,10 @@ VX_INTERNAL_API vx_status ComputeMNEx(
     vx_uint32 axiSRAMsize = layer->graph->base.context->axiSRAM[layer->graph->deviceID].size;
     vxnne_operation_info_s opInfo = {0}, opInfo2 = {0};
     vx_status status;
-    vx_bool phase3 = vxoContext_IsFeatureAvailable(layer->graph->base.context, VX_NN_FEATURE_SWTILING_PHASE3);
+    vx_bool tilingInVIP = (memType == VXNNE_MEM_POOL_TYPE_VIP_SRAM ? vx_true_e : vx_false_e);
+
+    vx_uint32 sRamIn  = layer->memRequestList[start].inputMemory[0]->allocType;
+    vx_uint32 sRamOut = layer->memRequestList[start + count - 1].outputMemory[0]->allocType;
 
     if (count < 2) return VX_FAILURE;
 
@@ -920,10 +922,10 @@ VX_INTERNAL_API vx_status ComputeMNEx(
         axiSRAMsize -= outputSize;
     }
 
-    if ((((vx_int32)axiSRAMsize) <= 0 && !phase3) ||
-        (((vx_int32)vipSRAMsize) <= 0 && phase3))
-        return VX_FAILURE;
-
+    if ((vx_int32)axiSRAMsize < 0  || (vx_int32)vipSRAMsize < 0 )
+    {
+        return vx_false_e;
+    }
 
     for (i = start + count - 1; i >= start; i--)
     {
@@ -955,7 +957,7 @@ VX_INTERNAL_API vx_status ComputeMNEx(
                                             &circleHeight
                                             );
 
-            if (status != VX_SUCCESS) return status;
+            if (status != VX_SUCCESS) return vx_false_e;
 
             termA += circleHeight * depth * stride;
 
@@ -964,7 +966,7 @@ VX_INTERNAL_API vx_status ComputeMNEx(
             termB += depth * stride * accumPoolingStrideY;
         }
 
-        if (i == start && phase3 && (opInfo.target == VXNNE_OPERATION_TARGET_NN) && !sRamIn)
+        if (i == start && tilingInVIP && (opInfo.target == VXNNE_OPERATION_TARGET_NN) && !sRamIn)
         {
             if (layer->operations[i]->bTransposeIn)
             {
@@ -990,7 +992,7 @@ VX_INTERNAL_API vx_status ComputeMNEx(
                                                 VX_NULL
                                                 );
 
-                if (status != VX_SUCCESS) return status;
+                if (status != VX_SUCCESS) return vx_false_e;
 
                 outTileX = gcmMIN(outTileX, layer->graph->base.context->nnConfig.unifiedFeature.maxTileSize);
                 inTileX = outTileX + opInfo.kernelX - 1;
@@ -1010,7 +1012,7 @@ VX_INTERNAL_API vx_status ComputeMNEx(
 
     vxmASSERT(vipSRAMsize > 0);
 
-    if (phase3)
+    if (tilingInVIP)
     {
         if (layer->operations[start]->bTransposeOut)
         {
@@ -1024,7 +1026,7 @@ VX_INTERNAL_API vx_status ComputeMNEx(
     }
     else
     {
-        vxmASSERT(axiSRAMsize > 0 && !phase3);
+        vxmASSERT(axiSRAMsize > 0 && !tilingInVIP);
 
         if ((vx_int32)(axiSRAMsize - termA) > 0)
         {
@@ -1041,10 +1043,10 @@ VX_INTERNAL_API vx_status ComputeMNEx(
                 vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
                 vx_arch_perf_s archPerfHandle;
 
-                INITIALIZE_STRUCT(archPerfHandle);
                 vxmASSERT(opInfo.opType != VXNNE_OPERATOR_FULLYCONNECTED);
-                vxmASSERT(axiSRAMsize > 0 && !phase3);
+                vxmASSERT(axiSRAMsize > 0 && !tilingInVIP);
 
+                memset(&archPerfHandle, 0, sizeof(vx_arch_perf_s));
                 outTileY = gcmMIN(TENSOR_SIZE_INDEX(opInfo.output, 1), M);
 
                 status = ComputeInputSizeEx(
@@ -1061,7 +1063,7 @@ VX_INTERNAL_API vx_status ComputeMNEx(
                                                 &inputTileY
                                                 );
 
-                if (status != VX_SUCCESS) return status;
+                if (status != VX_SUCCESS) return vx_false_e;
 
                 {
                     vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), outTileY, TENSOR_SIZE_INDEX(opInfo.output, 2)};
@@ -1096,18 +1098,18 @@ VX_INTERNAL_API vx_status ComputeMNEx(
 
             if (imageCacheSize + totalKernelbufferSize > vipSRAMsize)
             {
-                return VX_FAILURE;
+                return vx_false_e;
             }
         }
     }
 
     if (M < 1)
     {
-        return VX_FAILURE;
+        return vx_false_e;
     }
     else
     {
-        if (phase3)
+        if (tilingInVIP)
         {
             *axiSRAMUsed = layer->graph->base.context->axiSRAM[layer->graph->deviceID].size - axiSRAMsize;
             *vipSRAMUsed = termA + M * termB + totalKernelbufferSize;
@@ -1121,7 +1123,7 @@ VX_INTERNAL_API vx_status ComputeMNEx(
 
         *outN = TENSOR_SIZE_INDEX(opInfo2.output, 0);
         *outM = M;
-        return VX_SUCCESS;
+        return vx_true_e;
     }
 }
 
@@ -1446,54 +1448,6 @@ OnError:
     return status;
 }
 
-VX_PRIVATE_API vx_bool SupportAB(vx_context context, vxnne_operation operation)
-{
-    gcmHEADER_ARG("context=%p, operation=%p", context, operation);
-    if ((operation->target == VXNNE_OPERATION_TARGET_NN ||
-        (operation->target == VXNNE_OPERATION_TARGET_SH && context->axiSRAM[operation->layer->node->graph->deviceID].size > 0) ||
-        (operation->target == VXNNE_OPERATION_TARGET_TP &&
-          (operation->operatorType != VXNNE_OPERATOR_DILATION_RESHUFFLE &&
-           operation->operatorType != VXNNE_OPERATOR_DILATION_UPSAMPLE &&
-           operation->operatorType != VXNNE_OPERATOR_DILATION_UPSAMPLE2 &&
-           operation->operatorType != VXNNE_OPERATOR_ROIPOOL
-       ))) &&
-       vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE1) &&
-       !context->options.enableNNLayerDump &&
-       (context->vipSRAM.size > VX_VIP_SRAM_IMAGE_STREAM_SIZE)
-       )
-    {
-        /* AB buffer didn't support those TP 4d oprerations like dilation reshuffle & upsample*/
-        gcmFOOTER_ARG("%d", vx_true_e);
-        return vx_true_e;
-    }
-    gcmFOOTER_ARG("%d", vx_false_e);
-    return vx_false_e;
-}
-
-VX_PRIVATE_API vx_bool SupportSWTiling(vx_context context, vxnne_operation operation)
-{
-    gcmHEADER_ARG("context=%p, operation=%p", context, operation);
-    if ((operation->target == VXNNE_OPERATION_TARGET_NN &&
-         operation->operatorType != VXNNE_OPERATOR_FULLYCONNECTED)
-        ||(operation->target == VXNNE_OPERATION_TARGET_TP &&
-           vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE2) &&
-          (operation->operatorType == VXNNE_OPERATOR_RESHUFFLE ||
-           operation->operatorType == VXNNE_OPERATOR_POOLING   ||
-           operation->operatorType == VXNNE_OPERATOR_NORMALIZATION ||
-           operation->operatorType == VXNNE_OPERATOR_ACTIVATION ||
-           operation->operatorType == VXNNE_OPERATOR_TENSOR_ADD
-          ))
-       )
-    {
-        gcmFOOTER_ARG("%d", vx_true_e);
-        return vx_true_e;
-    }
-
-    gcmFOOTER_ARG("%d", vx_false_e);
-    return vx_false_e;
-}
-
-
 VX_PRIVATE_API vx_status GetMemoryRequestList(
     vx_graph                graph,
     vx_uint32               start,
@@ -1560,8 +1514,11 @@ VX_PRIVATE_API vx_status GetMemoryParamList(
     {
         k = i - start;
 
-        vxmASSERT(graph->layer->operations[i]->inputsNum <= VX_MAX_MEM_PARAM
-                  && graph->layer->operations[i]->outputsNum <= VX_MAX_MEM_PARAM);
+        if (graph->layer->operations[i]->inputsNum > VX_MAX_MEM_PARAM ||
+            graph->layer->operations[i]->outputsNum > VX_MAX_MEM_PARAM)
+        {
+            continue;
+        }
 
         memParamList[k].inputCount = graph->layer->operations[i]->inputsNum;
 
@@ -1600,21 +1557,18 @@ VX_PRIVATE_API vx_status GetMemoryParamList(
 
 VX_PRIVATE_API vx_status RestoreMemoryParamList(
     vx_graph                graph,
-    vx_uint32               start,
+    vx_uint32               dstStart,
     vx_uint32               count,
+    vx_uint32               srcStart,
     vxnne_mem_param         memParamList
     )
 {
     vx_uint32 i, j, k;
     vxnne_mem_request requestList;
 
-    gcmHEADER_ARG("graph=%p, start=0x%x, count=0x%x, memParamList=%p", graph, start, count, memParamList);
-
-    for (i = start; i < start + count; i++)
+    for (i = dstStart, k = srcStart; i < dstStart + count; i++, k++)
     {
         requestList = graph->layer->memRequestList  + i;
-
-        k = i - start;
 
         vxmASSERT(graph->layer->operations[i]->inputsNum <= VX_MAX_MEM_PARAM
                   && graph->layer->operations[i]->outputsNum <= VX_MAX_MEM_PARAM);
@@ -1657,7 +1611,6 @@ VX_PRIVATE_API vx_status RestoreMemoryParamList(
         gcoOS_ZeroMemory(&requestList->transposeOut, sizeof(vx_memory_s));
     }
 
-    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -1745,417 +1698,391 @@ VX_PRIVATE_API vx_status SetMemoryRequestList(
     vx_graph                graph,
     vx_uint32               start,
     vx_uint32               count,
-    vx_bool                 esitimateInAB,
-    vx_bool                 sRamIn,
-    vx_bool                 sRamOut)
+    vx_enum                 allocType)
 {
     vx_uint32 i, j, dims;
     vxnne_mem_request   memRequest = graph->layer->memRequestList + start;
-    vx_memory_s         outputMemory[VX_MAX_MEM_REQUEST_OUTPUT];
-    vx_enum             allocType, allocType2;
 
-    if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_FEATURE_SWTILING_PHASE3))
+    vxmASSERT(allocType == VXNNE_MEM_POOL_TYPE_AXI_SRAM || allocType == VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+
+    for (i = 0; i < count - 1; i++)
     {
-        vxmASSERT(graph->base.context->vipSRAM.size != 0);
-
-        allocType = graph->base.context->axiSRAM[graph->deviceID].size == 0 ? VXNNE_MEM_POOL_TYPE_VIP_SRAM : VXNNE_MEM_POOL_TYPE_SRAM;
-    }
-    else
-    {
-        vxmASSERT(graph->base.context->axiSRAM[graph->deviceID].size != 0);
-        allocType = VXNNE_MEM_POOL_TYPE_AXI_SRAM;
-    }
-
-    for(j = 0; j < memRequest[count - 1].outputCount; j++)
-    {
-        outputMemory[j] = *memRequest[count - 1].outputMemory[j];
-    }
-
-    for (i = 0; i < count; i++)
-    {
-        if ((((i == 0 || i == count - 2) && esitimateInAB) ||
-            ((i == count - 1) && sRamOut)) && (allocType == VXNNE_MEM_POOL_TYPE_SRAM))
-        {
-            vxmASSERT(!sRamOut || !esitimateInAB);
-            allocType2 = allocType & ~VXNNE_MEM_POOL_TYPE_VIP_SRAM;
-        }
-        else
-        {
-            allocType2 = allocType;
-        }
-
         for(j = 0; j < memRequest[i].outputCount; j++)
         {
             dims = memRequest[i].outputMemory[j]->dimCount - 1;
-            memRequest[i].outputMemory[j]->allocType    = allocType2;
+            memRequest[i].outputMemory[j]->allocType    = allocType;
             memRequest[i].outputMemory[j]->sizes[0]     = gcmALIGN_NP2(memRequest[i].outputMemory[j]->strides[0][dims] * memRequest[i].outputMemory[j]->dims[0][dims], CACHE_ALIGNMENT_SIZE);
             memRequest[i].outputMemory[j]->allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_2);
             vxmASSERT(memRequest[i].outputMemory[j]->sizes[0] > 0);
         }
-
-        if (graph->layer->operations[start + i]->target == VXNNE_OPERATION_TARGET_SH)
-        {
-            for(j = 0; j < memRequest[i].outputCount; j++)
-            {
-                memRequest[i].outputMemory[j]->allocType &= ~VXNNE_MEM_POOL_TYPE_VIP_SRAM;
-            }
-
-            for(j = 0; j < memRequest[i].inputCount; j++)
-            {
-                memRequest[i].inputMemory[j]->allocType &= ~VXNNE_MEM_POOL_TYPE_VIP_SRAM;
-            }
-        }
-    }
-
-    if (!sRamOut)
-    {
-        for(j = 0; j < memRequest[i-1].outputCount; j++)
-        {
-            *memRequest[i-1].outputMemory[j] = outputMemory[j];
-        }
     }
 
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status DetectABSegments(
+VX_PRIVATE_API vx_bool SupportAB(
+    vx_context          context,
+    vxnne_operation     operation,
+    vx_enum             memType
+    )
+{
+    vxnne_operation_info_s opInfo;
+    vxnneOperation_GetInfo(operation, &opInfo);
+
+    vxmASSERT(memType & VXNNE_MEM_POOL_TYPE_SRAM);
+
+    if ((operation->target == VXNNE_OPERATION_TARGET_NN ||
+        (operation->target == VXNNE_OPERATION_TARGET_SH && memType == VXNNE_MEM_POOL_TYPE_AXI_SRAM) ||
+        (operation->target == VXNNE_OPERATION_TARGET_TP &&
+          (operation->operatorType != VXNNE_OPERATOR_DILATION_RESHUFFLE &&
+           operation->operatorType != VXNNE_OPERATOR_DILATION_UPSAMPLE &&
+           operation->operatorType != VXNNE_OPERATOR_DILATION_UPSAMPLE2 &&
+           operation->operatorType != VXNNE_OPERATOR_ROIPOOL
+       )))
+       && operation->inputsNum == 1 && operation->outputsNum == 1
+       && operation->batchCount == 1
+       && TENSOR_SIZE_INDEX(opInfo.input, 3) == 1 && TENSOR_SIZE_INDEX(opInfo.output, 3) == 1
+       && opInfo.output->isVirtual
+       )
+    {
+        /* AB buffer didn't support those TP 4d oprerations like dilation reshuffle & upsample*/
+        return vx_true_e;
+    }
+
+
+    return vx_false_e;
+}
+
+VX_PRIVATE_API vx_bool SupportTiling(
+    vx_context          context,
+    vxnne_operation     operation,
+    vx_bool             head,
+    vx_bool             tail
+    )
+{
+    if (((operation->target == VXNNE_OPERATION_TARGET_NN &&
+         operation->operatorType != VXNNE_OPERATOR_FULLYCONNECTED)
+        ||(operation->target == VXNNE_OPERATION_TARGET_TP &&
+           vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE2) &&
+          (operation->operatorType == VXNNE_OPERATOR_RESHUFFLE ||
+           operation->operatorType == VXNNE_OPERATOR_POOLING   ||
+           operation->operatorType == VXNNE_OPERATOR_NORMALIZATION ||
+           operation->operatorType == VXNNE_OPERATOR_ACTIVATION ||
+           operation->operatorType == VXNNE_OPERATOR_TENSOR_ADD
+          )))
+          && (operation->parentOpNum == 1 || head)
+          && (operation->childOpNum == 1 || tail)
+       )
+    {
+        return vx_true_e;
+    }
+
+    return vx_false_e;
+}
+
+VX_PRIVATE_API vx_bool SupportSWTiling(
+    vx_graph  graph,
+    vx_uint32 start,
+    vx_uint32 count,
+    vx_enum   segType,
+    vx_enum   memType)
+{
+    vx_uint32 i;
+
+    vxmASSERT(segType == VXNNE_SEGMENT_TYPE_TILING || segType == VXNNE_SEGMENT_TYPE_AB);
+
+    for (i = start; i < start + count; i++)
+    {
+        if (!SupportAB(graph->base.context, graph->layer->operations[i], memType) )
+        {
+            return vx_false_e;
+        }
+        else if (segType == VXNNE_SEGMENT_TYPE_TILING)
+        {
+            if (!SupportTiling(graph->base.context, graph->layer->operations[i], i == start, i == start + count - 1))
+            {
+                return vx_false_e;
+            }
+            else
+            {
+                vxnne_operation_info_s opInfo1, opInfo2;
+
+                if (i != start)
+                {
+                    vxnneOperation_GetInfo(graph->layer->operations[i], &opInfo1);
+                    vxnneOperation_GetInfo(graph->layer->operations[i - 1], &opInfo2);
+
+                    if (opInfo1.input != opInfo2.output)
+                    {
+                        return vx_false_e;
+                    }
+                }
+            }
+        }
+    }
+
+    return vx_true_e;
+}
+
+VX_PRIVATE_API vx_status DetectABSegment(
     vx_graph                   graph,
     vx_uint32                  start,
     vx_uint32                  count,
-    vxnne_segment_collection   collection)
+    vx_enum                    memType,
+    vx_bool                    *detected)
 {
-    vx_uint32 i = 0, j = 0, k = 0, mergeInputType, mergeOutputType;
+    vx_uint32  k = 0, oldStart = start, oldCount = count;
     vxnne_operation_info_s opInfo;
-    vx_status vStatus = VX_SUCCESS, vStatus1 = VX_SUCCESS;
+    vx_status status = VX_SUCCESS;
     vxnne_mem_param memParam = VX_NULL;
-    gceSTATUS status = gcvSTATUS_OK;
 
-     gcmHEADER_ARG("graph=%p, start=0x%x, count=0x%x, collection=%p", graph, start, count, collection);
-
-    status = gcoOS_Allocate(gcvNULL, sizeof(vxnne_mem_param_s) * count, (gctPOINTER*)&memParam);
-    if (gcmIS_ERROR(status))
+    /* Tricky To Make the require list closure (start from DDR and end with DDR) */
+    if (graph->layer->memRequestList[oldStart].inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM &&
+        oldStart != 0)
     {
-        vStatus =  VX_ERROR_NO_MEMORY;
+        start -= 1;
+        count += 1;
+    }
+
+    if (graph->layer->memRequestList[oldStart + oldCount - 1].outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM &&
+        oldStart + oldCount != graph->layer->base.num_operations)
+    {
+        count += 1;
+    }
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(vxnne_mem_param_s) * count, (gctPOINTER*)&memParam)))
+    {
+        status =  VX_ERROR_NO_MEMORY;
         goto OnError;
     }
 
-    vStatus = GetMemoryParamList(graph, start, count, memParam);
-    if (vStatus != VX_SUCCESS) goto OnError;
+    status = GetMemoryParamList(graph, start, count, memParam);
+    vxmASSERT (status == VX_SUCCESS);
 
-    for(i = start; i < start + count - 1; i++)
+
+    graph->layer->memRequestList[start].inputMemory[0]->allocType &= ~VXNNE_MEM_POOL_TYPE_SRAM;
+    graph->layer->memRequestList[start + count - 1].outputMemory[0]->allocType &= ~VXNNE_MEM_POOL_TYPE_SRAM;
+
+    status = SetMemoryRequestList(
+        graph, oldStart, oldCount, memType);
+    vxmASSERT (status == VX_SUCCESS);
+
+    if (graph->layer->memRequestList[start].inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM ||
+        graph->layer->memRequestList[start + count - 1].outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
     {
-        for(j = start + count - i; j > 1; j--)
+        *detected = vx_false_e;
+        goto OnError;
+    }
+
+
+    for (k = start; k < start + count; k++)
+    {
+        vxnneOperation_GetInfo(graph->layer->operations[k], &opInfo);
+
+        if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
         {
-            vxmASSERT((vx_int32) j > 0);
-            vStatus = SetMemoryRequestList(
-                graph, i, j, vx_true_e,
-                vx_false_e, vx_false_e);
+            vxnne_mem_request requestList;
+            vx_uint32 transposeSize = 0;
+            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[k];
 
-            if (vStatus != VX_SUCCESS) goto OnError;
-
-            for (k = i; k < i + j; k++)
+            requestList = graph->layer->memRequestList  + k;
+            if (!(requestList->inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM) || (requestList->inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_AXI_SRAM))
             {
-                vxnneOperation_GetInfo(graph->layer->operations[k], &opInfo);
-
-                if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
+                if (graph->layer->operations[k]->bTransposeIn)
                 {
-                    vxnne_mem_request requestList;
-                    vx_uint32 transposeSize = 0;
-                    vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[k];
+                    vx_tensor input = (vx_tensor)(graph->layer->operations[k]->inputs[0]);
+                    vx_uint32 inputZ = 0;
 
-                    requestList = graph->layer->memRequestList  + k;
-                    if (!(requestList->inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM) || (requestList->inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_AXI_SRAM))
-                    {
-                        if (graph->layer->operations[k]->bTransposeIn /*&& requestList->inputMemory[0]->transposed*/)
-                        {
-                            vx_tensor input = (vx_tensor)(graph->layer->operations[k]->inputs[0]);
-                            vx_uint32 inputZ = 0;
+                    alignTensorChannelToTransposeChannel(input, graph->layer->operations[k]->transposeInChannel);
 
-                            alignTensorChannelToTransposeChannel(input, graph->layer->operations[k]->transposeInChannel);
+                    inputZ = TENSOR_STRIDE_INDEX(input, 3) / TENSOR_STRIDE_INDEX(input, 2);
 
-                            inputZ = TENSOR_STRIDE_INDEX(input, 3) / TENSOR_STRIDE_INDEX(input, 2);
+                    transposeSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
+                                                                     convOperation->resultInfo.outImageTileXSize,
+                                                                     convOperation->resultInfo.outImageTileYSize,
+                                                                     opInfo.weightsBiases->weights_sizes[0],
+                                                                     opInfo.weightsBiases->weights_sizes[1],
+                                                                     inputZ,
+                                                                     convOperation->resultInfo.interleaveMode,
+                                                                     graph->base.context->nnConfig.customizedFeature.ddrLatency,
+                                                                     graph->layer->operations[k]->transposeInChannel,
+                                                                     input->tensorBuffer->dataFormat);
 
-                            transposeSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
-                                                                             convOperation->resultInfo.outImageTileXSize,
-                                                                             convOperation->resultInfo.outImageTileYSize,
-                                                                             opInfo.weightsBiases->weights_sizes[0],
-                                                                             opInfo.weightsBiases->weights_sizes[1],
-                                                                             inputZ,
-                                                                             convOperation->resultInfo.interleaveMode,
-                                                                             graph->base.context->nnConfig.customizedFeature.ddrLatency,
-                                                                             graph->layer->operations[k]->transposeInChannel,
-                                                                             input->tensorBuffer->dataFormat);
+                    gcoOS_ZeroMemory(&requestList->transposeIn, sizeof(vx_memory_s));
+                    requestList->transposeIn.lastUseId = requestList->transposeIn.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                    requestList->transposeIn.sizes[0] = transposeSize;
+                    requestList->transposeIn.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                    requestList->transposeIn.allocPartial = vx_false_e;
+                    requestList->transposeIn.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
+                    requestList->inputMemory[requestList->inputCount] = &requestList->transposeIn;
+                    requestList->inputCount++;
+                }
+                else
+                {
+                    requestList->imageCache.lastUseId = requestList->imageCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                    requestList->imageCache.sizes[0]  = graph->layer->operations[k]->esitimateImageCacheSize;
+                    requestList->imageCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                    requestList->imageCache.allocPartial = vx_false_e;
 
-                            gcoOS_ZeroMemory(&requestList->transposeIn, sizeof(vx_memory_s));
-                            requestList->transposeIn.lastUseId = requestList->transposeIn.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
-                            requestList->transposeIn.sizes[0] = transposeSize;
-                            requestList->transposeIn.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
-                            requestList->transposeIn.allocPartial = vx_false_e;
-                            requestList->transposeIn.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
-                            requestList->inputMemory[requestList->inputCount] = &requestList->transposeIn;
-                            requestList->inputCount++;
-                        }
-                        else
-                        {
-                            requestList->imageCache.lastUseId = requestList->imageCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
-                            requestList->imageCache.sizes[0]  = graph->layer->operations[k]->esitimateImageCacheSize;
-                            requestList->imageCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
-                            requestList->imageCache.allocPartial = vx_false_e;
+                    requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
 
-                            requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
-
-                            requestList->inputMemory[requestList->inputCount] = &requestList->imageCache;
-                            requestList->inputCount++;
-                        }
-                    }
-
-                    if (graph->layer->operations[k]->bTransposeOut && (!(requestList->outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM) || (requestList->outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_AXI_SRAM)))
-                    {
-                        vx_tensor output = (vx_tensor)(graph->layer->operations[k]->outputs[0]);
-
-                        alignTensorChannelToTransposeChannel(output, graph->layer->operations[k]->transposeOutChannel);
-
-                        transposeSize = caculateOutTransposeBufferSize(convOperation->resultInfo.outImageTileXSize, convOperation->resultInfo.outImageTileYSize, output->tensorBuffer->dataFormat);
-                        requestList->transposeOut.lastUseId = requestList->transposeOut.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
-                        requestList->transposeOut.sizes[0] = transposeSize;
-                        requestList->transposeOut.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
-                        requestList->transposeOut.allocPartial = vx_false_e;
-                        requestList->transposeOut.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
-                        requestList->inputMemory[requestList->inputCount] = &requestList->transposeOut;
-                        requestList->inputCount++;
-                    }
-
-                    requestList->kernelCache.lastUseId = requestList->kernelCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
-                    requestList->kernelCache.sizes[0] = graph->layer->operations[k]->esitimateKernelCacheSize;;
-                    requestList->kernelCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
-                    requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_3;
-                    requestList->kernelCache.allocPartial = vx_true_e;
-                    requestList->inputMemory[requestList->inputCount] = &requestList->kernelCache;
+                    requestList->inputMemory[requestList->inputCount] = &requestList->imageCache;
                     requestList->inputCount++;
                 }
             }
 
-            vStatus1 = vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, i, j, VX_NULL);
-
-            vxmASSERT(j >= 2);
-
-            mergeInputType  = (graph->layer->memRequestList + i)->outputMemory[0]->allocType;
-            mergeOutputType = (graph->layer->memRequestList + i + j - 1)->inputMemory[0]->allocType;
-
-            RestoreMemoryParamList(graph, start, count, memParam);
-
-            if (vStatus1 == VX_SUCCESS)
+            if (graph->layer->operations[k]->bTransposeOut && (!(requestList->outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM) || (requestList->outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_AXI_SRAM)))
             {
-                vxmASSERT(collection->segmentNum < VX_MAX_SEGMENT_COUNT);
-                collection->segments[collection->segmentNum].type = VXNNE_SEGMENT_TYPE_AB;
-                collection->segments[collection->segmentNum].start = i;
-                collection->segments[collection->segmentNum].count = j;
-                collection->segments[collection->segmentNum].end = i + j - 1;
-                collection->segments[collection->segmentNum].segmentInfo.ab.mergeInputType = mergeInputType;
-                collection->segments[collection->segmentNum].segmentInfo.ab.mergeOutputType = mergeOutputType;
-                collection->segmentNum++;
+                vx_tensor output = (vx_tensor)(graph->layer->operations[k]->outputs[0]);
 
-                i = i + j - 1;
+                alignTensorChannelToTransposeChannel(output, graph->layer->operations[k]->transposeOutChannel);
 
-                if (collection->segmentNum == VX_MAX_SEGMENT_COUNT)
-                {
-                    vStatus = VX_SUCCESS;
-                    goto OnError;
-                }
-                break;
+                transposeSize = caculateOutTransposeBufferSize(convOperation->resultInfo.outImageTileXSize, convOperation->resultInfo.outImageTileYSize, output->tensorBuffer->dataFormat);
+                requestList->transposeOut.lastUseId = requestList->transposeOut.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                requestList->transposeOut.sizes[0] = transposeSize;
+                requestList->transposeOut.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                requestList->transposeOut.allocPartial = vx_false_e;
+                requestList->transposeOut.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
+                requestList->inputMemory[requestList->inputCount] = &requestList->transposeOut;
+                requestList->inputCount++;
             }
 
+            requestList->kernelCache.lastUseId = requestList->kernelCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+            requestList->kernelCache.sizes[0] = graph->layer->operations[k]->esitimateKernelCacheSize;;
+            requestList->kernelCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+            requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_3;
+            requestList->kernelCache.allocPartial = vx_true_e;
+            requestList->inputMemory[requestList->inputCount] = &requestList->kernelCache;
+            requestList->inputCount++;
         }
     }
 
+    if (vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, start, count, VX_NULL) == VX_SUCCESS)
+    {
+        *detected = vx_true_e;
+    }
+    else
+    {
+        *detected = vx_false_e;
+    }
 
 OnError:
-#if SW_TILING_DEBUG
-    if (collection->segmentNum > 0)
+    if (memParam)
     {
-        vxInfo("Detected AB Segments\n");
-        for(i = 0; i <  collection->segmentNum; i++)
-        {
-            vxInfo("%3d (%d - %d)\n", i, collection->segments[i].start, collection->segments[i].end);
-        }
-    }
-#endif
-
-    if (memParam) gcoOS_Free(gcvNULL, memParam);
-
-    gcmFOOTER_ARG("%d", vStatus);
-    return vStatus;
-}
-
-VX_PRIVATE_API vx_status GetSWTilingCollection(
-    vx_graph  graph,
-    vx_uint32 start,
-    vx_uint32 count,
-    vxnne_segment_collection tilingCollection)
-{
-    vx_uint32 i = 0, num = 0;
-    vx_bool terminator, subI;
-    vxnne_operation_info_s opInfo1, opInfo2;
-
-    gcmHEADER_ARG("graph=%p, start=0x%x, count=0x%x, tilingCollection=%p", graph, start, count, tilingCollection);
-
-    gcoOS_ZeroMemory(tilingCollection, sizeof(vxnne_segment_collection_s));
-
-    for(i = start; i <= start + count; i++)
-    {
-        terminator = vx_false_e;
-        subI       = vx_false_e;
-
-        if ((i == start + count) ||
-            !SupportSWTiling(graph->base.context, graph->layer->operations[i]) ||
-            (graph->layer->operations[i]->parentOpNum > 1  && num != 0) ||
-            (graph->layer->operations[i]->childOpNum > 1 && num == 0) )
-        {
-            terminator = vx_true_e;
-        }
-        else if (num >= 1)
-        {
-            vxmASSERT(graph->layer->operations[i-1]->target == VXNNE_OPERATION_TARGET_NN
-                   || graph->layer->operations[i-1]->target == VXNNE_OPERATION_TARGET_TP);
-            vxmASSERT(graph->layer->operations[i]->target == VXNNE_OPERATION_TARGET_NN
-                   || graph->layer->operations[i]->target == VXNNE_OPERATION_TARGET_TP);
-
-            vxnneOperation_GetInfo(graph->layer->operations[i], &opInfo1);
-            vxnneOperation_GetInfo(graph->layer->operations[i - 1], &opInfo2);
-
-            if (opInfo1.input != opInfo2.output)
-            {
-                terminator = vx_true_e;
-                subI       = vx_true_e;
-            }
-            else if (graph->layer->operations[i]->childOpNum > 1)
-            {
-                i++;
-                num++;
-                terminator = vx_true_e;
-                subI       = vx_true_e;
-            }
-        }
-
-        if (terminator)
-        {
-            if (num > 1)
-            {
-                vxmASSERT(tilingCollection->segmentNum < VX_MAX_SEGMENT_COUNT);
-
-                tilingCollection->segments[tilingCollection->segmentNum].start = i - num;
-                tilingCollection->segments[tilingCollection->segmentNum].count = num;
-                tilingCollection->segments[tilingCollection->segmentNum].end   = i - 1;
-
-                tilingCollection->segmentNum++;
-
-                if (tilingCollection->segmentNum == VX_MAX_SEGMENT_COUNT)
-                {
-                    return VX_SUCCESS;
-                }
-
-            }
-
-            if (subI)
-            {
-                i--;
-            }
-
-            num = 0;
-        }
-        else
-        {
-            num++;
-        }
+        RestoreMemoryParamList(graph, start, count, 0, memParam);
+        gcoOS_Free(gcvNULL, memParam);
     }
 
-    gcmFOOTER_ARG("%d", VX_SUCCESS);
-    return VX_SUCCESS;
+    return status;
 }
 
-VX_PRIVATE_API vx_status DetectTilingSegments(
+VX_PRIVATE_API vx_status DetectSegments(
     vx_graph                    graph,
     vx_uint32                   start,
     vx_uint32                   count,
-    vxnne_segment_collection    abCollection,
-    vxnne_segment_collection    tilingCollection)
+    vx_enum                     segType,
+    vx_enum                     memType,
+    vxnne_segment_collection    collection)
 {
-    vx_uint32 i = 0, j = 0, k = 0, l = 0, tilingStart, tilingEnd, M, N, axiSRAMUsed = 0, vipSRAMUsed = 0;
+    vx_uint32 i = 0, j = 0, k = 0, tilingStart, tilingEnd, M = 0, N = 0, axiSRAMUsed = 0, vipSRAMUsed = 0;
     vx_status status = VX_SUCCESS;
-    vx_bool sRamIn, sRamOut, sRamIn2, sRamOut2;
-    vxnne_segment_collection_s    tempCollection;
-    vx_uint32 mergeInputType, mergeOutputType;
+    vxnne_segment_collection_s  detectedCollection;
+    vx_bool detected = vx_false_e;
 
-    gcmHEADER_ARG("graph=%p, start=0x%x, count=0x%x, abCollection=%p, tilingCollection=%p", graph, start, count, abCollection, tilingCollection);
+    gcoOS_ZeroMemory(&detectedCollection, sizeof(vxnne_segment_collection_s));
 
-    for(j = 0; j <= abCollection->segmentNum; j++)
+    for(j = 0; j <= collection->segmentNum; j++)
     {
-        tilingStart = (j == 0) ? start : abCollection->segments[j - 1].end;
-        tilingEnd = (j == abCollection->segmentNum) ? (start + count - 1) : abCollection->segments[j].start;
-
-        if (tilingEnd - tilingStart > 0)
+        if (segType == VXNNE_SEGMENT_TYPE_TILING)
         {
-            sRamIn  = (tilingStart  == start ? vx_false_e : vx_true_e);
-            sRamOut = (tilingEnd    == start + count - 1 ? vx_false_e : vx_true_e);
+            tilingStart = (j == 0) ? start : (collection->segments[j - 1]->type == VXNNE_SEGMENT_TYPE_TILING ? gcmMIN(collection->segments[j - 1]->end + 1, start + count - 1) : collection->segments[j - 1]->end);
+            tilingEnd = (j == collection->segmentNum) ? (start + count - 1) : (collection->segments[j]->type == VXNNE_SEGMENT_TYPE_TILING ? gcmMAX((vx_int32)collection->segments[j]->start - 1, (vx_int32)start) : collection->segments[j]->start);
+        }
+        else
+        {
+            tilingStart = (j == 0) ? start : collection->segments[j - 1]->end;
+            tilingEnd = (j == collection->segmentNum) ? (start + count - 1) : collection->segments[j]->start;
+        }
 
-            GetSWTilingCollection(graph, tilingStart, tilingEnd - tilingStart + 1, &tempCollection);
-            if (tempCollection.segmentNum == 0) continue;
-
-            for(l = 0; l < tempCollection.segmentNum; l++)
+        if ((vx_uint32)(tilingEnd - tilingStart) > 0)
+        {
+            for (i = tilingStart; i < tilingEnd; i++)
             {
-                for (i = tempCollection.segments[l].start; i < tempCollection.segments[l].end; i++)
+                for (k = tilingEnd - i + 1; (vx_int32)k > 1; k--)
                 {
-                    sRamIn2 = (i == tilingStart ? sRamIn : vx_false_e);
+                    if (!SupportSWTiling(graph, i, k, segType, memType)) continue;
 
-                    for (k = tempCollection.segments[l].end - i + 1; (vx_int32)k > 1; k--)
+                    if (segType == VXNNE_SEGMENT_TYPE_AB)
                     {
-                        sRamOut2 = (tilingEnd == i + k -1 ? sRamOut : vx_false_e);
+                        status = DetectABSegment(graph, i, k, memType, &detected);
+                        if (status != VX_SUCCESS) goto OnError;
+                    }
+                    else
+                    {
+                        vxmASSERT(segType == VXNNE_SEGMENT_TYPE_TILING);
+                        detected = ComputeMNEx(graph->layer, i, k, &N, &M, &axiSRAMUsed, &vipSRAMUsed, memType);
+                    }
 
-                        mergeInputType  = sRamIn2 ? (abCollection->segments[j-1].segmentInfo.ab.mergeOutputType) : VXNNE_MEM_POOL_TYPE_ORIG_DDR;
-                        mergeOutputType = sRamOut2 ? (abCollection->segments[j].segmentInfo.ab.mergeInputType) : VXNNE_MEM_POOL_TYPE_ORIG_DDR;
-
-                        status = ComputeMNEx(graph->layer, i, k, &N, &M, &axiSRAMUsed, &vipSRAMUsed, mergeInputType, mergeOutputType);
-                        if (status == VX_SUCCESS)
+                    if (detected)
+                    {
+                        vxmASSERT(detectedCollection.segmentNum < VX_MAX_SEGMENT_COUNT);
+                        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(vxnne_segment_s), (gctPOINTER*)&detectedCollection.segments[detectedCollection.segmentNum])))
                         {
-                            vxmASSERT(tilingCollection->segmentNum < VX_MAX_SEGMENT_COUNT);
-                            tilingCollection->segments[tilingCollection->segmentNum].type = VXNNE_SEGMENT_TYPE_TILING;
-                            tilingCollection->segments[tilingCollection->segmentNum].start = i;
-                            tilingCollection->segments[tilingCollection->segmentNum].count = k;
-                            tilingCollection->segments[tilingCollection->segmentNum].end = i + k - 1;
-                            tilingCollection->segments[tilingCollection->segmentNum].segmentInfo.tiling.M = M;
-                            tilingCollection->segments[tilingCollection->segmentNum].segmentInfo.tiling.N = N;
-                            tilingCollection->segments[tilingCollection->segmentNum].segmentInfo.tiling.estimateAxiSRAMUsed = axiSRAMUsed;
-                            tilingCollection->segments[tilingCollection->segmentNum].segmentInfo.tiling.estimateVipSRAMUsed = vipSRAMUsed;
-                            tilingCollection->segmentNum++;
-
-                            if (tilingCollection->segmentNum == VX_MAX_SEGMENT_COUNT)
-                            {
-                                goto OnError;
-                            }
-
-                            i = i + k - 1;
-                            break;
+                            status = VX_ERROR_NO_MEMORY;
+                            goto OnError;
                         }
+
+                        gcoOS_ZeroMemory(detectedCollection.segments[detectedCollection.segmentNum], sizeof(vxnne_segment_s));
+
+                        detectedCollection.segments[detectedCollection.segmentNum]->type    = segType;
+                        detectedCollection.segments[detectedCollection.segmentNum]->memType = memType;
+                        detectedCollection.segments[detectedCollection.segmentNum]->start = i;
+                        detectedCollection.segments[detectedCollection.segmentNum]->count = k;
+                        detectedCollection.segments[detectedCollection.segmentNum]->end = i + k - 1;
+
+                        if (segType == VXNNE_SEGMENT_TYPE_TILING)
+                        {
+                            detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.M = M;
+                            detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.N = N;
+                            detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.estimateAxiSRAMUsed = axiSRAMUsed;
+                            detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.estimateVipSRAMUsed = vipSRAMUsed;
+                        }
+
+                        detectedCollection.segmentNum++;
+
+                        status = SetMemoryRequestList(graph, i, k, memType);
+                        vxmASSERT(status == VX_SUCCESS);
+
+                        if (detectedCollection.segmentNum == VX_MAX_SEGMENT_COUNT)
+                        {
+                            status = VX_SUCCESS;
+                            goto OnError;
+                        }
+
+                        i = i + k - 1;
+                        break;
                     }
                 }
             }
         }
-    }
 
-OnError:
-#if SW_TILING_DEBUG
-    if (tilingCollection->segmentNum > 0)
-    {
-        vxInfo("Detected Tiling Segments\n");
-        for(j = 0; j <tilingCollection->segmentNum; j++)
+        /* combine segments */
+        if (j != collection->segmentNum)
         {
-            vxInfo("%3d (%d - %d)\n", j, tilingCollection->segments[j].start, tilingCollection->segments[j].end);
+            detectedCollection.segments[detectedCollection.segmentNum] = collection->segments[j];
+            detectedCollection.segmentNum++;
+            if (detectedCollection.segmentNum == VX_MAX_SEGMENT_COUNT)
+            {
+                status = VX_SUCCESS;
+                goto OnError;
+            }
         }
     }
-#endif
 
-    gcmFOOTER_ARG("%d", VX_SUCCESS);
-    return VX_SUCCESS;
+    gcoOS_MemCopy(collection, &detectedCollection, sizeof(vxnne_segment_collection_s));
+
+OnError:
+    return status;
 }
 
 VX_PRIVATE_API vx_status GenerateABSegmentInfo(
@@ -2177,10 +2104,6 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
         gcmFOOTER_ARG("%d", VX_SUCCESS);
         return VX_SUCCESS;
     }
-
-    status = SetMemoryRequestList(
-        graph, segment->start, segment->count, vx_false_e,
-        sRamIn, sRamOut);
 
     for (i = 0; i < segment->count; i++)
     {
@@ -2222,8 +2145,8 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                 status = vxnneCalculateConvTilingParam(graph->base.context,
                                                         convOperation,
                                                         tilingsInfo,
-                                                        requestList->inputMemory[0]->allocType == VXNNE_MEM_POOL_TYPE_SRAM  ? SW_TILING_FROM_AXI_SRAM : MemPoolTypeToPerfType(requestList->inputMemory[0]->allocType),
-                                                        requestList->outputMemory[0]->allocType == VXNNE_MEM_POOL_TYPE_SRAM ? SW_TILING_FROM_AXI_SRAM : MemPoolTypeToPerfType(requestList->outputMemory[0]->allocType),
+                                                        MemPoolTypeToPerfType(requestList->inputMemory[0]->allocType),
+                                                        MemPoolTypeToPerfType(requestList->outputMemory[0]->allocType),
                                                         vx_false_e,
                                                         j,
                                                         graph->base.context->vipSRAM.size);
@@ -2373,7 +2296,7 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
 
     requestList = graph->layer->memRequestList + segment->start;
 
-    for(i = 1; i < segment->count - 1; i++)
+    for(i = 0; i < segment->count - 1; i++)
     {
         requestList[i].inputCount = 0;
     }
@@ -2402,14 +2325,11 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
         {
             requestList[i].outputMemory[0]->strides[0][j] = requestList[i].outputMemory[0]->strides[0][j-1] * requestList[i].outputMemory[0]->dims[0][j-1];
         }
+
+        requestList[i].outputMemory[0]->sizes[0] = gcmALIGN_NP2(requestList[i].outputMemory[0]->strides[0][3], CACHE_ALIGNMENT_SIZE);
+
         requestList[i].outputMemory[0]->circular = vx_true_e;
     }
-
-    status = SetMemoryRequestList(graph,
-        segment->start, segment->count, vx_false_e,
-        sRamIn, sRamOut);
-
-    if (status != VX_SUCCESS) goto OnError;
 
     for(i = 0; i < segment->count; i++)
     {
@@ -2617,17 +2537,19 @@ VX_PRIVATE_API void  vxnneBlock_Free(
 
     for(j = 0; j < block->segmentNum; j++)
     {
-        if (block->segments[j].segmentInfo.tiling.tilingInfo)
+        if (block->segments[j]->segmentInfo.tiling.tilingInfo)
         {
-            gcoOS_Free(gcvNULL, block->segments[j].segmentInfo.tiling.tilingInfo);
-            block->segments[j].segmentInfo.tiling.tilingInfo = gcvNULL;
+            gcoOS_Free(gcvNULL, block->segments[j]->segmentInfo.tiling.tilingInfo);
+            block->segments[j]->segmentInfo.tiling.tilingInfo = gcvNULL;
         }
 
-        if (block->segments[j].segmentInfo.tiling.tilingOrderInfo)
+        if (block->segments[j]->segmentInfo.tiling.tilingOrderInfo)
         {
-            gcoOS_Free(gcvNULL, block->segments[j].segmentInfo.tiling.tilingOrderInfo);
-            block->segments[j].segmentInfo.tiling.tilingOrderInfo = gcvNULL;
+            gcoOS_Free(gcvNULL, block->segments[j]->segmentInfo.tiling.tilingOrderInfo);
+            block->segments[j]->segmentInfo.tiling.tilingOrderInfo = gcvNULL;
         }
+
+        gcoOS_Free(gcvNULL, block->segments[j]);
     }
 
     if (block->memParam)
@@ -2635,9 +2557,9 @@ VX_PRIVATE_API void  vxnneBlock_Free(
         gcoOS_Free(gcvNULL, block->memParam);
         block->memParam = VX_NULL;
     }
+
     gcoOS_ZeroMemory(block, sizeof(vxnne_block_s));
 }
-
 
 VX_PRIVATE_API vx_status GenerateBlockInfo(
     vx_graph                graph,
@@ -2647,17 +2569,16 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
     vx_status status = VX_SUCCESS;
     gceSTATUS gStatus;
     vx_uint32 i, peakMemSize[VXNNE_MEM_POOL_TYPE_END]={0};
-    vxnne_mem_param tempMemParam = VX_NULL;
     vx_bool sRamIn, sRamOut;
 
     gcmHEADER_ARG("graph=%p, block=%p", graph, block);
 
     for (i = 0; i < block->segmentNum; i++)
     {
-        block->count += block->segments[i].count;
+        block->count += block->segments[i]->count;
     }
 
-    block->start = block->segments[0].start;
+    block->start = block->segments[0]->start;
 
     gStatus = gcoOS_Allocate(gcvNULL, sizeof(vxnne_mem_param_s) * block->count, (gctPOINTER*)&block->memParam);
     if (gcmIS_ERROR(gStatus))
@@ -2666,33 +2587,22 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
         goto OnError;
     }
 
-    gStatus = gcoOS_Allocate(gcvNULL, sizeof(vxnne_mem_param_s) * block->count, (gctPOINTER*)&tempMemParam);
-    if (gcmIS_ERROR(gStatus))
-    {
-        status =  VX_ERROR_NO_MEMORY;
-        goto OnError;
-    }
-
-    /* backup mem param to restore */
-    status = GetMemoryParamList(graph, block->start, block->count, tempMemParam);
-    if (status != VX_SUCCESS) goto OnError;
-
     for (i = 0; i < block->segmentNum; i++)
     {
         sRamIn = (i == 0 ? vx_false_e : vx_true_e);
         sRamOut = (i == block->segmentNum - 1 ? vx_false_e : vx_true_e);
 
-        if (block->segments[i].type == VXNNE_SEGMENT_TYPE_AB)
+        if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_AB)
         {
-            status = GenerateABSegmentInfo(graph, block, &block->segments[i], sRamIn, sRamOut);
+            status = GenerateABSegmentInfo(graph, block, block->segments[i], sRamIn, sRamOut);
             if (status != VX_SUCCESS) goto OnError;
-            block->totalCommandCount += block->segments[i].count;
+            block->totalCommandCount += block->segments[i]->count;
         }
-        else if (block->segments[i].type == VXNNE_SEGMENT_TYPE_TILING)
+        else if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_TILING)
         {
-            status = GenerateTilingSegmentInfo(graph, block, &block->segments[i], sRamIn, sRamOut);
+            status = GenerateTilingSegmentInfo(graph, block, block->segments[i], sRamIn, sRamOut);
             if (status != VX_SUCCESS) goto OnError;
-            block->totalCommandCount += block->segments[i].segmentInfo.tiling.tilingOrderCount;
+            block->totalCommandCount += block->segments[i]->segmentInfo.tiling.tilingOrderCount;
         }
         else
         {
@@ -2703,47 +2613,56 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
     }
 
     {
+#if SW_TILING_DEBUG
+        char* memType[VXNNE_MEM_POOL_TYPE_END] = {"DD", "DD", "VS", "", "AS"};
+        char* opTarget[5] = {"NONE", "SH", "NN", "TP", "SW"};
+        vxnne_mem_request memRequireList;
+
+        vxInfo("======================== Block [%d - %d] ==============================\n", block->start, block->start + block->count - 1);
+        for (i = block->start; i < block->start + block->count; i++)
+        {
+            memRequireList = graph->layer->memRequestList + i;
+
+            vxInfo("%3d %s %s->%s [(%8d, %8d), IC(%8d), KC(%8d)]\n",
+                i, opTarget[graph->layer->operations[i]->target],
+                memType[((vx_tensor)graph->layer->operations[i]->inputs[0])->tensorBuffer->memory.allocType], memType[memRequireList->outputMemory[0]->allocType],
+                ((vx_tensor)graph->layer->operations[i]->inputs[0])->tensorBuffer->memory.sizes[0], memRequireList->outputMemory[0]->sizes[0],
+                memRequireList->imageCache.sizes[0], memRequireList->kernelCache.sizes[0]
+                );
+        }
+#endif
+
         status = vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, block->start, block->count, peakMemSize);
         if (status != VX_SUCCESS)
         {
             vx_uint32 j = 0;
             vxnne_operation_info_s opInfo;
-            vxInfo("WARINGING: Fail To GenerateBlockInfo with RequireMemoryList \n");
             for (i = 0; i < block->segmentNum; i++)
             {
-                if (block->segments[i].type == VXNNE_SEGMENT_TYPE_TILING)
+                if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_TILING)
                 {
-                    for (j = 0; j < block->segments[i].count; j++)
+                    for (j = 0; j < block->segments[i]->count; j++)
                     {
-                        vxnneOperation_GetInfo(graph->layer->operations[j + block->segments[i].start], &opInfo);
+                        vxnneOperation_GetInfo(graph->layer->operations[j + block->segments[i]->start], &opInfo);
                         if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
                         {
-                            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i].start];
-
-                            vx_uint32 EstimateKernelSize = GetEsitimateWBSize(opInfo.weightsBiases);
-                            vx_uint32 CompressedKernelSize = (vx_uint32)gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(convOperation->swtWeightBiases, 0), CACHE_ALIGNMENT_SIZE);
+                            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i]->start];
 
                             vxoReference_Release((vx_reference_ptr)&convOperation->swtWeightBiases, VX_TYPE_WEIGHTS_BIASES_PARAMETER, VX_REF_INTERNAL);
 
                             convOperation->swtWeightBiases = VX_NULL;
 
-                            vxInfo("%d: %d, %d, IC %d EstimateKernelSize %d CompressedKernelSize %d  %f%% \n", j + block->segments[i].start,
-                                opInfo.input->tensorBuffer->memory.allocType &  VXNNE_MEM_POOL_TYPE_SRAM ? opInfo.input->tensorBuffer->memory.sizes[0]: 0,
-                                opInfo.output->tensorBuffer->memory.allocType &  VXNNE_MEM_POOL_TYPE_SRAM ? opInfo.output->tensorBuffer->memory.sizes[0]: 0,
-                                opInfo.input->tensorBuffer->memory.allocType &  VXNNE_MEM_POOL_TYPE_SRAM ? 0 : graph->layer->operations[j + block->segments[i].start]->imageCacheSize,
-                                EstimateKernelSize, CompressedKernelSize, (vx_float32)(CompressedKernelSize/EstimateKernelSize)*100);
                         }
                     }
-                    vxInfo("=======================================================================\n");
                 }
                 else
                 {
-                    vxmASSERT(block->segments[i].type == VXNNE_SEGMENT_TYPE_AB);
-                    for (j = 0; j < block->segments[i].count; j++)
+                    vxmASSERT(block->segments[i]->type == VXNNE_SEGMENT_TYPE_AB);
+                    for (j = 0; j < block->segments[i]->count; j++)
                     {
-                        if (graph->layer->operations[j + block->segments[i].start]->target == VXNNE_OPERATION_TARGET_NN)
+                        if (graph->layer->operations[j + block->segments[i]->start]->target == VXNNE_OPERATION_TARGET_NN)
                         {
-                            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i].start];
+                            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i]->start];
                             vxoWeightsBiases_Decompress(graph->base.context, convOperation->weights_biases);
                         }
                     }
@@ -2842,30 +2761,32 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
             gcoOS_FreeMemory(gcvNULL, checkCount);
         }
 
+        graph->peakAxiSramUsedSize = gcmMAX(peakMemSize[VXNNE_MEM_POOL_TYPE_AXI_SRAM], graph->peakAxiSramUsedSize);
+
         /* temp solution for wb's reshuffleWeightPtr free, need remove it when solve reference count issue */
         {
             vx_uint32 j = 0;
 
             for (i = 0; i < block->segmentNum; i++)
             {
-                if (block->segments[i].type == VXNNE_SEGMENT_TYPE_TILING)
+                if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_TILING)
                 {
-                    for (j = 0; j < block->segments[i].count; j++)
+                    for (j = 0; j < block->segments[i]->count; j++)
                     {
-                        if (graph->layer->operations[j + block->segments[i].start]->target == VXNNE_OPERATION_TARGET_NN)
+                        if (graph->layer->operations[j + block->segments[i]->start]->target == VXNNE_OPERATION_TARGET_NN)
                         {
-                            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i].start];
+                            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i]->start];
                             vxoWeightsBiases_Clear(convOperation->swtWeightBiases);
                         }
                     }
                 }
-                else if (block->segments[i].type == VXNNE_SEGMENT_TYPE_AB)
+                else if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_AB)
                 {
-                    for (j = 0; j < block->segments[i].count; j++)
+                    for (j = 0; j < block->segments[i]->count; j++)
                     {
-                        if (graph->layer->operations[j + block->segments[i].start]->target == VXNNE_OPERATION_TARGET_NN)
+                        if (graph->layer->operations[j + block->segments[i]->start]->target == VXNNE_OPERATION_TARGET_NN)
                         {
-                            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i].start];
+                            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i]->start];
                             vxoWeightsBiases_Clear(convOperation->weights_biases);
                         }
                     }
@@ -2878,11 +2799,11 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
             vx_uint32 j;
             vxnne_mem_request memReqList;
 
-            for (j = 0; j < block->segments[i].count; j++)
+            for (j = 0; j < block->segments[i]->count; j++)
             {
-                vxnne_operation operation = graph->layer->operations[j + block->segments[i].start];
+                vxnne_operation operation = graph->layer->operations[j + block->segments[i]->start];
 
-                memReqList = graph->layer->memRequestList  + j + block->segments[i].start;
+                memReqList = graph->layer->memRequestList  + j + block->segments[i]->start;
                 if (memReqList->imageCache.physicals[0] != 0)
                 {
                     operation->imageCacheSize = (vx_uint32)memReqList->imageCache.sizes[0];
@@ -2938,59 +2859,35 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
 
         status = GetMemoryParamList(graph, block->start, block->count, block->memParam);
         if (status != VX_SUCCESS) goto OnError;
-
-        status = RestorePartialMemoryParamList(graph, block->start, block->count, tempMemParam);
-        if (status != VX_SUCCESS) goto OnError;
     }
 
 
 
 #if SW_TILING_DEBUG
-
     {
         vxnne_tiling_info_s* tilingInfo;
         vx_uint32  j, k;
-        vxnne_operation_info_s opInfo;
-        char* opTarget[5] = {"NONE", "SH", "NN", "TP", "SW"};
         char* memType[VXNNE_MEM_POOL_TYPE_END] = {"DD", "DD", "VS", "", "AS"};
-
-        vxInfo("======================= start block  ==============================\n");
-        vxInfo("            input          output    kernelSize  pad   pooling\n");
-        for(i = block->start; i < block->start + block->count; i++)
-        {
-            vxnneOperation_GetInfo(graph->layer->operations[i], &opInfo);
-            vxInfo("%3d %s [(%3d %3d %4d, %3d %3d %4d) (%d, %d) (%d, %d) (%d, %d, %d, %d)] \n",
-                    i, opTarget[opInfo.target],
-                    TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2),
-                    TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2),
-                    opInfo.kernelX, opInfo.kernelY,
-                    opInfo.pad.left, opInfo.pad.top,
-                    opInfo.poolSizeX, opInfo.poolSizeY, opInfo.poolStrideX, opInfo.poolStrideY);
-        }
-
 
         for (i = 0; i < block->segmentNum; i++)
         {
-            vxInfo("--------------------------------------------------------\n");
-            if (block->segments[i].type == VXNNE_SEGMENT_TYPE_AB)
-            {
-                vxInfo("Segment AB (%d - %d)\n", block->segments[i].start, block->segments[i].start + block->segments[i].count - 1);
+            vxInfo("------------------------------------------------------------------\n");
 
-                for(j = block->segments[i].start; j < block->segments[i].start + block->segments[i].count; j++)
-                {
-                    vxInfo("[%s -> %s]  ", memType[block->memParam[j - block->start].inputMemory[0].allocType],
-                                           memType[block->memParam[j - block->start].outputMemory[0].allocType]);
-                }
+            if (block->segments[i]->end < block->segments[i]->start) continue;
+
+            if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_AB)
+            {
+                vxInfo("Segment AB (%d - %d)\n", block->segments[i]->start, block->segments[i]->start + block->segments[i]->count - 1);
             }
             else
             {
-                vxInfo("Segment Tiling (%d - %d)\n", block->segments[i].start, block->segments[i].start +  block->segments[i].count - 1);
+                vxInfo("Segment Tiling (%d - %d)\n", block->segments[i]->start, block->segments[i]->start +  block->segments[i]->count - 1);
 
-                for(j = 0; j <block->segments[i].segmentInfo.tiling.tileYCount; j++)
+                for(j = 0; j <block->segments[i]->segmentInfo.tiling.tileYCount; j++)
                 {
-                    for(k = block->segments[i].start; k < block->segments[i].start + block->segments[i].count; k++)
+                    for(k = block->segments[i]->start; k < block->segments[i]->start + block->segments[i]->count; k++)
                     {
-                        tilingInfo = block->segments[i].segmentInfo.tiling.tilingInfo + (k - block->segments[i].start) * block->segments[i].segmentInfo.tiling.tileYCount;
+                        tilingInfo = block->segments[i]->segmentInfo.tiling.tilingInfo + (k - block->segments[i]->start) * block->segments[i]->segmentInfo.tiling.tileYCount;
 
                         if (tilingInfo[j].output.height > 0)
                         {
@@ -3014,33 +2911,20 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
                 }
 
                 vxInfo("\nAXISRAM: Estimate used %d  %f%%  VIPSRAM: Estimate used %d  %f%% M = %d\n",
-                        block->segments[i].segmentInfo.tiling.estimateAxiSRAMUsed, graph->base.context->axiSRAM[graph->deviceID].size == 0 ?
+                        block->segments[i]->segmentInfo.tiling.estimateAxiSRAMUsed, graph->base.context->axiSRAM[graph->deviceID].size == 0 ?
  0 :
- ((vx_float32)block->segments[i].segmentInfo.tiling.estimateAxiSRAMUsed / graph->base.context->axiSRAM[graph->deviceID].size) * 100,
-                        block->segments[i].segmentInfo.tiling.estimateVipSRAMUsed, graph->base.context->vipSRAM.size == 0 ? 0 : ((vx_float32)block->segments[i].segmentInfo.tiling.estimateVipSRAMUsed / graph->base.context->vipSRAM.size) * 100,
-                        block->segments[i].segmentInfo.tiling.M
+ ((vx_float32)block->segments[i]->segmentInfo.tiling.estimateAxiSRAMUsed / graph->base.context->axiSRAM[graph->deviceID].size) * 100,
+                        block->segments[i]->segmentInfo.tiling.estimateVipSRAMUsed, graph->base.context->vipSRAM.size == 0 ? 0 : ((vx_float32)block->segments[i]->segmentInfo.tiling.estimateVipSRAMUsed / graph->base.context->vipSRAM.size) * 100,
+                        block->segments[i]->segmentInfo.tiling.M
                         );
             }
+        }
 
-            vxInfo("\nCacheState = [IC KC][ ");
-            for(j = 0; j < block->segments[i].count; j++)
-            {
-                vxInfo("%c %c", graph->layer->operations[j + block->segments[i].start]->imageCacheSize == 0 ? '0' : graph->layer->operations[j + block->segments[i].start]->imageCacheMode == VXNNE_SRAM_CACHE_MODE_PARTIAL_CACHE ? 'P' : 'F',
-                                graph->layer->operations[j + block->segments[i].start]->kernelCacheSize == 0 ? '0' : graph->layer->operations[j + block->segments[i].start]->kernelCacheMode == VXNNE_SRAM_CACHE_MODE_PARTIAL_CACHE ? 'P' : 'F');
-                if (j !=  block->segments[i].count - 1)
-                {
-                    vxInfo(",");
-                }
-            }
-            vxInfo("]");
-
-            vxInfo("\nAXISRAM: Peak used %d  %f%% VIPSRAM: Peak used %d  %f%%\n",
+        vxInfo("\nAXISRAM: Peak used %d  %f%% VIPSRAM: Peak used %d  %f%%\n",
                    peakMemSize[VXNNE_MEM_POOL_TYPE_AXI_SRAM], graph->base.context->axiSRAM[graph->deviceID].size == 0 ? 0 : ((vx_float32)peakMemSize[VXNNE_MEM_POOL_TYPE_AXI_SRAM] / graph->base.context->axiSRAM[graph->deviceID].size) * 100,
                    peakMemSize[VXNNE_MEM_POOL_TYPE_VIP_SRAM], graph->base.context->vipSRAM.size == 0 ? 0 : ((vx_float32)peakMemSize[VXNNE_MEM_POOL_TYPE_VIP_SRAM] / graph->base.context->vipSRAM.size) * 100);
 
-        }
-
-        vxInfo("======================= End block  ==============================\n");
+        vxInfo("======================== Block [%d - %d] SUCCEED =========================\n", block->start, block->start + block->count - 1);
 
     }
 #endif
@@ -3049,112 +2933,69 @@ OnError:
 
     if (status != VX_SUCCESS)
     {
+        vxInfo("======================== Block [%d - %d] FAILED ==========================\n", block->start, block->start + block->count - 1);
         /* roll back */
-        if (tempMemParam)
-            RestoreMemoryParamList(graph, block->start, block->count, tempMemParam);
-
+        RestoreMemoryParamList(graph, block->start, block->count, block->start, graph->layer->initialReqList);
         vxnneBlock_Free(block);
     }
 
-    GetMemoryRequestList(graph, 0, graph->layer->base.num_operations, graph->layer->memRequestList);
-
-    if (tempMemParam) gcoOS_Free(gcvNULL, tempMemParam);
     gcmFOOTER_ARG("%d", status);
     return status;
 }
 
-VX_PRIVATE_API vxnne_segment GetNextSegment(
-        vx_uint32                   *abCurrent,
-        vxnne_segment_collection    abCollection,
-        vx_uint32                   *tilingCurrent,
-        vxnne_segment_collection    tilingCollection)
-{
-    vxnne_segment next;
-
-    gcmHEADER_ARG("abCurrent=%p, abCollection=%p, tilingCurrent=%p, tilingCollection=%p", abCurrent, abCollection, tilingCurrent, tilingCollection);
-
-    if (*abCurrent >= abCollection->segmentNum &&
-        *tilingCurrent >= tilingCollection->segmentNum)
-    {
-        gcmFOOTER_NO();
-        return VX_NULL;
-    }
-
-
-    if (*abCurrent >= abCollection->segmentNum ||
-        (*tilingCurrent < tilingCollection->segmentNum && abCollection->segments[*abCurrent].start > tilingCollection->segments[*tilingCurrent].start))
-    {
-        next = &tilingCollection->segments[*tilingCurrent];
-        (*tilingCurrent)++;
-    }
-    else
-    {
-        next = &abCollection->segments[*abCurrent];
-        (*abCurrent)++;
-    }
-
-    gcmFOOTER_ARG("next=%p", next);
-    return next;
-
-}
-
 VX_PRIVATE_API vx_status GenerateBlocks(
     vx_graph                    graph,
-    vxnne_segment_collection    abCollection,
-    vxnne_segment_collection    tilingCollection
+    vxnne_segment_collection    collection
     )
 {
     vx_status     status = VX_SUCCESS;
-    vx_uint32     i, abCurrent = 0, tilingCurrent = 0, maxSegmentNum = 0;
+    vx_uint32     i;
     vxnne_segment next;
     vxnne_block   block = VX_NULL;
 
-    gcmHEADER_ARG("graph=%p, abCollection=%p, tilingCollection=%p", graph, abCollection, tilingCollection);
-
     vxmASSERT(graph->layer->blockNum < VX_MAX_BLOCK_COUNT);
+
+    if (collection->segmentNum == 0) return VX_SUCCESS;
 
     block = &graph->layer->blocks[graph->layer->blockNum];
 
-    if (abCollection->segmentNum + tilingCollection->segmentNum == 0)
+    for(i = 0; i < collection->segmentNum; i++)
     {
-        gcmFOOTER_ARG("%d", VX_SUCCESS);
-        return VX_SUCCESS;
-    }
+        if (block->segmentNum >= VX_MAX_BLOCK_SEGMENT_COUNT)
+        {
+            status = VX_SUCCESS;
+            goto OnError;
+        }
 
-    maxSegmentNum = abCollection->segmentNum + tilingCollection->segmentNum;
-
-    for(i = 0; i < maxSegmentNum; i++)
-    {
-        next = GetNextSegment(&abCurrent, abCollection, &tilingCurrent, tilingCollection);
+        next = collection->segments[i];
         vxmASSERT(next);
 
         if (block->segmentNum == 0)
         {
-            block->segments[block->segmentNum] = *next;
+            block->segments[block->segmentNum] = next;
             block->segmentNum++;
             vxmASSERT(block->segmentNum <= VX_MAX_BLOCK_SEGMENT_COUNT);
         }
         else
         {
-            if (block->segments[block->segmentNum - 1].end == next->start)
+            if (block->segments[block->segmentNum - 1]->end == next->start)
             {
                 vxmASSERT(block->segmentNum < VX_MAX_BLOCK_SEGMENT_COUNT);
                 /* remove the overlap operation */
-                if (block->segments[block->segmentNum - 1].type == VXNNE_SEGMENT_TYPE_AB)
+                if (block->segments[block->segmentNum - 1]->type == VXNNE_SEGMENT_TYPE_AB)
                 {
-                    vxmASSERT(next->type == VXNNE_SEGMENT_TYPE_TILING);
-                    block->segments[block->segmentNum - 1].count -= 1;
-                    block->segments[block->segmentNum - 1].end -= 1;
+                    block->segments[block->segmentNum - 1]->count -= 1;
+                    block->segments[block->segmentNum - 1]->end -= 1;
                 }
-                else
+                else if (next->type == VXNNE_SEGMENT_TYPE_AB)
                 {
-                    vxmASSERT(next->type == VXNNE_SEGMENT_TYPE_AB);
+                    vxmASSERT(block->segments[block->segmentNum - 1]->type == VXNNE_SEGMENT_TYPE_TILING);
                     next->start += 1;
                     next->count -= 1;
                 }
 
                 /* merge segments */
-                block->segments[block->segmentNum] = *next;
+                block->segments[block->segmentNum] = next;
                 block->segmentNum++;
                 vxmASSERT(block->segmentNum <= VX_MAX_BLOCK_SEGMENT_COUNT);
             }
@@ -3174,7 +3015,7 @@ VX_PRIVATE_API vx_status GenerateBlocks(
                 }
 
                 block = &graph->layer->blocks[graph->layer->blockNum];
-                block->segments[block->segmentNum] = *next;
+                block->segments[block->segmentNum] = next;
                 block->segmentNum++;
                 vxmASSERT(block->segmentNum <= VX_MAX_BLOCK_SEGMENT_COUNT);
             }
@@ -3192,89 +3033,72 @@ VX_PRIVATE_API vx_status GenerateBlocks(
     status = VX_SUCCESS;
 
 OnError:
-    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return status;
 }
 
-VX_PRIVATE_API vx_status AnalyzeBlock(
-    vx_graph                graph,
-    vx_uint32               start,
-    vx_uint32               count,
-    vx_uint32               SWTilingOption
+
+VX_PRIVATE_API vx_status DetectSegmentsWithOption(
+    vx_graph                 graph,
+    vx_uint32                start,
+    vx_uint32                count,
+    vx_uint32                SWTilingOption,
+    vxnne_segment_collection detected
     )
 {
     vx_status status = VX_SUCCESS;
-    gceSTATUS gStatus = gcvSTATUS_OK;
 
-    vxnne_segment_collection abCollection = VX_NULL, tilingCollection = VX_NULL;
+    vxmASSERT(graph->base.context->vipSRAM.size > VX_VIP_SRAM_IMAGE_STREAM_SIZE);
 
-    gcmHEADER_ARG("graph=%p, start=0x%x, count=0x%x", graph, start, count);
-
-    if (graph->layer->blockNum >= VX_MAX_BLOCK_COUNT)
+    if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_FEATURE_SWTILING_PHASE3))
     {
-        goto OnError;
-    }
-
-    vxInfo("Analyze block (%d - %d)\n", start, start + count - 1);
-
-    gStatus = gcoOS_Allocate(gcvNULL, sizeof(vxnne_segment_collection_s), (gctPOINTER*)&abCollection);
-    if (gcmIS_ERROR(gStatus))
-    {
-        status = VX_ERROR_NO_MEMORY;
-        goto OnError;
-    }
-
-    gStatus = gcoOS_Allocate(gcvNULL, sizeof(vxnne_segment_collection_s), (gctPOINTER*)&tilingCollection);
-    if (gcmIS_ERROR(gStatus))
-    {
-        status = VX_ERROR_NO_MEMORY;
-        goto OnError;
-    }
-
-    gcoOS_ZeroMemory(abCollection, sizeof(vxnne_segment_collection_s));
-    gcoOS_ZeroMemory(tilingCollection, sizeof(vxnne_segment_collection_s));
-
-    if ((SWTilingOption == VX_SWTILING_OPTION_ALL) ||
-        (SWTilingOption == VX_SWTILING_OPTION_AB))
-    {
-        status  = DetectABSegments(graph, start, count, abCollection);
-        if (status != VX_SUCCESS)
+        if ((SWTilingOption == VX_SWTILING_OPTION_ALL) ||
+            (SWTilingOption == VX_SWTILING_OPTION_AB))
         {
-            goto OnError;
+            status  = DetectSegments(graph, start, count, VXNNE_SEGMENT_TYPE_AB, VXNNE_MEM_POOL_TYPE_VIP_SRAM, detected);
+            if (status != VX_SUCCESS)
+            {
+                goto OnError;
+            }
+        }
+
+        if ((SWTilingOption == VX_SWTILING_OPTION_ALL) ||
+            (SWTilingOption == VX_SWTILING_OPTION_TILING))
+        {
+            status  = DetectSegments(graph, start, count, VXNNE_SEGMENT_TYPE_TILING, VXNNE_MEM_POOL_TYPE_VIP_SRAM, detected);
+            if (status != VX_SUCCESS)
+            {
+                goto OnError;
+            }
         }
     }
 
-    if ((SWTilingOption == VX_SWTILING_OPTION_ALL) ||
-        (SWTilingOption == VX_SWTILING_OPTION_TILING))
+    if (graph->base.context->axiSRAM[graph->deviceID].size > 0)
     {
-        status  = DetectTilingSegments(graph, start, count, abCollection, tilingCollection);
-        if (status != VX_SUCCESS)
+        if ((SWTilingOption == VX_SWTILING_OPTION_ALL) ||
+            (SWTilingOption == VX_SWTILING_OPTION_AB))
         {
-            goto OnError;
-        }
-    }
+            status  = DetectSegments(graph, start, count, VXNNE_SEGMENT_TYPE_AB, VXNNE_MEM_POOL_TYPE_AXI_SRAM, detected);
+            if (status != VX_SUCCESS)
+            {
+                goto OnError;
+            }
 
-    status = GenerateBlocks(graph, abCollection, tilingCollection);
-    if (status != VX_SUCCESS)
-    {
-        goto OnError;
+        }
+
+        if ((SWTilingOption == VX_SWTILING_OPTION_ALL) ||
+            (SWTilingOption == VX_SWTILING_OPTION_TILING))
+        {
+            status  = DetectSegments(graph, start, count, VXNNE_SEGMENT_TYPE_TILING, VXNNE_MEM_POOL_TYPE_AXI_SRAM, detected);
+            if (status != VX_SUCCESS)
+            {
+                goto OnError;
+            }
+        }
     }
 
 OnError:
-    if (abCollection)
-    {
-        gcoOS_Free(gcvNULL, abCollection);
-    }
-
-    if (tilingCollection)
-    {
-        gcoOS_Free(gcvNULL, tilingCollection);
-    }
-
-    gcmFOOTER_ARG("%d", status);
     return status;
 }
-
 
 VX_PRIVATE_API vx_status InitializeABSegmentCommands(
     vx_graph                graph,
@@ -3298,7 +3122,7 @@ VX_PRIVATE_API vx_status InitializeABSegmentCommands(
         {
             opCommand->segmentFlag = VXNNE_SEGMENT_FLAG_START;
 
-            if (&block->segments[0] == segment)
+            if (block->segments[0] == segment)
             {
                 opCommand->blockFlag = VXNNE_BLOCK_FLAG_START;
             }
@@ -3311,7 +3135,7 @@ VX_PRIVATE_API vx_status InitializeABSegmentCommands(
         {
             opCommand->segmentFlag = VXNNE_SEGMENT_FLAG_END;
 
-            if (&block->segments[block->segmentNum - 1] == segment)
+            if (block->segments[block->segmentNum - 1] == segment)
             {
                 opCommand->blockFlag = VXNNE_BLOCK_FLAG_END;
             }
@@ -3492,7 +3316,7 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
                         {
                             opCommand->segmentFlag = VXNNE_SEGMENT_FLAG_START;
 
-                            if (&block->segments[0] == segment)
+                            if (block->segments[0] == segment)
                             {
                                 opCommand->blockFlag = VXNNE_BLOCK_FLAG_START;
                             }
@@ -3504,7 +3328,7 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
                         else if ((i == segmentTiling->tileYCount - 1) && (k == segmentTiling->count - 1))
                         {
                             opCommand->segmentFlag          = VXNNE_SEGMENT_FLAG_END;
-                            if (&block->segments[block->segmentNum - 1] == segment)
+                            if (block->segments[block->segmentNum - 1] == segment)
                             {
                                 opCommand->blockFlag = VXNNE_BLOCK_FLAG_END;
                             }
@@ -3753,13 +3577,13 @@ VX_PRIVATE_API vx_status InitializeBlock(
 
     for (i = 0; i < block->segmentNum; i++)
     {
-        if (block->segments[i].type == VXNNE_SEGMENT_TYPE_AB)
+        if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_AB)
         {
-            status = InitializeABSegmentCommands(graph, block, &block->segments[i]);
+            status = InitializeABSegmentCommands(graph, block, block->segments[i]);
         }
-        else if (block->segments[i].type == VXNNE_SEGMENT_TYPE_TILING)
+        else if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_TILING)
         {
-            status = InitializeTilingSegmentCommands(graph, block, &block->segments[i]);
+            status = InitializeTilingSegmentCommands(graph, block, block->segments[i]);
         }
         else
         {
@@ -3773,105 +3597,6 @@ VX_PRIVATE_API vx_status InitializeBlock(
 }
 
 
-VX_PRIVATE_API vx_status DetectBlocks(
-    vx_graph                graph,
-    vx_uint32               start,
-    vx_uint32               count,
-    vx_uint32               swTilingOption)
-{
-    vx_status status = VX_SUCCESS;
-    vx_bool   terminator = vx_false_e;
-    vx_uint32 i = 0, begin = start, num = 0;
-    vxnne_operation_info_s opInfo1 = {0}, opInfo2 = {0};
-
-    for (i = start; i <= start + count; i++)
-    {
-        terminator = vx_false_e;
-
-        if ((i == start + count) ||
-            !SupportAB(graph->base.context, graph->layer->operations[i]) ||
-            graph->layer->operations[i]->inputsNum == 0 || graph->layer->operations[i]->outputsNum == 0 ||
-            graph->layer->operations[i]->batchCount > 1)
-        {
-            terminator = vx_true_e;
-        }
-        else
-        {
-            vxmASSERT(graph->layer->operations[i]->target == VXNNE_OPERATION_TARGET_NN
-                   || graph->layer->operations[i]->target == VXNNE_OPERATION_TARGET_TP
-                   || graph->layer->operations[i]->target == VXNNE_OPERATION_TARGET_SH);
-
-            vxnneOperation_GetInfo(graph->layer->operations[i], &opInfo1);
-
-            if (TENSOR_SIZE_INDEX(opInfo1.input, 3) > 1 || TENSOR_SIZE_INDEX(opInfo1.output, 3) > 1)
-            {
-                terminator = vx_true_e;
-            }
-            else if (!graph->base.context->options.enableHandleBranch)
-            {
-                if (graph->layer->operations[i]->target == VXNNE_OPERATION_TARGET_SH)
-                {
-                    terminator = vx_true_e;
-                }
-                else if (graph->layer->operations[i]->parentOpNum > 1)
-                {
-                    terminator = vx_true_e;
-                }
-                else if (num >= 1)
-                {
-                    vxmASSERT(graph->layer->operations[i-1]->target == VXNNE_OPERATION_TARGET_NN
-                            || graph->layer->operations[i-1]->target == VXNNE_OPERATION_TARGET_TP);
-
-                    vxnneOperation_GetInfo(graph->layer->operations[i - 1], &opInfo2);
-
-                    if (!vxoTensor_IsOverlap(opInfo1.input, opInfo2.output))
-                    {
-                        terminator = vx_true_e;
-                    }
-                    else if (graph->layer->operations[i]->childOpNum > 1)
-                    {
-                        num++;
-                        terminator = vx_true_e;
-                    }
-                }
-                else if (graph->layer->operations[i]->childOpNum > 1)
-                {
-                    terminator = vx_true_e;
-                }
-            }
-            else if (graph->layer->operations[i]->inputsNum > 1 || graph->layer->operations[i]->outputsNum > 1)
-            {
-                terminator = vx_true_e;
-            }
-            else if (!opInfo1.output->isVirtual)
-            {
-                num++;
-                terminator = vx_true_e;
-            }
-        }
-
-        if (terminator)
-        {
-            if (num > 1)
-            {
-                status = AnalyzeBlock(graph, begin, num, swTilingOption);
-                if (status != VX_SUCCESS) goto OnError;
-            }
-
-            begin = i + 1;
-            num = 0;
-        }
-        else
-        {
-            num++;
-        }
-    }
-
-OnError:
-    return status;
-}
-
-
 enum {
     BLOCK_ARGS_INIT_FLAG = 0,
     BLOCK_ARGS_START_FLAG,
@@ -3879,9 +3604,10 @@ enum {
     BLOCK_ARGS_TYPE_FLAG
 };
 
-VX_PRIVATE_API vx_status DetectBlocksFromConfig(
+VX_PRIVATE_API vx_status DetectSegmentsFromConfig(
     vx_graph                    graph,
-    gctSTRING                   config
+    gctSTRING                   config,
+    vxnne_segment_collection    detected
     )
 {
     vx_status status = VX_SUCCESS;
@@ -3925,7 +3651,7 @@ VX_PRIVATE_API vx_status DetectBlocksFromConfig(
 
                 last = gcmMIN(last, (vx_int32)(graph->layer->base.num_operations - 1));
 
-                status = DetectBlocks(graph, start, last - start + 1, type);
+                status = DetectSegmentsWithOption(graph, start, last - start + 1, type, detected);
                 if (status != VX_SUCCESS) goto OnError;
             }
         }
@@ -3978,8 +3704,6 @@ VX_PRIVATE_API vx_status DetectBlocksFromConfig(
     return VX_SUCCESS;
 
 OnError:
-    graph->layer->blockNum = 0;
-    memset(graph->layer->blocks, 0, sizeof(vxnne_block_s) * VX_MAX_BLOCK_COUNT);
     return status;
 }
 
@@ -4081,10 +3805,16 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
 
 #if SW_TILING_DEBUG
     {
-        char* opTarget[6] = {"NONE", "SH", "NN", "TP", "SW", "SC"};
+        char     *opTarget[6] = {"NONE", "SH", "NN", "TP", "SW", "SC"};
         vx_uint32 offsetIn = 0, offsetOut = 0, inputSize, outputSize;
         vxInfo("---------------------------Begin VerifyTiling -------------------------\n");
-        vxInfo("AXI-SRAM = %d Bytes VIP-SRAM = %d Bytes\n", graph->base.context->axiSRAM[graph->deviceID].size, graph->base.context->vipSRAM.size);
+        vxInfo("AXI-SRAM = %d Bytes VIP-SRAM = %d Bytes SWTILING_PHASE_FEATURES[%d, %d, %d]\n",
+            graph->base.context->axiSRAM[graph->deviceID].size, graph->base.context->vipSRAM.size,
+            vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_FEATURE_SWTILING_PHASE1),
+            vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_FEATURE_SWTILING_PHASE2),
+            vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_FEATURE_SWTILING_PHASE3)
+            );
+
         for(i = 0; i < graph->layer->base.num_operations; i++)
         {
             offsetIn = 0; offsetOut = 0;
@@ -4101,13 +3831,14 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                 outputSize = TENSOR_SIZE_INDEX(opInfo.output, 3) * TENSOR_STRIDE_INDEX(opInfo.output, 3);
             }
 
-            vxInfo("%3d %s [%3d %3d %3d %3d 0x%p(0x%p, %u) -> %3d %3d %3d %3d 0x%p(0x%p, %u)] (k=%d i=%d O=%d)",
+            vxInfo("%3d %s [(%4d %4d %4d %d, %8d, 0x%p(0x%p, 0x%p) -> %4d %4d %4d %d, %8d, 0x%p(0x%p, 0x%p)) k(%d %d %4d, %8d) pad(%d %d) pool(%d %d, %d %d)]",
                         i,
                         opTarget[graph->layer->operations[i]->target],
                         opInfo.input  ? TENSOR_SIZE_INDEX(opInfo.input, 0) : 0,
                         opInfo.input  ? TENSOR_SIZE_INDEX(opInfo.input, 1) : 0,
                         opInfo.input  ? TENSOR_SIZE_INDEX(opInfo.input, 2) : 0,
                         opInfo.input  ? TENSOR_SIZE_INDEX(opInfo.input, 3) : 0,
+                        inputSize,
                         opInfo.input  ? opInfo.input->tensorBuffer + offsetIn : 0,
                         opInfo.input  ? opInfo.input->tensorBuffer : 0,
                         opInfo.input  ? offsetIn : 0,
@@ -4115,12 +3846,14 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                         opInfo.output ? TENSOR_SIZE_INDEX(opInfo.output, 1) : 0,
                         opInfo.output ? TENSOR_SIZE_INDEX(opInfo.output, 2) : 0,
                         opInfo.output ? TENSOR_SIZE_INDEX(opInfo.output, 3) : 0,
+                        outputSize,
                         opInfo.output ? opInfo.output->tensorBuffer+ offsetOut : 0,
                         opInfo.output ? opInfo.output->tensorBuffer : 0,
                         opInfo.output ? offsetOut : 0,
-                        opInfo.weightsBiases ?  GetEsitimateWBSize(opInfo.weightsBiases) : 0,
-                        inputSize,
-                        outputSize);
+                        opInfo.kernelX, opInfo.kernelY, opInfo.kernelZ, opInfo.weightsBiases ?  GetEsitimateWBSize(opInfo.weightsBiases) : 0,
+                        opInfo.pad.left, opInfo.pad.top,
+                        opInfo.poolSizeX, opInfo.poolSizeY, opInfo.poolStrideX, opInfo.poolStrideY
+                        );
 
             if (graph->layer->operations[i]->childOpNum >= 1  || graph->layer->operations[i]->parentOpNum >= 1 )
             {
@@ -4154,67 +3887,113 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
     status = GetMemoryRequestList(graph, 0, graph->layer->base.num_operations, graph->layer->memRequestList);
     if (status != VX_SUCCESS) goto OnError;
 
-    gStatus = gcoOS_Allocate(gcvNULL,
-                            sizeof(vxnne_block_s) * VX_MAX_BLOCK_COUNT,
-                            (gctPOINTER*)&graph->layer->blocks);
-
-    if (gcmIS_ERROR(gStatus))
+    if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_FEATURE_SWTILING_PHASE1) &&
+       !graph->base.context->options.enableNNLayerDump &&
+       graph->base.context->vipSRAM.size > VX_VIP_SRAM_IMAGE_STREAM_SIZE)
     {
-        vxmONERROR(VX_ERROR_NO_MEMORY);
-    }
+        vxnne_segment_collection_s detected;
+        gcoOS_ZeroMemory(&detected, sizeof(vxnne_segment_collection_s));
 
-    gcoOS_ZeroMemory(graph->layer->blocks, sizeof(vxnne_block_s) * VX_MAX_BLOCK_COUNT);
-
-    /* initialize operations perfHandle with DDR->DDR kerelPerCore, tx, ty */
-    for (i = 0; i < graph->layer->base.num_operations; i++)
-    {
-        vxnneOperation_GetInfo(graph->layer->operations[i], &opInfo);
-
-        if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
+        /* for roll back */
+        gStatus = gcoOS_Allocate(gcvNULL, sizeof(vxnne_mem_param_s) * graph->layer->base.num_operations, (gctPOINTER*)&graph->layer->initialReqList);
+        if (gcmIS_ERROR(gStatus))
         {
-            vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
-            vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
-            vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
-            vx_arch_perf_s archPerfHandle;
-
-            INITIALIZE_STRUCT(archPerfHandle);
-            calculateArchPerfFromWB(graph->base.context,
-                                &archPerfHandle,
-                                opInfo.weightsBiases,
-                                inputDims,
-                                outputDims,
-                                TENSOR_DATA_TYPE(opInfo.output),
-                                VX_NULL,
-                                vx_true_e,
-                                SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
-                                graph->base.context->vipSRAM.size,
-                                (vxnne_operation_target_e)opInfo.target,
-                                (vxnne_operator_e)opInfo.opType);
-
-            outImageTileX   = archPerfHandle.resultInfo.outImageTileXSize;
-            outImageTileY   = archPerfHandle.resultInfo.outImageTileYSize;
-            interleaveMode  = archPerfHandle.resultInfo.interleaveMode;
-            kernelX         = opInfo.weightsBiases->weights_sizes[0];
-            kernelY         = opInfo.weightsBiases->weights_sizes[1];
-            inImageZ        = TENSOR_SIZE_INDEX(opInfo.input, 2);
-            inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
-
-            graph->layer->operations[i]->esitimateImageCacheSize =
-                caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
-            graph->layer->operations[i]->esitimateKernelCacheSize = GetEsitimateWBSize(opInfo.weightsBiases);
+            status = VX_ERROR_NO_MEMORY;
+            goto OnError;
         }
-    }
 
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_BLOCKS_CONFIG", &blocksConfig)) && blocksConfig)
-    {
-        status = DetectBlocksFromConfig(graph, blocksConfig);
+        gcoOS_ZeroMemory(graph->layer->initialReqList, sizeof(vxnne_mem_param_s) * graph->layer->base.num_operations);
+
+        status = GetMemoryParamList(graph, 0, graph->layer->base.num_operations, graph->layer->initialReqList);
         if (status != VX_SUCCESS) goto OnError;
-    }
-    else
-    {
-        vx_uint32 swtilingOption = graph->base.context->options.enableSwtilingPhase1;
-        status = DetectBlocks(graph, 0, layer->base.num_operations, swtilingOption);
-        if (status != VX_SUCCESS) goto OnError;
+
+
+        gStatus = gcoOS_Allocate(gcvNULL,
+                                sizeof(vxnne_block_s) * VX_MAX_BLOCK_COUNT,
+                                (gctPOINTER*)&graph->layer->blocks);
+
+        if (gcmIS_ERROR(gStatus))
+        {
+            vxmONERROR(VX_ERROR_NO_MEMORY);
+        }
+
+        gcoOS_ZeroMemory(graph->layer->blocks, sizeof(vxnne_block_s) * VX_MAX_BLOCK_COUNT);
+
+        /* initialize operations perfHandle with DDR->DDR kerelPerCore, tx, ty */
+        for (i = 0; i < graph->layer->base.num_operations; i++)
+        {
+            vxnneOperation_GetInfo(graph->layer->operations[i], &opInfo);
+
+            if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
+            {
+                vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
+                vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
+                vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
+                vx_arch_perf_s archPerfHandle;
+
+                memset(&archPerfHandle, 0, sizeof(vx_arch_perf_s));
+                calculateArchPerfFromWB(graph->base.context,
+                                    &archPerfHandle,
+                                    opInfo.weightsBiases,
+                                    inputDims,
+                                    outputDims,
+                                    TENSOR_DATA_TYPE(opInfo.output),
+                                    VX_NULL,
+                                    vx_true_e,
+                                    SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
+                                    graph->base.context->vipSRAM.size,
+                                    (vxnne_operation_target_e)opInfo.target,
+                                    (vxnne_operator_e)opInfo.opType);
+
+                outImageTileX   = archPerfHandle.resultInfo.outImageTileXSize;
+                outImageTileY   = archPerfHandle.resultInfo.outImageTileYSize;
+                interleaveMode  = archPerfHandle.resultInfo.interleaveMode;
+                kernelX         = opInfo.weightsBiases->weights_sizes[0];
+                kernelY         = opInfo.weightsBiases->weights_sizes[1];
+                inImageZ        = TENSOR_SIZE_INDEX(opInfo.input, 2);
+                inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
+
+                graph->layer->operations[i]->esitimateImageCacheSize =
+                    caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
+                graph->layer->operations[i]->esitimateKernelCacheSize = GetEsitimateWBSize(opInfo.weightsBiases);
+            }
+        }
+
+        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_BLOCKS_CONFIG", &blocksConfig)) && blocksConfig)
+        {
+            status = DetectSegmentsFromConfig(graph, blocksConfig, &detected);
+            if (status != VX_SUCCESS) goto OnError;
+        }
+        else
+        {
+            vx_uint32 swtilingOption = graph->base.context->options.enableSwtilingPhase1;
+            status = DetectSegmentsWithOption(graph, 0, layer->base.num_operations, swtilingOption, &detected);
+            if (status != VX_SUCCESS) goto OnError;
+        }
+
+ #if SW_TILING_DEBUG
+        {
+            char* strMemType[VXNNE_MEM_POOL_TYPE_END] = {"DD", "DD", "VS", "", "AS"};
+            char* strSegType[2] = {"AB_", "TL_"};
+            vx_uint32 i;
+            for (i = 0; i < detected.segmentNum; i++)
+            {
+                if (i == 0)
+                {
+                    vxInfo("\nDetected Segments\n");
+                }
+
+                vxInfo("%s%s (%d - %d)\n", strSegType[detected.segments[i]->type], strMemType[detected.segments[i]->memType],
+                    detected.segments[i]->start, detected.segments[i]->end);
+            }
+        }
+#endif
+
+        status = GenerateBlocks(graph, &detected);
+        if (status != VX_SUCCESS)
+        {
+            goto OnError;
+        }
     }
 
     for (i = 0; i < layer->base.num_operations; i++)
@@ -4227,14 +4006,13 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
         maxOpCommandCount += layer->blocks[i].totalCommandCount -  layer->blocks[i].count;
     }
 
-    gStatus = gcoOS_Allocate(gcvNULL,
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
                             sizeof(vxnne_operation_command_s) * maxOpCommandCount,
-                            (gctPOINTER*)&layer->opIndices);
-
-    if (gcmIS_ERROR(gStatus))
+                            (gctPOINTER*)&layer->opIndices)))
     {
         layer->opIndicesNum = 0;
-        vxmONERROR(VX_ERROR_NO_MEMORY);
+        status = VX_ERROR_NO_MEMORY;
+        goto OnError;
     }
 
     gcoOS_ZeroMemory(layer->opIndices, sizeof(vxnne_operation_command_s) * maxOpCommandCount);
@@ -4340,29 +4118,53 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
         s = layer->blocks[j].start + layer->blocks[j].count;
     }
 
-    gcmASSERT(maxOpCommandCount >= layer->opIndicesNum);
+    /*
+    vxnnePreLoadWeightsBiases(graph->base.context, graph, graph->base.context->axiSRAM.size - gcmALIGN_NP2(graph->peakAxiSramUsedSize, PRELOAD_WB_ALIGNMENT));
+    */
 
 #if SW_TILING_DEBUG
-    if (layer->blockNum > 0)
+
+#define IS_SRAM(addr, type) \
+    ((addr) >= graph->base.context->type##SRAM[graph->deviceID].physical && (addr) < (graph->base.context->type##SRAM[graph->deviceID].physical + graph->base.context->type##SRAM[graph->deviceID].size))
+
+
     {
-        vxInfo("\n id IN [ x  y  w   h ]   OUT  [ x  y  w  h ] \n");
+        char *memType[VXNNE_MEM_POOL_TYPE_END] = {"DD", "DD", "VS", "", "AS"};
+        char *opTarget[6] = {"NONE", "SH", "NN", "TP", "SW", "SC"};
+        vxInfo("\n id IN [ x  y  w   h ]   OUT  [ x  y  w  h ] (tx, ty, kpc) (ic, kc, kc/ks, ks/eks, kernel_type)\n");
         for (i = 0; i < layer->opIndicesNum; i++)
         {
-            vxInfo(" %3d %s %8x [%3d %3d %3d %3d] -> %s %8x [%3d %3d %3d %3d] \n",
+            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)layer->opIndices[i].operation;
+            vx_weights_biases_parameter wb = layer->opIndices[i].operation->target == VXNNE_OPERATION_TARGET_NN ? (convOperation->swtWeightBiases ? convOperation->swtWeightBiases : convOperation->weights_biases) : 0;
+
+            vxInfo(" %3d %s %s 0x%p [%4d %4d %8d %8d] -> %s 0x%p [%4d %4d %8d %8d] (%3d, %3d, %3d) (%8d, %8d, %f%%, %f%%, %s)\n",
                 layer->opIndices[i].operationID,
-                layer->opIndices[i].inputTile.sRAM ? "SRAM" : "GDDR",
+                opTarget[layer->opIndices[i].operation->target],
+                memType[layer->opIndices[i].inputTile.sRAM],
                 layer->opIndices[i].inputTile.physical,
                 layer->opIndices[i].inputTile.x,
                 layer->opIndices[i].inputTile.y,
                 layer->opIndices[i].inputTile.width,
                 layer->opIndices[i].inputTile.height,
-                layer->opIndices[i].outputTile.sRAM ? "SRAM" : "GDDR",
+                memType[layer->opIndices[i].outputTile.sRAM],
                 layer->opIndices[i].outputTile.physical,
                 layer->opIndices[i].outputTile.x,
                 layer->opIndices[i].outputTile.y,
                 layer->opIndices[i].outputTile.width,
-                layer->opIndices[i].outputTile.height);
+                layer->opIndices[i].outputTile.height,
+                wb ? layer->opIndices[i].cmdInfo.tilingParam.kernelsPerCore != 0 ? layer->opIndices[i].cmdInfo.tilingParam.outImageTileXSize : convOperation->resultInfo.outImageTileXSize : 0,
+                wb ? layer->opIndices[i].cmdInfo.tilingParam.kernelsPerCore != 0 ? layer->opIndices[i].cmdInfo.tilingParam.outImageTileYSize : convOperation->resultInfo.outImageTileYSize : 0,
+                wb ? layer->opIndices[i].cmdInfo.tilingParam.kernelsPerCore != 0 ? layer->opIndices[i].cmdInfo.tilingParam.kernelsPerCore : convOperation->resultInfo.kernelsPerCore : 0,
+                wb ? layer->opIndices[i].cmdInfo.imageCacheSize : 0,
+                wb ? layer->opIndices[i].cmdInfo.kernelCacheSize : 0,
+                wb ? (vx_float32)layer->opIndices[i].cmdInfo.kernelCacheSize/gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(wb, 0), CACHE_ALIGNMENT_SIZE) *100  : 0,
+                wb ? ((vx_float32)gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(wb, 0), CACHE_ALIGNMENT_SIZE) / GetEsitimateWBSize(wb) *100) : 0,
+                wb ? IS_SRAM(wb->memory.physicals[0], axi) ? "AS" : "DD" : "NONE"
+                );
         }
+
+        vxInfo("\nPreLoadWeightBiases = %d  %f%%\n", graph->base.context->axiSRAM[graph->deviceID].size - graph->peakAxiSramUsedSize, (vx_float32)(graph->base.context->axiSRAM[graph->deviceID].size - graph->peakAxiSramUsedSize) / graph->base.context->axiSRAM[graph->deviceID].size *100);
+
     }
 
     vxInfo("---------------------------End VerifyTiling -------------------------\n");
@@ -4388,6 +4190,12 @@ OnError:
     {
         gcoOS_Free(gcvNULL, layer->memRequestList);
         layer->memRequestList = VX_NULL;
+    }
+
+    if (layer->initialReqList)
+    {
+        gcoOS_Free(gcvNULL, layer->initialReqList);
+        layer->initialReqList = VX_NULL;
     }
 
     gcmFOOTER_ARG("%d", status);

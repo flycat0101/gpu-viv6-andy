@@ -28,8 +28,8 @@ extern "C" {
 #define VX_MAX_OPERTAION_GENERICS           (VX_MAX_OPERTAION_PARAMETERS - (VX_MAX_OPERTAION_INPUTS_OUTPUTS<<1))
 #define VX_MAX_OPERATION_COUNT              8192
 #define VX_MAX_BLOCK_COUNT                  1024
-#define VX_MAX_SEGMENT_COUNT                1024
-#define VX_MAX_BLOCK_SEGMENT_COUNT          8
+#define VX_MAX_SEGMENT_COUNT                4 * 1024
+#define VX_MAX_BLOCK_SEGMENT_COUNT          64
 
 #define VX_VIP_SRAM_IMAGE_STREAM_SIZE       2048
 #define SW_TILING_DEBUG                     1
@@ -686,6 +686,7 @@ typedef struct _vxnne_segment_ab_info_s
 typedef struct _vxnne_segment_s
 {
     vx_enum        type;
+    vx_enum        memType;
     vx_uint32      start;
     vx_uint32      end;
     vx_uint32      count;
@@ -700,7 +701,7 @@ typedef struct _vxnne_segment_s
 typedef struct _vxnne_segment_collection_s
 {
     vx_uint32           segmentNum;
-    vxnne_segment_s     segments[VX_MAX_SEGMENT_COUNT];
+    vxnne_segment       segments[VX_MAX_SEGMENT_COUNT];
 
 }vxnne_segment_collection_s, *vxnne_segment_collection;
 
@@ -709,7 +710,7 @@ typedef struct _vxnne_block_s
     vx_uint32           start;
     vx_uint32           count;
     vx_uint32           segmentNum;
-    vxnne_segment_s     segments[VX_MAX_BLOCK_SEGMENT_COUNT];
+    vxnne_segment       segments[VX_MAX_BLOCK_SEGMENT_COUNT];
     vxnne_mem_param     memParam;
     vx_uint32           totalCommandCount;
 
@@ -854,6 +855,7 @@ typedef struct _vxnne_execution_layer_s
     vx_graph                     graph;
     vxnne_operation              *operations;
     vxnne_mem_request            memRequestList;
+    vxnne_mem_param              initialReqList;
 
     vx_uint32                    blockNum;
     vxnne_block                  blocks;
