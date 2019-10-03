@@ -814,6 +814,7 @@ _LoadBuiltinConstants(IN cloCOMPILER Compiler)
 
         __BUILD_BUILT_IN(TEXU)
         __BUILD_BUILT_IN(GET_IMAGE_TYPE)
+        __BUILD_BUILT_IN(MOV_LONG)
     };
 
 #undef __BUILD_BUILT_IN
