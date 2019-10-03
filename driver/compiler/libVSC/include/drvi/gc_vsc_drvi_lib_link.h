@@ -25,10 +25,6 @@ typedef union _SPECIALIZATION_CONSTANT_VALUE
 
 typedef struct _VSC_LIB_SPECIALIZATION_CONSTANT
 {
-    /*
-    ** Some specialized variables for a function parameter, note that a name of the function parameter may be padding with "#dup%d",
-    ** so we need to use gcoOS_StrNCmp to compare with the function parameter.
-    */
     gctCONST_STRING                   varName;
     SPECIALIZATION_CONSTANT_VALUE     value;
     VSC_SHADER_DATA_TYPE              type;
