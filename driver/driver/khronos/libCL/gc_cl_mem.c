@@ -2691,7 +2691,7 @@ gctINT clfPackImagePixelui( cl_uint *srcVector, const cl_image_format *imageForm
         {
             unsigned char *ptr = (unsigned char *)outData;
             for( i = 0; i < channelCount; i++ )
-                ptr[ i ] = (unsigned char)SATURATEUI( srcVector[ i ], 0, 255 );
+                ptr[ i ] = (unsigned char)SATURATEUI( srcVector[ i ], 255 );
             CLBGRA2GRGA(unsigned char);
             break;
         }
@@ -2699,7 +2699,7 @@ gctINT clfPackImagePixelui( cl_uint *srcVector, const cl_image_format *imageForm
         {
             unsigned short *ptr = (unsigned short *)outData;
             for( i = 0; i < channelCount; i++ )
-                ptr[ i ] = (unsigned short)SATURATEUI( srcVector[ i ], 0, 65535 );
+                ptr[ i ] = (unsigned short)SATURATEUI( srcVector[ i ], 65535 );
             CLBGRA2GRGA(unsigned short);
             break;
         }
