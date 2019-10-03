@@ -3030,7 +3030,8 @@ static gceSTATUS gcoHARDWARE_FlushStates(
 
     if (Hardware->multiGPURenderingModeDirty && (Hardware->config->gpuCoreCount > 1))
     {
-        gcmONERROR(gcoHARDWARE_FlushMultiGPURenderingMode(Hardware, Memory));
+        /* TODO: select optimum rendering mode for different statemetn */
+        gcmONERROR(gcoHARDWARE_FlushMultiGPURenderingMode(Hardware, Memory, gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_128x64));
     }
 
     if (Hardware->features[gcvFEATURE_DRAW_ID])

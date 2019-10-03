@@ -2484,7 +2484,8 @@ gcoHARDWARE_InvokeThreadWalkerGL(
 
     if (Hardware->config->gpuCoreCount > 1)
     {
-        gcmONERROR(gcoHARDWARE_FlushMultiGPURenderingMode(Hardware, (gctPOINTER*)&memory));
+        /* TODO: select optimum rendering mode for different statemetn */
+        gcmONERROR(gcoHARDWARE_FlushMultiGPURenderingMode(Hardware, (gctPOINTER*)&memory, gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_128x64));
     }
 
 #if gcdENABLE_TRUST_APPLICATION&&0

@@ -2696,7 +2696,8 @@ gcoHARDWARE_SetMultiGPURenderingMode(
 gceSTATUS
 gcoHARDWARE_FlushMultiGPURenderingMode(
     IN gcoHARDWARE Hardware,
-    INOUT gctPOINTER * Memory
+    INOUT gctPOINTER * Memory,
+    IN gceMULTI_GPU_RENDERING_MODE mode
     );
 
 gceSTATUS

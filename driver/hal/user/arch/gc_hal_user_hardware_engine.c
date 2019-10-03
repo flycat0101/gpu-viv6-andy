@@ -2634,7 +2634,8 @@ OnError:
 gceSTATUS
 gcoHARDWARE_FlushMultiGPURenderingMode(
     IN gcoHARDWARE Hardware,
-    INOUT gctPOINTER * Memory
+    INOUT gctPOINTER * Memory,
+    IN gceMULTI_GPU_RENDERING_MODE mode
     )
 {
     gctUINT32 i;
@@ -2646,7 +2647,6 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
     gcoSURF surface = Hardware->PEStates->colorStates.target[0].surface
                     ? Hardware->PEStates->colorStates.target[0].surface
                     : Hardware->PEStates->depthStates.surface;
-    gceMULTI_GPU_RENDERING_MODE mode;
     gcsHINT_PTR hints;
     gctBOOL singleCore = gcvFALSE;
     gctUINT32 setMappingGPU4to7 = 0;
@@ -2676,10 +2676,6 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
     if (surface == gcvNULL || singleCore)
     {
         mode = gcvMULTI_GPU_RENDERING_MODE_OFF;
-    }
-    else
-    {
-        mode = gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_128x64;
     }
 
     if (mode == Hardware->gpuRenderingMode)
