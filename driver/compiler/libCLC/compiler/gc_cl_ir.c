@@ -2991,22 +2991,22 @@ IN OUT clsNAME **RefParamName
                    return gcvTRUE;
               }
           }
-      }
-      else {
-         if(clmDECL_IsPointerType(rDecl)) {
-             if(clmIsElementTypePacked(rDecl->dataType->elementType)) {
-                clsBUILTIN_DATATYPE_INFO *typeInfo;
+          else {
+             if(clmDECL_IsPointerType(rDecl)) {
+                 if(clmIsElementTypePacked(rDecl->dataType->elementType)) {
+                    clsBUILTIN_DATATYPE_INFO *typeInfo;
 
-                typeInfo = clGetBuiltinDataTypeInfo(rDecl->dataType->type);
-                if(typeInfo->dualType == paramDecl->dataType->type) return gcvTRUE;
-             }
-             else if(clmIsElementTypePacked(paramDecl->dataType->elementType)) {
-                clsBUILTIN_DATATYPE_INFO *typeInfo;
+                    typeInfo = clGetBuiltinDataTypeInfo(rDecl->dataType->type);
+                    if(typeInfo->dualType == paramDecl->dataType->type) return gcvTRUE;
+                 }
+                 else if(clmIsElementTypePacked(paramDecl->dataType->elementType)) {
+                    clsBUILTIN_DATATYPE_INFO *typeInfo;
 
-                typeInfo = clGetBuiltinDataTypeInfo(paramDecl->dataType->type);
-                if(typeInfo->dualType == rDecl->dataType->type) return gcvTRUE;
+                    typeInfo = clGetBuiltinDataTypeInfo(paramDecl->dataType->type);
+                    if(typeInfo->dualType == rDecl->dataType->type) return gcvTRUE;
+                 }
              }
-         }
+          }
       }
   }
 
