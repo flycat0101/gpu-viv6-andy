@@ -349,12 +349,7 @@ vdkGetAddress(
 #define VDK_CONFIG_RGB888           ((const EGLint *) 19)
 #define VDK_CONFIG_RGB565_AA        ((const EGLint *) 21)
 #define VDK_CONFIG_RGB888_AA        ((const EGLint *) 23)
-#define VDK_CONFIG_RGB888_D16_GL    ((const EGLint *) 24)
 
-
-/* OpenVG Configurations. */
-#define VDK_CONFIG_RGB565_VG        ((const EGLint *) 500)
-#define VDK_CONFIG_RGB888_VG        ((const EGLint *) 501)
 
 #define VDK_CONTEXT_ES11            ((const EGLint *) 0)
 #define VDK_CONTEXT_ES20            ((const EGLint *) 2)
