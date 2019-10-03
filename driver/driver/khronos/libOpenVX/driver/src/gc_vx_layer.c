@@ -12764,6 +12764,7 @@ vxnne_shader_executable vxnneReshuffleShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength    = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -12779,7 +12780,6 @@ vxnne_shader_executable vxnneReshuffleShaderExecutable(
     vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
     vx_scalar    padXLeft_s        = VX_NULL;
     vx_scalar    padYTOP_s         = VX_NULL;
-    char *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
