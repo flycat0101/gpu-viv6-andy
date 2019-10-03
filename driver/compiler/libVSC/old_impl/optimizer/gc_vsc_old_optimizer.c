@@ -2332,6 +2332,10 @@ gcOpt_OptimizeConstantAssignment(
 
                 for (list = userCode->prevDefines; list; list = list->next)
                 {
+                    if (list->index < 0)
+                    {
+                        continue;
+                    }
                     code2 = list->code;
                     if (gcmSL_TARGET_GET(code1->instruction.temp, Enable) &
                         gcmSL_TARGET_GET(code2->instruction.temp, Enable))
@@ -2343,6 +2347,10 @@ gcOpt_OptimizeConstantAssignment(
 
                 for (list = userCode->nextDefines; list; list = list->next)
                 {
+                    if (list->index < 0)
+                    {
+                        continue;
+                    }
                     code2 = list->code;
                     if (gcmSL_TARGET_GET(code1->instruction.temp, Enable) &
                         gcmSL_TARGET_GET(code2->instruction.temp, Enable))
