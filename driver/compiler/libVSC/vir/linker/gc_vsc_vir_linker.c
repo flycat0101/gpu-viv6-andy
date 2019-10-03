@@ -316,6 +316,8 @@ _CreateIntrinsicLib(
         gcLibImageLoad_2D_float, /* 16f */
         gcLibImageLoad_2D_float_rgba8,
         gcLibImageLoad_2D_float_rgba8_snorm,
+        gcLibImageLoad_2D_float_rg8_snorm,
+        gcLibImageLoad_2D_float_r8_snorm,
         gcLibImageLoad_2D_float_rg8,
         gcLibImageLoad_2D_float_r8,
         gcLibImageLoad_2D_float_rgba32f,
@@ -1851,16 +1853,19 @@ _ConvImageTypeId(
     case VIR_IMAGE_FORMAT_RGBA16F:
     case VIR_IMAGE_FORMAT_RG16F:
     case VIR_IMAGE_FORMAT_R16F:
+    case VIR_IMAGE_FORMAT_RGBA16:
+    case VIR_IMAGE_FORMAT_RGBA16_SNORM:
+    case VIR_IMAGE_FORMAT_RG16:
+    case VIR_IMAGE_FORMAT_RG16_SNORM:
+    case VIR_IMAGE_FORMAT_R16:
+    case VIR_IMAGE_FORMAT_R16_SNORM:
     case VIR_IMAGE_FORMAT_BGRA8_UNORM:
     case VIR_IMAGE_FORMAT_RGBA8:
     case VIR_IMAGE_FORMAT_RGBA8_SNORM:
-    case VIR_IMAGE_FORMAT_RGBA8_UNORM:
     case VIR_IMAGE_FORMAT_RG8:
     case VIR_IMAGE_FORMAT_RG8_SNORM:
-    case VIR_IMAGE_FORMAT_RG8_UNORM:
     case VIR_IMAGE_FORMAT_R8:
     case VIR_IMAGE_FORMAT_R8_SNORM:
-    case VIR_IMAGE_FORMAT_R8_UNORM:
         imageFormatTypeId = VIR_TYPE_FLOAT32;
         break;
 
@@ -2139,6 +2144,7 @@ _IntrisicImageRelatedFuncName(
             break;
 
         /* 16bit. */
+        /* 16bit floating. */
         case VIR_IMAGE_FORMAT_RGBA16F:
             break;
 
@@ -2150,6 +2156,32 @@ _IntrisicImageRelatedFuncName(
             gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_r16f");
             break;
 
+        /* 16bit floating unorm/snorm. */
+        case VIR_IMAGE_FORMAT_RGBA16:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rgba16");
+            break;
+
+        case VIR_IMAGE_FORMAT_RGBA16_SNORM:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rgba16_snorm");
+            break;
+
+        case VIR_IMAGE_FORMAT_RG16:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rg16");
+            break;
+
+        case VIR_IMAGE_FORMAT_RG16_SNORM:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rg16_snorm");
+            break;
+
+        case VIR_IMAGE_FORMAT_R16:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_r16");
+            break;
+
+        case VIR_IMAGE_FORMAT_R16_SNORM:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_r16_snorm");
+            break;
+
+        /* 16bit integer. */
         case VIR_IMAGE_FORMAT_RGBA16I:
             break;
 
@@ -2173,6 +2205,7 @@ _IntrisicImageRelatedFuncName(
             break;
 
         /* 8bit. */
+        /* 8bit floating unorm/snorm. */
         case VIR_IMAGE_FORMAT_BGRA8_UNORM:
             gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_bgra8");
             break;
@@ -2185,20 +2218,12 @@ _IntrisicImageRelatedFuncName(
             gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rgba8_snorm");
             break;
 
-        case VIR_IMAGE_FORMAT_RGBA8_UNORM:
-            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rgba8_unorm");
-            break;
-
         case VIR_IMAGE_FORMAT_RG8:
             gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rg8");
             break;
 
         case VIR_IMAGE_FORMAT_RG8_SNORM:
             gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rg8_snorm");
-            break;
-
-        case VIR_IMAGE_FORMAT_RG8_UNORM:
-            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rg8_unorm");
             break;
 
         case VIR_IMAGE_FORMAT_R8:
@@ -2209,10 +2234,7 @@ _IntrisicImageRelatedFuncName(
             gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_r8_snorm");
             break;
 
-        case VIR_IMAGE_FORMAT_R8_UNORM:
-            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_r8_unorm");
-            break;
-
+        /* 8bit integer. */
         case VIR_IMAGE_FORMAT_RGBA8I:
             gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rgba8i");
             break;
@@ -6258,6 +6280,7 @@ _FixImageFormatByImageType(
 
         case VIR_IMAGE_FORMAT_RGBA16F:
         case VIR_IMAGE_FORMAT_RGBA16UI:
+        case VIR_IMAGE_FORMAT_RGBA16:
             fixedImageFormat = VIR_IMAGE_FORMAT_RGBA16I;
             break;
 
@@ -6274,6 +6297,7 @@ _FixImageFormatByImageType(
 
         case VIR_IMAGE_FORMAT_RG16F:
         case VIR_IMAGE_FORMAT_RG16UI:
+        case VIR_IMAGE_FORMAT_RG16:
             fixedImageFormat = VIR_IMAGE_FORMAT_RG16I;
             break;
 
@@ -6290,6 +6314,7 @@ _FixImageFormatByImageType(
 
         case VIR_IMAGE_FORMAT_R16F:
         case VIR_IMAGE_FORMAT_R16UI:
+        case VIR_IMAGE_FORMAT_R16:
             fixedImageFormat = VIR_IMAGE_FORMAT_R16I;
             break;
 
@@ -6318,6 +6343,7 @@ _FixImageFormatByImageType(
 
         case VIR_IMAGE_FORMAT_RGBA16I:
         case VIR_IMAGE_FORMAT_RGBA16F:
+        case VIR_IMAGE_FORMAT_RGBA16:
             fixedImageFormat = VIR_IMAGE_FORMAT_RGBA16UI;
             break;
 
@@ -6334,6 +6360,7 @@ _FixImageFormatByImageType(
 
         case VIR_IMAGE_FORMAT_RG16I:
         case VIR_IMAGE_FORMAT_RG16F:
+        case VIR_IMAGE_FORMAT_RG16:
             fixedImageFormat = VIR_IMAGE_FORMAT_RG16UI;
             break;
 
@@ -6350,6 +6377,7 @@ _FixImageFormatByImageType(
 
         case VIR_IMAGE_FORMAT_R16I:
         case VIR_IMAGE_FORMAT_R16F:
+        case VIR_IMAGE_FORMAT_R16:
             fixedImageFormat = VIR_IMAGE_FORMAT_R16UI;
             break;
 

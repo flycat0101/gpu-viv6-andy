@@ -2423,6 +2423,39 @@ static VIR_ImageFormat __SpvVkFormat2VirImageFormat(VkFormat vkformat)
         imageFormat = VIR_IMAGE_FORMAT_RGBA8_SNORM;
         break;
 
+    case VK_FORMAT_R8G8_SNORM:
+        imageFormat = VIR_IMAGE_FORMAT_RG8_SNORM;
+        break;
+
+    case VK_FORMAT_R8_SNORM:
+        imageFormat = VIR_IMAGE_FORMAT_R8_SNORM;
+        break;
+
+    /* F16 UNORM/SNORM. */
+    case VK_FORMAT_R16G16B16A16_UNORM:
+        imageFormat = VIR_IMAGE_FORMAT_RGBA16;
+        break;
+
+    case VK_FORMAT_R16G16_UNORM:
+        imageFormat = VIR_IMAGE_FORMAT_RG16;
+        break;
+
+    case VK_FORMAT_R16_UNORM:
+        imageFormat = VIR_IMAGE_FORMAT_RG16;
+        break;
+
+    case VK_FORMAT_R16G16B16A16_SNORM:
+        imageFormat = VIR_IMAGE_FORMAT_RGBA16_SNORM;
+        break;
+
+    case VK_FORMAT_R16G16_SNORM:
+        imageFormat = VIR_IMAGE_FORMAT_RG16_SNORM;
+        break;
+
+    case VK_FORMAT_R16_SNORM:
+        imageFormat = VIR_IMAGE_FORMAT_R16_SNORM;
+        break;
+
     /* SINT */
     case VK_FORMAT_R32G32B32A32_SINT:
         imageFormat = VIR_IMAGE_FORMAT_RGBA32I;
@@ -2557,22 +2590,22 @@ static VIR_ImageFormat __SpvImageFormatToVirImageFormat(SpvImageFormat format)
     case SpvImageFormatRg8i:            imageFormat = VIR_IMAGE_FORMAT_RG8I; break;
     case SpvImageFormatR16i:            imageFormat = VIR_IMAGE_FORMAT_R16I; break;
     case SpvImageFormatR8i:             imageFormat = VIR_IMAGE_FORMAT_R8I; break;
-    case SpvImageFormatRgba16:          imageFormat = VIR_IMAGE_FORMAT_RGBA16F; break;
-    case SpvImageFormatRg16:            imageFormat = VIR_IMAGE_FORMAT_RG16F; break;
+    case SpvImageFormatRgba16:          imageFormat = VIR_IMAGE_FORMAT_RGBA16; break;
+    case SpvImageFormatRg16:            imageFormat = VIR_IMAGE_FORMAT_RG16; break;
     case SpvImageFormatRg8:             imageFormat = VIR_IMAGE_FORMAT_RG8; break;
-    case SpvImageFormatR16:             imageFormat = VIR_IMAGE_FORMAT_R16F; break;
+    case SpvImageFormatR16:             imageFormat = VIR_IMAGE_FORMAT_R16; break;
     case SpvImageFormatR8:              imageFormat = VIR_IMAGE_FORMAT_R8; break;
     case SpvImageFormatRg32ui:          imageFormat = VIR_IMAGE_FORMAT_RG32UI; break;
     case SpvImageFormatRg8ui:           imageFormat = VIR_IMAGE_FORMAT_RG8UI; break;
     case SpvImageFormatR16ui:           imageFormat = VIR_IMAGE_FORMAT_R16UI; break;
     case SpvImageFormatR8ui:            imageFormat = VIR_IMAGE_FORMAT_R8UI; break;
+    case SpvImageFormatRgba16Snorm:     imageFormat = VIR_IMAGE_FORMAT_RGBA16_SNORM; break;
+    case SpvImageFormatRg16Snorm:       imageFormat = VIR_IMAGE_FORMAT_RG16_SNORM; break;
+    case SpvImageFormatR16Snorm:        imageFormat = VIR_IMAGE_FORMAT_R16_SNORM; break;
 
     case SpvImageFormatR11fG11fB10f:
     case SpvImageFormatRgb10A2:
-    case SpvImageFormatRgba16Snorm:
-    case SpvImageFormatRg16Snorm:
     case SpvImageFormatRg8Snorm:
-    case SpvImageFormatR16Snorm:
     case SpvImageFormatR8Snorm:
     case SpvImageFormatRgb10a2ui:
         gcmASSERT(gcvFALSE);

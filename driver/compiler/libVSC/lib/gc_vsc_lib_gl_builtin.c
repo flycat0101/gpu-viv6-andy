@@ -6209,11 +6209,25 @@ gctSTRING gcLibImageLoad_2D_float_rg8 =
 "   return vec4(min(raw, 255u)) / 255.0;\n"
 "}\n";
 
+gctSTRING gcLibImageLoad_2D_float_rg8_snorm =
+"highp vec4 _viv_image_load_image_2d_rg8_snorm(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   ivec4 raw = _viv_image_load_iimage_2d_rg8i(img_desc, p);\n"
+"   return vec4(clamp(raw, -127, 127)) / 127.0;\n"
+"}\n";
+
 gctSTRING gcLibImageLoad_2D_float_r8 =
 "highp vec4 _viv_image_load_image_2d_r8(highp uvec4 img_desc, ivec2 p)\n"
 "{\n"
 "   uvec4 raw = _viv_image_load_uimage_2d_r8ui(img_desc, p);\n"
 "   return vec4(min(raw, 255u)) / 255.0;\n"
+"}\n";
+
+gctSTRING gcLibImageLoad_2D_float_r8_snorm =
+"highp vec4 _viv_image_load_image_2d_r8_snorm(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   ivec4 raw = _viv_image_load_iimage_2d_r8i(img_desc, p);\n"
+"   return vec4(clamp(raw, -127, 127)) / 127.0;\n"
 "}\n";
 
 gctSTRING gcLibImageLoad_2D_float_rgba32f =
