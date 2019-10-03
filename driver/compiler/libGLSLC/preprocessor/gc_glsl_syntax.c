@@ -63,6 +63,7 @@ static slsEXTENSION_INFO _DefinedExtensions[] =
     {"GL_EXT_shader_io_blocks", slvEXTENSION_IO_BLOCKS, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_shader_io_blocks"},
     /* GPU_Shader5 extension. */
     {"GL_EXT_gpu_shader5", slvEXTENSION_GPU_SHADER5, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_gpu_shader5"},
+    {"GL_ARB_gpu_shader5", slvEXTENSION_GPU_SHADER5, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_GL13_VERSION, "GL_EXT_shader_implicit_conversions"},
     /* shader implicit conversions extension. */
     {"GL_EXT_shader_implicit_conversions", slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS, gcvTRUE, gcvFALSE, gcvFALSE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
     /* texture buffer extension. */
