@@ -24951,7 +24951,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcatIndefiniteLayer_Initializer(vx_n
     }
     else
     {
-        enable_SHExe = (vx_bool)((dimCount - 1) == axis || ((dimCount - 1) > axis && dimCount < 4));
+        enable_SHExe = (vx_bool)(_Is_concat_on_highest_dimension(output_s, axis) || ((dimCount - 1) > axis && dimCount < 4));
     }
 
     for (i = 0; i < itemCount; i++)
@@ -25090,6 +25090,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcatIndefiniteLayer_Initializer(vx_n
                 vx_tensor input = (vx_tensor)input_s->itemsTable[i];
                 vx_tensor_view  tensor_view  = NULL;
                 vx_tensor       subtensor    = NULL;
+                vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+                vx_uint32  reshpTensor_Dims           = 2;
+                vx_tensor input_rs      = NULL;
+                vx_tensor output_rs     = NULL;
+
+                vxoElementOptimization_GetTensorShape(input, reshpTensor_Sizes, &reshpTensor_Dims);
 
                 batchCount     = TENSOR_VIEW_DIM_NUM(input) > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
 
@@ -25105,13 +25111,18 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcatIndefiniteLayer_Initializer(vx_n
 
                 subtensor           = vxoTensor_CreateTensorFromView(output_s, tensor_view);
 
+                input_rs  = vxoTensor_ReshapeTensor(input, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+                output_rs = vxoTensor_ReshapeTensor(subtensor, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+                concatNLayer->base.temp_tensors[tmpTensorIndex++] = input_rs;
+                concatNLayer->base.temp_tensors[tmpTensorIndex++] = output_rs;
+
                 if(node->base.context->evisNoInst.supportEVIS)
                 {
-                    shaderExecutable    = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, subtensor);
+                    shaderExecutable    = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input_rs, output_rs);
                 }
                 else
                 {
-                    shaderExecutable    = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, subtensor);
+                    shaderExecutable    = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input_rs, output_rs);
                 }
 
                 if (!shaderExecutable)
@@ -25125,8 +25136,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcatIndefiniteLayer_Initializer(vx_n
                     batchCount,
                     shaderExecutable));
 
-                vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
-                vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)subtensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)input_rs, VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)output_rs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
                 vxnneLayer_SetOperation(
                     &concatNLayer->base,

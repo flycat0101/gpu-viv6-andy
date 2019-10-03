@@ -9,13 +9,28 @@ __kernel void gpuTensorCopy_Fp32 (
     write_imagef(output, coord, tmpOut);
 }
 
-__kernel void gpuTensorCopy_Quant8 (__read_only image2d_array_t  input,
+__kernel void gpuTensorCopy_8Bto8B (__read_only image2d_array_t  input,
                                     __write_only image2d_array_t output)
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
     uint4 tmp = {0};
 
     tmp = read_imageui(input, coord);
+    write_imageui(output, coord, tmp);
+}
+
+__kernel void gpuTensorCopy_Quant8 (__read_only image2d_array_t  input,
+                                    __write_only image2d_array_t output,
+                                                          float  scale,
+                                                          float tail)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    uint4 tmp = {0};
+
+    tmp = read_imageui(input, coord);
+
+    tmp = convert_uint4(convert_float4(tmp) * scale + tail);
+
     write_imageui(output, coord, tmp);
 }
 

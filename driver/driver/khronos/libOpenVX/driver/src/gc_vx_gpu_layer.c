@@ -447,13 +447,34 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
     }
     else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
     {
-        vx_reference parameters[2] = {(vx_reference)input_rs, (vx_reference)output_rs};
+        if (_IsSameType(input, output))
+        {
+            vx_reference parameters[2] = {(vx_reference)input_rs, (vx_reference)output_rs};
 
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
-        if (!shaderExecutable) goto OnError;
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_8Bto8B", borderMode);
+            if (!shaderExecutable) goto OnError;
 
-        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
-        if (status != VX_SUCCESS) goto OnError;
+            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
+            if (status != VX_SUCCESS) goto OnError;
+        }
+        else
+        {
+            vx_float32 scale_in  = TENSOR_TF_SCALE(input);
+            vx_float32  zp_in    = (vx_float32)TENSOR_TF_ZEROPOINT(input);
+            vx_float32 scale_out = TENSOR_TF_SCALE(output);
+            vx_float32  zp_out   = (vx_float32)TENSOR_TF_ZEROPOINT(output);
+            vx_float32 uint8_scale = scale_in / scale_out;
+            vx_float32 tail = zp_out - zp_in * uint8_scale + 0.5f;
+            vx_scalar scale_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &uint8_scale);
+            vx_scalar tail_s  = vxCreateScalar(context, VX_TYPE_FLOAT32, &tail);
+            vx_reference parameters[4] = {(vx_reference)input_rs, (vx_reference)output_rs, (vx_reference)scale_s, (vx_reference)tail_s};
+
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+            if (!shaderExecutable) goto OnError;
+
+            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+            if (status != VX_SUCCESS) goto OnError;
+        }
     }
     else if (inputFormat == VX_TYPE_UINT8 && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32))
     {
