@@ -370,49 +370,9 @@ GLboolean __glDpSetPixelFormat(GLint iPixelFormat )
 /* done */
 #endif
 
-#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
-#include<X11/Xlib.h>
-#include<X11/Xutil.h>
-#include<stdio.h>
-GLvoid __gldevInitialize(void *pdata)
-{
-    Display *dpy = NULL;
-    int scrn = 0;
-    unsigned int bpp = 0;
-    __GLscreenPrivate *screenPriv = (__GLscreenPrivate *)pdata;
 
-    GL_ASSERT( pdata != gcvNULL);
-
-    dpGlobalInfo.width = screenPriv->width;
-    dpGlobalInfo.height = screenPriv->height;
-
-    dpy = XOpenDisplay(NULL);
-    if ( dpy == NULL )
-    {
-        fprintf(stderr,"Can't open Display in %s\n",__FUNCTION__);
-        dpGlobalInfo.bpp = (screenPriv->stride / screenPriv->width);
-    }
-    else
-    {
-        scrn = DefaultScreen(dpy);
-        bpp = DefaultDepth(dpy, scrn);
-        if(bpp == 24)
-            bpp = 32;
-        dpGlobalInfo.bpp = bpp/8;
-    }
-    dpGlobalInfo.stride = screenPriv->stride;
-    dpGlobalInfo.basePhyAddress = screenPriv->baseFBPhysicalAddress;
-    dpGlobalInfo.logicalAddress = screenPriv->baseFBLinearAddress;
-    dpGlobalInfo.gpuAddress = gcvINVALID_ADDRESS;
-}
-
-GLvoid __gldevDeinitialize(void *pdata)
-{
-}
-#else
 GLvoid __gldevInitialize()
 {
-
 }
 
 GLboolean
@@ -420,7 +380,6 @@ __gldevDeinitialize()
 {
     return GL_TRUE;
 }
-#endif
 
 GLboolean
 __glDpInitialize(
