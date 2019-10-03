@@ -67,7 +67,7 @@ USE_VDK             ?= 0
 EGL_API_FB          ?= 0
 EGL_API_WL          ?= 0
 EGL_API_DRI         ?= 0
-X11_DRI3            ?= 0
+X11_DRI3        ?= 0
 EGL_API_DFB         ?= 0
 EGL_API_X           ?= 0
 
@@ -91,9 +91,7 @@ SOC_PLATFORM        ?= default
 GPU_CONFIG          ?= default
 USE_VXC_BINARY      ?= 0
 
-USE_VSC_LITE        ?= 0
-
-USE_STATIC_STDCxx   ?= 0
+USE_KMS             ?= 0
 
 ################################################################
 # Option dependency.
@@ -170,7 +168,6 @@ endif
 
 PKG_CONFIG          ?= $(CROSS_COMPILE)pkg-config
 
-
 ################################################################
 # Resource.
 
@@ -219,11 +216,6 @@ CONFIG_DOVE_GPU     := 0
 
 ###############################################################
 # Common flags.
-
-ifneq (,$(findstring -mcpu=,$(CC) $(CFLAGS)))
-CPU_TYPE=0
-CPU_ARCH=0
-endif
 
 ifeq ($(USE_ARMCC),1)
   CFLAGS            += --c99 #--strict
@@ -341,6 +333,7 @@ ifeq ($(EGL_API_WL),1)
   ifeq ($(GL4_LINUX_ENABLE),1)
     CFLAGS            += -DOPENGL40
   endif
+  LFLAGS             += -L$(VIVANTE_SDK_LIB) -L$(ROOTFS_USR)/lib
 endif
 
 ifeq ($(EGL_API_DRI),1)
@@ -422,18 +415,18 @@ ifneq ($(VG_APPENDIX),)
   CFLAGS            += -D_VG_APPENDIX=$(VG_APPENDIX)
 endif
 
-ifeq ($(REGISTER_READ_FROM_USER),1)
-CFLAGS              += -DgcdREGISTER_READ_FROM_USER=1
-endif
-
-ifeq ($(REGISTER_WRITE_FROM_USER),1)
-CFLAGS              += -DgcdREGISTER_WRITE_FROM_USER=1
-endif
+CFLAGS              += -DgcdREGISTER_ACCESS_FROM_USER=1
 
 ifeq ($(FPGA_BUILD),1)
   CFLAGS            += -DgcdFPGA_BUILD=1
 else
   CFLAGS            += -DgcdFPGA_BUILD=0
+endif
+
+ifeq ($(FORCE_ALL_VIDEO_MEMORY_CACHED),1)
+  CFLAGS            += -DgcdPAGED_MEMORY_CACHEABLE=1
+else
+  CFLAGS            += -DgcdPAGED_MEMORY_CACHEABLE=0
 endif
 
 ifeq ($(USE_LOADTIME_OPT),1)
@@ -473,9 +466,6 @@ soc_board     := $(lastword  $(subst -, ,$(SOC_PLATFORM)))
 CFLAGS              += -DVIVANTE_PROFILER=1
 CFLAGS              += -DVIVANTE_PROFILER_CONTEXT=1
 
-ifeq ($(USE_FILE_OFFSET_BITS_64),1)
-  CFLAGS            += -D_FILE_OFFSET_BITS=64
-endif
 
 ################################################################################
 #
@@ -496,7 +486,6 @@ GLES2X_DIR          := $(AQROOT)/driver/khronos/libGLESv3
 
 GLSLC_DIR           := $(AQROOT)/compiler/libGLSLC
 VSC_DIR             := $(AQROOT)/compiler/libVSC
-VSC_Lite_DIR        := $(AQROOT)/compiler/libVSC_Lite
 
 VULKAN_DIR          := $(AQROOT)/driver/khronos/libVulkan10
 SPIRV_DIR           := $(AQROOT)/compiler/libSPIRV

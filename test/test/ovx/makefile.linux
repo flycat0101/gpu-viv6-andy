@@ -34,7 +34,7 @@ include $(AQROOT)/makefile.linux.def
 ######################################################
 # Components of the project.
 
-SAMPLES	:= vx_tutorial1 vx_tutorial2 vx_tutorial3 vx_tutorial4 vx_tutorial5
+SAMPLES	:= vx_tutorial1 vx_tutorial2 vx_tutorial3 vx_tutorial4
 
 ######################################################
 # Define the macros used in the common file.

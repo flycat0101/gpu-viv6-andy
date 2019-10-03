@@ -45,7 +45,7 @@ CC ?= $(CROSS_COMPILE)g++
 ################################################################################
 # Supply additional include directories.
 
-INCLUDE += -I$(VIVANTE_SDK_INC) -I$(VIVANTE_SDK_INC)/HAL -I$(VIVANTE_SDK_INC)
+INCLUDE += -I$(VIVANTE_SDK_INC) -I$(VIVANTE_SDK_INC)/HAL -I$(AQROOT)/sdk/inc
 ifeq ($(EGL_API_DRI), 1)
 	INCLUDE += -I$(X11_ARM_DIR)/include
 endif
