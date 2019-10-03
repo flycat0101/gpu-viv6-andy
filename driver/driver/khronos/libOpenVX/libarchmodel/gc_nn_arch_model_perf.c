@@ -224,8 +224,8 @@ static void _calcArchModelCacheMode(vx_context context, vx_arch_perf perf, vx_in
 
 
 static vx_int8 gOrigShowType = -1;
-static const vx_char *archModelVersion = "ARCHCTS@212456";
-static const vx_char *SWTilingVersion = "ARCHCTS@212456";
+static const vx_char *archModelVersion = "ARCHCTS@222120";
+static const vx_char *SWTilingVersion = "ARCHCTS@222120";
 vx_status showArchPerformance(
     vx_context context,
     vxnne_layer layer,
