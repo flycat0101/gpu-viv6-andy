@@ -7267,7 +7267,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseGraph(vx_graph *graph)
 
     status = vxoReference_Release((vx_reference_ptr)graph, VX_TYPE_GRAPH, VX_REF_EXTERNAL);
 
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
