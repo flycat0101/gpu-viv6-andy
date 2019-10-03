@@ -35146,6 +35146,7 @@ gcInitGLSLCaps(
 
     Caps->maxVertAttributes = maxVertexAttribs + 2;
     Caps->maxUserVertAttributes = maxVertexAttribs;
+    Caps->maxVertStreams = 4;
     Caps->maxBuildInVertAttributes = 2;
     Caps->maxVaryingVectors = maxVaryingVectors;
     Caps->maxVertOutVectors = maxVaryingVectors + 1;
@@ -35218,6 +35219,7 @@ gcInitGLSLCaps(
     Caps->maxXfbInterleavedComponents = 64;
     Caps->maxXfbSeparateComponents = 64;
     Caps->maxXfbSeparateAttribs = 4;
+    Caps->maxXfbBuffers = 4;
 
     Caps->maxProgErrStrLen = 256;
 
