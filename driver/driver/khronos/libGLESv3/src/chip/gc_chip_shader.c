@@ -6961,6 +6961,7 @@ __glChipCompileShader(
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gcSHADER_KIND shaderType = gcSHADER_TYPE_UNKNOWN;
     gceSTATUS status;
+    gcsGLSLCaps *glslCaps = &gc->constants.shaderCaps;
 
     gcmHEADER_ARG("gc=0x%x shaderObject=0x%x", gc, shaderObject);
 
@@ -7009,6 +7010,9 @@ __glChipCompileShader(
     {
         gcOPT_SetFeature(FB_TREAT_CONST_ARRAY_AS_UNIFORM);
     }
+
+    /* re-initialize CompilerCaps ,avoid muti-context ,the shaderCaps.extensions that compiler uses has been released when other context destory */
+    (*chipCtx->pfInitCompilerCaps)(glslCaps);
 
     gcmONERROR((*chipCtx->pfCompile)(shaderType,
                                      shaderObject->shaderInfo.sourceSize,
@@ -9728,6 +9732,7 @@ gcChipLoadCompiler(
 
         chipCtx->pfCompile = gcCompileShader;
         chipCtx->pfInitCompiler = gcInitializeCompiler;
+        chipCtx->pfInitCompilerCaps = gcInitializeCompilerCaps;
         chipCtx->pfFinalizeCompiler = gcFinalizeCompiler;
 
         gcmERR_BREAK(gcInitializeCompiler(chipCtx->patchId, &hwCfg, &gc->constants.shaderCaps));
@@ -9744,6 +9749,12 @@ gcChipLoadCompiler(
             gctGLSLInitCompiler initGLSL;
             gctPOINTER          ptr;
         } intializer;
+
+        union __GLinitializerCapsUnion
+        {
+            gctGLSLInitCompilerCaps initCaps;
+            gctPOINTER          ptr;
+        } intializerCaps;
 
         union __GLfinalizerUnion
         {
@@ -9776,10 +9787,12 @@ gcChipLoadCompiler(
 
         gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, chipCtx->dll, "gcCompileShader", &compiler.ptr));
         gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, chipCtx->dll, "gcInitializeCompiler", &intializer.ptr));
+        gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, chipCtx->dll, "gcInitializeCompilerCaps", &intializerCaps.ptr));
         gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, chipCtx->dll, "gcFinalizeCompiler", &finalizer.ptr));
 
         chipCtx->pfCompile = compiler.compile;
         chipCtx->pfInitCompiler = intializer.initGLSL;
+        chipCtx->pfInitCompilerCaps = intializerCaps.initCaps;
         chipCtx->pfFinalizeCompiler = finalizer.finalizeGLSL;
 
         gcmERR_BREAK(chipCtx->pfInitCompiler(chipCtx->patchId, &hwCfg, &gc->constants.shaderCaps));

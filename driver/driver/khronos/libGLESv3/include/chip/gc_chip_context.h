@@ -303,6 +303,7 @@ struct __GLchipContextRec
     gctHANDLE                   dll;
     gctGLSLCompiler             pfCompile;
     gctGLSLInitCompiler         pfInitCompiler;
+    gctGLSLInitCompilerCaps     pfInitCompilerCaps;
     gctGLSLFinalizeCompiler     pfFinalizeCompiler;
 
     /* Attention: Below 3 shortcuts ONLY can be used within draw/compute validation,

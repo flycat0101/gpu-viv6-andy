@@ -2220,6 +2220,7 @@ typedef gceSTATUS (*gctGLSLInitCompiler)(IN gcePATCH_ID PatchId,
                                          IN gcsHWCaps *HWCaps,
                                          IN gcsGLSLCaps *Caps);
 
+typedef gceSTATUS (*gctGLSLInitCompilerCaps)(IN gcsGLSLCaps *Caps);
 
 typedef gceSTATUS (*gctGLSLFinalizeCompiler)(void);
 
