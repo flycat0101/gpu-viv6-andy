@@ -218,7 +218,7 @@ gco3D_Destroy(
     }
 
     /* Free Hardware Object */
-    gcoOS_GetTLS(&tls);
+    gcmVERIFY_OK(gcoOS_GetTLS(&tls));
     gcmVERIFY_OK(gcoHARDWARE_Destroy(Engine->hardware, gcvFALSE));
     if (Engine->hardware == tls->defaultHardware)
     {
