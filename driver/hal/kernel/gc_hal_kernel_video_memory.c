@@ -1982,6 +1982,11 @@ gckVIDMEM_Free(
                  node != gcvNULL && node->VirtualChunk.nextFree == gcvNULL;
                  node = node->VirtualChunk.next);
 
+            if (node == gcvNULL)
+            {
+                gcmkONERROR(gcvSTATUS_INVALID_DATA);
+            }
+
             /* Insert this chunk in the free list. */
             Node->VirtualChunk.nextFree = node;
             Node->VirtualChunk.prevFree = node->VirtualChunk.prevFree;
