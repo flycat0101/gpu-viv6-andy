@@ -1933,8 +1933,8 @@ VX_PRIVATE_API vx_status GetSWTilingCollection(
 
         if ((i == start + count) ||
             !SupportSWTiling(graph->base.context, graph->layer->operations[i]) ||
-            (graph->layer->operations[i]->parentOpNum > 1  && i != start) ||
-            (graph->layer->operations[i]->childOpNum > 1 && i == start) )
+            (graph->layer->operations[i]->parentOpNum > 1  && num != 0) ||
+            (graph->layer->operations[i]->childOpNum > 1 && num == 0) )
         {
             terminator = vx_true_e;
         }
