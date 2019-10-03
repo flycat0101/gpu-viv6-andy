@@ -507,6 +507,7 @@ _VIR_LoopInfo_Init(
     VIR_LoopInfo_SetLoopHead(loopInfo, loopHead);
     VIR_LoopInfo_SetLoopEnd(loopInfo, loopEnd);
     VIR_LoopInfo_SetParentIterationCount(loopInfo, -1);
+    VIR_LoopInfo_SetBackJmpInInstSet(loopInfo, (VIR_Inst_GetId(BB_GET_START_INST(loopHead)) < VIR_Inst_GetId(BB_GET_START_INST(loopEnd))));
 }
 
 static void
@@ -990,12 +991,22 @@ _VIR_LoopInfo_GetLowestBB(
 {
     gctUINT bbCount = VIR_LoopInfo_GetBBCount(loopInfo);
     gctUINT i = 0;
-    VIR_BB* bb = VIR_LoopInfo_GetLoopHead(loopInfo);
+    VIR_BB* pHeadBB = VIR_LoopInfo_GetLoopHead(loopInfo);
+    VIR_BB* pEndBB = VIR_LoopInfo_GetLoopEnd(loopInfo);
+    VIR_BB* pHighestBB = pHeadBB;
+    VIR_BB* pWorkingBB = gcvNULL;
     gctUINT coveringCount = 0;
+
+    if (!VIR_LoopInfo_GetBackJmpInInstSet(loopInfo))
+    {
+        pHighestBB = pEndBB;
+    }
+
+    pWorkingBB = pHighestBB;
 
     while(gcvTRUE)
     {
-        if(_VIR_LoopInfo_BBIsInLoop(loopInfo, bb))
+        if(_VIR_LoopInfo_BBIsInLoop(loopInfo, pWorkingBB))
         {
             i++;
         }
@@ -1007,7 +1018,7 @@ _VIR_LoopInfo_GetLowestBB(
         }
         else
         {
-            bb = VIR_BB_GetFollowingBB(bb);
+            pWorkingBB = VIR_BB_GetFollowingBB(pWorkingBB);
         }
     }
 
@@ -1016,9 +1027,9 @@ _VIR_LoopInfo_GetLowestBB(
         *coveringBBCount = coveringCount;
     }
 
-    gcmASSERT(bb);
+    gcmASSERT(pWorkingBB);
 
-    return bb;
+    return pWorkingBB;
 }
 
 static VIR_BB*
@@ -2735,6 +2746,9 @@ VIR_LoopOpts_DetectNaturalLoops(
     VIR_CFG_EDGE*                pSuccEdge;
     VSC_CFG_DFS_VISIT_ORDER      visitOrder = {0};
     gctBOOL                      bLoopDetected = gcvFALSE;
+
+    /* We use the instruction ID to do some rough analyses, so we need to re-number the instruction ID here.*/
+    VIR_Shader_RenumberInstId(VIR_LoopOpts_GetShader(loopOpts));
 
     /* Build DOM tree */
     vscVIR_BuildDOMTreePerCFG(cfg);

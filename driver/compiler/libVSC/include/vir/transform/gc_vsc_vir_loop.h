@@ -222,8 +222,13 @@ typedef struct VIR_LOOPINFO
     VSC_UNI_LIST_NODE       node;
     gctUINT                 id;
     VIR_LoopInfoMgr*        loopinfoMgr;
+    /*
+    ** Note that the "head" and "end" is in the graph level, but in the instruction set level,
+    ** the loopHead may be in the front and the loopEnd may be behind it.
+    */
     VIR_BASIC_BLOCK*        loopHead;
     VIR_BASIC_BLOCK*        loopEnd;
+    gctBOOL                 bBackJmpInInstSet;
     struct VIR_LOOPINFO*    parentLoop;
     gctINT                  parentIterationCount;   /* If parent loop have been statically unrolling, save the iteration count. */
     VSC_UNI_LIST            childLoopSet;
@@ -251,6 +256,8 @@ typedef struct VIR_LOOPINFO
 #define VIR_LoopInfo_SetLoopHead(l, lh)             ((l)->loopHead = (lh))
 #define VIR_LoopInfo_GetLoopEnd(l)                  ((l)->loopEnd)
 #define VIR_LoopInfo_SetLoopEnd(l, le)              ((l)->loopEnd = (le))
+#define VIR_LoopInfo_GetBackJmpInInstSet(l)         ((l)->bBackJmpInInstSet)
+#define VIR_LoopInfo_SetBackJmpInInstSet(l, le)     ((l)->bBackJmpInInstSet = (le))
 #define VIR_LoopInfo_GetParentLoop(l)               ((l)->parentLoop)
 #define VIR_LoopInfo_SetParentLoop(l, p)            ((l)->parentLoop = (p))
 #define VIR_LoopInfo_GetParentIterationCount(l)     ((l)->parentIterationCount)
