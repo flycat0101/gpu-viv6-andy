@@ -4461,7 +4461,7 @@ gco3D_SetSamples(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_3D);
 
-    if (Samples < 4 || Samples != 3)
+    if (Samples < 5 || Samples != 3)
     {
         status = gcoHARDWARE_SetSamples(Engine->hardware, g_sampleInfos[Samples]);
     }
