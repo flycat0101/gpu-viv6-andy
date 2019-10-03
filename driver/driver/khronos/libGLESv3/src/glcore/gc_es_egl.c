@@ -228,10 +228,6 @@ static EGLBoolean veglLoseCurrent_es3(void *thrData, void *pCtxPriv)
 
 static EGLBoolean veglFlushContext_es3(void * Context)
 {
-    __GLcontext* gc = (__GLcontext*)Context;
-
-    __gles_Finish(gc);
-
     return EGL_TRUE;
 }
 
