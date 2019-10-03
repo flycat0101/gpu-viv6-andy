@@ -106,9 +106,13 @@ gckASYNC_FE_Construct(
     return gcvSTATUS_OK;
 
 OnError:
-    if (fe->freeDscriptors)
+    if (fe)
     {
-        gckOS_AtomDestroy(Hardware->os, fe->freeDscriptors);
+        if (fe->freeDscriptors)
+        {
+            gckOS_AtomDestroy(Hardware->os, fe->freeDscriptors);
+        }
+        gcmkOS_SAFE_FREE(Hardware->os, fe);
     }
 
     gcmkFOOTER();
