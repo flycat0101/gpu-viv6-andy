@@ -3109,7 +3109,7 @@ gcoTEXTURE_UploadCompressed(
     gcmDUMP_BUFFER(gcvNULL, gcvDUMP_BUFFER_TEXTURE, address[0], memory[0], offset, map->sliceSize);
 
 OnError:
-    if (memory[0])
+    if (map && memory[0])
     {
         /* Unlock the surface. */
         gcmVERIFY_OK(gcoSURF_Unlock(map->surface, memory[0]));
@@ -3287,7 +3287,7 @@ gcoTEXTURE_UploadCompressedSub(
 
 OnError:
     /* Unlock the surface. */
-    if (memory[0])
+    if (map && memory[0])
     {
         gcmVERIFY_OK(gcoSURF_Unlock(map->surface, memory[0]));
     }
