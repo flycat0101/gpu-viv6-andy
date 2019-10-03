@@ -1300,7 +1300,7 @@ _ConvertPhysical(
         physical -= Kernel->hardware->baseAddress;
 
         /* 2G upper is virtual space, better to move to gckHARDWARE section. */
-        if (physical + Node->Virtual.bytes > 0x80000000)
+        if (Node && (physical + Node->Virtual.bytes > 0x80000000))
         {
             /* End is above 2G, ie virtual space. */
             status = gcvSTATUS_NOT_SUPPORTED;
