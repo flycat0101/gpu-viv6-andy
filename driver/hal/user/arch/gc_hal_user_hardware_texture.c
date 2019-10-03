@@ -8330,8 +8330,6 @@ gcoHARDWARE_UpdateTextureDesc(
 
     if (needYUVAssembler)
     {
-        pDesc->gcregTXAddress[0] = pDesc->gcregTXAddress[0];
-
         if (baseSurf->flags & gcvSURF_FLAG_MULTI_NODE)
         {
             /* Get u,v channel addresses from other nodes for multi-node surface. */
