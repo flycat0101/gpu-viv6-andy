@@ -4418,7 +4418,7 @@ clfExecuteVIRKernel(clsCommandNDRangeVIRKernel_PTR NDRangeKernel)
     ProgramState.stateBufferSize = NDRangeKernel->currentInstance->hwStates.stateBufferSize;
     ProgramState.stateDelta = NDRangeKernel->currentInstance->hwStates.pStateDelta;
     ProgramState.stateDeltaSize = NDRangeKernel->currentInstance->hwStates.stateDeltaSize;
-    clmONERROR(gcoCL_LoadKernel(ProgramState),
+    clmONERROR(gcoCL_LoadKernel(&ProgramState),
                CL_OUT_OF_RESOURCES);
 
     /* Adjust local work sizes if not specified by the application. */
@@ -4469,7 +4469,7 @@ clfExecuteKernel(
     gcmHEADER_ARG("Kernel=0x%x", Kernel);
 
     /* Load kernel states. */
-    clmONERROR(gcoCL_LoadKernel(Instance->programState),
+    clmONERROR(gcoCL_LoadKernel(&Instance->programState),
                CL_OUT_OF_RESOURCES);
 
     /* Adjust local work sizes if not specified by the application. */

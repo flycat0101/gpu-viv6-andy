@@ -346,23 +346,23 @@ gceSTATUS vgshCORE_SetColorWrite(_vgCORE *core, gctUINT8 colorWrite)
 }
 
 gceSTATUS vgshCORE_LoadShader(_vgCORE *core,
-    gcsPROGRAM_STATE ProgramState)
+    gcsPROGRAM_STATE *ProgramState)
 {
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("core=0x%x statusBufferSize=%u stateBuffer=0x%x hints=0x%x",
-        core, (unsigned long)ProgramState.stateBufferSize, ProgramState.stateBuffer, ProgramState.hints);
+        core, (unsigned long)ProgramState->stateBufferSize, ProgramState->stateBuffer, ProgramState->hints);
 
-    gcmASSERT(ProgramState.stateBuffer != gcvNULL);
+    gcmASSERT(ProgramState->stateBuffer != gcvNULL);
 
     do
     {
-        if (core->programState.stateBuffer != ProgramState.stateBuffer)
+        if (core->programState.stateBuffer != ProgramState->stateBuffer)
         {
             gcmERR_BREAK(gcLoadShaders(core->hal,
                                       ProgramState));
 
-            core->programState = ProgramState;
+            core->programState = *ProgramState;
         }
     }while(gcvFALSE);
 
@@ -6964,7 +6964,7 @@ static gceSTATUS _LoadShader(_vgHARDWARE *hardware)
         }
         /*load the shader*/
         gcmERR_BREAK(vgshCORE_LoadShader(&hardware->core,
-                                        hardware->program->programState));
+                                        &hardware->program->programState));
 
         gcmERR_BREAK(_LoadUniforms(hardware));
 

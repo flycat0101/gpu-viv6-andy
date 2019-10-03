@@ -736,7 +736,7 @@ OnError:
 
 gceSTATUS
 gcoVX_LoadKernelShader(
-    IN gcsPROGRAM_STATE ProgramState
+    IN gcsPROGRAM_STATE *ProgramState
     )
 {
 
@@ -744,7 +744,7 @@ gcoVX_LoadKernelShader(
     gceAPI    currentApi;
 
     gcmHEADER_ARG("StateBufferSize=%u StateBuffer=0x%x Hints=0x%x",
-                  ProgramState.stateBufferSize, ProgramState.stateBuffer, ProgramState.hints);
+                  ProgramState->stateBufferSize, ProgramState->stateBuffer, ProgramState->hints);
 
     gcmASSERT(gcoVX_VerifyHardware());
     /* Set the hardware type. */

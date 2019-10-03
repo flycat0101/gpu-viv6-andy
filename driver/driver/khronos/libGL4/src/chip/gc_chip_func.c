@@ -570,7 +570,7 @@ gceSTATUS gcChipLoadFixFunctionShader(
             /* Send states to hardware. */
             gcmONERROR(gcLoadShaders(
                 chipCtx->hal,
-                chipCtx->currProgram->programState
+                &chipCtx->currProgram->programState
                 ));
         } else {
             /* Shader switched from GLSH to fix function */
@@ -578,7 +578,7 @@ gceSTATUS gcChipLoadFixFunctionShader(
                 /* Send states to hardware. */
                 gcmONERROR(gcLoadShaders(
                     chipCtx->hal,
-                    chipCtx->currProgram->programState
+                    &chipCtx->currProgram->programState
                     ));
                 chipCtx->programDirty = GL_FALSE;
             }

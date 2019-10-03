@@ -726,12 +726,12 @@ gcoCL_SetSignal(
 **
 **  INPUT:
 **
-**      gcsPROGRAM_STATE ProgramState
-**          Program state.
+**      gcsPROGRAM_STATE *ProgramState
+**          Program state pointer.
 */
 gceSTATUS
 gcoCL_LoadKernel(
-    IN gcsPROGRAM_STATE ProgramState
+    IN gcsPROGRAM_STATE *ProgramState
     );
 
 gceSTATUS

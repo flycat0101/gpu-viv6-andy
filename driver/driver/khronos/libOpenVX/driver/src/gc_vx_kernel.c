@@ -2731,7 +2731,7 @@ gcfVX_ExecuteKernel(
         Kernel, NumArgs, Args, BorderMode, batchID, GlobalWorkOffset, GlobalWorkScale, GlobalWorkSize, LocalWorkSize);
     gcmASSERT(gcoVX_VerifyHardware());
     /* Load kernel states. */
-    gcmONERROR(gcoVX_LoadKernelShader(Kernel->states.programState));
+    gcmONERROR(gcoVX_LoadKernelShader(&Kernel->states.programState));
 
 
     /* Load argument values. */

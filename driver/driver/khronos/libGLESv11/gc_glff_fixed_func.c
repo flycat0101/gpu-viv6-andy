@@ -743,7 +743,7 @@ gceSTATUS glfLoadShader(
             /* Send states to hardware. */
             gcmONERROR(gcLoadShaders(
                 Context->hal,
-                Context->currProgram->programState
+                &Context->currProgram->programState
                 ));
 
             /* Load uniforms. */

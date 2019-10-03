@@ -2020,18 +2020,18 @@ gcoCL_SetSignal(
 **
 **  INPUT:
 **
-**      gcsPROGRAM_STATE ProgramState
-**          Program state.
+**      gcsPROGRAM_STATE *ProgramState
+**          Program state pointer.
 */
 gceSTATUS
 gcoCL_LoadKernel(
-    IN gcsPROGRAM_STATE ProgramState
+    IN gcsPROGRAM_STATE *ProgramState
     )
 {
     gceSTATUS status;
 
     gcmHEADER_ARG("StateBufferSize=%u StateBuffer=0x%x Hints=0x%x",
-                  ProgramState.stateBufferSize, ProgramState.stateBuffer, ProgramState.hints);
+                  ProgramState->stateBufferSize, ProgramState->stateBuffer, ProgramState->hints);
 
     /* Load kernel states. */
     status = gcLoadShaders(gcvNULL,

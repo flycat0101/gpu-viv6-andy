@@ -176,7 +176,7 @@ gcoVX_BindKernel(
 
 gceSTATUS
 gcoVX_LoadKernelShader(
-    IN gcsPROGRAM_STATE ProgramState
+    IN gcsPROGRAM_STATE *ProgramState
     );
 
 gceSTATUS
