@@ -446,6 +446,30 @@ vx_bool _IsSameType(
     vx_tensor dst
     );
 
+vx_uint32 caculateInputTransposeBufferSize(
+    vx_enum imageCacheMode,
+    vx_uint32 outputTileXSize,
+    vx_uint32 outputTileYSize,
+    vx_uint32 kernelX,
+    vx_uint32 kernelY,
+    vx_uint32 kernelZ,
+    vx_uint32 interleaveMode,
+    vx_float32 ddrLatency,
+    vx_uint32 transposeInChannel,
+    vx_enum dataFormat
+    );
+
+vx_uint32 caculateOutTransposeBufferSize(
+    vx_uint32 outputTileXSize,
+    vx_uint32 outputTileYSize,
+    vx_enum format
+    );
+
+void alignTensorChannelToTransposeChannel(
+    vx_tensor tensor,
+    vx_uint32 transposeChannel
+    );
+
 #endif
 
 

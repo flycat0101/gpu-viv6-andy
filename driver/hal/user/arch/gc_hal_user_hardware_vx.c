@@ -37251,6 +37251,53 @@ gcoHARDWAREVX_ProgrammeNNEngine(
  25:18) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 25:18) - (0 ? 25:18) + 1))))))) << (0 ? 25:18)));
 
+    /*GCREG_NN_INST_WORD23*/
+    *(*Instruction)++ = 0;
+
+    /*GCREG_NN_INST_WORD24*/
+    *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1))))))) << (0 ?
+ 3:0))) | (((gctUINT32) ((gctUINT32) (info->inImageTransposeChMinusOne) & ((gctUINT32) ((((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:4) - (0 ?
+ 31:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:4) - (0 ?
+ 31:4) + 1))))))) << (0 ?
+ 31:4))) | (((gctUINT32) ((gctUINT32) (info->outImageTransposeBufStartAddr >> 4) & ((gctUINT32) ((((1 ?
+ 31:4) - (0 ?
+ 31:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:4) - (0 ? 31:4) + 1))))))) << (0 ? 31:4)));
+
+    /*GCREG_NN_INST_WORD25*/
+    *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1))))))) << (0 ?
+ 3:0))) | (((gctUINT32) ((gctUINT32) (info->outImageTransposeChMinusOne) & ((gctUINT32) ((((1 ?
+ 3:0) - (0 ?
+ 3:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:4) - (0 ?
+ 31:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:4) - (0 ?
+ 31:4) + 1))))))) << (0 ?
+ 31:4))) | (((gctUINT32) ((gctUINT32) (info->outImageTransposeBufEndAddr >> 4) & ((gctUINT32) ((((1 ?
+ 31:4) - (0 ?
+ 31:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:4) - (0 ? 31:4) + 1))))))) << (0 ? 31:4)));
+
      return gcvSTATUS_OK;
 
 OnError:

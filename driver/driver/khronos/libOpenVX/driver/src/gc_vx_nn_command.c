@@ -686,20 +686,37 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SRAM))
     {
-        if (conv_cmd_ptr->imageCacheMode == VXNNE_SRAM_CACHE_MODE_FULL_CACHE &&
-            checkImageCacheMode(info->vx_nn_general_cmd_info.outImageZSize, info->vx_nn_general_cmd_info.kernelsPerCore, nnCoreCount))
+        if (conv_cmd_ptr->transposeInMode == VXNNE_SRAM_CACHE_MODE_FULL_CACHE)
         {
-            info->vx_nn_general_cmd_info.imageCachingMode    = 1;
-            info->vx_nn_general_cmd_info.imageStartAddress   = conv_cmd_ptr->imageCacheStart;
-            info->vx_nn_general_cmd_info.imageEndAddress     = conv_cmd_ptr->imageCacheStart + conv_cmd_ptr->imageCacheSize;
-            vxmASSERT(conv_cmd_ptr->imageCacheSize != 0);
+            info->vx_nn_general_cmd_info.imageCachingMode = 1;
+            info->vx_nn_general_cmd_info.imageStartAddress = conv_cmd_ptr->transposeInStart;
+            info->vx_nn_general_cmd_info.imageEndAddress = conv_cmd_ptr->transposeInStart + conv_cmd_ptr->transposeInSize;
+            info->vx_nn_general_cmd_info.inImageTransposeChMinusOne = (vx_uint8)(conv_cmd_ptr->transposeInChannel - 1);
         }
         else
         {
-            info->vx_nn_general_cmd_info.imageCachingMode              = 0;
-            info->vx_nn_general_cmd_info.imageStartAddress             = 0;
-            info->vx_nn_general_cmd_info.imageEndAddress               = (context->vipSRAM.size <= VX_VIP_SRAM_IMAGE_STREAM_SIZE) ? context->vipSRAM.size : VX_VIP_SRAM_IMAGE_STREAM_SIZE;
-            conv_cmd_ptr->imageCacheMode                              = VXNNE_SRAM_CACHE_MODE_NONE;
+            if (conv_cmd_ptr->imageCacheMode == VXNNE_SRAM_CACHE_MODE_FULL_CACHE &&
+                checkImageCacheMode(info->vx_nn_general_cmd_info.outImageZSize, info->vx_nn_general_cmd_info.kernelsPerCore, nnCoreCount))
+            {
+                info->vx_nn_general_cmd_info.imageCachingMode    = 1;
+                info->vx_nn_general_cmd_info.imageStartAddress   = conv_cmd_ptr->imageCacheStart;
+                info->vx_nn_general_cmd_info.imageEndAddress     = conv_cmd_ptr->imageCacheStart + conv_cmd_ptr->imageCacheSize;
+                vxmASSERT(conv_cmd_ptr->imageCacheSize != 0);
+            }
+            else
+            {
+                info->vx_nn_general_cmd_info.imageCachingMode              = 0;
+                info->vx_nn_general_cmd_info.imageStartAddress             = 0;
+                info->vx_nn_general_cmd_info.imageEndAddress               = (context->vipSRAM.size <= VX_VIP_SRAM_IMAGE_STREAM_SIZE) ? context->vipSRAM.size : VX_VIP_SRAM_IMAGE_STREAM_SIZE;
+                conv_cmd_ptr->imageCacheMode                              = VXNNE_SRAM_CACHE_MODE_NONE;
+            }
+        }
+
+        if (conv_cmd_ptr->transposeOutMode == VXNNE_SRAM_CACHE_MODE_FULL_CACHE)
+        {
+            info->vx_nn_general_cmd_info.outImageTransposeBufStartAddr = conv_cmd_ptr->transposeOutStart;
+            info->vx_nn_general_cmd_info.outImageTransposeBufEndAddr = conv_cmd_ptr->transposeOutStart + conv_cmd_ptr->transposeOutSize;
+            info->vx_nn_general_cmd_info.outImageTransposeChMinusOne = conv_cmd_ptr->transposeOutChannel - 1;
         }
 
         if (conv_cmd_ptr->kernelCacheMode == VXNNE_SRAM_CACHE_MODE_STREAM_CACHE)

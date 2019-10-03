@@ -405,6 +405,17 @@ typedef struct _vx_op_param_s
     vx_uint32    imageCacheStart;
     vx_uint32    imageCacheSize;
     vx_enum      imageCacheMode;
+
+    vx_uint32    transposeInStart;
+    vx_uint32    transposeInSize;
+    vx_enum      transposeInMode;
+    vx_uint8     transposeInChannel;
+
+    vx_uint32    transposeOutStart;
+    vx_uint32    transposeOutSize;
+    vx_enum      transposeOutMode;
+    vx_uint8     transposeOutChannel;
+
     /* for TP */
     vx_enum          tpType;
     vx_tp_value_cmd  tp_value;
@@ -456,6 +467,17 @@ typedef struct _vxnne_operation_s
     vx_uint32                       kernelCacheStart;
     vx_uint32                       kernelCacheSize;
     vx_enum                         kernelCacheMode;
+    vx_uint32                       transposeInSize;
+    vx_uint32                       transposeInStart;
+    vx_uint32                       transposeInMode;
+    vx_uint8                        transposeInChannel;
+    vx_uint32                       transposeOutSize;
+    vx_uint32                       transposeOutStart;
+    vx_uint32                       transposeOutMode;
+    vx_uint8                        transposeOutChannel;
+    vx_uint32                       transposeKernelSize;
+    vx_bool                         bTransposeIn;
+    vx_bool                         bTransposeOut;
 
     vx_uint32                       esitimateKernelCacheSize;
     vx_uint32                       esitimateImageCacheSize;
@@ -782,6 +804,14 @@ typedef struct _vxnne_operation_command_s
         vx_uint32 imageCacheStart;
         vx_uint32 imageCacheSize;
         vx_enum   imageCacheMode;
+        vx_uint32 transposeInSize;
+        vx_uint32 transposeInStart;
+        vx_uint32 transposeInMode;
+        vx_uint8  transposeInChannel;
+        vx_uint32 transposeOutSize;
+        vx_uint32 transposeOutStart;
+        vx_uint32 transposeOutMode;
+        vx_uint8  transposeOutChannel;
         vxnne_tiling_perf_param_s   tilingParam;
         vx_weights_biases_parameter wb;
     }cmdInfo;

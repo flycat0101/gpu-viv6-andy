@@ -3227,6 +3227,10 @@ typedef union _vx_nn_cmd_info_union
         gctUINT8   slowOutput;
 
         gctUINT8   bFloat16Mode;
+        gctUINT8   inImageTransposeChMinusOne;
+        gctUINT8   outImageTransposeChMinusOne;
+        gctUINT32  outImageTransposeBufStartAddr;
+        gctUINT32  outImageTransposeBufEndAddr;
 
         /* for SRAM */
         gctUINT32 imageCachingMode;

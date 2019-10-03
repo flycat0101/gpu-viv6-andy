@@ -205,6 +205,8 @@
 #define VX_MAX_MEM_PARAM                     2
 #define VX_KERNEL_PATTERN_BIT_SIZE          64
 
+#define VX_TRANSPOSE_MAX_INTERLEAVE_CH      16
+#define VX_TRANSPOSE_MAX_INTERLEAVE_1MULTI1_CH      9
 /* Function macros */
 #ifndef vxmLENGTH_OF
 #define vxmLENGTH_OF(array)                 (sizeof(array) / sizeof((array)[0]))
@@ -1726,6 +1728,9 @@ typedef struct _vx_memory_s
 
     /* currently only for virtual buffer and virtual tensor memory allocation */
     vx_graph                                graph;
+
+    vx_bool                                 transposed;
+    vx_uint8                                transposeChannel;
 }
 vx_memory_s;
 
@@ -1739,6 +1744,8 @@ typedef struct _vxnne_mem_request_s
     vx_memory   outputMemory[VX_MAX_MEM_REQUEST_OUTPUT];
     vx_memory_s kernelCache;
     vx_memory_s imageCache;
+    vx_memory_s transposeIn;
+    vx_memory_s transposeOut;
 }
 vxnne_mem_request_s;
 

@@ -960,31 +960,39 @@ VX_INTERNAL_API vx_status ComputeMNEx(
 
         if (i == start && phase3 && (opInfo.target == VXNNE_OPERATION_TARGET_NN) && !sRamIn)
         {
-            vx_uint32 outTileX = TENSOR_SIZE_INDEX(opInfo.output, 0), inTileX, inDataSize;
-            vxmASSERT(opInfo.opType != VXNNE_OPERATOR_FULLYCONNECTED);
+            if (layer->operations[i]->bTransposeIn)
+            {
+                termA += 32 * (vx_uint32)(ceilf(opInfo.kernelZ/16.f) * gcmMIN(TENSOR_SIZE_INDEX(opInfo.input, 0), 72) * (opInfo.poolSizeY +  opInfo.kernelY - 1) + 15);
+                termB += 32 * (vx_uint32)ceilf(opInfo.kernelZ/16.f) * gcmMIN(TENSOR_SIZE_INDEX(opInfo.input, 0), 72) * opInfo.poolStrideY;
+            }
+            else
+            {
+                vx_uint32 outTileX = TENSOR_SIZE_INDEX(opInfo.output, 0), inTileX, inDataSize;
+                vxmASSERT(opInfo.opType != VXNNE_OPERATOR_FULLYCONNECTED);
 
-            status = ComputeInputSizeEx(
-                                            opInfo.opType,
-                                            outTileX,
-                                            opInfo.kernelX,
-                                            0,
-                                            0,
-                                            opInfo.poolSizeX,
-                                            opInfo.poolStrideX,
-                                            opInfo.reshuffStrideX,
-                                            opInfo.normStrideX,
-                                            &outTileX,
-                                            VX_NULL
-                                            );
+                status = ComputeInputSizeEx(
+                                                opInfo.opType,
+                                                outTileX,
+                                                opInfo.kernelX,
+                                                0,
+                                                0,
+                                                opInfo.poolSizeX,
+                                                opInfo.poolStrideX,
+                                                opInfo.reshuffStrideX,
+                                                opInfo.normStrideX,
+                                                &outTileX,
+                                                VX_NULL
+                                                );
 
-            if (status != VX_SUCCESS) return status;
+                if (status != VX_SUCCESS) return status;
 
-            outTileX = gcmMIN(outTileX, layer->graph->base.context->nnConfig.unifiedFeature.maxTileSize);
-            inTileX = outTileX + opInfo.kernelX - 1;
-            inDataSize = vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(opInfo.input));
-            /*termA += inTileX * (opInfo.poolSizeX + opInfo.kernelX - 1) * opInfo.kernelZ * inDataSize;*/
-            termA += inTileX * (opInfo.poolSizeX + opInfo.kernelX - 1 - opInfo.poolStrideX) * opInfo.kernelZ * inDataSize;
-            termB += inTileX * opInfo.kernelZ * inDataSize;
+                outTileX = gcmMIN(outTileX, layer->graph->base.context->nnConfig.unifiedFeature.maxTileSize);
+                inTileX = outTileX + opInfo.kernelX - 1;
+                inDataSize = vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(opInfo.input));
+                /*termA += inTileX * (opInfo.poolSizeX + opInfo.kernelX - 1) * opInfo.kernelZ * inDataSize;*/
+                termA += inTileX * (opInfo.poolSizeX + opInfo.kernelX - 1 - opInfo.poolStrideX) * opInfo.kernelZ * inDataSize;
+                termB += inTileX * opInfo.kernelZ * inDataSize;
+            }
         }
 
         if (opInfo.weightsBiases)
@@ -998,6 +1006,11 @@ VX_INTERNAL_API vx_status ComputeMNEx(
 
     if (phase3)
     {
+        if (layer->operations[start]->bTransposeOut)
+        {
+            vipSRAMsize -= 32 * 1024;
+        }
+
         if (vipSRAMsize - totalKernelbufferSize > 0 && (vx_int32)(vipSRAMsize - totalKernelbufferSize - termA) > 0)
         {
             M = (vipSRAMsize - totalKernelbufferSize - termA) / termB;
@@ -1634,6 +1647,8 @@ VX_PRIVATE_API vx_status RestoreMemoryParamList(
 
         gcoOS_ZeroMemory(&requestList->imageCache, sizeof(vx_memory_s));
         gcoOS_ZeroMemory(&requestList->kernelCache, sizeof(vx_memory_s));
+        gcoOS_ZeroMemory(&requestList->transposeIn, sizeof(vx_memory_s));
+        gcoOS_ZeroMemory(&requestList->transposeOut, sizeof(vx_memory_s));
     }
 
     gcmFOOTER_ARG("%d", VX_SUCCESS);
@@ -1647,7 +1662,7 @@ VX_PRIVATE_API vx_status RestorePartialMemoryParamList(
     vxnne_mem_param         memParamList
     )
 {
-    vx_uint32 i, j, k;
+    vx_uint32 i, j, k, dimIndex;
     vx_memory_s memory;
 
     gcmHEADER_ARG("graph=%p, start=0x%x, count=0x%x, memParamList=%p", graph, start, count, memParamList);
@@ -1684,8 +1699,6 @@ VX_PRIVATE_API vx_status RestorePartialMemoryParamList(
                 ((vx_image)graph->layer->operations[i]->inputs[j])->memory.physicals[0] = memory.physicals[0];
                 ((vx_image)graph->layer->operations[i]->inputs[j])->memory.logicals[0] = memory.logicals[0];
             }
-
-
         }
 
         for(j = 0; j < memParamList[k].outputCount; j++)
@@ -1696,6 +1709,12 @@ VX_PRIVATE_API vx_status RestorePartialMemoryParamList(
                 memory = ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory;
 
                 ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory = memParamList[k].outputMemory[j];
+                for (dimIndex = 0; dimIndex < VX_CONTEXT_TENSOR_MAX_DIMENSION; dimIndex++)
+                {
+                    ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.dims[0][dimIndex] = memory.dims[0][dimIndex];
+                    ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.strides[0][dimIndex] = memory.strides[0][dimIndex];
+                }
+                ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.transposed = memory.transposed;
                 ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.allocType = memory.allocType;
                 ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.physicals[0] = memory.physicals[0];
                 ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.logicals[0] = memory.logicals[0];
@@ -1835,18 +1854,68 @@ VX_PRIVATE_API vx_status DetectABSegments(
                 if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
                 {
                     vxnne_mem_request requestList;
+                    vx_uint32 transposeSize = 0;
+                    vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[k];
 
                     requestList = graph->layer->memRequestList  + k;
                     if (!(requestList->inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM) || (requestList->inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_AXI_SRAM))
                     {
-                        requestList->imageCache.lastUseId = requestList->imageCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
-                        requestList->imageCache.sizes[0]  = graph->layer->operations[k]->esitimateImageCacheSize;
-                        requestList->imageCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
-                        requestList->imageCache.allocPartial = vx_false_e;
+                        if (graph->layer->operations[k]->bTransposeIn /*&& requestList->inputMemory[0]->transposed*/)
+                        {
+                            vx_tensor input = (vx_tensor)(graph->layer->operations[k]->inputs[0]);
+                            vx_uint32 inputZ = 0;
 
-                        requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
+                            alignTensorChannelToTransposeChannel(input, graph->layer->operations[k]->transposeInChannel);
 
-                        requestList->inputMemory[requestList->inputCount] = &requestList->imageCache;
+                            inputZ = TENSOR_STRIDE_INDEX(input, 3) / TENSOR_STRIDE_INDEX(input, 2);
+
+                            transposeSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
+                                                                             convOperation->resultInfo.outImageTileXSize,
+                                                                             convOperation->resultInfo.outImageTileYSize,
+                                                                             opInfo.weightsBiases->weights_sizes[0],
+                                                                             opInfo.weightsBiases->weights_sizes[1],
+                                                                             inputZ,
+                                                                             convOperation->resultInfo.interleaveMode,
+                                                                             graph->base.context->nnConfig.customizedFeature.ddrLatency,
+                                                                             graph->layer->operations[k]->transposeInChannel,
+                                                                             input->tensorBuffer->dataFormat);
+
+                            gcoOS_ZeroMemory(&requestList->transposeIn, sizeof(vx_memory_s));
+                            requestList->transposeIn.lastUseId = requestList->transposeIn.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                            requestList->transposeIn.sizes[0] = transposeSize;
+                            requestList->transposeIn.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                            requestList->transposeIn.allocPartial = vx_false_e;
+                            requestList->transposeIn.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
+                            requestList->inputMemory[requestList->inputCount] = &requestList->transposeIn;
+                            requestList->inputCount++;
+                        }
+                        else
+                        {
+                            requestList->imageCache.lastUseId = requestList->imageCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                            requestList->imageCache.sizes[0]  = graph->layer->operations[k]->esitimateImageCacheSize;
+                            requestList->imageCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                            requestList->imageCache.allocPartial = vx_false_e;
+
+                            requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
+
+                            requestList->inputMemory[requestList->inputCount] = &requestList->imageCache;
+                            requestList->inputCount++;
+                        }
+                    }
+
+                    if (graph->layer->operations[k]->bTransposeOut && (!(requestList->outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM) || (requestList->outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_AXI_SRAM)))
+                    {
+                        vx_tensor output = (vx_tensor)(graph->layer->operations[k]->outputs[0]);
+
+                        alignTensorChannelToTransposeChannel(output, graph->layer->operations[k]->transposeOutChannel);
+
+                        transposeSize = caculateOutTransposeBufferSize(convOperation->resultInfo.outImageTileXSize, convOperation->resultInfo.outImageTileYSize, output->tensorBuffer->dataFormat);
+                        requestList->transposeOut.lastUseId = requestList->transposeOut.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                        requestList->transposeOut.sizes[0] = transposeSize;
+                        requestList->transposeOut.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                        requestList->transposeOut.allocPartial = vx_false_e;
+                        requestList->transposeOut.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
+                        requestList->inputMemory[requestList->inputCount] = &requestList->transposeOut;
                         requestList->inputCount++;
                     }
 
@@ -2120,6 +2189,7 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
             vx_uint32 outputDims[3] = {TENSOR_VIEW_SIZE_INDEX(opInfo.output, 0),
                                         TENSOR_VIEW_SIZE_INDEX(opInfo.output, 1),
                                         TENSOR_VIEW_SIZE_INDEX(opInfo.output, 2)};
+            vx_uint32 transposeSize = 0;
 
             if (convOperation->resultInfo.kernelsPerCore == 0)
             {
@@ -2198,13 +2268,64 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
 
             if (!(requestList->inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_VIP_SRAM))
             {
-                /* From DDR, AXISRAM need to be cached */
-                requestList->imageCache.lastUseId = requestList->imageCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
-                requestList->imageCache.sizes[0] = imageTileSize;
-                requestList->imageCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
-                requestList->imageCache.allocPartial = vx_false_e;
-                requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
-                requestList->inputMemory[requestList->inputCount] = &requestList->imageCache;
+                if (operation->bTransposeIn /*&& requestList->inputMemory[0]->transposed*/)
+                {
+                    vx_tensor input = (vx_tensor)(operation->inputs[0]);
+
+                    vx_uint32 inputZ = 0;
+
+                    alignTensorChannelToTransposeChannel(input, operation->transposeInChannel);
+
+                    inputZ = TENSOR_STRIDE_INDEX(input, 3) / TENSOR_STRIDE_INDEX(input, 2);
+
+                    transposeSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
+                                                                     outImageTileX,
+                                                                     outImageTileY,
+                                                                     kernelX,
+                                                                     kernelY,
+                                                                     inputZ,
+                                                                     interleaveMode,
+                                                                     graph->base.context->nnConfig.customizedFeature.ddrLatency,
+                                                                     operation->transposeInChannel,
+                                                                     input->tensorBuffer->dataFormat);
+
+                    gcoOS_ZeroMemory(&requestList->transposeIn, sizeof(vx_memory_s));
+                    requestList->transposeIn.lastUseId = requestList->transposeIn.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                    requestList->transposeIn.sizes[0] = transposeSize;
+                    requestList->transposeIn.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                    requestList->transposeIn.allocPartial = vx_false_e;
+                    requestList->transposeIn.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
+                    requestList->inputMemory[requestList->inputCount] = &requestList->transposeIn;
+                    requestList->inputCount++;
+                }
+                else
+                {
+                    /* From DDR, AXISRAM need to be cached */
+                    requestList->imageCache.lastUseId = requestList->imageCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                    requestList->imageCache.sizes[0] = imageTileSize;
+                    requestList->imageCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                    requestList->imageCache.allocPartial = vx_false_e;
+                    requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
+                    requestList->inputMemory[requestList->inputCount] = &requestList->imageCache;
+                    requestList->inputCount++;
+                }
+            }
+
+            if (operation->bTransposeOut && (!(requestList->outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM) || (requestList->outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_AXI_SRAM)) )
+            {
+                vx_tensor output = (vx_tensor)(operation->outputs[0]);
+
+                alignTensorChannelToTransposeChannel(output, operation->transposeOutChannel);
+
+                transposeSize = caculateOutTransposeBufferSize(outImageTileX, outImageTileY, output->tensorBuffer->dataFormat);
+
+                gcoOS_ZeroMemory(&requestList->transposeOut, sizeof(vx_memory_s));
+                requestList->transposeOut.lastUseId = requestList->transposeOut.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                requestList->transposeOut.sizes[0] = transposeSize;
+                requestList->transposeOut.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                requestList->transposeOut.allocPartial = vx_false_e;
+                requestList->transposeOut.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
+                requestList->inputMemory[requestList->inputCount] = &requestList->transposeOut;
                 requestList->inputCount++;
             }
         }
@@ -2229,6 +2350,7 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
     vxnne_operation operation = VX_NULL;
     vxnne_mem_request requestList = VX_NULL;
     vx_uint32 inputCount = 0;
+    vx_uint32 transposeSize;
 
     vx_status status = GenerateTilingInfo(
                     graph->base.context,
@@ -2317,16 +2439,40 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
                 {
                     vx_uint32 interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
 
-                    outImageTileX = tilingInfo[j].tilingParam.outImageTileXSize;
-                    outImageTileY = tilingInfo[j].tilingParam.outImageTileYSize;
-                    interleaveMode = tilingInfo[j].tilingParam.interleaveMode;
-                    kernelX = opInfo.weightsBiases->weights_sizes[0];
-                    kernelY = opInfo.weightsBiases->weights_sizes[1];
-                    inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
-                    inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
+                    if (operation->bTransposeIn)
+                    {
+                        vx_uint32 inputZ = 0;
+                        vx_tensor input = (vx_tensor)(operation->inputs[0]);
 
-                    imageTileSize = caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
-                    operation->imageCacheSize = gcmMAX(operation->imageCacheSize, imageTileSize);
+                        alignTensorChannelToTransposeChannel(input, operation->transposeInChannel);
+
+                        inputZ = TENSOR_STRIDE_INDEX(input, 3) / TENSOR_STRIDE_INDEX(input, 2);
+
+                        transposeSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
+                                                                        tilingInfo[j].tilingParam.outImageTileXSize,
+                                                                        tilingInfo[j].tilingParam.outImageTileYSize,
+                                                                        opInfo.weightsBiases->weights_sizes[0],
+                                                                        opInfo.weightsBiases->weights_sizes[1],
+                                                                        inputZ,
+                                                                        tilingInfo[j].tilingParam.interleaveMode,
+                                                                        graph->base.context->nnConfig.customizedFeature.ddrLatency,
+                                                                        operation->transposeInChannel,
+                                                                        input->tensorBuffer->dataFormat);
+                        operation->transposeInSize = gcmMAX(operation->transposeInSize, transposeSize);
+                    }
+                    else
+                    {
+                        outImageTileX = tilingInfo[j].tilingParam.outImageTileXSize;
+                        outImageTileY = tilingInfo[j].tilingParam.outImageTileYSize;
+                        interleaveMode = tilingInfo[j].tilingParam.interleaveMode;
+                        kernelX = opInfo.weightsBiases->weights_sizes[0];
+                        kernelY = opInfo.weightsBiases->weights_sizes[1];
+                        inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
+                        inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
+
+                        imageTileSize = caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
+                        operation->imageCacheSize = gcmMAX(operation->imageCacheSize, imageTileSize);
+                    }
                 }
             }
         }
@@ -2384,17 +2530,49 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
             requestList->kernelCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
             requestList->kernelCache.allocPartial = vx_false_e;
 
-             vxmASSERT(operation->imageCacheSize != 0);
+            if (operation->bTransposeIn == 0)
+            {
+                vxmASSERT(operation->imageCacheSize != 0);
+            }
              {
                  vxnne_mem_request requestList1 = graph->layer->memRequestList + segment->start + segment->count - 1;
 
                  if (!(requestList1->inputMemory[i]->allocType & VXNNE_MEM_POOL_TYPE_SRAM))
                  {
-                     requestList->imageCache.lastUseId = requestList->imageCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
-                     requestList->imageCache.sizes[0] = operation->imageCacheSize;
-                     requestList->imageCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
-                     requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
-                     requestList->imageCache.allocPartial = vx_false_e;
+                    if (operation->bTransposeIn /*&& requestList->inputMemory[0]->transposed*/)
+                    {
+                        gcoOS_ZeroMemory(&requestList->transposeIn, sizeof(vx_memory_s));
+                        requestList->transposeIn.lastUseId = requestList->transposeIn.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                        requestList->transposeIn.sizes[0] = operation->transposeInSize;
+                        requestList->transposeIn.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                        requestList->transposeIn.allocPartial = vx_false_e;
+                        requestList->transposeIn.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
+                    }
+                    else
+                    {
+                        requestList->imageCache.lastUseId = requestList->imageCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                        requestList->imageCache.sizes[0] = operation->imageCacheSize;
+                        requestList->imageCache.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                        requestList->imageCache.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
+                        requestList->imageCache.allocPartial = vx_false_e;
+                    }
+                 }
+
+                 if (operation->bTransposeOut &&
+                    (i == segment->count - 1) &&
+                    requestList1->outputMemory[0] &&
+                    !(requestList1->outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM))
+                {
+                    vx_tensor output = (vx_tensor)(operation->outputs[0]);
+
+                    alignTensorChannelToTransposeChannel(output, operation->transposeOutChannel);
+
+                    gcoOS_ZeroMemory(&requestList->transposeOut, sizeof(vx_memory_s));
+                    requestList->transposeOut.lastUseId = requestList->transposeOut.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
+                    requestList->transposeOut.sizes[0] = 32 * 1024;
+                    requestList->transposeOut.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+                    requestList->transposeOut.allocPartial = vx_false_e;
+                    requestList->transposeOut.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
                  }
 
                  requestList1->inputMemory[requestList1->inputCount] = &requestList->kernelCache;
@@ -2402,6 +2580,18 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
                  if (requestList->imageCache.sizes[0] > 0)
                  {
                      requestList1->inputMemory[requestList1->inputCount] = &requestList->imageCache;
+                     requestList1->inputCount++;
+                 }
+
+                 if (requestList->transposeIn.sizes[0] > 0)
+                 {
+                     requestList1->inputMemory[requestList1->inputCount] = &requestList->transposeIn;
+                     requestList1->inputCount++;
+                 }
+
+                 if (requestList->transposeOut.sizes[0] > 0)
+                 {
+                     requestList1->inputMemory[requestList1->inputCount] = &requestList->transposeOut;
                      requestList1->inputCount++;
                  }
              }
@@ -2707,6 +2897,32 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
                     operation->kernelCacheMode = VXNNE_SRAM_CACHE_MODE_NONE;
                     operation->kernelCacheSize = 0;
                 }
+
+                if (memReqList->transposeIn.physicals[0] != 0)
+                {
+                    operation->transposeInSize  = (vx_uint32)memReqList->transposeIn.sizes[0];
+                    operation->transposeInStart = memReqList->transposeIn.physicals[0];
+                    operation->transposeInMode  = VXNNE_SRAM_CACHE_MODE_FULL_CACHE;
+                }
+                else
+                {
+                    operation->transposeInMode = VXNNE_SRAM_CACHE_MODE_NONE;
+                    operation->transposeInSize = 0;
+                }
+
+                if (memReqList->transposeOut.physicals[0] != 0)
+                {
+                    operation->transposeOutSize  = (vx_uint32)memReqList->transposeOut.sizes[0];
+                    operation->transposeOutStart = memReqList->transposeOut.physicals[0];
+                    operation->transposeOutMode  = VXNNE_SRAM_CACHE_MODE_FULL_CACHE;
+
+                    memReqList->outputMemory[0]->transposed = vx_true_e;
+                }
+                else
+                {
+                    operation->transposeOutMode = VXNNE_SRAM_CACHE_MODE_NONE;
+                    operation->transposeOutSize = 0;
+                }
             }
         }
 
@@ -2827,6 +3043,8 @@ OnError:
 
         vxnneBlock_Free(block);
     }
+
+    GetMemoryRequestList(graph, 0, graph->layer->base.num_operations, graph->layer->memRequestList);
 
     if (tempMemParam) gcoOS_Free(gcvNULL, tempMemParam);
     gcmFOOTER_ARG("%d", status);
@@ -3206,6 +3424,15 @@ VX_PRIVATE_API vx_status InitializeABSegmentCommands(
         opCommand->cmdInfo.kernelCacheStart = graph->layer->operations[i]->kernelCacheStart;
         opCommand->cmdInfo.kernelCacheMode  = graph->layer->operations[i]->kernelCacheMode;
 
+        opCommand->cmdInfo.transposeInSize = graph->layer->operations[i]->transposeInSize;
+        opCommand->cmdInfo.transposeInStart = graph->layer->operations[i]->transposeInStart;
+        opCommand->cmdInfo.transposeInMode = graph->layer->operations[i]->transposeInMode;
+        opCommand->cmdInfo.transposeInChannel = graph->layer->operations[i]->transposeInChannel;
+        opCommand->cmdInfo.transposeOutSize = graph->layer->operations[i]->transposeOutSize;
+        opCommand->cmdInfo.transposeOutStart = graph->layer->operations[i]->transposeOutStart;
+        opCommand->cmdInfo.transposeOutMode = graph->layer->operations[i]->transposeOutMode;
+        opCommand->cmdInfo.transposeOutChannel = graph->layer->operations[i]->transposeOutChannel;
+
 
         graph->layer->opIndicesNum++;
     }
@@ -3331,9 +3558,27 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
 
                         vxmASSERT(!opCommand->inputTile.sRAM || opCommand->inputTile.physical);
 
+                        opCommand->operation   = graph->layer->operations[opCommand->operationID];
 
-                        offset = opCommand->inputTile.x * opCommand->inputTile.xStride
-                                    + opCommand->inputTile.y * opCommand->inputTile.yStride;
+                        opCommand->cmdInfo.transposeInSize = opCommand->operation->transposeInSize;
+                        opCommand->cmdInfo.transposeInStart = opCommand->operation->transposeInStart;
+                        opCommand->cmdInfo.transposeInMode = opCommand->operation->transposeInMode;
+                        opCommand->cmdInfo.transposeInChannel = opCommand->operation->transposeInChannel;
+                        opCommand->cmdInfo.transposeOutSize = opCommand->operation->transposeOutSize;
+                        opCommand->cmdInfo.transposeOutStart = opCommand->operation->transposeOutStart;
+                        opCommand->cmdInfo.transposeOutMode = opCommand->operation->transposeOutMode;
+                        opCommand->cmdInfo.transposeOutChannel = opCommand->operation->transposeOutChannel;
+
+                        if (opCommand->cmdInfo.transposeInMode == VXNNE_SRAM_CACHE_MODE_FULL_CACHE)
+                        {
+                            offset = (opCommand->inputTile.x * opCommand->inputTile.xStride
+                                         + opCommand->inputTile.y * opCommand->inputTile.yStride) * opCommand->cmdInfo.transposeInChannel;
+                        }
+                        else
+                        {
+                            offset = opCommand->inputTile.x * opCommand->inputTile.xStride
+                                        + opCommand->inputTile.y * opCommand->inputTile.yStride;
+                        }
 
                         if (opCommand->inputTile.sRAM && opCommand->inputTile.circleBufferSize != 0)
                         {
@@ -3395,8 +3640,16 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
 
                         vxmASSERT(!opCommand->outputTile.sRAM || opCommand->outputTile.physical);
 
-                        offset = opCommand->outputTile.x * opCommand->outputTile.xStride
-                                    + opCommand->outputTile.y * opCommand->outputTile.yStride;
+                        if (opCommand->cmdInfo.transposeOutMode == VXNNE_SRAM_CACHE_MODE_FULL_CACHE)
+                        {
+                            offset = (opCommand->outputTile.x * opCommand->outputTile.xStride
+                                         + opCommand->outputTile.y * opCommand->outputTile.yStride) * opCommand->cmdInfo.transposeOutChannel;
+                        }
+                        else
+                        {
+                            offset = opCommand->outputTile.x * opCommand->outputTile.xStride
+                                        + opCommand->outputTile.y * opCommand->outputTile.yStride;
+                        }
 
                         if (opCommand->outputTile.sRAM && opCommand->outputTile.circleBufferSize != 0)
                         {
@@ -3407,8 +3660,6 @@ VX_PRIVATE_API vx_status InitializeTilingSegmentCommands(
                         opCommand->outputTile.logical   = (vx_uint8*)opCommand->outputTile.logical + offset;
 
                         vxmASSERT(!opCommand->outputTile.sRAM || opCommand->outputTile.physical < opCommand->outputTile.circularBufEndAddrPlus1);
-
-                        opCommand->operation   = graph->layer->operations[opCommand->operationID];
 
                         opCommand->cmdInfo.tilingParam = tilingInfo[i].tilingParam;
                         opCommand->cmdInfo.imageCacheSize  = opCommand->operation->imageCacheSize;
@@ -9396,6 +9647,154 @@ VX_PRIVATE_API void vxoGraph_GeneratePatchLocForInputs(vx_graph graph)
     return;
 }
 
+VX_INTERNAL_API vx_status vxoGraph_VerifyNNTranspose(vx_graph graph)
+{
+#define ESTIMATE_KERNEL_CACHE_COEFFICIENT 0.5
+    vx_uint32 index = 0, j = 0;
+    vxnne_operation operation;
+    vx_uint8 transposeOutChannel = 0;
+    vx_uint32 outputZ = 0;
+    vx_tensor input, output;
+    vx_context context = graph->base.context;
+    vx_status status = VX_SUCCESS;
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_TRANSPOSE))
+    {
+        for (index = 0; index < graph->layer->base.num_operations; index++)
+        {
+            vxnne_operation_info_s opInfo;
+            operation = graph->layer->operations[index];
+            input = (vx_tensor)(operation->inputs[0]);
+            output = (vx_tensor)(operation->outputs[0]);
+
+            vxnneOperation_GetInfo(operation, &opInfo);
+            if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
+            {
+                vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
+                vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
+                vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
+                vx_arch_perf_s archPerfHandle;
+                vx_uint8 transposeInChannel = 0;
+
+                outputZ = TENSOR_VIEW_SIZE_INDEX(output, 2);
+                if ((WB_KERNEL_X(((vxnne_convolution_relu_pooling_operation)operation)->weights_biases) == 1) &&
+                    (WB_KERNEL_Y(((vxnne_convolution_relu_pooling_operation)operation)->weights_biases) == 1))
+                {
+                    transposeInChannel = VX_TRANSPOSE_MAX_INTERLEAVE_1MULTI1_CH;
+                }
+                else
+                    transposeInChannel = (vx_uint8)gcmMIN(outputZ, VX_TRANSPOSE_MAX_INTERLEAVE_CH);
+
+                INITIALIZE_STRUCT(archPerfHandle);
+                calculateArchPerfFromWB(context,
+                                    &archPerfHandle,
+                                    opInfo.weightsBiases,
+                                    inputDims,
+                                    outputDims,
+                                    TENSOR_DATA_TYPE(output),
+                                    VX_NULL,
+                                    vx_true_e,
+                                    SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
+                                    context->vipSRAM.size,
+                                    (vxnne_operation_target_e)opInfo.target,
+                                    (vxnne_operator_e)opInfo.opType);
+
+                outImageTileX   = archPerfHandle.resultInfo.outImageTileXSize;
+                outImageTileY   = archPerfHandle.resultInfo.outImageTileYSize;
+                interleaveMode  = archPerfHandle.resultInfo.interleaveMode;
+                kernelX         = opInfo.weightsBiases->weights_sizes[0];
+                kernelY         = opInfo.weightsBiases->weights_sizes[1];
+                inImageZ        = TENSOR_SIZE_INDEX(opInfo.input, 2);
+                inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
+
+                operation->transposeInSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
+                                                outImageTileX,
+                                                outImageTileY,
+                                                kernelX,
+                                                kernelY,
+                                                inputDims[2],
+                                                interleaveMode,
+                                                context->nnConfig.customizedFeature.ddrLatency,
+                                                transposeInChannel,
+                                                input->tensorBuffer->dataFormat);
+
+                operation->transposeOutSize = caculateOutTransposeBufferSize(outImageTileX, outImageTileY, output->tensorBuffer->dataFormat);
+                operation->transposeKernelSize = GetEsitimateWBSize(opInfo.weightsBiases);
+            }
+        }
+
+        for (index = 0; index < graph->layer->base.num_operations; index++)
+        {
+            operation = graph->layer->operations[index];
+
+            input = (vx_tensor)(operation->inputs[0]);
+            output = (vx_tensor)(operation->outputs[0]);
+
+            /* skip TP, shader operation */
+            if (operation->target != VXNNE_OPERATION_TARGET_NN)
+            {
+                operation->bTransposeIn = vx_false_e;
+                operation->bTransposeOut = vx_false_e;
+
+                vxmASSERT((operation->parentOpNum == 0 )|| operation->bTransposeIn  == operation->parentOps[0]->bTransposeOut);
+                continue;
+            }
+
+            if (operation->parentOpNum == 1)
+            {
+                operation->bTransposeIn = operation->parentOps[0]->bTransposeOut;
+                operation->transposeInChannel = input->tensorBuffer->memory.transposeChannel;
+            }
+            else
+            {
+                operation->bTransposeIn = vx_false_e;
+                operation->transposeInChannel = 0;
+            }
+
+            vxmASSERT((operation->parentOpNum == 0 )|| operation->bTransposeIn  == operation->parentOps[0]->bTransposeOut);
+
+            /* skip last layer's output */
+            if (vxoTensor_IsVirtualTensor(output) == 0 ||
+                output->isViewed ||
+                (operation->childOpNum == 0) ||
+                (((operation->bTransposeIn ? operation->transposeInSize : 0) + operation->transposeOutSize + operation->transposeKernelSize * ESTIMATE_KERNEL_CACHE_COEFFICIENT) >= context->vipSRAM.size))
+            {
+                operation->bTransposeOut = vx_false_e;
+                continue;
+            }
+
+            outputZ = TENSOR_VIEW_SIZE_INDEX(output, 2);
+            transposeOutChannel = (vx_uint8)gcmMIN(outputZ, VX_TRANSPOSE_MAX_INTERLEAVE_CH);
+
+            for (j = 0; j < operation->childOpNum; j++)
+            {
+                vxnne_operation childOp = operation->childOps[j];
+
+                if ((childOp->target != VXNNE_OPERATION_TARGET_NN) ||
+                    (((vx_tensor)childOp->inputs[0])->isViewed) ||
+                    (childOp->inputs[0] != operation->outputs[0]) ||
+                    ((childOp->transposeInSize + childOp->transposeKernelSize * ESTIMATE_KERNEL_CACHE_COEFFICIENT) >= context->vipSRAM.size))
+                {
+                    transposeOutChannel = 0;
+                    break;
+                }
+
+                if ((childOp->target == VXNNE_OPERATION_TARGET_NN) &&
+                    (WB_KERNEL_X(((vxnne_convolution_relu_pooling_operation)childOp)->weights_biases) == 1) &&
+                    (WB_KERNEL_Y(((vxnne_convolution_relu_pooling_operation)childOp)->weights_biases) == 1))
+                {
+                    transposeOutChannel = VX_TRANSPOSE_MAX_INTERLEAVE_1MULTI1_CH;
+                }
+            }
+
+            operation->bTransposeOut = (transposeOutChannel > 0) ? vx_true_e : vx_false_e;
+            operation->transposeOutChannel = transposeOutChannel;
+            output->tensorBuffer->memory.transposeChannel = operation->transposeOutChannel;
+        }
+    }
+
+    return status;
+}
 
 
 VX_PRIVATE_API vx_status vxoGraph_VerifyGraph(vx_graph graph)
@@ -9499,6 +9898,8 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyGraph(vx_graph graph)
         {
             vxmONERROR(vxoGraph_AllocateContiguousMemory(graph));
         }
+
+        vxmONERROR(vxoGraph_VerifyNNTranspose(graph));
 
         vxmONERROR(vxoGraph_VerifyTiling(graph));
 
