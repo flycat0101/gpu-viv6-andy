@@ -1456,6 +1456,26 @@ gcoHAL_QueryMultiGPUAffinityConfig(
         queriedOnce = gcvTRUE;
     }
 
+    gcoOS_GetEnv(gcvNULL, "VIV_ENABLE_OPENCV_WORKGROUPSIZE", &affinity);
+
+    if(gcoOS_StrCmp(affinity, "1") == 0)
+    {
+        gceCHIPMODEL chipModel;
+        gctUINT32 chipRevision;
+
+        gcoHARDWARE_QueryChipIdentity(
+                                        gcvNULL,
+                                        &chipModel,
+                                        &chipRevision);
+
+        if((chipModel == gcv7000) && (chipRevision == 0x6009))
+        {
+            mode = *Mode = gcvMULTI_GPU_MODE_INDEPENDENT;
+            *CoreIndex = 0;
+            return gcvSTATUS_OK;
+        }
+    }
+
     gcoOS_GetEnv(gcvNULL, "VIV_MGPU_AFFINITY", &affinity);
 
     if (affinity == gcvNULL)
