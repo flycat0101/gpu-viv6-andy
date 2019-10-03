@@ -1179,7 +1179,7 @@ gcoBUFOBJ_IndexBind (
     gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_INDEX, Index->memory.u.normal.node, 0);
 #endif
     /* Program index */
-    gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL, address, endAddress, Type, (Count * 3), RestartElement));
+    gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL, startAddress, endAddress, Type, (Count * 3), RestartElement));
 
 OnError:
     /* Return the status. */
