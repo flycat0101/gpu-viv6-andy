@@ -2012,7 +2012,14 @@ gceSTATUS gcoVERTEXARRAY_MergeAllStreams(IN gcsVERTEXARRAY_BUFOBJ_PTR Streams,
             if (streamLoopPtr->divisor == streamPtr->divisor)
             {
                 /* Merge streams */
-                lastAttr->next = streamPtr->attributePtr;
+                if (lastAttr != gcvNULL)
+                {
+                    lastAttr->next = streamPtr->attributePtr;
+                }
+                else
+                {
+                    lastAttr = streamPtr->attributePtr;
+                }
 
                 if (streamPtr->stream == gcvNULL)
                 {
