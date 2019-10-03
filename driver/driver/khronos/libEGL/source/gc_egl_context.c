@@ -591,7 +591,7 @@ _FlushApiContext(
         return EGL_FALSE;
     }
 
-    return (*dispatch->flushContext)(Context);
+    return (*dispatch->flushContext)(ApiContext);
 }
 
 static EGLBoolean

@@ -346,7 +346,12 @@ veglFlushContext(
     void * Context
     )
 {
+    _VGContext* context = (_VGContext *)Context;
+
     gcmHEADER_ARG("Context=0x%x", Context);
+
+    finish(context);
+
     gcmFOOTER_ARG("return=%s", "EGL_TRUE");
     return EGL_TRUE;
 }
