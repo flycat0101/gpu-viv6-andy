@@ -300,7 +300,7 @@ veglGetThreadData(
         /* Initialize the thread data. */
         thread->error             = EGL_SUCCESS;
         thread->api               = EGL_OPENGL_ES_API;
-        thread->worker            = gcvNULL;
+        thread->context           = thread->esContext;
 
 #if gcdGC355_MEM_PRINT
         thread->fbMemSize         = 0;

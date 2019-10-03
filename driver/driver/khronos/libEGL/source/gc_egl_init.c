@@ -63,7 +63,7 @@ static struct eglExtension extensions[] =
     {"EGL_EXT_image_dma_buf_import_modifiers",  EGL_FALSE},
     {"EGL_KHR_lock_surface",                    EGL_TRUE },
     {"EGL_KHR_create_context",                  EGL_TRUE },
-    {"EGL_KHR_no_config_context",               EGL_FALSE },
+    {"EGL_KHR_no_config_context",               EGL_TRUE },
     {"EGL_KHR_surfaceless_context",             EGL_TRUE },
     {"EGL_EXT_create_context_robustness",       EGL_TRUE },
     {"EGL_EXT_protected_surface",               EGL_FALSE},
@@ -96,7 +96,6 @@ _GenExtension(
     extensions[VEGL_EXTID_EXT_image_dma_buf_import].enabled = EGL_TRUE;
     extensions[VEGL_EXTID_EXT_image_dma_buf_import_modifiers].enabled = EGL_TRUE;
     extensions[VEGL_EXTID_ANDROID_native_fence_sync].enabled = EGL_TRUE;
-    extensions[VEGL_EXTID_KHR_no_config_context].enabled = EGL_TRUE;
 
     if (Display->platform->platform == EGL_PLATFORM_FB_VIV ||
         Display->platform->platform == EGL_PLATFORM_GBM_VIV ||
@@ -118,6 +117,7 @@ _GenExtension(
         extensions[VEGL_EXTID_ANDROID_swap_rectangle].enabled      = EGL_TRUE;
         extensions[VEGL_EXTID_ANDROID_blob_cache].enabled          = EGL_TRUE;
         extensions[VEGL_EXTID_ANDROID_recordable].enabled          = EGL_TRUE;
+        extensions[VEGL_EXTID_KHR_no_config_context].enabled       = EGL_FALSE;
     }
 #endif
 
@@ -1856,6 +1856,10 @@ eglInitialize(
         gcmFOOTER_ARG("%d", EGL_FALSE);
         return EGL_FALSE;
     }
+    /* Re-initialize the client API in thread data. */
+    thread->error             = EGL_SUCCESS;
+    thread->api               = EGL_OPENGL_ES_API;
+    thread->context           = thread->esContext;
 
     /* Test for valid EGLDisplay structure. */
     dpy = veglGetDisplay(Dpy);
