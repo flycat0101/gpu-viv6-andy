@@ -13217,6 +13217,13 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
         }
     }
 
+    /* We don't update the DU when insert LOAD_S/STORE_S, so we need to invalid the DU. */
+    if (pShader->hasRegisterSpill)
+    {
+        pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateCfg= gcvTRUE;
+    }
+
     if (debugEnabled)
     {
         if (ra.DIContext)
