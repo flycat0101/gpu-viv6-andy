@@ -1050,21 +1050,20 @@ _RemoveFromBlockList(
     {
         if (vidMemBlock->addresses[hwType] == VidMemBlock->addresses[hwType])
         {
+            if (previous)
+            {
+                previous->next = vidMemBlock->next;
+            }
+            else
+            {
+                Kernel->vidMemBlock = vidMemBlock->next;
+            }
+            vidMemBlock->next = gcvNULL;
+
             break;
         }
         previous = vidMemBlock;
     }
-
-    if (previous)
-    {
-        previous->next = vidMemBlock->next;
-    }
-    else
-    {
-        Kernel->vidMemBlock = vidMemBlock->next;
-    }
-
-    vidMemBlock->next = gcvNULL;
 
     return gcvSTATUS_OK;
 }
