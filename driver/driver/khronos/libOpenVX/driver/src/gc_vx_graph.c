@@ -6745,10 +6745,12 @@ VX_INTERNAL_API void vxoGraph_GenerateNextNodeTable(vx_graph graph,
 VX_INTERNAL_API void vxoGraph_PolluteIfInput(vx_graph graph, vx_reference targetRef)
 {
     vx_uint32 nodeIndex;
-
+    vx_context context = targetRef->context;
     gcmHEADER_ARG("graph=%p, targetRef=%p", graph, targetRef);
     vxmASSERT(graph);
     vxmASSERT(targetRef);
+
+    vxAcquireMutex(context->base.lock);
 
     for (nodeIndex = 0; nodeIndex < graph->nodeCount; nodeIndex++)
     {
@@ -6766,12 +6768,13 @@ VX_INTERNAL_API void vxoGraph_PolluteIfInput(vx_graph graph, vx_reference target
                 graph->verified = vx_false_e;
 
                 graph->status   = VX_GRAPH_STATE_UNVERIFIED;
-
+                vxReleaseMutex(context->base.lock);
                 gcmFOOTER_NO();
                 return;
             }
         }
     }
+    vxReleaseMutex(context->base.lock);
 }
 
 VX_API_ENTRY vx_graph VX_API_CALL vxCreateGraph(vx_context context)

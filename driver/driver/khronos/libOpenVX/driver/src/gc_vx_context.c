@@ -1307,10 +1307,7 @@ VX_PRIVATE_API vx_context vxoContext_Create()
     gcmHEADER_ARG("context=%p", context);
 
     gcoHAL_GetPLS(&pls);
-    if (pls->vxContextGlobalLock == VX_NULL)
-    {
-        vxCreateMutex(OUT &pls->vxContextGlobalLock);
-    }
+    vxmASSERT(pls->vxContextGlobalLock);
 
     vxAcquireMutex(pls->vxContextGlobalLock);
 
@@ -1756,6 +1753,7 @@ VX_INTERNAL_API vx_error vxoContext_GetErrorObject(vx_context context, vx_status
 {
     vx_reference_item current;
     gcmHEADER_ARG("context=%p, status=0x%x", context, status);
+    vxAcquireMutex(context->base.lock);
     current = context->refListHead;
 
     while (current != VX_NULL)
@@ -1766,6 +1764,7 @@ VX_INTERNAL_API vx_error vxoContext_GetErrorObject(vx_context context, vx_status
 
             if (error->status == status)
             {
+                vxReleaseMutex(context->base.lock);
                 gcmFOOTER_ARG("%p", error);
                 return error;
             }
@@ -1773,6 +1772,7 @@ VX_INTERNAL_API vx_error vxoContext_GetErrorObject(vx_context context, vx_status
 
         current = current->next;
     }
+    vxReleaseMutex(context->base.lock);
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -1793,12 +1793,14 @@ VX_INTERNAL_API vx_bool vxoContext_AddObject(vx_context context, vx_reference re
     vxmASSERT(context);
     vxmASSERT(ref);
 
+    vxAcquireMutex(context->base.lock);
     if (context->refFreeCount == 0)
     {
         vx_reference_item ritem = (vx_reference_item)vxAllocate(sizeof(vx_reference_item_s));
         if (ritem == VX_NULL)
         {
             vxError("Fail to allocate memory");
+            vxReleaseMutex(context->base.lock);
             gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
@@ -1824,11 +1826,13 @@ VX_INTERNAL_API vx_bool vxoContext_AddObject(vx_context context, vx_reference re
             }
 
             vxError("Context ref list error");
+            vxReleaseMutex(context->base.lock);
             gcmFOOTER_ARG("%d", vx_false_e);
             return vx_false_e;
         }
 
         context->refTotalCount++;
+        vxReleaseMutex(context->base.lock);
         gcmFOOTER_ARG("%d", vx_true_e);
         return vx_true_e;
     }
@@ -1842,6 +1846,7 @@ VX_INTERNAL_API vx_bool vxoContext_AddObject(vx_context context, vx_reference re
             {
                 current->ref = ref;
                 context->refFreeCount--;
+                vxReleaseMutex(context->base.lock);
                 gcmFOOTER_ARG("%d", vx_true_e);
                 return vx_true_e;
             }
@@ -1849,6 +1854,8 @@ VX_INTERNAL_API vx_bool vxoContext_AddObject(vx_context context, vx_reference re
             current = current->prev;
         }
     }
+
+    vxReleaseMutex(context->base.lock);
     gcmFOOTER_ARG("%d", vx_true_e);
     return vx_false_e;
 }
@@ -1861,7 +1868,7 @@ VX_INTERNAL_API vx_bool vxoContext_RemoveObject(vx_context context, vx_reference
 
     vxmASSERT(context);
     vxmASSERT(ref);
-
+    vxAcquireMutex(context->base.lock);
     if (order)
     {
         current = context->refListHead;
@@ -1872,6 +1879,7 @@ VX_INTERNAL_API vx_bool vxoContext_RemoveObject(vx_context context, vx_reference
             {
                 current->ref = VX_NULL;
                 context->refFreeCount++;
+                vxReleaseMutex(context->base.lock);
                 gcmFOOTER_ARG("%d", vx_true_e);
                 return vx_true_e;
             }
@@ -1889,6 +1897,7 @@ VX_INTERNAL_API vx_bool vxoContext_RemoveObject(vx_context context, vx_reference
             {
                 current->ref = VX_NULL;
                 context->refFreeCount++;
+                vxReleaseMutex(context->base.lock);
                 gcmFOOTER_ARG("%d", vx_true_e);
                 return vx_true_e;
             }
@@ -1897,6 +1906,7 @@ VX_INTERNAL_API vx_bool vxoContext_RemoveObject(vx_context context, vx_reference
         }
     }
 
+    vxReleaseMutex(context->base.lock);
     vxError("Can'targetIndex find the reference, %p, in the context, %p.", ref, context);
     gcmFOOTER_ARG("%d", vx_false_e);
     return vx_false_e;
