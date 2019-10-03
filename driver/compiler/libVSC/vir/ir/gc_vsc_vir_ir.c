@@ -8409,6 +8409,23 @@ VIR_TypeId_ConvertIntegerType(
     return newTypeId;
 }
 
+VIR_TypeId
+VIR_TypeId_ConvertFP16Type(
+    IN VIR_Shader*      pShader,
+    IN VIR_TypeId       fp16TypeId
+    )
+{
+    gctUINT             componentCount = VIR_GetTypeComponents(fp16TypeId);
+    VIR_TypeId          newTypeId = fp16TypeId;
+
+    if (VIR_GetTypeComponentType(fp16TypeId) == VIR_TYPE_FLOAT16)
+    {
+        newTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_UINT16, componentCount, 1);
+    }
+
+    return newTypeId;
+}
+
 /* symbol tables */
 /* find the symbol by nameId or constId and its kind, kind should not be field,
 * virtual register, return NULL if symbol is not found */

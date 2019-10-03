@@ -6130,6 +6130,12 @@ VIR_TypeId_ConvertIntegerType(
     IN gctBOOL          bSignedToUnsigned
     );
 
+VIR_TypeId
+VIR_TypeId_ConvertFP16Type(
+    IN VIR_Shader*      pShader,
+    IN VIR_TypeId       fp16TypeId
+    );
+
 /* shader symbols */
 
 /* return NULL if symbol is not found */

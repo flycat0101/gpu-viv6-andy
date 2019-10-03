@@ -3112,6 +3112,25 @@ _Extract_LShift_Mul3(
 }
 
 static VSC_ErrCode
+_VSC_UF_AUBO_CopyOperandFromLoad(
+    IN VIR_Operand*     pDataOpnd,
+    IN VIR_Operand*     pLoadDest,
+    IN VIR_Swizzle      newSwizzle
+    )
+{
+    VSC_ErrCode         virErrCode = VSC_ERR_NONE;
+    VIR_TypeId          typeId = VIR_Operand_GetTypeId(pDataOpnd);
+
+    VIR_Operand_Copy(pDataOpnd, pLoadDest);
+    VIR_Operand_Change2Src(pDataOpnd);
+    VIR_Operand_SetSwizzle(pDataOpnd, newSwizzle);
+    /* Don't change the type. */
+    VIR_Operand_SetTypeId(pDataOpnd, typeId);
+
+    return virErrCode;
+}
+
+static VSC_ErrCode
 _VSC_UF_AUBO_InsertInstructions(
     IN OUT VSC_UF_AUBO* aubo,
     IN OUT VIR_Shader* shader,
@@ -3140,9 +3159,16 @@ _VSC_UF_AUBO_InsertInstructions(
         VIR_Symbol* uniformSym = VSC_UF_AUBO_UniformInfoNode_GetUniformSym(uin);
         VIR_Type* uniformSymType = VIR_Symbol_GetType(uniformSym);
         VIR_TypeId uniformSymRegTypeId = _VSC_UF_AUBO_GetUniformDataTypeID(shader, uniformSym);
+        VIR_TypeId fakeUniformSymRegTypeId = uniformSymRegTypeId;
         VIR_Type* uniformSymRegType = VIR_Shader_GetTypeFromId(shader, uniformSymRegTypeId);
         VIR_Uniform* uniform = VIR_Symbol_GetUniform(uniformSym);
         VIR_Instruction* insertBefore = inst;
+
+        /* If a CTC uniform is FP16, we need to fake it as UINT16 because HW can't support FP16 directly. */
+        if (isSymUniformMovedToCUBO(uniformSym))
+        {
+            fakeUniformSymRegTypeId = VIR_TypeId_ConvertFP16Type(shader, uniformSymRegTypeId);
+        }
 
         if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
         {
@@ -3184,9 +3210,8 @@ _VSC_UF_AUBO_InsertInstructions(
             {
                 VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                 VIR_Inst_SetSrcNum(inst, 1);
-                VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
-                VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
-                VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                _VSC_UF_AUBO_CopyOperandFromLoad(VIR_Inst_GetSource(inst, 0), loadDest, operandSwizzle);
+
                 if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                 {
                     VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
@@ -3198,12 +3223,8 @@ _VSC_UF_AUBO_InsertInstructions(
             {
                 VIR_Operand* operand = VSC_UF_AUBO_UniformInfoNode_GetOperand(uin);
 
-                VIR_Operand_Copy(operand, loadDest);
-                VIR_Operand_Change2Src(operand);
-                VIR_Operand_SetSwizzle(operand, operandSwizzle);
-                VIR_Operand_SetRelIndex(operand, 0);
-                VIR_Operand_SetRelAddrMode(operand, 0);
-                VIR_Operand_SetMatrixConstIndex(operand, 0);
+                _VSC_UF_AUBO_CopyOperandFromLoad(operand, loadDest, operandSwizzle);
+
                 if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                 {
                     VIR_LOG(dumper, "propagate as:\n");
@@ -3265,7 +3286,7 @@ _VSC_UF_AUBO_InsertInstructions(
                                                   &loadSymId);
                 if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
-                VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
+                VIR_Operand_SetTempRegister(loadDest, func, loadSymId, fakeUniformSymRegTypeId);
                 VIR_Operand_SetEnable(loadDest, VIR_TypeId_Conv2Enable(uniformSymRegTypeId));
 
                 addressSymId = _VSC_UF_AUBO_GetAuxAddress(aubo, shader, uniformSym, VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin));
@@ -3296,9 +3317,8 @@ _VSC_UF_AUBO_InsertInstructions(
             {
                 VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                 VIR_Inst_SetSrcNum(inst, 1);
-                VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
-                VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
-                VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                _VSC_UF_AUBO_CopyOperandFromLoad(VIR_Inst_GetSource(inst, 0), loadDest, operandSwizzle);
+
                 if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                 {
                     VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
@@ -3358,7 +3378,7 @@ _VSC_UF_AUBO_InsertInstructions(
                                                     &loadSymId);
                 if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
-                VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
+                VIR_Operand_SetTempRegister(loadDest, func, loadSymId, fakeUniformSymRegTypeId);
                 VIR_Operand_SetEnable(loadDest, VIR_TypeId_Conv2Enable(uniformSymRegTypeId));
 
                 VIR_Operand_Copy(loadSrc0, madDest);
@@ -3380,9 +3400,8 @@ _VSC_UF_AUBO_InsertInstructions(
             {
                 VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                 VIR_Inst_SetSrcNum(inst, 1);
-                VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
-                VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
-                VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                _VSC_UF_AUBO_CopyOperandFromLoad(VIR_Inst_GetSource(inst, 0), loadDest, operandSwizzle);
+
                 if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                 {
                     VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
@@ -3514,7 +3533,7 @@ _VSC_UF_AUBO_InsertInstructions(
                                                           &loadSymId);
                         if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
-                        VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
+                        VIR_Operand_SetTempRegister(loadDest, func, loadSymId, fakeUniformSymRegTypeId);
                         VIR_Operand_SetEnable(loadDest, VIR_TypeId_Conv2Enable(uniformSymRegTypeId));
 
                         addressSymId = _VSC_UF_AUBO_GetAuxAddress(aubo, shader, uniformSym, VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin));
@@ -3541,9 +3560,8 @@ _VSC_UF_AUBO_InsertInstructions(
                     {
                         VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                         VIR_Inst_SetSrcNum(inst, 1);
-                        VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
-                        VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
-                        VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                        _VSC_UF_AUBO_CopyOperandFromLoad(VIR_Inst_GetSource(inst, 0), loadDest, operandSwizzle);
+
                         if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                         {
                             VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
@@ -3666,7 +3684,7 @@ _VSC_UF_AUBO_InsertInstructions(
                                                           &loadSymId);
                         if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
-                        VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
+                        VIR_Operand_SetTempRegister(loadDest, func, loadSymId, fakeUniformSymRegTypeId);
                         VIR_Operand_SetEnable(loadDest, VIR_TypeId_Conv2Enable(uniformSymRegTypeId));
 
                         VIR_Operand_SetTempRegister(loadSrc0, func, lastSymId, VIR_TYPE_UINT32);
@@ -3686,9 +3704,8 @@ _VSC_UF_AUBO_InsertInstructions(
                     {
                         VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                         VIR_Inst_SetSrcNum(inst, 1);
-                        VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
-                        VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
-                        VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                        _VSC_UF_AUBO_CopyOperandFromLoad(VIR_Inst_GetSource(inst, 0), loadDest, operandSwizzle);
+
                         if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                         {
                             VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
@@ -3721,7 +3738,7 @@ _VSC_UF_AUBO_InsertInstructions(
                                                   &loadSymId);
                 if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
-                VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
+                VIR_Operand_SetTempRegister(loadDest, func, loadSymId, fakeUniformSymRegTypeId);
                 VIR_Operand_SetEnable(loadDest, VIR_TypeId_Conv2Enable(uniformSymRegTypeId));
 
                 /* set loadSrc0 */
@@ -3795,9 +3812,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 }
 
                 {
-                    VIR_Operand_Copy(operand, loadDest);
-                    VIR_Operand_Change2Src(operand);
-                    VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                    _VSC_UF_AUBO_CopyOperandFromLoad(operand, loadDest, operandSwizzle);
                 }
 
                 VSC_UF_AUBO_UniformInfoNode_SetLOADInst(uin, load);
