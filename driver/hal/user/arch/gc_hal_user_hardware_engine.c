@@ -15456,6 +15456,23 @@ gcoHARDWARE_FlushShaders(
          gcmONERROR(gcvSTATUS_INVALID_ADDRESS);
     }
 
+    /* Remap 1 to all PS out when using gl_FragColor to draw MRTs */
+    if ((0x1 < Hardware->PEStates->colorOutCount) && (0x1 == hints->fragColorUsage) &&
+        (0x1 == hints->psOutCntl0to3) && (gcvAPI_OPENGL == Hardware->currentApi))
+    {
+        gctUINT j;
+        if (0x8 == Hardware->config->renderTargets)
+        {
+            for (j = 0; j < Hardware->config->renderTargets; j++)
+            {
+                hints->psOutput2RtIndex[j] = j;
+            }
+            hints->psOutCntl0to3 = 0x01010101;
+            hints->psOutCntl4to7 = 0x01010101;
+            remapPSout = gcvTRUE;
+        }
+    }
+
     if (hints->stageBits & gcvPROGRAM_STAGE_FRAGMENT_BIT)
     {
         for (i = (Hardware->PEStates->colorOutCount - 1); i >= 0; i--)
