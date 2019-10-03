@@ -548,6 +548,10 @@ _GetCommandBuffer(
                 ));
         }
 
+        if (commandBuffer == gcvNULL)
+        {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
         /* Wait for buffer to become available. */
         gcmONERROR(gcoOS_WaitSignal(gcvNULL, commandBuffer->signal, gcvINFINITE));
     }
@@ -2349,7 +2353,7 @@ gcoBUFFER_Commit(
     {
         gcmONERROR(gcoQUEUE_Commit(Queue, gcvFALSE));
     }
-    else
+    else if (!emptyBuffer)
     {
         gcsHAL_INTERFACE iface;
         gctUINT32 context = 0;

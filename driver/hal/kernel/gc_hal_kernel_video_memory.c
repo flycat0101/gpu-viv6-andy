@@ -1250,17 +1250,18 @@ _ConvertPhysical(
     gctUINT64 physical = 0;
 
     gcmkHEADER_ARG("Node=0x%X", Node);
+    gcmkVERIFY_ARGUMENT(Node != gcvNULL);
+    gcmkVERIFY_ARGUMENT(VidMemBlock != gcvNULL);
+    gcmkVERIFY_ARGUMENT(Address != gcvNULL);
 
-    if ((Node && !Node->Virtual.contiguous) ||
-        (VidMemBlock && !VidMemBlock->contiguous))
+    if (!Node->Virtual.contiguous || !VidMemBlock->contiguous)
     {
         /* non-contiguous, mapping is required. */
         status = gcvSTATUS_NOT_SUPPORTED;
         goto OnError;
     }
 
-    if ((Node && Node->Virtual.secure) ||
-        (VidMemBlock && VidMemBlock->secure))
+    if (Node->Virtual.secure || VidMemBlock->secure)
     {
         /* Secure, mapping is forced. */
         status = gcvSTATUS_NOT_SUPPORTED;
@@ -1281,8 +1282,8 @@ _ConvertPhysical(
 #endif
 
     if ((physical > gcvMAXUINT32) ||
-        (Node && (physical + Node->Virtual.bytes - 1 > gcvMAXUINT32)) ||
-        (VidMemBlock && (physical + VidMemBlock->bytes - 1 > gcvMAXUINT32)))
+        (physical + Node->Virtual.bytes - 1 > gcvMAXUINT32) ||
+        (physical + VidMemBlock->bytes - 1 > gcvMAXUINT32))
     {
         /* Above 4G (32bit), mapping is required currently. */
         status = gcvSTATUS_NOT_SUPPORTED;

@@ -1522,6 +1522,13 @@ typedef enum _VXC_RoundMode
     VXC_RM_ToNearestEven = 2
 } vxc_round_mode;
 
+typedef enum _VXC_FRAGOUT_USAGE
+{
+    VXC_FRAGOUT_USAGE_USER_DEFINED     = 0,
+    VXC_FRAGOUT_USAGE_FRAGCOLOR        = 1,
+    VXC_FRAGOUT_USAGE_FRAGDATA         = 2,
+} vxc_fragout_usage;
+
 #define VXC_CLAMP_BITMASK           0x400000     /* shift 22 */
 #define VXC_PREADJ_BITMASK          0x200000     /* shift 21 */
 #define VXC_RANGEPI_BITMASK         0x100000     /* shift 20 */
@@ -5226,6 +5233,8 @@ struct _VIR_SHADER
     gctBOOL             _enableDefaultUBO;
 
     gctBOOL             _IsLibraryShader;
+
+    vxc_fragout_usage   fragColorUsage;
 
     /* VIR Specific data */
     VIR_StringTable     stringTable;

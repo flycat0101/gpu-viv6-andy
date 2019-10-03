@@ -1655,6 +1655,11 @@ ppoPREPROCESSOR_SetSourceStrings(
            {
                continue;
            }
+           /* do not define GL_ES for desktop GL */
+           if ((i== 0) && (sloCOMPILER_GetClientApiVersion(PP->compiler) == gcvAPI_OPENGL))
+           {
+               continue;
+           }
            gcmONERROR(sloCOMPILER_AllocatePoolString(PP->compiler,
                                                      _PredefinedMacros[i].str,
                                                      &msName));

@@ -1275,6 +1275,7 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
 #else
             gctUINT               reserved                        : 1;
 #endif
+            gctUINT               fragColorUsage                  : 2;
         } ps;
 
         /* States acted on gps */

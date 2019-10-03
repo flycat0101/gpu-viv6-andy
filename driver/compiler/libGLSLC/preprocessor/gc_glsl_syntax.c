@@ -1147,7 +1147,7 @@ ppoPREPROCESSOR_TextLine_Handle_FILE_LINE_VERSION(
         creat_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute __VERSION__";
         gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", PP->version);
     }
-    else if(What == PP->keyword->gl_es)
+    else if(What == PP->keyword->gl_es && (sloCOMPILER_GetClientApiVersion(PP->compiler) != gcvAPI_OPENGL))
     {
         creat_str = "ppoPREPROCESSOR_TextLine : Creat a new token to substitute GL_ES";
         gcoOS_PrintStrSafe(numberbuffer, gcmSIZEOF(numberbuffer), &offset, "%d", 1);

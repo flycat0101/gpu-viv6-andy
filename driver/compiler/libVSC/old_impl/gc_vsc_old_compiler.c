@@ -2974,6 +2974,7 @@ gcSHADER_Copy(
     Shader->clientApiVersion   = Source->clientApiVersion;
     Shader->useDriverTcsPatchInputVertices = Source->useDriverTcsPatchInputVertices;
     Shader->hasNotStagesRelatedLinkError   = Source->hasNotStagesRelatedLinkError;
+    Shader->fragOutUsage = Source->fragOutUsage;
 
     /* Copy the shaderLayout */
     switch (Shader->type)
@@ -10150,6 +10151,9 @@ gcSHADER_Load(
             Shader->transformFeedback.varyings[i].isWholeTFBed = binaryTfbVarying->isWholeTFBed;
             Shader->transformFeedback.varyings[i].isArray = binaryTfbVarying->isArray;
             Shader->transformFeedback.varyings[i].arraySize = binaryTfbVarying->arraySize;
+            Shader->transformFeedback.varyings[i].isBuiltinArray = binaryTfbVarying->isBuiltinArray;
+            Shader->transformFeedback.varyings[i].builtinArrayIdx = binaryTfbVarying->builtinArrayIdx;
+            Shader->transformFeedback.varyings[i].bEndOfInterleavedBuffer = binaryTfbVarying->bEndOfInterleavedBuffer;
             for (j = 0; j < Shader->outputCount; j++)
             {
                 if (Shader->outputs[j]->index == binaryTfbVarying->outputIndex)
@@ -11615,6 +11619,9 @@ gcSHADER_Save(
         binary->isWholeTFBed = (gctINT16) Shader->transformFeedback.varyings[i].isWholeTFBed;
         binary->isArray = (gctINT16) Shader->transformFeedback.varyings[i].isArray;
         binary->nameLength = (gctINT16) gcoOS_StrLen(Shader->transformFeedback.varyings[i].name, gcvNULL);
+        binary->isBuiltinArray = (gctINT16) Shader->transformFeedback.varyings[i].isBuiltinArray;
+        binary->builtinArrayIdx = (gctINT16) Shader->transformFeedback.varyings[i].builtinArrayIdx;
+        binary->bEndOfInterleavedBuffer = (gctINT16) Shader->transformFeedback.varyings[i].bEndOfInterleavedBuffer;
         if (binary->nameLength > 0)
         {
             /* Compute number of bytes to copy. */
@@ -27419,6 +27426,21 @@ gcSHADER_GetDebugInfo(
     return NULL;
 }
 
+void
+gcSHADER_SetFragOutUsage(
+    IN gcSHADER             Shader,
+    IN gctUINT              Usage
+    )
+{
+    if (Shader == NULL)
+        return;
+
+    if (Usage <= 2)
+        Shader->fragOutUsage = Usage;
+    else
+        gcmASSERT(gcvFALSE);
+}
+
 #if (!VSC_LITE_BUILD)
 gceSTATUS
 gcSHADER_SetAttrLocationByDriver(
@@ -33417,6 +33439,28 @@ _findNameDotAndBracket(
     return;
 }
 
+static void
+_findArrayIndex(
+    IN  gctCONST_STRING VaryingBracket,
+    OUT gctINT*         Index
+    )
+{
+    const gctCHAR *ptr = VaryingBracket + 1;
+    gctINT index = 0;
+
+    while (*ptr >= '0' && *ptr <= '9')
+    {
+        index = index*10 + (*ptr++ - '0');
+    }
+    if (*ptr != ']')
+    {
+        /* error format */
+        index = -1;
+    }
+    *Index= index;
+    return;
+}
+
 gceSTATUS
 gcSHADER_SetTransformFeedbackVarying(
     IN gcSHADER Shader,
@@ -33425,9 +33469,10 @@ gcSHADER_SetTransformFeedbackVarying(
     IN gceFEEDBACK_BUFFER_MODE BufferMode
     )
 {
-    gceSTATUS status;
-    gctUINT32 i, j, nameIndex[4]= {0};
-    gctINT varyingCount = -1;
+    gceSTATUS  status;
+    gctUINT32  i, j, nameIndex[4]= {0};
+    gctINT     varyingCount = -1;
+    gctUINT32  newTempIndex = 0, outputIdx = 0;
 
     gcmHEADER_ARG("Shader=0x%x Count=%u Varyings=0x%x BufferMode=%d",
                   Shader, Count, Varyings, BufferMode);
@@ -33491,12 +33536,13 @@ gcSHADER_SetTransformFeedbackVarying(
 
         Shader->transformFeedback.varyings[varyingCount].isArray = gcvFALSE;
         Shader->transformFeedback.varyings[varyingCount].bEndOfInterleavedBuffer = gcvFALSE;
+        Shader->transformFeedback.varyings[varyingCount].isBuiltinArray = gcvFALSE;
+        Shader->transformFeedback.varyings[varyingCount].builtinArrayIdx = 0;
         if (gcmIS_SUCCESS(gcoOS_StrNCmp(Varyings[i], "gl_", sizeof("gl_")-1)))
         {
             if (gcShaderIsDesktopGL(Shader))
             {
                 /* Check transformfeedback variables, for GL only. */
-                gctUINT32       newTempIndex = 0;
                 gctUINT32       varyingNameLength = 4;
                 const gctSTRING varyingName[4] =
                         { "gl_SkipComponents1", "gl_SkipComponents2", "gl_SkipComponents3", "gl_SkipComponents4"};
@@ -33541,20 +33587,59 @@ gcSHADER_SetTransformFeedbackVarying(
 
             if (!found)
             {
-                gctUINT32 kind;
-                gcSHADER_GetBuiltinNameKind(Shader, Varyings[i], &kind);
-                if (kind != gcSL_NONBUILTINGNAME)
+                gctCONST_STRING varyingBracket = gcvNULL;
+                gctCONST_STRING varyingDot     = gcvNULL;
+                gctINT varyingNameLength = 0;
+                gctCHAR   builtinName[1024] = {0};
+
+                _findNameDotAndBracket(Varyings[i], &varyingDot, &varyingBracket);
+                varyingNameLength = gcoOS_StrLen(Varyings[i], gcvNULL);
+
+                if (varyingBracket != gcvNULL)
                 {
-                    for (j = 0; j < Shader->outputCount; j++)
+                    gctINT varyingBracketLength = 0;
+                    gctUINT32 kind;
+                    index = 0;
+                    varyingBracketLength = gcoOS_StrLen(varyingBracket, gcvNULL);
+                    gcoOS_StrCopySafe(builtinName, (varyingNameLength - varyingBracketLength + 1), Varyings[i]);
+                    _findArrayIndex(varyingBracket, &index);
+                    for (; outputIdx < Shader->outputCount; outputIdx ++)
                     {
-                        output = Shader->outputs[j];
-                        if (Shader->outputs[j]->nameLength == (gctINT) kind)
+                        gctINT nameLength;
+                        output = Shader->outputs[outputIdx];
+                        nameLength = (gctINT)output->nameLength;
+                        gcSHADER_GetBuiltinNameKind(Shader, builtinName, &kind);
+                        if (nameLength == (gctINT) kind)
                         {
+                            output = Shader->outputs[outputIdx];
+                            Shader->transformFeedback.varyings[varyingCount].isBuiltinArray = gcvTRUE;
+                            Shader->transformFeedback.varyings[varyingCount].builtinArrayIdx = index;
                             Shader->transformFeedback.varyings[varyingCount].output = output;
                             Shader->transformFeedback.varyings[varyingCount].arraySize = output->arraySize;
-                            Shader->transformFeedback.varyings[varyingCount].isWholeTFBed = gcvTRUE;
+                            Shader->transformFeedback.varyings[varyingCount].isWholeTFBed = gcvFALSE;
+                            outputIdx ++ ;
                             found = gcvTRUE;
                             break;
+                        }
+                    }
+                }
+                else
+                {
+                    gctUINT32 kind;
+                    gcSHADER_GetBuiltinNameKind(Shader, Varyings[i], &kind);
+                    if (kind != gcSL_NONBUILTINGNAME)
+                    {
+                        for (j = 0; j < Shader->outputCount; j++)
+                        {
+                            output = Shader->outputs[j];
+                            if (Shader->outputs[j]->nameLength == (gctINT) kind)
+                            {
+                                Shader->transformFeedback.varyings[varyingCount].output = output;
+                                Shader->transformFeedback.varyings[varyingCount].arraySize = output->arraySize;
+                                Shader->transformFeedback.varyings[varyingCount].isWholeTFBed = gcvTRUE;
+                                found = gcvTRUE;
+                                break;
+                            }
                         }
                     }
                 }
@@ -33571,17 +33656,8 @@ gcSHADER_SetTransformFeedbackVarying(
 
            if (varyingBracket != gcvNULL)
            {
-                const gctCHAR *ptr = varyingBracket + 1;
                 index = 0;
-                while (*ptr >= '0' && *ptr <= '9')
-                {
-                    index = index*10 + (*ptr++ - '0');
-                }
-                if (*ptr != ']')
-                {
-                    /* error format */
-                    index = -1;
-                }
+                _findArrayIndex(varyingBracket, &index);
             }
             for(j = 0; j < Shader->outputCount; j++) {
                gctINT nameLength;

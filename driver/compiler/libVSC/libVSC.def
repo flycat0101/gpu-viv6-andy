@@ -319,6 +319,7 @@ EXPORTS
     gcSHADER_SetDebugInfo
     gcSHADER_GetDebugInfo
 	gcSHADER_SetAttrLocationByDriver
+    gcSHADER_SetFragOutUsage
 
     ; gcATTRIBUTE
     gcATTRIBUTE_GetName

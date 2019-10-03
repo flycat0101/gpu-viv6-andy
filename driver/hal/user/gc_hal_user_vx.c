@@ -1160,7 +1160,7 @@ gcoVX_AllocateMemoryExAddAllocflag(
     )
 {
     gceSTATUS status;
-    gctUINT bytes;
+    gctUINT bytes = 0;
     gcsSURF_NODE_PTR node = gcvNULL;
     gctPOINTER pointer = gcvNULL;
     gctPOINTER logical = gcvNULL;
@@ -1228,7 +1228,7 @@ gcoVX_AllocateMemoryExAddAllocflag(
 
     /* Success. */
     gcmFOOTER_ARG("*Bytes=%lu *Physical=0x%x *Logical=0x%x *CpuPhysicalAddress=0x%x *Node=0x%x",
-                  *Bytes, *Physical, *Logical, *CpuPhysicalAddress, *Node);
+                  bytes, physical, logical, *CpuPhysicalAddress, *Node);
     return gcvSTATUS_OK;
 
 OnError:
@@ -1255,7 +1255,7 @@ gcoVX_AllocateMemoryEx(
     )
 {
     gceSTATUS status;
-    gctUINT bytes;
+    gctUINT bytes = 0;
     gcsSURF_NODE_PTR node = gcvNULL;
     gctPOINTER pointer = gcvNULL;
     gctPOINTER logical = gcvNULL;
@@ -1324,7 +1324,7 @@ gcoVX_AllocateMemoryEx(
 
     /* Success. */
     gcmFOOTER_ARG("*Bytes=%lu *Physical=0x%x *Logical=0x%x *Node=0x%x",
-                  *Bytes, *Physical, *Logical, *Node);
+                  bytes, physical, logical, *Node);
     return gcvSTATUS_OK;
 
 OnError:

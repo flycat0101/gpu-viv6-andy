@@ -115,14 +115,16 @@ BEGIN_EXTERN_C()
 #define gcdSL_SHADER_BINARY_BEFORE_SAVING_SHADER_SOURCE_FOR_OCL gcmCC(0, 0, 1, 33)
 
 /* bump up version to 1.34 for workGroupSizeFactor into the binary on 07/18/2019 */
-/* bump up version to 1.35 for saving the full graphics shaders into the binary on 08/08/2019 */
-/* bump up version to 1.36 for saving ubo array index into the binary on 08/09/2019 */
+/* bump up version to 1.35 for adding isBuiltinArray and builtinArrayIdx in TFBVarying on 07/19/2019 */
+/* bump up version to 1.36 for adding bEndOfInterleavedBuffer in TFBVarying on 07/22/2019 */
 /* bump up version to 1.37 for adding intrisinc functions for gSampler2DRect on 08/06/2019 */
+/* bump up version to 1.38 for saving the full graphics shaders into the binary on 08/08/2019 */
+/* bump up version to 1.39 for saving ubo array index into the binary on 08/09/2019 */
 
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 37)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 39)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 37)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 39)
 
 typedef union _gcsValue
 {
@@ -168,6 +170,14 @@ typedef enum _gcSHADER_KIND {
     gcSHADER_TYPE_GEOMETRY,
     gcSHADER_KIND_COUNT
 } gcSHADER_KIND;
+
+typedef enum gceFRAGOUT_USAGE
+{
+    gcvFRAGOUT_USAGE_USER_DEFINED     = 0,
+    gcvFRAGOUT_USAGE_FRAGCOLOR        = 1,
+    gcvFRAGOUT_USAGE_FRAGDATA         = 2,
+}
+gceFRAGOUT_USAGE;
 
 #define gcSL_GetShaderKindString(Kind) (((Kind) == gcSHADER_TYPE_VERTEX) ? "VS" :        \
                                         ((Kind) == gcSHADER_TYPE_FRAGMENT) ? "FS" :      \
@@ -4106,6 +4116,8 @@ typedef struct _gcsTFBVarying
     gctBOOL   isWholeTFBed;
     gctBOOL   isArray;
     gcOUTPUT  output;
+    gctBOOL   isBuiltinArray;
+    gctINT    builtinArrayIdx;
     gctBOOL   bEndOfInterleavedBuffer;
 } gcsTFBVarying;
 
@@ -4115,6 +4127,9 @@ typedef struct _gcBINARY_TFBVarying
     gctINT16                        arraySize;
     gctINT16                        isWholeTFBed;
     gctINT16                        isArray;
+    gctINT16                        isBuiltinArray;
+    gctINT16                        builtinArrayIdx;
+    gctINT16                        bEndOfInterleavedBuffer;
     gctINT16                        nameLength;
     char                            name[1];
 }
@@ -4589,12 +4604,14 @@ struct _gcSHADER
     gceSTATUS                   hasNotStagesRelatedLinkError;
 
     void *                      debugInfo;
+    gceFRAGOUT_USAGE            fragOutUsage;
 
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
     /* used to modefy the index of instruction when need to insert instruction into the shader when recompile */
     gctUINT                     InsertCount;
     gctUINT                     InstNum;
 #endif
+
 };
 
 /* Defines for OCL on reserved temp registers used for memory space addresses */

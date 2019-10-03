@@ -19508,7 +19508,7 @@ _LinkProgramCopyTFB(
                 outShader->transformFeedback.varyings[j].arraySize = inShader->transformFeedback.varyings[j].arraySize;
                 outShader->transformFeedback.varyings[j].isWholeTFBed = inShader->transformFeedback.varyings[j].isWholeTFBed;
                 outShader->transformFeedback.varyings[j].isArray = inShader->transformFeedback.varyings[j].isArray;
-
+                outShader->transformFeedback.varyings[j].bEndOfInterleavedBuffer = inShader->transformFeedback.varyings[j].bEndOfInterleavedBuffer;
                 for (k = 0; k < inShader->outputCount; k++)
                 {
                     if (inShader->outputs[k] == inShader->transformFeedback.varyings[j].output)
@@ -19810,6 +19810,7 @@ _LinkFullGraphicsProgramPipeline(
                     tempShaders[i]->transformFeedback.varyings[j].arraySize = Shaders[i]->transformFeedback.varyings[j].arraySize;
                     tempShaders[i]->transformFeedback.varyings[j].isWholeTFBed = Shaders[i]->transformFeedback.varyings[j].isWholeTFBed;
                     tempShaders[i]->transformFeedback.varyings[j].isArray = Shaders[i]->transformFeedback.varyings[j].isArray;
+                    tempShaders[i]->transformFeedback.varyings[j].bEndOfInterleavedBuffer = Shaders[i]->transformFeedback.varyings[j].bEndOfInterleavedBuffer;
 
                     for (k = 0; k < Shaders[i]->outputCount; k++)
                     {
@@ -20367,7 +20368,7 @@ _gcLINKTREE_ClampOutputColor(
     )
 {
     gceSTATUS   status              = gcvSTATUS_OK;
-    gcOUTPUT    outputColor[4]      = {gcvNULL, gcvNULL, gcvNULL, gcvNULL};
+    gcOUTPUT    outputColor[8] = { gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL };
     gctUINT     i, j = 0;
     gctINT      mainEndIdx;
     gctBOOL     outputColorExist    = gcvFALSE;
@@ -20418,7 +20419,7 @@ _gcLINKTREE_ClampOutputColor(
         mainEndIdx--;
     }
 
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < 8; i++)
     {
         if (outputColor[i] == gcvNULL)
         {

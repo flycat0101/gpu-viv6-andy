@@ -7176,7 +7176,8 @@ gcSHADER_Conv2VIR(
 
     VirShader->debugInfo = Shader->debugInfo;
 
-    if (gcmOPT_DriverVIRPath() && !gcShaderHasVivVxExtension(Shader)) /* skip medium level opt for vx program */
+    if (gcmOPT_DriverVIRPath() &&
+        !(gcShaderHasVivVxExtension(Shader) || gcShaderHasVivGcslDriverImage(Shader))) /* skip medium level opt for vx program */
     {
         /* Suppose vir is under pre-ML now */
         VIR_Shader_SetLevel(VirShader, VIR_SHLEVEL_Pre_Medium);
@@ -8068,6 +8069,8 @@ gcSHADER_Conv2VIR(
     /* Save the constant memory size. */
     VIR_Shader_SetConstantMemorySize(VirShader,GetShaderConstantMemorySize(Shader));
     VirShader->constantMemoryBuffer = Shader->constantMemoryBuffer;
+
+    VirShader->fragColorUsage = Shader->fragOutUsage;
 
 
 OnError:

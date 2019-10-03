@@ -210,7 +210,7 @@ VX_INTERNAL_API vx_bool vxoMemory_FreeEx(vx_context context, vx_memory memory)
 
 VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory memory)
 {
-    vx_int32 planeIndex, dimIndex;
+    vx_int32 planeIndex;
 
     gcmHEADER_ARG("context=%p, memory=%p", context, memory);
     vxmASSERT(context);
@@ -233,12 +233,8 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
         {
             gctUINT32 size = sizeof(vx_uint8);
 
-            if (memory->strides[planeIndex][VX_DIM_CHANNEL] != 0)
-            {
-                size = (gctUINT32)abs(memory->strides[planeIndex][VX_DIM_CHANNEL]);
-            }
-            dimIndex = 0;
             size = memory->strides[planeIndex][VX_DIM_Y] * memory->dims[planeIndex][VX_DIM_Y];
+
             memory->sizes[planeIndex] = size;
         }
 

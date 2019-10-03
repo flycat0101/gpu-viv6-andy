@@ -5322,6 +5322,8 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
                                       (calibratedGprCount - (pPsSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16 ? 2 : 1)) :
                                       calibratedGprCount;
 
+    pStatesPgmer->pHints->fragColorUsage = pPsSEP->exeHints.derivedHints.prvStates.ps.fragColorUsage;
+
     gcoOS_MemCopy((gctPOINTER)pStatesPgmer->pHints->psOutput2RtIndex, (gctPOINTER)output2RTIndex, sizeof(output2RTIndex));
     gcoOS_MemCopy((gctPOINTER)pStatesPgmer->pHints->interpolationType, (gctPOINTER)interpolationType, sizeof(interpolationType));
 

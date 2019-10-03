@@ -745,11 +745,11 @@ _LoadBuiltInConstants(
     {
         constantInfos[gcBIConst_MaxClipDistances].value[0].intValue = GetGLMaxClipDistances();
         constantInfos[gcBIConst_MaxClipPlanes].value[0].intValue = GetGLMaxClipPlanes();
-        constantInfos[gcBIConst_MaxFragmentUniformComponents].value[0].intValue = GetGLMaxTextureCoords();
-        constantInfos[gcBIConst_MaxTextureCoords].value[0].intValue = GetGLMaxTextureUnits();
-        constantInfos[gcBIConst_MaxTextureUnits].value[0].intValue = GetGLMaxVaryingComponents();
-        constantInfos[gcBIConst_MaxVaryingComponents].value[0].intValue = GetGLMaxVaryingFloats();
-        constantInfos[gcBIConst_MaxVaryingFloats].value[0].intValue = GetGLMaxVertexUniformComponents();
+        constantInfos[gcBIConst_MaxFragmentUniformComponents].value[0].intValue = GetGLMaxFragmentUniformComponents();
+        constantInfos[gcBIConst_MaxTextureCoords].value[0].intValue = GetGLMaxTextureCoords();
+        constantInfos[gcBIConst_MaxTextureUnits].value[0].intValue = GetGLMaxTextureUnits();
+        constantInfos[gcBIConst_MaxVaryingComponents].value[0].intValue = GetGLMaxVaryingComponents();
+        constantInfos[gcBIConst_MaxVaryingFloats].value[0].intValue = GetGLMaxVaryingFloats();
         constantInfos[gcBIConst_MaxVertexUniformComponents].value[0].intValue = GetGLMaxVertexUniformComponents();
         constantInfos[gcBIConst_MaxFragmentInputComponents].value[0].intValue = GetGLMaxFragmentInputComponents();
         constantInfos[gcBIConst_MaxVertexOutputComponents].value[0].intValue = GetGLMaxVertexOutputComponents();
@@ -907,7 +907,8 @@ updateForFragData(
 {
     gctUINT arrayLength = GetGLMaxDrawBuffers();
 
-    arrayLength = (arrayLength > 4) ? 4 : arrayLength;
+    if (Compiler->clientApiVersion != gcvAPI_OPENGL)
+        arrayLength = (arrayLength > 4) ? 4 : arrayLength;
 
     /* Spec says: although gl_FragData is declared as an array in GLSL ES 1.00,
                     mrt are not supported in OpenGL ES 2.0 and are therefore not

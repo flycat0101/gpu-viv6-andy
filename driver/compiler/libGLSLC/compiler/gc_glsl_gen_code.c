@@ -1483,6 +1483,17 @@ _AllocLogicalRegOrArray(
         !(Name->type == slvFUNC_NAME &&
           slsFUNC_HAS_FLAG(&(Name->u.funcInfo), slvFUNC_IS_INTRINSIC)))
     {
+        if (shaderType == slvSHADER_TYPE_FRAGMENT)
+        {
+            if (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_FragData")))
+            {
+                gcSHADER_SetFragOutUsage(binary, gcvFRAGOUT_USAGE_FRAGDATA);
+            }
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_FragColor")))
+            {
+                gcSHADER_SetFragOutUsage(binary, gcvFRAGOUT_USAGE_FRAGCOLOR);
+            }
+        }
         status = slGetBuiltInVariableImplSymbol(Compiler,
                                                 Symbol,
                                                 &Symbol,

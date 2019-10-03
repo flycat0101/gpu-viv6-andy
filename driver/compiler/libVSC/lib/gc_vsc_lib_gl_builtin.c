@@ -9614,30 +9614,32 @@ gctSTRING gcLibImageStore_2D_float_rgba8 =
 gctSTRING gcLibImageStore_2D_float_rg8 =
 "void _viv_image_store_image_2d_rg8(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
 "{\n"
-"   vec4 result;\n"
+"   vec2 result;\n"
 "   ivec3 p1;\n"
 "   p1.xy = p;\n"
 "   p1.z = 0;\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
-"       uvec2 data1 = uvec2(clamp(data.xy, 0.0, 1.0) * 255.5);\n"
-"       _viv_asm(STORE1, result!<f:UINT8>, address, data1);\n"
+"       uvec4 data1 = uvec4(clamp(data, 0.0, 1.0) * 255.5);\n"
+"       uvec4 data2 = _viv_image_store_swizzle_uint(img_desc, data1);\n"
+"       _viv_asm(STORE1, result!<f:UINT8>, address, data2.xy);\n"
 "   }\n"
 "}\n";
 
 gctSTRING gcLibImageStore_2D_float_r8 =
 "void _viv_image_store_image_2d_r8(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
 "{\n"
-"   vec4 result;\n"
+"   float result;\n"
 "   ivec3 p1;\n"
 "   p1.xy = p;\n"
 "   p1.z = 0;\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
-"       uint data1 = uint(clamp(data.x, 0.0, 1.0) * 255.5);\n"
-"       _viv_asm(STORE1, result!<f:UINT8>, address, data1);\n"
+"       uvec4 data1 = uvec4(clamp(data, 0.0, 1.0) * 255.5);\n"
+"       uvec4 data2 = _viv_image_store_swizzle_uint(img_desc, data1);\n"
+"       _viv_asm(STORE1, result!<f:UINT8>, address, data2.x);\n"
 "   }\n"
 "}\n";
 
@@ -9661,15 +9663,16 @@ gctSTRING gcLibImageStore_2D_float_rgba8_snorm =
 gctSTRING gcLibImageStore_2D_float_rg8_snorm =
 "void _viv_image_store_image_2d_rg8_snorm(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
 "{\n"
-"   vec4 result;\n"
+"   vec2 result;\n"
 "   ivec3 p1;\n"
 "   p1.xy = p;\n"
 "   p1.z = 0;\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
-"       ivec2 data1 = ivec2(clamp(data.xy, -1.0, 1.0) * 127.5);\n"
-"       _viv_asm(STORE1, result!<f:INT8>, address, data1);\n"
+"       ivec4 data1 = ivec4(clamp(data, -1.0, 1.0) * 127.5);\n"
+"       ivec4 data2 = _viv_image_store_swizzle_int(img_desc, data1);\n"
+"       _viv_asm(STORE1, result!<f:INT8>, address, data2.xy);\n"
 "   }\n"
 "}\n";
 
@@ -9677,15 +9680,16 @@ gctSTRING gcLibImageStore_2D_float_rg8_snorm =
 gctSTRING gcLibImageStore_2D_float_r8_snorm =
 "void _viv_image_store_image_2d_r8_snorm(highp uvec4 img_desc, ivec2 p, vec4 data)\n"
 "{\n"
-"   vec4 result;\n"
+"   float result;\n"
 "   ivec3 p1;\n"
 "   p1.xy = p;\n"
 "   p1.z = 0;\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
-"       int data1 = int(clamp(data.x, -1.0, 1.0) * 127.5);\n"
-"       _viv_asm(STORE1, result!<f:INT8>, address, data1);\n"
+"       ivec4 data1 = ivec4(clamp(data, -1.0, 1.0) * 127.5);\n"
+"       ivec4 data2 = _viv_image_store_swizzle_int(img_desc, data1);\n"
+"       _viv_asm(STORE1, result!<f:INT8>, address, data2.x);\n"
 "   }\n"
 "}\n";
 
@@ -10652,28 +10656,30 @@ gctSTRING gcLibImageStore_Buffer_float_rgba8 =
 gctSTRING gcLibImageStore_Buffer_float_rg8 =
 "void _viv_image_store_imageBuffer_rg8(highp uvec4 img_desc, int coord, vec4 data)\n"
 "{\n"
-"   vec4 result;\n"
+"   vec2 result;\n"
 "   ivec2 p = ivec2(coord%MAX_TEXTURE_BUFFER_SIZE, coord/MAX_TEXTURE_BUFFER_SIZE);\n"
 "   uvec4 img_desc_u = img_desc;\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc_u, p);\n"
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
-"       uvec2 data1 = uvec2(clamp(data.xy, 0.0, 1.0) * 255.5);\n"
-"       _viv_asm(STORE1, result!<f:UINT8>, address, data1);\n"
+"       uvec4 data1 = uvec4(clamp(data, 0.0, 1.0) * 255.5);\n"
+"       uvec4 data2 = _viv_image_store_swizzle_uint(img_desc, data1);\n"
+"       _viv_asm(STORE1, result!<f:UINT8>, address, data2.xy);\n"
 "   }\n"
 "}\n";
 
 gctSTRING gcLibImageStore_Buffer_float_r8 =
 "void _viv_image_store_imageBuffer_r8(highp uvec4 img_desc, int coord, vec4 data)\n"
 "{\n"
-"   vec4 result;\n"
+"   float result;\n"
 "   ivec2 p = ivec2(coord%MAX_TEXTURE_BUFFER_SIZE, coord/MAX_TEXTURE_BUFFER_SIZE);\n"
 "   uvec4 img_desc_u = img_desc;\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc_u, p);\n"
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
-"       uint data1 = uint(clamp(data.x, 0.0, 1.0) * 255.5);\n"
-"       _viv_asm(STORE1, result!<f:UINT8>, address, data1);\n"
+"       uvec4 data1 = uvec4(clamp(data, 0.0, 1.0) * 255.5);\n"
+"       uvec4 data2 = _viv_image_store_swizzle_uint(img_desc, data1);\n"
+"       _viv_asm(STORE1, result!<f:UINT8>, address, data2.x);\n"
 "   }\n"
 "}\n";
 
@@ -10695,13 +10701,14 @@ gctSTRING gcLibImageStore_Buffer_float_rgba8_snorm =
 gctSTRING gcLibImageStore_Buffer_float_rg8_snorm =
 "void _viv_image_store_imageBuffer_rg8_snorm(highp uvec4 img_desc, int coord, vec4 data)\n"
 "{\n"
-"   vec4 result;\n"
+"   vec2 result;\n"
 "   ivec2 p = ivec2(coord%MAX_TEXTURE_BUFFER_SIZE, coord/MAX_TEXTURE_BUFFER_SIZE);\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
-"       ivec2 data1 = ivec2(clamp(data.xy, -1.0, 1.0) * 127.5);\n"
-"       _viv_asm(STORE1, result!<f:INT8>, address, data1);\n"
+"       ivec4 data1 = ivec4(clamp(data, -1.0, 1.0) * 127.5);\n"
+"       ivec4 data2 = _viv_image_store_swizzle_int(img_desc, data1);\n"
+"       _viv_asm(STORE1, result!<f:INT8>, address, data2.xy);\n"
 "   }\n"
 "}\n";
 
@@ -10709,13 +10716,14 @@ gctSTRING gcLibImageStore_Buffer_float_rg8_snorm =
 gctSTRING gcLibImageStore_Buffer_float_r8_snorm =
 "void _viv_image_store_imageBuffer_r8_snorm(highp uvec4 img_desc, int coord, vec4 data)\n"
 "{\n"
-"   vec4 result;\n"
+"   float result;\n"
 "   ivec2 p = ivec2(coord%MAX_TEXTURE_BUFFER_SIZE, coord/MAX_TEXTURE_BUFFER_SIZE);\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x == 0u) {\n"
-"       int data1 = int(clamp(data.x, -1.0, 1.0) * 127.5);\n"
-"       _viv_asm(STORE1, result!<f:INT8>, address, data1);\n"
+"       ivec4 data1 = ivec4(clamp(data, -1.0, 1.0) * 127.5);\n"
+"       ivec4 data2 = _viv_image_store_swizzle_int(img_desc, data1);\n"
+"       _viv_asm(STORE1, result!<f:INT8>, address, data2.xy);\n"
 "   }\n"
 "}\n";
 

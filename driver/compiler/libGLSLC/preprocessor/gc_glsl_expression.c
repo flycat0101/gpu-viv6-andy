@@ -619,7 +619,7 @@ ppoPREPROCESSOR_Eval_Case_Unary_Op(
             if (id == PP->keyword->_file_
                 ||    id == PP->keyword->_line_
                 ||    id == PP->keyword->_version_
-                ||    id == PP->keyword->gl_es
+                ||    (id == PP->keyword->gl_es && (sloCOMPILER_GetClientApiVersion(PP->compiler) != gcvAPI_OPENGL))
                 ||    id == PP->keyword->gl_core_profile)
             {
                 if (id == PP->keyword->_version_ && PP->keyword->isVersionUndefined)

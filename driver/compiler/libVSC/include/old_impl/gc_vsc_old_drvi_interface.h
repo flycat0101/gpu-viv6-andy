@@ -739,6 +739,7 @@ typedef struct _gcsHINT
 #endif
     gctBOOL     useGroupId            : 2;
     gctBOOL     useLocalId            : 2;
+    gctUINT     fragColorUsage        : 2;
     /* flag if the shader uses gl_FragCoord, gl_FrontFacing, gl_PointCoord */
     gctCHAR     useFragCoord[4];
     gctCHAR     usePointCoord[4];
@@ -8515,6 +8516,12 @@ gcSHADER_SetDebugInfo(
 gctPOINTER
 gcSHADER_GetDebugInfo(
     IN gcSHADER             Shader
+    );
+
+void
+gcSHADER_SetFragOutUsage(
+    IN gcSHADER             Shader,
+    IN gctUINT              Usage
     );
 
 gceSTATUS

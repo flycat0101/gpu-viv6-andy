@@ -709,8 +709,17 @@ static void _FindStreamOutputArrayInfo(VIR_Shader* pShader,
     /* Search the pVirIoSym position in pShader->transformFeedback.varyings */
     for (symIdx = 0; symIdx < soOutputCount; symIdx ++)
     {
+        gctUINT thisIoRegCount = 0, i;
         sym = VIR_Shader_GetSymFromId(pShader,VIR_IdList_GetId(pShader->transformFeedback.varyings, symIdx));
-        if (VIR_Symbol_GetVregIndex(pVirIoSym) == VIR_Symbol_GetVregIndex(sym))
+        thisIoRegCount = VIR_Shader_GetXFBVaryingTempRegInfo(pShader, symIdx)->tempRegCount;
+        for (i = 0; i < thisIoRegCount; i++)
+        {
+            if (VIR_Symbol_GetVregIndex(pVirIoSym) == (VIR_Symbol_GetVregIndex(sym) + i))
+            {
+                break;
+            }
+        }
+        if (i < thisIoRegCount)
         {
             break;
         }
@@ -2351,6 +2360,7 @@ static void _CollectExeHints(VSC_SHADER_COMPILER_PARAM* pCompilerParam, VSC_SEP_
         pOutSEP->exeHints.derivedHints.prvStates.ps.hwRegChannelForSampleMaskId = pShader->sampleMaskIdChannelStart;
         pOutSEP->exeHints.derivedHints.prvStates.ps.bExecuteOnSampleFreq = VIR_Shader_PS_RunOnSampleShading(pShader);
         pOutSEP->exeHints.derivedHints.prvStates.ps.bNeedRtRead = pShader->useLastFragData;
+        pOutSEP->exeHints.derivedHints.prvStates.ps.fragColorUsage = pShader->fragColorUsage;
 
         for (i = CHANNEL_X; i < CHANNEL_NUM; i ++)
         {
