@@ -384,7 +384,6 @@ EXPORTS
 
     vscCreateShader
     vscDestroyShader
-    vscReferenceShader
     vscGetDebugInfo
     vscDupDebugInfo
     vscDestroyDebugInfo

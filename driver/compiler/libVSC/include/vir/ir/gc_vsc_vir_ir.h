@@ -5045,8 +5045,6 @@ struct _VIR_SHADER
     /* dump options, don't need to save/copy. */
     VSC_OPTN_DumpOptions *  dumpOptions;
 
-    gctINT32            refCount;           /* Reference count */
-
     /* At which level that this VIR shader is */
     VIR_ShLevel         shLevel;
 

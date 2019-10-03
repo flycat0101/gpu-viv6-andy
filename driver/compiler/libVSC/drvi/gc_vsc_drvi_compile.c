@@ -429,15 +429,6 @@ gceSTATUS vscFinalizeUavSlotMapping(SHADER_UAV_SLOT_MAPPING* pUavSlotMapping)
     return vscInitializeUavSlotMapping(pUavSlotMapping);
 }
 
-gceSTATUS vscReferenceShader(SHADER_HANDLE hShader)
-{
-    VIR_Shader *pVirShader = (VIR_Shader*)hShader;
-
-    ++pVirShader->refCount;
-
-    return gcvSTATUS_OK;
-}
-
 gceSTATUS vscCreateShader(SHADER_HANDLE* pShaderHandle, gctUINT shStage)
 {
     gceSTATUS                     status = gcvSTATUS_OK;
@@ -482,8 +473,6 @@ gceSTATUS vscCreateShader(SHADER_HANDLE* pShaderHandle, gctUINT shStage)
     errCode = VIR_Shader_Construct(gcvNULL, virShaderKind, pVirShader);
     ON_ERROR(errCode, "Shader Construct");
 
-    vscReferenceShader(pVirShader);
-
     /* Yes, we've created our vir shader, now just return its handle */
     *pShaderHandle = pVirShader;
 
@@ -497,13 +486,10 @@ gceSTATUS vscDestroyShader(SHADER_HANDLE hShader)
     VSC_ErrCode                   errCode = VSC_ERR_NONE;
     VIR_Shader*                   pVirShader = (VIR_Shader*)hShader;
 
-    if (--pVirShader->refCount == 0)
-    {
-        errCode = VIR_Shader_Destroy(pVirShader);
-        ON_ERROR(errCode, "Shader Destroy");
+    errCode = VIR_Shader_Destroy(pVirShader);
+    ON_ERROR(errCode, "Shader Destroy");
 
-        gcmONERROR(gcoOS_Free(gcvNULL, pVirShader));
-    }
+    gcmONERROR(gcoOS_Free(gcvNULL, pVirShader));
 
 OnError:
     return (status == gcvSTATUS_OK) ? vscERR_CastErrCode2GcStatus(errCode) : status;
@@ -550,8 +536,6 @@ gceSTATUS vscCopyShader(SHADER_HANDLE * hToShader, SHADER_HANDLE hFromShader)
 
     errCode = VIR_Shader_Copy(pToVirShader, pFromVirShader);
     ON_ERROR(errCode, "Shader Copy");
-
-    vscReferenceShader(pToVirShader);
 
 OnError:
     return (status == gcvSTATUS_OK) ? vscERR_CastErrCode2GcStatus(errCode) : status;
@@ -661,7 +645,6 @@ gceSTATUS vscLoadShaderFromBinary(void*          pBinary,
     {
         VIR_IO_Finalize(&buf, bFreeBinary);  /* reclaim allocated buffer */
     }
-    vscReferenceShader(readShader);
     VIR_Shader_IOBuffer_Finalize(&buf);
 
     *pShaderHandle = readShader;

@@ -1088,7 +1088,6 @@ gceSTATUS vscDestroyPrivateData(VSC_CORE_SYS_CONTEXT* pCoreSysCtx, VSC_PRIV_DATA
 gceSTATUS vscCreateShader(SHADER_HANDLE* pShaderHandle,
                           gctUINT shStage);
 gceSTATUS vscDestroyShader(SHADER_HANDLE hShader);
-gceSTATUS vscReferenceShader(SHADER_HANDLE hShader);
 
 /* Print (dump) shader */
 gceSTATUS vscPrintShader(SHADER_HANDLE hShader,

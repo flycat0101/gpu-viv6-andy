@@ -7033,8 +7033,7 @@ vscConvertGcShader2VirShader(
                                   sizeof(VIR_Shader),
                                   (gctPOINTER*)&virShader));
 
-        ON_ERROR2STATUS(VIR_Shader_Construct(gcvNULL, shaderKind, virShader), "Failed to call construct VIR_Shader" );
-        vscReferenceShader(virShader);
+        ON_ERROR2STATUS(VIR_Shader_Construct(gcvNULL, shaderKind, virShader), "Failed to call construct VIR_Shader");
         if (dumpCGV)
         {
             gcDump_Shader(gcvNULL, "Incoming gcSL shader IR.", gcvNULL, shader, gcvTRUE);
