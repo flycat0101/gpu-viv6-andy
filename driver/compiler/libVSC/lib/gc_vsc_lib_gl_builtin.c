@@ -4169,6 +4169,55 @@ gctSTRING gcLibTextureGather_Func_28 =
 "    return result;\n"
 "}\n";
 
+gctSTRING gcLibTextureGather_Func_29 =
+"uvec4 _viv_textureGather_uint_2DRect_NoComp(usampler2D sampler, mediump ivec3 levelBaseSize, vec2 p)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGather_uint_2D_NoComp(sampler, levelBaseSize, p);\n"
+"}\n";
+
+gctSTRING gcLibTextureGather_Func_30 =
+"ivec4 _viv_textureGather_int_2DRect_NoComp(isampler2D sampler, mediump ivec3 levelBaseSize, vec2 p)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGather_int_2D_NoComp(sampler, levelBaseSize, p);\n"
+"}\n";
+
+gctSTRING gcLibTextureGather_Func_31 =
+"vec4 _viv_textureGather_float_2DRect_NoComp(sampler2D sampler, mediump ivec3 levelBaseSize, vec2 p)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGather_float_2D_NoComp(sampler, levelBaseSize, p);\n"
+"}\n";
+
+gctSTRING gcLibTextureGather_Func_32 =
+"uvec4 _viv_textureGather_uint_2DRect_WithComp(usampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, int comp)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGather_uint_2D_WithComp(sampler, levelBaseSize, p, comp);\n"
+"}\n";
+
+gctSTRING gcLibTextureGather_Func_33 =
+"ivec4 _viv_textureGather_int_2DRect_WithComp(isampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, int comp)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGather_int_2D_WithComp(sampler, levelBaseSize, p, comp);\n"
+"}\n";
+
+gctSTRING gcLibTextureGather_Func_34 =
+"vec4 _viv_textureGather_float_2DRect_WithComp(sampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, int comp)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGather_float_2D_WithComp(sampler, levelBaseSize, p, comp);\n"
+"}\n";
+
+gctSTRING gcLibTextureGather_Func_35 =
+"vec4 _viv_textureGather_2DRectShadow(sampler2DShadow sampler, mediump ivec3 levelBaseSize, vec2 p, float refZ)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGather_2DShadow(sampler, levelBaseSize, p, refZ);\n"
+"}\n";
+
 /***********************textureGather implementation that HW can't directly support***********************/
 /* 2D sampler. */
 gctSTRING gcLibTextureGather_Func_2_0 =
@@ -5114,6 +5163,55 @@ gctSTRING gcLibTextureGatherOffset_Func_14 =
 "    return _viv_textureGather_uint_2DArray_WithComp(sampler, levelBaseSize, newCoord, comp);\n"
 "}\n";
 
+gctSTRING gcLibTextureGatherOffset_Func_15 =
+"vec4 _viv_textureGatherOffset_float_2DRect_NoComp(sampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offset)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffset_float_NoComp(sampler, levelBaseSize, p, offset);\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffset_Func_16 =
+"vec4 _viv_textureGatherOffset_float_2DRect_WithComp(sampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offset, int comp)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffset_float_WithComp(sampler, levelBaseSize, p, offset, comp);\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffset_Func_17 =
+"ivec4 _viv_textureGatherOffset_int_2DRect_NoComp(isampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offset)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffset_int_NoComp(sampler, levelBaseSize, p, offset);\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffset_Func_18 =
+"ivec4 _viv_textureGatherOffset_int_2DRect_WithComp(isampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offset, int comp)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffset_int_WithComp(sampler, levelBaseSize, p, offset, comp);\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffset_Func_19 =
+"uvec4 _viv_textureGatherOffset_uint_2DRect_NoComp(usampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offset)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffset_uint_NoComp(sampler, levelBaseSize, p, offset);\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffset_Func_20 =
+"uvec4 _viv_textureGatherOffset_uint_2DRect_WithComp(usampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offset, int comp)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffset_uint_WithComp(sampler, levelBaseSize, p, offset, comp);\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffset_Func_21 =
+"vec4 _viv_textureGatherOffset_float_2DRectShadow(sampler2DShadow sampler, mediump ivec3 levelBaseSize, vec2 p, float refZ, ivec2 offset)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffset_float_2DShadow(sampler, levelBaseSize, p, refZ, offset);\n"
+"}\n";
+
 /***********************textureGatherOffsets implementation***********************/
 gctSTRING gcLibTextureGatherOffsets_Func_1 =
 "vec4 _viv_textureGatherOffsets_float_NoComp(sampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offsets[4])\n"
@@ -5453,6 +5551,55 @@ gctSTRING gcLibTextureGatherOffsets_Func_14 =
 "        result = uvec4(resultR.w, resultG.w, resultB.w, resultA.w);\n"
 "    }\n"
 "    return result;\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffsets_Func_15 =
+"vec4 _viv_textureGatherOffsets_float_2DRect_NoComp(sampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offsets[4])\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffsets_float_NoComp(sampler, levelBaseSize, p, offsets);\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffsets_Func_16 =
+"vec4 _viv_textureGatherOffsets_float_2DRect_WithComp(sampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offsets[4], int comp)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffsets_float_WithComp(sampler, levelBaseSize, p, offsets, comp);\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffsets_Func_17 =
+"ivec4 _viv_textureGatherOffsets_int_2DRect_NoComp(isampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offsets[4])\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffsets_int_NoComp(sampler, levelBaseSize, p, offsets);\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffsets_Func_18 =
+"ivec4 _viv_textureGatherOffsets_int_2DRect_WithComp(isampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offsets[4], int comp)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffsets_int_WithComp(sampler, levelBaseSize, p, offsets, comp);\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffsets_Func_19 =
+"uvec4 _viv_textureGatherOffsets_uint_2DRect_NoComp(usampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offsets[4])\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffsets_uint_NoComp(sampler, levelBaseSize, p, offsets);\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffsets_Func_20 =
+"uvec4 _viv_textureGatherOffsets_uint_2DRect_WithComp(usampler2D sampler, mediump ivec3 levelBaseSize, vec2 p, ivec2 offsets[4], int comp)\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffsets_uint_WithComp(sampler, levelBaseSize, p, offsets, comp);\n"
+"}\n";
+
+gctSTRING gcLibTextureGatherOffsets_Func_21 =
+"vec4 _viv_textureGatherOffsets_float_2DRectShadow(sampler2DShadow sampler, mediump ivec3 levelBaseSize, vec2 p, float refZ, ivec2 offsets[4])\n"
+"{\n"
+"    p = p / vec2(levelBaseSize.xy);\n"
+"    return _viv_textureGatherOffsets_float_2DShadow(sampler, levelBaseSize, p, refZ, offsets);\n"
 "}\n";
 
 /***********************texelFetch for MSAA implementation that HW can directly support***********************/

@@ -117,11 +117,12 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.34 for workGroupSizeFactor into the binary on 07/18/2019 */
 /* bump up version to 1.35 for saving the full graphics shaders into the binary on 08/08/2019 */
 /* bump up version to 1.36 for saving ubo array index into the binary on 08/09/2019 */
+/* bump up version to 1.37 for adding intrisinc functions for gSampler2DRect on 08/06/2019 */
 
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 36)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 37)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 36)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 37)
 
 typedef union _gcsValue
 {
@@ -3709,8 +3710,11 @@ typedef enum _gceINTRINSICS_KIND
     gceINTRIN_source,
     gceINTRIN_create_size_for_sampler,
     gceINTRIN_texture_gather,
+    gceINTRIN_texture_gather_2DRect,
     gceINTRIN_texture_gather_offset,
+    gceINTRIN_texture_gather_offset_2DRect,
     gceINTRIN_texture_gather_offsets,
+    gceINTRIN_texture_gather_offsets_2DRect,
     gceINTRIN_texelFetch_for_MSAA,
     gceINTRIN_image_size,
     gceINTRIN_image_load,
@@ -3724,8 +3728,11 @@ typedef enum _gceINTRINSICS_KIND
 
 #define IsIntrinsicsKindCreateSamplerSize(Kind)        ((Kind) == gceINTRIN_create_size_for_sampler)
 #define IsIntrinsicsKindTextureGather(Kind)            ((Kind) == gceINTRIN_texture_gather)
+#define IsIntrinsicsKindTextureGather2DRect(Kind)      ((Kind) == gceINTRIN_texture_gather_2DRect)
 #define IsIntrinsicsKindTextureGatherOffset(Kind)      ((Kind) == gceINTRIN_texture_gather_offset)
+#define IsIntrinsicsKindTextureGatherOffset2DRect(Kind)      ((Kind) == gceINTRIN_texture_gather_offset_2DRect)
 #define IsIntrinsicsKindTextureGatherOffsets(Kind)     ((Kind) == gceINTRIN_texture_gather_offsets)
+#define IsIntrinsicsKindTextureGatherOffsets2DRect(Kind)     ((Kind) == gceINTRIN_texture_gather_offsets_2DRect)
 #define IsIntrinsicsKindTexelFetchForMSAA(Kind)        ((Kind) == gceINTRIN_texelFetch_for_MSAA)
 #define IsIntrinsicsKindImageSize(Kind)                ((Kind) == gceINTRIN_image_size)
 #define IsIntrinsicsKindImageLoad(Kind)                ((Kind) == gceINTRIN_image_load)
@@ -3739,8 +3746,11 @@ typedef enum _gceINTRINSICS_KIND
                                                         (IsIntrinsicsKindInterpolateAtOffset(Kind)))
 
 #define IsIntrinsicsKindNeedTexSizeOnly(Kind)          ((IsIntrinsicsKindTextureGather(Kind)) ||\
+                                                        (IsIntrinsicsKindTextureGather2DRect(Kind)) || \
                                                         (IsIntrinsicsKindTextureGatherOffset(Kind)) ||\
+                                                        (IsIntrinsicsKindTextureGatherOffset2DRect(Kind)) ||\
                                                         (IsIntrinsicsKindTextureGatherOffsets(Kind)) ||\
+                                                        (IsIntrinsicsKindTextureGatherOffsets2DRect(Kind)) ||\
                                                         (IsIntrinsicsKindTexelFetchForMSAA(Kind)))
 
 struct _gcsFUNCTION

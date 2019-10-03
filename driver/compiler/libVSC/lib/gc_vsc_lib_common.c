@@ -2049,7 +2049,14 @@ gcSHADER_InitBuiltinLibrary(
         gcLibTextureGather_Func_18,
         gcLibTextureGather_Func_19,
         gcLibTextureGather_Func_20,
-        gcLibTextureGather_Func_21
+        gcLibTextureGather_Func_21,
+        gcLibTextureGather_Func_29,
+        gcLibTextureGather_Func_30,
+        gcLibTextureGather_Func_31,
+        gcLibTextureGather_Func_32,
+        gcLibTextureGather_Func_33,
+        gcLibTextureGather_Func_34,
+        gcLibTextureGather_Func_35
     };
 
     /* HW that can't directly support textureGather. */
@@ -2094,7 +2101,14 @@ gcSHADER_InitBuiltinLibrary(
         gcLibTextureGatherOffset_Func_11,
         gcLibTextureGatherOffset_Func_12,
         gcLibTextureGatherOffset_Func_13,
-        gcLibTextureGatherOffset_Func_14
+        gcLibTextureGatherOffset_Func_14,
+        gcLibTextureGatherOffset_Func_15,
+        gcLibTextureGatherOffset_Func_16,
+        gcLibTextureGatherOffset_Func_17,
+        gcLibTextureGatherOffset_Func_18,
+        gcLibTextureGatherOffset_Func_19,
+        gcLibTextureGatherOffset_Func_20,
+        gcLibTextureGatherOffset_Func_21
     };
 
     gctSTRING TextureGatherOffsetsLib[] =
@@ -2112,7 +2126,14 @@ gcSHADER_InitBuiltinLibrary(
         gcLibTextureGatherOffsets_Func_11,
         gcLibTextureGatherOffsets_Func_12,
         gcLibTextureGatherOffsets_Func_13,
-        gcLibTextureGatherOffsets_Func_14
+        gcLibTextureGatherOffsets_Func_14,
+        gcLibTextureGatherOffsets_Func_15,
+        gcLibTextureGatherOffsets_Func_16,
+        gcLibTextureGatherOffsets_Func_17,
+        gcLibTextureGatherOffsets_Func_18,
+        gcLibTextureGatherOffsets_Func_19,
+        gcLibTextureGatherOffsets_Func_20,
+        gcLibTextureGatherOffsets_Func_21
     };
 
     gctSTRING TexelFetchForMSAALib[] =

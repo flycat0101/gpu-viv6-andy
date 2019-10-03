@@ -11439,12 +11439,15 @@ _InsertAssignmentForSamplerSize(
             gcmASSERT(uniform);
 
             if (IsIntrinsicsKindTextureGather(IntrinsicsKind) ||
-                IsIntrinsicsKindTextureGatherOffset(IntrinsicsKind))
+                IsIntrinsicsKindTextureGather2DRect(IntrinsicsKind) ||
+                IsIntrinsicsKindTextureGatherOffset(IntrinsicsKind) ||
+                IsIntrinsicsKindTextureGatherOffset2DRect(IntrinsicsKind))
             {
                 SetUniformFlag(uniform, gcvUNIFORM_FLAG_USED_AS_TEXGATHER_SAMPLER);
             }
 
-            if (IsIntrinsicsKindTextureGatherOffsets(IntrinsicsKind))
+            if (IsIntrinsicsKindTextureGatherOffsets(IntrinsicsKind) ||
+                IsIntrinsicsKindTextureGatherOffsets2DRect(IntrinsicsKind))
             {
                 SetUniformFlag(uniform, gcvUNIFORM_FLAG_USED_AS_TEXGATHEROFFSETS_SAMPLER);
             }
@@ -12760,7 +12763,9 @@ gcSHADER_FindLibFunction(
                                                    gcvNULL));
     }
     else if (IsIntrinsicsKindTextureGatherOffset(intrinsicsKind) ||
-             IsIntrinsicsKindTextureGatherOffsets(intrinsicsKind))
+             IsIntrinsicsKindTextureGatherOffsets(intrinsicsKind) ||
+             IsIntrinsicsKindTextureGatherOffset2DRect(intrinsicsKind) ||
+             IsIntrinsicsKindTextureGatherOffsets2DRect(intrinsicsKind))
     {
         gcmONERROR(_InsertAssignmentForSamplerSize(Shader,
                                                    function,
@@ -12771,6 +12776,7 @@ gcSHADER_FindLibFunction(
                                                    gcvNULL));
     }
     else if ((IsIntrinsicsKindTextureGather(intrinsicsKind) && !isSupportTextureGather) ||
+             IsIntrinsicsKindTextureGather2DRect(intrinsicsKind) ||
              (IsIntrinsicsKindTexelFetchForMSAA(intrinsicsKind) && !isSupportTexelFetchForMSAA))
     {
         gcmONERROR(_InsertAssignmentForSamplerSize(Shader,
