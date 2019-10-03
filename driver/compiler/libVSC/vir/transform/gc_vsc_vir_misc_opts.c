@@ -11765,8 +11765,12 @@ OnError:
 DEF_SH_NECESSITY_CHECK(vscVIR_GenExternalAtomicCall)
 {
     VSC_HW_CONFIG*   pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
-    /* now only apply patch to identified appNameId */
-    if (pPassWorker->pCompilerParam->cfg.ctx.appNameId != gcvPATCH_OPENCV_ATOMIC)
+    gctSTRING env = gcvNULL;
+    gctBOOL  isOpenCV = gcvFALSE;
+    gcoOS_GetEnv(gcvNULL, "VIV_ENABLE_OPENCV_WORKGROUPSIZE", &env);
+    isOpenCV = (env && (gcoOS_StrCmp(env, "1") == 0));
+    /* apply patch to identified appNameId or VIR_ENABLE_OPENCV_WORKGROUP = 1 is set*/
+    if ((pPassWorker->pCompilerParam->cfg.ctx.appNameId != gcvPATCH_OPENCV_ATOMIC) && (!isOpenCV))
     {
         return gcvFALSE;
     }
