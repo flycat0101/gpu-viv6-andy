@@ -1801,8 +1801,10 @@ _SetHardwareOptions(
                     attribBufSizeInKB = 42;
                 }                else                {                    gcmkASSERT(!featureGS);
                     attribBufSizeInKB = 8;
-                }                L1cacheSize = featureUSCMaxPages - attribBufSizeInKB;
-            }            gcmkASSERT(L1cacheSize);
+                }                if (attribBufSizeInKB < featureUSCMaxPages)                {                    L1cacheSize = featureUSCMaxPages - attribBufSizeInKB;
+                }                else                {                    attribBufSizeInKB -= 2;
+                    L1cacheSize = 2;
+                }            }            gcmkASSERT(L1cacheSize);
             if (L1cacheSize >= featureL1CacheSize)            {                Hardware->options.uscL1CacheRatio = 0x0;
                 gcmkASSERT(featureUSCFullCacheFix);
                 featureUSCFullCacheFix = featureUSCFullCacheFix;
@@ -1819,7 +1821,6 @@ _SetHardwareOptions(
                     }                }                gcmkASSERT(-1 != curIndex);
                 Hardware->options.uscL1CacheRatio = curIndex;
             }        }    }};
-
 
     status = gckOS_QueryOption(Hardware->os, "smallBatch", &data);
     options->smallBatch = (data != 0);
