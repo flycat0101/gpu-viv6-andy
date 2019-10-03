@@ -1109,9 +1109,6 @@ __glChipGetDeviceConstants(
     }
     else
     {
-        /* If app request client=3, while hw cannot support, it should be blocked in EGL. */
-        GL_ASSERT(gc->apiVersion == __GL_API_VERSION_ES20);
-
         gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
         constants->GLSLVersion = __GL_GLSL_VERSION20;
         constants->majorVersion = 2;

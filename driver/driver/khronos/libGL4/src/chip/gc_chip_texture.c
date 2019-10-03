@@ -1447,7 +1447,6 @@ gcChipResidentTextureLevel(
         chipMipLevel->formatMapInfo = formatMapInfo;
 
         GL_ASSERT((formatMapInfo->flags & __GL_CHIP_FMTFLAGS_CANT_FOUND_HAL_FORMAT) == GL_FALSE);
-        GL_ASSERT(formatMapInfo->readFormat != gcvSURF_UNKNOWN);
 
         /* For non-compress source image, now we can construct its HAL format for late surface blit.
         ** For compressed format, it will be determined later.

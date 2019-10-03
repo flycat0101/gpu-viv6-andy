@@ -175,6 +175,28 @@ vdkSetupEGL(
         }
     }
 
+    if (ContextAttributes == VDK_CONTEXT_OPENGL)
+    {
+        if (!eglBindAPI(EGL_OPENGL_API))
+        {
+            return 0;
+        }
+    }
+    else if (ContextAttributes == VDK_CONTEXT_OPENVG)
+    {
+        if (!eglBindAPI(EGL_OPENVG_API))
+        {
+            return 0;
+        }
+    }
+    else
+    {
+        if (!eglBindAPI(EGL_OPENGL_ES_API))
+        {
+            return 0;
+        }
+    }
+
     /* Choose a configuration and test for error. */
     if (Egl->eglConfig == NULL)
     {
@@ -247,49 +269,20 @@ vdkSetupEGL(
             configuration[9] = 4;
         }
 
-        /* Test for OpenVG RGB565 color. */
-        if (ConfigurationAttributes == VDK_CONFIG_RGB565_VG)
-        {
-            defaultConfig     = 1;
-            configuration[ 1] = 5;
-            configuration[ 3] = 6;
-            configuration[ 5] = 5;
-            configuration[ 7] = EGL_DONT_CARE;
-            configuration[ 9] = EGL_DONT_CARE;
-            configuration[11] = EGL_OPENVG_BIT;
-
-            /* Bind OpenVG API. */
-            if (!eglBindAPI(EGL_OPENVG_API))
-            {
-                return 0;
-            }
-        }
-
-        /* Test for OpenVG RGB565 color. */
-        if (ConfigurationAttributes == VDK_CONFIG_RGB888_VG)
+        /* Test for OpenVG context. */
+        if (ContextAttributes == VDK_CONTEXT_OPENVG)
         {
             defaultConfig     = 1;
             configuration[ 7] = EGL_DONT_CARE;
             configuration[ 9] = EGL_DONT_CARE;
             configuration[11] = EGL_OPENVG_BIT;
-
-            /* Bind OpenVG API. */
-            if (!eglBindAPI(EGL_OPENVG_API))
-            {
-                return 0;
-            }
         }
 
-        if (ConfigurationAttributes == VDK_CONFIG_RGB888_D16_GL)
+        /* Test for OpenGL context. */
+        if (ContextAttributes == VDK_CONTEXT_OPENGL)
         {
             defaultConfig     = 1;
             configuration[11] = EGL_OPENGL_BIT;
-
-            /* Bind OpenGL API. */
-            if (!eglBindAPI(EGL_OPENGL_API))
-            {
-                return 0;
-            }
         }
 
         if (!eglChooseConfig(Egl->eglDisplay,
@@ -332,17 +325,32 @@ vdkSetupEGL(
             EGL_CONTEXT_CLIENT_VERSION, 2,
             EGL_NONE,
         };
+        static const EGLint contextGL40[] =
+        {
+            EGL_CONTEXT_CLIENT_VERSION, 4,
+            EGL_NONE,
+        };
+        const EGLint *attib = NULL;
 
+        if (ContextAttributes == VDK_CONTEXT_ES20)
+        {
+            attib = contextES20;
+        }
+        else if (ContextAttributes == VDK_CONTEXT_OPENGL)
+        {
+            attib = contextGL40;
+        }
+        else if (ContextAttributes == VDK_CONTEXT_OPENVG)
+        {
+            attib = NULL;
+        }
+        else
+        {
+            attib = ContextAttributes;
+        }
 
         Egl->eglContext =
-            eglCreateContext(Egl->eglDisplay,
-                                  Egl->eglConfig,
-                                  EGL_NO_CONTEXT,
-                                  (ContextAttributes == VDK_CONTEXT_ES20)
-                                      ? contextES20
-                                      : ContextAttributes);
-
-
+            eglCreateContext(Egl->eglDisplay, Egl->eglConfig, EGL_NO_CONTEXT, attib);
         /* Test for error. */
         if (Egl->eglContext == EGL_NO_CONTEXT)
         {
