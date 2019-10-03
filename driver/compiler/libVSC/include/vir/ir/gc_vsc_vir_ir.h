@@ -2750,6 +2750,7 @@ struct _VIR_ARRAYDIM
     VIR_ArrayDim *      next;       /* next dimension*/
 };
 
+/* Any modification here, please do the corresponding change for VSC_IMAGE_FORMAT. */
 typedef enum _VIR_IMAGEFORMAT
 {
     VIR_IMAGE_FORMAT_NONE=0x00000000,
@@ -4074,8 +4075,10 @@ typedef enum _VIR_RES_OP_TYPE
     VIR_RES_OP_TYPE_TEXLD_PCF       = 14,
     VIR_RES_OP_TYPE_TEXLD_BIAS_PCF  = 15,
     VIR_RES_OP_TYPE_TEXLD_LOD_PCF   = 16,
-
-    VIR_RES_OP_TYPE_COUNT           = VIR_RES_OP_TYPE_TEXLD_LOD_PCF + 1,
+    VIR_RES_OP_TYPE_LOAD_STORE      = 17,
+    VIR_RES_OP_TYPE_IMAGE_OP        = 18,
+    VIR_RES_OP_TYPE_ATOMIC          = 19,
+    VIR_RES_OP_TYPE_COUNT           = VIR_RES_OP_TYPE_ATOMIC + 1,
 }VIR_RES_OP_TYPE;
 
 /* must be the same order as VSC_BI_LIST_NODE */
@@ -6052,7 +6055,7 @@ VIR_Uniform_AlwaysAlloc(
     );
 
 VSC_ErrCode
-VIR_Sampler_UpdateResOpBitFromSampledImage(
+VIR_Uniform_UpdateResOpBitFromSampledImage(
     IN VIR_Shader* Shader,
     IN VIR_Uniform* SampledImageUniform,
     IN gctINT       Index,
@@ -6060,9 +6063,9 @@ VIR_Sampler_UpdateResOpBitFromSampledImage(
     );
 
 VSC_ErrCode
-VIR_Sampler_UpdateResOpBits(
+VIR_Uniform_UpdateResOpBits(
     IN VIR_Shader* Shader,
-    IN VIR_Uniform* Sampler,
+    IN VIR_Uniform* Uniform,
     IN VIR_RES_OP_TYPE resOpType,
     IN gctUINT index
     );

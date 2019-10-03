@@ -1038,7 +1038,7 @@ VIR_Inst_IsHWBarrier(
 }
 
 VSC_ErrCode
-VIR_Sampler_UpdateResOpBitFromSampledImage(
+VIR_Uniform_UpdateResOpBitFromSampledImage(
     IN VIR_Shader* Shader,
     IN VIR_Uniform* SampledImageUniform,
     IN gctINT       Index,
@@ -1121,21 +1121,21 @@ VIR_Sampler_UpdateResOpBitFromSampledImage(
 }
 
 VSC_ErrCode
-VIR_Sampler_UpdateResOpBits(
+VIR_Uniform_UpdateResOpBits(
     IN VIR_Shader* Shader,
-    IN VIR_Uniform* Sampler,
+    IN VIR_Uniform* Uniform,
     IN VIR_RES_OP_TYPE resOpType,
     IN gctUINT index
     )
 {
     VSC_ErrCode   errCode = VSC_ERR_NONE;
     gctUINT       arraySize, i, resOpBits;
-    VIR_Symbol*   sym = VIR_Shader_GetSymFromId(Shader, Sampler->sym);
+    VIR_Symbol*   sym = VIR_Shader_GetSymFromId(Shader, VIR_Uniform_GetSymID(Uniform));
     VIR_Type*     type = VIR_Symbol_GetType(sym);
     VIR_Symbol*   separateSamplerSym = gcvNULL;
     VIR_Symbol*   separateImageSym = gcvNULL;
 
-    gcmASSERT(VIR_Uniform_isSampler(Sampler));
+    gcmASSERT(VIR_Uniform_isSampler(Uniform) || VIR_Uniform_isImage(Uniform));
     if (VIR_Type_GetKind(type) == VIR_TY_ARRAY)
     {
         arraySize = VIR_Type_GetArrayLength(type);
@@ -1145,11 +1145,11 @@ VIR_Sampler_UpdateResOpBits(
         arraySize = 1;
     }
 
-    if (VIR_Uniform_GetResOpBitsArray(Sampler) == gcvNULL)
+    if (VIR_Uniform_GetResOpBitsArray(Uniform) == gcvNULL)
     {
         gctUINT32 * ptr = (gctUINT32*)vscMM_Alloc(&Shader->pmp.mmWrapper, sizeof(gctUINT32) * arraySize);
-        VIR_Uniform_SetResOpBitsArray(Sampler, ptr);
-        VIR_Uniform_SetResOpBitsArraySize(Sampler, arraySize);
+        VIR_Uniform_SetResOpBitsArray(Uniform, ptr);
+        VIR_Uniform_SetResOpBitsArraySize(Uniform, arraySize);
         memset(ptr, 0, sizeof(gctUINT32) * arraySize);
     }
 
@@ -1157,16 +1157,16 @@ VIR_Sampler_UpdateResOpBits(
     {
         for (i = 0; i < arraySize; i ++)
         {
-            resOpBits =  VIR_Uniform_GetResOpBits(Sampler, i) | (1 << resOpType);
-            VIR_Uniform_SetResOpBits(Sampler, i, resOpBits);
+            resOpBits =  VIR_Uniform_GetResOpBits(Uniform, i) | (1 << resOpType);
+            VIR_Uniform_SetResOpBits(Uniform, i, resOpBits);
         }
     }
     else
     {
         gcmASSERT(index < arraySize);
         /* Update the resOpBits. */
-        resOpBits =  VIR_Uniform_GetResOpBits(Sampler, index) | (1 << resOpType);
-        VIR_Uniform_SetResOpBits(Sampler, index, resOpBits);
+        resOpBits =  VIR_Uniform_GetResOpBits(Uniform, index) | (1 << resOpType);
+        VIR_Uniform_SetResOpBits(Uniform, index, resOpBits);
     }
 
     /* Copy the ResOpBits for sampled_image. */
@@ -1175,8 +1175,8 @@ VIR_Sampler_UpdateResOpBits(
         separateSamplerSym = VIR_Symbol_GetSeparateSampler(Shader, sym);
         if (separateSamplerSym != gcvNULL)
         {
-            VIR_Sampler_UpdateResOpBitFromSampledImage(Shader,
-                                                       Sampler,
+            VIR_Uniform_UpdateResOpBitFromSampledImage(Shader,
+                                                       Uniform,
                                                        VIR_Symbol_GetSamplerIdxRange(sym),
                                                        VIR_Symbol_GetSampler(separateSamplerSym));
         }
@@ -1184,8 +1184,8 @@ VIR_Sampler_UpdateResOpBits(
         separateImageSym = VIR_Symbol_GetSeparateImage(Shader, sym);
         if (separateImageSym != gcvNULL)
         {
-            VIR_Sampler_UpdateResOpBitFromSampledImage(Shader,
-                                                       Sampler,
+            VIR_Uniform_UpdateResOpBitFromSampledImage(Shader,
+                                                       Uniform,
                                                        VIR_Symbol_GetImgIdxRange(sym),
                                                        VIR_Symbol_GetImage(separateImageSym));
         }

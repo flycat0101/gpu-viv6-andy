@@ -2045,7 +2045,7 @@ static VSC_ErrCode _SetResOpBitsForSampler(VIR_Shader *pShader,
         }
     }
 
-    return VIR_Sampler_UpdateResOpBits(pShader,
+    return VIR_Uniform_UpdateResOpBits(pShader,
                                        VIR_Symbol_GetSampler(sym),
                                        VIR_Inst_GetResOpType(texldInst),
                                        index);

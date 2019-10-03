@@ -3502,7 +3502,16 @@ VSC_RES_OP_BIT _VirResOpType2DrviResOpBit(gctUINT resOpType)
         return VSC_RES_OP_BIT_GATHER_PCF;
 
     case VIR_RES_OP_TYPE_LODQ:
-        return VSC_RES_OP_LODQ;
+        return VSC_RES_OP_BIT_LODQ;
+
+    case VIR_RES_OP_TYPE_LOAD_STORE:
+        return VSC_RES_OP_BIT_LOAD_STORE;
+
+    case VIR_RES_OP_TYPE_IMAGE_OP:
+        return VSC_RES_OP_BIT_IMAGE_OP;
+
+    case VIR_RES_OP_TYPE_ATOMIC:
+        return VSC_RES_OP_BIT_ATOMIC;
 
     default:
         gcmASSERT(gcvFALSE);
