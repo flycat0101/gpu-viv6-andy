@@ -718,7 +718,12 @@ static vx_status readAxiSram(
     {
         vxError("%s[%d]: binary sramSize: 0x%x, context size: 0x%x\n",
             __FUNCTION__, __LINE__, axiTable->sramSize, reader->binLoad->context->axiSRAM[0].size);
-        vxmONERROR(VX_ERROR_INVALID_VALUE);
+
+        if (axiTable->sramSize > reader->binLoad->context->axiSRAM[0].size)
+        {
+            vxError("%s[%d]: binary sram more than context sram\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_ERROR_INVALID_VALUE);
+        }
     }
 
 OnError:
