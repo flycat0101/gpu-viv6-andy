@@ -345,10 +345,12 @@ _NonContiguous1MPagesAlloc(
 
     *NumPages = (numPages1M << gcd1M_PAGE_SHIFT) >> PAGE_SHIFT;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32)
-    if (*NumPages > totalram_pages)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+        if (*NumPages > totalram_pages())
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32)
+        if (*NumPages > totalram_pages)
 #else
-    if (*NumPages > num_physpages)
+        if (*NumPages > num_physpages)
 #endif
     {
         return gcvNULL;
