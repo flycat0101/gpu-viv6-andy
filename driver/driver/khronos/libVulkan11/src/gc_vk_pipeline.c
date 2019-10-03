@@ -24,7 +24,7 @@ void __vkPipelineCacheFreeModule(
     __vkModuleCacheEntry *moduleCache = (__vkModuleCacheEntry*)pUserData;
     __VK_SET_ALLOCATIONCB(pAllocator);
 
-    vscDestroyShader(moduleCache->handle);
+    halti5_DestroyVkShader(moduleCache->handle);
 
     __VK_FREE(moduleCache);
     return;
@@ -72,13 +72,16 @@ VkResult __vkInitPipelineCacheData(
         __VK_ASSERT(moduleHead->binBytes <= moduleHead->alignBytes);
         do
         {
+            SHADER_HANDLE vscHandle = VK_NULL_HANDLE;
             pEntry = (__vkModuleCacheEntry*)__VK_ALLOC(sizeof(__vkModuleCacheEntry), 8, VK_SYSTEM_ALLOCATION_SCOPE_CACHE);
             __VK_ERR_BREAK(pEntry ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
 
             __VK_MEMCOPY(&pEntry->head, moduleHead, __VK_MIN(sizeof(__vkModuleCacheHead), moduleHead->headBytes));
             pEntry->head.headBytes = sizeof(__vkModuleCacheHead);
             __VK_ERR_BREAK(vscLoadShaderFromBinary((void*)(pData + moduleHead->headBytes),
-                                                   moduleHead->binBytes, &pEntry->handle, VK_FALSE));
+                                                   moduleHead->binBytes, &vscHandle, VK_FALSE));
+            pEntry->handle = halti5_CreateVkShader(vscHandle);
+            __VK_ASSERT(pEntry->handle);
 
             if (!__vk_utils_hashAddObj(pMemCb, pch->moduleHash, pEntry, moduleHead->hashKey, VK_FALSE))
             {
@@ -95,7 +98,7 @@ VkResult __vkInitPipelineCacheData(
         {
             if (pEntry)
             {
-                __VK_VERIFY_OK(vscDestroyShader(pEntry->handle));
+                __VK_VERIFY_OK(halti5_DestroyVkShader(pEntry->handle));
                 __VK_FREE(pEntry);
             }
             __VK_ERR_BREAK(result);
@@ -248,7 +251,7 @@ static VkResult __vkPlcGetData(
     pCtx->pData      += headBytes;
     pCtx->accumBytes += headBytes;
 
-    __VK_ONERROR(vscSaveShaderToBinary(pEntry->handle, (void**)&pCtx->pData, &binBytes));
+    __VK_ONERROR(vscSaveShaderToBinary(pEntry->handle->vscHandle, (void**)&pCtx->pData, &binBytes));
     /* binBytes might be overwritten when save binary */
     __VK_ASSERT(binBytes <= pEntry->head.binBytes);
     pCtx->pData      += pEntry->head.alignBytes;
@@ -339,11 +342,11 @@ __vkPlcMergeData(
         __VK_ONERROR(dstEntry ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
 
         __VK_MEMCOPY(dstEntry, pEntry, sizeof(__vkModuleCacheEntry));
-        vscReferenceShader(dstEntry->handle);
+        halti5_ReferenceVkShader(dstEntry->handle);
 
         if (__vk_utils_hashAddObj(pMemCb, pDstCache->moduleHash, dstEntry, pEntry->head.hashKey, VK_FALSE))
         {
-            __VK_VERIFY_OK(vscDestroyShader(dstEntry->handle));
+            __VK_VERIFY_OK(halti5_DestroyVkShader(dstEntry->handle));
             __VK_FREE(dstEntry);
             __VK_ONERROR(VK_ERROR_OUT_OF_HOST_MEMORY);
         }

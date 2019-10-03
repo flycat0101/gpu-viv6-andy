@@ -533,7 +533,7 @@ typedef struct
     gcsCENTROIDS    centroids4[3];
     gctFLOAT        sampleLocations[4][4];
 
-    SHADER_HANDLE   patchLib;
+    vkShader_HANDLE   patchLib;
 
     halti5_vscprogram_blit blitProgs[HALTI5_BLIT_NUM];
 
@@ -663,7 +663,7 @@ typedef struct
     __vkUtilsHash *vscProgInstanceHash;
 
     VSC_PROGRAM_RESOURCE_LAYOUT *vscResLayout;
-    SHADER_HANDLE  vscShaderArray[VSC_MAX_SHADER_STAGE_COUNT];
+    vkShader_HANDLE  vkShaderArray[VSC_MAX_SHADER_STAGE_COUNT];
 
     uint32_t cmdBuffer[__VK_PIPELINE_CMDBUFFER_MAXSIZE];
     uint32_t curCmdIndex;
@@ -1498,6 +1498,23 @@ VkResult halti5_setDrawID(
 int32_t halti5_convertLocationToRenderIndex(
     gcsHINT_PTR pHints,
     uint32_t locationIndex
+    );
+
+vkShader_HANDLE halti5_CreateVkShader(
+    SHADER_HANDLE handle
+    );
+
+VkResult halti5_ReferenceVkShader(
+    vkShader_HANDLE handle
+    );
+
+VkResult halti5_CopyVkShader(
+    vkShader_HANDLE *toHandle,
+    vkShader_HANDLE fromHandle
+    );
+
+VkResult halti5_DestroyVkShader(
+    vkShader_HANDLE handle
     );
 
 #endif /* __gc_halti5_chip_h__ */

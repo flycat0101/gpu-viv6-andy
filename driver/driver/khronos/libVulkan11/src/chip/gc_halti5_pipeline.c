@@ -30,7 +30,7 @@ static VkResult __vkSaveThenLoadShaderBin(
     do
     {
         __VK_ERR_BREAK(vscSaveShaderToBinary(*pVirShader, &pBinBack, &binBytes));
-        __VK_ERR_BREAK(vscDestroyShader(*pVirShader));
+        __VK_ERR_BREAK(halti5_DestroyVkShader(*pVirShader));
         *pVirShader = gcvNULL;
 
         pBinCopy = __VK_ALLOC(__VK_ALIGN(binBytes, 8), 8, VK_SYSTEM_ALLOCATION_SCOPE_CACHE);
@@ -5356,8 +5356,8 @@ static VkResult halti5_pip_build_gfxshaders(
     SpvDecodeInfo *decodeInfo = VK_NULL_HANDLE;
     void *stateKey[__VK_MAX_DESCRIPTOR_SETS];
     uint32_t stateKeySizeInBytes[__VK_MAX_DESCRIPTOR_SETS];
-    SHADER_HANDLE hShaderArray[VSC_MAX_SHADER_STAGE_COUNT];
-    SHADER_HANDLE hShaderArrayCopy[VSC_MAX_SHADER_STAGE_COUNT];
+    vkShader_HANDLE hShaderArray[VSC_MAX_SHADER_STAGE_COUNT];
+    vkShader_HANDLE hShaderArrayCopy[VSC_MAX_SHADER_STAGE_COUNT];
     VSC_SHADER_RESOURCE_LAYOUT vscShaderResLayout;
     struct _gcsHINT *hints = VK_NULL_HANDLE;
     VkBool32 bTriangle = (pip->topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST ||
@@ -5482,12 +5482,13 @@ static VkResult halti5_pip_build_gfxshaders(
             {
                 __vkModuleCacheEntry *pEntry = (__vkModuleCacheEntry*)hashObj->pUserData;
                 hShaderArray[shaderType] = pEntry->handle;
-                vscReferenceShader(pEntry->handle);
+                halti5_ReferenceVkShader(pEntry->handle);
             }
         }
 
         if (!hShaderArray[shaderType])
         {
+            SHADER_HANDLE   vscHandle = VK_NULL_HANDLE;
             decodeInfo->binary = shaderModule->pCode;
             decodeInfo->sizeInByte = (gctUINT)shaderModule->codeSize;
             decodeInfo->stageInfo = (gctPOINTER)&(info->pStages[i]);
@@ -5568,11 +5569,13 @@ static VkResult halti5_pip_build_gfxshaders(
                 }
             }
 
-            __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(decodeInfo, &hShaderArray[shaderType]))
+            __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(decodeInfo, &vscHandle))
                                         ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+            hShaderArray[shaderType] = halti5_CreateVkShader(vscHandle);
+            __VK_ASSERT(hShaderArray[shaderType]);
 
             __VK_ONERROR(halti5_helper_createVscShaderResLayout(pip, chipPipeline->vscResLayout, shaderType, &vscShaderResLayout));
-            vscCompileParams.hShader = hShaderArray[shaderType];
+            vscCompileParams.hShader = vscHandle;
             vscCompileParams.pShResourceLayout = &vscShaderResLayout;
             __VK_ONERROR((gcvSTATUS_OK == vscCompileShader(&vscCompileParams, gcvNULL))
                                         ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
@@ -5589,13 +5592,13 @@ static VkResult halti5_pip_build_gfxshaders(
                 pEntry->head.magic = 0x12345678;
                 pEntry->head.stage = shaderType;
                 pEntry->head.patchCase = 0;
-                vscQueryShaderBinarySize(hShaderArray[shaderType], &pEntry->head.binBytes);
+                vscQueryShaderBinarySize(hShaderArray[shaderType]->vscHandle, &pEntry->head.binBytes);
                 pEntry->head.alignBytes = __VK_ALIGN(pEntry->head.binBytes, 8);
                 __VK_MEMCOPY(pEntry->head.hashKey, md5digest, sizeof(md5digest));
 
                 pEntry->handle = hShaderArray[shaderType];
                 __vk_utils_hashAddObj(pMemCb, pip->cache->moduleHash, pEntry, md5digest, VK_FALSE);
-                vscReferenceShader(pEntry->handle);
+                halti5_ReferenceVkShader(pEntry->handle);
 
                 pip->cache->numModules++;
                 pip->cache->totalBytes += (pEntry->head.headBytes + pEntry->head.alignBytes);
@@ -5611,12 +5614,15 @@ static VkResult halti5_pip_build_gfxshaders(
         __VK_ONERROR(__vkSaveThenLoadShaderBin(pMemCb, &hShaderArray[shaderType]));
 #endif
 
-        __VK_ONERROR((gcvSTATUS_OK == vscCopyShader(&hShaderArrayCopy[shaderType], hShaderArray[shaderType]))
+        __VK_ONERROR((VK_SUCCESS == halti5_CopyVkShader(&hShaderArrayCopy[shaderType], hShaderArray[shaderType]))
                                     ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
     }
 
     __VK_MEMZERO(&vscLinkParams, sizeof(vscLinkParams));
-    __VK_MEMCOPY(vscLinkParams.hShaderArray, hShaderArrayCopy, sizeof(hShaderArrayCopy));
+    for (i = 0; i < sizeof(hShaderArrayCopy) / sizeof(hShaderArrayCopy[0]); i++)
+    {
+        vscLinkParams.hShaderArray[i] = hShaderArrayCopy[i] ? hShaderArrayCopy[i]->vscHandle : VK_NULL_HANDLE;
+    }
     vscLinkParams.pGlApiCfg = &devCtx->pPhyDevice->shaderCaps;
     vscLinkParams.pPgResourceLayout = chipPipeline->vscResLayout;
     __VK_MEMCOPY(&vscLinkParams.cfg, &vscCompileParams.cfg, sizeof(VSC_COMPILER_CONFIG));
@@ -5656,7 +5662,7 @@ static VkResult halti5_pip_build_gfxshaders(
                 if (patchMask & (1 << j))
                 {
                     vsclinkEntries[linkEntryIdx].mainShaderStageBits = VSC_SHADER_STAGE_BIT_PS;
-                    vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib;
+                    vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPointCount = 1;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_COLOR_OUTPUT;
@@ -5676,7 +5682,7 @@ static VkResult halti5_pip_build_gfxshaders(
         {
             vsclinkEntries[linkEntryIdx].mainShaderStageBits = VSC_SHADER_STAGE_BIT_PS;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPointCount = 1;
-            vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib;
+            vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_FRONTFACING_CCW;
             linkEntryIdx++;
@@ -5686,7 +5692,7 @@ static VkResult halti5_pip_build_gfxshaders(
         {
             vsclinkEntries[linkEntryIdx].mainShaderStageBits = VSC_SHADER_STAGE_BIT_PS;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPointCount = 1;
-            vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib;
+            vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_FRONTFACING_ALWAY_FRONT;
             linkEntryIdx++;
@@ -5777,11 +5783,11 @@ static VkResult halti5_pip_build_gfxshaders(
     {
         if (hShaderArrayCopy[i])
         {
-            vscDestroyShader(hShaderArrayCopy[i]);
+            halti5_DestroyVkShader(hShaderArrayCopy[i]);
         }
     }
 
-    __VK_MEMCOPY(chipPipeline->vscShaderArray, hShaderArray, sizeof(hShaderArray));
+    __VK_MEMCOPY(chipPipeline->vkShaderArray, hShaderArray, sizeof(hShaderArray));
     chipPipeline->linkEntries = vsclinkEntries;
     chipPipeline->linkEntryCount  = linkEntryNum;
 
@@ -5856,7 +5862,7 @@ OnError:
     {
         if (hShaderArrayCopy[i])
         {
-            vscDestroyShader(hShaderArrayCopy[i]);
+            halti5_DestroyVkShader(hShaderArrayCopy[i]);
         }
     }
 
@@ -5864,9 +5870,9 @@ OnError:
     {
         if (hShaderArray[i])
         {
-            vscDestroyShader(hShaderArray[i]);
+            halti5_DestroyVkShader(hShaderArray[i]);
         }
-        chipPipeline->vscShaderArray[i] = VK_NULL_HANDLE;
+        chipPipeline->vkShaderArray[i] = VK_NULL_HANDLE;
     }
 
     halti5_helper_destroyVscShaderResLayout(pip, &vscShaderResLayout);
@@ -5958,8 +5964,8 @@ static VkResult halti5_pip_build_computeshader(
     VSC_SHADER_RESOURCE_LAYOUT vscShaderResLayout;
     VSC_SHADER_COMPILER_PARAM vscCompileParams;
     VSC_PROGRAM_LINKER_PARAM vscLinkParams;
-    SHADER_HANDLE virShader = VK_NULL_HANDLE;
-    SHADER_HANDLE virShaderCopy = VK_NULL_HANDLE;
+    vkShader_HANDLE virShader = VK_NULL_HANDLE;
+    vkShader_HANDLE virShaderCopy = VK_NULL_HANDLE;
     __vkShaderModule *shaderModule;
     VkResult result = VK_SUCCESS;
     halti5_computePipeline *chipCmptPipeline = (halti5_computePipeline *)pip->chipPriv;
@@ -6055,12 +6061,13 @@ static VkResult halti5_pip_build_computeshader(
         {
             __vkModuleCacheEntry *pEntry = (__vkModuleCacheEntry*)hashObj->pUserData;
             virShader = pEntry->handle;
-            vscReferenceShader(pEntry->handle);
+            halti5_ReferenceVkShader(pEntry->handle);
         }
     }
 
     if (!virShader)
     {
+        SHADER_HANDLE vscShader = VK_NULL_HANDLE;
         SpvDecodeInfo decodeInfo;
         __VK_MEMZERO(&decodeInfo, sizeof(decodeInfo));
         decodeInfo.binary = shaderModule->pCode;
@@ -6073,11 +6080,13 @@ static VkResult halti5_pip_build_computeshader(
         decodeInfo.renderpassInfo = gcvNULL;
         decodeInfo.subPass = ~0U;
 
-        __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &virShader))
+        __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &vscShader))
                                     ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+        virShader = halti5_CreateVkShader(vscShader);
+        __VK_ASSERT(virShader);
 
         __VK_ONERROR(halti5_helper_createVscShaderResLayout(pip, chipPipeline->vscResLayout, VSC_SHADER_STAGE_CS, &vscShaderResLayout));
-        vscCompileParams.hShader = virShader;
+        vscCompileParams.hShader = vscShader;
         vscCompileParams.pShResourceLayout = &vscShaderResLayout;
         __VK_ONERROR((gcvSTATUS_OK == vscCompileShader(&vscCompileParams, gcvNULL))
                                     ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
@@ -6093,13 +6102,13 @@ static VkResult halti5_pip_build_computeshader(
             pEntry->head.magic = 0x12345678;
             pEntry->head.stage = VSC_SHADER_STAGE_CS;
             pEntry->head.patchCase = 0;
-            vscQueryShaderBinarySize(virShader, &pEntry->head.binBytes);
+            vscQueryShaderBinarySize(virShader->vscHandle, &pEntry->head.binBytes);
             pEntry->head.alignBytes = __VK_ALIGN(pEntry->head.binBytes, 8);
             __VK_MEMCOPY(pEntry->head.hashKey, md5digest, sizeof(md5digest));
 
             pEntry->handle = virShader;
             __vk_utils_hashAddObj(pMemCb, pip->cache->moduleHash, pEntry, md5digest, VK_FALSE);
-            vscReferenceShader(pEntry->handle);
+            halti5_ReferenceVkShader(pEntry->handle);
 
             pip->cache->numModules++;
             pip->cache->totalBytes += (pEntry->head.headBytes + pEntry->head.alignBytes);
@@ -6115,11 +6124,11 @@ static VkResult halti5_pip_build_computeshader(
         __VK_ONERROR(__vkSaveThenLoadShaderBin(pMemCb, &virShader));
 #endif
 
-    __VK_ONERROR((gcvSTATUS_OK == vscCopyShader(&virShaderCopy, virShader))
+    __VK_ONERROR((VK_SUCCESS == halti5_CopyVkShader(&virShaderCopy, virShader))
                                 ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
 
     __VK_MEMZERO(&vscLinkParams, sizeof(vscLinkParams));
-    vscLinkParams.hShaderArray[VSC_SHADER_STAGE_CS] = virShaderCopy;
+    vscLinkParams.hShaderArray[VSC_SHADER_STAGE_CS] = virShaderCopy->vscHandle;
     vscLinkParams.pGlApiCfg = &devCtx->pPhyDevice->shaderCaps;
     vscLinkParams.pPgResourceLayout = chipPipeline->vscResLayout;
     __VK_MEMCOPY(&vscLinkParams.cfg, &vscCompileParams.cfg, sizeof(VSC_COMPILER_CONFIG));
@@ -6178,9 +6187,9 @@ static VkResult halti5_pip_build_computeshader(
 
     if (virShaderCopy)
     {
-        vscDestroyShader(virShaderCopy);
+        halti5_DestroyVkShader(virShaderCopy);
     }
-    chipPipeline->vscShaderArray[VSC_SHADER_STAGE_CS] = virShader;
+    chipPipeline->vkShaderArray[VSC_SHADER_STAGE_CS] = virShader;
 
     return VK_SUCCESS;
 
@@ -6207,9 +6216,9 @@ OnError:
 
     if (virShader)
     {
-        vscDestroyShader(virShader);
+        halti5_DestroyVkShader(virShader);
     }
-    chipPipeline->vscShaderArray[VSC_SHADER_STAGE_CS] = VK_NULL_HANDLE;
+    chipPipeline->vkShaderArray[VSC_SHADER_STAGE_CS] = VK_NULL_HANDLE;
 
     if (chipPipeline->separateBindingProgramed)
     {
@@ -6225,7 +6234,7 @@ OnError:
     }
     if (virShaderCopy)
     {
-        vscDestroyShader(virShaderCopy);
+        halti5_DestroyVkShader(virShaderCopy);
     }
 
     halti5_helper_destroyVscShaderResLayout(pip, &vscShaderResLayout);
@@ -6615,10 +6624,10 @@ VkResult halti5_destroyPipeline(
 
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        if (chipPipeline->vscShaderArray[i])
+        if (chipPipeline->vkShaderArray[i])
         {
-            vscDestroyShader(chipPipeline->vscShaderArray[i]);
-            chipPipeline->vscShaderArray[i] = VK_NULL_HANDLE;
+            halti5_DestroyVkShader(chipPipeline->vkShaderArray[i]);
+            chipPipeline->vkShaderArray[i] = VK_NULL_HANDLE;
         }
     }
 
@@ -6658,7 +6667,7 @@ VkResult halti5_patch_pipeline(
     VSC_PROG_LIB_LINK_ENTRY *vscLinkEntries = VK_NULL_HANDLE;
     VSC_PROG_LIB_LINK_ENTRY *vscLinkEntriesCur = VK_NULL_HANDLE;
     VkBool32 needCleanInstance = VK_TRUE;
-    SHADER_HANDLE hShaderArrayCopy[VSC_MAX_SHADER_STAGE_COUNT];
+    vkShader_HANDLE hShaderArrayCopy[VSC_MAX_SHADER_STAGE_COUNT];
     VkBool32 newInstance = VK_FALSE;
     struct _gcsHINT *vscHints = VK_NULL_HANDLE;
     VkBool32 txClearPendingFix = devCtx->database->TX_CLEAR_PENDING_FIX;
@@ -6696,9 +6705,9 @@ VkResult halti5_patch_pipeline(
 
             for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
             {
-                if (chipPipeline->vscShaderArray[i])
+                if (chipPipeline->vkShaderArray[i])
                 {
-                    __VK_ONERROR((gcvSTATUS_OK == vscCopyShader(&hShaderArrayCopy[i], chipPipeline->vscShaderArray[i]))
+                    __VK_ONERROR((VK_SUCCESS == halti5_CopyVkShader(&hShaderArrayCopy[i], chipPipeline->vkShaderArray[i]))
                                                 ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
                 }
             }
@@ -6715,7 +6724,10 @@ VkResult halti5_patch_pipeline(
             needCleanInstance = VK_FALSE;
             __VK_MEMZERO(&vscLinkParams, sizeof(vscLinkParams));
             __VK_MEMZERO(&vscLibLinkTable, sizeof(vscLibLinkTable));
-            __VK_MEMCOPY(vscLinkParams.hShaderArray, hShaderArrayCopy, sizeof(hShaderArrayCopy));
+            for (i = 0; i < sizeof(hShaderArrayCopy) / sizeof(hShaderArrayCopy[0]); i++)
+            {
+                vscLinkParams.hShaderArray[i] = hShaderArrayCopy[i] ? hShaderArrayCopy[i]->vscHandle : VK_NULL_HANDLE;
+            }
             vscLinkParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
             vscLinkParams.cfg.ctx.appNameId = devCtx->pPhyDevice->pInst->patchID;
             vscLinkParams.cfg.ctx.isPatchLib = gcvFALSE;
@@ -6797,7 +6809,7 @@ VkResult halti5_patch_pipeline(
                                 VSC_RES_OP_BIT opTypeBits = 0;
                                 VSC_RES_ACT_BIT actBits = 0;
                                 uint32_t subType;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib;
+                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_RESOURCE;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc =
@@ -6879,7 +6891,7 @@ VkResult halti5_patch_pipeline(
             {
                 if (hShaderArrayCopy[i])
                 {
-                    vscDestroyShader(hShaderArrayCopy[i]);
+                    halti5_DestroyVkShader(hShaderArrayCopy[i]);
                 }
             }
         }
@@ -6943,7 +6955,7 @@ OnError:
     {
         if (hShaderArrayCopy[i])
         {
-            vscDestroyShader(hShaderArrayCopy[i]);
+            halti5_DestroyVkShader(hShaderArrayCopy[i]);
         }
     }
     if (vscLinkEntries)

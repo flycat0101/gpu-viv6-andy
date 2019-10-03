@@ -21,6 +21,11 @@ enum __VK_FACE
     __VK_FACE_NUMBER = 2,
 };
 
+typedef struct
+{
+    SHADER_HANDLE vscHandle;
+    gcsATOM_PTR   refCount;
+} vkShader, *vkShader_HANDLE;
 
 typedef struct __vkShaderModuleRec
 {
@@ -80,7 +85,7 @@ typedef struct __VK_ATTRIB_ALIGN(8) __vkModuleCacheHeadRec
 typedef struct __vkModuleCacheEntryRec
 {
     __vkModuleCacheHead head;
-    SHADER_HANDLE       handle;
+    vkShader_HANDLE     handle;
 } __vkModuleCacheEntry;
 
 

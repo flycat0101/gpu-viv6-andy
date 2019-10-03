@@ -330,6 +330,7 @@ VkResult halti5_initializeChipModule(
     __vkDevContext *devCtx = (__vkDevContext *)device;
     halti5_module *chipModule;
     SpvDecodeInfo decodeInfo;
+    SHADER_HANDLE vscpatchLib = VK_NULL_HANDLE;
     VSC_SHADER_COMPILER_PARAM vscCompileParams;
     float limit;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
@@ -889,7 +890,9 @@ VkResult halti5_initializeChipModule(
     decodeInfo.tcsInputVertices = 0;
     decodeInfo.isLibraryShader = gcvTRUE;
 
-    __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &chipModule->patchLib)) ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+    __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &vscpatchLib)) ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+    chipModule->patchLib = halti5_CreateVkShader(vscpatchLib);
+    __VK_ASSERT(chipModule->patchLib);
 
     __VK_MEMZERO(&vscCompileParams, sizeof(VSC_SHADER_COMPILER_PARAM));
     vscCompileParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
@@ -900,7 +903,7 @@ VkResult halti5_initializeChipModule(
                                 | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
                                 | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
     vscCompileParams.cfg.optFlags = (VSC_COMPILER_OPT_FULL & (~VSC_COMPILER_OPT_ILF_LINK)) | VSC_COMPILER_OPT_NO_ILF_LINK;
-    vscCompileParams.hShader = chipModule->patchLib;
+    vscCompileParams.hShader = chipModule->patchLib->vscHandle;
 
     __VK_ONERROR((gcvSTATUS_OK == vscCompileShader(&vscCompileParams, gcvNULL))
                                 ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
@@ -921,7 +924,7 @@ VkResult halti5_initializeChipModule(
 OnError:
     if (chipModule->patchLib)
     {
-        vscDestroyShader(chipModule->patchLib);
+        halti5_DestroyVkShader(chipModule->patchLib);
         chipModule->patchLib = VK_NULL_HANDLE;
     }
 
@@ -947,7 +950,7 @@ VkResult halti5_finalizeChipModule(
 
     if (chipModule && (chipModule->patchLib))
     {
-        vscDestroyShader(chipModule->patchLib);
+        halti5_DestroyVkShader(chipModule->patchLib);
     }
 
     if (chipModule && chipModule->ppTweakHandlers)
@@ -1484,5 +1487,71 @@ VkResult halti5_helper_convertHwPEDesc(
     return VK_ERROR_FORMAT_NOT_SUPPORTED;
 }
 
+vkShader_HANDLE halti5_CreateVkShader(
+    SHADER_HANDLE handle
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    vkShader_HANDLE vkHandle = VK_NULL_HANDLE;
+    __VK_ASSERT(handle);
+
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(vkShader), (gctPOINTER*)&vkHandle));
+    vkHandle->vscHandle = handle;
+    gcmONERROR(gcoOS_AtomConstruct(gcvNULL, &vkHandle->refCount));
+    halti5_ReferenceVkShader(vkHandle);
+
+    return vkHandle;
+OnError:
+    if (vkHandle)
+    {
+        gcoOS_Free(gcvNULL, vkHandle);
+    }
+    return VK_NULL_HANDLE;
+}
+
+VkResult halti5_ReferenceVkShader(
+    vkShader_HANDLE handle
+    )
+{
+    __VK_ASSERT(handle);
+    gcoOS_AtomIncrement(gcvNULL, handle->refCount, gcvNULL);
+    return VK_SUCCESS;
+}
+
+VkResult halti5_CopyVkShader(
+    vkShader_HANDLE *toHandle,
+    vkShader_HANDLE fromHandle
+    )
+{
+    SHADER_HANDLE to;
+    __VK_ASSERT(fromHandle);
+
+    if (toHandle)
+    {
+        vscCopyShader(&to, fromHandle->vscHandle);
+        *toHandle = halti5_CreateVkShader(to);
+    }
+
+    return VK_SUCCESS;
+}
+
+VkResult halti5_DestroyVkShader(
+    vkShader_HANDLE handle
+    )
+{
+    gctINT32  oldValue = -1;
+
+    __VK_ASSERT(handle);
+    gcoOS_AtomDecrement(gcvNULL, handle->refCount, &oldValue);
+    __VK_ASSERT(oldValue > 0);
+
+    if (oldValue == 1)
+    {
+        vscDestroyShader(handle->vscHandle);
+        gcoOS_AtomDestroy(gcvNULL, handle->refCount);
+        gcoOS_Free(gcvNULL, handle);
+    }
+    return VK_SUCCESS;
+}
 
 
