@@ -707,7 +707,8 @@ static int patch_param_imx8_subsystem(struct platform_device *pdev,
     struct device_node *core_node;
     int core = gcvCORE_MAJOR;
 
-    while ((core_node = of_parse_phandle(node, "cores", i++)) != NULL) {
+    while ((core_node = of_parse_phandle(node, "cores", i++)) != NULL &&
+            core < gcvCORE_COUNT) {
         struct platform_device *pdev_gpu;
         int irqLine = -1;
 
