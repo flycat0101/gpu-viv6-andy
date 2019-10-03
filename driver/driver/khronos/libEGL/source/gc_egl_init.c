@@ -65,6 +65,7 @@ static struct eglExtension extensions[] =
     {"EGL_KHR_create_context",                  EGL_TRUE },
     {"EGL_KHR_no_config_context",               EGL_FALSE },
     {"EGL_KHR_surfaceless_context",             EGL_TRUE },
+    {"EGL_KHR_get_all_proc_addresses",          EGL_TRUE },
     {"EGL_EXT_create_context_robustness",       EGL_TRUE },
     {"EGL_EXT_protected_surface",               EGL_FALSE},
     {"EGL_EXT_protected_content",               EGL_FALSE},
@@ -427,19 +428,13 @@ _FillIn(
 
     config->renderableType = EGL_OPENGL_ES_BIT
                            | EGL_OPENGL_ES2_BIT
-                           | EGL_OPENGL_ES3_BIT_KHR;
+                           | EGL_OPENGL_ES3_BIT_KHR
+                           | EGL_OPENGL_BIT;
 
     config->conformant     = EGL_OPENGL_ES_BIT
                            | EGL_OPENGL_ES2_BIT
-                           | EGL_OPENGL_ES3_BIT_KHR;
-
-    if(thread->dispatchTables[vegl_OPENGL])
-    {
-        config->renderableType |= EGL_OPENGL_BIT;
-        config->conformant |= EGL_OPENGL_BIT;
-    }
-
-
+                           | EGL_OPENGL_ES3_BIT_KHR
+                           | EGL_OPENGL_BIT;
 
     if (Samples == 16)
     {
@@ -482,8 +477,6 @@ _FillIn(
                     printed = gcvTRUE;
                 }
             }
-            config->renderableType &= ~EGL_OPENGL_BIT;
-            config->conformant &= ~EGL_OPENGL_BIT;
         }
     }
 #endif
