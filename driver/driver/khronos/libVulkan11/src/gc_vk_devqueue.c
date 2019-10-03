@@ -898,6 +898,12 @@ VkResult __vk_QueueIdle(
     /* Dump the stall. */
     gcmDUMP(gcvNULL, "@[stall]");
 
+    /*if the last QueueSubmit haven't commit any command buffer, need commit it first*/
+    if (!devQueue->commitFlag)
+    {
+        __VK_ONERROR(__vk_QueueCommit(devQueue));
+    }
+
     /* Create a signal event. */
     iface.command            = gcvHAL_SIGNAL;
     iface.u.Signal.signal    = gcmPTR_TO_UINT64(devQueue->signal);

@@ -740,6 +740,7 @@ VkResult __vk_CommitStateBuffers(
     }
 
     __VK_ONERROR(__vk_QueueCommit(devQueue));
+    devQueue->commitFlag = VK_TRUE;
 
     __VK_MEMZERO(&iface, sizeof(iface));
     iface.command = gcvHAL_DEVICE_MUTEX;
@@ -815,6 +816,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
             __vk_InsertSemaphoreWaits(
                 queue, pSubmits[isub].pWaitSemaphores, pSubmits[isub].waitSemaphoreCount);
         }
+
+        devQueue->commitFlag = VK_FALSE;
 
         for (icmd = 0; icmd < pSubmits[isub].commandBufferCount; icmd++)
         {
