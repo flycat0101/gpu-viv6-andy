@@ -505,7 +505,8 @@ __glChipReadPixels(
         rlvArgs.uArgs.v2.numSlices   = 1;
         rlvArgs.uArgs.v2.dump        = gcvTRUE;
 
-        if (packBufObj)
+        /* pixel pack mode might have some extra bytes, software copy may touch them, use copy pixels to avoid. */
+        if (packBufObj && (!gcdPROC_IS_WEBGL(chipCtx->patchId) || ps->packModes.alignment != 8))
         {
             if (gcmIS_SUCCESS(gcoSURF_ResolveRect(&srcView, &dstView, &rlvArgs)))
             {
