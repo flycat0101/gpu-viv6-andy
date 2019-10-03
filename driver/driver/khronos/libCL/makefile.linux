@@ -92,6 +92,7 @@ LIBS += -L $(SDK_DIR)/drivers
 LIBS += -L $(AQROOT)/hal/user/$(OBJ_DIR)
 ifeq ($(ENABLE_CL_GL),1)
 LIBS += -L $(AQROOT)/driver/khronos/libGLESv3/$(OBJ_DIR)
+LIBS += -L $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)
 endif
 LIBS += -L $(AQROOT)/compiler/libVSC/$(OBJ_DIR)
 ifeq ($(ENABLE_CL_GL),1)
