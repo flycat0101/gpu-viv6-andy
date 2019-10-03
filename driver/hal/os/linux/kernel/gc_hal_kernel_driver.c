@@ -707,7 +707,7 @@ static int drv_open(
                 gcmkVERIFY_OK(gckKERNEL_AttachProcess(galDevice->kernels[i], gcvFALSE));
             }
         }
-
+        kfree(data);
         gcmkFOOTER_ARG("status=%d", status);
         return -ENOTTY;
     }
