@@ -473,12 +473,34 @@ gcoHARDWAREVX_SetImageInfo(
             /* 8 bits per pixel.*/
             shift = 0;
             multiply = 0x0;
+            if (Info->format == 0x7)
+            {
+                conversion = 0x7;
+            }
+            else if (Info->format == 0x4)
+            {
+                conversion = 0x4;
+            }
+
             break;
 
         case 16:
             /* 16 bits per pixel.*/
             shift = 1;
-            conversion = Info->isFloat ? 0x1 : 0x6;
+
+            if (Info->format == 0x1)
+            {
+                conversion = 0x1;
+            }
+            else if (Info->format == 0x6)
+            {
+                conversion = 0x6;
+            }
+            else if (Info->format == 0x3)
+            {
+                conversion = 0x3;
+            }
+
             multiply = 0x0;
             break;
 

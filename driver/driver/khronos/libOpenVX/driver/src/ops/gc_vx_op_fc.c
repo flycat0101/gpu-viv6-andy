@@ -366,11 +366,23 @@ vx_status vxoFCOperation_Initialize(
                                           VX_NULL,
                                           VX_NULL));
 
-    supportDataFormat0 = (vx_bool)(input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && bias_dataformat == VX_TYPE_FLOAT32 && output_dataformat == VX_TYPE_FLOAT16);
-    supportDataFormat1 = (vx_bool)(input_dataformat == VX_TYPE_INT8 && weight_dataformat == VX_TYPE_INT8 && bias_dataformat == VX_TYPE_INT32 && output_dataformat == VX_TYPE_INT8);
-    supportDataFormat2 = (vx_bool)(input_dataformat == VX_TYPE_INT16 && weight_dataformat == VX_TYPE_INT16 && (bias_dataformat == VX_TYPE_INT32 || bias_dataformat == VX_TYPE_INT64) && output_dataformat == VX_TYPE_INT16);
-    supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && bias_dataformat == VX_TYPE_INT32 && output_dataformat != VX_TYPE_FLOAT32);
-    enable_shader = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
+    if (node->base.context->evisNoInst.supportEVIS)
+    {
+        supportDataFormat0 = (vx_bool)(input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && bias_dataformat == VX_TYPE_FLOAT32 && output_dataformat == VX_TYPE_FLOAT16);
+        supportDataFormat1 = (vx_bool)(input_dataformat == VX_TYPE_INT8 && weight_dataformat == VX_TYPE_INT8 && bias_dataformat == VX_TYPE_INT32 && output_dataformat == VX_TYPE_INT8);
+        supportDataFormat2 = (vx_bool)(input_dataformat == VX_TYPE_INT16 && weight_dataformat == VX_TYPE_INT16 && (bias_dataformat == VX_TYPE_INT32 || bias_dataformat == VX_TYPE_INT64) && output_dataformat == VX_TYPE_INT16);
+        supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && bias_dataformat == VX_TYPE_INT32 && output_dataformat != VX_TYPE_FLOAT32);
+        enable_shader = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
+    }
+    else
+    {
+        supportDataFormat0 = (vx_bool)((input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_FLOAT32) && output_dataformat == VX_TYPE_FLOAT16) ||
+                                        (input_dataformat == VX_TYPE_FLOAT32 && weight_dataformat == VX_TYPE_FLOAT32 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_FLOAT32) && output_dataformat == VX_TYPE_FLOAT32));
+        supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) &&
+                                        ((output_dataformat == VX_TYPE_UINT8) || (output_dataformat == VX_TYPE_INT16)));
+
+        enable_shader      = (supportDataFormat0 || supportDataFormat3);
+    }
 
     /* Choose the accelerator. */
     if (vxnneIsNNSupportFormat(context, inputs, VX_NULL, outputs) && batch_count > 1 && support_1xn)
@@ -1394,7 +1406,16 @@ vx_status vxoFCOperationSH_Initialize(
 
     if (TENSOR_DIM_NUM(inputs) < 3) batch_count = 1;
 
-    shaderExecutable = vxnneGetFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &node->kernelAttributes.borderMode, inputs, weights, biases, activation, outputs);
+    if (node->base.context->evisNoInst.supportEVIS)
+    {
+        shaderExecutable = vxnneGetFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED,
+                                    &node->kernelAttributes.borderMode, inputs, weights, biases, activation, outputs);
+    }
+    else
+    {
+        shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED,
+                                    &node->kernelAttributes.borderMode, 0, inputs, weights, biases, activation, outputs);
+    }
     if (!shaderExecutable)
     {
         vxmONERROR(VX_FAILURE);
