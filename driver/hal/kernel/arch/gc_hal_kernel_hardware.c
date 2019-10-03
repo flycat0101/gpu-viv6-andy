@@ -1502,7 +1502,10 @@ _QueryFeatureDatabase(
     case gcvFEATURE_FE_NEED_DUMMYDRAW:
         available = database->FE_NEED_DUMMYDRAW;
 
-        if (_IsHardwareMatch(Hardware, gcv600, 0x4653))
+        // Due to not accurately know about which chip's FE needs a dummy-draw to initialize flop reset issue, to
+        // fix bug due to wrongly set, just temp use chip-model to roughly check. If there is no any side-effect,
+        // it will be finally set in feature-DB
+        if (Hardware->identity.chipModel < gcv2100)
         {
             available = gcvTRUE;
         }
