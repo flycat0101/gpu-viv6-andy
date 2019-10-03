@@ -15154,7 +15154,11 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
     if (!first_time) vxoReference_Increment(&wb_base->base, VX_REF_INTERNAL);
 
 exit:
-
+    if (Weight_Cpuptr != VX_NULL)
+    {
+        vxFree(Weight_Cpuptr);
+        Weight_Cpuptr = VX_NULL;
+    }
     return status == VX_SUCCESS ? wb : VX_NULL;
 }
 
@@ -15561,6 +15565,11 @@ vx_status vxoWeightsBiases_Compress(
 #endif
 
 exit:
+    if (Weight_Cpuptr != VX_NULL)
+    {
+        vxFree(Weight_Cpuptr);
+        Weight_Cpuptr = VX_NULL;
+    }
     return status;
 }
 

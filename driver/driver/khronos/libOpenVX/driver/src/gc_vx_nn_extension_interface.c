@@ -17515,7 +17515,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(v
                     if (!shaderExecutable)
                     {
                         status = VX_FAILURE;
-                        return status;
+                        goto exit;
                     }
 
                     status = vxnneShaderOperation_Initialize(&depthwiseConvolutionLayer->depthwise_tensorcopy_sh_operation,
