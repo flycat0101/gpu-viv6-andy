@@ -8080,8 +8080,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     /* collect all patch count, op count, lcdt count from operations */
     for (i = 0; i < executionLayer->opIndicesNum; i++)
     {
-        vxnne_operation operation;
-        vxnne_operation_command operationCommand;
+        vxnne_operation operation = VX_NULL;
+        vxnne_operation_command operationCommand = VX_NULL;
         vx_tensor input = VX_NULL;
         vx_tensor output = VX_NULL;
         vx_enum operationTarget = VX_BINARY_OPERATION_TYPE_NONE;
@@ -10284,6 +10284,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSHParamSize(
     vx_graph graph,
     vx_reference *shParams,
     vx_uint32 paramNum,
+    vx_uint32 **lcdTensorPhy,
+    vx_uint32 *lcdTensorsPhyIndex,
     vx_uint32 *size
     )
 {
@@ -10291,6 +10293,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSHParamSize(
     vx_uint32 i = 0, j =0;
     vx_uint32 totalSize = 0;
     vx_enum allocType = VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR;
+    vx_uint32 *tensorPhy = *lcdTensorPhy;
+    vx_uint32 index = *lcdTensorsPhyIndex;
 
     for (i = 0; i < paramNum; i++)
     {
@@ -10324,7 +10328,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSHParamSize(
                 gcoVX_Kernel_Context kernelContext; /* not useful, just fulfill the interface */
                 gcoOS_MemFill((gctPOINTER*)(&kernelContext), 0, sizeof(gcoVX_Kernel_Context));
                 gcfVX_GetImageInfo(&kernelContext, image, &imageInfo, 1);
-                totalSize += (vx_uint32)imageInfo.bytes;
+                totalSize += gcmALIGN((vx_uint32)imageInfo.bytes, 64);
             }
         }
         else if (ref->type == VX_TYPE_ARRAY)
@@ -10333,12 +10337,38 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSHParamSize(
             allocType = vxoMemory_GetType(&array->memory);
             if (allocType == VXNNE_MEM_POOL_TYPE_ORIG_DDR)
             {
-                totalSize += (vx_uint32)array->memory.sizes[0];
+                totalSize += gcmALIGN((vx_uint32)array->memory.sizes[0], 64);
             }
         }
         else if (ref->type == VX_TYPE_SCALAR)
         {
             totalSize += 64;/* alignement to 64 bytes */
+        }
+        else if (ref->type == VX_TYPE_TENSOR)
+        {
+            vx_tensor tensor = (vx_tensor)ref;
+            vx_enum allocType = vxoMemory_GetType(&tensor->tensorBuffer->memory);
+
+            if (allocType == VXNNE_MEM_POOL_TYPE_ORIG_DDR)
+            {
+                vx_uint32 physical = TENSOR_PHYSICAL_ADDR(tensor);
+                vx_uint32 i = 0;
+
+                for (i = 0; i < index; i++)
+                {
+                    if (physical == tensorPhy[i])
+                    {
+                        break;
+                    }
+                }
+
+                if (i == index)
+                {
+                    tensorPhy[index] = physical;
+                    index++;
+                    *lcdTensorsPhyIndex = index;
+                }
+            }
         }
     }
 
@@ -10387,23 +10417,48 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
     vx_uint32 shIntrSize = 0;
     vx_uint32 shShareMemSize = 0;
     vx_uint32 shParaSize = 0;
+    vx_uint32 *lcdTensorsPhysical = VX_NULL;
+    vx_uint32 lcdTensorsPhyIndex = 0;
+    vx_uint32 lcdTensorSize = 0;
+    vx_uint32 deviceID = graph->deviceID;
+
+    lcdTensorsPhysical = (vx_uint32*)vxAllocateAndZeroMemory(sizeof(vx_uint32) * VX_MAX_TEMP_TENSORS);
+
+    if ((context->binaryGraphInitBuffer[deviceID] != VX_NULL) && (context->binaryGraphInitSize[deviceID] > 0))
+    {
+        operationCount = 2; /* initialize and end */
+        patchCount = 3; /* SRAM */
+        lcdtCount = operationCount;
+        KernelStreamSize += gcmALIGN_NP2_SAFE(context->binaryGraphInitSize[deviceID], 64);
+        KernelStreamSize += 0X40;
+    }
 
     for (i = 0; i < executionLayer->opIndicesNum; i++)
     {
+        vx_tensor input = VX_NULL;
+        vx_tensor output = VX_NULL;
+
+        operation = executionLayer->operations[executionLayer->opIndices[i].operationID];
         operationCommand = &executionLayer->opIndices[i];
-        operation = operationCommand->operation;
         node = operation->layer->node;
 
         if (operation->target == VXNNE_OPERATION_TARGET_NN)
         {
             vx_weights_biases_parameter weights_biases = operationCommand->cmdInfo.wb;
+            vxnne_convolution_relu_pooling_operation nnConvOperation = (vxnne_convolution_relu_pooling_operation)operation;
             vx_uint32 ksDataSize = 0;
-            vx_uint32 tempCount = 0;
+            vx_uint32 tempCount = 1;
+
+            tempCount = vxoBinaryGraph_CalculateNNSliceCount(context, operationCommand);
+            if (tempCount > context->nnConfig.fixedFeature.nnCoreCount)
+            {
+                tempCount = context->nnConfig.fixedFeature.nnCoreCount;
+            }
 
             vxmASSERT(weights_biases != VX_NULL);
 
             ksDataSize = (vx_uint32)WB_MEM_SIZE_INDEX(weights_biases, 0);
-            ksDataSize = gcmALIGN(ksDataSize, 64);
+            ksDataSize = gcmALIGN_NP2_SAFE(ksDataSize, 64);
             if (0 == ksDataSize)
             {
                 vxError("fail to get NBG size, NN kernel stream size is 0\n");
@@ -10412,33 +10467,34 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
 
             KernelStreamSize += ksDataSize;
 
-            if (context->nnConfig.fixedFeature.nnCoreCount > 0)
-            {
-                tempCount = context->nnConfig.fixedFeature.nnCoreCount;
-            }
-            else
-            {
-                tempCount = 1;
-            }
-
             operationCount += tempCount;
             nnCount += tempCount;
             lcdtCount += tempCount * 2;
             patchCount += tempCount * 7;
+
+            input = nnConvOperation->inputs;
+            output = nnConvOperation->outputs;
         }
         else if (operation->target == VXNNE_OPERATION_TARGET_TP)
         {
             vx_op_param parameter = &operationCommand->operation->parameter;
             vx_uint32 ksDataSize = 0;
-            vx_uint32 tempCount = 0;
+            vx_uint32 tempCount = context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
+            vxnne_tp_operation tpOperation = (vxnne_tp_operation)operation;
 
-            if (context->nnConfig.fixedFeature.tpCoreCount > 0)
+            if (operation->parameter.tpType == TP_SINGLE_FC)
             {
-                tempCount = context->nnConfig.fixedFeature.tpCoreCount;
-            }
-            else
-            {
-                tempCount = 1;
+                vx_tensor otherRef = (vx_tensor)operation->parameter.other_ref;
+                vx_tp_value_cmd value = operation->parameter.tp_value;
+                if (!value->e32[0])
+                {
+                    vxmASSERT(otherRef != VX_NULL);
+                    tempCount = ((vx_weights_biases_parameter)otherRef)->slice_num;
+                }
+                else
+                {
+                    tempCount = 1;
+                }
             }
 
             operationCount += tempCount;
@@ -10475,12 +10531,15 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
                 }
             }
 
-            ksDataSize = gcmALIGN(ksDataSize, 64);
+            ksDataSize = gcmALIGN_NP2_SAFE(ksDataSize, 64);
 
             KernelStreamSize += ksDataSize;
 
             lcdtCount += operationCount * 2;
             patchCount += operationCount * 7;
+
+            input = tpOperation->input;
+            output = tpOperation->output;
         }
         else if (operation->target == VXNNE_OPERATION_TARGET_SH)
         {
@@ -10490,6 +10549,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
             vx_shader kernelShader = VX_NULL;
             gcsHINT_PTR hints = VX_NULL;
             vx_reference *shParams = VX_NULL;
+            vx_uint32 tempSize = 0;
 
             operationCount += 1;
             shCount += 1;
@@ -10503,7 +10563,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
 
                 shParams = shaderOperation->shaderExecutable->params;
 
-                lcdtCount += 3 + node->kernel->signature.paramCount;
+                lcdtCount += 2 + node->kernel->signature.paramCount;
                 patchCount += 1 + node->kernel->signature.paramCount;
             }
             else
@@ -10512,7 +10572,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
 
                 shParams = shaderOperation->shaderExecutable->param;
 
-                lcdtCount += 3 + shaderOperation->shaderExecutable->paramNum;
+                lcdtCount += 2 + shaderOperation->shaderExecutable->paramNum;
                 patchCount += 1 + shaderOperation->shaderExecutable->paramNum;
             }
 
@@ -10520,17 +10580,20 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
             instMemNode = (gcsSURF_NODE_PTR)hints->shaderVidNodes.instVidmemNode[gceSGSK_FRAGMENT_SHADER];
             if (VX_NULL != instMemNode)
             {
-                shIntrSize += (vx_uint32)instMemNode->size;
+                shIntrSize += gcmALIGN_NP2_SAFE((vx_uint32)instMemNode->size, 64);
             }
 
             sharedMemNode = (gcsSURF_NODE_PTR)hints->shaderVidNodes.sharedMemVidMemNode;
             if (VX_NULL != sharedMemNode)
             {
-                shShareMemSize += (vx_uint32)sharedMemNode->size;
+                shShareMemSize += gcmALIGN_NP2_SAFE((vx_uint32)sharedMemNode->size, 64);
+                lcdtCount++;
+                patchCount++;
             }
 
-            vxmONERROR(vxoBinaryGraph_GetSHParamSize(graph, shParams, shaderOperation->shaderExecutable->paramNum, &shParaSize));
-
+            vxmONERROR(vxoBinaryGraph_GetSHParamSize(graph, shParams, shaderOperation->shaderExecutable->paramNum,
+                                                     &lcdTensorsPhysical, &lcdTensorsPhyIndex, &tempSize));
+            shParaSize += tempSize;
         }
         else if (operation->target == VXNNE_OPERATION_TARGET_SC)
         {
@@ -10546,6 +10609,65 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
             layerParamCount += node->kernel->signature.paramCount;
             lcdtCount += node->kernel->signature.paramCount;
         }
+
+        if (input != VX_NULL)
+        {
+            vx_size tensorSize = 0;
+            vx_uint32 physical = TENSOR_PHYSICAL_ADDR(input);
+            vx_uint32 i = 0;
+
+            if (vxoMemory_GetType(&input->tensorBuffer->memory) == VXNNE_MEM_POOL_TYPE_ORIG_DDR)
+            {
+                for (i = 0; i < lcdTensorsPhyIndex; i++)
+                {
+                    if (physical == lcdTensorsPhysical[i])
+                    {
+                        break;
+                    }
+                }
+
+                if (i == lcdTensorsPhyIndex)
+                {
+                    vxoTensor_GetTensorWholeSize(input, &tensorSize);
+                    lcdTensorsPhysical[lcdTensorsPhyIndex] = physical;
+                    lcdTensorsPhyIndex++;
+                    lcdTensorSize += (vx_uint32)tensorSize;
+                    lcdtCount++;
+                }
+            }
+        }
+
+        if (output != VX_NULL)
+        {
+            vx_size tensorSize = 0;
+            vx_uint32 physical = TENSOR_PHYSICAL_ADDR(output);
+            vx_uint32 i = 0;
+
+            if (vxoMemory_GetType(&output->tensorBuffer->memory) == VXNNE_MEM_POOL_TYPE_ORIG_DDR)
+            {
+                for (i = 0; i < lcdTensorsPhyIndex; i++)
+                {
+                    if (physical == lcdTensorsPhysical[i])
+                    {
+                        break;
+                    }
+                }
+
+                if (i == lcdTensorsPhyIndex)
+                {
+                    vxoTensor_GetTensorWholeSize(output, &tensorSize);
+                    lcdTensorsPhysical[lcdTensorsPhyIndex] = physical;
+                    lcdTensorsPhyIndex++;
+                    lcdTensorSize += (vx_uint32)tensorSize;
+                    lcdtCount++;
+                }
+            }
+        }
+    }
+
+    if (graph->nodeCount == 1)
+    {
+        lcdTensorSize = 0;
     }
 
     operationSize = sizeof(vx_binary_operation_info_s) * operationCount;
@@ -10558,14 +10680,19 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
     layerParamSize = sizeof(vx_binary_layer_parameter_s) * layerParamCount;
 
     statesSize = nnCount * NN_STATES_SIZE + tpCount * TP_STATES_SIZE + scCount * SC_STATES_SIZE + shCount * SH_STATES_SIZE;
-    lcdSize = KernelStreamSize + statesSize + shShareMemSize + shIntrSize + shParaSize;
+    lcdSize = KernelStreamSize + statesSize + shShareMemSize + shIntrSize + shParaSize + lcdTensorSize;
 
     totalSize = operationSize + lcdtSize + nnSize + tpSize + shSize + patchSize
                 + swSize + layerParamSize + lcdSize;
 
-    *size = totalSize;
+    *size = totalSize + SH_COMMAND_ALIGN_SIZE;
 
 OnError:
+    if (lcdTensorsPhysical != VX_NULL)
+    {
+        vxFree(lcdTensorsPhysical);
+        lcdTensorsPhysical = VX_NULL;
+    }
     return status;
 }
 
@@ -10724,6 +10851,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
     vx_uint32 inputCount = 0;
     vx_uint32 outputCount = 0;
     vx_uint32 totalSize = 0;
+    vx_uint32 inputOutputSize = 0;
+    vx_reference inputTableRef[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_reference outputTableRef[VX_MAX_NN_INOUT_PARAM_COUNT];
 
     /* 1. enrtance size */
     nbEntranceSize = sizeof(vx_binary_header_s) + sizeof(vx_binary_memory_pool_info_s) +
@@ -10732,9 +10862,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
     /* 2. input and output table size */
     if ((graph->inputCount == 0) || (graph->outputCount == 0))
     {
-        vx_reference inputTableRef[VX_MAX_NN_INOUT_PARAM_COUNT];
-        vx_reference outputTableRef[VX_MAX_NN_INOUT_PARAM_COUNT];
-
         vxmONERROR(vxoBinaryGraph_InputsOutputs(graph, inputTableRef, &inputCount,
                                                 outputTableRef, &outputCount));
     }
@@ -10773,7 +10900,84 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
     /* 4. other sections size */
     vxmONERROR(vxoBinaryGraph_GetSectionsSize(graph, &sectionsSize));
 
-    totalSize = nbEntranceSize + nbIOSize + layeSize + sectionsSize;
+    if (0 != graph->inputCount)
+    {
+        vx_uint32 i = 0;
+        vx_size tensorSize = 0;
+        for (i = 0; i < graph->inputCount; i++)
+        {
+            vx_reference ref = graph->inputs[i];
+            tensorSize = 0;
+            if (ref->type == VX_TYPE_TENSOR)
+            {
+                vx_tensor tensor = (vx_tensor)ref;
+                vxoTensor_GetTensorWholeSize(tensor, &tensorSize);
+                inputOutputSize += (vx_uint32)tensorSize;
+            }
+        }
+    }
+    else
+    {
+        vx_uint32 i = 0;
+        vx_size tensorSize = 0;
+        for (i = 0; i < inputCount; i++)
+        {
+            vx_reference ref = inputTableRef[i];
+            tensorSize = 0;
+            if (ref->type == VX_TYPE_TENSOR)
+            {
+                vx_tensor tensor = (vx_tensor)ref;
+                vxoTensor_GetTensorWholeSize(tensor, &tensorSize);
+                inputOutputSize += (vx_uint32)tensorSize;
+            }
+        }
+    }
+
+    if (0 != graph->outputCount)
+    {
+        vx_uint32 i = 0;
+        vx_size tensorSize = 0;
+        for (i = 0; i < graph->outputCount; i++)
+        {
+            vx_reference ref = graph->outputs[i];
+            tensorSize = 0;
+            if (ref->type == VX_TYPE_TENSOR)
+            {
+                vx_tensor tensor = (vx_tensor)ref;
+                vxoTensor_GetTensorWholeSize(tensor, &tensorSize);
+                inputOutputSize += (vx_uint32)tensorSize;
+            }
+        }
+    }
+    else
+    {
+        vx_uint32 i = 0;
+        vx_size tensorSize = 0;
+        for (i = 0; i < outputCount; i++)
+        {
+            vx_reference ref = outputTableRef[i];
+            tensorSize = 0;
+            if (ref->type == VX_TYPE_TENSOR)
+            {
+                vx_tensor tensor = (vx_tensor)ref;
+                vxoTensor_GetTensorWholeSize(tensor, &tensorSize);
+                inputOutputSize += (vx_uint32)tensorSize;
+            }
+        }
+    }
+
+    if (graph->nodeCount == 1)
+    {
+        inputOutputSize = 0;
+    }
+
+    if (inputOutputSize > sectionsSize)
+    {
+        vxError("inputOutputSize: %d, sectionsSize: %d\n", inputOutputSize, sectionsSize);
+        vxmONERROR(VX_FAILURE);
+    }
+
+    totalSize = nbEntranceSize + nbIOSize + layeSize + sectionsSize - inputOutputSize;
 
     if (size != VX_NULL)
     {
