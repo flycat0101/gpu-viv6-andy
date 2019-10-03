@@ -3504,7 +3504,9 @@ VkResult halti5_computeClear(
     uint32_t blitKind = HALTI5_BLIT_NUM;
     __vkImage *pDstImg;
     uint32_t bitsPerPixel;
-    uint32_t tmpClearValue[4];
+    uint32_t tmpClearValue[4] = { 0 };
+    uint32_t bytemask[4] = { 0 };
+
 
     if (dstRes->isImage)
     {
@@ -3552,6 +3554,7 @@ VkResult halti5_computeClear(
     }
 
      __VK_MEMZERO(&params, sizeof(params));
+     params.channelWriteMask = 0xf;
 
     if (dstRes->isImage)
     {
@@ -3566,7 +3569,7 @@ VkResult halti5_computeClear(
                 partIndex,
                 &tmpClearValue[2 * partIndex],
                 VK_NULL_HANDLE,
-                VK_NULL_HANDLE));
+                &bytemask[2 * partIndex]));
         }
 
         bitsPerPixel = pDstImg->formatInfo.bitsPerBlock;
@@ -3597,7 +3600,13 @@ VkResult halti5_computeClear(
              params.uClearValue0[1] = (tmpClearValue[0] & 0x0000FF00) >> 8;
              params.uClearValue0[2] = (tmpClearValue[0] & 0x00FF0000) >> 16;
              params.uClearValue0[3] = (tmpClearValue[0] & 0xFF000000) >> 24;
-             break;
+         }
+
+         if (dstRes->u.img.subRes.aspectMask &
+             (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
+             )
+         {
+             params.channelWriteMask = bytemask[0];
          }
     }
     else
