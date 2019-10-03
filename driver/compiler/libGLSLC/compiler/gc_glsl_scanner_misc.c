@@ -745,13 +745,14 @@ slScanIdentifier(
         case T_SAMPLER2DRECT:
         case T_USAMPLER2DRECT:
         case T_ISAMPLER2DRECT:
+        case T_SAMPLER2DRECTSHADOW:
             if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NON_POWER_OF_TWO) != gcvSTATUS_TRUE)
             {
                 gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                         LineNo,
                         StringNo,
                         slvREPORT_ERROR,
-                        "sampler2DRect, isampler2DRect and usampler2DRect are unsupported in this chip."
+                        "sampler2DRect, isampler2DRect, usampler2DRect and sampler2DRectShadow are unsupported in this chip."
                         ));
                 gcmASSERT(gcvFALSE);
             }
