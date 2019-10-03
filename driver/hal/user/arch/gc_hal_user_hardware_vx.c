@@ -401,6 +401,11 @@ gceSTATUS _getCLFormatFromInternalFormat(gcsVX_IMAGE_INFO_PTR info, gctUINT32_PT
             *channelOrder = CLK_R;
             *channelDataType = CLK_UNSIGNED_INT32;
         }
+        else if((info->format == 0x2) && (info->componentCount == 2))
+        {
+            *channelOrder = CLK_Rx;
+            *channelDataType = CLK_UNSIGNED_INT32;
+        }
         else
         {
             status = gcvSTATUS_INVALID_ARGUMENT;
