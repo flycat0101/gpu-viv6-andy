@@ -8857,6 +8857,13 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyAllNodesByTarget(vx_graph graph)
 #define OVX12_VXC_LIB_NAME "libOvx12VXCBinary.so"
 #define NNGPU_LIB_NAME "libNNGPUBinary.so"
 #endif
+
+#if defined(__QNX__)
+static vx_int32 nnVxcHandleCnt = 0;
+static vx_int32 ovx12VxcHandleCnt = 0;
+static vx_int32 nnGpuHandleCnt = 0;
+#endif
+
 VX_INTERNAL_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
 {
     vx_uint32 nodeIndex;
@@ -8865,6 +8872,45 @@ VX_INTERNAL_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
     vxmASSERT(graph);
 
 #if gcdUSE_VXC_BINARY
+#if defined(__QNX__)
+    vx_context context = vxoContext_GetFromReference((vx_reference)graph);
+    if (vx_false_e == vxoBinaryGraph_HasBinaryInGraph(graph))
+    {
+        gceSTATUS status = gcvSTATUS_OK;
+        if (context->libNNVXCKernelHandle == NULL)
+        {
+            status = gcoOS_LoadLibrary(gcvNULL, NNVXC_LIB_NAME, &context->libNNVXCKernelHandle);
+            if(status != gcvSTATUS_OK) vxError("Can't open libNNVXCBinary!\n");
+            nnVxcHandleCnt++;
+        }
+        else
+        {
+            nnVxcHandleCnt++;
+        }
+
+        if (context->libOvx12VXCBinaryHandle == NULL)
+        {
+            status = gcoOS_LoadLibrary(gcvNULL, OVX12_VXC_LIB_NAME, &context->libOvx12VXCBinaryHandle);
+            if(status != gcvSTATUS_OK) vxError("Can't open libOvx12VXCBinary!\n");
+            ovx12VxcHandleCnt++;
+        }
+        else
+        {
+            ovx12VxcHandleCnt++;
+        }
+
+        if (context->libNNGPUKernelHandle == NULL)
+        {
+            status = gcoOS_LoadLibrary(gcvNULL, NNGPU_LIB_NAME, &context->libNNGPUKernelHandle);
+            if(status != gcvSTATUS_OK) vxError("Can't open libNNGPUBinary!\n");
+            nnGpuHandleCnt++;
+        }
+        else
+        {
+            nnGpuHandleCnt++;
+        }
+    }
+#else
     vx_context context = vxoContext_GetFromReference((vx_reference)graph);
     if (vx_false_e == vxoBinaryGraph_HasBinaryInGraph(graph))
     {
@@ -8878,6 +8924,7 @@ VX_INTERNAL_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
         status = gcoOS_LoadLibrary(gcvNULL, NNGPU_LIB_NAME, &context->libNNGPUKernelHandle);
         if(status != gcvSTATUS_OK) vxError("Can't open libNNGPUBinary!\n");
     }
+#endif
 #endif
 
     for (nodeIndex = 0; nodeIndex < graph->nodeCount; nodeIndex++)
@@ -8946,6 +8993,37 @@ VX_INTERNAL_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
     graph->Initilized = vx_true_e;
 
 #if gcdUSE_VXC_BINARY
+#if defined(__QNX__)
+    if(context->libNNVXCKernelHandle)
+    {
+        nnVxcHandleCnt--;
+        if (nnVxcHandleCnt == 0)
+        {
+            gcoOS_FreeLibrary(gcvNULL, context->libNNVXCKernelHandle);
+            context->libNNVXCKernelHandle = NULL;
+        }
+    }
+
+    if(context->libOvx12VXCBinaryHandle)
+    {
+        ovx12VxcHandleCnt--;
+        if (ovx12VxcHandleCnt == 0)
+        {
+            gcoOS_FreeLibrary(gcvNULL, context->libOvx12VXCBinaryHandle);
+            context->libOvx12VXCBinaryHandle = NULL;
+        }
+    }
+
+    if(context->libNNGPUKernelHandle)
+    {
+        nnGpuHandleCnt--;
+        if (nnGpuHandleCnt == 0)
+        {
+            gcoOS_FreeLibrary(gcvNULL, context->libNNGPUKernelHandle);
+            context->libNNGPUKernelHandle = NULL;
+        }
+    }
+#else
     if(context->libNNVXCKernelHandle)
         gcoOS_FreeLibrary(gcvNULL, context->libNNVXCKernelHandle);
 
@@ -8954,6 +9032,7 @@ VX_INTERNAL_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
 
     if(context->libNNGPUKernelHandle)
         gcoOS_FreeLibrary(gcvNULL, context->libNNGPUKernelHandle);
+#endif
 #endif
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
