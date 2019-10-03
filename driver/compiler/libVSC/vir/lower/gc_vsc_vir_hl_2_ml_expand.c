@@ -2008,42 +2008,35 @@ static VIR_PatternReplaceInst _loadRepInst0[] = {
     { VIR_OP_CSELECT, VIR_COP_NOT_ZERO, 0, { 1, 1, 0, 0 }, { 0, 0, _constb_true, _constb_false } },
 };
 
-static VIR_Pattern _loadPattern[] = {
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_load, 0) },
-    { VIR_PATN_FLAG_NONE }
-};
-
-/*
-** loadD pattern.
-*/
 /* Since HW can't support LOAD FP16, change it to LOAD UINT16. */
-static VIR_PatternMatchInst _loadDPatInst0[] = {
-    { VIR_OP_LOAD_D, 0, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsDstFP16 }, VIR_PATN_MATCH_FLAG_OR },
+static VIR_PatternMatchInst _loadPatInst1[] = {
+    { VIR_OP_LOAD, 0, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsDstFP16 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _loadDRepInst0[] = {
+static VIR_PatternReplaceInst _loadRepInst1[] = {
     { VIR_OP_LOAD, 0, 0, { 1, 2, 3, 0 }, { VIR_Lower_SetOpndUINT16 } },
 };
 
-static VIR_Pattern _loadDPattern[] = {
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_loadD, 0) },
+static VIR_Pattern _loadPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_load, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_load, 1) },
     { VIR_PATN_FLAG_NONE }
 };
 
 /*
-** storeD pattern.
+** store pattern.
 */
 /* Since HW can't support STORE FP16, change it to STORE UINT16. */
-static VIR_PatternMatchInst _storeDPatInst0[] = {
-    { VIR_OP_STORE_D, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsDstFP16 }, VIR_PATN_MATCH_FLAG_OR },
+static VIR_PatternMatchInst _storePatInst0[] = {
+    { VIR_OP_STORE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsDstFP16 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _storeDRepInst0[] = {
+static VIR_PatternReplaceInst _storeRepInst0[] = {
     { VIR_OP_STORE, 0, 0, {  1, 2, 3, 4 }, { VIR_Lower_SetOpndUINT16, 0, 0, VIR_Lower_SetOpndUINT16 } },
 };
 
-static VIR_Pattern _storeDPattern[] = {
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_storeD, 0) },
+static VIR_Pattern _storePattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_store, 0) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -2211,11 +2204,8 @@ _GetHL2MLPatternPhaseExpand(
     case VIR_OP_LOAD:
         return _loadPattern;
 
-    case VIR_OP_LOAD_D:
-        return _loadDPattern;
-
-    case VIR_OP_STORE_D:
-        return _storeDPattern;
+    case VIR_OP_STORE:
+        return _storePattern;
 
     case VIR_OP_TEXLD:
         return _texldPattern;

@@ -9009,14 +9009,7 @@ VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
         /* Change MOV to LOAD/STORE if needed. */
         if (useLoadToAccessBlock)
         {
-            if (VIR_TypeId_isPrimitive(dstVirTypeId) && VIR_GetTypeComponentType(dstVirTypeId) == VIR_TYPE_FLOAT16)
-            {
-                virOpcode = VIR_OP_LOAD_D;
-            }
-            else
-            {
-                virOpcode = VIR_OP_LOAD;
-            }
+            virOpcode = VIR_OP_LOAD;
         }
 
         if (SPV_ID_SYM_PER_VERTEX(spv->operands[0]))
@@ -9438,14 +9431,7 @@ VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
         /* Change MOV to LOAD/STORE if needed. */
         if (useLoadToAccessBlock)
         {
-            if (VIR_TypeId_isPrimitive(dstVirTypeId) && VIR_GetTypeComponentType(dstVirTypeId) == VIR_TYPE_FLOAT16)
-            {
-                virOpcode = VIR_OP_STORE_D;
-            }
-            else
-            {
-                virOpcode = VIR_OP_STORE;
-            }
+            virOpcode = VIR_OP_STORE;
         }
         else if(dstVirSym && SPV_ID_SYM_IS_FUNC_PARAM(spvOperand) && SPV_ID_SYM_SPV_POINTER_TYPE(spvOperand))
         {
@@ -10593,14 +10579,8 @@ VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
         }
         else
         {
-            VIR_OpCode loadOpcode = VIR_OP_LOAD;
-
-            if (VIR_TypeId_isPrimitive(virDstTypeId) && VIR_GetTypeComponentType(virDstTypeId) == VIR_TYPE_FLOAT16)
-            {
-                loadOpcode = VIR_OP_LOAD_D;
-            }
             VIR_Function_AddInstruction(spv->virFunction,
-                                        loadOpcode,
+                                        VIR_OP_LOAD,
                                         virDstTypeId,
                                         &virInst);
             /* Set DEST. */
@@ -10639,14 +10619,8 @@ VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
         /* Write the data if need. */
         if (isDstMemory || dstBlockSym)
         {
-            VIR_OpCode storeOpcode = VIR_OP_STORE;
-
-            if (VIR_TypeId_isPrimitive(virDstTypeId) && VIR_GetTypeComponentType(virDstTypeId) == VIR_TYPE_FLOAT16)
-            {
-                storeOpcode = VIR_OP_STORE_D;
-            }
             VIR_Function_AddInstruction(spv->virFunction,
-                                        storeOpcode,
+                                        VIR_OP_STORE,
                                         virDstTypeId,
                                         &virInst);
             /* Set DEST. */
@@ -10695,14 +10669,8 @@ VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
     {
         if (isDstMemory || dstBlockSym)
         {
-            VIR_OpCode storeOpcode = VIR_OP_STORE;
-
-            if (VIR_TypeId_isPrimitive(virDstTypeId) && VIR_GetTypeComponentType(virDstTypeId) == VIR_TYPE_FLOAT16)
-            {
-                storeOpcode = VIR_OP_STORE_D;
-            }
             VIR_Function_AddInstruction(spv->virFunction,
-                                        storeOpcode,
+                                        VIR_OP_STORE,
                                         virDstTypeId,
                                         &virInst);
             /* Set DEST. */

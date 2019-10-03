@@ -493,14 +493,10 @@
        src0 <- addr, src1 <- offset
            LOAD dest, src0, src1 */
     VIR_OPINFO(LOAD, 2, HasDest|Loads|Expr, 1, AL),
-    /* Same as LOAD, expect for that the instruction type is same as the dest type. */
-    VIR_OPINFO(LOAD_D, 2, HasDest|Loads|Expr, 1, HL),
     /* memory store, with pre-operation: addr[offset] = val
        src0 <- addr, src1 <- offset, val <- src2, dest used as buffer for USC constrain
             STORE  dest, src0, src1, src2 */
     VIR_OPINFO(STORE, 3, HasDest|Stores|Src2Componentwise|EPFromS2, 1, AL),
-    /* Same as STORE, expect for that the instruction type is same as the dest type. */
-    VIR_OPINFO(STORE_D, 3, HasDest|Stores|Src2Componentwise|EPFromS2, 1, HL),
     /* load address, dest = addr + offset
             LDA dest, src0, src1 */
     VIR_OPINFO(LDA, 2, HasDest|Expr, 1, NU),
