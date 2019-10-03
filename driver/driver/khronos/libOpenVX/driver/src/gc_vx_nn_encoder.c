@@ -568,24 +568,6 @@ vx_bool calcFitZdp3N(vx_context context,vx_uint32 inputX, vx_uint32 inputY, vx_u
                     *fitN = i;
                     return vx_true_e;
                 }
-                else if (poolingSize == 2 &&
-                    ((inputX * inputY) / (i * stride)) % 2 == 0 &&
-                    i % 2 == 0 &&
-                    ((inputX * inputY) / (i * stride * 2)) % 2 == 0)
-                {
-                    /* 2x2 pooling out image size should be even */
-                    *fitN = i;
-                    return vx_true_e;
-                }
-                else if (poolingSize == 3 &&
-                    ((inputX * inputY) / (i * stride)) % 2 == 0 &&
-                    i % 2 == 0 &&
-                    ((inputX * inputY) / (i * stride * 2)) % 2 == 1)
-                {
-                    /* 3x3 pooling out image size should be odd */
-                    *fitN = i;
-                    return vx_true_e;
-                }
                 else
                     continue;
             }
@@ -1453,7 +1435,7 @@ vx_bool calculateWeightBiasBufferSizeForZeroRunLenEx(
     vx_uint32 *zerosPerCoreArray = VX_NULL; /* zerosPerCoreArray[nnCoreCount][MAX_ZRL_LEN + 1 + 2] */
     vx_uint32 minSize = (vx_uint32)~0UL, maxZRL = 0, maxZRLType, bigZRL = 0, blockCount = 0, nonZeroCount = 0;
     vx_uint8  minZrl = 0;
-    vx_bool   complete;
+    vx_bool  complete = vx_false_e;
     vx_bool hasVipV7Feature = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7) == gcvSTATUS_TRUE ? vx_true_e : vx_false_e;
     vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
     vx_bool hasZDP6 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6);
@@ -1844,7 +1826,10 @@ vx_bool calculateWeightBiasBufferSizeForZeroRunLenEx(
     /* analyze compressed size with different zrl */
     maxZRL = gcmMIN(maxZRL, maxZeroRunLen);
     maxZRLType = maxZRL ? gcmMIN((vx_uint32)ceilf((vx_float32)(log(maxZRL) / log(2))), context->nnConfig.fixedFeature.zrlBits) : 0;
-    complete = (vx_float32)bigZRL / blockCount > 0.1f ? vx_false_e : vx_true_e;
+
+    if(blockCount != 0)
+        complete = (vx_float32)bigZRL / blockCount > 0.1f ? vx_false_e : vx_true_e;
+
     for (i = 0; i <= maxZRLType; i++)
     {
         vx_uint32 size = 64;
@@ -2599,7 +2584,7 @@ vx_bool calculateWeightBiasBalanceSizeForZeroRunLenEx(
     vx_uint32 *zerosPerCoreArray = VX_NULL; /* zerosPerCoreArray[nnCoreCount][MAX_ZRL_LEN + 1 + 2] */
     vx_uint32 minSize = (vx_uint32)~0UL, maxZRL = 0, maxZRLType, bigZRL = 0, blockCount = 0, nonZeroCount = 0;
     vx_uint8  minZrl = 0;
-    vx_bool   complete;
+    vx_bool  complete = vx_false_e;
     vx_bool hasVipV7Feature = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7) == gcvSTATUS_TRUE ? vx_true_e : vx_false_e;
     vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
     vx_bool hasZDP6 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6);
@@ -3159,7 +3144,10 @@ vx_bool calculateWeightBiasBalanceSizeForZeroRunLenEx(
     /* analyze compressed size with different zrl */
     maxZRL = gcmMIN(maxZRL, maxZeroRunLen);
     maxZRLType = maxZRL ? gcmMIN((vx_uint32)ceilf((vx_float32)(log(maxZRL) / log(2))), context->nnConfig.fixedFeature.zrlBits) : 0;
-    complete = (vx_float32)bigZRL / blockCount > 0.1f ? vx_false_e : vx_true_e;
+
+    if(blockCount != 0)
+        complete = (vx_float32)bigZRL / blockCount > 0.1f ? vx_false_e : vx_true_e;
+
     for (i = 0; i <= maxZRLType; i++)
     {
         vx_uint32 size = 64;
@@ -4021,7 +4009,7 @@ void reorderWeightBiasBufferForHuffman(
                     }
                 }
             }
-            if (calc_perf)
+            if (calc_perf && (blockCount != 0))
                 nonZeroRatioPerCorePerVZG[nonZrlIdx] = (vx_float64)nonZeroCount / (vx_float64)blockCount;
         }
     }
@@ -5011,7 +4999,7 @@ void reorderKernelBufferV7HuffmanBalance(
                     }
                 }
             }
-            if (calc_perf)
+            if (calc_perf && (blockCount != 0))
                 nonZeroRatioPerCorePerVZG[nonZrlIdx] = (vx_float64)nonZeroCount / (vx_float64)blockCount;
 
             usedKid += actualFilterCount;
@@ -5743,7 +5731,7 @@ vx_uint32 calcKernelStreamSizeHuffman(
         vx_uint32 dataSizeOfCore = reorderStreamPerCoreCount[coreIndex];
         vx_uint32 dataRemainingOfCore = dataSizeOfCore;
         vx_int32 size = 0;
-        vx_int32 code = 0;
+        //vx_int32 code = 0;
         vx_int32 coef16 = 0;
         vx_int32 k = 0, j = 0, m = 0;
         vx_bool isCoef;
@@ -5824,10 +5812,6 @@ vx_uint32 calcKernelStreamSizeHuffman(
                         break;
                 }
                 k = invSizeOrder[size];
-                code = huffCode[k];
-
-                if (sizeCodeLen[k]%2 == 0)/*huffCode length = 2 or 4, pack 1 bit to 3 or 5*/
-                    code |= ((coef>>7)<<(sizeCodeLen[k]) );
                 kernelBitSize += 3;
 
                 if (sizeCodeLen[k] > 3)
@@ -5974,8 +5958,6 @@ vx_uint32 calcKernelStreamSizeHuffman(
                         in ZRL path 8-bit, 0 belong to group7, -128~127, residue bit length is 8, residue code = 0*/
                         size = 7;
                         j = invSizeOrder[size];
-                        code = huffCode[j];
-
                         kernelBitSize += 3;
 
                         if (sizeCodeLen[j] > 3)
@@ -8030,7 +8012,7 @@ vx_uint32 calcKernelSizeV8Huffman(
         vx_uint32 dataSizeOfCore = reorderStreamPerCoreCount[coreIndex];
         vx_uint32 dataRemainingOfCore = dataSizeOfCore;
         vx_int32 size = 0;
-        vx_int32 code = 0;
+        //vx_int32 code = 0;
         vx_int32 coef16 = 0;
         vx_int32 k = 0, j = 0, m = 0;
         vx_bool isCoef;
@@ -8112,10 +8094,6 @@ vx_uint32 calcKernelSizeV8Huffman(
                         break;
                 }
                 k = invSizeOrder[size];
-                code = huffCode[k];
-
-                if (sizeCodeLen[k]%2 == 0)/*huffCode length = 2 or 4, pack 1 bit to 3 or 5*/
-                    code |= ((coef>>7)<<(sizeCodeLen[k]) );
                 kernelBitSize += 3;
 
                 if (sizeCodeLen[k] > 3)
@@ -8262,8 +8240,6 @@ vx_uint32 calcKernelSizeV8Huffman(
                         in ZRL path 8-bit, 0 belong to group7, -128~127, residue bit length is 8, residue code = 0*/
                         size = 7;
                         j = invSizeOrder[size];
-                        code = huffCode[j];
-
                         kernelBitSize += 3;
 
                         if (sizeCodeLen[j] > 3)
@@ -8473,6 +8449,12 @@ void fillinKernelBufferV8Huffman(
         alphaFP = alpha->fixedPointPos;
         alphaFormat = (vx_type_e)alpha->tensorBuffer->dataFormat;
         alphaQuantFormat = alpha->quantFormat;
+    }
+
+    if (weightBitSize == 0)
+    {
+        vxError("%s: weightBitSize should not be zero.", __FUNCTION__);
+        goto exit;
     }
 
     if (weight_format == VX_TYPE_INT16 || weight_format == VX_TYPE_UINT8)
@@ -8749,6 +8731,7 @@ void fillinKernelBufferV8Huffman(
                     in nonZRL path 8-bit, 0 belong to group0, -1~0, residue bit length is 1, residue code = 0*/
                     size = 0;
                     k = invSizeOrder[size];
+
                     code = huffCode[k];
 
                     dummyStage[0] = code & 0x07;
@@ -11115,7 +11098,7 @@ void calcTPKernelBufferSizeHuffman(
         vx_uint32 dataSizeOfCore = filterCount;
         vx_uint32 dataRemainingOfCore = dataSizeOfCore;
         vx_int32 size = 0;
-        vx_int32 code = 0;
+        //vx_int32 code = 0;
         vx_int32 coef16 = 0;
         vx_int32 k = 0, j = 0, m = 0;
 
@@ -11183,10 +11166,6 @@ void calcTPKernelBufferSizeHuffman(
                         break;
                 }
                 k = invSizeOrder[size];
-                code = huffCode[k];
-
-                if (sizeCodeLen[k]%2 == 0)/*huffCode length = 2 or 4, pack 1 bit to 3 or 5*/
-                    code |= ((coef>>7)<<(sizeCodeLen[k]) );
                 kernelBitSize += 3;
 
                 if (sizeCodeLen[k] > 3)
@@ -12129,7 +12108,7 @@ vx_float32 calculateWeightNonZeroRatio(
     vx_uint8* kernelDataPtr      = VX_NULL;
 
     vx_uint32 blockCount = 0, nonZeroCount = 0;
-    vx_float32 nonZeroRatio;
+    vx_float32 nonZeroRatio = 0;
 
     vx_uint32 filterIndex, sliceIndex;
     vx_uint32 weightXIndex, weightYIndex;
@@ -12319,7 +12298,8 @@ vx_float32 calculateWeightNonZeroRatio(
         return 0;
     }
 
-    nonZeroRatio = (vx_float32)nonZeroCount / (vx_float32)blockCount;
+    if(blockCount != 0)
+        nonZeroRatio = (vx_float32)nonZeroCount / (vx_float32)blockCount;
 
     return nonZeroRatio;
 }
@@ -13180,7 +13160,8 @@ void fillinKernelBuffer(
                     }
                 }
             }
-            nonZeroRatioPerCorePerVZG[nonZrlIdx] = (vx_float64)nonZeroCount / (vx_float64)blockCount;
+            if(blockCount != 0)
+                nonZeroRatioPerCorePerVZG[nonZrlIdx] = (vx_float64)nonZeroCount / (vx_float64)blockCount;
 
         }
 
@@ -14418,7 +14399,8 @@ void fillinKernelBufferBalance(
                     }
                 }
             }
-            nonZeroRatioPerCorePerVZG[nonZrlIdx] = (vx_float64)nonZeroCount / (vx_float64)blockCount;
+            if(blockCount != 0)
+                nonZeroRatioPerCorePerVZG[nonZrlIdx] = (vx_float64)nonZeroCount / (vx_float64)blockCount;
 
             usedKid += actualFilterCount;
             if (filterGroup)
@@ -14899,12 +14881,9 @@ vx_weights_biases_parameter_base vxoWeightsBiasesBase_Create(
     }
 
     if (outputs_dims != VX_NULL && pooling_outputs_dims != VX_NULL)
-    {
-        if (pooling_outputs_dims != VX_NULL)
-            wb_base->pooling_stride = outputs_dims[0] / pooling_outputs_dims[0];
-        else
-            wb_base->pooling_stride = 1;
-    }
+        wb_base->pooling_stride = outputs_dims[0] / pooling_outputs_dims[0];
+    else
+        wb_base->pooling_stride = 1;
 
     wb_base->memory_pad = 64;
 

@@ -754,14 +754,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
                 case 0:
                     dataUnitByte = 64;
                     break;
-                case 1:
-                    dataUnitByte = 128;
-                    break;
-                case 2:
-                    dataUnitByte = 256;
-                    break;
-                case 3:
-                    dataUnitByte = 512;
+                default:
+                    dataUnitByte = 64;
                     break;
             }
 

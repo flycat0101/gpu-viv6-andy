@@ -367,7 +367,7 @@ vx_float32 Uint8toFp32(vx_uint8 val, vx_int32 zeroPoint, vx_float32 scale)
     return result;
 }
 
-vx_int8 Fp32toUchar(vx_float32 val, vx_uint8 fixedPointPos, vx_int32 roundMode)
+vx_int8 Fp32toUchar(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode)
 {
     vx_uint8 result = 0;
 
@@ -1403,8 +1403,9 @@ void replaceBits(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 data, vx_uin
     if ((vx_int32)data >= (1LL << dataBits))
     {
         vxError("ERROR: data overflow: dataBits = 0x%08x, data = 0x%08x\n", dataBits, data);
+        gcmASSERT((vx_int32)data < (1LL << dataBits));
+        return;
     }
-    gcmASSERT((vx_int32)data < (1LL << dataBits));
 
     // Clear upper bits.
     if (dataBits < 32)
@@ -1825,11 +1826,14 @@ void ReplaceOperationCmmdZdpOpt(
 
     /* Need reshape input[x, y, kz] --> [x*y/fitN, fitN, kz] */
     /* Need reshape output[x, y, vz] --> [x*y/fitN, fitN, vz] */
-    inputInfo->width = inputInfo->width * inputInfo->height / fitN;
-    inputInfo->height = fitN;
+    if(fitN != 0)
+    {
+        inputInfo->width = inputInfo->width * inputInfo->height / fitN;
+        inputInfo->height = fitN;
 
-    outputInfo->width = outputInfo->width * outputInfo->height / fitN;
-    outputInfo->height = fitN;
+        outputInfo->width = outputInfo->width * outputInfo->height / fitN;
+        outputInfo->height = fitN;
+    }
 
     inputInfo->yStride        = inputSize * inputInfo->width;
     outputInfo->yStride       = outputSize * outputInfo->width;
@@ -3695,8 +3699,8 @@ vx_status vxnnePoolingAvg(
                             count ++;
                         }
                     }
-
-                    vxnneSaveDataExt(dstFormat, dstQuantFormat, pool_index, sum/count, data_d, dstFixPointPos, outputZP, outputScale, dstRoundingMode);
+                    if(count != 0)
+                        vxnneSaveDataExt(dstFormat, dstQuantFormat, pool_index, sum/count, data_d, dstFixPointPos, outputZP, outputScale, dstRoundingMode);
                 }
 
             }
@@ -4538,7 +4542,7 @@ vx_status vxnneOperation_NodeDump(
     static vx_uint32 layerNum = 0;
     vx_uint32 elementCount = 0;
     vx_uint32 index;
-    vx_bool isDumpOperation = vx_false_e;
+    vx_bool isDumpOperation = vx_true_e;
     size_t len = 0;
 
     for (i = 0; i < opCommand->operation->outputsNum; i++)
@@ -4668,11 +4672,11 @@ vx_bool vxnneIsNNSupportFormat(
         return vx_false_e;
     }
 
-    inputFormat = (inputTensor != NULL) ? TENSOR_DATA_TYPE(inputTensor) : 0;
+    inputFormat = TENSOR_DATA_TYPE(inputTensor);
     wbFormat = (wb != NULL) ? WB_WEIGHT_DATA_FORMAT(wb) : 0;
     outputFormat = (outputTensor != NULL) ? TENSOR_DATA_TYPE(outputTensor) : 0;
 
-    inputQuantFormat = (inputTensor != NULL) ? TENSOR_QUANT_TYPE(inputTensor) : 0;
+    inputQuantFormat = TENSOR_QUANT_TYPE(inputTensor);
     wbQuantFormat = (wb != NULL) ? WB_WEIGHT_QUANT_FORMAT(wb) : 0;
     outputQuantFormat = (outputTensor != NULL) ? TENSOR_QUANT_TYPE(outputTensor) : 0;
 
