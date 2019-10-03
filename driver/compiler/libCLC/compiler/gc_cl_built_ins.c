@@ -5138,7 +5138,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"isgreaterequal",  gcvTRUE,        gcvFALSE,        gcvNULL, _GenGreaterThanEqualCode},
     {"isless",          gcvTRUE,        gcvFALSE,        gcvNULL, _GenLessThanCode},
     {"islessequal",     gcvTRUE,        gcvFALSE,        gcvNULL, _GenLessThanEqualCode},
-    {"islessgreater",   gcvTRUE,        gcvFALSE,        gcvNULL, _GenLessGreaterCode},
+    {"islessgreater",   gcvTRUE,        gcvTRUE,        gcvNULL, _GenLessGreaterCode},
     {"isordered",       gcvTRUE,        gcvTRUE,        gcvNULL, _GenOrderedCode},
     {"isunordered",     gcvTRUE,        gcvTRUE,        gcvNULL, _GenUnOrderedCode},
     {"isfinite",        gcvTRUE,        gcvTRUE,        gcvNULL, _GenFiniteCode},
