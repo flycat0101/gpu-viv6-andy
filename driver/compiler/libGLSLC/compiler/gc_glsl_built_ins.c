@@ -3723,14 +3723,9 @@ _GenTextureCode(
         break;
 
     case slvTYPE_SAMPLER2DSHADOW:
-        genCode = _GenTextureShadowCode;
-        break;
-
     case slvTYPE_SAMPLERCUBESHADOW:
-        genCode = _GenTextureShadowCode;
-        break;
-
     case slvTYPE_SAMPLERCUBEARRAYSHADOW:
+    case slvTYPE_SAMPLER1DSHADOW:
         genCode = _GenTextureShadowCode;
         break;
 
@@ -3828,6 +3823,7 @@ _GenTextureLodCode(
         break;
 
     case slvTYPE_SAMPLER2DSHADOW:
+    case slvTYPE_SAMPLER1DSHADOW:
         genCode = _GenTextureShadowLodCode;
         break;
 
@@ -3958,6 +3954,7 @@ _GenTextureProjLodCode(
         break;
 
     case slvTYPE_SAMPLER2DSHADOW:
+    case slvTYPE_SAMPLER1DSHADOW:
         genCode = _GenTextureShadowProjLodCode;
         break;
 
@@ -4015,6 +4012,7 @@ _GetSamplerCoordComponentCount(
     case slvTYPE_SAMPLER1D:
     case slvTYPE_ISAMPLER1D:
     case slvTYPE_USAMPLER1D:
+    case slvTYPE_SAMPLER1DSHADOW:
         return 1;
 
     case slvTYPE_SAMPLER3D:
@@ -5495,7 +5493,10 @@ _ComputeOffsetCoords(
     {
         sizeComponents++;
     }
-    sizeElementType = gcGetVectorComponentDataType(Offset->dataType);
+    if (numCoordComponents > 1)
+        sizeElementType = gcGetVectorComponentDataType(Offset->dataType);
+    else
+        sizeElementType = Offset->dataType;
     dataType = gcConvScalarToVectorDataType(sizeElementType, sizeComponents);
     slsIOPERAND_New(Compiler,
                     intermIOperand,
