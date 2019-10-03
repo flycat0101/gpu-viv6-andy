@@ -23,9 +23,6 @@
 #include "vir/lower/gc_vsc_vir_hl_2_ml.h"
 #include "vir/lower/gc_vsc_vir_lower_common_func.h"
 
-/* treat half as float in OCL until either VIR or HW has full support of HALF data type */
-#define _GC_OCL_TREAT_HALF_AS_FLOAT   1
-
 #define OPCODE_TEXBIAS      (VIR_OP_TEXLD)
 #define OPCODE_TEXBIAS_U    (VIR_OP_TEXLD)
 #define EXTERN_TEXBIAS      (1)
@@ -484,7 +481,7 @@ _ResolveNameClash(
     );
 
 #define _gcmTreatHalfAsFloat(Shader) \
-    (_GC_OCL_TREAT_HALF_AS_FLOAT && VIR_Shader_IsCL(Shader) && !VIR_Shader_HasVivVxExtension(Shader))
+    (gcmOPT_oclTreatHalfAsFloat() && VIR_Shader_IsCL(Shader) && !VIR_Shader_HasVivVxExtension(Shader))
 
 static VIR_TypeId
 _ConvScalarFormatToVirVectorTypeId(
