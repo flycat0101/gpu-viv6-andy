@@ -2886,7 +2886,7 @@ gcoBUFFER_Capture(
          */
         if (dropCommandEnabled)
         {
-            gcoHAL_Commit(Buffer->hal, gcvTRUE);
+            status = gcoHAL_Commit(Buffer->hal, gcvTRUE);
         }
         Buffer->captureEnabled = gcvTRUE;
         Buffer->captureBuffer = CaptureBuffer;
