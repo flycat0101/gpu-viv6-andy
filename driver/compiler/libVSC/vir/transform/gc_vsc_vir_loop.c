@@ -1678,7 +1678,7 @@ _VIR_LoopInfo_CollectDefs(
                     VIR_LoopInfo_AddFlag(loopInfo, VIR_LoopInfo_Flags_HasStore);
                 }
             }
-            if(opcode == VIR_OP_ATTR_ST)
+            if(opcode == VIR_OP_ATTR_ST || opcode == VIR_OP_STARR)
             {
                 VIR_Operand* dest = VIR_Inst_GetDest(inst);
                 VIR_Symbol* destSym = VIR_Operand_GetSymbol(dest);
