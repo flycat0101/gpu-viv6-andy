@@ -823,7 +823,14 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     }
 
     envctrl = gcvNULL;
-    context->options.enableZdpOpt = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_TRANSPOSE) ? 0 : 1;
+    context->options.enableNNTranspose = 1;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NN_TRANSPOSE", &envctrl)) && envctrl)
+    {
+        context->options.enableNNTranspose = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
+    context->options.enableZdpOpt = vxoContext_IsFeatureAvailable(context,VX_NN_FEATURE_NN_TRANSPOSE) ? 0 : 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_ZDP_OPT", &envctrl)) && envctrl)
     {
         context->options.enableZdpOpt = atoi(envctrl);
@@ -3000,6 +3007,10 @@ VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_
         /*if feature ready, add it*/
     case VX_TP_FEATURE_FP32_BIAS:
         return vx_false_e;
+
+    case VX_NN_FEATURE_NN_TRANSPOSE:
+        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_TRANSPOSE)
+             && context->options.enableNNTranspose ) ? vx_true_e : vx_false_e;
 
     default:
         return vx_false_e;

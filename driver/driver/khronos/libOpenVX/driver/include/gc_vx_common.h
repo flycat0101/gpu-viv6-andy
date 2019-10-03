@@ -2026,6 +2026,7 @@ typedef enum _vx_nn_feature_e
     VX_NN_FEATURE_SHADER,
     VX_NN_TP_PARALLEL,
     VX_TP_FEATURE_FP32_BIAS,
+    VX_NN_FEATURE_NN_TRANSPOSE,
     VX_NN_FEATURE_COUNT,
 }
 vx_nn_feature_e;

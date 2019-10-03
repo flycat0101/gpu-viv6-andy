@@ -9737,7 +9737,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyNNTranspose(vx_graph graph)
     vx_context context = graph->base.context;
     vx_status status = VX_SUCCESS;
 
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_TRANSPOSE))
+    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_NN_TRANSPOSE))
     {
         for (index = 0; index < graph->layer->base.num_operations; index++)
         {
