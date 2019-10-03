@@ -123,6 +123,7 @@ CFLAGS += \
 LDFLAGS := \
     $(LFLAGS) \
     -shared \
+    -pthread \
     -Wl,-z,defs \
     -Wl,-soname,$(TARGET_SONAME) \
     -Wl,--version-script=$(CURDIR)/libVulkan.map

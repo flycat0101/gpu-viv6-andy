@@ -41,6 +41,70 @@ typedef struct __vkWaylandSwapchainKHRRec   __vkWaylandSwapchainKHR;
 typedef struct __vkWaylandImageBufferRec    __vkWaylandImageBuffer;
 static VkExtent2D VIV_EXTENT = (VkExtent2D){-1, -1};
 
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
+static pthread_once_t __once_control = PTHREAD_ONCE_INIT;
+static pthread_mutex_t __vk_surface_swapchain_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+struct __vkSurfaceSwapchain
+{
+    struct wl_surface *surface;
+    struct wl_list link;
+    struct zwp_linux_surface_synchronization_v1 *surface_sync;
+    int ref_count;
+};
+
+static struct wl_list __vk_surface_list;
+
+static void __vkSurfaceInit(void)
+{
+    wl_list_init(&__vk_surface_list);
+}
+
+static struct __vkSurfaceSwapchain* __vkQuerySurface(struct wl_surface *surface)
+{
+    struct __vkSurfaceSwapchain *_vk_surface;
+    struct __vkSurfaceSwapchain *ret = NULL;
+
+    pthread_once(&__once_control, __vkSurfaceInit);
+
+    pthread_mutex_lock(&__vk_surface_swapchain_mutex);
+    wl_list_for_each(_vk_surface, &__vk_surface_list, link)
+    {
+        if (_vk_surface->surface == surface)
+        {
+            ret = _vk_surface;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&__vk_surface_swapchain_mutex);
+
+    return ret;
+}
+
+static void __vkRemoveSurface(struct wl_surface *surface)
+{
+    struct __vkSurfaceSwapchain *_vk_surface;
+    struct __vkSurfaceSwapchain *_target_surface = NULL;
+
+    pthread_mutex_lock(&__vk_surface_swapchain_mutex);
+    wl_list_for_each(_vk_surface, &__vk_surface_list, link)
+    {
+        if (_vk_surface->surface == surface)
+        {
+            _target_surface = _vk_surface;
+            break;
+        }
+    }
+
+    if(_target_surface)
+    {
+        wl_list_remove(&_target_surface->link);
+        free(_target_surface);
+    }
+    pthread_mutex_unlock(&__vk_surface_swapchain_mutex);
+}
+#endif
+
 /*
  * A VkSwapchainKHR object (a.k.a. swapchain) provides the ability to present
  * rendering results to a surface. A swapchain is an abstraction for an array
@@ -814,14 +878,27 @@ static void __DestroySwapchain(
     }
 
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
-    if (sc->surface_sync)
-    {
-        zwp_linux_surface_synchronization_v1_destroy(sc->surface_sync);
-        sc->surface_sync = gcvNULL;
-    }
     if(sc->explicit_sync) {
         zwp_linux_explicit_synchronization_v1_destroy(sc->explicit_sync);
         sc->explicit_sync = gcvNULL;
+    }
+
+    if(sc->surface)
+    {
+        VkIcdSurfaceWayland *surf = sc->surface;
+        struct __vkSurfaceSwapchain *tmp = __vkQuerySurface(surf->surface);
+        if(tmp)
+        {
+            --tmp->ref_count;
+            if(tmp->ref_count == 0){
+                __vkRemoveSurface(sc->surface->surface);
+                if (sc->surface_sync)
+                {
+                    zwp_linux_surface_synchronization_v1_destroy(sc->surface_sync);
+                    sc->surface_sync = gcvNULL;
+                }
+            }
+        }
     }
 #endif
 
@@ -1161,7 +1238,6 @@ registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
     __vkWaylandSwapchainKHR *sc = data;
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
     char *p;
-    gcePATCH_ID patchId = gcvPATCH_INVALID;
 #endif
 
     if (strcmp(interface, "wl_viv") == 0)
@@ -1180,15 +1256,11 @@ registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
         p = getenv("WL_EGL_CLIENT_FENCE");
         if((p == gcvNULL) || (p[0] != '0'))
         {
-            gcoHAL_GetPatchID(gcvNULL, &patchId);
-            if (patchId != gcvPATCH_DEQP_VK )
-            {
-                sc->use_explicit_sync = 1;
-                sc->explicit_sync = wl_registry_bind(
-                    registry, name,
-                    &zwp_linux_explicit_synchronization_v1_interface, 1);
-                wl_proxy_set_queue((struct wl_proxy *)sc->explicit_sync, sc->wl_queue);
-            }
+            sc->use_explicit_sync = 1;
+            sc->explicit_sync = wl_registry_bind(
+                registry, name,
+                &zwp_linux_explicit_synchronization_v1_interface, 1);
+            wl_proxy_set_queue((struct wl_proxy *)sc->explicit_sync, sc->wl_queue);
         }
     }
 #endif
@@ -1311,13 +1383,29 @@ static VkResult waylandCreateSwapchain(
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
     if(sc->use_explicit_sync == 1)
     {
-        sc->surface_sync =
-            zwp_linux_explicit_synchronization_v1_get_synchronization(
-                  sc->explicit_sync, surf->surface);
-        if (!sc->surface_sync)
+        struct __vkSurfaceSwapchain *tmp = __vkQuerySurface(surf->surface);
+        if(!tmp)
         {
-            gcmPRINT("zwp_linux_explicit_synchronization_v1_get_synchronization failed");
-            goto OnError;
+            struct __vkSurfaceSwapchain *surface_swap = (struct __vkSurfaceSwapchain *)malloc(sizeof(struct __vkSurfaceSwapchain));
+            surface_swap->surface = surf->surface;
+            surface_swap->ref_count = 1;
+            sc->surface_sync =
+                zwp_linux_explicit_synchronization_v1_get_synchronization(
+                      sc->explicit_sync, surf->surface);
+            surface_swap->surface_sync = sc->surface_sync;
+            pthread_mutex_lock(&__vk_surface_swapchain_mutex);
+            wl_list_insert(&__vk_surface_list, &surface_swap->link);
+            pthread_mutex_unlock(&__vk_surface_swapchain_mutex);
+            if (!sc->surface_sync)
+            {
+                gcmPRINT("zwp_linux_explicit_synchronization_v1_get_synchronization failed");
+                goto OnError;
+            }
+        }
+        else
+        {
+            tmp->ref_count++;
+            sc->surface_sync = tmp->surface_sync;
         }
     }
 #endif
