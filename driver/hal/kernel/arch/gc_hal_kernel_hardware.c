@@ -17439,7 +17439,11 @@ gckHARDWARE_QueryFrequency(
     mcStart = shStart = 0;
     mcClk   = shClk   = 0;
 
-    gckOS_QueryOption(Hardware->os, "powerManagement", &powerManagement);
+    status = gckOS_QueryOption(Hardware->os, "powerManagement", &powerManagement);
+    if (gcmIS_ERROR(status))
+    {
+        powerManagement = 0;
+    }
 
     if (powerManagement)
     {
