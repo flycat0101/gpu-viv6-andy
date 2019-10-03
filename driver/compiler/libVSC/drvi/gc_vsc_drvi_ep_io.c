@@ -1651,6 +1651,8 @@ _vscEP_Buffer_SaveVKUniformTexelBufferEntry(
         }
     }
 
+    VSC_IO_writeUint(pIoBuf, (gctUINT)pUniformTexelBufferEntry->imageFormat);
+
     if (pUniformTexelBufferEntry->utbBinding.arraySize != 0)
     {
         VSC_IO_writeBlock(pIoBuf,
@@ -4589,6 +4591,8 @@ _vscEP_Buffer_LoadVKUniformTexelBufferEntry(
             }
         }
     }
+
+    VSC_IO_readUint(pIoBuf, (gctUINT *)&pUniformTexelBufferEntry->imageFormat);
 
     if (pUniformTexelBufferEntry->utbBinding.arraySize != 0)
     {

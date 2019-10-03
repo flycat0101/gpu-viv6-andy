@@ -763,10 +763,14 @@ typedef struct PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY
     /* Is this entry really used by shader */
     gctUINT                                     activeStageMask;
 
+    /*----------------------------------Sampler-related----------------------------------*/
     /* For texel buffer, it might need a texture-size attached. As each texel buffer in
        utbBinding::arraySize array has texture-size, so this is the first entry
        of texture-size array. */
     SHADER_PRIV_CONSTANT_ENTRY*                 pTextureSize[VSC_MAX_SHADER_STAGE_COUNT][2];
+
+    /*----------------------------------Image-related----------------------------------*/
+    VSC_IMAGE_FORMAT                            imageFormat;
 
     /* Which kinds of inst operation acting on texture. The count of this
        resOpBit is same as utbBinding::arraySize */

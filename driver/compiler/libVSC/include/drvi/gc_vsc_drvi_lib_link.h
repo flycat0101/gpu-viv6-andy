@@ -62,6 +62,9 @@ typedef enum _VSC_LIB_LINK_TYPE
      * the function for given <image, sampler> pair for read,
      * image for write */
     VSC_LIB_LINK_TYPE_IMAGE_READ_WRITE              = 5,
+
+    /* Image format. */
+    VSC_LIB_LINK_TYPE_IMAGE_FORMAT                  = 6,
 }VSC_LIB_LINK_TYPE;
 
 typedef enum _VSC_RES_OP_BIT
@@ -147,6 +150,14 @@ typedef struct _VSC_LIB_LINK_IMAGE_READ_WRITE
     VSC_SAMPLER_INFO *              samplerInfo;
 } VSC_LIB_LINK_IMAGE_READ_WRITE;
 
+typedef struct _VSC_LIB_LINK_IMAGE_FORMAT
+{
+    gctUINT                         set;
+    gctUINT                         binding;
+    gctUINT                         arraySize;
+    VSC_IMAGE_FORMAT                imageFormat;
+} VSC_LIB_LINK_IMAGE_FORMAT;
+
 typedef struct _VSC_LIB_LINK_POINT
 {
     VSC_LIB_LINK_TYPE                 libLinkType;
@@ -164,6 +175,7 @@ typedef struct _VSC_LIB_LINK_POINT
         VSC_LIB_LINK_POINT_CLR_OUTPUT clrOutput;
         VSC_LIB_LINK_POINT_RESOURCE   resource;
         VSC_LIB_LINK_IMAGE_READ_WRITE imageReadWrite;
+        VSC_LIB_LINK_IMAGE_FORMAT     imageFormat;
     } u;
 }VSC_LIB_LINK_POINT;
 

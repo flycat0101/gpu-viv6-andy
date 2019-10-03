@@ -2071,20 +2071,6 @@ _ConvDepthImageTypeToNonDepthImageType(
     return fixedTypeId;
 }
 
-VIR_NameId
-VIR_Shader_GetImageRelatedLibFuncName(
-    VIR_Shader      *pShader,
-    VSC_HW_CONFIG   *pHwCfg,
-    VIR_Instruction *pInst,
-    VIR_Symbol      *pImageSym,
-    VIR_TypeId       TypeId,
-    gctSTRING       *pLibName
-    )
-{
-    VIR_NameId nameId = VIR_INVALID_ID;
-    return nameId;
-}
-
 static void
 _IntrisicImageRelatedFuncName(
     VIR_Shader      *pShader,
@@ -6806,7 +6792,7 @@ OnError:
 }
 
 VSC_ErrCode
-VIR_Shader_ReverseFacingValue(
+VIR_Lib_ReverseFacingValue(
     IN OUT VIR_Shader               *pShader
     )
 {
@@ -6897,7 +6883,7 @@ VIR_Shader_ReverseFacingValue(
 }
 
 VSC_ErrCode
-VIR_Shader_FacingValueAlwaysFront(
+VIR_Lib_FacingValueAlwaysFront(
     IN OUT VIR_Shader               *pShader
     )
 {
@@ -6935,6 +6921,53 @@ VIR_Shader_FacingValueAlwaysFront(
                     VIR_Operand_SetImmediateBoolean(pOpnd, gcvTRUE);
                 }
             }
+        }
+    }
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_Lib_UpdateImageFormat(
+    IN VSC_LIB_LINK_IMAGE_FORMAT*   pImageFormatInfo,
+    IN OUT VIR_Shader*              pShader
+    )
+{
+    VSC_ErrCode                     errCode = VSC_ERR_NONE;
+    gctUINT                         virUniformIdx;
+    gctUINT                         resArraySize;
+    VIR_Symbol*                     pVirUniformSym;
+    VIR_Uniform*                    pVirUniform;
+    VIR_UniformIdList*              pVirUniformLsts = VIR_Shader_GetUniforms(pShader);
+    VIR_Type*                       pVirUniformSymType;
+    VIR_ImageFormat                 imageFormat = (VIR_ImageFormat)pImageFormatInfo->imageFormat;
+
+    for (virUniformIdx = 0; virUniformIdx < VIR_IdList_Count(pVirUniformLsts); virUniformIdx ++)
+    {
+        pVirUniformSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirUniformLsts, virUniformIdx));
+        pVirUniform = VIR_Symbol_GetUniformPointer(pShader, pVirUniformSym);
+
+        if (pVirUniform == gcvNULL)
+        {
+            continue;
+        }
+
+        resArraySize = 1;
+        pVirUniformSymType = VIR_Symbol_GetType(pVirUniformSym);
+        while (VIR_Type_isArray(pVirUniformSymType))
+        {
+            resArraySize *= VIR_Type_GetArrayLength(pVirUniformSymType);
+            pVirUniformSymType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pVirUniformSymType));
+        }
+
+        if (VIR_Symbol_GetDescriptorSet(pVirUniformSym) == pImageFormatInfo->set &&
+            VIR_Symbol_GetBinding(pVirUniformSym) == pImageFormatInfo->binding &&
+            resArraySize == pImageFormatInfo->arraySize)
+        {
+            gcmASSERT(VIR_Symbol_GetImageFormat(pVirUniformSym) != imageFormat);
+
+            VIR_Symbol_SetImageFormat(pVirUniformSym, imageFormat);
+            break;
         }
     }
 
@@ -7119,17 +7152,21 @@ VIR_LinkLibLibrary(
                         _InsertCallTexldFmt);
                 break;
 
+            /* Below LIB_LINK_TYPE don't need to link the lib functions. */
             case VSC_LIB_LINK_TYPE_FRONTFACING_CCW:
-                errCode = VIR_Shader_ReverseFacingValue(pShader);
+                errCode = VIR_Lib_ReverseFacingValue(pShader);
                 ON_ERROR(errCode, "VIR_LinkLibLibrary: FRONTFACING_CCW");
                 continue;
-                break;
 
             case VSC_LIB_LINK_TYPE_FRONTFACING_ALWAY_FRONT:
-                errCode = VIR_Shader_FacingValueAlwaysFront(pShader);
-                ON_ERROR(errCode, "VIR_LinkLibLibrary: FRONTFACING_CCW");
+                errCode = VIR_Lib_FacingValueAlwaysFront(pShader);
+                ON_ERROR(errCode, "VIR_LinkLibLibrary: FRONTFACING_ALWAY_FRONT");
                 continue;
-                break;
+
+            case VSC_LIB_LINK_TYPE_IMAGE_FORMAT:
+                errCode = VIR_Lib_UpdateImageFormat(&linkPoint->u.imageFormat, pShader);
+                ON_ERROR(errCode, "VIR_LinkLibLibrary: set image format");
+                continue;
 
             default:
                 gcmASSERT(gcvFALSE);

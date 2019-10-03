@@ -3570,14 +3570,12 @@ static void _SetResOpBits(VIR_Shader* pShader,
             continue;
         }
 
+        resArraySize = 1;
         pVirUniformSymType = VIR_Symbol_GetType(pVirUniformSym);
-        if (VIR_Type_GetKind(pVirUniformSymType) == VIR_TY_ARRAY)
+        while (VIR_Type_isArray(pVirUniformSymType))
         {
-            resArraySize = VIR_Type_GetArrayLength(pVirUniformSymType);
-        }
-        else
-        {
-            resArraySize = 1;
+            resArraySize *= VIR_Type_GetArrayLength(pVirUniformSymType);
+            pVirUniformSymType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pVirUniformSymType));
         }
 
         if (VIR_Symbol_GetDescriptorSet(pVirUniformSym) == pResBinding->set &&
@@ -3595,6 +3593,65 @@ static void _SetResOpBits(VIR_Shader* pShader,
     {
         *ppResOpBits = pResOpBits;
     }
+}
+
+static VSC_IMAGE_FORMAT _GetImageFormat(VIR_Shader* pShader,
+                                        VSC_SHADER_RESOURCE_BINDING* pResBinding)
+{
+    gctUINT                                   virUniformIdx;
+    gctUINT                                   resArraySize;
+    VIR_Symbol*                               pVirUniformSym;
+    VIR_Uniform*                              pVirUniform;
+    VIR_UniformIdList*                        pVirUniformLsts = VIR_Shader_GetUniforms(pShader);
+    VIR_Type*                                 pVirUniformSymType;
+    VSC_IMAGE_FORMAT                          imageFormat = VSC_IMAGE_FORMAT_NONE;
+
+    for (virUniformIdx = 0; virUniformIdx < VIR_IdList_Count(pVirUniformLsts); virUniformIdx ++)
+    {
+        pVirUniformSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirUniformLsts, virUniformIdx));
+        pVirUniform = VIR_Symbol_GetUniformPointer(pShader, pVirUniformSym);
+
+        if (pVirUniform == gcvNULL)
+        {
+            continue;
+        }
+
+        resArraySize = 1;
+        pVirUniformSymType = VIR_Symbol_GetType(pVirUniformSym);
+        while (VIR_Type_isArray(pVirUniformSymType))
+        {
+            resArraySize *= VIR_Type_GetArrayLength(pVirUniformSymType);
+            pVirUniformSymType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pVirUniformSymType));
+        }
+
+        if (VIR_Symbol_GetDescriptorSet(pVirUniformSym) == pResBinding->set &&
+            VIR_Symbol_GetBinding(pVirUniformSym) == pResBinding->binding &&
+            resArraySize == pResBinding->arraySize)
+        {
+            imageFormat = (VSC_IMAGE_FORMAT)VIR_Symbol_GetImageFormat(pVirUniformSym);
+
+            /* If there is no image format information in shader, compiler uses 16bit as the default value. */
+            if (imageFormat == VSC_IMAGE_FORMAT_NONE)
+            {
+                if (VIR_TypeId_isImageDataFloat(VIR_Type_GetIndex(pVirUniformSymType)))
+                {
+                    imageFormat = VSC_IMAGE_FORMAT_RGBA16F;
+                }
+                else if (VIR_TypeId_isImageDataSignedInteger(VIR_Type_GetIndex(pVirUniformSymType)))
+                {
+                    imageFormat = VSC_IMAGE_FORMAT_RGBA16I;
+                }
+                else
+                {
+                    gcmASSERT(VIR_TypeId_isImageDataUnSignedInteger(VIR_Type_GetIndex(pVirUniformSymType)));
+                    imageFormat = VSC_IMAGE_FORMAT_RGBA16UI;
+                }
+            }
+            break;
+        }
+    }
+
+    return imageFormat;
 }
 
 static PROG_VK_RESOURCE_SET* _GetVkResourceSetBySetIdx(PROGRAM_EXECUTABLE_PROFILE* pPEP, gctUINT setIndex)
@@ -4327,21 +4384,23 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* p
             hwChannel = (((pResAllocEntry->swizzle) >> ((channel) * 2)) & 0x3);
             _SetValidChannelForHwConstantLoc(pHwDirectAddrBase, hwChannel);
         }
+
+        pUtbEntry->imageFormat = _GetImageFormat(pShader, &pUtbEntry->utbBinding);
     }
     else
     {
         pUtbEntry->hwMappings[stageIdx].u.s.hwLoc.samplerMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
+
+        /* Set texture size */
+        _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
+                                    gcvNULL,
+                                    gcvNULL,
+                                    &pUtbEntry->utbBinding,
+                                    pSep);
     }
 
     pUtbEntry->activeStageMask |= pResAllocEntry->bUse ? (1 << stageIdx) : 0;
     pUtbEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);
-
-    /* Set texture size */
-    _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
-                                gcvNULL,
-                                gcvNULL,
-                                &pUtbEntry->utbBinding,
-                                pSep);
 
     _SetResOpBits(pShader, &pUtbEntry->utbBinding, &pUtbEntry->pResOpBits);
 

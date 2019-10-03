@@ -403,7 +403,7 @@ VSC_SHADER_DATA_TYPE;
 /* Any modification here, please do the corresponding change for VIR_ImageFormat. */
 typedef enum _VSC_IMAGE_FORMAT
 {
-    VSC_IMAGE_FORMAT_NONE=0x00000000,
+    VSC_IMAGE_FORMAT_NONE = 0x00000000,
     /*F32.*/
     VSC_IMAGE_FORMAT_RGBA32F,
     VSC_IMAGE_FORMAT_RG32F,
