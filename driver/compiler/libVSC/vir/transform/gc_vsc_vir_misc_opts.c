@@ -11766,21 +11766,46 @@ DEF_SH_NECESSITY_CHECK(vscVIR_GenExternalAtomicCall)
 {
     VSC_HW_CONFIG*   pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     gctSTRING env = gcvNULL;
+    VIR_Shader *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     gctBOOL  isOpenCV = gcvFALSE;
+    gctBOOL  hasAtomInst = gcvFALSE;
     gcoOS_GetEnv(gcvNULL, "VIV_ENABLE_OPENCV_WORKGROUPSIZE", &env);
     isOpenCV = (env && (gcoOS_StrCmp(env, "1") == 0));
+
+    if ((!pHwCfg->hwFeatureFlags.supportUSC) || pHwCfg->hwFeatureFlags.hasUSCAtomicFix2)
+    {
+        return gcvFALSE;
+    }
     /* apply patch to identified appNameId or VIR_ENABLE_OPENCV_WORKGROUP = 1 is set*/
     if ((pPassWorker->pCompilerParam->cfg.ctx.appNameId != gcvPATCH_OPENCV_ATOMIC) && (!isOpenCV))
     {
         return gcvFALSE;
     }
-
-    if ((pHwCfg->hwFeatureFlags.supportUSC) && (!pHwCfg->hwFeatureFlags.hasUSCAtomicFix2))
+    /* check shader has atom instruction */
     {
-        return gcvTRUE;
+        VIR_FuncIterator func_iter;
+        VIR_FunctionNode* func_node;
+        VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+        for(func_node = VIR_FuncIterator_First(&func_iter);
+            func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+        {
+            VIR_Function     *func = func_node->function;
+            VIR_InstIterator inst_iter;
+            VIR_Instruction  *inst;
+            VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+            for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+                 inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+            {
+                if (VIR_Inst_GetOpcode(inst) >= VIR_OP_ATOMADD && VIR_Inst_GetOpcode(inst) <= VIR_OP_ATOMXOR)
+                {
+                    hasAtomInst = gcvTRUE;
+                    break;
+                }
+            }
+        }
     }
 
-    return gcvFALSE;
+    return hasAtomInst;
 }
 
 DEF_QUERY_PASS_PROP(vscVIR_GenExternalAtomicCall)
@@ -11828,7 +11853,7 @@ VSC_ErrCode vscVIR_GenExternalAtomicCall(VSC_SH_PASS_WORKER* pPassWorker)
     /* invalid callgraph if extcall is generated */
     if (extcallgenerated)
     {
-        pPassWorker->pResDestroyReq->s.bInvalidateDu = gcvTRUE;
+        pPassWorker->pResDestroyReq->s.bInvalidateCg = gcvTRUE;
     }
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
