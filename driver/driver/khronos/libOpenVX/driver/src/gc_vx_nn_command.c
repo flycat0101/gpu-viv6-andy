@@ -3954,8 +3954,8 @@ _CalculateSplitSizes(vxnne_tensor_info input,
     inferred_input_size_x = output->width * stride_x;
     inferred_input_size_y = output->height * stride_y;
 
-    pad_left = parameter->pad_x_left;
-    pad_top = parameter->pad_y_top;
+    pad_left = (parameter->pad_x_left == 0xFFFFFFFF) ? 0: parameter->pad_x_left;
+    pad_top = (parameter->pad_y_top == 0xFFFFFFFF) ? 0: parameter->pad_y_top;
     pad_right = (inferred_input_size_x > parameter->pad_x_left + input->width) ?
                 inferred_input_size_x - (parameter->pad_x_left + input->width) : 0;
     pad_bottom = (inferred_input_size_y > parameter->pad_y_top + input->height) ?
@@ -4263,9 +4263,9 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
     vx_uint32 core = tp_type != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
                                                context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
     vx_bool mult = context->options.enableMultiTP && core > 1;
-    vx_uint32 pad_left = parameter->pad_x_left;
+    vx_uint32 pad_left = (parameter->pad_x_left == 0xFFFFFFFF) ? 0: parameter->pad_x_left;
+    vx_uint32 pad_top = (parameter->pad_y_top == 0xFFFFFFFF) ? 0: parameter->pad_y_top;
     vx_uint32 pad_right = output->width * stride_x - pad_left - input->width;
-    vx_uint32 pad_top = parameter->pad_y_top;
     vx_uint32 pad_bottom = output->height * stride_y - pad_top - input->height;
     vx_uint32 div_x = 1, div_y = 1, div_z = 1;
     vxnne_tensor_sub_block splits_of_input = VX_NULL;
