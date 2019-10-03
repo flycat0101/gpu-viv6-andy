@@ -26850,7 +26850,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node 
 
     enable_sh_reverse    = (vx_bool)(numOfAxis > 0 && numOfAxis < 4);
 
-    shExe_flag = (vx_bool)((_IsSameType(input, output) && batch == 1) || enable_sh_crop);
+    shExe_flag = (vx_bool)(((_IsSameType(input, output) && batch == 1) || enable_sh_crop) && (TENSOR_VIEW_SIZE_INDEX(input, 0) < IMG_MAX_WIDTH && TENSOR_VIEW_SIZE_INDEX(input, 1) < IMG_MAX_WIDTH)) ;
 
     if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP) &&
         vxnneIsTPSupportFormat(node->base.context, input, VX_NULL, output) && STRIDED_SLICE_CHECK_TP_SUPPORT
