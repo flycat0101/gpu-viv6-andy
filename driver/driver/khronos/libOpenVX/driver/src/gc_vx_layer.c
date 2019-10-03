@@ -5961,7 +5961,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     parameters[paramIdx ++] = (vx_reference)output_rs;
 
     if ((input_format == VX_TYPE_INT8  &&  weights_format ==  VX_TYPE_INT8  && bias_format == VX_TYPE_INT32  && output_format == VX_TYPE_INT8) ||
-        (input_format == VX_TYPE_INT16 &&  weights_format ==  VX_TYPE_INT16 && bias_format == VX_TYPE_INT32  && output_format == VX_TYPE_INT16))
+        (input_format == VX_TYPE_INT16 &&  weights_format ==  VX_TYPE_INT16 && output_format == VX_TYPE_INT16))
     {
         vx_int8   srcFixedPointPos    = TENSOR_POS(input);
         vx_int8   weiFixedPointPos    = TENSOR_POS(weights);
@@ -6132,7 +6132,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "in_scale", 1, &in_scale);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (input_format == VX_TYPE_INT16 &&  weights_format ==  VX_TYPE_INT16 && bias_format == VX_TYPE_INT32  && output_format == VX_TYPE_INT16)
+    else if (input_format == VX_TYPE_INT16 &&  weights_format ==  VX_TYPE_INT16 && output_format == VX_TYPE_INT16)
     {
         vx_uint32 uniMulAccInt16_16x1[16] = {
             0x00005555, // TCfg
@@ -6144,7 +6144,10 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
             0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
         };
 
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoReluInt16", borderMode);
+        if (bias_format == VX_TYPE_INT32)
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoReluI16", borderMode);
+        else
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoReluI16_BI64", borderMode);
         if (!shaderExecutable) goto OnError;
 
         status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniMulAccInt16_16x1", 1, uniMulAccInt16_16x1);
@@ -15463,6 +15466,7 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
     vx_reference parameters[5]     = {(vx_reference)input, NULL, NULL, NULL, (vx_reference)output};
     vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
     vx_enum      outputFormat      = TENSOR_DATA_TYPE(output);
+    vx_enum      biasFormat        = TENSOR_DATA_TYPE(bias);
     vx_int32     size[]            = {1, 1, 1, 1};
     vx_float32   in_scale          = 1.0;
     vx_int32     dRelu             = 0;
@@ -15864,22 +15868,30 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
 
         if (enable_2dTensor)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_int16", borderMode);
+            if (biasFormat == VX_TYPE_INT32)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_BI64", borderMode);
             if (!shaderExecutable) goto OnError;
 
             execution_parameters.globalWorkScale[0]  = 4;
         }
         else
         {
-            if (depth % 4 == 0)
+            if (depth % 4 == 0 && biasFormat == VX_TYPE_INT32)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_int16_4x", borderMode);
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_I16_4x", borderMode);
                 if (!shaderExecutable) goto OnError;
 
                 execution_parameters.globalWorkScale[2]  = 4;
             }
             else
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_int16", borderMode);
+            {
+                if (biasFormat == VX_TYPE_INT32)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_I16", borderMode);
+                else
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_I16_BI64", borderMode);
+            }
             if (!shaderExecutable) goto OnError;
         }
 

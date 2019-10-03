@@ -368,7 +368,7 @@ vx_status vxoFCOperation_Initialize(
 
     supportDataFormat0 = (vx_bool)(input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && bias_dataformat == VX_TYPE_FLOAT32 && output_dataformat == VX_TYPE_FLOAT16);
     supportDataFormat1 = (vx_bool)(input_dataformat == VX_TYPE_INT8 && weight_dataformat == VX_TYPE_INT8 && bias_dataformat == VX_TYPE_INT32 && output_dataformat == VX_TYPE_INT8);
-    supportDataFormat2 = (vx_bool)(input_dataformat == VX_TYPE_INT16 && weight_dataformat == VX_TYPE_INT16 && bias_dataformat == VX_TYPE_INT32 && output_dataformat == VX_TYPE_INT16);
+    supportDataFormat2 = (vx_bool)(input_dataformat == VX_TYPE_INT16 && weight_dataformat == VX_TYPE_INT16 && (bias_dataformat == VX_TYPE_INT32 || bias_dataformat == VX_TYPE_INT64) && output_dataformat == VX_TYPE_INT16);
     supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && bias_dataformat == VX_TYPE_INT32 && output_dataformat != VX_TYPE_FLOAT32);
     enable_shader = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
 

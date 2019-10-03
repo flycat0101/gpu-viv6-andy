@@ -224,7 +224,7 @@ FULLY_CONNECTED_U8(I16, short, short)
 FULLY_CONNECTED_U8(F16, half, short)
 
 _viv_uniform VXC_512Bits uniMulAccInt16_16x1;
-__kernel void vxcFullyConnected_NoReluInt16(
+__kernel void vxcFullyConnected_NoReluI16(
     __read_only image2d_array_t            input,
     __read_only image2d_array_t            weights,
     __read_only image2d_array_t            bias,
@@ -265,6 +265,55 @@ __kernel void vxcFullyConnected_NoReluInt16(
     short val = convert_short_sat_rte(dst);
     VXC_WriteImage(output, coord_out, val, VXC_MODIFIER(0, 0, 0,VXC_RM_TowardZero, 0));
 }
+
+__kernel void vxcFullyConnected_NoReluI16_BI64(
+    __read_only image2d_array_t            input,
+    __read_only image2d_array_t            weights,
+    __read_only image2d_t                  bias,
+    int            dRelu,
+    __write_only image2d_array_t     output)
+{
+    int4 coord_in    = (int4)(0, get_global_id(0), get_global_id(1), 0);
+    int2 coord_out   = (int2)(get_global_id(0), get_global_id(1));
+
+    vxc_short8 v0, v1, v2, v3, v4, v5, v6, v7;
+    float4 sum = 0;
+    int temp = 0;
+    float dst;
+
+    coord_in.w = coord_in.y << 1;
+    vxc_int4 tmpBias = read_imagei(bias, coord_in.wx);
+    coord_in.x = 16;
+    long b;
+    _viv_asm(MOV_LONG, b, tmpBias.x, tmpBias.y);
+    dst = convert_float(b);
+
+    do
+    {
+        VXC_ReadImage(v0, input,  coord_in.xz, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(v1, weights, coord_in.xy, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(v2, input,  coord_in.xz, VXC_5BITOFFSET_XY(-8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(v3, weights, coord_in.xy, VXC_5BITOFFSET_XY(-8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(v4, input,  coord_in.xz, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(v5, weights, coord_in.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(v6, input,  coord_in.xz, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(v7, weights, coord_in.xy, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        coord_in.x += 32;
+
+        VXC_DP16x1(sum, v0, v1, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), uniMulAccInt16_16x1);
+        VXC_DP16x1(sum, v2, v3, VXC_MODIFIER(1, 1, 0, VXC_RM_TowardZero, 0), uniMulAccInt16_16x1);
+        VXC_DP16x1(sum, v4, v5, VXC_MODIFIER(2, 2, 0, VXC_RM_TowardZero, 0), uniMulAccInt16_16x1);
+        VXC_DP16x1(sum, v6, v7, VXC_MODIFIER(3, 3, 0, VXC_RM_TowardZero, 0), uniMulAccInt16_16x1);
+
+        float4 tmp = {1, 1, 1, 1};
+        dst = dst + dot(sum, tmp);
+
+    } while (coord_in.x < Cycles);
+    dst = in_scale * dst;
+    short val = convert_short_sat_rte(dst);
+    VXC_WriteImage(output, coord_out, val, VXC_MODIFIER(0, 0, 0,VXC_RM_TowardZero, 0));
+}
+
 __kernel void vxcFullyConnected_fp16_noBias(
     __read_only image2d_array_t      input,
     __read_only image2d_array_t      weights,
