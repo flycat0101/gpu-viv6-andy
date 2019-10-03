@@ -4752,8 +4752,7 @@ VX_PRIVATE_API vx_status vxnneConvolutionReluPoolingInitializer(
                 shaderExecutable = vxnneReshuffleShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_RESHUFFLE, &node->kernelAttributes.borderMode, inputs, stride_x, stride_y, padMode, padConstValue, pad_x_left, pad_x_right, pad_y_top, pad_y_bottom, outTensor);
 
 
-                if(outTensor)
-                    vxoTensor_ReleaseTensor(&outTensor);
+                vxoTensor_ReleaseTensor(&outTensor);
 
                 if (!shaderExecutable)
                 {
@@ -6000,7 +5999,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_Initializer(vx_node node, c
 
             shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, beta_s, inputs, outputs);
 
-            if (beta_s) vxReleaseScalar(&beta_s);
+            vxReleaseScalar(&beta_s);
 
             if (!shaderExecutable)
             {
@@ -7327,8 +7326,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad2_Initializer(vx_node node, c
                 vxReleaseScalar(&padTop);
                 vxReleaseScalar(&padBottom);
 
-                if (input) vxoTensor_ReleaseTensor(&input);
-                if (output) vxoTensor_ReleaseTensor(&output);
+                vxoTensor_ReleaseTensor(&input);
+                vxoTensor_ReleaseTensor(&output);
             }
             else if(outWidth * outHeight * inDepth < 65536 && inBatch != outBatch && !whc_flag)
             {
@@ -7374,8 +7373,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad2_Initializer(vx_node node, c
                 vxReleaseScalar(&padTop);
                 vxReleaseScalar(&padBottom);
 
-                if (input) vxoTensor_ReleaseTensor(&input);
-                if (output) vxoTensor_ReleaseTensor(&output);
+                vxoTensor_ReleaseTensor(&input);
+                vxoTensor_ReleaseTensor(&output);
             }
             else
             {
@@ -9709,8 +9708,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
             shaderExecutable = vxnneGetGPUActivationShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION, &node->kernelAttributes.borderMode, func_v, input, minVal, maxVal, output);
         }
 
-        if (input) vxoTensor_ReleaseTensor(&input);
-        if (output) vxoTensor_ReleaseTensor(&output);
+        vxoTensor_ReleaseTensor(&input);
+        vxoTensor_ReleaseTensor(&output);
 
         if (!shaderExecutable)
         {
@@ -10864,7 +10863,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorAdd_Initializer(vx_node node, co
         }
         else
         {
-                shaderExecutable = vxnneGetGPUTensorElewiseShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_ELTWISE, &node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_ADD, output);
+                shaderExecutable = vxnneGetGPUTensorElewiseShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_ADD, &node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_ADD, output);
         }
 
         if (!shaderExecutable)
@@ -21353,7 +21352,7 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
         else if(type == VX_REORG_SPACE_TO_DEPTH)
             shaderExecutable = vxnneGetSpace2DepthShaderExecutable(context, VXNNE_KERNEL_SPACE2DEPTH, &node->kernelAttributes.borderMode,
                 inputs, stride, outc_s, outputs);
-        else if(type == VX_REORG_SPACE_TO_BATCH_ND)
+        else if(type == VX_REORG_SPACE_TO_BATCH_ND && pad)
             shaderExecutable = vxnneGetSpace2BatchShaderExecutable(context, VXNNE_KERNEL_SPACE2BATCH, &node->kernelAttributes.borderMode,
                 inputs, block_size_s, pad, outc_s, outputs, pad_list);
         else if(type == VX_REORG_BATCH_TO_SPACE_ND)

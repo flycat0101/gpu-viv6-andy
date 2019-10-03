@@ -497,6 +497,11 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
         if (status != VX_SUCCESS) goto OnError;
     }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
+    }
 
     execution_parameters.globalWorkSize[0]   = width;
     execution_parameters.globalWorkSize[1]   = height;
@@ -612,6 +617,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
                 if(width % 4 == 0 && height % 4 == 0 && depth % 4 == 0)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "FP32_WHC2CWH_opt", borderMode);
+                    if (!shaderExecutable) goto OnError;
 
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -630,6 +636,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
                 if(width % 4 == 0 && depth % 4 == 0)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "FP32_WHC2CHW_opt", borderMode);
+                    if (!shaderExecutable) goto OnError;
 
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -648,6 +655,8 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
                 if(width % 4 == 0)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "FP32_WHC2WCH_opt", borderMode);
+                    if (!shaderExecutable) goto OnError;
+
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     if (status != VX_SUCCESS) goto OnError;
@@ -665,6 +674,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
                 if(width % 4 == 0 && height % 4 == 0)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "FP32_WHC2HCW_opt", borderMode);
+                    if (!shaderExecutable) goto OnError;
 
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -678,6 +688,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
                 else if(width == 3 && height % 4 == 0)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "FP32_3HC2HC3_opt", borderMode);
+                    if (!shaderExecutable) goto OnError;
 
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -700,6 +711,8 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
                 if(width % 4 == 0 && height % 4 == 0)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "FP32_CHW2CWH_opt", borderMode);
+                    if (!shaderExecutable) goto OnError;
+
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     if (status != VX_SUCCESS) goto OnError;
@@ -720,6 +733,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
                 if(width % 4 == 0 && height % 4 == 0 && depth % 4 == 0)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "Quant8_WHC2CWH_opt", borderMode);
+                    if (!shaderExecutable) goto OnError;
 
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -738,6 +752,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
                 if(width % 4 == 0 && depth % 4 == 0)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "Quant8_WHC2CHW_opt", borderMode);
+                    if (!shaderExecutable) goto OnError;
 
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -756,6 +771,8 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
                 if(width % 4 == 0)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "Quant8_WHC2WCH_opt", borderMode);
+                    if (!shaderExecutable) goto OnError;
+
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     if (status != VX_SUCCESS) goto OnError;
@@ -773,6 +790,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
                 if(width % 4 == 0 && height % 4 == 0)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "Quant8_WHC2HCW_opt", borderMode);
+                    if (!shaderExecutable) goto OnError;
 
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -786,6 +804,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
                 else if(width == 3 && height % 4 == 0)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "Quant8_3HC2HC3_opt", borderMode);
+                    if (!shaderExecutable) goto OnError;
 
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -808,6 +827,8 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
                 if(width % 4 == 0 && height % 4 == 0)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "Quant8_CHW2CWH_opt", borderMode);
+                    if (!shaderExecutable) goto OnError;
+
                     status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     if (status != VX_SUCCESS) goto OnError;
@@ -840,6 +861,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
             if(width % 4 == 0 && height % 4 == 0)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "FP32_2D_opt", borderMode);
+                if (!shaderExecutable) goto OnError;
 
                 status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -853,6 +875,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
             else if(width == 3 && height % 4 == 0)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "FP32_2D_3h", borderMode);
+                if (!shaderExecutable) goto OnError;
 
                 status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -871,6 +894,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
             if(width % 4 == 0 && height % 4 == 0)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "Quant8_2D_opt", borderMode);
+                if (!shaderExecutable) goto OnError;
 
                 status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -884,6 +908,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
             else if(width == 3 && height % 4 == 0)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "Quant8_2D_3h", borderMode);
+                if (!shaderExecutable) goto OnError;
 
                 status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -899,7 +924,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
         }
         else
         {
-            vxError("Not supported data format at ling %d of function %s.\n", __FUNCTION__, __LINE__);
+            vxError("Not supported data format at line %d of function %s.\n", __LINE__, __FUNCTION__);
         }
 
         execution_parameters.workDim = 2;
@@ -914,7 +939,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
     }
     else
     {
-        vxError("Invalid parameter at line %d of function %s.\n", __FUNCTION__, __LINE__);
+        vxError("Invalid parameter at line %d of function %s.\n", __LINE__, __FUNCTION__);
     }
 
     if (!shaderExecutable) goto OnError;
@@ -1315,6 +1340,11 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 goto OnError;
             }
         }
+        else
+        {
+            vxError("input or output's format is not support");
+            goto OnError;
+        }
     }
 
     if (enable_K1S1)
@@ -1514,6 +1544,11 @@ vxnne_shader_executable vxnneGPUGemm_noBiasShaderExecutable(
 
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 10);
         if (status != VX_SUCCESS) goto OnError;
+    }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
     }
 
     execution_parameters.globalWorkSize[0]   = width;
@@ -1753,8 +1788,6 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
 
-            if (enable_small_kernel)
-                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             if (enable_four_pixel)
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
 
@@ -1874,7 +1907,11 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
                         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4S", borderMode);
                 }
                 else if (enable_four_pixel)
+                {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4X", borderMode);
+                    if (!shaderExecutable) goto OnError;
+                    status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+                }
                 else
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D", borderMode);
             }
@@ -1892,8 +1929,6 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             if (enable_small_kernel)
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-            if (enable_four_pixel)
-                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
 
             if (status != VX_SUCCESS) goto OnError;
         }
@@ -1993,6 +2028,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
         execution_parameters.globalWorkSize[2] = depth;
     }
 
+    if (!shaderExecutable) goto OnError;
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
     if (status != VX_SUCCESS) goto OnError;
 
@@ -2482,6 +2518,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 16);
             if (status != VX_SUCCESS) goto OnError;
         }
+        if (!shaderExecutable) goto OnError;
     }
 
     if (is_write_4data)
@@ -2692,6 +2729,11 @@ vxnne_shader_executable vxnneGetGPUDepth2SpaceShaderExecutable(
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
             if (status != VX_SUCCESS) goto OnError;
         }
+    }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
     }
 
     execution_parameters.globalWorkSize[0]   = output_width;
@@ -3487,7 +3529,11 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
             if (status != VX_SUCCESS) goto OnError;
         }
-
+    }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
     }
 
     execution_parameters.globalWorkScale[0] = 1;
@@ -4012,6 +4058,11 @@ vxnne_shader_executable vxnneGPUL2NormSumScaleShaderExecutable(
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 7);
         if (status != VX_SUCCESS) goto OnError;
     }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
+    }
 
     execution_parameters.globalWorkSize[0]   = width;
     execution_parameters.globalWorkSize[1]   = height;
@@ -4231,6 +4282,11 @@ vxnne_shader_executable vxnneGetGPUL2PoolingShaderExecutable(
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
             if (status != VX_SUCCESS) goto OnError;
         }
+    }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
     }
 
     execution_parameters.globalWorkSize[0]   = out_width;
@@ -4830,6 +4886,7 @@ vxnne_shader_executable vxnneGetGPUActivationShaderExecutable(
             }
         }
     }
+    if (!shaderExecutable) goto OnError;
 
     execution_parameters.globalWorkSize[0]   = width;
     execution_parameters.globalWorkSize[1]   = height;
@@ -5055,6 +5112,11 @@ vxnne_shader_executable vxnneGetGPUMaxPoolingShaderExecutable(
             if (status != VX_SUCCESS) goto OnError;
         }
     }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
+    }
 
     execution_parameters.globalWorkSize[0]   = out_width;
     execution_parameters.globalWorkSize[1]   = out_height;
@@ -5214,6 +5276,11 @@ vxnne_shader_executable vxnneGetGPUTensorScaleShaderExecutable(
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
         if (status != VX_SUCCESS) goto OnError;
     }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
+    }
 
     execution_parameters.globalWorkSize[0]   = out_width;
     execution_parameters.globalWorkSize[1]   = out_height;
@@ -5361,6 +5428,11 @@ vxnne_shader_executable vxnneGetGPUTensorMaxValueShaderExecutable(
 
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 5);
         if (status != VX_SUCCESS) goto OnError;
+    }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
     }
 
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
@@ -5520,6 +5592,11 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 5);
         if (status != VX_SUCCESS) goto OnError;
     }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
+    }
 
     if(inDims > 2)
     {
@@ -5647,6 +5724,11 @@ vxnne_shader_executable vxnneGetGPUTensorReduceDivShaderExecutable(
         }
         if (!shaderExecutable) goto OnError;
     }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
+    }
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
     if (status != VX_SUCCESS) goto OnError;
@@ -5678,6 +5760,7 @@ OnError:
         programSources = NULL;
     }
 #endif
+
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -5917,6 +6000,11 @@ vxnne_shader_executable vxnneGetGPURnnShaderExecutable(
 
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 19);
         if (status != VX_SUCCESS) goto OnError;
+    }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
     }
 
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
@@ -6538,23 +6626,20 @@ vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
                 {
                     parameters[paramt_num++] = (vx_reference)twoLogE;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_tanh", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_LOGISTIC)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_logistic", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_relu", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU6)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_relu6", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
+                if (!shaderExecutable) goto OnError;
             }
             else
             {
@@ -6562,23 +6647,20 @@ vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
                 {
                     parameters[paramt_num++] = (vx_reference)twoLogE;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_tanh_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_LOGISTIC)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_logistic_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_relu_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU6)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_relu6_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
+                if (!shaderExecutable) goto OnError;
             }
 
         }
@@ -6590,23 +6672,20 @@ vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
                 {
                     parameters[paramt_num++] = (vx_reference)twoLogE;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_non_CIFG_tanh", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_LOGISTIC)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_non_CIFG_logistic", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_non_CIFG_relu", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU6)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_non_CIFG_relu6", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
+                if (!shaderExecutable) goto OnError;
             }
             else
             {
@@ -6614,23 +6693,20 @@ vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
                 {
                     parameters[paramt_num++] = (vx_reference)twoLogE;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_non_CIFG_tanh_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_LOGISTIC)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_non_CIFG_logistic_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_non_CIFG_relu_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU6)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_non_peephole_non_CIFG_relu6_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
+                if (!shaderExecutable) goto OnError;
             }
 
         }
@@ -6645,23 +6721,20 @@ vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
                 {
                     parameters[paramt_num++] = (vx_reference)twoLogE;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_tanh", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_LOGISTIC)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_logistic", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_relu", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU6)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_relu6", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
+                if (!shaderExecutable) goto OnError;
             }
             else
             {
@@ -6669,23 +6742,20 @@ vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
                 {
                     parameters[paramt_num++] = (vx_reference)twoLogE;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_tanh_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_LOGISTIC)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_logistic_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_relu_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU6)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_relu6_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
+                if (!shaderExecutable) goto OnError;
             }
         }
         else
@@ -6696,23 +6766,20 @@ vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
                 {
                     parameters[paramt_num++] = (vx_reference)twoLogE;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_non_CIFG_tanh", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_LOGISTIC)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_non_CIFG_logistic", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_non_CIFG_relu", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU6)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_non_CIFG_relu6", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
+                if (!shaderExecutable) goto OnError;
             }
             else
             {
@@ -6720,24 +6787,21 @@ vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
                 {
                     parameters[paramt_num++] = (vx_reference)twoLogE;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_non_CIFG_tanh_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_LOGISTIC)
                 {
                     parameters[paramt_num++] = (vx_reference)logE;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_non_CIFG_logistic_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_non_CIFG_relu_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
                 else if(activation == VX_NN_ACTIVATION_RELU6)
                 {
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_peephole_non_CIFG_relu6_cellclip", borderMode);
-                    if (!shaderExecutable) goto OnError;
                 }
+                if (!shaderExecutable) goto OnError;
             }
         }
     }
@@ -6905,6 +6969,11 @@ vxnne_shader_executable vxnneGetGPULSTMUnitProjectionShaderExecutable(
             }
             if (!shaderExecutable) goto OnError;
         }
+    }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
     }
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paramNum);
@@ -7402,6 +7471,11 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxis0ShaderExecutable(
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
         if (!shaderExecutable) goto OnError;
     }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
+    }
 
     execution_parameters.globalWorkSize[0]   = height;
     execution_parameters.globalWorkSize[1]   = depth;
@@ -7561,6 +7635,11 @@ vxnne_shader_executable vxnneGetGPUSvdfShaderExecutable(
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32Relu6", borderMode);
         if (!shaderExecutable) goto OnError;
     }
+    else
+    {
+        vxError("activation type is not support");
+        goto OnError;
+    }
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
     if (status != VX_SUCCESS) goto OnError;
@@ -7699,6 +7778,11 @@ vxnne_shader_executable vxnneGetGPUTensorPadShaderExecutable(
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
         if (!shaderExecutable) goto OnError;
     }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
+    }
 
     execution_parameters.globalWorkSize[0]   = output_width;
     execution_parameters.globalWorkSize[1]   = output_height;
@@ -7823,7 +7907,7 @@ vxnne_shader_executable vxnneGetGPUTensorCropShaderExecutable(
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
         if (!shaderExecutable) goto OnError;
     }
-    else if (input_format == VX_TYPE_UINT8 && input_format == VX_TYPE_UINT8)
+    else if (input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_UINT8)
     {
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
         if (!shaderExecutable) goto OnError;
@@ -8119,45 +8203,40 @@ vxnne_shader_executable vxnneGetGPUReverseShaderExecutable(
             if (axsis[0] == 0)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis0_FP32", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
             else if (axsis[0] == 1)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis1_FP32", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
             else if (axsis[0] == 2)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis2_FP32", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
+            if (!shaderExecutable) goto OnError;
         }
         else if (axsisNum == 2)
         {
             if (axsis[0] == 0 && axsis[1] == 1)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis01_FP32", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
             else if (axsis[0] == 0 && axsis[1] == 2)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis02_FP32", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
             else if (axsis[0] == 1 && axsis[1] == 2)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis12_FP32", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
+            if (!shaderExecutable) goto OnError;
         }
         else if (axsisNum == 3)
         {
             if (axsis[0] == 0 && axsis[1] == 1 && axsis[2] == 2)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis012_FP32", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
-            if (status != VX_SUCCESS) goto OnError;
+            if (!shaderExecutable) goto OnError;
         }
     }
     else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
@@ -8167,44 +8246,40 @@ vxnne_shader_executable vxnneGetGPUReverseShaderExecutable(
             if (axsis[0] == 0)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis0_Quant8", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
             else if (axsis[0] == 1)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis1_Quant8", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
             else if (axsis[0] == 2)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis2_Quant8", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
+            if (!shaderExecutable) goto OnError;
         }
         else if (axsisNum == 2)
         {
             if (axsis[0] == 0 && axsis[1] == 1)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis01_Quant8", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
             else if (axsis[0] == 0 && axsis[1] == 2)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis02_Quant8", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
             else if (axsis[0] == 1 && axsis[1] == 2)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis12_Quant8", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
+            if (!shaderExecutable) goto OnError;
         }
         else if (axsisNum == 3)
         {
             if (axsis[0] == 0 && axsis[1] == 1 && axsis[2] == 2)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_axis012_Quant8", borderMode);
-                if (!shaderExecutable) goto OnError;
             }
+            if (!shaderExecutable) goto OnError;
         }
     }
 
@@ -8698,6 +8773,7 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
         execution_parameters.globalWorkSize[2] = 1;
     }
 
+    if (!shaderExecutable) goto OnError;
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
     if (status != VX_SUCCESS) goto OnError;
 
