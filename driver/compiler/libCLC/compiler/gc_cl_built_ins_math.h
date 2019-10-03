@@ -161,7 +161,7 @@ clsBUILTIN_FUNCTION    MathBuiltinFunctions[] =
     {clvEXTENSION_NONE,     "fdim",                T_F_GENTYPE,    2, {T_F_GENTYPE, T_F_GENTYPE}, {0}, {1, 1}, 1},
     {clvEXTENSION_NONE,     "fmix",                T_F_GENTYPE,    3, {T_F_GENTYPE, T_F_GENTYPE, T_F_GENTYPE}, {0}, {1, 1, 1}, 1},
     {clvEXTENSION_NONE,     "fma",                 T_F_GENTYPE,    3, {T_F_GENTYPE, T_F_GENTYPE, T_F_GENTYPE}, {0}, {1, 1, 1}, 0},
-    {clvEXTENSION_NONE,     "fast_fma",            T_F_GENTYPE,    3, {T_F_GENTYPE, T_F_GENTYPE, T_F_GENTYPE}, {0}, {1, 1, 1}, 0},
+    {clvEXTENSION_NONE,     "fast_fma",            T_F_GENTYPE,    3, {T_F_GENTYPE, T_F_GENTYPE, T_F_GENTYPE}, {0}, {1, 1, 1}, 1},
     {clvEXTENSION_NONE,     "mad",                 T_F_GENTYPE,    3, {T_F_GENTYPE, T_F_GENTYPE, T_F_GENTYPE}, {0}, {1, 1, 1}, 1},
 
 
@@ -32825,17 +32825,32 @@ _GenFmaCode(
 
    /*Normal case, not zero involve, use fix point calculation  */
 
-
    /*Get the sign */
+
    for(i = 0; i<3; i++){
        /*Use the signed shift, get -1 or 0 */
+       clsIOPERAND iOperand[1];
+       clsROPERAND rOperand[1];
+       clsGEN_CODE_DATA_TYPE dataType = OperandsParameters[i].rOperands[0].dataType;
+
+       dataType.elementType = clvTYPE_INT;
+       clsIOPERAND_New(Compiler, iOperand, dataType);
+       status = clGenGenericCode1(Compiler,
+                                  PolynaryExpr->exprBase.base.lineNo,
+                                  PolynaryExpr->exprBase.base.stringNo,
+                                  clvOPCODE_ASTYPE,
+                                  iOperand,
+                                  &OperandsParameters[i].rOperands[0]);
+       if (gcmIS_ERROR(status)) return status;
+       clsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+
        intermIOperands[3+i].dataType.elementType = clvTYPE_INT;
        status = clGenShiftExprCode(Compiler,
                             PolynaryExpr->exprBase.base.lineNo,
                             PolynaryExpr->exprBase.base.stringNo,
                             clvOPCODE_RSHIFT,
                             &intermIOperands[3+i],
-                            &OperandsParameters[i].rOperands[0],
+                            rOperand,
                             &thirtyOneROperand);
        intermIOperands[3+i].dataType.elementType = clvTYPE_UINT;
    }

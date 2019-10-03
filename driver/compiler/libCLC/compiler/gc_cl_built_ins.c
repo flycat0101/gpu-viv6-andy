@@ -18,6 +18,7 @@
 
 #define FULL_PROFILE_TEST   1
 #define HAS_DOUBLE_SUPPORT  0
+#define IMPL_TRIG_OR_POW_FUNCS_AS_INTRINSICS 1
 
 #define _LOGE_2                ((float)0.693147180559945309417232)
 #define _LOG2_E_high        ((float)1.4426950f)
@@ -62,16 +63,20 @@ clsFAST_RELAXED_MATH_MAPPING_NODE;
 
 static clsFAST_RELAXED_MATH_MAPPING _FastRelaxedMathMapping[] =
 {
+#if !IMPL_TRIG_OR_POW_FUNCS_AS_INTRINSICS
     {"sin",         "native_sin"},
     {"cos",         "native_cos"},
     {"tan",         "native_tan"},
+#endif
     {"asin",        "native#asin"},
     {"acos",        "native#acos"},
     {"atan",        "native#atan"},
 
     /* Exponential Functions */
     {"powr",        "native_powr"},
+#if !IMPL_TRIG_OR_POW_FUNCS_AS_INTRINSICS
     {"pow",         "viv_native_pow"},
+#endif
     {"exp",         "native_exp"},
     {"exp10",       "native_exp10"},
     {"log",         "native_log"},
@@ -5025,7 +5030,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"step",            gcvTRUE,        gcvFALSE,       gcvNULL, _GenStepCode},
     {"smoothstep",      gcvTRUE,        gcvFALSE,       gcvNULL, _GenSmoothStepCode},
     {"fma",             gcvTRUE,        gcvTRUE,        gcvNULL, _GenFmaCode},
-    {"fast_fma",        gcvTRUE,        gcvTRUE,        gcvNULL, _GenFastFmaCode},
+    {"fast_fma",        gcvTRUE,        gcvFALSE,       gcvNULL, _GenFastFmaCode},
     {"mad",             gcvTRUE,        gcvFALSE,       gcvNULL, _GenMadCode},
     {"clz",             gcvTRUE,        gcvFALSE,       gcvNULL, _GenClzCode},
     {"popcount",        gcvTRUE,        gcvFALSE,       gcvNULL, _GenPopcountCode},
@@ -5055,20 +5060,20 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"radians",         gcvTRUE,       gcvFALSE,       gcvNULL, _GenRadiansCode},
     {"degrees",         gcvTRUE,       gcvFALSE,       gcvNULL, _GenDegreesCode},
     {"half_sin",        gcvTRUE,       gcvTRUE,        gcvNULL, _GenSinCode},
-    {"native_sin",      gcvTRUE,       gcvTRUE,        gcvNULL, _GenNativeSinCode},
+    {"native_sin",      gcvTRUE,       gcvFALSE,       gcvNULL, _GenNativeSinCode},
     {"sin",             gcvTRUE,       gcvTRUE,        gcvNULL, _GenSinCode},
     {"half_cos",        gcvTRUE,       gcvTRUE,        gcvNULL, _GenCosCode},
-    {"native_cos",      gcvTRUE,       gcvTRUE,        gcvNULL, _GenNativeCosCode},
+    {"native_cos",      gcvTRUE,       gcvFALSE,       gcvNULL, _GenNativeCosCode},
     {"cos",             gcvTRUE,       gcvTRUE,        gcvNULL, _GenCosCode},
     {"sincos",          gcvTRUE,       gcvTRUE,        gcvNULL, _GenSinCosCode},
     {"half_tan",        gcvTRUE,       gcvTRUE,        gcvNULL, _GenTanCode},
-    {"native_tan",      gcvTRUE,       gcvTRUE,        gcvNULL, _GenNativeTanCode},
+    {"native_tan",      gcvTRUE,       gcvFALSE,       gcvNULL, _GenNativeTanCode},
     {"tan",             gcvTRUE,       gcvTRUE,        gcvNULL, _GenTanCode},
-    {"native#asin",     gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativeAsinCode},
+    {"native#asin",     gcvFALSE,      gcvFALSE,       gcvNULL, _GenNativeAsinCode},
     {"asin",            gcvTRUE,       gcvTRUE,        gcvNULL, _GenAsinCode},
-    {"native#acos",     gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativeAcosCode},
+    {"native#acos",     gcvFALSE,      gcvFALSE,       gcvNULL, _GenNativeAcosCode},
     {"acos",            gcvTRUE,       gcvTRUE,        gcvNULL, _GenAcosCode},
-    {"native#atan",     gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativeAtanCode},
+    {"native#atan",     gcvFALSE,      gcvFALSE,       gcvNULL, _GenNativeAtanCode},
     {"atan",            gcvTRUE,       gcvTRUE,        gcvNULL, _GenAtanCode},
     {"half_divide",     gcvTRUE,       gcvTRUE,        gcvNULL, _GenDivideCode},
     {"native_divide",   gcvTRUE,       gcvFALSE,       gcvNULL, _GenNativeDivCode},
@@ -5127,13 +5132,13 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"viv_bitfieldInsert",  gcvFALSE,       gcvFALSE,        gcvNULL, _GenBitInsertCode},
 
     /* Relational Functions */
-    {"isequal",         gcvTRUE,        gcvTRUE,        gcvNULL, _GenEqualCode},
-    {"isnotequal",      gcvTRUE,        gcvTRUE,        gcvNULL, _GenNotEqualCode},
-    {"isgreater",       gcvTRUE,        gcvTRUE,        gcvNULL, _GenGreaterThanCode},
-    {"isgreaterequal",  gcvTRUE,        gcvTRUE,        gcvNULL, _GenGreaterThanEqualCode},
-    {"isless",          gcvTRUE,        gcvTRUE,        gcvNULL, _GenLessThanCode},
-    {"islessequal",     gcvTRUE,        gcvTRUE,        gcvNULL, _GenLessThanEqualCode},
-    {"islessgreater",   gcvTRUE,        gcvTRUE,        gcvNULL, _GenLessGreaterCode},
+    {"isequal",         gcvTRUE,        gcvFALSE,        gcvNULL, _GenEqualCode},
+    {"isnotequal",      gcvTRUE,        gcvFALSE,        gcvNULL, _GenNotEqualCode},
+    {"isgreater",       gcvTRUE,        gcvFALSE,        gcvNULL, _GenGreaterThanCode},
+    {"isgreaterequal",  gcvTRUE,        gcvFALSE,        gcvNULL, _GenGreaterThanEqualCode},
+    {"isless",          gcvTRUE,        gcvFALSE,        gcvNULL, _GenLessThanCode},
+    {"islessequal",     gcvTRUE,        gcvFALSE,        gcvNULL, _GenLessThanEqualCode},
+    {"islessgreater",   gcvTRUE,        gcvFALSE,        gcvNULL, _GenLessGreaterCode},
     {"isordered",       gcvTRUE,        gcvTRUE,        gcvNULL, _GenOrderedCode},
     {"isunordered",     gcvTRUE,        gcvTRUE,        gcvNULL, _GenUnOrderedCode},
     {"isfinite",        gcvTRUE,        gcvTRUE,        gcvNULL, _GenFiniteCode},
