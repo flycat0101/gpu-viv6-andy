@@ -1019,7 +1019,8 @@ OnError:
     indexInfo.count = instantDraw->count; \
     indexInfo.indexType = instantDraw->indexType; \
     indexInfo.u.es30.indexBuffer = instantDraw->indexBuffer; \
-    indexInfo.indexMemory = instantDraw->indexMemory
+    indexInfo.indexMemory = instantDraw->indexMemory; \
+    indexInfo.restartElement = instantDraw->restartElement
 
 __GL_INLINE gceSTATUS
 gcChipSetVertexArrayBindBegin(
@@ -3465,6 +3466,7 @@ gcChipValidateDrawPath(
             defaultInstant->attributes = chipCtx->attributeArray;
             defaultInstant->positionIndex = chipCtx->positionIndex;
             defaultInstant->primitiveRestart = gc->state.enables.primitiveRestart;
+            defaultInstant->restartElement = 0xFFFFFFFF;
 
             /* Is it an indexed draw? */
             if (gc->vertexArray.indexCount == 0)

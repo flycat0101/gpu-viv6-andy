@@ -280,6 +280,7 @@ typedef struct __GLchipInstantDrawRec
     GLint           positionIndex;
 
     gctBOOL         primitiveRestart;
+    gctUINT         restartElement;
 } __GLchipInstantDraw;
 
 typedef struct __GLchipHalRtSlotInfoRec
