@@ -336,7 +336,7 @@ static gceSTATUS _ConstructExtensionString(
     gctPOINTER pointer = gcvNULL;
     gctCONST_STRING extraExtension = "GL_KHR_blend_equation_advanced GL_OES_sample_variables GL_OES_shader_image_atomic "
                                      "GL_OES_shader_multisample_interpolation GL_OES_texture_storage_multisample_2d_array "
-                                     "GL_EXT_geometry_shader GL_EXT_gpu_shader5 GL_ARB_gpu_shader5 GL_EXT_primitive_bounding_box GL_EXT_shader_io_blocks "
+                                     "GL_EXT_geometry_shader GL_EXT_gpu_shader5 GL_EXT_primitive_bounding_box GL_EXT_shader_io_blocks "
                                      "GL_EXT_tessellation_shader GL_EXT_texture_buffer GL_EXT_texture_cube_map_array ";
     gctSIZE_T extraExtensionLength = gcoOS_StrLen(extraExtension, gcvNULL);
     gctSIZE_T extensionStringLength = gcoOS_StrLen(GetGLExtensionString(), gcvNULL);
@@ -1573,7 +1573,6 @@ static slsPREDEFINED_MACRO _PredefinedMacros[] =
    {"GL_OES_sample_variables", "1", gcvNULL, gcvTRUE},
    {"GL_OES_shader_multisample_interpolation", "1", gcvNULL, gcvTRUE},
    {"GL_EXT_gpu_shader5", "1", gcvNULL, gcvTRUE},
-   {"GL_ARB_gpu_shader5", "1", gcvNULL, gcvTRUE},
    {"GL_EXT_texture_cube_map_array", "1", gcvNULL, gcvTRUE},
    /* TS extension. */
    {"GL_EXT_tessellation_shader", "1", gcvNULL, gcvTRUE},

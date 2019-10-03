@@ -1887,7 +1887,6 @@ gcePROVOKING_VERTEX_CONVENSION;
                                                 "GL_EXT_texture_cube_map_array "\
                                                 "GL_EXT_shader_io_blocks "\
                                                 "GL_EXT_gpu_shader5 "\
-                                                "GL_ARB_gpu_shader5 "\
                                                 "GL_EXT_geometry_shader "\
                                                 "GL_EXT_geometry_point_size "\
                                                 "GL_EXT_tessellation_shader "\
