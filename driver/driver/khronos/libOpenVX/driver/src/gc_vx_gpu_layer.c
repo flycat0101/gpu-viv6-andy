@@ -66,12 +66,12 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size                          programLength    = 0;
+    char *                           programSources = NULL;
 #endif
     vx_program                       program = VX_NULL;
     vx_status                        status = VX_FAILURE;
     vxnne_shader_executable          shaderExecutable = VX_NULL;
     vxnne_kernel_shaders             kernel;
-    char *                           programSources = NULL;
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 
     vx_enum      inputFormat        = input->tensorBuffer->dataFormat;
@@ -369,6 +369,7 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -386,7 +387,6 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
     vx_tensor    input_rs          = NULL;
     vx_tensor    output_rs         = NULL;
     vx_int32     sizes[4]          = {1, 1, 1, batch};
-    char *programSources = NULL;
     vx_scalar scale = NULL;
     vx_scalar zp = NULL;
 
@@ -545,6 +545,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -558,7 +559,6 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
     vx_uint32    depth             = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
     vx_enum      inputFormat       = input->tensorBuffer->dataFormat;
     vx_uint32    tmp               = 0;
-    char *programSources = NULL;
     vx_bool      optFlg            = vx_false_e;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
@@ -955,6 +955,7 @@ vxnne_shader_executable vxnneGetGPUEmbeddingLUTShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -971,7 +972,6 @@ vxnne_shader_executable vxnneGetGPUEmbeddingLUTShaderExecutable(
     vx_uint32     vw                         = TENSOR_VIEW_SIZE_INDEX(value, 0);
     vx_tensor     input_rs                   = NULL;
     vx_int32      rs_sizes[4]                = {1, 1, 1, 1};
-    char *programSources = NULL;
     vx_scalar zeroPointIn =NULL;
     vx_scalar zeroPointOut = NULL;
     vx_scalar scale = NULL;
@@ -1134,6 +1134,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength    = 0;
+    char *programSources = NULL;
 #endif
     vx_program program          = VX_NULL;
     vx_status  status           = VX_FAILURE;
@@ -1144,7 +1145,6 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
     vx_uint32  batch            = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
     vxnne_shader_executable shaderExecutable = VX_NULL;
     vxnne_kernel_shaders        kernel;
-    char *programSources = NULL;
 
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
     vx_enum      inputFormat       = input->tensorBuffer->dataFormat;
@@ -1385,6 +1385,7 @@ vxnne_shader_executable vxnneGPUGemm_noBiasShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program          = VX_NULL;
     vx_status  status           = VX_FAILURE;
@@ -1409,7 +1410,6 @@ vxnne_shader_executable vxnneGPUGemm_noBiasShaderExecutable(
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
     vx_enum      inputFormat       = input->tensorBuffer->dataFormat;
     vx_int32     size[]            = {1, 1, 1, 1};
-    char *programSources = NULL;
     vx_scalar cycle = NULL;
     vx_scalar scaleIn = NULL;
     vx_scalar scaleWeight = NULL;
@@ -1571,6 +1571,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char        *programSources          = NULL;
 #endif
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}};
     vxnne_shader_executable shaderExecutable = VX_NULL;
@@ -1598,7 +1599,6 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
 
     vx_enum     inputFormat              = input->tensorBuffer->dataFormat;
     vx_int32    size[]                   = {1, 1, 1, 1};
-    char        *programSources          = NULL;
     vx_scalar   scaleIn                  = NULL;
     vx_scalar   zpIn                     = NULL;
     vx_scalar   zpWeight                 = NULL;
@@ -2057,6 +2057,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program                       program              = VX_NULL;
     vx_status                        status               = VX_FAILURE;
@@ -2097,7 +2098,6 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_bool       enable_adjust_biases       = vx_false_e;
     vx_bool       enable_2d_img              = vx_false_e;
     vx_bool       is_use_2d_fun              = vx_false_e;
-    char *programSources = NULL;
     vx_scalar scaleIn = NULL;
     vx_scalar scaleWeight = NULL;
     vx_scalar scaleOut = NULL;
@@ -2570,6 +2570,7 @@ vxnne_shader_executable vxnneGetGPUDepth2SpaceShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -2581,7 +2582,6 @@ vxnne_shader_executable vxnneGetGPUDepth2SpaceShaderExecutable(
     vx_uint32     output_depth               = TENSOR_VIEW_SIZE_INDEX(output, 2);
     vx_enum       inputFormat                = input->tensorBuffer->dataFormat;
     vx_enum       outputFormat               = output->tensorBuffer->dataFormat;
-    char *programSources = NULL;
     vx_scalar zeroPointIn = NULL;
     vx_scalar zeroPointOut = NULL;
     vx_scalar scale = NULL;
@@ -2736,6 +2736,7 @@ vxnne_shader_executable vxnneGetGPUSpace2DepthShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -2747,7 +2748,6 @@ vxnne_shader_executable vxnneGetGPUSpace2DepthShaderExecutable(
     vx_uint32     input_width                = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32     input_height               = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32     input_depth                = TENSOR_VIEW_SIZE_INDEX(input, 2);
-    char *programSources = NULL;
     vx_scalar zeroPointIn = NULL;
     vx_scalar zeroPointOut = NULL;
     vx_scalar scale = NULL;
@@ -2980,6 +2980,7 @@ vxnne_shader_executable vxnneGetGPUFloorShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -2999,7 +3000,6 @@ vxnne_shader_executable vxnneGetGPUFloorShaderExecutable(
     vx_uint32     input_width                = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32     input_height               = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32     input_depth                = TENSOR_VIEW_SIZE_INDEX(input, 2);
-    char *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
@@ -3125,6 +3125,7 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -3159,7 +3160,6 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
     vx_uint32     sizes[4]         = {1, 1, 1, 1};
     vx_uint32     inputSize        = 0;
     vx_uint32     batch            = 0;
-    char *programSources = NULL;
     vx_scalar scaleIn = NULL;
     vx_scalar     scaleWeight      = NULL;
     vx_scalar     scaleOut         = NULL;
@@ -3556,6 +3556,7 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -3584,7 +3585,6 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
     vx_tensor     hit_rs                     = NULL;
     vx_tensor     output_rs                  = NULL;
     vx_int32      rs_sizes[4]                = {1, 1, 1, 1};
-    char *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
@@ -3781,6 +3781,7 @@ vxnne_shader_executable vxnneGPUL2NormSumSqrtShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -3792,7 +3793,6 @@ vxnne_shader_executable vxnneGPUL2NormSumSqrtShaderExecutable(
     vx_uint32     height                     = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_float32    inputScale                 = TENSOR_TF_SCALE(input);
     vx_int32      inputZP                    = TENSOR_TF_ZEROPOINT(input);
-    char *programSources = NULL;
     vx_scalar scaleIn = NULL;
     vx_scalar scaleOut = NULL;
     vx_scalar zp = NULL;
@@ -3917,6 +3917,7 @@ vxnne_shader_executable vxnneGPUL2NormSumScaleShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -3932,7 +3933,6 @@ vxnne_shader_executable vxnneGPUL2NormSumScaleShaderExecutable(
     vx_float32    outputScale        = TENSOR_TF_SCALE(output);
     vx_int32      inputZP            = TENSOR_TF_ZEROPOINT(input);
     vx_int32      outputZP           = TENSOR_TF_ZEROPOINT(output);
-    char *programSources = NULL;
     vx_scalar scaleIn = NULL;
     vx_scalar scaleOut = NULL;
     vx_scalar inZP = NULL;
@@ -4068,6 +4068,7 @@ vxnne_shader_executable vxnneGetGPUL2PoolingShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength    = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -4091,7 +4092,6 @@ vxnne_shader_executable vxnneGetGPUL2PoolingShaderExecutable(
     vx_float32   scaleOutValue      = 1.0f/TENSOR_TF_SCALE(output);
     vx_uint32    height             = (out_height - 1) * stride_w + kernel_size_y - pad_top - pad_bottom;
     vx_uint32    width              = (out_width - 1) * stride_h + kernel_size_x - pad_left - pad_right;
-    char *programSources = NULL;
     vx_scalar inZP = NULL;
     vx_scalar outZP = NULL;
     vx_scalar scaleIn = NULL;
@@ -4287,6 +4287,7 @@ vxnne_shader_executable vxnneGetGPUNormalizationShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength    = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -4304,7 +4305,6 @@ vxnne_shader_executable vxnneGetGPUNormalizationShaderExecutable(
     vx_float32      out_scale     = 1.0f/TENSOR_TF_SCALE(output);
     vx_int32        zpInValue     = TENSOR_TF_ZEROPOINT(input);
     vx_int32        zpOutValue    = TENSOR_TF_ZEROPOINT(output);
-    char *programSources = NULL;
     vx_scalar alpha = NULL;
     vx_scalar scaleIn  = NULL;
     vx_scalar scaleOut = NULL;
@@ -4496,6 +4496,7 @@ vxnne_shader_executable vxnneGetGPUActivationShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char           *programSources  = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -4517,7 +4518,6 @@ vxnne_shader_executable vxnneGetGPUActivationShaderExecutable(
     vx_int32       zpOutValue       = TENSOR_TF_ZEROPOINT(output);
     vx_float32     logEValue        = (vx_float32)(log10(exp(1.0f)) / log10(2.0f));
     vx_bool        enalbe_relu      = (vx_bool)(funcType == VX_NN_ACTIVATION_RELU || funcType == VX_NN_ACTIVATION_RELU1 || funcType == VX_NN_ACTIVATION_RELU6);
-    char           *programSources  = NULL;
     vx_scalar      logE             = VX_NULL;
     vx_bool        paramChanged     = vx_false_e;
     vx_scalar      scaleIn          = VX_NULL;
@@ -4891,6 +4891,7 @@ vxnne_shader_executable vxnneGetGPUMaxPoolingShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength    = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -4914,7 +4915,6 @@ vxnne_shader_executable vxnneGetGPUMaxPoolingShaderExecutable(
     vx_float32   scaleOutValue      = 1.0f/TENSOR_TF_SCALE(output);
     vx_uint32    height             = (out_height - 1) * stride_w + kernel_size_y - pad_top - pad_bottom;
     vx_uint32    width              = (out_width - 1) * stride_h + kernel_size_x - pad_left - pad_right;
-    char *programSources = NULL;
     vx_scalar inZP = NULL;
     vx_scalar outZP = NULL;
     vx_scalar scaleIn = NULL;
@@ -5106,6 +5106,7 @@ vxnne_shader_executable vxnneGetGPUTensorScaleShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char        *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -5125,7 +5126,6 @@ vxnne_shader_executable vxnneGetGPUTensorScaleShaderExecutable(
     vx_float32   scaleOutValue      = 1.0f/TENSOR_TF_SCALE(output);
     vx_float32   scaleXValue        = (vx_float32)in_width / (vx_float32)out_width;
     vx_float32   scaleYValue        = (vx_float32)in_height / (vx_float32)out_height;
-    char        *programSources = NULL;
     vx_scalar    scaleX_s = VX_NULL, scaleY_s = VX_NULL;
     vx_scalar inZP = NULL;
     vx_scalar outZP = NULL;
@@ -5262,6 +5262,7 @@ vxnne_shader_executable vxnneGetGPUTensorMaxValueShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char        *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -5270,7 +5271,6 @@ vxnne_shader_executable vxnneGetGPUTensorMaxValueShaderExecutable(
     vx_uint32 inDims = TENSOR_DIM_NUM(input);
     vx_kernel_execution_parameters_t execution_parameters = {inDims-1, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {1, 1, 1}};
     vx_enum      inputFormat        = TENSOR_DATA_TYPE(input);
-    char        *programSources = NULL;
     vx_scalar scaleIn = NULL;
     vx_scalar scaleOut = NULL;
     vx_scalar zpIn = NULL;
@@ -5401,6 +5401,7 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char        *programSources     = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -5417,7 +5418,6 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
     vx_enum      output_qnt_type    = TENSOR_QUANT_TYPE(output);
     vx_float32   scaleOutValue      = 1.0f;
     vx_float32   zpOutValue         = 0.0f;
-    char        *programSources     = NULL;
     vx_scalar    scale_s            = NULL;
     vx_scalar    scaleout           = NULL;
     vx_scalar    zpOut              = NULL;
@@ -5569,6 +5569,7 @@ vxnne_shader_executable vxnneGetGPUTensorReduceDivShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char        *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -5581,7 +5582,6 @@ vxnne_shader_executable vxnneGetGPUTensorReduceDivShaderExecutable(
     vx_uint32    in_width           = TENSOR_VIEW_SIZE_INDEX(input0, 0);
     vx_uint32    in_height          = TENSOR_VIEW_SIZE_INDEX(input0, 1);
     vx_uint32    depth              = TENSOR_VIEW_SIZE_INDEX(input0, 2);
-    char        *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input0=%p, output=%p", context, kernelEnum, input0, output);
 
@@ -5699,6 +5699,7 @@ vxnne_shader_executable vxnneGetGPURnnShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -5716,7 +5717,6 @@ vxnne_shader_executable vxnneGetGPURnnShaderExecutable(
     vx_uint32     bs_dims_rs                 = TENSOR_DIM_NUM(bias) == 1 ? 2 : TENSOR_DIM_NUM(bias);
     vx_uint32     i                          = 0;
     vx_enum       act                        = VX_NN_ACTIVATION_NONE;
-    char *programSources = NULL;
     vx_scalar  outputZP       = NULL;
     vx_scalar  inputZP        = NULL;
     vx_scalar  biasZP         = NULL;
@@ -5980,6 +5980,7 @@ vxnne_shader_executable vxnneGetGPUTensorElewiseShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength    = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -6007,7 +6008,6 @@ vxnne_shader_executable vxnneGetGPUTensorElewiseShaderExecutable(
     vx_uint32     i                     = 0;
     vx_bool       useImage2DFlag        = vx_false_e;
 
-    char *programSources = NULL;
     vx_scalar scaleIn0 = NULL;
     vx_scalar scaleIn1 = NULL;
     vx_scalar scaleOut = NULL;
@@ -6418,6 +6418,7 @@ vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -6439,7 +6440,6 @@ vxnne_shader_executable vxnneGPULSTMUnitShaderExecutable(
     vx_uint32    inputCount             = 0;
     vx_uint32    paramt_num             = 7;
     vx_scalar    cell_clip              = NULL;
-    char *programSources = NULL;
     vx_float32   logEValue              = (vx_float32)(log10(exp(1.0f)) / log10(2.0f));
     vx_float32   twoLogEValue           = 2 * logEValue;
     vx_scalar    logE                   = vxCreateScalar(context, VX_TYPE_FLOAT32, &logEValue);
@@ -6796,6 +6796,7 @@ vxnne_shader_executable vxnneGetGPULSTMUnitProjectionShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength    = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -6815,7 +6816,6 @@ vxnne_shader_executable vxnneGetGPULSTMUnitProjectionShaderExecutable(
     vx_scalar     proj_clip      = NULL;
     vx_int32      bias_sizes[4]  = {num_units, 1, 1, 1};
     vx_uint32     paramNum       = 0;
-    char *programSources = NULL;
 
     parameters[paramNum++] = (vx_reference)input;
     parameters[paramNum++] = (vx_reference)weights;
@@ -6948,6 +6948,7 @@ vxnne_shader_executable vxnneGetGPUBatch2SpaceShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -6978,7 +6979,6 @@ vxnne_shader_executable vxnneGetGPUBatch2SpaceShaderExecutable(
     vx_int32      block_h                    = 0;
     vx_scalar     blockw                     = NULL;
     vx_scalar     blockh                     = NULL;
-    char *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -7129,6 +7129,7 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -7160,7 +7161,6 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
     vx_scalar     blockh                     = NULL;
     vx_scalar     padX                       = NULL;
     vx_scalar     padY                       = NULL;
-    char *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -7314,6 +7314,7 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxis0ShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength    = 0;
+    char *programSources   = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -7329,7 +7330,6 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxis0ShaderExecutable(
     vx_scalar     axisScale             = vxCreateScalar(context, VX_TYPE_FLOAT32, &axis_coef);
     vx_reference  parameters[7]         = {(vx_reference)input, (vx_reference)axisScale, (vx_reference)output, (vx_reference)VX_NULL, (vx_reference)VX_NULL, (vx_reference)VX_NULL, (vx_reference)VX_NULL};
     vx_uint32     paramnum              = 3;
-    char *programSources   = NULL;
     vx_scalar     zpIn     = NULL;
     vx_scalar     zpOut    = NULL;
     vx_scalar     scaleIn  = NULL;
@@ -7459,6 +7459,7 @@ vxnne_shader_executable vxnneGetGPUSvdfShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -7475,7 +7476,6 @@ vxnne_shader_executable vxnneGetGPUSvdfShaderExecutable(
     vx_uint32     bs_dims                    = TENSOR_DIM_NUM(bias);
     vx_uint32     output_width               = TENSOR_VIEW_SIZE_INDEX(output, 0);
     vx_scalar     rank                       = vxCreateScalar(context, VX_TYPE_INT32, &rankValue);
-    char *programSources = NULL;
 
    gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, bias=%p, weight=%p, output=%p",
          context, kernelEnum, borderMode, input, bias, weight, output);
@@ -7606,6 +7606,7 @@ vxnne_shader_executable vxnneGetGPUTensorPadShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program                       program              = VX_NULL;
     vx_status                        status               = VX_FAILURE;
@@ -7626,7 +7627,6 @@ vxnne_shader_executable vxnneGetGPUTensorPadShaderExecutable(
     vx_uint32     padRightv                  = padRight->value->u32;
     vx_uint32     padTopv                    = padTop->value->u32;
     vx_uint32     padBottomv                 = padBottom->value->u32;
-    char *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, inputs=%p, outputs=%p",
          context, kernelEnum, borderMode, inputs, outputs);
@@ -7740,6 +7740,7 @@ vxnne_shader_executable vxnneGetGPUTensorCropShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength    = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -7756,7 +7757,6 @@ vxnne_shader_executable vxnneGetGPUTensorCropShaderExecutable(
     vx_uint32     depth                 = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
     vx_tensor     src                   = NULL;
     vx_tensor     dst                   = NULL;
-    char *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -7885,6 +7885,7 @@ vxnne_shader_executable vxnneGetGPUTensorStridedSliceShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength    = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -7907,7 +7908,6 @@ vxnne_shader_executable vxnneGetGPUTensorStridedSliceShaderExecutable(
     vx_uint32     height                = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(output, 1) : 1;
     vx_uint32     depth                 = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
     vx_reference  parameters[8]         = {(vx_reference)input, (vx_reference)output, (vx_reference)offsetX, (vx_reference)offsetY, (vx_reference)offsetZ, (vx_reference)strideX, (vx_reference)strideY, (vx_reference)strideZ};
-    char *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -8043,6 +8043,7 @@ vxnne_shader_executable vxnneGetGPUReverseShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -8060,7 +8061,6 @@ vxnne_shader_executable vxnneGetGPUReverseShaderExecutable(
     vx_tensor     input_rs                   = NULL;
     vx_tensor     output_rs                  = NULL;
     vx_int32      rs_sizes[4]                = {1, 1, 1, 1};
-    char *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -8255,6 +8255,7 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char        *programSources          = NULL;
 #endif
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}};
     vxnne_shader_executable shaderExecutable = VX_NULL;
@@ -8282,7 +8283,6 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
 
     vx_enum     inputFormat              = TENSOR_DATA_TYPE(input);
     vx_int32    size[]                   = {1, 1, 1, 1};
-    char        *programSources          = NULL;
     vx_scalar   scaleIn                  = NULL;
     vx_scalar   zpIn                     = NULL;
     vx_scalar   zpWeight                 = NULL;
@@ -8755,6 +8755,7 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
+    char *programSources = NULL;
 #endif
     vx_program program = VX_NULL;
     vx_status  status = VX_FAILURE;
@@ -8788,7 +8789,6 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
     vx_scalar    inputHeight       = NULL;
     vx_scalar    heightDiff        = NULL;
 
-    char *programSources = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
