@@ -4322,6 +4322,12 @@ _DetectProcess(
             gcvFALSE
         },
 
+        {
+            gcvPATCH_DEQP_VK,
+            "\x9b\x9a\x8e\x8f\xd2\x89\x94",
+            gcvFALSE
+        },
+
 #if defined(ANDROID)
         {
             gcvPATCH_A8HP,

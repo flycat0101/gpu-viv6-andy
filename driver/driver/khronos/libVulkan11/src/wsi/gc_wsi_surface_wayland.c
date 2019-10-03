@@ -1161,6 +1161,7 @@ registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
     __vkWaylandSwapchainKHR *sc = data;
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
     char *p;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
 #endif
 
     if (strcmp(interface, "wl_viv") == 0)
@@ -1179,11 +1180,15 @@ registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
         p = getenv("WL_EGL_CLIENT_FENCE");
         if((p == gcvNULL) || (p[0] != '0'))
         {
-            sc->use_explicit_sync = 1;
-            sc->explicit_sync = wl_registry_bind(
-                registry, name,
-                &zwp_linux_explicit_synchronization_v1_interface, 1);
-            wl_proxy_set_queue((struct wl_proxy *)sc->explicit_sync, sc->wl_queue);
+            gcoHAL_GetPatchID(gcvNULL, &patchId);
+            if (patchId != gcvPATCH_DEQP_VK )
+            {
+                sc->use_explicit_sync = 1;
+                sc->explicit_sync = wl_registry_bind(
+                    registry, name,
+                    &zwp_linux_explicit_synchronization_v1_interface, 1);
+                wl_proxy_set_queue((struct wl_proxy *)sc->explicit_sync, sc->wl_queue);
+            }
         }
     }
 #endif
