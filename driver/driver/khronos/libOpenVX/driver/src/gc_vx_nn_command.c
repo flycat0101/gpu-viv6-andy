@@ -1068,15 +1068,15 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
                     size = dims[2];
                     value->e32[0] = 1;
                 }
-                else if (perm[0] == 1 && perm[1] == 2) /* y, z, x */
+                else if (context->hwChipInfo.customerID == 0xAE)
                 {
-                    slice = x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
-                    size = dims[2];
-                    value->e32[0] = 2;
-                }
-                if (context->hwChipInfo.customerID == 0xAE)
-                {
-                    if (perm[0] == 2 && perm[1] == 0) /* z, x, y */
+                    if (perm[0] == 1 && perm[1] == 2) /* y, z, x */
+                    {
+                        slice = x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
+                        size = dims[2];
+                        value->e32[0] = 2;
+                    }
+                    else if (perm[0] == 2 && perm[1] == 0) /* z, x, y */
                     {
                         slice = mult ? gcmMIN(dims[1], core) : 1;
                         size = dims[1];
