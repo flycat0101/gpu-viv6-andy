@@ -3292,7 +3292,8 @@ IN OUT clsNAME **RefParamName
      clmIsElementTypeImage(rDecl->dataType->elementType)) {
       sameType = gcvTRUE;
   }
-  else if(clmIsElementTypeFloating(paramDecl->dataType->elementType) &&
+  else if(!cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_CL_KHR_FP16) &&
+     clmIsElementTypeFloating(paramDecl->dataType->elementType) &&
      rDecl->dataType->elementType == clvTYPE_HALF) {
       sameType = gcvTRUE;
   }
