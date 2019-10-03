@@ -8006,6 +8006,9 @@ gcChipProgramBinary_V0(
         gcSHADER_TYPE_FRAGMENT,
         gcSHADER_TYPE_COMPUTE,
     };
+    gctUINT32 i;
+    gctUINT32 j;
+    gctUINT32 nameCount = 0;
 
     gcmHEADER_ARG("gc=0x%x programObject=0x%x binary=0x%x length=%d", gc, programObject, binary, length);
 
@@ -8072,6 +8075,43 @@ gcChipProgramBinary_V0(
                                          (gctUINT32)length,
                                          masterPgInstance->binaries,
                                          gcvNULL));
+    }
+
+    /* Loop up shaders until the last one non-fragment,and restore program XFB state if need. */
+    for (i = 0; i < gcvPROGRAM_STAGE_FRAGMENT; i++)
+    {
+        if (masterPgInstance->binaries[i] != gcvNULL)
+        {
+            nameCount += GetFeedbackVaryingCount(&(masterPgInstance->binaries[i]->transformFeedback));
+        }
+    }
+
+    /* If some XFB state need to restore. */
+    if (nameCount > 0)
+    {
+        programObject->ppXfbVaryingNames = (GLchar**)(*gc->imports.malloc)(gc, nameCount*sizeof(GLchar*));
+        programObject->xfbVaryingNum = nameCount;
+
+        nameCount = 0;
+
+        for (i = 0; i < gcvPROGRAM_STAGE_FRAGMENT; i++)
+        {
+            if (masterPgInstance->binaries[i] != gcvNULL)
+            {
+                /* Restore XFB state of program,according to binaries sharder info. */
+                if(GetFeedbackVaryingCount(&(masterPgInstance->binaries[i]->transformFeedback)))
+                    programObject->xfbMode = (GetFeedbackBufferMode(&(masterPgInstance->binaries[i]->transformFeedback)) == gcvFEEDBACK_SEPARATE)
+                                                                                                                            ? GL_SEPARATE_ATTRIBS
+                                                                                                                            : GL_INTERLEAVED_ATTRIBS;
+                for (j = 0; j < GetFeedbackVaryingCount(&(masterPgInstance->binaries[i]->transformFeedback)); j++)
+                {
+                    gctUINT32 nameLen = (gctUINT32)strlen(&GetFeedbackVaryings(&(masterPgInstance->binaries[i]->transformFeedback))->name[j]) + 1;
+                    programObject->ppXfbVaryingNames[nameCount] = (GLchar*)(*gc->imports.malloc)(gc, nameLen);
+                    strcpy(programObject->ppXfbVaryingNames[nameCount],&GetFeedbackVaryings(&(masterPgInstance->binaries[i]->transformFeedback))->name[j]);
+                    nameCount += 1;
+                }
+            }
+        }
     }
 
     for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
