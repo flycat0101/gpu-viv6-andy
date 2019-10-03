@@ -9825,18 +9825,13 @@ VX_PRIVATE_API vx_status vxoGraph_ProcessKernelPrint(vx_graph graph)
         {
             if (graph->layer->operations[i]->target == VXNNE_OPERATION_TARGET_SH)
             {
-                vxnne_shader_operation shaderOperation  = VX_NULL;
-                vx_shader shader = VX_NULL;
+                vxnne_shader_operation shaderOperation  = (vxnne_shader_operation)graph->layer->operations[i];
+                vx_shader shader = shaderOperation->shaderExecutable->kernelShader;
 
-                if (!graph->layer->operations[i]->layer->node->kernel->kernelShader)
+                if (shader->hasPrintf)
                 {
-                    shaderOperation  = (vxnne_shader_operation)graph->layer->operations[i];
-                    shader = shaderOperation->shaderExecutable->kernelShader;
-                    if (shader->hasPrintf)
-                    {
-                        vxmONERROR(vxoKernel_ProcessKernelShaderPrint(shader,
-                            &shaderOperation->shaderExecutable->shaderParam));
-                    }
+                    vxmONERROR(vxoKernel_ProcessKernelShaderPrint(shader,
+                        &shaderOperation->shaderExecutable->shaderParam));
                 }
             }
         }
