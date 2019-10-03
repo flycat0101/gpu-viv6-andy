@@ -7176,7 +7176,7 @@ gcSHADER_Conv2VIR(
 
     VirShader->debugInfo = Shader->debugInfo;
 
-    if (gcmOPT_DriverVIRPath())
+    if (gcmOPT_DriverVIRPath() && !gcShaderHasVivVxExtension(Shader)) /* skip medium level opt for vx program */
     {
         /* Suppose vir is under pre-ML now */
         VIR_Shader_SetLevel(VirShader, VIR_SHLEVEL_Pre_Medium);
