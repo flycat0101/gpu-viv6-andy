@@ -1865,7 +1865,7 @@ static int32_t get_used_color_count(
         {
             colorOutCount++;
         }
-        __VK_ASSERT(!(hints->psOutput2RtIndex[i] != -1 && subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED) );
+        /*__VK_ASSERT(!(hints->psOutput2RtIndex[i] != -1 && subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED) );*/
     }
 
     return colorOutCount;
