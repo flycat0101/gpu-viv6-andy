@@ -8566,7 +8566,7 @@ gcoHARDWARE_DrawPattern(
 
     gcmHEADER_ARG("Hardware=0x%x", Hardware);
 
-    gcoBUFFER_StartTEMPCMDBUF(Hardware->engine[gcvENGINE_RENDER].buffer, Hardware->engine[gcvENGINE_RENDER].queue, &tempCMD);
+    gcmONERROR(gcoBUFFER_StartTEMPCMDBUF(Hardware->engine[gcvENGINE_RENDER].buffer, Hardware->engine[gcvENGINE_RENDER].queue, &tempCMD));
 
     cmdBuffer = tempCMD->buffer;
 
@@ -8585,7 +8585,7 @@ gcoHARDWARE_DrawPattern(
     tempCMD->currentByteSize =  (gctUINT32)((gctUINT8_PTR)cmdBuffer -
                                 (gctUINT8_PTR)tempCMD->buffer);
 
-    gcoBUFFER_EndTEMPCMDBUF(Hardware->engine[gcvENGINE_RENDER].buffer, gcvFALSE);
+    gcmONERROR(gcoBUFFER_EndTEMPCMDBUF(Hardware->engine[gcvENGINE_RENDER].buffer, gcvFALSE));
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
