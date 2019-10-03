@@ -224,8 +224,8 @@ static void _calcArchModelCacheMode(vx_context context, vx_arch_perf perf, vx_in
 
 
 static vx_int8 gOrigShowType = -1;
-static const vx_char *archModelVersion = "ARCHCTS@219176";
-static const vx_char *SWTilingVersion = "ARCHCTS@219176";
+static const vx_char *archModelVersion = "ARCHCTS@212456";
+static const vx_char *SWTilingVersion = "ARCHCTS@212456";
 vx_status showArchPerformance(
     vx_context context,
     vxnne_layer layer,
@@ -1242,7 +1242,7 @@ vx_float64 _calcComputeCycleCount(
     vx_float64 computeCycle;
     vx_uint32 xydpVectorPruneAmount, zdpVectorPruneAmount, numOfPruneGroupsInDpn, numOfDpnInImgBuf;
     vx_uint32 selected_xydp_x, selected_xydp_y, selected_zdp;
-
+    vx_uint32 vip7Version = 0, rotate_cell = 0, vip_v7_fc = 0, vip_v7_dp6 = 0, vip_v7_xdp3 = 0, vip_v7_zdp3 = 0;
     if (xydp_x == 0 || xydp_y == 0) /*zdp only arch*/
     {
         tile3DComputeCycle = ceilf(((vx_float32)tile_y * tile_x) / lanes_per_conv) * kernel_per_core;
@@ -1277,41 +1277,63 @@ vx_float64 _calcComputeCycleCount(
         *refined_non_zero_ratio = non_zero_ratio;
         return computeCycle;
     }
-
-    pipeLatency = (data_size != 8 && fp16 != 0)  ? 6
-        : ((xydp_x != 1) || (xydp_y != 1) || (zdp != 1)) ? 1 : 4;
-
-    accumCycle = ceilf((vx_float32)tile_y / interleave_mode);
-
-    if (kx * ky == 1)
+    else
     {
-        tile3DComputeCycle = gcmMAX(ceilf((vx_float32)tile_y / interleave_mode) * kernel_per_core, pipeLatency);
+        vip7Version = (vip_v7_16bit == 0 && fp16 == 1) ? 0 : 1;
     }
-    else if (accumCycle == 4)
+
+    vip_v7_fc = (vip7Version && (kx == 1) && (ky != 1)) ? 1 : 0;
+    vip_v7_dp6 = (vip7Version && (xydp_x == 3) && (xydp_y == 2)) ? 1 : 0;
+    vip_v7_xdp3 = (vip7Version && (xydp_x == 3) && (xydp_y == 1)) ? 1 : 0;
+    vip_v7_zdp3 = (vip7Version && (zdp == 3) && (kx * ky == 1)) ? 1 : 0;
+    if (vip_v7_fc || vip_v7_zdp3 || (vip_v7_dp6 && (kx == 3) && (ky == 3)) || (vip_v7_xdp3 && (kx == 2) && (ky == 2)))
     {
-        tile3DComputeCycle = 4 * (vx_float32)kernel_per_core;
+        rotate_cell = 2;
+    }
+    else if ((vip_v7_dp6 && (kx == 2) && (ky == 2)) || ((zdp == 1) && (kx * ky == 1)) || (xydp_x == 1))
+    {
+        rotate_cell = 1;
     }
     else
     {
-        tile3DComputeCycle = gcmMAX(ceilf((vx_float32)tile_y / interleave_mode) , pipeLatency) * kernel_per_core;
+        rotate_cell = 3;
+    }
+
+    pipeLatency = (rotate_cell == 1) ? 4 : 6;
+    if (vip_v7_16bit)
+    {
+        pipeLatency += 2;
+    }
+
+    accumCycle = ceilf((vx_float32)tile_y / interleave_mode);
+    if ((zdp == 1) && (xydp_x == 1) && (xydp_y == 1) && (accumCycle == 4))
+    {
+        tile3DComputeCycle = 4 * (vx_float32)kernel_per_core;
+    }
+    else if ((rotate_cell == 1) || (vip_v7_zdp3 == 1) || (vip7Version == 0))
+    {
+        tile3DComputeCycle = gcmMAX(ceilf((vx_float32)tile_y / interleave_mode) * kernel_per_core * rotate_cell, pipeLatency);
+    }
+    else
+    {
+        tile3DComputeCycle = gcmMAX(ceilf((vx_float32)tile_y / interleave_mode) * rotate_cell, pipeLatency) * kernel_per_core;
     }
 
     tmp = y % tile_y;
     if (tmp != 0)
     {
         accumCycle = ceilf((vx_float32)tmp / interleave_mode);
-
-        if (kx * ky == 1)
-        {
-            bottomTile3DComputeCycle = gcmMAX(ceilf((vx_float32)tmp / interleave_mode) * kernel_per_core, pipeLatency);
-        }
-        else if (accumCycle == 4)
+        if ((zdp == 1) && (xydp_x == 1) && (xydp_y == 1) && (accumCycle == 4))
         {
             bottomTile3DComputeCycle = 4 * (vx_float32)kernel_per_core;
         }
+        else if ((rotate_cell == 1) || (vip_v7_zdp3 == 1) || (vip7Version == 0))
+        {
+            bottomTile3DComputeCycle = gcmMAX(ceilf((vx_float32)tmp / interleave_mode) * kernel_per_core * rotate_cell, pipeLatency);
+        }
         else
         {
-            bottomTile3DComputeCycle = gcmMAX(ceilf((vx_float32)tmp / interleave_mode), pipeLatency) * kernel_per_core;
+            bottomTile3DComputeCycle = gcmMAX(ceilf((vx_float32)tmp / interleave_mode) * rotate_cell, pipeLatency) * kernel_per_core;;
         }
     }
     else
@@ -1420,11 +1442,18 @@ vx_float64 _calcComputeCycleCount(
     computeCycle = tile3DComputeCycle * (vx_int32)(y / tile_y) + bottomTile3DComputeCycle;
     if (is_depth_wise)
     {
-        computeCycle = computeCycle * dpKX * dpKY * z * ceilf((vx_float32)x / tile_x) / kernel_per_core;
+        computeCycle = computeCycle * ceilf((vx_float32)dpKX * dpKY / rotate_cell) * z * ceilf((vx_float32)x / tile_x) / kernel_per_core;
     }
     else
     {
-        computeCycle = computeCycle * dpKX * dpKY * dpKZ * z * dpNonZeroRatio * ceilf((vx_float32)x / tile_x) / kernel_per_core;
+        if ((vip7Version == 0) || (vip_v7_zdp3 == 1))
+        {
+            computeCycle = computeCycle * ceilf((vx_float32)dpKX * dpKY * dpKZ / rotate_cell) * z * dpNonZeroRatio * ceilf((vx_float32)x / tile_x) / kernel_per_core;
+        }
+        else
+        {
+            computeCycle = computeCycle * ceilf((vx_float32)dpKX * dpKY / rotate_cell) * dpKZ * z * dpNonZeroRatio * ceilf((vx_float32)x / tile_x) / kernel_per_core;
+        }
     }
     if (kx == 1 && ky == 1 && conv1x1_half_performance && selected_zdp == 1)
     {
