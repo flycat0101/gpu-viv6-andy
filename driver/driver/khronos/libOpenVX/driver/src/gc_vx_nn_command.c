@@ -4236,13 +4236,13 @@ _SplitInputAndOutputForMultiTPCores(vx_context context,
             }
             else
             {
-                vx_uint32 max = gcmMAX(gcmMAX(output_size_x * stride_x, output_size_y * stride_y), output_size_z / stride_x / stride_y);
+                vx_uint32 max = gcmMAX(gcmMAX(output_size_x, output_size_y), output_size_z / stride_x / stride_y);
 
                 if (output_size_z / stride_x / stride_y == max)
                 {
                     div_z = gcmMIN(core, num_slice);
                 }
-                else if (output_size_y * stride_y == max)
+                else if (output_size_y == max)
                 {
                     div_y = gcmMIN(core, num_slice);
                 }
