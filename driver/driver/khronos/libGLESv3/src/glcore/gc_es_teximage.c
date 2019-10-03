@@ -1592,6 +1592,10 @@ GLboolean __glCheckCompressedTexImgFmt(__GLcontext *gc, GLint internalFormat, GL
     case GL_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2:
     case GL_COMPRESSED_RGBA8_ETC2_EAC:
     case  GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC:
+        if(gc->apiVersion == __GL_API_VERSION_ES20 || gc->constants.majorVersion == 2)
+        {
+            gcoOS_Print("warning: APP should not use compressed format 0x%0x under ES2.0!" , internalFormat);
+        }
         *supportCubeMapArray = GL_TRUE;
         break;
 
@@ -1625,6 +1629,11 @@ GLboolean __glCheckCompressedTexImgFmt(__GLcontext *gc, GLint internalFormat, GL
     case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR:
     case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR:
     case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR:
+
+        if(gc->apiVersion == __GL_API_VERSION_ES20 || gc->constants.majorVersion == 2)
+        {
+            gcoOS_Print("warning: APP should not use compressed format 0x%0x under ES2.0!" , internalFormat);
+        }
 
         if (__glExtension[__GL_EXTID_KHR_texture_compression_astc_ldr].bEnabled)
         {
