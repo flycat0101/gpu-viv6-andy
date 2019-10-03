@@ -1495,7 +1495,7 @@ _fill_TP_RESHUFFLE_Command_EX(
             info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outSliceSize * outZSize / (stride_x * stride_y);
             info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = stride_y;
             info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
-            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = out_size_x;
+            info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = out_pitch_x;
             info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = out_size_y;
             info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 1;
             info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
