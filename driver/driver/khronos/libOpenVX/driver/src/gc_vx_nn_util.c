@@ -85,6 +85,13 @@ vx_float32 BF16toFp32(const vx_uint16 in)
     return out;
 }
 
+vx_int16 Fp32toBF16(vx_float32 val)
+{
+    vx_uint32 f32 = (*(vx_uint32 *) &val);
+    vx_int16 bf16 = f32 >> 16;
+    return bf16;
+}
+
 vx_int16 Fp32toFp16(vx_float32 val)
 {
     vx_uint32 f32 = (*(vx_uint32 *) &val);

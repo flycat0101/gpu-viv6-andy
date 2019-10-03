@@ -19,6 +19,8 @@
 
 static vx_uint32 optPhase = 1;
 
+extern vx_int16 Fp32toBF16(vx_float32 val);
+
 VX_INTERNAL_API vx_uint32 vxoGraphOptimization_computeFinalKernelSize(vx_uint32 kernelsize, vx_uint32 stride)
 {
     vx_uint32 alignedWidth = ((kernelsize % stride == 0) ? kernelsize : (kernelsize + (stride - kernelsize % stride)));
@@ -438,6 +440,13 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
 
             switch (TENSOR_DATA_TYPE(input0))
             {
+            case VX_TYPE_BFLOAT16:
+                if(TENSOR_DATA_TYPE(output) == VX_TYPE_BFLOAT16)
+                {
+                    gcmFOOTER_ARG("%d", OP_ELTWISE_ASMD);
+                    return OP_ADD_SUB;
+                }
+                break;
             case VX_TYPE_FLOAT16:
                 if(TENSOR_DATA_TYPE(output) == VX_TYPE_FLOAT16 ||
                     TENSOR_DATA_TYPE(output) == VX_TYPE_UINT8 ||
@@ -2526,6 +2535,8 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
     {
         if(TENSOR_DATA_TYPE(input) == VX_TYPE_FLOAT16)
             quantizedData = Fp32toFp16(fill_data);
+        if(TENSOR_DATA_TYPE(input) == VX_TYPE_BFLOAT16)
+            quantizedData = Fp32toBF16(fill_data);
         else
         {
             vx_int8 fl= TENSOR_POS(weight);
@@ -2704,15 +2715,23 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv_createWeight_fp16(
 {
     vx_context context = vxGetContext((vx_reference)tensorIn[0]);
     vx_size wDims[4] = {1,1,2 * coreNum,coreNum};
+    vx_int16 weightData[2] = {0, 0};
 
     gcmHEADER_ARG("tensorIn=%p, coreNum=0x%x, weight=%p, factor=0x%x", tensorIn, coreNum, weight, factor);
 
-    *weight = vxCreateTensor(context, 4, wDims, VX_TYPE_FLOAT16, 0);
+    *weight = vxCreateTensor(context, 4, wDims, TENSOR_DATA_TYPE(tensorIn[0]), 0);
 
+    if(VX_TYPE_BFLOAT16 == TENSOR_DATA_TYPE(tensorIn[0]))
     {
-        vx_int16 weightData[2] = {Fp32toFp16(1.f), (vx_int16)(Fp32toFp16(1.f* factor) )};
-        vxoGraphOptimization_TensorAdd2Conv_copyData2Weight_int16(weight, coreNum, weightData);
+        weightData[0] = Fp32toBF16(1.f);
+        weightData[1] = Fp32toBF16(1.f* factor);
     }
+    else if(VX_TYPE_FLOAT16 == TENSOR_DATA_TYPE(tensorIn[0]))
+    {
+        weightData[0] = Fp32toFp16(1.f);
+        weightData[1] = Fp32toFp16(1.f* factor);
+    }
+    vxoGraphOptimization_TensorAdd2Conv_copyData2Weight_int16(weight, coreNum, weightData);
 
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
@@ -3081,20 +3100,26 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
                 CHECK_NULL(convOutTensor);
             }
 
-            if(VX_TYPE_FLOAT16 == TENSOR_DATA_TYPE(tensorIn[0]))
+            if(VX_TYPE_FLOAT16 == TENSOR_DATA_TYPE(tensorIn[0]) ||
+                VX_TYPE_BFLOAT16 == TENSOR_DATA_TYPE(tensorIn[0]))
             {
                 vxoGraphOptimization_TensorAdd2Conv_createWeight_fp16(tensorIn, core, &weight, factor);
             }
             else
             {
-                perpareQuantizedWeightAndBiasFunc getWB[2] = {
-                    vxoGraphOptimization_TensorAdd2Conv_copyData2WeightAndBias_dfp,
-                    vxoGraphOptimization_TensorAdd2Conv_copyData2WeightAndBias_asymmetic
-                };
-
                 vxoGraphOptimization_TensorAdd2Conv_createQuantizedWeightAndBias(&weight, &bias, tensorIn, core);
-
-                getWB[TENSOR_QUANT_TYPE(tensorIn[0]) - 1](&weight, &bias, tensorIn, core, factor);
+                switch (TENSOR_QUANT_TYPE(tensorIn[0]))
+                {
+                case VX_QUANT_AFFINE_SCALE:
+                    vxoGraphOptimization_TensorAdd2Conv_copyData2WeightAndBias_asymmetic(&weight, &bias, tensorIn, core, factor);
+                    break;
+                case VX_QUANT_DYNAMIC_FIXED_POINT:
+                    vxoGraphOptimization_TensorAdd2Conv_copyData2WeightAndBias_dfp(&weight, &bias, tensorIn, core, factor);
+                    break;
+                default:
+                     vxWarning("unknwon quantization type when to create weight in tensorAdd\n");
+                    break;
+                }
             }
 
             if(bias) TENSOR_DATA_LIFETIME(bias) = VX_TENSOR_LIFE_TIME_STATIC;
