@@ -10570,7 +10570,7 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 
         vxoGraph_BeginProcess(graph);
 
-        vxo_updateSwapHandle(graph);
+        //vxo_updateSwapHandle(graph);
 
         if (graph->commandBuffer)
         {
