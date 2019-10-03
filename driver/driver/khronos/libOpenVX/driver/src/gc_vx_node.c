@@ -711,11 +711,6 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
         node->graph->reverify = vx_true_e;
         node->graph->verified = vx_false_e;
     }
-    else if (node->graph->verified &&
-             node->kernel->enumeration == VX_KERNEL_NN_YUV2RGB_SCALE && !node->numParents)
-    {
-        node->graph->reprocess = vx_true_e;
-    }
 
     if (node->paramTable[index] != VX_NULL && node->paramTable[index]->delay != VX_NULL)
     {

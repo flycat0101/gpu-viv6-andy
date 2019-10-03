@@ -10259,7 +10259,7 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 
         if (!isSwaped && graph->commandBuffer)
         {
-            if (graph->reprocess)
+            if (graph->scalerHead)
             {
                 status |= vxoGraph_ProcessInternal(graph);
             }

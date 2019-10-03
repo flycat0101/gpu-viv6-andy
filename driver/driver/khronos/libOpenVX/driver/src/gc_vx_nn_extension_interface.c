@@ -20264,10 +20264,11 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
         if (executionLayer->graph->verified == vx_false_e && executionLayer->graph->base.context->options.enableGraphCommandBuffer == vx_true_e &&
             i == 0 && operation->target == VXNNE_OPERATION_TARGET_SC)
         {
+            executionLayer->graph->scalerHead = vx_true_e;
             continue;
         }
         else if (executionLayer->graph->verified == vx_true_e && executionLayer->graph->base.context->options.enableGraphCommandBuffer == vx_true_e &&
-                 executionLayer->graph->reprocess == vx_true_e && (i != 0 || operation->target != VXNNE_OPERATION_TARGET_SC))
+                 executionLayer->graph->scalerHead == vx_true_e && (i != 0 || operation->target != VXNNE_OPERATION_TARGET_SC))
         {
             continue;
         }
