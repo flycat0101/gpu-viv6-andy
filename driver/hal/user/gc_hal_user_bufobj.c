@@ -1152,7 +1152,8 @@ gcoBUFOBJ_IndexBind (
     IN gcoBUFOBJ Index,
     IN gceINDEX_TYPE Type,
     IN gctSIZE_T Offset,
-    IN gctSIZE_T Count
+    IN gctSIZE_T Count,
+    IN gctUINT   RestartElement
     )
 {
     gctUINT32 startAddress, endAddress;
@@ -1178,7 +1179,7 @@ gcoBUFOBJ_IndexBind (
     gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_INDEX, Index->memory.u.normal.node, 0);
 #endif
     /* Program index */
-    gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL, startAddress, endAddress, Type, (Count * 3)));
+    gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL, address, endAddress, Type, (Count * 3), RestartElement));
 
 OnError:
     /* Return the status. */
@@ -1670,7 +1671,8 @@ gcoBUFOBJ_IndexBind (
     IN gcoBUFOBJ Index,
     IN gceINDEX_TYPE Type,
     IN gctSIZE_T Offset,
-    IN gctSIZE_T Count
+    IN gctSIZE_T Count,
+    IN gctUINT   RestartElement
     )
 {
     return gcvSTATUS_OK;

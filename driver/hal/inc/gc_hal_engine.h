@@ -2855,7 +2855,8 @@ gcoBUFOBJ_IndexBind (
     IN gcoBUFOBJ Index,
     IN gceINDEX_TYPE Type,
     IN gctSIZE_T Offset,
-    IN gctSIZE_T Count
+    IN gctSIZE_T Count,
+    IN gctUINT   RestartElement
     );
 
 /* Find min and max index for the index buffer */

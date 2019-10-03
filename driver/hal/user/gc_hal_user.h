@@ -1966,7 +1966,8 @@ gcoHARDWARE_BindIndex(
     IN gctUINT32 Address,
     IN gctUINT32 EndAddress,
     IN gceINDEX_TYPE IndexType,
-    IN gctSIZE_T Bytes
+    IN gctSIZE_T Bytes,
+    IN gctUINT   RestartElement
     );
 
 /* Initialize CL hardware. */

@@ -2082,7 +2082,8 @@ gcoVERTEXARRAY_IndexBind(
         gcmONERROR(gcoBUFOBJ_IndexBind(IndexInfo->u.es30.indexBuffer,
                                        IndexInfo->indexType,
                                        gcmPTR2SIZE(IndexInfo->indexMemory),
-                                       count32));
+                                       count32,
+                                       IndexInfo->restartElement));
     }
     /* Test if there are client indices. */
     else if (IndexInfo->indexMemory != gcvNULL)

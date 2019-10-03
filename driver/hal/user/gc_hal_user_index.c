@@ -515,7 +515,8 @@ gcoINDEX_Load(
                                      address,
                                      endAddress,
                                      IndexType,
-                                     Index->bytes));
+                                     Index->bytes,
+                                     0xFFFFFFFF));
 
     /* Success. */
     gcmFOOTER_NO();
@@ -589,7 +590,8 @@ gcoINDEX_Bind(
                                    address,
                                    endAddress,
                                    Type,
-                                   Index->bytes);
+                                   Index->bytes,
+                                   0xFFFFFFFF);
     gcmFOOTER();
     return status;
 }
@@ -642,7 +644,8 @@ gcoINDEX_BindOffset(
                                    address + Offset,
                                    endAddress,
                                    Type,
-                                   Index->bytes - Offset);
+                                   Index->bytes - Offset,
+                                   0xFFFFFFFF);
     gcmFOOTER();
     return status;
 }
@@ -2316,7 +2319,8 @@ gcoINDEX_BindDynamic(
                                      (Index->dynamicHead->physical + Index->dynamicHead->lastStart),
                                      endAddress,
                                      Type,
-                                     (Index->dynamicHead->lastEnd - Index->dynamicHead->lastStart)));
+                                     (Index->dynamicHead->lastEnd - Index->dynamicHead->lastStart),
+                                     0xFFFFFFFF));
 
     /* Success. */
     gcmFOOTER_NO();
