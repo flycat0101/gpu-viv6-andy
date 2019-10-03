@@ -98,7 +98,7 @@ gckASYNC_FE_Construct(
     gcmkONERROR(gckOS_AtomSet(Hardware->os, fe->freeDscriptors, data));
 
     /* Enable interrupts. */
-    gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x000D8, ~0U);
+    gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->core, 0x000D8, ~0U));
 
     *FE = fe;
 
