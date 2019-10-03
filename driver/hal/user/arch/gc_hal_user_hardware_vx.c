@@ -18223,6 +18223,7 @@ static gceSTATUS _convertdepth(
             gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
             gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
             gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+            break;
         default:
             status = gcvSTATUS_INVALID_ARGUMENT;
             break;
@@ -27614,6 +27615,7 @@ static gceSTATUS _convertdepth_halfevis(
             gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
             gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
             gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+            break;
         default:
             status = gcvSTATUS_INVALID_ARGUMENT;
             break;
