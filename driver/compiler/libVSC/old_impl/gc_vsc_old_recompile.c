@@ -10527,12 +10527,47 @@ _fixTempIndexByMappingTable(
     if (*TempIndexPtr >= libFunctionTempIndexStart &&
         *TempIndexPtr < (libFunctionTempIndexStart + MI->Function->tempIndexCount))
     {
-        gctUINT32 newTempIndex = (gctUINT32)(*TempIndexPtr + MI->TempOffset);
+        gctUINT i;
+        gctUINT curTemp = *TempIndexPtr;
+        gctUINT32 lastTemp = curTemp + 1;
+        gcSHADER libraryShader = MI->LibList->lib;
+        gctUINT32 newTempIndex = (gctUINT32)(curTemp + MI->TempOffset);
         gcmASSERT(newTempIndex > 0 && newTempIndex < (gctUINT)MI->Shader->_tempRegCount);
-        /* enter the mapping */
         gcmASSERT(newTempIndex < 0xFFFFFF);
-        MI->LibList->tempMappingTable[*TempIndexPtr] = newTempIndex;
-        *TempIndexPtr = newTempIndex;
+
+        for(i = 0; i < GetShaderVariableCount(libraryShader); i++)
+        {
+            gcVARIABLE variable = libraryShader->variables[i];
+            gctUINT32 components = 0, rows = 0;
+            gctUINT32 numTemp;
+            gctUINT16 index;
+
+            if (variable == gcvNULL)
+                continue;
+
+            gcTYPE_GetTypeInfo(variable->u.type, &components, &rows, 0);
+            numTemp = rows * GetVariableKnownArraySize(variable);
+            if(curTemp >= variable->tempIndex &&
+               curTemp < variable->tempIndex + numTemp)  /* temp is associated with a variable: copy variable */
+            {
+                gcSHADER_CopyVariable(MI->Shader,
+                                      variable,
+                                      &index);
+                newTempIndex = (gctUINT32)(variable->tempIndex + MI->TempOffset);
+                gcmASSERT(newTempIndex > 0 && newTempIndex < (gctUINT)MI->Shader->_tempRegCount);
+                MI->Shader->variables[index]->tempIndex = newTempIndex;
+                curTemp = variable->tempIndex;
+                lastTemp = curTemp + numTemp;
+                break;
+            }
+        }
+        /* enter the mapping */
+        do
+        {
+           MI->LibList->tempMappingTable[curTemp] = newTempIndex++;
+        }
+        while(++curTemp < lastTemp);
+        *TempIndexPtr = MI->LibList->tempMappingTable[*TempIndexPtr];
     }
     else
     {
