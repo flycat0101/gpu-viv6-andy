@@ -7075,6 +7075,11 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
         ksLCDTIndex = vxoBinaryGraph_GetLCDTIndexForTempTensor(node->graph, ksDataPhysical, &lcdSize);
         if (-1 == ksLCDTIndex)
         {
+            /*if (binarySave->generateNBGToMemory)
+            {
+                vxInfo("save NBG KS physcial: 0x%08xm size: 0x%08x \n", ksDataPhysical, ksDataSize);
+            }*/
+
             ksLCDTIndex = vxoBinaryGraph_SaveLoadingConfigData(node->graph,
                                                                 ksDataLogical,
                                                                 ksDataSize);
@@ -10405,6 +10410,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSHParamSize(
     {
         vx_reference ref = shParams[i];
 
+        /* is network input */
         for (j = 0; j < graph->inputCount; j++)
         {
             if (ref == graph->inputs[j])
@@ -10414,6 +10420,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSHParamSize(
         }
         if (j != graph->inputCount) continue;
 
+        /* is network output */
         for (j = 0; j < graph->outputCount; j++)
         {
             if (ref == graph->outputs[j])
@@ -10469,6 +10476,13 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSHParamSize(
 
                 if (i == index)
                 {
+                    vx_size size_tensor = 0;
+                    vx_uint32 size_temp = 0;
+                    vxoTensor_GetTensorWholeSize(tensor, &size_tensor);
+                    size_temp = gcmALIGN(size_temp, 64);
+
+                    totalSize += size_temp;
+
                     tensorPhy[index] = physical;
                     index++;
                     *lcdTensorsPhyIndex = index;
@@ -10540,8 +10554,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
         operationCount = 2; /* initialize and end */
         patchCount += 2; /* SRAM */
         lcdtCount = operationCount;
-        KernelStreamSize += gcmALIGN_NP2_SAFE(context->binaryGraphInitSize[deviceID], 64);
-        KernelStreamSize += 0X40;
+        statesSize += gcmALIGN_NP2_SAFE(context->binaryGraphInitSize[deviceID], 64);
+        statesSize += 0X40;
     }
 
     for (i = 0; i < executionLayer->opIndicesNum; i++)
@@ -10572,7 +10586,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
 
             ksDataPhysical = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(weights_biases, 0);
             ksDataSize = (vx_uint32)WB_MEM_SIZE_INDEX(weights_biases, 0);
-            ksDataSize = (vx_uint32)((vx_float32)ksDataSize * 1.005);
             ksDataSize = gcmALIGN_NP2_SAFE(ksDataSize, 64);
             if (0 == ksDataSize)
             {
@@ -10590,6 +10603,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
 
             if (cnt == lcdKernelDataPhyIndex)
             {
+                /*vxInfo("get NBG size nn KS physcial: 0x%08xm size: 0x%08x \n", ksDataPhysical, ksDataSize);*/
                 KernelStreamSize += ksDataSize;
                 lcdKernelDataPhysical[lcdKernelDataPhyIndex] = ksDataPhysical;
                 lcdKernelDataPhyIndex++;
@@ -10677,7 +10691,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
                 vx_size size_tensor = 0;
                 vxoTensor_GetTensorWholeSize(parameter->data_buff, &size_tensor);
                 ksDataSize = (vx_uint32)size_tensor;
-                ksDataSize = (vx_uint32)((vx_float32)ksDataSize * 1.005);
+                ksDataSize = (vx_uint32)((vx_float32)ksDataSize);
 
                 vxoTensor_GetTensorBatchArrayViewMemory(parameter->data_buff, 0, VX_NULL, &ksDataPhysical);
 
@@ -10692,6 +10706,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
                 if (cnt == lcdKernelDataPhyIndex)
                 {
                     ksDataSize = gcmALIGN_NP2_SAFE(ksDataSize, 64);
+                    /*vxInfo("get NBG size TP KS physcial: 0x%08xm size: 0x%08x \n", ksDataPhysical, ksDataSize);*/
                     KernelStreamSize += ksDataSize;
                     lcdKernelDataPhysical[lcdKernelDataPhyIndex] = ksDataPhysical;
                     lcdKernelDataPhyIndex++;
@@ -10699,6 +10714,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
             }
             else if (parameter->tpType == TP_SINGLE_FC && parameter->other_ref != VX_NULL)
             {
+                vx_float32 temp = 0;
                 vx_uint32 j = 0;
                 vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter)parameter->other_ref;
 
@@ -10711,24 +10727,12 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
                 for (j = 0; j < weights_biases->slice_num; j++)
                 {
                     ksDataSize = (vx_uint32)WB_STREAM_SIZE_INDEX(weights_biases, j);
-                    ksDataPhysical = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(weights_biases, i);
-                    ksDataSize = (vx_uint32)((vx_float32)ksDataSize * 1.005);
+                    temp = (vx_float32)ksDataSize * 1.003f; /* compress */
+                    ksDataSize = (vx_uint32)temp;
 
-                    for (cnt = 0; cnt < lcdKernelDataPhyIndex; cnt++)
-                    {
-                        if (lcdKernelDataPhysical[cnt] == ksDataPhysical)
-                        {
-                            break;
-                        }
-                    }
-
-                    if (cnt == lcdKernelDataPhyIndex)
-                    {
-                        ksDataSize = gcmALIGN_NP2_SAFE(ksDataSize, 64);
-                        KernelStreamSize += ksDataSize;
-                        lcdKernelDataPhysical[lcdKernelDataPhyIndex] = ksDataPhysical;
-                        lcdKernelDataPhyIndex++;
-                    }
+                    ksDataSize = gcmALIGN_NP2_SAFE(ksDataSize, 64);
+                    /*vxInfo("get NBG size TP FC KS size: 0x%08x \n", ksDataSize);*/
+                    KernelStreamSize += ksDataSize;
                 }
 
                 if (ksDataSize == 0)
