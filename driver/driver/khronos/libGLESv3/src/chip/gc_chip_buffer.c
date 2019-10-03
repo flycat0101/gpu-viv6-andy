@@ -284,6 +284,7 @@ gcChipInitFormatMapInfo(
     GLuint patch8bitMsaaCount        = 0;
     GLuint patchD32FCount            = 0;
     GLuint patchAstcCount            = 0;
+    GLuint patchETC2EACCount         = 0;
     GLuint patchFmtMapInfoCount      = 0;
     static __GLApiVersion initializedVer = __GL_API_VERSION_INVALID;
 
@@ -345,6 +346,12 @@ gcChipInitFormatMapInfo(
         {gcvSURF_ASTC10x10_SRGB,    gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
         {gcvSURF_ASTC12x10_SRGB,    gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
         {gcvSURF_ASTC12x12_SRGB,    gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+    };
+
+    __GLChipPatchFmt patchETC2EACFmts[] =
+    {
+        {gcvSURF_RGBA8_ETC2_EAC,   gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+        {gcvSURF_RGB8_ETC2,        gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
     };
 
     GLuint halfFloatTableSize = 0;
@@ -439,6 +446,15 @@ gcChipInitFormatMapInfo(
                 patchAstcCount++;
             }
         }
+
+        for (j = 0; j < gcmCOUNTOF(patchETC2EACFmts); ++j)
+        {
+            if (patchETC2EACFmts[j].requestFormat == __glChipFmtMapInfo[i].requestFormat)
+            {
+                patchETC2EACFmts[j].entry = i;
+                patchETC2EACCount++;
+            }
+        }
     }
 
     /* case0 */
@@ -464,6 +480,9 @@ gcChipInitFormatMapInfo(
 
     /* case7: ASTC */
     patchFmtMapInfoCount += patchAstcCount;
+
+    /* case9 : ETC2EAC*/
+    patchFmtMapInfoCount += patchETC2EACCount;
 
     GL_ASSERT(patchFmtMapInfoCount < __GL_CHIP_PATCH_FMT_MAX);
 
@@ -606,6 +625,25 @@ gcChipInitFormatMapInfo(
                 __glChipFmtMapInfo_patch[index].readFormat    = patchAstcFmts[i].readFormat;
                 __glChipFmtMapInfo_patch[index].writeFormat   = patchAstcFmts[i].writeFormat;
                 __glChipFmtMapInfo_patch[index].patchCase     = __GL_CHIP_FMT_PATCH_ASTC;
+                __glChipFmtMapInfo_patch[index].flags         = 0;
+
+                gcChipSetFmtMapAttribs(gc, entry, &__glChipFmtMapInfo_patch[index], maxSamples);
+            }
+            index++;
+        }
+
+        /* 9: ETC2 EAC */
+        for (i = 0; i < gcmCOUNTOF(patchETC2EACFmts); ++i)
+        {
+            GLint entry = patchETC2EACFmts[i].entry;
+
+            GL_ASSERT(entry != -1);
+            if ((entry != -1) && (index < __GL_CHIP_PATCH_FMT_MAX))
+            {
+                __glChipFmtMapInfo_patch[index].requestFormat = patchETC2EACFmts[i].requestFormat;
+                __glChipFmtMapInfo_patch[index].readFormat    = patchETC2EACFmts[i].readFormat;
+                __glChipFmtMapInfo_patch[index].writeFormat   = patchETC2EACFmts[i].writeFormat;
+                __glChipFmtMapInfo_patch[index].patchCase     = __GL_CHIP_FMT_PATCH_ETC2_EAC;
                 __glChipFmtMapInfo_patch[index].flags         = 0;
 
                 gcChipSetFmtMapAttribs(gc, entry, &__glChipFmtMapInfo_patch[index], maxSamples);

@@ -148,6 +148,533 @@ gcChipDecodeETC1Block(
 }
 
 /*************************************************************************
+**
+** SW Decompress Functions
+**
+*************************************************************************/
+
+/************************************************************************/
+/* Implementation for internal functions                                */
+/************************************************************************/
+
+
+/*************************************************************************
+** ETC2 & EAC Decompress
+*************************************************************************/
+
+#define VIV_PIXEL32_ALPHA_BYTE_OFFSET 3
+
+static const GLint complement3bitshifted_table[8] = {
+    0, 8, 16, 24, -32, -24, -16, -8
+};
+
+static const GLint modifier_table[8][4] = {
+    { 2, 8, -2, -8 },
+    { 5, 17, -5, -17 },
+    { 9, 29, -9, -29 },
+    { 13, 42, -13, -42 },
+    { 18, 60, -18, -60 },
+    { 24, 80, -24, -80 },
+    { 33, 106, -33, -106 },
+    { 47, 183, -47, -183 }
+};
+
+static const GLint etc2_distance_table[8] = { 3, 6, 11, 16, 23, 32, 41, 64 };
+
+static const GLbyte eac_modifier_table[16][8] = {
+    { -3, -6, -9, -15, 2, 5, 8, 14 },
+    { -3, -7, -10, -13, 2, 6, 9, 12 },
+    { -2, -5, -8, -13, 1, 4, 7, 12 },
+    { -2, -4, -6, -13, 1, 3, 5, 12 },
+    { -3, -6, -8, -12, 2, 5, 7, 11 },
+    { -3, -7, -9, -11, 2, 6, 8, 10 },
+    { -4, -7, -8, -11, 3, 6, 7, 10 },
+    { -3, -5, -8, -11, 2, 4, 7, 10 },
+    { -2, -6, -8, -10, 1, 5, 7, 9 },
+    { -2, -5, -8, -10, 1, 4, 7, 9 },
+    { -2, -4, -8, -10, 1, 3, 7, 9 },
+    { -2, -5, -7, -10, 1, 4, 6, 9 },
+    { -3, -4, -7, -10, 2, 3, 6, 9 },
+    { -1, -2, -3, -10, 0, 1, 2, 9 },
+    { -4, -6, -8, -9, 3, 5, 7, 8 },
+    { -3, -5, -7, -9, 2, 4, 6, 8 }
+};
+
+static const GLubyte viv_clamp0to255_table[255 + 256 + 256] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+    17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+    33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
+    49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
+    65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+    81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96,
+    97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112,
+    113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128,
+    129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144,
+    145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160,
+    161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176,
+    177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192,
+    193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208,
+    209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224,
+    225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240,
+    241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
+};
+
+/* Mode mask flags. */
+
+enum {
+    VIV_MODE_MASK_ETC_INDIVIDUAL = 0x1,
+    VIV_MODE_MASK_ETC_DIFFERENTIAL = 0x2,
+    VIV_MODE_MASK_ETC_T = 0x4,
+    VIV_MODE_MASK_ETC_H = 0x8,
+    VIV_MODE_MASK_ETC_PLANAR = 0x10,
+    VIV_MODE_MASK_ALL_MODES_ETC1 = 0x3,
+    VIV_MODE_MASK_ALL_MODES_ETC2 = 0x1F,
+    VIV_MODE_MASK_ALL_MODES_ETC2_PUNCHTHROUGH = 0X1E,
+    VIV_MODE_MASK_ALL_MODES_BPTC = 0xFF,
+    VIV_MODE_MASK_ALL_MODES_BPTC_FLOAT = 0x3FFF,
+    VIV_MODE_MASK_ALL = 0XFFFFFFFF,
+};
+
+enum {
+    /* Function returns false (invalid block) when the compressed block
+    ** is in a format not allowed to be generated by an encoder.
+    */
+    VIV_DECOMPRESS_FLAG_ENCODE = 0x1,
+    /* For compression formats that have opaque and non-opaque modes,
+    ** return false (invalid block) when the compressed block is encoded
+    ** using a non-opaque mode.
+    */
+    VIV_DECOMPRESS_FLAG_OPAQUE_ONLY = 0x2,
+    /* For compression formats that have opaque and non-opaque modes,
+    ** return false (invalid block) when the compressed block is encoded
+    ** using an opaque mode.
+    */
+    VIV_DECOMPRESS_FLAG_NON_OPAQUE_ONLY = 0x4,
+};
+
+/* This function calculates the 3-bit complement value in the range -4 to 3 of a three bit
+** representation. The result is arithmetically shifted 3 places to the left before returning.
+*/
+static GLint complement3bitshifted(GLint x) {
+    return complement3bitshifted_table[x];
+}
+
+static GLint complement3bitshifted_slow(GLint x) {
+    if (x & 4)
+        /* Note: shift is arithmetic. */
+        return ((x & 3) - 4) << 3;
+    return x << 3;
+}
+
+static GLint complement3bit(GLint x) {
+    if (x & 4)
+        return ((x & 3) - 4);
+    return x;
+}
+
+/* Clamp an integer value in the range -255 to 511 to the the range 0 to 255. */
+static GLubyte vivClamp0To255(GLint x) {
+    return viv_clamp0to255_table[x + 255];
+}
+
+static GLuint vivPack32RGBA8(GLint r, GLint g, GLint b, GLint a) {
+    return (GLuint)r | ((GLuint)g << 8) | ((GLuint)b << 16) |
+        ((GLuint)a << 24);
+}
+
+static GLuint vivPack32RGB8Alpha0xFF(GLint r, GLint g, GLint b) {
+    return vivPack32RGBA8(r, g, b, 0xFF);
+}
+
+static GLint modifier_times_multiplier(GLint modifier, GLint multiplier) {
+    return modifier * multiplier;
+}
+
+static void ProcessPixelEAC(GLubyte i, GLuint64 pixels,
+const GLbyte *  modifier_table, GLint base_codeword, GLint multiplier,
+GLubyte * pixel_buffer) {
+    GLint modifier = modifier_table[(pixels >> (45 - i * 3)) & 7];
+    pixel_buffer[((i & 3) * 4 + ((i & 12) >> 2)) * 4 + VIV_PIXEL32_ALPHA_BYTE_OFFSET] =
+        vivClamp0To255(base_codeword + modifier_times_multiplier(modifier, multiplier));
+}
+
+/* Define inline function to speed up ETC1 decoding. */
+static void ProcessPixelETC1(GLubyte i, GLuint pixel_index_word,
+GLuint table_codeword, GLint * base_color_subblock,
+GLubyte * pixel_buffer) {
+    GLint pixel_index = ((pixel_index_word & (1 << i)) >> i)
+        | ((pixel_index_word & (0x10000 << i)) >> (16 + i - 1));
+    GLint r, g, b;
+    GLint modifier = modifier_table[table_codeword][pixel_index];
+    GLuint *buffer = (GLuint *)pixel_buffer;
+    r = vivClamp0To255(base_color_subblock[0] + modifier);
+    g = vivClamp0To255(base_color_subblock[1] + modifier);
+    b = vivClamp0To255(base_color_subblock[2] + modifier);
+
+    buffer[(i & 3) * 4 + ((i & 12) >> 2)] =
+        vivPack32RGB8Alpha0xFF(r, g, b);
+}
+
+/* Decompress a 64-bit 4x4 pixel texture block compressed using the ETC1 format. */
+GLboolean vivDecompressBlockETC1(const GLubyte * bitstring, GLuint mode_mask, GLuint flags, GLubyte * pixel_buffer)
+{
+    GLint differential_mode = bitstring[3] & 2;
+    GLint flipbit = bitstring[3] & 1;
+    GLint base_color_subblock1[3];
+    GLint base_color_subblock2[3];
+    GLuint table_codeword1;
+    GLuint table_codeword2;
+    GLuint pixel_index_word;
+
+    if (differential_mode) {
+        if ((mode_mask & VIV_MODE_MASK_ETC_DIFFERENTIAL) == 0)
+            return GL_FALSE;
+    }
+    else
+        if ((mode_mask & VIV_MODE_MASK_ETC_INDIVIDUAL) == 0)
+            return GL_FALSE;
+
+    if (differential_mode) {
+        base_color_subblock1[0] = (bitstring[0] & 0xF8);
+        base_color_subblock1[0] |= ((base_color_subblock1[0] & 224) >> 5);
+        base_color_subblock1[1] = (bitstring[1] & 0xF8);
+        base_color_subblock1[1] |= (base_color_subblock1[1] & 224) >> 5;
+        base_color_subblock1[2] = (bitstring[2] & 0xF8);
+        base_color_subblock1[2] |= (base_color_subblock1[2] & 224) >> 5;
+        /* 5 highest order bits. */
+        base_color_subblock2[0] = (bitstring[0] & 0xF8);
+        /* Add difference. */
+        base_color_subblock2[0] += complement3bitshifted(bitstring[0] & 7);
+        /* Check for overflow. */
+        if (base_color_subblock2[0] & 0xFF07)
+            return GL_FALSE;
+        /* Replicate. */
+        base_color_subblock2[0] |= (base_color_subblock2[0] & 224) >> 5;
+        base_color_subblock2[1] = (bitstring[1] & 0xF8);
+        base_color_subblock2[1] += complement3bitshifted(bitstring[1] & 7);
+        if (base_color_subblock2[1] & 0xFF07)
+            return GL_FALSE;
+        base_color_subblock2[1] |= (base_color_subblock2[1] & 224) >> 5;
+        base_color_subblock2[2] = (bitstring[2] & 0xF8);
+        base_color_subblock2[2] += complement3bitshifted(bitstring[2] & 7);
+        if (base_color_subblock2[2] & 0xFF07)
+            return GL_FALSE;
+        base_color_subblock2[2] |= (base_color_subblock2[2] & 224) >> 5;
+    }
+    else {
+        base_color_subblock1[0] = (bitstring[0] & 0xF0);
+        base_color_subblock1[0] |= base_color_subblock1[0] >> 4;
+        base_color_subblock1[1] = (bitstring[1] & 0xF0);
+        base_color_subblock1[1] |= base_color_subblock1[1] >> 4;
+        base_color_subblock1[2] = (bitstring[2] & 0xF0);
+        base_color_subblock1[2] |= base_color_subblock1[2] >> 4;
+        base_color_subblock2[0] = (bitstring[0] & 0x0F);
+        base_color_subblock2[0] |= base_color_subblock2[0] << 4;
+        base_color_subblock2[1] = (bitstring[1] & 0x0F);
+        base_color_subblock2[1] |= base_color_subblock2[1] << 4;
+        base_color_subblock2[2] = (bitstring[2] & 0x0F);
+        base_color_subblock2[2] |= base_color_subblock2[2] << 4;
+    }
+    table_codeword1 = (bitstring[3] & 224) >> 5;
+    table_codeword2 = (bitstring[3] & 28) >> 2;
+    pixel_index_word = ((GLuint)bitstring[4] << 24) | ((GLuint)bitstring[5] << 16) |
+        ((GLuint)bitstring[6] << 8) | bitstring[7];
+    if (flipbit == 0) {
+        ProcessPixelETC1(0, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(1, pixel_index_word, table_codeword1,base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(2, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(3, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(4, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(5, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(6, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(7, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(8, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(9, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(10, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(11, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(12, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(13, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(14, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(15, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+    }
+    else {
+        ProcessPixelETC1(0, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(1, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(2, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(3, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(4, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(5, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(6, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(7, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(8, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(9, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(10, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(11, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(12, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(13, pixel_index_word, table_codeword1, base_color_subblock1, pixel_buffer);
+        ProcessPixelETC1(14, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+        ProcessPixelETC1(15, pixel_index_word, table_codeword2, base_color_subblock2, pixel_buffer);
+    }
+    return GL_TRUE;
+}
+
+static void ProcessBlockETC2TOrHMode(const GLubyte *  bitstring, GLint mode,
+GLubyte * pixel_buffer) {
+    GLint base_color1_R, base_color1_G, base_color1_B;
+    GLint base_color2_R, base_color2_G, base_color2_B;
+    GLint paint_color_R[4], paint_color_G[4], paint_color_B[4];
+    GLint distance;
+    GLint base_color1_value;
+    GLint base_color2_value;
+    GLint bit;
+    GLuint pixel_index_word;
+    GLuint *buffer;
+    GLint i ;
+
+    if (mode == VIV_MODE_MASK_ETC_T) {
+        /* T mode. */
+        base_color1_R = ((bitstring[0] & 0x18) >> 1) | (bitstring[0] & 0x3);
+        base_color1_R |= base_color1_R << 4;
+        base_color1_G = bitstring[1] & 0xF0;
+        base_color1_G |= base_color1_G >> 4;
+        base_color1_B = bitstring[1] & 0x0F;
+        base_color1_B |= base_color1_B << 4;
+        base_color2_R = bitstring[2] & 0xF0;
+        base_color2_R |= base_color2_R >> 4;
+        base_color2_G = bitstring[2] & 0x0F;
+        base_color2_G |= base_color2_G << 4;
+        base_color2_B = bitstring[3] & 0xF0;
+        base_color2_B |= base_color2_B >> 4;
+
+        distance = etc2_distance_table[((bitstring[3] & 0x0C) >> 1) | (bitstring[3] & 0x1)];
+        paint_color_R[0] = base_color1_R;
+        paint_color_G[0] = base_color1_G;
+        paint_color_B[0] = base_color1_B;
+        paint_color_R[2] = base_color2_R;
+        paint_color_G[2] = base_color2_G;
+        paint_color_B[2] = base_color2_B;
+        paint_color_R[1] = vivClamp0To255(base_color2_R + distance);
+        paint_color_G[1] = vivClamp0To255(base_color2_G + distance);
+        paint_color_B[1] = vivClamp0To255(base_color2_B + distance);
+        paint_color_R[3] = vivClamp0To255(base_color2_R - distance);
+        paint_color_G[3] = vivClamp0To255(base_color2_G - distance);
+        paint_color_B[3] = vivClamp0To255(base_color2_B - distance);
+    }
+    else {
+        /* H mode. */
+        base_color1_R = (bitstring[0] & 0x78) >> 3;
+        base_color1_R |= base_color1_R << 4;
+        base_color1_G = ((bitstring[0] & 0x07) << 1) | ((bitstring[1] & 0x10) >> 4);
+        base_color1_G |= base_color1_G << 4;
+        base_color1_B = (bitstring[1] & 0x08) | ((bitstring[1] & 0x03) << 1) | ((bitstring[2] & 0x80) >> 7);
+        base_color1_B |= base_color1_B << 4;
+        base_color2_R = (bitstring[2] & 0x78) >> 3;
+        base_color2_R |= base_color2_R << 4;
+        base_color2_G = ((bitstring[2] & 0x07) << 1) | ((bitstring[3] & 0x80) >> 7);
+        base_color2_G |= base_color2_G << 4;
+        base_color2_B = (bitstring[3] & 0x78) >> 3;
+        base_color2_B |= base_color2_B << 4;
+        /* da is most significant bit, db is middle bit, least significant bit is
+        ** (base_color1 value >= base_color2 value).
+        */
+        base_color1_value = (base_color1_R << 16) + (base_color1_G << 8) + base_color1_B;
+        base_color2_value = (base_color2_R << 16) + (base_color2_G << 8) + base_color2_B;
+
+        if (base_color1_value >= base_color2_value)
+            bit = 1;
+        else
+            bit = 0;
+        distance = etc2_distance_table[(bitstring[3] & 0x04) | ((bitstring[3] & 0x01) << 1) | bit];
+        paint_color_R[0] = vivClamp0To255(base_color1_R + distance);
+        paint_color_G[0] = vivClamp0To255(base_color1_G + distance);
+        paint_color_B[0] = vivClamp0To255(base_color1_B + distance);
+        paint_color_R[1] = vivClamp0To255(base_color1_R - distance);
+        paint_color_G[1] = vivClamp0To255(base_color1_G - distance);
+        paint_color_B[1] = vivClamp0To255(base_color1_B - distance);
+        paint_color_R[2] = vivClamp0To255(base_color2_R + distance);
+        paint_color_G[2] = vivClamp0To255(base_color2_G + distance);
+        paint_color_B[2] = vivClamp0To255(base_color2_B + distance);
+        paint_color_R[3] = vivClamp0To255(base_color2_R - distance);
+        paint_color_G[3] = vivClamp0To255(base_color2_G - distance);
+        paint_color_B[3] = vivClamp0To255(base_color2_B - distance);
+    }
+
+    pixel_index_word = ((GLuint)bitstring[4] << 24) | ((GLuint)bitstring[5] << 16) |
+        ((GLuint)bitstring[6] << 8) | bitstring[7];
+    buffer = (GLuint *)pixel_buffer;
+    for (i = 0; i < 16; i++) {
+        GLint pixel_index = ((pixel_index_word & (1 << i)) >> i)         /* Least significant bit. */
+            | ((pixel_index_word & (0x10000 << i)) >> (16 + i - 1));    /* Most significant bit. */
+        GLint r = paint_color_R[pixel_index];
+        GLint g = paint_color_G[pixel_index];
+        GLint b = paint_color_B[pixel_index];
+        buffer[(i & 3) * 4 + ((i & 12) >> 2)] = vivPack32RGB8Alpha0xFF(r, g, b);
+    }
+}
+
+static void ProcessBlockETC2PlanarMode(const GLubyte * bitstring,
+GLubyte * pixel_buffer) {
+    GLuint *buffer;
+    GLint y;
+    GLint x;
+    GLint r, g, b;
+    /* Each color O, H and V is in 6-7-6 format. */
+    GLint RO = (bitstring[0] & 0x7E) >> 1;
+    GLint GO = ((bitstring[0] & 0x1) << 6) | ((bitstring[1] & 0x7E) >> 1);
+    GLint BO = ((bitstring[1] & 0x1) << 5) | (bitstring[2] & 0x18) | ((bitstring[2] & 0x03) << 1) |
+        ((bitstring[3] & 0x80) >> 7);
+    GLint RH = ((bitstring[3] & 0x7C) >> 1) | (bitstring[3] & 0x1);
+    GLint GH = (bitstring[4] & 0xFE) >> 1;
+    GLint BH = ((bitstring[4] & 0x1) << 5) | ((bitstring[5] & 0xF8) >> 3);
+    GLint RV = ((bitstring[5] & 0x7) << 3) | ((bitstring[6] & 0xE0) >> 5);
+    GLint GV = ((bitstring[6] & 0x1F) << 2) | ((bitstring[7] & 0xC0) >> 6);
+    GLint BV = bitstring[7] & 0x3F;
+    RO = (RO << 2) | ((RO & 0x30) >> 4);    // Replicate bits.
+    GO = (GO << 1) | ((GO & 0x40) >> 6);
+    BO = (BO << 2) | ((BO & 0x30) >> 4);
+    RH = (RH << 2) | ((RH & 0x30) >> 4);
+    GH = (GH << 1) | ((GH & 0x40) >> 6);
+    BH = (BH << 2) | ((BH & 0x30) >> 4);
+    RV = (RV << 2) | ((RV & 0x30) >> 4);
+    GV = (GV << 1) | ((GV & 0x40) >> 6);
+    BV = (BV << 2) | ((BV & 0x30) >> 4);
+    buffer = (GLuint *)pixel_buffer;
+    for (y = 0; y < 4; y++)
+        for (x = 0; x < 4; x++) {
+            r = vivClamp0To255((x * (RH - RO) + y * (RV - RO) + 4 * RO + 2) >> 2);
+            g = vivClamp0To255((x * (GH - GO) + y * (GV - GO) + 4 * GO + 2) >> 2);
+            b = vivClamp0To255((x * (BH - BO) + y * (BV - BO) + 4 * BO + 2) >> 2);
+            buffer[y * 4 + x] = vivPack32RGB8Alpha0xFF(r, g, b);
+        }
+}
+
+/* Decompress a 64-bit 4x4 pixel texture block compressed using the ETC2 */
+/* format. */
+GLboolean vivDecompressBlockETC2(const GLubyte *  bitstring, GLuint mode_mask,
+GLuint flags, GLubyte * pixel_buffer) {
+    GLint R, G , B;
+    /* Figure out the mode. */
+    if ((bitstring[3] & 2) == 0) {
+        /* Individual mode. */
+        return vivDecompressBlockETC1(bitstring, mode_mask, flags,
+            pixel_buffer);
+    }
+    if ((mode_mask & (~VIV_MODE_MASK_ETC_INDIVIDUAL)) == 0)
+        return GL_FALSE;
+    R = (bitstring[0] & 0xF8);
+    R += complement3bitshifted(bitstring[0] & 7);
+    G = (bitstring[1] & 0xF8);
+    G += complement3bitshifted(bitstring[1] & 7);
+    B = (bitstring[2] & 0xF8);
+    B += complement3bitshifted(bitstring[2] & 7);
+    if (R & 0xFF07) {
+        /* T mode. */
+        if ((mode_mask & VIV_MODE_MASK_ETC_T) == 0)
+            return GL_FALSE;
+        ProcessBlockETC2TOrHMode(bitstring, VIV_MODE_MASK_ETC_T,
+            pixel_buffer);
+        return GL_TRUE;
+    }
+    else
+    if (G & 0xFF07) {
+        /* H mode. */
+        if ((mode_mask & VIV_MODE_MASK_ETC_H) == 0)
+            return GL_FALSE;
+        ProcessBlockETC2TOrHMode(bitstring, VIV_MODE_MASK_ETC_H,
+            pixel_buffer);
+        return GL_TRUE;
+    }
+    else
+    if (B & 0xFF07) {
+        /* Planar mode. */
+        if ((mode_mask & VIV_MODE_MASK_ETC_PLANAR) == 0)
+            return GL_FALSE;
+        ProcessBlockETC2PlanarMode(bitstring, pixel_buffer);
+        return GL_TRUE;
+    }
+    else {
+        /* Differential mode. */
+        return vivDecompressBlockETC1(bitstring, mode_mask, flags,
+            pixel_buffer);
+    }
+}
+
+
+
+/* Decompress a 128-bit 4x4 pixel texture block compressed using the ETC2_EAC */
+/* format. */
+GLboolean vivDecompressBlockETC2_EAC(const GLubyte *  bitstring, GLuint mode_mask,
+GLuint flags, GLubyte *  pixel_buffer) {
+    GLint base_codeword;
+    GLint multiplier;
+    GLuint64 pixels;
+    GLboolean r = vivDecompressBlockETC2(&bitstring[8], mode_mask, flags, pixel_buffer);
+    const GLbyte *modifier_table = eac_modifier_table[(bitstring[1] & 0x0F)];
+    if (!r)
+        return GL_FALSE;
+    /* Decode the alpha part. */
+    base_codeword = bitstring[0];
+
+    multiplier = (bitstring[1] & 0xF0) >> 4;
+    if (multiplier == 0 && (flags & VIV_DECOMPRESS_FLAG_ENCODE))
+        /* Not allowed in encoding. Decoder should handle it. */
+        return GL_FALSE;
+    pixels = ((GLuint64)bitstring[2] << 40) | ((GLuint64)bitstring[3] << 32) |
+        ((GLuint64)bitstring[4] << 24)
+        | ((GLuint64)bitstring[5] << 16) | ((GLuint64)bitstring[6] << 8) | bitstring[7];
+    ProcessPixelEAC(0, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(1, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(2, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(3, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(4, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(5, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(6, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(7, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(8, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(9, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(10, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(11, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(12, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(13, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(14, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    ProcessPixelEAC(15, pixels, modifier_table, base_codeword, multiplier, pixel_buffer);
+    return GL_TRUE;
+}
+
+
+/*************************************************************************
 ** ASTC Decompress
 *************************************************************************/
 
@@ -3217,6 +3744,104 @@ gcChipDecompressETC1(
     return pixels;
 }
 
+#define BLOCK_SIZE 64
+GLvoid*
+gcChipDecompressETC2EAC(
+    IN  __GLcontext* gc,
+    IN  gctSIZE_T Width,
+    IN  gctSIZE_T Height,
+    IN  gctSIZE_T ImageSize,
+    IN  const void * Data,
+    IN  GLenum InternalFormat,
+    OUT gceSURF_FORMAT * Format,
+    OUT gctSIZE_T *pRowStride
+    )
+{
+    GLubyte * pixels = gcvNULL;
+    const GLubyte * data;
+    gctSIZE_T x, y, stride;
+    /* tile to linear with 4 X 4 pixel block*/
+    GLubyte block_buffer[BLOCK_SIZE];
+    GLint row;
+    GLubyte * p;
+    GLint bpp , blockSizeX , blockSizeY , imageStride;
+    gcmHEADER_ARG("gc=0x%x Width=%d Height=%d ImageSize=%d Data=0x%x Format=0x%x pRowStride=0x%x",
+                   gc, Width, Height, ImageSize, Data, Format, pRowStride);
+
+    /* Output linear gcvSURF_A8B8G8R8 */
+    bpp = 4;
+
+    switch (InternalFormat)
+    {
+        case GL_COMPRESSED_RGB8_ETC2:
+            blockSizeX = 4;
+            blockSizeY = 4;
+            imageStride = 8;
+            break;
+            /* Fall through. */
+        case GL_COMPRESSED_RGBA8_ETC2_EAC:
+            blockSizeX = 4;
+            blockSizeY = 4;
+            imageStride = 16;
+            break;
+        default:
+            gcoOS_Print("unsupproted decompress format 0x%0x" , InternalFormat);
+            GL_ASSERT(GL_FALSE);
+            return gcvNULL;
+    }
+
+    /* align w/h with 4 to deal with npot */
+    Width = gcmALIGN(Width , 4);
+    Height = gcmALIGN(Height , 4);
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, Width * Height * bpp , (gctPOINTER*)&pixels)))
+    {
+        gcmFOOTER_ARG("return=0x%x", gcvNULL);
+        return gcvNULL;
+    }
+    p = pixels;
+    stride = Width * bpp;
+    data   = Data;
+
+    for (y = 0; y < Height; y += blockSizeY)
+    {
+        for (x = 0; x < Width; x += blockSizeX)
+        {
+            GL_ASSERT(ImageSize >= (gctSIZE_T)imageStride);
+            gcoOS_MemFill(block_buffer, 0, BLOCK_SIZE);
+            switch (imageStride)
+            {
+                case 16:
+                    /* RGBA8_ETC2_EAC decpomress */
+                    vivDecompressBlockETC2_EAC(data, (GLuint)VIV_MODE_MASK_ALL, 0, block_buffer);
+                    break;
+                case 8:
+                    /* RGB_ETC2 decpomress */
+                    vivDecompressBlockETC2(data, (GLuint)VIV_MODE_MASK_ALL, 0, block_buffer);
+                    break;
+                 default:
+                    GL_ASSERT(GL_TRUE);
+            }
+
+            /* tile to linear*/
+            p = pixels + stride * y + blockSizeX * x;
+            for (row = 0; row < blockSizeY; row++)
+                gcoOS_MemCopy(p + row * stride,
+                    block_buffer + row * bpp * blockSizeX,
+                    bpp * blockSizeX);
+
+            data      += imageStride;
+            ImageSize -= imageStride;
+        }
+    }
+
+    GL_ASSERT(Format && pRowStride);
+    *Format = gcvSURF_A8B8G8R8;
+    *pRowStride = stride;
+
+    gcmFOOTER_ARG("return=0x%x", pixels);
+    return pixels;
+}
 
 
 /*************************************************************************

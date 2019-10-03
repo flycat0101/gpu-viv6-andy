@@ -927,6 +927,19 @@ gcChipDecompressETC1(
     OUT gctSIZE_T *pRowStride
     );
 
+/* chip_codec.c */
+extern GLvoid*
+gcChipDecompressETC2EAC(
+    IN  __GLcontext *gc,
+    IN  gctSIZE_T Width,
+    IN  gctSIZE_T Height,
+    IN  gctSIZE_T ImageSize,
+    IN  const void * Data,
+    IN  GLenum InternalFormat,
+    OUT gceSURF_FORMAT *Format,
+    OUT gctSIZE_T *pRowStride
+    );
+
 extern GLvoid*
 gcChipDecompressDXT(
     IN  __GLcontext *gc,

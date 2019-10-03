@@ -816,6 +816,11 @@ gcChipResidentTextureLevel(
         {
             patchCase = __GL_CHIP_FMT_PATCH_ASTC;
         }
+        else if((mipmap->requestedFormat == GL_COMPRESSED_RGBA8_ETC2_EAC || mipmap->requestedFormat ==  GL_COMPRESSED_RGB8_ETC2) &&
+                (chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653))
+        {
+            patchCase = __GL_CHIP_FMT_PATCH_ETC2_EAC;
+        }
         else if ((texObj->targetIndex == __GL_TEXTURE_2D_ARRAY_INDEX) ||
                  (texObj->targetIndex == __GL_TEXTURE_3D_INDEX))
         {
@@ -1058,11 +1063,31 @@ gcChipResidentTextureLevel(
                 break;
 
              case GL_COMPRESSED_RGB8_ETC2:
-             case GL_COMPRESSED_SRGB8_ETC2:
-             case GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2:
-             case GL_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2:
              case GL_COMPRESSED_RGBA8_ETC2_EAC:
-             case GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC:
+                if (needDecompress)
+                {
+                    /* Decompress. */
+                    pixels = gcChipDecompressETC2EAC(gc,
+                                                  (gctSIZE_T)mipmap->width,
+                                                  (gctSIZE_T)mipmap->height,
+                                                  (gctSIZE_T)mipmap->compressedSize,
+                                                  buf,
+                                                  mipmap->requestedFormat,
+                                                  &srcImageFormat,
+                                                  &rowStride);
+                    compressed = GL_FALSE;
+                    needClean = GL_TRUE;
+                }
+                else
+                {
+                    pixels = buf;
+                }
+                break;
+
+            case GL_COMPRESSED_SRGB8_ETC2:
+            case GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2:
+            case GL_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2:
+            case GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC:
                 if (needDecompress)
                 {
                     GL_ASSERT(GL_FALSE);
