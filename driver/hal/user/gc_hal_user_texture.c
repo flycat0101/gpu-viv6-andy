@@ -3201,13 +3201,13 @@ gcoTEXTURE_UploadCompressedSub(
     if (!map || !map->surface)
     {
         /* Requested map might be too large, or not been created yet. */
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        gcmERR_RETURN(gcvSTATUS_INVALID_ARGUMENT);
     }
 
     if ((XOffset + Width > map->width) || (YOffset + Height > map->height))
     {
         /* Requested upload does not match the mip map. */
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        gcmERR_RETURN(gcvSTATUS_INVALID_ARGUMENT);
     }
 
     /* Convert face into index. */
@@ -3226,7 +3226,7 @@ gcoTEXTURE_UploadCompressedSub(
             if (index >= map->depth)
             {
                 /* The specified slice is outside the allocated texture. */
-                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                gcmERR_RETURN(gcvSTATUS_INVALID_ARGUMENT);
             }
             break;
 
@@ -3236,7 +3236,7 @@ gcoTEXTURE_UploadCompressedSub(
             if (index != 0)
             {
                 /* The specified slice is outside the allocated texture. */
-                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                gcmERR_RETURN(gcvSTATUS_INVALID_ARGUMENT);
             }
             break;
 
@@ -3256,7 +3256,7 @@ gcoTEXTURE_UploadCompressedSub(
         if (index >= map->faces)
         {
             /* The specified face is outside the allocated texture faces. */
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            gcmERR_RETURN(gcvSTATUS_INVALID_ARGUMENT);
         }
         break;
 
@@ -3266,7 +3266,7 @@ gcoTEXTURE_UploadCompressedSub(
     }
 
     /* Lock the surface. */
-    gcmONERROR(gcoSURF_Lock(map->surface, address, memory));
+    gcmERR_RETURN(gcoSURF_Lock(map->surface, address, memory));
 
 
     /* Compute offset. */
@@ -3287,7 +3287,7 @@ gcoTEXTURE_UploadCompressedSub(
 
 OnError:
     /* Unlock the surface. */
-    if (map && memory[0])
+    if (map && map->surface && memory[0])
     {
         gcmVERIFY_OK(gcoSURF_Unlock(map->surface, memory[0]));
     }
