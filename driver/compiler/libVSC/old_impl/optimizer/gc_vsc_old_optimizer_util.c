@@ -2001,7 +2001,8 @@ gcOpt_InitializeTempArray(
             stride = isFormat64bit(outputTemp->format) ? 2 : 1;
             if (outputTemp->arrayVariable)
             {
-                size = outputTemp->arrayVariable->arraySize;
+                /* output array has been flattened as one output per each element. so set size to 1 here */
+                size = 1;
                 size *= gcmType_Rows(outputTemp->arrayVariable->u.type);
             }
             else
