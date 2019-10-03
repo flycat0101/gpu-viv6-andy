@@ -1826,6 +1826,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceProperties2(
                 phyDevSubProp->subgroupSize = phyDev->phyDevSubProp.subgroupSize;
                 phyDevSubProp->supportedStages = phyDev->phyDevSubProp.supportedStages;
                 phyDevSubProp->supportedOperations = phyDev->phyDevSubProp.supportedOperations;
+                phyDevSubProp->quadOperationsInAllStages = phyDev->phyDevSubProp.quadOperationsInAllStages;
                 extProp = (uint32_t *)phyDevSubProp->pNext;
             }
             break;
