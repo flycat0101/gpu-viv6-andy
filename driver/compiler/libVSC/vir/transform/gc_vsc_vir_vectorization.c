@@ -245,7 +245,7 @@ static gctSTRING _GetVectorizedSymStrName(VIR_Shader* pShader, VIR_Symbol** ppSy
 
 static VIR_Type* _GetVectorizedSymType(VIR_Shader* pShader, VIR_Symbol** ppSymArray, gctUINT symCount, gctBOOL bComponentPack)
 {
-    gctUINT           i, compCount = 0, rowsCount;
+    gctUINT           i, compCount = 0, rowsCount = 0;
     VIR_TypeId        compType, newTypeId = VIR_TYPE_UNKNOWN;
     gctINT            arrayLen = -1;
 
@@ -253,14 +253,6 @@ static VIR_Type* _GetVectorizedSymType(VIR_Shader* pShader, VIR_Symbol** ppSymAr
     {
         /* Since the component is sorted, just get the last symbol. */
         VIR_Symbol_GetStartAndEndComponentForIO(ppSymArray[symCount - 1], gcvFALSE, gcvNULL, &compCount);
-        /* if vectorizedSym list are scalar and array, get array length to construct array type */
-        for (i = 0; i < symCount; i++)
-        {
-            if (VIR_Type_isArray(VIR_Symbol_GetType(ppSymArray[i])))
-            {
-                arrayLen = VIR_Type_GetArrayLength(VIR_Symbol_GetType(ppSymArray[i]));
-            }
-        }
     }
     else
     {
@@ -270,8 +262,36 @@ static VIR_Type* _GetVectorizedSymType(VIR_Shader* pShader, VIR_Symbol** ppSymAr
         }
     }
 
+    /* if vectorizedSym list are scalar and array/matrix, get max(array length, rowsCount) to construct array or matrix type */
+    for (i = 0; i < symCount; i++)
+    {
+        if (VIR_Type_isArray(VIR_Symbol_GetType(ppSymArray[i])))
+        {
+            arrayLen = VIR_Type_GetArrayLength(VIR_Symbol_GetType(ppSymArray[i]));
+        }
+        else if (VIR_Type_isMatrix(VIR_Symbol_GetType(ppSymArray[i])))
+        {
+            gctUINT rows = VIR_GetTypeRows(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(ppSymArray[i])));
+            /* get the max rowsCount of matrix type */
+            if (rows > rowsCount)
+            {
+                rowsCount = rows;
+            }
+        }
+    }
+
     compType = VIR_GetTypeComponentType(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(ppSymArray[0])));
-    rowsCount = VIR_GetTypeRows(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(ppSymArray[0])));
+    /* update rowsCount if create array */
+    if (arrayLen >= (gctINT)rowsCount)
+    {
+        /* construct array type, if mat3+float[3], construct vec4[3] */
+        rowsCount = 1;
+    }
+    else
+    {
+        /* construct matrix type, if mat3+float[2], construct float3*4 */
+        arrayLen = -1;
+    }
 
     newTypeId = VIR_TypeId_ComposeNonOpaqueArrayedType(pShader,
                                                        compType,
@@ -3966,7 +3986,8 @@ OnError:
 gctBOOL vscVIR_CheckTwoSymsVectorizability(VIR_Shader* pShader, VIR_Symbol* pSym1, VIR_Symbol* pSym2)
 {
     gctSTRING strSymName1, strSymName2, strTemp1, strTemp2;
-    gctBOOL   checkFragmentOutput = gcvFALSE;
+    /* do array and builtin type vectorization for input/output variables */
+    gctBOOL   checkInputOutput = VIR_Symbol_isInputOrOutput(pSym1) && VIR_Symbol_isInputOrOutput(pSym2);
 
     /* Storage-class must be same */
     if (VIR_Symbol_GetStorageClass(pSym1) != VIR_Symbol_GetStorageClass(pSym2))
@@ -3996,16 +4017,11 @@ gctBOOL vscVIR_CheckTwoSymsVectorizability(VIR_Shader* pShader, VIR_Symbol* pSym
     if (VIR_Type_isArray(VIR_Symbol_GetType(pSym1)) !=
         VIR_Type_isArray(VIR_Symbol_GetType(pSym2)))
     {
-        /* support fragment shader output vectorization if
-         * they are scalar and array types */
-        if (!VIR_Shader_IsFS(pShader) ||
-            !VIR_Symbol_isOutput(pSym1) || !VIR_Symbol_isOutput(pSym2))
+        /* support shader input/output vectorization if
+         * they are scalar/vector and array types */
+        if (!checkInputOutput)
         {
             return gcvFALSE;
-        }
-        else
-        {
-            checkFragmentOutput = gcvTRUE;
         }
     }
 
@@ -4019,8 +4035,8 @@ gctBOOL vscVIR_CheckTwoSymsVectorizability(VIR_Shader* pShader, VIR_Symbol* pSym
         }
     }
 
-    /* Primitive type must have same row and component type */
-    if ((!checkFragmentOutput &&(VIR_GetTypeRows(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSym1))) !=
+    /* Primitive type must have same row (except input/output, combine mat3*2 + mat2) and component type */
+    if ((!checkInputOutput && (VIR_GetTypeRows(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSym1))) !=
          VIR_GetTypeRows(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSym2))))) ||
         (VIR_GetTypeComponentType(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSym1))) !=
          VIR_GetTypeComponentType(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pSym2)))) ||

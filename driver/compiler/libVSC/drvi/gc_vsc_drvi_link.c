@@ -3166,10 +3166,12 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
         {
             for (outputIdx = 0; outputIdx < soOutputCount; outputIdx ++)
             {
+                VIR_Type *pOutputSymType = gcvNULL;
                 pSoSym = VIR_Shader_GetSymFromId(pUpperShader,
                                     VIR_IdList_GetId(pUpperShader->transformFeedback.varyings, outputIdx));
 
                 pOutputSym = VIR_Symbol_GetIndexingInfo(pUpperShader, pSoSym).underlyingSym;
+                pOutputSymType = VIR_Symbol_GetType(pOutputSym);
 
                 gcmASSERT(!isSymUnused(pOutputSym) && !isSymVectorizedOut(pOutputSym));
 
@@ -3178,7 +3180,9 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
                 if ((VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym)) &&
                      !_IsFakeSIV(pUpperShader, pLowerShader, pOutputSym, gcvTRUE)) ||
                      pSoSym != pOutputSym ||
-                     VIR_Symbol_GetVirIoRegCount(pUpperShader, pOutputSym) > 1)
+                     /*TODO: if output is matrix and used in lower shader, the layout is different */
+                     (VIR_Symbol_GetVirIoRegCount(pUpperShader, pOutputSym) > 1 &&
+                      VIR_Type_isMatrix(pOutputSymType) && VIR_IdList_Count(pAttrIdLstsOfLowerShader) > 0))
                 {
                     /* For SIV/partial SO/multi-regs SO, add break-pair */
                     pSoIoPairArray[*pSoPairArraySize].pOutputSym = gcvNULL;
