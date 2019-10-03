@@ -1050,7 +1050,7 @@ VX_PRIVATE_API gctSIZE_T loadBinaryEntry(
     gcoOS_Seek(gcvNULL, binLoad->dFile, 4, gcvFILE_SEEK_SET);
     gcoOS_Read(gcvNULL, binLoad->dFile, sizeof(vx_uint32), version, &readSize);
 
-    geLCDOffset(binLoad, version[0]);
+    LCDEntryOffsetPos = geLCDOffset(binLoad, version[0]);
     readSize = 0;
 
     gcoOS_Seek(gcvNULL, binLoad->dFile, LCDEntryOffsetPos, gcvFILE_SEEK_SET);
@@ -1058,14 +1058,14 @@ VX_PRIVATE_API gctSIZE_T loadBinaryEntry(
     LCDOffsetPos = array[0];
     if ((LCDOffsetPos <= LCDEntryOffsetPos) || ((vx_uint32)readSize != sizeof(vx_uint32)))
     {
-        vxError("fail to read lcdt offset, cdt: %d, lcd: %d\n", LCDEntryOffsetPos, LCDOffsetPos);
+        vxError("%s[%d]: fail to read lcdt offset, cdt: %d, lcd: %d\n", __FUNCTION__, __LINE__, LCDEntryOffsetPos, LCDOffsetPos);
         vxmONERROR(VX_FAILURE);
     }
 
     binLoad->binaryBuffer = vxAllocateAndZeroMemory((vx_size)LCDOffsetPos);
     if (VX_NULL == binLoad->binaryBuffer)
     {
-        vxError("fail to allocate memory for binary buffer\n");
+        vxError("%s[%d]: fail to allocate memory for binary buffer\n", __FUNCTION__, __LINE__);
         vxmONERROR(VX_FAILURE);
     }
 
@@ -1073,7 +1073,8 @@ VX_PRIVATE_API gctSIZE_T loadBinaryEntry(
     gcoOS_Read(gcvNULL, binLoad->dFile, LCDOffsetPos, binLoad->binaryBuffer, &readSize);
     if (LCDOffsetPos != (vx_uint32)readSize)
     {
-        vxError("fail to read entry data, readsize: %d, entrySize: %d\n", (vx_uint32)readSize, LCDOffsetPos);
+        vxError("%s[%d]: fail to read entry data, readsize: %d, entrySize: %d\n",
+                 __FUNCTION__, __LINE__, (vx_uint32)readSize, LCDOffsetPos);
         vxmONERROR(VX_FAILURE);
     }
 
@@ -3756,7 +3757,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_LoadFromPointer(
     binLoad->binaryBuffer = vxAllocateAndZeroMemory((vx_size)lcdInfo.offset);
     if (VX_NULL == binLoad->binaryBuffer)
     {
-        vxError("fail to allocate memory for binary buffer\n");
+        vxError("%s[%d]: fail to allocate memory for binary buffer\n", __FUNCTION__, __LINE__);
         vxmONERROR(VX_FAILURE);
     }
 
@@ -10435,7 +10436,7 @@ VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(
 SaveBin:
     vxoBinaryGraph_RemoveUnusedFile();
 
-    if (binaryName == VX_NULL)
+    if (gcoOS_StrCmp(binaryName, "0") == gcvSTATUS_OK)
     {
         vxError("%s[%d]: bianry name is NULL\n", __FUNCTION__, __LINE__);
         vxmONERROR(VX_FAILURE);
