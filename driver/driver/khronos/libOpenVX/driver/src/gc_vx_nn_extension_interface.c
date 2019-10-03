@@ -25399,6 +25399,7 @@ vx_status vxnneWrapUserNode(
 
     if (userNodeType == VXNNE_USER_NODE_TYPE_VXC)
     {
+        vx_uint32 batchCount = 1;
         vxnne_shader_executable shaderExecutable = VX_NULL;
 
         shaderExecutable = vxnneGetUserShaderExecutable(node->base.context,
@@ -25416,11 +25417,18 @@ vx_status vxnneWrapUserNode(
             goto OnError;
         }
 
+        if (node->kernel->signature.directionTable[0] == VX_INPUT &&
+            node->kernel->signature.dataTypeTable[0] == VX_TYPE_TENSOR)
+        {
+            vx_tensor input = (vx_tensor)node->paramTable[0];
+            batchCount = (TENSOR_SIZE_INDEX(input, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(input, 3);
+        }
+
         status = vxnneShaderOperation_Initialize(
                     &userLayer->user_shader_operation,
                     &userLayer->base,
                     VXNNE_OPERATOR_USER_VXC,
-                    1,
+                    batchCount,
                     shaderExecutable);
         if (status != VX_SUCCESS)
         {
@@ -25429,6 +25437,12 @@ vx_status vxnneWrapUserNode(
 
         for (i = 0; i < node->kernel->signature.paramCount; i++)
         {
+            if (node->kernel->signature.dataTypeTable[i] == VX_TYPE_TENSOR &&
+                (TENSOR_SIZE_INDEX(((vx_tensor)(node->paramTable[i])), 3) == 0 || TENSOR_SIZE_INDEX(((vx_tensor)(node->paramTable[i])), 3) == 1))
+            {
+                vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, i, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT);
+            }
+
             if (node->kernel->signature.directionTable[i] == VX_INPUT &&
                 (node->kernel->signature.isStaticTable[i] == vx_false_e ||
                  (node->kernel->signature.dataTypeTable[i] == VX_TYPE_TENSOR &&
