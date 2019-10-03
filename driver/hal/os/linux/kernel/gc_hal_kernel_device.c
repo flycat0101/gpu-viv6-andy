@@ -344,6 +344,9 @@ _ShowVideoMemoryRecord(
                 );
         }
     }
+
+OnError:
+    return;
 }
 
 static void
