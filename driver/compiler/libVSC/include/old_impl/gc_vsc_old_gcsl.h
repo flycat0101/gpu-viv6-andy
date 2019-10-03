@@ -121,12 +121,10 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.38 for saving the full graphics shaders into the binary on 08/08/2019 */
 /* bump up version to 1.39 for saving ubo array index into the binary on 08/09/2019 */
 
-/* bump up version to 1.41 for saving adding intrinsic functions sin, cos, tan 08/27/2019 */
-
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 41)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 39)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 41)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 39)
 
 typedef union _gcsValue
 {
