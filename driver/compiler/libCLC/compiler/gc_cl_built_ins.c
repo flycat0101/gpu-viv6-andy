@@ -1104,7 +1104,9 @@ cloCOMPILER Compiler,
 gctINT TypeToken
 )
 {
-    if(cloCOMPILER_IsBasicTypePacked(Compiler)) {
+/* treat vx as packed */
+    if((cloCOMPILER_IsBasicTypePacked(Compiler) ||
+       cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))) {
         clsBUILTIN_DATATYPE_INFO *typeInfo;
 
         typeInfo = clGetBuiltinDataTypeInfo(TypeToken);

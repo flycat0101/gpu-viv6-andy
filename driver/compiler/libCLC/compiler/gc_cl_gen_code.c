@@ -15410,6 +15410,7 @@ IN OUT clsGEN_CODE_PARAMETERS *ToParameters
    gceSTATUS status;
    gctUINT i;
    cltELEMENT_TYPE fromElementType, toElementType;
+   clsIOPERAND iOperand[1];
 
    gcmASSERT(FromParameters->operandCount == ToParameters->operandCount);
 
@@ -15438,6 +15439,32 @@ IN OUT clsGEN_CODE_PARAMETERS *ToParameters
                 FromExpr->decl.dataType = ToExpr->decl.dataType;
              }
           }
+       }
+       else if((clmIsElementTypePacked(fromElementType) &&
+                !clmIsElementTypePacked(toElementType))) {
+          clsIOPERAND_New(Compiler, iOperand, ToParameters->dataTypes[i].def);
+          status = clUnpackROperand(Compiler,
+                                    FromExpr->base.lineNo,
+                                    FromExpr->base.stringNo,
+                                    &FromParameters->rOperands[i],
+                                    iOperand);
+          if(gcmIS_ERROR(status)) return status;
+          clsROPERAND_InitializeUsingIOperand(&FromParameters->rOperands[i], iOperand);
+          FromParameters->dataTypes[i].def = ToParameters->dataTypes[i].def;
+          FromExpr->decl.dataType = ToExpr->decl.dataType;
+       }
+       else if((!clmIsElementTypePacked(fromElementType) &&
+                clmIsElementTypePacked(toElementType))) {
+          clsIOPERAND_New(Compiler, iOperand, ToParameters->dataTypes[i].def);
+          status = clPackROperand(Compiler,
+                                  FromExpr->base.lineNo,
+                                  FromExpr->base.stringNo,
+                                  &FromParameters->rOperands[i],
+                                  iOperand);
+          if(gcmIS_ERROR(status)) return status;
+          clsROPERAND_InitializeUsingIOperand(&FromParameters->rOperands[i], iOperand);
+          FromParameters->dataTypes[i].def = ToParameters->dataTypes[i].def;
+          FromExpr->decl.dataType = ToExpr->decl.dataType;
        }
        else {
           gcmASSERT(gcIsScalarDataType(FromParameters->dataTypes[i].def));

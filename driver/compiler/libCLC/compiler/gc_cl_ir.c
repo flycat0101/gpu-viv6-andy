@@ -444,7 +444,7 @@ IN clsDECL * LDecl,
 IN clsDECL * RDecl
 )
 {
-  gctBOOL sameType = gcvFALSE;
+  gctBOOL sameType = gcvFALSE, sameElementType = gcvFALSE;
   gcmASSERT(LDecl);
   gcmASSERT(RDecl);
 
@@ -474,9 +474,24 @@ IN clsDECL * RDecl
        (RDecl->dataType->elementType == clvTYPE_HALF || LDecl->dataType->elementType == clvTYPE_HALF))) {
       sameType = gcvTRUE;
   }
+  else if(clmDECL_IsPackedType(RDecl))
+  {
+      clsBUILTIN_DATATYPE_INFO *typeInfo;
+
+      typeInfo = clGetBuiltinDataTypeInfo(LDecl->dataType->type);
+      sameElementType = typeInfo->dualType == RDecl->dataType->type;
+  }
+  else if(clmDECL_IsPackedType(LDecl))
+  {
+      clsBUILTIN_DATATYPE_INFO *typeInfo;
+
+      typeInfo = clGetBuiltinDataTypeInfo(RDecl->dataType->type);
+      sameElementType = typeInfo->dualType == LDecl->dataType->type;
+  }
+  sameElementType = sameElementType || (LDecl->dataType->elementType == RDecl->dataType->elementType);
 
   if(sameType ||
-     ((LDecl->dataType->elementType == RDecl->dataType->elementType) &&
+     (sameElementType &&
      (clmDATA_TYPE_matrixRowCount_GET(LDecl->dataType) == clmDATA_TYPE_matrixRowCount_GET(RDecl->dataType)) &&
      (clmDATA_TYPE_matrixColumnCount_GET(LDecl->dataType) == clmDATA_TYPE_matrixColumnCount_GET(RDecl->dataType)) &&
      (LDecl->dataType->u.generic == RDecl->dataType->u.generic))) {
@@ -504,7 +519,7 @@ IN clsDECL * LDecl,
 IN clsDECL * RDecl
 )
 {
-  gctBOOL sameType = gcvFALSE;
+  gctBOOL sameType = gcvFALSE, sameElementType = gcvFALSE;
   gcmASSERT(LDecl);
   gcmASSERT(RDecl);
 
@@ -529,9 +544,24 @@ IN clsDECL * RDecl
      clmIsElementTypePacked(LDecl->dataType->elementType)) {
       sameType = gcvTRUE;
   }
+  else if(clmDECL_IsPackedType(RDecl))
+  {
+      clsBUILTIN_DATATYPE_INFO *typeInfo;
+
+      typeInfo = clGetBuiltinDataTypeInfo(LDecl->dataType->type);
+      sameElementType = typeInfo->dualType == RDecl->dataType->type;
+  }
+  else if(clmDECL_IsPackedType(LDecl))
+  {
+      clsBUILTIN_DATATYPE_INFO *typeInfo;
+
+      typeInfo = clGetBuiltinDataTypeInfo(RDecl->dataType->type);
+      sameElementType = typeInfo->dualType == LDecl->dataType->type;
+  }
+  sameElementType = sameElementType || (LDecl->dataType->elementType == RDecl->dataType->elementType);
 
   if(sameType ||
-     ((LDecl->dataType->elementType == RDecl->dataType->elementType) &&
+     (sameElementType &&
      (clmDATA_TYPE_vectorSize_NOCHECK_GET(LDecl->dataType) == clmDATA_TYPE_vectorSize_NOCHECK_GET(RDecl->dataType)) &&
      (clmDATA_TYPE_matrixRowCount_GET(LDecl->dataType) == clmDATA_TYPE_matrixRowCount_GET(RDecl->dataType)) &&
      (clmDATA_TYPE_matrixColumnCount_GET(LDecl->dataType) == clmDATA_TYPE_matrixColumnCount_GET(RDecl->dataType)) &&
