@@ -752,6 +752,9 @@ typedef struct
 
     uint32_t psOutCntl4to7;
 
+    VkBuffer defaultUbo;
+    halti5_priv_const defaultBuffer;
+
 } halti5_graphicsPipeline;
 
 typedef struct

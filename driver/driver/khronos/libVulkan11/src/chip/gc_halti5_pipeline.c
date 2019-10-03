@@ -2390,6 +2390,18 @@ static VkResult halti5_pip_emit_graphicsProgram(
         ((info->pMultisampleState->rasterizationSamples > VK_SAMPLE_COUNT_1_BIT) ? 1 : 0));
     }
 
+     /* program default UBO address */
+    if (chipGfxPipeline->defaultBuffer.bUsed)
+    {
+        uint32_t physical;
+        __vkBuffer *defaultBuf =  __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, chipGfxPipeline->defaultUbo);
+        __VK_ASSERT(chipGfxPipeline->defaultBuffer.hwRegCount != 0 && chipGfxPipeline->defaultBuffer.hwRegCount <= 4);
+        physical = defaultBuf->memory->devAddr;
+        physical += (uint32_t)(defaultBuf->memOffset);
+
+        __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->defaultBuffer.hwRegAddress, VK_FALSE, physical);
+    }
+
     chipPipeline->curCmdIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
 
     return VK_SUCCESS;
@@ -5216,7 +5228,8 @@ static void halti5_pip_build_patchKeyMask(
 static VkResult halti5_pip_process_priv_const(
     halti5_vscprogram_instance *masterInstance,
     void *chipPipeline,
-    gctBOOL isGraphicsPipeline
+    gctBOOL isGraphicsPipeline,
+    const void *info
     )
 {
     VkResult result = VK_SUCCESS;
@@ -5225,6 +5238,7 @@ static VkResult halti5_pip_process_priv_const(
     if (isGraphicsPipeline)
     {
         halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)chipPipeline;
+        const VkGraphicsPipelineCreateInfo *gfxInfo = (VkGraphicsPipelineCreateInfo *) info;
 
         /* VS private constant mapping. */
         if (masterInstance->pep.seps[VSC_SHADER_STAGE_VS].staticPrivMapping.privConstantMapping.countOfEntries)
@@ -5315,6 +5329,50 @@ static VkResult halti5_pip_process_priv_const(
                     break;
                 }
             }
+
+            if (chipGfxPipeline->defaultBuffer.bUsed)
+            {
+                halti5_module *chipModule = (halti5_module *)masterInstance->devCtx->chipPriv;
+                SHADER_DEFAULT_UBO_MAPPING *defaultUboMapping = &masterInstance->pep.seps[VSC_SHADER_STAGE_PS].defaultUboMapping;
+                uint32_t index = defaultUboMapping->baseAddressIndexInPrivConstTable;
+                uint32_t entryCount = defaultUboMapping->countOfEntries;
+                SHADER_PRIV_CONSTANT_ENTRY *privConstEntry = &privConstMapping->pPrivmConstantEntries[index];
+                __vkBuffer *defaultBuf =  __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, chipGfxPipeline->defaultUbo);
+
+                __VK_ASSERT(privConstEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_DEFAULT_UBO_ADDRESS);
+                chipGfxPipeline->defaultBuffer.hwRegNo = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
+                chipGfxPipeline->defaultBuffer.hwRegAddress =
+                    (masterInstance->hwStates.hints.hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2) +
+                    (chipGfxPipeline->defaultBuffer.hwRegNo * 4) +
+                    privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                chipGfxPipeline->defaultBuffer.hwRegCount = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegRange;
+
+                for (i = 0; i < entryCount; i++)
+                {
+                    SHADER_DEFAULT_UBO_MEMBER_ENTRY *uboMemberEntry = &defaultUboMapping->pDefaultUboMemberEntries[i];
+                    uint32_t offset = uboMemberEntry->offsetInByte;
+                    VkBool32 enableMultisample = (gfxInfo->pMultisampleState->rasterizationSamples > VK_SAMPLE_COUNT_1_BIT) ? 1 : 0;
+
+                    if (uboMemberEntry->memberKind == SHS_DEFAULT_UBO_MEMBER_PRIV_CONST)
+                    {
+                        SHADER_PRIV_CONSTANT_ENTRY *privConstEntry = &privConstMapping->pPrivmConstantEntries[uboMemberEntry->memberIndexInOtherEntryTable];
+                        __VK_ASSERT(privConstEntry->mode == SHADER_PRIV_CONSTANT_MODE_VAL_2_DUBO);
+
+                        switch (privConstEntry->commonPrivm.privmKind)
+                        {
+                        case SHS_PRIV_CONSTANT_KIND_SAMPLE_LOCATION:
+                            gcoOS_MemCopy((gctPOINTER)((uint8_t *)defaultBuf->memory->hostAddr + offset), chipModule->sampleLocations, 16 * sizeof(gctFLOAT));
+                            break;
+                        case SHS_PRIV_CONSTANT_KIND_ENABLE_MULTISAMPLE_BUFFERS:
+                            gcoOS_MemCopy((gctPOINTER)((uint8_t *)defaultBuf->memory->hostAddr + offset), &enableMultisample, sizeof(UINT32));
+                            break;
+
+                        default:
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
     else
@@ -5352,6 +5410,72 @@ static VkResult halti5_pip_process_priv_const(
 
     return result;
 }
+
+static VkResult halti5_pip_process_defaultUbo(
+    halti5_vscprogram_instance *masterInstance,
+    void *chipPipeline,
+    gctBOOL isGraphicsPipeline
+    )
+{
+    VkResult result = VK_SUCCESS;
+    VkMemoryAllocateInfo mem_alloc;
+    VkDeviceMemory bufferMemory;
+    __vkDevContext *devCtx = masterInstance->devCtx;
+    halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)chipPipeline;
+
+    if (isGraphicsPipeline)
+    {
+        if (masterInstance->pep.seps[VSC_SHADER_STAGE_PS].defaultUboMapping.sizeInByte)
+        {
+            VkBufferCreateInfo buf_info;
+            __vkBuffer *buf = VK_NULL_HANDLE;
+            uint32_t bufferSize = masterInstance->pep.seps[VSC_SHADER_STAGE_PS].defaultUboMapping.sizeInByte;
+
+            /* Create a VkBuffer for default UBO */
+            __VK_MEMZERO(&buf_info, sizeof(VkBufferCreateInfo));
+            buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+            buf_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+            buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            buf_info.size = bufferSize;
+
+            chipGfxPipeline->defaultUbo = VK_NULL_HANDLE;
+            __VK_ONERROR(__vk_CreateBuffer((VkDevice)devCtx, &buf_info, gcvNULL, &chipGfxPipeline->defaultUbo));
+
+            /* Allocate device memory for default UBO */
+            buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, chipGfxPipeline->defaultUbo);
+            __VK_MEMZERO(&mem_alloc, sizeof(mem_alloc));
+            mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            mem_alloc.allocationSize = buf->memReq.size;
+            mem_alloc.memoryTypeIndex = 0;
+            __VK_ONERROR(__vk_AllocateMemory((VkDevice)devCtx, &mem_alloc, gcvNULL, &bufferMemory));
+
+            /* bind memory */
+            __VK_ONERROR(__vk_BindBufferMemory((VkDevice)devCtx, chipGfxPipeline->defaultUbo, bufferMemory, 0));
+
+            chipGfxPipeline->defaultBuffer.bUsed = VK_TRUE;
+        }
+    }
+    return result;
+
+OnError:
+    if (chipGfxPipeline)
+    {
+        if (chipGfxPipeline->defaultUbo)
+        {
+            __vkBuffer *buf;
+
+            buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, chipGfxPipeline->defaultUbo);
+
+            if (buf->memory)
+            {
+                __vk_FreeMemory((VkDevice)(uintptr_t)devCtx, (VkDeviceMemory)(uintptr_t)buf->memory, gcvNULL);
+            }
+        }
+    }
+
+    return result;
+}
+
 
 static VkResult halti5_pip_build_gfxshaders(
     __vkDevContext *devCtx,
@@ -5766,8 +5890,11 @@ static VkResult halti5_pip_build_gfxshaders(
         __VK_MEMZERO(chipPipeline->separateBindingProgramed, chipPipeline->countOfseparateBinding * sizeof(VkBool32));
     }
 
+    /*should create ubo if needed*/
+    halti5_pip_process_defaultUbo(masterInstance, chipGfxPipeline, VK_TRUE);
+
     /* process private constants. */
-    halti5_pip_process_priv_const(masterInstance, chipGfxPipeline, VK_TRUE);
+    halti5_pip_process_priv_const(masterInstance, chipGfxPipeline, VK_TRUE, info);
 
     chipPipeline->curInstance = chipPipeline->masterInstance = masterInstance;
 
@@ -6163,7 +6290,7 @@ static VkResult halti5_pip_build_computeshader(
     chipPipeline->curInstance = chipPipeline->masterInstance = masterInstance;
 
     /* process private constants. */
-    halti5_pip_process_priv_const(masterInstance, chipCmptPipeline, VK_FALSE);
+    halti5_pip_process_priv_const(masterInstance, chipCmptPipeline, VK_FALSE, info);
 
     if (masterInstance->pep.u.vk.privateCombTsHwMappingPool.countOfArray)
     {
@@ -6600,8 +6727,24 @@ VkResult halti5_destroyPipeline(
     __vkPipeline *pip = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipeline *, pipeline);
     uint32_t i;
     halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
+    halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
 
     __VK_SET_ALLOCATIONCB(&pip->memCb);
+
+    if (chipGfxPipeline)
+    {
+        if (chipGfxPipeline->defaultUbo)
+        {
+            __vkBuffer *buf;
+
+            buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, chipGfxPipeline->defaultUbo);
+
+            if (buf->memory)
+            {
+                __vk_FreeMemory((VkDevice)(uintptr_t)devCtx, (VkDeviceMemory)(uintptr_t)buf->memory, gcvNULL);
+            }
+        }
+    }
 
     if (chipPipeline->separateBindingProgramed)
     {
