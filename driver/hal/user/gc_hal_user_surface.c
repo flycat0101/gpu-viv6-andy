@@ -12485,15 +12485,21 @@ gcoSURF_BlitCPU(
     gcsSURF_FORMAT_INFO *srcFmtInfo, *dstFmtInfo;
     gcsSURF_VIEW srcView;
     gcsSURF_VIEW dstView;
+    gceAPI currentApi;
 
     if (!args || !args->srcSurface || !args->dstSurface)
     {
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-    if (args->srcSurface == args->dstSurface)
+    gcmONERROR(gcoHARDWARE_GetAPI(gcvNULL, &currentApi, gcvNULL));
+
+    if(currentApi != gcvAPI_OPENGL)
     {
-        return gcvSTATUS_INVALID_ARGUMENT;
+        if (args->srcSurface == args->dstSurface)
+        {
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
     }
 
     srcView.surf = args->srcSurface;
