@@ -804,39 +804,6 @@ _PLSDestructor(
         gcPLS.destructor = gcvNULL;
     }
 
-    if (gcPLS.contiguousLogical != gcvNULL)
-    {
-        gcmVERIFY_OK(_UnmapMemory(
-            gcPLS.contiguousPhysName,
-            gcPLS.contiguousSize,
-            gcPLS.contiguousLogical
-            ));
-
-        gcPLS.contiguousLogical = gcvNULL;
-    }
-
-    if (gcPLS.externalLogical != gcvNULL)
-    {
-        gcmVERIFY_OK(_UnmapMemory(
-            gcPLS.externalPhysName,
-            gcPLS.externalSize,
-            gcPLS.externalLogical
-            ));
-
-        gcPLS.externalLogical = gcvNULL;
-    }
-
-    if (gcPLS.internalLogical != gcvNULL)
-    {
-        gcmVERIFY_OK(_UnmapMemory(
-            gcPLS.internalPhysName,
-            gcPLS.internalSize,
-            gcPLS.internalLogical
-            ));
-
-        gcPLS.internalLogical = gcvNULL;
-    }
-
 #if gcdDUMP_2D
     gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, dumpMemInfoListMutex));
     dumpMemInfoListMutex = gcvNULL;
@@ -1126,10 +1093,8 @@ _ModuleConstructor(
 #endif
 
     gcmFOOTER_ARG(
-        "gcPLS.os=0x%08X, gcPLS.hal=0x%08X"
-        " internal=0x%08X external=0x%08X contiguous=0x%08X",
-        gcPLS.os, gcPLS.hal,
-        gcPLS.internalLogical, gcPLS.externalLogical, gcPLS.contiguousLogical
+        "gcPLS.os=0x%08X, gcPLS.hal=0x%08X",
+        gcPLS.os, gcPLS.hal
         );
 
     return status;
@@ -1263,36 +1228,6 @@ _OpenDevice(
         &gcPLS.contiguousPhysName,
         &gcPLS.contiguousSize
         ));
-
-    /* Map internal video memory. */
-    if (gcPLS.internalSize != 0)
-    {
-        gcmONERROR(_MapMemory(
-             gcPLS.internalPhysName,
-             gcPLS.internalSize,
-            &gcPLS.internalLogical
-            ));
-    }
-
-    /* Map external video memory. */
-    if (gcPLS.externalSize != 0)
-    {
-        gcmONERROR(_MapMemory(
-             gcPLS.externalPhysName,
-             gcPLS.externalSize,
-            &gcPLS.externalLogical
-            ));
-    }
-
-    /* Map contiguous video memory. */
-    if (gcPLS.contiguousSize != 0)
-    {
-        gcmONERROR(_MapMemory(
-             gcPLS.contiguousPhysName,
-             gcPLS.contiguousSize,
-            &gcPLS.contiguousLogical
-            ));
-    }
 
     /* make sure this instruction is at last */
     gcPLS.bDeviceOpen = gcvTRUE;
