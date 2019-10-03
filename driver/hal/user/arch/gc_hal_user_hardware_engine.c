@@ -3638,15 +3638,15 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
 
     gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, Memory);
 
+    Hardware->multiGPURenderingModeDirty = gcvFALSE;
+    Hardware->gpuRenderingMode = mode;
+
+OnError:
     if (renderWindow != gcvNULL)
     {
         gcoOS_FreeMemory(gcvNULL, (gctPOINTER)renderWindow);
     }
 
-    Hardware->multiGPURenderingModeDirty = gcvFALSE;
-    Hardware->gpuRenderingMode = mode;
-
-OnError:
     /* Return the status. */
     gcmFOOTER();
     return status;
