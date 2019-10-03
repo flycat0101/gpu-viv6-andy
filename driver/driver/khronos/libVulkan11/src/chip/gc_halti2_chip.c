@@ -1204,6 +1204,13 @@ VkResult halti2_copyImageWithRS(
     {
         /* Change srcFormat to be same as dstFormat for rawCopy */
         srcFormat = dstFormat;
+
+        if (__vk_GetVkFormatInfo((VkFormat) dstFormat)->bitsPerBlock >= 64 &&
+            srcMsaa != dstMsaa)
+        {
+            useComputeBlit = VK_TRUE;
+            rawCopy = VK_FALSE;
+        }
     }
 
     if (srcParts != dstParts)

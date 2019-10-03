@@ -2067,13 +2067,11 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyImage(
 
                 if (pSrcImage->formatInfo.compressed || pDstImage->formatInfo.compressed)
                 {
-                    VkBool32 rawCopy = pSrcImage->sampleInfo.product == pDstImage->sampleInfo.product;
-
                     __VK_ERR_BREAK(devCtx->chipFuncs->CopyImage(
                         commandBuffer,
                         pSrcRes,
                         pDstRes,
-                        rawCopy,
+                        VK_TRUE,
                         VK_FILTER_NEAREST,
                         VK_FALSE
                         ));
