@@ -1458,17 +1458,17 @@ gcoHAL_QueryMultiGPUAffinityConfig(
 
     gcoOS_GetEnv(gcvNULL, "VIV_ENABLE_OPENCV_WORKGROUPSIZE", &affinity);
 
-    if(gcoOS_StrCmp(affinity, "1") == 0)
+    if (affinity && (gcoOS_StrCmp(affinity, "1") == 0))
     {
         gceCHIPMODEL chipModel;
         gctUINT32 chipRevision;
 
         gcoHARDWARE_QueryChipIdentity(
-                                        gcvNULL,
-                                        &chipModel,
-                                        &chipRevision);
+                                    gcvNULL,
+                                    &chipModel,
+                                    &chipRevision);
 
-        if((chipModel == gcv7000) && (chipRevision == 0x6009))
+        if ((chipModel == gcv7000) && (chipRevision == 0x6009))
         {
             mode = *Mode = gcvMULTI_GPU_MODE_INDEPENDENT;
             *CoreIndex = 0;
