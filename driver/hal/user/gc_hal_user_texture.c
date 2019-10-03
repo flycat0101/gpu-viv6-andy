@@ -4218,7 +4218,7 @@ _ReplaceSurfaceForBorderPatch(
         lockedSrcNode = &curSurf->node;
         gcmONERROR(gcoHARDWARE_LockEx(&surface->node, gcvENGINE_RENDER, &dstAddress, gcvNULL));
         lockedDstNode = &surface->node;
-        gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, gcvENGINE_RENDER, srcAddress, dstAddress, (gctUINT32)curSurf->size));
+        gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, gcvENGINE_RENDER, srcAddress, dstAddress, (gctUINT32)curSurf->size, gcvFALSE));
         gcmONERROR(gcoHARDWARE_UnlockEx(lockedSrcNode, gcvENGINE_RENDER, curSurf->type));
         lockedSrcNode = gcvNULL;
         gcmONERROR(gcoHARDWARE_UnlockEx(lockedDstNode, gcvENGINE_RENDER, surface->type));
@@ -4231,7 +4231,7 @@ _ReplaceSurfaceForBorderPatch(
             lockedSrcNode = &curSurf->tileStatusNode;
             gcmONERROR(gcoHARDWARE_LockEx(&surface->tileStatusNode, gcvENGINE_RENDER, &dstAddress, gcvNULL));
             lockedDstNode = &surface->tileStatusNode;
-            gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, gcvENGINE_RENDER, srcAddress, dstAddress, (gctUINT32)curSurf->tileStatusNode.size));
+            gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, gcvENGINE_RENDER, srcAddress, dstAddress, (gctUINT32)curSurf->tileStatusNode.size, gcvFALSE));
             gcmONERROR(gcoHARDWARE_UnlockEx(lockedSrcNode, gcvENGINE_RENDER, gcvSURF_TILE_STATUS));
             lockedSrcNode = gcvNULL;
             gcmONERROR(gcoHARDWARE_UnlockEx(lockedDstNode, gcvENGINE_RENDER, gcvSURF_TILE_STATUS));

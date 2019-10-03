@@ -2707,7 +2707,8 @@ gcoHARDWARE_3DBlitCopy(
     IN gceENGINE Engine,
     IN gctUINT32 SrcAddress,
     IN gctUINT32 DestAddress,
-    IN gctUINT32 CopySize
+    IN gctUINT32 CopySize,
+    IN gctBOOL forceSingle
     );
 
 gceSTATUS

@@ -2247,7 +2247,7 @@ gcoCL_MemBltCopy(
     gcmHEADER();
 
     gcmGETHARDWARE(Hardware);
-    gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, engine, SrcAddress, DestAddress, CopySize));
+    gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, engine, SrcAddress, DestAddress, CopySize, gcvFALSE));
 
 
     gcoHARDWARE_OnIssueFence(gcvNULL, engine);

@@ -577,7 +577,7 @@ static gceSTATUS _gpuUpload(
             Bytes);
     }
 
-    gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, blitEngine, srcAddress, destAddress, (gctUINT32)Bytes));
+    gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, blitEngine, srcAddress, destAddress, (gctUINT32)Bytes, gcvFALSE));
 
     gcmONERROR(gcsSURF_NODE_GetFence(&srcMemory, blitEngine, gcvFENCE_TYPE_READ));
 

@@ -1157,6 +1157,8 @@ gcoHARDWARE_CopyData(
 **      gctSIZE_T Bytes
 **          Number of byte to copy.
 **
+**      gctBOOL forceSingle
+**          Force single gpu and single cluster
 **  OUTPUT:
 **
 **      Nothing
@@ -1167,7 +1169,8 @@ gcoHARDWARE_3DBlitCopy(
     IN gceENGINE Engine,
     IN gctUINT32 SrcAddress,
     IN gctUINT32 DestAddress,
-    IN gctUINT32 CopySize
+    IN gctUINT32 CopySize,
+    IN gctBOOL forceSingle
     )
 {
     gceSTATUS status;
@@ -1176,8 +1179,6 @@ gcoHARDWARE_3DBlitCopy(
     gctUINT32 gpuCount = 0;
     gctUINT32 clusterCount = 0;
     gctUINT32 clusterMask = 0;
-    /*force single gpu and single cluster*/
-    gctBOOL forceSingle = gcvFALSE;
 
     /* Define state buffer variables. */
     gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
