@@ -3281,7 +3281,7 @@ static gceSTATUS _SetUniformItem(
     IN gctUINT32                            Offset3,
     IN gctUINT32                            Shift,
     IN gctBOOL                              IgnoreOffset,
-    IN gcVXConfig                           Config,
+    IN gcVXConfig                           *Config,
     IN gctUINT32                            AccumulatorType,
     IN OUT gcoVX_Kernel_Context_Uniform     *Uniform
 )
@@ -3293,8 +3293,8 @@ static gceSTATUS _SetUniformItem(
 
     for(k = 0; k < 8; k++)
     {
-        Uniform->uniform.bins[0].bin16[k] = Config.matrix[k];
-        Uniform->uniform.bins[1].bin16[k] = Config.matrix[k + 8];
+        Uniform->uniform.bins[0].bin16[k] = Config->matrix[k];
+        Uniform->uniform.bins[1].bin16[k] = Config->matrix[k + 8];
     }
 
     Uniform->uniform.termConfig = ((((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
@@ -3303,7 +3303,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  1:0) - (0 ?
  1:0) + 1))))) << (0 ?
- 1:0))) | ((gctUINT32)((gctUINT32)(Config.termconfig[0]) & ((((1 ?
+ 1:0))) | ((gctUINT32)((gctUINT32)(Config->termconfig[0]) & ((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3314,7 +3314,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  3:2) - (0 ?
  3:2) + 1))))) << (0 ?
- 3:2))) | ((gctUINT32)((gctUINT32)(Config.termconfig[1]) & ((((1 ?
+ 3:2))) | ((gctUINT32)((gctUINT32)(Config->termconfig[1]) & ((((1 ?
  3:2) - (0 ?
  3:2) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3325,7 +3325,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  5:4) - (0 ?
  5:4) + 1))))) << (0 ?
- 5:4))) | ((gctUINT32)((gctUINT32)(Config.termconfig[2]) & ((((1 ?
+ 5:4))) | ((gctUINT32)((gctUINT32)(Config->termconfig[2]) & ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3336,7 +3336,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  7:6) - (0 ?
  7:6) + 1))))) << (0 ?
- 7:6))) | ((gctUINT32)((gctUINT32)(Config.termconfig[3]) & ((((1 ?
+ 7:6))) | ((gctUINT32)((gctUINT32)(Config->termconfig[3]) & ((((1 ?
  7:6) - (0 ?
  7:6) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3347,7 +3347,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  9:8) - (0 ?
  9:8) + 1))))) << (0 ?
- 9:8))) | ((gctUINT32)((gctUINT32)(Config.termconfig[4]) & ((((1 ?
+ 9:8))) | ((gctUINT32)((gctUINT32)(Config->termconfig[4]) & ((((1 ?
  9:8) - (0 ?
  9:8) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3358,7 +3358,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  11:10) - (0 ?
  11:10) + 1))))) << (0 ?
- 11:10))) | ((gctUINT32)((gctUINT32)(Config.termconfig[5]) & ((((1 ?
+ 11:10))) | ((gctUINT32)((gctUINT32)(Config->termconfig[5]) & ((((1 ?
  11:10) - (0 ?
  11:10) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3369,7 +3369,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  13:12) - (0 ?
  13:12) + 1))))) << (0 ?
- 13:12))) | ((gctUINT32)((gctUINT32)(Config.termconfig[6]) & ((((1 ?
+ 13:12))) | ((gctUINT32)((gctUINT32)(Config->termconfig[6]) & ((((1 ?
  13:12) - (0 ?
  13:12) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3380,7 +3380,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  15:14) - (0 ?
  15:14) + 1))))) << (0 ?
- 15:14))) | ((gctUINT32)((gctUINT32)(Config.termconfig[7]) & ((((1 ?
+ 15:14))) | ((gctUINT32)((gctUINT32)(Config->termconfig[7]) & ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3391,7 +3391,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  17:16) - (0 ?
  17:16) + 1))))) << (0 ?
- 17:16))) | ((gctUINT32)((gctUINT32)(Config.termconfig[8]) & ((((1 ?
+ 17:16))) | ((gctUINT32)((gctUINT32)(Config->termconfig[8]) & ((((1 ?
  17:16) - (0 ?
  17:16) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3402,7 +3402,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  19:18) - (0 ?
  19:18) + 1))))) << (0 ?
- 19:18))) | ((gctUINT32)((gctUINT32)(Config.termconfig[9]) & ((((1 ?
+ 19:18))) | ((gctUINT32)((gctUINT32)(Config->termconfig[9]) & ((((1 ?
  19:18) - (0 ?
  19:18) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3413,7 +3413,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  21:20) - (0 ?
  21:20) + 1))))) << (0 ?
- 21:20))) | ((gctUINT32)((gctUINT32)(Config.termconfig[10]) & ((((1 ?
+ 21:20))) | ((gctUINT32)((gctUINT32)(Config->termconfig[10]) & ((((1 ?
  21:20) - (0 ?
  21:20) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3424,7 +3424,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  23:22) - (0 ?
  23:22) + 1))))) << (0 ?
- 23:22))) | ((gctUINT32)((gctUINT32)(Config.termconfig[11]) & ((((1 ?
+ 23:22))) | ((gctUINT32)((gctUINT32)(Config->termconfig[11]) & ((((1 ?
  23:22) - (0 ?
  23:22) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3435,7 +3435,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  25:24) - (0 ?
  25:24) + 1))))) << (0 ?
- 25:24))) | ((gctUINT32)((gctUINT32)(Config.termconfig[12]) & ((((1 ?
+ 25:24))) | ((gctUINT32)((gctUINT32)(Config->termconfig[12]) & ((((1 ?
  25:24) - (0 ?
  25:24) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3446,7 +3446,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  27:26) - (0 ?
  27:26) + 1))))) << (0 ?
- 27:26))) | ((gctUINT32)((gctUINT32)(Config.termconfig[13]) & ((((1 ?
+ 27:26))) | ((gctUINT32)((gctUINT32)(Config->termconfig[13]) & ((((1 ?
  27:26) - (0 ?
  27:26) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3457,7 +3457,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  29:28) - (0 ?
  29:28) + 1))))) << (0 ?
- 29:28))) | ((gctUINT32)((gctUINT32)(Config.termconfig[14]) & ((((1 ?
+ 29:28))) | ((gctUINT32)((gctUINT32)(Config->termconfig[14]) & ((((1 ?
  29:28) - (0 ?
  29:28) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3468,7 +3468,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  31:30) - (0 ?
  31:30) + 1))))) << (0 ?
- 31:30))) | ((gctUINT32)((gctUINT32)(Config.termconfig[15]) & ((((1 ?
+ 31:30))) | ((gctUINT32)((gctUINT32)(Config->termconfig[15]) & ((((1 ?
  31:30) - (0 ?
  31:30) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3476,7 +3476,7 @@ static gceSTATUS _SetUniformItem(
                      );
 
     Uniform->uniform.aSelect = (
-                    ((Config.aselect[0] == 0) ?
+                    ((Config->aselect[0] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  1:0) - (0 ?
  1:0) + 1) == 32) ?
@@ -3500,7 +3500,7 @@ static gceSTATUS _SetUniformItem(
  1:0) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  1:0) - (0 ? 1:0) + 1))))) << (0 ? 1:0))))
-                  | ((Config.aselect[1] == 0) ?
+                  | ((Config->aselect[1] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  3:2) - (0 ?
  3:2) + 1) == 32) ?
@@ -3524,7 +3524,7 @@ static gceSTATUS _SetUniformItem(
  3:2) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  3:2) - (0 ? 3:2) + 1))))) << (0 ? 3:2))))
-                  | ((Config.aselect[2] == 0) ?
+                  | ((Config->aselect[2] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
@@ -3548,7 +3548,7 @@ static gceSTATUS _SetUniformItem(
  5:4) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  5:4) - (0 ? 5:4) + 1))))) << (0 ? 5:4))))
-                  | ((Config.aselect[3] == 0) ?
+                  | ((Config->aselect[3] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  7:6) - (0 ?
  7:6) + 1) == 32) ?
@@ -3572,7 +3572,7 @@ static gceSTATUS _SetUniformItem(
  7:6) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  7:6) - (0 ? 7:6) + 1))))) << (0 ? 7:6))))
-                  | ((Config.aselect[4] == 0) ?
+                  | ((Config->aselect[4] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  9:8) - (0 ?
  9:8) + 1) == 32) ?
@@ -3596,7 +3596,7 @@ static gceSTATUS _SetUniformItem(
  9:8) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  9:8) - (0 ? 9:8) + 1))))) << (0 ? 9:8))))
-                  | ((Config.aselect[5] == 0) ?
+                  | ((Config->aselect[5] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  11:10) - (0 ?
  11:10) + 1) == 32) ?
@@ -3620,7 +3620,7 @@ static gceSTATUS _SetUniformItem(
  11:10) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  11:10) - (0 ? 11:10) + 1))))) << (0 ? 11:10))))
-                  | ((Config.aselect[6] == 0) ?
+                  | ((Config->aselect[6] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  13:12) - (0 ?
  13:12) + 1) == 32) ?
@@ -3644,7 +3644,7 @@ static gceSTATUS _SetUniformItem(
  13:12) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  13:12) - (0 ? 13:12) + 1))))) << (0 ? 13:12))))
-                  | ((Config.aselect[7] == 0) ?
+                  | ((Config->aselect[7] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
@@ -3668,7 +3668,7 @@ static gceSTATUS _SetUniformItem(
  15:14) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  15:14) - (0 ? 15:14) + 1))))) << (0 ? 15:14))))
-                  | ((Config.aselect[8] == 0) ?
+                  | ((Config->aselect[8] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  17:16) - (0 ?
  17:16) + 1) == 32) ?
@@ -3692,7 +3692,7 @@ static gceSTATUS _SetUniformItem(
  17:16) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  17:16) - (0 ? 17:16) + 1))))) << (0 ? 17:16))))
-                  | ((Config.aselect[9] == 0) ?
+                  | ((Config->aselect[9] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  19:18) - (0 ?
  19:18) + 1) == 32) ?
@@ -3716,7 +3716,7 @@ static gceSTATUS _SetUniformItem(
  19:18) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  19:18) - (0 ? 19:18) + 1))))) << (0 ? 19:18))))
-                  | ((Config.aselect[10] == 0) ?
+                  | ((Config->aselect[10] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  21:20) - (0 ?
  21:20) + 1) == 32) ?
@@ -3740,7 +3740,7 @@ static gceSTATUS _SetUniformItem(
  21:20) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  21:20) - (0 ? 21:20) + 1))))) << (0 ? 21:20))))
-                  | ((Config.aselect[11] == 0) ?
+                  | ((Config->aselect[11] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  23:22) - (0 ?
  23:22) + 1) == 32) ?
@@ -3764,7 +3764,7 @@ static gceSTATUS _SetUniformItem(
  23:22) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  23:22) - (0 ? 23:22) + 1))))) << (0 ? 23:22))))
-                  | ((Config.aselect[12] == 0) ?
+                  | ((Config->aselect[12] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  25:24) - (0 ?
  25:24) + 1) == 32) ?
@@ -3788,7 +3788,7 @@ static gceSTATUS _SetUniformItem(
  25:24) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  25:24) - (0 ? 25:24) + 1))))) << (0 ? 25:24))))
-                  | ((Config.aselect[13] == 0) ?
+                  | ((Config->aselect[13] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  27:26) - (0 ?
  27:26) + 1) == 32) ?
@@ -3812,7 +3812,7 @@ static gceSTATUS _SetUniformItem(
  27:26) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  27:26) - (0 ? 27:26) + 1))))) << (0 ? 27:26))))
-                  | ((Config.aselect[14] == 0) ?
+                  | ((Config->aselect[14] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  29:28) - (0 ?
  29:28) + 1) == 32) ?
@@ -3836,7 +3836,7 @@ static gceSTATUS _SetUniformItem(
  29:28) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  29:28) - (0 ? 29:28) + 1))))) << (0 ? 29:28))))
-                  | ((Config.aselect[15] == 0) ?
+                  | ((Config->aselect[15] == 0) ?
  (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  31:30) - (0 ?
  31:30) + 1) == 32) ?
@@ -3869,7 +3869,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  3:0) - (0 ?
  3:0) + 1))))) << (0 ?
- 3:0))) | ((gctUINT32)((gctUINT32)(Offset0 + Config.abin0[0]) & ((((1 ?
+ 3:0))) | ((gctUINT32)((gctUINT32)(Offset0 + Config->abin0[0]) & ((((1 ?
  3:0) - (0 ?
  3:0) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3880,7 +3880,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  7:4) - (0 ?
  7:4) + 1))))) << (0 ?
- 7:4))) | ((gctUINT32)((gctUINT32)(Offset0 + Config.abin0[1]) & ((((1 ?
+ 7:4))) | ((gctUINT32)((gctUINT32)(Offset0 + Config->abin0[1]) & ((((1 ?
  7:4) - (0 ?
  7:4) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3891,12 +3891,12 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  11:8) - (0 ?
  11:8) + 1))))) << (0 ?
- 11:8))) | ((gctUINT32)((gctUINT32)(Offset0 + Config.abin0[2]) & ((((1 ?
+ 11:8))) | ((gctUINT32)((gctUINT32)(Offset0 + Config->abin0[2]) & ((((1 ?
  11:8) - (0 ?
  11:8) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  11:8) - (0 ? 11:8) + 1))))) << (0 ? 11:8)))
-                  | ((Config.termconfig[3] == VX_ACCUMULATOR && IgnoreOffset)
+                  | ((Config->termconfig[3] == VX_ACCUMULATOR && IgnoreOffset)
                         ?
 (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  15:12) - (0 ?
@@ -3904,7 +3904,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  15:12) - (0 ?
  15:12) + 1))))) << (0 ?
- 15:12))) | ((gctUINT32)((gctUINT32)(Config.abin0[3]) & ((((1 ?
+ 15:12))) | ((gctUINT32)((gctUINT32)(Config->abin0[3]) & ((((1 ?
  15:12) - (0 ?
  15:12) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3915,7 +3915,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  15:12) - (0 ?
  15:12) + 1))))) << (0 ?
- 15:12))) | ((gctUINT32)((gctUINT32)(Offset0 + Config.abin0[3]) & ((((1 ?
+ 15:12))) | ((gctUINT32)((gctUINT32)(Offset0 + Config->abin0[3]) & ((((1 ?
  15:12) - (0 ?
  15:12) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3927,7 +3927,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  19:16) - (0 ?
  19:16) + 1))))) << (0 ?
- 19:16))) | ((gctUINT32)((gctUINT32)(Offset1 + Config.abin0[4]) & ((((1 ?
+ 19:16))) | ((gctUINT32)((gctUINT32)(Offset1 + Config->abin0[4]) & ((((1 ?
  19:16) - (0 ?
  19:16) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3938,7 +3938,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  23:20) - (0 ?
  23:20) + 1))))) << (0 ?
- 23:20))) | ((gctUINT32)((gctUINT32)(Offset1 + Config.abin0[5]) & ((((1 ?
+ 23:20))) | ((gctUINT32)((gctUINT32)(Offset1 + Config->abin0[5]) & ((((1 ?
  23:20) - (0 ?
  23:20) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3949,12 +3949,12 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  27:24) - (0 ?
  27:24) + 1))))) << (0 ?
- 27:24))) | ((gctUINT32)((gctUINT32)(Offset1 + Config.abin0[6]) & ((((1 ?
+ 27:24))) | ((gctUINT32)((gctUINT32)(Offset1 + Config->abin0[6]) & ((((1 ?
  27:24) - (0 ?
  27:24) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  27:24) - (0 ? 27:24) + 1))))) << (0 ? 27:24)))
-                  | ((Config.termconfig[7] == VX_ACCUMULATOR && IgnoreOffset)
+                  | ((Config->termconfig[7] == VX_ACCUMULATOR && IgnoreOffset)
                         ?
 (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  31:28) - (0 ?
@@ -3962,7 +3962,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  31:28) - (0 ?
  31:28) + 1))))) << (0 ?
- 31:28))) | ((gctUINT32)((gctUINT32)(Config.abin0[7]) & ((((1 ?
+ 31:28))) | ((gctUINT32)((gctUINT32)(Config->abin0[7]) & ((((1 ?
  31:28) - (0 ?
  31:28) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3973,7 +3973,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  31:28) - (0 ?
  31:28) + 1))))) << (0 ?
- 31:28))) | ((gctUINT32)((gctUINT32)(Offset1 + Config.abin0[7]) & ((((1 ?
+ 31:28))) | ((gctUINT32)((gctUINT32)(Offset1 + Config->abin0[7]) & ((((1 ?
  31:28) - (0 ?
  31:28) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3988,7 +3988,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  3:0) - (0 ?
  3:0) + 1))))) << (0 ?
- 3:0))) | ((gctUINT32)((gctUINT32)(Offset2 + Config.abin1[0]) & ((((1 ?
+ 3:0))) | ((gctUINT32)((gctUINT32)(Offset2 + Config->abin1[0]) & ((((1 ?
  3:0) - (0 ?
  3:0) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -3999,7 +3999,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  7:4) - (0 ?
  7:4) + 1))))) << (0 ?
- 7:4))) | ((gctUINT32)((gctUINT32)(Offset2 + Config.abin1[1]) & ((((1 ?
+ 7:4))) | ((gctUINT32)((gctUINT32)(Offset2 + Config->abin1[1]) & ((((1 ?
  7:4) - (0 ?
  7:4) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -4010,12 +4010,12 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  11:8) - (0 ?
  11:8) + 1))))) << (0 ?
- 11:8))) | ((gctUINT32)((gctUINT32)(Offset2 + Config.abin1[2]) & ((((1 ?
+ 11:8))) | ((gctUINT32)((gctUINT32)(Offset2 + Config->abin1[2]) & ((((1 ?
  11:8) - (0 ?
  11:8) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  11:8) - (0 ? 11:8) + 1))))) << (0 ? 11:8)))
-                  | ((Config.termconfig[11] == VX_ACCUMULATOR && IgnoreOffset)
+                  | ((Config->termconfig[11] == VX_ACCUMULATOR && IgnoreOffset)
                         ?
 (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  15:12) - (0 ?
@@ -4023,7 +4023,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  15:12) - (0 ?
  15:12) + 1))))) << (0 ?
- 15:12))) | ((gctUINT32)((gctUINT32)(Config.abin1[3]) & ((((1 ?
+ 15:12))) | ((gctUINT32)((gctUINT32)(Config->abin1[3]) & ((((1 ?
  15:12) - (0 ?
  15:12) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -4034,7 +4034,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  15:12) - (0 ?
  15:12) + 1))))) << (0 ?
- 15:12))) | ((gctUINT32)((gctUINT32)(Offset2 + Config.abin1[3]) & ((((1 ?
+ 15:12))) | ((gctUINT32)((gctUINT32)(Offset2 + Config->abin1[3]) & ((((1 ?
  15:12) - (0 ?
  15:12) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -4046,7 +4046,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  19:16) - (0 ?
  19:16) + 1))))) << (0 ?
- 19:16))) | ((gctUINT32)((gctUINT32)(Offset3 + Config.abin1[4]) & ((((1 ?
+ 19:16))) | ((gctUINT32)((gctUINT32)(Offset3 + Config->abin1[4]) & ((((1 ?
  19:16) - (0 ?
  19:16) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -4057,7 +4057,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  23:20) - (0 ?
  23:20) + 1))))) << (0 ?
- 23:20))) | ((gctUINT32)((gctUINT32)(Offset3 + Config.abin1[5]) & ((((1 ?
+ 23:20))) | ((gctUINT32)((gctUINT32)(Offset3 + Config->abin1[5]) & ((((1 ?
  23:20) - (0 ?
  23:20) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -4068,12 +4068,12 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  27:24) - (0 ?
  27:24) + 1))))) << (0 ?
- 27:24))) | ((gctUINT32)((gctUINT32)(Offset3 + Config.abin1[6]) & ((((1 ?
+ 27:24))) | ((gctUINT32)((gctUINT32)(Offset3 + Config->abin1[6]) & ((((1 ?
  27:24) - (0 ?
  27:24) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  27:24) - (0 ? 27:24) + 1))))) << (0 ? 27:24)))
-                  | ((Config.termconfig[15] == VX_ACCUMULATOR)
+                  | ((Config->termconfig[15] == VX_ACCUMULATOR)
                         ?
 (((gctUINT32)(0) & ~((gctUINT32)(((((1 ?
  31:28) - (0 ?
@@ -4081,7 +4081,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  31:28) - (0 ?
  31:28) + 1))))) << (0 ?
- 31:28))) | ((gctUINT32)((gctUINT32)(Config.abin1[7]) & ((((1 ?
+ 31:28))) | ((gctUINT32)((gctUINT32)(Config->abin1[7]) & ((((1 ?
  31:28) - (0 ?
  31:28) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -4092,7 +4092,7 @@ static gceSTATUS _SetUniformItem(
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
  31:28) - (0 ?
  31:28) + 1))))) << (0 ?
- 31:28))) | ((gctUINT32)((gctUINT32)(Offset3 + Config.abin1[7]) & ((((1 ?
+ 31:28))) | ((gctUINT32)((gctUINT32)(Offset3 + Config->abin1[7]) & ((((1 ?
  31:28) - (0 ?
  31:28) + 1) == 32) ?
  ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
@@ -5984,7 +5984,7 @@ static gceSTATUS _max_pooling(
             config.abin1[p]    = (p % 4 == 0)?(p + 8)/2:0;
         }
 
-        _SetUniformItem(&index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x3, &Uinform);
+        _SetUniformItem(&index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x3, &Uinform);
     }
     */
     /*dp4.u8 r4[0-2], r4, r4, c4 */
@@ -6579,7 +6579,7 @@ static gceSTATUS _nonlinearfilter(
                          * r5: | ffffxxff |   ff     |          |          |
                          */
                         {
-                            _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, Input, &Uinform[*index]);
+                            _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, Input, &Uinform[*index]);
 
                             /*mov r6, c4.x/y/z */
                             gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
@@ -6741,7 +6741,7 @@ static gceSTATUS _nonlinearfilter(
                      * r6: |  ffxxff  |   src2   |   src2   |          |
                      */
                     {
-                        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, Input, &Uinform[*index]);
+                        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, Input, &Uinform[*index]);
 
                         /*mov r7, c4.x/y/z */
                         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
@@ -6962,7 +6962,7 @@ static gceSTATUS _nonlinearfilter_vx2(
                          */
 
                         {
-                            _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, Input, &Uinform[*index]);
+                            _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, Input, &Uinform[*index]);
 
                             /*mov r6, c4.x/y/z */
                             gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
@@ -7228,7 +7228,7 @@ static gceSTATUS _nonlinearfilter_vx2(
                      */
 
                     {
-                        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, Input, &Uinform[*index]);
+                        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, Input, &Uinform[*index]);
 
                         /*mov r7, c4.x/y/z */
                         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
@@ -7663,7 +7663,7 @@ static gceSTATUS _histogram_vx2(
         gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count++]));
 
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, subConfig, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &subConfig, 0x7, &Uinform[*index]);
         /*dp2x8.u8 r3, r3, r5, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0B, 0x3, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -9445,7 +9445,7 @@ static gceSTATUS _minmaxloc_loc(
         config.matrix[i] = 1;
     }
 
-    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, Input, &Uinform[*index]);
+    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, Input, &Uinform[*index]);
 
     /*mov r4, r0 */
     gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
@@ -10130,7 +10130,7 @@ static gceSTATUS _meanstddev(
         gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count++]));
 
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, sumConfig, Input, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &sumConfig, Input, &Uinform[*index]);
 
         /*dp16.u8 r2, r1, 1, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x08, 0x2, &Instructions->binarys[Instructions->count]));
@@ -10196,7 +10196,7 @@ static gceSTATUS _meanstddev(
     }
     else /*size of sqsum is smaller than 32-bit*/
     {
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, sumConfig, Input, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &sumConfig, Input, &Uinform[*index]);
 
         /*mov r1, 0; clean r1 to avoid garbage  */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
@@ -13983,7 +13983,7 @@ static gceSTATUS _convolution8x(
                 end = start + 1;
             }
 
-            _SetUniformItem(&index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, config, 0x5, &Uinform[index]);
+            _SetUniformItem(&index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, &config, 0x5, &Uinform[index]);
 
             /*dp8.u16 r2[6-7], r1, r2, c4_512 :selection for first dp8 pixels 0-1*/
             gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x09, 0x2, &Instructions->binarys[Instructions->count]));
@@ -14037,7 +14037,7 @@ static gceSTATUS _convolution8x(
             config.abin1[p]    = ((p + 1) % 4 == 0)?(p/4 + 2):(offset0 + p%4);
         }
 
-        _SetUniformItem(&index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, config, 0x2, &Uinform[index]);
+        _SetUniformItem(&index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, &config, 0x2, &Uinform[index]);
 
         /*dp4.u8 r7[0-3], r6, r5, c28_512 :selection for last dp4 pixels 0-3 + r5[6,7];r4[6,7]*/
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, Output, &Instructions->binarys[Instructions->count]));
@@ -14185,7 +14185,7 @@ static gceSTATUS _convolution16x(
                 end = start;
             }
 
-            _SetUniformItem(&index, i, i, i, i, shift, gcvTRUE, config, 0x5, &Uinform[index]);
+            _SetUniformItem(&index, i, i, i, i, shift, gcvTRUE, &config, 0x5, &Uinform[index]);
 
             /*dp8.u16 r2[6-7], r1, r2, c4_512 :selection for first dp8 pixels 0-1*/
             gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x08, output, &Instructions->binarys[Instructions->count]));
@@ -20786,7 +20786,7 @@ static gceSTATUS _edge_trace_hysteresis(
         config.matrix[i] = 1;
     }
 
-    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
 
     /*mov r0.yz, 0 */
     gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
@@ -20977,7 +20977,7 @@ static gceSTATUS _edge_trace_hysteresis_vx2(
         config.matrix[i] = 1;
     }
 
-    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
 
     /*mov r0.yz, 0 */
     gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
@@ -21725,7 +21725,7 @@ static gceSTATUS _sobel_mxn(
                     end = start + 1;
                 }
 
-                _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, config, 0x5, &Uinform[*index]);
+                _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, &config, 0x5, &Uinform[*index]);
 
                 /*dp8.u16 r2[6-7], r1, r2, c4_512 :selection for first dp8 pixels 0-1*/
                 gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x09, 0x2, &Instructions->binarys[Instructions->count]));
@@ -21774,7 +21774,7 @@ static gceSTATUS _sobel_mxn(
                 config.abin1[p]    = ((p + 1) % 4 == 0)?(p/4 + 2):(offset0 + p%4);
             }
 
-            _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, config, 0x5, &Uinform[*index]);
+            _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, &config, 0x5, &Uinform[*index]);
 
             /*dp4.u8 r7[0-3], r6, r5, c28_512 :selection for last dp4 pixels 0-3 + r5[6,7];r4[6,7]*/
             gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, Output, &Instructions->binarys[Instructions->count]));
@@ -21855,7 +21855,7 @@ static gceSTATUS _sobel_mxn(
                     end = start + 1;
                 }
 
-                _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, config, 0x2, &Uinform[*index]);
+                _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, &config, 0x2, &Uinform[*index]);
 
                 /*dp8.u16 r2[6-7], r1, r2, c4_512 :selection for first dp8 pixels 0-1*/
                 gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x09, 0x2, &Instructions->binarys[Instructions->count]));
@@ -21909,7 +21909,7 @@ static gceSTATUS _sobel_mxn(
                 config.abin1[p]    = ((p + 1) % 4 == 0)?(p/4 + 2):(offset0 + p%4);
             }
 
-            _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, config, 0x2, &Uinform[*index]);
+            _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, &config, 0x2, &Uinform[*index]);
 
             /*dp4.u8 r7[0-3], r6, r5, c28_512 :selection for last dp4 pixels 0-3 + r5[6,7];r4[6,7]*/
             gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, Output, &Instructions->binarys[Instructions->count]));
@@ -21988,7 +21988,7 @@ static gceSTATUS _sobel_mxn(
                     end = start + 1;
                 }
 
-                _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, config, 0x2, &Uinform[*index]);
+                _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, &config, 0x2, &Uinform[*index]);
 
                 /*dp8.u16 r2[6-7], r1, r2, c4_512 :selection for first dp8 pixels 0-1*/
                 gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x09, 0x2, &Instructions->binarys[Instructions->count]));
@@ -22042,7 +22042,7 @@ static gceSTATUS _sobel_mxn(
                 config.abin1[p]    = ((p + 1) % 4 == 0)?(p/4 + 2):(offset0 + p%4);
             }
 
-            _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, config, 0x2, &Uinform[*index]);
+            _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, &config, 0x2, &Uinform[*index]);
 
             /*dp4.u8 r7[0-3], r6, r5, c28_512 :selection for last dp4 pixels 0-3 + r5[6,7];r4[6,7]*/
             gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, Output, &Instructions->binarys[Instructions->count]));
@@ -22364,7 +22364,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r11, r12, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -22515,7 +22515,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r10, r11, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -22667,7 +22667,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r9, r10, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -22943,7 +22943,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r11, r12, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -23094,7 +23094,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r10, r11, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -23246,7 +23246,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r9, r10, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -23522,7 +23522,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r11, r12, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -23673,7 +23673,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r10, r11, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -23825,7 +23825,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r9, r10, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -24101,7 +24101,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r11, r12, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -24252,7 +24252,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r10, r11, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -24404,7 +24404,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r9, r10, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -24680,7 +24680,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r11, r12, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -24831,7 +24831,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r10, r11, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -24983,7 +24983,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r9, r10, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -25259,7 +25259,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r11, r12, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -25410,7 +25410,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r10, r11, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -25562,7 +25562,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r9, r10, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -25838,7 +25838,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r11, r12, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -25989,7 +25989,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r10, r11, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -26141,7 +26141,7 @@ static gceSTATUS _sgm_cost(
                 config.matrix[i] = 1;
             }
         }
-        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
         /*dp16.u8 r16, r9, r10, c4_512 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x13, 0x7, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(16, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
@@ -26405,7 +26405,7 @@ static gceSTATUS _laplacian(
                 end = start + 1;
             }
 
-            _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, config, 0x5, &Uinform[*index]);
+            _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, &config, 0x5, &Uinform[*index]);
 
             /*dp8.u16 r2[6-7], r1, r2, c4_512 :selection for first dp8 pixels 0-1*/
             gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x09, 0x2, &Instructions->binarys[Instructions->count]));
@@ -26459,7 +26459,7 @@ static gceSTATUS _laplacian(
             config.abin1[p]    = ((p + 1) % 4 == 0)?(p/4 + 2):(offset0 + p%4);
         }
 
-        _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, config, 0x5, &Uinform[*index]);
+        _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, &config, 0x5, &Uinform[*index]);
 
         /*dp4.u8 r7[0-3], r6, r5, c28_512 :selection for last dp4 pixels 0-3 + r5[6,7];r4[6,7]*/
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, Output, &Instructions->binarys[Instructions->count]));
@@ -27277,7 +27277,7 @@ static gceSTATUS _absdiff_halfevis(
     gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
     gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count++]));
 
-    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, subConfig, Input1, &Uinform[*index]);
+    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &subConfig, Input1, &Uinform[*index]);
 
     /*dp2x8.u8 r3, r1, r2, c4_512 */
     gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0B, 0x3, &Instructions->binarys[Instructions->count]));
@@ -27312,7 +27312,7 @@ static gceSTATUS _absdiff_halfevis(
         }
     }
 
-    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, subConfig, Input1, &Uinform[*index]);
+    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &subConfig, Input1, &Uinform[*index]);
 
     /*dp2x8.u8 r3, r1, r2, c4_512 */
     gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0B, 0x3, &Instructions->binarys[Instructions->count]));
@@ -27448,7 +27448,7 @@ static gceSTATUS _add_sub_halfevis(
     gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
     gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count++]));
 
-    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, Input1, &Uinform[*index]);
+    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, Input1, &Uinform[*index]);
 
     /*dp2x8.u8 r1, r1, r2, c4_512 */
     gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0B, Output, &Instructions->binarys[Instructions->count]));
@@ -27515,7 +27515,7 @@ static gceSTATUS _accumulate_halfevis(
     gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
     gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count++]));
 
-    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
 
     /*dp2x8.u8 r2, r1, r2, c4_512 */
     gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0B, 0x3, &Instructions->binarys[Instructions->count]));
@@ -27932,7 +27932,7 @@ static gceSTATUS _sobel_mxn_halfevis(
                 end = start + 1;
             }
 
-            _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, config, 0x2, &Uinform[*index]);
+            _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, &config, 0x2, &Uinform[*index]);
 
             /*dp8.u16 r2[6-7], r1, r2, c4_512 :selection for first dp8 pixels 0-1*/
             gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x09, 0x2, &Instructions->binarys[Instructions->count]));
@@ -27986,7 +27986,7 @@ static gceSTATUS _sobel_mxn_halfevis(
             config.abin1[p]    = ((p + 1) % 4 == 0)?(p/4 + 2):(offset0 + p%4);
         }
 
-        _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, config, 0x2, &Uinform[*index]);
+        _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, &config, 0x2, &Uinform[*index]);
 
         /*dp4.u8 r7[0-3], r6, r5, c28_512 :selection for last dp4 pixels 0-3 + r5[6,7];r4[6,7]*/
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, Output, &Instructions->binarys[Instructions->count]));
@@ -28069,7 +28069,7 @@ static gceSTATUS _sobel_mxn_halfevis(
                 end = start + 1;
             }
 
-            _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, config, 0x2, &Uinform[*index]);
+            _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, &config, 0x2, &Uinform[*index]);
 
             /*dp8.u16 r2[6-7], r1, r2, c4_512 :selection for first dp8 pixels 0-1*/
             gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x09, 0x2, &Instructions->binarys[Instructions->count]));
@@ -28123,7 +28123,7 @@ static gceSTATUS _sobel_mxn_halfevis(
             config.abin1[p]    = ((p + 1) % 4 == 0)?(p/4 + 2):(offset0 + p%4);
         }
 
-        _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, config, 0x2, &Uinform[*index]);
+        _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, &config, 0x2, &Uinform[*index]);
 
         /*dp4.u8 r7[0-3], r6, r5, c28_512 :selection for last dp4 pixels 0-3 + r5[6,7];r4[6,7]*/
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, Output, &Instructions->binarys[Instructions->count]));
@@ -28293,7 +28293,7 @@ static gceSTATUS _filter_halfevis(
                 end = start + 1;
             }
 
-            _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, config, 0x5, &Uinform[*index]);
+            _SetUniformItem(index, 2*i, 2*i, 2*i + 1, 2*i + 1, 0, gcvTRUE, &config, 0x5, &Uinform[*index]);
 
             /*dp8.u16 r2[6-7], r1, r2, c4_512 :selection for first dp8 pixels 0-1*/
             gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x09, 0x2, &Instructions->binarys[Instructions->count]));
@@ -28347,7 +28347,7 @@ static gceSTATUS _filter_halfevis(
             config.abin1[p]    = ((p + 1) % 4 == 0)?(p/4 + 2):(offset0 + p%4);
         }
 
-        _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, config, 0x5, &Uinform[*index]);
+        _SetUniformItem(index, 4*j + 0, 4*j + 1, 4*j + 2, 4*j + 3, Scale, gcvTRUE, &config, 0x5, &Uinform[*index]);
 
         /*dp4.u8 r7[0-3], r6, r5, c28_512 :selection for last dp4 pixels 0-3 + r5[6,7];r4[6,7]*/
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, OutputDp4, &Instructions->binarys[Instructions->count]));
@@ -30148,7 +30148,7 @@ static gceSTATUS _edge_trace_non_filter_hysteresis(
         config.aselect[i] = 0;
     }
 
-    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, &config, 0x7, &Uinform[*index]);
 
     /*mov r0.yz, 0 */
     gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
