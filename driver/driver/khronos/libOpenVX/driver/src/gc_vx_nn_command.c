@@ -3343,39 +3343,63 @@ void _fill_TP_TENSOR_COPY_Command(
     vx_nn_cmd_info_u*           general_info,
     vx_enum                     split_type,
     vx_uint32                   split_count,
-    vx_uint32                   split_sizes[],
-    vx_uint32                   split_offsets[],
+    vx_uint32                   input_split[],
+    vx_uint32                   output_split[],
     vx_nn_cmd_split_info_u*     info_array
     )
 {
     vx_uint32 i;
+    vxnne_tensor_sub_block input_split_blocks = (vxnne_tensor_sub_block)input_split;
+    vxnne_tensor_sub_block output_split_blocks = (vxnne_tensor_sub_block)output_split;
+
     DEFINE_TP_GENERAL_PARAMETER();
 
     for (i = 0; i < split_count; i++)
     {
-        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageYSize = inYSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
-        info_array[i].vx_tp_general_cmd_split_info.inImageStride = inYStride / inputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.inImageSlice  = inZStride / inputElemSize;
+        vx_uint32 in_offset_x = input_split_blocks[i].offset_x;
+        vx_uint32 in_offset_y = input_split_blocks[i].offset_y;
+        vx_uint32 in_offset_z = input_split_blocks[i].offset_z;
+
+        vx_uint32 in_size_x = input_split_blocks[i].size_x;
+        vx_uint32 in_size_y = input_split_blocks[i].size_y;
+        vx_uint32 in_size_z = input_split_blocks[i].size_z;
+
+        vx_uint32 in_pitch_x = input_split_blocks[i].pitch_x;
+        vx_uint32 in_pitch_y = input_split_blocks[i].pitch_y;
+
+        vx_uint32 out_offset_x = output_split_blocks[i].offset_x;
+        vx_uint32 out_offset_y = output_split_blocks[i].offset_y;
+        vx_uint32 out_offset_z = output_split_blocks[i].offset_z;
+
+        vx_uint32 out_size_x = output_split_blocks[i].size_x;
+        vx_uint32 out_size_y = output_split_blocks[i].size_y;
+
+        vx_uint32 out_pitch_x = output_split_blocks[i].pitch_x;
+        vx_uint32 out_pitch_y = output_split_blocks[i].pitch_y;
+
+        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = in_size_x;
+        info_array[i].vx_tp_general_cmd_split_info.inImageYSize = in_size_y;
+        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = in_size_z;
+        info_array[i].vx_tp_general_cmd_split_info.inImageStride = in_pitch_x;
+        info_array[i].vx_tp_general_cmd_split_info.inImageSlice  = in_pitch_x * in_pitch_y;
         info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
         info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = inXSize - 1;
-        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = inYSize - 1;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = in_size_x - 1;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = in_size_y - 1;
         info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
-        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
-        info_array[i].vx_tp_general_cmd_split_info.inTileXSize = inXSize;
-        info_array[i].vx_tp_general_cmd_split_info.inTileYSize = inYSize;
-        info_array[i].vx_tp_general_cmd_split_info.inTileXInc = inXSize;
-        info_array[i].vx_tp_general_cmd_split_info.inTileYInc = inYSize;
-        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i];
+        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + (in_pitch_x * in_pitch_y * in_offset_z + in_pitch_x * in_offset_y + in_offset_x) * inputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.inTileXSize = in_size_x;
+        info_array[i].vx_tp_general_cmd_split_info.inTileYSize = in_size_y;
+        info_array[i].vx_tp_general_cmd_split_info.inTileXInc = in_size_x;
+        info_array[i].vx_tp_general_cmd_split_info.inTileYInc = in_size_y;
+        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + (out_pitch_x * out_pitch_y * out_offset_z + out_pitch_x * out_offset_y + out_offset_x) * outputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = 1;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = outXSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = out_size_x;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outYStride / outputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = outYSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = out_pitch_x;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = out_size_y;
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = 1;
@@ -3384,7 +3408,7 @@ void _fill_TP_TENSOR_COPY_Command(
         info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
         info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = outZStride / outputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = out_pitch_x * out_pitch_y;
 
         info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
         info_array[i].vx_tp_general_cmd_split_info.last = 1;
