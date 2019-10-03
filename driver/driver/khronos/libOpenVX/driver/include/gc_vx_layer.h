@@ -4018,6 +4018,7 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
     vx_bool                 enable_cast_format,
+    vx_bool                 enable_packed_weights,
     vx_tensor               input,
     vx_tensor               weight,
     vx_tensor               bias,

@@ -8207,6 +8207,7 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
     vx_bool                 enable_cast_format,
+    vx_bool                 enable_packed_weights,
     vx_tensor               input,
     vx_tensor               weight,
     vx_tensor               bias,
@@ -8387,9 +8388,16 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
                 execution_parameters.globalWorkScale[0] = 4;
                 if (enable_four_pixel)
                 {
-                    execution_parameters.globalWorkScale[1] = 4;
-
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant32_2D_4X", borderMode);
+                    if (enable_packed_weights)
+                    {
+                        execution_parameters.globalWorkScale[1] = 4;
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant32_2D_4X_Wpacked", borderMode);
+                    }
+                    else
+                    {
+                        execution_parameters.globalWorkScale[1] = 4;
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant32_2D_4X", borderMode);
+                    }
                     if (!shaderExecutable) goto OnError;
                 }
                 else if (input_width != output_width)
@@ -8502,11 +8510,29 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
             {
                 execution_parameters.globalWorkScale[0] = 4;
                 if (enable_four_pixel)
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4X", borderMode);
+                {
+                    if (enable_packed_weights)
+                    {
+                        execution_parameters.globalWorkScale[1] = 16;
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Wpacked_4x16_2D_4X", borderMode);
+                    }
+                    else
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4X", borderMode);
+                    }
+                }
                 else if (width * height < depth)
                 {
-                    execution_parameters.globalWorkScale[1] = 8;
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant32_4x8_2D_4S", borderMode);
+                    if (enable_packed_weights)
+                    {
+                        execution_parameters.globalWorkScale[1] = 16;
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Wpacked_4x16_2D_4S", borderMode);
+                    }
+                    else
+                    {
+                        execution_parameters.globalWorkScale[1] = 8;
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant32_4x8_2D_4S", borderMode);
+                    }
                 }
                 else
                 {
@@ -8570,8 +8596,16 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
             }
             else
             {
-                execution_parameters.localWorkSize[0]  = 2;
-                execution_parameters.localWorkSize[1]  = 4;
+                if (enable_packed_weights)
+                {
+                    execution_parameters.localWorkSize[0]  = 1;
+                    execution_parameters.localWorkSize[1]  = 8;
+                }
+                else
+                {
+                    execution_parameters.localWorkSize[0]  = 2;
+                    execution_parameters.localWorkSize[1]  = 4;
+                }
             }
         }
         else
@@ -8590,8 +8624,16 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
                 }
                 else
                 {
-                    execution_parameters.localWorkSize[0]  = 2;
-                    execution_parameters.localWorkSize[1]  = 4;
+                    if (enable_packed_weights)
+                    {
+                        execution_parameters.localWorkSize[0]  = 1;
+                        execution_parameters.localWorkSize[1]  = 8;
+                    }
+                    else
+                    {
+                        execution_parameters.localWorkSize[0]  = 2;
+                        execution_parameters.localWorkSize[1]  = 4;
+                    }
                 }
             }
             else
@@ -8694,7 +8736,9 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
     vx_bool      enable_2d_img     = vx_false_e;
     vx_bool      is_use_2d_fun     = vx_false_e;
     vx_bool      is_pad1           = vx_false_e;
+    vx_bool      is_no_pad         = vx_false_e;
     vx_bool      enable_pad1_x7    = vx_false_e;
+    vx_bool      enable_pad1_x14   = vx_false_e;
     vx_tensor    inputs            = NULL;
     vx_tensor    outputs           = NULL;
     vx_uint32    dims              = 0;
@@ -8747,7 +8791,8 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
     if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
     {
         is_pad1 = ((inputXOffsetV == 0) && (inputYOffsetV == 0) && (outputXOffsetV == 1) && (outputYOffsetV == 1));
-        if (is_pad1)
+        is_no_pad = ((inputXOffsetV == 0) && (inputYOffsetV == 0) && (outputXOffsetV == 0) && (outputYOffsetV == 0));
+        if (is_pad1 || is_no_pad)
         {
             enable_2d_img = (vx_bool)(((width  < IMG_MAX_WIDTH) && (height * depth < IMG_MAX_WIDTH))
                                      && ((output_width < IMG_MAX_WIDTH) && (output_depth * output_height < IMG_MAX_WIDTH)));
@@ -8765,25 +8810,44 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
             }
         }
 
-        if ((inputXOffsetV == 0) && (inputYOffsetV == 0) && (outputXOffsetV == 0) && (outputYOffsetV == 0))
-        {
-            vx_reference parameters[2] = {(vx_reference)input, (vx_reference)output};
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad_Single", borderMode);
-            if (!shaderExecutable) goto OnError;
-            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
-        }
-        else if (is_pad1)
+        if (is_pad1 || is_no_pad)
         {
             enable_pad1_x7 =  ((width % 7 == 0) && (width % 4 != 0));
-
-            if (width % 16 == 0 && enable_2d_img)
+            enable_pad1_x14 = ((width % 14 == 0) && (width % 4 != 0));
+             if (width % 16 == 0 && enable_2d_img)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1_2D_x16", borderMode);
+                if (is_pad1)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1_2D_x16", borderMode);
+                }
+                else if (is_no_pad)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_NoPad_2D_x16", borderMode);
+                }
                 is_use_2d_fun    = vx_true_e;
             }
             else if (width % 8 == 0 && enable_2d_img)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1_2D_x8", borderMode);
+                if (is_pad1)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1_2D_x8", borderMode);
+                }
+                else if (is_no_pad)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_NoPad_2D_x8", borderMode);
+                }
+                is_use_2d_fun    = vx_true_e;
+            }
+            else if (enable_pad1_x14 && enable_2d_img)
+            {
+                if (is_pad1)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1_2D_x14", borderMode);
+                }
+                else if (is_no_pad)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_NoPad_2D_x14", borderMode);
+                }
                 is_use_2d_fun    = vx_true_e;
             }
             else if (enable_pad1_x7)
@@ -8791,12 +8855,26 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
 
                 if (enable_2d_img)
                 {
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1_2D_x7", borderMode);
+                    if (is_pad1)
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1_2D_x7", borderMode);
+                    }
+                    else if (is_no_pad)
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_NoPad_2D_x7", borderMode);
+                    }
                     is_use_2d_fun    = vx_true_e;
                 }
                 else
                 {
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1_x7", borderMode);
+                    if (is_pad1)
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1_x7", borderMode);
+                    }
+                    else if (is_no_pad)
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_NoPad_x7", borderMode);
+                    }
                 }
 
             }
@@ -8804,12 +8882,26 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
             {
                 if (enable_2d_img)
                 {
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1_2D", borderMode);
+                    if (is_pad1)
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1_2D", borderMode);
+                    }
+                    else if (is_no_pad)
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_NoPad_2D", borderMode);
+                    }
                     is_use_2d_fun    = vx_true_e;
                 }
                 else
                 {
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1", borderMode);
+                    if (is_pad1)
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Pad1", borderMode);
+                    }
+                    else if (is_no_pad)
+                    {
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_NoPad", borderMode);
+                    }
                 }
             }
             if (!shaderExecutable) goto OnError;
@@ -8839,17 +8931,23 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 6);
         }
 
-        if (width % 16 == 0 && is_pad1 && is_use_2d_fun)
+        if (width % 16 == 0 && (is_pad1 || is_no_pad) && is_use_2d_fun)
         {
             execution_parameters.globalWorkScale[0] = 16;
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
         }
-        else if (width % 8 == 0 && is_pad1 && is_use_2d_fun)
+        else if (width % 8 == 0 && (is_pad1 || is_no_pad) && is_use_2d_fun)
         {
             execution_parameters.globalWorkScale[0] = 8;
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        }
+        else if (enable_pad1_x14)
+        {
+            execution_parameters.globalWorkScale[0] = 14;
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_TWO_COMPONENTS);
         }
         else if (width % 4 == 0)
         {
@@ -8857,7 +8955,7 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
         }
-        else if (width % 7 == 0)
+        else if (enable_pad1_x7)
         {
             execution_parameters.globalWorkScale[0] = 7;
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -8876,8 +8974,18 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
     if (is_use_2d_fun)
     {
         execution_parameters.workDim = 2;
-        execution_parameters.globalWorkSize[0] = (width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
-        execution_parameters.globalWorkSize[1] = height * depth;
+        execution_parameters.localWorkSize[0]  = 1;
+        execution_parameters.localWorkSize[1]  = 16;
+        if (execution_parameters.localWorkSize[0])
+        {
+            execution_parameters.globalWorkSize[0] = gcmALIGN((width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], execution_parameters.localWorkSize[0]);
+            execution_parameters.globalWorkSize[1] = gcmALIGN((height * depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1], execution_parameters.localWorkSize[1]);
+        }
+        else
+        {
+             execution_parameters.globalWorkSize[0] = (width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
+             execution_parameters.globalWorkSize[1] = height * depth;
+        }
     }
     else
     {

@@ -1,3 +1,5 @@
+#pragma OPENCL EXTENSION cl_viv_bitfield_extension : enable
+
 __kernel void gpuTensor2Row_FP32
     (
     image2d_array_t input, int strideX, int strideY, int padX, int padY,
@@ -60,6 +62,129 @@ __kernel void gpuTensor2Row_Quant8
         yy += dilateY;
         xx = 0;
     } while (yy < yRange);
+}
+
+__kernel void gpuTensor2Row_Q32_3x3_s2_dil1_Pad0_x8
+    (
+    image2d_array_t input, int strideX, int strideY, int padX, int padY, int kernelX, unsigned int inputZp,
+    int inputWidth, int outputWidth, image2d_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int xx = 0, yy = 0;
+    int out_x = 9 * z;
+    uint4 tmp0, tmp1, tmp2, tmp3, tmp4, tmp5;
+    uint4 pixel0, pixel1, pixel2;
+    int4 coord_in0 = (int4)(x * strideX, y * strideY - padY, z, 0);
+    int  x_left = coord_in0.x + 17 - inputWidth;
+    int4 coord = (int4)(out_x, y * outputWidth + x, out_x + 3, out_x + 6);
+    uint4 bits = (uint4)(8, 8, 8, 8);
+    uint4 cfg = (uint4)(0, 8, 16, 24);
+    uint4 cfg2 = (uint4)(16, 24, 0, 8);
+
+    coord_in0.x = coord_in0.x >> 2;
+    tmp0 = read_imageui(input, coord_in0);
+    coord_in0.y++;
+    tmp1 = read_imageui(input, coord_in0);
+    coord_in0.y++;
+    tmp2 = read_imageui(input, coord_in0);
+    coord_in0.xy = coord_in0.xy + (int2)(2, -2);
+    tmp3 = read_imageui(input, coord_in0);
+    coord_in0.y++;
+    tmp4 = read_imageui(input, coord_in0);
+    coord_in0.y++;
+    tmp5 = read_imageui(input, coord_in0);
+
+    pixel0 = viv_bitfieldExtract(tmp0.xxxx, cfg, bits);
+    pixel1 = viv_bitfieldExtract(tmp1.xxxx, cfg, bits);
+    pixel2 = viv_bitfieldExtract(tmp2.xxxx, cfg, bits);
+    write_imageui(output, coord.xy, pixel0);
+    write_imageui(output, coord.zy, pixel1);
+    write_imageui(output, coord.wy, pixel2);
+    coord.y++;
+    pixel0 = viv_bitfieldExtract(tmp0.xxyy, cfg2, bits);
+    pixel1 = viv_bitfieldExtract(tmp1.xxyy, cfg2, bits);
+    pixel2 = viv_bitfieldExtract(tmp2.xxyy, cfg2, bits);
+    write_imageui(output, coord.xy, pixel0);
+    write_imageui(output, coord.zy, pixel1);
+    write_imageui(output, coord.wy, pixel2);
+    coord.y++;
+    pixel0 = viv_bitfieldExtract(tmp0.yyyy, cfg, bits);
+    pixel1 = viv_bitfieldExtract(tmp1.yyyy, cfg, bits);
+    pixel2 = viv_bitfieldExtract(tmp2.yyyy, cfg, bits);
+    write_imageui(output, coord.xy, pixel0);
+    write_imageui(output, coord.zy, pixel1);
+    write_imageui(output, coord.wy, pixel2);
+    coord.y++;
+    pixel0 = viv_bitfieldExtract(tmp0.yyzz, cfg2, bits);
+    pixel1 = viv_bitfieldExtract(tmp1.yyzz, cfg2, bits);
+    pixel2 = viv_bitfieldExtract(tmp2.yyzz, cfg2, bits);
+    write_imageui(output, coord.xy, pixel0);
+    write_imageui(output, coord.zy, pixel1);
+    write_imageui(output, coord.wy, pixel2);
+    coord.y++;
+
+    pixel0 = viv_bitfieldExtract(tmp3.xxxx, cfg, bits);
+    pixel1 = viv_bitfieldExtract(tmp4.xxxx, cfg, bits);
+    pixel2 = viv_bitfieldExtract(tmp5.xxxx, cfg, bits);
+    write_imageui(output, coord.xy, pixel0);
+    write_imageui(output, coord.zy, pixel1);
+    write_imageui(output, coord.wy, pixel2);
+    coord.y++;
+    pixel0 = viv_bitfieldExtract(tmp3.xxyy, cfg2, bits);
+    pixel1 = viv_bitfieldExtract(tmp4.xxyy, cfg2, bits);
+    pixel2 = viv_bitfieldExtract(tmp5.xxyy, cfg2, bits);
+    write_imageui(output, coord.xy, pixel0);
+    write_imageui(output, coord.zy, pixel1);
+    write_imageui(output, coord.wy, pixel2);
+    coord.y++;
+    pixel0 = viv_bitfieldExtract(tmp3.yyyy, cfg, bits);
+    pixel1 = viv_bitfieldExtract(tmp4.yyyy, cfg, bits);
+    pixel2 = viv_bitfieldExtract(tmp5.yyyy, cfg, bits);
+    write_imageui(output, coord.xy, pixel0);
+    write_imageui(output, coord.zy, pixel1);
+    write_imageui(output, coord.wy, pixel2);
+    coord.y++;
+    pixel0 = viv_bitfieldExtract(tmp3.yyzz, cfg2, bits);
+    pixel1 = viv_bitfieldExtract(tmp4.yyzz, cfg2, bits);
+    pixel2 = viv_bitfieldExtract(tmp5.yyzz, cfg2, bits);
+    pixel0.z = x_left > 0 ? inputZp : pixel0.z;
+    pixel1.z = x_left > 0 ? inputZp : pixel1.z;
+    pixel2.z = x_left > 0 ? inputZp : pixel2.z;
+    write_imageui(output, coord.xy, pixel0);
+    write_imageui(output, coord.zy, pixel1);
+    write_imageui(output, coord.wy, pixel2);
+
+}
+
+__kernel void gpuTensor2Row_Quant8_3x3_s2_dil1_Pad0
+    (
+    image2d_array_t input, int strideX, int strideY, int padX, int padY, int kernelX, unsigned int inputZp,
+    int inputWidth, int outputWidth, image2d_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int xx = 0, yy = 0;
+    int out_x = 9 * z;
+    uint4 pixel0, pixel1, pixel2;
+    int4 coord_in0 = (int4)(x * strideX, y * strideY - padY, z, 0);
+    int  x_left = coord_in0.x + 3 - inputWidth;
+    int4 coord = (int4)(out_x, y * outputWidth + x, out_x + 3, out_x + 6);
+    pixel0 = read_imageui(input, coord_in0);
+    coord_in0.y++;
+    pixel1 = read_imageui(input, coord_in0);
+    coord_in0.y++;
+    pixel2 = read_imageui(input, coord_in0);
+    pixel0.z = x_left > 0 ? inputZp : pixel0.z;
+    pixel1.z = x_left > 0 ? inputZp : pixel1.z;
+    pixel2.z = x_left > 0 ? inputZp : pixel2.z;
+    write_imageui(output, coord.xy, pixel0);
+    write_imageui(output, coord.zy, pixel1);
+    write_imageui(output, coord.wy, pixel2);
 }
 
 __kernel void gpuTensor2Row_Quant16

@@ -1,4 +1,8 @@
 #pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#pragma OPENCL EXTENSION CL_VIV_asm : enable
+#pragma OPENCL EXTENSION cl_viv_bitfield_extension : enable
+
+typedef _viv_uchar16_packed   vxc_uchar16;
 
 __kernel void gpuDepthwiseConv_FP32(
     image2d_array_t input,
@@ -420,8 +424,6 @@ __kernel void gpuDepthwiseConv_3x3_c1_s1_Quant8_x2(
     dst = convert_uint4(sum * scaleOut + zpOut);
     write_imageui(output, coord_out, dst);
 }
-
-
 #define U8_3x3_X2_S2_PROCESS() \
     tmp0  = read_imageui(input, coord_in); \
     tmp2  = read_imageui(input, coord_in2); \
@@ -467,7 +469,6 @@ __kernel void gpuDepthwiseConv_3x3_c1_s1_Quant8_x2(
     weightValue.w  = 0; \
     sum.x  += dot(pixel, weightValue); \
     sum.y  += dot(pixel2, weightValue);
-
 __kernel void gpuDepthwiseConv_3x3_c1_s2_Quant8_x2(
     image2d_array_t input,
     image2d_t weight,
@@ -914,6 +915,713 @@ __kernel void gpuDepthwiseConv_3x3_c1_s1_NoPad_Quant8_x4_2D(
     U8_3x3_X4_NOPAD_2D_PROCESS()
     dst = convert_uint4(sum * scaleOut + zpOut);
     write_imageui(output, coord_out, dst);
+}
+
+
+#define U8_3x3_X4_NOPAD_Q32toQ8_2D_PROCESS() \
+    tmp4  = read_imageui(input, coord_in); \
+    tmp0  = viv_bitfieldExtract(tmp4.xxxx, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.xxxy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.xxyy, cfg2, bits); \
+    tmp1  = read_imageui(weight, coord_wei); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    weightValue = convert_float4(tmp1) -  zpWeight; \
+    sum  +=  pixel  * weightValue.x; \
+    sum  +=  pixel2 * weightValue.y; \
+    sum  +=  pixel3 * weightValue.z;
+
+__kernel void gpuDepthwiseConv_3x3_c1_s1_NoPad_Q32toQ8_x4_2D(
+    image2d_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int outputHeight,
+    int heigt_diff,
+    float scaleOut,
+    float zpIn,
+    float zpWeight,
+    float zpOut,
+    int    zpIn_int,
+    image2d_t output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(outputHeight));
+    int inyStart = y + depth * heigt_diff;
+    int2 coord_out = (int2)(x, y);
+    int inxStart = x >> 2;
+    int2 coord_in = (int2)(inxStart, inyStart);
+    int2 coord_wei = (int2)(0, depth);
+    float4 sum = 0;
+    uint4 dst = {0}, tmp0 = {0}, tmp1 = {0}, tmp2 = {0}, tmp3 = {0}, tmp4 = {0};
+    float biasData;
+    float4 pixel = {0.0}, weightValue = {0.0}, pixel2 = {0.0}, pixel3 = {0.0};
+    uint4 bits = (uint4)(8, 8, 8, 8);
+    uint4 cfg = (uint4)(0, 8, 16, 24);
+    uint4 cfg1 = (uint4)(8, 16, 24, 0);
+    uint4 cfg2 = (uint4)(16, 24, 0, 8);
+
+    biasData = convert_float(read_imagei(bias, (int2)(depth, 0)));
+    sum = biasData;
+    U8_3x3_X4_NOPAD_Q32toQ8_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_X4_NOPAD_Q32toQ8_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_X4_NOPAD_Q32toQ8_2D_PROCESS()
+    dst = convert_uint4(sum * scaleOut + zpOut);
+    write_imageui(output, coord_out, dst);
+}
+
+#define U8_3x3_X4_S2_NOPAD_Q32toQ8_2D_PROCESS() \
+    tmp4  = read_imageui(input, coord_in); \
+    tmp0  = viv_bitfieldExtract(tmp4.xxyy, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.xxyy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.xyyz, cfg2, bits); \
+    tmp1  = read_imageui(weight, coord_wei); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    weightValue = convert_float4(tmp1) -  zpWeight; \
+    sum  +=  pixel  * weightValue.x; \
+    sum  +=  pixel2 * weightValue.y; \
+    sum  +=  pixel3 * weightValue.z;
+
+__kernel void gpuDepthwiseConv_3x3_c1_s2_NoPad_Q32toQ8_x4_2D(
+    image2d_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int outputHeight,
+    int heigt_diff,
+    float scaleOut,
+    float zpIn,
+    float zpWeight,
+    float zpOut,
+    int    zpIn_int,
+    image2d_t output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(outputHeight));
+    int inyStart = y * 2 + depth * (heigt_diff - outputHeight);
+    int2 coord_out = (int2)(x, y);
+    int inxStart = x >> 1;
+    int2 coord_in = (int2)(inxStart, inyStart);
+    int2 coord_wei = (int2)(0, depth);
+    float4 sum = 0;
+    uint4 dst = {0}, tmp0 = {0}, tmp1 = {0}, tmp2 = {0}, tmp3 = {0}, tmp4 = {0};
+    float biasData;
+    float4 pixel = {0.0}, weightValue = {0.0}, pixel2 = {0.0}, pixel3 = {0.0};
+    uint4 bits = (uint4)(8, 8, 8, 8);
+    uint4 cfg = (uint4)(0, 16, 0, 16);
+    uint4 cfg1 = (uint4)(8, 24, 8, 24);
+    uint4 cfg2 = (uint4)(16, 0, 16, 0);
+
+    biasData = convert_float(read_imagei(bias, (int2)(depth, 0)));
+    sum = biasData;
+    U8_3x3_X4_S2_NOPAD_Q32toQ8_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_X4_S2_NOPAD_Q32toQ8_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_X4_S2_NOPAD_Q32toQ8_2D_PROCESS()
+    dst = convert_uint4(sum * scaleOut + zpOut);
+    write_imageui(output, coord_out, dst);
+}
+
+
+#define U8_3x3_X8_NOPAD_Q32_2D_PROCESS() \
+    tmp4  = read_imageui(input, coord_in); \
+    tmp0  = viv_bitfieldExtract(tmp4.xxxx, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.xxxy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.xxyy, cfg2, bits); \
+    tmp1  = read_imageui(weight, coord_wei); \
+    weightValue = convert_float4(tmp1) -  zpWeight; \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[0]  +=  pixel  * weightValue.x; \
+    sum[0]  +=  pixel2 * weightValue.y; \
+    sum[0]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp4.yyyy, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.yyyz, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.yyzz, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[1]  +=  pixel  * weightValue.x; \
+    sum[1]  +=  pixel2 * weightValue.y; \
+    sum[1]  +=  pixel3 * weightValue.z;
+
+__kernel void gpuDepthwiseConv_3x3_c1_s1_NoPad_Q32_x8_2D(
+    image2d_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int outputHeight,
+    int heigt_diff,
+    float scaleOut,
+    float zpIn,
+    float zpWeight,
+    float zpOut,
+    int    zpIn_int,
+    image2d_t output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(outputHeight));
+    int inyStart = y + depth * heigt_diff;
+    int4 coord_out = (int4)(x, y, x + 4, 0);
+    int inxStart = x >> 2;
+    int2 coord_in = (int2)(inxStart, inyStart);
+    int2 coord_wei = (int2)(0, depth);
+    float4 sum[2];
+    uint4 dst[2], tmp0 = {0}, tmp1 = {0}, tmp2 = {0}, tmp3 = {0}, tmp4 = {0};
+    float biasData;
+    float4 pixel = {0.0}, weightValue = {0.0}, pixel2 = {0.0}, pixel3 = {0.0};
+    uint4 bits = (uint4)(8, 8, 8, 8);
+    uint4 cfg = (uint4)(0, 8, 16, 24);
+    uint4 cfg1 = (uint4)(8, 16, 24, 0);
+    uint4 cfg2 = (uint4)(16, 24, 0, 8);
+
+    biasData = convert_float(read_imagei(bias, (int2)(depth, 0)));
+    sum[0] = biasData;
+    sum[1] = biasData;
+    U8_3x3_X8_NOPAD_Q32_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_X8_NOPAD_Q32_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_X8_NOPAD_Q32_2D_PROCESS()
+    dst[0] = convert_uint4(sum[0] * scaleOut + zpOut);
+    dst[1] = convert_uint4(sum[1] * scaleOut + zpOut);
+    write_imageui(output, coord_out.xy, dst[0]);
+    write_imageui(output, coord_out.zy, dst[1]);
+}
+
+
+#define U8_3x3_X8_S2_NOPAD_Q32_2D_PROCESS() \
+    tmp4  = read_imageui(input, coord_in.xy); \
+    tmp5  = read_imageui(input, coord_in.zy); \
+    tmp0  = viv_bitfieldExtract(tmp4.xxyy, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.xxyy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.xyyz, cfg2, bits); \
+    tmp1  = read_imageui(weight, coord_wei); \
+    weightValue = convert_float4(tmp1) -  zpWeight; \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[0]  +=  pixel  * weightValue.x; \
+    sum[0]  +=  pixel2 * weightValue.y; \
+    sum[0]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp5.xxyy, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp5.xxyy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp5.xyyz, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[1]  +=  pixel  * weightValue.x; \
+    sum[1]  +=  pixel2 * weightValue.y; \
+    sum[1]  +=  pixel3 * weightValue.z;
+
+__kernel void gpuDepthwiseConv_3x3_c1_s2_NoPad_Q32_x8_2D(
+    image2d_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int outputHeight,
+    int heigt_diff,
+    float scaleOut,
+    float zpIn,
+    float zpWeight,
+    float zpOut,
+    int    zpIn_int,
+    image2d_t output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(outputHeight));
+    int inyStart = y * 2 + depth * (heigt_diff - outputHeight);
+    int4 coord_out = (int4)(x, y, x + 4, 0);
+    int inxStart = x >> 1;
+    int4 coord_in = (int4)(inxStart, inyStart, inxStart + 2, 0);
+    int2 coord_wei = (int2)(0, depth);
+    float4 sum[2];
+    uint4 dst[2], tmp0 = {0}, tmp1 = {0}, tmp2 = {0}, tmp3 = {0}, tmp4 = {0}, tmp5 = {0};
+    float biasData;
+    float4 pixel = {0.0}, weightValue = {0.0}, pixel2 = {0.0}, pixel3 = {0.0};
+    uint4 bits = (uint4)(8, 8, 8, 8);
+    uint4 cfg = (uint4)(0, 16, 0, 16);
+    uint4 cfg1 = (uint4)(8, 24, 8, 24);
+    uint4 cfg2 = (uint4)(16, 0, 16, 0);
+
+    biasData = convert_float(read_imagei(bias, (int2)(depth, 0)));
+    sum[0] = biasData;
+    sum[1] = biasData;
+    U8_3x3_X8_S2_NOPAD_Q32_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_X8_S2_NOPAD_Q32_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_X8_S2_NOPAD_Q32_2D_PROCESS()
+    dst[0] = convert_uint4(sum[0] * scaleOut + zpOut);
+    dst[1] = convert_uint4(sum[1] * scaleOut + zpOut);
+    write_imageui(output, coord_out.xy, dst[0]);
+    write_imageui(output, coord_out.zy, dst[1]);
+}
+
+
+#define U8_3x3_W14_NOPAD_Q32toQ8_2D_PROCESS() \
+    tmp4  = read_imageui(input, coord_in.xy); \
+    tmp0  = viv_bitfieldExtract(tmp4.xxxx, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.xxxy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.xxyy, cfg2, bits); \
+    tmp1  = read_imageui(weight, coord_wei); \
+    weightValue = convert_float4(tmp1) -  zpWeight; \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[0]  +=  pixel  * weightValue.x; \
+    sum[0]  +=  pixel2 * weightValue.y; \
+    sum[0]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp4.yyyy, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.yyyz, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.yyzz, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[1]  +=  pixel  * weightValue.x; \
+    sum[1]  +=  pixel2 * weightValue.y; \
+    sum[1]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp4.zzzz, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.zzzw, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.zzww, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[2]  +=  pixel  * weightValue.x; \
+    sum[2]  +=  pixel2 * weightValue.y; \
+    sum[2]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp4.wwww, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.wwwx, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.wwxx, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[3]  +=  pixel  * weightValue.x; \
+    sum[3]  +=  pixel2 * weightValue.y; \
+    sum[3]  +=  pixel3 * weightValue.z;
+
+__kernel void gpuDepthwiseConv_3x3_c1_s1_NoPad_Q32toQ8_w14_2D(
+    image2d_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int outputHeight,
+    int heigt_diff,
+    float scaleOut,
+    float zpIn,
+    float zpWeight,
+    float zpOut,
+    int    zpIn_int,
+    image2d_t output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(outputHeight));
+    int inyStart = y + depth * heigt_diff;
+    int4 coord_out = (int4)(x, y, x + 2, x + 4);
+    int inxStart = x;
+    int4 coord_in = (int4)(inxStart, inyStart, x + 6, y);
+    int2 coord_wei = (int2)(0, depth);
+    float4 sum[4];
+    uint4 dst[4], tmp0 = {0}, tmp1 = {0}, tmp2 = {0}, tmp3 = {0}, tmp4 = {0};
+    float biasData;
+    float4 pixel = {0.0}, weightValue = {0.0}, pixel2 = {0.0}, pixel3 = {0.0};
+    uint4 bits = (uint4)(8, 8, 8, 8);
+    uint4 cfg = (uint4)(0, 8, 16, 24);
+    uint4 cfg1 = (uint4)(8, 16, 24, 0);
+    uint4 cfg2 = (uint4)(16, 24, 0, 8);
+
+    biasData = convert_float(read_imagei(bias, (int2)(depth, 0)));
+    sum[0] = biasData;
+    sum[1] = biasData;
+    sum[2] = biasData;
+    sum[3] = biasData;
+    U8_3x3_W14_NOPAD_Q32toQ8_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_W14_NOPAD_Q32toQ8_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_W14_NOPAD_Q32toQ8_2D_PROCESS()
+    dst[0] = convert_uint4(sum[0] * scaleOut + zpOut);
+    dst[1] = convert_uint4(sum[1] * scaleOut + zpOut);
+    dst[2] = convert_uint4(sum[2] * scaleOut + zpOut);
+    dst[3] = convert_uint4(sum[3] * scaleOut + zpOut);
+
+    write_imageui(output, coord_out.xy, dst[0].xyxy);
+    write_imageui(output, coord_out.zy, dst[0].zwzw);
+    write_imageui(output, coord_out.wy, dst[1].xyxy);
+    write_imageui(output, coord_in.zw, dst[1].zwzw);
+    coord_out.xzw += 8;
+    write_imageui(output, coord_out.xy, dst[2].xyxy);
+    write_imageui(output, coord_out.zy, dst[2].zwzw);
+    write_imageui(output, coord_out.wy, dst[3].xyxy);
+}
+
+
+#define U8_3x3_W14_S2_NOPAD_Q32toQ8_2D_PROCESS() \
+    tmp4  = read_imageui(input, coord_in.xy); \
+    tmp5  = read_imageui(input, coord_in.zy); \
+    tmp6  = read_imageui(input, coord_in.wy); \
+    tmp0  = viv_bitfieldExtract(tmp4.xxyy, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.xxyy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.xyyz, cfg2, bits); \
+    tmp1  = read_imageui(weight, coord_wei); \
+    weightValue = convert_float4(tmp1) -  zpWeight; \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[0]  +=  pixel  * weightValue.x; \
+    sum[0]  +=  pixel2 * weightValue.y; \
+    sum[0]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp5.xxyy, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp5.xxyy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp5.xyyz, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[1]  +=  pixel  * weightValue.x; \
+    sum[1]  +=  pixel2 * weightValue.y; \
+    sum[1]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp6.xxyy, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp6.xxyy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp6.xyyz, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[2]  +=  pixel  * weightValue.x; \
+    sum[2]  +=  pixel2 * weightValue.y; \
+    sum[2]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp6.zzww, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp6.zzww, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp6.zwwx, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[3]  +=  pixel  * weightValue.x; \
+    sum[3]  +=  pixel2 * weightValue.y; \
+    sum[3]  +=  pixel3 * weightValue.z;
+
+__kernel void gpuDepthwiseConv_3x3_c1_s2_NoPad_Q32toQ8_w14_2D(
+    image2d_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int outputHeight,
+    int heigt_diff,
+    float scaleOut,
+    float zpIn,
+    float zpWeight,
+    float zpOut,
+    int    zpIn_int,
+    image2d_t output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(outputHeight));
+    int inyStart = y * 2 + depth * (heigt_diff - outputHeight);
+    int4 coord_out = (int4)(x, y, x + 2, x + 4);
+    int inxStart = x;
+    int4 coord_in = (int4)(inxStart, inyStart, inxStart + 2, inxStart + 4);
+    int2 coord_wei = (int2)(0, depth);
+    float4 sum[4];
+    uint4 dst[4], tmp0 = {0}, tmp1 = {0}, tmp2 = {0}, tmp3 = {0}, tmp4 = {0}, tmp5 = {0}, tmp6 = {0};
+    float biasData;
+    float4 pixel = {0.0}, weightValue = {0.0}, pixel2 = {0.0}, pixel3 = {0.0};
+    uint4 bits = (uint4)(8, 8, 8, 8);
+    uint4 cfg = (uint4)(0, 16, 0, 16);
+    uint4 cfg1 = (uint4)(8, 24, 8, 24);
+    uint4 cfg2 = (uint4)(16, 0, 16, 0);
+
+    biasData = convert_float(read_imagei(bias, (int2)(depth, 0)));
+    sum[0] = biasData;
+    sum[1] = biasData;
+    sum[2] = biasData;
+    sum[3] = biasData;
+    U8_3x3_W14_S2_NOPAD_Q32toQ8_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_W14_S2_NOPAD_Q32toQ8_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_W14_S2_NOPAD_Q32toQ8_2D_PROCESS()
+    dst[0] = convert_uint4(sum[0] * scaleOut + zpOut);
+    dst[1] = convert_uint4(sum[1] * scaleOut + zpOut);
+    dst[2] = convert_uint4(sum[2] * scaleOut + zpOut);
+    dst[3] = convert_uint4(sum[3] * scaleOut + zpOut);
+
+    write_imageui(output, coord_out.xy, dst[0].xyxy);
+    write_imageui(output, coord_out.zy, dst[0].zwzw);
+    write_imageui(output, coord_out.wy, dst[1].xyxy);
+    coord_out.xzw += 6;
+    write_imageui(output, coord_out.xy, dst[1].zwzw);
+    write_imageui(output, coord_out.zy, dst[2].xyxy);
+    write_imageui(output, coord_out.wy, dst[2].zwzw);
+    coord_out.xzw += 6;
+    write_imageui(output, coord_out.xy, dst[3].xyxy);
+}
+
+
+#define U8_3x3_W7_NOPAD_Q32toQ8_2D_PROCESS() \
+    tmp4  = read_imageui(input, coord_in.xy); \
+    tmp0  = viv_bitfieldExtract(tmp4.xxxx, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.xxxy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.xxyy, cfg2, bits); \
+    tmp1  = read_imageui(weight, coord_wei); \
+    weightValue = convert_float4(tmp1) -  zpWeight; \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[0]  +=  pixel  * weightValue.x; \
+    sum[0]  +=  pixel2 * weightValue.y; \
+    sum[0]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp4.yyyy, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.yyyz, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.yyzz, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[1]  +=  pixel  * weightValue.x; \
+    sum[1]  +=  pixel2 * weightValue.y; \
+    sum[1]  +=  pixel3 * weightValue.z;
+
+__kernel void gpuDepthwiseConv_3x3_c1_s1_NoPad_Q32toQ8_w7_2D(
+    image2d_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int outputHeight,
+    int heigt_diff,
+    float scaleOut,
+    float zpIn,
+    float zpWeight,
+    float zpOut,
+    int    zpIn_int,
+    image2d_t output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(outputHeight));
+    int inyStart = y + depth * heigt_diff;
+    int4 coord_out = (int4)(x, y, x + 1, x + 2);
+    int inxStart = x;
+    int4 coord_in = (int4)(inxStart, inyStart, x + 3, y);
+    int2 coord_wei = (int2)(0, depth);
+    float4 sum[2];
+    uint4 dst[2], tmp0 = {0}, tmp1 = {0}, tmp2 = {0}, tmp3 = {0}, tmp4 = {0};
+    float biasData;
+    float4 pixel = {0.0}, weightValue = {0.0}, pixel2 = {0.0}, pixel3 = {0.0};
+    uint4 bits = (uint4)(8, 8, 8, 8);
+    uint4 cfg = (uint4)(0, 8, 16, 24);
+    uint4 cfg1 = (uint4)(8, 16, 24, 0);
+    uint4 cfg2 = (uint4)(16, 24, 0, 8);
+
+    biasData = convert_float(read_imagei(bias, (int2)(depth, 0)));
+    sum[0] = biasData;
+    sum[1] = biasData;
+    U8_3x3_W7_NOPAD_Q32toQ8_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_W7_NOPAD_Q32toQ8_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_W7_NOPAD_Q32toQ8_2D_PROCESS()
+    dst[0] = convert_uint4(sum[0] * scaleOut + zpOut);
+    dst[1] = convert_uint4(sum[1] * scaleOut + zpOut);
+
+    write_imageui(output, coord_out.xy, dst[0].xxxx);
+    write_imageui(output, coord_out.zy, dst[0].yyyy);
+    write_imageui(output, coord_out.wy, dst[0].zzzz);
+    write_imageui(output, coord_in.zw,  dst[0].wwww);
+    coord_out.xzw += 4;
+    write_imageui(output, coord_out.xy, dst[1].xxxx);
+    write_imageui(output, coord_out.zy, dst[1].yyyy);
+    write_imageui(output, coord_out.wy, dst[1].zzzz);
+}
+
+
+#define U8_3x3_W7_S2_NOPAD_Q32toQ8_2D_PROCESS() \
+    tmp4  = read_imageui(input, coord_in.xy); \
+    tmp0  = viv_bitfieldExtract(tmp4.xxyy, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.xxyy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.xyyz, cfg2, bits); \
+    tmp1  = read_imageui(weight, coord_wei); \
+    weightValue = convert_float4(tmp1) -  zpWeight; \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[0]  +=  pixel  * weightValue.x; \
+    sum[0]  +=  pixel2 * weightValue.y; \
+    sum[0]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp4.zzww, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.zzww, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.zwwx, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[1]  +=  pixel  * weightValue.x; \
+    sum[1]  +=  pixel2 * weightValue.y; \
+    sum[1]  +=  pixel3 * weightValue.z;
+
+__kernel void gpuDepthwiseConv_3x3_c1_s2_NoPad_Q32toQ8_w7_2D(
+    image2d_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int outputHeight,
+    int heigt_diff,
+    float scaleOut,
+    float zpIn,
+    float zpWeight,
+    float zpOut,
+    int    zpIn_int,
+    image2d_t output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(outputHeight));
+    int inyStart = y * 2 + depth * (heigt_diff - outputHeight);
+    int4 coord_out = (int4)(x, y, x + 1, x + 2);
+    int inxStart = x;
+    int4 coord_in = (int4)(inxStart, inyStart, x + 3, y);
+    int2 coord_wei = (int2)(0, depth);
+    float4 sum[2];
+    uint4 dst[2], tmp0 = {0}, tmp1 = {0}, tmp2 = {0}, tmp3 = {0}, tmp4 = {0};
+    float biasData;
+    float4 pixel = {0.0}, weightValue = {0.0}, pixel2 = {0.0}, pixel3 = {0.0};
+    uint4 bits = (uint4)(8, 8, 8, 8);
+    uint4 cfg = (uint4)(0, 16, 0, 16);
+    uint4 cfg1 = (uint4)(8, 24, 8, 24);
+    uint4 cfg2 = (uint4)(16, 0, 16, 0);
+
+    biasData = convert_float(read_imagei(bias, (int2)(depth, 0)));
+    sum[0] = biasData;
+    sum[1] = biasData;
+    U8_3x3_W7_S2_NOPAD_Q32toQ8_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_W7_S2_NOPAD_Q32toQ8_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_W7_S2_NOPAD_Q32toQ8_2D_PROCESS()
+    dst[0] = convert_uint4(sum[0] * scaleOut + zpOut);
+    dst[1] = convert_uint4(sum[1] * scaleOut + zpOut);
+
+    write_imageui(output, coord_out.xy, dst[0].xxxx);
+    write_imageui(output, coord_out.zy, dst[0].yyyy);
+    write_imageui(output, coord_out.wy, dst[0].zzzz);
+    write_imageui(output, coord_in.zw,  dst[0].wwww);
+    coord_out.xzw += 4;
+    write_imageui(output, coord_out.xy, dst[1].xxxx);
+    write_imageui(output, coord_out.zy, dst[1].yyyy);
+    write_imageui(output, coord_out.wy, dst[1].zzzz);
+}
+
+#define U8_3x3_X16_NOPAD_Q32_2D_PROCESS() \
+    tmp4  = read_imageui(input, coord_in.xy); \
+    tmp5  = read_imageui(input, coord_in.zy); \
+    tmp0  = viv_bitfieldExtract(tmp4.xxxx, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.xxxy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.xxyy, cfg2, bits); \
+    tmp1  = read_imageui(weight, coord_wei); \
+    weightValue = convert_float4(tmp1) -  zpWeight; \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[0]  +=  pixel  * weightValue.x; \
+    sum[0]  +=  pixel2 * weightValue.y; \
+    sum[0]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp4.yyyy, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.yyyz, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.yyzz, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[1]  +=  pixel  * weightValue.x; \
+    sum[1]  +=  pixel2 * weightValue.y; \
+    sum[1]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp4.zzzz, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp4.zzzw, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp4.zzww, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[2]  +=  pixel  * weightValue.x; \
+    sum[2]  +=  pixel2 * weightValue.y; \
+    sum[2]  +=  pixel3 * weightValue.z; \
+    tmp0  = viv_bitfieldExtract(tmp5.xxxx, cfg, bits); \
+    tmp2  = viv_bitfieldExtract(tmp5.xxxy, cfg1, bits); \
+    tmp3  = viv_bitfieldExtract(tmp5.xxyy, cfg2, bits); \
+    pixel = convert_float4(tmp0); \
+    pixel2 = convert_float4(tmp2); \
+    pixel3 = convert_float4(tmp3); \
+    sum[3]  +=  pixel  * weightValue.x; \
+    sum[3]  +=  pixel2 * weightValue.y; \
+    sum[3]  +=  pixel3 * weightValue.z;
+
+__kernel void gpuDepthwiseConv_3x3_c1_s1_NoPad_Q32_x16_2D(
+    image2d_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int outputHeight,
+    int heigt_diff,
+    float scaleOut,
+    float zpIn,
+    float zpWeight,
+    float zpOut,
+    int    zpIn_int,
+    image2d_t output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(outputHeight));
+    int inyStart = y + depth * heigt_diff;
+    int4 coord_out = (int4)(x, y, x + 4, x + 8);
+    int inxStart = x >> 2;
+    int4 coord_in = (int4)(inxStart, inyStart, inxStart + 3, 0);
+    int2 coord_wei = (int2)(0, depth);
+    float4 sum[4];
+    uint4  dst[4];
+    uint4  tmp0 = {0}, tmp1 = {0}, tmp2 = {0}, tmp3 = {0}, tmp4 = {0}, tmp5 = {0};
+    float biasData;
+    float4 pixel = {0.0}, weightValue = {0.0}, pixel2 = {0.0}, pixel3 = {0.0};
+    uint4 bits = (uint4)(8, 8, 8, 8);
+    uint4 cfg = (uint4)(0, 8, 16, 24);
+    uint4 cfg1 = (uint4)(8, 16, 24, 0);
+    uint4 cfg2 = (uint4)(16, 24, 0, 8);
+
+    biasData = convert_float(read_imagei(bias, (int2)(depth, 0)));
+    sum[0] = biasData;
+    sum[1] = biasData;
+    sum[2] = biasData;
+    sum[3] = biasData;
+    U8_3x3_X16_NOPAD_Q32_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_X16_NOPAD_Q32_2D_PROCESS()
+    coord_in.y++;
+    coord_wei.x += 3;
+    U8_3x3_X16_NOPAD_Q32_2D_PROCESS()
+    dst[0] = convert_uint4(sum[0] * scaleOut + zpOut);
+    dst[1] = convert_uint4(sum[1] * scaleOut + zpOut);
+    dst[2] = convert_uint4(sum[2] * scaleOut + zpOut);
+    dst[3] = convert_uint4(sum[3] * scaleOut + zpOut);
+    write_imageui(output, coord_out.xy, dst[0]);
+    write_imageui(output, coord_out.zy, dst[1]);
+    write_imageui(output, coord_out.wy, dst[2]);
+    coord_out.w += 4;
+    write_imageui(output, coord_out.wy, dst[3]);
 }
 
 #define U8_3x3_X2_NOPAD_2D_PROCESS() \

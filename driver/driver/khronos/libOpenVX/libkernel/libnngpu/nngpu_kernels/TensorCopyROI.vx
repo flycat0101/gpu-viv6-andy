@@ -138,7 +138,38 @@ __kernel void gpuTensorCopyROI_Quant8_Pad1_2D_x7 (__read_only image2d_t  input,
     write_imageui(output, coord_out.wy, tmp2.zzzz);
 }
 
-__kernel void gpuTensorCopyROI_Quant8_Pad_Single (__read_only image2d_array_t  input,
+
+__kernel void gpuTensorCopyROI_Quant8_Pad1_2D_x14 (__read_only image2d_t  input,
+                                                  __write_only image2d_t output,
+                                                  int   input_height,
+                                                  int   height_diff
+                                                  )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(input_height));
+    int out_y  = depth * height_diff + y + 1;
+    int4 coord_in   = (int4)(x, y, x + 4, out_y);
+    int4 coord_out  = (int4)(x + 1, out_y, x + 3, x + 5);
+    uint4 tmp = {0}, tmp1 = {0}, tmp2 = {0}, tmp3 = {0};
+    tmp  = read_imageui(input, coord_in.xy);
+    tmp1 = read_imageui(input, coord_in.zy);
+    coord_in.xz += 8;
+    tmp2 = read_imageui(input, coord_in.xy);
+    tmp3 = read_imageui(input, coord_in.zy);
+    write_imageui(output, coord_out.xy, tmp.xyxy);
+    write_imageui(output, coord_out.zy, tmp.zwzw);
+    write_imageui(output, coord_out.wy, tmp1.xyxy);
+    coord_out.xzw = coord_out.xzw + 6;
+    write_imageui(output, coord_out.xy, tmp1.zwzw);
+    write_imageui(output, coord_out.zy, tmp2.xyxy);
+    write_imageui(output, coord_out.wy, tmp2.zwzw);
+    coord_out.xzw = coord_out.xzw + 6;
+    write_imageui(output, coord_out.xy, tmp3.xyxy);
+}
+
+
+__kernel void gpuTensorCopyROI_Quant8_NoPad (__read_only image2d_array_t  input,
                                        __write_only image2d_array_t output
                                        )
 {
@@ -147,4 +178,148 @@ __kernel void gpuTensorCopyROI_Quant8_Pad_Single (__read_only image2d_array_t  i
     uint4 tmp = {0};
     tmp = read_imageui(input, coord_in);
     write_imageui(output, coord_out, tmp);
+}
+
+__kernel void gpuTensorCopyROI_Quant8_NoPad_2D (__read_only image2d_t  input,
+                                                __write_only image2d_t output,
+                                                int   input_height,
+                                                int   height_diff
+                                                )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(input_height));
+    int out_y  = depth * height_diff + y;
+    int2 coord_in   = (int2)(x, y);
+    int2 coord_out  = (int2)(x, out_y);
+    uint4 tmp = {0};
+    tmp = read_imageui(input, coord_in);
+    write_imageui(output, coord_out, tmp);
+}
+
+
+__kernel void gpuTensorCopyROI_Quant8_NoPad_2D_x8 (__read_only image2d_t  input,
+                                                __write_only image2d_t output,
+                                                int   input_height,
+                                                int   height_diff
+                                                )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(input_height));
+    int out_y  = depth * height_diff + y;
+    int4 coord_in   = (int4)(x, y, x + 4, 0);
+    int4 coord_out  = (int4)(x, out_y, x + 4, 0);
+    uint4 tmp = {0}, tmp2 = {0};
+    tmp = read_imageui(input, coord_in.xy);
+    tmp2 = read_imageui(input, coord_in.zy);
+    write_imageui(output, coord_out.xy, tmp);
+    write_imageui(output, coord_out.zy, tmp2);
+}
+
+
+__kernel void gpuTensorCopyROI_Quant8_NoPad_2D_x16 (__read_only image2d_t  input,
+                                                    __write_only image2d_t output,
+                                                    int   input_height,
+                                                    int   height_diff
+                                                    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(input_height));
+    int out_y  = depth * height_diff + y;
+    int4 coord_in   = (int4)(x, y, x + 4, 0);
+    int4 coord_out  = (int4)(x, out_y, x + 4, 0);
+    uint4 tmp = {0}, tmp2 = {0};
+    tmp = read_imageui(input, coord_in.xy);
+    tmp2 = read_imageui(input, coord_in.zy);
+    write_imageui(output, coord_out.xy, tmp);
+    write_imageui(output, coord_out.zy, tmp2);
+    coord_in.xz += 8;
+    coord_out.xz += 8;
+    tmp = read_imageui(input, coord_in.xy);
+    tmp2 = read_imageui(input, coord_in.zy);
+    write_imageui(output, coord_out.xy, tmp);
+    write_imageui(output, coord_out.zy, tmp2);
+}
+
+__kernel void gpuTensorCopyROI_Quant8_NoPad_x7 (__read_only image2d_array_t  input,
+                                       __write_only image2d_array_t output
+                                       )
+{
+    int4 coord_in   = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out  = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    uint4 tmp = {0}, tmp2 = {0};
+    tmp  = read_imageui(input, coord_in);
+    coord_in.x += 4;
+    tmp2 = read_imageui(input, coord_in);
+    write_imageui(output, coord_out, tmp.xxxx);
+    coord_out.x++;
+    write_imageui(output, coord_out, tmp.yyyy);
+    coord_out.x++;
+    write_imageui(output, coord_out, tmp.zzzz);
+    coord_out.x++;
+    write_imageui(output, coord_out, tmp.wwww);
+    coord_out.x++;
+    write_imageui(output, coord_out, tmp2.xxxx);
+    coord_out.x++;
+    write_imageui(output, coord_out, tmp2.yyyy);
+    coord_out.x++;
+    write_imageui(output, coord_out, tmp2.zzzz);
+}
+
+__kernel void gpuTensorCopyROI_Quant8_NoPad_2D_x7 (__read_only image2d_t  input,
+                                                  __write_only image2d_t output,
+                                                  int   input_height,
+                                                  int   height_diff
+                                                  )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(input_height));
+    int out_y  = depth * height_diff + y;
+    int4 coord_in   = (int4)(x, y, x + 4, out_y);
+    int4 coord_out  = (int4)(x, out_y, x + 1, x + 2);
+    uint4 tmp = {0}, tmp2 = {0};
+    tmp  = read_imageui(input, coord_in.xy);
+    tmp2 = read_imageui(input, coord_in.zy);
+    write_imageui(output, coord_out.xy, tmp.xxxx);
+    write_imageui(output, coord_out.zy, tmp.yyyy);
+    write_imageui(output, coord_out.wy, tmp.zzzz);
+    coord_out.xzw = coord_out.xzw + 3;
+    write_imageui(output, coord_out.xy, tmp.wwww);
+    write_imageui(output, coord_out.zy, tmp2.xxxx);
+    write_imageui(output, coord_out.wy, tmp2.yyyy);
+    coord_out.xzw = coord_out.xzw + 3;
+    write_imageui(output, coord_out.xy, tmp2.zzzz);
+}
+
+
+__kernel void gpuTensorCopyROI_Quant8_NoPad_2D_x14 (__read_only image2d_t  input,
+                                                  __write_only image2d_t output,
+                                                  int   input_height,
+                                                  int   height_diff
+                                                  )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int depth = convert_int(convert_short(y)/convert_short(input_height));
+    int out_y  = depth * height_diff + y;
+    int4 coord_in   = (int4)(x, y, x + 4, out_y);
+    int4 coord_out  = (int4)(x, out_y, x + 2, x + 4);
+    uint4 tmp = {0}, tmp1 = {0}, tmp2 = {0}, tmp3 = {0};
+    tmp  = read_imageui(input, coord_in.xy);
+    tmp1 = read_imageui(input, coord_in.zy);
+    coord_in.xz += 8;
+    tmp2 = read_imageui(input, coord_in.xy);
+    tmp3 = read_imageui(input, coord_in.zy);
+    write_imageui(output, coord_out.xy, tmp.xyxy);
+    write_imageui(output, coord_out.zy, tmp.zwzw);
+    write_imageui(output, coord_out.wy, tmp1.xyxy);
+    coord_out.xzw = coord_out.xzw + 6;
+    write_imageui(output, coord_out.xy, tmp1.zwzw);
+    write_imageui(output, coord_out.zy, tmp2.xyxy);
+    write_imageui(output, coord_out.wy, tmp2.zwzw);
+    coord_out.xzw = coord_out.xzw + 6;
+    write_imageui(output, coord_out.xy, tmp3.xyxy);
 }
