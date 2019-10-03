@@ -4017,9 +4017,12 @@ gctBOOL vscVIR_CheckTwoSymsVectorizability(VIR_Shader* pShader, VIR_Symbol* pSym
     if (VIR_Type_isArray(VIR_Symbol_GetType(pSym1)) !=
         VIR_Type_isArray(VIR_Symbol_GetType(pSym2)))
     {
-        /* support shader input/output vectorization if
-         * they are scalar/vector and array types */
-        if (!checkInputOutput)
+        /* support shader input/output vectorization except ioblock member if
+         * they are scalar/vector and array types
+         * array ioblock memory may use baseofblock variable + offset instead of its temp variable
+         * _ChangeInstsByIoVectorizedInfos can not replace this with new vectorized variable
+         */
+        if (!checkInputOutput || isSymIOBlockMember(pSym1))
         {
             return gcvFALSE;
         }
