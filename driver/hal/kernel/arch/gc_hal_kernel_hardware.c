@@ -4363,6 +4363,7 @@ _ResumeWaitLinkFE(
     gckHARDWARE Hardware
     )
 {
+    gceSTATUS status;
     gctUINT32 resume;
     gctUINT32 bytes;
     gctUINT32 idle;
@@ -4370,10 +4371,10 @@ _ResumeWaitLinkFE(
     /* Make sure FE is idle. */
     do
     {
-        gckOS_ReadRegisterEx(Hardware->os,
+        gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
                              Hardware->core,
                              0x00004,
-                             &idle);
+                             &idle));
     }
     while (idle != 0x7FFFFFFF);
 
@@ -4391,20 +4392,23 @@ _ResumeWaitLinkFE(
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))),
              idle);
 
-    gckOS_ReadRegisterEx(Hardware->os,
+    gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
                          Hardware->core,
                          0x00664,
-                         &resume);
+                         &resume));
 
-    gckOS_ReadRegisterEx(Hardware->os,
+    gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
                          Hardware->core,
                          0x00664,
-                         &resume);
+                         &resume));
 
     bytes = Hardware->hasL2Cache ? 24 : 16;
 
     /* Start Command Parser. */
     gckWLFE_AtomicExecute(Hardware, resume, bytes);
+
+OnError:
+    return;
 }
 
 /*******************************************************************************
