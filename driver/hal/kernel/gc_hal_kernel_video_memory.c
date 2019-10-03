@@ -1566,12 +1566,19 @@ gckVIDMEM_BLOCK_Construct(
 OnError:
     if (vidMemBlock != gcvNULL)
     {
+        if (vidMemBlock->mutex)
+        {
+            gcmkVERIFY_OK(gckOS_DeleteMutex(os, vidMemBlock->mutex));
+        }
+
         if (vidMemBlock->physical)
         {
             gcmkVERIFY_OK(gckOS_FreePagedMemory(os,
                                                 vidMemBlock->physical,
                                                 vidMemBlock->bytes));
         }
+
+        gcmkVERIFY_OK(gcmkOS_SAFE_FREE(os, vidMemBlock));
     }
 
     if (node != gcvNULL)
