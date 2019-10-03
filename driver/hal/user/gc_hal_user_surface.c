@@ -12471,7 +12471,7 @@ gcoSURF_BlitCPU(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcoSURF srcSurf, dstSurf;
+    gcoSURF srcSurf = gcvNULL, dstSurf = gcvNULL;
     gctPOINTER srcAddr[3] = {gcvNULL};
     gctPOINTER dstAddr[3] = {gcvNULL};
     _PFNreadPixel pfReadPixel = gcvNULL;
