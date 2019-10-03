@@ -1070,7 +1070,7 @@ _DumpFEStack(
 
     for (i = 0; i < gcmCOUNTOF(_feStacks); i++)
     {
-        gckOS_WriteRegisterEx(Os, Core, Descriptor->index, _feStacks[i].clear);
+        gcmkVERIFY_OK(gckOS_WriteRegisterEx(Os, Core, Descriptor->index, _feStacks[i].clear));
 
         for (j = 0; j < _feStacks[i].count; j++)
         {
