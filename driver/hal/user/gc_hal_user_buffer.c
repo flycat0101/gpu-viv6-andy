@@ -2356,7 +2356,7 @@ gcoBUFFER_Commit(
     {
         gcmONERROR(gcoQUEUE_Commit(Queue, gcvFALSE));
     }
-    else if (!emptyBuffer)
+    else if (commandBuffer != gcvNULL)
     {
         gcsHAL_INTERFACE iface;
         gctUINT32 context = 0;
@@ -2637,6 +2637,10 @@ gcoBUFFER_Commit(
 
         /* Recycle the sub-commits. */
         _RecycleSubCommits(Buffer);
+    }
+    else
+    {
+        gcmONERROR(gcvSTATUS_INVALID_DATA);
     }
 
     /* Empty buffer must be the tail. */
