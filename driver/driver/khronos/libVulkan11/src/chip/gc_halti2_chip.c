@@ -1097,6 +1097,17 @@ VkResult halti2_copyImageWithRS(
         srcStride = (uint32_t)pSrcLevel->stride;
         srcSampleInfo = srcImg->sampleInfo;
         srcFormat = srcImg->formatInfo.residentImgFormat;
+        if (srcImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT &&
+           (srcImg->createInfo.format == VK_FORMAT_B4G4R4A4_UNORM_PACK16/* ||
+           (!devCtx->database->PE_A8B8G8R8 &&
+           (srcImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM ||
+            srcImg->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB ||
+            srcImg->createInfo.format == VK_FORMAT_A8B8G8R8_UNORM_PACK32 ||
+            srcImg->createInfo.format == VK_FORMAT_A8B8G8R8_SRGB_PACK32))*/))
+        {
+            srcFormat = srcImg->createInfo.format;
+        }
+
         srcParts = srcImg->formatInfo.partCount;
         srcAddress = srcImg->memory->devAddr;
         srcAddress += (uint32_t)(srcImg->memOffset + pSrcLevel->offset +
@@ -1154,6 +1165,17 @@ VkResult halti2_copyImageWithRS(
         dstStride = (uint32_t)pDstLevel->stride;
         dstSampleInfo = dstImg->sampleInfo;
         dstFormat = dstImg->formatInfo.residentImgFormat;
+        if (dstImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT &&
+           (dstImg->createInfo.format == VK_FORMAT_B4G4R4A4_UNORM_PACK16/* ||
+           (!devCtx->database->PE_A8B8G8R8 &&
+           (dstImg->createInfo.format == VK_FORMAT_R8G8B8A8_UNORM ||
+            dstImg->createInfo.format == VK_FORMAT_R8G8B8A8_SRGB ||
+            dstImg->createInfo.format == VK_FORMAT_A8B8G8R8_UNORM_PACK32 ||
+            dstImg->createInfo.format == VK_FORMAT_A8B8G8R8_SRGB_PACK32))*/))
+        {
+            dstFormat = dstImg->createInfo.format;
+        }
+
         dstParts = dstImg->formatInfo.partCount;
         dstAddress = dstImg->memory->devAddr;
         dstAddress += (uint32_t)(dstImg->memOffset + pDstLevel->offset +
@@ -1296,7 +1318,7 @@ VkResult halti2_copyImageWithRS(
             {
                 useComputeBlit = VK_TRUE;
             }
-            else if (srcFormat == VK_FORMAT_B4G4R4A4_UNORM_PACK16)
+            else if (srcFormat == VK_FORMAT_B4G4R4A4_UNORM_PACK16 && dstFormat != VK_FORMAT_B4G4R4A4_UNORM_PACK16)
             {
                 useComputeBlit = VK_TRUE;
             }
