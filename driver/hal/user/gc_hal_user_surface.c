@@ -6915,13 +6915,13 @@ _3DBlitClearRect(
     }
     else
     {
-        gcmONERROR(gcoHARDWARE_3DBlitClear(gcvNULL, gcvENGINE_RENDER, SurfView, &clearInfo, &origin, &rectSize));
+        gcmONERROR(gcoHARDWARE_3DBlitClear(gcvNULL, gcvENGINE_RENDER, SurfView, &clearInfo, &origin, &rectSize, gcvFALSE));
     }
 
     if (clearHZ)
     {
         /* Clear HZ. */
-        gcmONERROR(gcoHARDWARE_3DBlitClear(gcvNULL, gcvENGINE_RENDER, SurfView, &hzClearInfo, &origin, &rectSize));
+        gcmONERROR(gcoHARDWARE_3DBlitClear(gcvNULL, gcvENGINE_RENDER, SurfView, &hzClearInfo, &origin, &rectSize, gcvFALSE));
     }
 
     if (enableFC)

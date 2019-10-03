@@ -2718,7 +2718,8 @@ gcoHARDWARE_3DBlitClear(
     IN gcsSURF_VIEW *DstView,
     IN gcs3DBLIT_INFO_PTR Info,
     IN gcsPOINT_PTR DstOrigin,
-    IN gcsPOINT_PTR RectSize
+    IN gcsPOINT_PTR RectSize,
+    IN gctBOOL forceSingle
     );
 
 gceSTATUS

@@ -4329,6 +4329,8 @@ OnError:
 **      gcsPOINT_PTR RectSize
 **          The size of the rectangular area to be cleared.
 **
+**      gctBOOL forceSingle
+**          Force single gpu or single cluster
 **  OUTPUT:
 **
 **      Nothing
@@ -4340,7 +4342,8 @@ gcoHARDWARE_3DBlitClear(
     IN gcsSURF_VIEW *DstView,
     IN gcs3DBLIT_INFO_PTR Info,
     IN gcsPOINT_PTR DstOrigin,
-    IN gcsPOINT_PTR RectSize
+    IN gcsPOINT_PTR RectSize,
+    IN gctBOOL forceSingle
     )
 {
     gceSTATUS       status;
@@ -4366,7 +4369,6 @@ gcoHARDWARE_3DBlitClear(
     gctPOINTER*     outside = gcvNULL;
     gcoSURF         DstSurf = DstView->surf;
     gctUINT         gpuCount = 0;
-    gctBOOL         forceSingle = gcvFALSE;
     gcsSURF_FORMAT_INFO_PTR fmtInfo = &DstSurf->formatInfo;
     gctUINT32       clusterCount = 0;
     gctUINT32       clusterMask = 0;
