@@ -7593,6 +7593,7 @@ clfRecompileVIRKernel(
     linkTable.pShLibLinkEntries = &linkEntry;
 
     linkEntry.linkPointCount = 1;
+    linkEntry.applyLevel = VSC_SHLEVEL_Pre_Medium;
     linkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_IMAGE_READ_WRITE;
     linkEntry.linkPoint[0].u.imageReadWrite.imageCount = kep->kernelHints.imageCount;
     linkEntry.linkPoint[0].u.imageReadWrite.samplerCount = kep->kernelHints.samplerCount;
