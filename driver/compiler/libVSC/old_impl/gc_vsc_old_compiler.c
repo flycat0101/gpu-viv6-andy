@@ -33427,6 +33427,7 @@ gcSHADER_SetTransformFeedbackVarying(
 {
     gceSTATUS status;
     gctUINT32 i, j;
+    gctUINT32*  nameIndex;
 
     gcmHEADER_ARG("Shader=0x%x Count=%u Varyings=0x%x BufferMode=%d",
                   Shader, Count, Varyings, BufferMode);
@@ -33459,19 +33460,29 @@ gcSHADER_SetTransformFeedbackVarying(
     Shader->transformFeedback.varyingCount = Count;
     Shader->transformFeedback.bufferMode = BufferMode;
 
-    for (i = 0; i < Count; i++) {
-        gctUINT32 nameLen;
-        gctBOOL   found  = gcvFALSE;
-        gcOUTPUT  output = gcvNULL;
-        gctINT    index  = -1;
+    status = gcoOS_Allocate(gcvNULL,
+                    gcmSIZEOF(gctUINT32) * 4,
+                    (gctPOINTER *)&nameIndex);
+    gcoOS_ZeroMemory(nameIndex, gcmSIZEOF(gctUINT32) * 4);
+
+    for (i = 0; i < Count; i++)
+    {
+
+        gctUINT32   nameLen;
+        gctBOOL     found  = gcvFALSE;
+        gcOUTPUT    output = gcvNULL;
+        gctINT      index  = -1;
+        gctCHAR     variableAddName[24];
 
         Shader->transformFeedback.varyings[i].isArray = gcvFALSE;
+
+
 
         if (gcmIS_SUCCESS(gcoOS_StrNCmp(Varyings[i], "gl_", sizeof("gl_")-1)))
         {
             if (gcShaderIsDesktopGL(Shader))
             {
-                /* Check transformfeedback variables, for GL only. */
+                /* Check TransformFeedback variables, for GL only. */
                 gctUINT32       newTempIndex = 0;
                 gctUINT32       varyingNameLength = 4;
                 const gctSTRING varyingName[4] =
@@ -33487,6 +33498,7 @@ gcSHADER_SetTransformFeedbackVarying(
                         &&
                         gcmIS_SUCCESS(gcoOS_StrCmp(Varyings[i], varyingName[j])))
                     {
+                        nameIndex[j] ++;
                         found = gcvTRUE;
                         break;
                     }
@@ -33494,21 +33506,19 @@ gcSHADER_SetTransformFeedbackVarying(
 
                 if (found)
                 {
-                    gctUINT32 kind = 0;
-                    gcSHADER_GetBuiltinNameKind(Shader, variableName[i], &kind);
-                    gcSHADER_GetBuiltInOutputByKind(Shader, kind, &output);
+                    gctUINT32 varyingNameLen;
+                    varyingNameLen = gcoOS_StrLen(variableName[j], gcvNULL);
+                    gcoOS_StrCopySafe(variableAddName, varyingNameLen + 1, variableName[j]);
+                    gcoOS_PrintStrSafe(variableAddName, varyingNameLen + sizeof (gctUINT32), &varyingNameLen, "_%d", nameIndex[j]);
 
-                    if (output == gcvNULL)
-                    {
-                        newTempIndex = gcSHADER_NewTempRegs(Shader, 1, varyingType[j]);
-                        gcSHADER_AddOutput(Shader,
-                                           variableName[i],
-                                           varyingType[j],
-                                           1,
-                                           newTempIndex,
-                                           gcSHADER_PRECISION_HIGH);
-                        gcSHADER_GetOutput(Shader, Shader->outputCount - 1, &output);
-                    }
+                    newTempIndex = gcSHADER_NewTempRegs(Shader, 1, varyingType[j]);
+                    gcSHADER_AddOutput(Shader,
+                                        variableAddName,
+                                        varyingType[j],
+                                        1,
+                                        newTempIndex,
+                                        gcSHADER_PRECISION_HIGH);
+                    gcSHADER_GetOutput(Shader, Shader->outputCount - 1, &output);
 
                     Shader->transformFeedback.varyings[i].output = output;
                     Shader->transformFeedback.varyings[i].arraySize = output->arraySize;
@@ -33537,7 +33547,8 @@ gcSHADER_SetTransformFeedbackVarying(
                 }
             }
         }
-        else {
+        else
+        {
            gctCONST_STRING varyingDot     = gcvNULL;
            gctCONST_STRING varyingBracket = gcvNULL;
            gctINT varyingNameLength;
