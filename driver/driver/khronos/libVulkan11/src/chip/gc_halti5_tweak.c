@@ -1198,7 +1198,7 @@ static VkBool32 deqp_vk_msaa_128bpp_04_match(
     void *createInfo
     )
 {
-    if (devCtx->database->msaa_64bpp)
+    if (devCtx->msaa_64bpp)
     {
         return VK_FALSE;
     }
@@ -1425,7 +1425,7 @@ static VkBool32 deqp_vk_msaa_128bpp_05_match(
     void *createInfo
     )
 {
-    if (devCtx->database->msaa_64bpp)
+    if (devCtx->msaa_64bpp)
     {
         return VK_FALSE;
     }
@@ -1602,7 +1602,7 @@ static VkBool32 deqp_vk_msaa_128bpp_06_match(
     void *createInfo
     )
 {
-    if (devCtx->database->msaa_64bpp)
+    if (devCtx->msaa_64bpp)
     {
         return VK_FALSE;
     }
@@ -1885,7 +1885,7 @@ static VkBool32 deqp_vk_msaa_128bpp_07_match(
     void *createInfo
     )
 {
-    if (devCtx->database->msaa_64bpp)
+    if (devCtx->msaa_64bpp)
     {
         return VK_FALSE;
     }
@@ -2076,7 +2076,7 @@ static VkBool32 deqp_vk_msaa_128bpp_08_match(
     void *createInfo
     )
 {
-    if (devCtx->database->msaa_64bpp)
+    if (devCtx->msaa_64bpp)
     {
         return VK_FALSE;
     }
@@ -2355,7 +2355,7 @@ static VkBool32 deqp_vk_msaa_128bpp_09_match(
     void *createInfo
     )
 {
-    if (devCtx->database->msaa_64bpp)
+    if (devCtx->msaa_64bpp)
     {
         return VK_FALSE;
     }
@@ -2609,7 +2609,7 @@ static VkBool32 deqp_vk_msaa_128bpp_10_match(
     void *createInfo
     )
 {
-    if (devCtx->database->msaa_64bpp)
+    if (devCtx->msaa_64bpp)
     {
         return VK_FALSE;
     }
