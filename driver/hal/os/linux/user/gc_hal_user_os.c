@@ -5159,7 +5159,7 @@ gcoOS_LoadLibrary(
             strncpy(library, Library, length + 1);
 
             /* Append the ".so" to the temporary string buffer. */
-            strncat(library, ".so", 3);
+            strncat(library, ".so", 3 + 1);
 
             /* Replace the library name. */
             Library = library;
