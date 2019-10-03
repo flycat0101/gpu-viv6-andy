@@ -680,10 +680,11 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_Run(
     vx_binary_loader_s *binLoad
     );
 
-VX_INTERNAL_API vx_status vxoBinaryGraph_LoadFile(
+VX_INTERNAL_API vx_status vxoBinaryGraph_LoadNBG(
     vx_context context,
-    vx_binary_loader_s **binLoad,
-    gctCONST_STRING fileName
+    vx_binary_loader_s **binaryLoad,
+    const vx_char *type,
+    const vx_char *url
     );
 
 VX_INTERNAL_API vx_bool vxoBinaryGraph_HasBinaryInGraph(
@@ -700,7 +701,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_UpdataIOPhsicalTable(
     vx_uint32 index
 );
 
-VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseFile(
+VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseNBG(
     vx_binary_loader_s *binLoad
     );
 

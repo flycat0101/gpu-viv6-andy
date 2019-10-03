@@ -3823,7 +3823,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseKernel(vx_kernel *kernel)
     {
         /* release binary kernel*/
         vx_binary_loader_s *binaryLoad = (vx_binary_loader_s*)((*kernel)->base.reserved);
-        vxoBinaryGraph_ReleaseFile(binaryLoad);
+        vxoBinaryGraph_ReleaseNBG(binaryLoad);
         gcmFOOTER_NO();
         return vxoKernel_ExternalRelease(kernel);
     }
@@ -5956,41 +5956,50 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxImportKernelFromURL(vx_context context, con
         gcmFOOTER_NO();
         return VX_NULL;
     }
-    if (gcoOS_StrCmp(type, VX_VIVANTE_IMPORT_KERNEL_FROM_FILE) == gcvSTATUS_OK)
+
+    if ((gcoOS_StrCmp(type, VX_VIVANTE_IMPORT_KERNEL_FROM_FILE) == gcvSTATUS_OK) ||
+        (gcoOS_StrCmp(type, VX_VIVANTE_IMPORT_KERNEL_FROM_POINTER) == gcvSTATUS_OK))
     {
         vx_uint32   urlLen = 0;
         vx_char     *cPtr = VX_NULL;
         vx_target   target = VX_NULL;
         /* load binary file */
-        vxmONERROR(vxoBinaryGraph_LoadFile(context, &binaryLoad, url));
+        vxmONERROR(vxoBinaryGraph_LoadNBG(context, &binaryLoad, type, url));
         numParams = binaryLoad->fixed.header.inputCount + binaryLoad->fixed.header.outputCount;
 
-        /* use url to get kernel's name*/
-        urlLen = (vx_uint32)strlen(url);
-        cPtr = strrchr(url, '/');
-        if (cPtr != VX_NULL)
+        if (gcoOS_StrCmp(type, VX_VIVANTE_IMPORT_KERNEL_FROM_FILE) == gcvSTATUS_OK)
         {
-            vx_char *tmp = strrchr(cPtr + 1, '.');
-            if (tmp != VX_NULL)
+            /* use url to get kernel's name*/
+            urlLen = (vx_uint32)strlen(url);
+            cPtr = strrchr(url, '/');
+            if (cPtr != VX_NULL)
             {
-                vxStrCopySafe(kernelName, tmp - cPtr, cPtr + 1);
+                vx_char *tmp = strrchr(cPtr + 1, '.');
+                if (tmp != VX_NULL)
+                {
+                    vxStrCopySafe(kernelName, tmp - cPtr, cPtr + 1);
+                }
+                else
+                {
+                    vxStrCopySafe(kernelName, strlen(cPtr), cPtr + 1);
+                }
             }
             else
             {
-                vxStrCopySafe(kernelName, strlen(cPtr), cPtr + 1);
+                vx_char *tmp = strrchr(url, '.');
+                if (tmp != VX_NULL)
+                {
+                    vxStrCopySafe(kernelName, urlLen - strlen(tmp), url);
+                }
+                else
+                {
+                    vxStrCopySafe(kernelName, VX_MAX_KERNEL_NAME, url);
+                }
             }
         }
         else
         {
-            vx_char *tmp = strrchr(url, '.');
-            if (tmp != VX_NULL)
-            {
-                vxStrCopySafe(kernelName, urlLen - strlen(tmp), url);
-            }
-            else
-            {
-                vxStrCopySafe(kernelName, VX_MAX_KERNEL_NAME, url);
-            }
+            vxStrCopySafe(kernelName, VX_MAX_KERNEL_NAME, "ovx_load_NBG");
         }
 
         for (targetIndex = 0; targetIndex < context->targetCount; targetIndex++)
@@ -6051,7 +6060,7 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxImportKernelFromURL(vx_context context, con
     }
     else
     {
-        vxError("no implement this type: %s\n", type);
+        vxError("vxImportKernelFromURL no implement this type: %s\n", type);
         kernel = VX_NULL;
     }
 

@@ -803,7 +803,8 @@ static vx_uint32 getStateSize(
 
 static vx_status readBinDynamic(
     vx_binary_reader_s *reader,
-    vx_binary_loader_s *binLoad
+    vx_binary_loader_s *binLoad,
+    vx_bool fromFile
     )
 {
     vx_status status = VX_SUCCESS;
@@ -909,13 +910,15 @@ static vx_status readBinDynamic(
             vxmONERROR(VX_ERROR_NO_MEMORY);
         }
 
-        #if LOAD_WHOLE_BINARY_TO_BUFFER
-        /*copy LCD data to GPU memory*/
-        vxmONERROR(readerLocate(reader, binLoad->fixed.LCD.offset));
-        vxmONERROR(readData(reader, binLoad->LCD.logical, binLoad->fixed.LCD.size));
-        #else
-        /*read LCD data from binary*/
+        if (fromFile == vx_false_e)
         {
+            /*copy LCD data to GPU memory*/
+            vxmONERROR(readerLocate(reader, binLoad->fixed.LCD.offset));
+            vxmONERROR(readData(reader, binLoad->LCD.logical, binLoad->fixed.LCD.size));
+        }
+        else
+        {
+            /*read LCD data from binary file*/
             gctSIZE_T readSize = 0;
             gcoOS_Seek(gcvNULL, binLoad->dFile, binLoad->fixed.LCD.offset, gcvFILE_SEEK_SET);
             gcoOS_Read(gcvNULL, binLoad->dFile, binLoad->fixed.LCD.size, binLoad->LCD.logical, &readSize);
@@ -926,7 +929,6 @@ static vx_status readBinDynamic(
                 vxmONERROR(VX_FAILURE);
             }
         }
-        #endif
     }
     else
     {
@@ -3506,7 +3508,85 @@ OnError:
     return (gcmIS_ERROR(status) ? VX_ERROR_NO_MEMORY : VX_SUCCESS);
 }
 
-VX_INTERNAL_API vx_status vxoBinaryGraph_LoadFile(
+VX_PRIVATE_API vx_status vxoBinaryGraph_InitBinaryLoad(
+    vx_context context,
+    vx_binary_loader_s **binaryLoad
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_binary_loader_s *binLoad = *binaryLoad;
+    vx_uint32 i = 0;
+
+    gcmHEADER_ARG("context=%p, binLoad=%p", context, binLoad);
+
+    /* Preprocess graph input/output table data. The table entries record where to modify the addresses. */
+   if (binLoad->fixed.header.inputCount > 0)
+   {
+       binLoad->inputPatch = (vx_binary_io_patch_info_s*)vxAllocateAndZeroMemory(binLoad->nInputs * sizeof(vx_binary_io_patch_info_s));
+   }
+
+   if (binLoad->fixed.header.outputCount > 0)
+   {
+       binLoad->outputPatch = (vx_binary_io_patch_info_s*)vxAllocateAndZeroMemory(binLoad->nOutputs * sizeof(vx_binary_io_patch_info_s));
+   }
+
+   /* find out network inputs/outputs count */
+   for (i = 0; i < binLoad->nOperations; i++)
+   {
+       vx_uint32 j = 0;
+       vx_int32 ioIndex = -1;
+       vx_binary_patch_info_s *patchData = VX_NULL;
+       vx_binary_operation_info_s *operation = &binLoad->operations[i];
+
+       for (j = 0; j < operation->counterOfPatches; j++)
+       {
+           patchData = &binLoad->patchData[operation->indexOfFirstPatch + j];
+           ioIndex = patchData->index;
+           if (ioIndex >= 0)
+           {
+               if (VX_BINARY_SOURCE_INPUT == patchData->sourceType)
+               {
+                   binLoad->inputPatch[ioIndex].count++;
+               }
+               else if (VX_BINARY_SOURCE_OUTPUT == patchData->sourceType)
+               {
+                   binLoad->outputPatch[ioIndex].count++;
+               }
+           }
+       }
+   }
+
+   /* allocte memory for inputs/outputs */
+   for (i = 0; i < binLoad->fixed.header.inputCount; i++)
+   {
+       if (binLoad->inputPatch[i].count > 0)
+       {
+           binLoad->inputPatch[i].references = (vx_uint32**)vxAllocateAndZeroMemory(binLoad->inputPatch[i].count * sizeof(vx_uint32*));
+           binLoad->inputPatch[i].offsets = (vx_uint32*)vxAllocateAndZeroMemory(binLoad->inputPatch[i].count * sizeof(vx_uint32));
+       }
+   }
+
+   for (i = 0; i < binLoad->fixed.header.outputCount; i++)
+   {
+       if (binLoad->outputPatch[i].count > 0)
+       {
+           binLoad->outputPatch[i].references = (vx_uint32**)vxAllocateAndZeroMemory(binLoad->outputPatch[i].count * sizeof(vx_uint32*));
+           binLoad->outputPatch[i].offsets = (vx_uint32*)vxAllocateAndZeroMemory(binLoad->outputPatch[i].count * sizeof(vx_uint32));
+       }
+   }
+
+   /* allocate memory for NN layer dump or SW operation */
+   binLoad->segmentsCount = vxoBinaryGraph_GetLayerCount(binLoad);
+   if (binLoad->segmentsCount > 0)
+   {
+       binLoad->segments = (vx_binary_segment_s*)vxAllocateAndZeroMemory(binLoad->segmentsCount * sizeof(vx_binary_segment_s));
+   }
+
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoBinaryGraph_LoadFromFile(
     vx_context context,
     vx_binary_loader_s **binaryLoad,
     gctCONST_STRING fileName
@@ -3516,11 +3596,11 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_LoadFile(
     vx_binary_loader_s *binLoad = VX_NULL;
     vx_status status = VX_SUCCESS;
     vx_uint32 readSize = 0;
-    vx_uint32 i = 0;
+    vx_bool fromFile = vx_false_e;
 #if LOAD_WHOLE_BINARY_TO_BUFFER
     gctUINT fileSize = 0;
 #endif
-    gcmHEADER_ARG("context=%p, binLoad=%p, fileName=%s", context, binLoad, fileName);
+    gcmHEADER_ARG("context=%p, binLoad=%p, fileName=%s", context, binaryLoad, fileName);
 
     vxmASSERT(context != VX_NULL);
     vxmASSERT(fileName != NULL);
@@ -3555,8 +3635,10 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_LoadFile(
         vxmONERROR(VX_ERROR_NO_MEMORY);
     }
     readSize = (vx_uint32)loadBinaryWhole(binLoad);
+    fromFile = vx_false_e;
 #else
     readSize = (vx_uint32)loadBinaryEntry(binLoad);
+    fromFile =  vx_true_e;
 #endif
     if (readSize <= 0)
     {
@@ -3568,72 +3650,11 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_LoadFile(
     reader.binLoad = binLoad;
 
     vxmONERROR(readBinFixed(&reader, binLoad));
-    vxmONERROR(readBinDynamic(&reader, binLoad));
+    vxmONERROR(readBinDynamic(&reader, binLoad, fromFile));
 
     closeReader(&reader);
 
-    /* Preprocess graph input/output table data. The table entries record where to modify the addresses. */
-    if (binLoad->fixed.header.inputCount > 0)
-    {
-        binLoad->inputPatch = (vx_binary_io_patch_info_s*)vxAllocateAndZeroMemory(binLoad->nInputs * sizeof(vx_binary_io_patch_info_s));
-    }
-
-    if (binLoad->fixed.header.outputCount > 0)
-    {
-        binLoad->outputPatch = (vx_binary_io_patch_info_s*)vxAllocateAndZeroMemory(binLoad->nOutputs * sizeof(vx_binary_io_patch_info_s));
-    }
-
-    /* find out network inputs/outputs count */
-    for (i = 0; i < binLoad->nOperations; i++)
-    {
-        vx_uint32 j = 0;
-        vx_int32 ioIndex = -1;
-        vx_binary_patch_info_s *patchData = VX_NULL;
-        vx_binary_operation_info_s *operation = &binLoad->operations[i];
-
-        for (j = 0; j < operation->counterOfPatches; j++)
-        {
-            patchData = &binLoad->patchData[operation->indexOfFirstPatch + j];
-            ioIndex = patchData->index;
-            if (ioIndex >= 0)
-            {
-                if (VX_BINARY_SOURCE_INPUT == patchData->sourceType)
-                {
-                    binLoad->inputPatch[ioIndex].count++;
-                }
-                else if (VX_BINARY_SOURCE_OUTPUT == patchData->sourceType)
-                {
-                    binLoad->outputPatch[ioIndex].count++;
-                }
-            }
-        }
-    }
-
-    /* allocte memory for inputs/outputs */
-    for (i = 0; i < binLoad->fixed.header.inputCount; i++)
-    {
-        if (binLoad->inputPatch[i].count > 0)
-        {
-            binLoad->inputPatch[i].references = (vx_uint32**)vxAllocateAndZeroMemory(binLoad->inputPatch[i].count * sizeof(vx_uint32*));
-            binLoad->inputPatch[i].offsets = (vx_uint32*)vxAllocateAndZeroMemory(binLoad->inputPatch[i].count * sizeof(vx_uint32));
-        }
-    }
-
-    for (i = 0; i < binLoad->fixed.header.outputCount; i++)
-    {
-        if (binLoad->outputPatch[i].count > 0)
-        {
-            binLoad->outputPatch[i].references = (vx_uint32**)vxAllocateAndZeroMemory(binLoad->outputPatch[i].count * sizeof(vx_uint32*));
-            binLoad->outputPatch[i].offsets = (vx_uint32*)vxAllocateAndZeroMemory(binLoad->outputPatch[i].count * sizeof(vx_uint32));
-        }
-    }
-
-    /* allocate memory for NN layer dump or SW operation */
-    binLoad->segmentsCount = vxoBinaryGraph_GetLayerCount(binLoad);
-    if (binLoad->segmentsCount > 0)
-    {
-        binLoad->segments = (vx_binary_segment_s*)vxAllocateAndZeroMemory(binLoad->segmentsCount * sizeof(vx_binary_segment_s));
-    }
+    vxmONERROR(vxoBinaryGraph_InitBinaryLoad(context, &binLoad));
 
     if (binLoad->dFile != VX_NULL)
     {
@@ -3654,13 +3675,95 @@ OnError:
 
     if (binLoad != NULL)
     {
-        vxoBinaryGraph_ReleaseFile(binLoad);
+        vxoBinaryGraph_ReleaseNBG(binLoad);
     }
     gcmFOOTER_ARG("%d", status);
     return status;
 }
 
-VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseFile(
+VX_PRIVATE_API vx_status vxoBinaryGraph_LoadFromPointer(
+    vx_context context,
+    vx_binary_loader_s **binaryLoad,
+    const char *pointer
+    )
+{
+    vx_binary_loader_s *binLoad = VX_NULL;
+    vx_status status = VX_SUCCESS;
+    vx_binary_reader_s reader;
+
+    gcmHEADER_ARG("context=%p, binLoad=%p, pointer=%s", context, binaryLoad, pointer);
+
+    binLoad = (vx_binary_loader_s*)vxAllocateAndZeroMemory(sizeof(vx_binary_loader_s));
+    if (VX_NULL == binLoad)
+    {
+        vxError("%s[%d]: fail to allocate memory for binary load\n", __FUNCTION__, __LINE__);
+        *binaryLoad = VX_NULL;
+        vxmONERROR(VX_ERROR_NO_MEMORY);
+    }
+    *binaryLoad = binLoad;
+    binLoad->context = context;
+
+    binLoad->binaryBuffer = (gctPOINTER)pointer;
+
+    openReader(&reader, binLoad->binaryBuffer, (512 << 20));
+    reader.binLoad = binLoad;
+
+    vxmONERROR(readBinFixed(&reader, binLoad));
+    vxmONERROR(readBinDynamic(&reader, binLoad, vx_false_e));
+
+    closeReader(&reader);
+
+    binLoad->dFile = VX_NULL;
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
+
+OnError:
+    vxError("fail to load binary from pointerto create graph\n");
+
+    if (binLoad != NULL)
+    {
+        vxoBinaryGraph_ReleaseNBG(binLoad);
+    }
+
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+VX_INTERNAL_API vx_status vxoBinaryGraph_LoadNBG(
+    vx_context context,
+    vx_binary_loader_s **binaryLoad,
+    const vx_char *type,
+    const vx_char *url
+    )
+{
+    vx_status status = VX_SUCCESS;
+    gcmHEADER_ARG("context=%p, binaryLoad=%p, type=%p, url=%p", context, binaryLoad, type, url);
+
+    if ((context == VX_NULL) || (binaryLoad == VX_NULL) || (type == VX_NULL) || (url == VX_NULL))
+    {
+        vxError("load binary network context/binaryLoad/type/url is NULL\n");
+        vxmONERROR(VX_ERROR_NOT_ALLOCATED);
+    }
+
+    if (gcoOS_StrCmp(type, VX_VIVANTE_IMPORT_KERNEL_FROM_FILE) == gcvSTATUS_OK)
+    {
+        vxmONERROR(vxoBinaryGraph_LoadFromFile(context, binaryLoad, url));
+    }
+    else if (gcoOS_StrCmp(type, VX_VIVANTE_IMPORT_KERNEL_FROM_POINTER) == gcvSTATUS_OK)
+    {
+        vxmONERROR(vxoBinaryGraph_LoadFromPointer(context, binaryLoad, url));
+    }
+    else
+    {
+        vxError("not support this type load NBG to create graph\n");
+    }
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseNBG(
     vx_binary_loader_s *binLoad
     )
 {
@@ -10091,7 +10194,7 @@ VX_INTERNAL_API void vxoBinaryGraph_ReleaseCache(
         if ((kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE) &&
             (binaryLoad != VX_NULL))
         {
-            vxoBinaryGraph_ReleaseFile(binaryLoad);
+            vxoBinaryGraph_ReleaseNBG(binaryLoad);
         }
     }
 
