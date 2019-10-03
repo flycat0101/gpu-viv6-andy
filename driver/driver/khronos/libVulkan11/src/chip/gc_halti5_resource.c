@@ -11010,7 +11010,7 @@ VkResult halti5_createBufferView(
 
     __VK_MEMZERO(chipBufv, sizeof(halti5_bufferView));
 
-    if (buf->createInfo.usage & (VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT))
+    if (buf->createInfo.usage & VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT)
     {
         __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, VK_NULL_HANDLE, bufv, gcvNULL, chipBufv->imgDesc));
     }
