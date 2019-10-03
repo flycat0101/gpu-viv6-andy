@@ -26873,7 +26873,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node 
             VXNNE_OPERATOR_TENSOR_STRIDE_SLICE,
             VX_NULL,
             vxnneOperation_TP_Deinitialize,
-            batchCount,
+            batch,
             0);
 
         vxnneLayer_SetOperation(
