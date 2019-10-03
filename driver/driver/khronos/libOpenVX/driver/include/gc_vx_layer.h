@@ -1813,7 +1813,7 @@ vxnne_deconvolution_reshuffle_operation_s, * vxnne_deconvolution_reshuffle_opera
 typedef struct _vxnne_deconvolution_layer_s
 {
     vxnne_layer_s                                   base;
-    vxnne_operation                                 operations[3];
+    vxnne_operation                                 operations[4];
     vxnne_deconvolution_operation_s                 deconvolution_sw_operation;
 
     vxnne_deconvolution_reshuffle_operation_s       deconvolution_sw1_reshuffle_operation;

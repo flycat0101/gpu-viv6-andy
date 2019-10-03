@@ -18916,13 +18916,16 @@ VX_PRIVATE_API vx_status vxnneExecuteSWDeConv_UpSample(struct _vxnne_operation_s
     vx_int32 output_item_size = vxnneGetTypeSize(output_format);
     vx_int32 s_w = 0, s_h = 0;
 
+    vx_int32 input_batch_offset = in_w * in_h * TENSOR_SIZE_INDEX(inputs, 2) * input_item_size *  operation->currBatchIndex;
+    vx_int32 output_batch_offset = out_w * out_h * conv_out_channels * output_item_size *  operation->currBatchIndex;
+
     vxoTensor_GetTensorBatchArrayViewMemory(inputs, 0, (gctPOINTER*)&input_ptr, VX_NULL);
     vxoTensor_GetTensorBatchArrayViewMemory(outputs, 0, (gctPOINTER*)&output_ptr, VX_NULL);
 
     for (b = 0; b < conv_out_channels; b++)
     {
-        vx_uint8_ptr output_base = output_ptr + b * out_w * out_h * output_item_size;
-        vx_uint8_ptr input_base = input_ptr + b * in_w * in_h * stride_w * stride_h * input_item_size;
+        vx_uint8_ptr output_base = output_ptr + b * out_w * out_h * output_item_size + output_batch_offset;
+        vx_uint8_ptr input_base = input_ptr + b * in_w * in_h * stride_w * stride_h * input_item_size + input_batch_offset;
 
         for (s_h = 0; s_h < stride_h; s_h++)
         {
@@ -19476,9 +19479,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
                   */
 
                  {kernel_reshuffle_width, kernel_reshuffle_height, kernel_batch, stride_w * stride_h * kernel_channel}, /* reshuffled_weights */
-                 {decov_output_w, decov_output_h, stride_w * stride_h * kernel_channel, 1}, /* sample_output */
+                 {decov_output_w, decov_output_h, stride_w * stride_h * kernel_channel, batchCount}, /* sample_output */
                  {1, 1, 1, kernel_batch * stride_w * stride_h}, /* reshuffled_bias */
-                 { decov_output_w * stride_w, decov_output_h * stride_h, kernel_channel, 1 }, /* upsampled_output */
+                 { decov_output_w * stride_w, decov_output_h * stride_h, kernel_channel, batchCount}, /* upsampled_output */
             };
             vx_tensor_create_params_t tensor_create_params;
 
@@ -19536,7 +19539,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
 
                 if (need_clip)
                 {
-                    tensor_create_params.num_of_dims = 3;
+                    tensor_create_params.num_of_dims = 4;
                     tensor_create_params.sizes = size[3];
                     sampled_output = vxoTensor_CreateTensor(context, node->graph, &tensor_create_params, vx_true_e);
                     if (sampled_output == VX_NULL)
