@@ -4288,6 +4288,7 @@ gckKERNEL_AllocateIntegerId(
     gctUINT32 pos;
     gctUINT32 n, i;
     gckOS os = database->os;
+    gctPOINTER * table = gcvNULL;
 
     gcmkHEADER_ARG("Database=%p Pointer=%p", Database, Pointer);
 
@@ -4295,7 +4296,6 @@ gckKERNEL_AllocateIntegerId(
 
     if (database->freeCount < 1)
     {
-        gctPOINTER * table = gcvNULL;
         gctUINT32 * bitmap = gcvNULL;
         gctUINT32 expand;
         gctUINT32 capacity;
