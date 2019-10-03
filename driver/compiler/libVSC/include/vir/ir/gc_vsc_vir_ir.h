@@ -5552,6 +5552,12 @@ VIR_Shader_AddString(
     OUT VIR_NameId *    Name
     );
 
+gctBOOL
+VIR_Shader_FindString(
+    IN  VIR_Shader *    Shader,
+    IN  gctCONST_STRING String
+    );
+
 VSC_ErrCode
 VIR_Shader_AddBuiltinType(
     IN  VIR_Shader *    Shader,

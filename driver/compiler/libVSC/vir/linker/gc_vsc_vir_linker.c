@@ -5806,7 +5806,7 @@ _InsertCallTexld(
     {
         specializationConst = &Context->libSpecializationConsts[i];
 
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(specializationConst->varName, paramName)) &&
+        if (gcmIS_SUCCESS(gcoOS_StrNCmp(specializationConst->varName, paramName, gcoOS_StrLen(specializationConst->varName, gcvNULL))) &&
             specializationConst->type == VSC_SHADER_DATA_TYPE_INTEGER_X4)
         {
             VIR_ConstVal    new_const_val;
@@ -5918,7 +5918,7 @@ _InsertCallTexldGather(
     {
         specializationConst = &Context->libSpecializationConsts[i];
 
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(specializationConst->varName, paramName)) &&
+        if (gcmIS_SUCCESS(gcoOS_StrNCmp(specializationConst->varName, paramName, gcoOS_StrLen(specializationConst->varName, gcvNULL))) &&
             specializationConst->type == VSC_SHADER_DATA_TYPE_INTEGER_X4)
         {
             VIR_ConstVal    new_const_val;
@@ -6042,7 +6042,7 @@ _InsertCallTexldGatherPCF(
     {
         specializationConst = &Context->libSpecializationConsts[i];
 
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(specializationConst->varName, paramName)) &&
+        if (gcmIS_SUCCESS(gcoOS_StrNCmp(specializationConst->varName, paramName, gcoOS_StrLen(specializationConst->varName, gcvNULL))) &&
             specializationConst->type == VSC_SHADER_DATA_TYPE_INTEGER_X4)
         {
             errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
@@ -6073,7 +6073,7 @@ _InsertCallTexldGatherPCF(
     {
         specializationConst = &Context->libSpecializationConsts[i];
 
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(specializationConst->varName, paramName)) &&
+        if (gcmIS_SUCCESS(gcoOS_StrNCmp(specializationConst->varName, paramName, gcoOS_StrLen(specializationConst->varName, gcvNULL))) &&
             specializationConst->type == VSC_SHADER_DATA_TYPE_INTEGER_X4)
         {
             VIR_ConstVal    new_const_val;

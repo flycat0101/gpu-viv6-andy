@@ -10943,6 +10943,7 @@ VSC_ErrCode __SpvEmitName(gcSPV spv, VIR_Shader * virShader)
     gctCHAR * name;
     VIR_NameId nameId;
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
+    gctUINT offset = 0;
 
     id = spv->operands[i++];
 
@@ -10952,16 +10953,21 @@ VSC_ErrCode __SpvEmitName(gcSPV spv, VIR_Shader * virShader)
         /* TO_DO, 64 bit pointer need handle for name */
         name = (gctCHAR*)*((gctUINTPTR_T*)(&(spv->operands[i++])));
 
-        /* TO_DO, if string size is not enough */
-        /* Don't cat base struct name. */
-        gcoOS_StrCopySafe(spv->virName, SPV_VIR_NAME_SIZE, name);
+        gcoOS_StrCopySafe(spv->virName, SPV_VIR_NAME_SIZE - 16, name);
 
-        VIR_Shader_AddString(virShader, spv->virName, &nameId);
+        if (VIR_Shader_FindString(virShader, spv->virName))
+        {
+            gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "%s#dup%d_%d", name, spv->operands[0], spv->operands[1]);
+            VIR_Shader_AddString(virShader, spv->virName, &nameId);
+        }
+        else
+        {
+            VIR_Shader_AddString(virShader, spv->virName, &nameId);
+        }
         SPV_SET_IDDESCRIPTOR_FIELD_NAME(spv, id, field, nameId);
     }
     else
     {
-        gctUINT offset = 0;
         name = (gctCHAR*)*((gctUINTPTR_T*)(&(spv->operands[i++])));
         if (gcmIS_SUCCESS(gcoOS_StrNCmp(name, SPV_DEFAULT_PARAM_NAME, SPV_DEFAULT_PARAM_LENGTH)))
         {
@@ -10975,7 +10981,15 @@ VSC_ErrCode __SpvEmitName(gcSPV spv, VIR_Shader * virShader)
         }
         else
         {
-            VIR_Shader_AddString(virShader, name, &nameId);
+            if (VIR_Shader_FindString(virShader, name))
+            {
+                gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "%s#dup%d", name, spv->operands[0]);
+                VIR_Shader_AddString(virShader, spv->virName, &nameId);
+            }
+            else
+            {
+                VIR_Shader_AddString(virShader, name, &nameId);
+            }
         }
         SPV_SET_IDDESCRIPTOR_NAME(spv, id, nameId);
     }
