@@ -1226,9 +1226,6 @@ vx_status vxoFC_NN_Trans_Initialize(
             batch,
             shaderExecutable));
 
-        if (status != VX_SUCCESS)
-            goto OnError;
-
         vxmONERROR(vxnneOperation_AddReference(&sh_op->base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
         vxmONERROR(vxnneOperation_AddReference(&sh_op->base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 

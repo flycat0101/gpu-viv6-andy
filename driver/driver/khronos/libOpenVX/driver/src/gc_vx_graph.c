@@ -84,7 +84,11 @@ VX_INTERNAL_CALLBACK_API void vxoGraph_Destructor(vx_reference ref)
 
     if(graph->parentGraph == VX_NULL)
     {
-        gcoVX_SwitchContext(graph->deviceID, &savedHardware, &savedHardwareType, &savedCoreIndex);
+        if (gcvSTATUS_OK != gcoVX_SwitchContext(graph->deviceID, &savedHardware, &savedHardwareType, &savedCoreIndex))
+        {
+            gcmFOOTER_NO();
+            return;
+        }
     }
 
     while (graph->nodeCount > 0)
@@ -434,6 +438,8 @@ VX_INTERNAL_API void vxoGraph_GenerateAllNodeIndexTable(vx_graph graph)
     vx_node nextNode = VX_NULL;
     vx_uint32 childIndex = 0;
     vx_node childNode = VX_NULL;
+
+    if (graph->headNodeCount == 0) return;
 
     for (index = 0; index < graph->headNodeCount; index++)
     {
@@ -4089,7 +4095,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                 outputSize = TENSOR_SIZE_INDEX(opInfo.output, 3) * TENSOR_STRIDE_INDEX(opInfo.output, 3);
             }
 
-            vxInfo("%3d %s [%3d %3d %3d %3d 0x%p(0x%p, 0x%p) -> %3d %3d %3d %3d 0x%p(0x%p, 0x%p)] (k=%d i=%d O=%d)",
+            vxInfo("%3d %s [%3d %3d %3d %3d 0x%p(0x%p, %u) -> %3d %3d %3d %3d 0x%p(0x%p, %u)] (k=%d i=%d O=%d)",
                         i,
                         opTarget[graph->layer->operations[i]->target],
                         opInfo.input  ? TENSOR_SIZE_INDEX(opInfo.input, 0) : 0,
@@ -4405,7 +4411,7 @@ VX_INTERNAL_API vx_status vxoGraph_AllocateContiguousMemory(vx_graph graph)
         context->SumTotalKernelBufferSize += (opInfo.weightsBiases ?  GetEsitimateWBSize(opInfo.weightsBiases) : 0);
     }
 
-    context->Node = (gcsSURF_NODE_PTR *)vxAllocate(sizeof(gcsSURF_NODE));
+    context->Node = (gcsSURF_NODE_PTR *)vxAllocate(sizeof(gcsSURF_NODE_PTR));
     context->Physical = (gctUINT32 *)vxAllocate(sizeof(gctUINT32));
     context->Logical = (vx_uint8_ptr *)vxAllocate(sizeof(vx_uint8_ptr));
     SumTotalKernelBufferSize = context->SumTotalKernelBufferSize;
@@ -4976,11 +4982,6 @@ VX_INTERNAL_API vx_status vxoMultiGPU_SplitOperation(
     {
         vxnne_tp_operation dstTpOP = &node->mGpuTpOperation[node->mGpuTpOpCnt];
         vxnne_tp_operation srcTpOp = (vxnne_tp_operation)srcOperation;
-        if (VX_NULL == dstTpOP)
-        {
-            vxmASSERT(0);
-            vxmONERROR(VX_ERROR_NO_MEMORY);
-        }
 
         vxoMultiGPU_CopyOperationBase(srcOperation, &dstTpOP->base);
 
@@ -4995,12 +4996,6 @@ VX_INTERNAL_API vx_status vxoMultiGPU_SplitOperation(
     {
         vxnne_convolution_relu_pooling_operation convOp = (vxnne_convolution_relu_pooling_operation)srcOperation;
         vxnne_convolution_relu_pooling_operation dstNNOP = &node->mGpuNNOperation[node->mGpuNNOpCnt];
-        if (VX_NULL == dstNNOP)
-        {
-            vxmASSERT(0);
-            vxmONERROR(VX_ERROR_NO_MEMORY);
-        }
-
         vxoMultiGPU_CopyOperationBase(srcOperation, &dstNNOP->base);
 
         dstNNOP->inputs = VX_NULL;
@@ -5032,8 +5027,6 @@ VX_INTERNAL_API vx_status vxoMultiGPU_SplitOperation(
         vxmASSERT(0);
         vxError("mutliple GPU can't support this operation type: %d\n", srcOperation->target);
     }
-
-OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -5654,7 +5647,7 @@ VX_INTERNAL_API vx_status vxoGraphParallel_AnalyzeOperationsBefore(vx_graph grap
 
         if (operation->childOpNum == 0)
         {
-            for (j = ecount-1; (vx_int32)j >= 0; j--)
+            for (j = ecount-1; j >= 0; j--)
             {
                 if (operation->absoluteOperationID > entrys[j]->absoluteOperationID)
                     break;
@@ -7615,11 +7608,11 @@ VX_PRIVATE_API vx_status vxoGraph_PostMetaFormatData(vx_node node, vx_reference 
     case VX_TYPE_REMAP:
         {
             vx_remap remap = (vx_remap)paramRef;
-            if (remap->srcWidth != metaFormat->u.remapInfo.src_width || remap->srcWidth != metaFormat->u.remapInfo.src_height)
+            if (remap->srcWidth != metaFormat->u.remapInfo.src_width || remap->srcHeight != metaFormat->u.remapInfo.src_height)
             {
                 vxAddLogEntry(&node->base, VX_ERROR_INVALID_DIMENSION,
                     "Node: %s: parameter[%u] has an invalid source dimention %ux%u\n",
-                    node->kernel->name, paramIndex);
+                    node->kernel->name, paramIndex, remap->srcWidth, remap->srcHeight);
                 gcmFOOTER_ARG("%d", VX_ERROR_INVALID_DIMENSION);
                 return VX_ERROR_INVALID_DIMENSION;
             }
@@ -10893,6 +10886,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxProcessGraph(vx_graph graph)
 #endif
 
     status = vxoGraph_Process(graph);
+    if (status != VX_SUCCESS) goto OnError;
 
     if(graph->parentGraph == gcvNULL)
     {
@@ -11029,11 +11023,6 @@ OnError:
     if (input_refs)
     {
         vxFree(input_refs);
-    }
-
-    if (output_refs)
-    {
-        vxFree(output_refs);
     }
 
     return status;

@@ -51,8 +51,9 @@ EXTERN_C_BEGIN
     if(context->options.enableGraphDump)\
     {\
         char logName[100] = {0};\
+        vx_uint32 offset = 0; \
         const char *ptr = __FUNCTION__ + sizeof("vxoGraphOptimization_") - 1;\
-        sprintf(logName,"%s_%d_%s_%s", "after", optPhase++, ptr,"graph.json");    \
+        gcoOS_PrintStrSafe(logName, sizeof(logName), &offset, "%s_%d_%s_%s", "after", optPhase++, ptr,"graph.json");    \
         vxoGraphOptimization_dumpTopology(graph, logName);\
     }\
 }

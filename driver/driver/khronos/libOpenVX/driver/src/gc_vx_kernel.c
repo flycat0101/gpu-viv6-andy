@@ -1283,11 +1283,11 @@ gcfVX_LoadKernelArgValues(
             }
             else
             {
-                vx_reference ref = *(vx_reference*) Arg->data;
+                vx_reference *ref = (vx_reference*) Arg->data;
 
-                if(Arg->isVivArray == vx_true_e && ref && vxoReference_IsValidAndSpecific(ref, VX_TYPE_ARRAY))
+                if(Arg->isVivArray == vx_true_e && ref && *ref && vxoReference_IsValidAndSpecific(*ref, VX_TYPE_ARRAY))
                 {
-                    vx_array arrayValue = (vx_array)ref;
+                    vx_array arrayValue = (vx_array)(*ref);
                     gctUINT32 address = arrayValue->memory.physicals[0] + batchID * arrayValue->memory.strides[0][1];
 
                     gcmONERROR(gcfVX_SetUniformValue(Arg->uniform,
@@ -1722,7 +1722,7 @@ gcfVX_LoadKernelArgValues(
                     datas[index] = (gctINT *) &gpuPhysicals[index];
                 }
 
-                gcfVX_SetUniformValueCombinedMode(Arg->uniform, length, datas, gpuCount);
+                gcmONERROR(gcfVX_SetUniformValueCombinedMode(Arg->uniform, length, datas, gpuCount));
             }
         }
     }
@@ -2040,9 +2040,7 @@ gcfVX_LoadKernelArgValues(
                     gctPOINTER pointer= gcvNULL;
                     gctSIZE_T i, elemSize, numElem, bytes;
 
-                    elemSize =  ((format == gcSL_INT8)   ? 1 :
-                                 (format == gcSL_UINT8)  ? 1 :
-                                 (format == gcSL_INT16)  ? 2 : 2);
+                    elemSize =  (((format == gcSL_INT8) || (format == gcSL_UINT8)) ? 1 : 2);
 
                     signMask =  ((format == gcSL_INT8)   ? 0x80 :
                                  (format == gcSL_INT16)  ? 0x8000 : 0);

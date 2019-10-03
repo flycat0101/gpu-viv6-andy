@@ -206,6 +206,11 @@ vx_status vxoTensorCopyOperationSH_Initialize(
     sizes[3]   = 1;
 
     input     = vxoTensor_ReshapeTensor(src, sizes, dimCount0);
+    if (input == NULL)
+    {
+        vxError("%s: out-of-memory\n", __FUNCTION__);
+        goto OnError;
+    }
 
     sizes[0]   = gcmMAX(gcmMAX(width1, height1), depth1);
     sizes[1]   = gcmMAX(gcmMIN(width1, height1), gcmMIN(gcmMAX(width1, height1), depth1));
@@ -213,12 +218,13 @@ vx_status vxoTensorCopyOperationSH_Initialize(
     sizes[3]   = 1;
 
     output     = vxoTensor_ReshapeTensor(dst, sizes, dimCount1);
+    if (output == NULL)
+    {
+        vxError("%s: out-of-memory\n", __FUNCTION__);
+        goto OnError;
+    }
 
     shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
-
-    if (input) vxoTensor_ReleaseTensor(&input);
-    if (output) vxoTensor_ReleaseTensor(&output);
-
     if (!shaderExecutable)
     {
         vxmONERROR(VX_FAILURE);
@@ -239,6 +245,8 @@ vx_status vxoTensorCopyOperationSH_Initialize(
     vxnneOperation_AddReference(&operation->base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
 OnError:
+    if (input) vxoTensor_ReleaseTensor(&input);
+    if (output) vxoTensor_ReleaseTensor(&output);
     return status;
 }
 

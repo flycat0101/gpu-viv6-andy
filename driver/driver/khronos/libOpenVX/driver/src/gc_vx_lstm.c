@@ -6660,7 +6660,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRUUnit_Initializer(vx_node node, con
         {
             status = VX_ERROR_NO_MEMORY;
             gcmPRINT("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
-            goto exit;
+            return status;
         }
 
         gcoOS_ZeroMemory(gru_layer, sizeof(vxnne_gru_unit_s));
@@ -6708,14 +6708,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRUUnit_Initializer(vx_node node, con
     }
 
     return VX_SUCCESS;
-
-exit:
-    if (gru_layer)
-    {
-        gcoOS_Free(VX_NULL, gru_layer);
-    }
-
-    return status;
 }
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_GRUUnit_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
@@ -6840,7 +6832,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMUnit_Initializer(vx_node node
         {
             status = VX_ERROR_NO_MEMORY;
             gcmPRINT("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
-            goto exit;
+            return status;
         }
 
         gcoOS_ZeroMemory(convlstm_layer, sizeof(vxnne_convlstm_unit_s));
@@ -6891,14 +6883,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMUnit_Initializer(vx_node node
     }
 
     return VX_SUCCESS;
-
-exit:
-    if (convlstm_layer)
-    {
-        gcoOS_Free(VX_NULL, convlstm_layer);
-    }
-
-    return status;
 }
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_ConvLSTMUnit_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)

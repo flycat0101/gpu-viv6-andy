@@ -348,12 +348,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if(programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -520,12 +521,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if(programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -930,12 +932,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if(programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -1067,7 +1070,7 @@ vxnne_shader_executable vxnneGetGPUEmbeddingLUTShaderExecutable(
         }
 
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 6);
-        if (!shaderExecutable) goto OnError;
+        if (status != VX_SUCCESS) goto OnError;
     }
     else if((valueFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
             (valueFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32))
@@ -1100,12 +1103,13 @@ OnError:
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if(programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -1359,12 +1363,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if(programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -1542,12 +1547,13 @@ OnError:
     if (cycle) vxReleaseScalar(&cycle);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if(programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -1862,7 +1868,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
                         if (!shaderExecutable) goto OnError;
 
                         status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                        if (!shaderExecutable) goto OnError;
+                        if (status != VX_SUCCESS) goto OnError;
                     }
                     else
                         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4S", borderMode);
@@ -2018,12 +2024,13 @@ OnError:
     if (cycle) vxReleaseScalar(&cycle);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if(programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -2541,12 +2548,13 @@ OnError:
     if (outputHeight) vxReleaseScalar(&outputHeight);
     if (heightDiff) vxReleaseScalar(&heightDiff);
 
+#if !gcdUSE_VXC_BINARY
     if(programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -2706,12 +2714,13 @@ OnError:
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -2948,12 +2957,13 @@ OnError:
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -3005,10 +3015,6 @@ vxnne_shader_executable vxnneGetGPUFloorShaderExecutable(
     if (inputFormat == VX_TYPE_FLOAT16)
     {
         borderMode->constant_value.S16 = 0;
-    }
-    else if (inputFormat == VX_TYPE_UINT8)
-    {
-        borderMode->constant_value.U8 = 0;
     }
     else if (inputFormat == VX_TYPE_FLOAT32)
     {
@@ -3094,12 +3100,13 @@ OnError:
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -3524,12 +3531,13 @@ OnError:
     if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -3752,12 +3760,13 @@ OnError:
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -3887,12 +3896,13 @@ OnError:
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -4026,12 +4036,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 
@@ -4250,11 +4261,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -4459,12 +4472,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -4846,12 +4860,13 @@ OnError:
     if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -5069,12 +5084,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -5225,11 +5241,13 @@ OnError:
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
     if(scaleX_s) vxReleaseScalar(&scaleX_s);
     if(scaleY_s) vxReleaseScalar(&scaleY_s);
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -5361,11 +5379,13 @@ OnError:
     if(zpIn) vxReleaseScalar(&zpIn);
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -5528,11 +5548,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
     if (scale_s) vxReleaseScalar(&scale_s);
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -5649,11 +5671,13 @@ vxnne_shader_executable vxnneGetGPUTensorReduceDivShaderExecutable(
 OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -5932,11 +5956,13 @@ OnError:
     if(program) vxReleaseProgram(&program);
     if(shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -6359,12 +6385,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -6746,12 +6773,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     return VX_NULL;
 }
 
@@ -6899,12 +6927,13 @@ OnError:
     if (proj_clip) vxReleaseScalar(&proj_clip);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     return VX_NULL;
 }
 
@@ -7076,12 +7105,13 @@ OnError:
     if (blockw) vxReleaseScalar(&blockw);
     if (blockh) vxReleaseScalar(&blockh);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -7262,12 +7292,13 @@ OnError:
     if (padX) vxReleaseScalar(&padX);
     if (padY) vxReleaseScalar(&padY);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -7399,12 +7430,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -7547,11 +7579,13 @@ OnError:
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -7683,12 +7717,13 @@ OnError:
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -7825,11 +7860,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
+#endif
 
     gcmFOOTER_NO();
     return VX_NULL;
@@ -7982,12 +8019,13 @@ OnError:
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
-
+#endif
     gcmFOOTER_NO();
     return VX_NULL;
 }
@@ -8192,11 +8230,13 @@ OnError:
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
+#endif
 
     gcmFOOTER_NO();
     return VX_NULL;
@@ -8689,11 +8729,13 @@ OnError:
     if (cycle) vxReleaseScalar(&cycle);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if(programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
+#endif
 
     gcmFOOTER_NO();
     return VX_NULL;
@@ -9013,11 +9055,13 @@ OnError:
     if (inputHeight) vxReleaseScalar(&inputHeight);
     if (heightDiff) vxReleaseScalar(&heightDiff);
 
+#if !gcdUSE_VXC_BINARY
     if(programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
+#endif
 
     gcmFOOTER_NO();
     return VX_NULL;

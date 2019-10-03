@@ -103,6 +103,9 @@ OnError:
     if (pFile)
         fclose(pFile);
 
+    if (programSource)
+        vxFree(programSource);
+
     gcmFOOTER_NO();
     return NULL;
 }
@@ -505,6 +508,7 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
     }
     else if (inputFormat != outputFormat)
     {
+        vx_uint32 offset = 0;
         char kernelName[1024];
         vx_uint32 uniExtact8Bin_2x8[16] = {
             0x33333333, // TCfg
@@ -546,16 +550,16 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
         switch (inputFormat)
         {
         case VX_TYPE_FLOAT16:
-            sprintf(kernelName, "_F16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_F16");
             break;
         case VX_TYPE_INT8:
-            sprintf(kernelName, "_I8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I8");
             break;
         case VX_TYPE_UINT8:
-            sprintf(kernelName, "_U8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_U8");
             break;
         case VX_TYPE_INT16:
-            sprintf(kernelName, "_I16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I16");
             break;
         default:
             break;
@@ -564,27 +568,27 @@ vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
         switch (outputFormat)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "toF16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toF16" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "toI8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI8" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "toU8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toU8" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "toI16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI16" );
             break;
         default:
             break;
         }
 
         if (axis == 0)
-            strcat(kernelName, "_Axis0" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Axis0" );
 
         if (useImage2DFlag)
         {
-            strcat(kernelName, "_2D" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_2D" );
 
             execution_parameters.workDim             = 2;
             execution_parameters.globalWorkScale[0]  = 8;
@@ -1904,6 +1908,7 @@ vxnne_shader_executable vxnneGetFloorShaderExecutable(
     }
 
     {
+        vx_uint32 offset = 0;
         char subKernelName[64];
         vx_uint32 uniConvertFstFp16Fp32_4x4[16] = {
             0x01010101, // TCfg
@@ -1935,20 +1940,20 @@ vxnne_shader_executable vxnneGetFloorShaderExecutable(
 
         status = VX_SUCCESS;
 
-        sprintf(subKernelName, "_");
+        gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "_");
         switch (inputFormat)
         {
         case VX_TYPE_FLOAT16:
-            strcat(subKernelName, "F16");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "F16");
             break;
         case VX_TYPE_INT8:
-            strcat(subKernelName, "I8");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "I8");
             break;
         case VX_TYPE_UINT8:
-            strcat(subKernelName, "U8");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "U8");
             break;
         case VX_TYPE_INT16:
-            strcat(subKernelName, "I16");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "I16");
             break;
         default:
             break;
@@ -1956,23 +1961,23 @@ vxnne_shader_executable vxnneGetFloorShaderExecutable(
         switch (outputFormat)
         {
         case VX_TYPE_FLOAT16:
-            strcat(subKernelName, "toF16");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "toF16");
             break;
         case VX_TYPE_INT8:
-            strcat(subKernelName, "toI8");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "toI8");
             break;
         case VX_TYPE_UINT8:
-            strcat(subKernelName, "toU8");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "toU8");
             break;
         case VX_TYPE_INT16:
-            strcat(subKernelName, "toI16");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "toI16");
             break;
         default:
             break;
         }
         if (useImage2DFlag)
         {
-            strcat(subKernelName, "_2D");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "_2D");
         }
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, subKernelName, borderMode);
             if (!shaderExecutable) goto OnError;
@@ -3857,7 +3862,7 @@ vxnne_shader_executable vxnneGetEmbeddingLUTShaderExecutable(
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvert3rdUint8SubZpToFp32_4x4", 1, uniConvert3rdUint8SubZpToFp32_4x4);
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvert4thUint8SubZpToFp32_4x4", 1, uniConvert4thUint8SubZpToFp32_4x4);
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvertInt32toUint8_2x8", 1, uniConvertInt32toUint8_2x8);
-            if (!shaderExecutable) goto OnError;
+            if (status != VX_SUCCESS) goto OnError;
         }
         else if (valueFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
         {
@@ -13067,11 +13072,13 @@ OnError:
     if (padYTOP_s) vxReleaseScalar(&padYTOP_s);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
+#if !gcdUSE_VXC_BINARY
     if (programSources)
     {
         vxFree(programSources);
         programSources = NULL;
     }
+#endif
 
     gcmFOOTER_NO();
     return VX_NULL;
@@ -15105,6 +15112,7 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
 
         vx_int32 padding_xy[2] = {padding_x, padding_y};
         vx_int32 strideXY[]    = {stride_x, stride_y};
+        vx_uint32 offset = 0;
         vx_bool   set_order_uniform      = vx_false_e;
         vx_bool   set_order_uniform_u8   = vx_false_e;
         execution_parameters.workDim             = 3;
@@ -15119,43 +15127,43 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             {
                 if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_k3_fast)
                 {
-                    sprintf(kernelName, "_Integer16_3_S1");
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_3_S1");
                     set_order_uniform = vx_true_e;
                 }
                 else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_k3_fast)
                 {
-                    sprintf(kernelName, "_Integer16_3_S2");
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_3_S2");
                     set_order_uniform = vx_true_e;
                 }
                 else
                 {
-                sprintf(kernelName, "_Integer16_%d", kernelSize_x);
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_%d", kernelSize_x);
                 }
             }
             else if (kernelSize_x > 16 && useImage2DFlag)
             {
-                sprintf(kernelName, "_Integer16_Generic");
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_Generic");
             }
             else if (kernelSize_x < 17 && !useImage2DFlag && dilation_x == 1 && dilation_y == 1)
             {
                 if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_k3_fast)
                 {
-                    sprintf(kernelName, "_Tensor_Integer16_3_S1");
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_3_S1");
                     set_order_uniform = vx_true_e;
                 }
                 else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_k3_fast)
                 {
-                    sprintf(kernelName, "_Tensor_Integer16_3_S2");
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_3_S2");
                     set_order_uniform = vx_true_e;
                 }
                 else
                 {
-                sprintf(kernelName, "_Tensor_Integer16_%d", kernelSize_x);
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_%d", kernelSize_x);
                 }
             }
             else
             {
-                sprintf(kernelName, "_Tensor_Integer16_Generic");
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_Generic");
             }
 
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, kernelName, borderMode);
@@ -15168,43 +15176,43 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             {
                 if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_k3_fast)
                 {
-                    sprintf(kernelName, "_Integer8_3_S1");
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer8_3_S1");
                     set_order_uniform_u8 = vx_true_e;
                 }
                 else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_k3_fast)
                 {
-                    sprintf(kernelName, "_Integer8_3_S2");
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer8_3_S2");
                     set_order_uniform_u8 = vx_true_e;
                 }
                 else
                 {
-                    sprintf(kernelName, "_Integer8_%d", kernelSize_x);
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer8_%d", kernelSize_x);
                 }
             }
             else if (kernelSize_x > 16 && useImage2DFlag)
             {
-                sprintf(kernelName, "_Integer8_Generic");
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer8_Generic");
             }
             else if (kernelSize_x < 17 && !useImage2DFlag && dilation_x == 1 && dilation_y == 1)
             {
                 if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_k3_fast)
                 {
-                    sprintf(kernelName, "_Tensor_Integer8_3_S1");
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_3_S1");
                     set_order_uniform_u8 = vx_true_e;
                 }
                 else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_k3_fast)
                 {
-                    sprintf(kernelName, "_Tensor_Integer8_3_S2");
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_3_S2");
                     set_order_uniform_u8 = vx_true_e;
                 }
                 else
                 {
-                sprintf(kernelName, "_Tensor_Integer8_%d", kernelSize_x);
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_%d", kernelSize_x);
                 }
             }
             else
             {
-                sprintf(kernelName, "_Tensor_Integer8_Generic");
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_Generic");
             }
 
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, kernelName, borderMode);
@@ -17024,6 +17032,7 @@ vxnne_shader_executable vxnneL2NormSumScaleShaderExecutable(
     }
     else if (srcFormat != dstFormat)
     {
+        vx_uint32 offset = 0;
         vx_float32 IntergerScale = inputScale;
         vx_float32 output_ZP      = (vx_float32)outputZP;
         char kernelName[1024];
@@ -17072,16 +17081,16 @@ vxnne_shader_executable vxnneL2NormSumScaleShaderExecutable(
         switch (srcFormat)
         {
         case VX_TYPE_FLOAT16:
-            sprintf(kernelName, "_Fp16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Fp16");
             break;
         case VX_TYPE_INT8:
-            sprintf(kernelName, "_Int8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Int8");
             break;
         case VX_TYPE_UINT8:
-            sprintf(kernelName, "_UInt8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_UInt8");
             break;
         case VX_TYPE_INT16:
-            sprintf(kernelName, "_Int16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Int16");
             break;
         default:
             break;
@@ -17090,16 +17099,16 @@ vxnne_shader_executable vxnneL2NormSumScaleShaderExecutable(
         switch (dstFormat)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "toFp16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toFp16" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "toInt8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toInt8" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "toUInt8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toUInt8" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "toInt16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toInt16" );
             break;
         default:
             break;
@@ -22295,6 +22304,7 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "widthIter", 1, &widthIter);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "widthRes", 1, &widthRes);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_depth", 1, &input_depth);
+        if (status != VX_SUCCESS) goto OnError;
     }
 
     status = vxnneShaderExecutable_GetMaxWorkGroupSize(shaderExecutable, &maxWorkGroupSize);
@@ -25131,6 +25141,7 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
     }
     else
     {
+        vx_uint32 offset = 0;
         char kernelName[1024];
         vx_uint32 uniExtact8Bin_2x8[16] = {
             0x33333333, // TCfg
@@ -25172,16 +25183,16 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
         switch (input0_format)
         {
         case VX_TYPE_FLOAT16:
-            sprintf(kernelName, "_Fp16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Fp16");
             break;
         case VX_TYPE_INT8:
-            sprintf(kernelName, "_Int8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Int8");
             break;
         case VX_TYPE_UINT8:
-            sprintf(kernelName, "_UInt8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_UInt8");
             break;
         case VX_TYPE_INT16:
-            sprintf(kernelName, "_Int16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Int16");
             break;
         default:
             break;
@@ -25191,13 +25202,13 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
         {
         case VX_TENSOR_OP_ADD:
         case VX_TENSOR_OP_SUB:
-            strcat(kernelName, "Add" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Add" );
             break;
         case VX_TENSOR_OP_MUL:
-            strcat(kernelName, "Mul" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Mul" );
             break;
         case VX_TENSOR_OP_DIV:
-            strcat(kernelName, "Div" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Div" );
             break;
         default:
             break;
@@ -25206,16 +25217,16 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
         switch (input1_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "Fp16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Fp16" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "Int8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Int8" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "UInt8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "UInt8" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "Int16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Int16" );
             break;
         default:
             break;
@@ -25224,16 +25235,16 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
         switch (output_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "toFp16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toFp16" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "toInt8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toInt8" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "toUInt8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toUInt8" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "toInt16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toInt16" );
             break;
         default:
             break;
@@ -25244,13 +25255,13 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
             switch (policyEnum)
             {
             case VX_CONVERT_POLICY_SATURATE:
-                strcat(kernelName, "_Sat_Z_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Sat_Z_func" );
                 break;
             case VX_CONVERT_POLICY_WRAP:
-                strcat(kernelName, "_Warp_Z_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Warp_Z_func" );
                 break;
             default:
-                strcat(kernelName, "_Sat_Z_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Sat_Z_func" );
                 break;
             }
         }
@@ -25259,13 +25270,13 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
             switch (policyEnum)
             {
             case VX_CONVERT_POLICY_SATURATE:
-                strcat(kernelName, "_Sat_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Sat_func" );
                 break;
             case VX_CONVERT_POLICY_WRAP:
-                strcat(kernelName, "_Warp_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Warp_func" );
                 break;
             default:
-                strcat(kernelName, "_Sat_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Sat_func" );
                 break;
             }
         }
@@ -25654,6 +25665,7 @@ vxnne_shader_executable vxnneGetTensorMulShaderExecutable(
     }
     else
     {
+        vx_uint32 offset = 0;
         char kernelName[1024];
         vx_uint32 uniExtact8Bin_2x8[16] = {
             0x33333333, // TCfg
@@ -25695,16 +25707,16 @@ vxnne_shader_executable vxnneGetTensorMulShaderExecutable(
         switch (input0_format)
         {
         case VX_TYPE_FLOAT16:
-            sprintf(kernelName, "_Fp16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Fp16");
             break;
         case VX_TYPE_INT8:
-            sprintf(kernelName, "_Int8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Int8");
             break;
         case VX_TYPE_UINT8:
-            sprintf(kernelName, "_UInt8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_UInt8");
             break;
         case VX_TYPE_INT16:
-            sprintf(kernelName, "_Int16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Int16");
             break;
         default:
             break;
@@ -25714,13 +25726,13 @@ vxnne_shader_executable vxnneGetTensorMulShaderExecutable(
         {
         case VX_TENSOR_OP_ADD:
         case VX_TENSOR_OP_SUB:
-            strcat(kernelName, "Add" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Add" );
             break;
         case VX_TENSOR_OP_MUL:
-            strcat(kernelName, "Mul" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Mul" );
             break;
         case VX_TENSOR_OP_DIV:
-            strcat(kernelName, "Div" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Div" );
             break;
         default:
             break;
@@ -25729,16 +25741,16 @@ vxnne_shader_executable vxnneGetTensorMulShaderExecutable(
         switch (input1_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "Fp16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Fp16" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "Int8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Int8" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "UInt8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "UInt8" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "Int16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Int16" );
             break;
         default:
             break;
@@ -25747,16 +25759,16 @@ vxnne_shader_executable vxnneGetTensorMulShaderExecutable(
         switch (output_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "toFp16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toFp16" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "toInt8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toInt8" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "toUInt8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toUInt8" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "toInt16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toInt16" );
             break;
         default:
             break;
@@ -25765,13 +25777,13 @@ vxnne_shader_executable vxnneGetTensorMulShaderExecutable(
         switch (policyEnum)
         {
         case VX_CONVERT_POLICY_SATURATE:
-            strcat(kernelName, "_Sat" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Sat" );
             break;
         case VX_CONVERT_POLICY_WRAP:
-            strcat(kernelName, "_Warp" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Warp" );
             break;
         default:
-            strcat(kernelName, "_Sat" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Sat" );
             break;
         }
 
@@ -25780,13 +25792,13 @@ vxnne_shader_executable vxnneGetTensorMulShaderExecutable(
             switch (roundingEnum)
             {
             case VX_ROUND_POLICY_TO_ZERO:
-                strcat(kernelName, "_RTZ_Z_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_RTZ_Z_func" );
                 break;
             case VX_ROUND_POLICY_TO_NEAREST_EVEN:
-                strcat(kernelName, "_RTE_Z_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_RTE_Z_func" );
                 break;
             default:
-                strcat(kernelName, "_RTE_Z_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_RTE_Z_func" );
                 break;
             }
         }
@@ -25795,13 +25807,13 @@ vxnne_shader_executable vxnneGetTensorMulShaderExecutable(
             switch (roundingEnum)
             {
             case VX_ROUND_POLICY_TO_ZERO:
-                strcat(kernelName, "_RTZ_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_RTZ_func" );
                 break;
             case VX_ROUND_POLICY_TO_NEAREST_EVEN:
-                strcat(kernelName, "_RTE_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_RTE_func" );
                 break;
             default:
-                strcat(kernelName, "_RTE_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_RTE_func" );
                 break;
             }
         }
@@ -26135,6 +26147,7 @@ vxnne_shader_executable vxnneGetTensorDivShaderExecutable(
     }
 
     {
+        vx_uint32 offset = 0;
         char kernelName[1024];
         vx_uint32 uniExtact8Bin_2x8[16] = {
             0x33333333, // TCfg
@@ -26176,16 +26189,16 @@ vxnne_shader_executable vxnneGetTensorDivShaderExecutable(
         switch (input0_format)
         {
         case VX_TYPE_FLOAT16:
-            sprintf(kernelName, "_Fp16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Fp16");
             break;
         case VX_TYPE_INT8:
-            sprintf(kernelName, "_Int8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Int8");
             break;
         case VX_TYPE_UINT8:
-            sprintf(kernelName, "_UInt8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_UInt8");
             break;
         case VX_TYPE_INT16:
-            sprintf(kernelName, "_Int16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Int16");
             break;
         default:
             break;
@@ -26196,16 +26209,16 @@ vxnne_shader_executable vxnneGetTensorDivShaderExecutable(
         switch (input1_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "Fp16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Fp16" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "Int8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Int8" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "UInt8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "UInt8" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "Int16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Int16" );
             break;
         default:
             break;
@@ -26214,16 +26227,16 @@ vxnne_shader_executable vxnneGetTensorDivShaderExecutable(
         switch (output_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "toFp16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toFp16" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "toInt8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toInt8" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "toUInt8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toUInt8" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "toInt16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toInt16" );
             break;
         default:
             break;
@@ -26234,10 +26247,10 @@ vxnne_shader_executable vxnneGetTensorDivShaderExecutable(
             switch (policyEnum)
             {
             case VX_CONVERT_POLICY_SATURATE:
-                strcat(kernelName, "_Sat_Z0_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Sat_Z0_func" );
                 break;
             case VX_CONVERT_POLICY_WRAP:
-                strcat(kernelName, "_Warp_Z0_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Warp_Z0_func" );
                 break;
             default:
                 break;
@@ -26248,10 +26261,10 @@ vxnne_shader_executable vxnneGetTensorDivShaderExecutable(
             switch (policyEnum)
             {
             case VX_CONVERT_POLICY_SATURATE:
-                strcat(kernelName, "_Sat_Z1_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Sat_Z1_func" );
                 break;
             case VX_CONVERT_POLICY_WRAP:
-                strcat(kernelName, "_Warp_Z1_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Warp_Z1_func" );
                 break;
             default:
                 break;
@@ -26262,10 +26275,10 @@ vxnne_shader_executable vxnneGetTensorDivShaderExecutable(
             switch (policyEnum)
             {
             case VX_CONVERT_POLICY_SATURATE:
-                strcat(kernelName, "_Sat_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Sat_func" );
                 break;
             case VX_CONVERT_POLICY_WRAP:
-                strcat(kernelName, "_Warp_func" );
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Warp_func" );
                 break;
             default:
                 break;
@@ -26633,21 +26646,22 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
     if(VX_SUCCESS == status)
     {
         char subKernelName[64];
+        vx_uint32 offset = 0;
 
-        sprintf(subKernelName, "%d_", last_axis);
+        gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "%d_", last_axis);
         switch (input_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(subKernelName, "F16");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "F16");
             break;
         case VX_TYPE_INT8:
-            strcat(subKernelName, "I8");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "I8");
             break;
         case VX_TYPE_UINT8:
-            strcat(subKernelName, "U8");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "U8");
             break;
         case VX_TYPE_INT16:
-            strcat(subKernelName, "I16");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "I16");
             break;
         default:
             break;
@@ -26656,16 +26670,16 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
         switch (output_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(subKernelName, "toF16");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "toF16");
             break;
         case VX_TYPE_INT8:
-            strcat(subKernelName, "toI8");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "toI8");
             break;
         case VX_TYPE_UINT8:
-            strcat(subKernelName, "toU8");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "toU8");
             break;
         case VX_TYPE_INT16:
-            strcat(subKernelName, "toI16");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "toI16");
             break;
         default:
             break;
@@ -26673,7 +26687,7 @@ vxnne_shader_executable vxnneGetTensorMeanAxisShaderExecutable(
 
         if (useImage2DFlag)
         {
-            strcat(subKernelName, "_2D");
+            gcoOS_PrintStrSafe(subKernelName, sizeof(subKernelName), &offset, "_2D");
         }
 
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, subKernelName, borderMode);
@@ -29533,6 +29547,7 @@ vxnne_shader_executable vxnneGetTensor2DAddShaderExecutable(
     }
     else
     {
+        vx_uint32 offset = 0;
         char kernelName[1024];
         vx_uint32 uniExtact8Bin_2x8[16] = {
             0x33333333, // TCfg
@@ -29574,16 +29589,16 @@ vxnne_shader_executable vxnneGetTensor2DAddShaderExecutable(
         switch (input0_format)
         {
         case VX_TYPE_FLOAT16:
-            sprintf(kernelName, "_F16Add");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_F16Add");
             break;
         case VX_TYPE_INT8:
-            sprintf(kernelName, "_I8Add");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I8Add");
             break;
         case VX_TYPE_UINT8:
-            sprintf(kernelName, "_U8Add");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_U8Add");
             break;
         case VX_TYPE_INT16:
-            sprintf(kernelName, "_I16Add");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I16Add");
             break;
         default:
             break;
@@ -29592,16 +29607,16 @@ vxnne_shader_executable vxnneGetTensor2DAddShaderExecutable(
         switch (input1_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "F16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "F16" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "I8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "I8" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "U8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "U8" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "I16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "I16" );
             break;
         default:
             break;
@@ -29610,16 +29625,16 @@ vxnne_shader_executable vxnneGetTensor2DAddShaderExecutable(
         switch (output_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "toF16_2D" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toF16_2D" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "toI8_2D" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI8_2D" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "toU8_2D" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toU8_2D" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "toI16_2D" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI16_2D" );
             break;
         default:
             break;
@@ -29797,20 +29812,21 @@ vxnne_shader_executable vxnneGetTensorAbsShaderExecutable(
     if (input_format != VX_TYPE_FLOAT32 && output_format != VX_TYPE_FLOAT32)
     {
         char kernelName[1024];
+        vx_uint32 offset = 0;
 
         switch (input_format)
         {
         case VX_TYPE_FLOAT16:
-            sprintf(kernelName, "_F16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_F16");
             break;
         case VX_TYPE_INT8:
-            sprintf(kernelName, "_I8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I8");
             break;
         case VX_TYPE_UINT8:
-            sprintf(kernelName, "_U8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_U8");
             break;
         case VX_TYPE_INT16:
-            sprintf(kernelName, "_I16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I16");
             break;
         default:
             break;
@@ -29819,16 +29835,16 @@ vxnne_shader_executable vxnneGetTensorAbsShaderExecutable(
         switch (output_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "toF16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toF16");
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "toI8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI8");
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "toU8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toU8");
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "toI16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI16");
             break;
         default:
             break;
@@ -29836,7 +29852,7 @@ vxnne_shader_executable vxnneGetTensorAbsShaderExecutable(
 
         if (useImage2DFlag)
         {
-            strcat(kernelName, "_2D");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_2D");
         }
 
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, kernelName, borderMode);
@@ -29990,6 +30006,7 @@ vxnne_shader_executable vxnneGetTensorAbsShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniDataMulAndPostShift_2x8", 1, uniDataMulAndPostShift_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniU8toI16Lo_2x8", 1, uniU8toI16Lo_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniU8toI16Hi_2x8", 1, uniU8toI16Hi_2x8);
+        if (status != VX_SUCCESS) goto OnError;
     }
 
     if (input_format == VX_TYPE_FLOAT16 || input_format == VX_TYPE_INT16)
@@ -30164,29 +30181,30 @@ vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
     if (input_format != VX_TYPE_FLOAT32 && output_format != VX_TYPE_FLOAT32)
     {
         char kernelName[1024];
+        vx_uint32 offset = 0;
 
         switch (funcType)
         {
         case VX_NN_ACTIVATION_LOGISTIC:
-            sprintf(kernelName, "_sigmoid");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_sigmoid");
             break;
         case VX_NN_ACTIVATION_HYPERBOLIC_TAN:
            {
                 twoLogE = twoLogE * b_val;
-                sprintf(kernelName, "_tanh");
+                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_tanh");
                 break;
            }
         case VX_NN_ACTIVATION_SQRT:
-            sprintf(kernelName, "_sqrt");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_sqrt");
             break;
         case VX_NN_ACTIVATION_RSQRT:
-            sprintf(kernelName, "_rsqrt");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_rsqrt");
             break;
         case VX_NN_ACTIVATION_SOFTRELU:
-            sprintf(kernelName, "_softRelu");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_softRelu");
             break;
         case VX_NN_ACTIVATION_SQUARE:
-            sprintf(kernelName, "_square");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_square");
             break;
         default:
             vxError("Can't support this function type!\n");
@@ -30196,16 +30214,16 @@ vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
         switch (input_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "_F16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_F16");
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "_I8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I8");
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "_U8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_U8");
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "_I16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I16");
             break;
         default:
             break;
@@ -30214,16 +30232,16 @@ vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
         switch (output_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "toF16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toF16");
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "toI8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI8");
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "toU8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toU8");
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "toI16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI16");
             break;
         default:
             break;
@@ -30231,7 +30249,7 @@ vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
 
         if (useImage2DFlag)
         {
-            strcat(kernelName, "_2D");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_2D");
         }
 
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, kernelName, borderMode);
@@ -30601,6 +30619,8 @@ vxnne_shader_executable vxnneGetTensorMulSatRTEShaderExecutable(
     }
     else
     {
+        vx_uint32 offset = 0;
+
         char kernelName[1024];
         vx_uint32 uniExtact8Bin_2x8[16] = {
             0x33333333, // TCfg
@@ -30644,16 +30664,16 @@ vxnne_shader_executable vxnneGetTensorMulSatRTEShaderExecutable(
         switch (input0_format)
         {
         case VX_TYPE_FLOAT16:
-            sprintf(kernelName, "_F16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_F16");
             break;
         case VX_TYPE_INT8:
-            sprintf(kernelName, "_I8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I8");
             break;
         case VX_TYPE_UINT8:
-            sprintf(kernelName, "_U8");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_U8");
             break;
         case VX_TYPE_INT16:
-            sprintf(kernelName, "_I16");
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_I16");
             break;
         default:
             break;
@@ -30663,13 +30683,13 @@ vxnne_shader_executable vxnneGetTensorMulSatRTEShaderExecutable(
         {
         case VX_TENSOR_OP_ADD:
         case VX_TENSOR_OP_SUB:
-            strcat(kernelName, "Add" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Add" );
             break;
         case VX_TENSOR_OP_MUL:
-            strcat(kernelName, "Mul" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Mul" );
             break;
         case VX_TENSOR_OP_DIV:
-            strcat(kernelName, "Div" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Div" );
             break;
         default:
             break;
@@ -30678,16 +30698,16 @@ vxnne_shader_executable vxnneGetTensorMulSatRTEShaderExecutable(
         switch (input1_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "F16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "F16" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "I8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "I8" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "U8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "U8" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "I16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "I16" );
             break;
         default:
             break;
@@ -30696,23 +30716,23 @@ vxnne_shader_executable vxnneGetTensorMulSatRTEShaderExecutable(
         switch (output_format)
         {
         case VX_TYPE_FLOAT16:
-            strcat(kernelName, "toF16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toF16" );
             break;
         case VX_TYPE_INT8:
-            strcat(kernelName, "toI8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI8" );
             break;
         case VX_TYPE_UINT8:
-            strcat(kernelName, "toU8" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toU8" );
             break;
         case VX_TYPE_INT16:
-            strcat(kernelName, "toI16" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "toI16" );
             break;
         default:
             break;
         }
 
         if (useImage2DFlag)
-            strcat(kernelName, "_2D" );
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_2D" );
 
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, kernelName, borderMode);
         if (!shaderExecutable) goto OnError;

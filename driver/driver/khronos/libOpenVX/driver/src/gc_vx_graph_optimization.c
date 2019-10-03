@@ -648,16 +648,16 @@ VX_INTERNAL_API vx_uint32* vxoGraphOptimization_kernelSize(vx_node convNode)
 
 VX_INTERNAL_API void vxoGraphOptimization_fillDims2paramters(vx_char *buf, vx_uint32 bufLen, vx_uint32 dims[], vx_uint32 dimNum, vx_char *paramterName, vxcJSON *paramters)
 {
-    vx_uint32 i = 0;
+    vx_uint32 i = 0, offset = 0;
     gcmHEADER_ARG("buf=%s, bufLen=0x%x, dims=%p, paramterName=%s, paramters=%p", buf, bufLen, dims, paramterName, paramters);
 
     memset(buf, 0, sizeof(vx_char)*bufLen);
     for(i = 0; i < dimNum; i++)
     {
-        sprintf(buf + strlen(buf), "%d", dims[i]);
+        gcoOS_PrintStrSafe(buf, bufLen, &offset, "%d", dims[i]);
         if(i != dimNum -1)
         {
-            sprintf(buf + strlen(buf), " x ");
+            gcoOS_PrintStrSafe(buf, bufLen, &offset, " x ");
         }
     }
     /*sprintf(buf, "%d x %d x %d x %d", dims[0], dims[1], dims[2], dims[3]);     */
@@ -734,6 +734,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_stroeNodeDetail2json(vx_node node
 {
     vx_enum     nodeType = node->kernel->enumeration;
     vx_char     opName[100] = {0};
+    vx_uint32   offset = 0;
 
     gcmHEADER_ARG("node=%p, layer=%p, paramters=%p", node, layer, paramters);
 
@@ -741,7 +742,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_stroeNodeDetail2json(vx_node node
     switch(nodeType)
     {
     case VX_KERNEL_CONVOLUTION_LAYER:
-        sprintf(opName, "%s","conv");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s","conv");
 
         vxoGraphOptimization_stroeNodeDims2paramter(paramters, node);
 
@@ -755,7 +756,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_stroeNodeDetail2json(vx_node node
 
         break;
     case VX_KERNEL_NN_CONVOLUTION_RELU_LAYER:
-        sprintf(opName, "%s","convolutionrelu");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s","convolutionrelu");
 
         vxoGraphOptimization_stroeNodeDims2paramter(paramters, node);
 
@@ -765,7 +766,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_stroeNodeDetail2json(vx_node node
 
         break;
     case VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER:
-        sprintf(opName, "%s","convolutionrelupooling");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s","convolutionrelupooling");
 
         vxoGraphOptimization_stroeNodeDims2paramter(paramters, node);
         vxoJson_AddBoolToObject(paramters,"has_relu", SCALAR_VALUE(node->paramTable[PARAM_CONV_RELU_POOLING_1_ENABLE_RELU_INDEX], b) == vx_true_e);
@@ -776,7 +777,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_stroeNodeDetail2json(vx_node node
 
         break;
     case VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER2:
-        sprintf(opName, "%s","convolutionrelupooling2");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s","convolutionrelupooling2");
 
         vxoGraphOptimization_stroeNodeDims2paramter(paramters, node);
 
@@ -793,16 +794,17 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_stroeNodeDetail2json(vx_node node
         vx_enum poolingType = SCALAR_VALUE(node->paramTable[1], u32);
         vx_char poolType[10] = {0};
 
-        sprintf(opName, "%s", "pool");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "pool");
 
+        offset = 0;
         if(poolingType == VX_NN_POOLING_AVG || poolingType == VX_NN_POOLING_AVG_ANDROID)
-            sprintf(poolType, "%s", "AVG");
+            gcoOS_PrintStrSafe(poolType, sizeof(poolType), &offset, "%s", "AVG");
         else if(poolingType == VX_NN_POOLING_MAX)
-            sprintf(poolType, "%s", "MAX");
+            gcoOS_PrintStrSafe(poolType, sizeof(poolType), &offset, "%s", "MAX");
         else if(poolingType == VX_NN_POOLING_L2)
-            sprintf(poolType, "%s", "L2");
+            gcoOS_PrintStrSafe(poolType, sizeof(poolType), &offset, "%s", "L2");
         else
-            sprintf(poolType, "%s", "unknown");
+            gcoOS_PrintStrSafe(poolType, sizeof(poolType), &offset, "%s", "unknown");
 
         vxoJson_AddStringToObject(paramters, "type", poolType);
         {
@@ -825,77 +827,77 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_stroeNodeDetail2json(vx_node node
     {
         vx_enum activationType = SCALAR_VALUE(node->paramTable[1], u32);
         if(activationType == VX_NN_ACTIVATION_RELU)
-            sprintf(opName, "%s", "relu");
+            gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "relu");
         else if(activationType == VX_NN_ACTIVATION_RELU1)
-            sprintf(opName, "%s", "relu1");
+            gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "relu1");
         else if(activationType == VX_NN_ACTIVATION_RELU6)
-            sprintf(opName, "%s", "relu6");
+            gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "relu6");
         else if(activationType == VX_NN_ACTIVATION_LOGISTIC)
-            sprintf(opName, "%s", "logistic");
+            gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "logistic");
         else if(activationType == VX_NN_ACTIVATION_HYPERBOLIC_TAN)
-            sprintf(opName, "%s", "tanh");
+            gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "tanh");
         else
-            sprintf(opName, "%s", "unknown");
+            gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "unknown");
         break;
     }
     case VX_KERNEL_FULLY_CONNECTED_LAYER:
     case VX_KERNEL_NN_FULLY_CONNECTED_LAYER:
-        sprintf(opName, "%s", "fullyconnected");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "fullyconnected");
         vxoGraphOptimization_stroeNodeDims2paramter(paramters, node);
         break;
     case VX_KERNEL_NN_FULLY_CONNECTED_RELU_LAYER:
-        sprintf(opName, "%s", "fullyconnectedrelu");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "fullyconnectedrelu");
         vxoGraphOptimization_stroeNodeDims2paramter(paramters, node);
         vxoJson_AddBoolToObject(paramters, "has_relu", SCALAR_VALUE(node->paramTable[7],b) == vx_true_e);
         break;
     case VX_KERNEL_NN_SOFTMAX2_LAYER:
         vxoJson_AddNumberToObject(paramters, "beta", SCALAR_VALUE(node->paramTable[1],f32));
     case VX_KERNEL_SOFTMAX_LAYER:
-        sprintf(opName, "%s", "softmax");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "softmax");
         break;
     case VX_KERNEL_TENSOR_TRANSPOSE:
-        sprintf(opName, "%s", "transpose");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "transpose");
         break;
 
     case VX_KERNEL_TENSOR_ADD:
-        sprintf(opName, "%s", "add");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "add");
         break;
     case VX_KERNEL_NN_TENSOR_RESHPE:
-        sprintf(opName, "%s", "reshape");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "reshape");
         break;
     case VX_KERNEL_NORMALIZATION_LAYER:
-        sprintf(opName, "%s", "normalization");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "normalization");
         break;
     case VX_KERNEL_NN_CONCATINDEFINITE_LAYER:
     case VX_KERNEL_NN_CONCAT2_LAYER:
-        sprintf(opName, "%s", "concat");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "concat");
         break;
     case VX_KERNEL_INTERNAL_ADAPTER:
-        sprintf(opName, "%s", "adapter");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "adapter");
         break;
     case VX_KERNEL_NN_LEAKY:
-        sprintf(opName, "%s", "leakyrelu");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "leakyrelu");
         break;
     case VX_KERNEL_NN_TENSOR_COPY:
-        sprintf(opName, "%s", "tensorcopy");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "tensorcopy");
         break;
     case VX_KERNEL_INTERNAL_ROI_POOLING_RELU_LAYER:
-        sprintf(opName, "%s", "ROIPoolingRelu");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "ROIPoolingRelu");
         break;
     case VX_KERNEL_ROI_POOLING_LAYER:
-        sprintf(opName, "%s", "ROIPooling");
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "ROIPooling");
         break;
     case VX_KERNEL_NN_PRELU:
         {
             vx_tensor alpha = (vx_tensor)node->paramTable[1];
             float data = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(alpha), TENSOR_QUANT_TYPE(alpha), 0,
                 TENSOR_LOGICAL_ADDR(alpha), TENSOR_POS(alpha), TENSOR_TF_ZEROPOINT(alpha), TENSOR_TF_SCALE(alpha));
-            sprintf(opName, "%s", "prelu");
+            gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", "prelu");
             vxoJson_AddNumberToObject(paramters, "alpha", data);
             break;
         }
     default:
-        sprintf(opName, "%s", node->kernel->name);
+        gcoOS_PrintStrSafe(opName, sizeof(opName), &offset, "%s", node->kernel->name);
         break;
     }
 
@@ -942,7 +944,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_storeNodeInfo(vx_node node, vxcJS
 
     for(i = 0; i < node->numParents; i++)
     {
-        sprintf(buf, "@id_%d:out0", node->graph->nodeTable[ node->parentNodes[i] ]->nodeID);
+        vx_uint32 offset = 0;
+        gcoOS_PrintStrSafe(buf, sizeof(buf), &offset, "@id_%d:out0", node->graph->nodeTable[ node->parentNodes[i] ]->nodeID);
         name = vxoJson_CreateString(buf);
         CHECK_NULL(name);
         vxoJson_AddItemToArray(inputs,name);
@@ -977,9 +980,10 @@ VX_INTERNAL_API char * vxoGraphOptimization_getJsonStyleInfo(vx_graph graph)
     for(idx = 0; idx < graph->nodeCount; idx ++)
     {
         char layerName[20] = {0};
+        vx_uint32 offset = 0;
         vx_node currentNode = nodeTable[idx];
 
-        sprintf(layerName, "id_%d", currentNode->nodeID);
+        gcoOS_PrintStrSafe(layerName, sizeof(layerName), &offset, "id_%d", currentNode->nodeID);
 
         layer = vxoJson_CreateObject();
         vxoJson_AddItemToObject(layers,layerName,layer);

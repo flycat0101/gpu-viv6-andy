@@ -138,6 +138,11 @@ vx_bool _cur_cost_is_more_better(struct _archModelCost *cost, struct _archModelC
 void deInitArchModelSplitInfo(struct _archModelSplitInfo * splitInfo, vx_uint32 operationCount)
 {
     vx_uint32 i;
+    if (splitInfo == NULL)
+    {
+        return;
+    }
+
     if (splitInfo->savedSIX)
     {
         for (i = 0; i < operationCount; i++)
@@ -182,7 +187,8 @@ void deInitArchModelSplitInfo(struct _archModelSplitInfo * splitInfo, vx_uint32 
         }
         vxFree(splitInfo->split_array);
     }
-    if (splitInfo) vxFree(splitInfo);
+
+    vxFree(splitInfo);
 }
 
 void emptyArchModelSplitInfo(struct _archModelSplitInfo * splitInfo, vx_uint32 operationCount)
@@ -360,6 +366,11 @@ error:
 void deInitArchModelInfo(struct _archModelInfo *archModel, vx_uint32 operationCount)
 {
     vx_uint32 i;
+    if (archModel == NULL)
+    {
+        return;
+    }
+
     for (i = 0; i < operationCount; i++)
     {
         if (archModel->opInfoArray && archModel->opInfoArray[i] != NULL)
@@ -377,7 +388,7 @@ void deInitArchModelInfo(struct _archModelInfo *archModel, vx_uint32 operationCo
     if (archModel->opInfoArray != NULL) vxFree(archModel->opInfoArray);
     if (archModel->splitInfoArray != NULL) vxFree(archModel->splitInfoArray);
 
-    if (archModel != NULL) vxFree(archModel);
+    vxFree(archModel);
 }
 
 struct _archModelInfo * initArchModelInfo(vx_uint32 operationCount)
@@ -2585,7 +2596,6 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
     vx_bool hasVXC = vx_false_e;
     gceSTATUS status = gcvSTATUS_OK;
     vx_status vxStatus = VX_SUCCESS;
-    vx_bool supportNNTPParallel = vx_false_e;
 
     if (!graph->layer) return status;
 
@@ -2737,13 +2747,6 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->bfy = 1;
                 opInfo[count]->bfz = 1;
 
-                if (count > 0 && supportNNTPParallel)
-                {
-                    if (opInfo[count - 1]->target == VXNNE_OPERATION_TARGET_TP)
-                    {
-                        opInfo[count - 1]->bfy = 2;
-                    }
-                }
 
                 opInfo[count]->downStreamLayerCount = operation->childOpNum;
                 opInfo[count]->upStreamLayerCount = operation->parentOpNum;
@@ -2849,20 +2852,6 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->bfy = 1;
                 opInfo[count]->bfz = 1;
 
-                if (count > 0 && supportNNTPParallel)
-                {
-                    if (opInfo[count - 1]->target == VXNNE_OPERATION_TARGET_NN) /* NN -> TP*/
-                    {
-                        if (opInfo[count]->ky != 1)
-                        {
-                            opInfo[count - 1]->bfy = 2;
-                        }
-                        else
-                        {
-                            opInfo[count - 1]->bfz = 2;
-                        }
-                    }
-                }
                 opInfo[count]->downStreamLayerCount = operation->childOpNum;
                 opInfo[count]->upStreamLayerCount = operation->parentOpNum;
                 if (opInfo[count]->inputDataFormat == VX_TYPE_INT16)
@@ -2971,30 +2960,6 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                 opInfo[count]->bfy = 1;
                 opInfo[count]->bfz = 1;
 
-                if (count > 0 && supportNNTPParallel)
-                {
-                    if (operation->target == VXNNE_OPERATION_TARGET_TP)
-                    {
-                        if (opInfo[count - 1]->target != VXNNE_OPERATION_TARGET_TP)
-                        {
-                            if (opInfo[count - 1]->ky != 1)
-                            {
-                                opInfo[count - 1]->bfy = 2;
-                            }
-                            else
-                            {
-                                opInfo[count - 1]->bfz = 2;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (opInfo[count - 1]->target == VXNNE_OPERATION_TARGET_TP)
-                        {
-                            opInfo[count - 1]->bfy = 2;
-                        }
-                    }
-                }
                 opInfo[count]->downStreamLayerCount = operation->childOpNum;
                 opInfo[count]->upStreamLayerCount = operation->parentOpNum;
                 operation->segIndex = count;

@@ -1835,6 +1835,12 @@ vx_bool calculateWeightBiasBufferSizeForZeroRunLenEx(
         bigZRL += *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1);
     }
 
+    if (blockCount == 0)
+    {
+        vxError("%s: blockCount should not be zero\n", __FUNCTION__);
+        return vx_false_e;
+    }
+
     /* analyze compressed size with different zrl */
     maxZRL = gcmMIN(maxZRL, maxZeroRunLen);
     maxZRLType = maxZRL ? gcmMIN((vx_uint32)ceilf((vx_float32)(log(maxZRL) / log(2))), context->nnConfig.fixedFeature.zrlBits) : 0;
@@ -5651,6 +5657,12 @@ vx_uint32 calcKernelStreamSizeHuffman(
     vx_uint32 runSet2Bits = 1;
     CodeSymbol codeSymbol[THROUGHPUT * 3];
 
+    if (weightBitSize == 0)
+    {
+        vxError("%s: weightBitSize should not be zero.", __FUNCTION__);
+        goto exit;
+    }
+
     if (weight_format == VX_TYPE_INT16)
         biasBitSize = NN_INTEGER_BIAS_BITS_VIP_V7_INT16;
     else
@@ -6840,6 +6852,12 @@ void reorderDepthWiseKernelBufferV8Huffman(
     vx_uint32 nonCoefIndex = 0, idx = 0, elementIndex = 0;
     vx_uint32 limitIndex = 0;
 
+    if (weightBitSize == 0)
+    {
+        vxError("%s: weightBitSize should not be zero.", __FUNCTION__);
+        return;
+    }
+
     for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
     {
         vx_uint32 coreFilterCount = (coreIndex < oddFilterPerCore) ? totalFilterPerCore + 1 : totalFilterPerCore;
@@ -7145,13 +7163,22 @@ void reorderKernelBufferV8Huffman(
     vx_bool isBias = vx_false_e;
     vx_uint32 biasIdx = 0;
 #if DUMP_BF16_ENC
-    static vx_uint32 n = 0;
+    static vx_uint32 n = 0, offset = 0;
     vx_char fileName[128];
     FILE * pfile1 = NULL;
-    sprintf(fileName, "%s_%d.txt", "reordered_kernel", n++);
+    gcoOS_PrintStrSafe(fileName, sizeof(fileName), &offset, "%s_%d.txt", "reordered_kernel", n++);
 
     pfile1 = fopen(fileName, "wt");
 #endif
+
+    if (weightBitSize == 0)
+    {
+        vxError("%s: weightBitSize should not be zero.", __FUNCTION__);
+#if DUMP_BF16_ENC
+        if (pfile1) fclose(pfile1);
+#endif
+        return;
+    }
 
     if (weight_format == VX_TYPE_BFLOAT16)
         filterWeightCount += 3;
@@ -7550,6 +7577,12 @@ void reorderKernelBufferV8HuffmanBalance(
     vx_uint32 core0FilterCount = 0;
     gcVXNonZeroWeights tmp;
 
+    if (weightBitSize == 0)
+    {
+        vxError("%s: weightBitSize should not be zero.", __FUNCTION__);
+        goto exit;
+    }
+
     nonZeroWeights = (gcVXNonZeroWeights*)vxAllocateAndZeroMemory(filterTotalCount * sizeof(gcVXNonZeroWeights));
     if (nonZeroWeights == VX_NULL)
     {
@@ -7905,6 +7938,12 @@ vx_uint32 calcKernelSizeV8Huffman(
     vx_uint32 nonCoefCountIdx = 0;
     vx_uint32 kernelStreamSizePerCore = 0;
     vx_uint32 limitZRLCountIdx = 0;
+
+    if (weightBitSize == 0)
+    {
+        vxError("%s: weightBitSize should not be zero.", __FUNCTION__);
+        goto exit;
+    }
 
     if (weight_format == VX_TYPE_BFLOAT16)
     {
@@ -9279,6 +9318,12 @@ void reorderKernelBufferV8MergeDW1x1(
     vx_uint32 linesInImageBuffer = dpAmount * zDPLoopCount;
 
     vx_uint32 nonCoefIndex = 0, idx = 0, elementIndex = 0;
+
+    if (weightBitSize == 0)
+    {
+        vxError("%s: weightBitSize should not be zero.", __FUNCTION__);
+        return;
+    }
 
     for (coreIndex = 0; coreIndex < nnCoreCount1x1 + 1; coreIndex++)
     {
@@ -11828,7 +11873,10 @@ void fillinTPKernelBufferHuffman(
 
     }
     kernelSizePerCore = (vx_uint32)((vx_uint8 *)kernelBufferPtr - kernelStartPtr);
-    vxmASSERT(kernelSizePerCore <= wb->slice_array[index].kernel_stream_size);
+    if (!(kernelSizePerCore <= wb->slice_array[index].kernel_stream_size))
+    {
+        vxmASSERT(0);
+    }
 
 exit:
     if (reorderStream)
@@ -12262,6 +12310,13 @@ vx_float32 calculateWeightNonZeroRatio(
                 }
             }
         }
+    }
+
+    if (blockCount == 0)
+    {
+        vxmASSERT(0);
+        vxError("%s: blockCount should not be zero.\n", __FUNCTION__);
+        return 0;
     }
 
     nonZeroRatio = (vx_float32)nonZeroCount / (vx_float32)blockCount;
@@ -14887,7 +14942,7 @@ VX_INTERNAL_CALLBACK_API void vxoWeightsBiasesBase_Destructor(vx_reference ref)
     if (wbBase->origAlpha != VX_NULL)
     {
         vxoReference_Release((vx_reference_ptr)&wbBase->origAlpha, VX_TYPE_TENSOR, VX_REF_INTERNAL);
-        wbBase->origBias = VX_NULL;
+        wbBase->origAlpha = VX_NULL;
     }
 }
 
@@ -15543,17 +15598,6 @@ vx_status vxoWeightsBiases_Compress(
     }
     vxReleaseMutex(wb->memory.writeLocks[0]);
 
-    if (Weight_Cpuptr != VX_NULL)
-    {
-        vxFree(Weight_Cpuptr);
-        Weight_Cpuptr = VX_NULL;
-    }
-    if (Bias_Cpuptr != VX_NULL)
-    {
-        vxFree(Bias_Cpuptr);
-        Bias_Cpuptr = VX_NULL;
-    }
-
 #if gcdDUMP
     gcmDUMP(gcvNULL, "#[weights and biases]\n");
     gcmDUMP_BUFFER(gcvNULL,
@@ -15569,6 +15613,12 @@ exit:
     {
         vxFree(Weight_Cpuptr);
         Weight_Cpuptr = VX_NULL;
+    }
+
+    if (Bias_Cpuptr != VX_NULL)
+    {
+        vxFree(Bias_Cpuptr);
+        Bias_Cpuptr = VX_NULL;
     }
     return status;
 }
@@ -15752,10 +15802,6 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
     vx_float32 biasScale        = 0;
     vx_enum biasDataType        = VX_TYPE_FLOAT32;
     vx_enum biasQuantType       = biases ? TENSOR_QUANT_TYPE(biases) : TENSOR_QUANT_TYPE(weights);
-
-    vx_uint32 sliceCount;
-    vx_uint32 weightCount;
-    vx_uint32 filterTotalCount;
     vx_uint32 i;
 
     gctPOINTER convertedWeightData  = VX_NULL;
@@ -16163,17 +16209,6 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
     else
         wb_base->hw_depth_wise = vx_false_e;
 
-    if ((weightDims[0] == 1) && (weightDims[1] == 1) && (strideX > 1) && (strideX == strideY))
-    {
-        sliceCount = weightDims[2];
-    }
-    else
-    {
-        sliceCount = weightDims[2] * strideX * strideY;
-    }
-
-    weightCount = wb_base->weights_sizes[0] * wb_base->weights_sizes[1];
-    filterTotalCount = wb_base->weights_sizes[3];
 
     /* reshuffle weight data and save in wb_base->reshuffleWeightPtr if kernel stride > 1 */
     vxoWeightsBiases_Reshuffle(wb_base);

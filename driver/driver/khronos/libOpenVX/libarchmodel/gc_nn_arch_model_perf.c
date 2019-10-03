@@ -645,6 +645,13 @@ static vx_float64 _calcPartialAlignedBW(vx_uint32 size, vx_uint32 ppc, vx_uint32
         }
     }
 
+    if (stepCount == 0)
+    {
+        vxError("%s: stepCount should not be zero\n");
+        vxmASSERT(0);
+        return 0;
+    }
+
     partialAlignedBW = ((vx_float64)lineCount / stepCount) * ppc;
     return partialAlignedBW;
 }

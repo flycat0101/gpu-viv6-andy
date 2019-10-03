@@ -5195,6 +5195,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionReluPoolingLayer_Deinitiali
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
     return VX_SUCCESS;
 }
@@ -5300,6 +5301,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionReluPoolingLayer2_Deinitial
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
     return VX_SUCCESS;
 }
@@ -5384,6 +5386,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionReluLayer_Deinitializer(vx_
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -5873,6 +5876,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedReluLayer_Deinitializer(
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
     return VX_SUCCESS;
 }
@@ -6054,6 +6058,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_Deinitializer(vx_node node,
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -6141,6 +6146,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcat2Layer_Deinitializer(vx_node nod
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -6378,6 +6384,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Deinitializer(vx_node node,
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -6566,6 +6573,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReverse_Deinitializer(vx_node no
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -6879,6 +6887,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReduceSum_Deinitializer(vx_node 
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -7445,6 +7454,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad_Deinitializer(vx_node node, 
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -8215,6 +8225,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_Deinitializer(vx_node node
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -8361,6 +8372,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Deinitializer(vx_nod
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -9204,6 +9216,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPoolingLayer_Deinitializer(vx_node nod
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -9276,6 +9289,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPoolingLayer2_Deinitializer(vx_node no
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -9473,6 +9487,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedLayer_Deinitializer(vx_n
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -9788,6 +9803,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Deinitializer(vx_node 
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -10016,6 +10032,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNLeakyReluLayer_Deinitializer(vx_node n
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -10221,6 +10238,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPReluLayer_Deinitializer(vx_node node,
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -10572,6 +10590,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Deinitializer(
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -10933,6 +10952,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorAdd_Deinitializer(vx_node node, 
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -11156,6 +11176,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSub_Deinitializer(vx_node node, 
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -11390,6 +11411,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMul_Deinitializer(vx_node node, 
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -11579,6 +11601,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorDiv_Deinitializer(vx_node node, 
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -12063,6 +12086,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Deinitializer(vx_node node
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -14135,6 +14159,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Deinitializer(vx_node node, c
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -14819,6 +14844,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolLayer_Deinitializer(vx_node nod
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -17928,6 +17954,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionLayer_Deinitializer(vx_node
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -18176,6 +18203,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNReorgLayer_Deinitializer(vx_node node,
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -19434,7 +19462,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
             vx_int32 kernel_channel = TENSOR_SIZE_INDEX(weights, 2);
             vx_int32 kernel_batch = TENSOR_SIZE_INDEX(weights, 3);
 
-            vx_bool tp_upsample = (deconvolution_mode == gcoNNE_DECONV_MODE_NNE_TP)? vx_true_e : vx_true_e;
+            vx_bool tp_upsample = (deconvolution_mode == gcoNNE_DECONV_MODE_NNE_TP)? vx_true_e : vx_false_e;
             vx_int32 upsample_pad_x = 0, upsample_pad_y = 0;
             vx_bool need_clip = vx_false_e;
             vx_int32 s = 1;
@@ -19852,6 +19880,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Deinitializer(vx_no
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -20195,6 +20224,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNL2NormalizeLayer_Deinitializer(vx_node
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -21600,6 +21630,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReOrg2_Deinitializer(vx_node node, const
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -21788,6 +21819,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorRounding_Deinitializer(vx_node nod
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -22014,6 +22046,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHashLUT_Deinitializer(vx_node node, cons
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -22282,6 +22315,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLSHProjection_Deinitializer(vx_node node
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -22575,6 +22609,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReshape_Deinitializer(vx_node node, cons
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -22937,6 +22972,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorScale_Deinitializer(vx_node node, 
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -23631,6 +23667,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoYUV2RGBScale_Deinitializer(vx_node node,
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -23891,6 +23928,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer2_Deinitializer(vx_node node
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -24072,6 +24110,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLUT2_Deinitializer(vx_node node, const v
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -26360,6 +26399,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Deinitializer(vx_node node,
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -27114,6 +27154,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Deinitializer(vx_nod
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;
@@ -27339,6 +27380,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSqueeze_Deinitializer(vx_node no
     if (node->layer)
     {
         vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
     }
 
     return VX_SUCCESS;

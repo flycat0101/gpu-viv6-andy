@@ -576,7 +576,10 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
         /* HW design follow the paper, biasScale = inputScale * coefScale*/
         if (!weights_biases->wb_base->no_bias)
         {
-            vxmASSERT(gcmABS(bScale - inScale * wScale) < 0.000001);
+            if (!(gcmABS(bScale - inScale * wScale) < 0.000001))
+            {
+                vxmASSERT(0);
+            }
         }
 
         if (!isV8)
@@ -1255,7 +1258,7 @@ void _fill_TP_RESHUFFLE_Command(
     vx_uint32 in_offset_x, in_offset_y, in_offset_z;
     vx_uint32 in_size_x, in_size_y, in_size_z;
     vx_uint32 in_pitch_x, in_pitch_y;
-    vx_int32 pad_left, pad_top, pad_right, pad_bottom;
+    vx_int32 pad_left, pad_top;
     vx_uint32 stride_x = 1, stride_y = 1;
     vx_uint32 out_offset_x, out_offset_y, out_offset_z;
     vx_uint32 out_size_x, out_size_y, out_size_z;
@@ -1295,8 +1298,6 @@ void _fill_TP_RESHUFFLE_Command(
 
         pad_left = input_split_blocks[i].pad_left;
         pad_top = input_split_blocks[i].pad_top;
-        pad_right = input_split_blocks[i].pad_right;
-        pad_bottom = input_split_blocks[i].pad_bottom;
 
         out_offset_x = output_split_blocks[i].offset_x;
         out_offset_y = output_split_blocks[i].offset_y;
@@ -1427,7 +1428,7 @@ _fill_TP_RESHUFFLE_Command_EX(
     vx_uint32 in_offset_x, in_offset_y, in_offset_z;
     vx_uint32 in_size_x, in_size_y, in_size_z;
     vx_uint32 in_pitch_x, in_pitch_y;
-    vx_int32 pad_left, pad_top, pad_right, pad_bottom;
+    vx_int32 pad_left, pad_top;
     vx_uint32 stride_x = 1, stride_y = 1;
     vx_uint32 out_offset_x, out_offset_y, out_offset_z;
     vx_uint32 out_size_x, out_size_y, out_size_z;
@@ -1465,8 +1466,8 @@ _fill_TP_RESHUFFLE_Command_EX(
 
         pad_left = input_split_blocks[i].pad_left;
         pad_top = input_split_blocks[i].pad_top;
-        pad_right = input_split_blocks[i].pad_right;
-        pad_bottom = input_split_blocks[i].pad_bottom;
+        /*pad_right = input_split_blocks[i].pad_right;
+        pad_bottom = input_split_blocks[i].pad_bottom;*/
 
         out_offset_x = output_split_blocks[i].offset_x;
         out_offset_y = output_split_blocks[i].offset_y;
@@ -3927,14 +3928,21 @@ _CalculateSplitSizes(vxnne_tensor_info input,
     vx_uint32 x, y, z;
     vx_uint32 input_element_size = vxnneGetTypeSize(input->dataFormat);
     vx_uint32 output_element_size = vxnneGetTypeSize(output->dataFormat);
-    vx_uint32 input_pitch_x = input->yStride / input_element_size;
+    vx_uint32 input_pitch_x;
     vx_uint32 input_pitch_y = input->zStride / input->yStride;
-    vx_uint32 output_pitch_x = output->yStride / output_element_size;
+    vx_uint32 output_pitch_x;
     vx_uint32 output_pitch_y = output->zStride / output->yStride;
     vx_uint32 inferred_input_size_x, inferred_input_size_y;
     vx_uint32 pad_left, pad_right, pad_top, pad_bottom;
     vx_uint32 index, last_x_index, last_y_index, last_z_index;
     vx_uint32 x_sizes[MAX_TP_SPLIT_XY_NUM], x_offsets[MAX_TP_SPLIT_XY_NUM], y_sizes[MAX_TP_SPLIT_XY_NUM], y_offsets[MAX_TP_SPLIT_XY_NUM], z_sizes[MAX_TP_SPLIT_XY_NUM], z_offsets[MAX_TP_SPLIT_XY_NUM];
+
+    if ((input_element_size == 0) || (output_element_size == 0))
+    {
+        return VX_FAILURE;
+    }
+    input_pitch_x = input->yStride / input_element_size;
+    output_pitch_x = output->yStride / output_element_size;
 
     if (weights_biases)
     {
@@ -4291,15 +4299,10 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     vx_uint32 splitOffsets[TP_TENSOR_COUNT] = {0};
     vxnne_tensor_sub_block input_splits = VX_NULL;
     vxnne_tensor_sub_block output_splits = VX_NULL;
-    vx_uint32 core;
 
     vxmASSERT(parameter != VX_NULL);
 
     tpType = parameter->tpType;
-
-    core = tpType != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
-                                    context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
-
     /* TODO: Change if optimized */
     switch (tpType)
     {
@@ -4322,7 +4325,22 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     }
 
     sinfoArray = vxAllocateAndZeroMemory(sizeof(vx_nn_cmd_split_info_u) * splitCount);
-    if (sinfoArray == VX_NULL) return VX_ERROR_NO_MEMORY;
+    if (sinfoArray == VX_NULL)
+    {
+        if (input_splits)
+        {
+            vxFree(input_splits);
+            input_splits = VX_NULL;
+        }
+
+        if (output_splits)
+        {
+            vxFree(output_splits);
+            output_splits = VX_NULL;
+        }
+
+        return VX_ERROR_NO_MEMORY;
+    }
 
     switch (tpType)
     {

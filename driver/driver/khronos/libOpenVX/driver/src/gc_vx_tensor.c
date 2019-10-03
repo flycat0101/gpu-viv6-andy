@@ -554,6 +554,7 @@ vxoTensor_Create(
 
 OnError:
     if (!(tensorType & VX_TENSOR_SHARED) &&
+        tensor &&
         tensor->tensorBuffer != VX_NULL)
     {
         vxFree(tensor->tensorBuffer);
@@ -901,13 +902,19 @@ vxoTensor_CopyTensorPatch(
     vx_enum usage
     )
 {
+    vx_status status;
     vx_uint32 usrElemSize, totalSize;
     gctPOINTER logical;
     gcmHEADER_ARG("tensor=%p, view=%p, user_addr=%p, user_ptr=%p, usage=0x%x", tensor, view, user_addr, user_ptr, usage);
 
     usrElemSize = user_addr->dimStridesUser[0];
 
-    vxoTensor_GetTensorBaseMemory(tensor, (vx_uint8_ptr*)&logical, VX_NULL);
+    status = vxoTensor_GetTensorBaseMemory(tensor, (vx_uint8_ptr*)&logical, VX_NULL);
+    if (VX_SUCCESS != status)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
 
     if (view == VX_NULL &&
         !tensor->isViewed &&
@@ -3692,7 +3699,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* co
                 }
             }
             *prev_ptrs = tensor->tensorBuffer->memory.logicals[0];
-            vxInfo("prev_ptrs = %#llx", *prev_ptrs);
+            vxInfo("prev_ptrs = %p", *prev_ptrs);
         }
 
         /* reclaim previous and set new handlers for this image */
@@ -3707,7 +3714,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* co
                     /* offset is non zero if this is a subimage of some image */
                     tensor->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)new_ptrs;
                     vxoTensro_WrapUserMemory(tensor);
-                    vxInfo("memory.logicals = %#llx", tensor->tensorBuffer->memory.logicals[0]);
+                    vxInfo("memory.logicals = %p\n", tensor->tensorBuffer->memory.logicals[0]);
                 }
                 else
                 {
@@ -3814,6 +3821,11 @@ VX_INTERNAL_API vx_tensor vxoTensor_ReformatTensor(vx_tensor tensor, vx_enum for
     }
 
     fSize = vxoTensor_GetDataSizeByFormat(format);
+
+    if (fSize == 0)
+    {
+        return VX_NULL;
+    }
 
     if (tensor->isViewed)
     {

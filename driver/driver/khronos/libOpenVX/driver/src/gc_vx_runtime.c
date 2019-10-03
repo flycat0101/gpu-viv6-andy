@@ -458,8 +458,10 @@ VX_INTERNAL_API void vxoQueue_Deinitialize(vx_queue queue)
 
     if (queue == VX_NULL) return;
 
+    vxAcquireMutex(queue->lock);
     queue->beginIndex   = 0;
     queue->endIndex     = -1;
+    vxReleaseMutex(queue->lock);
 
     vxmASSERT(queue->readEvent);
     vxDestroyEvent(queue->readEvent);

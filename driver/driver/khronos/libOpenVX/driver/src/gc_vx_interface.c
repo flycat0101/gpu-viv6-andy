@@ -184,6 +184,9 @@ OnError:
     if (pFile)
         fclose(pFile);
 
+    if (programSource)
+        vxFree(programSource);
+
     gcmFOOTER_NO();
     return NULL;
 }
