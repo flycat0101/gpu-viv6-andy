@@ -385,7 +385,10 @@ retry:
 
 OnError:
     /* Roll back. */
-    _DestroyCommandBuffer(Hardware, Info, commandBuffer);
+    if (commandBuffer)
+    {
+        _DestroyCommandBuffer(Hardware, Info, commandBuffer);
+    }
 
     /* Return the status. */
     gcmFOOTER();
