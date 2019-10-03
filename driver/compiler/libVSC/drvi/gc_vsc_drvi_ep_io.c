@@ -37,6 +37,8 @@
 #define SPMEND_SIG          gcmCC('S', 'P', 'M', 'E')   /* Static priv mapping end signature. */
 #define DPMSTART_SIG        gcmCC('D', 'P', 'M', 'S')   /* Dynamic priv mapping start signature. */
 #define DPMEND_SIG          gcmCC('D', 'P', 'M', 'E')   /* Dynamic priv mapping end signature. */
+#define DUBOSTART_SIG       gcmCC('D', 'U', 'B', 'S')   /* Dynamic priv mapping start signature. */
+#define DUBOEND_SIG         gcmCC('D', 'U', 'B', 'E')   /* Dynamic priv mapping end signature. */
 
 /* PEP-related signature. */
 #define PATSTART_SIG        gcmCC('P', 'A', 'T', 'S')   /* Program attribute table start signature. */
@@ -594,6 +596,10 @@ _vscEP_Buffer_SavePrivConstEntry(
         }
         break;
 
+    case SHADER_PRIV_CONSTANT_MODE_VAL_2_DUBO:
+        VSC_IO_writeUint(pIoBuf, pPrivConstEntry->u.duboEntryIndex);
+        break;
+
     default:
         gcmASSERT(gcvFALSE);
         break;
@@ -806,6 +812,43 @@ _vscEP_Buffer_SaveDynamicPrivMapping(
     _vscEP_Buffer_SavePrivOutputMapping(pEPBuf, &pDynamicPrivMapping->privOutputMapping);
 
     VSC_IO_writeUint(pIoBuf, DPMEND_SIG);
+}
+
+/* Save default UBO mapping. */
+static void
+_vscEP_Buffer_SaveDefaultUboMeberEntry(
+    VSC_EP_IO_BUFFER*       pEPBuf,
+    SHADER_DEFAULT_UBO_MEMBER_ENTRY* pDefaultUboMemberEntry
+    )
+{
+    VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
+
+    VSC_IO_writeUint(pIoBuf, pDefaultUboMemberEntry->memberIndexInOtherEntryTable);
+    VSC_IO_writeUint(pIoBuf, (gctUINT)pDefaultUboMemberEntry->memberKind);
+    VSC_IO_writeUint(pIoBuf, pDefaultUboMemberEntry->offsetInByte);
+}
+
+static void
+_vscEP_Buffer_SaveDefaultUboMapping(
+    VSC_EP_IO_BUFFER*       pEPBuf,
+    SHADER_DEFAULT_UBO_MAPPING* pDefaultUboMapping
+    )
+{
+    VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
+    gctUINT i;
+
+    VSC_IO_writeUint(pIoBuf, DUBOSTART_SIG);
+
+    VSC_IO_writeUint(pIoBuf, pDefaultUboMapping->baseAddressIndexInPrivConstTable);
+    VSC_IO_writeUint(pIoBuf, pDefaultUboMapping->countOfEntries);
+    VSC_IO_writeUint(pIoBuf, pDefaultUboMapping->sizeInByte);
+
+    for (i = 0; i < pDefaultUboMapping->countOfEntries; i++)
+    {
+        _vscEP_Buffer_SaveDefaultUboMeberEntry(pEPBuf, &pDefaultUboMapping->pDefaultUboMemberEntries[i]);
+    }
+
+    VSC_IO_writeUint(pIoBuf, DUBOEND_SIG);
 }
 
 /****************************************Save PEP-related functions****************************************/
@@ -2178,6 +2221,7 @@ _vscEP_Buffer_SaveSEPToBinary(
     _vscEP_Buffer_SaveUavMapping(pEPBuf, &pSEP->uavMapping);
     _vscEP_Buffer_SaveStaticPrivMapping(pEPBuf, &pSEP->staticPrivMapping);
     _vscEP_Buffer_SaveDynamicPrivMapping(pEPBuf, &pSEP->dynamicPrivMapping);
+    _vscEP_Buffer_SaveDefaultUboMapping(pEPBuf, &pSEP->defaultUboMapping);
 
     /* End signature. */
     VSC_IO_writeInt(pIoBuf, SEPEND_SIG);
@@ -2985,6 +3029,10 @@ _vscEP_Buffer_LoadPrivConstEntry(
         }
         break;
 
+    case SHADER_PRIV_CONSTANT_MODE_VAL_2_DUBO:
+        VSC_IO_readUint(pIoBuf, &pPrivConstEntry->u.duboEntryIndex);
+        break;
+
     default:
         gcmASSERT(gcvFALSE);
         break;
@@ -3335,6 +3383,73 @@ _vscEP_Buffer_LoadDynamicPrivMapping(
 
     VSC_IO_readUint(pIoBuf, &uVal);
     if (uVal != DPMEND_SIG)
+    {
+        gcmASSERT(gcvFALSE);
+        errCode = VSC_ERR_INVALID_DATA;
+        ON_ERROR(errCode, "Invalid shader signature 0x%x.", uVal);
+    }
+
+OnError:
+    return errCode;
+}
+
+/* Load default UBO mapping. */
+static VSC_ErrCode
+_vscEP_Buffer_LoadDefaultUboMemberEntry(
+    VSC_EP_IO_BUFFER*       pEPBuf,
+    SHADER_DEFAULT_UBO_MEMBER_ENTRY* pDefaultUboMemberEntry
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
+
+    VSC_IO_readUint(pIoBuf, &pDefaultUboMemberEntry->memberIndexInOtherEntryTable);
+    VSC_IO_readUint(pIoBuf, (gctUINT *)&pDefaultUboMemberEntry->memberKind);
+    VSC_IO_readUint(pIoBuf, &pDefaultUboMemberEntry->offsetInByte);
+
+    return errCode;
+}
+
+static VSC_ErrCode
+_vscEP_Buffer_LoadDefaultUboMapping(
+    VSC_EP_IO_BUFFER*       pEPBuf,
+    SHADER_DEFAULT_UBO_MAPPING* pDefaultUboMapping
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
+    gctUINT uVal = 0;
+    gctUINT i;
+
+    VSC_IO_readUint(pIoBuf, &uVal);
+    if (uVal != DUBOSTART_SIG)
+    {
+        gcmASSERT(gcvFALSE);
+        errCode = VSC_ERR_INVALID_DATA;
+        ON_ERROR(errCode, "Invalid shader signature 0x%x.", uVal);
+    }
+
+    VSC_IO_readUint(pIoBuf, &pDefaultUboMapping->baseAddressIndexInPrivConstTable);
+    VSC_IO_readUint(pIoBuf, &pDefaultUboMapping->countOfEntries);
+    VSC_IO_readUint(pIoBuf, &pDefaultUboMapping->sizeInByte);
+
+    if (pDefaultUboMapping->countOfEntries > 0)
+    {
+        VSC_EP_ALLOC_MEM(pDefaultUboMapping->pDefaultUboMemberEntries,
+                         SHADER_DEFAULT_UBO_MEMBER_ENTRY,
+                         sizeof(SHADER_DEFAULT_UBO_MEMBER_ENTRY) * pDefaultUboMapping->countOfEntries);
+        for (i = 0; i < pDefaultUboMapping->countOfEntries; i++)
+        {
+            ON_ERROR0(_vscEP_Buffer_LoadDefaultUboMemberEntry(pEPBuf, &pDefaultUboMapping->pDefaultUboMemberEntries[i]));
+        }
+    }
+    else
+    {
+        pDefaultUboMapping->pDefaultUboMemberEntries = gcvNULL;
+    }
+
+    VSC_IO_readUint(pIoBuf, &uVal);
+    if (uVal != DUBOEND_SIG)
     {
         gcmASSERT(gcvFALSE);
         errCode = VSC_ERR_INVALID_DATA;
@@ -5222,6 +5337,7 @@ _vscEP_Buffer_LoadSEPFromBinary(
     ON_ERROR0(_vscEP_Buffer_LoadUavMapping(pEPBuf, &pSEP->uavMapping));
     ON_ERROR0(_vscEP_Buffer_LoadStaticPrivMapping(pEPBuf, &pSEP->staticPrivMapping));
     ON_ERROR0(_vscEP_Buffer_LoadDynamicPrivMapping(pEPBuf, &pSEP->dynamicPrivMapping));
+    ON_ERROR0(_vscEP_Buffer_LoadDefaultUboMapping(pEPBuf, &pSEP->defaultUboMapping));
 
     /* End signature. */
     VSC_IO_readUint(pIoBuf, &uVal);

@@ -1342,6 +1342,8 @@ typedef struct SHADER_EXECUTABLE_PROFILE
        to a slot in above mapping pool */
     SHADER_DYNAMIC_PRIV_MAPPING                 dynamicPrivMapping;
 
+    SHADER_DEFAULT_UBO_MAPPING                  defaultUboMapping;
+
     /* Current SEI that this profile uses. This is the one used to program HW registers. Currently disable it
        due to we're using program-level recompiling */
     /*SHADER_EXECUTABLE_INSTANCE*                 pCurInstance;*/

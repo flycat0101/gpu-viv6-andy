@@ -3956,6 +3956,12 @@ clfFlushVIRKernelResource(
             gctBOOL   isCombinedMode = gcvFALSE;
 
             privEntry = &sep->staticPrivMapping.privConstantMapping.pPrivmConstantEntries[i];
+
+            if (privEntry->mode == SHADER_PRIV_CONSTANT_MODE_VAL_2_DUBO)
+            {
+                continue;
+            }
+
             Rows = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegRange;
             hwConstRegNo = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
             hwConstRegAddr = (hints->hwConstRegBases[gcvPROGRAM_STAGE_OPENCL]) + (hwConstRegNo * 16)

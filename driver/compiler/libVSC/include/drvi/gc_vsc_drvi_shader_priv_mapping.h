@@ -54,6 +54,7 @@ typedef enum SHS_PRIV_CONSTANT_KIND
     SHS_PRIV_CONSTANT_KIND_DATA_BIT_SIZE                    = 24,
     SHS_PRIV_CONSTANT_KIND_COMPUTE_GROUP_NUM_FOR_SINGLE_GPU = 25,
     SHS_PRIV_CONSTANT_KIND_VIEW_INDEX                       = 26,
+    SHS_PRIV_CONSTANT_KIND_DEFAULT_UBO_ADDRESS              = 27,
     SHS_PRIV_CONSTANT_KIND_COUNT, /* last member, add new kind beofre this */
 }SHS_PRIV_CONSTANT_KIND;
 
@@ -96,6 +97,7 @@ typedef enum SHADER_PRIV_CONSTANT_MODE
     SHADER_PRIV_CONSTANT_MODE_CTC           = 0,
     SHADER_PRIV_CONSTANT_MODE_VAL_2_INST    = 1,
     SHADER_PRIV_CONSTANT_MODE_VAL_2_MEMORREG= 2,
+    SHADER_PRIV_CONSTANT_MODE_VAL_2_DUBO    = 3,
 }
 SHADER_PRIV_CONSTANT_MODE;
 
@@ -125,6 +127,7 @@ typedef struct SHADER_PRIV_CONSTANT_ENTRY
         SHADER_CONSTANT_SUB_ARRAY_MAPPING*      pSubCBMapping; /* SHADER_PRIV_CONSTANT_MODE_VAL_2_MEMORREG */
         SHADER_PRIV_CONSTANT_CTC                ctcConstant;   /* SHADER_PRIV_CONSTANT_MODE_CTC */
         SHADER_PRIV_CONSTANT_INST_IMM           instImm;       /* SHADER_PRIV_CONSTANT_MODE_VAL_2_INST */
+        gctUINT                                 duboEntryIndex;/* SHADER_PRIV_CONSTANT_MODE_VAL_2_DUBO */
     } u;
 }
 SHADER_PRIV_CONSTANT_ENTRY;
@@ -234,6 +237,27 @@ typedef struct SHADER_DYNAMIC_PRIV_MAPPING
      SHADER_PRIV_SAMPLER_MAPPING                privSamplerMapping;
      SHADER_PRIV_OUTPUT_MAPPING                 privOutputMapping;
 }SHADER_DYNAMIC_PRIV_MAPPING;
+
+/* Default UBO mapping. */
+typedef enum SHS_DEFAULT_UBO_MEMBER_KIND
+{
+    SHS_DEFAULT_UBO_MEMBER_PRIV_CONST           = 0,
+}SHS_DEFAULT_UBO_MEMBER_KIND;
+
+typedef struct SHADER_DEFAULT_UBO_MEMBER_ENTRY
+{
+    gctUINT                                     memberIndexInOtherEntryTable;
+    SHS_DEFAULT_UBO_MEMBER_KIND                 memberKind;
+    gctUINT                                     offsetInByte;
+}SHADER_DEFAULT_UBO_MEMBER_ENTRY;
+
+typedef struct SHADER_DEFAULT_UBO_MAPPING
+{
+    gctUINT                                     baseAddressIndexInPrivConstTable;
+    SHADER_DEFAULT_UBO_MEMBER_ENTRY*            pDefaultUboMemberEntries;
+    gctUINT                                     countOfEntries;
+    gctUINT                                     sizeInByte;
+}SHADER_DEFAULT_UBO_MAPPING;
 
 END_EXTERN_C();
 

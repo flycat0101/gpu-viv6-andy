@@ -1978,7 +1978,7 @@ VIR_Shader_Construct0(
 
     Shader->object.type                 = gcvOBJ_VIR_SHADER;
     Shader->shaderKind                  = ShaderKind;
-    Shader->defaultUniformBlockIndex    = -1;
+    VIR_Shader_SetDefaultUBOIndex(Shader, -1);
     Shader->constUniformBlockIndex      = -1;
     Shader->samplerBaseOffset           = -1;
     Shader->baseSamplerId               = VIR_INVALID_ID;
@@ -9175,8 +9175,6 @@ VIR_Shader_GetConstBorderValueUniform(
     return VIR_Symbol_GetUniform(sym);
 }
 
-
-
 VSC_ErrCode
 VIR_Shader_GetDUBO(
     IN VIR_Shader *     Shader,
@@ -9187,20 +9185,13 @@ VIR_Shader_GetDUBO(
 {
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     VIR_UBOIdList* uboList = VIR_Shader_GetUniformBlocks(Shader);
-    gctUINT uboCount = VIR_IdList_Count(uboList);
     VIR_Symbol* duboSym = gcvNULL;
-    gctUINT i;
 
-    for (i = 0; i < uboCount; i++)
+    if (VIR_Shader_GetDefaultUBOIndex(Shader) != -1)
     {
-        VIR_Symbol*  uboSym = VIR_Shader_GetSymFromId(Shader, VIR_IdList_GetId(uboList, i));
+        duboSym = VIR_Shader_GetSymFromId(Shader, VIR_IdList_GetId(uboList, VIR_Shader_GetDefaultUBOIndex(Shader)));
 
-        gcmASSERT(VIR_Symbol_isUBO(uboSym));
-        if(isSymUBODUBO(uboSym))
-        {
-            duboSym = uboSym;
-            break;
-        }
+        gcmASSERT(isSymUBODUBO(duboSym));
     }
 
     if (duboSym == gcvNULL && !CreateDUBO)

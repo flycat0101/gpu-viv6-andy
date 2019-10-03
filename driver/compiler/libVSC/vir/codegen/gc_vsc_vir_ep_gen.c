@@ -2492,6 +2492,111 @@ static SHS_PRIV_CONSTANT_KIND _MapUniformKindToPrivConstKind(VIR_Shader* pShader
     return privConstKind;
 }
 
+static SHADER_DEFAULT_UBO_MEMBER_ENTRY* _enlargeDefaultUboMappingRoom(SHADER_DEFAULT_UBO_MAPPING* pDuboMapping,
+                                                                      gctUINT enlargeDuboEntryCount,
+                                                                      gctUINT* pStartDuboEntryIdx)
+{
+    void*                         pOldDuboEntry;
+    gctUINT                       oldDuboEntryCount, newDuboEntryCount;
+
+    pOldDuboEntry = pDuboMapping->pDefaultUboMemberEntries;
+    oldDuboEntryCount = pDuboMapping->countOfEntries;
+    newDuboEntryCount = oldDuboEntryCount + enlargeDuboEntryCount;
+    gcoOS_Allocate(gcvNULL,
+                   sizeof(SHADER_DEFAULT_UBO_MEMBER_ENTRY) * newDuboEntryCount,
+                   (gctPOINTER*)&pDuboMapping->pDefaultUboMemberEntries);
+
+    if (pOldDuboEntry)
+    {
+        memcpy(pDuboMapping->pDefaultUboMemberEntries, pOldDuboEntry,
+               oldDuboEntryCount*sizeof(SHADER_DEFAULT_UBO_MEMBER_ENTRY));
+
+        gcoOS_Free(gcvNULL, pOldDuboEntry);
+    }
+
+    pDuboMapping->countOfEntries = newDuboEntryCount;
+
+    if (pStartDuboEntryIdx)
+    {
+        *pStartDuboEntryIdx = oldDuboEntryCount;
+    }
+
+    /* Return first enlarged default UBO member entry */
+    return &pDuboMapping->pDefaultUboMemberEntries[oldDuboEntryCount];
+}
+
+static VSC_ErrCode _AllocateDefaultUboToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper,
+                                            SHADER_EXECUTABLE_PROFILE* pOutSEP)
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    SHADER_DEFAULT_UBO_MAPPING* pDuboMapping = &pOutSEP->defaultUboMapping;
+    VIR_Shader*                 pShader = pSepGenHelper->pShader;
+    VIR_Symbol*                 pDuboSym = gcvNULL;
+    VIR_Symbol*                 pDuboBaseAddrSym = gcvNULL;
+    VIR_UniformBlock*           pDubo = gcvNULL;
+    VIR_Uniform*                pDuboBaseAddrUniform = gcvNULL;
+    SHADER_PRIV_CONSTANT_ENTRY* pPrivCnstEntry = gcvNULL;
+    gctUINT                     llSlot, llArraySlot;
+
+    if (VIR_Shader_GetDefaultUBOIndex(pShader) == -1)
+    {
+        return errCode;
+    }
+
+    /* Get the default UBO symbol. */
+    pDuboSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(VIR_Shader_GetUniformBlocks(pShader), VIR_Shader_GetDefaultUBOIndex(pShader)));
+    if (!(pDuboSym && isSymUBODUBO(pDuboSym)))
+    {
+        gcmASSERT(gcvFALSE);
+        return errCode;
+    }
+
+    /* Get the default UBO. */
+    pDubo = VIR_Symbol_GetUBO(pDuboSym);
+
+    /* Get the base address symbol. */
+    pDuboBaseAddrSym = VIR_Shader_GetSymFromId(pShader, VIR_UBO_GetBaseAddress(pDubo));
+    if (pDuboBaseAddrSym == gcvNULL)
+    {
+        gcmASSERT(gcvFALSE);
+        return errCode;
+    }
+
+    /* Get the uniform. */
+    pDuboBaseAddrUniform = VIR_Symbol_GetUniform(pDuboBaseAddrSym);
+
+    /* Check if we need to allocate this UBO. */
+    if (pDuboBaseAddrUniform == gcvNULL || VIR_Uniform_GetPhysical(pDuboBaseAddrUniform) == -1)
+    {
+        return errCode;
+    }
+
+    if (!isSymUniformUsedInShader(pDuboBaseAddrSym)   &&
+        !isSymUniformImplicitlyUsed(pDuboBaseAddrSym) &&
+        !isSymUniformUsedInLTC(pDuboBaseAddrSym))
+    {
+        return errCode;
+    }
+
+    /* Allocate the default UBO mapping. */
+    pDuboMapping->sizeInByte = VIR_UBO_GetBlockSize(pDubo);
+
+    /* Creata a new private constant entry. */
+    pPrivCnstEntry = _enlargePrivCnstMappingRoom(&pOutSEP->staticPrivMapping.privConstantMapping, 1, &pDuboMapping->baseAddressIndexInPrivConstTable);
+    pPrivCnstEntry->commonPrivm.privmKind = SHS_PRIV_CONSTANT_KIND_DEFAULT_UBO_ADDRESS;
+    pPrivCnstEntry->commonPrivm.privmKindIndex = 0;
+    pPrivCnstEntry->commonPrivm.pPrivateData = gcvNULL;
+
+    llArraySlot = VIR_Symbol_GetArraySlot(pDuboBaseAddrSym);
+    gcmASSERT(llArraySlot != NOT_ASSIGNED);
+    llSlot = VIR_Symbol_GetFirstSlot(pDuboBaseAddrSym);
+
+    pPrivCnstEntry->mode = SHADER_PRIV_CONSTANT_MODE_VAL_2_MEMORREG;
+    pPrivCnstEntry->u.pSubCBMapping = &pOutSEP->constantMapping.pConstantArrayMapping[llArraySlot].pSubConstantArrays[llSlot];
+
+    return errCode;
+}
+
 static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper, SHADER_EXECUTABLE_PROFILE* pOutSEP)
 {
     VSC_ErrCode                    errCode = VSC_ERR_NONE;
@@ -2509,6 +2614,7 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
     SHADER_PRIV_UAV_ENTRY*         pPrivUavEntry;
     SHADER_PRIV_CONSTANT_ENTRY*    pPrivCnstEntry;
     SHADER_COMPILE_TIME_CONSTANT** ppCTC;
+    gctBOOL                        bCreateDuboInSep = (pOutSEP->defaultUboMapping.sizeInByte != 0);
 
     /* Gpr spilled memory */
     if (pShader->hasRegisterSpill)
@@ -2693,16 +2799,30 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
     for (virUniformIdx = 0; virUniformIdx < VIR_IdList_Count(pVirUniformLsts); virUniformIdx ++)
     {
         SHS_PRIV_CONSTANT_KIND  privConstKind;
+        gctUINT                 privConstIndex = 0;
         gctBOOL                 bOCLOnly = gcvFALSE;
+        gctBOOL                 bUseInDubo = gcvFALSE, bMapToDubo = gcvFALSE;
 
         pVirUniformSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirUniformLsts, virUniformIdx));
         pVirUniform = VIR_Symbol_GetUniformPointer(pShader, pVirUniformSym);
+        bUseInDubo = isSymUniformMovedToAUBO(pVirUniformSym) && bCreateDuboInSep;
 
-        if (pVirUniform == gcvNULL                      ||
-            VIR_Uniform_GetPhysical(pVirUniform) == -1  ||
+        if (pVirUniform == gcvNULL ||
             isSymUniformCompiletimeInitialized(pVirUniformSym))
         {
             continue;
+        }
+
+        if (VIR_Uniform_GetPhysical(pVirUniform) == -1)
+        {
+            if (bUseInDubo)
+            {
+                bMapToDubo = gcvTRUE;
+            }
+            else
+            {
+                continue;
+            }
         }
 
         if (!isSymUniformUsedInShader(pVirUniformSym)   &&
@@ -2722,7 +2842,7 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
         /* Collect OCL only private uniforms  */
 
         /* Creata a new private constant entry. */
-        pPrivCnstEntry = _enlargePrivCnstMappingRoom(&pOutSEP->staticPrivMapping.privConstantMapping, 1, gcvNULL);
+        pPrivCnstEntry = _enlargePrivCnstMappingRoom(&pOutSEP->staticPrivMapping.privConstantMapping, 1, &privConstIndex);
         pPrivCnstEntry->commonPrivm.privmKind = privConstKind;
         pPrivCnstEntry->commonPrivm.privmKindIndex = 0;
         pPrivCnstEntry->commonPrivm.pPrivateData = gcvNULL;
@@ -2743,12 +2863,28 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
             }
         }
 
-        llArraySlot = VIR_Symbol_GetArraySlot(pVirUniformSym);
-        gcmASSERT(llArraySlot != NOT_ASSIGNED);
-        llSlot = VIR_Symbol_GetFirstSlot(pVirUniformSym);
+        if (bMapToDubo)
+        {
+            SHADER_DEFAULT_UBO_MEMBER_ENTRY*    pDuboMemberEntry = gcvNULL;
+            gctUINT                             duboEntryIndex = 0;
 
-        pPrivCnstEntry->mode = SHADER_PRIV_CONSTANT_MODE_VAL_2_MEMORREG;
-        pPrivCnstEntry->u.pSubCBMapping = &pOutSEP->constantMapping.pConstantArrayMapping[llArraySlot].pSubConstantArrays[llSlot];
+            pDuboMemberEntry = _enlargeDefaultUboMappingRoom(&pOutSEP->defaultUboMapping, 1, &duboEntryIndex);
+            pDuboMemberEntry->memberIndexInOtherEntryTable = privConstIndex;
+            pDuboMemberEntry->memberKind = SHS_DEFAULT_UBO_MEMBER_PRIV_CONST;
+            pDuboMemberEntry->offsetInByte = VIR_Uniform_GetOffset(pVirUniform);
+
+            pPrivCnstEntry->mode = SHADER_PRIV_CONSTANT_MODE_VAL_2_DUBO;
+            pPrivCnstEntry->u.duboEntryIndex = duboEntryIndex;
+        }
+        else
+        {
+            llArraySlot = VIR_Symbol_GetArraySlot(pVirUniformSym);
+            gcmASSERT(llArraySlot != NOT_ASSIGNED);
+            llSlot = VIR_Symbol_GetFirstSlot(pVirUniformSym);
+
+            pPrivCnstEntry->mode = SHADER_PRIV_CONSTANT_MODE_VAL_2_MEMORREG;
+            pPrivCnstEntry->u.pSubCBMapping = &pOutSEP->constantMapping.pConstantArrayMapping[llArraySlot].pSubConstantArrays[llSlot];
+        }
     }
 
     return errCode;
@@ -5384,6 +5520,10 @@ vscVIR_GenerateSEP(
     /* Constant-mapping post-collection */
     errCode = _CollectConstantMappingToSEP(&sepGenHelper, pOutSEP, gcvTRUE);
     ON_ERROR(errCode, "Collect constant mapping to SEP");
+
+    /* Default UBO allocation. */
+    errCode = _AllocateDefaultUboToSEP(&sepGenHelper, pOutSEP);
+    ON_ERROR(errCode, "Allocate default UBO.");
 
     /* UAV-mapping post-collection */
     errCode = _CollectUavMappingToSEP(&sepGenHelper, pOutSEP, gcvTRUE);

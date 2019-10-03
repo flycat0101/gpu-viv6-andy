@@ -1025,8 +1025,7 @@ _VSC_UF_AUBO_CollectIndirectlyAccessedUniforms(
                         if(VIR_Operand_isSymbol(src0))
                         {
                             VIR_Symbol* sym = VIR_Operand_GetSymbol(src0);
-                            /* for sample_location, we need use VIR_UNIFORM_SAMPLE_LOCATION instead of moving to ubo */
-                            if (VIR_Symbol_isUniform(sym) && VIR_Symbol_GetUniformKind(sym) != VIR_UNIFORM_SAMPLE_LOCATION)
+                            if(VIR_Symbol_isUniform(sym))
                             {
                                 switch(level)
                                 {
@@ -1057,10 +1056,7 @@ _VSC_UF_AUBO_CollectIndirectlyAccessedUniforms(
                             if(VIR_Operand_isSymbol(src))
                             {
                                 VIR_Symbol* sym = VIR_Operand_GetSymbol(src);
-                                if(VIR_Symbol_isUniform(sym) && !VIR_Operand_GetIsConstIndexing(src) &&
-                                   VIR_Operand_GetRelAddrMode(src) != VIR_INDEXED_NONE &&
-                                   /* for sample_location, we need use VIR_UNIFORM_SAMPLE_LOCATION instead of moving to ubo */
-                                   VIR_Symbol_GetUniformKind(sym) != VIR_UNIFORM_SAMPLE_LOCATION)
+                                if(VIR_Symbol_isUniform(sym) && !VIR_Operand_GetIsConstIndexing(src) && VIR_Operand_GetRelAddrMode(src) != VIR_INDEXED_NONE)
                                 {
                                     uniform_sym = sym;
                                 }

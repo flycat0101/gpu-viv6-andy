@@ -5233,6 +5233,12 @@ static VkResult halti5_pip_process_priv_const(
             for (i = 0; i < privConstMapping->countOfEntries; i++)
             {
                 SHADER_PRIV_CONSTANT_ENTRY *privConstEntry = &privConstMapping->pPrivmConstantEntries[i];
+
+                if (privConstEntry->mode == SHADER_PRIV_CONSTANT_MODE_VAL_2_DUBO)
+                {
+                    continue;
+                }
+
                 switch (privConstEntry->commonPrivm.privmKind)
                 {
                 case SHS_PRIV_CONSTANT_KIND_BASE_INSTANCE:
@@ -5266,6 +5272,12 @@ static VkResult halti5_pip_process_priv_const(
             for (i = 0; i < privConstMapping->countOfEntries; i++)
             {
                 SHADER_PRIV_CONSTANT_ENTRY *privConstEntry = &privConstMapping->pPrivmConstantEntries[i];
+
+                if (privConstEntry->mode == SHADER_PRIV_CONSTANT_MODE_VAL_2_DUBO)
+                {
+                    continue;
+                }
+
                 switch (privConstEntry->commonPrivm.privmKind)
                 {
                 case SHS_PRIV_CONSTANT_KIND_SAMPLE_LOCATION:
@@ -5315,6 +5327,12 @@ static VkResult halti5_pip_process_priv_const(
             for (i = 0; i < privConstMapping->countOfEntries; i++)
             {
                 SHADER_PRIV_CONSTANT_ENTRY *privConstEntry = &privConstMapping->pPrivmConstantEntries[i];
+
+                if (privConstEntry->mode == SHADER_PRIV_CONSTANT_MODE_VAL_2_DUBO)
+                {
+                    continue;
+                }
+
                 switch (privConstEntry->commonPrivm.privmKind)
                 {
                 case SHS_PRIV_CONSTANT_KIND_COMPUTE_GROUP_NUM:

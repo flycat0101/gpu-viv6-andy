@@ -135,6 +135,12 @@ gceSTATUS vscInitializeSEP(SHADER_EXECUTABLE_PROFILE* pSEP)
     pSEP->samplerMapping.countOfSamplers = 0;
     pSEP->samplerMapping.hwSamplerRegCount = 0;
     pSEP->samplerMapping.maxHwSamplerRegIndex = NOT_ASSIGNED;
+
+    pSEP->defaultUboMapping.pDefaultUboMemberEntries = gcvNULL;
+    pSEP->defaultUboMapping.countOfEntries = 0;
+    pSEP->defaultUboMapping.sizeInByte = 0;
+    pSEP->defaultUboMapping.baseAddressIndexInPrivConstTable = 0xFFFFFFFF;
+
     return gcvSTATUS_OK;
 }
 
@@ -291,6 +297,15 @@ gceSTATUS vscFinalizeSEP(SHADER_EXECUTABLE_PROFILE* pSEP)
         gcoOS_Free(gcvNULL, pSEP->dynamicPrivMapping.privOutputMapping.pPrivOutputEntries);
         pSEP->dynamicPrivMapping.privOutputMapping.pPrivOutputEntries = gcvNULL;
         pSEP->dynamicPrivMapping.privOutputMapping.countOfEntries = 0;
+    }
+
+    if (pSEP->defaultUboMapping.pDefaultUboMemberEntries)
+    {
+        gcoOS_Free(gcvNULL, pSEP->defaultUboMapping.pDefaultUboMemberEntries);
+        pSEP->defaultUboMapping.pDefaultUboMemberEntries = gcvNULL;
+        pSEP->defaultUboMapping.countOfEntries = 0;
+        pSEP->defaultUboMapping.sizeInByte = 0;
+        pSEP->defaultUboMapping.baseAddressIndexInPrivConstTable = 0xFFFFFFFF;
     }
 
     vscInitializeSEP(pSEP);
