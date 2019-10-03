@@ -28328,13 +28328,13 @@ _MultiGPUSync2(
 
     }
 
-    gcoHARDWARE_Semaphore(Hardware,
+    gcmONERROR(gcoHARDWARE_Semaphore(Hardware,
                           (Hardware->features[gcvFEATURE_COMMAND_PREFETCH] ?
                             gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND),
                           (Hardware->features[gcvFEATURE_BLT_ENGINE] ?
                             gcvWHERE_BLT : gcvWHERE_PIXEL),
                           gcvHOW_SEMAPHORE_STALL,
-                          (gctPOINTER *)&memory);
+                          (gctPOINTER *)&memory));
 
     /* Select core 3D 0. */
     *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -28844,13 +28844,13 @@ _MultiGPUSyncV2(
 
     }
     /* Drain the whole pipe for each GPUs */
-    gcoHARDWARE_Semaphore(Hardware,
+    gcmONERROR(gcoHARDWARE_Semaphore(Hardware,
                           (Hardware->features[gcvFEATURE_COMMAND_PREFETCH] ?
                               gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND),
                           (Hardware->features[gcvFEATURE_BLT_ENGINE] ?
                               gcvWHERE_BLT : gcvWHERE_PIXEL),
                           gcvHOW_SEMAPHORE_STALL,
-                          (gctPOINTER *)&memory);
+                          (gctPOINTER *)&memory));
 
     for (coreID = 0; coreID < GPUCount; coreID++)
     {
@@ -29728,13 +29728,13 @@ _MultiGPUSyncV3(
 
     }
     /* Drain the whole pipe for each GPUs */
-    gcoHARDWARE_Semaphore(Hardware,
+    gcmONERROR(gcoHARDWARE_Semaphore(Hardware,
                           (Hardware->features[gcvFEATURE_COMMAND_PREFETCH] ?
                             gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND),
                           (Hardware->features[gcvFEATURE_BLT_ENGINE] ?
                             gcvWHERE_BLT : gcvWHERE_PIXEL),
                           gcvHOW_SEMAPHORE_STALL,
-                          (gctPOINTER *)&memory);
+                          (gctPOINTER *)&memory));
 
     /* Send a semaphore token from core0 to core1. */
     {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
