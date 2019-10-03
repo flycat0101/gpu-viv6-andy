@@ -3191,7 +3191,16 @@ static gceSTATUS gcSHADER_GetTempFileName(IN gctBOOL     isPatch,
     gceSTATUS status = gcvSTATUS_OK;
     gctCHAR gcTmpFileName[_cldFILENAME_MAX+1];
 
-    gcmONERROR(vscGetTemporaryDir(gcTmpFileName));
+    gctSTRING env = gcvNULL;
+    gcoOS_GetEnv(gcvNULL, "VIV_LIB_SHADER_DIR", &env);
+    if (env)
+    {
+        gcoOS_StrCopySafe(gcTmpFileName, _cldFILENAME_MAX, env);
+    }
+    else
+    {
+        gcmONERROR(vscGetTemporaryDir(gcTmpFileName));
+    }
 #if _WIN32
     gcmONERROR(gcoOS_StrCatSafe(gcTmpFileName,
         _cldFILENAME_MAX,
