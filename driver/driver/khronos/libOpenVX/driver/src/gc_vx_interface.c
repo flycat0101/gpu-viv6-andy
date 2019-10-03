@@ -125,6 +125,7 @@ static vx_status getOvx12FullFilePath(char *fullpath, vx_size len, const char su
     }
 }
 
+#if !gcdUSE_VXC_BINARY
 VX_PRIVATE_API vx_string vxoLoadSource(vx_char *filename, vx_size *programSize)
 {
     FILE *pFile = NULL;
@@ -186,6 +187,7 @@ OnError:
     gcmFOOTER_NO();
     return NULL;
 }
+#endif
 
 VX_PRIVATE_API vx_shader* vxGetVxKernelShadersByEnum(vx_context context, vx_enum kernelEnum)
 {

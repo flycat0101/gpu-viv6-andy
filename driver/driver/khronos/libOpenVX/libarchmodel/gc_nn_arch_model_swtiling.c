@@ -472,15 +472,6 @@ static void setSegmentCostResult(
     archModel->splitInfoArray[segment_first % MAX_LAYERS_OF_BLOCK]->savedSegmentCost[segment_last % MAX_LAYERS_OF_BLOCK].bw = cost->bw;
 }
 
-static vx_int32 getBestCostSWTilingTypeInfo(
-    struct _archModelInfo *archModel,
-    vx_int32 segment_first,
-    vx_int32 segment_last)
-{
-    gcmASSERT(segment_first >= 0);
-    gcmASSERT(segment_last >= 0);
-    return archModel->splitInfoArray[segment_first % MAX_LAYERS_OF_BLOCK]->bestCostSWTilingType[segment_last % MAX_LAYERS_OF_BLOCK];
-}
 
 static void setBestCostSWTilingTypeInfo(
     struct _archModelInfo *archModel,
@@ -759,25 +750,6 @@ static vx_uint32 _outbuf_needed_ex(
         }
     }
     return outBufNeeded;
-}
-static vx_int32 _calc_gcd(vx_int32 a, vx_int32 b)
-{
-    vx_int32 t;
-
-    while (b != 0)
-    {
-        t = b;
-        b = a % b;
-        a = t;
-    }
-
-    return a;
-}
-
-static vx_int32 _calc_lcm(vx_int32 a, vx_int32 b)
-{
-    vx_int32 x = _calc_gcd(a, b);
-    return (vx_int32)(a * b / x);
 }
 
 vx_uint32 _calc_full_cached_space_needed(struct _archModelInfo *archModel, vx_uint32 segment_index, vx_uint32 psixArray[], vx_uint32 psiyArray[], vx_uint32 max_tile_size)
