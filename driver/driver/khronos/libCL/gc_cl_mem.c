@@ -2630,6 +2630,7 @@ OnError:
 #define MAKE_HEX_LONG(x,y,z)   ((long double) ldexp( (long double)(y), z))
 
 #define SATURATE( v, min, max ) ( v < min ? min : ( v > max ? max : v ) )
+#define SATURATEUI( v, max ) ( v > max ? max : v )
 
 #define CLBGRA2GRGA(TYPE) \
     if (imageFormat->image_channel_order == CL_BGRA) \
@@ -2690,7 +2691,7 @@ gctINT clfPackImagePixelui( cl_uint *srcVector, const cl_image_format *imageForm
         {
             unsigned char *ptr = (unsigned char *)outData;
             for( i = 0; i < channelCount; i++ )
-                ptr[ i ] = (unsigned char)SATURATE( srcVector[ i ], 0, 255 );
+                ptr[ i ] = (unsigned char)SATURATEUI( srcVector[ i ], 0, 255 );
             CLBGRA2GRGA(unsigned char);
             break;
         }
@@ -2698,7 +2699,7 @@ gctINT clfPackImagePixelui( cl_uint *srcVector, const cl_image_format *imageForm
         {
             unsigned short *ptr = (unsigned short *)outData;
             for( i = 0; i < channelCount; i++ )
-                ptr[ i ] = (unsigned short)SATURATE( srcVector[ i ], 0, 65535 );
+                ptr[ i ] = (unsigned short)SATURATEUI( srcVector[ i ], 0, 65535 );
             CLBGRA2GRGA(unsigned short);
             break;
         }

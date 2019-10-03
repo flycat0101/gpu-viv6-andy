@@ -105,6 +105,7 @@ void khrIcdOsVendorsEnumerate(void)
                 char* fileName = NULL;
                 char* buffer = NULL;
                 long bufferSize = 0;
+                int status = 0;
 
                 /* make sure the file name ends in .icd */
                 if (strlen(extension) > strlen(dirEntry->d_name) )
@@ -132,9 +133,9 @@ void khrIcdOsVendorsEnumerate(void)
                     free(fileName);
                     break;
                 }
-                fseek(fin, 0, SEEK_END);
+                status = fseek(fin, 0, SEEK_END);
                 bufferSize = ftell(fin);
-                if (bufferSize == -1)
+                if ((status != 0 ) || (bufferSize == -1))
                 {
                     free(fileName);
                     fclose(fin);
@@ -149,7 +150,15 @@ void khrIcdOsVendorsEnumerate(void)
                     break;
                 }
                 memset(buffer, 0, bufferSize+1);
-                fseek(fin, 0, SEEK_SET);
+                status = fseek(fin, 0, SEEK_SET);
+                if(status != 0)
+                {
+                    free(fileName);
+                    free(buffer);
+                    fclose(fin);
+                    break;
+                }
+
                 if (bufferSize != (long)fread(buffer, 1, bufferSize, fin) )
                 {
                     free(fileName);

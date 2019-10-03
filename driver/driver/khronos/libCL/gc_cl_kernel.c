@@ -1793,7 +1793,8 @@ clfLoadKernelArgValues(
                     datas[index] = (gctINT *) &gpuPhysicals[index];
                 }
 
-                clfSetUniformValueCombinedMode(Arg->uniform, length, datas, gpuCount);
+                clmONERROR(clfSetUniformValueCombinedMode(Arg->uniform, length, datas, gpuCount),
+                            CL_INVALID_VALUE);
 
             }
 

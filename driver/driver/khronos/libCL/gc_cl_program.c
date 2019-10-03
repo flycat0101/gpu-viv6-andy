@@ -623,8 +623,10 @@ static gceSTATUS clfUpdateCompileOption(clsPlatformId_PTR platform, gctSTRING *o
     gcmASSERT(extraOptionLength);
     gcmVERIFY_OK(gcoOS_StrCatSafe((gctSTRING)pointer, totalLength, " -cl-viv-gcsl-driver-image"));
 
-
-    *options = (gctSTRING)pointer;
+    if(*options)
+    {
+        *options = (gctSTRING)pointer;
+    }
 OnError:
     return status;
 

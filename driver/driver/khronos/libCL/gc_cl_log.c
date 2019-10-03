@@ -131,7 +131,7 @@ cl_int LogclCreateSubDevices(
 {
     cl_uint i = 0;
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateSubDevices, InDevice:%p, Properties:%p, NumDevices:%d, NumDevicesRet\n", tid, InDevice, Properties?*Properties:0, NumDevices, NumDevicesRet?*NumDevicesRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateSubDevices, InDevice:%p, Properties:%d, NumDevices:%d, NumDevicesRet:%d\n", tid, InDevice, Properties?*Properties:0, NumDevices, NumDevicesRet?*NumDevicesRet:0);
     if(OutDevices)
     {
         for(i=0; i<(*NumDevicesRet); i++)
@@ -202,7 +202,7 @@ cl_context LogclCreateContextFromType_Pre(
     cl_int *                      ErrcodeRet
     )
 {
-    CL_LOG_API("CL(tid=%d): clCreateContextFromType_Pre, Properties:%p, DeviceType:0x%x, callbackFunc:%p, UserData:%p, ErrcodeRet:%d\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Properties, DeviceType, PfnNotify, UserData, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateContextFromType_Pre, Properties:%p, DeviceType:0x%llx, callbackFunc:%p, UserData:%p, ErrcodeRet:%d\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Properties, DeviceType, PfnNotify, UserData, ErrcodeRet?*ErrcodeRet:0);
     return gcvNULL;
 }
 
@@ -216,7 +216,7 @@ cl_context LogclCreateContextFromType_Post(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateContextFromType_Post, Properties:%p, DeviceType:0x%x, callbackFunc:%p, UserData:%p, ErrcodeRet:%d\n", tid, Properties, DeviceType, PfnNotify, UserData, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateContextFromType_Post, Properties:%p, DeviceType:0x%llx, callbackFunc:%p, UserData:%p, ErrcodeRet:%d\n", tid, Properties, DeviceType, PfnNotify, UserData, ErrcodeRet?*ErrcodeRet:0);
     CL_LOG_API("CL(tid=%d): context:%p\n", tid, context);
     return gcvNULL;
 }
@@ -254,7 +254,7 @@ cl_command_queue LogclCreateCommandQueue_Pre(
     cl_int *                       ErrcodeRet
     )
 {
-    CL_LOG_API("CL(tid=%d): clCreateCommandQueue_Pre, context:%p, device:%p, Properties:0x%x, ErrcodeRet:%d\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Context, Device, Properties, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateCommandQueue_Pre, context:%p, device:%p, Properties:0x%llx, ErrcodeRet:%d\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Context, Device, Properties, ErrcodeRet?*ErrcodeRet:0);
     return gcvNULL;
 }
 
@@ -267,7 +267,7 @@ cl_command_queue LogclCreateCommandQueue_Post(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateCommandQueue_Post, context:0x%x, device:0x%x, Properties:0x%x, ErrcodeRet:%d\n", tid, Context, Device, Properties, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateCommandQueue_Post, context:%p, device:%p, Properties:0x%llx, ErrcodeRet:%d\n", tid, Context, Device, Properties, ErrcodeRet?*ErrcodeRet:0);
     CL_LOG_API("CL(tid=%d): clCreateCommandQueue_Post, Commandqueue:%p\n", tid, Commandqueue);
     return gcvNULL;
 }
@@ -305,7 +305,7 @@ cl_mem LogclCreateBuffer_Pre(
     void *       HostPtr,
     cl_int *     ErrcodeRet)
 {
-    CL_LOG_API("CL(tid=%d): clCreateBuffer_Pre, context:%p, Flags:0x%x, Size:%d, HostPtr:%p, ErrcodeRet:%d\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Context, Flags, Size, HostPtr, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateBuffer_Pre, context:%p, Flags:0x%llx, Size:%d, HostPtr:%p, ErrcodeRet:%d\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Context, Flags, Size, HostPtr, ErrcodeRet?*ErrcodeRet:0);
     return gcvNULL;
 }
 
@@ -318,7 +318,7 @@ cl_mem LogclCreateBuffer_Post(
     cl_mem       buffer)
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateBuffer_Post, context:%p, Flags:0x%x, Size:%d, HostPtr:%p, ErrcodeRet:%d\n", tid, Context, Flags, Size, HostPtr, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateBuffer_Post, context:%p, Flags:0x%llx, Size:%d, HostPtr:%p, ErrcodeRet:%d\n", tid, Context, Flags, Size, HostPtr, ErrcodeRet?*ErrcodeRet:0);
     CL_LOG_API("CL(tid=%d): clCreateBuffer_Post, buffer:%p\n", tid, buffer);
     return gcvNULL;
 }
@@ -332,7 +332,7 @@ cl_mem LogclCreateSubBuffer_Pre(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateSubBuffer_Pre, Buffer:%p, Flags:0x%x, BufferCreateType:0x%x, ErrcodeRet:%d\n", tid, Buffer, Flags, BufferCreateType, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateSubBuffer_Pre, Buffer:%p, Flags:0x%llx, BufferCreateType:0x%x, ErrcodeRet:%d\n", tid, Buffer, Flags, BufferCreateType, ErrcodeRet?*ErrcodeRet:0);
     CL_LOG_API("CL(tid=%d): clCreateSubBuffer_Pre, BufferCreateInfo->origin:%d, BufferCreateInfo->size:%d\n", tid, ((cl_buffer_region*)BufferCreateInfo)->origin, ((cl_buffer_region*)BufferCreateInfo)->size);
     return gcvNULL;
 }
@@ -347,7 +347,7 @@ cl_mem LogclCreateSubBuffer_Post(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateSubBuffer_Post, Buffer:%p, Flags:0x%x, BufferCreateType:0x%x, ErrcodeRet:%d\n", tid, Buffer, Flags, BufferCreateType, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateSubBuffer_Post, Buffer:%p, Flags:0x%llx, BufferCreateType:0x%x, ErrcodeRet:%d\n", tid, Buffer, Flags, BufferCreateType, ErrcodeRet?*ErrcodeRet:0);
     CL_LOG_API("CL(tid=%d): clCreateSubBuffer_Post, BufferCreateInfo->origin:%d, BufferCreateInfo->size:%d\n", tid, ((cl_buffer_region*)BufferCreateInfo)->origin, ((cl_buffer_region*)BufferCreateInfo)->size);
     CL_LOG_API("CL(tid=%d): clCreateSubBuffer_Post, subBuffer:%p\n", tid, subBuffer);
     return gcvNULL;
@@ -363,7 +363,7 @@ cl_mem LogclCreateImage_Pre(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateImage_Pre, context:%p, flags:0x%x, hostPtr:%p, ErrcodeRet:%d\n", tid, Context, Flags, HostPtr, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateImage_Pre, context:%p, flags:0x%llx, hostPtr:%p, ErrcodeRet:%d\n", tid, Context, Flags, HostPtr, ErrcodeRet?*ErrcodeRet:0);
     CL_LOG_API("CL(tid=%d): clCreateImage_Pre, image_channel_order:0x%x, image_channel_data_type:0x%x\n", tid, ImageFormat->image_channel_order, ImageFormat->image_channel_data_type);
     CL_LOG_API("CL(tid=%d): clCreateImage_Pre, image_type:0x%x, width:%d, height:%d, depth:%d\n", tid, ImageDesc->image_type, ImageDesc->image_width, ImageDesc->image_height, ImageDesc->image_depth);
     CL_LOG_API("CL(tid=%d): clCreateImage_Pre, image_array_size:%d, image_row_pitch:%d, image_slice_pitch:%d, buffer:%p\n", tid, ImageDesc->image_array_size, ImageDesc->image_row_pitch, ImageDesc->image_slice_pitch, ImageDesc->buffer);
@@ -381,7 +381,7 @@ cl_mem LogclCreateImage_Post(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateImage_Pre, context:%p, flags:0x%x, hostPtr:%p, ErrcodeRet:%d\n", tid, Context, Flags, HostPtr, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateImage_Pre, context:%p, flags:0x%llx, hostPtr:%p, ErrcodeRet:%d\n", tid, Context, Flags, HostPtr, ErrcodeRet?*ErrcodeRet:0);
     CL_LOG_API("CL(tid=%d): clCreateImage_Pre, image_channel_order:0x%x, image_channel_data_type:0x%x\n", tid, ImageFormat->image_channel_order, ImageFormat->image_channel_data_type);
     CL_LOG_API("CL(tid=%d): clCreateImage_Pre, image_type:0x%x, width:%d, height:%d, depth:%d\n", tid, ImageDesc->image_type, ImageDesc->image_width, ImageDesc->image_height, ImageDesc->image_depth);
     CL_LOG_API("CL(tid=%d): clCreateImage_Pre, image_array_size:%d, image_row_pitch:%d, image_slice_pitch:%d, buffer:%p\n", tid, ImageDesc->image_array_size, ImageDesc->image_row_pitch, ImageDesc->image_slice_pitch, ImageDesc->buffer);
@@ -412,7 +412,7 @@ cl_int LogclGetSupportedImageFormats(
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
     cl_uint i   = 0;
-    CL_LOG_API("CL(tid=%d): clGetSupportedImageFormats, Context:%p, Flags:0x%x, ImageType:0x%x, NumEntries:%d, NumImageFormats:%d\n", tid, Context, Flags, ImageType, NumEntries, NumImageFormats?*NumImageFormats:0);
+    CL_LOG_API("CL(tid=%d): clGetSupportedImageFormats, Context:%p, Flags:0x%llx, ImageType:0x%x, NumEntries:%d, NumImageFormats:%d\n", tid, Context, Flags, ImageType, NumEntries, NumImageFormats?*NumImageFormats:0);
     if(ImageFormats)
     {
         for(i=0; i<NumEntries; i++)
@@ -628,7 +628,7 @@ cl_program LogclCreateProgramWithBuiltInKernels_Post(
     CL_LOG_API("CL(tid=%d): clCreateProgramWithBuiltInKernels_Post, Context:%p, NumDevices:%d, ErrcodeRet:%d, Program:%p\n", tid, Context, NumDevices, ErrcodeRet?*ErrcodeRet:0, program);
     for(i=0; i<NumDevices; i++)
     {
-        CL_LOG_API("CL(tid=%d): clCreateProgramWithBuiltInKernels_Post, DeviceList[%d]:%p, KernelNames[%d]:%s\n", tid, i, DeviceList[i], i, KernelNames[i]);
+        CL_LOG_API("CL(tid=%d): clCreateProgramWithBuiltInKernels_Post, DeviceList[%d]:%p, KernelNames[%d]:%s\n", tid, i, DeviceList[i], i, KernelNames);
     }
     return gcvNULL;
 }
@@ -1620,7 +1620,7 @@ cl_mem LogclCreateImage2D_Pre(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateImage2D_Pre, context:%p, flags:0x%x, hostPtr:%p, ErrcodeRet:%d\n", tid, Context, Flags, HostPtr, (ErrcodeRet?*ErrcodeRet:0));
+    CL_LOG_API("CL(tid=%d): clCreateImage2D_Pre, context:%p, flags:0x%llx, hostPtr:%p, ErrcodeRet:%d\n", tid, Context, Flags, HostPtr, (ErrcodeRet?*ErrcodeRet:0));
     CL_LOG_API("CL(tid=%d): clCreateImage2D_Pre, image_channel_order:0x%x, image_channel_data_type:0x%x\n", tid, ImageFormat->image_channel_order, ImageFormat->image_channel_data_type);
     CL_LOG_API("CL(tid=%d): clCreateImage2D_Pre, width:%d, height:%d, ImageRowPitch:%d\n", tid, ImageWidth, ImageHeight, ImageRowPitch);
     return gcvNULL;
@@ -1639,7 +1639,7 @@ cl_mem LogclCreateImage2D_Post(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateImage2D_Post, context:%p, flags:0x%x, hostPtr:0x%x, ErrcodeRet:%d\n", tid, Context, Flags, HostPtr, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateImage2D_Post, context:%p, flags:0x%llx, hostPtr:0x%x, ErrcodeRet:%d\n", tid, Context, Flags, HostPtr, ErrcodeRet?*ErrcodeRet:0);
     CL_LOG_API("CL(tid=%d): clCreateImage2D_Post, image_channel_order:0x%x, image_channel_data_type:0x%x\n", tid, ImageFormat->image_channel_order, ImageFormat->image_channel_data_type);
     CL_LOG_API("CL(tid=%d): clCreateImage2D_Post, width:%d, height:%d, ImageRowPitch:%d, image:%p\n", tid, ImageWidth, ImageHeight, ImageRowPitch, image);
     return gcvNULL;
@@ -1659,7 +1659,7 @@ cl_mem LogclCreateImage3D_Pre(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateImage3D_Pre, context:%p, flags:0x%x, hostPtr:%p, ErrcodeRet:%d\n", tid, Context, Flags, HostPtr, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateImage3D_Pre, context:%p, flags:0x%llx, hostPtr:%p, ErrcodeRet:%d\n", tid, Context, Flags, HostPtr, ErrcodeRet?*ErrcodeRet:0);
     CL_LOG_API("CL(tid=%d): clCreateImage3D_Pre, image_channel_order:0x%x, image_channel_data_type:0x%x\n", tid, ImageFormat->image_channel_order, ImageFormat->image_channel_data_type);
     CL_LOG_API("CL(tid=%d): clCreateImage3D_Pre, width:%d, height:%d, depth:%d, ImageRowPitch:%d, ImageSlicePitch:%d\n", tid, ImageWidth, ImageHeight, ImageDepth, ImageRowPitch, ImageSlicePitch);
     return gcvNULL;
@@ -1680,7 +1680,7 @@ cl_mem LogclCreateImage3D_Post(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateImage2D_Post, context:%p, flags:0x%x, hostPtr:%p, ErrcodeRet:%d\n", tid, Context, Flags, HostPtr, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateImage2D_Post, context:%p, flags:0x%llx, hostPtr:%p, ErrcodeRet:%d\n", tid, Context, Flags, HostPtr, ErrcodeRet?*ErrcodeRet:0);
     CL_LOG_API("CL(tid=%d): clCreateImage2D_Post, image_channel_order:0x%x, image_channel_data_type:0x%x\n", tid, ImageFormat->image_channel_order, ImageFormat->image_channel_data_type);
     CL_LOG_API("CL(tid=%d): clCreateImage3D_Pre, width:%d, height:%d, depth:%d, ImageRowPitch:%d, ImageSlicePitch:%d, image:%p\n", tid, ImageWidth, ImageHeight, ImageDepth, ImageRowPitch, ImageSlicePitch, image);
     return gcvNULL;
@@ -1774,7 +1774,7 @@ cl_mem LogclCreateFromGLBuffer_Pre(
     int *           ErrcodeRet
     )
 {
-    CL_LOG_API("CL(tid=%d): clCreateFromGLBuffer_Pre, Context:%p, Flags:0x%x, BufObj:%d, ErrcodeRet:%d\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Context, Flags, BufObj, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateFromGLBuffer_Pre, Context:%p, Flags:0x%llx, BufObj:%d, ErrcodeRet:%d\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Context, Flags, BufObj, ErrcodeRet?*ErrcodeRet:0);
     return gcvNULL;
 }
 
@@ -1786,7 +1786,7 @@ cl_mem LogclCreateFromGLBuffer_Post(
     cl_mem          memObj
     )
 {
-    CL_LOG_API("CL(tid=%d): clCreateFromGLBuffer_Post, Context:%p, Flags:0x%x, BufObj:%d, ErrcodeRet:%d, memObj:0x%x\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Context, Flags, BufObj, ErrcodeRet?*ErrcodeRet:0, memObj);
+    CL_LOG_API("CL(tid=%d): clCreateFromGLBuffer_Post, Context:%p, Flags:0x%llx, BufObj:%d, ErrcodeRet:%d, memObj:%p\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Context, Flags, BufObj, ErrcodeRet?*ErrcodeRet:0, memObj);
     return 0;
 }
 
@@ -1800,7 +1800,7 @@ cl_mem LogclCreateFromGLTexture_Pre(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateFromGLTexture_Pre, Context:%p, Flags:0x%x, Target:%d\n", tid, Context, Flags, Target);
+    CL_LOG_API("CL(tid=%d): clCreateFromGLTexture_Pre, Context:%p, Flags:0x%llx, Target:%d\n", tid, Context, Flags, Target);
     CL_LOG_API("CL(tid=%d): clCreateFromGLTexture_Pre, MipLevel:%d, Texture:%d, ErrcodeRet:%d\n", tid, MipLevel, Texture, ErrcodeRet?*ErrcodeRet:0);
     return gcvNULL;
 }
@@ -1816,7 +1816,7 @@ cl_mem LogclCreateFromGLTexture_Post(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateFromGLTexture_Pre, Context:%p, Flags:0x%x, Target:%d\n", tid, Context, Flags, Target);
+    CL_LOG_API("CL(tid=%d): clCreateFromGLTexture_Pre, Context:%p, Flags:0x%llx, Target:%d\n", tid, Context, Flags, Target);
     CL_LOG_API("CL(tid=%d): clCreateFromGLTexture_Pre, MipLevel:%d, Texture:%d, ErrcodeRet:%d, memObj:%p\n", tid, MipLevel, Texture, ErrcodeRet?*ErrcodeRet:0, memObj);
     return gcvNULL;
 }
@@ -1828,7 +1828,7 @@ cl_mem LogclCreateFromGLRenderbuffer_Pre(
     cl_int *        ErrcodeRet
     )
 {
-    CL_LOG_API("CL(tid=%d): clCreateFromGLRenderbuffer_Pre, Context:%p, Flags:0x%x, Renderbuffer:%d, ErrcodeRet:%d\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Context, Flags, Renderbuffer, ErrcodeRet?*ErrcodeRet:0);
+    CL_LOG_API("CL(tid=%d): clCreateFromGLRenderbuffer_Pre, Context:%p, Flags:0x%llx, Renderbuffer:%d, ErrcodeRet:%d\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Context, Flags, Renderbuffer, ErrcodeRet?*ErrcodeRet:0);
     return gcvNULL;
 }
 
@@ -1840,7 +1840,7 @@ cl_mem LogclCreateFromGLRenderbuffer_Post(
     cl_mem          memObj
     )
 {
-    CL_LOG_API("CL(tid=%d): clCreateFromGLRenderbuffer_Post, Context:%p, Flags:0x%x, Renderbuffer:%d, ErrcodeRet:%d, memObj:%p\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Context, Flags, Renderbuffer, ErrcodeRet?*ErrcodeRet:0, memObj);
+    CL_LOG_API("CL(tid=%d): clCreateFromGLRenderbuffer_Post, Context:%p, Flags:0x%llx, Renderbuffer:%d, ErrcodeRet:%d, memObj:%p\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), Context, Flags, Renderbuffer, ErrcodeRet?*ErrcodeRet:0, memObj);
     return gcvNULL;
 }
 
@@ -1923,7 +1923,7 @@ cl_mem LogclCreateFromGLTexture2D_Pre(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateFromGLTexture2D_Pre, Context:%p, Flags:0x%x, Target:%d\n", tid, Context, Flags, Target);
+    CL_LOG_API("CL(tid=%d): clCreateFromGLTexture2D_Pre, Context:%p, Flags:0x%llx, Target:%d\n", tid, Context, Flags, Target);
     CL_LOG_API("CL(tid=%d): clCreateFromGLTexture2D_Pre, MipLevel:%d, Texture:%d, ErrcodeRet:%d\n", tid, MipLevel, Texture, ErrcodeRet?*ErrcodeRet:0);
     return gcvNULL;
 }
@@ -1939,7 +1939,7 @@ cl_mem LogclCreateFromGLTexture2D_Post(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateFromGLTexture2D_Pre, Context:%p, Flags:0x%x, Target:%d\n", tid, Context, Flags, Target);
+    CL_LOG_API("CL(tid=%d): clCreateFromGLTexture2D_Pre, Context:%p, Flags:0x%llx, Target:%d\n", tid, Context, Flags, Target);
     CL_LOG_API("CL(tid=%d): clCreateFromGLTexture2D_Pre, MipLevel:%d, Texture:%d, ErrcodeRet:%d, memObj:%p\n", tid, MipLevel, Texture, ErrcodeRet?*ErrcodeRet:0, memObj);
     return gcvNULL;
 }
@@ -1954,7 +1954,7 @@ cl_mem LogclCreateFromGLTexture3D_Pre(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateFromGLTexture3D_Pre, Context:%p, Flags:0x%x, Target:%d\n", tid, Context, Flags, Target);
+    CL_LOG_API("CL(tid=%d): clCreateFromGLTexture3D_Pre, Context:%p, Flags:0x%llx, Target:%d\n", tid, Context, Flags, Target);
     CL_LOG_API("CL(tid=%d): clCreateFromGLTexture3D_Pre, MipLevel:%d, Texture:%d, ErrcodeRet:%d\n", tid, MipLevel, Texture, ErrcodeRet?*ErrcodeRet:0);
     return gcvNULL;
 }
@@ -1970,7 +1970,7 @@ cl_mem LogclCreateFromGLTexture3D_Post(
     )
 {
     cl_int tid = (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID();
-    CL_LOG_API("CL(tid=%d): clCreateFromGLTexture3D_Post, Context:%p, Flags:0x%x, Target:%d\n", tid, Context, Flags, Target);
+    CL_LOG_API("CL(tid=%d): clCreateFromGLTexture3D_Post, Context:%p, Flags:0x%llx, Target:%d\n", tid, Context, Flags, Target);
     CL_LOG_API("CL(tid=%d): clCreateFromGLTexture3D_Post, MipLevel:%d, Texture:%d, ErrcodeRet:%d, memObj:%p\n", tid, MipLevel, Texture, ErrcodeRet?*ErrcodeRet:0, memObj);
     return gcvNULL;
 }
@@ -1992,7 +1992,7 @@ cl_event LogclCreateEventFromGLsyncKHR_Pre(
     cl_GLsync sync,
     cl_int * errcode_ret)
 {
-    CL_LOG_API("CL(tid=%d): clCreateEventFromGLsyncKHR_Pre, context:%p, sync:%d, errcode_ret:%d\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), context, sync, errcode_ret?*errcode_ret:0);
+    CL_LOG_API("CL(tid=%d): clCreateEventFromGLsyncKHR_Pre, context:%p, sync:%p, errcode_ret:%d\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), context, sync, errcode_ret?*errcode_ret:0);
     return gcvNULL;
 }
 
@@ -2002,7 +2002,7 @@ cl_event LogclCreateEventFromGLsyncKHR_Post(
     cl_int      * errcode_ret,
     cl_event    Event)
 {
-    CL_LOG_API("CL(tid=%d): clCreateEventFromGLsyncKHR_Pre, context:%p, sync:%d, errcode_ret:%d, event:%p\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), context, sync, errcode_ret?*errcode_ret:0, Event);
+    CL_LOG_API("CL(tid=%d): clCreateEventFromGLsyncKHR_Pre, context:%p, sync:%p, errcode_ret:%d, event:%p\n", (cl_int)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), context, sync, errcode_ret?*errcode_ret:0, Event);
     return gcvNULL;
 }
 
