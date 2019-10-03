@@ -3513,12 +3513,16 @@ gcoSTREAM_DynamicCacheAttributes(
         gcmONERROR(_NewDynamicCache(Stream, Bytes));
         cache = &Stream->cache[(Stream->cacheCurrent) % gcdSTREAM_CACHE_COUNT];
     }
-    gcmASSERT(cache->dynamicNode);
 
     /* Allocate data form the cache. */
     offset         = cache->offset;
     cache->offset += Bytes;
     cache->free   -= Bytes;
+
+    if (!cache->dynamicNode)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
 
     /* Copy the data. */
     gcmONERROR(_copyBuffers(BufferCount,
