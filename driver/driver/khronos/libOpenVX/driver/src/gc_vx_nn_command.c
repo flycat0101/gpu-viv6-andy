@@ -3954,8 +3954,8 @@ _CalculateSplitSizes(vxnne_tensor_info input,
     inferred_input_size_x = output->width * stride_x;
     inferred_input_size_y = output->height * stride_y;
 
-    pad_left = (parameter->pad_x_left == 0xFFFFFFFF) ? 0: parameter->pad_x_left;
-    pad_top = (parameter->pad_y_top == 0xFFFFFFFF) ? 0: parameter->pad_y_top;
+    pad_left = parameter->pad_x_left;
+    pad_top = parameter->pad_y_top;
     pad_right = (inferred_input_size_x > parameter->pad_x_left + input->width) ?
                 inferred_input_size_x - (parameter->pad_x_left + input->width) : 0;
     pad_bottom = (inferred_input_size_y > parameter->pad_y_top + input->height) ?
@@ -3963,7 +3963,7 @@ _CalculateSplitSizes(vxnne_tensor_info input,
 
     output_center_unit_size_x = output->width / div_x;
     output_remainder_size_x = output->width % div_x;
-    if ((output_center_unit_size_x +  (output_remainder_size_x ? 1 : 0)) * stride_x <= pad_left)
+    if ((vx_int32)((output_center_unit_size_x +  (output_remainder_size_x ? 1 : 0)) * stride_x) <= (vx_int32)pad_left)
     {
         output_left_unit_size_x = (pad_left + 1 + stride_x - 1) / stride_x;
     }
@@ -3997,7 +3997,7 @@ _CalculateSplitSizes(vxnne_tensor_info input,
 
     output_center_unit_size_y = output->height / div_y;
     output_remainder_size_y = output->height % div_y;
-    if ((output_center_unit_size_y +  (output_remainder_size_y ? 1 : 0)) * stride_y <= pad_top)
+    if ((vx_int32)((output_center_unit_size_y +  (output_remainder_size_y ? 1 : 0)) * stride_y) <= (vx_int32)pad_top)
     {
         output_top_unit_size_y = (pad_top + 1 + stride_y - 1) / stride_y;
     }
@@ -4263,8 +4263,8 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
     vx_uint32 core = tp_type != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
                                                context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
     vx_bool mult = context->options.enableMultiTP && core > 1;
-    vx_uint32 pad_left = (parameter->pad_x_left == 0xFFFFFFFF) ? 0: parameter->pad_x_left;
-    vx_uint32 pad_top = (parameter->pad_y_top == 0xFFFFFFFF) ? 0: parameter->pad_y_top;
+    vx_uint32 pad_left = parameter->pad_x_left;
+    vx_uint32 pad_top = parameter->pad_y_top;
     vx_uint32 pad_right = output->width * stride_x - pad_left - input->width;
     vx_uint32 pad_bottom = output->height * stride_y - pad_top - input->height;
     vx_uint32 div_x = 1, div_y = 1, div_z = 1;
@@ -4335,12 +4335,12 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
 
 
     /*we need make sure inputSize more than 0*/
-    while(div_x > 1 && (output_size_x / div_x <= pad_left || output_size_x / div_x <= pad_right))
+    while(div_x > 1 && (output_size_x / div_x + (vx_int32)pad_left <=0 || output_size_x / div_x <= pad_right))
     {
         div_x /=2;
     }
 
-    while(div_y > 1 &&(output_size_y / div_y <= pad_top || output_size_y / div_y <= pad_bottom))
+    while(div_y > 1 &&(output_size_y / div_y + (vx_int32)pad_top <=0 || output_size_y / div_y <= pad_bottom))
     {
         div_y /=2;
     }
