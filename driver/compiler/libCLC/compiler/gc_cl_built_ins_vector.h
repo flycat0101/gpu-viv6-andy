@@ -66,6 +66,31 @@ static clsBUILTIN_FUNCTION    VectorBuiltinFunctions[] =
     {clvEXTENSION_VIV_VX,    "vstore8",          T_VOID, 3, {T_HALF8_PACKED, T_SIZE_T, T_HALF_PACKED}, {0, 0, 1}, {0, 1, 0}, 1, 1},
     {clvEXTENSION_VIV_VX,    "vstore16",         T_VOID, 3, {T_HALF16_PACKED, T_SIZE_T, T_HALF_PACKED}, {0, 0, 1}, {0, 1, 0}, 1, 1},
 
+    {clvEXTENSION_VIV_VX,    "vstore2",          T_VOID, 3, {T_SHORT2_PACKED, T_SIZE_T, T_SHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore4",          T_VOID, 3, {T_SHORT4_PACKED, T_SIZE_T, T_SHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore8",          T_VOID, 3, {T_SHORT8_PACKED, T_SIZE_T, T_SHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore16",         T_VOID, 3, {T_SHORT16_PACKED, T_SIZE_T, T_SHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_VIV_VX,    "vstore2",          T_VOID, 3, {T_USHORT2_PACKED, T_SIZE_T, T_USHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore4",          T_VOID, 3, {T_USHORT4_PACKED, T_SIZE_T, T_USHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore8",          T_VOID, 3, {T_USHORT8_PACKED, T_SIZE_T, T_USHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore16",         T_VOID, 3, {T_USHORT16_PACKED, T_SIZE_T, T_USHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_VIV_VX,    "vstore2",          T_VOID, 3, {T_CHAR2_PACKED, T_SIZE_T, T_CHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore4",          T_VOID, 3, {T_CHAR4_PACKED, T_SIZE_T, T_CHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore8",          T_VOID, 3, {T_CHAR8_PACKED, T_SIZE_T, T_CHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore16",         T_VOID, 3, {T_CHAR16_PACKED, T_SIZE_T, T_CHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_VIV_VX,    "vstore2",          T_VOID, 3, {T_UCHAR2_PACKED, T_SIZE_T, T_UCHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore4",          T_VOID, 3, {T_UCHAR4_PACKED, T_SIZE_T, T_UCHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore8",          T_VOID, 3, {T_UCHAR8_PACKED, T_SIZE_T, T_UCHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore16",         T_VOID, 3, {T_UCHAR16_PACKED, T_SIZE_T, T_UCHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_VIV_VX,    "vstore2",          T_VOID, 3, {T_HALF2_PACKED, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore4",          T_VOID, 3, {T_HALF4_PACKED, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore8",          T_VOID, 3, {T_HALF8_PACKED, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore16",         T_VOID, 3, {T_HALF16_PACKED, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
     {clvEXTENSION_CL_KHR_FP16,    "vload2",   T_HALF2, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
     {clvEXTENSION_CL_KHR_FP16,    "vload3",   T_HALF3, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
     {clvEXTENSION_CL_KHR_FP16,    "vload4",   T_HALF4, 2, {T_SIZE_T, T_HALF}, {0, 1}, {1, 0}, 1},
