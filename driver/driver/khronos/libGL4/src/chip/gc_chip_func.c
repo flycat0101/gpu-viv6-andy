@@ -20,7 +20,7 @@
 #define _GC_OBJ_ZONE gcdZONE_GL40_TRACE
 
 extern gceSTATUS getHashedProgram( __GLchipContext  *chipCtx, glsPROGRAMINFO_PTR* Program);
-extern gceSTATUS gcLoadShaders( IN gcoHAL Hal, IN gcsPROGRAM_STATE *ProgramState);
+
 /*******************************************************************************
 ** Shader generation helpers.
 */
@@ -570,7 +570,7 @@ gceSTATUS gcChipLoadFixFunctionShader(
             /* Send states to hardware. */
             gcmONERROR(gcLoadShaders(
                 chipCtx->hal,
-                &chipCtx->currProgram->programState
+                chipCtx->currProgram->programState
                 ));
         } else {
             /* Shader switched from GLSH to fix function */
@@ -578,7 +578,7 @@ gceSTATUS gcChipLoadFixFunctionShader(
                 /* Send states to hardware. */
                 gcmONERROR(gcLoadShaders(
                     chipCtx->hal,
-                    &chipCtx->currProgram->programState
+                    chipCtx->currProgram->programState
                     ));
                 chipCtx->programDirty = GL_FALSE;
             }
