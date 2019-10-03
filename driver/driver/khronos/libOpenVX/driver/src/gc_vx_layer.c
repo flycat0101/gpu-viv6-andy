@@ -10908,6 +10908,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
         }
         else if (inputFormat == VX_TYPE_FLOAT16 && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32))
         {
+            vx_uint32 vsi_min_fl16[4] = {0xFC00FC00, 0xFC00FC00, 0xFC00FC00, 0xFC00FC00};
             vx_uint32 uniPackMaxData_2x8[16] = {
                 0x00000111, // TCfg
                 0x00000000, // ASelt
@@ -10953,6 +10954,7 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputWidthRemain4", 1, &inputWidthRemain4);
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputSize", 1, &depth);
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleLogE", 1, &scaleLogE);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "vsi_min_fl16", 1, &vsi_min_fl16);
             vxmONERROR_STATUS(status);
         }
         else if (inputFormat == VX_TYPE_INT16 && (outputFormat == VX_TYPE_INT16 || outputFormat == VX_TYPE_FLOAT16))

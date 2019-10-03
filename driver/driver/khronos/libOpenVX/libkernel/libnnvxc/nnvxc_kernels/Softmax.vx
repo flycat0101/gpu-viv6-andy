@@ -37,7 +37,7 @@ __kernel void vxcSoftmax_Int8(
         VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
         VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     }
-    while(coord.x < inputSize);
+    while(coord.x < (inputSize + 16));
 
     half scaleIn_half;
     _viv_asm(CONV, scaleIn_half, input_Scale);
@@ -156,7 +156,7 @@ __kernel void vxcSoftmax_I8toI8(
         VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
         VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     }
-    while(coord.x < inputSize);
+    while(coord.x < (inputSize + 16));
 
     half scaleIn_half;
     _viv_asm(CONV, scaleIn_half, input_Scale);
@@ -233,6 +233,7 @@ __kernel void vxcSoftmax_I8toI8(
 }
 
 _viv_uniform int fp16_isFp16;
+_viv_uniform uint4 vsi_min_fl16;
 __kernel void vxcSoftmax_Fp16(
     __read_only image2d_array_t   input,
     __write_only image2d_array_t  output)
@@ -240,9 +241,9 @@ __kernel void vxcSoftmax_Fp16(
     int4 coord = (int4)(16, get_global_id(0), 0, 0);
 
     vxc_half8 img_val0, img_val1, img_val2, img_val3;
-    vxc_short8 val0, val1, val2, val3 = (vxc_short8)(0xFC00, 0xFC00, 0xFC00, 0xFC00, 0xFC00, 0xFC00, 0xFC00, 0xFC00);
+    vxc_short8 val0, val1, val2, val3;
     vxc_half8 val;
-    _viv_asm(COPY, val, val3, 16);
+    _viv_asm(COPY, val, vsi_min_fl16, 16);
     do
     {
         VXC_ReadImage(val0, input,  coord.xy, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
@@ -261,7 +262,7 @@ __kernel void vxcSoftmax_Fp16(
         VXC_DP2x8(val, val, val, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0), uniPackMaxData_2x8);
         VXC_HorzMax3_Half(val, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     }
-    while(coord.x < inputSize);
+    while(coord.x < (inputSize + 16));
 
     vxc_float4 prob;
     float fProbSum = 0;
@@ -802,7 +803,7 @@ __kernel void vxcSoftmax_Int16_1x1xN(
         VXC_DP2x8(val, val, img_val0, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0), uniPackMaxData_2x8);
         VXC_HorzMax3_Integer(val, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
     }
-    while(coord.x < inputSize);
+    while(coord.x < (inputSize + 16));
 
     vxc_float4 prob;
     float fProbSum = 0;
