@@ -4369,6 +4369,11 @@ gckKERNEL_AllocateIntegerId(
     return gcvSTATUS_OK;
 
 OnError:
+    if (table)
+    {
+        gckOS_Free(os, table);
+    }
+
     gcmkVERIFY_OK(gckOS_ReleaseMutex(os, database->mutex));
 
     gcmkFOOTER();
