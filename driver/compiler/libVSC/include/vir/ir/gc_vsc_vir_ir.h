@@ -4252,6 +4252,7 @@ typedef enum VIR_UNIFORMFLAG
 {
     VIR_UNIFORMFLAG_NONE                        = 0x00000000,
     VIR_UNIFORMFLAG_IMAGE_CAN_BE_SAMPLED        = 0x00000001,
+    /* Treat a texel buffer as an image, now it only happens in recompilation. */
     VIR_UNIFORMFLAG_TREAT_TEXELBUFFE_AS_IMG     = 0x00000002,
     VIR_UNIFORMFLAG_PUSH_CONSTANT_BASE_ADDR     = 0x00000004,
 } VIR_UniformFlag;
@@ -4997,8 +4998,11 @@ typedef enum _VIR_SHADER_RESOURCE_ENTRY_FLAG
     /* Treat this inputAttachment as a sampler. */
     VIR_SRE_FLAG_TREAT_IA_AS_SAMPLER            = 0x0001,
 
-    /* Treat a texelBuffer as an image. */
+    /* Treat a texelBuffer as an image, now from a recompilation only. */
     VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE     = 0x0002,
+
+    /* A texelBuffer is an image natively. */
+    VIR_SRE_FLAG_TEXELBUFFER_AN_IMAGE_NATIVELY  = 0x0004,
 } VIR_ShaderResourceEntryFlag;
 
 typedef struct _VIR_SHADER_RESOURCE_ALLOC_ENTRY VIR_SHADER_RESOURCE_ALLOC_ENTRY;

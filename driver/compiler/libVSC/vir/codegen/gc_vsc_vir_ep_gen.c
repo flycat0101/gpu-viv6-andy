@@ -4349,7 +4349,9 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* p
     }
 
     pUtbEntry->hwMappings[stageIdx].hwMappingMode = VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING_MODE_NOT_NATIVELY_SUPPORT;
-    if (pResAllocEntry->resFlag & VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE)
+    if ((pResAllocEntry->resFlag & VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE)
+        ||
+        (pResAllocEntry->resFlag & VIR_SRE_FLAG_TEXELBUFFER_AN_IMAGE_NATIVELY))
     {
         pUtbEntry->hwMappings[stageIdx].u.s.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR;
         bIsImage = gcvTRUE;
@@ -4392,11 +4394,14 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* p
     }
 
     /* Set texture size */
-    _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
-                                gcvNULL,
-                                gcvNULL,
-                                &pUtbEntry->utbBinding,
-                                pSep);
+    if (pResAllocEntry->resFlag & VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE)
+    {
+        _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
+                                    gcvNULL,
+                                    gcvNULL,
+                                    &pUtbEntry->utbBinding,
+                                    pSep);
+    }
 
     pUtbEntry->activeStageMask |= pResAllocEntry->bUse ? (1 << stageIdx) : 0;
     pUtbEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);

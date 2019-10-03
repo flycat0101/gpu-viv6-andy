@@ -2224,10 +2224,7 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                         &uniformSize,
                         gcvNULL);
 
-                    if (VIR_Uniform_IsTreatTexelBufferAsImg(pUniform))
-                    {
-                        pResAllocLayout->pResAllocEntries[i].resFlag |= VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE;
-                    }
+                    pResAllocLayout->pResAllocEntries[i].resFlag |= VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE;
                 }
                 else
                 {
@@ -2296,6 +2293,10 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
                     if (VIR_Uniform_IsTreatTexelBufferAsImg(pUniform))
                     {
                         pResAllocLayout->pResAllocEntries[i].resFlag |= VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE;
+                    }
+                    else
+                    {
+                        pResAllocLayout->pResAllocEntries[i].resFlag |= VIR_SRE_FLAG_TEXELBUFFER_AN_IMAGE_NATIVELY;
                     }
                 }
                 else
