@@ -1064,13 +1064,13 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
                 vx_uint32_ptr perm = (vx_uint32*)value->p8[0];
                 if (perm[0] == 1 && perm[1] == 0) /* y, x, z */
                 {
-                    slice = x * y > 128 ? gcmMIN(dims[2], core) : 1;
+                    slice = x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
                     size = dims[2];
                     value->e32[0] = 1;
                 }
                 else if (perm[0] == 1 && perm[1] == 2) /* y, z, x */
                 {
-                    slice = x * y > 128 ? gcmMIN(dims[2], core) : 1;
+                    slice = x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
                     size = dims[2];
                     value->e32[0] = 2;
                 }
@@ -1078,20 +1078,20 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
                 {
                     if (perm[0] == 2 && perm[1] == 0) /* z, x, y */
                     {
-                        slice = gcmMIN(dims[1], core);
+                        slice = mult ? gcmMIN(dims[1], core) : 1;
                         size = dims[1];
                         value->e32[0] = 3;
                     }
                     else if (perm[0] == 2 && perm[1] == 1) /* z, y, x */
                     {
-                        slice = gcmMIN(dims[1], core);
+                        slice = mult ? gcmMIN(dims[1], core) : 1;
                         size = dims[1];
                         value->e32[0] = 4;
                     }
                     else if (perm[0] == 0 && perm[1] == 2) /* x, z, y */
                     {
-                        slice = gcmMIN(dims[2], core);
-                        size = dims[2];
+                        slice = mult ? gcmMIN(dims[1], core) : 1;
+                        size = dims[1];
                         value->e32[0] = 5;
                     }
                 }
