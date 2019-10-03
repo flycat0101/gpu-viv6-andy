@@ -20,6 +20,17 @@ static VkBool32 g_dbgForceCacheFlushAndStallPerDraw = VK_FALSE;
 static VkBool32 g_dbgSkipDraw = VK_FALSE;
 #endif
 
+/* when 19:19 is set to 0,
+   after a draw, immediately switch to blt or resolve, should load a empty PE state to make PE idle
+   0x0500, load a any PE state before blt in multiGPU sync to avoid hang  */
+#define LoadEmptyPEState()     do {      \
+    if (devCtx->database->REG_BltEngine) \
+    {                                    \
+        *pCmdBuffer++ = 0x08010500;      \
+        *pCmdBuffer++ = 0;               \
+    }                                    \
+} while (0);
+
 /* Data size for each type in HW.*/
 static const uint32_t g_queryDataSizeTable[] = {
     4, /* VK_QUERY_TYPE_OCCLUSION */
@@ -915,6 +926,7 @@ VkResult halti5_draw(
             {
                 if (useOneCore)
                 {
+                    LoadEmptyPEState();
                     *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -1083,6 +1095,7 @@ VkResult halti5_draw(
         {
             if (useOneCore)
             {
+                LoadEmptyPEState();
                 *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -1326,6 +1339,7 @@ VkResult halti5_drawIndexed(
             {
                 if (useOneCore)
                 {
+                    LoadEmptyPEState();
                     *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -1492,6 +1506,7 @@ VkResult halti5_drawIndexed(
         {
             if (useOneCore)
             {
+                LoadEmptyPEState();
                 *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -1693,6 +1708,7 @@ VkResult halti5_drawDirect(
     {
         if (useOneCore)
         {
+            LoadEmptyPEState();
             *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -1896,6 +1912,7 @@ VkResult halti5_drawIndexedDirect(
     {
         if (useOneCore)
         {
+            LoadEmptyPEState();
             *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -2378,6 +2395,7 @@ VkResult halti5_splitDrawIndexedPatchList(
     {
         if (useOneCore)
         {
+            LoadEmptyPEState();
             *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -2700,6 +2718,7 @@ static VkResult halti5_drawIndirect_common(
             {
                 if (useOneCore)
                 {
+                    LoadEmptyPEState();
                     *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -2852,6 +2871,7 @@ static VkResult halti5_drawIndirect_common(
         {
             if (useOneCore)
             {
+                LoadEmptyPEState();
                 *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3360,6 +3380,7 @@ VkResult halti5_dispatch(
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
+        LoadEmptyPEState();
         *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3478,6 +3499,7 @@ VkResult halti5_dispatchIndirect(
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
+        LoadEmptyPEState();
         *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
