@@ -26503,7 +26503,7 @@ vxnne_shader_executable vxnneGetTensorDivShaderExecutable(
             break;
         }
 
-        strcat(kernelName, "Div" );
+        gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "Div" );
 
         switch (input1_format)
         {
