@@ -16223,22 +16223,8 @@ vx_weights_biases_parameter _createWeightsBiasesParameterFromTensors(
         goto exit;
     }
 
-    /* allocate mGpuWBTable memory for multiVIP vData */
-    {
-        gctUINT32 gpuCount = 1;
-        vx_uint32 size = 0;
-        gcoVX_GetHWConfigGpuCount(&gpuCount);
-        if ((gpuCount > 1) && (context->options.enableMultiVIPCombined))
-        {
-            size = sizeof(vx_weights_biases_parameter) * gpuCount;
-            weight_bias->mGpuWBTable = (vx_weights_biases_parameter*)vxAllocateAndZeroMemory((vx_size)size);
-        }
-        else
-        {
-            weight_bias->mGpuWBTable = VX_NULL;
-        }
-        weight_bias->mGpuWBCount = 0;
-    }
+    weight_bias->mGpuWBTable = VX_NULL;
+    weight_bias->mGpuWBCount = 0;
 
 
 exit:

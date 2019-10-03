@@ -20367,7 +20367,7 @@ VX_PRIVATE_API vx_status vxnneOperation_ExecuteYUVScalerCommand(vx_node node, vx
     /* for split Y */
     if (node->base.context->options.enableMultiVIPCombined)
     {
-        gcmONERROR(gcoVX_GetHWConfigGpuCount(&splitCount));
+        gcmONERROR(gcoVX_QueryCoreCount(node->graph->deviceID, &splitCount));
     }
     else
     {

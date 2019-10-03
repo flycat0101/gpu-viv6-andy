@@ -886,7 +886,7 @@ VX_INTERNAL_API vx_status ComputeMNEx(
     vx_uint32 totalKernelbufferSize = 0, termA = 0, termB = 0, imageCacheSize = 0;
     vx_uint32 circleHeight = 0, accumPoolingStrideY = 1, inputSize = 0, outputSize = 0;
     vx_uint32 vipSRAMsize = layer->graph->base.context->vipSRAM.size;
-    vx_uint32 axiSRAMsize = layer->graph->base.context->axiSRAM.size;
+    vx_uint32 axiSRAMsize = layer->graph->base.context->axiSRAM[layer->graph->deviceID].size;
     vxnne_operation_info_s opInfo = {0}, opInfo2 = {0};
     vx_status status;
     vx_bool phase3 = vxoContext_IsFeatureAvailable(layer->graph->base.context, VX_NN_FEATURE_SWTILING_PHASE3);
@@ -1109,7 +1109,7 @@ VX_INTERNAL_API vx_status ComputeMNEx(
     {
         if (phase3)
         {
-            *axiSRAMUsed = layer->graph->base.context->axiSRAM.size - axiSRAMsize;
+            *axiSRAMUsed = layer->graph->base.context->axiSRAM[layer->graph->deviceID].size - axiSRAMsize;
             *vipSRAMUsed = termA + M * termB + totalKernelbufferSize;
         }
         else
@@ -1450,7 +1450,7 @@ VX_PRIVATE_API vx_bool SupportAB(vx_context context, vxnne_operation operation)
 {
     gcmHEADER_ARG("context=%p, operation=%p", context, operation);
     if ((operation->target == VXNNE_OPERATION_TARGET_NN ||
-        (operation->target == VXNNE_OPERATION_TARGET_SH && context->axiSRAM.size > 0) ||
+        (operation->target == VXNNE_OPERATION_TARGET_SH && context->axiSRAM[operation->layer->node->graph->deviceID].size > 0) ||
         (operation->target == VXNNE_OPERATION_TARGET_TP &&
           (operation->operatorType != VXNNE_OPERATOR_DILATION_RESHUFFLE &&
            operation->operatorType != VXNNE_OPERATOR_DILATION_UPSAMPLE &&
@@ -1758,11 +1758,11 @@ VX_PRIVATE_API vx_status SetMemoryRequestList(
     {
         vxmASSERT(graph->base.context->vipSRAM.size != 0);
 
-        allocType = graph->base.context->axiSRAM.size == 0 ? VXNNE_MEM_POOL_TYPE_VIP_SRAM : VXNNE_MEM_POOL_TYPE_SRAM;
+        allocType = graph->base.context->axiSRAM[graph->deviceID].size == 0 ? VXNNE_MEM_POOL_TYPE_VIP_SRAM : VXNNE_MEM_POOL_TYPE_SRAM;
     }
     else
     {
-        vxmASSERT(graph->base.context->axiSRAM.size != 0);
+        vxmASSERT(graph->base.context->axiSRAM[graph->deviceID].size != 0);
         allocType = VXNNE_MEM_POOL_TYPE_AXI_SRAM;
     }
 
@@ -3010,7 +3010,9 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
                 }
 
                 vxInfo("\nAXISRAM: Estimate used %d  %f%%  VIPSRAM: Estimate used %d  %f%% M = %d\n",
-                        block->segments[i].segmentInfo.tiling.estimateAxiSRAMUsed, graph->base.context->axiSRAM.size == 0 ? 0 : ((vx_float32)block->segments[i].segmentInfo.tiling.estimateAxiSRAMUsed / graph->base.context->axiSRAM.size) * 100,
+                        block->segments[i].segmentInfo.tiling.estimateAxiSRAMUsed, graph->base.context->axiSRAM[graph->deviceID].size == 0 ?
+ 0 :
+ ((vx_float32)block->segments[i].segmentInfo.tiling.estimateAxiSRAMUsed / graph->base.context->axiSRAM[graph->deviceID].size) * 100,
                         block->segments[i].segmentInfo.tiling.estimateVipSRAMUsed, graph->base.context->vipSRAM.size == 0 ? 0 : ((vx_float32)block->segments[i].segmentInfo.tiling.estimateVipSRAMUsed / graph->base.context->vipSRAM.size) * 100,
                         block->segments[i].segmentInfo.tiling.M
                         );
@@ -3029,7 +3031,7 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
             vxInfo("]");
 
             vxInfo("\nAXISRAM: Peak used %d  %f%% VIPSRAM: Peak used %d  %f%%\n",
-                   peakMemSize[VXNNE_MEM_POOL_TYPE_AXI_SRAM], graph->base.context->axiSRAM.size == 0 ? 0 : ((vx_float32)peakMemSize[VXNNE_MEM_POOL_TYPE_AXI_SRAM] / graph->base.context->axiSRAM.size) * 100,
+                   peakMemSize[VXNNE_MEM_POOL_TYPE_AXI_SRAM], graph->base.context->axiSRAM[graph->deviceID].size == 0 ? 0 : ((vx_float32)peakMemSize[VXNNE_MEM_POOL_TYPE_AXI_SRAM] / graph->base.context->axiSRAM[graph->deviceID].size) * 100,
                    peakMemSize[VXNNE_MEM_POOL_TYPE_VIP_SRAM], graph->base.context->vipSRAM.size == 0 ? 0 : ((vx_float32)peakMemSize[VXNNE_MEM_POOL_TYPE_VIP_SRAM] / graph->base.context->vipSRAM.size) * 100);
 
         }
@@ -4078,7 +4080,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
         char* opTarget[6] = {"NONE", "SH", "NN", "TP", "SW", "SC"};
         vx_uint32 offsetIn = 0, offsetOut = 0, inputSize, outputSize;
         vxInfo("---------------------------Begin VerifyTiling -------------------------\n");
-        vxInfo("AXI-SRAM = %d Bytes VIP-SRAM = %d Bytes\n", graph->base.context->axiSRAM.size, graph->base.context->vipSRAM.size);
+        vxInfo("AXI-SRAM = %d Bytes VIP-SRAM = %d Bytes\n", graph->base.context->axiSRAM[graph->deviceID].size, graph->base.context->vipSRAM.size);
         for(i = 0; i < graph->layer->base.num_operations; i++)
         {
             offsetIn = 0; offsetOut = 0;
@@ -5355,6 +5357,13 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForFC(
     else
     {
         /*2. split weight tensor*/
+        if (weights_biases->mGpuWBTable == VX_NULL)
+        {
+            /* first allocate mGpuWBTable memory for multiVIP vData */
+            vx_uint32 size = sizeof(vx_weights_biases_parameter) * splitCount;
+            weights_biases->mGpuWBTable = (vx_weights_biases_parameter*)vxAllocateAndZeroMemory((vx_size)size);
+        }
+
         weight = weights_biases->wb_base->origWeight;
         bias   = weights_biases->wb_base->origBias;
         vxmONERROR(vxQueryTensor(weight, VX_TENSOR_DIMS, weightSizeEnd, sizeof(weightSizeEnd)));
@@ -6557,7 +6566,7 @@ VX_INTERNAL_API void vxoGraph_GenerateOperationTable(vx_graph graph)
     /* TODO: use accurate batchCount. */
     vxmONERROR(vxnneExecutionLayer_Create(graph, &layer));
 
-    gcmONERROR(gcoVX_GetHWConfigGpuCount(&gpuCount));
+    gcmONERROR(gcoVX_QueryCoreCount(graph->deviceID, &gpuCount));
 
     for (i = 0; i < graph->nodeCount; i++)
     {

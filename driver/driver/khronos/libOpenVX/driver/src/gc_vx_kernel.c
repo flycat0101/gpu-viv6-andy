@@ -1119,6 +1119,7 @@ gcfVX_GetUniformArrayInfo(
 
 static gceSTATUS
 gcfVX_LoadKernelArgValues(
+    vx_node             node,
     vx_shader           Kernel,
     gcSHADER            Shader,
     vx_argument         Arg,
@@ -1154,7 +1155,7 @@ gcfVX_LoadKernelArgValues(
         return gcvSTATUS_OK;
     }
 
-    gcmONERROR(gcoVX_GetHWConfigGpuCount(&gpuCount));
+    gcmONERROR(gcoVX_QueryCoreCount(node->graph->deviceID, &gpuCount));
     gcmONERROR(gcUNIFORM_GetType(Arg->uniform, &type, &length));
 
     gcmONERROR(gcUNIFORM_GetFormat(Arg->uniform, &format, &isPointer));
@@ -2713,6 +2714,7 @@ OnError:
 
 gceSTATUS
 gcfVX_ExecuteKernel(
+    vx_node             node,
     vx_shader           Kernel,
     gctUINT             NumArgs,
     vx_argument         Args,
@@ -2739,7 +2741,8 @@ gcfVX_ExecuteKernel(
     {
         if (Args[i].uniform && !isUniformInactive(Args[i].uniform))
         {
-            gcmONERROR(gcfVX_LoadKernelArgValues(Kernel,
+            gcmONERROR(gcfVX_LoadKernelArgValues(node,
+                                                Kernel,
                                                 (gcSHADER) Kernel->states.binary,
                                                 &Args[i],
                                                 BorderMode,
@@ -2790,7 +2793,7 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
     gcsPROGRAM_STATE programState = {0};
     gctSIZE_T       strLen = 0;
 #if (!VSC_LITE_BUILD)
-    gctUINT32       gpuCount;
+    gctBOOL         isMultiCore = gcvFALSE;
 #endif
     gcKERNEL_FUNCTION   kernelFunction;
     vx_shader           kernel = gcvNULL;
@@ -2850,9 +2853,9 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
     }
 
     gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
-    gcmONERROR(gcoVX_QueryDeviceCount(gcvNULL, &gpuCount));
+    gcmONERROR(gcoVX_QueryMultiCore(&isMultiCore));
 
-    if(gpuCount > 1)
+    if (isMultiCore)
     {
         flags |= gcvSHADER_ENABLE_MULTI_GPU;
     }
@@ -4834,7 +4837,8 @@ VX_INTERNAL_API vx_status vxoShader_Execute(
 
     if (workGroupSize > kernelShader->maxWorkGroupSize) goto OnError;
 
-    gcmONERROR(gcfVX_ExecuteKernel(kernelShader,
+    gcmONERROR(gcfVX_ExecuteKernel(node,
+                                   kernelShader,
                                    kernelShader->numArgs,
                                    kernelShader->args,
                                    borderMode,

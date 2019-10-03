@@ -713,10 +713,10 @@ static vx_status readAxiSram(
     axiTable->sramBase = readuInt(reader, 1);
     axiTable->sramSize = readuInt(reader, 1);
 
-    if (axiTable->sramSize != reader->binLoad->context->axiSRAM.size)
+    if (axiTable->sramSize != reader->binLoad->context->axiSRAM[0].size)
     {
         vxError("%s[%d]: binary sramSize: 0x%x, context size: 0x%x\n",
-            __FUNCTION__, __LINE__, axiTable->sramSize, reader->binLoad->context->axiSRAM.size);
+            __FUNCTION__, __LINE__, axiTable->sramSize, reader->binLoad->context->axiSRAM[0].size);
         vxmONERROR(VX_ERROR_INVALID_VALUE);
     }
 
@@ -1898,7 +1898,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchNN(
                     {
                         srcAddr <<= 6;
                     }
-                    dstAddr = (srcAddr - nnPatchData->originalBaseAddress) + binLoad->context->axiSRAM.physical;
+                    dstAddr = (srcAddr - nnPatchData->originalBaseAddress) + binLoad->context->axiSRAM[graph->deviceID].physical;
                     if (nnPatchData->transformation == VX_BINARY_PATCH_TRANSFORMATION_RIGHT_SHIFT_6)
                     {
                         dstAddr = ((*memAddr) & 0xfc000000) | (dstAddr >> 6);
@@ -2235,7 +2235,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchTP(
                     {
                         srcAddr <<= 6;
                     }
-                    dstAddr = (srcAddr - tpPatchData->originalBaseAddress) + binLoad->context->axiSRAM.physical;
+                    dstAddr = (srcAddr - tpPatchData->originalBaseAddress) + binLoad->context->axiSRAM[graph->deviceID].physical;
                     if (tpPatchData->transformation == VX_BINARY_PATCH_TRANSFORMATION_RIGHT_SHIFT_6)
                     {
                         dstAddr = ((*memAddr) & 0xfc000000) | (dstAddr >> 6);
@@ -2663,7 +2663,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
                 {
                     *memAddr <<= 6;
                 }
-                *memAddr =  (*memAddr - shPatchData->originalBaseAddress) + binLoad->context->axiSRAM.physical;
+                *memAddr =  (*memAddr - shPatchData->originalBaseAddress) + binLoad->context->axiSRAM[graph->deviceID].physical;
                 if (shPatchData->transformation == VX_BINARY_PATCH_TRANSFORMATION_RIGHT_SHIFT_6)
                 {
                     *memAddr >>= 6;
@@ -2978,7 +2978,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
                 case VX_BINARY_SOURCE_AXI_SRAM:
                 {
                     memAddr = (vx_uint32 *)(SCStates + scPatchData->offset);
-                    *memAddr =  (*memAddr - scPatchData->originalBaseAddress) + binLoad->context->axiSRAM.physical;
+                    *memAddr =  (*memAddr - scPatchData->originalBaseAddress) + binLoad->context->axiSRAM[graph->deviceID].physical;
                     if (binLoad->context->options.enableNNLayerDump)
                     {
                         vxError("%s[%d]: cann't support data type %d, please set ENV NN_LAYER_DUMP=1 and re-generate binary graph\n",
@@ -4544,7 +4544,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveShaderPatchTable(
     }
     else if (allocType & VXNNE_MEM_POOL_TYPE_AXI_SRAM)
     {
-        patchInfo.originalBaseAddress = node->base.context->axiSRAM.physical;
+        patchInfo.originalBaseAddress = node->base.context->axiSRAM[node->graph->deviceID].physical;
     }
     else if (allocType & VXNNE_MEM_POOL_TYPE_VIP_SRAM)
     {
@@ -5595,11 +5595,11 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
         vx_int32 ret = 0;
         vx_binary_patch_info_s patchInfo;
 
-        if (context->axiSRAM.size > 0)
+        if (context->axiSRAM[deviceID].size > 0)
         {
             /*1. patch start/end remap address for AXI-SRAM */
-            vx_uint32 axiSRAMPhysical = context->axiSRAM.physical;
-            vx_uint32 axiSRAMPhysicalEnd = context->axiSRAM.physical + context->axiSRAM.size;
+            vx_uint32 axiSRAMPhysical = context->axiSRAM[deviceID].physical;
+            vx_uint32 axiSRAMPhysicalEnd = context->axiSRAM[deviceID].physical + context->axiSRAM[deviceID].size;
 
             ret = vxoBinaryGraph_SearchPattern((gctUINT32 *)initBuffer,
                                           context->binaryGraphInitSize[deviceID]/gcmSIZEOF(gctUINT32),
@@ -5979,7 +5979,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
         }
         else if (allocType & VXNNE_MEM_POOL_TYPE_AXI_SRAM)
         {
-            patchInfo.originalBaseAddress = graph->base.context->axiSRAM.physical;
+            patchInfo.originalBaseAddress = graph->base.context->axiSRAM[graph->deviceID].physical;
         }
         else if (allocType & VXNNE_MEM_POOL_TYPE_VIP_SRAM)
         {
@@ -6108,7 +6108,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
         }
         else if (allocType & VXNNE_MEM_POOL_TYPE_AXI_SRAM)
         {
-            patchInfo.originalBaseAddress = graph->base.context->axiSRAM.physical;
+            patchInfo.originalBaseAddress = graph->base.context->axiSRAM[graph->deviceID].physical;
         }
         else if (allocType & VXNNE_MEM_POOL_TYPE_VIP_SRAM)
         {
@@ -6670,7 +6670,7 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
         {
             inputSourceType = VX_BINARY_SOURCE_MEMORY_POOL;
         }
-        else if (input->memoryPhysicalBase == node->graph->base.context->axiSRAM.physical)
+        else if (input->memoryPhysicalBase == node->graph->base.context->axiSRAM[node->graph->deviceID].physical)
         {
             inputSourceType = VX_BINARY_SOURCE_AXI_SRAM;
             vxmASSERT(input->sRAM);
@@ -6878,7 +6878,7 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
         {
             outputSourceType = VX_BINARY_SOURCE_MEMORY_POOL;
         }
-        else if (output->memoryPhysicalBase == node->graph->base.context->axiSRAM.physical)
+        else if (output->memoryPhysicalBase == node->graph->base.context->axiSRAM[node->graph->deviceID].physical)
         {
             outputSourceType = VX_BINARY_SOURCE_AXI_SRAM;
             vxmASSERT(output->sRAM);
@@ -8302,7 +8302,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
 
             if (vxoMemory_GetType(&input->tensorBuffer->memory) & VXNNE_MEM_POOL_TYPE_AXI_SRAM)
             {
-                operationCommand->inputTile.memoryPhysicalBase = context->axiSRAM.physical;
+                operationCommand->inputTile.memoryPhysicalBase = context->axiSRAM[graph->deviceID].physical;
             }
             else if (vxoMemory_GetType(&input->tensorBuffer->memory) & VXNNE_MEM_POOL_TYPE_VIP_SRAM)
             {
@@ -8386,7 +8386,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
 
             if (vxoMemory_GetType(&output->tensorBuffer->memory) & VXNNE_MEM_POOL_TYPE_AXI_SRAM)
             {
-                operationCommand->outputTile.memoryPhysicalBase = context->axiSRAM.physical;
+                operationCommand->outputTile.memoryPhysicalBase = context->axiSRAM[graph->deviceID].physical;
             }
             else if (vxoMemory_GetType(&output->tensorBuffer->memory) & VXNNE_MEM_POOL_TYPE_VIP_SRAM)
             {
@@ -8669,11 +8669,11 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     }
 
     gcoOS_MemFill(&axiSramInfo, 0, sizeof(vx_binary_axi_sram_info_s));
-    if (context->axiSRAM.physical != 0)
+    if (context->axiSRAM[graph->deviceID].physical != 0)
     {
         /* to do, enable sw tiling */
-        axiSramInfo.sramBase = context->axiSRAM.physical;
-        axiSramInfo.sramSize = context->axiSRAM.size;
+        axiSramInfo.sramBase = context->axiSRAM[graph->deviceID].physical;
+        axiSramInfo.sramSize = context->axiSRAM[graph->deviceID].size;
     }
 
     /* save network binary header - re-write later */

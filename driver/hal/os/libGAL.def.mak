@@ -1036,7 +1036,6 @@ EXPORTS
     gcoVX_FreeMemoryEx
     gcoVX_GetMemorySize
     gcoVX_ZeroMemorySize
-    gcoVX_GetHWConfigGpuCount
     gcoVX_SwitchContext
     gcoVX_RestoreContext
     gcoVX_WaitNNEvent
@@ -1048,7 +1047,9 @@ EXPORTS
     gcoVX_VerifyHardware
     gcoVX_GetEvisNoInstFeatureCap
     gcoVX_QueryDeviceCount
-	gcoVX_CaptureInitState
+    gcoVX_QueryCoreCount
+    gcoVX_QueryMultiCore
+    gcoVX_CaptureInitState
 
 !IF "$(VSIMULATOR_DEBUG)" == "1"
     gcoOS_UpdateSimulatorCallback

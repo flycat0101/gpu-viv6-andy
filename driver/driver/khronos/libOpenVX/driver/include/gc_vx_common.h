@@ -1352,7 +1352,7 @@ typedef struct _vx_context
 
     vx_uint32                               allTensorNum;
 
-    vxnne_sram_s                            axiSRAM;
+    vxnne_sram_s                            axiSRAM[MAX_GPU_CORE_COUNT];
     vxnne_sram_s                            vipSRAM;
 
     vx_char                                 productName[32];

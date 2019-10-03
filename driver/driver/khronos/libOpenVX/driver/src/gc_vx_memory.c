@@ -1332,7 +1332,7 @@ vxoMemoryPool_AdjustAddress(
                 break;
 
             case VXNNE_MEM_POOL_TYPE_AXI_SRAM:
-                pbase = graph->base.context->axiSRAM.physical;
+                pbase = graph->base.context->axiSRAM[graph->deviceID].physical;
                 break;
 
             case VXNNE_MEM_POOL_TYPE_VIP_SRAM:
@@ -1365,7 +1365,7 @@ vxoMemoryPool_AdjustAddress(
                 break;
 
             case VXNNE_MEM_POOL_TYPE_AXI_SRAM:
-                lbase = (vx_uint8_ptr)graph->base.context->axiSRAM.logical;
+                lbase = (vx_uint8_ptr)graph->base.context->axiSRAM[graph->deviceID].logical;
                 break;
 
             case VXNNE_MEM_POOL_TYPE_VIP_SRAM:
@@ -1450,7 +1450,7 @@ vxoMemoryPool_RequestList(
 
     maxs[VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR] = 0xFFFFFFFF;
     maxs[VXNNE_MEM_POOL_TYPE_VIP_SRAM] = context->vipSRAM.size - context->vipSRAM.used;
-    maxs[VXNNE_MEM_POOL_TYPE_AXI_SRAM] = context->axiSRAM.size - context->axiSRAM.used;
+    maxs[VXNNE_MEM_POOL_TYPE_AXI_SRAM] = context->axiSRAM[graph->deviceID].size - context->axiSRAM[graph->deviceID].used;
     maxs[VXNNE_MEM_POOL_TYPE_SRAM] = maxs[VXNNE_MEM_POOL_TYPE_VIP_SRAM] + maxs[VXNNE_MEM_POOL_TYPE_AXI_SRAM];
 
     /* set first/last access id for each memory */

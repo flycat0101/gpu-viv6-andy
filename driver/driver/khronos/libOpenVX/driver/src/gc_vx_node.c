@@ -1101,7 +1101,7 @@ VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
     vx_status status = VX_SUCCESS;
     gcmHEADER_ARG("nodePtr=%p", nodePtr);
 
-    gcoVX_GetHWConfigGpuCount(&gpuCount);
+    gcoVX_QueryCoreCount((*nodePtr)->graph->deviceID, &gpuCount);
     if (gpuCount > 1)
     {
         /* release multiGPU operations memory*/

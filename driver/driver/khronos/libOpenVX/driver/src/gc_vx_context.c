@@ -1257,12 +1257,33 @@ VX_PRIVATE_API vx_status vxoContext_InitSRAM(
 
     if (axiSRAMSize != 0)
     {
-        context->axiSRAM.size        = axiSRAMSize;
-        context->axiSRAM.logical     = axiSRAMLogical;
-        context->axiSRAM.physical    = axiSRAMPhysical;
-        context->axiSRAM.used        = 0;
-        context->axiSRAM.node        = axiSRAMNode;
+        vx_uint32 i, deviceCount, gpuCountArray[MAX_GPU_CORE_COUNT], gpuTotalCount = 0, quot;
+        vxmONERROR(gcoVX_QueryDeviceCount(&deviceCount));
+
+        for (i = 0; i < deviceCount; i++)
+        {
+            vxmONERROR(gcoVX_QueryCoreCount(i, &gpuCountArray[i]));
+            gpuTotalCount += gpuCountArray[i];
+        }
+
+        quot = axiSRAMSize / gpuTotalCount;
+        vxmASSERT(quot % 64 == 0);
+
+        context->axiSRAM[0].size     = quot * gpuCountArray[0];
+        context->axiSRAM[0].logical  = axiSRAMLogical;
+        context->axiSRAM[0].physical = axiSRAMPhysical;
+        context->axiSRAM[0].used     = 0;
+        context->axiSRAM[0].node     = axiSRAMNode;
+
+        for (i = 1; i < deviceCount; i++)
+        {
+            context->axiSRAM[i].size     = quot * gpuCountArray[i];
+            context->axiSRAM[i].logical  = (vx_uint8_ptr)axiSRAMLogical + context->axiSRAM[i-1].size;
+            context->axiSRAM[i].physical = axiSRAMPhysical + context->axiSRAM[i-1].size;
+            context->axiSRAM[i].used     = 0;
+        }
     }
+
     if (vipSRAMSize != 0)
     {
         context->vipSRAM.size        = (vipSRAMSize <= VX_VIP_SRAM_IMAGE_STREAM_SIZE) ? vipSRAMSize : (vipSRAMSize - VX_VIP_SRAM_IMAGE_STREAM_SIZE);
@@ -1379,7 +1400,7 @@ VX_PRIVATE_API vx_context vxoContext_Create()
 
         context->cnnAvailableEventID = 1;
 
-        gcoVX_QueryDeviceCount(&context->deviceCount, gcvNULL);
+        gcoVX_QueryDeviceCount(&context->deviceCount);
 
         gcoVX_GetNNConfig(&context->nnConfig);
 
@@ -1646,9 +1667,9 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 
         vxRegisterLogCallback(context, VX_NULL, vx_false_e);
 
-        if (context->axiSRAM.node)
+        if (context->axiSRAM[0].node)
         {
-            gcoVX_FreeMemoryEx(context->axiSRAM.node, gcvSURF_VERTEX);
+            gcoVX_FreeMemoryEx(context->axiSRAM[0].node, gcvSURF_VERTEX);
         }
 
         if (context->vipSRAM.node)

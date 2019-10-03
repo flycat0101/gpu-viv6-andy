@@ -94,6 +94,8 @@ typedef struct _gcsVX_KERNEL_PARAMETERS
 gcsVX_KERNEL_PARAMETERS;
 #endif
 
+#define MAX_GPU_CORE_COUNT 8
+
 /******************************************************************************\
 ****************************** API Declarations *****************************
 \******************************************************************************/
@@ -225,8 +227,18 @@ gcoVX_SetNNImage(
 
 gceSTATUS
 gcoVX_QueryDeviceCount(
-    OUT gctUINT32 * DeviceCount,
-    OUT gctUINT32 * GPUCountPerDevice
+    OUT gctUINT32 * DeviceCount
+    );
+
+gceSTATUS
+gcoVX_QueryCoreCount(
+    IN gctUINT32  DeviceID,
+    OUT gctUINT32 *CoreCount
+    );
+
+gceSTATUS
+gcoVX_QueryMultiCore(
+    OUT gctBOOL *IsMultiCore
     );
 
 gceSTATUS
@@ -293,11 +305,6 @@ gceSTATUS
 gcoVX_ZeroMemorySize();
 
 gceSTATUS
-gcoVX_GetHWConfigGpuCount(
-    OUT gctUINT32 *count
-    );
-
-gceSTATUS
 gcoVX_SwitchContext(
     IN  gctUINT DeviceID,
     OUT gcoHARDWARE *SavedHardware,
@@ -348,7 +355,9 @@ gcoVX_ProgrammYUV2RGBScale(
 
 gceSTATUS
 gcoVX_CreateHW(
-    IN gctUINT32    DeviceId,
+    IN gctUINT32  DeviceID,
+    IN gctUINT32  GpuCountPerDevice,
+    IN gctUINT32  GpuCoreIndexs[],
     OUT gcoHARDWARE * Hardware
     );
 

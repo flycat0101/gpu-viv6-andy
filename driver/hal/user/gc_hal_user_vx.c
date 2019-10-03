@@ -43,18 +43,173 @@ static gctBOOL Is_HistogramKernel(gctUINT32 kernel) {
 typedef struct _gcoVX
 {
     gcoHARDWARE hardwares[gcdMAX_3DGPU_COUNT];
-    gctUINT32   coreCount;
+    gctUINT32   deviceCount;
 } _gcoVX;
 
+static gceSTATUS
+_QueryDeviceCoreCount(
+    OUT gctUINT32 * DeviceCount,
+    OUT gctUINT32 * GPUCountPerDevice
+    )
+{
+    gctUINT chipIDs[32];
+    gceMULTI_GPU_MODE mode;
+    gctUINT coreIndex;
+    gctSTRING attr;
+    gctUINT32 i, gpuCount;
+    static gctUINT deviceCount = 1;
+    static gctUINT gpuCountPerDevice[MAX_GPU_CORE_COUNT] = {1};
+    static gctBOOL queriedOnce = gcvFALSE;
+
+    if (queriedOnce)
+    {
+        goto exit;
+    }
+
+    gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D, &gpuCount, chipIDs);
+
+    if (gpuCount == 0)
+    {
+        gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D2D, &gpuCount, chipIDs);
+    }
+
+    gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_3D, &mode, &coreIndex);
+
+    if (mode == gcvMULTI_GPU_MODE_COMBINED)      /*Combined Mode*/
+    {
+        if(gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_USE_MULTI_DEVICES))
+        {
+            gcmPRINT("VIV Warning : VIV_OVX_USE_MULIT_DEVICES=1 only for INDEPENDENT mode, back to combinedMode");
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+
+        deviceCount = 1;
+        gpuCountPerDevice[0] = gpuCount;
+    }
+    else     /*For Dependent mode*/
+    {
+        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_USE_MULTI_DEVICES))  /*multi-device mode */
+        {
+            gcoOS_GetEnv(gcvNULL, "VIV_OVX_USE_MULTI_DEVICE", &attr);
+
+            gcmASSERT(attr && attr[0] == '1');
+
+            if (attr[1] == '\0' || (attr[1] == ':' && (attr[2] == '1' || attr[2] == '2' || attr[2] == '4' || attr[2] == '1')))
+            {
+                if (attr[1] == '\0' || attr[1] == '0')
+                {
+                    gpuCountPerDevice[0] = 1;
+                }
+                else
+                {
+                    gpuCountPerDevice[0] = attr[2] - '0';
+                }
+
+                if ((gpuCount % gpuCountPerDevice[0] != 0) || (gpuCountPerDevice[0] > gpuCount))
+                {
+                    gcmPRINT("VIV Warning: Invalid VIV_OVX_USE_MULIT_DEVICES Env vars GPUCountPerDevivce is invalid");
+                    return gcvSTATUS_INVALID_ARGUMENT;
+                }
+
+                deviceCount = gpuCount / gpuCountPerDevice[0];
+                for (i = 1; i < deviceCount; i++)
+                {
+                    gpuCountPerDevice[i] = gpuCountPerDevice[0];
+                }
+            }
+            else if (attr[1] == ':' && attr[2] == '[' && attr[3] != '\0')
+            {
+                char *attrp;
+                gctUINT32 count = 0;
+#ifdef _WIN32
+                char *np;
+                attrp = strtok_s(&attr[3], ",", &np);
+#else
+                attrp = strtok(&attr[3], ",");
+#endif
+                if (attrp == gcvNULL || ((count = attrp[0] - '0') != 1 && count != 2 && count != 4))
+                {
+                    gcmPRINT("VIV Warning : VIV_OVX_USE_MULTI_DEVICES setting 1:[1 or 2 or 4,...]");
+                }
+
+                gpuCountPerDevice[0] = count;
+
+                do
+                {
+#ifdef _WIN32
+                    attrp= strtok_s(NULL, ",", &np);
+#else
+                    attrp= strtok(NULL, ",");
+#endif
+                    if (attrp != NULL)
+                    {
+                        if ((count = attrp[0] - '0') != 1 && count != 2 && count != 4)
+                        {
+                            gcmPRINT("VIV Warning : VIV_OVX_USE_MULTI_DEVICES setting 1:[1 or 2 or 4,...]");
+                        }
+                        else
+                        {
+                            gpuCountPerDevice[deviceCount++] = count;
+                        }
+                    }
+                }
+                while (attrp != NULL);
+
+                count = 0;
+                for (i = 0; i < deviceCount; i++)
+                {
+                    count += gpuCountPerDevice[i];
+                }
+
+                if (count != gpuCount)
+                {
+                    gcmPRINT("VIV Warning: Invalid VIV_OVX_USE_MULIT_DEVICES Env: GPUCountPerDevivce sum doesn't equal to gpu core count");
+                    return gcvSTATUS_INVALID_ARGUMENT;
+                }
+            }
+            else
+            {
+                gcmPRINT("VIV Warning : VIV_OVX_USE_MULTI_DEVICES only supports 1 | 1:1 | 1:2 | 1:4 | 1:[1or2or4,]");
+            }
+        }
+        else    /*multi-device is disable, Independent mode , one device and device has only one gpucore */
+        {
+            deviceCount = 1;
+            gpuCountPerDevice[0] = 1;
+
+            if (coreIndex >= gpuCount) /*coreIndex need small than maxCoreCount*/
+            {
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+        }
+    }
+
+    queriedOnce = gcvTRUE;
+
+exit:
+    if (DeviceCount != gcvNULL)
+    {
+        *DeviceCount = deviceCount;
+    }
+    if (GPUCountPerDevice != gcvNULL)
+    {
+        gcoOS_MemCopy((gctPOINTER)GPUCountPerDevice, (gctPOINTER)gpuCountPerDevice, sizeof(gpuCountPerDevice));
+    }
+
+    return gcvSTATUS_OK;
+}
 
 gctBOOL gcoVX_VerifyHardware();
+
+gceSTATUS gcoVX_CreateHW();
 
 gceSTATUS gcoVX_Construct(OUT gcoVX * VXObj )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctUINT  i;
+    gctUINT i, deviceCount, perDeviceGpuCount[MAX_GPU_CORE_COUNT], startIndex = 0;
+    gctUINT32 gpuCoreIndexs[] = {0, 1, 2, 3, 4, 5, 6, 7};
     gctPOINTER pointer = gcvNULL;
-    gcoVX     vxObj = gcvNULL;
+    gcoVX vxObj = gcvNULL;
 
     gcmHEADER();
 
@@ -66,13 +221,25 @@ gceSTATUS gcoVX_Construct(OUT gcoVX * VXObj )
     vxObj = (gcoVX) pointer;
 
     gcoOS_ZeroMemory(vxObj, gcmSIZEOF(struct _gcoVX));
-    gcmONERROR(gcoVX_QueryDeviceCount(&vxObj->coreCount, gcvNULL));
+    gcmONERROR(_QueryDeviceCoreCount(&deviceCount, perDeviceGpuCount));
     gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
-    for(i = 0; i < vxObj->coreCount; i++)
+    if (deviceCount == 1 && perDeviceGpuCount[0] == 1) /*Special deal with independent mode*/
     {
-        gcmONERROR(gcoVX_CreateHW(i, &vxObj->hardwares[i]));
+        gctUINT32 mainCoreIndex;
+        gceMULTI_GPU_MODE mode;
+
+        gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_3D, &mode, &mainCoreIndex);
+        gpuCoreIndexs[0] = mainCoreIndex;
     }
+
+    for (i = 0; i < deviceCount; i++)
+    {
+        gcmONERROR(gcoVX_CreateHW(i, perDeviceGpuCount[i], &gpuCoreIndexs[startIndex], &vxObj->hardwares[i]));
+        startIndex += perDeviceGpuCount[i];
+    }
+
+    vxObj->deviceCount = deviceCount;
 
     *VXObj = vxObj;
 
@@ -83,7 +250,7 @@ OnError:
      if(vxObj)
      {
 
-         for(i = 0; i < vxObj->coreCount; i++)
+         for(i = 0; i < vxObj->deviceCount; i++)
          {
              if(vxObj->hardwares[i])
              {
@@ -104,7 +271,7 @@ gceSTATUS gcoVX_Destroy(IN gcoVX VXObj)
 
     gcmASSERT(VXObj != gcvNULL);
 
-    for(i = 0; i < VXObj->coreCount; i++)
+    for(i = 0; i < VXObj->deviceCount; i++)
     {
         if(VXObj->hardwares[i])
         {
@@ -968,95 +1135,64 @@ OnError:
 
 gceSTATUS
 gcoVX_QueryDeviceCount(
-    OUT gctUINT32 * DeviceCount,
-    OUT gctUINT32 * GPUCountPerDevice
+    OUT gctUINT32 * DeviceCount
     )
 {
-    gctUINT chipIDs[32];
-    gceMULTI_GPU_MODE mode;
-    gctUINT coreIndex;
-    gctSTRING attr;
-    gctUINT32 gpuCount;
-    static gctUINT gpuCountPerDevice = 1, deviceCount = 1;
-    static gctBOOL queriedOnce = gcvFALSE;
+    return _QueryDeviceCoreCount(DeviceCount, gcvNULL);
+}
 
-    if(queriedOnce)
+gceSTATUS
+gcoVX_QueryCoreCount(
+    gctUINT32  DeviceID,
+    OUT gctUINT32 *CoreCount
+    )
+{
+    gctUINT32 deviceCount, gpuCountPerDevice[MAX_GPU_CORE_COUNT];
+
+    _QueryDeviceCoreCount(&deviceCount, gpuCountPerDevice);
+
+    if (deviceCount <= DeviceID)
     {
-        if(DeviceCount) *DeviceCount = deviceCount;
-        if(GPUCountPerDevice) *GPUCountPerDevice = gpuCountPerDevice;
-
-        return gcvSTATUS_OK;
+        return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-    queriedOnce = gcvTRUE;
-    gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D, &gpuCount, chipIDs);
-
-    if (gpuCount == 0)
+    if (CoreCount != gcvNULL)
     {
-        gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D2D, &gpuCount, chipIDs);
+        *CoreCount = gpuCountPerDevice[DeviceID];
     }
-
-    gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_3D, &mode, &coreIndex);
-
-    if(mode == gcvMULTI_GPU_MODE_COMBINED)      /*Combined Mode*/
-    {
-        if(gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_USE_MULTI_DEVICES))
-        {
-            gcmPRINT("VIV Warning : VIV_OVX_USE_MULIT_DEVICES=1 only for INDEPENDENT mode, back to combinedMode");
-            return gcvSTATUS_INVALID_ARGUMENT;
-        }
-
-        gpuCountPerDevice = gpuCount;
-        deviceCount = 1;
-    }
-    else     /*For Dependent mode*/
-    {
-        if(gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_USE_MULTI_DEVICES))  /*multi-device mode */
-        {
-
-            gcoOS_GetEnv(gcvNULL, "VIV_OVX_USE_MULTI_DEVICE", &attr);
-
-            if(attr && attr[0] == '1')
-            {
-                gpuCountPerDevice = 1;
-
-                if(attr[1] == ':' && ( attr[2] == '2' || attr[2] == '4' || attr[2] =='1'))
-                {
-                    gpuCountPerDevice = attr[2] - '0';
-                }
-                else if (attr[1] != '\0')
-                {
-                    gcmPRINT("VIV Warning : VIV_OVX_USE_MULTI_DEVICES only supporte 1 | 1:1 | 1:2 | 1:4");
-                }
-            }
-
-            if((gpuCount % gpuCountPerDevice != 0) || (gpuCountPerDevice > gpuCount))
-            {
-                gcmPRINT("VIV Warning: Invalid VIV_OVX_USE_MULIT_DEVICES Env vars GPUCountPerDevivce is invalid");
-                return gcvSTATUS_INVALID_ARGUMENT;
-            }
-
-            deviceCount = gpuCount / gpuCountPerDevice;
-        }
-        else    /*multi-device is disable, Independent mode , one device and device has only one gpucore */
-        {
-            gpuCountPerDevice = 1;
-            deviceCount = 1;
-
-            if(coreIndex >= gpuCount) /*coreIndex need small than maxCoreCount*/
-            {
-                return gcvSTATUS_INVALID_ARGUMENT;
-            }
-        }
-    }
-
-    if(DeviceCount) *DeviceCount = deviceCount;
-
-    if(GPUCountPerDevice) *GPUCountPerDevice = gpuCountPerDevice;
 
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+gcoVX_QueryMultiCore(
+    OUT gctBOOL *IsMultiCore
+    )
+{
+    gctUINT32 i, deviceCount, gpuCountPerDevice[MAX_GPU_CORE_COUNT];
+
+    _QueryDeviceCoreCount(&deviceCount, gpuCountPerDevice);
+
+    for (i = 0; i < deviceCount; i++)
+    {
+        if (gpuCountPerDevice[i] > 1)
+            break;
+    }
+
+    if (IsMultiCore != gcvNULL)
+    {
+        if (i < deviceCount)
+        {
+            *IsMultiCore = gcvTRUE;
+        }
+        else
+        {
+            *IsMultiCore = gcvFALSE;
+        }
+    }
+
+    return gcvSTATUS_OK;
+}
 
 gceSTATUS
 gcoVX_GetNNConfig(
@@ -1397,7 +1533,7 @@ gcoVX_SwitchContext(
     gcmONERROR(gcoHARDWARE_Get3DHardware(SavedHardware));
     gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, SavedType));
 
-    gcmASSERT(DeviceID < tls->engineVX->coreCount);
+    gcmASSERT(DeviceID < tls->engineVX->deviceCount);
     gcmONERROR(gcoHARDWARE_Set3DHardware(tls->engineVX->hardwares[DeviceID]));
     gcoHARDWARE_QueryCoreIndex(tls->engineVX->hardwares[DeviceID], 0, &coreIndex);
 
@@ -1428,18 +1564,6 @@ OnError:
     gcmFOOTER();
     return status;
 }
-
-gceSTATUS
-gcoVX_GetHWConfigGpuCount(
-     gctUINT32 * GpuCount
-    )
-{
-    /* gcoHAL_Query3DcoreCount is dependent on tls->currentHardware. its' valid only in scope of vxVerify/vxProcess.
-      replace it with gcoVX_QueryDeviceCount for safe
-     */
-    return gcoVX_QueryDeviceCount(gcvNULL, GpuCount);
-}
-
 
 gctBOOL gcoVX_VerifyHardware()  /* Verify VX not use the default hardware*/
 {
@@ -1529,7 +1653,7 @@ gcoVX_SetRemapAddress(
         gcmONERROR(gcoVX_Construct(&tls->engineVX));
     }
 
-    for(i = 0; i < tls->engineVX->coreCount; i++)
+    for(i = 0; i < tls->engineVX->deviceCount; i++)
     {
         gcmONERROR(gcoHARDWAREVX_SetRemapAddress(tls->engineVX->hardwares[i], remapStart, remapEnd, remapType));
     }
@@ -1561,43 +1685,32 @@ OnError:
 
 gceSTATUS
 gcoVX_CreateHW(
-    IN gctUINT32    DeviceId,
+    IN gctUINT32  DeviceID,
+    IN gctUINT32  GpuCountPerDevice,
+    IN gctUINT32  GpuCoreIndexs[],
     OUT gcoHARDWARE * Hardware
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcoHARDWARE  hardware = gcvNULL;
-    gctUINT      perDeviceGpuCount;
-    gctUINT      DeviceCount;
-    gctUINT32    gpuCoreIndexs[]={0, 1, 2, 3, 4, 5, 6, 7};
     gctBOOL      changed = gcvFALSE;
     gceHARDWARE_TYPE preType = gcvHARDWARE_INVALID ;
-    gctUINT32        preCoreIndex;
-    gceMULTI_GPU_MODE  mode;
-    gctUINT32 mainCoreIndex;
-    gcmHEADER_ARG("DeviceId=%d", DeviceId);
+    gctUINT32   preCoreIndex;
+    gcmHEADER_ARG("DeviceID=%d GpuCount=%d", DeviceID, GpuCountPerDevice);
 
     gcmVERIFY_OK(gcoHAL_GetHardwareType(gcvNULL, &preType));
     gcmVERIFY_OK(gcoHAL_GetCurrentCoreIndex(gcvNULL, &preCoreIndex));
     gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
-    gcmVERIFY_OK(gcoVX_QueryDeviceCount(&DeviceCount, &perDeviceGpuCount));
-
-    if(DeviceCount == 1 && perDeviceGpuCount == 1) /*Special deal with independent mode*/
-    {
-         gcoHAL_QueryMultiGPUAffinityConfig(gcvHARDWARE_3D, &mode, &mainCoreIndex);
-
-         gpuCoreIndexs[0] = mainCoreIndex;
-    }
-    gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, gpuCoreIndexs[DeviceId * perDeviceGpuCount]));
+    gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, GpuCoreIndexs[0]));
 
     changed = gcvTRUE;
     gcmONERROR(gcoHARDWARE_ConstructEx(gcPLS.hal,
                                        gcvFALSE,
                                        gcvFALSE,
                                        gcvHARDWARE_3D,
-                                       perDeviceGpuCount,
-                                       &gpuCoreIndexs[DeviceId*perDeviceGpuCount],
+                                       GpuCountPerDevice,
+                                       GpuCoreIndexs,
                                        &hardware));
 
     /* gcoHARDWARE_SetMultiGPUMode(hardware,gcvMULTI_GPU_MODE_INDEPENDENT); */

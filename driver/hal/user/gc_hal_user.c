@@ -399,17 +399,11 @@ _FillInOptions(
 
     envctrl = gcvNULL;
     gcoOS_GetEnv(gcvNULL,"VIV_OVX_USE_MULTI_DEVICE", &envctrl); /*mulit-device mode validation  in gcoVX_QueryDeviceCount*/
-    if(envctrl == gcvNULL || envctrl[0] == '0')
+    if (envctrl == gcvNULL || envctrl[0] == '0')
     {
-
          gcOptions[gcvOPTION_OVX_USE_MULTI_DEVICES] = gcvFALSE;
-
     }
-    else  if( (gcoOS_StrCmp(envctrl, "1") == gcvSTATUS_OK)
-              || (gcoOS_StrCmp(envctrl, "1:1") == gcvSTATUS_OK)
-              || (gcoOS_StrCmp(envctrl, "1:2") == gcvSTATUS_OK)
-              || (gcoOS_StrCmp(envctrl, "1:4") == gcvSTATUS_OK)
-            )/* VIV_MGPU_AFFINITY is INDEPENENT */
+    else if (envctrl != gcvNULL && envctrl[0] == '1')
     {
          gcOptions[gcvOPTION_OVX_USE_MULTI_DEVICES] = gcvTRUE;
     }
