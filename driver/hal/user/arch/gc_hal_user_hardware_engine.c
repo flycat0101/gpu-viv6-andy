@@ -22831,10 +22831,24 @@ gcoHARDWARE_SetXfbCmd(
         gcmASSERT(Memory == gcvNULL);
         /*
         ** Core level check can ensure current status is paused.
-        ** For multi TFB objects, if the previous object is ended, the next object may still be paused.
-        ** So setting following status and command forcibly.
+        ** Case 1: begin->draw->pause->resume
+        ** Case 2: begin->pause->draw->resume
+        ** Case 3: begin->draw->pause->resume->draw->end->resume(another object)
         */
+        if (Hardware->XFBStates->status == gcvXFB_Paused)
         {
+            Hardware->XFBStates->cmd = gcvXFBCMD_RESUME;
+        }
+        else if (Hardware->XFBStates->cmd == gcvXFBCMD_PAUSE)
+        {
+            gcmASSERT(Hardware->XFBStates->status == gcvXFB_Disabled);
+            gcmASSERT(Hardware->XFBStates->statusInCmd == gcvXFB_Disabled);
+            Hardware->XFBStates->cmd = gcvXFBCMD_BEGIN;
+        }
+        else
+        {
+            gcmASSERT(Hardware->XFBStates->status == gcvXFB_Disabled);
+            gcmASSERT(Hardware->XFBStates->statusInCmd == gcvXFB_Disabled);
             Hardware->XFBStates->status = gcvXFB_Paused;
             Hardware->XFBStates->statusInCmd = gcvXFB_Paused;
             Hardware->XFBStates->cmd = gcvXFBCMD_RESUME;
