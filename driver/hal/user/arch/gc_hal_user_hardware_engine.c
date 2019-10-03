@@ -20829,7 +20829,6 @@ gceSTATUS gcoHARDWARE_FastFlushStream(
     gctUINT streamAddressState;
     gctUINT streamStrideState;
     gctUINT streamDivisorState;
-    gctINT VertexInstanceIdLinkage = -1;
     gctUINT bytes;
     gctSIZE_T reserveSize;
     gctUINT32 physical;
@@ -21401,65 +21400,8 @@ gceSTATUS gcoHARDWARE_FastFlushStream(
     /* See if there are any attributes left to program in the vertex shader
     ** shader input registers. And also check if we need to add vertex instance linkage
     */
-    if (((linkCount & 3) != 0) || (VertexInstanceIdLinkage != -1))
+    if ((linkCount & 3) != 0)
     {
-        /* Do we need to add vertex instance linkage? */
-        if (VertexInstanceIdLinkage != -1)
-        {
-            /* Set vertex shader input linkage. */
-            switch (linkCount & 3)
-            {
-            case 0:
-                linkState = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 5:0) - (0 ?
- 5:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 5:0) - (0 ?
- 5:0) + 1))))))) << (0 ?
- 5:0))) | (((gctUINT32) ((gctUINT32) (VertexInstanceIdLinkage ) & ((gctUINT32) ((((1 ?
- 5:0) - (0 ?
- 5:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)));
-                break;
-            case 1:
-                linkState = ((((gctUINT32) (linkState)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 13:8) - (0 ?
- 13:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 13:8) - (0 ?
- 13:8) + 1))))))) << (0 ?
- 13:8))) | (((gctUINT32) ((gctUINT32) (VertexInstanceIdLinkage ) & ((gctUINT32) ((((1 ?
- 13:8) - (0 ?
- 13:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ? 13:8)));
-                break;
-            case 2:
-                linkState = ((((gctUINT32) (linkState)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 21:16) - (0 ?
- 21:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 21:16) - (0 ?
- 21:16) + 1))))))) << (0 ?
- 21:16))) | (((gctUINT32) ((gctUINT32) (VertexInstanceIdLinkage ) & ((gctUINT32) ((((1 ?
- 21:16) - (0 ?
- 21:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 21:16) - (0 ? 21:16) + 1))))))) << (0 ? 21:16)));
-                break;
-            case 3:
-                linkState = ((((gctUINT32) (linkState)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:24) - (0 ?
- 29:24) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 29:24) - (0 ?
- 29:24) + 1))))))) << (0 ?
- 29:24))) | (((gctUINT32) ((gctUINT32) (VertexInstanceIdLinkage ) & ((gctUINT32) ((((1 ?
- 29:24) - (0 ?
- 29:24) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 29:24) - (0 ? 29:24) + 1))))))) << (0 ? 29:24)));
-                break;
-            }
-        }
-
         /* Program attributes */
         _gcmSETSTATEDATA_FAST(
             stateDelta, shaderCtrl, shaderCtrlState, linkState
