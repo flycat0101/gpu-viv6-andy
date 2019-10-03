@@ -356,6 +356,73 @@ __kernel void vxcDepthwiseConv_I16kernel_3x3_S1(
     VXC_WriteImage2DArray(output, coord_out, result, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
 
+__kernel void vxcDepthwiseConv_I16kernel_3x3_S1_BI64(
+    __read_only image2d_array_t input,
+    __read_only image2d_array_t weight,
+    __read_only image2d_t bias,
+    int channel_multiplier,
+    int kernel_width,
+    int kernel_height,
+    int stride,
+    int padLeft,
+    int padTop,
+    __write_only image2d_array_t output)
+{
+    int gidx = get_global_id(0);
+    int gidy = get_global_id(1);
+    int gidz = get_global_id(2);
+    int4 coord_out = (int4)(gidx, gidy, gidz, 0);
+    int inz = (short)gidz / (short)channel_multiplier;
+    int inyStart = gidy * stride - padTop;
+    int inxStart = gidx * stride - padLeft;
+    int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
+    int2 coord_wei = (int2)(0, coord_out.z);
+    float4 sum[2];
+
+    vxc_short8 inval[2], weval;
+    float4 tmp;
+    float4 tmpSum[2];
+    VXC_ReadImage(weval, weight, coord_wei, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(inval[0], input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(inval[1], input, coord_in, VXC_5BITOFFSET_XY(4, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_DP4x4(tmpSum[0], inval[0], weval, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConv_k3x3_s1_1_4x4);
+    VXC_DP4x4(tmpSum[1], inval[1], weval, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConv_k3x3_s1_1_4x4);
+    VXC_ReadImage2DArray(inval[0], input, coord_in, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(inval[1], input, coord_in, VXC_5BITOFFSET_XY(4, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_DP4x4(tmp, inval[0], weval, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConv_k3x3_s1_2_4x4);
+    tmpSum[0] += tmp;
+    VXC_DP4x4(tmp, inval[1], weval, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConv_k3x3_s1_2_4x4);
+    tmpSum[1] += tmp;
+    VXC_ReadImage(weval, weight, coord_wei, VXC_5BITOFFSET_XY(6, 0), VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(inval[0], input, coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(inval[1], input, coord_in, VXC_5BITOFFSET_XY(4, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_DP4x4(tmp, inval[0], weval, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConv_k3x3_s1_1_4x4);
+    tmpSum[0] += tmp;
+    VXC_DP4x4(tmp, inval[1], weval, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConv_k3x3_s1_1_4x4);
+    tmpSum[1] += tmp;
+
+    short4 hI8val[2];
+    vxc_short8 result;
+
+    float bival;
+    coord_wei.y = coord_wei.y << 1;
+    vxc_int4 tmpBias = read_imagei(bias, coord_wei.yx);
+    long b;
+    _viv_asm(MOV_LONG, b, tmpBias.x, tmpBias.y);
+    bival = convert_float(b);
+
+    sum[0].x = bival * biasOutScale;
+    sum[0] = sum[0].xxxx;
+    sum[1] = sum[0];
+    sum[0] += (tmpSum[0] * inWtOutScale);
+    sum[1] += (tmpSum[1] * inWtOutScale);
+    _viv_asm(CONV_SAT_RTE, hI8val[0], sum[0]);
+    _viv_asm(CONV_SAT_RTE, hI8val[1], sum[1]);
+    VXC_DP2x8(result, hI8val[0], hI8val[1], VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrderShort4_2x8);
+    VXC_WriteImage2DArray(output, coord_out, result, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+}
+
+
 __kernel void vxcDepthwiseConv_I16kernel_3x3_S2(
     __read_only image2d_array_t input,
     __read_only image2d_array_t weight,
@@ -414,6 +481,74 @@ __kernel void vxcDepthwiseConv_I16kernel_3x3_S2(
     VXC_DP2x8(result, hI8val[0], hI8val[1], VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder2Short4_2x8);
     VXC_WriteImage2DArray(output, coord_out, result, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
 }
+
+
+__kernel void vxcDepthwiseConv_I16kernel_3x3_S2_BI64(
+    __read_only image2d_array_t input,
+    __read_only image2d_array_t weight,
+    __read_only image2d_t bias,
+    int channel_multiplier,
+    int kernel_width,
+    int kernel_height,
+    int stride,
+    int padLeft,
+    int padTop,
+    __write_only image2d_array_t output)
+{
+    int gidx = get_global_id(0);
+    int gidy = get_global_id(1);
+    int gidz = get_global_id(2);
+    int4 coord_out = (int4)(gidx, gidy, gidz, 0);
+    int inz = (short)gidz / (short)channel_multiplier;
+    int inyStart = gidy * stride - padTop;
+    int inxStart = gidx * stride - padLeft;
+    int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
+    int2 coord_wei = (int2)(0, coord_out.z);
+    float4 sum[2];
+
+    vxc_short8 inval[2], weval;
+    float4 tmp;
+    float4 tmpSum[2];
+    VXC_ReadImage(weval, weight, coord_wei, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(inval[0], input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(inval[1], input, coord_in, VXC_5BITOFFSET_XY(6, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_DP4x4(tmpSum[0], inval[0], weval, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0), uniConvF16_k3x3_s2_1_4x4);
+    VXC_DP4x4(tmpSum[1], inval[1], weval, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0), uniConvF16_k3x3_s2_1_4x4);
+    VXC_ReadImage2DArray(inval[0], input, coord_in, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(inval[1], input, coord_in, VXC_5BITOFFSET_XY(6, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_DP4x4(tmp, inval[0], weval, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0), uniConvF16_k3x3_s2_2_4x4);
+    tmpSum[0] += tmp;
+    VXC_DP4x4(tmp, inval[1], weval, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0), uniConvF16_k3x3_s2_2_4x4);
+    tmpSum[1] += tmp;
+    VXC_ReadImage(weval, weight, coord_wei, VXC_5BITOFFSET_XY(6, 0), VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(inval[0], input, coord_in, VXC_5BITOFFSET_XY(0, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage2DArray(inval[1], input, coord_in, VXC_5BITOFFSET_XY(6, 2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_DP4x4(tmp, inval[0], weval, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvF16_k3x3_s2_1_4x4);
+    tmpSum[0] += tmp;
+    VXC_DP4x4(tmp, inval[1], weval, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvF16_k3x3_s2_1_4x4);
+    tmpSum[1] += tmp;
+
+    short4 hI8val[2];
+    vxc_short8 result;
+
+    float bival;
+    coord_wei.y = coord_wei.y << 1;
+    vxc_int4 tmpBias = read_imagei(bias, coord_wei.yx);
+    long b;
+    _viv_asm(MOV_LONG, b, tmpBias.x, tmpBias.y);
+    bival = convert_float(b);
+
+    sum[0].x = bival * biasOutScale;
+    sum[0] = sum[0].xxxx;
+    sum[1] = sum[0];
+    sum[0] += (tmpSum[0] * inWtOutScale);
+    sum[1] += (tmpSum[1] * inWtOutScale);
+    _viv_asm(CONV_SAT_RTE, hI8val[0], sum[0]);
+    _viv_asm(CONV_SAT_RTE, hI8val[1], sum[1]);
+    VXC_DP2x8(result, hI8val[0], hI8val[1], VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniSumOrder2Short4_2x8);
+    VXC_WriteImage2DArray(output, coord_out, result, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
+}
+
 
 _viv_uniform VXC_512Bits uniConv_k3x3_s1_3_4x4;
 _viv_uniform VXC_512Bits uniConv_k3x3_s1_4_4x4;
@@ -949,6 +1084,75 @@ __kernel void vxcDepthwiseConv_i16i16(
     int bival;
     bival = read_imagei(bias, coord_wei.zw).x;
     sum = bival * biasScale;
+
+    if(inz < input_depth)
+    {
+        vxc_short8 inval, weval;
+
+        for(int j = 0; j < kernel_height; j++)
+        {
+            int tmpSum = 0;
+
+            for(int i = 0; i < widthIter; i++)
+            {
+                int tmpMul;
+                VXC_ReadImage2DArray(inval, input, coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+                VXC_ReadImage2DArray(weval, weight, coord_wei, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+                VXC_DP16x1(tmpMul, inval, weval, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), uniI16MulAccumtoI32_16x1);
+                tmpSum += tmpMul;
+                coord.x += 8;
+                coord_wei.x += 8;
+            }
+            if(widthRes)
+            {
+                int tmpMul;
+                VXC_ReadImage2DArray(inval, input, coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+                VXC_ReadImage2DArray(weval, weight, coord_wei, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+                VXC_DP16x1(tmpMul, inval, weval, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), uniI16MulAccumNtoI32_16x1);
+                tmpSum += tmpMul;
+            }
+            sum += (tmpSum * inWtScale);
+            coord.x = gidx;
+            coord_wei.x = 0;
+            coord.y++;
+            coord_wei.y++;
+        }
+    }
+    sum *= outScale;
+    short dst = convert_short_sat_rte(sum);
+    coord = (int4)(get_global_id(0), get_global_id(1), gidz, 0);
+    VXC_WriteImage2DArray(output, coord, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxcDepthwiseConv_i16i16_BI64(
+    __read_only image2d_array_t input,
+    __read_only image2d_array_t weight,
+    __read_only image2d_t bias,
+    int channel_multiplier,
+    int kernel_width,
+    int kernel_height,
+    int stride,
+    int padLeft,
+    int padTop,
+    __write_only image2d_array_t output)
+{
+    int gidx = get_global_id(0) * stride - padLeft;
+    int gidy = get_global_id(1) * stride - padTop;
+    int gidz = get_global_id(2);
+    int inz = (short)gidz / (short)channel_multiplier;
+    int4 coord = (int4)(gidx, gidy, inz, 0);
+
+    int4 coord_wei = (int4)(0, 0, gidz, 0);
+    float sum = 0;
+
+    float bival;
+    coord_wei.y = coord_wei.z << 1;
+    vxc_int4 tmpBias = read_imagei(bias, coord_wei.yw);
+    long b;
+    _viv_asm(MOV_LONG, b, tmpBias.x, tmpBias.y);
+    bival = convert_float(b);
+    sum = bival * biasScale;
+    coord_wei.y = 0;
 
     if(inz < input_depth)
     {

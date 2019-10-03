@@ -21528,6 +21528,7 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_uint32     output_depth               = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
     vx_enum       inputFormat                = TENSOR_DATA_TYPE(inputs);
     vx_enum       outputFormat               = TENSOR_DATA_TYPE(outputs);
+    vx_enum       biasesFormat               = TENSOR_DATA_TYPE(biases);
     vx_int32      kernel_width               = TENSOR_VIEW_SIZE_INDEX(weights, 0);
     vx_int32      kernel_height              = TENSOR_VIEW_SIZE_INDEX(weights, 1);
     vx_int32      padLeftv                   = padXLeft->value->n32;
@@ -21820,11 +21821,25 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         {
             if (1 == stride)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16kernel_3x3_S1", borderMode);
+                if (biasesFormat == VX_TYPE_INT64)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16kernel_3x3_S1_BI64", borderMode);
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16kernel_3x3_S1", borderMode);
+                }
             }
             else if (2 == stride)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16kernel_3x3_S2", borderMode);
+                if (biasesFormat == VX_TYPE_INT64)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16kernel_3x3_S2_BI64", borderMode);
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16kernel_3x3_S2", borderMode);
+                }
             }
         }
         if (!shaderExecutable) goto OnError;
@@ -22262,7 +22277,14 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         uniI16MulAccumNtoI32_16x1[2] = uniConfigMulAccPosiN[widthRes];
         uniI16MulAccumNtoI32_16x1[5] = uniConfigMulAccPosiN[widthRes];
 
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i16i16", borderMode);
+        if (biasesFormat == VX_TYPE_INT64)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i16i16_BI64", borderMode);
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i16i16", borderMode);
+        }
         if (!shaderExecutable) goto OnError;
 
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniI16MulAccumtoI32_16x1", 1, uniI16MulAccumtoI32_16x1);
