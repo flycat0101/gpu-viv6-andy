@@ -924,12 +924,7 @@ VkResult halti5_draw(
             *pCmdBuffer++ = firstVertex;
             *pCmdBuffer++ = 0;
             __VK_DEBUG_ONLY(});
-
-            if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-            {
-                if (useOneCore)
-                {
-                    do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -973,6 +968,11 @@ VkResult halti5_draw(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+
+            if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+            {
+                if (useOneCore)
+                {
                     *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -1136,12 +1136,7 @@ VkResult halti5_draw(
         *pCmdBuffer++ = firstVertex;
         *pCmdBuffer++ = 0;
         __VK_DEBUG_ONLY(});
-
-        if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-        {
-            if (useOneCore)
-            {
-                do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1185,6 +1180,11 @@ VkResult halti5_draw(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+
+        if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+        {
+            if (useOneCore)
+            {
                 *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -1423,12 +1423,7 @@ VkResult halti5_drawIndexed(
             *pCmdBuffer++ = vertexOffset;
             *pCmdBuffer++ = 0;
             __VK_DEBUG_ONLY(});
-
-            if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-            {
-                if (useOneCore)
-                {
-                    do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1472,6 +1467,11 @@ VkResult halti5_drawIndexed(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+
+            if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+            {
+                if (useOneCore)
+                {
                     *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -1633,12 +1633,7 @@ VkResult halti5_drawIndexed(
         *pCmdBuffer++ = vertexOffset;
         *pCmdBuffer++ = 0;
         __VK_DEBUG_ONLY(});
-
-        if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-        {
-            if (useOneCore)
-            {
-                do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1682,6 +1677,11 @@ VkResult halti5_drawIndexed(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+
+        if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+        {
+            if (useOneCore)
+            {
                 *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -1878,12 +1878,7 @@ VkResult halti5_drawDirect(
     *pCmdBuffer++ = 0;
     *pCmdBuffer++ = 0;
     __VK_DEBUG_ONLY(});
-
-    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-    {
-        if (useOneCore)
-        {
-            do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1927,6 +1922,11 @@ VkResult halti5_drawDirect(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+
+    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+    {
+        if (useOneCore)
+        {
             *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -2125,12 +2125,7 @@ VkResult halti5_drawIndexedDirect(
     *pCmdBuffer++ = firstIndex;
     *pCmdBuffer++ = 0;
     __VK_DEBUG_ONLY(});
-
-    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-    {
-        if (useOneCore)
-        {
-            do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2174,6 +2169,11 @@ VkResult halti5_drawIndexedDirect(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+
+    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+    {
+        if (useOneCore)
+        {
             *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -2651,12 +2651,7 @@ VkResult halti5_splitDrawIndexedPatchList(
 
     /* set split draw cmd.*/
     __VK_ONERROR(halti5_setSplitDrawCmd(cmdBuf, &pCmdBuffer, buf, &splitParamter, instanceCount, vertexOffset));
-
-    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-    {
-        if (useOneCore)
-        {
-            do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2700,6 +2695,11 @@ VkResult halti5_splitDrawIndexedPatchList(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+
+    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+    {
+        if (useOneCore)
+        {
             *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3016,13 +3016,7 @@ static VkResult halti5_drawIndirect_common(
             *pCmdBuffer++ = drawCommand;
             *pCmdBuffer++ = srcAddr;
             __VK_DEBUG_ONLY(})
-
-
-            if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-            {
-                if (useOneCore)
-                {
-                    do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -3066,6 +3060,12 @@ static VkResult halti5_drawIndirect_common(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+
+
+            if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+            {
+                if (useOneCore)
+                {
                     *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3212,13 +3212,7 @@ static VkResult halti5_drawIndirect_common(
         *pCmdBuffer++ = drawCommand;
         *pCmdBuffer++ = srcAddr;
         __VK_DEBUG_ONLY(})
-
-
-        if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
-        {
-            if (useOneCore)
-            {
-                do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -3262,6 +3256,12 @@ static VkResult halti5_drawIndirect_common(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+
+
+        if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+        {
+            if (useOneCore)
+            {
                 *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3788,50 +3788,6 @@ VkResult halti5_dispatch(
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
-        do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ?
- 31:27) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:27) - (0 ?
- 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
- 31:27) - (0 ?
- 31:27) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:27) - (0 ?
- 31:27) + 1))))))) << (0 ?
- 31:27))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E03) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ?
- 25:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 25:16) - (0 ?
- 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
- 25:16) - (0 ?
- 25:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ?
- 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 0:0) - (0 ?
- 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 0:0) - (0 ?
- 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
-
         *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -3950,50 +3906,6 @@ VkResult halti5_dispatchIndirect(
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
-        do{if (devCtx->database->REG_BltEngine){*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ?
- 31:27) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:27) - (0 ?
- 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
- 31:27) - (0 ?
- 31:27) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 31:27) - (0 ?
- 31:27) + 1))))))) << (0 ?
- 31:27))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E03) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ?
- 15:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 15:0) - (0 ?
- 15:0) + 1))))))) << (0 ?
- 15:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ?
- 25:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 25:16) - (0 ?
- 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
- 25:16) - (0 ?
- 25:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));*pCmdBuffer++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ?
- 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 0:0) - (0 ?
- 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 0:0) - (0 ?
- 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
-
         *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
