@@ -15,9 +15,11 @@ LOCAL_PATH := $(call my-dir)
 include $(LOCAL_PATH)/Android.mk.def
 
 ifndef FIXED_ARCH_TYPE
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) "<=" 28),1)
 
   ifeq ($(VIVANTE_ENABLE_VG),1)
   endif
+endif
 endif
 
 LOCAL_PATH := $(AQROOT)

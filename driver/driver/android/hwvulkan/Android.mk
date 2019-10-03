@@ -31,6 +31,13 @@ LOCAL_C_INCLUDES += \
 		system/core/include
 endif
 
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 29),1)
+LOCAL_C_INCLUDES += \
+       external/vulkan-headers/include \
+       $(AQROOT)/sdk/inc
+endif
+
 LOCAL_CFLAGS := \
     -Wall \
     -Wextra \

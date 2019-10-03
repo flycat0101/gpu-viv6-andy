@@ -62,12 +62,13 @@ LOCAL_GENERATED_SOURCES := \
 
 ifndef FIXED_ARCH_TYPE
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) "<=" 28),1)
 VULKAN_DIR := $(LOCAL_PATH)
 
 
 
 
-
+endif
 endif
 
 LOCAL_CFLAGS := \
