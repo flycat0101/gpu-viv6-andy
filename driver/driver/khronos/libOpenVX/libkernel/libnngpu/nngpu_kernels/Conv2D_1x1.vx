@@ -1,5 +1,6 @@
 #pragma OPENCL EXTENSION CL_VIV_asm : enable
 #pragma OPENCL EXTENSION cl_viv_bitfield_extension : enable
+#pragma OPENCL EXTENSION cl_viv_vx_extension : enable
 
 __kernel void gpuConv2D_1x1_FP32_2D
     (
@@ -308,11 +309,10 @@ __kernel void gpuConv2D_1x1_Quant32_2D
         w0Temp = read_imageui(weights, coord.xz);
         coord.z ++;
         w1Temp = read_imageui(weights, coord.xz);
-        coord.z --;
 
         tmp0 = read_imageui(input, coord.yx);
         tmp1 = read_imageui(input, coord.yw);
-        coord.xw += (int2)(2, 2);
+        coord += (int4)(2, 0, -1, 2);
         tmp2 = read_imageui(input, coord.yx);
         tmp3 = read_imageui(input, coord.yw);
         coord.xw += (int2)(2, 2);
@@ -331,14 +331,13 @@ __kernel void gpuConv2D_1x1_Quant32_2D
         i3Temp = viv_bitfieldExtract(tmp0.wwww, cfg, bits);
 
         in0Pixel = convert_float4(i0Temp);
-        sum_array[0] = in0Pixel * w0Pixel.xxxx + sum_array[0];
         in1Pixel = convert_float4(i1Temp);
-        sum_array[1] = in1Pixel * w0Pixel.xxxx + sum_array[1];
         in2Pixel = convert_float4(i2Temp);
-        sum_array[2] = in2Pixel * w0Pixel.xxxx + sum_array[2];
         in3Pixel = convert_float4(i3Temp);
+        sum_array[0] = in0Pixel * w0Pixel.xxxx + sum_array[0];
+        sum_array[1] = in1Pixel * w0Pixel.xxxx + sum_array[1];
+        sum_array[2] = in2Pixel * w0Pixel.xxxx + sum_array[2];
         sum_array[3] = in3Pixel * w0Pixel.xxxx + sum_array[3];
-
         sum_array[4] = in0Pixel * w1Pixel.xxxx + sum_array[4];
         sum_array[5] = in1Pixel * w1Pixel.xxxx + sum_array[5];
         sum_array[6] = in2Pixel * w1Pixel.xxxx + sum_array[6];
@@ -350,14 +349,13 @@ __kernel void gpuConv2D_1x1_Quant32_2D
         i3Temp = viv_bitfieldExtract(tmp1.wwww, cfg, bits);
 
         in0Pixel = convert_float4(i0Temp);
-        sum_array[0] = in0Pixel * w0Pixel.yyyy + sum_array[0];
         in1Pixel = convert_float4(i1Temp);
-        sum_array[1] = in1Pixel * w0Pixel.yyyy + sum_array[1];
         in2Pixel = convert_float4(i2Temp);
-        sum_array[2] = in2Pixel * w0Pixel.yyyy + sum_array[2];
         in3Pixel = convert_float4(i3Temp);
+        sum_array[0] = in0Pixel * w0Pixel.yyyy + sum_array[0];
+        sum_array[1] = in1Pixel * w0Pixel.yyyy + sum_array[1];
+        sum_array[2] = in2Pixel * w0Pixel.yyyy + sum_array[2];
         sum_array[3] = in3Pixel * w0Pixel.yyyy + sum_array[3];
-
         sum_array[4] = in0Pixel * w1Pixel.yyyy + sum_array[4];
         sum_array[5] = in1Pixel * w1Pixel.yyyy + sum_array[5];
         sum_array[6] = in2Pixel * w1Pixel.yyyy + sum_array[6];
@@ -369,14 +367,13 @@ __kernel void gpuConv2D_1x1_Quant32_2D
         i3Temp = viv_bitfieldExtract(tmp2.wwww, cfg, bits);
 
         in0Pixel = convert_float4(i0Temp);
-        sum_array[0] = in0Pixel * w0Pixel.zzzz + sum_array[0];
         in1Pixel = convert_float4(i1Temp);
-        sum_array[1] = in1Pixel * w0Pixel.zzzz + sum_array[1];
         in2Pixel = convert_float4(i2Temp);
-        sum_array[2] = in2Pixel * w0Pixel.zzzz + sum_array[2];
         in3Pixel = convert_float4(i3Temp);
+        sum_array[0] = in0Pixel * w0Pixel.zzzz + sum_array[0];
+        sum_array[1] = in1Pixel * w0Pixel.zzzz + sum_array[1];
+        sum_array[2] = in2Pixel * w0Pixel.zzzz + sum_array[2];
         sum_array[3] = in3Pixel * w0Pixel.zzzz + sum_array[3];
-
         sum_array[4] = in0Pixel * w1Pixel.zzzz + sum_array[4];
         sum_array[5] = in1Pixel * w1Pixel.zzzz + sum_array[5];
         sum_array[6] = in2Pixel * w1Pixel.zzzz + sum_array[6];
@@ -388,14 +385,13 @@ __kernel void gpuConv2D_1x1_Quant32_2D
         i3Temp = viv_bitfieldExtract(tmp3.wwww, cfg, bits);
 
         in0Pixel = convert_float4(i0Temp);
-        sum_array[0] = in0Pixel * w0Pixel.wwww + sum_array[0];
         in1Pixel = convert_float4(i1Temp);
-        sum_array[1] = in1Pixel * w0Pixel.wwww + sum_array[1];
         in2Pixel = convert_float4(i2Temp);
-        sum_array[2] = in2Pixel * w0Pixel.wwww + sum_array[2];
         in3Pixel = convert_float4(i3Temp);
+        sum_array[0] = in0Pixel * w0Pixel.wwww + sum_array[0];
+        sum_array[1] = in1Pixel * w0Pixel.wwww + sum_array[1];
+        sum_array[2] = in2Pixel * w0Pixel.wwww + sum_array[2];
         sum_array[3] = in3Pixel * w0Pixel.wwww + sum_array[3];
-
         sum_array[4] = in0Pixel * w1Pixel.wwww + sum_array[4];
         sum_array[5] = in1Pixel * w1Pixel.wwww + sum_array[5];
         sum_array[6] = in2Pixel * w1Pixel.wwww + sum_array[6];
@@ -403,7 +399,7 @@ __kernel void gpuConv2D_1x1_Quant32_2D
 
     } while (coord.x < input_width);
 
-
+    coord.xw = coord.yy + (int2)(1, 2);
     for (int i = 0; i < 8; i+=4)
     {
         uint4 dst0, dst1, dst2, dst3, dst;
@@ -429,7 +425,6 @@ __kernel void gpuConv2D_1x1_Quant32_2D
 
         _viv_asm(COPY, dst, t, 16);
 
-        coord.xw = coord.yy + (int2)(1, 2);
         write_imageui(output, coord.yz, dst.xxxx);
         write_imageui(output, coord.xz, dst.yyyy);
         write_imageui(output, coord.wz, dst.zzzz);
@@ -953,7 +948,7 @@ __kernel void gpuConv2D_1x1_Quant32_2D_4X
 {
     int x = get_global_id(0);
     int y = get_global_id(1);
-    int4 coord = (int4)(0, x, y, 1);
+    int4 coord = (int4)(0, x, y, y);
     float4 in0Pixel, in1Pixel, in2Pixel, in3Pixel, w0Pixel, w1Pixel, w2Pixel, w3Pixel;
     float4 sum, sum_array[16];
     uint4 tmp0, tmp1, tmp2, tmp3, w0Temp, w1Temp, w2Temp, w3Temp;
@@ -975,22 +970,22 @@ __kernel void gpuConv2D_1x1_Quant32_2D_4X
     sum_array[13] = sum.wwww;
     sum_array[14] = sum.wwww;
     sum_array[15] = sum.wwww;
+
+    coord.w += 1;
     do
     {
         w0Temp = read_imageui(weights, coord.xz);
-        coord.z ++;
-        w1Temp = read_imageui(weights, coord.xz);
-        coord.z ++;
+        w1Temp = read_imageui(weights, coord.xw);
+        coord.zw += (int2)(2, 2);
         w2Temp = read_imageui(weights, coord.xz);
-        coord.z ++;
-        w3Temp = read_imageui(weights, coord.xz);
-        coord.z -= 3;
+        w3Temp = read_imageui(weights, coord.xw);
+        coord.zw = coord.zx + (int2)(-2, 1);
         tmp0 = read_imageui(input, coord.yx);
         tmp1 = read_imageui(input, coord.yw);
         coord.xw += (int2)(2, 2);
         tmp2 = read_imageui(input, coord.yx);
         tmp3 = read_imageui(input, coord.yw);
-        coord.xw += (int2)(2, 2);
+        coord.xw = coord.xz + (int2)(2, 1);
 
         w0Pixel = convert_float4(w0Temp) - zpWeight;
         w1Pixel = convert_float4(w1Temp) - zpWeight;

@@ -2,7 +2,6 @@
 #pragma OPENCL EXTENSION CL_VIV_asm : enable
 #pragma OPENCL EXTENSION cl_viv_bitfield_extension : enable
 
-typedef _viv_uchar16_packed   vxc_uchar16;
 
 __kernel void gpuDepthwiseConv_FP32(
     image2d_array_t input,
