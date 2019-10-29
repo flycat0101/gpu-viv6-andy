@@ -25,35 +25,65 @@ VIVANTE_ANDROID_MK_DEF := 1
 FIXED_ARCH_TYPE              ?=
 
 # Set this variable to Kernel directory.
-KERNEL_DIR                   ?= $(ANDROID_BUILD_TOP)/kernel/kernel
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+ifeq ($(KERNEL_OUT),)
+KERNEL_OUT := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ
+endif
+endif
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+KERNEL_DIR                   ?= $(abspath $(OUT_DIR))/../$(KERNEL_OUT)
+else ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)
+KERNEL_DIR                   ?= $(ANDROID_BUILD_TOP)/$(KERNEL_OUT)
+else
+KERNEL_DIR                   ?= $(ANDROID_BUILD_TOP)/kernel_imx
+endif
 
 # Cross compiler for building kernel module.
-CROSS_COMPILE                ?= $(notdir $(TARGET_TOOLS_PREFIX))
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+  ifeq ($(TARGET_ARCH),arm64)
+    CROSS_COMPILE            ?= $(abspath $(OUT_DIR))/../prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-
+  else
+    CROSS_COMPILE            ?= $(abspath $(OUT_DIR))/../prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-
+  endif
+else ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+  ifeq ($(TARGET_ARCH),arm64)
+    CROSS_COMPILE            ?= $(ANDROID_BUILD_TOP)/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-
+  else
+    CROSS_COMPILE            ?= $(ANDROID_BUILD_TOP)/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-
+  endif
+else
+  ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 17),1)
+    CROSS_COMPILE            ?= $(ANDROID_BUILD_TOP)/prebuilts/gcc/linux-x86/arm/arm-eabi-4.6/bin/arm-eabi-
+  else
+    CROSS_COMPILE            ?= $(ANDROID_BUILD_TOP)/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
+  endif
+endif
 
 # CPU arch for kernel module build.
 ARCH_TYPE                    ?= $(TARGET_ARCH)
 
 # HAL module variant, for gralloc.<variant>.so, etc.
-HAL_MODULE_VARIANT           ?=
+HAL_MODULE_VARIANT           ?= $(TARGET_BOARD_PLATFORM)
 
 # Enable debug.
 DEBUG                        ?= 0
 
 USE_OPENCL ?= 1
 USE_OPENVX                   ?= 1
-USE_VULKAN                   ?= 0
+USE_VULKAN                   ?= 1
 
 USE_VXC_BINARY  ?=0
 GPU_CONFIG  ?=gpu_imx8qm
 VIVANTE_ENABLE_3D            ?= 1
 VIVANTE_ENABLE_2D            ?= 1
-VIVANTE_ENABLE_VG            ?= 0
+VIVANTE_ENABLE_VG            ?= 1
 VIVANTE_ENABLE_VSIMULATOR    ?= 0
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 27),1)
 PLATFORM_VENDOR              ?= 1
 endif
 # Specific soc platform in <vendor>-<board> format, or 'default'.
-SOC_PLATFORM                 ?= default
+SOC_PLATFORM                 ?= freescale-imx
 
 
 ################################################################################
@@ -122,6 +152,8 @@ CFLAGS        += -Wno-missing-field-initializers -Wno-unused-parameter
 
 ifeq ($(DEBUG),1)
 CFLAGS        += -DDBG=1 -DDEBUG -D_DEBUG -O0 -g
+else
+CFLAGS        += -DgcdEMPTY_HEADER_FOOTER=1
 endif
 
 CFLAGS        += -DVIVANTE_PROFILER=1
@@ -143,8 +175,28 @@ CFLAGS        += -Wno-typedef-redefinition
 endif
 
 # For clang.
-ifeq ($(USE_CLANG_PLATFORM_BUILD),)
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
 CFLAGS        += -Wno-parentheses-equality -Wno-self-assign
+else
+ifeq ($(USE_CLANG_PLATFORM_BUILD),true)
+CFLAGS        += -Wno-parentheses-equality -Wno-self-assign -Wno-strncat-size
+endif
+endif
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)
+CFLAGS        += -DFSL_ADD_RESERVE
+endif
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) "==" 25),1)
+ifeq ($(TARGET_PRODUCT),evk_8mq)
+CFLAGS        += -DFSL_ADD_RESERVE
+endif
+endif
+
+ifneq ($(filter libdrm_imx,$(BOARD_GPU_LIBDRM)),)
+LIBDRM_IMX      := 1
+else
+LIBDRM_IMX      := 0
 endif
 
 soc_vendor    := $(firstword $(subst -, ,$(SOC_PLATFORM)))

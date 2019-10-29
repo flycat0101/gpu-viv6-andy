@@ -29,21 +29,21 @@ ifeq ($(gcdSTATIC_LINK), 1)
   GLES_V1_CL        := $(OBJ_DIR)/libGLESv1_CL.a
   GLES_V1_CM        := $(OBJ_DIR)/libGLESv1_CM.a
 else
-  GLES_CL           := $(OBJ_DIR)/libGLES_CL.so
-  GLES_CM           := $(OBJ_DIR)/libGLES_CM.so
-  GLES_V1_CL        := $(OBJ_DIR)/libGLESv1_CL.so
-  GLES_V1_CM        := $(OBJ_DIR)/libGLESv1_CM.so
+  GLES_CL           := $(OBJ_DIR)/libGLES_CL.so.1.1.0
+  GLES_CM           := $(OBJ_DIR)/libGLES_CM.so.1.1.0
+  GLES_V1_CL        := $(OBJ_DIR)/libGLESv1_CL.so.1.1.0
+  GLES_V1_CM        := $(OBJ_DIR)/libGLESv1_CM.so.1.1.0
 
   # Define target soname.
-  GLES_CL_SONAME    := libGLES_CL.so
-  GLES_CM_SONAME    := libGLES_CM.so
-  GLES_V1_CL_SONAME := libGLESv1_CL.so
-  GLES_V1_CM_SONAME := libGLESv1_CM.so
+  GLES_CL_SONAME    := libGLES_CL.so.1
+  GLES_CM_SONAME    := libGLES_CM.so.1
+  GLES_V1_CL_SONAME := libGLESv1_CL.so.1
+  GLES_V1_CM_SONAME := libGLESv1_CM.so.1
 
-  GLES_CL_LINKS     :=
-  GLES_CM_LINKS     :=
-  GLES_V1_CL_LINKS  :=
-  GLES_V1_CM_LINKS  :=
+  GLES_CL_LINKS     := libGLES_CL.so.1 libGLES_CL.so
+  GLES_CM_LINKS     := libGLES_CM.so.1 libGLES_CM.so
+  GLES_V1_CL_LINKS  := libGLESv1_CL.so.1 libGLESv1_CL.so
+  GLES_V1_CM_LINKS  := libGLESv1_CM.so.1 libGLESv1_CM.so
 endif
 
 TARGET_MODULES      := $(GLES_CL)

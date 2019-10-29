@@ -25,18 +25,13 @@ GL4_CHIP         := src/chip
 GL4_API          := src/glcore/api
 GL4_DISPLAY_LIST := src/glcore/display_list
 GL4_GLCORE       := src/glcore
-ifneq ($(EGL_API_WL), 1)
+
 GL4_CLIENT       := src/GLX/client
 GL4_SERVER       := src/GLX/server
-endif
 
-ifeq ($(EGL_API_WL), 1)
-$(GL4_GLCORE): $(GL4_CHIP) $(GL4_API) $(GL4_DISPLAY_LIST)
-MODULES 	:= $(GL4_CHIP) $(GL4_API) $(GL4_DISPLAY_LIST)  $(GL4_GLCORE)
-else
 $(GL4_GLCORE): $(GL4_CHIP) $(GL4_API) $(GL4_DISPLAY_LIST)  $(GL4_CLIENT)
 MODULES 	:= $(GL4_CHIP) $(GL4_API) $(GL4_DISPLAY_LIST)  $(GL4_CLIENT) $(GL4_GLCORE)
-endif
+
 MAIN_MODULE	= $(GL4_GLCORE)
 
 include $(AQROOT)/common.node

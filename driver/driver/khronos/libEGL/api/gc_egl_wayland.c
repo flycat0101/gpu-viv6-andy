@@ -329,6 +329,36 @@ __wl_egl_roundtrip_queue(struct wl_display *wl_dpy, struct wl_event_queue *wl_qu
     return ret;
 }
 
+static uint32_t
+gbm_query_enable_overlay_view(void)
+{
+    char *path = gcvNULL;
+    char *dir = getenv("XDG_RUNTIME_DIR");
+    int ret = -1;
+
+    if (dir)
+    {
+        path = (char*)malloc(strlen(dir) + 32);
+    }
+
+    if (path)
+    {
+        strcpy(path, dir);
+        strcat(path, "/enable-overlay-view");
+        ret = access(path, F_OK);
+        free(path);
+    }
+
+    if (ret == 0)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
 static void
 __registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
                        const char *interface, uint32_t version)
@@ -344,7 +374,7 @@ __registry_handle_global(void *data, struct wl_registry *registry, uint32_t name
         wl_proxy_set_queue((struct wl_proxy *)display->wl_viv, display->wl_queue);
     }
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
-    else if (strcmp(interface, "zwp_linux_explicit_synchronization_v1") == 0) {
+    else if (strcmp(interface, "zwp_linux_explicit_synchronization_v1") == 0 && !gbm_query_enable_overlay_view()) {
         p = getenv("WL_EGL_CLIENT_FENCE");
         if((p == gcvNULL) || (p[0] != '0'))
         {
@@ -1188,7 +1218,7 @@ __wl_egl_surface_set_format(__WLEGLSurface egl_surface,
     }
 
     /* Not use gcvSURF_CACHE_MODE_128 for client surface to improve wayland performance. */
-    egl_surface->type   = Type | gcvSURF_DMABUF_EXPORTABLE;
+    egl_surface->type   = Type | gcvSURF_DMABUF_EXPORTABLE | gcvSURF_CMA_LIMIT;
     egl_surface->format = Format;
     return 0;
 }
@@ -2209,6 +2239,19 @@ _BindWindow(
                 texMode = VEGL_DIRECT_RENDERING;
             }
 
+            /*XXX: use 'direct rendering without tile status' by default for imx845s and imx7ulp. */
+            {
+                gceCHIPMODEL chipModel;
+                gctUINT32 chipRevision;
+
+                gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
+
+                if (chipModel == gcv600 && chipRevision == 0x4653)
+                {
+                    renderMode = VEGL_DIRECT_RENDERING_NOFC;
+                }
+            }
+
             if ((texMode >= VEGL_DIRECT_RENDERING_NOFC) && fcFill)
             {
                 renderMode = VEGL_DIRECT_RENDERING_FCFILL;
@@ -2229,6 +2272,45 @@ _BindWindow(
         }
         while (gcvFALSE);
 #  endif
+        {
+            char *p, *dir, *path;
+            int ret = 0;
+            p = getenv("GPU_VIV_EXT_RESOLVE");
+
+            if (p && p[0] == '0')
+            {
+                renderMode = VEGL_INDIRECT_RENDERING;
+            }
+
+            p = getenv("GPU_VIV_DISABLE_SUPERTILED_TEXTURE");
+
+            if (p && p[0] == '1')
+            {
+                renderMode = VEGL_INDIRECT_RENDERING;
+            }
+
+            dir = getenv("XDG_RUNTIME_DIR");
+            path = malloc(strlen(dir) + 40);
+            strcpy(path, dir);
+            strcat(path, "/use-g2d-renderer");
+            ret = access(path, F_OK);
+            free(path);
+            if (ret == 0 && renderMode > VEGL_DIRECT_RENDERING_NOFC)
+            {
+                renderMode = VEGL_DIRECT_RENDERING_NOFC;
+                egl_surface->enable_tile_status = 0;
+
+                if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TILE_FILLER))
+                {
+                    renderMode = VEGL_DIRECT_RENDERING_FCFILL;
+                }
+
+                if(gbm_query_enable_overlay_view())
+                {
+                    renderMode = VEGL_INDIRECT_RENDERING;
+                }
+            }
+        }
 
         type = egl_surface->type;
         switch (renderMode)

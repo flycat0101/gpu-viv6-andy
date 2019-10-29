@@ -38,7 +38,7 @@
 #endif
 
 /* Enable 4444 and 5551 EGL configs. */
-#if defined(ANDROID)
+#if defined(ANDROID) || defined(__QNXNTO__)
 #   define VEGL_ENABLE_4444_5551_EGL_CONFIGS    0
 #else
 #   define VEGL_ENABLE_4444_5551_EGL_CONFIGS    1

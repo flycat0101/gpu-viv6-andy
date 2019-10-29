@@ -31,16 +31,23 @@ LOCAL_CFLAGS := \
     -DDRM_GRALLOC=1 \
     -DLOG_TAG=\"gralloc-adp\"
 
+ifeq ($(LIBDRM_IMX),1)
+LOCAL_C_INCLUDES := \
+    $(IMX_PATH)/libdrm-imx/vivante \
+    $(IMX_PATH)/libdrm-imx/include/drm \
+    external/drm_gralloc
+
+LOCAL_SHARED_LIBRARIES := \
+    libcutils \
+    liblog \
+    libdrm_android \
+    libdrm_vivante \
+    libgralloc_drm
+else
 LOCAL_C_INCLUDES := \
     external/libdrm/vivante \
     external/libdrm/include/drm \
     external/drm_gralloc
-
-ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
-LOCAL_C_INCLUDES += \
-        hardware/libhardware/include \
-        system/core/include
-endif
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
@@ -48,6 +55,13 @@ LOCAL_SHARED_LIBRARIES := \
     libdrm \
     libdrm_vivante \
     libgralloc_drm
+endif
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
+LOCAL_C_INCLUDES += \
+        hardware/libhardware/include \
+        system/core/include
+endif
 
 else
 # Vivante drm based gralloc
@@ -60,9 +74,29 @@ LOCAL_CFLAGS := \
     -DDRM_GRALLOC=1 \
     -DLOG_TAG=\"gralloc-viv\"
 
+ifeq ($(LIBDRM_IMX),1)
+LOCAL_C_INCLUDES := \
+    $(IMX_PATH)/libdrm-imx/vivante \
+    $(IMX_PATH)/libdrm-imx/include/drm \
+
+LOCAL_SHARED_LIBRARIES := \
+    libcutils \
+    liblog \
+    libdrm_android \
+    libdrm_vivante
+
+else
+
 LOCAL_C_INCLUDES := \
     external/libdrm/vivante \
     external/libdrm/include/drm
+
+LOCAL_SHARED_LIBRARIES := \
+    libcutils \
+    liblog \
+    libdrm \
+    libdrm_vivante
+endif
 
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 28),1)
 LOCAL_C_INCLUDES += \
@@ -70,18 +104,18 @@ LOCAL_C_INCLUDES += \
         system/core/include
 endif
 
-LOCAL_SHARED_LIBRARIES := \
-    libcutils \
-    liblog \
-    libdrm \
-    libdrm_vivante
-
 endif
+
+LOCAL_C_INCLUDES += \
+    $(IMX_PATH)/imx/include
 
 LOCAL_MODULE_RELATIVE_PATH := hw
 
 LOCAL_MODULE         := gralloc_viv.$(HAL_MODULE_VARIANT)
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 27),1)
+LOCAL_VENDOR_MODULE  := true
+endif
 include $(BUILD_SHARED_LIBRARY)
 

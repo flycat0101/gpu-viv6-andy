@@ -30,6 +30,10 @@
 
 #include <sys/time.h>
 
+#ifndef HWC_VIV_HARDWARE_MODULE_ID
+#define HWC_VIV_HARDWARE_MODULE_ID "hwcomposer_viv"
+#endif
+
 
 static int
 hwc_device_close(
@@ -84,7 +88,7 @@ hwc_module_t HAL_MODULE_INFO_SYM =
         tag:           HARDWARE_MODULE_TAG,
         module_api_version: 0,
         hal_api_version:    0,
-        id:            HWC_HARDWARE_MODULE_ID,
+        id:            HWC_VIV_HARDWARE_MODULE_ID,
         name:          "Hardware Composer Module",
         author:        "Vivante Corporation",
         methods:       &hwc_module_methods,
@@ -168,10 +172,10 @@ hwc_device_open(
     context->device.common.tag     = HARDWARE_DEVICE_TAG;
 #if ANDROID_SDK_VERSION >= 23
     /* HWC version 1.5 for Marshmallow. */
-    context->device.common.version = HWC_DEVICE_API_VERSION_1_5;
+    context->device.common.version = HWC_DEVICE_API_VERSION_1_3;
 #elif ANDROID_SDK_VERSION >= 21
     /* HWC version 1.4 for Lollipop. */
-    context->device.common.version = HWC_DEVICE_API_VERSION_1_4;
+    context->device.common.version = HWC_DEVICE_API_VERSION_1_3;
 #elif ANDROID_SDK_VERSION >= 19
     /* HWC version 1.3 for KitKat and later. */
     context->device.common.version = HWC_DEVICE_API_VERSION_1_3;

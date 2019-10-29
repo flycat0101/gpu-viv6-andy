@@ -178,6 +178,7 @@ extra_install: all
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_types.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_version.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_base.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_debug_zones.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_raster.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_options.h $(SDK_DIR)/include/HAL

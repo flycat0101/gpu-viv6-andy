@@ -635,13 +635,17 @@ static struct hw_module_methods_t drm_adaptor_methods = {
     .open = drm_adaptor_open
 };
 
+#ifndef GRALLOC_VIV_HARDWARE_MODULE_ID
+#  define GRALLOC_VIV_HARDWARE_MODULE_ID "gralloc_viv"
+#endif
+
 struct drm_adaptor_t HAL_MODULE_INFO_SYM = {
     .base = {
         .common = {
             .tag = HARDWARE_MODULE_TAG,
             .version_major = 1,
             .version_minor = 0,
-            .id = GRALLOC_HARDWARE_MODULE_ID,
+            .id = GRALLOC_VIV_HARDWARE_MODULE_ID,
             .name = "DRM Memory Allocator Adaptor",
             .author = "Zongzong Yan",
             .methods = &drm_adaptor_methods

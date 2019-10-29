@@ -42,7 +42,11 @@ const char * _VDK_VERSION = "\n\0$VERSION$"
                             vdkDEF2STRING(gcvVERSION_MAJOR) "."
                             vdkDEF2STRING(gcvVERSION_MINOR) "."
                             vdkDEF2STRING(gcvVERSION_PATCH) ":"
-                            vdkDEF2STRING(gcvVERSION_BUILD) "$\n";
+                            vdkDEF2STRING(gcvVERSION_BUILD)
+#ifdef GIT_STRING
+                           ":"vdkDEF2STRING(GIT_STRING)
+#endif
+                            "$\n";
 
 /*******************************************************************************
 ** EGL support. ****************************************************************

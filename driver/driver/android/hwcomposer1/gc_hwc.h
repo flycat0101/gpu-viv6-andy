@@ -35,7 +35,13 @@
         NOTICE: This feature is only effective for jellybean 4.2 and before.
         It is standard feature after that version.
 */
+#if ANDROID_SDK_VERSION >= 18
+#define ENABLE_PLANE_ALPHA          1
+#elif ANDROID_SDK_VERSION >= 16
 #define ENABLE_PLANE_ALPHA          0
+#else
+#define ENABLE_PLANE_ALPHA          1
+#endif
 
 /*
     ENABLE_DIM
@@ -43,7 +49,13 @@
         Set to 1 for enabling dim layer support in hwc.
         This needs android system patch for surfaceflinger.
 */
-#define ENABLE_DIM                  0
+#if ANDROID_SDK_VERSION >= 18
+#define ENABLE_DIM            1
+#elif ANDROID_SDK_VERSION >= 16
+#define ENABLE_DIM            0
+#else
+#define ENABLE_DIM            1
+#endif
 
 /*
     ENABLE_CLEAR_HOLE
@@ -54,7 +66,11 @@
         NOTICE: This feature will block arbitrary rotation. Disable it if
         arbitrary rotation is needed.
 */
-#define ENABLE_CLEAR_HOLE           0
+#if ANDROID_SDK_VERSION >= 16
+#define ENABLE_CLEAR_HOLE     0
+#else
+#define ENABLE_CLEAR_HOLE     1
+#endif
 
 /*
     CLEAR_FB_FOR_OVERLAY

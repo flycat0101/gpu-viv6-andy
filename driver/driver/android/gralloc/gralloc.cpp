@@ -74,6 +74,9 @@ static int gralloc_perform(struct gralloc_module_t const* module,
 
 /*****************************************************************************/
 
+#ifndef GRALLOC_VIV_HARDWARE_MODULE_ID
+#define GRALLOC_VIV_HARDWARE_MODULE_ID "gralloc_viv"
+#endif
 static struct hw_module_methods_t gralloc_module_methods =
 {
     open: gralloc_device_open
@@ -86,7 +89,7 @@ struct private_module_t HAL_MODULE_INFO_SYM =
             tag: HARDWARE_MODULE_TAG,
             version_major: 1,
             version_minor: 0,
-            id: GRALLOC_HARDWARE_MODULE_ID,
+            id: GRALLOC_VIV_HARDWARE_MODULE_ID,
             name: "Graphics Memory Allocator Module",
             author: "Vivante Corporation",
             methods: &gralloc_module_methods,
@@ -103,7 +106,6 @@ struct private_module_t HAL_MODULE_INFO_SYM =
     },
 
     framebuffer: 0,
-    flags: 0,
     numBuffers: 0,
     bufferMask: 0,
     lock: PTHREAD_MUTEX_INITIALIZER,

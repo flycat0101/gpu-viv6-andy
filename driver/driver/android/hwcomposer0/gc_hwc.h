@@ -24,7 +24,11 @@
 
         Set to 1 for enabling swap rectangle optimization.
 */
-#define ENABLE_SWAP_RECTANGLE       1
+#if ANDROID_SDK_VERSION >= 16
+#define ENABLE_SWAP_RECTANGLE 0
+#else
+#define ENABLE_SWAP_RECTANGLE 1
+#endif
 
 /*
     ENABLE_PLANE_ALPHA
@@ -32,7 +36,11 @@
         Set to 1 to support plane alpha in hwc.
         This needs android system patch for surfaceflinger.
 */
+#if ANDROID_SDK_VERSION >= 16
+#define ENABLE_PLANE_ALPHA          0
+#else
 #define ENABLE_PLANE_ALPHA          1
+#endif
 
 /*
     ENABLE_DIM
@@ -40,7 +48,11 @@
         Set to 1 for enabling dim layer support in hwc.
         This needs android system patch for surfaceflinger.
 */
+#if ANDROID_SDK_VERSION >= 16
+#define ENABLE_DIM                  0
+#else
 #define ENABLE_DIM                  1
+#endif
 
 /*
     ENABLE_CLEAR_HOLE
@@ -51,7 +63,11 @@
         NOTICE: This feature will block arbitrary rotation. Disable it if
         arbitrary rotation is needed.
 */
+#if ANDROID_SDK_VERSION >= 16
 #define ENABLE_CLEAR_HOLE           0
+#else
+#define ENABLE_CLEAR_HOLE           1
+#endif
 
 /*
     CLEAR_FB_FOR_OVERLAY

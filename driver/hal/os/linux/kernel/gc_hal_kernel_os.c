@@ -1377,6 +1377,15 @@ gckOS_AllocateNonPagedMemory(
 
     gcmkASSERT(Flag & gcvALLOC_FLAG_CONTIGUOUS);
 
+    if (Os->allocatorLimitMarker)
+    {
+        Flag |= gcvALLOC_FLAG_CMA_LIMIT;
+        Flag |= gcvALLOC_FLAG_CMA_PREEMPT;
+#if gcdENABLE_CACHEABLE_COMMAND_BUFFER
+        Flag &= ~gcvALLOC_FLAG_CACHEABLE;
+#endif
+    }
+
     /* Walk all allocators. */
     list_for_each_entry(allocator, &Os->allocatorList, link)
     {
@@ -3105,6 +3114,24 @@ gckOS_AllocatePagedMemory(
     if ((Flag & gcvALLOC_FLAG_4GB_ADDR) && !zoneDMA32)
     {
         Flag &= ~gcvALLOC_FLAG_4GB_ADDR;
+    }
+
+#if defined(CONFIG_ZONE_DMA32) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+    /* redirect DMA32 pool for CMA LIMIT request */
+    if (Flag & gcvALLOC_FLAG_CMA_LIMIT)
+    {
+        Flag &= ~gcvALLOC_FLAG_CMA_LIMIT;
+        Flag |= gcvALLOC_FLAG_4GB_ADDR;
+    }
+#endif
+
+    if (Os->allocatorLimitMarker && (Flag & gcvALLOC_FLAG_CMA_LIMIT))
+    {
+        Flag &= ~gcvALLOC_FLAG_CACHEABLE;
+    }
+    else
+    {
+        Flag &= ~gcvALLOC_FLAG_CMA_LIMIT;
     }
 
     /* Walk all allocators. */

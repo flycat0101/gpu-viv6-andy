@@ -84,6 +84,9 @@ hwc_device_open(
 
 /******************************************************************************/
 
+#ifndef HWC_VIV_HARDWARE_MODULE_ID
+#define HWC_VIV_HARDWARE_MODULE_ID "hwcomposer_viv"
+#endif
 static struct hw_module_methods_t hwc_module_methods =
 {
     open: hwc_device_open
@@ -96,7 +99,7 @@ hwc_module_t HAL_MODULE_INFO_SYM =
         tag:           HARDWARE_MODULE_TAG,
         version_major: 2,
         version_minor: 4,
-        id:            HWC_HARDWARE_MODULE_ID,
+        id:            HWC_VIV_HARDWARE_MODULE_ID,
         name:          "Hardware Composer Module",
         author:        "Vivante Corporation",
         methods:       &hwc_module_methods,

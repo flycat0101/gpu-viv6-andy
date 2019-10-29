@@ -26,9 +26,12 @@ include $(AQROOT)/makefile.linux.def
 ifeq ($(gcdSTATIC_LINK),1)
   TARGET_MODULE    := $(OBJ_DIR)/libEGL.a
 else
-  TARGET_MODULE    := $(OBJ_DIR)/libEGL.so
-  TARGET_SONAME    := libEGL.so
-  TARGET_LINKS     :=
+  TARGET_MODULE    := $(OBJ_DIR)/libEGL.so.1.0
+  TARGET_SONAME    := libEGL.so.1
+  TARGET_LINKS     := libEGL.so.1 libEGL.so
+ifeq ($(EGL_API_WL),1)
+  TARGET_LINKS     += libwayland-egl.so.1.0.0 libwayland-egl.so.1 libwayland-egl.so
+endif
 endif
 
 ################################################################################
@@ -64,12 +67,11 @@ endif
 ifeq ($(X11_DRI3),1)
   INCLUDE += -I$(X11_ARM_DIR)/include \
              -I$(X11_ARM_DIR)/include/X11/extensions \
-             -I$(AQROOT)/driver/X/libdrm-2.4.91/include/drm \
-             -I$(AQROOT)/driver/X/libdrm-2.4.91/vivante
+             -I${ROOTFS_USR}/include/libdrm
 endif
 
 ifeq ($(EGL_API_FB),1)
-  INCLUDE += -I$(X11_ARM_DIR)/include/libdrm
+  INCLUDE += -I$(ROOTFS_USR)/include/libdrm
 endif
 
 ifeq ($(EGL_API_GBM),1)
