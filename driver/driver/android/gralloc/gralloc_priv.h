@@ -47,6 +47,10 @@
 #   define LOGE(...) ALOGE(__VA_ARGS__)
 #endif
 
+#if ANDROID_SDK_VERSION >= 26
+#define GRALLOC_USAGE_HW_FBX 0x04000000
+#define GRALLOC_USAGE_FORCE_CONTIGUOUS 0x08000000
+#endif
 
 struct private_module_t;
 struct private_handle_t;
@@ -56,7 +60,6 @@ struct private_module_t
     gralloc_module_t base;
 
     struct private_handle_t* framebuffer;
-    uint32_t flags;
     uint32_t numBuffers;
     uint32_t bufferMask;
     pthread_mutex_t lock;
@@ -92,12 +95,35 @@ struct private_handle_t {
     int     size;
     int     offset;
 
+#if ANDROID_SDK_VERSION >= 23
+    uint64_t base __attribute__((aligned(8)));
+    uint64_t phys __attribute__((aligned(8)));
+#else
+    int base;
+    int phys;
+#endif
+    int     format;
+    int     width;
+    int     height;
+
+    int     pid;
+
+#if 1
+    /* Revert part for change for FSL/KK4.4.3 */
+    int     usage;
+    int     stride;
+
+    int     node;
+    int     vidmem;
+    int     reserved[2];
+#endif
+
     /* Vivante private ints. */
     uint64_t viv_priv[12];
 
-    uint64_t base __attribute__((aligned(8)));
-
-    int     pid;
+#if FSL_ADD_RESERVE
+    uint64_t reserved_uint64[4];
+#endif
 
 #ifdef __cplusplus
     static inline int sNumInts()

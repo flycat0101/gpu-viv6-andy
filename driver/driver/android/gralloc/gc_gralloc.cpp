@@ -394,6 +394,19 @@ gc_gralloc_alloc_buffer(
         LOGV(" > Unknown usage: Allocate BITMAP (type=%x, halFormat=%d)", type, halFormat);
     }
 
+#if ANDROID_SDK_VERSION <= 25
+    if (Usage & GRALLOC_USAGE_FORCE_CONTIGUOUS)
+    {
+        LOGV("Workaround freeslcale vpu buffer usage issue");
+        LOGV("  usage=0x%08x, allocate linear buffer from default pool", Usage);
+
+        /* Must be linear contiguous buffer. */
+        type = gceSURF_TYPE(gcvSURF_BITMAP | gcvSURF_CONTIGUOUS);
+        /* Use default pool to avoid oom. */
+        pool = gcvPOOL_DEFAULT;
+    }
+#endif
+
 #if gcdENABLE_3D
     /* May alter hal format for no-resolve and tiled output. */
     if ((type & 0xFF) == gcvSURF_RENDER_TARGET)
@@ -453,6 +466,16 @@ gc_gralloc_alloc_buffer(
         type = (gceSURF_TYPE) (type | gcvSURF_PROTECTED_CONTENT);
     }
 #endif
+
+    /* XXX: Add flag to allocte memory within 4G for freescale DPU and VPU touched buffer*/
+#if ANDROID_SDK_VERSION <= 25
+    if (Usage & (GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_FORCE_CONTIGUOUS))
+#else
+    if (Usage & GRALLOC_USAGE_HW_COMPOSER)
+#endif
+    {
+        type = (gceSURF_TYPE) (type | gcvSURF_CMA_LIMIT);
+    }
 
     /* Construct surface. */
     status = gcoSURF_Construct(gcvNULL,
@@ -571,6 +594,9 @@ gc_gralloc_alloc_buffer(
     /* Record surface info. */
     hnd->size            = (int) surface->size;
 
+    hnd->stride          = (int)stride;
+    hnd->usage           = Usage;
+
     /* Naming video memory node. */
     node = surface->node.u.normal.node;
     gcmVERIFY_OK(gcoHAL_NameVideoMemory(node, &node));
@@ -624,6 +650,22 @@ gc_gralloc_alloc_buffer(
 
     if (err == 0)
     {
+        /* XXX: Freescale need export the following fields. */
+        gctUINT32 baseAddress = 0;
+        gctUINT32 address[3];
+
+        gcmONERROR(gcoSURF_Lock(surface, address, gcvNULL));
+        gcmVERIFY_OK(gcoSURF_Unlock(surface, gcvNULL));
+
+        hnd->width  = Width;
+        hnd->height = Height;
+        hnd->format = Format;
+        hnd->phys   = address[0];
+
+        /* Get base address. */
+        gcmONERROR(gcoHAL_GetBaseAddr(gcvNULL, &baseAddress));
+
+        hnd->phys += baseAddress;
         *Handle = hnd;
 
 #if ANDROID_SDK_VERSION >= 18

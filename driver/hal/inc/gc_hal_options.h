@@ -366,7 +366,7 @@ This define enables the use of VM for gckCommand and fence buffers.
         virtual data.
 */
 #ifndef gcdMMU_SIZE
-#   define gcdMMU_SIZE                          (256 << 10)
+#   define gcdMMU_SIZE                          (2048 << 10)
 #endif
 
 #ifndef gcdGC355_VGMMU_MEMORY_SIZE_KB
@@ -761,7 +761,7 @@ This define enables the use of VM for gckCommand and fence buffers.
         Android only.
 */
 #ifndef gcdSUPPORT_SWAP_RECTANGLE
-#   define gcdSUPPORT_SWAP_RECTANGLE            0
+#   define gcdSUPPORT_SWAP_RECTANGLE            1
 #endif
 
 /*
@@ -800,7 +800,7 @@ This define enables the use of VM for gckCommand and fence buffers.
         This will dynamically check if color compression is available.
 */
 #ifndef gcdENABLE_RENDER_INTO_WINDOW_WITH_FC
-#   define gcdENABLE_RENDER_INTO_WINDOW_WITH_FC 0
+#   define gcdENABLE_RENDER_INTO_WINDOW_WITH_FC 1
 #endif
 
 /*
@@ -963,7 +963,7 @@ This define enables the use of VM for gckCommand and fence buffers.
         Wait fence, loop count.
 */
 #ifndef gcdFENCE_WAIT_LOOP_COUNT
-#   define gcdFENCE_WAIT_LOOP_COUNT 10000
+#   define gcdFENCE_WAIT_LOOP_COUNT 100
 #endif
 
 /*
@@ -1013,7 +1013,7 @@ This define enables the use of VM for gckCommand and fence buffers.
          disable input devices usage under fb mode to support fb+vdk multi-process
 */
 #ifndef gcdUSE_INPUT_DEVICE
-#   define gcdUSE_INPUT_DEVICE        1
+#   define gcdUSE_INPUT_DEVICE        0
 #endif
 
 /*

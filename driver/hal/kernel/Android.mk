@@ -26,6 +26,10 @@ GALCORE_OUT := $(TARGET_OUT_INTERMEDIATES)/GALCORE_OBJ
 GALCORE := \
 	$(GALCORE_OUT)/galcore.ko
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 23),1)
+KERNEL_CFLAGS ?= KCFLAGS=-mno-android
+endif
+
 KERNELENVSH := $(GALCORE_OUT)/kernelenv.sh
 $(KERNELENVSH):
 	rm -rf $(KERNELENVSH)
@@ -38,6 +42,7 @@ GALCORE_LOCAL_PATH := $(LOCAL_PATH)
 $(GALCORE): $(KERNELENVSH)
 	@cd $(AQROOT)
 	source $(KERNELENVSH); $(MAKE) -f Kbuild -C $(AQROOT) \
+		$(KERNEL_CFLAGS) \
 		AQROOT=$(abspath $(AQROOT)) \
 		AQARCH=$(abspath $(AQARCH)) \
 		AQVGARCH=$(abspath $(AQVGARCH)) \
@@ -70,6 +75,9 @@ LOCAL_MODULE_SUFFIX := .ko
 LOCAL_MODULE_TAGS   := optional
 LOCAL_MODULE_CLASS  := SHARED_LIBRARIES
 LOCAL_STRIP_MODULE  := false
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 27),1)
+LOCAL_VENDOR_MODULE := true
+endif
 include $(BUILD_PREBUILT)
 
 include $(AQROOT)/copy_installed_module.mk

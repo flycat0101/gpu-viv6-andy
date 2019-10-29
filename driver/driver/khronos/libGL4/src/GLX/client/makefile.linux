@@ -81,9 +81,8 @@ INCLUDE += \
 	-I$(ROOTFS_USR)/include/pixman-1
 
 ifeq ($(X11_DRI3),1)
-INCLUDE += -I$(AQROOT)/driver/X/libdrm-2.4.91/include/drm \
-           -I$(AQROOT)/driver/X/libdrm-2.4.91/vivante
 LLDLIBS += -lX11-xcb -ldrm_vivante -lxcb -lxcb-shm -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync
+INCLUDE += -I$(ROOTFS_USR)/include/libdrm
 else
 INCLUDE += -I$(ROOTFS_USR)/include/libdrm
 endif

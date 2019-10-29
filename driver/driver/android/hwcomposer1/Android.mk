@@ -75,8 +75,11 @@ else
   LOCAL_MODULE_PATH          := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 endif
 
-LOCAL_MODULE         := hwcomposer.$(HAL_MODULE_VARIANT)
+LOCAL_MODULE         := hwcomposer_viv.$(HAL_MODULE_VARIANT)
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 27),1)
+LOCAL_VENDOR_MODULE  := true
+endif
 include $(BUILD_SHARED_LIBRARY)
 
