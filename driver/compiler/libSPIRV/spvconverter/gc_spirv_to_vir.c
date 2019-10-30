@@ -5236,7 +5236,7 @@ VSC_ErrCode __SpvEmitSpecConstantOp(gcSPV spv, VIR_Shader * virShader)
         break;
 
     case SpvOpQuantizeToF16:
-        __SpvEmitIntrisicCall(spv, virShader);
+        __SpvEmitIntrinsicCall(spv, virShader);
         break;
 
     case SpvOpAccessChain:
@@ -6108,7 +6108,7 @@ static VSC_ErrCode __SpvDecodeImageOperand(
     return virErrCode;
 }
 
-VSC_ErrCode __SpvEmitIntrisicFunction(gcSPV spv, VIR_Shader * virShader)
+VSC_ErrCode __SpvEmitIntrinsicFunction(gcSPV spv, VIR_Shader * virShader)
 {
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     gctUINT setId = spv->operands[0];
@@ -6170,7 +6170,7 @@ VSC_ErrCode __SpvEmitIntrisicFunction(gcSPV spv, VIR_Shader * virShader)
     }
 
     /* src0 is intrinsicKind */
-    intrsicId = VIR_IntrisicGetKind(setId, instId);
+    intrsicId = VIR_IntrinsicGetKind(setId, instId);
     VIR_Operand_SetIntrinsic(VIR_Inst_GetSource(virInst, 0), intrsicId);
 
     /* src1 is parameter */
@@ -8174,7 +8174,7 @@ VSC_ErrCode __SpvEmitCompositeConstruct(gcSPV spv, VIR_Shader * virShader)
     return virErrCode;
 }
 
-static VSC_ErrCode __SpvOpcode2Intrisic(
+static VSC_ErrCode __SpvOpcode2Intrinsic(
     IN gcSPV spv,
     IN gctUINT opCode,
     INOUT gctUINT * setId,
@@ -8290,9 +8290,9 @@ static VSC_ErrCode __SpvOpcode2Intrisic(
     return virErrCode;
 }
 
-VSC_ErrCode __SpvEmitIntrisicCall(gcSPV spv, VIR_Shader * virShader)
+VSC_ErrCode __SpvEmitIntrinsicCall(gcSPV spv, VIR_Shader * virShader)
 {
-    /* fake a intrisic */
+    /* fake a intrinsic */
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     gctUINT argCount = spv->operandSize;
     gctUINT tmpOperand[SPV_MAX_OPERAND_NUM];
@@ -8465,13 +8465,13 @@ VSC_ErrCode __SpvEmitIntrisicCall(gcSPV spv, VIR_Shader * virShader)
     /* enlarge the size, we need add operand 0 and operand 1 */
     spv->operandSize += 2;
 
-    virErrCode = __SpvOpcode2Intrisic(spv, spv->opCode, &setId, &instId);
+    virErrCode = __SpvOpcode2Intrinsic(spv, spv->opCode, &setId, &instId);
     if (virErrCode != VSC_ERR_NONE) return virErrCode;
 
     spv->operands[0] = setId;
     spv->operands[1] = instId;
 
-    virErrCode = __SpvEmitIntrisicFunction(spv, virShader);
+    virErrCode = __SpvEmitIntrinsicFunction(spv, virShader);
 
     /* Reset the internalSym. */
     spv->internalSym = gcvNULL;

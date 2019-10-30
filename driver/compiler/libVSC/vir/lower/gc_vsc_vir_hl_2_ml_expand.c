@@ -1678,8 +1678,8 @@ static VIR_Pattern _intrinTexldpcfPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
-/* should synchronize with gc_vsc_vir_intrisic_kind.def.h */
-static VIR_Pattern* _intrisicPatterns[] = {
+/* should synchronize with gc_vsc_vir_intrinsic_kind.def.h */
+static VIR_Pattern* _intrinsicPatterns[] = {
     gcvNULL, /* (NONE), */
     gcvNULL, /* (UNKNOWN), */
 
@@ -1946,7 +1946,7 @@ static VIR_Pattern* _intrisicPatterns[] = {
     gcvNULL, /* bitInsert */
 };
 
-char _checkIntrisicPatternsSize[(sizeof(_intrisicPatterns) / sizeof(VIR_Pattern*)) == VIR_IK_LAST];
+char _checkIntrinsicPatternsSize[(sizeof(_intrinsicPatterns) / sizeof(VIR_Pattern*)) == VIR_IK_LAST];
 
 static
 gctBOOL _componentX(
@@ -2193,7 +2193,7 @@ _GetHL2MLPatternPhaseExpand(
     {
     /* intrinsic built-in function call. */
     case VIR_OP_INTRINSIC:
-        return _intrisicPatterns[VIR_Operand_GetIntrinsicKind(VIR_Inst_GetSource(Inst, 0))];
+        return _intrinsicPatterns[VIR_Operand_GetIntrinsicKind(VIR_Inst_GetSource(Inst, 0))];
 
     case VIR_OP_LENGTH:
         return _lengthPattern;
