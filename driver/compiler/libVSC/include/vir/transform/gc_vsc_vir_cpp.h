@@ -31,6 +31,8 @@ typedef enum _VSC_CPP_FLAG
     ** we only check the output parameter once so if it have multiple usages, we can only detect the first usage.
     */
     VSC_CPP_COPY_FROM_OUTPUT_PARAM  = 0x02,
+    /* Find the nearest defined instruction when there are multiple definitions. */
+    VSC_CPP_FIND_NEAREST_DEF_INST   = 0x04,
 } VSC_CPP_FLAG;
 
 typedef struct _VSC_CPP_PASS_DATA
@@ -54,6 +56,8 @@ typedef struct VIR_CPP_COPYPROPAGATION
     gctINT                  bwOptCount;
 
     VSC_MM                  *pMM;
+
+    VSC_HW_CONFIG           *pHwCfg;
 
     gctBOOL                 bInvalidCfg;
 
@@ -82,6 +86,8 @@ typedef struct VIR_CPP_COPYPROPAGATION
 #define VSC_CPP_SetBWOptCount(cpp, s)   ((cpp)->bwOptCount = (s))
 #define VSC_CPP_SetMM(cpp, s)           ((cpp)->pMM = (s))
 #define VSC_CPP_GetMM(cpp)              ((cpp)->pMM)
+#define VSC_CPP_SetHWCFG(cpp, s)        ((cpp)->pHwCfg = (s))
+#define VSC_CPP_GetHWCFG(cpp)           ((cpp)->pHwCfg)
 #define VSC_CPP_SetInvalidCfg(cpp, s)   ((cpp)->bInvalidCfg = (s))
 #define VSC_CPP_GetInvalidCfg(cpp)      ((cpp)->bInvalidCfg)
 

@@ -49,7 +49,8 @@ static void VSC_CPP_Init(
     IN VSC_OPTN_CPPOptions          *options,
     IN VSC_CPP_PASS_DATA            *passData,
     IN VIR_Dumper                   *dumper,
-    IN VSC_MM                       *pMM
+    IN VSC_MM                       *pMM,
+    IN VSC_HW_CONFIG                *pHwCfg
     )
 {
     VSC_CPP_SetAppNameId(cpp, patchId);
@@ -62,6 +63,7 @@ static void VSC_CPP_Init(
     VSC_CPP_SetFWOptCount(cpp, 0);
     VSC_CPP_SetBWOptCount(cpp, 0);
     VSC_CPP_SetMM(cpp, pMM);
+    VSC_CPP_SetHWCFG(cpp, pHwCfg);
     VSC_CPP_SetInvalidCfg(cpp, gcvFALSE);
 }
 
@@ -346,6 +348,37 @@ static gctBOOL _VSC_CPP_AnyOtherUsageCanNotBeOptimize(
     return bResult;
 }
 
+static gctBOOL _VSC_CPP_NeedToFindNearestDefInst(
+    IN OUT VSC_CPP_CopyPropagation  *cpp,
+    IN     VIR_Instruction          *inst,
+    IN     VIR_Operand              *srcOpnd,
+    IN     VIR_Operand              *parentSrcOpnd,
+    IN     gctUINT                  srcNum
+    )
+{
+    VIR_OpCode                      opCode = VIR_Inst_GetOpcode(inst);
+    VIR_Operand*                    pSrc0Opnd = VIR_Inst_GetSource(inst, 0);
+    VIR_OperandInfo                 src0OpndInfo;
+    VSC_HW_CONFIG*                  pHwCfg = VSC_CPP_GetHWCFG(cpp);
+
+    /* So far we only need to check if the src0 of an image-related instruction is not a uniform. */
+    if (pHwCfg->hwFeatureFlags.canSrc0OfImgLdStBeTemp || !VIR_OPCODE_isImgRelated(opCode))
+    {
+        return gcvFALSE;
+    }
+    if (srcNum != 0 || parentSrcOpnd != gcvNULL)
+    {
+        return gcvFALSE;
+    }
+    VIR_Operand_GetOperandInfo(inst, pSrc0Opnd, &src0OpndInfo);
+    if (!src0OpndInfo.isVreg)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
     IN OUT VSC_CPP_CopyPropagation  *cpp,
     IN     VIR_Instruction          *inst,
@@ -368,6 +401,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
     gctBOOL         srcOpndIsRelIndexing = (VIR_Operand_GetRelAddrMode(srcOpnd) != VIR_INDEXED_NONE);
     gctBOOL         bCopyFromOutputParam = (VSC_CPP_GetFlag(cpp) & VSC_CPP_COPY_FROM_OUTPUT_PARAM);
     gctBOOL         bHasUniqueDefInst = gcvFALSE;
+    gctBOOL         bUseUniqueNearestDef = gcvFALSE;
 
     do
     {
@@ -423,9 +457,29 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                                                               gcvNULL,
                                                               &defInst);
 
-        if (!bHasUniqueDefInst || defInst == gcvNULL)
+        if (!bHasUniqueDefInst)
         {
-            continue;
+            /* If there is no need to check the nearest defined instruction, just bail out. */
+            if (!(VSC_CPP_GetFlag(cpp) & VSC_CPP_FIND_NEAREST_DEF_INST) ||
+                defInst == gcvNULL ||
+                !_VSC_CPP_NeedToFindNearestDefInst(cpp, inst, srcOpnd, parentSrcOpnd, srcNum))
+            {
+                continue;
+            }
+
+            /* Try to find the nearest defined instruction. */
+            if (!vscVIR_FindUniqueNearestDefInst(VSC_CPP_GetDUInfo(cpp),
+                                                 inst,
+                                                 srcOpnd,
+                                                 VIR_Inst_GetPrev(inst),
+                                                 gcvNULL,
+                                                 &defInst))
+            {
+                continue;
+            }
+
+            gcmASSERT(defInst != gcvNULL);
+            bUseUniqueNearestDef = gcvTRUE;
         }
 
         if (!VIR_IS_IMPLICIT_DEF_INST(defInst) &&
@@ -777,7 +831,8 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                 ** If any usage instruction of this MOV has more than one DEF instruction, which means we can't remove this MOV,
                 ** we don't generate this new copy because it may increase the live range of SOURCE0.
                 */
-                if (_VSC_CPP_AnyOtherUsageCanNotBeOptimize(VSC_CPP_GetDUInfo(cpp),
+                if (!bUseUniqueNearestDef &&
+                    _VSC_CPP_AnyOtherUsageCanNotBeOptimize(VSC_CPP_GetDUInfo(cpp),
                                                            inst,
                                                            defInst,
                                                            movEnable,
@@ -2223,7 +2278,7 @@ VSC_ErrCode VSC_CPP_PerformOnShader(
     }
 
     VSC_CPP_Init(&cpp, pPassWorker->pCompilerParam->cfg.ctx.appNameId, shader, pPassWorker->pDuInfo, cpp_options, &cppPassData,
-                 pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM);
+                 pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM, &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg);
 
     /* don't perform global CPP when the cfg has too many nodes*/
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(shader));
