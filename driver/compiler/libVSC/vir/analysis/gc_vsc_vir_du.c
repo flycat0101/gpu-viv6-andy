@@ -4224,7 +4224,7 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsageInst(VIR_DEF_USAGE_INFO*     pDuInfo,
                                           VIR_Operand*            pUsageOperand,
                                           gctBOOL                 bIsIndexingRegUsage,
                                           VIR_Instruction*        pExpectedUniqueDefInst,
-                                          VIR_Instruction**       ppFirstOtherDefInst)
+                                          VIR_Instruction**       ppFirstDefInstOrFirstOtherDefInst)
 {
     VIR_GENERAL_UD_ITERATOR udIter;
     VIR_DEF*                pDef;
@@ -4244,9 +4244,9 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsageInst(VIR_DEF_USAGE_INFO*     pDuInfo,
         {
             if (pDef->defKey.pDefInst != pExpectedUniqueDefInst)
             {
-                if (ppFirstOtherDefInst)
+                if (ppFirstDefInstOrFirstOtherDefInst)
                 {
-                    *ppFirstOtherDefInst = pDef->defKey.pDefInst;
+                    *ppFirstDefInstOrFirstOtherDefInst = pDef->defKey.pDefInst;
                 }
 
                 return gcvFALSE;
@@ -4263,14 +4263,14 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsageInst(VIR_DEF_USAGE_INFO*     pDuInfo,
             {
                 return gcvFALSE;
             }
+
+            if (ppFirstDefInstOrFirstOtherDefInst)
+            {
+                *ppFirstDefInstOrFirstOtherDefInst = pFirstDefInst;
+            }
         }
 
         bHasDef = gcvTRUE;
-    }
-
-    if (!bCheckGivenDefInst && bHasDef && ppFirstOtherDefInst)
-    {
-        *ppFirstOtherDefInst = pFirstDefInst;
     }
 
     return (bHasDef ? gcvTRUE : gcvFALSE);
@@ -5236,5 +5236,124 @@ gctBOOL vscVIR_RedefineBetweenInsts(
     vscHTBL_Destroy(visitSet);
 
     return retValue;
+}
+
+/* Find the unique nearest defined instruction. */
+gctBOOL vscVIR_FindUniqueNearestDefInst(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Instruction*             pUsageInst,
+    IN VIR_Operand*                 pUsageOpnd,
+    IN VIR_Instruction*             pStartSearchInst,
+    IN PFN_VSC_DEF_CMP              pDefCmpFunc,
+    INOUT VIR_Instruction**         ppNearestDefInst
+    )
+{
+    gctBOOL                         bFound = gcvFALSE;
+    VIR_Instruction*                pWorkingInst = pStartSearchInst;
+    VIR_BB*                         pWorkingBB = VIR_Inst_GetBasicBlock(pWorkingInst);
+    VSC_ADJACENT_LIST_ITERATOR      prevEdgeIter;
+    VIR_CFG_EDGE*                   pPrevEdge = gcvNULL;
+    VIR_BB*                         pPrevBB = gcvNULL;
+    VIR_Instruction*                pNearestDefInst = gcvNULL;
+    VIR_Instruction*                pPrevDefInst = gcvNULL;
+    VIR_OperandInfo                 usageOpndInfo, destOpndInfo;
+    VIR_Operand*                    pDestOpnd = gcvNULL;
+    VIR_Enable                      usageEnable2Swizzle = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pUsageOpnd));
+
+    VIR_Operand_GetOperandInfo(pUsageInst, pUsageOpnd, &usageOpndInfo);
+
+    /* Search the current BB. */
+    while(gcvTRUE)
+    {
+        pDestOpnd = VIR_Inst_GetDest(pWorkingInst);
+
+        if (pDestOpnd)
+        {
+            VIR_Operand_GetOperandInfo(pWorkingInst, pDestOpnd, &destOpndInfo);
+
+            if (destOpndInfo.isVreg
+                &&
+                destOpndInfo.u1.virRegInfo.virReg == usageOpndInfo.u1.virRegInfo.virReg
+                &&
+                VIR_Enable_Covers(VIR_Operand_GetEnable(pDestOpnd), usageEnable2Swizzle))
+            {
+                bFound = gcvTRUE;
+            }
+        }
+
+        if (bFound)
+        {
+            pNearestDefInst = pWorkingInst;
+            break;
+        }
+
+        /* Get the previous instruction. */
+        if (pWorkingInst == BB_GET_START_INST(pWorkingBB))
+        {
+            break;
+        }
+        else
+        {
+            pWorkingInst = VIR_Inst_GetPrev(pWorkingInst);
+        }
+    }
+
+    /* Find a nearest def. */
+    if (bFound)
+    {
+        if (pDefCmpFunc)
+        {
+            bFound = pDefCmpFunc(pNearestDefInst);
+        }
+
+        /* Get the result. */
+        if (ppNearestDefInst && bFound)
+        {
+            *ppNearestDefInst = pNearestDefInst;
+        }
+
+        return bFound;
+    }
+
+    /* Not find, search all the previous edges. */
+    VSC_ADJACENT_LIST_ITERATOR_INIT(&prevEdgeIter, &pWorkingBB->dgNode.predList);
+    pPrevEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&prevEdgeIter);
+    for (; pPrevEdge != gcvNULL; pPrevEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&prevEdgeIter))
+    {
+        pPrevBB = CFG_EDGE_GET_TO_BB(pPrevEdge);
+
+        if (pPrevBB == gcvNULL || BB_GET_LENGTH(pPrevBB) == 0)
+        {
+            continue;
+        }
+        bFound = vscVIR_FindUniqueNearestDefInst(pDuInfo,
+                                                 pUsageInst,
+                                                 pUsageOpnd,
+                                                 BB_GET_END_INST(pPrevBB),
+                                                 pDefCmpFunc,
+                                                 &pNearestDefInst);
+
+        /* If there are multiple definition, they must be the same. */
+        if (bFound)
+        {
+            if (pPrevDefInst == gcvNULL)
+            {
+                pPrevDefInst = pNearestDefInst;
+            }
+            else if (pPrevDefInst != pNearestDefInst)
+            {
+                bFound = gcvFALSE;
+                break;
+            }
+        }
+    }
+
+    /* Get the result. */
+    if (ppNearestDefInst && bFound)
+    {
+        *ppNearestDefInst = pNearestDefInst;
+    }
+
+    return bFound;
 }
 

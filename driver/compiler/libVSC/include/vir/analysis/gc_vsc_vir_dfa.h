@@ -760,7 +760,9 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsageInst(VIR_DEF_USAGE_INFO* pDuInfo,
                                           VIR_Operand*        pUsageOperand,
                                           gctBOOL             bIsIndexingRegUsage,
                                           VIR_Instruction*    pExpectedUniqueDefInst, /* Expected unique def inst */
-                                          VIR_Instruction**   ppFirstOtherDefInst);              /* If not unique, it returns first other def inst when searching */
+                                          VIR_Instruction**   ppFirstDefInstOrFirstOtherDefInst);/* When the expected unique def instruction is not NULL,
+                                                                                                 ** then it returns first other def inst when searching.
+                                                                                                 ** Otherwise it returns the first def instruction we meet when searching. */
 
 /* Given a register no, check whether it has a unique def instruction, if yes, return TRUE and the def instruction. */
 gctBOOL vscVIR_IsRegNoHasUniqueDefInst(VIR_DEF_USAGE_INFO*      pDuInfo,
@@ -819,6 +821,19 @@ gctBOOL vscVIR_RedefineBetweenInsts(IN VSC_MM                   *pMM,
                                     IN VIR_Instruction          *endInst,
                                     IN VIR_Operand              *srcOpndOfStartInst,
                                     OUT VIR_Instruction         **redefInst);
+
+/* Find the unique nearest defined instruction. */
+typedef gctBOOL (*PFN_VSC_DEF_CMP)(VIR_Instruction* pDefInst);
+
+gctBOOL vscVIR_FindUniqueNearestDefInst(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Instruction*             pUsageInst,
+    IN VIR_Operand*                 pUsageOpnd,
+    IN VIR_Instruction*             pStartSearchInst,
+    IN PFN_VSC_DEF_CMP              pDefCmpFunc,
+    INOUT VIR_Instruction**         ppNearestDefInst
+    );
+
 /*
  *  LV analysis
  */
