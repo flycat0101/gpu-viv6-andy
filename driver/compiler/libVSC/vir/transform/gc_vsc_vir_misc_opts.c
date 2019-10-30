@@ -13865,10 +13865,10 @@ _vscVIR_IsImageReadOrWrite(
 
     if (opCode == VIR_OP_INTRINSIC)
     {
-        VIR_IntrinsicsKind  ik = VIR_Operand_GetIntrinsicKind(VIR_Inst_GetSource(pInst, 0));
+        VIR_IntrinsicsKind  ik = VIR_Intrinsic_GetFinalIntrinsicKind(pInst);
         VIR_ParmPassing*    pParmOpnd = VIR_Operand_GetParameters(VIR_Inst_GetSource(pInst, 1));
 
-        if (VIR_Intrinsics_isImageLoad(ik) || VIR_Intrinsics_isImageFetch(ik))
+        if (VIR_Intrinsics_isImageLoad(ik))
         {
             bImageRead = gcvTRUE;
             pImageSrcOpnd = pParmOpnd->args[0];
