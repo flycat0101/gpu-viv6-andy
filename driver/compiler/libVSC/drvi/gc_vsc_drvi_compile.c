@@ -914,6 +914,7 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_SHADER_PASS_MANAGER* pShPassMnger
         CALL_SH_PASS(vscVIR_ConvFrontFacing, 0, gcvNULL);
 
         cppPassData.cppFlag |= VSC_CPP_COPY_FROM_OUTPUT_PARAM;
+        cppPassData.cppFlag |= VSC_CPP_FIND_NEAREST_DEF_INST;
         CALL_SH_PASS(VSC_CPP_PerformOnShader, 1, &cppPassData);
 
         CALL_SH_PASS(VSC_DCE_Perform, 1, gcvNULL);
