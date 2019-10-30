@@ -18222,7 +18222,7 @@ VIR_Shader_CalcSamplerCount(
 }
 
 VIR_IntrinsicsKind
-VIR_IntrisicGetKind(
+VIR_IntrinsicGetKind(
     IN  gctUINT setId,
     IN  gctUINT funcId
     )

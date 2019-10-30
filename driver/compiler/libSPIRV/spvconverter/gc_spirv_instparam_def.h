@@ -138,7 +138,7 @@
     /* SpvOpExtInst = 12 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassExtension,
-        __SpvEmitIntrisicFunction,
+        __SpvEmitIntrinsicFunction,
         3,
         { OperandId, OperandLiteralNumber, OperandVariableIds, },
         { "'Set'", "'Instruction'", "'Operand 1', +\n'Operand 2', +\n...", },
@@ -618,7 +618,7 @@
     /* SpvOpImageTexelPointer = 60 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassMemory,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         3,
         { OperandId, OperandId, OperandId, },
         { "Image", "Coordinate", "Sample", },
@@ -874,7 +874,7 @@
     /* SpvOpTranspose = 84 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassComposite,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         1,
         { OperandId, },
         { "'Matrix'", },
@@ -987,7 +987,7 @@
     /* SpvOpImageFetch = 95 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassImage,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         4,
         { OperandId, OperandId, OperandImageOperands, OperandVariableIds },
         { "Image", "Coordinate", "Optional Image Operands", "" },
@@ -1020,7 +1020,7 @@
     /* SpvOpImageRead = 98 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassImage,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         4,
         { OperandId, OperandId, OperandImageOperands, OperandVariableIds },
         { "Image", "Coordinate", "Optional Image Operands", "" },
@@ -1031,7 +1031,7 @@
     /* SpvOpImageWrite = 99 */
     {
         gcvTRUE, gcvFALSE, gcvFALSE, OpClassImage,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         5,
         { OperandId, OperandId, OperandId, OperandImageOperands, OperandVariableIds },
         { "Image", "Coordinate", "Texel", "Optional Image Operands", "" },
@@ -1053,7 +1053,7 @@
     /* SpvOpImageQueryFormat = 101 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassImage,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         1,
         { OperandId },
         { "Image" },
@@ -1064,7 +1064,7 @@
     /* SpvOpImageQueryOrder = 102 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassImage,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         1,
         { OperandId },
         { "Image" },
@@ -1075,7 +1075,7 @@
     /* SpvOpImageQuerySizeLod = 103 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassImage,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         2,
         { OperandId, OperandId },
         { "Image", "Level of Detail" },
@@ -1086,7 +1086,7 @@
     /* SpvOpImageQuerySize = 104 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassImage,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         1,
         { OperandId },
         { "Image" },
@@ -1097,7 +1097,7 @@
     /* SpvOpImageQueryLod = 105 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassImage,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         2,
         { OperandId, OperandId },
         { "Image", "Coordinate" },
@@ -1108,7 +1108,7 @@
     /* SpvOpImageQueryLevels = 106 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassImage,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         1,
         { OperandId },
         { "Image" },
@@ -1119,7 +1119,7 @@
     /* SpvOpImageQuerySamples = 107 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassImage,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         1,
         { OperandId },
         { "Image" },
@@ -1199,7 +1199,7 @@
     /* SpvOpFConvert = 115 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConvert,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         1,
         { OperandId, },
         { "'Float Value Convert'", },
@@ -1210,7 +1210,7 @@
     /* SpvOpQuantizeToF16 = 116 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassConvert,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         1,
         { OperandId, },
         { "Value", },
@@ -1565,7 +1565,7 @@
     /* SpvOpIAddCarry = 149 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassArithmetic,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         2,
         { OperandId, OperandId, },
         { "'Operand 1'", "'Operand 2'", },
@@ -1576,7 +1576,7 @@
     /* SpvOpISubBorrow = 150 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassArithmetic,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         2,
         { OperandId, OperandId, },
         { "'Operand 1'", "'Operand 2'", },
@@ -1587,7 +1587,7 @@
     /* SpvOpUMulExtended = 151 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassArithmetic,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         2,
         { OperandId, OperandId, },
         { "'Operand 1'", "'Operand 2'", },
@@ -1598,7 +1598,7 @@
     /* SpvOpSMulExtended = 152 */
     {
         gcvTRUE, gcvTRUE, gcvTRUE, OpClassArithmetic,
-        __SpvEmitIntrisicCall,
+        __SpvEmitIntrinsicCall,
         2,
         { OperandId, OperandId, },
         { "'Operand 1'", "'Operand 2'", },

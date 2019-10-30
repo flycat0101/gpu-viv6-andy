@@ -563,7 +563,7 @@ VSC_ErrCode __SpvEmitCompositeInsert(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitVectorExtractDynamic(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitVectorInsertDynamic(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitCompositeConstruct(gcSPV spv, VIR_Shader * virShader);
-VSC_ErrCode __SpvEmitIntrisicCall(gcSPV spv, VIR_Shader * virShader);
+VSC_ErrCode __SpvEmitIntrinsicCall(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitSampledImage(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitSpecConstantOp(gcSPV spv, VIR_Shader * virShader);
@@ -584,7 +584,7 @@ VSC_ErrCode __SpvEmitExtInst(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitReturnValue(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitNop(gcSPV spv, VIR_Shader * virShader);
-VSC_ErrCode __SpvEmitIntrisicFunction(gcSPV spv, VIR_Shader * virShader);
+VSC_ErrCode __SpvEmitIntrinsicFunction(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitUnsupported(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitLoopMerge(gcSPV spv, VIR_Shader * virShader);
 
