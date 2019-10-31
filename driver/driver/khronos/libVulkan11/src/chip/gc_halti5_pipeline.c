@@ -19,62 +19,62 @@
 
 halti5_formatMapInfo mapTable[__VK_VSC_DRV_FORMAT_MAP_NUM] =
 {
-    {VSC_IMAGE_FORMAT_NONE, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_NONE, VK_FORMAT_UNDEFINED, VK_FORMAT_UNDEFINED},
     /*F32.*/
-    {VSC_IMAGE_FORMAT_RGBA32F, VK_FORMAT_R32G32B32A32_SFLOAT},
-    {VSC_IMAGE_FORMAT_RG32F, VK_FORMAT_R32G32_SFLOAT},
-    {VSC_IMAGE_FORMAT_R32F, VK_FORMAT_R32_SFLOAT},
+    {VSC_IMAGE_FORMAT_RGBA32F, VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_RG32F, VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_R32F, VK_FORMAT_R32_SFLOAT, VK_FORMAT_UNDEFINED},
     /*I32.*/
-    {VSC_IMAGE_FORMAT_RGBA32I, VK_FORMAT_R32G32B32A32_SINT},
-    {VSC_IMAGE_FORMAT_RG32I, VK_FORMAT_R32G32_SINT},
-    {VSC_IMAGE_FORMAT_R32I, VK_FORMAT_R32_SINT},
+    {VSC_IMAGE_FORMAT_RGBA32I, VK_FORMAT_R32G32B32A32_SINT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_RG32I, VK_FORMAT_R32G32_SINT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_R32I, VK_FORMAT_R32_SINT, VK_FORMAT_UNDEFINED},
     /*UI32.*/
-    {VSC_IMAGE_FORMAT_RGBA32UI, VK_FORMAT_R32G32B32A32_UINT},
-    {VSC_IMAGE_FORMAT_RG32UI, VK_FORMAT_R32G32_UINT},
-    {VSC_IMAGE_FORMAT_R32UI, VK_FORMAT_R32_UINT},
+    {VSC_IMAGE_FORMAT_RGBA32UI, VK_FORMAT_R32G32B32A32_UINT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_RG32UI, VK_FORMAT_R32G32_UINT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_R32UI, VK_FORMAT_R32_UINT, VK_FORMAT_UNDEFINED},
     /*F16.*/
-    {VSC_IMAGE_FORMAT_RGBA16F, VK_FORMAT_R16G16B16A16_SFLOAT},
-    {VSC_IMAGE_FORMAT_RG16F, VK_FORMAT_R16G16_SFLOAT},
-    {VSC_IMAGE_FORMAT_R16F, VK_FORMAT_R16_SFLOAT},
+    {VSC_IMAGE_FORMAT_RGBA16F, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_RG16F, VK_FORMAT_R16G16_SFLOAT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_R16F, VK_FORMAT_R16_SFLOAT, VK_FORMAT_UNDEFINED},
     /*I16.*/
-    {VSC_IMAGE_FORMAT_RGBA16I, VK_FORMAT_R16G16B16A16_SINT},
-    {VSC_IMAGE_FORMAT_RG16I, VK_FORMAT_R16G16_SINT},
-    {VSC_IMAGE_FORMAT_R16I, VK_FORMAT_R16_SINT},
+    {VSC_IMAGE_FORMAT_RGBA16I, VK_FORMAT_R16G16B16A16_SINT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_RG16I, VK_FORMAT_R16G16_SINT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_R16I, VK_FORMAT_R16_SINT, VK_FORMAT_UNDEFINED},
     /*UI16.*/
-    {VSC_IMAGE_FORMAT_RGBA16UI, VK_FORMAT_R16G16B16A16_UINT},
-    {VSC_IMAGE_FORMAT_RG16UI, VK_FORMAT_R16G16_UINT},
-    {VSC_IMAGE_FORMAT_R16UI, VK_FORMAT_R16_UINT},
+    {VSC_IMAGE_FORMAT_RGBA16UI, VK_FORMAT_R16G16B16A16_UINT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_RG16UI, VK_FORMAT_R16G16_UINT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_R16UI, VK_FORMAT_R16_UINT, VK_FORMAT_UNDEFINED},
     /*F16 SNORM/UNORM.*/
-    {VSC_IMAGE_FORMAT_RGBA16, VK_FORMAT_R16G16B16A16_UNORM},
-    {VSC_IMAGE_FORMAT_RGBA16_SNORM, VK_FORMAT_R16G16B16A16_SNORM},
-    {VSC_IMAGE_FORMAT_RG16, VK_FORMAT_R16G16_UNORM},
-    {VSC_IMAGE_FORMAT_RG16_SNORM, VK_FORMAT_R16G16_SNORM},
-    {VSC_IMAGE_FORMAT_R16, VK_FORMAT_R16_UNORM},
-    {VSC_IMAGE_FORMAT_R16_SNORM, VK_FORMAT_R16_SNORM},
+    {VSC_IMAGE_FORMAT_RGBA16, VK_FORMAT_R16G16B16A16_UNORM, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_RGBA16_SNORM, VK_FORMAT_R16G16B16A16_SNORM, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_RG16, VK_FORMAT_R16G16_UNORM, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_RG16_SNORM, VK_FORMAT_R16G16_SNORM, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_R16, VK_FORMAT_R16_UNORM, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_R16_SNORM, VK_FORMAT_R16_SNORM, VK_FORMAT_UNDEFINED},
     /*F8 SNORM/UNORM.*/
-    {VSC_IMAGE_FORMAT_BGRA8_UNORM, VK_FORMAT_B8G8R8A8_UNORM},
-    {VSC_IMAGE_FORMAT_RGBA8, VK_FORMAT_R8G8B8A8_UNORM},
-    {VSC_IMAGE_FORMAT_RGBA8_SNORM, VK_FORMAT_R8G8B8A8_SNORM},
-    {VSC_IMAGE_FORMAT_RG8, VK_FORMAT_R8G8_UNORM},
-    {VSC_IMAGE_FORMAT_RG8_SNORM, VK_FORMAT_R8G8_SNORM},
-    {VSC_IMAGE_FORMAT_R8, VK_FORMAT_R8_UNORM},
-    {VSC_IMAGE_FORMAT_R8_SNORM, VK_FORMAT_R8_SNORM},
+    {VSC_IMAGE_FORMAT_BGRA8_UNORM, VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_RGBA8, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_A8B8G8R8_UNORM_PACK32},
+    {VSC_IMAGE_FORMAT_RGBA8_SNORM, VK_FORMAT_R8G8B8A8_SNORM, VK_FORMAT_A8B8G8R8_SNORM_PACK32},
+    {VSC_IMAGE_FORMAT_RG8, VK_FORMAT_R8G8_UNORM, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_RG8_SNORM, VK_FORMAT_R8G8_SNORM, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_R8, VK_FORMAT_R8_UNORM, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_R8_SNORM, VK_FORMAT_R8_SNORM, VK_FORMAT_UNDEFINED},
     /*I8.*/
-    {VSC_IMAGE_FORMAT_RGBA8I, VK_FORMAT_R8G8B8A8_SINT},
-    {VSC_IMAGE_FORMAT_RG8I, VK_FORMAT_R8G8_SINT},
-    {VSC_IMAGE_FORMAT_R8I, VK_FORMAT_R8_SINT},
+    {VSC_IMAGE_FORMAT_RGBA8I, VK_FORMAT_R8G8B8A8_SINT, VK_FORMAT_A8B8G8R8_SINT_PACK32},
+    {VSC_IMAGE_FORMAT_RG8I, VK_FORMAT_R8G8_SINT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_R8I, VK_FORMAT_R8_SINT, VK_FORMAT_UNDEFINED},
     /*UI8.*/
-    {VSC_IMAGE_FORMAT_RGBA8UI, VK_FORMAT_R8G8B8A8_UINT},
-    {VSC_IMAGE_FORMAT_RG8UI, VK_FORMAT_R8G8_UINT},
-    {VSC_IMAGE_FORMAT_R8UI, VK_FORMAT_R8_UINT},
+    {VSC_IMAGE_FORMAT_RGBA8UI, VK_FORMAT_R8G8B8A8_UINT, VK_FORMAT_A8B8G8R8_UINT_PACK32},
+    {VSC_IMAGE_FORMAT_RG8UI, VK_FORMAT_R8G8_UINT, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_R8UI, VK_FORMAT_R8_UINT, VK_FORMAT_UNDEFINED},
     /*F-PACK.*/
-    {VSC_IMAGE_FORMAT_R5G6B5_UNORM_PACK16, VK_FORMAT_R5G6B5_UNORM_PACK16},
-    {VSC_IMAGE_FORMAT_ABGR8_UNORM_PACK32, VK_FORMAT_A8B8G8R8_UNORM_PACK32},
-    {VSC_IMAGE_FORMAT_ABGR8I_PACK32, VK_FORMAT_A8B8G8R8_SINT_PACK32},
-    {VSC_IMAGE_FORMAT_ABGR8UI_PACK32, VK_FORMAT_A8B8G8R8_UINT_PACK32},
-    {VSC_IMAGE_FORMAT_A2R10G10B10_UNORM_PACK32, VK_FORMAT_A2R10G10B10_UNORM_PACK32},
-    {VSC_IMAGE_FORMAT_A2B10G10R10_UNORM_PACK32, VK_FORMAT_A2B10G10R10_UNORM_PACK32},
-    {VSC_IMAGE_FORMAT_A2B10G10R10UI_PACK32, VK_FORMAT_A2B10G10R10_UINT_PACK32}
+    {VSC_IMAGE_FORMAT_R5G6B5_UNORM_PACK16, VK_FORMAT_R5G6B5_UNORM_PACK16, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_ABGR8_UNORM_PACK32, VK_FORMAT_A8B8G8R8_UNORM_PACK32, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_ABGR8I_PACK32, VK_FORMAT_A8B8G8R8_SINT_PACK32, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_ABGR8UI_PACK32, VK_FORMAT_A8B8G8R8_UINT_PACK32, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_A2R10G10B10_UNORM_PACK32, VK_FORMAT_A2R10G10B10_UNORM_PACK32, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_A2B10G10R10_UNORM_PACK32, VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_FORMAT_UNDEFINED},
+    {VSC_IMAGE_FORMAT_A2B10G10R10UI_PACK32, VK_FORMAT_A2B10G10R10_UINT_PACK32, VK_FORMAT_UNDEFINED}
 };
 
 #if __VK_SAVE_THEN_LOAD_SHADER_BIN
@@ -157,6 +157,21 @@ static VkBaseInStructure* get_object_by_type(VkBaseInStructure* pObj, VkStructur
     }
 
     return gcvNULL;
+}
+
+VkBool32 halti5_isMismatch(VSC_IMAGE_FORMAT vscFormat, VkFormat descFormat)
+{
+    VkFormat drvFormat = mapTable[vscFormat].drvFormat;
+    VkFormat cmpFormat = mapTable[vscFormat].cmpFormat;
+    VkBool32 result = VK_FALSE;
+
+    if ((descFormat != drvFormat) &&
+        (descFormat != cmpFormat))
+    {
+        result = VK_TRUE;
+    }
+
+    return result;
 }
 
 VkResult halti5_helper_convert_VertexAttribDesc(
@@ -7452,8 +7467,8 @@ VkResult halti5_patch_pipeline(
                                     {
                                         VSC_IMAGE_FORMAT compilerFormat = VSC_IMAGE_FORMAT_NONE;
                                         VSC_IMAGE_FORMAT mapedFormat = VSC_IMAGE_FORMAT_NONE;
-                                        VkFormat shaderFormat = VK_FORMAT_UNDEFINED;
                                         VkFormat imageFormat = (VkFormat)patchInfo->patchFormat;
+                                        VkFormat shaderFormat = VK_FORMAT_UNDEFINED;
                                         VkFormat originalFormat = (VkFormat)patchInfo->originalFormat;
                                         VkBool32 needPatch = VK_TRUE;
 
@@ -7461,9 +7476,8 @@ VkResult halti5_patch_pipeline(
                                         {
                                         case HALTI5_PATCH_FORMAT_TO_COMPILER:
                                             compilerFormat = chipPipeline->patchTexBufFormat[i][j];
-                                            shaderFormat = mapTable[compilerFormat].drvFormat;
 
-                                            if (shaderFormat != imageFormat)
+                                            if (halti5_isMismatch(compilerFormat,imageFormat))
                                             {
                                                 for (m = 0; m < __VK_VSC_DRV_FORMAT_MAP_NUM; m++)
                                                 {
@@ -7509,7 +7523,7 @@ VkResult halti5_patch_pipeline(
                                                 needPatch = VK_FALSE;
                                             }
 
-                                            if ((shaderFormat != originalFormat) && needPatch)
+                                            if (halti5_isMismatch(compilerFormat,originalFormat) && needPatch)
                                             {
                                                 for (m = 0; m < __VK_VSC_DRV_FORMAT_MAP_NUM; m++)
                                                 {
@@ -7543,9 +7557,8 @@ VkResult halti5_patch_pipeline(
                                             break;
                                         case HALTI5_PATCH_SAMPLED_IMAGRE_FORMAT:
                                             compilerFormat = chipPipeline->patchSampledImgFormat[i][j];
-                                            shaderFormat = mapTable[compilerFormat].drvFormat;
 
-                                            if (shaderFormat != originalFormat)
+                                            if (halti5_isMismatch(compilerFormat, originalFormat))
                                             {
                                                 for (m = 0; m < __VK_VSC_DRV_FORMAT_MAP_NUM; m++)
                                                 {
@@ -7579,9 +7592,8 @@ VkResult halti5_patch_pipeline(
                                             break;
                                         case HALTI5_PATCH_COMBINED_IMAGE_FORMAT:
                                             compilerFormat = chipPipeline->patchCombinedImgFormat[i][j];
-                                            shaderFormat = mapTable[compilerFormat].drvFormat;
 
-                                            if (shaderFormat != originalFormat)
+                                            if (halti5_isMismatch(compilerFormat,originalFormat))
                                             {
                                                 for (m = 0; m < __VK_VSC_DRV_FORMAT_MAP_NUM; m++)
                                                 {
@@ -7645,7 +7657,13 @@ VkResult halti5_patch_pipeline(
 
             totalEntries += chipPipeline->linkEntryCount;
 
-            if (!totalEntries && !recompiled)
+            /*VIV: the follow two situations no need do reLink:
+            **1.totalEntries is zero and didn't do recompile;
+            **2.totalEntries is none zero, but didn't do recompile and needn't do other patch.
+            */
+            if ((!totalEntries && !recompiled) ||
+                (totalEntries && !recompiled &&
+                (totalEntries == chipPipeline->linkEntryCount)))
             {
                 for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
                 {

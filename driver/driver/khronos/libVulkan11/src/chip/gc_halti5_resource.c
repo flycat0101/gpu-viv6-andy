@@ -10929,7 +10929,7 @@ VkResult halti5_createImageView(
 
     if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
     {
-        chipImgv->patchKey = HALTI5_PATCH_SAMPLED_IMAGRE_FORMAT_BIT;
+        chipImgv->patchKey |= HALTI5_PATCH_SAMPLED_IMAGRE_FORMAT_BIT;
         chipImgv->patchKey |= HALTI5_PATCH_COMBINED_IMAGE_FORAMT_BIT;
     }
 
