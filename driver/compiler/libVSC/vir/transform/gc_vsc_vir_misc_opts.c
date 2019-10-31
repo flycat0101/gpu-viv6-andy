@@ -5310,71 +5310,76 @@ static VSC_ErrCode vscVIR_PrecisionUpdateDst(VIR_Instruction* inst)
     return errCode;
 }
 
-static VSC_ErrCode _PrecisionUpdate(VIR_Shader* pShader, VIR_Dumper* dumper)
+/* Update precision and pack mode. */
+static VSC_ErrCode _UpdatePrecisionAndPackMode(VIR_Shader* pShader)
 {
-    VSC_ErrCode errCode = VSC_ERR_NONE;
-    VIR_FuncIterator func_iter;
-    VIR_FunctionNode* func_node;
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_FuncIterator        func_iter;
+    VIR_FunctionNode*       pFunc_node = gcvNULL;
+    gctBOOL                 bUpdatePrecision = gcvTRUE;
 
-    if(!VIR_Shader_IsFS(pShader) ||
-        VIR_Shader_IsVulkan(pShader) ||
-        VIR_Shader_IsDesktopGL(pShader))
+    /* Check if we need to update the precision. */
+    if(!(VIR_Shader_IsFS(pShader) || VIR_Shader_IsCL(pShader)) || VIR_Shader_IsVulkan(pShader) || VIR_Shader_IsDesktopGL(pShader))
     {
-        return errCode;
+        bUpdatePrecision = gcvFALSE;
     }
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
-    for (func_node = VIR_FuncIterator_First(&func_iter);
-         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    for (pFunc_node = VIR_FuncIterator_First(&func_iter);
+         pFunc_node != gcvNULL;
+         pFunc_node = VIR_FuncIterator_Next(&func_iter))
     {
-        VIR_Function* func = func_node->function;
+        VIR_Function*       pFunc = pFunc_node->function;
+        VIR_InstIterator    inst_iter;
+        VIR_Instruction*    pInst = gcvNULL;
+        gctUINT             i;
 
-        /* */
+        /* Update the precision for the function parameters. */
+        if (bUpdatePrecision)
         {
-            gctUINT i;
-            for(i = 0; i < VIR_IdList_Count(&func->paramters); ++i)
+            for (i = 0; i < VIR_IdList_Count(&pFunc->paramters); i++)
             {
-                VIR_Id id = VIR_IdList_GetId(&func->paramters, i);
-                VIR_Symbol* param = VIR_Function_GetSymFromId(func, id);
-                VIR_Symbol* virReg = VIR_Shader_FindSymbolByTempIndex(pShader, VIR_Symbol_GetVariableVregIndex(param));
+                VIR_Id      id = VIR_IdList_GetId(&pFunc->paramters, i);
+                VIR_Symbol* pParam = VIR_Function_GetSymFromId(pFunc, id);
+                VIR_Symbol* pVirReg = VIR_Shader_FindSymbolByTempIndex(pShader, VIR_Symbol_GetVariableVregIndex(pParam));
 
-                gcmASSERT(VIR_Symbol_GetPrecision(param) != VIR_PRECISION_DEFAULT || VIR_Shader_IsCL(pShader));
+                gcmASSERT(VIR_Symbol_GetPrecision(pParam) != VIR_PRECISION_DEFAULT || VIR_Shader_IsCL(pShader));
                 /* gcmASSERT(VIR_Symbol_GetVregVariable(virReg) == param); */ /* virReg's variable will be reset to another sym which came from old variable for function input/output */
-                if(VIR_Symbol_GetPrecision(param) == VIR_PRECISION_ANY)
+                if(VIR_Symbol_GetPrecision(pParam) == VIR_PRECISION_ANY)
                 {
-                    VIR_Symbol_SetCurrPrecision(param, VIR_PRECISION_HIGH);
-                    VIR_Symbol_SetCurrPrecision(virReg, VIR_PRECISION_HIGH);
+                    VIR_Symbol_SetCurrPrecision(pParam, VIR_PRECISION_HIGH);
+                    VIR_Symbol_SetCurrPrecision(pVirReg, VIR_PRECISION_HIGH);
                 }
             }
         }
 
-        /* */
+        /* Check all instructions. */
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pFunc));
+        for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             pInst != gcvNULL;
+             pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
-            VIR_InstIterator inst_iter;
-            VIR_Instruction* inst;
-
-            VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
-            for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
-                 inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+            if (bUpdatePrecision)
             {
-                gctUINT j;
-                for(j = 0; j < VIR_Inst_GetSrcNum(inst); j++)
+                for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
                 {
-                    VIR_Operand* src = VIR_Inst_GetSource(inst, j);
+                    VIR_Operand*    pSrcOpnd = VIR_Inst_GetSource(pInst, i);
 
-                    vscVIR_PrecisionUpdateSrc(pShader, src);
+                    vscVIR_PrecisionUpdateSrc(pShader, pSrcOpnd);
                 }
 
-                vscVIR_PrecisionUpdateDst(inst);
-
-                /* VIR_Inst_Dump(dumper, inst); */
+                vscVIR_PrecisionUpdateDst(pInst);
             }
+
+            /* set pack mode if the instruction uses packed type.
+             * adjust immediate date type for componentwise instruction */
+            VIR_Inst_CheckAndSetPakedMode(pInst);
         }
     }
 
     if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
-        VIR_Shader_Dump(gcvNULL, "After Precision Update.", pShader, gcvTRUE);
+        VIR_Shader_Dump(gcvNULL, "Update precision and pack mode.", pShader, gcvTRUE);
     }
 
     return errCode;
@@ -6446,10 +6451,6 @@ VSC_ErrCode _ConvertScalarVectorConstToImm(
             gctUINT         i;
             VIR_Operand*    pSrcOpnd;
 
-            /* set pack mode if the instruction uses packed type.
-             * adjust immediate date type for componentwise instruction */
-            VIR_Inst_CheckAndSetPakedMode(pInst);
-
             for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
             {
                 pSrcOpnd = VIR_Inst_GetSource(pInst, i);
@@ -6516,9 +6517,9 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
         ON_ERROR(errCode, "Convert PatchVerticesIn to uniform");
     }
 
-    /* Update Precision */
-    errCode = _PrecisionUpdate(pShader, pPassWorker->basePassWorker.pDumper);
-    ON_ERROR(errCode, "precision update");
+    /* Update precision and pack mode. */
+    errCode = _UpdatePrecisionAndPackMode(pShader);
+    ON_ERROR(errCode, "Update precision and pack mode.");
 
     /* Change all RETs to JMPs and only keep one RET at the end of the function. */
     errCode = _ConvertRetToJmpForFunctions(pShader, &bInvalidCfg);
