@@ -22,6 +22,26 @@ __kernel void gpuTensorAdd_FP32
     write_imagef(output, coord, dst);
 }
 
+__kernel void gpuTensorAdd_FP32_BroadCastZ
+    (
+    __read_only     image2d_array_t input0,
+    __read_only     image2d_t       input1,
+    __write_only    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    float4 src0, src1, dst = {0.0};
+
+    src0 = read_imagef(input0, coord);
+    src1 = read_imagef(input1, coord.xy);
+    dst.x = src0.x + src1.x;
+    write_imagef(output, coord, dst);
+}
+
+
 __kernel void gpuTensorAdd_FP32_2D_4X
     (
     __read_only     image2d_t input0,
@@ -172,6 +192,25 @@ __kernel void gpuTensorSub_FP32
     write_imagef(output, coord, dst);
 }
 
+__kernel void gpuTensorSub_FP32_BroadCastZ
+    (
+    __read_only     image2d_array_t input0,
+    __read_only     image2d_t       input1,
+    __write_only    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    float4 src0, src1, dst = {0.0};
+
+    src0 = read_imagef(input0, coord);
+    src1 = read_imagef(input1, coord.xy);
+    dst.x = src0.x - src1.x;
+    write_imagef(output, coord, dst);
+}
+
 __kernel void gpuTensorSub_Quant8
     (
     __read_only     image2d_array_t input0,
@@ -221,6 +260,25 @@ __kernel void gpuTensorMul_FP32
     write_imagef(output, coord, dst);
 }
 
+__kernel void gpuTensorMul_FP32_BroadCastZ
+    (
+    __read_only     image2d_array_t input0,
+    __read_only     image2d_t       input1,
+    __write_only    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    float4 src0, src1, dst = {0.0};
+
+    src0 = read_imagef(input0, coord);
+    src1 = read_imagef(input1, coord.xy);
+    dst.x = src0.x * src1.x;
+    write_imagef(output, coord, dst);
+}
+
 __kernel void gpuTensorMul_Quant8
     (
     __read_only     image2d_array_t input0,
@@ -255,7 +313,7 @@ __kernel void gpuTensorDiv_FP32
     (
     __read_only     image2d_array_t input0,
     __read_only     image2d_array_t input1,
-    __write_only     image2d_array_t output
+    __write_only    image2d_array_t output
     )
 {
     int x = get_global_id(0);
@@ -266,6 +324,25 @@ __kernel void gpuTensorDiv_FP32
 
     src0 = read_imagef(input0, coord);
     src1 = read_imagef(input1, coord);
+    dst.x = src0.x / src1.x;
+    write_imagef(output, coord, dst);
+}
+
+__kernel void gpuTensorDiv_FP32_BroadCastZ
+    (
+    __read_only     image2d_array_t input0,
+    __read_only     image2d_t       input1,
+    __write_only    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int4 coord = (int4)(x, y, z, 0);
+    float4 src0, src1, dst = {0.0};
+
+    src0 = read_imagef(input0, coord);
+    src1 = read_imagef(input1, coord.xy);
     dst.x = src0.x / src1.x;
     write_imagef(output, coord, dst);
 }
