@@ -19,7 +19,6 @@ int32_t __vkDebugLevel = __VK_DBG_LEVEL_ERROR;
 
 extern const VkExtensionProperties g_DeviceExtensions[];
 extern const uint32_t g_DeviceExtensionsCount;
-extern __vkExtension g_EnabledExtensions[];
 
 /* NOTICE: This string array order MUST match item order in dispatch table. */
 #define __vkProcInfo_(func) #func,
@@ -281,9 +280,28 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&phyDev->pInst->memCb);
 
+    /* Allocate memory for __vkDevContext.
+    */
+    devCtx = (__vkDevContext*)__VK_ALLOC(sizeof(__vkDevContext), 8, VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
+    if (!devCtx)
+    {
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+    __VK_MEMZERO(devCtx, sizeof(__vkDevContext));
+
+    /* Allocate extension enable flags */
+    devCtx->pEnabledExtensions = (__vkExtension*)__VK_ALLOC(
+        sizeof(__vkExtension) * g_DeviceExtensionsCount, 8, VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
+    if (!devCtx->pEnabledExtensions)
+    {
+        result = VK_ERROR_OUT_OF_HOST_MEMORY;
+        goto OnError;
+    }
+
     for (i = 0; i < g_DeviceExtensionsCount; i++)
     {
-        g_EnabledExtensions[i].bEnabled = VK_FALSE;
+        devCtx->pEnabledExtensions[i].bEnabled = VK_FALSE;
+        devCtx->pEnabledExtensions[i].name = gcvNULL;
     }
 
     for (iExt = 0; iExt < pCreateInfo->enabledExtensionCount; iExt++)
@@ -294,7 +312,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
         {
             if (gcoOS_StrCmp(pCreateInfo->ppEnabledExtensionNames[iExt], g_DeviceExtensions[i].extensionName) == gcvSTATUS_OK)
             {
-                g_EnabledExtensions[i].bEnabled = VK_TRUE;
+                devCtx->pEnabledExtensions[i].bEnabled = VK_TRUE;
                 found = VK_TRUE;
                 break;
             }
@@ -303,15 +321,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
         if (!found)
             return VK_ERROR_EXTENSION_NOT_PRESENT;
     }
-
-    /* Allocate memory for __vkDevContext.
-    */
-    devCtx = (__vkDevContext*)__VK_ALLOC(sizeof(__vkDevContext), 8, VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
-    if (!devCtx)
-    {
-        return VK_ERROR_OUT_OF_HOST_MEMORY;
-    }
-    __VK_MEMZERO(devCtx, sizeof(__vkDevContext));
 
     if (pCreateInfo->pEnabledFeatures)
     {
@@ -442,6 +451,11 @@ OnError:
 
         __vki_DetachDevice(devCtx);
 
+        if (devCtx->pEnabledExtensions)
+        {
+            __VK_FREE(devCtx->pEnabledExtensions);
+        }
+
         __VK_FREE(devCtx);
     }
 
@@ -527,6 +541,11 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDevice(
 
             __vki_DetachDevice(devCtx);
 
+            if (devCtx->pEnabledExtensions)
+            {
+                __VK_FREE(devCtx->pEnabledExtensions);
+            }
+
             __VK_FREE(devCtx);
         }
     }
@@ -538,6 +557,8 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
     )
 {
     uint32_t i;
+    __vkDevContext *devCtx = (__vkDevContext*)device;
+
     /* Skip invalid names first */
     if (!pName || pName[0] != 'v' || pName[1] != 'k' || pName[2] == '\0')
     {
@@ -574,7 +595,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
     {
         if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0)
         {
-             if (!g_EnabledExtensions[i].bEnabled)
+            if (!devCtx->pEnabledExtensions[i].bEnabled)
              {
                  if (strcmp(pName, "vkCreateSwapchainKHR") == 0)return VK_NULL_HANDLE;
                  if (strcmp(pName, "vkDestroySwapchainKHR") == 0)return VK_NULL_HANDLE;
@@ -590,7 +611,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
         }
         if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_MAINTENANCE1_EXTENSION_NAME) == 0)
         {
-            if (!g_EnabledExtensions[i].bEnabled)
+            if (!devCtx->pEnabledExtensions[i].bEnabled)
              {
                  if (strcmp(pName, "vkTrimCommandPoolKHR") == 0)return VK_NULL_HANDLE;
              }
@@ -598,7 +619,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
         }
         if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME) == 0)
         {
-            if (!g_EnabledExtensions[i].bEnabled)
+            if (!devCtx->pEnabledExtensions[i].bEnabled)
              {
                  if (strcmp(pName, "vkGetImageSparseMemoryRequirements2KHR") == 0)return VK_NULL_HANDLE;
                  if (strcmp(pName, "vkGetBufferMemoryRequirements2KHR") == 0)return VK_NULL_HANDLE;
@@ -608,7 +629,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
         }
         if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_BIND_MEMORY_2_EXTENSION_NAME) == 0)
         {
-            if (!g_EnabledExtensions[i].bEnabled)
+            if (!devCtx->pEnabledExtensions[i].bEnabled)
              {
                  if (strcmp(pName, "vkBindBufferMemory2KHR") == 0)return VK_NULL_HANDLE;
                  if (strcmp(pName, "vkBindImageMemory2KHR") == 0)return VK_NULL_HANDLE;
@@ -617,7 +638,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
         }
         if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME) == 0)
         {
-            if (!g_EnabledExtensions[i].bEnabled)
+            if (!devCtx->pEnabledExtensions[i].bEnabled)
              {
                  if (strcmp(pName, "vkCreateDescriptorUpdateTemplateKHR") == 0)return VK_NULL_HANDLE;
                  if (strcmp(pName, "vkDestroyDescriptorUpdateTemplateKHR") == 0)return VK_NULL_HANDLE;
@@ -627,7 +648,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
         }
         if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_DEVICE_GROUP_EXTENSION_NAME) == 0)
         {
-            if (!g_EnabledExtensions[i].bEnabled)
+            if (!devCtx->pEnabledExtensions[i].bEnabled)
              {
                  if (strcmp(pName, "vkGetDeviceGroupPeerMemoryFeaturesKHR") == 0)return VK_NULL_HANDLE;
                  if (strcmp(pName, "vkCmdSetDeviceMaskKHR") == 0)return VK_NULL_HANDLE;
@@ -637,7 +658,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetDeviceProcAddr(
         }
         if (strcmp(g_DeviceExtensions[i].extensionName, VK_KHR_MAINTENANCE3_EXTENSION_NAME) == 0)
         {
-            if (!g_EnabledExtensions[i].bEnabled)
+            if (!devCtx->pEnabledExtensions[i].bEnabled)
              {
                  if (strcmp(pName, "vkGetDescriptorSetLayoutSupportKHR") == 0)return VK_NULL_HANDLE;
              }
