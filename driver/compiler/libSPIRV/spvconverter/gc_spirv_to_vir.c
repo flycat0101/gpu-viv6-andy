@@ -6787,7 +6787,6 @@ VSC_ErrCode __SpvEmitAccessChain(gcSPV spv, VIR_Shader * virShader)
     gctUINT *accessChain = gcvNULL;
     VIR_SymbolKind *accessChainType = gcvNULL;
     VIR_TypeId baseTypeId = VIR_TYPE_UNKNOWN;
-    VIR_Type* pBaseType = gcvNULL;
     gctUINT accessChainLength;
     gctUINT i = 0;
     VIR_AC_OFFSET_INFO virAcOffsetInfo;
@@ -6852,24 +6851,12 @@ VSC_ErrCode __SpvEmitAccessChain(gcSPV spv, VIR_Shader * virShader)
     {
         baseTypeId = VIR_Symbol_GetTypeId(baseSymbol);
     }
-    pBaseType = VIR_Shader_GetTypeFromId(virShader, baseTypeId);
 
     /* If this is a OpPtrAccessChain, we need to construct an array type based on the array stride from OpDecorate. */
     if (virBaseTypeInfo.bIsPtrAccessChain)
     {
         SpvCovDecorator*        pDec = spv->decorationList;
         SpvId                   baseSpvTypeId = SPV_ID_SYM_SPV_POINTER_TYPE(spv->operands[0]);
-
-        /*
-        ** According to spec:
-        ** If Base is originally typed to be a pointer an array, and the desired
-        ** operation is to select an element of that array, OpAccessChain should be
-        ** directly used, as its first Index will select the array element.
-        */
-        if (spv->operandSize > 2 && VIR_Type_isArray(pBaseType))
-        {
-            gcmASSERT(gcvFALSE);
-        }
 
         /* Find the decoration by target and member index. */
         SPV_GET_DECORATOR(pDec, baseSpvTypeId, -1);
