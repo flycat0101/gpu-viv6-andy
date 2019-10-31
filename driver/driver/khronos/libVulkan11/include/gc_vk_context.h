@@ -164,6 +164,9 @@ struct __vkDevContextRec
     void *chipPriv;
     struct __vkDevContextRec *pNext;
     VkBool32  msaa_64bpp;
+
+    /* Store extension enable state */
+    __vkExtension *pEnabledExtensions;
 };
 
 typedef struct __vkDebugCallbackEXTRec
