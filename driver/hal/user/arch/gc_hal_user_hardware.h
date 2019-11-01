@@ -1257,6 +1257,12 @@ gcoHARDWARE_FlushUniform(
     IN OUT gctPOINTER *Memory
     );
 
+/* Initialize some video memories that allocated by compiler. */
+gceSTATUS
+gcoHARDWARE_InitVidMemAllocatedByCompiler(
+    IN gcoHARDWARE Hardware
+    );
+
 gceSTATUS
 gcoHARDWARE_FlushShaders(
     IN gcoHARDWARE Hardware,
