@@ -1208,6 +1208,9 @@ gcoHARDWAREVX_InvokeThreadWalker(
     /* Switch to the 3D pipe. */
     gcmONERROR(gcoHARDWARE_SelectPipe(gcvNULL, gcvPIPE_3D, cmdBuffer));
 
+    /* Initialize some video memories that allocated by compiler. */
+    gcmONERROR(gcoHARDWARE_InitVidMemAllocatedByCompiler(Hardware));
+
     if (Hardware->SHDirty->shaderDirty)
     {
         /* Flush shader states. */

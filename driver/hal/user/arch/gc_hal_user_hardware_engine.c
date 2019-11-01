@@ -15394,6 +15394,64 @@ _GetPsOutputSetting(
     return gcvSTATUS_OK;
 }
 
+static gceSTATUS
+_ResetVideoNode(
+    IN gcsSURF_NODE_PTR node,
+    IN gceSURF_TYPE     type
+    )
+{
+    gceSTATUS           status = gcvSTATUS_OK;
+    gctPOINTER          logical = gcvNULL;
+
+    if (node == gcvNULL)
+    {
+        return status;
+    }
+
+    /* Lock the surface node. */
+    gcmONERROR(gcoHARDWARE_Lock(node, gcvNULL, &logical));
+
+    /* Initialize the data. */
+    gcoOS_ZeroMemory(logical, node->size);
+
+    /* Unlocak the surface node. */
+    gcmONERROR(gcoHARDWARE_Unlock(node, type));
+
+OnError:
+    return status;
+}
+
+gceSTATUS
+gcoHARDWARE_InitVidMemAllocatedByCompiler(
+    IN gcoHARDWARE Hardware
+    )
+{
+    gceSTATUS           status = gcvSTATUS_OK;
+    gcSHADER_VID_NODES* pVidNodes = gcvNULL;
+    gctUINT             i;
+
+    if (Hardware->SHStates == gcvNULL || Hardware->SHStates->programState.hints == gcvNULL)
+    {
+        return status;
+    }
+
+    pVidNodes = &Hardware->SHStates->programState.hints->shaderVidNodes;
+
+    /* Reset the gpr spill memory. */
+    for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
+    {
+        gcmONERROR(_ResetVideoNode((gcsSURF_NODE_PTR)pVidNodes->gprSpillVidmemNode[i], gcvSURF_VERTEX));
+    }
+
+    /* Reset the shared memory. */
+    gcmONERROR(_ResetVideoNode((gcsSURF_NODE_PTR)pVidNodes->sharedMemVidMemNode, gcvSURF_VERTEX));
+
+    /* Reset the thread ID memory. */
+    gcmONERROR(_ResetVideoNode((gcsSURF_NODE_PTR)pVidNodes->threadIdVidMemNode, gcvSURF_VERTEX));
+
+OnError:
+    return status;
+}
 
 gceSTATUS
 gcoHARDWARE_FlushShaders(
