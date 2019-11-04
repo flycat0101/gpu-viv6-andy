@@ -5840,6 +5840,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     vx_uint32     paramNum       = enable_bias ? 5 : 4;
     vx_uint32     paramIdx       = 0;
     vx_float32    bias_scale     = 1.0f;
+    vx_float32    bias_ZP        = 0.0f;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -5910,7 +5911,8 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
 
     if (enable_bias)
     {
-        if (TENSOR_QUANT_TYPE(bias) == VX_QUANT_DYNAMIC_FIXED_POINT && bias_format == VX_TYPE_INT16)
+        if (TENSOR_QUANT_TYPE(bias) == VX_QUANT_DYNAMIC_FIXED_POINT
+           && (bias_format == VX_TYPE_INT16 || bias_format == VX_TYPE_UINT8))
         {
             vx_int8   biasFixedPointPos  = TENSOR_POS(bias);
             vx_int32  postshift         = 0;
@@ -5925,6 +5927,12 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
             {
                 bias_scale = (vx_float32) (1 << postshift);
             }
+            bias_ZP = 0.0f;
+        }
+        else if (TENSOR_QUANT_TYPE(bias) == VX_QUANT_AFFINE_SCALE && bias_format == VX_TYPE_UINT8)
+        {
+            bias_scale   = TENSOR_TF_SCALE(bias);
+            bias_ZP      = (vx_float32)TENSOR_TF_ZEROPOINT(bias);
         }
     }
 
@@ -6127,16 +6135,17 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "bias_scale", 1, &bias_scale);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (input_format == VX_TYPE_UINT8 &&  weights_format ==  VX_TYPE_UINT8 && bias_format == VX_TYPE_INT32)
+    else if (input_format == VX_TYPE_UINT8 &&  weights_format ==  VX_TYPE_UINT8 && (bias_format == VX_TYPE_INT32 || bias_format == VX_TYPE_UINT8))
     {
         vx_uint32  inputSize_aln64 = 0;
         vx_float32 minValue        = 0;
         vx_float32 maxValue        = 0;
         vx_uint32  packedZ1        = (weight_ZP << 24) | (weight_ZP << 16) | (weight_ZP << 8) | (weight_ZP);
         vx_uint32  packedZ0        = (input_ZP << 24) | (input_ZP << 16) | (input_ZP << 8) | (input_ZP);
-        vx_int32   nZ1Z2           = gcmALIGN(inputSize, 64) * input_ZP * weight_ZP;
+        vx_float32 nZ1Z2           = (vx_float32)(gcmALIGN(inputSize, 64) * input_ZP * weight_ZP) - bias_scale * bias_ZP;
         vx_float32 uint8Scale      = input_scale * weight_scale * output_scale;
         vx_float32 outputZP        = (vx_float32)output_ZP;
+        vx_uint32  is_bias_uint8 = 0;
         vx_uint32  uniAccQ1MulQ2_16x1[16] = {
             0x55555555, // TCfg
             0x00000000, // ASelt
@@ -6152,6 +6161,15 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
             0x00000700, // AccumType, ConstantType, and PostShift
             packedZ1, packedZ1, packedZ1, packedZ1, packedZ0, packedZ0, packedZ0, packedZ0 // Constant
         };
+
+        if (bias_format == VX_TYPE_UINT8)
+        {
+            is_bias_uint8 = 1;
+        }
+        else
+        {
+            is_bias_uint8 = 0;
+        }
 
         minValue = (activation == VX_NN_ACTIVATION_RELU) ? 0 : -2147483648.0f;
         maxValue = 2147483647.0f;
@@ -6173,12 +6191,14 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniAccQaMulZb_16x2", 1, uniAccQaMulZb_16x2);
         if (status != VX_SUCCESS) goto OnError;
 
-        status = vxnneShaderExecutable_SetUniform(shaderExecutable, "inputSize_aln64", 1, &inputSize_aln64);
+        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "inputSize_aln64", 1, &inputSize_aln64);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uint8Scale", 1, &uint8Scale);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "nZ1Z2", 1, &nZ1Z2);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outputZP", 1, &outputZP);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "minValue", 1, &minValue);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "maxValue", 1, &maxValue);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "bias_scale", 1, &bias_scale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "is_bias_uint8", 1, &is_bias_uint8);
         if (status != VX_SUCCESS) goto OnError;
     }
     else
