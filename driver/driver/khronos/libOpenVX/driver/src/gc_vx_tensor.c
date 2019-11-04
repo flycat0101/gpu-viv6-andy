@@ -368,6 +368,7 @@ vxoTensor_IsContiguousMemory(
 VX_PRIVATE_API vx_tensor
 vxoTensor_Create(
     vx_context context,
+    vx_graph   graph,
     const vx_tensor_create_params_t* tensor_create_params,
     vx_uint32 * strides,
     vx_view_region_s * viewRegion,
@@ -552,7 +553,14 @@ vxoTensor_Create(
 
     tensor->useInternalMem  = vx_true_e;
 
+    if (tensorType & VX_TENSOR_VIRTUAL)
+    {
+        tensor->base.scope = (vx_reference)graph;
+        TENSOR_GRAPH(tensor) = graph;
+        graph->virtTensorNum++;
+    }
     gcmFOOTER_NO();
+
     return tensor;
 
 OnError:
@@ -1922,8 +1930,10 @@ _CreateTensorFromView(
 
     vxoTensor_MergeTwoViews(&tensor->viewRegion, &view->viewRegion, &viewMerged.viewRegion);
 
+    vxmASSERT(!tensor->base.isVirtual || vxoReference_GetType(tensor->base.scope) == VX_TYPE_GRAPH);
     childTensor = vxoTensor_Create(
                     context,
+                    (vx_graph)(tensor->base.isVirtual ? tensor->base.scope : VX_NULL),
                     &tensor_create_params,
                     tensor->strides,
                     &viewMerged.viewRegion,
@@ -2614,9 +2624,12 @@ _ReshapeTensor(
         offset = vxoTensor_CalculateDimOffsetByStarts(tensor, TENSOR_VIEW_STARTS(tensor));
     }
 
+    vxmASSERT(!tensor->base.isVirtual || vxoReference_GetType(tensor->base.scope) == VX_TYPE_GRAPH);
+
     gcmFOOTER_NO();
     return vxoTensor_Create(
                 context,
+                (vx_graph)(tensor->base.isVirtual ? tensor->base.scope : VX_NULL),
                 &tensor_create_params,
                 VX_NULL,
                 VX_NULL,
@@ -3195,6 +3208,7 @@ _CreateTensor(
 
     tensor = vxoTensor_Create(
                 context,
+                graph,
                 tensor_create_params,
                 VX_NULL,
                 VX_NULL,
@@ -3208,12 +3222,7 @@ _CreateTensor(
         gcmFOOTER_NO();
         return VX_NULL;
     }
-    if (is_virtual)
-    {
-        tensor->base.scope = (vx_reference)graph;
-        TENSOR_GRAPH(tensor) = graph;
-        graph->virtTensorNum++;
-    }
+
     gcmFOOTER_NO();
     return tensor;
 }
@@ -3251,6 +3260,7 @@ vxoTensor_CreateTensorWithStrides(
 {
     vx_tensor tensor = vxoTensor_Create(
                             context,
+                            graph,
                             tensor_create_params,
                             strides,
                             VX_NULL,
@@ -3261,13 +3271,6 @@ vxoTensor_CreateTensorWithStrides(
                             );
 
     if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) return VX_NULL;
-
-    if (is_virtual)
-    {
-        tensor->base.scope = (vx_reference)graph;
-        TENSOR_GRAPH(tensor) = graph;
-        graph->virtTensorNum++;
-    }
 
     return tensor;
 }
@@ -3874,7 +3877,10 @@ VX_INTERNAL_API vx_tensor vxoTensor_ReformatTensor(vx_tensor tensor, vx_enum for
         tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(tensor);
     }
 
+    vxmASSERT(!tensor->base.isVirtual || vxoReference_GetType(tensor->base.scope) == VX_TYPE_GRAPH);
+
     return vxoTensor_Create(context,
+                            (vx_graph)(tensor->base.isVirtual ? tensor->base.scope : VX_NULL),
                             &tensor_create_params,
                             VX_NULL,
                             VX_NULL,
