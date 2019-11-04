@@ -2446,6 +2446,12 @@ gcoHARDWARE_InvokeThreadWalkerGL(
 
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, outSide);
 
+    /* If the previos pipe is graphic, sometimes the RT cache are forgot to flush */
+    if (!gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_FAST_CLEAR))
+    {
+        gcmONERROR(gcoHARDWARE_FlushPipe(Hardware, gcvNULL));
+    }
+
     /* Switch to the 3D pipe. */
     gcmONERROR(gcoHARDWARE_SelectPipe(gcvNULL, gcvPIPE_3D, (gctPOINTER*)&memory));
 
