@@ -28332,7 +28332,6 @@ vxnne_shader_executable vxnneGetTensorCropShaderExecutable(
     vx_enum       outputFormat          = TENSOR_DATA_TYPE(output);
     vx_float32    scaleIn               = 1.0;
     vx_float32    scaleOut              = 1.0;
-    vx_float32    outputScale           = 1.0f;
     vx_int32      inputZP               = 0;
     vx_int32      outputZP              = 0;
     vx_int8       srcFixPointPos        = 0;
@@ -28384,15 +28383,11 @@ vxnne_shader_executable vxnneGetTensorCropShaderExecutable(
         {
             scaleOut = 1.0f / (vx_float32) (1 << -dstFixPointPos);
         }
-
-        outputScale = scaleOut;
     }
     else if (outputFormat == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
     {
         scaleOut = TENSOR_TF_SCALE(output);
         outputZP = TENSOR_TF_ZEROPOINT(output);
-
-        outputScale = 1.0f / scaleOut;
     }
 
     if (TENSOR_DIM_NUM(input) == 1)

@@ -3775,7 +3775,6 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
     vx_uint32     dims                       = TENSOR_DIM_NUM(input);
     vx_uint32     width                      = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32     input_count                = 0;
-    vx_uint32     key_count                  = 0;
     vx_uint32     kDims                      = TENSOR_DIM_NUM(key);
     vx_uint32     kw                         = TENSOR_VIEW_SIZE_INDEX(key, 0);
     vx_uint32     vDims                      = TENSOR_DIM_NUM(value);
@@ -3829,7 +3828,6 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
         key_rs = vxoTensor_ReshapeTensor(key, rs_sizes, 2);
         parameters[1] = (vx_reference)key_rs;
     }
-    key_count = rs_sizes[0];
 
     if (vDims == 1)
     {
@@ -7826,7 +7824,7 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
         /* register an shader kernel */
 #if gcdUSE_VXC_BINARY
         vx_uint32 len;
-        void * ptr = getGPUKernelInfo(context, TensorMeanAxis0, &len);
+        void * ptr = getGPUKernelInfo(context, TensorMeanAxis, &len);
         program = vxCreateProgramWithBinary(context, ptr, len);
 #else
         char path[_vxcFILENAME_MAX];
@@ -8816,15 +8814,12 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
     vx_bool     enable_2d_img            = vx_false_e;
     vx_uint32   element_cnt_input        = 0;
     vx_uint32   element_cnt_kernel       = 0;
-    vx_float32  radio                    = 0;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
     status  = vxoTensor_GetTensorElementCount(input, &element_cnt_input);
     status |= vxoTensor_GetTensorElementCount(weight, &element_cnt_kernel);
     if (status != VX_SUCCESS) goto OnError;
-
-    radio = (vx_float32)element_cnt_kernel / (vx_float32)element_cnt_input;
 
     enable_adjust_biases     = TENSOR_QUANT_TYPE(weight) == VX_QUANT_AFFINE_SCALE && TENSOR_QUANT_TYPE(bias);
 
