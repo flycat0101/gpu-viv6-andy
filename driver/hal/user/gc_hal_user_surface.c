@@ -6562,8 +6562,12 @@ _Clear(
                  */
                 status = _PartialFastClear(SurfView, ClearArgs, LayerIndex);
             }
+#else
+            else
+            {
+                status = gcvSTATUS_NOT_SUPPORTED;
+            }
 #endif
-
             if (gcmIS_SUCCESS(status))
             {
                 /* Done. */

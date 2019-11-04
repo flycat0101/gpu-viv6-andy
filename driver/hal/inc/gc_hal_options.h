@@ -971,10 +971,10 @@ This define enables the use of VM for gckCommand and fence buffers.
         When it's not zero, partial fast clear is enabled.
         Depends on gcdHAL_3D_DRAWBLIT, if gcdHAL_3D_DRAWBLIT is not enabled,
         only available when scissor box is completely aligned.
-        Expremental, under test.
+        Expremental, under test only. Not ready for production.
 */
 #ifndef gcdPARTIAL_FAST_CLEAR
-#   define gcdPARTIAL_FAST_CLEAR                1
+#   define gcdPARTIAL_FAST_CLEAR                0
 #endif
 
 /*
