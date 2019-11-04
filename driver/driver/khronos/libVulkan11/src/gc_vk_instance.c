@@ -269,6 +269,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
     uint32_t iExt;
     __vkInstance *inst = VK_NULL_HANDLE;
     VkResult result = VK_SUCCESS;
+    gcsHAL_INTERFACE iface;
     const VkApplicationInfo *pAppInfo = pCreateInfo->pApplicationInfo;
 
     /* Set the allocator to the local allocator or API defined allocator if valid */
@@ -354,6 +355,21 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
     __VK_ONERROR(__vki_InitializeChipInfo(inst));
 
     __vki_InitializeDrvOption(inst);
+#if gcdGPU_TIMEOUT
+
+    iface.ignoreTLS = gcvFALSE;
+    iface.command = gcvHAL_SET_TIMEOUT;
+    if (inst->patchID == gcvPATCH_SASCHAWILLEMS)
+    {
+        iface.u.SetTimeOut.timeOut = 10 * gcdGPU_TIMEOUT;
+    }
+    else
+    {
+        iface.u.SetTimeOut.timeOut = gcdGPU_TIMEOUT;
+    }
+    __VK_ONERROR(__vk_DeviceControl(&iface, 0));
+
+#endif
 
     /* Lock the __vkRootMutex */
     gcoOS_AcquireMutex(gcvNULL, __vkRootMutex, gcvINFINITE);
