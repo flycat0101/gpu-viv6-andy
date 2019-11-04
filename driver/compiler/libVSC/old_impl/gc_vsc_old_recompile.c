@@ -9053,7 +9053,7 @@ _updateFunctionSrcloc(
     gctUINT codeStart = Function->codeStart;
     gctUINT codeEnd = Function->codeStart + Function->codeCount;
     gctUINT i;
-    for (i = codeStart; i <= codeEnd; i++)
+    for (i = codeStart; i < codeEnd; i++)
     {
         gcSL_INSTRUCTION code = Shader->code + i;
         code->srcLoc =  srcLoc;
@@ -9233,8 +9233,10 @@ _patchLongULongVIR(
                                                         convertFunction);
 
             /* update the source loc */
-            _updateFunctionSrcloc(Shader, convertFunction, srcLoc);
-            _updateFunctionSrcloc(Shader, stubFunction, srcLoc);
+            if (convertFunction)
+                _updateFunctionSrcloc(Shader, convertFunction, srcLoc);
+            if (stubFunction)
+                _updateFunctionSrcloc(Shader, stubFunction, srcLoc);
 
             /* Change the instruciton to call stub */
             code = &Shader->code[patchInstrIndex];
