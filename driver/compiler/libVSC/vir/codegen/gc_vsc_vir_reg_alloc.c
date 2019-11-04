@@ -7677,6 +7677,27 @@ _VIR_RA_LS_ComputeHwRegComponentSize(
     gctUINT             compSize = 1;
     VIR_Type*           pCompType;
 
+    if (!VIR_TypeId_isPrimitive(typeId))
+    {
+        VIR_Type*       pType = VIR_Shader_GetTypeFromId(pShader, typeId);
+
+        if (VIR_Type_isArray(pType))
+        {
+            while (VIR_Type_isArray(pType))
+            {
+                pType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pType));
+            }
+            typeId = VIR_Type_GetBaseTypeId(pType);
+        }
+        else if (VIR_Type_isPointer(pType))
+        {
+            pType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pType));
+            typeId = VIR_Type_GetBaseTypeId(pType);
+        }
+    }
+
+    gcmASSERT(VIR_TypeId_isPrimitive(typeId));
+
     pCompType = VIR_Shader_GetTypeFromId(pShader, VIR_GetTypeComponentType(typeId));
     compSize = VIR_Type_GetSize(pCompType);
 
