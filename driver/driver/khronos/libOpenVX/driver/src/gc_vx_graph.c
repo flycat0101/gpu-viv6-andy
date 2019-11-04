@@ -1622,8 +1622,14 @@ VX_PRIVATE_API vx_status SetMemoryRequestList(
 {
     vx_uint32 i, j, dims;
     vxnne_mem_request   memRequest = graph->layer->memRequestList + start;
+     vx_memory_s        outputMemory[VX_MAX_MEM_REQUEST_OUTPUT];
 
     vxmASSERT(allocType == VXNNE_MEM_POOL_TYPE_AXI_SRAM || allocType == VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+
+    for(j = 0; j < memRequest[count - 1].outputCount; j++)
+    {
+        outputMemory[j] = *memRequest[count - 1].outputMemory[j];
+    }
 
     for (i = 0; i < count - 1; i++)
     {
@@ -1638,6 +1644,11 @@ VX_PRIVATE_API vx_status SetMemoryRequestList(
                 vxmASSERT(memRequest[i].outputMemory[j]->sizes[0] > 0);
             }
         }
+    }
+
+    for(j = 0; j < memRequest[count - 1].outputCount; j++)
+    {
+        *memRequest[count - 1].outputMemory[j] = outputMemory[j];
     }
 
     return VX_SUCCESS;
@@ -2544,11 +2555,21 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
         vxInfo("======================== Block [%d - %d] ==============================\n", block->start, block->start + block->count - 1);
         for (i = block->start; i < block->start + block->count; i++)
         {
+            vx_uint32 j = 0;
             memRequireList = graph->layer->memRequestList + i;
+            vxInfo("%3d %s ", i, opTarget[graph->layer->operations[i]->target]);
 
-            vxInfo("%3d %s %s->%s [(%8d, %8d), IC(%8d), KC(%8d)]\n",
-                i, opTarget[graph->layer->operations[i]->target],
-                memType[((vx_tensor)graph->layer->operations[i]->inputs[0])->tensorBuffer->memory.allocType], memType[memRequireList->outputMemory[0]->allocType],
+            for (j = 0; j < graph->layer->operations[i]->inputsNum; j++)
+            {
+                vxInfo("%s ", memType[((vx_tensor)graph->layer->operations[i]->inputs[j])->tensorBuffer->memory.allocType]);
+            }
+            vxInfo("-> ");
+            for (j = 0; j < graph->layer->operations[i]->outputsNum; j++)
+            {
+                vxInfo("%s ", memType[((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.allocType]);
+            }
+
+            vxInfo("[(%8d, %8d), IC(%8d), KC(%8d)]\n",
                 ((vx_tensor)graph->layer->operations[i]->inputs[0])->tensorBuffer->memory.sizes[0], memRequireList->outputMemory[0]->sizes[0],
                 memRequireList->imageCache.sizes[0], memRequireList->kernelCache.sizes[0]
                 );
