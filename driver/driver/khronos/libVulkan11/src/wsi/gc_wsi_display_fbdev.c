@@ -260,7 +260,7 @@ static __vkDisplayKHR *__CreateFbdevDisplay(
     __VK_MEMZERO(display, sizeof(__vkDisplayKHR));
 
     /* Get display name from graphics plane. */
-    strncpy(display->displayName, graphicPlane->fixInfo.id, sizeof(display->displayName));
+    gcoOS_StrCopySafe(display->displayName, sizeof(display->displayName), graphicPlane->fixInfo.id);
 
     display->physicalDimensions.width  = (info->width  <= 0) ? ((info->xres * 25.4f)/160.0f + 0.5f) : info->width;
     display->physicalDimensions.height = (info->height <= 0) ? ((info->yres * 25.4f)/160.0f + 0.5f) : info->height;
@@ -372,7 +372,7 @@ static __vkFbdevDisplayPlane *__CreateFbdevDisplayPlane(
     plane->base.planeIndex = planeIndex;
     plane->varInfo = varInfo;
 
-    strncpy(plane->fbPath, fbPath, sizeof(plane->fbPath) - 1);
+    gcoOS_StrCopySafe(plane->fbPath, sizeof(plane->fbPath), fbPath);
     plane->fd = fd;
 
     /* check supported formats. */

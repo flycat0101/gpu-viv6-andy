@@ -1467,7 +1467,7 @@ static void __AddDisplay(__vkPhysicalDevice *phyDev, LPCTSTR deviceName, DISPLAY
     phyDev->displays[phyDev->numberOfDisplays] = (__vkDisplayKHR *) disp;
     __VK_MEMZERO(disp, sizeof(__vkWin32DisplayKHR));
 
-    strncpy(disp->base.displayName, monitor->DeviceName, sizeof(disp->base.displayName));
+    gcoOS_StrCopySafe(disp->base.displayName, sizeof(disp->base.displayName), monitor->DeviceName);
 
     hdc = CreateDC(deviceName, NULL, NULL, NULL);
     disp->base.physicalDimensions.width  = GetDeviceCaps(hdc, HORZSIZE);

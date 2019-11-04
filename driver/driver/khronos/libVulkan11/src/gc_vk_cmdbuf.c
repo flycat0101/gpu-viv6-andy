@@ -1086,10 +1086,12 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBeginRenderPass(
         {
             VkImageSubresource subResource;
             uint32_t il, i2, i3, i4;
-            uint32_t baseArrayLayer, layerCount;
-            __vkImageView* imageView = fb->imageViews[i];
+            uint32_t baseArrayLayer;
             VkClearValue clearValue = pRenderPassBegin->pClearValues[i];
-
+            __vkImageView* imageView = fb->imageViews[i];
+#if (defined(DEBUG) || defined(_DEBUG))
+            uint32_t layerCount = imageView->createInfo.subresourceRange.layerCount;
+#endif
             const VkMemoryBarrier memBarrier =
             {
                 VK_STRUCTURE_TYPE_MEMORY_BARRIER,
@@ -1100,7 +1102,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBeginRenderPass(
 
             subResource.aspectMask = imageView->createInfo.subresourceRange.aspectMask;
             subResource.mipLevel = imageView->createInfo.subresourceRange.baseMipLevel;
-            layerCount = imageView->createInfo.subresourceRange.layerCount;
 
             /* Determine correct aspect mask for depth / stencil clear */
             if (rdp->attachments[i].stencil_loadClear)

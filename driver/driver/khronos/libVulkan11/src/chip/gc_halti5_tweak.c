@@ -728,7 +728,6 @@ static VkResult deqp_vk_msaa_128bpp_01_tweak(
     uint32_t *pCode;
     VkBool32 bMatch = VK_FALSE;
     VkBool32 bFound = VK_FALSE;
-    __VK_SET_ALLOCATIONCB(&devCtx->memCb);
 
     for (i = 0; i < graphicCreateInfo->stageCount; i++)
     {
