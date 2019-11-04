@@ -64,7 +64,6 @@ _viv_uniform VXC_512Bits uniMulAcc_Int8;
 _viv_uniform int Cycles_uint8;
 _viv_uniform VXC_512Bits uniAccQ1MulQ2_16x1;
 _viv_uniform VXC_512Bits uniAccQaMulZb_16x2;
-_viv_uniform int nZ1Z2;
 _viv_uniform float uint8Scale;
 _viv_uniform float outputZP;
 _viv_uniform int minData;

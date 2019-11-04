@@ -9618,7 +9618,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedLayer_Initializer(vx_nod
     {
         supportDataFormat0 = (vx_bool)(input_type == VX_TYPE_FLOAT16 && weight_type == VX_TYPE_FLOAT16 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_FLOAT32) && output_type == VX_TYPE_FLOAT16);
         supportDataFormat1 = (vx_bool)(input_type == VX_TYPE_INT8 && weight_type == VX_TYPE_INT8 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32) && output_type == VX_TYPE_INT8);
-        supportDataFormat2 = (vx_bool)(input_type == VX_TYPE_INT16 && weight_type == VX_TYPE_INT16 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32 || bias_type == VX_TYPE_INT64) && output_type == VX_TYPE_INT16);
+        supportDataFormat2 = (vx_bool)(input_type == VX_TYPE_INT16 && weight_type == VX_TYPE_INT16
+                             && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32 || bias_type == VX_TYPE_INT64 || bias_type == VX_TYPE_INT16) && output_type == VX_TYPE_INT16);
         supportDataFormat3 = (vx_bool)(input_type == VX_TYPE_UINT8 && weight_type == VX_TYPE_UINT8 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32) && output_type != VX_TYPE_FLOAT32);
         enable_shader      = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
     }
@@ -15338,8 +15339,22 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
         else
         {
             /* Calculate stride = (w + padXLeft + padXRight - weight)/(output_w - 1) */
-            stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputWidth + padXLeft + padXRight - kernelXSize) / (outputWidth - 1), downScaleSizeRoundingValue);
-            stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputHeight + padYTop + padYBottom - kernelYSize) / (outputHeight - 1), downScaleSizeRoundingValue);
+            if (1 == outputWidth)
+            {
+                stride_x = inputWidth + padXLeft + padXRight - kernelXSize;
+            }
+            else
+            {
+                stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputWidth + padXLeft + padXRight - kernelXSize) / (outputWidth - 1), downScaleSizeRoundingValue);
+            }
+            if (1 == outputHeight)
+            {
+                stride_y = inputHeight + padYTop + padYBottom - kernelYSize;
+            }
+            else
+            {
+                stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputHeight + padYTop + padYBottom - kernelYSize) / (outputHeight - 1), downScaleSizeRoundingValue);
+            }
         }
     }
 
@@ -16126,6 +16141,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     || (inputFormat == VX_TYPE_INT8  && weightFormat == VX_TYPE_INT8  && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32)
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT64 && outputFormat == VX_TYPE_INT16)
+                    || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32)
                     || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16));
             }
@@ -16914,7 +16930,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
 
         }
         break;
-        case gcoNNE_CONV_MODE_SH:
+   case gcoNNE_CONV_MODE_SH:
             {
 #define CONV2D_ALIGN_SIZE4 (4)
 #define CONV2D_ALIGN_SIZE16 (16)
@@ -17061,21 +17077,21 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     {
                         status = VX_FAILURE;
                         return status;
-                }
+                    }
 
-                status = vxnneShaderOperation_Initialize(&convolutionLayer->convolutionTensor2Row_sh_operation,
-                    &convolutionLayer->base,
-                    VXNNE_OPERATOR_CONVOLUTION,
-                    batchCount,
-                    shaderExecutable);
-
-                if (status != VX_SUCCESS)
-                    return status;
-
-                vxnneLayer_SetOperation(
+                    status = vxnneShaderOperation_Initialize(&convolutionLayer->convolutionTensor2Row_sh_operation,
                         &convolutionLayer->base,
-                        &convolutionLayer->convolutionTensor2Row_sh_operation.base,
-                        idx++);
+                        VXNNE_OPERATOR_CONVOLUTION,
+                        batchCount,
+                        shaderExecutable);
+
+                    if (status != VX_SUCCESS)
+                        return status;
+
+                    vxnneLayer_SetOperation(
+                            &convolutionLayer->base,
+                            &convolutionLayer->convolutionTensor2Row_sh_operation.base,
+                            idx++);
 
                     vxnneOperation_AddReference(&convolutionLayer->convolutionTensor2Row_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
                     vxnneOperation_AddReference(&convolutionLayer->convolutionTensor2Row_sh_operation.base, (vx_reference)tensor2Row, VXNNE_OPERATION_REFENRENCE_OUTPUT);

@@ -224,6 +224,7 @@ FULLY_CONNECTED_U8(I16, short, short)
 FULLY_CONNECTED_U8(F16, half, short)
 
 _viv_uniform VXC_512Bits uniMulAccInt16_16x1;
+_viv_uniform float bias_scale;
 __kernel void vxcFullyConnected_NoReluI16(
     __read_only image2d_array_t            input,
     __read_only image2d_array_t            weights,
@@ -239,7 +240,7 @@ __kernel void vxcFullyConnected_NoReluI16(
     int temp = 0;
     float dst;
     temp = read_imagei(bias, coord_in.ywww).x;
-    dst = convert_float(temp);
+    dst = convert_float(temp) * bias_scale;
     do
     {
         VXC_ReadImage(v0, input,  coord_in.xz, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));

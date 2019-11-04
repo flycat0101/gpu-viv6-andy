@@ -5839,6 +5839,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
     vx_uint32     batch          = 0;
     vx_uint32     paramNum       = enable_bias ? 5 : 4;
     vx_uint32     paramIdx       = 0;
+    vx_float32    bias_scale     = 1.0f;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -5906,6 +5907,26 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
         parameters[paramIdx ++] = (vx_reference)bias_rs;
     parameters[paramIdx ++] = (vx_reference)dRelu_s;
     parameters[paramIdx ++] = (vx_reference)output_rs;
+
+    if (enable_bias)
+    {
+        if (TENSOR_QUANT_TYPE(bias) == VX_QUANT_DYNAMIC_FIXED_POINT)
+        {
+            vx_int8   biasFixedPointPos  = TENSOR_POS(bias);
+            vx_int32  postshift         = 0;
+
+            postshift = postshift - biasFixedPointPos;
+
+            if (postshift < 0)
+            {
+                bias_scale = 1.0f / (vx_float32) (1 << -postshift);
+            }
+            else
+            {
+                bias_scale = (vx_float32) (1 << postshift);
+            }
+        }
+    }
 
     if ((input_format == VX_TYPE_INT8  &&  weights_format ==  VX_TYPE_INT8  && bias_format == VX_TYPE_INT32  && output_format == VX_TYPE_INT8) ||
         (input_format == VX_TYPE_INT16 &&  weights_format ==  VX_TYPE_INT16 && output_format == VX_TYPE_INT16))
@@ -6091,7 +6112,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
             0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
         };
 
-        if (bias_format == VX_TYPE_INT32)
+        if (bias_format == VX_TYPE_INT32 || bias_format == VX_TYPE_INT16)
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoReluI16", borderMode);
         else
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoReluI16_BI64", borderMode);
@@ -6103,6 +6124,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
         inputSize   = gcmALIGN(inputSize, 32);
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "Cycles", 1, &inputSize);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "in_scale", 1, &in_scale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "bias_scale", 1, &bias_scale);
         if (status != VX_SUCCESS) goto OnError;
     }
     else if (input_format == VX_TYPE_UINT8 &&  weights_format ==  VX_TYPE_UINT8 && bias_format == VX_TYPE_INT32)
@@ -16629,6 +16651,7 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
     vx_int32     dRelu             = 0;
     vx_bool      is_static_weights_biases       = vx_false_e;
     vx_bool      enable_adjust_biases           = vx_false_e;
+    vx_float32   bias_scale        = 1.0f;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -16678,11 +16701,14 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
         if (postshift < 0)
         {
             in_scale = 1.0f / (vx_float32) (1 << -postshift);
+            input_scale =  1.0f / (vx_float32) (1 << -postshift);
         }
         else
         {
             in_scale = (vx_float32) (1 << postshift);
+            input_scale = (vx_float32) (1 << postshift);
         }
+        input_ZP = 0;
     }
     else if (TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
     {
@@ -16700,11 +16726,14 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
         if (postshift < 0)
         {
             in_scale *= 1.0f / (vx_float32) (1 << -postshift);
+            weight_scale = 1.0f / (vx_float32) (1 << -postshift);
         }
         else
         {
             in_scale *= (vx_float32) (1 << postshift);
+            weight_scale = (vx_float32) (1 << postshift);
         }
+        weight_ZP = 0;
     }
     else if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE)
     {
@@ -16722,16 +16751,36 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
         if (postshift < 0)
         {
             in_scale *= 1.0f / (vx_float32) (1 << -postshift);
+            output_scale = (vx_float32) (1 << -postshift);
         }
         else
         {
             in_scale *= (vx_float32) (1 << postshift);
+            output_scale = 1.0f / (vx_float32) (1 << postshift);
         }
+        output_ZP = 0;
     }
     else if (TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
     {
         output_scale     = TENSOR_TF_SCALE(output);
         output_ZP        = TENSOR_TF_ZEROPOINT(output);
+    }
+
+    if (TENSOR_QUANT_TYPE(bias) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        vx_int8   biasFixedPointPos  = TENSOR_POS(bias);
+        vx_int32  postshift         = 0;
+
+        postshift = postshift - biasFixedPointPos;
+
+        if (postshift < 0)
+        {
+            bias_scale = 1.0f / (vx_float32) (1 << -postshift);
+        }
+        else
+        {
+            bias_scale = (vx_float32) (1 << postshift);
+        }
     }
 
     borderMode->mode = VX_BORDER_CONSTANT;
@@ -17026,7 +17075,7 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
 
         if (enable_2dTensor)
         {
-            if (biasFormat == VX_TYPE_INT32)
+            if (biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_INT16)
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16", borderMode);
             else
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_BI64", borderMode);
@@ -17036,7 +17085,7 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
         }
         else
         {
-            if (depth % 4 == 0 && biasFormat == VX_TYPE_INT32)
+            if (depth % 4 == 0 && (biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_INT16))
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_I16_4x", borderMode);
                 if (!shaderExecutable) goto OnError;
@@ -17045,7 +17094,7 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
             }
             else
             {
-                if (biasFormat == VX_TYPE_INT32)
+                if (biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_INT16)
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_I16", borderMode);
                 else
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Tensor_I16_BI64", borderMode);
@@ -17065,6 +17114,7 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtractInteger_2x8", 1, uniExtractInteger_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputSize_aln8", 1, &inputSize_aln8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "in_scale", 1, &in_scale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "bias_scale", 1, &bias_scale);
         if (status != VX_SUCCESS) goto OnError;
 
     }
@@ -17407,7 +17457,7 @@ vxnne_shader_executable vxnneGemm_noBiasShaderExecutable(
     vx_reference parameters[4]     = {(vx_reference)input, NULL, NULL, (vx_reference)output};
     vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
     vx_int32     size[]            = {1, 1, 1, 1};
-    vx_float32   in_scale          = 0;
+    vx_float32   in_scale          = 1.0f;
     vx_int32     dRelu             = 0;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
@@ -17451,28 +17501,82 @@ vxnne_shader_executable vxnneGemm_noBiasShaderExecutable(
         borderMode->constant_value.U8 = 0;
     }
 
-    if (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT
-          && TENSOR_QUANT_TYPE(weights) == VX_QUANT_DYNAMIC_FIXED_POINT
-          && TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    in_scale = 1.0f;
+    if (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         vx_int8   srcFixedPointPos  = TENSOR_POS(input);
-        vx_int8   weiFixedPointPos  = TENSOR_POS(weights);
-        vx_int8   dstFixedPointPos  = TENSOR_POS(output);
         vx_int32  postshift         = 0;
 
         postshift = postshift - srcFixedPointPos;
-        postshift = postshift - weiFixedPointPos;
-        postshift = postshift + dstFixedPointPos;
 
         if (postshift < 0)
         {
             in_scale = 1.0f / (vx_float32) (1 << -postshift);
+            input_scale =  1.0f / (vx_float32) (1 << -postshift);
         }
         else
         {
             in_scale = (vx_float32) (1 << postshift);
+            input_scale = (vx_float32) (1 << postshift);
         }
+        input_ZP = 0;
     }
+    else if (TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
+    {
+        input_scale      = TENSOR_TF_SCALE(input);
+        input_ZP         = TENSOR_TF_ZEROPOINT(input);
+    }
+
+    if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        vx_int8   weiFixedPointPos  = TENSOR_POS(weights);
+        vx_int32  postshift         = 0;
+
+        postshift = postshift - weiFixedPointPos;
+
+        if (postshift < 0)
+        {
+            in_scale *= 1.0f / (vx_float32) (1 << -postshift);
+            weight_scale = 1.0f / (vx_float32) (1 << -postshift);
+        }
+        else
+        {
+            in_scale *= (vx_float32) (1 << postshift);
+            weight_scale = (vx_float32) (1 << postshift);
+        }
+        weight_ZP = 0;
+    }
+    else if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE)
+    {
+        weight_scale     = TENSOR_TF_SCALE(weight);
+        weight_ZP        = TENSOR_TF_ZEROPOINT(weight);
+    }
+
+    if (TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        vx_int8   dstFixedPointPos  = TENSOR_POS(output);
+        vx_int32  postshift         = 0;
+
+        postshift = postshift + dstFixedPointPos;
+
+        if (postshift < 0)
+        {
+            in_scale *= 1.0f / (vx_float32) (1 << -postshift);
+            output_scale = (vx_float32) (1 << -postshift);
+        }
+        else
+        {
+            in_scale *= (vx_float32) (1 << postshift);
+            output_scale = 1.0f / (vx_float32) (1 << postshift);
+        }
+        output_ZP = 0;
+    }
+    else if (TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
+    {
+        output_scale     = TENSOR_TF_SCALE(output);
+        output_ZP        = TENSOR_TF_ZEROPOINT(output);
+    }
+
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
 
@@ -17613,7 +17717,6 @@ vxnne_shader_executable vxnneGemm_noBiasShaderExecutable(
         vx_uint32  maxData         = 0;
         vx_uint32  packedZ1        = (weight_ZP << 24) | (weight_ZP << 16) | (weight_ZP << 8) | (weight_ZP);
         vx_uint32  packedZ0        = (input_ZP << 24) | (input_ZP << 16) | (input_ZP << 8) | (input_ZP);
-        vx_int32   nZ1Z2           = gcmALIGN(inputSize, 64) * input_ZP * weight_ZP;
         vx_float32 uint8Scale      = input_scale * weight_scale / output_scale;
         vx_float32 outputZP        = (vx_float32)output_ZP;
         vx_uint32  uniAccQ1MulQ2_16x1[16] = {
@@ -17655,7 +17758,6 @@ vxnne_shader_executable vxnneGemm_noBiasShaderExecutable(
 
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "Cycles_uint8", 1, &Cycles_uint8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uint8Scale", 1, &uint8Scale);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "nZ1Z2", 1, &nZ1Z2);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outputZP", 1, &outputZP);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "minData", 1, &minData);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "maxData", 1, &maxData);
