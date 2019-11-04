@@ -7477,7 +7477,13 @@ VkResult halti5_patch_pipeline(
                         halti5_DestroyVkShader(hShaderArrayCopy[i]);
                     }
                 }
-                return result;
+                if (vscProgInstance)
+                {
+                    __vk_utils_hashDeleteObj(pMemCb, chipPipeline->vscProgInstanceHash, vscProgInstance->ownerCacheObj);
+                    vscProgInstance = VK_NULL_HANDLE;
+                }
+                vscProgInstance = chipPipeline->masterInstance;
+                goto PATCHEND;
             }else if (!totalEntries)
             {
                 vscLinkEntries = VK_NULL_HANDLE;
@@ -7626,6 +7632,7 @@ VkResult halti5_patch_pipeline(
         vscProgInstance = chipPipeline->masterInstance;
     }
 
+PATCHEND:
     vscHints = &vscProgInstance->hwStates.hints;
 
     if (vscHints && (!txClearPendingFix))
