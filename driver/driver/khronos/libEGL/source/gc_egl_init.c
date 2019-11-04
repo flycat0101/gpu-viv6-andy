@@ -472,11 +472,11 @@ _FillIn(
                     config->renderableType &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR | EGL_OPENGL_BIT);
                     config->conformant     &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR | EGL_OPENGL_BIT);
                 }
-            }
-            else if (!printed)
-            {
-                gcmPRINT("EGL: enable all configs for conformance test");
-                printed = gcvTRUE;
+                else if (!printed)
+                {
+                    gcmPRINT("EGL: enable all configs for conformance test");
+                    printed = gcvTRUE;
+                }
             }
             config->renderableType &= ~EGL_OPENGL_BIT;
             config->conformant     &= ~EGL_OPENGL_BIT;
@@ -496,6 +496,10 @@ _FillIn(
     {
         gctSTRING esVersion = gcvNULL;
         gcePATCH_ID patchId   = gcvPATCH_INVALID;
+
+        /* Clear EGL_OPENGL_BIT on Android to pass Android CTS EGL */
+        config->renderableType &= ~EGL_OPENGL_BIT;
+        config->conformant     &= ~EGL_OPENGL_BIT;
 
         gcoHAL_GetPatchID(gcvNULL, &patchId);
         if ((patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION)
