@@ -1643,17 +1643,10 @@ gckOS_ReleaseReservedMemory(
     gctPOINTER MemoryHandle
     )
 {
-    gckALLOCATOR allocator;
     PLINUX_MDL mdl = (PLINUX_MDL)MemoryHandle;
-
-    allocator = _FindAllocator(Os, gcvALLOC_FLAG_LINUX_RESERVED_MEM);
-
-    /* If no allocator, how comes the memory? */
-    BUG_ON(!allocator);
 
     if (mdl)
     {
-        gcmkVERIFY_OK(gcmALLOCATOR_Free(allocator, mdl));
         gcmkVERIFY_OK(_DestroyMdl(mdl));
     }
 }
