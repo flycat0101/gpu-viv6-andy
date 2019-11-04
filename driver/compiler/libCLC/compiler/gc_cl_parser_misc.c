@@ -12200,6 +12200,7 @@ clParseForControl(
     )
 {
     clsForExprPair pair;
+    gceSTATUS    status;
     gctUINT16   die = VSC_DI_INVALIDE_DIE;
     clsNAME_SPACE *    nameSpace;
     clsNAME_SPACE *    parentSpace = gcvNULL;
@@ -12207,8 +12208,12 @@ clParseForControl(
     parentSpace = cloCOMPILER_GetCurrentSpace(Compiler);
     die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_LEXICALBLOCK, parentSpace->die, gcvNULL, 0, 0, 0, 0);
 
-    cloCOMPILER_CreateNameSpace(Compiler,
+    status = cloCOMPILER_CreateNameSpace(Compiler,
                          &nameSpace);
+
+    if (gcmIS_ERROR(status)) return;
+
+    nameSpace->die = die;
 
     pair.condExpr    = CondExpr;
     pair.restExpr    = RestExpr;

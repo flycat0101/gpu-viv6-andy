@@ -315,7 +315,7 @@ static VSC_ErrCode _UpdateDIEPcRange(VIR_Shader *pShader, gctUINT16 endPC)
         parent = diContext->dieTable.die[die.parent];
         while (parent.tag != VSC_DI_TAG_SUBPROGRAM)
         {
-            if (parent.id == VSC_DI_INVALIDE_DIE)
+            if (parent.id == VSC_DI_INVALIDE_DIE || parent.parent == VSC_DI_INVALIDE_DIE)
                 break;
             parent = diContext->dieTable.die[parent.parent];
         }
