@@ -9145,7 +9145,8 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
             vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_MAX_POOLING) &&
             (isStride1Support || isStride2Support || isPoolSizeSupport) &&
             (poolSizeXValue <= 64) &&
-            (avgPool_BF_flag == vx_false_e))
+            (avgPool_BF_flag == vx_false_e) &&
+            (poolSizeXValue < 4 &&  poolSizeYValue < 4))
         {
             vx_op_param_s conv = {0};
 
