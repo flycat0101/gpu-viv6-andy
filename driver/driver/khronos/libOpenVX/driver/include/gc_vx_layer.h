@@ -3902,7 +3902,7 @@ vxnne_shader_executable vxnneGetGPURnnShaderExecutable(
     vx_tensor               output
     );
 
-vxnne_shader_executable vxnneGetGPUTensorElewiseShaderExecutable(
+vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
