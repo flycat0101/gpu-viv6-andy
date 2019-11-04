@@ -292,11 +292,6 @@ module_param_array(sRAMOffsets, int, NULL, 0644);
 MODULE_PARM_DESC(sRAMOffsets, "Array of SRAM offset inside bar of shared external SRAMs.");
 #endif
 
-static uint mmuPageTablePool = 1;
-module_param(mmuPageTablePool, uint, 0644);
-MODULE_PARM_DESC(mmuPageTablePool, "Default 1 means alloc mmu page table in virsual memory, 0 means auto select memory pool.");
-
-
 static int gpu3DMinClock = 1;
 static int contiguousRequested = 0;
 static ulong bankSize = 0;
@@ -426,9 +421,9 @@ _InitModuleParam(
     p->deviceType  = type;
     p->showArgs    = showArgs;
 
-    p->pageTablePool = mmuPageTablePool;
+    p->mmuPageTablePool = mmuPageTablePool;
 
-    p->dynamicMap = mmuDynamicMap;
+    p->mmuDynamicMap = mmuDynamicMap;
     p->allMapInOne = allMapInOne;
 #if !gcdENABLE_3D
     p->irqs[gcvCORE_MAJOR]          = irqLine = -1;
@@ -540,8 +535,8 @@ _SyncModuleParam(
     type        = p->deviceType;
     showArgs    = p->showArgs;
 
-    mmuPageTablePool = p->pageTablePool;
-    mmuDynamicMap = p->dynamicMap;
+    mmuPageTablePool = p->mmuDynamicMap;
+    mmuDynamicMap = p->mmuDynamicMap;
     allMapInOne = p->allMapInOne;
 }
 
@@ -664,13 +659,15 @@ gckOS_DumpParam(
         printk("\n");
     }
 
-    printk("  mmuPageTablePool   = %d\n", mmuPageTablePool);
     printk("  External sRAMBases = ");
     for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
     {
         printk("0x%llx, ", extSRAMBases[i]);
     }
     printk("\n");
+
+    printk("  mmuPageTablePool  = %d\n", mmuPageTablePool);
+    printk("  mmuDynamicMap     = %d\n", mmuDynamicMap);
 
     printk("Build options:\n");
     printk("  gcdGPU_TIMEOUT    = %d\n", gcdGPU_TIMEOUT);
