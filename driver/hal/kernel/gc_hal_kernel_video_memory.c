@@ -760,6 +760,7 @@ gckVIDMEM_AllocateLinear(
     gctUINT32 alignment;
     gctINT bank, i;
     gctBOOL acquired = gcvFALSE;
+    gctUINT64 mappingInOne = 1;
 
     gcmkHEADER_ARG("Memory=0x%x Bytes=%lu Alignment=%u Type=%d",
                    Memory, Bytes, Alignment, Type);
@@ -888,14 +889,18 @@ gckVIDMEM_AllocateLinear(
 #if gcdENABLE_VG
     node->VidMem.kernelVirtual = gcvNULL;
 #endif
-    gcmkONERROR(gckOS_RequestReservedMemory(
-            Memory->os,
-            Memory->physicalBase + node->VidMem.offset,
-            node->VidMem.bytes,
-            "gal reserved memory",
-            gcvTRUE,
-            &node->VidMem.physical
-            ));
+    gckOS_QueryOption(Memory->os, "allMapInOne", &mappingInOne);
+    if (!mappingInOne)
+    {
+        gcmkONERROR(gckOS_RequestReservedMemory(
+                Memory->os,
+                Memory->physicalBase + node->VidMem.offset,
+                node->VidMem.bytes,
+                "gal reserved memory",
+                gcvTRUE,
+                &node->VidMem.physical
+                ));
+    }
 
     /* Release the mutex. */
     gcmkVERIFY_OK(gckOS_ReleaseMutex(Memory->os, Memory->mutex));
@@ -1824,6 +1829,7 @@ gckVIDMEM_Free(
     gctBOOL mutexAcquired = gcvFALSE;
     gctBOOL vbMutexAcquired = gcvFALSE;
     gctBOOL vbListMutexAcquired = gcvFALSE;
+    gctUINT64 mappingInOne = 1;
 
     gcmkHEADER_ARG("Node=0x%x", Node);
 
@@ -1953,8 +1959,12 @@ gckVIDMEM_Free(
             }
         }
 
-        gckOS_ReleaseReservedMemory(memory->os, Node->VidMem.physical);
-        Node->VidMem.physical = gcvNULL;
+        gckOS_QueryOption(memory->os, "allMapInOne", &mappingInOne);
+        if (!mappingInOne)
+        {
+            gckOS_ReleaseReservedMemory(memory->os, Node->VidMem.physical);
+            Node->VidMem.physical = gcvNULL;
+        }
 
         /* Release the mutex. */
         gcmkVERIFY_OK(gckOS_ReleaseMutex(memory->os, memory->mutex));
@@ -3670,7 +3680,8 @@ gckVIDMEM_NODE_UnlockCPU(
     IN gckKERNEL Kernel,
     IN gckVIDMEM_NODE NodeObject,
     IN gctUINT32 ProcessID,
-    IN gctBOOL FromUser
+    IN gctBOOL FromUser,
+    IN gctBOOL Defer
     )
 {
     gceSTATUS status;
@@ -3692,13 +3703,7 @@ gckVIDMEM_NODE_UnlockCPU(
 #ifdef __QNXNTO__
             /* Do nothing here. */
 #else
-            gctUINT64 mappingInOne  = 1;
-
-            gckOS_QueryOption(os, "allMapInOne", &mappingInOne);
-            /* only unmap it in dynamic mapping, otherwise it will be unmapped
-             * in Vidmm free function
-             */
-            if (!mappingInOne)
+            if (!Defer)
             {
                 /* Unmap the video memory. */
                 if (node->VidMem.logical != gcvNULL)
@@ -3714,7 +3719,6 @@ gckVIDMEM_NODE_UnlockCPU(
 
                     node->VidMem.logical = gcvNULL;
                 }
-
                 /* Reset. */
                 node->VidMem.processID = 0;
             }

@@ -1584,7 +1584,7 @@ _LockVideoMemory(
 OnError:
     if (logical)
     {
-        gckVIDMEM_NODE_UnlockCPU(Kernel, nodeObject, ProcessID, gcvTRUE);
+        gckVIDMEM_NODE_UnlockCPU(Kernel, nodeObject, ProcessID, gcvTRUE, gcvFALSE);
     }
 
     if (address)
@@ -1642,6 +1642,7 @@ _UnlockVideoMemory(
     gcuVIDMEM_NODE_PTR node;
     gckVIDMEM_BLOCK vidMemBlock = gcvNULL;
     gctSIZE_T bytes;
+    gctUINT64 mappingInOne = 1;
 
     gcmkHEADER_ARG("Kernel=%p ProcessID=%d",
                    Kernel, ProcessID);
@@ -1656,9 +1657,10 @@ _UnlockVideoMemory(
         &nodeObject
         ));
 
+    gckOS_QueryOption(Kernel->os, "allMapInOne", &mappingInOne);
     /* Unlock CPU. */
     gcmkONERROR(gckVIDMEM_NODE_UnlockCPU(
-        Kernel, nodeObject, ProcessID, gcvTRUE));
+        Kernel, nodeObject, ProcessID, gcvTRUE, mappingInOne == 1));
 
     /* Unlock video memory. */
     gcmkONERROR(gckVIDMEM_NODE_Unlock(
@@ -5107,6 +5109,7 @@ gckFENCE_Destory(
             Fence->kernel,
             Fence->videoMem,
             0,
+            gcvFALSE,
             gcvFALSE
             ));
 

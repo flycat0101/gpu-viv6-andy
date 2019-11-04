@@ -2421,6 +2421,7 @@ gckHARDWARE_PreDestroy(
             Hardware->kernel,
             Hardware->auxFuncVideoMem,
             0,
+            gcvFALSE,
             gcvFALSE
             ));
 
@@ -2439,6 +2440,7 @@ gckHARDWARE_PreDestroy(
             Hardware->kernel,
             Hardware->mmuFuncVideoMem,
             0,
+            gcvFALSE,
             gcvFALSE
             ));
 
@@ -2457,6 +2459,7 @@ gckHARDWARE_PreDestroy(
             Hardware->kernel,
             Hardware->pagetableArray.videoMem,
             0,
+            gcvFALSE,
             gcvFALSE
             ));
 

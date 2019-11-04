@@ -1583,7 +1583,8 @@ gckVIDMEM_NODE_UnlockCPU(
     IN gckKERNEL Kernel,
     IN gckVIDMEM_NODE NodeObject,
     IN gctUINT32 ProcessID,
-    IN gctBOOL FromUser
+    IN gctBOOL FromUser,
+    IN gctBOOL Defer
     );
 
 gceSTATUS
