@@ -3577,8 +3577,8 @@ gckVIDMEM_NODE_LockCPU(
             {
                 gcmkONERROR(
                     gckOS_CreateKernelMapping(os,
-                                              node->VidMem.physical,
-                                              0,
+                                              node->VidMem.parent->physical,
+                                              node->VidMem.offset,
                                               node->VidMem.bytes,
                                               &node->VidMem.kvaddr));
             }
