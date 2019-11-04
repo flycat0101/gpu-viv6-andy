@@ -701,6 +701,8 @@ gbm_viv_bo_create(
     gcoSURF rtSurf = gcvNULL;
     gctUINT32 node, tsNode = 0;
     uint32_t handle = 0;
+    uint32_t alignedWidth;
+    uint32_t alignedHeight;
     struct gbm_viv_device *dev = gbm_viv_device(gbm);
     gceSTATUS status = gcvSTATUS_OK;
 
@@ -754,11 +756,22 @@ gbm_viv_bo_create(
                                     gcvSURF_FLAG_CONTENT_YINVERTED,
                                     gcvTRUE));
     }
+
+    gcmONERROR(gcoSURF_GetSize(rtSurf,
+                              (gctUINT_PTR) &bo->base.width,
+                              (gctUINT_PTR) &bo->base.height,
+                              gcvNULL));
+
     gcmONERROR(gcoSURF_GetAlignedSize(rtSurf,
-                                      &bo->base.width,
-                                      &bo->base.height,
+                                      &alignedWidth,
+                                      &alignedHeight,
                                       (gctINT_PTR)&bo->base.stride));
-    bo->size = bo->base.height * bo->base.stride;
+    if ((usage & GBM_BO_USE_SCANOUT) == GBM_BO_USE_SCANOUT)
+    {
+        bo->base.height = alignedHeight;
+        bo->base.width = alignedWidth;
+    }
+    bo->size = alignedHeight * bo->base.stride;
 
     gcmONERROR(gcoSURF_QueryVidMemNode(rtSurf,
                                        &node, gcvNULL, gcvNULL,
