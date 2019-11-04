@@ -2917,18 +2917,18 @@ gcChipTexMipSliceSyncFromShadow(
             {
                 gcsSURF_VIEW shadowView = {shadow->surface, 0 ,1};
 
+                /* Get fence for master surface if needed. */
+                if (!(chipCtx->chipFeature.hwFeature.hasBlitEngine))
+                {
+                    gcmONERROR(gcoSURF_GetFence(texView.surf, gcvFENCE_TYPE_WRITE));
+                }
+
                 gcmONERROR(gcoSURF_ResolveRect(&shadowView, &texView, gcvNULL));
                 gcmONERROR(gcChipSetImageSrc(texInfo->eglImage.image, texView.surf));
                 shadow->shadowDirty = GL_FALSE;
 
                 /* Commit commands. */
                 gcmONERROR(gcoHAL_Commit(gcvNULL, gcvFALSE));
-
-                /* Get fence for master surface if needed. */
-                if (!(chipCtx->chipFeature.hwFeature.hasBlitEngine))
-                {
-                    gcmONERROR(gcoSURF_GetFence(texView.surf, gcvFENCE_TYPE_WRITE));
-                }
             }
             else
             {
