@@ -2125,6 +2125,16 @@ VSC_ErrCode VIR_CG_MapUniformsWithLayout(
 
         /*
         ** According to vulkan spec:
+        ** If descriptorCount is zero this binding entry is reserved and the resource must not be
+        ** accessed from any stage via this binding within any pipeline using the set layout.
+        */
+        if (resBinding.arraySize == 0)
+        {
+            continue;
+        }
+
+        /*
+        ** According to vulkan spec:
         **      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER descriptor set entries can also be accessed via
         **      separate sampler and sampled image shader variables.
         ** So we may get two uniforms for a resource descriptorSet/binding pair.

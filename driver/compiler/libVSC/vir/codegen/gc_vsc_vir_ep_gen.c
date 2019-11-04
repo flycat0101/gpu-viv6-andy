@@ -5793,6 +5793,11 @@ static VSC_ErrCode _CollectResourceLayoutTablesToPEP(VSC_PEP_GEN_HELPER* pPepGen
         /* Get corresponding set */
         pResSet = _GetVkResourceSetBySetIdx(pOutPEP, pResAllocEntry->resBinding.set);
 
+        if (pResAllocEntry->resBinding.arraySize == 0)
+        {
+            continue;
+        }
+
         switch (pResAllocEntry->resBinding.type)
         {
         case VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER:

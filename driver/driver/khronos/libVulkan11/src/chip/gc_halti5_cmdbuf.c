@@ -8957,6 +8957,12 @@ VkResult halti5_setDesriptorSets(
                 for (j = 0; j < descSetLayout->bindingCount; j++)
                 {
                     __vkDescriptorSetLayoutBinding *binding = &descSetLayout->binding[j];
+
+                    if (binding->std.descriptorCount == 0)
+                    {
+                        continue;
+                    }
+
                     switch ((int) binding->std.descriptorType)
                     {
                     case VK_DESCRIPTOR_TYPE_SAMPLER:
