@@ -224,8 +224,8 @@ static void _calcArchModelCacheMode(vx_context context, vx_arch_perf perf, vx_in
 
 
 static vx_int8 gOrigShowType = -1;
-static const vx_char *archModelVersion = "ARCHCTS@222120";
-static const vx_char *SWTilingVersion = "ARCHCTS@222120";
+static const vx_char *archModelVersion = "ARCHCTS@230121";
+static const vx_char *SWTilingVersion = "ARCHCTS@230121";
 vx_status showArchPerformance(
     vx_context context,
     vxnne_layer layer,
@@ -920,13 +920,15 @@ static vx_float64 _calcImageReadBandWidth(
     vx_float64 *image_read_bw_vzgroup0)
 {
     vx_float64 imageRepeatSingleRead, imageRepeatRead, imageRepeatCacheRead, imageIdealCache, imageReadBandWidth, imageTile3DBW, imageReadBandWidthVZGroup0;
-    vx_float64 tmp;
+    vx_float64 tmpx, tmpy, tmp;
     vx_uint32 intile_x = (tile_x + kx - 1);
     vx_uint32 intile_y = (tile_y + ky - 1);
     intile_x = gcmMIN(intile_x, inx);
     intile_y = gcmMIN(intile_y, iny);
 
-    tmp = ((vx_float64)x / tile_x) * ((vx_float64)y / tile_y);
+    tmpx = ((vx_float64)inx + (ceilf((vx_float32)x / tile_x) - 1.0) * (kx - 1.0)) / intile_x;
+    tmpy = ((vx_float64)iny + (ceilf((vx_float32)y / tile_y) - 1.0) * (ky - 1.0)) / intile_y;
+    tmp = ceilf(tmpx) * tmpy;
     imageRepeatSingleRead = _calcTile3DImageSingleReadRepeated(z, kernel_per_core, cores, is_depth_wise);
     imageRepeatRead = imageRepeatSingleRead * tmp;
     imageRepeatCacheRead = (imageRepeatSingleRead - 1.0f) * tmp;
@@ -1028,13 +1030,15 @@ static vx_float64 _calcReadBandWidth(
     vx_float64 cacheSizeInPixel, kernelIdealCache, imageIdealCache, kernelReadBandWidthTile0, imageReadBandWidthVZGroup0;
     vx_float64 kernelRepeatRead, imageRepeatSingleRead, imageRepeatRead, readBandWidth = 0, kernelNonIdealCache, kernelStorage;
     vx_float64 kernelReadBW, inImageReadBW;
-    vx_float32 tmp, zPerCore;
+    vx_float32 tmpx, tmpy, tmp, zPerCore;
     vx_uint32 intile_x = (tile_x + kx - 1);
     vx_uint32 intile_y = (tile_y + ky - 1);
     intile_x = gcmMIN(intile_x, inx);
     intile_y = gcmMIN(intile_y, iny);
 
-    tmp = ((vx_float32)x / tile_x) * ((vx_float32)y / tile_y);
+    tmpx = ((vx_float64)inx + (ceilf((vx_float32)x / tile_x) - 1.0) * (kx - 1.0)) / intile_x;
+    tmpy = ((vx_float64)iny + (ceilf((vx_float32)y / tile_y) - 1.0) * (ky - 1.0)) / intile_y;
+    tmp = ceilf(tmpx) * tmpy;
     cacheSizeInPixel = l2cache_size / ((vx_float32)data_size / 8);
 
     kernelRepeatRead = _calcKernel4DSingleReadRepeated(tile_x, tile_y, x, y);
@@ -1246,7 +1250,7 @@ vx_float64 _calcComputeCycleCount(
     vx_uint32 dpKX, dpKY, dpKZ;
     vx_float64 accumCycle, tile3DComputeCycle, bottomTile3DComputeCycle;
     vx_float64 dpNonZeroRatio = 1.0;
-    vx_float64 computeCycle;
+    vx_float64 computeCycle, rotate_group_num;
     vx_uint32 xydpVectorPruneAmount, zdpVectorPruneAmount, numOfPruneGroupsInDpn, numOfDpnInImgBuf;
     vx_uint32 selected_xydp_x, selected_xydp_y, selected_zdp;
     vx_uint32 vip7Version = 0, rotate_cell = 0, vip_v7_fc = 0, vip_v7_dp6 = 0, vip_v7_xdp3 = 0, vip_v7_zdp3 = 0;
@@ -1293,60 +1297,7 @@ vx_float64 _calcComputeCycleCount(
     vip_v7_dp6 = (vip7Version && (xydp_x == 3) && (xydp_y == 2)) ? 1 : 0;
     vip_v7_xdp3 = (vip7Version && (xydp_x == 3) && (xydp_y == 1)) ? 1 : 0;
     vip_v7_zdp3 = (vip7Version && (zdp == 3) && (kx * ky == 1)) ? 1 : 0;
-    if (vip_v7_fc || vip_v7_zdp3 || (vip_v7_dp6 && (kx == 3) && (ky == 3)) || (vip_v7_xdp3 && (kx == 2) && (ky == 2)))
-    {
-        rotate_cell = 2;
-    }
-    else if ((vip_v7_dp6 && (kx == 2) && (ky == 2)) || ((zdp == 1) && (kx * ky == 1)) || (xydp_x == 1))
-    {
-        rotate_cell = 1;
-    }
-    else
-    {
-        rotate_cell = 3;
-    }
 
-    pipeLatency = (rotate_cell == 1) ? 4 : 6;
-    if (vip_v7_16bit)
-    {
-        pipeLatency += 2;
-    }
-
-    accumCycle = ceilf((vx_float32)tile_y / interleave_mode);
-    if ((zdp == 1) && (xydp_x == 1) && (xydp_y == 1) && (accumCycle == 4))
-    {
-        tile3DComputeCycle = 4 * (vx_float32)kernel_per_core;
-    }
-    else if ((rotate_cell == 1) || (vip_v7_zdp3 == 1) || (vip7Version == 0))
-    {
-        tile3DComputeCycle = gcmMAX(ceilf((vx_float32)tile_y / interleave_mode) * kernel_per_core * rotate_cell, pipeLatency);
-    }
-    else
-    {
-        tile3DComputeCycle = gcmMAX(ceilf((vx_float32)tile_y / interleave_mode) * rotate_cell, pipeLatency) * kernel_per_core;
-    }
-
-    tmp = y % tile_y;
-    if (tmp != 0)
-    {
-        accumCycle = ceilf((vx_float32)tmp / interleave_mode);
-        if ((zdp == 1) && (xydp_x == 1) && (xydp_y == 1) && (accumCycle == 4))
-        {
-            bottomTile3DComputeCycle = 4 * (vx_float32)kernel_per_core;
-        }
-        else if ((rotate_cell == 1) || (vip_v7_zdp3 == 1) || (vip7Version == 0))
-        {
-            bottomTile3DComputeCycle = gcmMAX(ceilf((vx_float32)tmp / interleave_mode) * kernel_per_core * rotate_cell, pipeLatency);
-        }
-        else
-        {
-            bottomTile3DComputeCycle = gcmMAX(ceilf((vx_float32)tmp / interleave_mode) * rotate_cell, pipeLatency) * kernel_per_core;;
-        }
-    }
-    else
-    {
-        bottomTile3DComputeCycle = 0;
-    }
 
     if (fp16 == 1)
     {
@@ -1446,6 +1397,70 @@ vx_float64 _calcComputeCycleCount(
         }
     }
 
+
+    if (vip_v7_fc || vip_v7_zdp3 || (vip_v7_dp6 && (kx == 3) && (ky == 3)) || (vip_v7_xdp3 && (kx == 2) && (ky == 2)))
+    {
+        rotate_cell = 2;
+    }
+    else if ((vip_v7_dp6 && (kx == 2) && (ky == 2)) || ((zdp == 1) && (kx * ky == 1)) || (xydp_x == 1))
+    {
+        rotate_cell = 1;
+    }
+    else
+    {
+        rotate_cell = 3;
+    }
+
+    pipeLatency = (rotate_cell == 1) ? 4 : 6;
+    rotate_group_num = ceilf(1.0f * dpKX * dpKY) / rotate_cell;
+
+    if (vip_v7_16bit)
+    {
+        pipeLatency += 2;
+    }
+
+    accumCycle = ceilf((vx_float32)tile_y / interleave_mode);
+    if ((zdp == 1) && (xydp_x == 1) && (xydp_y == 1) && (accumCycle == 4))
+    {
+        tile3DComputeCycle = 4 * (vx_float32)kernel_per_core;
+    }
+    else if ((rotate_cell == 1) || (vip_v7_zdp3 == 1) || (vip7Version == 0))
+    {
+        tile3DComputeCycle = gcmMAX(ceilf((vx_float32)tile_y / interleave_mode) * kernel_per_core * rotate_cell, pipeLatency);
+    }
+    else
+    {
+        if ((ceilf((vx_float32)tile_y / interleave_mode) * rotate_cell) > (vx_float32)pipeLatency)
+        {
+            tile3DComputeCycle = ceilf((vx_float32)tile_y / interleave_mode) * rotate_cell * rotate_group_num * kernel_per_core;
+        }
+        else
+        {
+            tile3DComputeCycle = (1.0f * pipeLatency * (rotate_group_num - 1.0) + ceilf((vx_float32)tile_y / interleave_mode) * rotate_cell) * kernel_per_core;
+        }
+    }
+
+    tmp = y % tile_y;
+    if (tmp != 0)
+    {
+        accumCycle = ceilf((vx_float32)tmp / interleave_mode);
+        if ((zdp == 1) && (xydp_x == 1) && (xydp_y == 1) && (accumCycle == 4))
+        {
+            bottomTile3DComputeCycle = 4 * (vx_float32)kernel_per_core;
+        }
+        else if ((rotate_cell == 1) || (vip_v7_zdp3 == 1) || (vip7Version == 0))
+        {
+            bottomTile3DComputeCycle = gcmMAX(ceilf((vx_float32)tmp / interleave_mode) * kernel_per_core * rotate_cell, pipeLatency);
+        }
+        else
+        {
+            bottomTile3DComputeCycle = gcmMAX(ceilf((vx_float32)tmp / interleave_mode) * rotate_cell, pipeLatency) * kernel_per_core;;
+        }
+    }
+    else
+    {
+        bottomTile3DComputeCycle = 0;
+    }
     computeCycle = tile3DComputeCycle * (vx_int32)(y / tile_y) + bottomTile3DComputeCycle;
     if (is_depth_wise)
     {
@@ -1459,7 +1474,7 @@ vx_float64 _calcComputeCycleCount(
         }
         else
         {
-            computeCycle = computeCycle * ceilf((vx_float32)dpKX * dpKY / rotate_cell) * dpKZ * z * dpNonZeroRatio * ceilf((vx_float32)x / tile_x) / kernel_per_core;
+            computeCycle = computeCycle * dpKZ * z * dpNonZeroRatio * ceilf((vx_float32)x / tile_x) / kernel_per_core;
         }
     }
     if (kx == 1 && ky == 1 && conv1x1_half_performance && selected_zdp == 1)
