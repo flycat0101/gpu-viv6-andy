@@ -2053,7 +2053,7 @@ vx_nn_calculate_type_e;
 
 #define MAX_WEIGHT_BIAS_GROUPS  4
 #define MAX_ZGROUP_COUNT     128
-#define MAX_KZGROUP_COUNT  16
+#define MAX_KZGROUP_COUNT  15
 
 #define SW_TILING_FROM_DDR          0
 #define SW_TILING_FROM_AXI_SRAM     1

@@ -15004,7 +15004,7 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
 
     if (weight_ptr != VX_NULL)
     {
-        vx_uint32 index = 0, woffset = 0, acount = 0, nzcount = 0, asize = 0;
+        vx_uint32 splitIndex = 0, index = 0, woffset = 0, acount = 0, nzcount = 0, asize = 0;
 
         weightSize = (vx_uint32)vxDataType_GetSize(wb_base->weights_data_format);
         oneFilterSize = wb_base->weights_sizes[0] *
@@ -15057,8 +15057,21 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
             if (i > MAX_ZGROUP_COUNT)
                 goto exit;
             zNum = i;
-            kzNum = sliceCount / (0x1 << 16) + 1;
-            calculateSplitSize(sliceCount, kzNum, kzArray, VX_NULL);
+            kzNum = (sliceCount % (0x1 << 16) == 0 ) ? sliceCount / (0x1 << 16) : sliceCount / (0x1 << 16) + 1;
+            kzNum = (sliceCount % (0x1 << MAX_KZGROUP_COUNT) == 0 ) ? sliceCount / (0x1 << MAX_KZGROUP_COUNT) : sliceCount / (0x1 << MAX_KZGROUP_COUNT) + 1;
+            for(splitIndex = 0; splitIndex < kzNum; splitIndex ++)
+            {
+                if(splitIndex == (kzNum - 1))
+                {
+                    kzArray[splitIndex] = (sliceCount - (0x1 << MAX_KZGROUP_COUNT) * splitIndex);
+                }
+                else
+                {
+                    kzArray[splitIndex] = 0x1 << MAX_KZGROUP_COUNT;
+                }
+            }
+
+            //calculateSplitSize(sliceCount, kzNum, kzArray, VX_NULL);
             zrlTmpPtr = wb_base->zrlTpFcPtr = (vx_uint8 *)vxAllocate(weight_dims[2] * zNum);
             if (wb_base->zrlTpFcPtr == NULL)
             {
