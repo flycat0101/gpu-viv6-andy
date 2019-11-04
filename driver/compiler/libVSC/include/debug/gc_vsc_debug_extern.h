@@ -134,14 +134,6 @@ int vscDIGetVariableCount(
     gctBOOL bArgument
     );
 
-void vscDIGetIdStrInfo(
-    const char * varIdStr,
-    int * varId,
-    gctUINT * PdimDepth,
-    gctUINT * pointIndex,
-    gctINT * dimNum
-    );
-
 void vscDIGetVariableInfo(
     void * ptr,
     const char * parentIdStr,

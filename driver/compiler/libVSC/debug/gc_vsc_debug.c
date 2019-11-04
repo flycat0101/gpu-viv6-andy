@@ -25,6 +25,8 @@
 #define VSC_DI_HW_LOC_PTR(id) (((id) == VSC_DI_INVALID_HW_LOC ? gcvNULL : (&context->locTable.loc[id])))
 #define VSC_DI_SW_LOC_PTR(id) (((id) == VSC_DI_INVALID_SW_LOC ? gcvNULL : (&context->swLocTable.loc[id])))
 
+#define VSC_DI_DIETYPE_IS_VECTOR(die) ((die->tag == VSC_DI_TAG_VARIABE || die->tag == VSC_DI_TAG_PARAMETER) && die->u.variable.type.isPrimitiveType && die->u.variable.type.type > 17 && die->u.variable.type.type < 90 )
+
 static gctPOINTER _ReallocateBuffer(VSC_DIContext * context, gctPOINTER srcPtr, gctUINT size, gctUINT initSize, gctUINT * reallocSize)
 {
     gctPOINTER ptr;
@@ -900,7 +902,10 @@ void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT tag)
         for (i = 0; i < argCount; i++)
         {
             vscDIGetVariableInfo((void *)context, funIdStr, i, gcvTRUE, varName, typeName, 1024, varIdStr, &lowPC, &highPC, &hwLocCount, &childrenCount);
-
+             for (j = 0; j < (int)childrenCount; j++)
+            {
+                vscDIGetVariableInfo((void *)context, varIdStr, j, gcvFALSE, varName, typeName, 1024, varIdStr2, &lowPC, &highPC, &hwLocCount, &childrenCount1);
+            }
             for (j = 0; j < (int) hwLocCount; j++)
             {
                 vscDIGetVariableHWLoc((void *)context, varIdStr, j, &isReg, &isConst, &lowPC, &highPC, &data0, &data1, &data2);
@@ -1833,20 +1838,26 @@ void vscDIGetIdStrInfo(
     const char * varIdStr,
     int * varId,
     gctUINT * PdimDepth,
-    gctUINT * pointIndex,
+    gctUINT * pointerDepth,
+    gctUINT * dotIndex,
     gctINT * dimNum
     )
 {
     gctUINT index = 0;
     gctSIZE_T Strlen = 0;
     *PdimDepth = 0;
+    *pointerDepth = 0;
     gcoOS_StrToInt(varIdStr, varId);
     gcoOS_StrLen(varIdStr, &Strlen);
     for(; index < Strlen; index++)
     {
-        if(varIdStr[index]=='.')
+        if(varIdStr[index] == '+')
         {
-            pointIndex[*PdimDepth] = index;
+            (*pointerDepth)++;
+        }
+        if(varIdStr[index] == '.')
+        {
+            dotIndex[*PdimDepth] = index;
             gcoOS_StrToInt(varIdStr+index+1, &dimNum[*PdimDepth]);
             (*PdimDepth)++;
         }
@@ -1869,6 +1880,7 @@ void vscDIGetArrayTempReg(
     gctINT tempReg = 0;
     gctINT eachDepthLength[4] = {1,1,1,1};
     gctINT arrayLength = 1;
+    gctINT elemCount = 4;
     if(sl && dimDepth + 1 >= (gctUINT)die->u.variable.type.array.numDim)
     {
         /* calculate the array width*/
@@ -1882,7 +1894,12 @@ void vscDIGetArrayTempReg(
             sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
         }
 
-        if(sl->reg && sl->u.reg.end - sl->u.reg.start + 1 == arrayLength)
+        /*calculate vector element count*/
+        if(VSC_DI_DIETYPE_IS_VECTOR(die))
+        {
+            elemCount = VIR_GetTypeLogicalComponents(die->u.variable.type.type);
+        }
+        /* if(sl->reg && sl->u.reg.end - sl->u.reg.start + 1 == arrayLength) */
         {
             /*find the array start position in sw reg*/
             regStart = sl->u.reg.start;
@@ -1893,7 +1910,8 @@ void vscDIGetArrayTempReg(
                 tempReg = tempReg + eachDepthLength[index] * dimNum[index];
             }
             /*the absolute sw location*/
-            tempReg = regStart + tempReg + idx;
+            /*if  elementCount < 4, occupy one reg*/
+            tempReg = regStart + (tempReg + idx) * ((elemCount / 4) == 0? 1 : (elemCount / 4));
         }
     }
     *PtempReg = tempReg;
@@ -1921,18 +1939,22 @@ void vscDIGetVariableInfo(
     gctSIZE_T i;
     int parentId;
 
-    /*variables for idStr has '.'*/
+    /*variables for idStr has '.' or '+'*/
     gctBOOL isArrayChild;
+    gctBOOL isVectorChild;
+    gctBOOL isPointerChild;
     gctUINT index = 0;
     gctUINT offset = 0;
     gctUINT dimDepth = 0;
-    gctUINT pointIndex[10];
+    gctUINT pointerDepth = 0;
+    gctUINT dotIndex[10];
     gctINT dimNum[10];
 
     vscDIGetIdStrInfo(parentIdStr,
                       &parentId,
                       &dimDepth,
-                      pointIndex,
+                      &pointerDepth,
+                      dotIndex,
                       dimNum);
 
     if (context == gcvNULL)
@@ -1940,12 +1962,20 @@ void vscDIGetVariableInfo(
 
     die = VSC_DI_DIE_PTR(parentId);
 
-    if (!die || (die->tag != VSC_DI_TAG_SUBPROGRAM && die->tag != VSC_DI_TAG_VARIABE))
+    if (!die || (die->tag != VSC_DI_TAG_SUBPROGRAM && die->tag != VSC_DI_TAG_VARIABE && die->tag != VSC_DI_TAG_PARAMETER))
         return;
 
-    isArrayChild = die->tag == VSC_DI_TAG_VARIABE && die->u.variable.type.array.numDim > 0;
+    isArrayChild = (die->tag == VSC_DI_TAG_VARIABE || die->tag == VSC_DI_TAG_PARAMETER)
+                   && die->u.variable.type.array.numDim > 0
+                   && (gctINT)dimDepth < die->u.variable.type.array.numDim;
 
-    if(!isArrayChild)
+    isVectorChild = VSC_DI_DIETYPE_IS_VECTOR(die);
+
+    isPointerChild = (die->tag == VSC_DI_TAG_VARIABE || die->tag == VSC_DI_TAG_PARAMETER)
+                     && die->u.variable.type.isPointer
+                     && pointerDepth < 1;/*need to judge (void **)*/
+
+    if(!isArrayChild && !isVectorChild && !isPointerChild)
     {
         child = VSC_DI_DIE_PTR(die->child);
 
@@ -2059,11 +2089,21 @@ void vscDIGetVariableInfo(
                 (*childrenCount)++;
                 curChild = VSC_DI_DIE_PTR(curChild->sib);
             }
-            if(child->tag == VSC_DI_TAG_VARIABE && child->u.variable.type.array.numDim > 0)
+            /*first judge the array, then the vector*/
+            if((child->tag == VSC_DI_TAG_VARIABE || child->tag == VSC_DI_TAG_PARAMETER) && child->u.variable.type.array.numDim > 0)
                 *childrenCount = child->u.variable.type.array.length[0];
+            else if((child->tag == VSC_DI_TAG_VARIABE || child->tag == VSC_DI_TAG_PARAMETER) && child->u.variable.type.isPointer)
+            {
+                *hwLocCount = 0;
+                *childrenCount = 1;
+            }
+            else if(VSC_DI_DIETYPE_IS_VECTOR(child))
+            {
+                *childrenCount = VIR_GetTypeLogicalComponents(child->u.variable.type.type);
+            }
         }
     }
-    else
+    else if(isArrayChild)
     {
 
         if (varName)
@@ -2138,11 +2178,191 @@ void vscDIGetVariableInfo(
         {
             if(dimDepth + 1 < (gctUINT)die->u.variable.type.array.numDim)
                 *childrenCount = die->u.variable.type.array.length[dimDepth + 1];
+            else if(isVectorChild)
+            {
+                *childrenCount = VIR_GetTypeLogicalComponents(die->u.variable.type.type);
+            }
             else
                 *childrenCount = 0;
         }
 
     }
+    else if(isPointerChild)
+    {
+         if (varName)
+        {
+            gctPOINTER memory;
+            char * tempstr;
+            gcoOS_AllocateMemory(NULL, nameLength*sizeof(char), &memory);
+            tempstr = (char*)memory;
+
+            gcoOS_StrCopySafe(tempstr, nameLength, _GetNameStr(context, die->name));
+            varName[0]='*';
+            for(index = 0; tempstr[index]!=0; index++)
+                varName[index + 1] = tempstr[index];
+            varName[index + 1] = 0;
+        }
+
+        if(typeStr)
+        {
+            gcoOS_StrCopySafe(typeStr, nameLength, VIR_GetOCLTypeName(die->u.variable.type.type));
+        }
+
+        if (varIdStr)
+        {
+            offset = 0;
+            gcoOS_PrintStrSafe(varIdStr, nameLength, &offset, "%s+", parentIdStr);
+        }
+
+        if (hwLocCount)
+        {
+            VSC_DI_SW_LOC * sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
+            VSC_DI_HW_LOC * hl;
+            *hwLocCount = 0;
+            while (sl)
+            {
+                hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, sl->hwLoc);
+                while(hl)
+                {
+                    *hwLocCount = *hwLocCount + 1;
+                    if(hl->reg)
+                    {
+                        offset = 0;
+                        gcoOS_PrintStrSafe(varIdStr, nameLength, &offset, "%s+%d", parentIdStr,hl->u1.hwShift);
+                    }
+                    hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, hl->next);
+                }
+                sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
+            }
+        }
+
+        if (lowPC)
+            *lowPC = die->u.variable.pcLine[0];
+
+        if (highPC)
+            *highPC = die->u.variable.pcLine[1];
+
+        if (childrenCount)
+        {
+            if(isVectorChild)
+            {
+                *childrenCount = VIR_GetTypeLogicalComponents(die->u.variable.type.type);
+            }
+            else
+            {
+                *childrenCount = 0;
+            }
+        }
+    }
+    else if(isVectorChild)
+    {
+        gctINT elemCount = 0;
+        if (varName)
+        {
+            offset = 0;
+            gcoOS_PrintStrSafe(varName, nameLength, &offset, "s%x", idx);
+        }
+
+        if(typeStr)
+        {
+            elemCount = VIR_GetTypeLogicalComponents(die->u.variable.type.type);
+            gcoOS_StrCopySafe(typeStr, nameLength, VIR_GetOCLTypeName(VIR_GetTypeComponentType(die->u.variable.type.type)));
+        }
+
+        if (varIdStr)
+        {
+            if(pointerDepth == 0)
+            {
+                offset = 0;
+                gcoOS_PrintStrSafe(varIdStr, nameLength, &offset, "%s.%d", parentIdStr, idx);
+            }
+            else/*need change*/
+            {
+                offset = 0;
+                gcoOS_PrintStrSafe(varIdStr, nameLength, &offset, "%s.%d", parentIdStr, idx);
+            }
+        }
+
+        if (hwLocCount)
+        {
+            VSC_DI_HW_LOC * hl;
+            VSC_DI_SW_LOC * sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
+            gctINT tempReg = 0;
+            gctINT arrayTempReg = 0;
+
+            if(dimDepth > 0 && die->u.variable.type.array.numDim > 0)
+            {
+                vscDIGetArrayTempReg(ptr,
+                                     die,
+                                     dimNum[dimDepth-1],
+                                     dimDepth-1,
+                                     dimNum,
+                                     &arrayTempReg);
+                tempReg = arrayTempReg + idx/4;
+            }
+            else if(pointerDepth > 0)
+            {
+                if(sl && sl->reg)
+                    tempReg = sl->u.reg.start;
+            }
+            else if(sl)
+            {
+                while (sl->next < context->swLocTable.usedCount)
+                {
+                    sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
+                }
+                if(sl->reg)
+                {
+                    tempReg = sl->u.reg.start + idx/4;
+                }
+            }
+
+            if(tempReg > 0)
+            {
+                /*calculate the hwLocCount*/
+                *hwLocCount = 0;
+                sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
+                while (sl)
+                {
+                    if (sl->reg)
+                    {
+                        if (sl->u.reg.start <= tempReg &&
+                            sl->u.reg.end >= tempReg)
+                        {
+                            hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, sl->hwLoc);
+                            /* when r(0,0) < 3 ,can't get s1,s2,s3*/
+                            if(hl && pointerDepth > 0)
+                            {
+                                *hwLocCount = 1;
+                            }
+                            else if(hl && hl->u1.hwShift + idx % 4 < 4)
+                            {
+                                *hwLocCount = 1;
+                                break;
+                            }
+                        }
+                    }
+                    sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
+                }
+            }
+            else
+            {
+                *hwLocCount = 0;
+            }
+        }
+
+        if (lowPC)
+            *lowPC = die->u.variable.pcLine[0];
+
+        if (highPC)
+            *highPC = die->u.variable.pcLine[1];
+
+        if (childrenCount)
+        {
+            *childrenCount = 0;
+        }
+    }
+
 #if vsdTEST_API
     gcmPRINT("id: %s, bArgument: %d, idx: %d, varName: %s, typeStr: %s, varId: %s, hwLocCount: %d, pc(%d %d), childrenCount: %d\n",
         parentIdStr, bArgument, idx, varName, typeStr, varIdStr, *hwLocCount, *lowPC, *highPC, *childrenCount);
@@ -2186,13 +2406,20 @@ void vscDIGetVariableHWLoc(
     VSC_DI_HW_LOC * hl = gcvNULL;
     gctBOOL found = gcvFALSE;
 
+    gctBOOL isVector = gcvFALSE;
+    gctBOOL isPointer = gcvFALSE;
     gctUINT dimDepth = 0;
-    gctUINT pointIndex[10];
+    gctUINT pointerDepth = 0;
+    gctUINT dotIndex[10];
     gctINT dimNum[10];
+    gctINT tempReg = 0;
+    gctINT regSOffset = 0;
+    gctINT regEOffset = 0;
     vscDIGetIdStrInfo(varIdStr,
                       &varId,
                       &dimDepth,
-                      pointIndex,
+                      &pointerDepth,
+                      dotIndex,
                       dimNum);
 
     if (context == gcvNULL)
@@ -2202,16 +2429,53 @@ void vscDIGetVariableHWLoc(
 
     if (!die || (die->tag != VSC_DI_TAG_VARIABE && die->tag != VSC_DI_TAG_PARAMETER))
         return;
+    isPointer = (die->tag == VSC_DI_TAG_VARIABE || die->tag == VSC_DI_TAG_PARAMETER) && die->u.variable.type.isPointer;
 
     if(dimDepth > 0)
     {
-        gctINT tempReg = 0;
-        vscDIGetArrayTempReg(ptr,
-                             die,
-                             idx,
-                             dimDepth,
-                             dimNum,
-                             &tempReg);
+        isVector = VSC_DI_DIETYPE_IS_VECTOR(die) ;
+
+        if(isVector)
+        {
+            gctINT arrayTempReg = 0;
+            sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
+
+            if(die->u.variable.type.array.numDim > 0)
+            {
+                vscDIGetArrayTempReg(ptr,
+                                     die,
+                                     idx,
+                                     dimDepth-1,
+                                     dimNum,
+                                     &arrayTempReg);
+                tempReg = arrayTempReg + dimNum[dimDepth-1]/4;
+            }
+            else if (pointerDepth > 0)
+            {
+                if(sl && sl->reg)
+                    tempReg = sl->u.reg.start;
+            }
+            else
+            {
+                 while (sl->next < context->swLocTable.usedCount)
+                {
+                    sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
+                }
+                if(sl->reg)
+                {
+                    tempReg = sl->u.reg.start  + dimNum[dimDepth-1]/4;
+                }
+            }
+        }
+        else
+        {
+            vscDIGetArrayTempReg(ptr,
+                                 die,
+                                 idx,
+                                 dimDepth,
+                                 dimNum,
+                                 &tempReg);
+        }
 
         if(tempReg == 0)
             return;
@@ -2224,12 +2488,18 @@ void vscDIGetVariableHWLoc(
                 if (sl->u.reg.start <= tempReg &&
                     sl->u.reg.end >= tempReg)
                 {
+                    regSOffset = tempReg - sl->u.reg.start;
+                    regEOffset = sl->u.reg.end - tempReg;
                     break;
                 }
             }
             sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
         }
     }
+    /*else if(isPointer)
+    {
+
+    }*/
     else/*normal case*/
     {
         sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
@@ -2255,49 +2525,100 @@ void vscDIGetVariableHWLoc(
 
     if (!found || !hl)
         return;
-
-    if (bIsReg)
-        *bIsReg = hl->reg;
-
-    if (bIsConst)
-        *bIsConst = (hl->u.reg.type == VSC_DIE_HW_REG_CONST);
-
-    if (lowPC)
-        *lowPC = hl->beginPC;
-
-    if (highPC)
-        *highPC = hl->endPC;
-
-    if (data0)
+    if(isPointer)
     {
-        if (hl->reg)
+        if (bIsReg)
+            *bIsReg = 0;
+
+        if (bIsConst)
+            *bIsConst = (hl->u.reg.type == VSC_DIE_HW_REG_CONST);
+
+        if (lowPC)
+            *lowPC = hl->beginPC;
+
+        if (highPC)
+            *highPC = hl->endPC;
+
+        if (data0)
+        {
             *data0 = hl->u.reg.start;
-        else
-            *data0 = hl->u.offset.baseAddr.start;
-    }
+        }
 
-    if (data1)
-    {
-        if (hl->reg)
-            *data1 = hl->u.reg.end;
-        else
-            *data1 = hl->u.offset.offset;
-    }
-
-    if (data2)
-    {
-        if (hl->reg)
+        if (data1)
         {
-            if (hl->u.reg.type == VSC_DIE_HW_REG_CONST)
-                *data2 = hl->u1.swizzle;
+            if(dimDepth == 0)
+                *data1 = 0;
             else
-                *data2 = hl->u1.hwShift;
+            {
+                *data1 = 0 + dimNum[dimDepth - 1] * VIR_GetTypeSize(VIR_GetTypeComponentType(die->u.variable.type.type));
+            }
         }
-        else
+        if (data2)
         {
-            *data2 = hl->u.offset.endOffset;
+            *data2 = VIR_GetTypeSize(VIR_GetTypeComponentType(die->u.variable.type.type));
         }
     }
+    else
+    {
+        if (bIsReg)
+            *bIsReg = hl->reg;
+
+        if (bIsConst)
+            *bIsConst = (hl->u.reg.type == VSC_DIE_HW_REG_CONST);
+
+        if (lowPC)
+            *lowPC = hl->beginPC;
+
+        if (highPC)
+            *highPC = hl->endPC;
+
+        if (data0)
+        {
+            if (hl->reg)
+                *data0 = hl->u.reg.start + regSOffset;
+            else
+                *data0 = hl->u.offset.baseAddr.start + regSOffset;
+        }
+
+        if (data1)
+        {
+            if (hl->reg)
+                *data1 = hl->u.reg.end - regEOffset;
+            else
+                *data1 = hl->u.offset.offset - regEOffset;
+        }
+
+        if (data2)
+        {
+            if (hl->reg)
+            {
+                if (hl->u.reg.type == VSC_DIE_HW_REG_CONST)
+                    *data2 = hl->u1.swizzle;
+                else
+                    *data2 = hl->u1.hwShift;
+
+                if(isVector)
+                {
+                    *data2 += dimNum[dimDepth-1]%4;
+                }
+            }
+            else
+            {
+                *data2 = hl->u.offset.endOffset;
+            }
+        }
+
+        if(!(*bIsReg) && isVector && *data2 - *data1 > 4)
+        {
+            int componentMemory = 0;
+            int componentNum = 0;
+            componentMemory = VIR_GetTypeSize(VIR_GetTypeComponentType(die->u.variable.type.type));
+            componentNum = (*data2 - *data1) / componentMemory;
+            *data1 = *data1 + (dimNum[dimDepth-1] % componentNum) * componentMemory;
+            *data2 = *data1 + componentMemory;
+        }
+    }
+
 
 #if vsdTEST_API
     gcmPRINT("id: %s, idx: %d, pc(%d %d), bIsReg: %d, bIsConst: %d, loc info: %d, %d, %d\n",
