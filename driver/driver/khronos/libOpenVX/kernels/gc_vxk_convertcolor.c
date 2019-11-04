@@ -214,7 +214,7 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData0, sizeof(constantData0));
             kernelContext->uniforms[0].index = 4;
-            kernelContext->uniforms[0].num = sizeof(constantData0) / sizeof(vx_uint8);
+            kernelContext->uniforms[0].num = sizeof(constantData0) / sizeof(vx_uint32);
 
             gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData1, sizeof(constantData1));
             kernelContext->uniforms[1].index = 5;
