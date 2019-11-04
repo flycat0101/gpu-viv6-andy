@@ -1385,6 +1385,73 @@ static VkResult win32CreateDisplayMode(
     return VK_SUCCESS;
 }
 
+static VkResult win32GetDisplayPlaneCapabilities(
+    VkPhysicalDevice physicalDevice,
+    VkDisplayModeKHR mode,
+    uint32_t planeIndex,
+    VkDisplayPlaneCapabilitiesKHR* pCapabilities
+    )
+{
+    VkResult result = VK_SUCCESS;
+    DISPLAY_DEVICE adapter;
+    uint32_t currentDisplayIndex;
+    uint32_t id;
+    HDC hdc;
+
+    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
+    __vkDisplayPlane *plane = phyDev->displayPlanes[planeIndex];
+    __vkDisplayModeKHR *displayMode = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDisplayModeKHR *, mode);
+
+    if (!plane || !displayMode || planeIndex  < 0 || planeIndex  > __VK_WSI_MAX_DISPLAY_PLANES)
+    {
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
+    currentDisplayIndex = plane->currentStackIndex;
+    /* plane src capabilities */
+    pCapabilities->minSrcExtent.width = 0;
+    pCapabilities->minSrcExtent.height = 0;
+    pCapabilities->maxSrcExtent.width = plane->supportedDisplays[currentDisplayIndex]->physicalDimensions.width;
+    pCapabilities->maxSrcExtent.height = plane->supportedDisplays[currentDisplayIndex]->physicalDimensions.height;
+    pCapabilities->minSrcPosition.x = 0;
+    pCapabilities->minSrcPosition.y = 0;
+    pCapabilities->maxSrcPosition.x = pCapabilities->maxSrcExtent.width;
+    pCapabilities->maxSrcPosition.y = pCapabilities->maxSrcExtent.height;
+
+    /* plane dst capabilities */
+    pCapabilities->minDstExtent.width = 0;
+    pCapabilities->minDstExtent.height = 0;
+    pCapabilities->maxDstExtent.width = displayMode->parameters.visibleRegion.width;
+    pCapabilities->maxDstExtent.height = displayMode->parameters.visibleRegion.height;
+    pCapabilities->minDstPosition.x = 0;
+    pCapabilities->minDstPosition.y = 0;
+    pCapabilities->maxDstPosition.x = pCapabilities->maxDstExtent.width;
+    pCapabilities->maxDstPosition.y = pCapabilities->maxDstExtent.height;
+
+    /* Loop devices to get plotform support Alpha mode */
+    for (id = 0; phyDev->numberOfDisplays < __VK_WSI_MAX_PHYSICAL_DISPLAYS; id++)
+    {
+        BOOL valid;
+        adapter.cb = sizeof(DISPLAY_DEVICE);
+        valid = EnumDisplayDevices(NULL, id, &adapter, EDD_GET_DEVICE_INTERFACE_NAME);
+
+        if (!valid)
+        {
+            result = VK_INCOMPLETE;
+            break;
+        }
+
+        if (adapter.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE)
+        {
+            hdc = CreateDC(adapter.DeviceName, NULL, NULL, NULL);
+            pCapabilities->supportedAlpha |= GetDeviceCaps(hdc, SHADEBLENDCAPS);
+            result =  VK_SUCCESS;
+        }
+    }
+
+    return result;
+}
+
 static void __AddDisplay(__vkPhysicalDevice *phyDev, LPCTSTR deviceName, DISPLAY_DEVICE *monitor)
 {
     __vkWin32DisplayKHR *disp = NULL;
@@ -1412,6 +1479,7 @@ static void __AddDisplay(__vkPhysicalDevice *phyDev, LPCTSTR deviceName, DISPLAY
     disp->base.planeReorderPossible      = VK_FALSE;
     disp->base.persistentContent         = VK_FALSE;
     disp->base.CreateDisplayMode         = win32CreateDisplayMode;
+    disp->base.GetDisplayPlaneCapabilities = win32GetDisplayPlaneCapabilities;
     disp->bpp = GetDeviceCaps(hdc, BITSPIXEL);
 
     disp->device = *monitor;
