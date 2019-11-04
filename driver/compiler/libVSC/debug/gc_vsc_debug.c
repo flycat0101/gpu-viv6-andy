@@ -3176,7 +3176,7 @@ void vscDIGetPCBySrcLine(void * ptr, unsigned int src, unsigned int refPC, unsig
     for (i = 0 ; i < context->lineTable.count; i++)
     {
         if (/*(context->lineTable.map[i].sourcLoc.fileId == src.fileId) && */
-            (context->lineTable.map[i].sourcLoc.lineNo == src))
+            context->lineTable.map[i].sourcLoc.lineNo == src)
         {
             if (*start == VSC_DI_INVALID_PC)
             {
