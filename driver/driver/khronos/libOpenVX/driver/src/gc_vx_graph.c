@@ -3855,6 +3855,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                 vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
                 vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
                 vx_arch_perf_s archPerfHandle;
+                vxnne_convolution_relu_pooling_operation convOp = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[i];
 
                 memset(&archPerfHandle, 0, sizeof(vx_arch_perf_s));
                 calculateArchPerfFromWB(graph->base.context,
@@ -3877,6 +3878,8 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                 kernelY         = opInfo.weightsBiases->weights_sizes[1];
                 inImageZ        = TENSOR_SIZE_INDEX(opInfo.input, 2);
                 inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
+
+                convOp->resultInfo = archPerfHandle.resultInfo;
 
                 graph->layer->operations[i]->esitimateImageCacheSize =
                     caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
