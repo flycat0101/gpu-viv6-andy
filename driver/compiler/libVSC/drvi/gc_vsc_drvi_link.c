@@ -5474,8 +5474,9 @@ _CheckAndUnifiedTessExecutionMode(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper)
                     pCurStage->shaderLayout.tes.tessPrimitiveMode = pPreStage->shaderLayout.tcs.tessPrimitiveMode;
                 }
 
-                /* check tessOrdering, if value in TES is undefined, copy value from TCS */
-                gcmASSERT((pPreStage->shaderLayout.tcs.tessOrdering != VIR_TESS_ORDER_UNDEFINED) ||
+                /* check tessOrdering, if value in TES is undefined, copy value from TCS except in ISOLINE mode */
+                gcmASSERT((pPreStage->shaderLayout.tcs.tessPrimitiveMode == VIR_TESS_PMODE_ISOLINE) ||
+                          (pPreStage->shaderLayout.tcs.tessOrdering != VIR_TESS_ORDER_UNDEFINED) ||
                           (pCurStage->shaderLayout.tes.tessOrdering != VIR_TESS_ORDER_UNDEFINED));
                 if ((pPreStage->shaderLayout.tcs.tessOrdering != pCurStage->shaderLayout.tes.tessOrdering) &&
                     (pCurStage->shaderLayout.tes.tessOrdering == VIR_TESS_ORDER_UNDEFINED))
