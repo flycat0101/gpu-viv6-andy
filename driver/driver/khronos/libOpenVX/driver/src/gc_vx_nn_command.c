@@ -1694,7 +1694,10 @@ void _fill_TP_SINGLE_FC_Command(
                 /* sum filter */
                 vx_uint32 outTileXSize;
                 outZSize = value_cmd_ptr[i].u32[1];
-                outTileXSize = gcmMIN(outZSize, 64);
+                if(kzGroup < 3)
+                    outTileXSize = gcmMIN(outZSize, 64);
+                else
+                    outTileXSize = gcmMIN(outZSize, 32);
 
                 info_array[i].vx_tp_fc_cmd_split_info.inImageXSize = outZSize;
                 info_array[i].vx_tp_fc_cmd_split_info.inImageYSize = kzGroup;
