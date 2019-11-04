@@ -672,6 +672,7 @@ typedef struct
 
     VSC_PROGRAM_RESOURCE_LAYOUT *vscResLayout;
     vkShader_HANDLE  vkShaderArray[VSC_MAX_SHADER_STAGE_COUNT];
+    vkShader_HANDLE  vkShaderDecoded[VSC_MAX_SHADER_STAGE_COUNT];
 
     uint32_t cmdBuffer[__VK_PIPELINE_CMDBUFFER_MAXSIZE];
     uint32_t curCmdIndex;
