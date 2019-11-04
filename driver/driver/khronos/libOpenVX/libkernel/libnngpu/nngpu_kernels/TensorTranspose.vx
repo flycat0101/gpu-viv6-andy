@@ -663,3 +663,392 @@ __kernel void gpuTransposeQuant8_2D_3h(
     coord_out.y++;
     write_imageui(output, coord_out, tmpOut2);
 }
+
+__kernel void gpuTransposeQuant8FL_WHC2CWH_opt(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output,
+                                         float mixScale, float mixZp
+                                         )
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.zxyw;
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+    uint4 tmpOut3 = {0};
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.z++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.z++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.z++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    int4 tmpDst0 = (int4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    int4 tmpDst1 = (int4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    int4 tmpDst2 = (int4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    int4 tmpDst3 = (int4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    tmpOut0 = convert_uint4_rte(convert_float4(tmpDst0) * mixScale + mixZp);
+    tmpOut1 = convert_uint4_rte(convert_float4(tmpDst1) * mixScale + mixZp);
+    tmpOut2 = convert_uint4_rte(convert_float4(tmpDst2) * mixScale + mixZp);
+    tmpOut3 = convert_uint4_rte(convert_float4(tmpDst3) * mixScale + mixZp);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut2);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeQuant8FL_WHC2CWH(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output,
+                                         float mixScale, float mixZp)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.zxyw;
+    uint4 tmp = {0};
+
+    tmp = read_imageui(input, coord_in);
+
+    tmp.x = convert_uint_rte(tmp.x * mixScale + mixZp);
+
+    write_imageui(output, coord_out, tmp);
+}
+
+__kernel void gpuTransposeQuant8FL_WHC2CHW_opt(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output,
+                                         float mixScale, float mixZp)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.zyxw;
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+    uint4 tmpOut3 = {0};
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.z++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.z++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.z++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (uint4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    tmpOut0 = convert_uint4_rte(convert_float4(tmpOut0) * mixScale + mixZp);
+    tmpOut1 = convert_uint4_rte(convert_float4(tmpOut1) * mixScale + mixZp);
+    tmpOut2 = convert_uint4_rte(convert_float4(tmpOut2) * mixScale + mixZp);
+    tmpOut3 = convert_uint4_rte(convert_float4(tmpOut3) * mixScale + mixZp);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut2);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeQuant8FL_WHC2CHW(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output,
+                                         float mixScale, float mixZp)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.zyxw;
+    uint4 tmp = {0};
+
+    tmp = read_imageui(input, coord_in);
+    tmp.x = convert_uint_rte(tmp.x * mixScale + mixZp);
+    write_imageui(output, coord_out, tmp);
+}
+
+__kernel void gpuTransposeQuant8FL_WHC2WCH_opt(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output,
+                                         float mixScale, float mixZp)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.xzyw;
+    uint4 tmp = {0};
+
+    tmp = read_imageui(input, coord_in);
+    tmp = convert_uint4_rte(convert_float4(tmp) * mixScale + mixZp);
+    write_imageui(output, coord_out, tmp);
+}
+
+__kernel void gpuTransposeQuant8FL_WHC2WCH(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output,
+                                         float mixScale, float mixZp)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.xzyw;
+    uint4 tmp = {0};
+
+    tmp = read_imageui(input, coord_in);
+    tmp.x = convert_uint_rte(tmp.x * mixScale + mixZp);
+    write_imageui(output, coord_out, tmp);
+}
+
+__kernel void gpuTransposeQuant8FL_WHC2HCW_opt(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output,
+                                         float mixScale, float mixZp)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.yzxw;
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+    uint4 tmpOut3 = {0};
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (uint4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    tmpOut0 = convert_uint4_rte(convert_float4(tmpOut0) * mixScale + mixZp);
+    tmpOut1 = convert_uint4_rte(convert_float4(tmpOut1) * mixScale + mixZp);
+    tmpOut2 = convert_uint4_rte(convert_float4(tmpOut2) * mixScale + mixZp);
+    tmpOut3 = convert_uint4_rte(convert_float4(tmpOut3) * mixScale + mixZp);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut2);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeQuant8FL_3HC2HC3_opt(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output,
+                                         float mixScale, float mixZp)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.yzxw;
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+
+    tmpOut0 = convert_uint4_rte(convert_float4(tmpOut0) * mixScale + mixZp);
+    tmpOut1 = convert_uint4_rte(convert_float4(tmpOut1) * mixScale + mixZp);
+    tmpOut2 = convert_uint4_rte(convert_float4(tmpOut2) * mixScale + mixZp);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.z++;
+    write_imageui(output, coord_out, tmpOut2);
+}
+
+__kernel void gpuTransposeQuant8FL_WHC2HCW(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output,
+                                         float mixScale, float mixZp)
+{
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_out = coord_in.yzxw;
+    uint4 tmp = {0};
+
+    tmp = read_imageui(input, coord_in);
+    tmp.x = convert_uint_rte(tmp.x * mixScale + mixZp);
+    write_imageui(output, coord_out, tmp);
+}
+
+__kernel void gpuTransposeQuant8FL_CHW2CWH_opt(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output,
+                                         float mixScale, float mixZp)
+{
+    int4 coord_in = (int4)(get_global_id(1), get_global_id(0), get_global_id(2), 0);
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+    uint4 tmpOut3 = {0};
+
+    int4 coord_out = coord_in.yxzw;
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (uint4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    tmpOut0 = convert_uint4_rte(convert_float4(tmpOut0) * mixScale + mixZp);
+    tmpOut1 = convert_uint4_rte(convert_float4(tmpOut1) * mixScale + mixZp);
+    tmpOut2 = convert_uint4_rte(convert_float4(tmpOut2) * mixScale + mixZp);
+    tmpOut3 = convert_uint4_rte(convert_float4(tmpOut3) * mixScale + mixZp);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut2);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeQuant8FL_CHW2CWH(__read_only image2d_array_t   input,
+                                         __write_only image2d_array_t  output,
+                                         float mixScale, float mixZp)
+{
+    int4 coord_in = (int4)(get_global_id(1), get_global_id(0), get_global_id(2), 0);
+    int4 coord_out = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    uint4 tmp = {0};
+
+    tmp = read_imageui(input, coord_in);
+    tmp.x = convert_uint_rte(tmp.x * mixScale + mixZp);
+    write_imageui(output, coord_out, tmp);
+}
+
+__kernel void gpuTransposeQuant8FL_2D_opt(
+                __read_only image2d_t input,
+                __write_only image2d_t output,
+                float mixScale, float mixZp)
+{
+    int2 coord_in = (int2)(get_global_id(0), get_global_id(1));
+    int2 coord_out = coord_in.yx;
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+    uint4 tmpOut3 = {0};
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+    tmpOut3 = (uint4)(tmpIn0.w, tmpIn1.w, tmpIn2.w, tmpIn3.w);
+
+    tmpOut0 = convert_uint4_rte(convert_float4(tmpOut0) * mixScale + mixZp);
+    tmpOut1 = convert_uint4_rte(convert_float4(tmpOut1) * mixScale + mixZp);
+    tmpOut2 = convert_uint4_rte(convert_float4(tmpOut2) * mixScale + mixZp);
+    tmpOut3 = convert_uint4_rte(convert_float4(tmpOut3) * mixScale + mixZp);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut2);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut3);
+}
+
+__kernel void gpuTransposeQuant8FL_2D_3h(
+                __read_only image2d_t input,
+                __write_only image2d_t output,
+                float mixScale, float mixZp)
+{
+    int2 coord_in = (int2)(get_global_id(0), get_global_id(1));
+    int2 coord_out = coord_in.yx;
+
+    uint4 tmpIn0 = {0};
+    uint4 tmpIn1 = {0};
+    uint4 tmpIn2 = {0};
+    uint4 tmpIn3 = {0};
+    uint4 tmpOut0 = {0};
+    uint4 tmpOut1 = {0};
+    uint4 tmpOut2 = {0};
+
+    tmpIn0 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn1 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn2 = read_imageui(input, coord_in);
+    coord_in.y++;
+    tmpIn3 = read_imageui(input, coord_in);
+
+    tmpOut0 = (uint4)(tmpIn0.x, tmpIn1.x, tmpIn2.x, tmpIn3.x);
+    tmpOut1 = (uint4)(tmpIn0.y, tmpIn1.y, tmpIn2.y, tmpIn3.y);
+    tmpOut2 = (uint4)(tmpIn0.z, tmpIn1.z, tmpIn2.z, tmpIn3.z);
+
+    tmpOut0 = convert_uint4_rte(convert_float4(tmpOut0) * mixScale + mixZp);
+    tmpOut1 = convert_uint4_rte(convert_float4(tmpOut1) * mixScale + mixZp);
+    tmpOut2 = convert_uint4_rte(convert_float4(tmpOut2) * mixScale + mixZp);
+
+    write_imageui(output, coord_out, tmpOut0);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut1);
+    coord_out.y++;
+    write_imageui(output, coord_out, tmpOut2);
+}
+
+__kernel void gpuTransposeQuant8FL_2D(
+                __read_only image2d_array_t input,
+                __write_only image2d_array_t output,
+                float mixScale, float mixZp)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    uint4 tmp = {0};
+
+    tmp = read_imageui(input, (int4)(x, y, 0, 0));
+    tmp.x = convert_uint_rte(tmp.x * mixScale + mixZp);
+    write_imageui(output, (int4)(y, x, 0, 0), tmp);
+}
