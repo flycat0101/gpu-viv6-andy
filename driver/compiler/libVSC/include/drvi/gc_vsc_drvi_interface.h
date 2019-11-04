@@ -760,7 +760,6 @@ typedef struct _VSC_HW_CONFIG
     gctUINT              productID;
     gctUINT              customerID;
     gctUINT              maxCoreCount;
-    gctUINT              maxClusterCount;
     gctUINT              maxThreadCountPerCore;
     gctUINT              maxVaryingCount;
     gctUINT              maxAttributeCount;

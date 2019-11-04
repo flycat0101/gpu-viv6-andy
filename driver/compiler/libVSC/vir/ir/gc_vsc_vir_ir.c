@@ -18355,7 +18355,7 @@ VIR_Shader_ComputeWorkThreadNum(
     gcmASSERT(VIR_Shader_GetKind(pShader) == VIR_SHADER_COMPUTE);
 
     /* Since we only use workThreadNum to calculate the private memory, it is OK that our result is larger than expect. */
-    numWorkThread = (gctUINT)(floor((gctFLOAT)maxFreeReg / (gctFLOAT)hwRegCount)) * threadCount * pHwCfg->maxClusterCount;
+    numWorkThread = (gctUINT)(floor((gctFLOAT)maxFreeReg / (gctFLOAT)hwRegCount)) * threadCount;
 
     if (numWorkThread == 0)
     {
@@ -18386,7 +18386,7 @@ VIR_Shader_ComputeWorkGroupNum(
     if (workGroupSize > threadCount)
     {
         gctFLOAT minHwThreadCountPerGroup = (gctFLOAT)ceil((gctFLOAT)workGroupSize / (gctFLOAT)threadCount);
-        numWorkGroup = (gctUINT)(floor((gctFLOAT)maxFreeReg / (minHwThreadCountPerGroup * hwRegCount)) * minHwThreadCountPerGroup) * pHwCfg->maxClusterCount;
+        numWorkGroup = (gctUINT)(floor((gctFLOAT)maxFreeReg / (minHwThreadCountPerGroup * hwRegCount)) * minHwThreadCountPerGroup);
     }
     else
     {
@@ -18394,7 +18394,7 @@ VIR_Shader_ComputeWorkGroupNum(
         ** VIV:TODO:
         ** For those chips can't support workGroup pack optimization, we should use 1 to replace (gctFLOAT)threadCount / (gctFLOAT)workGroupSize.
         */
-        numWorkGroup = (gctUINT)ceil(floor((gctFLOAT)maxFreeReg / (gctFLOAT)hwRegCount) * (gctFLOAT)threadCount / (gctFLOAT)workGroupSize) * pHwCfg->maxClusterCount;
+        numWorkGroup = (gctUINT)ceil(floor((gctFLOAT)maxFreeReg / (gctFLOAT)hwRegCount) * (gctFLOAT)threadCount / (gctFLOAT)workGroupSize);
     }
 
     if (numWorkGroup == 0)
