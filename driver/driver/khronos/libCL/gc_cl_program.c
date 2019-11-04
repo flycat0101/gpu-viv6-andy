@@ -667,7 +667,49 @@ clBuildProgram(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    /* TODO - Check devices, compiler, etc. */
+    /* Check devices */
+    if ( NumDevices != 0)
+    {
+        if (NumDevices > Program->numDevices)
+        {
+            gcmUSER_DEBUG_ERROR_MSG(
+                "OCL-006013: (clBuildProgram) invalid device.\n");
+            clmRETURN_ERROR(CL_INVALID_DEVICE);
+        }
+        else
+        {
+            gctUINT32 i, j = 0;
+
+            for (i = 0; i < NumDevices; i++)
+            {
+                for (j = 0; j < Program->numDevices; j++)
+                {
+                    if (DeviceList[i] == Program->devices[j])
+                    {
+                        break;
+                    }
+                }
+
+                if (j == Program->numDevices)
+                {
+                    gcmUSER_DEBUG_ERROR_MSG(
+                        "OCL-006014: (clBuildProgram) invalid device.\n");
+                    clmRETURN_ERROR(CL_INVALID_DEVICE);
+                }
+            }
+
+            for (i = 0; i < NumDevices; i++)
+            {
+                Program->devices[i] = DeviceList[i];
+            }
+            for (; i < Program->numDevices; i++)
+            {
+                Program->devices[i] = gcvNULL;
+            }
+            Program->numDevices = NumDevices;
+
+        }
+    }
 
     if ((Program->binary != gcvNULL) && (Program->source != gcvNULL))
     {
@@ -697,7 +739,7 @@ clBuildProgram(
         if (gcmIS_ERROR(status))
         {
             gcmUSER_DEBUG_ERROR_MSG(
-                "OCL-006013: (clBuildProgram) Run out of memory.\n");
+                "OCL-006015: (clBuildProgram) Run out of memory.\n");
             clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
         }
         gcoOS_StrCopySafe((gctSTRING)pointer, length, Options);
@@ -708,7 +750,7 @@ clBuildProgram(
         if (gcmIS_ERROR(status))
         {
             gcmUSER_DEBUG_ERROR_MSG(
-                "OCL-006013: (clBuildProgram) Run out of memory.\n");
+                "OCL-006016: (clBuildProgram) Run out of memory.\n");
             clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
         }
         gcoOS_StrCopySafe((gctSTRING)pointer, length, Options);
