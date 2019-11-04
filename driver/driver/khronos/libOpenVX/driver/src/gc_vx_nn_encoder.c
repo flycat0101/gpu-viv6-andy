@@ -6637,7 +6637,11 @@ void fillinKernelBufferHuffman(
         prev = 0;
     }
     vxmASSERT(reorderStreamAllCount == reorderStreamCheckCount); /*Check if the data count is the same*/
-    wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount);
+        /*bug1980*/
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX))
+        wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount );
+    else
+        wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
 
     if (!hasKernelFullCacheInterleaveFix)
     {
@@ -9214,7 +9218,12 @@ void fillinKernelBufferV8Huffman(
     if (maxKernelStreamSizePerCore < kernelStreamSize)
         maxKernelStreamSizePerCore = kernelStreamSize;
     /*Per HW, post processing stream size is needed in SRAM, when partial mode, need be noted as one core*/
-    wb->slice_array[index].kernel_align_stream_size = (vx_size)(maxKernelStreamSizePerCore * (usedCoreCount + 1));
+
+        /*bug1980*/
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX))
+        wb->slice_array[index].kernel_align_stream_size = (vx_size)(maxKernelStreamSizePerCore * (usedCoreCount + 1));
+    else
+        wb->slice_array[index].kernel_align_stream_size = (vx_size)(maxKernelStreamSizePerCore * (nnCoreCount + 1));
 
     if (!hasKernelFullCacheInterleaveFix)
     {
@@ -10455,7 +10464,11 @@ void fillinKernelBufferV8MergeDW1x1(
     if (maxKernelStreamSizePerCore < kernelStreamSize)
         maxKernelStreamSizePerCore = kernelStreamSize;
     /*Per HW, post processing stream size is needed in SRAM, when partial mode, need be noted as one core*/
-    wb->slice_array[index].kernel_align_stream_size = (vx_size)(maxKernelStreamSizePerCore * ((usedCoreCount1x1 + 1) + 1));
+       /*bug1980*/
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX))
+        wb->slice_array[index].kernel_align_stream_size = (vx_size)(maxKernelStreamSizePerCore *((usedCoreCount1x1 + 1) + 1));
+    else
+        wb->slice_array[index].kernel_align_stream_size = (vx_size)(maxKernelStreamSizePerCore * ((nnCoreCount + 1) + 1));
 
     if (!hasKernelFullCacheInterleaveFix)
     {
@@ -13183,7 +13196,11 @@ void fillinKernelBuffer(
         writeBits(&kernelStreamSizePtr, &streamSizeBitOffset, kernelStreamSize, 32);
     }
 
-    wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount);
+        /*bug1980*/
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX))
+        wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount );
+    else
+        wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
 
     if (!hasKernelFullCacheInterleaveFix)
     {
@@ -14431,7 +14448,12 @@ void fillinKernelBufferBalance(
 #endif
     }
 
-    wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount);
+            /*bug1980*/
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX))
+        wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount );
+    else
+        wb->slice_array[index].kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
+
 
     if (!hasKernelFullCacheInterleaveFix)
     {
