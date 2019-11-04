@@ -33,7 +33,7 @@ static void * getVXCKernelInfo(vx_context context, nnvxc_kernel_enum type, vx_ui
     gceSTATUS status = gcvSTATUS_OK;
 
     GetBinaryPtr_FUNC funcHandle = VX_NULL;
-    status = gcoOS_GetProcAddress(gcvNULL, context->libNNVXCKernelHandle, "GetBinaryPtr", (gctPOINTER *)&funcHandle);
+    status = gcoOS_GetProcAddress(gcvNULL, context->globalData->libNNVXCKernelHandle, "GetBinaryPtr", (gctPOINTER *)&funcHandle);
     if (status != gcvSTATUS_OK)
     {
         vxError("Can't get binary pointer!\n");

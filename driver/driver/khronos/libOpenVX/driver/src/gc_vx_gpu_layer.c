@@ -30,7 +30,7 @@ static void * getGPUKernelInfo(vx_context context, nngpu_kernel_enum type, vx_ui
     gceSTATUS status = gcvSTATUS_OK;
 
     GetBinaryPtr_FUNC funcHandle = VX_NULL;
-    status = gcoOS_GetProcAddress(gcvNULL, context->libNNGPUKernelHandle, "GetBinaryPtr", (gctPOINTER *)&funcHandle);
+    status = gcoOS_GetProcAddress(gcvNULL, context->globalData->libNNGPUKernelHandle, "GetBinaryPtr", (gctPOINTER *)&funcHandle);
     if (status != gcvSTATUS_OK)
     {
         vxError("Can't get binary pointer!\n");

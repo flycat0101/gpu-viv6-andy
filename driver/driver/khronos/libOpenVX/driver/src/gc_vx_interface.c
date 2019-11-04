@@ -83,7 +83,7 @@ static void * getOvx12VXCKernelInfo(vx_context context, vx_enum kernelID, vx_uin
         return VX_NULL;
     }
 
-    status = gcoOS_GetProcAddress(gcvNULL, context->libOvx12VXCBinaryHandle, "GetOvx12KernelBinaryPtr", (gctPOINTER *)&funcHandle);
+    status = gcoOS_GetProcAddress(gcvNULL, context->globalData->libOvx12VXCBinaryHandle, "GetOvx12KernelBinaryPtr", (gctPOINTER *)&funcHandle);
     if(status != gcvSTATUS_OK)
     {
         vxError("Can't get ovx1.2 binary pointer!\n");
