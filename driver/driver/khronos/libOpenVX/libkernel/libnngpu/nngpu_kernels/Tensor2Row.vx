@@ -80,6 +80,7 @@ __kernel void gpuTensor2Row_Q32_3x3_s2_dil1_Pad0_x8
     int4 coord_in0 = (int4)(x * strideX, y * strideY - padY, z, 0);
     int  x_left = coord_in0.x + 17 - inputWidth;
     int4 coord = (int4)(out_x, y * outputWidth + x, out_x + 3, out_x + 6);
+    int loop = (outputWidth - get_global_id(0)) > 8 ? 8 : outputWidth - get_global_id(0);
     uint4 bits = (uint4)(8, 8, 8, 8);
     uint4 cfg = (uint4)(0, 8, 16, 24);
     uint4 cfg2 = (uint4)(16, 24, 0, 8);
@@ -103,6 +104,7 @@ __kernel void gpuTensor2Row_Q32_3x3_s2_dil1_Pad0_x8
     write_imageui(output, coord.xy, pixel0);
     write_imageui(output, coord.zy, pixel1);
     write_imageui(output, coord.wy, pixel2);
+    if (loop == 1) return;
     coord.y++;
     pixel0 = viv_bitfieldExtract(tmp0.xxyy, cfg2, bits);
     pixel1 = viv_bitfieldExtract(tmp1.xxyy, cfg2, bits);
@@ -110,6 +112,7 @@ __kernel void gpuTensor2Row_Q32_3x3_s2_dil1_Pad0_x8
     write_imageui(output, coord.xy, pixel0);
     write_imageui(output, coord.zy, pixel1);
     write_imageui(output, coord.wy, pixel2);
+    if (loop == 2) return;
     coord.y++;
     pixel0 = viv_bitfieldExtract(tmp0.yyyy, cfg, bits);
     pixel1 = viv_bitfieldExtract(tmp1.yyyy, cfg, bits);
@@ -117,6 +120,7 @@ __kernel void gpuTensor2Row_Q32_3x3_s2_dil1_Pad0_x8
     write_imageui(output, coord.xy, pixel0);
     write_imageui(output, coord.zy, pixel1);
     write_imageui(output, coord.wy, pixel2);
+    if (loop == 3) return;
     coord.y++;
     pixel0 = viv_bitfieldExtract(tmp0.yyzz, cfg2, bits);
     pixel1 = viv_bitfieldExtract(tmp1.yyzz, cfg2, bits);
@@ -124,14 +128,15 @@ __kernel void gpuTensor2Row_Q32_3x3_s2_dil1_Pad0_x8
     write_imageui(output, coord.xy, pixel0);
     write_imageui(output, coord.zy, pixel1);
     write_imageui(output, coord.wy, pixel2);
+    if (loop == 4) return;
     coord.y++;
-
     pixel0 = viv_bitfieldExtract(tmp3.xxxx, cfg, bits);
     pixel1 = viv_bitfieldExtract(tmp4.xxxx, cfg, bits);
     pixel2 = viv_bitfieldExtract(tmp5.xxxx, cfg, bits);
     write_imageui(output, coord.xy, pixel0);
     write_imageui(output, coord.zy, pixel1);
     write_imageui(output, coord.wy, pixel2);
+    if (loop == 5) return;
     coord.y++;
     pixel0 = viv_bitfieldExtract(tmp3.xxyy, cfg2, bits);
     pixel1 = viv_bitfieldExtract(tmp4.xxyy, cfg2, bits);
@@ -139,6 +144,7 @@ __kernel void gpuTensor2Row_Q32_3x3_s2_dil1_Pad0_x8
     write_imageui(output, coord.xy, pixel0);
     write_imageui(output, coord.zy, pixel1);
     write_imageui(output, coord.wy, pixel2);
+    if (loop == 6) return;
     coord.y++;
     pixel0 = viv_bitfieldExtract(tmp3.yyyy, cfg, bits);
     pixel1 = viv_bitfieldExtract(tmp4.yyyy, cfg, bits);
@@ -146,6 +152,7 @@ __kernel void gpuTensor2Row_Q32_3x3_s2_dil1_Pad0_x8
     write_imageui(output, coord.xy, pixel0);
     write_imageui(output, coord.zy, pixel1);
     write_imageui(output, coord.wy, pixel2);
+    if (loop == 7) return;
     coord.y++;
     pixel0 = viv_bitfieldExtract(tmp3.yyzz, cfg2, bits);
     pixel1 = viv_bitfieldExtract(tmp4.yyzz, cfg2, bits);
