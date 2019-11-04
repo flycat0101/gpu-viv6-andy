@@ -7399,8 +7399,10 @@ VkResult halti5_patch_pipeline(
                                             VkFormat imageFormat = (VkFormat)patchInfo->originalFormat;
                                             VkBool32 needPatch = VK_TRUE;
 
-                                            if ((shaderFormat <= VK_FORMAT_R32G32B32A32_SFLOAT &&
-                                                shaderFormat >= VK_FORMAT_R32G32B32A32_UINT) &&
+                                            if (((shaderFormat <= VK_FORMAT_R32G32B32A32_SFLOAT &&
+                                                shaderFormat >= VK_FORMAT_R32G32B32A32_UINT) ||
+                                                (shaderFormat <= VK_FORMAT_R16G16B16A16_SFLOAT &&
+                                                shaderFormat >= VK_FORMAT_R16G16B16A16_UNORM)) &&
                                                 (imageFormat <= VK_FORMAT_R8G8B8A8_SINT &&
                                                 imageFormat >= VK_FORMAT_R8G8B8A8_UNORM))
                                             {
