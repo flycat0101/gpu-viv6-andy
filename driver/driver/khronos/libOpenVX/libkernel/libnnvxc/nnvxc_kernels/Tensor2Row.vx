@@ -694,7 +694,6 @@ __kernel void tensor2row_8Bits_K1S1
     VXC_WriteImage(output, coord, out_val7, VXC_MODIFIER(0, 7, 0,VXC_RM_TowardZero, 0));
 }
 
-
 #define tensor2row_KNx1_S1_write(index, write_fun, end_bin)  \
     write_fun(dst, coord, vec, VXC_MODIFIER(0, end_bin, 0, VXC_RM_TowardZero, 0)); \
     i++; \
@@ -1031,17 +1030,17 @@ __kernel void tensor2row_Tensor_Integer16_3x1_S1
     int4 coord = (int4)(kernelSizeXY * z, x, y, 0);
     int  i, loop;
     vxc_short8 pixel, vec;
-    loop = (outputWidth - get_global_id(0)) > 4 ? 4 : outputWidth - get_global_id(0);
+    loop = (outputWidth - get_global_id(0)) > 6 ? 6 : outputWidth - get_global_id(0);
     VXC_ReadImage2DArray(pixel, src, coord_in0, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
     i = 0;
     vec = pixel;
-    tensor2row_KNx1_S1_write(0, VXC_WriteImage2DArray, 4)
+    tensor2row_KNx1_S1_write(0, VXC_WriteImage2DArray, 2)
     vec = pixel.s12345677;
-    tensor2row_KNx1_S1_write(1, VXC_WriteImage2DArray, 4)
+    tensor2row_KNx1_S1_write(1, VXC_WriteImage2DArray, 2)
     vec = pixel.s23456777;
-    tensor2row_KNx1_S1_write(2, VXC_WriteImage2DArray, 4)
+    tensor2row_KNx1_S1_write(2, VXC_WriteImage2DArray, 2)
     vec = pixel.s34567777;
-    tensor2row_KNx1_S1_write(3, VXC_WriteImage2DArray, 4)
+    tensor2row_KNx1_S1_write(3, VXC_WriteImage2DArray, 2)
     vec = pixel.s45677777;
     tensor2row_KNx1_S1_write(4, VXC_WriteImage2DArray, 2)
     vec = pixel.s56777777;
