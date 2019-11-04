@@ -668,6 +668,8 @@ typedef union PROG_VK_SEPARATED_TEXTURE_HW_MAPPING
            of image-size array. */
         SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize;
 
+        VSC_IMAGE_FORMAT                            imageFormat;
+
         /* Extra layer HW mapping. As currently, for images in in texBinding::arraySize
            array, if one image has extra image, all other images must have extra image, so
            this is the first entry of extra-image */
@@ -831,6 +833,8 @@ typedef struct PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY
        of image-size array. */
     SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize[VSC_MAX_SHADER_STAGE_COUNT];
 
+    VSC_IMAGE_FORMAT                            imageFormat;
+
     /* Extra layer HW mapping. As currently, for images in in iaBinding::arraySize
        array, if one image has extra image, all other images must have extra image, so
        this is the first entry of extra-image */
@@ -892,6 +896,8 @@ typedef struct PROG_VK_STORAGE_TABLE_ENTRY
        storageBinding::arraySize array has image-size, so this is the first entry
        of image-size array. */
     SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize[VSC_MAX_SHADER_STAGE_COUNT];
+
+    VSC_IMAGE_FORMAT                            imageFormat;
 
     /* Extra layer HW mapping. As currently, for images in in storageBinding::arraySize
        array, if one image has extra image, all other images must have extra image, so

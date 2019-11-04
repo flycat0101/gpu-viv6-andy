@@ -1505,6 +1505,7 @@ _vscEP_Buffer_SaveVKSeparatedTextureHwMapping(
     )
 {
     _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pSeparatedTextureHwMapping->s.pImageSize);
+    VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pSeparatedTextureHwMapping->s.imageFormat);
     _vscEP_Buffer_SavePrivUavEntry(pEPBuf, pSeparatedTextureHwMapping->s.pExtraLayer);
     _vscEP_Buffer_SaveUavSlotMapping(pEPBuf, &pSeparatedTextureHwMapping->s.hwMapping);
     _vscEP_Buffer_SaveVKPrivCombTexSampHwMappingList(pEPBuf, &pSeparatedTextureHwMapping->s.texHwMappingList);
@@ -1748,6 +1749,8 @@ _vscEP_Buffer_SaveVKInutAttachmentEntry(
         }
     }
 
+    VSC_IO_writeUint(pIoBuf, (gctUINT)pInputAttachmentEntry->imageFormat);
+
     /* Save extra layer size. */
     entryMask = 0;
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
@@ -1910,6 +1913,8 @@ _vscEP_Buffer_SaveVKStorageEntry(
             _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pStorageEntry->pImageSize[i]);
         }
     }
+
+    VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pStorageEntry->imageFormat);
 
     /* Save extra layer size. */
     entryMask = 0;
@@ -4409,6 +4414,7 @@ _vscEP_Buffer_LoadVKSeparatedTextureHwMapping(
     VSC_ErrCode errCode = VSC_ERR_NONE;
 
     ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pSeparatedTextureHwMapping->s.pImageSize));
+    VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pSeparatedTextureHwMapping->s.imageFormat);
     ON_ERROR0(_vscEP_Buffer_LoadPrivUavEntry(pEPBuf, pSeparatedTextureHwMapping->s.pExtraLayer));
     ON_ERROR0(_vscEP_Buffer_LoadUavSlotMapping(pEPBuf, &pSeparatedTextureHwMapping->s.hwMapping));
     ON_ERROR0(_vscEP_Buffer_LoadVKPrivCombTexSampHwMappingList(pEPBuf, &pSeparatedTextureHwMapping->s.texHwMappingList));
@@ -4722,6 +4728,8 @@ _vscEP_Buffer_LoadVKInutAttachmentEntry(
         }
     }
 
+    VSC_IO_readUint(pIoBuf, (gctUINT *)&pInputAttachmentEntry->imageFormat);
+
     /* Load extra layer. */
     entryMask = 0;
     VSC_IO_readUint(pIoBuf, &entryMask);
@@ -4891,6 +4899,8 @@ _vscEP_Buffer_LoadVKStorageEntry(
             pStorageEntry->pImageSize[i] = gcvNULL;
         }
     }
+
+    VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pStorageEntry->imageFormat);
 
     /* Load extra layer. */
     VSC_IO_readUint(pIoBuf, &entryMask);

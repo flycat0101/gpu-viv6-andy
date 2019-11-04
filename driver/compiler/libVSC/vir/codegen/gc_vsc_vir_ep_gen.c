@@ -4535,6 +4535,8 @@ static VSC_ErrCode _AddVkSeparatedTexEntryToSeparatedTexTableOfPEP(VSC_PEP_GEN_H
                       &pTextureEntry->texBinding,
                       pSep);
 
+        pTextureEntry->hwMappings[stageIdx].s.imageFormat = _GetImageFormat(pShader, &pTextureEntry->texBinding);
+
         /* Extra image layer */
         _AddPrivateImageUniform(&pTextureEntry->hwMappings[stageIdx].s.pExtraLayer,
                                 &pTextureEntry->texBinding,
@@ -4802,6 +4804,8 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
                       &pIaEntry->iaBinding,
                       pSep);
 
+        pIaEntry->imageFormat = _GetImageFormat(pShader, &pIaEntry->iaBinding);
+
         /* Extra image layer */
         _AddPrivateImageUniform(&pIaEntry->pExtraLayer[stageIdx],
                                 &pIaEntry->iaBinding,
@@ -4925,6 +4929,8 @@ static VSC_ErrCode _AddVkStorageEntryToStorageTableOfPEP(VSC_PEP_GEN_HELPER* pPe
     _AddImageSize(&pStorageEntry->pImageSize[stageIdx],
                   &pStorageEntry->storageBinding,
                   pSep);
+
+    pStorageEntry->imageFormat = _GetImageFormat(pShader, &pStorageEntry->storageBinding);
 
     /* Extra image layer */
     _AddPrivateImageUniform(&pStorageEntry->pExtraLayer[stageIdx],
