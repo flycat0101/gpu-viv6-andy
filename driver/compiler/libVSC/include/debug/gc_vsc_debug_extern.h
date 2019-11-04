@@ -119,5 +119,33 @@ void vscDIGetStackFrameInfo(
     unsigned int fileNameLength /* not used currently */
     );
 
+void vscDIGetFunctionInfo(
+    void * ptr,
+    int functionId,
+    char * functionName,
+    unsigned int nameLength,
+    unsigned int * lowPC,
+    unsigned int * highPC
+    );
+
+int vscDIGetVariableCount(
+    void * ptr,
+    int functionId,
+    gctBOOL bArgument
+    );
+
+void vscDIGetVariableInfo(
+    void * ptr,
+    int functionId,
+    int idx,
+    gctBOOL bArgument,
+    char * varName,
+    char * typeStr,
+    unsigned int nameLength,
+    unsigned int * varId,
+    unsigned int * parentId,
+    unsigned int * hwLocCount
+    );
+
 #endif
 

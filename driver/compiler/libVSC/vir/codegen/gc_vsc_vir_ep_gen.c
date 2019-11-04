@@ -113,6 +113,143 @@ static gctUINT _GenerateShaderVersionAndType(VIR_Shader* pShader)
     return ENCODE_SHADER_VER_TYPE(shClient, shType, shMajorVer, shMinorVer);
 }
 
+#define _DUMP_REG 0
+
+static VSC_ErrCode _UpdateDIEPcRange(VIR_Shader *pShader, VIR_Instruction* pInst, gctUINT curPC)
+{
+    VIR_OpCode virOpcode    = VIR_Inst_GetOpcode(pInst);
+    gctSIZE_T  i = 0;
+    VIR_Operand  *operand;
+    VIR_Symbol *sym;
+#if _DUMP_REG
+    VIR_Type *type;
+    gctUINT   regCount = 0;
+#endif
+    VSC_DI_SW_LOC *sl = gcvNULL;
+    VSC_DI_HW_LOC * hl = gcvNULL;
+    VSC_DIContext * diContext = (VSC_DIContext *) (pShader->debugInfo);
+
+
+    if (virOpcode == VIR_OP_JMP ||
+        virOpcode == VIR_OP_JMPC ||
+        virOpcode == VIR_OP_JMP_ANY ||
+        virOpcode == VIR_OP_CALL)
+        return VSC_ERR_NONE;
+
+
+    for(i = 0; i < VIR_Inst_GetSrcNum(pInst); ++i)
+    {
+        operand = VIR_Inst_GetSource(pInst, i);
+
+        if (VIR_Operand_GetOpKind(operand) != VIR_OPND_SYMBOL)
+            continue;
+
+        sym  = VIR_Operand_GetSymbol(operand);
+
+        if (VIR_Symbol_isUniform(sym))
+            continue;
+
+        sl = vscDIFindSWLoc(diContext, VIR_Symbol_GetVregIndex(sym));
+
+        if (sl && (sl->u.reg.type == VSC_DIE_REG_TYPE_TMP))
+        {
+            hl = vscDIGetHWLoc(diContext, sl->hwLoc);
+            if (hl)
+            {
+                gctUINT16 highPC = (gctUINT16) curPC - 1;
+                gctUINT16 lowPC = (gctUINT16) (curPC - pInst->mcInstCount);
+                if (hl->beginPC == 0)
+                {
+                    hl->beginPC = lowPC;
+                }
+                else
+                {
+                    if (highPC > hl->endPC)
+                        hl->endPC = highPC;
+                    if (lowPC < hl->beginPC)
+                        hl->beginPC = lowPC;
+                }
+
+                if (hl->endPC == 0)
+                {
+                    hl->endPC = highPC;
+                }
+                else
+                {
+                    if (highPC > hl->endPC)
+                        hl->endPC = highPC;
+                    if (lowPC < hl->beginPC)
+                        hl->beginPC = lowPC;
+                }
+#if _DUMP_REG
+                type = VIR_Symbol_GetType(sym);
+                regCount = VIR_Type_GetVirRegCount(pShader, type, -1);
+                gcmPRINT("Src curPC: %d reg: %d - %d\n", curPC, VIR_Symbol_GetVregIndex(sym), VIR_Symbol_GetVregIndex(sym) + regCount -1);
+#endif
+            }
+        }
+    }
+
+
+    do
+    {
+        if (VIR_Inst_GetDest(pInst) != gcvNULL)
+        {
+            operand = VIR_Inst_GetDest(pInst);
+            if (VIR_Operand_GetOpKind(operand) != VIR_OPND_SYMBOL)
+                break;
+
+            sym  = VIR_Operand_GetSymbol(operand);
+
+            if (VIR_Symbol_isUniform(sym))
+                break;
+
+            sl = vscDIFindSWLoc(diContext, VIR_Symbol_GetVregIndex(sym));
+
+            if (sl && (sl->u.reg.type == VSC_DIE_REG_TYPE_TMP))
+            {
+                hl = vscDIGetHWLoc(diContext, sl->hwLoc);
+                if (hl)
+                {
+                    gctUINT16 highPC = (gctUINT16) curPC - 1;
+                    gctUINT16 lowPC = (gctUINT16) (curPC - pInst->mcInstCount);
+                    if (hl->beginPC == 0)
+                    {
+                        hl->beginPC = lowPC;
+                    }
+                    else
+                    {
+                        if (highPC > hl->endPC)
+                            hl->endPC = highPC;
+                        if (lowPC < hl->beginPC)
+                            hl->beginPC = lowPC;
+                    }
+
+                    if (hl->endPC == 0)
+                    {
+                        hl->endPC = highPC;
+                    }
+                    else
+                    {
+                        if (highPC > hl->endPC)
+                            hl->endPC = highPC;
+                        if (lowPC < hl->beginPC)
+                            hl->beginPC = lowPC;
+                    }
+
+#if _DUMP_REG
+                    type = VIR_Symbol_GetType(sym);
+                    regCount = VIR_Type_GetVirRegCount(pShader, type, -1);
+                    gcmPRINT("Dst curPC: %d reg: %d - %d\n", curPC, VIR_Symbol_GetVregIndex(sym), VIR_Symbol_GetVregIndex(sym) + regCount -1);
+#endif
+                }
+            }
+        }
+    } while (gcvFALSE);
+
+    return VSC_ERR_NONE;
+}
+
 static VSC_ErrCode _CollectMachineCodeToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper, SHADER_EXECUTABLE_PROFILE* pOutSEP)
 {
     VIR_Shader*                    pShader = pSepGenHelper->pShader;
@@ -311,18 +448,19 @@ static VSC_ErrCode _CollectMachineCodeToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper, S
 
                         curPC += pInst->mcInstCount;
 
+                        /* set hw loc's pc range in debug info */
                         if (diContext != gcvNULL)
                         {
+                            _UpdateDIEPcRange(pShader, pInst, curPC);
                             vscDIAddLineMap(diContext, diLineMapCount, pInst->sourceLoc,curPC - pInst->mcInstCount, curPC - 1);
                             diLineMapCount++;
                         }
-
                     }
                 }
 
                 if (diContext != gcvNULL)
                 {
-                    die = vscDIGetDIE(diContext, pShader->mainFunction->die);
+                    die = vscDIGetDIE(diContext, pFunc->die);
 
                     if (die != gcvNULL)
                     {
@@ -334,6 +472,49 @@ static VSC_ErrCode _CollectMachineCodeToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper, S
         }
 
         gcmASSERT(curPC == pOutSEP->countOfMCInst);
+    }
+
+    /* set uniform PC range in debug info */
+    if (pShader->debugInfo)
+    {
+        gctSIZE_T      i = 0;
+        VSC_DI_SW_LOC       SWLoc;
+        VSC_DI_HW_LOC       HWLoc;
+        VIR_Symbol *sym;
+
+        for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++i)
+        {
+            VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
+            VIR_Uniform *symUniform;
+            sym = VIR_Shader_GetSymFromId(pShader, id);
+            symUniform = VIR_Symbol_GetUniformPointer(pShader, sym);
+
+            if (symUniform == gcvNULL)
+            {
+                continue;
+            }
+
+            if (!isSymCompilerGen(sym) && symUniform->physical != -1)
+            {
+                /* find the temp reg for the uniform */
+                SWLoc.reg = gcvTRUE;
+                SWLoc.u.reg.type = VSC_DIE_REG_TYPE_CONST;
+                SWLoc.u.reg.start = (gctUINT16) symUniform->index;
+                SWLoc.u.reg.end = (gctUINT16)(symUniform->index + symUniform->realUseArraySize - 1);
+
+                HWLoc.beginPC = 0;
+                HWLoc.endPC = (gctUINT16) (gctUINT16)curPC -1;
+                HWLoc.next = VSC_DI_INVALID_HW_LOC;
+
+                HWLoc.reg = gcvTRUE;
+                HWLoc.u.reg.type = VSC_DIE_HW_REG_CONST;
+                HWLoc.u.reg.start = (gctUINT16) symUniform->physical;
+                HWLoc.u.reg.end = (gctUINT16) symUniform->physical;
+                HWLoc.u1.swizzle = (gctUINT) symUniform->swizzle;
+
+                vscDISetHwLocToSWLoc((VSC_DIContext *)(pShader->debugInfo), &SWLoc, &HWLoc);
+            }
+        }
     }
 
     return VSC_ERR_NONE;

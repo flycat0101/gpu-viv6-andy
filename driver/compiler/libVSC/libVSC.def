@@ -455,6 +455,9 @@ EXPORTS
     vscDICopyDebugInfo
     vscDIGetCallStackDepth
     vscDIGetStackFrameInfo
+    vscDIGetFunctionInfo
+    vscDIGetVariableCount
+    vscDIGetVariableInfo
 
     vscERR_ReportError
     vscERR_ReportWarning

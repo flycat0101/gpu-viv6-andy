@@ -12681,7 +12681,7 @@ _VIR_RA_LS_WriteDebugInfo(
     VIR_FuncIterator    func_iter;
     VIR_FunctionNode    *func_node;
     VIR_Function        *pFunc;
-    gctUINT             instIdx = 0, i;
+    gctUINT             instIdx = 0;
     gctUINT             instCount, totalInstCount = 0;
 
     gcmASSERT(pRA->DIContext);
@@ -12736,22 +12736,9 @@ _VIR_RA_LS_WriteDebugInfo(
             SWLoc.u.reg.start = (gctUINT16)pLR->firstRegNo;
             SWLoc.u.reg.end = (gctUINT16)(pLR->firstRegNo + pLR->regNoRange - 1);
 
-            if (pLR->startPoint == 0)
-            {
-                HWLoc.beginPC = (gctUINT16)instMapping[1];
-            }
-            else
-            {
-                HWLoc.beginPC = (gctUINT16)instMapping[pLR->startPoint];
-            }
-            if (pLR->endPoint == 0)
-            {
-                HWLoc.endPC = (gctUINT16)instMapping[1];
-            }
-            else
-            {
-                HWLoc.endPC = (gctUINT16)instMapping[pLR->endPoint];
-            }
+            /* do not set PC range here */
+            HWLoc.beginPC = 0;
+            HWLoc.endPC = 0;
             HWLoc.next = VSC_DI_INVALID_HW_LOC;
 
             if (isLRSpilled(pLR))
@@ -12769,6 +12756,7 @@ _VIR_RA_LS_WriteDebugInfo(
                 HWLoc.u.reg.type = VSC_DIE_HW_REG_TMP;
                 HWLoc.u.reg.start = (gctUINT16)pLR->u1.color._hwRegId;
                 HWLoc.u.reg.end = (gctUINT16)(pLR->u1.color._hwRegId + pLR->regNoRange - 1);
+                HWLoc.u1.hwShift = pLR->u1.color._hwShift;
             }
 
             vscDISetHwLocToSWLoc(pRA->DIContext, &SWLoc, &HWLoc);
@@ -12780,48 +12768,7 @@ _VIR_RA_LS_WriteDebugInfo(
         }
     }
 
-    /* write debug infor for uniform */
-    if (gcmOPT_EnableDebugDump())
-    {
-        gcmPRINT("\n------------hwLoc alloc for uniform reg----------------");
-    }
-
-    for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++i)
-    {
-        VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
-        VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, id);
-        VIR_Uniform *symUniform = VIR_Symbol_GetUniformPointer(pShader, sym);
-
-        if (symUniform == gcvNULL)
-        {
-            continue;
-        }
-
-        if (!isSymCompilerGen(sym) && symUniform->physical != -1)
-        {
-            /* find the temp reg for the uniform */
-            SWLoc.reg = gcvTRUE;
-            SWLoc.u.reg.type = VSC_DIE_REG_TYPE_CONST;
-            SWLoc.u.reg.start = (gctUINT16) symUniform->index;
-            SWLoc.u.reg.end = (gctUINT16)(symUniform->index + symUniform->realUseArraySize - 1);
-
-            HWLoc.beginPC = 0;
-            HWLoc.endPC = (gctUINT16) totalInstCount;
-            HWLoc.next = VSC_DI_INVALID_HW_LOC;
-
-            HWLoc.reg = gcvTRUE;
-            HWLoc.u.reg.type = VSC_DIE_HW_REG_CONST;
-            HWLoc.u.reg.start = (gctUINT16) symUniform->physical;
-            HWLoc.u.reg.end = (gctUINT16) symUniform->physical;
-
-            vscDISetHwLocToSWLoc(pRA->DIContext, &SWLoc, &HWLoc);
-        }
-    }
-
-    if (gcmOPT_EnableDebugDump())
-    {
-        gcmPRINT("---------------------------------------------------");
-    }
+    /* move this to MC gen */
 
 }
 
@@ -12984,12 +12931,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
 
     if (debugEnabled)
     {
-        /* set the reserved data to be 4, could be smarter */
-        reservedDataReg = 4;
-        pShader->hasRegisterSpill   = gcvTRUE;
-        ra.resDataRegisterCount = 4;
-        _VIR_RA_LS_SetReservedReg(&ra);
-
+        /* TODO */
         ra.DIContext = (VSC_DIContext *)pShader->debugInfo;
     }
 

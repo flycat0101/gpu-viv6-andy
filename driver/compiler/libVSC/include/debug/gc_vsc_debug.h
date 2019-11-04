@@ -81,6 +81,11 @@ typedef struct _VSC_DI_HW_LOC{
         VSC_DI_HW_REG reg;
         VSC_DI_OFFSET offset;
     }u;
+    union
+    {
+        gctUINT hwShift;
+        gctUINT swizzle;
+    }u1;
 }VSC_DI_HW_LOC;
 
 #define VSC_DI_MAX_ARRAY_DIM   4
@@ -380,6 +385,12 @@ vscDIChangeUniformSWLoc(
     gctUINT tmpStart,
     gctUINT tmpEnd,
     gctUINT uniformIdx);
+
+VSC_DI_SW_LOC *
+vscDIFindSWLoc(
+    VSC_DIContext * context,
+    gctUINT32 regId
+    );
 
 #endif
 
