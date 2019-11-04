@@ -1294,6 +1294,7 @@ __wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
     struct wl_display *wl_dpy = egl_surface->display->wl_dpy;
     struct wl_event_queue *wl_queue = egl_surface->wl_queue;
     int ret = 0;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
 
     if (egl_surface->indequeue)
     {
@@ -1314,6 +1315,19 @@ __wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
             zwp_linux_explicit_synchronization_v1_get_synchronization(
                   egl_surface->display->explicit_sync, window->surface);
         wl_proxy_set_queue((struct wl_proxy *) egl_surface->surface_sync, egl_surface->wl_queue);
+    }
+
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
+    if (patchId == gcvPATCH_GTFES30)
+    {
+        /* Make sure previous frame with this buffer is done. */
+        while (egl_surface->frame_callback && ret != -1)
+            ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 100);
+        if (ret == -1)
+        {
+            /* fatal error, can recover. */
+            gcmPRINT("frame_callback was failed to return");
+        }
     }
 #else
     /* Try to read and dispatch some events. */
@@ -1466,23 +1480,35 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
 #endif
     int x, y, width, height;
     int ret = 0;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
 
     __make_bounding_box(buffer, damage, &x, &y, &width, &height);
 
     pthread_mutex_lock(&egl_surface->commit_mutex);
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
 
+#ifndef gcdUSE_ZWP_SYNCHRONIZATION
     /* Make sure previous frame with this buffer is done. */
     while (egl_surface->frame_callback && ret != -1)
-#ifdef gcdUSE_ZWP_SYNCHRONIZATION
-        ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 100);
-#else
         ret = __wl_egl_dispatch_queue(wl_dpy, commit_queue, 100);
-#endif
     if (ret == -1)
     {
         /* fatal error, can not recover. */
         goto out;
     }
+#else
+    if(patchId != gcvPATCH_GTFES30)
+    {
+       /* Make sure previous frame with this buffer is done. */
+       while (egl_surface->frame_callback && ret != -1)
+           ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 100);
+       if (ret == -1)
+       {
+           /* fatal error, can not recover. */
+           goto out;
+       }
+    }
+#endif
 
     if (egl_surface->swap_interval > 0)
     {
@@ -1599,24 +1625,37 @@ __wl_egl_window_queue_buffer(struct wl_egl_window *window,
 #endif
     int x, y, width, height;
     int ret = 0;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
 
     __make_bounding_box(buffer, damage, &x, &y, &width, &height);
 
     pthread_mutex_lock(&egl_surface->commit_mutex);
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+#ifndef gcdUSE_ZWP_SYNCHRONIZATION
 
     /* Make sure previous frame with this buffer is done. */
     while (egl_surface->frame_callback && ret != -1)
-#ifdef gcdUSE_ZWP_SYNCHRONIZATION
-        ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 100);
-#else
         ret = __wl_egl_dispatch_queue(wl_dpy, commit_queue, 100);
-#endif
 
     if (ret == -1)
     {
         /* fatal error, can not recover. */
         goto out;
     }
+#else
+    if(patchId != gcvPATCH_GTFES30)
+    {
+       /* Make sure previous frame with this buffer is done. */
+       while (egl_surface->frame_callback && ret != -1)
+           ret = __wl_egl_dispatch_queue(wl_dpy, wl_queue, 100);
+       if (ret == -1)
+       {
+           /* fatal error, can not recover. */
+           goto out;
+       }
+    }
+#endif
 
     if (egl_surface->swap_interval > 0)
     {
