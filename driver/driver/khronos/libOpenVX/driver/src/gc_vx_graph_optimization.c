@@ -3100,21 +3100,21 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
                 CHECK_NULL(convOutTensor);
             }
 
-            if(VX_TYPE_FLOAT16 == TENSOR_DATA_TYPE(tensorIn[0]) ||
-                VX_TYPE_BFLOAT16 == TENSOR_DATA_TYPE(tensorIn[0]))
+            if(VX_TYPE_FLOAT16 == TENSOR_DATA_TYPE(tensorSub[0]) ||
+                VX_TYPE_BFLOAT16 == TENSOR_DATA_TYPE(tensorSub[0]))
             {
-                vxoGraphOptimization_TensorAdd2Conv_createWeight_fp16(tensorIn, core, &weight, factor);
+                vxoGraphOptimization_TensorAdd2Conv_createWeight_fp16(tensorSub, core, &weight, factor);
             }
             else
             {
-                vxoGraphOptimization_TensorAdd2Conv_createQuantizedWeightAndBias(&weight, &bias, tensorIn, core);
-                switch (TENSOR_QUANT_TYPE(tensorIn[0]))
+                vxoGraphOptimization_TensorAdd2Conv_createQuantizedWeightAndBias(&weight, &bias, tensorSub, core);
+                switch (TENSOR_QUANT_TYPE(tensorSub[0]))
                 {
                 case VX_QUANT_AFFINE_SCALE:
-                    vxoGraphOptimization_TensorAdd2Conv_copyData2WeightAndBias_asymmetic(&weight, &bias, tensorIn, core, factor);
+                    vxoGraphOptimization_TensorAdd2Conv_copyData2WeightAndBias_asymmetic(&weight, &bias, tensorSub, core, factor);
                     break;
                 case VX_QUANT_DYNAMIC_FIXED_POINT:
-                    vxoGraphOptimization_TensorAdd2Conv_copyData2WeightAndBias_dfp(&weight, &bias, tensorIn, core, factor);
+                    vxoGraphOptimization_TensorAdd2Conv_copyData2WeightAndBias_dfp(&weight, &bias, tensorSub, core, factor);
                     break;
                 default:
                      vxWarning("unknwon quantization type when to create weight in tensorAdd\n");
