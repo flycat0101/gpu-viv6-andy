@@ -7167,16 +7167,33 @@ VkResult halti5_patch_pipeline(
                     for (j = 0 ; j < chipDescSet->numofEntries; j++)
                     {
                         halti5_patch_key validPatchKey = chipDescSet->patchKeys[j] & chipPipeline->patchKeys[i][j];
-                        uint32_t k = 0;
+                        uint32_t stageFlags = chipDescSet->patchInfos[j].patchStages;
+
+                        uint32_t stageCount = 0, entryCount = 0;
+                        uint32_t k = 0, s = 0;
+
+                        while (stageFlags)
+                        {
+                            if (stageFlags & (1 << s))
+                            {
+                                stageCount++;
+                            }
+                            stageFlags &= ~(1 << s);
+                            s++;
+                        }
+
                         while (validPatchKey)
                         {
                             if (validPatchKey & (1 << k))
                             {
-                                totalEntries++;
+                                entryCount++;
                                 validPatchKey &= ~(1 << k);
                             }
                             k++;
                         }
+
+                        entryCount *= (stageCount > 0) ? stageCount : 1;
+                        totalEntries += entryCount;
                     }
                 }
                 patchMask &= ~(1<< i);
