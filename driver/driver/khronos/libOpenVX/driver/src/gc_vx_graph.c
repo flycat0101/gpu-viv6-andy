@@ -2971,9 +2971,9 @@ VX_PRIVATE_API vx_status DetectSegmentsWithOption(
     vx_status status = VX_SUCCESS;
     vx_context context = graph->base.context;
 
-    vxmASSERT(graph->base.context->vipSRAM.size > VX_VIP_SRAM_IMAGE_STREAM_SIZE);
+    vxmASSERT(context->vipSRAM.size > VX_VIP_SRAM_IMAGE_STREAM_SIZE);
 
-    if (vxoContext_IsFeatureAvailable(graph->base.context, VX_NN_FEATURE_SWTILING_PHASE3))
+    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE3))
     {
         if ((SWTilingOption == VX_SWTILING_OPTION_ALL) ||
             (SWTilingOption == VX_SWTILING_OPTION_AB))
@@ -2996,7 +2996,7 @@ VX_PRIVATE_API vx_status DetectSegmentsWithOption(
         }
     }
 
-    if (graph->base.context->axiSRAM[graph->deviceID].size > 0)
+    if (context->axiSRAM[graph->deviceID].size > 0)
     {
         if ((SWTilingOption == VX_SWTILING_OPTION_ALL) ||
             (SWTilingOption == VX_SWTILING_OPTION_AB))
