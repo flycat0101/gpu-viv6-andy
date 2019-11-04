@@ -974,7 +974,7 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     globalData->options.enableTransformNMConv = 1;
     globalData->options.enableGraphMergeTranspose = 1;
     globalData->options.enableGraphPadConv = 1;
-    globalData->options.enableGraphDeleteRelu = 1;
+    globalData->options.enableGraphDeleteRelu = 0;
     globalData->options.enableGraphDeleteSqueeze = 1;
     globalData->options.enableGraphWar1x1x1weight = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_GRAPH_TRANSFORM", &envctrl)) && envctrl)
