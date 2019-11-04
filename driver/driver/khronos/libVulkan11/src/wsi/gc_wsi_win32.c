@@ -1407,8 +1407,8 @@ static VkResult win32GetDisplayPlaneCapabilities(
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
-    currentDisplayIndex = plane->currentStackIndex;
     /* plane src capabilities */
+    currentDisplayIndex = plane->currentStackIndex;
     pCapabilities->minSrcExtent.width = 0;
     pCapabilities->minSrcExtent.height = 0;
     pCapabilities->maxSrcExtent.width = plane->supportedDisplays[currentDisplayIndex]->physicalDimensions.width;
@@ -1429,6 +1429,7 @@ static VkResult win32GetDisplayPlaneCapabilities(
     pCapabilities->maxDstPosition.y = pCapabilities->maxDstExtent.height;
 
     /* Loop devices to get plotform support Alpha mode */
+    pCapabilities->supportedAlpha = 0;
     for (id = 0; phyDev->numberOfDisplays < __VK_WSI_MAX_PHYSICAL_DISPLAYS; id++)
     {
         BOOL valid;
@@ -1437,7 +1438,6 @@ static VkResult win32GetDisplayPlaneCapabilities(
 
         if (!valid)
         {
-            result = VK_INCOMPLETE;
             break;
         }
 
@@ -1445,7 +1445,6 @@ static VkResult win32GetDisplayPlaneCapabilities(
         {
             hdc = CreateDC(adapter.DeviceName, NULL, NULL, NULL);
             pCapabilities->supportedAlpha |= GetDeviceCaps(hdc, SHADEBLENDCAPS);
-            result =  VK_SUCCESS;
         }
     }
 
