@@ -258,6 +258,10 @@ static uint sRAMRequested = 1;
 module_param(sRAMRequested, uint, 0644);
 MODULE_PARM_DESC(sRAMRequested, "Default 1 means AXI-SRAM is already reserved for GPU, 0 means GPU driver need request the memory region.");
 
+static uint mmuPageTablePool = 1;
+module_param(mmuPageTablePool, uint, 0644);
+MODULE_PARM_DESC(mmuPageTablePool, "Default 1 means alloc mmu page table in virsual memory, 0 means auto select memory pool.");
+
 static uint sRAMLoopMode = 0;
 module_param(sRAMLoopMode, uint, 0644);
 MODULE_PARM_DESC(sRAMLoopMode, "Default 0 means SRAM pool must be specified when allocating SRAM memory, 1 means SRAM memory will be looped as default pool.");
@@ -418,6 +422,7 @@ _InitModuleParam(
     p->deviceType  = type;
     p->showArgs    = showArgs;
 
+    p->pageTablePool = mmuPageTablePool;
 
     p->allMapInOne = allMapInOne;
 #if !gcdENABLE_3D
@@ -529,6 +534,8 @@ _SyncModuleParam(
 
     type        = p->deviceType;
     showArgs    = p->showArgs;
+
+    mmuPageTablePool = p->pageTablePool;
     allMapInOne = p->allMapInOne;
 }
 
@@ -651,6 +658,7 @@ gckOS_DumpParam(
         printk("\n");
     }
 
+    printk("  mmuPageTablePool   = %d\n", mmuPageTablePool);
     printk("  External sRAMBases = ");
     for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
     {

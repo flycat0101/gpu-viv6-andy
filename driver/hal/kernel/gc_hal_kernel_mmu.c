@@ -57,8 +57,6 @@
 
 #define _GC_OBJ_ZONE    gcvZONE_MMU
 
-#define gcdMMU_PGTABLE_POOL     gcvPOOL_VIRTUAL
-
 typedef enum _gceMMU_TYPE
 {
     gcvMMU_USED     = (0 << 4),
@@ -631,6 +629,24 @@ OnError:
 
     return status;
 }
+static gcePOOL _GetPageTablePool(IN gckOS Os)
+{
+    gcePOOL pool = gcvPOOL_DEFAULT;
+    gctUINT64 data = 0;
+    gceSTATUS status;
+
+    status = gckOS_QueryOption(Os, "mmuPageTablePool", &data);
+
+    if (status  == gcvSTATUS_OK)
+    {
+        if (data == 1)
+        {
+            pool = gcvPOOL_VIRTUAL;
+        }
+    }
+
+    return pool;
+}
 
 static gceSTATUS
 _FillFlatMapping(
@@ -936,7 +952,7 @@ _FillFlatMapping(
         /* Need allocate a new chunk of stlbs */
         if (totalNewStlbs)
         {
-            gcePOOL pool = gcdMMU_PGTABLE_POOL;
+            gcePOOL pool = _GetPageTablePool(Mmu->os);
             gctUINT32 allocFlag = gcvALLOC_FLAG_CONTIGUOUS;
 
             gcmkONERROR(
@@ -1249,7 +1265,7 @@ _ConstructDynamicStlb(
     gctBOOL acquired = gcvFALSE;
     gckKERNEL kernel = Mmu->hardware->kernel;
     gctUINT32 allocFlag = gcvALLOC_FLAG_CONTIGUOUS;
-    gcePOOL pool = gcdMMU_PGTABLE_POOL;
+    gcePOOL pool = _GetPageTablePool(Mmu->os);
     gctUINT32 address;
     gctUINT32 mtlbEntry;
     gctUINT32 i;
@@ -1645,7 +1661,7 @@ _Construct(
 
         area->mapLogical = pointer;
 
-        pool = gcdMMU_PGTABLE_POOL;
+        pool = _GetPageTablePool(mmu->os);
 
 #if gcdENABLE_CACHEABLE_COMMAND_BUFFER
         allocFlag |= gcvALLOC_FLAG_CACHEABLE;
@@ -1722,7 +1738,7 @@ _Construct(
     {
         mmu->mtlbSize = gcdMMU_MTLB_SIZE;
 
-        pool = gcdMMU_PGTABLE_POOL;
+        pool = _GetPageTablePool(mmu->os);
 
 #if gcdENABLE_CACHEABLE_COMMAND_BUFFER
         allocFlag |= gcvALLOC_FLAG_CACHEABLE;
@@ -1867,7 +1883,7 @@ _Construct(
     /* A 64 byte for safe address, we use 256 here. */
     mmu->safePageSize = 256;
 
-    pool = gcdMMU_PGTABLE_POOL;
+    pool = _GetPageTablePool(mmu->os);
 
     /* Allocate safe page from video memory. */
     gcmkONERROR(gckKERNEL_AllocateVideoMemory(

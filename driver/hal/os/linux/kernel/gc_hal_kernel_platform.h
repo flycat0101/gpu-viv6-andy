@@ -119,6 +119,8 @@ typedef struct _gcsMODULE_PARAMETERS
     gctUINT                 deviceType;
     gctUINT                 showArgs;
 
+    /* mmu page table pool, 0 mean auto, 1 means virsual*/
+    gctUINT                 pageTablePool;
     gctUINT                 allMapInOne;
 }
 gcsMODULE_PARAMETERS;

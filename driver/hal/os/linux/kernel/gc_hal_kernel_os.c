@@ -7204,6 +7204,10 @@ gckOS_QueryOption(
     {
         *Value = device->platform->flagBits;
     }
+    else if (!strcmp(Option, "mmuPageTablePool"))
+    {
+        *Value = device->args.pageTablePool;
+    }
     else if (!strcmp(Option, "allMapInOne"))
     {
         *Value = device->args.allMapInOne;
