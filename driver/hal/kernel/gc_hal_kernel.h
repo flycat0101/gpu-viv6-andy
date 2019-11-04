@@ -1108,6 +1108,9 @@ typedef union _gcuVIDMEM_NODE
         /* Kernel virtual address. */
         gctPOINTER              kvaddr;
 
+        /* mdl record pointer. */
+        gctPHYS_ADDR            physical;
+
 #if gcdENABLE_VG
         gctPOINTER              kernelVirtual;
 #endif
@@ -1476,6 +1479,7 @@ gckVIDMEM_NODE_AllocateLinear(
     IN gckVIDMEM VideoMemory,
     IN gcePOOL Pool,
     IN gceVIDMEM_TYPE Type,
+    IN gctUINT32 Flag,
     IN gctUINT32 Alignment,
     IN gctBOOL Specified,
     IN OUT gctSIZE_T * Bytes,

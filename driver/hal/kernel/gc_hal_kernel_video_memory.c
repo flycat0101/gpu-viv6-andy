@@ -730,6 +730,9 @@ OnError:
 **      gceVIDMEM_TYPE Type
 **          Type of surface to allocate (use by bank optimization).
 **
+**      gctUINT32 Flag
+**          Flag of allocatetion.
+**
 **      gctBOOL Specified
 **          If user must use this pool, it should set Specified to gcvTRUE,
 **          otherwise allocator may reserve some memory for other usage, such
@@ -747,6 +750,7 @@ gckVIDMEM_AllocateLinear(
     IN gctSIZE_T Bytes,
     IN gctUINT32 Alignment,
     IN gceVIDMEM_TYPE Type,
+    IN gctUINT32 Flag,
     IN gctBOOL Specified,
     OUT gcuVIDMEM_NODE_PTR * Node
     )
@@ -884,6 +888,15 @@ gckVIDMEM_AllocateLinear(
 #if gcdENABLE_VG
     node->VidMem.kernelVirtual = gcvNULL;
 #endif
+    gcmkONERROR(gckOS_RequestReservedMemory(
+            Memory->os,
+            Memory->physicalBase + node->VidMem.offset,
+            node->VidMem.bytes,
+            "gal reserved memory",
+            gcvTRUE,
+            !(gctBOOL)(Flag & gcvALLOC_FLAG_NON_CPU_ACCESS),
+            &node->VidMem.physical
+            ));
 
     /* Release the mutex. */
     gcmkVERIFY_OK(gckOS_ReleaseMutex(Memory->os, Memory->mutex));
@@ -1843,7 +1856,7 @@ gckVIDMEM_Free(
         {
             gcmkONERROR(
                 gckOS_DestroyKernelMapping(Kernel->os,
-                                           Node->VidMem.parent->physical,
+                                           Node->VidMem.physical,
                                            Node->VidMem.kvaddr));
 
             Node->VidMem.kvaddr = gcvNULL;
@@ -1939,6 +1952,9 @@ gckVIDMEM_Free(
                 gcmkASSERT(node->VidMem.prevFree != node);
             }
         }
+
+        gckOS_ReleaseReservedMemory(memory->os, Node->VidMem.physical);
+        Node->VidMem.physical = gcvNULL;
 
         /* Release the mutex. */
         gcmkVERIFY_OK(gckOS_ReleaseMutex(memory->os, memory->mutex));
@@ -3036,6 +3052,7 @@ gckVIDMEM_NODE_AllocateLinear(
     IN gckVIDMEM VideoMemory,
     IN gcePOOL Pool,
     IN gceVIDMEM_TYPE Type,
+    IN gctUINT32 Flag,
     IN gctUINT32 Alignment,
     IN gctBOOL Specified,
     IN OUT gctSIZE_T * Bytes,
@@ -3056,6 +3073,7 @@ gckVIDMEM_NODE_AllocateLinear(
                                  bytes,
                                  Alignment,
                                  Type,
+                                 Flag,
                                  Specified,
                                  &node));
 
@@ -3545,6 +3563,7 @@ gckVIDMEM_NODE_LockCPU(
                     gckKERNEL_MapVideoMemory(Kernel,
                                              gcvTRUE,
                                              node->VidMem.pool,
+                                             node->VidMem.physical,
                                              (gctUINT32)node->VidMem.offset,
                                              (gctUINT32)node->VidMem.bytes,
                                              &node->VidMem.logical));
@@ -3559,8 +3578,8 @@ gckVIDMEM_NODE_LockCPU(
             {
                 gcmkONERROR(
                     gckOS_CreateKernelMapping(os,
-                                              node->VidMem.parent->physical,
-                                              node->VidMem.offset,
+                                              node->VidMem.physical,
+                                              0,
                                               node->VidMem.bytes,
                                               &node->VidMem.kvaddr));
             }
@@ -3682,6 +3701,7 @@ gckVIDMEM_NODE_UnlockCPU(
                 gckKERNEL_UnmapVideoMemory(
                     Kernel,
                     node->VidMem.pool,
+                    node->VidMem.physical,
                     node->VidMem.logical,
                     node->VidMem.processID,
                     node->VidMem.bytes

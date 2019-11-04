@@ -293,6 +293,7 @@ gckKERNEL_MapVideoMemory(
     IN gckKERNEL Kernel,
     IN gctBOOL InUserSpace,
     IN gcePOOL Pool,
+    IN gctPHYS_ADDR Physical,
     IN gctUINT32 Offset,
     IN gctUINT32 Bytes,
     OUT gctPOINTER * Logical
@@ -380,6 +381,7 @@ gceSTATUS
 gckKERNEL_UnmapVideoMemory(
     IN gckKERNEL Kernel,
     IN gcePOOL Pool,
+    IN gctPHYS_ADDR Physical,
     IN gctPOINTER Logical,
     IN gctUINT32 Pid,
     IN gctSIZE_T Bytes

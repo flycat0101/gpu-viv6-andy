@@ -1217,6 +1217,7 @@ AllocateMemory:
                                                            videoMemory,
                                                            pool,
                                                            Type,
+                                                           Flag,
                                                            Alignment,
                                                            (pool == gcvPOOL_SYSTEM ||
                                                             pool == gcvPOOL_INTERNAL_SRAM ||
@@ -1348,6 +1349,7 @@ _AllocateLinearMemory(
     gctUINT32 alignment = Interface->u.AllocateLinearVideoMemory.alignment;
     gceVIDMEM_TYPE type = (Interface->u.AllocateLinearVideoMemory.type & 0xFF);
     gctUINT32 flag = Interface->u.AllocateLinearVideoMemory.flag;
+    gctUINT64 mappingInOne  = 1;
 
     gcmkHEADER_ARG("Kernel=%p pool=%d bytes=%lu alignment=%lu type=%d",
                    Kernel, pool, bytes, alignment, type);
@@ -1362,6 +1364,13 @@ _AllocateLinearMemory(
     if (Interface->u.AllocateLinearVideoMemory.extSRAMIndex >= 0)
     {
         Kernel->extSRAMIndex = Interface->u.AllocateLinearVideoMemory.extSRAMIndex;
+    }
+
+    gckOS_QueryOption(Kernel->os, "allMapInOne", &mappingInOne);
+    if (mappingInOne == 0)
+    {
+        /* it should page align if driver uses dynamic mapping for mapped user memory */
+        alignment = gcmALIGN(alignment, PAGE_SIZE);
     }
 
     /* Allocate video memory node. */
