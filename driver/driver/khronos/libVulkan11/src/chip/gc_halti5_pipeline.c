@@ -7431,7 +7431,8 @@ VkResult halti5_patch_pipeline(
                             if (validPatchKey & (1 << k))
                             {
 
-                                if (k == HALTI5_PATCH_FORMAT_TO_COMPILER)
+                                if (k == HALTI5_PATCH_FORMAT_TO_COMPILER ||
+                                    k == HALTI5_PATCH_STORAGE_IMAGE_FORMAT)
                                 {
                                     validPatchKey &= ~(1 << k);
                                 }
@@ -7481,7 +7482,6 @@ VkResult halti5_patch_pipeline(
                                     vscLinkEntriesCur[entryIdx].mainShaderStageBits = (VSC_SHADER_STAGE_BIT)chipDescSet->patchInfos[j].patchStages;
                                     entryIdx++;
                                     validPatchKey &= ~(1 << k);
-                                    totalEntries--;
                                 }
                             }
                             k++;
