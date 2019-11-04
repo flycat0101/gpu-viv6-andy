@@ -2734,7 +2734,9 @@ vx_status calculateArchPerf(
                             {
                                 if ((inXSize - xOffSet <= x + kernelXSize -1 &&
                                     inYSize - yOffSet <= y + kernelYSize -1) &&
-                                    (y == inYSize && x == inXSize && context->nnConfig.unifiedFeature.diffConditionForCachelineModePreFix))
+                                    (!context->nnConfig.unifiedFeature.diffConditionForCachelineModePreFix ||
+                                      (y == inYSize && x == inXSize && context->nnConfig.unifiedFeature.diffConditionForCachelineModePreFix)
+                                    ))
                                 {
                                     cacheLineMode = 1;
                                 }
