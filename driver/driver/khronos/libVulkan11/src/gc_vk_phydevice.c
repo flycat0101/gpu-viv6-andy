@@ -33,6 +33,7 @@ const VkExtensionProperties g_DeviceExtensions[] =
     {VK_KHR_MAINTENANCE2_EXTENSION_NAME, VK_KHR_MAINTENANCE2_SPEC_VERSION},
     {VK_KHR_MAINTENANCE3_EXTENSION_NAME, VK_KHR_MAINTENANCE3_SPEC_VERSION},
     {VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME, VK_KHR_VARIABLE_POINTERS_SPEC_VERSION},
+    {VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME, VK_KHR_DEDICATED_ALLOCATION_SPEC_VERSION},
 #if defined(LINUX) || defined(ANDROID)
     {VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME, VK_KHR_EXTERNAL_SEMAPHORE_FD_SPEC_VERSION},
 #endif
@@ -67,6 +68,7 @@ __vkExtension g_EnabledExtensions[] =
     {VK_KHR_MAINTENANCE2_EXTENSION_NAME, VK_FALSE},
     {VK_KHR_MAINTENANCE3_EXTENSION_NAME, VK_FALSE},
     {VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME, VK_FALSE},
+    {VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME, VK_FALSE},
     {VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME, VK_FALSE},
 #if defined(_WIN32)
     {VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME, VK_FALSE},
@@ -1257,10 +1259,13 @@ static VkResult __vki_InitializePhysicalDevice(
     phyDev->phyDevMemProp.memoryHeapCount = 1;
     phyDev->phyDevMemProp.memoryHeaps[0].flags = VK_MEMORY_HEAP_DEVICE_LOCAL_BIT;
     phyDev->phyDevMemProp.memoryHeaps[0].size = 0x30000000;
-    phyDev->phyDevMemProp.memoryTypeCount = 1;
+    phyDev->phyDevMemProp.memoryTypeCount = 2;
     phyDev->phyDevMemProp.memoryTypes[0].heapIndex = 0;
     phyDev->phyDevMemProp.memoryTypes[0].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
                                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    phyDev->phyDevMemProp.memoryTypes[1].heapIndex = 0;
+    phyDev->phyDevMemProp.memoryTypes[1].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
                                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
     /* Initialize VkPhysicalDeviceFeatures here */
@@ -2089,7 +2094,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties2(
             {
                 extMemProp->compatibleHandleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
                 extMemProp->exportFromImportedHandleTypes = 0;
-                extMemProp->externalMemoryFeatures = VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT;
+                extMemProp->externalMemoryFeatures = VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT
+                                                   | VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT
+                                                   | VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT;
+
+                pImageFormatProperties->imageFormatProperties.maxArrayLayers       = (type == VK_IMAGE_TYPE_3D) ? 1 : 1;
             }
             break;
         default:

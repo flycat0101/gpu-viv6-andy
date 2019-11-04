@@ -1621,7 +1621,38 @@ static VkFormat vk_format_from_android(uint32_t androidFormat)
 
 uint64_t getAndroidHardwareBufferUsageFromVkUsage(const VkImageCreateFlags vk_create, const VkImageUsageFlags vk_usage)
 {
-  return AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
+    uint64_t  usage = 0;
+
+    if (vk_usage & VK_IMAGE_USAGE_SAMPLED_BIT)
+    {
+        usage |= AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
+    }
+    if (vk_usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
+    {
+        usage |= AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
+    }
+    if (vk_usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+    {
+        usage |= AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT;
+    }
+
+#if ANDROID_SDK_VERSION > 26
+    if (vk_create & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT)
+    {
+        usage |= AHARDWAREBUFFER_USAGE_GPU_CUBE_MAP;
+    }
+#endif
+    if (vk_create & VK_IMAGE_CREATE_PROTECTED_BIT)
+    {
+        usage |= AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT;
+    }
+
+    if (usage == 0)
+    {
+       usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
+    }
+
+    return usage;
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_GetAndroidHardwareBufferPropertiesANDROID(VkDevice device, const struct AHardwareBuffer* buffer, VkAndroidHardwareBufferPropertiesANDROID* pProperties)
@@ -1727,37 +1758,14 @@ VkResult __VK_constructAHardwareBuffer(
     format = android_format_from_vk(vkFormat);
 
     /* VK usage -> android usage */
-    if (vkUsage & VK_IMAGE_USAGE_SAMPLED_BIT)
-    {
-        usage |= AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
-    }
-    if (vkUsage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
-    {
-        usage |= AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
-    }
-    if (vkUsage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
-    {
-        usage |= AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT;
-    }
+    usage = getAndroidHardwareBufferUsageFromVkUsage(vkImgCreateFlags, vkUsage);
 
-    if (vkImgCreateFlags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT)
-    {
-#if ANDROID_SDK_VERSION > 26
-        usage |= AHARDWAREBUFFER_USAGE_GPU_CUBE_MAP;
-#else
-        return VK_ERROR_FORMAT_NOT_SUPPORTED;
-#endif
-    }
-    if (vkImgCreateFlags & VK_IMAGE_CREATE_PROTECTED_BIT)
-    {
-        usage |= AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT;
-    }
-
+    /* for buffer and non dedicated */
     if (format == AHARDWAREBUFFER_FORMAT_BLOB)
     {
-       usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN |
-               AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
-               AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER;
+        usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN |
+                AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
+                AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER;
     }
 
     desc.width  = Width;

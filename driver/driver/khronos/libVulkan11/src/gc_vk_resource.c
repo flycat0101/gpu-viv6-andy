@@ -1572,12 +1572,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
     )
 {
     VkResult result = VK_SUCCESS;
-    gceSTATUS status = gcvSTATUS_OK;
     __vkDeviceMemory *dvm = gcvNULL;
     __vkDevContext *devCtx = (__vkDevContext*)device;
     gctSIZE_T size = 0u;
     VkBaseInStructure *pBaseIn = (VkBaseInStructure *)pAllocateInfo->pNext;
-    VkBool32  bAllocated = VK_FALSE;
+    VkBool32  bExternalMemory = VK_FALSE;
     VkExportMemoryAllocateInfo    *exportInfo = VK_NULL_HANDLE;
     VkMemoryDedicatedAllocateInfo *dedicatedInfo = VK_NULL_HANDLE;
 
@@ -1606,18 +1605,18 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
 
 #if (ANDROID_SDK_VERSION >= 26)
     do {
-        if (!bAllocated && ahwImported)
+        if (ahwImported)
         {
+            bExternalMemory = VK_TRUE;
             __VK_ASSERT(ahwImported->buffer);
             __VK_ERR_BREAK(__ImportMemoryFromAHardware(device, ahwImported->buffer, pMemory));
             dvm = (__vkDeviceMemory *)*pMemory;
 
             __VK_acquireAHardwareBuffer(ahwImported->buffer);
             dvm->ahwBuffer    = ahwImported->buffer;
-            bAllocated = VK_TRUE;
         }
 
-        if (!bAllocated && exportInfo && (exportInfo->handleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID) != 0)
+        if (exportInfo && (exportInfo->handleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID) != 0)
         {
             uint32_t width = 0, height = 1, layers = 1;
             VkFormat            imgFormat = VK_FORMAT_UNDEFINED;
@@ -1625,6 +1624,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
             VkImageUsageFlags   imgUsage = 0;
             struct AHardwareBuffer *aBuffer;
 
+            bExternalMemory = VK_TRUE;
             if (dedicatedInfo && dedicatedInfo->image)
             {
                 __vkImage *img = (__vkImage*)dedicatedInfo->image;
@@ -1655,11 +1655,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
 
             dvm = (__vkDeviceMemory* )*pMemory;
             dvm->ahwBuffer    = aBuffer;
-
-            bAllocated = VK_TRUE;
         }
 
-        if (bAllocated && dvm)
+        if (dvm)
         {
             gcoOS_MemCopy(&dvm->allocInfo, pAllocateInfo, gcmSIZEOF(VkMemoryAllocateInfo));
 #if gcdDUMP
@@ -1677,7 +1675,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
     } while (gcvFALSE);
 #endif
 
-    if (!bAllocated)
+    if (!bExternalMemory)
     {
         do {
             /* Set the allocator to the parent allocator or API defined allocator if valid */
@@ -1734,7 +1732,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
             *pMemory = (VkDeviceMemory)(uintptr_t)dvm;
         } while (VK_FALSE);
 
-        if (gcmIS_ERROR(status) && dvm)
+        if (!__VK_IS_SUCCESS(result) && dvm)
         {
 #if (ANDROID_SDK_VERSION >= 26)
             if (dvm->ahwBuffer)
@@ -1753,6 +1751,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
                 __VK_VERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->node));
             }
             __vk_DestroyObject(devCtx, __VK_OBJECT_DEVICE_MEMORY, (__vkObject *)dvm);
+            *pMemory = VK_NULL_HANDLE;
         }
     }
 
@@ -2572,7 +2571,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateBuffer(
             buf->memReq.size = (gctSIZE_T)pCreateInfo->size;
         }
         buf->memReq.alignment = align;
-        buf->memReq.memoryTypeBits = 0x1;
+        buf->memReq.memoryTypeBits = 0x3;
 
         buf->memory = gcvNULL;
         buf->memOffset = 0;
@@ -2912,7 +2911,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
 
         img->memReq.size = totalBytes;
         img->memReq.alignment = alignment;
-        img->memReq.memoryTypeBits = 0x1;
+        img->memReq.memoryTypeBits = 0x3;
 
         img->memory = gcvNULL;
         img->memOffset = 0;
