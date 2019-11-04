@@ -4862,11 +4862,32 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Initialize(
     vx_binary_save binarySave = VX_NULL;
     vx_status status = VX_SUCCESS;
     vx_char *networkBinaryPath = VX_NULL;
+    vx_char NBNameFromGraph[256];
+
     gcmHEADER_ARG("graph=%p, fileName=%s", graph, fileName);
+
     if (graph == VX_NULL)
     {
         vxError("%s[%d]: graph is NULL\n", __FUNCTION__, __LINE__);
         vxmONERROR(VX_ERROR_INVALID_VALUE);
+    }
+
+    if (gcoOS_StrCmp(graph->base.name, "0") != gcvSTATUS_OK)
+    {
+        /* specify NBG name by vx_graph's reference */
+        gctSTRING special = VX_NULL;
+
+        gcoOS_StrCopySafe(NBNameFromGraph, BINARY_FILE_NAME_MAX_SIZE, graph->base.name);
+        gcoOS_StrFindReverse(graph->base.name, '.', &special);
+        if (special == VX_NULL)
+        {
+            gcoOS_StrCatSafe(NBNameFromGraph, BINARY_FILE_NAME_MAX_SIZE, ".nb");
+        }
+        vxInfo("graph name : %s\n", NBNameFromGraph);
+    }
+    else
+    {
+        gcoOS_MemFill((gctPOINTER)NBNameFromGraph, 0, 256);
     }
 
     /* get save binary file path */
@@ -4881,6 +4902,10 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Initialize(
             networkBinaryPath = VX_NULL;
             vxError("please export VIV_VX_SAVE_NETWORK_BINARY_PATH= has . suffix filename path\n");
             vxError("genereate network binary graph default filename\n");
+        }
+        else
+        {
+            vxInfo("env specify nbg name : %s\n", networkBinaryPath);
         }
     }
 
@@ -4900,7 +4925,16 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Initialize(
         /* save binary graph for VIPlite*/
         char dumpFile[BINARY_FILE_NAME_MAX_SIZE];
         vx_uint32 offset = 0;
-        if (networkBinaryPath == VX_NULL)
+
+        if (gcoOS_StrCmp(NBNameFromGraph, "0") != gcvSTATUS_OK)
+        {
+            gcoOS_StrCopySafe(dumpFile, BINARY_FILE_NAME_MAX_SIZE, NBNameFromGraph);
+        }
+        else if (networkBinaryPath != VX_NULL)
+        {
+            gcoOS_StrCopySafe(dumpFile, BINARY_FILE_NAME_MAX_SIZE, networkBinaryPath);
+        }
+        else
         {
             if (graph->graphID == 0)
             {
@@ -4925,10 +4959,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Initialize(
                                                 graph->graphID
                                                 ));
             }
-        }
-        else
-        {
-            gcoOS_StrCopySafe(dumpFile, BINARY_FILE_NAME_MAX_SIZE, networkBinaryPath);
         }
 
         /* Open tga file for write. */
