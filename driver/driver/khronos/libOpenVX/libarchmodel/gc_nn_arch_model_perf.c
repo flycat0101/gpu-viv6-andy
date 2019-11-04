@@ -928,7 +928,7 @@ static vx_float64 _calcImageReadBandWidth(
 
     tmpx = ((vx_float64)inx + (ceilf((vx_float32)x / tile_x) - 1.0) * (kx - 1.0)) / intile_x;
     tmpy = ((vx_float64)iny + (ceilf((vx_float32)y / tile_y) - 1.0) * (ky - 1.0)) / intile_y;
-    tmp = ceilf(tmpx) * tmpy;
+    tmp = ceilf((vx_float32)tmpx) * tmpy;
     imageRepeatSingleRead = _calcTile3DImageSingleReadRepeated(z, kernel_per_core, cores, is_depth_wise);
     imageRepeatRead = imageRepeatSingleRead * tmp;
     imageRepeatCacheRead = (imageRepeatSingleRead - 1.0f) * tmp;
@@ -1030,7 +1030,7 @@ static vx_float64 _calcReadBandWidth(
     vx_float64 cacheSizeInPixel, kernelIdealCache, imageIdealCache, kernelReadBandWidthTile0, imageReadBandWidthVZGroup0;
     vx_float64 kernelRepeatRead, imageRepeatSingleRead, imageRepeatRead, readBandWidth = 0, kernelNonIdealCache, kernelStorage;
     vx_float64 kernelReadBW, inImageReadBW;
-    vx_float32 tmpx, tmpy, tmp, zPerCore;
+    vx_float64 tmpx, tmpy, tmp, zPerCore;
     vx_uint32 intile_x = (tile_x + kx - 1);
     vx_uint32 intile_y = (tile_y + ky - 1);
     intile_x = gcmMIN(intile_x, inx);
@@ -1038,7 +1038,7 @@ static vx_float64 _calcReadBandWidth(
 
     tmpx = ((vx_float64)inx + (ceilf((vx_float32)x / tile_x) - 1.0) * (kx - 1.0)) / intile_x;
     tmpy = ((vx_float64)iny + (ceilf((vx_float32)y / tile_y) - 1.0) * (ky - 1.0)) / intile_y;
-    tmp = ceilf(tmpx) * tmpy;
+    tmp = ceilf((vx_float32)tmpx) * tmpy;
     cacheSizeInPixel = l2cache_size / ((vx_float32)data_size / 8);
 
     kernelRepeatRead = _calcKernel4DSingleReadRepeated(tile_x, tile_y, x, y);
