@@ -614,6 +614,20 @@ OnError:
 }
 
 static gceSTATUS
+_addCallInstWithSrcloc(
+    IN OUT gcSHADER       Shader,
+    IN gcFUNCTION         Callee,
+    IN gctUINT32          SrcLoc
+    )
+{
+    return gcSHADER_AddOpcodeConditional(Shader,
+                                         gcSL_CALL,
+                                         gcSL_ALWAYS,
+                                         Callee->label,
+                                         SrcLoc);
+}
+
+static gceSTATUS
 _addCallInst(
     IN OUT gcSHADER       Shader,
     IN gcFUNCTION         Callee
@@ -9029,6 +9043,26 @@ OnError:
 }
 
 static gceSTATUS
+_updateFunctionSrcloc(
+    IN OUT gcSHADER         Shader,
+    IN gcFUNCTION           Function,
+    IN gctUINT32            srcLoc
+    )
+{
+    gceSTATUS   status = gcvSTATUS_OK;
+    gctUINT codeStart = Function->codeStart;
+    gctUINT codeEnd = Function->codeStart + Function->codeCount;
+    gctUINT i;
+    for (i = codeStart; i <= codeEnd; i++)
+    {
+        gcSL_INSTRUCTION code = Shader->code + i;
+        code->srcLoc =  srcLoc;
+    }
+
+    return status;
+}
+
+static gceSTATUS
 _patchLongULongVIR(
     IN OUT gcSHADER         Shader,
     IN gcsPatchLongULong *  Patch
@@ -9056,7 +9090,7 @@ _patchLongULongVIR(
         gctUINT patchInstrIndex  = Patch->instructionIndex;
         gcSL_INSTRUCTION code    = &Shader->code[patchInstrIndex];
         gcSL_CONDITION condition = gcmSL_TARGET_GET(code->temp, Condition);
-        gctUINT32   srcLoc;
+        gctUINT32 srcLoc = code->srcLoc;
 
         /* Construct longULong processing function. */
         if(gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_JMP &&
@@ -9069,8 +9103,6 @@ _patchLongULongVIR(
             gctUINT32    jmpIndex = 0;
             gctUINT32    origJmpLabel = 0;
             gctUINT      jmpLabel = 0;
-
-            srcLoc = code->srcLoc;
 
             {
                 /* Construct longULong processing function. */
@@ -9136,8 +9168,6 @@ _patchLongULongVIR(
             gctUINT32   origJmpLabel = 0;
             gctUINT     jmpLabel = 0;
 
-            srcLoc = Shader->code[patchInstrIndex].srcLoc;
-
             /* Construct longULong processing function. */
             gcmONERROR(_createLongULongFunction_jmp(Shader,
                                                     gcCLPatchLibrary[LONG_ULONG_LIB_INDEX],
@@ -9202,6 +9232,10 @@ _patchLongULongVIR(
                                                         Patch,
                                                         convertFunction);
 
+            /* update the source loc */
+            _updateFunctionSrcloc(Shader, convertFunction, srcLoc);
+            _updateFunctionSrcloc(Shader, stubFunction, srcLoc);
+
             /* Change the instruciton to call stub */
             code = &Shader->code[patchInstrIndex];
             gcSL_SetInst2NOP(code);
@@ -9209,7 +9243,7 @@ _patchLongULongVIR(
             instrIndex = Shader->instrIndex;
             Shader->lastInstruction = patchInstrIndex;
             Shader->instrIndex = gcSHADER_OPCODE;
-            _addCallInst(Shader, stubFunction);
+            _addCallInstWithSrcloc(Shader, stubFunction, srcLoc);
             Shader->lastInstruction = lastInstruction;
             Shader->instrIndex = instrIndex;
         }
