@@ -1983,6 +1983,8 @@ VIR_Shader_Construct0(
     Shader->samplerBaseOffset           = -1;
     Shader->baseSamplerId               = VIR_INVALID_ID;
     Shader->kernelNameId                = VIR_INVALID_ID;
+    Shader->optionsLen                  = 0;
+    Shader->buildOptions                = gcvNULL;
 
     /* initialize the execution mode in tcs and tes to UNDEFINED */
     if (ShaderKind == VIR_SHADER_TESSELLATION_CONTROL)

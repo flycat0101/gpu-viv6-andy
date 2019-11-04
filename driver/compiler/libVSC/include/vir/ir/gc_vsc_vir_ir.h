@@ -4738,6 +4738,8 @@ typedef enum _VIR_SHADERFLAGS
 
     VIR_SHFLAG_HAS_ALIAS_ATTRIBUTE              = 0x20000000, /* APP sets the aliased attribute for this shader. */
     VIR_SHFLAG_HAS_VIV_GCSL_DRIVER_IMAGE        = 0x40000000, /* the shader has Vivante OCL GcSL driver image option setting */
+
+    VIR_SHFLAG_GENERATED_OFFLINE_COMPILER       = 0x80000000, /* Whether use offline compile. */
 } VIR_ShaderFlags;
 
 typedef enum _VIR_SHADERFLAGS_EXT1
@@ -4788,6 +4790,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
 #define VIR_Shader_HasDefineMainFunc(Shader)        (((Shader)->flags & VIR_SHFLAG_HAS_DEFINE_MAIN_FUNC) != 0)
 #define VIR_Shader_UsePrivateMem(Shader)            (((Shader)->flags & VIR_SHFLAG_USE_PRIVATE_MEM) != 0)
 #define VIR_Shader_HasAliasedAttribute(Shader)      (((Shader)->flags & VIR_SHFLAG_HAS_ALIAS_ATTRIBUTE) != 0)
+#define VIR_Shader_UseOfflineCompiler(Shader)       (((Shader)->flags & VIR_SHFLAG_GENERATED_OFFLINE_COMPILER) != 0)
 
 /* let the client make sure the shaderKind is right.
    Otherwise, it is wrong when the flag is used in !flag case. */
@@ -5187,6 +5190,10 @@ struct _VIR_SHADER
 
     /* Transform feedback varyings */
     VIR_TransformFeedback   transformFeedback;
+
+    /* Build Options String */
+    gctUINT             optionsLen;
+    gctSTRING           buildOptions;
 
     /* Source code string */
     gctUINT             sourceLength;            /* including terminating '\0' */

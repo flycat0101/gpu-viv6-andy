@@ -296,9 +296,30 @@ gcCompileKernel(
     gceSTATUS status;
     cloCOMPILER compiler = gcvNULL;
     gctBOOL locked = gcvFALSE;
+    gctUINT debugLevel = 0;
 
     gcmONERROR(_LockCompiler());
     locked = gcvTRUE;
+
+    debugLevel = gcmOPT_GetDebugLevel();
+    if (Options && *Options != 0 && gcmOPT_hasFeature(FE_GENERATED_OFFLINE_COMPILER))
+    {
+        gctSTRING pos = gcvNULL;
+        gcoOS_StrStr(Options, "-", &pos);
+
+        while (pos)
+        {
+            pos++;
+            if (!pos)
+                break;
+
+            if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "g", 1))
+            {
+                gcmOPT_SetDebugLevel(4);
+            }
+            gcoOS_StrStr(pos, "-", &pos);
+        }
+    }
 
     compiler = *gcGetKernelCompiler();
     if (compiler == gcvNULL)
@@ -315,6 +336,9 @@ gcCompileKernel(
                               Options,
                               Binary,
                               Log));
+
+    gcmOPT_SetDebugLevel(debugLevel);
+
 OnError:
     if (compiler != gcvNULL) gcmVERIFY_OK(cloCOMPILER_Destroy(compiler));
 

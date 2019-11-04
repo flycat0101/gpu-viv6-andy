@@ -3002,6 +3002,11 @@ void _VIR_RA_LS_MarkDef(
                                 pLR->currDef = VIR_RA_LS_GetCurrPos(pRA);
                             }
                         }
+                        /* set nousedcolor flag in debug mode */
+                        if (gcmOPT_DisableOPTforDebugger())
+                        {
+                            VIR_RA_LR_SetFlag(pLR, VIR_RA_LRFLAG_NO_USED_COLOR);
+                        }
 
                         _VIR_RA_LS_SetRegNoRange(pRA, defIdx, firstRegNo, regNoRange, gcvTRUE);
 
@@ -3929,7 +3934,7 @@ void _VIR_RA_LS_ExpireActiveLRs(
     gctUINT             pos)
 {
     VIR_RA_LS_Liverange *pPrev, *pCurr, *pNext;
-    gctBOOL             debugEnabled = gcmOPT_EnableDebug();
+    gctBOOL             debugEnabled = gcmOPT_DisableOPTforDebugger();
 
     if (!debugEnabled)
     {
@@ -3960,7 +3965,7 @@ _VIR_RA_LS_SetUsedColorForLR(
     VSC_ErrCode retValue = VSC_ERR_NONE;
     VIR_Enable  LREnable = VIR_RA_LS_LR2WebChannelMask(pRA, pLR);
     gctUINT     highDiff = 0, i, regNo, regNoHI;
-    gctBOOL     debugEnabled = gcmOPT_EnableDebug();
+    gctBOOL     debugEnabled = gcmOPT_DisableOPTforDebugger();
 
     /* Set the usedColor bit accordingly */
     gcmASSERT(!_VIR_RA_LS_IsInvalidColor(_VIR_RA_GetLRColor(pLR)));
@@ -6894,7 +6899,7 @@ VSC_ErrCode  _VIR_RA_LS_AssignColorLR(
     VIR_RA_HWReg_Color  curColor;
     gctBOOL             newColor = gcvFALSE, needHI = gcvFALSE;
     VIR_Enable          LREnable = VIR_RA_LS_LR2WebChannelMask(pRA, pLR);
-    gctBOOL             debugEnabled = gcmOPT_EnableDebug();
+    gctBOOL             debugEnabled = gcmOPT_DisableOPTforDebugger();
 
     curColor = InvalidColor;
 
@@ -12933,7 +12938,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
         ra.resDataRegisterCount = 4;
         _VIR_RA_LS_SetReservedReg(&ra);
     }
-    if (gcmOPT_EnableDebug())
+    if (gcmOPT_EnableDebug() || gcmOPT_DisableOPTforDebugger())
     {
         ra.DIContext = (VSC_DIContext *)pShader->debugInfo;
     }
@@ -13169,7 +13174,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
         pPassWorker->pResDestroyReq->s.bInvalidateCfg= gcvTRUE;
     }
 
-    if (gcmOPT_EnableDebug() && ra.DIContext)
+    if ((gcmOPT_EnableDebug() || gcmOPT_DisableOPTforDebugger()) && ra.DIContext)
     {
         _VIR_RA_LS_WriteDebugInfo(&ra);
     }

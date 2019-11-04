@@ -1686,6 +1686,9 @@ typedef struct _gcOPTIMIZER_OPTION
      */
     gctBOOL     DriverVIRPath;
 
+    /* Close all optimization fro OCL debugger */
+    gctBOOL     disableOptForDebugger;
+
     /* NOTE: when you add a new option, you MUST initialize it with default
        value in theOptimizerOption too */
 } gcOPTIMIZER_OPTION;
@@ -1755,7 +1758,8 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_EnableDebug()        (gcmGetOptimizerOption()->enableDebug > 0)
 #define gcmOPT_EnableDebugDump()    (gcmGetOptimizerOption()->enableDebug > 1)
 #define gcmOPT_EnableDebugDumpALL() (gcmGetOptimizerOption()->enableDebug > 2)
-#define gcmOPT_EnableDebugMode()    (gcmGetOptimizerOption()->enableDebug == 4)
+#define gcmOPT_GetDebugLevel()      (gcmGetOptimizerOption()->enableDebug)
+#define gcmOPT_SetDebugLevel(level) (gcmGetOptimizerOption()->enableDebug = level)
 #define gcmOPT_INLINERKIND()        (gcmGetOptimizerOption()->inlinerKind)
 #define gcmOPT_INLINELEVEL()        (gcmGetOptimizerOption()->inlineLevel)
 #define gcmOPT_SetINLINELEVEL(v)    (gcmGetOptimizerOptionVariable()->inlineLevel = (v))
@@ -1765,6 +1769,9 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_DualFP16Mode()       (gcmGetOptimizerOption()->dual16Mode)
 #define gcmOPT_DualFP16Start()      (gcmGetOptimizerOption()->_dual16Start)
 #define gcmOPT_DualFP16End()        (gcmGetOptimizerOption()->_dual16End)
+
+#define gcmOPT_DisableOPTforDebugger()     (gcmGetOptimizerOption()->disableOptForDebugger)
+#define gcmOPT_SetDisableOPTforDebugger(b) (gcmGetOptimizerOption()->disableOptForDebugger = b)
 
 #define gcmOPT_TESSLEVEL()          (gcmGetOptimizerOption()->testTessLevel)
 
@@ -1832,6 +1839,8 @@ extern gctBOOL gcDoTriageForShaderId(gctINT shaderId, gctINT startId, gctINT end
 #define FB_TREAT_CONST_ARRAY_AS_UNIFORM     0x20000 /* Treat a const array as a uniform,
                                                        it can decrease the temp registers but increases the constant registers. */
 #define FB_DISABLE_GL_LOOP_UNROLLING        0x40000 /* Disable loop unrolling for GL FE. */
+
+#define FE_GENERATED_OFFLINE_COMPILER       0x80000 /* Enable Offline Compile . */
 
 #define gcmOPT_SetPatchTexld(m,n) (gcmGetOptimizerOption()->patchEveryTEXLDs = (m),\
                                    gcmGetOptimizerOption()->patchDummyTEXLDs = (n))
@@ -8505,6 +8514,12 @@ gcSHADER_SetNotStagesRelatedLinkError(
 gceSTATUS
 gcSHADER_Has64BitOperation(
     IN gcSHADER                    Shader
+    );
+
+void
+gcSHADER_SetBuildOptions(
+    IN gcSHADER             Shader,
+    IN gctSTRING            Options
     );
 
 void

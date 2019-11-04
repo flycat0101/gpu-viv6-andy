@@ -6145,6 +6145,24 @@ gceSTATUS vscCreateKernel(VSC_SHADER_COMPILER_PARAM*      pCompilerParam,
     VIR_Shader*                       pKernel = (VIR_Shader*)pCompilerParam->hShader;
 
     vscInitializePassMMPool(&passMemPool);
+    if (pKernel->optionsLen && VIR_Shader_UseOfflineCompiler(pKernel))
+    {
+        gctSTRING pos = gcvNULL;
+        gcoOS_StrStr(pKernel->buildOptions, "-", &pos);
+
+        while (pos)
+        {
+            pos++;
+            if (!pos)
+                break;
+
+            if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "O0", 2))
+            {
+                gcmOPT_SetDisableOPTforDebugger(gcvTRUE);
+            }
+            gcoOS_StrStr(pos, "-", &pos);
+        }
+    }
     vscInitializeOptions(&options,
                          &pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
                          pCompilerParam->cfg.cFlags,
@@ -6159,6 +6177,7 @@ gceSTATUS vscCreateKernel(VSC_SHADER_COMPILER_PARAM*      pCompilerParam,
                       VSC_PM_MODE_SEMI_AUTO);
 
     errCode = _CreateKernelInternal(&shPassMnger, pOutKEP, pOutKrnlStates);
+    gcmOPT_SetDisableOPTforDebugger(gcvFALSE);
     ON_ERROR(errCode, "Create kernel internal");
 
 OnError:

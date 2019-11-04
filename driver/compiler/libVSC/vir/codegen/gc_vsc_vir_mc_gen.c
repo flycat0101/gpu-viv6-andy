@@ -2924,32 +2924,35 @@ static gctBOOL _NeedGen(gctUINT                baseOpcode,
                         gctUINT                srcCount)
 {
     gctUINT channel;
-
-    /* FB_INSERT_MOV_INPUT: insert MOV Rn, Rn for input to help HW team to debug */
-    if (!gcmOPT_hasFeature(FB_INSERT_MOV_INPUT) &&
-        !pInstCtrl->bForceGen &&
-        baseOpcode == 0x09 &&
-        pSrc[srcCount - 1].regType == 0x0 &&
-        pSrc[srcCount - 1].u.reg.regNo == pDst->regNo &&
-        pDst->u.nmlDst.indexingAddr == pSrc[srcCount - 1].u.reg.indexingAddr &&
-        !pSrc[srcCount - 1].u.reg.bAbs &&
-        !pSrc[srcCount - 1].u.reg.bNegative &&
-        !pInstCtrl->bResultSat &&
-        pInstCtrl->condOpCode == 0x00 &&
-        pSrc[srcCount - 1].regType == pDst->regType)
+    gctBOOL debugEnabled = gcmOPT_DisableOPTforDebugger();
+    if (!debugEnabled)
     {
-        for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+        /* FB_INSERT_MOV_INPUT: insert MOV Rn, Rn for input to help HW team to debug */
+        if (!gcmOPT_hasFeature(FB_INSERT_MOV_INPUT) &&
+            !pInstCtrl->bForceGen &&
+            baseOpcode == 0x09 &&
+            pSrc[srcCount - 1].regType == 0x0 &&
+            pSrc[srcCount - 1].u.reg.regNo == pDst->regNo &&
+            pDst->u.nmlDst.indexingAddr == pSrc[srcCount - 1].u.reg.indexingAddr &&
+            !pSrc[srcCount - 1].u.reg.bAbs &&
+            !pSrc[srcCount - 1].u.reg.bNegative &&
+            !pInstCtrl->bResultSat &&
+            pInstCtrl->condOpCode == 0x00 &&
+            pSrc[srcCount - 1].regType == pDst->regType)
         {
-            if (pDst->u.nmlDst.writeMask & (1 << channel))
+            for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
             {
-                if (((pSrc[0].u.reg.swizzle >> channel * 2) & 0x3) != channel)
+                if (pDst->u.nmlDst.writeMask & (1 << channel))
                 {
-                    return gcvTRUE;
+                    if (((pSrc[0].u.reg.swizzle >> channel * 2) & 0x3) != channel)
+                    {
+                        return gcvTRUE;
+                    }
                 }
             }
-        }
 
-        return gcvFALSE;
+            return gcvFALSE;
+        }
     }
 
     return gcvTRUE;

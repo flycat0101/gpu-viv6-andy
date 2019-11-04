@@ -2212,6 +2212,9 @@ gcSHADER_Construct(
         }
     }
 
+    shader->optionsLen = 0;
+    shader->buildOptions = gcvNULL;
+
     /* Return gcSHADER object pointer. */
     *Shader = shader;
 
@@ -2728,6 +2731,12 @@ _gcSHADER_Clean(
     if (Shader->ltcUniformValues != gcvNULL)
     {
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Shader->ltcUniformValues));
+    }
+
+    if(Shader->buildOptions && Shader->optionsLen)
+    {
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Shader->buildOptions));
+        Shader->optionsLen = 0;
     }
 
     /* Free source code string */
@@ -14838,6 +14847,54 @@ gcSHADER_LoadEx(
         }
     }
 
+    /* Build Options String Length */
+    bytes -= binarySize;  /* remaining bytes */
+
+    if (bytes < sizeof(gctUINT))
+    {
+        /* Invalid code count. */
+        gcmFATAL("gcSHADER_LoadEx: Invalid codeCount");
+        gcmFOOTER();
+        return gcvSTATUS_INVALID_DATA;
+    }
+
+    /* Type name buffer size. */
+    gcoOS_MemCopy(&Shader->optionsLen, curPos, sizeof(gctUINT));
+    curPos += sizeof(gctUINT);
+    binarySize = sizeof(gctUINT);
+
+    /* Build Options String */
+    if (Shader->optionsLen)
+    {
+        bytes -= binarySize;
+        if (bytes < Shader->optionsLen)
+        {
+            /* Invalid type name buffer. */
+            gcmFATAL("gcSHADER_LoadEx: Invalid type name buffer");
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+
+        status = gcoOS_Allocate(gcvNULL,
+                                Shader->optionsLen,
+                                &pointer);
+        if (gcmIS_ERROR(status))
+        {
+            /* Roll back. */
+            Shader->optionsLen = 0;
+
+            /* Error. */
+            gcmFATAL("gcSHADER_LoadEx: gcoOS_Allocate failed status=%d", status);
+            gcmFOOTER();
+            return status;
+        }
+
+        Shader->buildOptions = pointer;
+        gcoOS_MemCopy(Shader->buildOptions, curPos, Shader->optionsLen);
+        binarySize = gcmALIGN(Shader->optionsLen, 2);
+        curPos += binarySize;
+    }
+
     /* Source code string */
     {
         /* curPos points to sourceLength */
@@ -15322,6 +15379,15 @@ gcSHADER_SaveEx(
 
     /* Type name buffer. */
     bytes += gcmALIGN(Shader->typeNameBufferSize, 2);
+
+    /* Build Options String Length */
+    bytes += sizeof(gctUINT);
+
+    /* Build Options String */
+    if (Shader->optionsLen)
+    {
+        bytes += gcmALIGN(Shader->optionsLen, 2);
+    }
 
     /* Source string */
     bytes += sizeof(Shader->sourceLength);
@@ -16295,6 +16361,17 @@ gcSHADER_SaveEx(
         gcmASSERT(Shader->typeNameBuffer);
         gcoOS_MemCopy(buffer, Shader->typeNameBuffer, Shader->typeNameBufferSize);
         buffer += gcmALIGN(Shader->typeNameBufferSize, 2);
+    }
+
+    /* Build Options string Length. */
+    gcoOS_MemCopy(buffer, &Shader->optionsLen, sizeof(gctUINT));
+    buffer += sizeof(gctUINT);
+
+    /* Build Options string */
+    if (Shader->optionsLen && Shader->buildOptions)
+    {
+        gcoOS_MemCopy(buffer, Shader->buildOptions, Shader->optionsLen);
+        buffer += gcmALIGN(Shader->optionsLen, 2);
     }
 
     /* Source code string */
@@ -27413,6 +27490,23 @@ gcSHADER_GetFunctionByFuncHead(
 }
 
 #if (!VSC_LITE_BUILD)
+void
+gcSHADER_SetBuildOptions(
+    IN gcSHADER             Shader,
+    IN gctSTRING            Options
+    )
+{
+    Shader->optionsLen = gcoOS_StrLen(Options, NULL) + 1;
+    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL,
+                                Shader->optionsLen,
+                                &Shader->buildOptions));
+
+    gcmVERIFY_OK(gcoOS_StrCopySafe(Shader->buildOptions,
+                                   Shader->optionsLen,
+                                   Options));
+}
+
+
 void
 gcSHADER_SetDebugInfo(
     IN gcSHADER             Shader,

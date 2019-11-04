@@ -2738,7 +2738,7 @@ static void _PostProcessNewWeb(VIR_DEF_USAGE_INFO* pDuInfo, gctUINT newWebIdx)
     }
 
     /* 4. In debug mode, merge all "varibles" with same regno into one web */
-    if (gcmOPT_EnableDebug())
+    if (gcmOPT_EnableDebug() || gcmOPT_DisableOPTforDebugger())
     {
         VIR_Symbol  *sym = gcvNULL;
         sym = VIR_Shader_FindSymbolByTempIndex(pDuInfo->baseTsDFA.baseDFA.pOwnerCG->pOwnerShader,

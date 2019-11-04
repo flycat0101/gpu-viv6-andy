@@ -117,6 +117,8 @@ struct _cloCOMPILER
         gctBOOL          longUlongPatch;
         VSC_DIContext *  debugInfo;
         gctBOOL          mainFile;
+        gctUINT          optionsLen;
+        gctSTRING        buildOptions;
     } context;
     cloPREPROCESSOR      preprocessor;
     cloCODE_EMITTER      codeEmitter;
@@ -1489,6 +1491,11 @@ cloCOMPILER_Compile(
            gcShaderSetHasVivGcslDriverImage(Compiler->binary);
         }
 
+        gcShaderClrEnableOfflineCompiler(Compiler->binary);
+        if(gcmOPT_hasFeature(FE_GENERATED_OFFLINE_COMPILER)) {
+            gcShaderSetEnableOfflineCompiler(Compiler->binary);
+        }
+
         /* Pack the binary */
         gcmONERROR(gcSHADER_Pack(Compiler->binary));
 
@@ -1507,6 +1514,11 @@ cloCOMPILER_Compile(
 
         gcSHADER_SetDebugInfo(Compiler->binary, Compiler->context.debugInfo);
         Compiler->context.debugInfo = gcvNULL;
+
+        if (Options != 0 && *Options != 0)
+        {
+            gcSHADER_SetBuildOptions(Compiler->binary, (gctSTRING)Options);
+        }
 
         /* Return */
         *Binary    = Compiler->binary;

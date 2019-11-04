@@ -3869,7 +3869,7 @@ void VSC_OPTN_Options_MergeVCEnvOption(
 
     {
         /* turn off most opts when debugging mode is turned on */
-        if (gcmOPT_EnableDebugMode())
+        if (gcmOPT_DisableOPTforDebugger())
         {
             VSC_OPTN_ISOptions_SetSwitchOn(VSC_OPTN_Options_GetISOptions(options, 0), gcvFALSE);
             VSC_OPTN_ISOptions_SetSwitchOn(VSC_OPTN_Options_GetISOptions(options, 1), gcvFALSE);

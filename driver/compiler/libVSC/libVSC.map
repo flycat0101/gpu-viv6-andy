@@ -302,6 +302,7 @@
     gcSHADER_GoVIRPass;
     gcSHADER_SetDebugInfo;
     gcSHADER_GetDebugInfo;
+	gcSHADER_SetBuildOptions;
 	gcSHADER_SetAttrLocationByDriver;
     gcSHADER_SetFragOutUsage;
 

@@ -572,7 +572,7 @@ void vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHAD
                       pSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16,
                       &sepDumper);
 
-    if (gcmOPT_EnableDebugDump() &&
+    if ((gcmOPT_EnableDebugDump() || gcmOPT_DisableOPTforDebugger()) &&
         pShader->debugInfo)
     {
         vscDIDumpDIETree(pShader->debugInfo, 0, 0xffffffff);

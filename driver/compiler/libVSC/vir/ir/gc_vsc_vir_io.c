@@ -4688,6 +4688,8 @@ VIR_Shader_Copy(
     Copy_Field(Shader, Source, privateMemorySize);
     Copy_Field(Shader, Source, localMemorySize);
     Copy_Field(Shader, Source, debugInfo);
+    Copy_Field(Shader, Source, optionsLen);
+    Copy_Field(Shader, Source, buildOptions);
     Copy_Field(Shader, Source, fragColorUsage);
 
     Copy_Field(Shader, Source, constUBOSize);

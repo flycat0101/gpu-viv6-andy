@@ -422,6 +422,10 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      */
     gcvFALSE, /* DriverVIRPath; */
 
+    /* whether to close all optimization for ocl debugger
+     */
+    gcvFALSE, /* enableCloseOPTforDebugger;*/
+
 };
 
 const struct _gcSL_INSTRUCTION gcvSL_NOP_INSTR =

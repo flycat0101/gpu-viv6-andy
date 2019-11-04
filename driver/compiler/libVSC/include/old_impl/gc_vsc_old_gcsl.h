@@ -4200,6 +4200,7 @@ typedef enum _gcSHADER_FLAGS
     gcSHADER_FLAG_HAS_DEFINE_MAIN_FUNC      = 0x800000, /* Whether the shader defines a main function, for GL shader only. */
     gcSHADER_FLAG_ENABLE_MULTI_GPU          = 0x1000000, /* whether enable multi-GPU. */
     gcSHADER_FLAG_HAS_VIV_GCSL_DRIVER_IMAGE = 0x2000000, /* the shader has OCL option `-cl-viv-gcsl-driver-image */
+    gcSHADER_FLAG_GENERATED_OFFLINE_COMPILER= 0x4000000, /* whether enable offline compile. */
 } gcSHADER_FLAGS;
 
 #define gcShaderIsOldHeader(Shader)             (((Shader)->flags & gcSHADER_FLAG_OLDHEADER) != 0)
@@ -4228,6 +4229,7 @@ typedef enum _gcSHADER_FLAGS
 #define gcShaderConstantMemoryReferenced(Shader) (((Shader)->flags & gcSHADER_FLAG_CONSTANT_MEMORY_REFERENCED) != 0)
 #define gcShaderHasDefineMainFunc(Shader)       (((Shader)->flags & gcSHADER_FLAG_HAS_DEFINE_MAIN_FUNC) != 0)
 #define gcShaderEnableMultiGPU(Shader)          (((Shader)->flags & gcSHADER_FLAG_ENABLE_MULTI_GPU) != 0)
+#define gcShaderEnableOfflineCompiler(Shader)   (((Shader)->flags & gcSHADER_FLAG_GENERATED_OFFLINE_COMPILER) != 0)
 
 #define gcShaderGetFlag(Shader)                 (Shader)->flags)
 
@@ -4275,6 +4277,8 @@ typedef enum _gcSHADER_FLAGS
 #define gcShaderClrHasDefineMainFunc(Shader)    do { (Shader)->flags &= ~gcSHADER_FLAG_HAS_DEFINE_MAIN_FUNC; } while (0)
 #define gcShaderSetEnableMultiGPU(Shader)       do { (Shader)->flags |= gcSHADER_FLAG_ENABLE_MULTI_GPU; } while (0)
 #define gcShaderClrEnableMultiGPU(Shader)       do { (Shader)->flags &= ~gcSHADER_FLAG_ENABLE_MULTI_GPU; } while (0)
+#define gcShaderSetEnableOfflineCompiler(Shader)do { (Shader)->flags |= gcSHADER_FLAG_GENERATED_OFFLINE_COMPILER; } while (0)
+#define gcShaderClrEnableOfflineCompiler(Shader)do { (Shader)->flags &= ~gcSHADER_FLAG_GENERATED_OFFLINE_COMPILER; } while (0)
 
 #define gcShaderSetFlag(Shader, Flag)           do { (Shader)->flags = (Flag); } while (0)
 
@@ -4605,6 +4609,9 @@ struct _gcSHADER
 
     void *                      debugInfo;
     gceFRAGOUT_USAGE            fragOutUsage;
+
+    gctUINT32                   optionsLen;
+    gctSTRING                   buildOptions;
 
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
     /* used to modefy the index of instruction when need to insert instruction into the shader when recompile */

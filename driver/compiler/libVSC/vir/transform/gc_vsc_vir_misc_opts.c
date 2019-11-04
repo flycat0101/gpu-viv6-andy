@@ -6712,7 +6712,7 @@ DEF_SH_NECESSITY_CHECK(VIR_Shader_CheckDual16able)
         VIR_Shader_IsOpenVG(Shader)                               ||
         VIR_Shader_HasOutputArrayHighp(Shader)                    || /* currently, we disable dual16 if the output array is highp */
         !VirSHADER_DoDual16(VIR_Shader_GetId(Shader))             ||
-        gcmOPT_EnableDebug()                                         /* we disable dual16 for debugging mode */
+        gcmOPT_DisableOPTforDebugger()                               /* we disable dual16 for debugging mode */
         )
     {
         return gcvFALSE;

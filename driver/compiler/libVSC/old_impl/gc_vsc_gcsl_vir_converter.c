@@ -7345,6 +7345,9 @@ gcSHADER_Conv2VIR(
     VirShader->useLastFragData = Shader->useLastFragData;
 
     /* convert shader flags */
+    if (gcShaderEnableOfflineCompiler(Shader))
+        VIR_Shader_SetFlag(VirShader, VIR_SHFLAG_GENERATED_OFFLINE_COMPILER);
+
     if (gcShaderIsOldHeader(Shader))
         VIR_Shader_SetFlag(VirShader, VIR_SHFLAG_OLDHEADER);
 
@@ -8066,6 +8069,20 @@ gcSHADER_Conv2VIR(
     /* Save the constant memory size. */
     VIR_Shader_SetConstantMemorySize(VirShader,GetShaderConstantMemorySize(Shader));
     VirShader->constantMemoryBuffer = Shader->constantMemoryBuffer;
+
+    /* Build options string */
+    VirShader->optionsLen = Shader->optionsLen;
+    if (VirShader->optionsLen)
+    {
+        gcmONERROR(gcoOS_Allocate(gcvNULL,
+                            VirShader->optionsLen,
+                            &pointer));
+
+        VirShader->buildOptions = pointer;
+        gcmONERROR(gcoOS_StrCopySafe(VirShader->buildOptions,
+                                       VirShader->optionsLen,
+                                       Shader->buildOptions));
+    }
 
     VirShader->fragColorUsage = Shader->fragOutUsage;
 
