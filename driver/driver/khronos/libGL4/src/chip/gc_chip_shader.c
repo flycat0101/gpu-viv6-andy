@@ -4620,7 +4620,7 @@ gcChipProgramBuildBindingInfo(
 
                 size = input->size;
                 /* Find continuous un-occupied slot */
-                for (index = 0; index < (GLint)gc->constants.shaderCaps.maxUserVertAttributes; ++index)
+                for (index = 0; index < (GLint)gc->constants.shaderCaps.maxUserVertAttributes; )
                 {
                     for (j = 0; j < size; ++j)
                     {
@@ -4634,6 +4634,7 @@ gcChipProgramBuildBindingInfo(
                     {
                         break;
                     }
+                    index += j + 1;
                 }
 
                 if (index >= (GLint)gc->constants.shaderCaps.maxUserVertAttributes)
@@ -5093,6 +5094,76 @@ gcChipProgramBuildBindingInfo(
                 }
             }
         }
+
+        if (gc->imports.conformGLSpec)
+        {
+            gcOUTPUT output;
+            GLboolean fragDataUnassignedFlag = GL_FALSE;
+            GLint fragDataLocationArray[__GL_MAX_DRAW_BUFFERS] = {0};
+
+            /* Step 1: Walk all binding and assigned fragment color location which is specified */
+            for (i = 0; i < resCount; ++i)
+            {
+                gcmONERROR(gcSHADER_GetOutput(pBinaries[lastStage], i, &output));
+                if (output)
+                {
+                    if (-1 == output->location)
+                    {
+                        fragDataUnassignedFlag = GL_TRUE;
+                        continue;
+                    }
+
+                    GL_ASSERT(output->location < GL_MAX_DRAW_BUFFERS);
+                    fragDataLocationArray[output->location] = GL_TRUE;
+                }
+            }
+
+            /* Step 2: Walk all unassigned fragement color location, and assign by driver */
+            if (fragDataUnassignedFlag)
+            {
+                for (i = 0; i < resCount; ++i)
+                {
+                    gcmONERROR(gcSHADER_GetOutput(pBinaries[lastStage], i, &output));
+                    if (output)
+                    {
+                        gctSIZE_T size;
+
+                        if ((-1 != output->location) || (0 != output->arrayIndex))
+                        {
+                            continue;
+                        }
+
+                        size = output->arraySize;
+                        /* Find continuous un-occupied slot */
+                        for (index = 0; index < (GLint)gc->constants.shaderCaps.maxDrawBuffers; )
+                        {
+                            for (j = 0; j < size; ++j)
+                            {
+                                if ((index + j < (GLint)gc->constants.shaderCaps.maxDrawBuffers) && (fragDataLocationArray[index + j]))
+                                {
+                                    break;
+                                }
+                            }
+
+                            if (j == size)
+                            {
+                                output->location = index;
+                                break;
+                            }
+                            index += j + 1;
+                        }
+
+                        if (index >= (GLint)gc->constants.shaderCaps.maxDrawBuffers)
+                        {
+                            gcmONERROR(gcoOS_PrintStrSafe(logBuffer, __GLSL_LOG_INFO_SIZE, &logOffset, "No room for Fragment Color %d (x %d).\n", i, size));
+                            gcmTRACE(gcvLEVEL_ERROR, "No room for Fragment Color %d (x %d)", i, size);
+                            gcmONERROR(gcvSTATUS_TOO_MANY_ATTRIBUTES);
+                        }
+                    }
+                }
+            }
+        }
+
         gc->imports.free(gc, (gctPOINTER)names);
     }
     else
@@ -9541,9 +9612,12 @@ __glChipBindFragDataLocation(
         /* If found the output and arrayIdx is within range */
         if (i < program->outCount && arrayIdx < (gctSIZE_T)output->arraySize)
         {
-            location = output->location + (gctINT)arrayIdx - output->startIndex;
+            location = (-1 == output->location) ? output->location :
+                (output->location + (gctINT)arrayIdx - output->startIndex);
+
             if (location != (GLint)colorNumber)
             {
+                output->location = colorNumber;
             }
         }
     }
