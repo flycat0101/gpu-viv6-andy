@@ -235,8 +235,14 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
             vx_uint32 weightX = TENSOR_SIZE_INDEX(weight, 0);
             vx_uint32 weightY = TENSOR_SIZE_INDEX(weight, 1);
 
+            vx_tensor inputTensor = (vx_tensor)node->paramTable[0];
+
             weightX = vxoGraphOptimization_computeFinalKernelSize(weightX, strideX);
             weightY = vxoGraphOptimization_computeFinalKernelSize(weightY, strideY);
+
+            if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
+                (TENSOR_SIZE_INDEX(inputTensor,0) > NN_IMAGE_XSIZE_MAX || TENSOR_SIZE_INDEX(inputTensor, 1) > NN_IMAGE_YSIZE_MAX) )
+                break;
 
             if(VX_TENSOR_LIFE_TIME_STATIC == TENSOR_DATA_LIFETIME(weight) &&
                  (node->paramTable[2] != VX_NULL ? VX_TENSOR_LIFE_TIME_STATIC == TENSOR_DATA_LIFETIME((vx_tensor)node->paramTable[2]) : vx_true_e) &&
@@ -379,6 +385,22 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
     case VX_KERNEL_NN_FULLY_CONNECTED_RELU_LAYER:
         {
             nodeOpType = OP_FULLYCONNECTED;
+            {
+                /* for batchfc, batch dims will be transposed to width in batchfc2conv feature,
+                so it must be required by some condition
+                */
+                vx_tensor input = (vx_tensor)node->paramTable[0];
+                vx_uint32 batch = 1;
+                if(2 == TENSOR_DIM_NUM(input) )
+                    batch = TENSOR_SIZE_INDEX(input, 1);
+                else
+                    batch = TENSOR_SIZE_INDEX(input, 3);
+
+                if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
+                    batch > NN_IMAGE_XSIZE_MAX )
+                    break;
+            }
+
             if (SCALAR_VALUE(node->paramTable[PARAM_FULLYCONNECTED_RELU_ENABLE_RELU_INDEX], b))
             {
                 nodeOpType = (node_op_type_e)(nodeOpType | OP_RELU);
@@ -389,7 +411,24 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
     case VX_KERNEL_NN_FULLY_CONNECTED_LAYER:
         {
             vx_bool nnSupport = vxoGraphOptimization_nnHalSupport((vx_tensor)node->paramTable[0]);
+            {
+                /*TODO:for batch fc 2 conv feature, the input of conv can be (m x n) instead of (batch x 1)
+                  which is more generous, and then the condition should be modified
+                */
+                /* for batchfc, batch dims will be transposed to width in batchfc2conv feature,
+                so it must be required by some condition
+                */
+                vx_tensor input = (vx_tensor)node->paramTable[0];
+                vx_uint32 batch = 1;
+                if(2 == TENSOR_DIM_NUM(input) )
+                    batch = TENSOR_SIZE_INDEX(input, 1);
+                else
+                    batch = TENSOR_SIZE_INDEX(input, 3);
 
+                if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
+                    batch > NN_IMAGE_XSIZE_MAX )
+                    break;
+            }
             if(VX_TENSOR_LIFE_TIME_STATIC == TENSOR_DATA_LIFETIME((vx_tensor)node->paramTable[1]) &&
                 VX_TENSOR_RANK_SN == TENSOR_RANK((vx_tensor)node->paramTable[1]) )
             {
@@ -2336,6 +2375,10 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertBatchFCtoConv(vx_graph gra
     * 4. permute output tensor, from(whcn: batch x 1 x kout) to (whcn: kout x 1 x batch)
     ********************************************************************************/
 
+    /*TODO:
+    for batch fc 2 conv feature, the input of conv can be (m x n) instead of (batch x 1)
+        which is more generous, and then the condition that get fc op should be modified
+    */
     vx_int32 nodeIndex;
     vx_int32 nodeCount = graph->nodeCount;
     vx_node* nodeTable = graph->nodeTable;
