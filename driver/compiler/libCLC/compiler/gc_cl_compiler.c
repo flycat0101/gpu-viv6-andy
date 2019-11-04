@@ -4854,6 +4854,25 @@ gctBOOL collect
     }
 }
 
+void
+cloCOMPILER_SetDIEType(
+IN  cloCOMPILER Compiler,
+IN  clsDECL     *Decl,
+IN  gctUINT16   Id
+)
+{
+    VSC_DIE     *Die;
+    struct _VSC_DI_TYPE type = {0};
+    if(Compiler->context.debugInfo)
+    {
+        type.type = Decl->dataType->u.fieldSpace->die;
+        type.isPrimitiveType = gcvFALSE;
+        Die = vscDIGetDIE(Compiler->context.debugInfo, Id);
+        Die->u.type = type;
+        Die->u.variable.type = type;
+    }
+}
+
 gctBOOL
 cloCOMPILER_InGlobalSpace(
 IN cloCOMPILER Compiler

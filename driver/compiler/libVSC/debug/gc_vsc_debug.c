@@ -143,6 +143,15 @@ gctSTRING _GetNameStr(VSC_DIContext * context, gctUINT id)
     return (gctSTRING)(&context->strTable.str[id]);
 }
 
+gceSTATUS _SetNameStr(VSC_DIContext * context, gctUINT id, gctSTRING name)
+{
+    if (id >= context->strTable.size || name == gcvNULL)
+        return gcvSTATUS_INVALID_ARGUMENT;
+
+    gcoOS_StrCopySafe(&context->strTable.str[id], 1024, name);
+    return gcvSTATUS_OK;
+}
+
 gctCONST_STRING _GetTagNameStr(VSC_DIContext * context, VSC_DIE_TAG tag)
 {
     switch (tag)
@@ -530,11 +539,11 @@ gctUINT16 vscDIAddHWLoc(VSC_DIContext * context)
 */
 void vscDISetHwLocToSWLoc(VSC_DIContext * context, VSC_DI_SW_LOC * swLoc, VSC_DI_HW_LOC * hwLoc)
 {
-    VSC_DI_SW_LOC * sl = gcvNULL;
+    VSC_DI_SW_LOC * sl = gcvNULL, * sl_tmp = gcvNULL, * sl_tmp1 = gcvNULL;
     VSC_DI_HW_LOC * hl = gcvNULL;
-    gctUINT     i;
+    gctUINT     i, j, k;
     gctUINT16   id;
-    gctBOOL     found = gcvFALSE;
+    gctBOOL     found = gcvFALSE, breakFlag = gcvFALSE;
 
     if (!swLoc || !hwLoc)
         return;
@@ -566,6 +575,30 @@ void vscDISetHwLocToSWLoc(VSC_DIContext * context, VSC_DI_SW_LOC * swLoc, VSC_DI
                         sl->u.reg.start > swLoc->u.reg.end ||
                         sl->u.reg.end < swLoc->u.reg.start)
                     {
+                        breakFlag = gcvFALSE;
+                        for (j = 0; j < i; j ++)
+                        {
+                            sl_tmp = &context->swLocTable.loc[j];
+                            if (sl_tmp->hwLoc != VSC_DI_INVALID_HW_LOC &&
+                                sl->u.reg.start == sl_tmp->u.reg.start)
+                            {
+                                for (k = j; k < i; k ++)
+                                {
+                                    sl_tmp1 = &context->swLocTable.loc[k];
+                                    if (sl_tmp1->hwLoc != VSC_DI_INVALID_HW_LOC &&
+                                        sl->u.reg.end == sl_tmp1->u.reg.end)
+                                    {
+                                        sl->hwLoc = sl_tmp1->hwLoc;
+                                        breakFlag = gcvTRUE;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (breakFlag == gcvTRUE)
+                            {
+                                break;
+                            }
+                        }
                         continue;
                     }
 
@@ -1057,11 +1090,30 @@ void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift, gctUINT 
             {
                 if (!die->u.type.isPrimitiveType)
                 {
+                    VSC_DIE * typeDie = gcvNULL;
+                    gctSTRING typeName = gcvNULL;
+
                     gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
                         "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s, defined type id = %d",
                         die->id, _GetTagNameStr(context, die->tag),die->parent,die->fileNo,die->lineNo,
                         die->colNo, _GetNameStr(context,die->name),
                         die->u.type.type);
+
+                    if (die->u.type.type != 0)
+                        typeDie = VSC_DI_DIE_PTR(die->u.type.type);
+                    if (typeDie)
+                        typeName = _GetNameStr(context, typeDie->name);
+                    if (typeDie && typeName && typeName[0] != '\0' )
+                    {
+                        if (!typeDie->u.type.isPrimitiveType &&
+                            (gcmIS_SUCCESS(gcoOS_StrCmp(typeName, "struct "))||
+                             gcmIS_SUCCESS(gcoOS_StrCmp(typeName, "union "))))
+                        {
+                            gctSTRING dieName = _GetNameStr(context,die->name);
+                            gcoOS_StrCatSafe(typeName, 1024, dieName);
+                            _SetNameStr(context, typeDie->name, typeName);
+                        }
+                    }
                 }
                 else
                 {

@@ -189,6 +189,13 @@
                                        &(Uniform)); \
     } while (gcvFALSE)
 
+extern void
+cloCOMPILER_SetDIEType(
+IN   cloCOMPILER Compiler,
+IN   clsDECL     *Decl,
+IN   gctUINT16   Id
+);
+
 /* Array to mark each opcode on its operation begin component-wise or not */
 #if _SPLIT_PACKED_TYPE_GT_16_BYTES
 static gctBOOL _IsOpcodeComponentWise[] =
@@ -4101,6 +4108,10 @@ OUT gctUINT *NumRegNeeded
                 cloCOMPILER_SetCollectDIE(Compiler, gcvTRUE);
 
                 /* for structure, we need append the swloc to the parent die */
+                if (clmDECL_IsStructOrUnion(&ParentName->decl))
+                {
+                    Symbol = Name->symbol;
+                }
                 cloCOMPILER_SetStructDIELogicalReg(Compiler, Name, ParentName->die, Symbol, tempRegIndex,
                     numRegNeeded, (gctUINT)_ConvComponentSelectionToEnable(&fieldComponentSelection));
 
@@ -4818,17 +4829,19 @@ IN clsNAME * Name,
 IN clsNAME * ParentName,
 IN gctCONST_STRING Symbol,
 IN clsDECL * Decl,
+IN gctBOOL   addDieFlag,
 IN OUT clsLOGICAL_REG * LogicalRegs,
 IN OUT gctUINT * Start,
 IN OUT gctUINT * Available,
 IN OUT gctUINT *NumTempRegNeeded
 )
 {
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_INVALID_ARGUMENT;
     gctUINT    count, i;
     clsNAME *fieldName;
     gctUINT    offset;
     gctUINT regAllocated;
+    gctUINT16   dieTmp = ParentName->die;
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -4851,6 +4864,16 @@ IN OUT gctUINT *NumTempRegNeeded
         gctSTRING symbol;
         clsARRAY arrayRef;
 
+        gctUINT16   die = VSC_DI_INVALIDE_DIE;
+
+        if (addDieFlag == gcvTRUE)
+        {
+            cloCOMPILER_SetCollectDIE(Compiler, gcvTRUE);
+            die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_VARIABE, ParentName->die, Name->symbol, 0, 0, 0, 0);
+            cloCOMPILER_SetDIEType(Compiler, Decl, die);
+            if (die == VSC_DI_INVALIDE_DIE) return status;
+            cloCOMPILER_SetCollectDIE(Compiler, gcvFALSE);
+        }
         arrayRef = Decl->array;
         if (clmDECL_IsArray(Decl)) {
            int j;
@@ -4919,12 +4942,22 @@ IN OUT gctUINT *NumTempRegNeeded
                                     fieldName->symbol));
                 }
 
+                if ((((fieldName)->mySpace)->scopeName)->symbol != ((((((ParentName)->decl).dataType)->u).fieldSpace)->scopeName)->symbol)
+                {
+                    dieTmp = ParentName->die;
+                    ParentName->die = die;
+                }
+                else
+                {
+                    ParentName->die = dieTmp;
+                }
                 status = _AllocLogicalRegs(Compiler,
                                CodeGenerator,
                                fieldName,
                                ParentName,
                                symbol,
                                &fieldName->decl,
+                               gcvTRUE,
                                LogicalRegs,
                                Start,
                                Available,
@@ -5027,11 +5060,12 @@ IN cloCODE_GENERATOR CodeGenerator,
 IN clsNAME * Name
 )
 {
-    gceSTATUS status;
+    gceSTATUS  status;
     gctUINT    logicalRegCount;
     clsLOGICAL_REG *logicalRegs = gcvNULL;
     gctUINT    start = 0;
-    gctUINT numTempRegNeeded = 0;
+    gctBOOL    addDieFlag = gcvFALSE;
+    gctUINT    numTempRegNeeded = 0;
 
     /*gcmHEADER_ARG("Compiler=0x%x CodeGenerator=0x%x Name=0x%x",
               Compiler, CodeGenerator, Name);*/
@@ -5078,6 +5112,7 @@ IN clsNAME * Name
                                    Name,
                                    Name->symbol,
                                    &Name->decl,
+                                   addDieFlag,
                                    logicalRegs,
                                    &start,
                                    gcvNULL,

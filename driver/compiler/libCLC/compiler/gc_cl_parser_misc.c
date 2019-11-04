@@ -18,6 +18,13 @@ yyparse(void *);
 extern void
 yyrestart(gctPOINTER);
 
+extern void
+cloCOMPILER_SetDIEType(
+IN   cloCOMPILER Compiler,
+IN   clsDECL     *Decl,
+IN   gctUINT16   Id
+);
+
 #define _CREATE_UNNAMED_CONSTANT_IN_MEMORY  1
 
 static gceSTATUS
@@ -13174,7 +13181,8 @@ IN clsLexToken * Identifier
     slsSLINK_LIST *ptrDscr = gcvNULL;
     cltPOOL_STRING symbol;
     clsNAME *scopeName;
-
+    gctCHAR  strucName[1024] = "struct ";
+    gctCHAR  unionName[1024] = "union ";
     gcmASSERT(StartToken);
     parentSpace = cloCOMPILER_GetCurrentSpace(Compiler);
     if (Identifier){
@@ -13234,8 +13242,22 @@ IN clsLexToken * Identifier
         gcmASSERT(0);
         return;
     }
-
-    nameSpace->die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_TYPE, parentSpace->die , nameSpace->symbol, fileNo, lineNo, lineNo, colNo);
+    gcoOS_StrCatSafe(strucName, 1024, nameSpace->symbol);
+    gcoOS_StrCatSafe(unionName, 1024, nameSpace->symbol);
+    if (clmDECL_IsStruct(&scopeName->decl))
+    {
+        symbol = strucName;
+    }
+    else if (clmDECL_IsUnion(&scopeName->decl))
+    {
+        symbol = unionName;
+    }
+    else
+    {
+        gcmASSERT(0);
+        return;
+    }
+    nameSpace->die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_TYPE, parentSpace->die , symbol, fileNo, lineNo, lineNo, colNo);
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler, clvDUMP_PARSER, "<STRUCT_DECL>"));
 }
@@ -13738,7 +13760,7 @@ IN slsDLINK_LIST * FieldDeclList
    gceSTATUS  rtnStatus;
    clsDECL decl[1];
    clsDECL *declPtr = Decl;
-   clsNAME *derivedType = gcvNULL;
+   clsNAME *derivedType = gcvNULL, * name = gcvNULL;
    clsFieldDecl *    fieldDecl = gcvNULL;
    slsSLINK_LIST *ptrDscr;
    clsDATA_TYPE *dataType;
@@ -13880,6 +13902,12 @@ IN slsDLINK_LIST * FieldDeclList
           if(fieldDecl->field->context.packed &&
              cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
               gcmONERROR(_ConvDataTypeToPacked(Compiler, fieldDecl->field));
+          }
+
+          if (clmDECL_IsStructOrUnion(declPtr) && clmDECL_IsStructOrUnion(&declPtr->dataType->u.fieldSpace->scopeName->decl))
+          {
+              name = fieldDecl->field;
+              cloCOMPILER_SetDIEType(Compiler, declPtr, name->die);
           }
       }
    } while (gcvFALSE);
