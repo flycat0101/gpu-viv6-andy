@@ -12211,9 +12211,8 @@ clParseForControl(
     status = cloCOMPILER_CreateNameSpace(Compiler,
                          &nameSpace);
 
-    if (gcmIS_ERROR(status)) return;
-
-    nameSpace->die = die;
+    if (gcmIS_SUCCESS(status))
+        nameSpace->die = die;
 
     pair.condExpr    = CondExpr;
     pair.restExpr    = RestExpr;
