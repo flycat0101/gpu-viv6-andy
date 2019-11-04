@@ -435,7 +435,7 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         vxReleaseProgram(&program);
     }
 
-    if((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT16) &&
+    if((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32) &&
         (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32))
     {
         vx_reference parameters[2] = {(vx_reference)input_rs, (vx_reference)output_rs};
