@@ -1755,15 +1755,14 @@ void _fill_TP_TRANSPOSE_Command(
     vx_nn_cmd_split_info_u*     info_array
     )
 {
-    vx_uint32 totalSize, inXSizeNew, inYSizeNew;
+    vx_uint32 totalSize = 1, inXSizeNew, inYSizeNew;
     vx_uint32 i, j, dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], distances[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
     vx_uint32_ptr perm;
-    vx_uint32 pnum, dsize;
+    vx_uint32 pnum;
     DEFINE_TP_GENERAL_PARAMETER();
 
     vxmASSERT(value_cmd_ptr != VX_NULL);
 
-    dsize = TENSOR_DATA_SIZE((vx_tensor)other_tensor);
     perm = (vx_uint32_ptr) value_cmd_ptr->p8[0];
     pnum = value_cmd_ptr->u32[0];
 
@@ -1776,8 +1775,12 @@ void _fill_TP_TRANSPOSE_Command(
         distances[perm[i]] = dim;
     }
 
+    for (i = 0; i < TENSOR_DIM_NUM((vx_tensor)other_tensor); i++)
+    {
+        totalSize *= dims[i];
+    }
+
     /* Merge input tensor to 2D image. X/YSize < 2^16. */
-    totalSize = strides[pnum-1] * dims[pnum-1] / dsize;
     inXSizeNew = dims[0];
     inYSizeNew = totalSize / inXSizeNew;
     if (split_count == 1 || value_cmd_ptr->e32[0] != 0)
@@ -1808,7 +1811,7 @@ void _fill_TP_TRANSPOSE_Command(
     {
         if (split_count > 1 && value_cmd_ptr->e32[0] == 0)
         {
-            inYSizeNew = strides[pnum-1] / dsize / dims[0] * split_sizes[i];
+            inYSizeNew = totalSize / dims[0] * split_sizes[i];
         }
         vxmASSERT(inXSizeNew < TP_MAX_XYSIZE && inYSizeNew < TP_MAX_XYSIZE);
 
