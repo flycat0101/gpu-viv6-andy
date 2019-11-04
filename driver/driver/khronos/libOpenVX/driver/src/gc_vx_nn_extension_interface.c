@@ -6689,6 +6689,36 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReverse_Deinitializer(vx_node no
     return VX_SUCCESS;
 }
 
+vx_status vxnneExecuteSWTensorTranspose(struct _vxnne_operation_s *operation)
+{
+    vxnne_tensor_trans_operation transOperation = (vxnne_tensor_trans_operation)operation;
+
+    vx_tensor input  = (vx_tensor)transOperation->input;
+    vx_tensor output = (vx_tensor)transOperation->output;
+
+    vx_uint32_ptr perm = (vx_uint32_ptr)transOperation->perm->memory.logicals[0];
+    vx_uint32 pnum = transOperation->pnum->value->u32;
+
+    vx_uint8_ptr inaddr, outaddr;
+    vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION], tstrides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+
+    vxoTensor_GetTensorViewMemory(input, (gctPOINTER*)&inaddr, VX_NULL);
+    vxoTensor_GetTensorViewMemory(output, (gctPOINTER*)&outaddr, VX_NULL);
+
+    vxoTensor_GetTensorDimStride(input, &pnum, dims, strides);
+    vxoTensor_GetTensorDimStride(output, &pnum, VX_NULL, tstrides);
+
+    if (pnum == 1)
+    {
+        memcpy(outaddr, inaddr, dims[0] * strides[0]);
+    }
+    else
+    {
+        _TransposeTensor(inaddr, outaddr,TENSOR_DATA_SIZE(input), dims, strides, tstrides, perm, pnum-1);
+    }
+
+    return VX_SUCCESS;
+}
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternelKernel_NNTensorReduceSum(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
@@ -6752,14 +6782,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReduceSum_Initializer(vx_node no
     if (reduceDim)
     {
         axis = reduceDim->value->u32;
-        if (axis > 3)
+        axis = axis < 0 ? TENSOR_DIM_NUM(src) + axis : axis;
+        if (axis < 0 || axis >= (vx_int32)TENSOR_DIM_NUM(src))
         {
             status = VX_ERROR_INVALID_PARAMETERS;
-            vxError("Invalid input dimention %d function %s line %d", axis, __FUNCTION__, __LINE__);
+            vxError("Invalid input dimention %d the axis value must be in the range [0, %d) function %s line %d", axis, TENSOR_DIM_NUM(src), __FUNCTION__, __LINE__);
             goto exit;
         }
     }
 
+    if(context->evisNoInst.supportEVIS)
+    {
     shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
         || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
         || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)
@@ -6773,6 +6806,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReduceSum_Initializer(vx_node no
         || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16))
         && (reduceDim != NULL)
         && (axis <= 3));
+    }
+    else
+    {
+        shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+            || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+            || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8))
+            && (reduceDim != NULL)
+            && (axis <= 3));
+    }
 
     if(shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
@@ -6789,17 +6831,19 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReduceSum_Initializer(vx_node no
         vx_uint32 i             = 0;
         vx_bool   enable_trans  = vx_false_e;
         vx_bool   enable_axis   = vx_true_e;
-
+        vx_bool   is_trans_sw   = vx_false_e;
         if (axis == 3)
         {
             enable_trans = vx_true_e;
 
             if (axis == 3)
             {
+                axis = 0;
                 perm_array[0] = 3;
                 perm_array[1] = 0;
                 perm_array[2] = 1;
                 perm_array[3] = 2;
+                is_trans_sw   = vx_true_e;
             }
         }
         else
@@ -6881,31 +6925,109 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReduceSum_Initializer(vx_node no
             }
             else
             {
+                vx_bool enable_shader_execute = vx_true_e;
                 vxnne_shader_executable shaderExecutable = VX_NULL;
+                vx_uint32 pnum = dims;
 
-                shaderExecutable = vxnneTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src, perm_array, dims, transTensor);
-
-                if (!shaderExecutable)
+                if (dims > 4)
                 {
-                    status = VX_FAILURE;
-                    goto exit;
+                    vx_uint32 i = 0;
+                    vx_uint32 elementCnt = 1;
+
+                    for (i = 4; i < dims; i++)
+                    {
+                        elementCnt *= TENSOR_VIEW_SIZE_INDEX(src, i);
+                    }
+
+                    if (elementCnt == 1)
+                        pnum = 3;
+                    else
+                        enable_shader_execute = vx_false_e;
                 }
-                status = vxnneShaderOperation_Initialize(&reduceNode->tensor_reduce_sum_trans_sh_operation,
-                    &reduceNode->base,
-                    VXNNE_OPERATOR_TENSOR_TRANS,
-                    batchCount,
-                    shaderExecutable);
 
-                if (status != VX_SUCCESS)
-                    goto exit;
+                if (is_trans_sw)
+                {
+                    enable_shader_execute = vx_false_e;
+                }
 
-                vxnneOperation_AddReference(&reduceNode->tensor_reduce_sum_trans_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
-                vxnneOperation_AddReference(&reduceNode->tensor_reduce_sum_trans_sh_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                if (enable_shader_execute && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER))
+                {
+                    if (dims == 4)
+                    {
+                        pnum = 3;
+                    }
+                    if(node->base.context->evisNoInst.supportEVIS)
+                    {
+                        shaderExecutable = vxnneTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src, perm_array, dims, transTensor);
+                    }
+                    else
+                    {
+                        shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src, perm_array, dims, transTensor);
+                    }
 
-                vxnneLayer_SetOperation(
-                    &reduceNode->base,
-                    &reduceNode->tensor_reduce_sum_trans_sh_operation.base,
-                    operationIdx++);
+                    if (!shaderExecutable)
+                    {
+                        status = VX_FAILURE;
+                        goto exit;
+                    }
+                    status = vxnneShaderOperation_Initialize(&reduceNode->tensor_reduce_sum_trans_sh_operation,
+                        &reduceNode->base,
+                        VXNNE_OPERATOR_TENSOR_TRANS,
+                        batchCount,
+                        shaderExecutable);
+
+                    if (status != VX_SUCCESS)
+                        goto exit;
+
+                    vxnneOperation_AddReference(&reduceNode->tensor_reduce_sum_trans_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
+                    vxnneOperation_AddReference(&reduceNode->tensor_reduce_sum_trans_sh_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+                    vxnneLayer_SetOperation(
+                        &reduceNode->base,
+                        &reduceNode->tensor_reduce_sum_trans_sh_operation.base,
+                        operationIdx++);
+                }
+                else
+                {
+                    vx_array perm = vxCreateArray(context, VX_TYPE_UINT32, pnum);
+                    vx_scalar pnum_s = NULL;
+
+                    if (!vxoArray_AllocateMemory(perm))
+                    {
+                        status = VX_ERROR_NO_MEMORY;
+                        vxError("Fail to vxoArray_AllocateMemory of perm function %s line %d", __FUNCTION__, __LINE__);
+                        goto exit;
+                    }
+                    else
+                    {
+                        vx_uint32* pos = (vx_uint32*)perm->memory.logicals[0];
+                        memcpy(pos, perm_array, pnum * sizeof(vx_uint32));
+                    }
+
+                    pnum_s = vxCreateScalar(context, VX_TYPE_UINT32, &pnum);
+
+                    vxnneOperation_Initialize(&reduceNode->tensor_trans_sw_operation.base,
+                                              &reduceNode->base,
+                                              VXNNE_OPERATION_TARGET_SW,
+                                              VXNNE_OPERATOR_TENSOR_TRANS,
+                                              vxnneExecuteSWTensorTranspose,
+                                              VX_NULL,
+                                              batchCount,
+                                              0);
+
+                    vxnneLayer_SetOperation(
+                        &reduceNode->base,
+                        &reduceNode->tensor_trans_sw_operation.base,
+                        operationIdx++);
+
+                    reduceNode->tensor_trans_sw_operation.input   = src;
+                    reduceNode->tensor_trans_sw_operation.perm    = perm;
+                    reduceNode->tensor_trans_sw_operation.pnum    = pnum_s;
+                    reduceNode->tensor_trans_sw_operation.output  = transTensor;
+
+                    vxnneOperation_AddReference(&reduceNode->tensor_trans_sw_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
+                    vxnneOperation_AddReference(&reduceNode->tensor_trans_sw_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                }
             }
         }
 
@@ -6915,7 +7037,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReduceSum_Initializer(vx_node no
             vx_float32              axis_coef        = 1.0f;
             vx_uint32               batch            = new_sizes[3];
 
-            shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS0, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, axis);
+            if(node->base.context->evisNoInst.supportEVIS)
+            {
+                shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, axis);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetGPUTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, axis);
+            }
 
             if (!shaderExecutable)
             {
@@ -11782,37 +11911,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_ValidateInput(vx_node node
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
-    return VX_SUCCESS;
-}
-
-vx_status vxnneExecuteSWTensorTranspose(struct _vxnne_operation_s *operation)
-{
-    vxnne_tensor_trans_operation transOperation = (vxnne_tensor_trans_operation)operation;
-
-    vx_tensor input  = (vx_tensor)transOperation->input;
-    vx_tensor output = (vx_tensor)transOperation->output;
-
-    vx_uint32_ptr perm = (vx_uint32_ptr)transOperation->perm->memory.logicals[0];
-    vx_uint32 pnum = transOperation->pnum->value->u32;
-
-    vx_uint8_ptr inaddr, outaddr;
-    vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION], tstrides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-
-    vxoTensor_GetTensorViewMemory(input, (gctPOINTER*)&inaddr, VX_NULL);
-    vxoTensor_GetTensorViewMemory(output, (gctPOINTER*)&outaddr, VX_NULL);
-
-    vxoTensor_GetTensorDimStride(input, &pnum, dims, strides);
-    vxoTensor_GetTensorDimStride(output, &pnum, VX_NULL, tstrides);
-
-    if (pnum == 1)
-    {
-        memcpy(outaddr, inaddr, dims[0] * strides[0]);
-    }
-    else
-    {
-        _TransposeTensor(inaddr, outaddr,TENSOR_DATA_SIZE(input), dims, strides, tstrides, perm, pnum-1);
-    }
-
     return VX_SUCCESS;
 }
 
@@ -26171,12 +26269,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
     }
     else
     {
-        shExe_flag = (vx_bool)((inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32 && resolved_dim_count == 2)
-                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1)
-                           || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32 && resolved_dim_count == 1)
-                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 2)
-                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 2)
-                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 1));
+        shExe_flag = (vx_bool)((inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32 && resolved_dim_count == 2 && resolved_dim[0] <= 3 && resolved_dim[1] <= 3)
+                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                           || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 2 && resolved_dim[0] <= 3 && resolved_dim[1] <= 3)
+                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 2 && resolved_dim[0] <= 3 && resolved_dim[1] <= 3)
+                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 1 && resolved_dim[0] <= 3));
     }
 
     if(shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
@@ -26194,6 +26292,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
         vx_tensor dst           = NULL;
         vx_bool   enable_trans  = vx_false_e;
         vx_bool   enable_axis  = vx_false_e;
+        vx_bool   is_trans_sw   = vx_false_e;
 
         if (resolved_dim_count == 1)
         {
@@ -26219,6 +26318,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
                     perm_array[1] = 3;
                     perm_array[2] = 1;
                     perm_array[3] = 2;
+                    is_trans_sw   = vx_true_e;
                 }
                 else
                 {
@@ -26234,6 +26334,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
                 perm_array[1] = 3;
                 perm_array[2] = 0;
                 perm_array[3] = 2;
+                is_trans_sw   = vx_true_e;
             }
             else if (resolved_dim[0] + resolved_dim[1] == 5)
             {
@@ -26241,53 +26342,25 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
                 perm_array[1] = 3;
                 perm_array[2] = 0;
                 perm_array[3] = 1;
+                is_trans_sw   = vx_true_e;
             }
         }
         else if (resolved_dim[0] != 0 && resolved_dim_count == 1)
         {
-
-            if(node->base.context->evisNoInst.supportEVIS)
-            {
-                if (resolved_dim[0] == 3)
-                {
-                    enable_trans = vx_true_e;
-                    input_axis = 0;
-                    perm_array[0] = 3;
-                    perm_array[1] = 0;
-                    perm_array[2] = 1;
-                    perm_array[3] = 2;
-                }
-                else
-                {
-                    transTensor = input;
-                    input_axis = resolved_dim[0];
-                }
-            }
-            else
+            if (resolved_dim[0] == 3)
             {
                 enable_trans = vx_true_e;
                 input_axis = 0;
-                if (resolved_dim[0] == 1)
-                {
-                    perm_array[0] = 1;
-                    perm_array[1] = 0;
-                    perm_array[2] = 2;
-                    perm_array[3] = 3;
-                }
-                else if (resolved_dim[0] == 2)
-                {
-                    perm_array[0] = 2;
-                    perm_array[1] = 0;
-                    perm_array[2] = 1;
-                    perm_array[3] = 3;
-                }
-                else if (resolved_dim[0] == 3)
-                {
-                    perm_array[0] = 3;
-                    perm_array[1] = 0;
-                    perm_array[2] = 1;
-                    perm_array[3] = 2;
-                }
+                perm_array[0] = 3;
+                perm_array[1] = 0;
+                perm_array[2] = 1;
+                perm_array[3] = 2;
+                is_trans_sw   = vx_true_e;
+            }
+            else
+            {
+                transTensor = input;
+                input_axis = resolved_dim[0];
             }
         }
         else
@@ -26369,22 +26442,51 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
             }
             else
             {
+                vx_bool enable_shader_execute = vx_true_e;
                 vxnne_shader_executable shaderExecutable = VX_NULL;
+                vx_uint32 pnum = dims;
 
-                if(node->base.context->evisNoInst.supportEVIS)
+                if (dims > 4)
                 {
-                    shaderExecutable = vxnneTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, input, perm_array, dims, transTensor);
-                }
-                else
-                {
-                    shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, input, perm_array, dims, transTensor);
+                    vx_uint32 i = 0;
+                    vx_uint32 elementCnt = 1;
+
+                    for (i = 4; i < dims; i++)
+                    {
+                        elementCnt *= TENSOR_VIEW_SIZE_INDEX(input, i);
+                    }
+
+                    if (elementCnt == 1)
+                        pnum = 3;
+                    else
+                        enable_shader_execute = vx_false_e;
                 }
 
-                if (!shaderExecutable)
+                if (is_trans_sw)
                 {
-                    status = VX_FAILURE;
-                    goto exit;
+                    enable_shader_execute = vx_false_e;
                 }
+
+                if (enable_shader_execute && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER))
+                {
+                    if (dims == 4)
+                    {
+                        pnum = 3;
+                    }
+                    if(node->base.context->evisNoInst.supportEVIS)
+                    {
+                        shaderExecutable = vxnneTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, input, perm_array, pnum, transTensor);
+                    }
+                    else
+                    {
+                        shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, input, perm_array, pnum, transTensor);
+                    }
+
+                    if (!shaderExecutable)
+                    {
+                        status = VX_FAILURE;
+                        goto exit;
+                    }
                 status = vxnneShaderOperation_Initialize(&tensor_mean_layer->tensor_mean_trans_sh_operation,
                     &tensor_mean_layer->base,
                     VXNNE_OPERATOR_TENSOR_TRANS,
@@ -26398,9 +26500,51 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
                 vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_sh_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
                 vxnneLayer_SetOperation(
-                    &tensor_mean_layer->base,
-                    &tensor_mean_layer->tensor_mean_trans_sh_operation.base,
-                    operationIdx++);
+                        &tensor_mean_layer->base,
+                        &tensor_mean_layer->tensor_mean_trans_sh_operation.base,
+                        operationIdx++);
+                }
+                else
+                {
+                    vx_array perm = vxCreateArray(context, VX_TYPE_UINT32, pnum);
+                    vx_scalar pnum_s = NULL;
+
+                    if (!vxoArray_AllocateMemory(perm))
+                    {
+                        status = VX_ERROR_NO_MEMORY;
+                        vxError("Fail to vxoArray_AllocateMemory of perm function %s line %d", __FUNCTION__, __LINE__);
+                        goto exit;
+                    }
+                    else
+                    {
+                        vx_uint32* pos = (vx_uint32*)perm->memory.logicals[0];
+                        memcpy(pos, perm_array, pnum * sizeof(vx_uint32));
+                    }
+
+                    pnum_s = vxCreateScalar(context, VX_TYPE_UINT32, &pnum);
+
+                    vxnneOperation_Initialize(&tensor_mean_layer->tensor_trans_sw_operation.base,
+                                              &tensor_mean_layer->base,
+                                              VXNNE_OPERATION_TARGET_SW,
+                                              VXNNE_OPERATOR_TENSOR_TRANS,
+                                              vxnneExecuteSWTensorTranspose,
+                                              VX_NULL,
+                                              batchCount,
+                                              0);
+
+                    vxnneLayer_SetOperation(
+                        &tensor_mean_layer->base,
+                        &tensor_mean_layer->tensor_trans_sw_operation.base,
+                        operationIdx++);
+
+                    tensor_mean_layer->tensor_trans_sw_operation.input   = input;
+                    tensor_mean_layer->tensor_trans_sw_operation.perm    = perm;
+                    tensor_mean_layer->tensor_trans_sw_operation.pnum    = pnum_s;
+                    tensor_mean_layer->tensor_trans_sw_operation.output  = transTensor;
+
+                    vxnneOperation_AddReference(&tensor_mean_layer->tensor_trans_sw_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
+                    vxnneOperation_AddReference(&tensor_mean_layer->tensor_trans_sw_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                }
             }
         }
 
@@ -26448,8 +26592,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
                 if (stride_s)  vxReleaseScalar(&stride_s);
                 if (poolSizeX) vxReleaseScalar(&poolSizeX);
                 if (poolSizeY) vxReleaseScalar(&poolSizeY);
-                status = VX_FAILURE;
 
+                status = VX_FAILURE;
                 goto exit;
             }
 
@@ -26509,11 +26653,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
 
             if(node->base.context->evisNoInst.supportEVIS)
             {
-                shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS0, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis);
+                shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis);
             }
             else
             {
-                shaderExecutable = vxnneGetGPUTensorMeanAxis0ShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS0, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst);
+                shaderExecutable = vxnneGetGPUTensorMeanAxisShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis);
             }
 
             if (!shaderExecutable)

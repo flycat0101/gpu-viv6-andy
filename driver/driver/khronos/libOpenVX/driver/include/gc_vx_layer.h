@@ -312,7 +312,7 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_TENSOR_DIV = 52,
     VXNNE_KERNEL_RESIZE_NEAREST_NEIGHBOR = 53,
     VXNNE_KERNEL_GEMM_NOBIAS = 54,
-    VXNNE_KERNEL_TENSOR_MEAN_AXIS0 = 55,
+    VXNNE_KERNEL_TENSOR_MEAN_AXIS = 55,
     VXNNE_KERNEL_TENSOR_CROP = 56,
     VXNNE_KERNEL_TENSOR_STRIDE_SLICE = 57,
     VXNNE_KERNEL_PRELU = 58,
@@ -1355,6 +1355,16 @@ typedef struct _vxnne_tensor_reduce_sum_sw_operation_s
 }
 vxnne_tensor_reduce_sum_sw_operation_s, *vxnne_tensor_reduce_sum_sw_operation;
 
+typedef struct _vxnne_tensor_trans_operation_s
+{
+    vxnne_operation_s                base;
+    vx_tensor                        input;
+    vx_array                         perm;
+    vx_scalar                        pnum;
+    vx_tensor                        output;
+}
+vxnne_tensor_trans_operation_s, *vxnne_tensor_trans_operation;
+
 typedef struct _vxnne_tensor_reduce_sum_s
 {
     vxnne_layer_s                                   base;
@@ -1363,6 +1373,7 @@ typedef struct _vxnne_tensor_reduce_sum_s
     vxnne_tp_operation_s                            tensor_reduce_sum_trans_tp_operation;
     vxnne_shader_operation_s                        tensor_reduce_sum_trans_sh_operation;
     vxnne_shader_operation_s                        tensor_reduce_sum_sh_operation;
+    vxnne_tensor_trans_operation_s                  tensor_trans_sw_operation;
 }
 vxnne_tensor_reduce_sum_s, *vxnne_tensor_reduce_sum;
 
@@ -1475,15 +1486,6 @@ typedef struct _vxnne_tensor_div_layer_s
 }
 vxnne_tensor_div_layer_s, *vxnne_tensor_div_layer;
 
-typedef struct _vxnne_tensor_trans_operation_s
-{
-    vxnne_operation_s                base;
-    vx_tensor                        input;
-    vx_array                         perm;
-    vx_scalar                        pnum;
-    vx_tensor                        output;
-}
-vxnne_tensor_trans_operation_s, *vxnne_tensor_trans_operation;
 
 typedef struct _vxnne_tensor_trans_layer_s
 {
@@ -1615,6 +1617,7 @@ typedef struct _vxnne_tensor_mean_layer_s
     vxnne_shader_operation_s                        tensor_mean_pool_sh_operation;
     vxnne_shader_operation_s                        tensor_mean_axis0_sh_operation;
     vxnne_shader_operation_s                        tensor_mean_trans_sh_operation;
+    vxnne_tensor_trans_operation_s                  tensor_trans_sw_operation;
 }
 vxnne_tensor_mean_layer_s, *vxnne_tensor_mean_layer;
 
@@ -3656,6 +3659,18 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
     vx_tensor               input,
     vx_tensor               output);
 
+vxnne_shader_executable vxnneGPUROIPoolShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               input_rois,
+    vx_uint32               pool_width,
+    vx_uint32               pool_height,
+    vx_float32              spatial_scale,
+    vx_bool                 enable_relu,
+    vx_tensor               output);
+
 vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -3955,13 +3970,14 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
     vx_tensor               output,
     vx_uint32*              padList);
 
-vxnne_shader_executable vxnneGetGPUTensorMeanAxis0ShaderExecutable(
+vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
     vx_float32              axis_coef,
     vx_tensor               input,
-    vx_tensor               output);
+    vx_tensor               output,
+    vx_uint32               axis);
 
 vxnne_shader_executable vxnneGetGPUSvdfShaderExecutable(
     vx_context              context,
