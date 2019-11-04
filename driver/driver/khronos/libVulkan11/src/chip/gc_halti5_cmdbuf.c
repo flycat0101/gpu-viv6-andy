@@ -7838,7 +7838,7 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
         {
             uint32_t arraySize;
             SHADER_HW_MEM_ACCESS_MODE hwMemAccessMode = samplerBufEntry->hwMappings[stageIdx].u.s.hwMemAccessMode;
-            VkBool32 bTreatTexelBufferAsImage = ((samplerBufEntry->utbEntryFlag | PROG_VK_UTB_ENTRY_FLAG_TREAT_TEXELBUFFER_AS_IMAGE) != 0);
+            VkBool32 bTreatTexelBufferAsImage = ((samplerBufEntry->utbEntryFlag & PROG_VK_UTB_ENTRY_FLAG_TREAT_TEXELBUFFER_AS_IMAGE) != 0);
 
             __VK_ASSERT(samplerBufEntry->hwMappings[stageIdx].hwMappingMode == VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING_MODE_NOT_NATIVELY_SUPPORT);
             __VK_ASSERT(hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR ||
