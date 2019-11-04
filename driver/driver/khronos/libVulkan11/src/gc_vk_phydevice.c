@@ -194,6 +194,7 @@ if ((database->SMALLBATCH && phyDev->phyDevConfig.options.smallBatch)){    vsCon
     pVscHwCfg->chipModel = chipModel;
     pVscHwCfg->chipRevision = chipRevision;
     pVscHwCfg->maxCoreCount = database->NumShaderCores;
+    pVscHwCfg->maxClusterCount = (database->ClusterAliveMask == 0xf) ? 4 : ((database->ClusterAliveMask == 0x3) ? 2 : 1);
     pVscHwCfg->maxThreadCountPerCore = database->ThreadCount / database->NumShaderCores;
     pVscHwCfg->maxVaryingCount = maxVaryingCount;
     pVscHwCfg->maxAttributeCount = maxAttribs;
