@@ -1709,7 +1709,7 @@ VX_PRIVATE_API vx_status SetMemoryRequestList(
     {
         for(j = 0; j < memRequest[i].outputCount; j++)
         {
-            if (graph->layer->operations[start + i]->outputs[j]->isVirtual)
+            if (graph->layer->operations[start + i]->outputs[j]->base.isVirtual)
             {
                 dims = memRequest[i].outputMemory[j]->dimCount - 1;
                 memRequest[i].outputMemory[j]->allocType    = allocType;
@@ -7133,7 +7133,7 @@ VX_PRIVATE_API vx_status vxoGraph_InitMetaFormatData(vx_graph graph, vx_node nod
     *vRef = node->paramTable[paramIndex];
     *metaFormat = vxoMetaFormat_Create(graph->base.context);
 
-    if ((*vRef)->isVirtual == vx_false_e)
+    if ((*vRef)->base.isVirtual == vx_false_e)
     {
         *vRef = NULL;
     }
@@ -7773,7 +7773,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph)
 
                 if (node->kernel->signature.directionTable[paramIndex] != VX_OUTPUT) continue;
 
-                if (paramRef->isVirtual)
+                if (paramRef->base.isVirtual)
                 {
                     if (!vxoGraph_IsParentGraphScope(paramRef->scope, graph))
                     {
