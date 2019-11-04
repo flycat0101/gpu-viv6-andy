@@ -1671,11 +1671,13 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNetworkNameAndRank(
 }
 
 VX_PRIVATE_API vx_status vxoBinaryGraph_GetFeatureDB(
+    vx_graph graph,
     vx_binary_save_s *binarySave
     )
 {
     vx_status status = VX_SUCCESS;
     vx_binary_header_s *headerInfo = &binarySave->headerInfo;
+    gctUINT32 gpuCount = 1;
 
     headerInfo->featureDB.hi_reorder_fix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HI_REORDER_FIX);
     headerInfo->featureDB.ocb_counter = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_OCB_COUNTER);
@@ -1689,6 +1691,15 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetFeatureDB(
         headerInfo->featureDB.num_pixel_pipes = 1;
     }
 
+    gcmONERROR(gcoVX_QueryCoreCount(graph->deviceID, &gpuCount));
+    headerInfo->featureDB.core_count = (vx_uint8)gpuCount;
+    if (gpuCount > 255)
+    {
+        vxError("not support gpuCount: %d\n", gpuCount);
+        vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
+    }
+
+OnError:
     return status;
 }
 
@@ -3434,6 +3445,19 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_GenerateStatesBuffer(
         if (binLoad->fixed.axiSramTable.sramSize > context->axiSRAM[graph->deviceID].size)
         {
             vxError("%s[%d]: binary sram more than context sram\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_ERROR_INVALID_VALUE);
+        }
+    }
+
+    /* check core count */
+    if (binLoad->fixed.header.version >= 0x00010003)
+    {
+        gctUINT32 gpuCount = 1;
+        gcmONERROR(gcoVX_QueryCoreCount(graph->deviceID, &gpuCount));
+        if (binLoad->fixed.header.featureDB.core_count != (vx_uint8)gpuCount)
+        {
+            vxError("%s[%d]: binary core count: %d, context core count: %d\n",
+                    __FUNCTION__, __LINE__, binLoad->fixed.header.featureDB.core_count, gpuCount);
             vxmONERROR(VX_ERROR_INVALID_VALUE);
         }
     }
@@ -9246,7 +9270,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     binarySave->headerInfo.layerCount     = graph->nodeCount;
     binarySave->headerInfo.operationCount = binarySave->operationCount;
     vxoBinaryGraph_GetNetworkNameAndRank(binarySave);
-    vxoBinaryGraph_GetFeatureDB(binarySave);
+    vxoBinaryGraph_GetFeatureDB(graph, binarySave);
 
     vxoBinaryGraph_Write(binarySave, 0, sizeof(vx_binary_header_s), &binarySave->headerInfo);
 

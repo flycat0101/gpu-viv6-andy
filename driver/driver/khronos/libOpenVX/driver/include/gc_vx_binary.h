@@ -177,7 +177,13 @@ typedef struct _vx_binary_feature_database_s
 
     vx_uint32 num_pixel_pipes;   /* gcFEATURE_VALUE_NumPixelPipes */
 
-    vx_uint32 vsi_reserved[14];  /* reserved for  verisilicon */
+    vx_uint8 core_count;         /* GPU core count */
+
+    vx_uint8 vsi_reserved1;
+    vx_uint8 vsi_reserved2;
+    vx_uint8 vsi_reserved3;
+
+    vx_uint32 vsi_reserved[13];  /* reserved for  verisilicon */
 
     vx_uint32 customer_reserved[48]; /* reserved for customer */
 }
