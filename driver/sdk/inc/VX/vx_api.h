@@ -380,6 +380,16 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromHandle(vx_context context, vx
 
 VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const new_ptrs[], void* prev_ptrs[], vx_size num_planes);
 
+
+/*! \brief Swaps the image created from handle.
+ *\details This function swap image logical and physical address.
+ *\these tensors must have the same proterties expect memory related content.
+ *\Attention: APP should make sure the cache and memory cohensive for the first call vxSwapImage
+ *\version 0.4
+ */
+VX_API_ENTRY vx_status VX_API_CALL vxSwapImage(vx_image image0, vx_image image1);
+
+
 /*! \brief Retrieves various attributes of an image.
  * \param [in] image The reference to the image to query.
  * \param [in] attribute The attribute to query. Use a <tt>\ref vx_image_attribute_e</tt>.

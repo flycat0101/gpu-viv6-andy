@@ -1724,6 +1724,7 @@ typedef struct _vx_memory_s
     vx_size                                 memOffset;
     vx_bool                                 memReverse;
     vx_bool                                 circular;
+    vx_bool                                 isDirty;
 
     vx_uint32                               offset[VX_MAX_PLANES];
 

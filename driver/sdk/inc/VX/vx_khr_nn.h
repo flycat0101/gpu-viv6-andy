@@ -493,6 +493,22 @@ VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle(
  */
 VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* const new_ptr, void** prev_ptr);
 
+/*! \brief Swaps the tensor created from handle.
+ *\details This function swap tensors logical and physical address.
+ *\these tensors must have the same proterties expect memory related content.
+ *\Attention: APP should make sure the cache and memory cohensive for the first call vxSwapTensor
+ *\version 0.4
+ */
+VX_API_ENTRY vx_status VX_API_CALL vxSwapTensor(vx_tensor tensor0, vx_tensor tensor1);
+
+/*
+*\ vxo_flushHandle used to support vxo_createTensorFromHandle/vxo_createImageFromHandle
+*\once app change the content of tensor/image, app can call vxo_flushHandle to make the cache cohenrence and will get better performance;
+*\ Or driver will handle it default, but worst perforamnce.
+*/
+VX_API_ENTRY vx_status VX_API_CALL vxFlushHandle(vx_reference ref);
+
+
 /*! \brief Return a new tensor referencing the same memory location but with different shape.
 * \param [in] tensor The input tensor data to reshape.
 * \param [in] num_of_dims Size of each dimension. If one component is special value -1,

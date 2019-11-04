@@ -3664,6 +3664,7 @@ VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle(
     if (import_type == VX_MEMORY_TYPE_HOST)
     {
         tensor->tensorBuffer->memory.wrapFlag  = gcvALLOC_FLAG_USERMEMORY;
+        tensor->tensorBuffer->memory.isDirty = vx_true_e;
     }
     else if(import_type == VX_MEMORY_TYPE_DMABUF)
     {
@@ -3760,6 +3761,41 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* co
     return status;
 }
 
+VX_API_ENTRY vx_status VX_API_CALL vxSwapTensor(vx_tensor tensor0, vx_tensor tensor1)
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint8_ptr ptr;
+    vx_uint32 physical;
+    vx_uint32 i;
+    gcmHEADER_ARG("tensor0=%p, tensor1=%p", tensor0, tensor1);
+    gcmDUMP_API("$VX vxSwapTensor: tensor0=%p, tensor1=%p", tensor0, tensor1);
+
+    if(tensor0->tensorBuffer->memory.wrapFlag != gcvALLOC_FLAG_USERMEMORY || tensor1->tensorBuffer->memory.wrapFlag != gcvALLOC_FLAG_USERMEMORY)
+        return vx_false_e;
+    if(!(vxoTensor_IsValidTensor(tensor0) && vxoTensor_IsValidTensor(tensor1)))
+        return vx_false_e;
+
+    if(tensor0->dimCount != tensor1->dimCount)
+        return vx_false_e;
+    if(tensor0->dataFormat != tensor1->dataFormat)
+        return vx_false_e;
+
+    for(i = 0; i < tensor0->dimCount; ++i)
+    {
+        if(tensor0->dims[i] != tensor1->dims[i])
+            return vx_false_e;
+    }
+
+    ptr = (vx_uint8_ptr)(tensor0->tensorBuffer->memory.logicals[0]);
+    physical = tensor0->tensorBuffer->memory.physicals[0];
+    tensor0->tensorBuffer->memory.logicals[0] = tensor1->tensorBuffer->memory.logicals[0];
+    tensor0->tensorBuffer->memory.physicals[0] = tensor1->tensorBuffer->memory.physicals[0];
+    tensor1->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)ptr;
+    tensor1->tensorBuffer->memory.physicals[0] = physical;
+
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetTensorAttribute(vx_tensor tensor, vx_enum attribute, const void *ptr, vx_size size)
 {
@@ -3886,5 +3922,50 @@ VX_INTERNAL_API vx_tensor vxoTensor_ReformatTensor(vx_tensor tensor, vx_enum for
                             VX_REF_INTERNAL);
 }
 
+VX_API_ENTRY vx_status VX_API_CALL vxFlushHandle(vx_reference ref)
+{
+    vx_status status = vx_true_e;
+
+    if(ref->type == VX_TYPE_TENSOR)
+    {
+        vx_tensor tensor = (vx_tensor)ref;
+        if(tensor->tensorBuffer->memory.wrapFlag != gcvALLOC_FLAG_USERMEMORY)
+            return status;
+        else
+        {
+            if(tensor->tensorBuffer->memory.isDirty)
+            {
+                gcoOS_CacheFlush(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
+                gcoOS_CacheInvalidate(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
+                tensor->tensorBuffer->memory.isDirty = vx_false_e;
+            }
+            status = vx_true_e;
+        }
+    }
+    else if(ref->type == VX_TYPE_IMAGE)
+    {
+        vx_image image = (vx_image)ref;
+        if(image->memory.wrapFlag != gcvALLOC_FLAG_USERMEMORY)
+            return status;
+        else
+        {
+            if(image->memory.isDirty)
+            {
+                vx_uint32 p = 0;
+                for (p = 0; p < image->planeCount; p++)
+                {
+                    gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+                    gcoOS_CacheInvalidate(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+                    image->memory.isDirty = vx_false_e;
+                }
+            }
+            status = vx_true_e;
+        }
+    }
+    else
+        status = vx_false_e;
+
+    return status;
+}
 
 

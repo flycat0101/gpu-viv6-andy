@@ -5456,7 +5456,7 @@ vx_status vxo_updateSwapHandle(vx_graph graph)
                 {
                     for(k = 0; k < executionLayer->swapHandle[j]->cmdCount; ++k)
                     {
-                        if(((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer->memory.physicals[0] + offset + executionLayer->swapHandle[j]->u.offset[k]!= (executionLayer->swapHandle[j]->orgAddress))
+                        //if(((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer->memory.physicals[0] + offset + executionLayer->swapHandle[j]->u.offset[k]!= (executionLayer->swapHandle[j]->orgAddress))
                         {
                             *(executionLayer->swapHandle[j]->cmdAddr[k]) = (vx_uint32)(((vx_tensor)executionLayer->swapHandle[j]->ref)->tensorBuffer->memory.physicals[0] + executionLayer->swapHandle[j]->u.offset[k]);
                         }
@@ -5484,7 +5484,7 @@ vx_status vxo_updateSwapHandle(vx_graph graph)
                 {
                     for(k = 0; k < executionLayer->swapHandle[j]->cmdCount; ++k)
                     {
-                        if(((vx_image)(executionLayer->swapHandle[j]->ref))->memory.physicals[0] + executionLayer->swapHandle[j]->u.offset[k] != executionLayer->swapHandle[j]->orgAddress)
+                        //if(((vx_image)(executionLayer->swapHandle[j]->ref))->memory.physicals[0] + executionLayer->swapHandle[j]->u.offset[k] != executionLayer->swapHandle[j]->orgAddress)
                         {
                             *(executionLayer->swapHandle[j]->cmdAddr[k]) = (vx_uint32)(((vx_image)(executionLayer->swapHandle[j]->ref))->memory.physicals[0] + executionLayer->swapHandle[j]->u.offset[k]);
                         }
@@ -5497,7 +5497,45 @@ vx_status vxo_updateSwapHandle(vx_graph graph)
     }
     return  vx_true_e;
 }
+vx_status vxoFlushTensorImage(vx_graph graph)
+{
+    vx_uint32 j;
+    vxnne_execution_layer   executionLayer = (vxnne_execution_layer)&graph->layer->base;
 
+    if(executionLayer == VX_NULL)
+        return vx_false_e;
+
+    for (j = 0; j < executionLayer->swapcount; ++j)
+    {
+        if (executionLayer->swapHandle[j] != VX_NULL && executionLayer->swapHandle[j]->ref != VX_NULL)
+        {
+            if(executionLayer->swapHandle[j]->ref->type == VX_TYPE_TENSOR)
+            {
+                vx_tensor tensor  = (vx_tensor)executionLayer->swapHandle[j]->ref;
+                if(tensor->tensorBuffer->memory.isDirty)
+                {
+                    gcoOS_CacheFlush(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
+                    gcoOS_CacheInvalidate(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
+                }
+            }
+            else if(executionLayer->swapHandle[j]->ref->type == VX_TYPE_IMAGE)
+            {
+                vx_image image  = (vx_image)executionLayer->swapHandle[j]->ref;
+                if(image->memory.isDirty)
+                {
+                    vx_uint32 p = 0;
+                    for (p = 0; p < image->planeCount; p++)
+                    {
+                        gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+                        gcoOS_CacheInvalidate(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+                    }
+                }
+            }
+        }
+    }
+
+    return  vx_true_e;
+}
 vx_bool _IsSameDataType(
     vx_tensor src,
     vx_tensor dst

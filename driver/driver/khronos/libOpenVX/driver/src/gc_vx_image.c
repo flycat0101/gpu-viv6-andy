@@ -1297,6 +1297,7 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromHandle(
     if (import_type == VX_MEMORY_TYPE_HOST)
     {
         image->memory.wrapFlag  = gcvALLOC_FLAG_USERMEMORY;
+        image->memory.isDirty = vx_true_e;
     }
     else if(import_type == VX_MEMORY_TYPE_DMABUF)
     {
@@ -2903,6 +2904,35 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapImageHandle(vx_image image, void* const
     return status;
 }
 
+VX_API_ENTRY vx_status VX_API_CALL vxSwapImage(vx_image image0, vx_image image1)
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 p;
+    vx_uint8_ptr ptr;
+    vx_uint32 physical;
+    gcmHEADER_ARG("tensor0=%p, tensor1=%p", image0, image1);
+    gcmDUMP_API("$VX vxSwapTensor: tensor0=%p, tensor1=%p", image0, image1);
+
+    if(image0->memory.wrapFlag != gcvALLOC_FLAG_USERMEMORY || image1->memory.wrapFlag != gcvALLOC_FLAG_USERMEMORY)
+        return vx_false_e;
+    if(!(vxoImage_IsValid(image0) && vxoImage_IsValid(image1)))
+        return vx_false_e;
+    if(image0->planeCount != image1->planeCount)
+       return vx_false_e;
+
+    for (p = 0; p < image0->planeCount; p++)
+    {
+        ptr = image0->memory.logicals[p];
+        physical = image0->memory.physicals[p];
+
+        image0->memory.logicals[p] = image0->memory.logicals[p];
+        image0->memory.physicals[p] = image0->memory.physicals[p];
+        image0->memory.logicals[p] = (vx_uint8_ptr)ptr;
+        image0->memory.physicals[p] = physical;
+    }
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
 VX_API_ENTRY vx_status VX_API_CALL vxSetImagePixelValues(vx_image image, const vx_pixel_value_t *pixel_value)
 {
     vx_status status = VX_SUCCESS;

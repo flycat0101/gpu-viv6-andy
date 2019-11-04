@@ -430,7 +430,7 @@ VX_INTERNAL_API vx_int32 vxoBinaryGraph_SearchPattern(
 
 vx_status vxo_insertHandel(vxnne_execution_layer   executionLayer);
 vx_status vxo_updateSwapHandle(vx_graph graph);
-
+vx_status vxoFlushTensorImage(vx_graph graph);
 vx_bool _IsSameDataType(
     vx_tensor src,
     vx_tensor dst
