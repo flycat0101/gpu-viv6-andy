@@ -2762,7 +2762,9 @@ _gcSHADER_Clean(
 
     if (Shader->debugInfo)
     {
+#if (!VSC_LITE_BUILD)
         vscDIDestroyContext((VSC_DIContext *)Shader->debugInfo);
+#endif
         Shader->debugInfo = gcvNULL;
     }
 
@@ -14900,6 +14902,7 @@ gcSHADER_LoadEx(
     curPos += sizeof(gctUINT8);
     bytes -= sizeof(gctUINT8);
 
+#if (!VSC_LITE_BUILD)
     if ((gctUINT)debugInfo > 0)
     {
         gctPOINTER ptr = curPos;
@@ -14917,6 +14920,7 @@ gcSHADER_LoadEx(
 
         Shader->debugInfo = (gctPOINTER)debugInfo;
     }
+#endif
 
     if (bytes != 0)
     {
@@ -14987,7 +14991,9 @@ gcSHADER_SaveEx(
     gctUINT32 kernelFunctionCount = 0;
     gctUINT16 ltcUniformMappingCount = 0;
     gcSHADER_LIST list;
+#if (!VSC_LITE_BUILD)
     gctPOINTER ptr;
+#endif
     gctBOOL   bHasLoadKernel = gcShaderHasLoadedKernel(Shader);
 
     gcmHEADER_ARG("Shader=0x%x Buffer=0x%x BufferSize=0x%x", Shader, Buffer, BufferSize);
@@ -15324,8 +15330,9 @@ gcSHADER_SaveEx(
     bytes += Shader->sourceLength;
 
     /* For debugInfo */
+#if (!VSC_LITE_BUILD)
     vscDISaveDebugInfo((VSC_DIContext * )(Shader->debugInfo), gcvNULL, &bytes);
-
+#endif
     /* Return required number of bytes if Buffer is gcvNULL. */
     if (Buffer == gcvNULL)
     {
@@ -16292,6 +16299,7 @@ gcSHADER_SaveEx(
 
     /* Source code string */
     gcoOS_MemCopy(buffer, &Shader->sourceLength, sizeof(Shader->sourceLength));
+#if (!VSC_LITE_BUILD)
     buffer += sizeof(Shader->sourceLength);
     bytes = Shader->sourceLength;
     if (bytes > 0)
@@ -16308,7 +16316,7 @@ gcSHADER_SaveEx(
 
     ptr = (gctPOINTER) buffer;
     vscDISaveDebugInfo((VSC_DIContext * )(Shader->debugInfo), &ptr, gcvNULL);
-
+#endif
     /* Success. */
     gcmFOOTER_ARG("*BufferSize=%lu", *BufferSize);
     return gcvSTATUS_OK;

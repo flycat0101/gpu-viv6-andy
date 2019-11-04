@@ -1405,7 +1405,6 @@ void _vscDIInitCallStack(VSC_DIContext * context)
     }
 }
 
-#if (!VSC_LITE_BUILD)
 gceSTATUS vscDIConstructContext(PFN_Allocate allocPfn, PFN_Free freePfn, VSC_DIContext ** context)
 {
     VSC_DIContext * ptr;
@@ -1447,7 +1446,6 @@ gceSTATUS vscDIConstructContext(PFN_Allocate allocPfn, PFN_Free freePfn, VSC_DIC
         return gcvSTATUS_INVALID_CONFIG;
     }
 }
-#endif
 
 void vscDIDestroyContext(VSC_DIContext * context)
 {

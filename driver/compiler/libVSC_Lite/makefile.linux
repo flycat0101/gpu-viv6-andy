@@ -126,7 +126,6 @@ OBJECTS += \
 	$(OBJ_DIR)/gc_vsc_utils_string.o \
 	$(OBJ_DIR)/gc_vsc_utils_block_table.o \
 	$(OBJ_DIR)/gc_vsc_utils_tree.o \
-	$(OBJ_DIR)/gc_vsc_debug.o \
 
 endif
 
@@ -186,7 +185,6 @@ ifeq ($(VSC_VIR_BUILD),1)
   vpath %.c ../libVSC/utils/string
   vpath %.c ../libVSC/utils/table
   vpath %.c ../libVSC/utils/tree
-  vpath %.c ../libVSC/debug
 endif
 
 $(OBJ_DIR)/%.o: %.c
