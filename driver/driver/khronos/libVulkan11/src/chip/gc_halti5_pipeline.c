@@ -7243,7 +7243,7 @@ VkResult halti5_patch_pipeline(
             if (totalEntries == 0)
                 return result;
 
-            /*handle all the Post_High level patch per shader stage*/
+            /*handle all the Pre_High level patch per shader stage*/
             for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx++)
             {
                 if (chipPipeline->vkShaderDecoded[stageIdx])
@@ -7321,7 +7321,7 @@ VkResult halti5_patch_pipeline(
                                                     __VK_ASSERT(linkIdx < 4);
 
                                                     shaderLinkTable->shLinkEntryCount = linkIdx + 1;
-                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].applyLevel = VSC_SHLEVEL_Post_High;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].applyLevel = VSC_SHLEVEL_Pre_High;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPointCount = 1;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].hShaderLib = gcvNULL;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].pTempHashTable = gcvNULL;
@@ -7357,7 +7357,7 @@ VkResult halti5_patch_pipeline(
                                                     __VK_ASSERT(linkIdx < 4);
 
                                                     shaderLinkTable->shLinkEntryCount = linkIdx + 1;
-                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].applyLevel = VSC_SHLEVEL_Post_High;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].applyLevel = VSC_SHLEVEL_Pre_High;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPointCount = 1;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].hShaderLib = gcvNULL;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].pTempHashTable = gcvNULL;
