@@ -93,6 +93,7 @@ __GLextension __glExtension[] =
     {__GL_EXTID_OES_standard_derivatives, "GL_OES_standard_derivatives", GL_FALSE, GL_TRUE},
     {__GL_EXTID_OES_EGL_image, "GL_OES_EGL_image", GL_FALSE, GL_FALSE},
     {__GL_EXTID_OES_EGL_image_external, "GL_OES_EGL_image_external", GL_FALSE, GL_TRUE},
+    {__GL_EXTID_OES_EGL_image_external_essl3, "GL_OES_EGL_image_external_essl3", GL_FALSE, GL_TRUE},
     {__GL_EXTID_OES_EGL_sync, "GL_OES_EGL_sync", GL_FALSE, GL_FALSE},
     {__GL_EXTID_OES_texture_stencil8, "GL_OES_texture_stencil8", GL_FALSE, GL_FALSE},
     {__GL_EXTID_OES_shader_image_atomic, "GL_OES_shader_image_atomic", GL_FALSE, GL_TRUE},
@@ -116,6 +117,7 @@ __GLextension __glExtension[] =
     {__GL_EXTID_OES_texture_cube_map_array, "GL_OES_texture_cube_map_array", GL_FALSE, GL_TRUE},
     {__GL_EXTID_OES_draw_elements_base_vertex, "GL_OES_draw_elements_base_vertex", GL_FALSE, GL_FALSE},
     {__GL_EXTID_OES_texture_half_float, "GL_OES_texture_half_float", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_OES_texture_half_float_linear, "GL_OES_texture_half_float_linear", GL_FALSE, GL_FALSE},
     {__GL_EXTID_OES_texture_float, "GL_OES_texture_float", GL_FALSE, GL_FALSE},
     {__GL_EXTID_OES_primitive_bounding_box, "GL_OES_primitive_bounding_box", GL_FALSE, GL_TRUE},
 

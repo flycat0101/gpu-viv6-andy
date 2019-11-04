@@ -2080,6 +2080,12 @@ __glChipRenderbufferStorage(
 
     }
 
+    if ((!gc->imports.conformGLSpec) && (drvFormat == __GL_FMT_RGB565) &&
+        (gcdPROC_IS_WEBGL(chipCtx->patchId)))
+    {
+        drvFormat = __GL_FMT_RGBX8;
+    }
+
     if (drvFormat == __GL_FMT_RGBA4 &&
         (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)&&
         gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_DITHER_FIX2) == gcvFALSE)

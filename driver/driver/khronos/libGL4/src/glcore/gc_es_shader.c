@@ -2202,6 +2202,12 @@ GLvoid __glUniform(__GLcontext *gc, GLint location, GLint type, GLsizei count,
         }
     }
 
+    if (!gc->imports.conformGLSpec && gc->apiVersion == __GL_API_VERSION_ES20 &&
+        transpose)
+    {
+        __GL_ERROR_RET(GL_INVALID_VALUE);
+    }
+
     if (location == -1)
     {
         return;

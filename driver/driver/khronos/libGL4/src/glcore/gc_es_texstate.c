@@ -373,12 +373,14 @@ GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLen
     GLint face, level;
     GLint requestedFormat;
     GLint faces, arrays;
+    GLint internalFormat;
 
     baseLevel = texObj->params.baseLevel;
     width = texObj->faceMipmap[0][baseLevel].width;
     height = texObj->faceMipmap[0][baseLevel].height;
     depth = texObj->faceMipmap[0][baseLevel].depth;
     baseFmtInfo = texObj->faceMipmap[0][baseLevel].formatInfo;
+    internalFormat = texObj->faceMipmap[0][baseLevel].internalFormat;
     requestedFormat = texObj->faceMipmap[0][baseLevel].requestedFormat;
     arrays = texObj->faceMipmap[0][baseLevel].arrays;
 
@@ -399,20 +401,62 @@ GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLen
         return GL_FALSE;
     }
 
-    if (GL_UNSIGNED_INT == baseFmtInfo->category || GL_INT == baseFmtInfo->category ||
-        /* ES30 dis-allows linear filter for "TEXTURE_COMPARE_MODE=NONE" depth texture */
-        (gc->apiVersion >= __GL_API_VERSION_ES30 && GL_NONE == compareMode &&
-         (GL_DEPTH_COMPONENT == baseFmtInfo->baseFormat || GL_DEPTH_STENCIL == baseFmtInfo->baseFormat)
-        )
-       )
+    if(gc->imports.conformGLSpec)
     {
-        if (magFilter != GL_NEAREST)
+        if (GL_UNSIGNED_INT == baseFmtInfo->category || GL_INT == baseFmtInfo->category ||
+            /* ES30 dis-allows linear filter for "TEXTURE_COMPARE_MODE=NONE" depth texture */
+            (gc->apiVersion >= __GL_API_VERSION_ES30 && GL_NONE == compareMode &&
+             (GL_DEPTH_COMPONENT == baseFmtInfo->baseFormat || GL_DEPTH_STENCIL == baseFmtInfo->baseFormat)
+            )
+           )
         {
-            return GL_FALSE;
+            if (magFilter != GL_NEAREST)
+            {
+                return GL_FALSE;
+            }
+            if (minFilter != GL_NEAREST && minFilter != GL_NEAREST_MIPMAP_NEAREST)
+            {
+                return GL_FALSE;
+            }
         }
-        if (minFilter != GL_NEAREST && minFilter != GL_NEAREST_MIPMAP_NEAREST)
+    }
+    else
+    {
+        if (gc->apiVersion >= __GL_API_VERSION_ES30 &&
+           (magFilter != GL_NEAREST || (minFilter != GL_NEAREST && minFilter != GL_NEAREST_MIPMAP_NEAREST)))
         {
-            return GL_FALSE;
+            if (__GL_IS_TEXTURE_ARRAY(texObj->targetIndex) &&
+               (GL_UNSIGNED_INT == baseFmtInfo->category ||
+                GL_INT == baseFmtInfo->category ||
+                GL_R32F == internalFormat ||
+                GL_RG32F == internalFormat ||
+                GL_RGB32F == internalFormat ||
+                GL_RGBA32F == internalFormat))
+            {
+                return GL_FALSE;
+            }
+
+            if (__GL_IS_TEXTURE_ARRAY(texObj->targetIndex) &&
+               (GL_NONE == compareMode &&
+               (GL_DEPTH_COMPONENT16 == internalFormat ||
+                GL_DEPTH_COMPONENT24 == internalFormat ||
+                GL_DEPTH_COMPONENT32F == internalFormat ||
+                GL_DEPTH24_STENCIL8 == internalFormat ||
+                GL_DEPTH32F_STENCIL8 == internalFormat)))
+            {
+                return GL_FALSE;
+            }
+
+            if (baseFmtInfo->glFormat == GL_DEPTH_STENCIL &&
+                texObj->params.dsTexMode == GL_STENCIL_INDEX)
+            {
+                return GL_FALSE;
+            }
+
+            if (baseFmtInfo->glFormat == GL_STENCIL_INDEX)
+            {
+                return GL_FALSE;
+            }
         }
     }
 
@@ -422,8 +466,8 @@ GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLen
         return GL_FALSE;
     }
 
-    if (baseFmtInfo->glFormat == GL_DEPTH_STENCIL &&
-        texObj->params.dsTexMode == GL_STENCIL_INDEX)
+    if (gc->imports.conformGLSpec && baseFmtInfo->glFormat == GL_DEPTH_STENCIL
+        && texObj->params.dsTexMode == GL_STENCIL_INDEX)
     {
         if (magFilter != GL_NEAREST || minFilter != GL_NEAREST)
         {
@@ -781,6 +825,11 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
         break;
 
     case GL_TEXTURE_BASE_LEVEL:
+        if ((!gc->imports.conformGLSpec) && __glExtension[__GL_EXTID_OES_EGL_image_external_essl3].bEnabled &&
+            __GL_TEXTURE_EXTERNAL_INDEX == targetIdx && param != 0)
+        {
+            __GL_ERROR_RET(GL_INVALID_OPERATION);
+        }
         if (param >= 0)
         {
             tex->params.baseLevel = tex->immutable
@@ -805,7 +854,15 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
         }
         else
         {
-            __GL_ERROR_RET(GL_INVALID_VALUE);
+            if ((!gc->imports.conformGLSpec) && ((__GL_TEXTURE_2D_MS_INDEX == targetIdx) ||
+                (__GL_TEXTURE_2D_MS_ARRAY_INDEX == targetIdx)))
+            {
+                __GL_ERROR_RET(GL_INVALID_OPERATION);
+            }
+            else
+            {
+                __GL_ERROR_RET(GL_INVALID_VALUE);
+            }
         }
         break;
 
@@ -975,14 +1032,23 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
         }
         break;
     case GL_TEXTURE_BORDER_COLOR_EXT:
+        if ((!gc->imports.conformGLSpec) && ((__GL_TEXTURE_2D_MS_INDEX == targetIdx) ||
+            (__GL_TEXTURE_2D_MS_ARRAY_INDEX == targetIdx)))
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
         if (__glExtension[__GL_EXTID_EXT_texture_border_clamp].bEnabled)
         {
             __GL_MEMCOPY(tex->params.sampler.borderColor.fv, pv, 4 * sizeof(GLfloat));
             dirty = __GL_TEXPARAM_BORDER_COLOR_BIT;
             break;
         }
-
+        if(!gc->imports.conformGLSpec)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
     case GL_TEXTURE_PROTECTED_VIV:
+    case GL_TEXTURE_PROTECTED_EXT:
         tex->params.contentProtected = (GLboolean)param;
         break;
 
@@ -1101,6 +1167,7 @@ GLvoid GL_APIENTRY __glim_TexParameterf(__GLcontext *gc, GLenum target, GLenum p
     case GL_TEXTURE_MAX_ANISOTROPY_EXT:
     case GL_TEXTURE_SRGB_DECODE_EXT:
     case GL_TEXTURE_PROTECTED_VIV:
+    case GL_TEXTURE_PROTECTED_EXT:
 #ifdef OPENGL40
     case GL_TEXTURE_PRIORITY:
     case GL_TEXTURE_LOD_BIAS:
@@ -1572,8 +1639,12 @@ __glGetTexParameterfv(__GLcontext *gc, GLenum target, GLenum pname, GLfloat *v)
             __GL_MEMCOPY(v, params->sampler.borderColor.fv, 4 * sizeof(GLfloat));
             break;
         }
-
+        if (!gc->imports.conformGLSpec)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
     case GL_TEXTURE_PROTECTED_VIV:
+    case GL_TEXTURE_PROTECTED_EXT:
         v[0] = (GLfloat) params->contentProtected;
         break;
 #ifdef OPENGL40
@@ -1741,6 +1812,10 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
         {
             tex = unit->boundTextures[__GL_TEXTURE_CUBEMAP_ARRAY_INDEX];
             break;
+        }
+        if (!gc->imports.conformGLSpec)
+        {
+            __GL_ERROR_RET(GL_INVALID_VALUE);
         }
     case GL_TEXTURE_BUFFER_EXT:
         tex = unit->boundTextures[__GL_TEXTURE_BINDING_BUFFER_EXT];
@@ -2282,6 +2357,11 @@ GLboolean __glDeleteTextureObject(__GLcontext *gc, __GLtextureObject *tex)
         /* Set the flag to indicate the object is marked for delete */
         tex->flag |= __GL_OBJECT_IS_DELETED;
         return GL_FALSE;
+    }
+
+    if (!gc->imports.conformGLSpec && tex->bufObj)
+    {
+        __glUnBindTextureBuffer(gc, tex, tex->bufObj);
     }
 
     if (tex->label)

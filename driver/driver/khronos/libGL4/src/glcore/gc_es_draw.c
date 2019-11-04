@@ -452,18 +452,24 @@ __GL_INLINE GLvoid __glEvaluateAttribGroup1(__GLcontext* gc, __GLattribute* cs, 
     __GL_CHECK_ATTR2(__GL_DEPTHRANGE_BIT, depth.zNear, depth.zFar);
 
 #ifdef OPENGL40
-    __GL_CHECK_ATTR4(__GL_CLEARACCUM_BIT,
-        accum.clear.r, accum.clear.g, accum.clear.b, accum.clear.a);
+    if (gc->imports.conformGLSpec)
+    {
+        __GL_CHECK_ATTR4(__GL_CLEARACCUM_BIT,
+            accum.clear.r, accum.clear.g, accum.clear.b, accum.clear.a);
+    }
 #endif
 
     if (localMask & (__GL_COLORBUF_ATTR_BITS))
     {
 #ifdef OPENGL40
-        __GL_CHECK_ATTR2(__GL_ALPHAFUNC_BIT,
-            raster.alphaFunction, raster.alphaReference);
+        if (gc->imports.conformGLSpec)
+        {
+            __GL_CHECK_ATTR2(__GL_ALPHAFUNC_BIT,
+                raster.alphaFunction, raster.alphaReference);
 
-        __GL_CHECK_ATTR1(__GL_ALPHATEST_ENDISABLE_BIT,
-            enables.colorBuffer.alphaTest);
+            __GL_CHECK_ATTR1(__GL_ALPHATEST_ENDISABLE_BIT,
+                enables.colorBuffer.alphaTest);
+        }
 #endif
 
         __GL_CHECK_ATTR4(__GL_BLENDCOLOR_BIT,
@@ -561,15 +567,18 @@ __GL_INLINE GLvoid __glEvaluateAttribGroup1(__GLcontext* gc, __GLattribute* cs, 
         __GL_CHECK_ATTR2(__GL_POLYGONOFFSET_BIT, polygon.factor, polygon.units);
         __GL_CHECK_ATTR1(__GL_POLYGONOFFSET_FILL_ENDISABLE_BIT, enables.polygon.polygonOffsetFill);
 #ifdef OPENGL40
-        __GL_CHECK_ATTR2(__GL_POLYGONMODE_BIT, polygon.frontMode, polygon.backMode);
-        __GL_CHECK_ATTR1(__GL_POLYGONOFFSET_POINT_ENDISABLE_BIT,
-            enables.polygon.polygonOffsetPoint);
+        if (gc->imports.conformGLSpec)
+        {
+            __GL_CHECK_ATTR2(__GL_POLYGONMODE_BIT, polygon.frontMode, polygon.backMode);
+            __GL_CHECK_ATTR1(__GL_POLYGONOFFSET_POINT_ENDISABLE_BIT,
+                enables.polygon.polygonOffsetPoint);
 
-        __GL_CHECK_ATTR1(__GL_POLYGONOFFSET_LINE_ENDISABLE_BIT,
-            enables.polygon.polygonOffsetLine);
+            __GL_CHECK_ATTR1(__GL_POLYGONOFFSET_LINE_ENDISABLE_BIT,
+                enables.polygon.polygonOffsetLine);
 
-        __GL_CHECK_ATTR1(__GL_POLYGONSTIPPLE_ENDISABLE_BIT,
-            enables.polygon.stipple);
+            __GL_CHECK_ATTR1(__GL_POLYGONSTIPPLE_ENDISABLE_BIT,
+                enables.polygon.stipple);
+        }
 #endif
     }
 
@@ -608,65 +617,67 @@ __GL_INLINE GLvoid __glEvaluateAttribGroup2(__GLcontext* gc, __GLattribute* cs, 
     /* Reassign localMask back to globalDirtyState[__GL_DIRTY_ATTRS_2]
     */
 #ifdef OPENGL40
-     if (localMask & __GL_FOG_ATTR_BITS) {
+    if (gc->imports.conformGLSpec)
+    {
+         if (localMask & __GL_FOG_ATTR_BITS) {
 
-        __GL_CHECK_ATTR4(__GL_FOGCOLOR_BIT,
-            fog.color.r, fog.color.g, fog.color.b, fog.color.a);
+            __GL_CHECK_ATTR4(__GL_FOGCOLOR_BIT,
+                fog.color.r, fog.color.g, fog.color.b, fog.color.a);
 
-        __GL_CHECK_ATTR1(__GL_FOGINDEX_BIT,
-            fog.index);
+            __GL_CHECK_ATTR1(__GL_FOGINDEX_BIT,
+                fog.index);
 
-        __GL_CHECK_ATTR1(__GL_FOGDENSITY_BIT,
-            fog.density);
+            __GL_CHECK_ATTR1(__GL_FOGDENSITY_BIT,
+                fog.density);
 
-        __GL_CHECK_ATTR1(__GL_FOGSTART_BIT,
-            fog.start);
+            __GL_CHECK_ATTR1(__GL_FOGSTART_BIT,
+                fog.start);
 
-        __GL_CHECK_ATTR1(__GL_FOGEND_BIT,
-            fog.end);
+            __GL_CHECK_ATTR1(__GL_FOGEND_BIT,
+                fog.end);
 
-        __GL_CHECK_ATTR1(__GL_FOGMODE_BIT,
-            fog.mode);
+            __GL_CHECK_ATTR1(__GL_FOGMODE_BIT,
+                fog.mode);
 
-        __GL_CHECK_ATTR1(__GL_FOG_ENDISABLE_BIT,
-            enables.fog);
+            __GL_CHECK_ATTR1(__GL_FOG_ENDISABLE_BIT,
+                enables.fog);
+        }
+
+        if (localMask & __GL_COLORBUF_ATTR2_BITS) {
+
+            __GL_CHECK_ATTR1(__GL_LOGICOP_BIT,
+                raster.logicOp);
+
+            __GL_CHECK_ATTR1(__GL_LOGICOP_ENDISABLE_BIT,
+                enables.colorBuffer.colorLogicOp);
+
+      //      __GL_CHECK_ATTR4(__GL_CLEARCOLOR_BIT,
+      //          raster.clear.r, raster.clear.g, raster.clear.b, raster.clear.a);
+
+            __GL_CHECK_ATTR1(__GL_DITHER_ENDISABLE_BIT,
+                enables.colorBuffer.dither);
+        }
+
+        if (localMask & __GL_DEPTHBUF_ATTR2_BITS) {
+
+            __GL_CHECK_ATTR2(__GL_DEPTHBOUNDTEST_BIT,
+                depthBoundTest.zMin, depthBoundTest.zMax);
+
+            __GL_CHECK_ATTR1(__GL_DEPTHBOUNDTESTENABLE_BIT,
+                enables.depthBoundTest);
+        }
+
+        if (localMask & __GL_LINE_ATTR_BITS) {
+            __GL_CHECK_ATTR1(__GL_LINESMOOTH_ENDISABLE_BIT,
+                enables.line.smooth);
+
+            __GL_CHECK_ATTR2(__GL_LINESTIPPLE_BIT,
+                line.stippleRepeat, line.stipple);
+
+            __GL_CHECK_ATTR1(__GL_LINESTIPPLE_ENDISABLE_BIT,
+                enables.line.stipple);
+        }
     }
-
-    if (localMask & __GL_COLORBUF_ATTR2_BITS) {
-
-        __GL_CHECK_ATTR1(__GL_LOGICOP_BIT,
-            raster.logicOp);
-
-        __GL_CHECK_ATTR1(__GL_LOGICOP_ENDISABLE_BIT,
-            enables.colorBuffer.colorLogicOp);
-
-  //      __GL_CHECK_ATTR4(__GL_CLEARCOLOR_BIT,
-  //          raster.clear.r, raster.clear.g, raster.clear.b, raster.clear.a);
-
-        __GL_CHECK_ATTR1(__GL_DITHER_ENDISABLE_BIT,
-            enables.colorBuffer.dither);
-    }
-
-    if (localMask & __GL_DEPTHBUF_ATTR2_BITS) {
-
-        __GL_CHECK_ATTR2(__GL_DEPTHBOUNDTEST_BIT,
-            depthBoundTest.zMin, depthBoundTest.zMax);
-
-        __GL_CHECK_ATTR1(__GL_DEPTHBOUNDTESTENABLE_BIT,
-            enables.depthBoundTest);
-    }
-
-    if (localMask & __GL_LINE_ATTR_BITS) {
-        __GL_CHECK_ATTR1(__GL_LINESMOOTH_ENDISABLE_BIT,
-            enables.line.smooth);
-
-        __GL_CHECK_ATTR2(__GL_LINESTIPPLE_BIT,
-            line.stippleRepeat, line.stipple);
-
-        __GL_CHECK_ATTR1(__GL_LINESTIPPLE_ENDISABLE_BIT,
-            enables.line.stipple);
-    }
-
 #endif
     gc->globalDirtyState[__GL_DIRTY_ATTRS_2] = localMask;
     if (localMask == 0)
@@ -1429,7 +1440,7 @@ __GL_INLINE GLboolean __glDrawValidateState(__GLcontext *gc)
             __glEvaluateAttribGroup2(gc, cs, ds);
         }
 #ifdef OPENGL40
-        if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3])
+        if ((gc->imports.conformGLSpec) && gc->globalDirtyState[__GL_DIRTY_ATTRS_3])
         {
             __glEvaluateAttribGroup3(gc, cs, ds);
         }
@@ -1451,12 +1462,12 @@ __GL_INLINE GLboolean __glDrawValidateState(__GLcontext *gc)
         }
 
 #ifdef OPENGL40
-        if (gc->globalDirtyState[__GL_LIGHTING_ATTRS])
+        if ((gc->imports.conformGLSpec) && gc->globalDirtyState[__GL_LIGHTING_ATTRS])
         {
             __glEvaluateLightingAttrib(gc,cs,ds);
         }
 
-        if (gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS])
+        if ((gc->imports.conformGLSpec) && gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS])
         {
             __glEvaluateLightSrcAttrib(gc,cs,ds);
         }
@@ -1798,7 +1809,7 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
                     __GLvertexAttrib *pAttrib = &curVertexArray->attribute[index];
                     __GLvertexAttribBinding *pAttribBinding = &curVertexArray->attributeBinding[pAttrib->attribBinding];
                     __GLbufferObject *boundVBObj = (gc->imports.conformGLSpec) ? pAttribBinding->boundArrayObj:
-                        __glGetCurrentVertexArrayBufObj(gc, pAttrib->attribBinding);
+                                                   __glGetCurrentVertexArrayBufObj(gc, pAttrib->attribBinding);
 
                     if (boundVBObj)
                     {
@@ -1853,27 +1864,42 @@ GLvoid  __glDrawPrimitive(__GLcontext *gc, GLenum mode)
     }
 
 #ifdef OPENGL40
-    if (gc->vertexStreams.primMode != mode)
+    if(gc->imports.conformGLSpec)
     {
-        gc->vertexStreams.primMode = mode;
-        __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_PRIMMODE_BIT);
-    }
+        if (gc->vertexStreams.primMode != mode)
+        {
+            gc->vertexStreams.primMode = mode;
+            __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_2, __GL_PRIMMODE_BIT);
+        }
 
-    if ( gc->input.beginMode != __GL_IN_BEGIN && gc->input.beginMode != __GL_SMALL_LIST_BATCH )
+        if ( gc->input.beginMode != __GL_IN_BEGIN && gc->input.beginMode != __GL_SMALL_LIST_BATCH )
 #endif
-    {
-        if (!__glCheckVBOSize(gc))
-       {
-           __GL_ERROR_RET(GL_INVALID_OPERATION);
-       }
+        {
+            if (!__glCheckVBOSize(gc))
+           {
+               __GL_ERROR_RET(GL_INVALID_OPERATION);
+           }
 
-       if (__GLSL_MODE_GRAPHICS != gc->shaderProgram.mode)
-      {
-           gc->shaderProgram.mode = __GLSL_MODE_GRAPHICS;
-           __GL_SET_ATTR_DIRTY_BIT(gc, __GL_PROGRAM_ATTRS, __GL_DIRTY_GLSL_MODE_SWITCH);
-       }
+           if (__GLSL_MODE_GRAPHICS != gc->shaderProgram.mode)
+          {
+               gc->shaderProgram.mode = __GLSL_MODE_GRAPHICS;
+               __GL_SET_ATTR_DIRTY_BIT(gc, __GL_PROGRAM_ATTRS, __GL_DIRTY_GLSL_MODE_SWITCH);
+           }
+        }
     }
+    else
+    {
+          if (!__glCheckVBOSize(gc))
+          {
+              __GL_ERROR_RET(GL_INVALID_OPERATION);
+          }
 
+           if (__GLSL_MODE_GRAPHICS != gc->shaderProgram.mode)
+          {
+               gc->shaderProgram.mode = __GLSL_MODE_GRAPHICS;
+               __GL_SET_ATTR_DIRTY_BIT(gc, __GL_PROGRAM_ATTRS, __GL_DIRTY_GLSL_MODE_SWITCH);
+          }
+    }
 #if gcdPATTERN_FAST_PATH
     if (__glDrawPattern(gc))
     {

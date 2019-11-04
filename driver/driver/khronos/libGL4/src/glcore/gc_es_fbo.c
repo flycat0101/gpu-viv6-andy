@@ -564,6 +564,7 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
     case GL_RGB10:
     case GL_RGB12:
     case GL_RGB16:
+    case GL_RGB565:
     case GL_RGBA2:
     case GL_RGBA4:
     case GL_RGB5_A1:
@@ -682,6 +683,11 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
         break;
 
     case GL_SRGB8_ALPHA8:
+        if (!gc->imports.conformGLSpec && !__glExtension[__GL_EXTID_EXT_sRGB].bEnabled
+            && gc->apiVersion < __GL_API_VERSION_ES30)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
         break;
 
     case GL_DEPTH_COMPONENT16:
@@ -769,6 +775,14 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
     }
 
     curRbo = gc->frameBuffer.boundRenderbufObj;
+
+    /* There is no renderbuffer object corresponding to the name zero,
+     * so client attempts to modify or query renderbuffer state while zero is bound will generate errors.
+     */
+    if (!gc->imports.conformGLSpec && curRbo->name == 0)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
 
     /* Redundancy check */
     if ((curRbo->width == width) &&
@@ -1775,9 +1789,9 @@ GLvoid GL_APIENTRY __glim_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
         /*
         ** ES3.0 spec allow query default frame buffer object
         */
-        if ((attachment >= GL_FRONT_LEFT && attachment <= GL_BACK_RIGHT) ||
-            (attachment >= GL_AUX0 && attachment <= GL_AUX3) ||
-            (attachment == GL_BACK))
+        if (((gc->imports.conformGLSpec) && ((attachment >= GL_FRONT_LEFT && attachment <= GL_BACK_RIGHT)
+            || (attachment >= GL_AUX0 && attachment <= GL_AUX3) ||
+            (attachment == GL_BACK))) || ((!gc->imports.conformGLSpec) && (attachment == GL_BACK)))
         {
             formatInfo = gc->drawablePrivate->rtFormatInfo;
         }
@@ -1832,6 +1846,15 @@ GLvoid GL_APIENTRY __glim_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
             attachPoint = &framebufferObj->attachPoint[attachIndex];
             formatInfo = __glGetFramebufferFormatInfo(gc, framebufferObj, attachment);
         }
+    }
+
+    /* According to the ES2.0 spec, if the value of FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE is NONE,
+    then querying any other pname will generate INVALID_ENUM */
+    if ((!gc->imports.conformGLSpec) && (2 == gc->constants.majorVersion) &&
+       (GL_NONE == attachPoint->object) &&
+       (GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE != pname))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
     /*
@@ -1923,10 +1946,9 @@ GLvoid GL_APIENTRY __glim_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
             __GL_EXIT();
 
         case GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE:
-            /* We can't tell what the component type is. But there is no clarification in SPEC,
-            ** just follow conformance test
-            */
-            if ((formatInfo->drvFormat == __GL_FMT_Z32FS8) || (formatInfo->drvFormat == __GL_FMT_Z24S8))
+            /* 3.x spec: This query can not be performed for a combined depth+stencil (GL_DEPTH_STENCIL_ATTACHMENT) attachment,
+            since it does not have a single format */
+            if (GL_DEPTH_STENCIL_ATTACHMENT == attachment)
             {
                 __GL_ERROR_EXIT(GL_INVALID_OPERATION);
             }
@@ -1934,7 +1956,7 @@ GLvoid GL_APIENTRY __glim_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
             {
                 *params = formatInfo->category;
             }
-            return;
+            __GL_EXIT();
 
         case GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING:
             *params = formatInfo->encoding;
@@ -2064,7 +2086,7 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
 
     if (filter != GL_LINEAR && filter != GL_NEAREST)
     {
-         __GL_ERROR_EXIT(GL_INVALID_VALUE);
+         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
     if (GL_LINEAR == filter && (mask & (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT)))
@@ -2128,31 +2150,34 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
             else
             {
 #ifdef OPENGL40
-                switch (gc->state.raster.readBuffer)
+                if(gc->imports.conformGLSpec)
                 {
-                case GL_FRONT:
-                case GL_LEFT:
-                case GL_FRONT_AND_BACK:
-                case GL_FRONT_LEFT:
-                    readHandle = readable->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
-                    break;
+                    switch (gc->state.raster.readBuffer)
+                    {
+                    case GL_FRONT:
+                    case GL_LEFT:
+                    case GL_FRONT_AND_BACK:
+                    case GL_FRONT_LEFT:
+                        readHandle = readable->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
+                        break;
 
-                case GL_RIGHT:
-                case GL_FRONT_RIGHT:
-                    readHandle = readable->rtHandles[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
-                    break;
+                    case GL_RIGHT:
+                    case GL_FRONT_RIGHT:
+                        readHandle = readable->rtHandles[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
+                        break;
 
-                case GL_BACK_RIGHT:
-                    readHandle = readable->rtHandles[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
-                    break;
+                    case GL_BACK_RIGHT:
+                        readHandle = readable->rtHandles[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
+                        break;
 
-                case GL_BACK:
-                case GL_BACK_LEFT:
-                    readHandle = readable->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX];
-                    break;
+                    case GL_BACK:
+                    case GL_BACK_LEFT:
+                        readHandle = readable->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX];
+                        break;
 
-                default:
-                  break;
+                    default:
+                      break;
+                    }
                 }
 #endif
                 if (!readHandle)
@@ -2202,40 +2227,56 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
             else
             {
 #ifdef OPENGL40
-                for (i = 0; i < (GLint)gc->constants.shaderCaps.maxDrawBuffers; ++i)
+                if(gc->imports.conformGLSpec)
                 {
-                    GLvoid *drawHandle = gcvNULL;
-
-                    switch (gc->state.raster.drawBuffers[i])
+                    for (i = 0; i < (GLint)gc->constants.shaderCaps.maxDrawBuffers; ++i)
                     {
-                    case GL_FRONT:
-                    case GL_LEFT:
-                    case GL_FRONT_LEFT:
-                    case GL_FRONT_AND_BACK:
-                        drawHandle = drawable->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
-                        break;
+                        GLvoid *drawHandle = gcvNULL;
 
-                    case GL_RIGHT:
-                    case GL_FRONT_RIGHT:
-                        drawHandle = drawable->rtHandles[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
-                        break;
+                        switch (gc->state.raster.drawBuffers[i])
+                        {
+                        case GL_FRONT:
+                        case GL_LEFT:
+                        case GL_FRONT_LEFT:
+                        case GL_FRONT_AND_BACK:
+                            drawHandle = drawable->rtHandles[__GL_DRAWBUFFER_FRONTLEFT_INDEX];
+                            break;
 
-                    case GL_BACK:
-                    case GL_BACK_LEFT:
-                        drawHandle = drawable->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX];
-                        break;
+                        case GL_RIGHT:
+                        case GL_FRONT_RIGHT:
+                            drawHandle = drawable->rtHandles[__GL_DRAWBUFFER_FRONTRIGHT_INDEX];
+                            break;
 
-                    case GL_BACK_RIGHT:
-                        drawHandle = drawable->rtHandles[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
-                        break;
+                        case GL_BACK:
+                        case GL_BACK_LEFT:
+                            drawHandle = drawable->rtHandles[__GL_DRAWBUFFER_BACKLEFT_INDEX];
+                            break;
 
-                    default:
-                      break;
+                        case GL_BACK_RIGHT:
+                            drawHandle = drawable->rtHandles[__GL_DRAWBUFFER_BACKRIGHT_INDEX];
+                            break;
+
+                        default:
+                          break;
+                        }
+
+                        if (drawHandle)
+                        {
+                            bHaveDrawbuffer = GL_TRUE;
+                        }
                     }
-
-                    if (drawHandle)
+                }
+                else
+                {
+                    if (drawable->rtHandles[0])
                     {
                         bHaveDrawbuffer = GL_TRUE;
+                    }
+
+                    /* Surface of default drawFBO must be different than named readFBO */
+                    if ((0 == readFBO->name) && (readable->rtHandles[0] == drawable->rtHandles[0]))
+                    {
+                        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
                     }
                 }
 #endif
@@ -2723,6 +2764,11 @@ GLvoid __glInvalidateFramebuffer(__GLcontext *gc,
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
+    if (numAttachments < 0)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
     if (0 == numAttachments || gcvNULL == attachments)
     {
         /* Ignore it*/
@@ -2782,7 +2828,7 @@ GLvoid __glInvalidateFramebuffer(__GLcontext *gc,
             case GL_STENCIL:
                 break;
             default:
-                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+                __GL_ERROR_EXIT(GL_INVALID_ENUM);
             }
 
             if (!gc->dp.isFramebufferComplete(gc, framebufferObj))
@@ -2817,7 +2863,19 @@ GLvoid GL_APIENTRY __glim_InvalidateSubFramebuffer(__GLcontext *gc,
                                                    GLsizei width,
                                                    GLsizei height)
 {
+    __GL_HEADER();
+
+    if (width < 0 || height < 0)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
     __glInvalidateFramebuffer(gc, target, numAttachments, attachments, x, y, width, height);
+
+OnError:
+
+    __GL_FOOTER();
+    return;
 }
 
 GLvoid GL_APIENTRY __glim_GetInternalformativ(__GLcontext *gc, GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint* params)

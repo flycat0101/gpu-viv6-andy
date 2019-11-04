@@ -594,20 +594,41 @@ static GLboolean __glCheckVAOState(__GLcontext *gc, GLboolean attribMustFromVBO,
     {
         if (attribEnabled & 0x1)
         {
-            __GLvertexAttrib *pAttrib = &curVertexArray->attribute[index];
-            __GLvertexAttribBinding *pAttribBinding = &curVertexArray->attributeBinding[pAttrib->attribBinding];
-            if (attribMustFromVBO)
+            if (gc->imports.conformGLSpec)
             {
-                if (pAttribBinding->boundArrayName == 0)
+                __GLvertexAttrib *pAttrib = &curVertexArray->attribute[index];
+                __GLvertexAttribBinding *pAttribBinding = &curVertexArray->attributeBinding[pAttrib->attribBinding];
+                if (attribMustFromVBO)
+                {
+                    if (pAttribBinding->boundArrayName == 0)
+                    {
+                        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                    }
+                }
+
+                if (pAttribBinding->boundArrayObj && pAttribBinding->boundArrayObj->name != 0 &&
+                    pAttribBinding->boundArrayObj->bufferMapped)
                 {
                     __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
                 }
             }
-
-            if (pAttribBinding->boundArrayObj && pAttribBinding->boundArrayObj->name != 0 &&
-                pAttribBinding->boundArrayObj->bufferMapped)
+            else
             {
-                __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                GLuint binding = curVertexArray->attribute[index].attribBinding;
+                __GLbufferObject *boundVBObj = __glGetCurrentVertexArrayBufObj(gc, binding);
+
+                if (attribMustFromVBO)
+                {
+                    if (!boundVBObj)
+                    {
+                        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                    }
+                }
+
+                if (boundVBObj && boundVBObj->bufferMapped)
+                {
+                    __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                }
             }
         }
         index++;
@@ -636,11 +657,15 @@ static GLvoid  __glUpdateVertexArray(__GLcontext *gc,
     __GLvertexAttrib *pAttrib = &vertexArrayState->attribute[attribIdx];
     __GLvertexAttribBinding *pAttribBinding = &vertexArrayState->attributeBinding[bindingIdx];
     __GLbufferObject *newBufObj = gc->bufferObject.generalBindingPoint[__GL_ARRAY_BUFFER_INDEX].boundBufObj;
-    __GLbufferObject *oldBufObj = pAttribBinding->boundArrayObj;
+    __GLbufferObject *oldBufObj = gc->imports.conformGLSpec ? pAttribBinding->boundArrayObj
+                                            :__glGetCurrentVertexArrayBufObj(gc, bindingIdx);
     GLsizei actualStride = stride ? stride : __glUtilCalculateStride(size, type);
 
 #ifdef OPENGL40
-    pAttrib->stride = actualStride;
+    if(gc->imports.conformGLSpec)
+    {
+        pAttrib->stride = actualStride;
+    }
 #endif
 
     /* if (oldBufObj != newBufObj) */
@@ -740,8 +765,8 @@ static GLboolean __glCheckXFBState(__GLcontext *gc, GLboolean allowXFB, GLenum m
 
             if (xfbObj->active && !xfbObj->paused)
             {
-                GLuint numPrims = vertexCount;
-                GLuint numVerts = vertexCount;
+                GLuint numPrims = gc->imports.conformGLSpec ? vertexCount : 0;
+                GLuint numVerts = gc->imports.conformGLSpec ? vertexCount : 0;
 
                 /* VIV TODO: Stream index */
                 __GLqueryObject *queryObj = gc->query.currQuery[__GL_QUERY_XFB_PRIMITIVES_WRITTEN][0];

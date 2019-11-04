@@ -128,6 +128,26 @@ static const __GLformatCombine canonicalformats[] = {
     { GL_RGB8, GL_RGB, GL_UNSIGNED_INT_2_10_10_10_REV_EXT, 4, GL_TRUE },
     { GL_RGB565, GL_RGB, GL_UNSIGNED_INT_2_10_10_10_REV_EXT, 4, GL_TRUE },
     { GL_DEPTH_COMPONENT32_OES, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 4, GL_TRUE },
+
+    /* required by GL_EXT_sRGB extension */
+    { GL_SRGB_EXT, GL_SRGB_EXT, GL_UNSIGNED_BYTE, 4, GL_FALSE },
+    { GL_SRGB_ALPHA_EXT, GL_SRGB_ALPHA_EXT, GL_UNSIGNED_BYTE, 4, GL_TRUE },
+
+    /*  GL_EXT_texture_rg extension GL_OES_texture_float and GL_OES_texture_half_float
+    ** would make these formats color-renderable */
+    { GL_RED_EXT, GL_RED_EXT, GL_FLOAT, 4, GL_TRUE },
+    { GL_RED_EXT, GL_RED_EXT, GL_HALF_FLOAT_OES, 2, GL_TRUE },
+    { GL_RED_EXT, GL_RED_EXT, GL_UNSIGNED_BYTE, 1, GL_TRUE },
+    { GL_RG_EXT, GL_RG_EXT, GL_FLOAT, 4, GL_TRUE },
+    { GL_RG_EXT, GL_RG_EXT, GL_HALF_FLOAT_OES, 2, GL_TRUE },
+    { GL_RG_EXT, GL_RG_EXT, GL_UNSIGNED_BYTE, 1, GL_TRUE },
+
+    /* required by EXT_color_buffer_half_float extension */
+    { GL_RGBA, GL_RGBA, GL_HALF_FLOAT_OES, 8, GL_TRUE },
+    { GL_RGB, GL_RGB, GL_HALF_FLOAT_OES, 6, GL_TRUE },
+
+    /* required by GL_EXT_BGRA extension */
+    { GL_BGRA_EXT, GL_BGRA_EXT, GL_UNSIGNED_BYTE, 4, GL_TRUE }
 };
 
 
@@ -339,10 +359,17 @@ GLboolean __glCheckTexDirectFmt(__GLcontext *gc,
     case GL_RGB:
     case GL_RGBA:
     case GL_BGRA_EXT:
+    case GL_RGB5_A1_OES:
     case GL_RG8_EXT:
+    case GL_R8_EXT:
     case GL_ALPHA:
     case GL_LUMINANCE_ALPHA:
+    case GL_LUMINANCE8_ALPHA8_EXT:
     case GL_DEPTH_COMPONENT16:
+        if(!gc->imports.conformGLSpec)
+        {
+            tex->canonicalFormat = GL_TRUE;
+        }
         return GL_TRUE;
 
     default:
@@ -522,7 +549,6 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
 #endif
 
         case GL_RED:
-        case GL_R8:
         case GL_R8_SNORM:
         case GL_R16_SNORM:
         case GL_R8I:
@@ -536,7 +562,6 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_R32F:
 
         case GL_RG:
-        case GL_RG8:
         case GL_RG16:
         case GL_RG8_SNORM:
         case GL_RG16_SNORM:
@@ -599,13 +624,26 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_DEPTH_COMPONENT24:
         case GL_DEPTH_COMPONENT32_OES:
         case GL_DEPTH_COMPONENT32F:
-        case GL_STENCIL_INDEX8:
         case GL_DEPTH_STENCIL:
         case GL_DEPTH24_STENCIL8:
         case GL_DEPTH32F_STENCIL8:
-
             break;
 
+        case GL_R8:
+        case GL_RG8:
+            if ((!gc->imports.conformGLSpec) && (gc->apiVersion == __GL_API_VERSION_ES20)
+                && (gc->constants.majorVersion == 2))
+            {
+                invalid = GL_TRUE;
+            }
+            break;
+        case GL_STENCIL_INDEX8:
+            if ((!gc->imports.conformGLSpec) && (!__glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled
+                && gc->apiVersion < __GL_API_VERSION_ES30 ))
+            {
+                invalid = GL_TRUE;
+            }
+            break;
         default:
             invalid = GL_TRUE;
             break;
@@ -1381,7 +1419,7 @@ GLboolean __glCheckTexImgFmtES(__GLcontext *gc,
         {
         case GL_UNSIGNED_BYTE:
             invalid = (GL_RGB8 != internalFormat && GL_RGB565 != internalFormat &&
-                       GL_SRGB8 != internalFormat && GL_RGB != internalFormat);
+                       GL_SRGB8 != internalFormat && GL_RGB != internalFormat &&  __GL_RGBX8 != internalFormat);
             break;
         case GL_BYTE:
             invalid = (GL_RGB8_SNORM != internalFormat);
@@ -1606,7 +1644,8 @@ GLboolean __glCheckTexImgFmtES(__GLcontext *gc,
         break;
 
     case GL_STENCIL_INDEX:
-        if (GL_STENCIL_INDEX8 != internalFormat ||
+        if ((!gc->imports.conformGLSpec && !__glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled &&
+            gc->apiVersion < __GL_API_VERSION_ES31) || GL_STENCIL_INDEX8 != internalFormat ||
             GL_UNSIGNED_BYTE != type)
         {
             invalid = GL_TRUE;
@@ -1761,6 +1800,13 @@ GLboolean __glCheckTexImgFmtES(__GLcontext *gc,
     }
 
     tex->canonicalFormat = __glIsCanonicalFormat(internalFormat, format, type);
+
+    /* Some applications (Taiji) use DEPTH_COMPONENT24_OES or DEPTH_COMPONENT32_OES, even though it's not part of the spec. */
+    if ((!gc->imports.conformGLSpec) && format == GL_DEPTH_COMPONENT &&
+        (type == GL_DEPTH_COMPONENT24_OES || type == GL_DEPTH_COMPONENT32_OES))
+    {
+        tex->canonicalFormat = GL_TRUE;
+    }
 
     return GL_TRUE;
 }

@@ -339,10 +339,24 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->constants.numExtensions;
         break;
     case GL_MAJOR_VERSION:
-        *ip++ = gc->constants.majorVersion;
+        if (!gc->imports.conformGLSpec && gc->constants.majorVersion < 3)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+        else
+        {
+            *ip++ = gc->constants.majorVersion;
+        }
         break;
     case GL_MINOR_VERSION:
-        *ip++ = gc->constants.minorVersion;
+        if (!gc->imports.conformGLSpec && gc->constants.majorVersion < 3)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+        else
+        {
+            *ip++ = gc->constants.minorVersion;
+        }
         break;
 #ifdef OPENGL40
     case GL_CONTEXT_FLAGS:
@@ -1696,7 +1710,14 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         break;
 
     case GL_TRANSFORM_FEEDBACK_BUFFER_BINDING:
-        *ip++ = gc->xfb.boundXfbObj->boundBufName;
+        if (gc->imports.conformGLSpec)
+        {
+            *ip++ = gc->xfb.boundXfbObj->boundBufName;
+        }
+        else
+        {
+            *ip++ = gc->bufferObject.generalBindingPoint[__GL_XFB_BUFFER_INDEX].boundBufName;
+        }
         break;
 
     case GL_TRANSFORM_FEEDBACK_PAUSED:
@@ -2835,16 +2856,18 @@ GLvoid GL_APIENTRY __glim_GenQueries(__GLcontext *gc, GLsizei n, GLuint *ids)
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    for (queryStream = 0; queryStream < gc->constants.shaderCaps.maxVertStreams; queryStream++)
+    if (gc->imports.conformGLSpec)
     {
-        if (gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED][queryStream] ||
-            gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE][queryStream] ||
-            gc->query.currQuery[__GL_QUERY_XFB_PRIMITIVES_WRITTEN][queryStream])
+        for (queryStream = 0; queryStream < gc->constants.shaderCaps.maxVertStreams; queryStream++)
         {
-            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+            if (gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED][queryStream] ||
+                gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE][queryStream] ||
+                gc->query.currQuery[__GL_QUERY_XFB_PRIMITIVES_WRITTEN][queryStream])
+            {
+                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+            }
         }
     }
-
     start = __glGenerateNames(gc, gc->query.noShare, n);
 
     for (i = 0; i < n; i++)

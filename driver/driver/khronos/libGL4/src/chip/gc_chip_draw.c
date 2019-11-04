@@ -8197,19 +8197,52 @@ __glChipDrawArrays(
 
     if (instantDraw->count > 0 && instantDraw->primCount > 0)
     {
-        /* Bind the vertex array to the hardware. */
-        if ( gc->vertexArray.varrayDirty            ||
-                instantDraw->indexBuffer == gcvNULL ||
-                chipCtx->patchId != gcvPATCH_REALRACING)
+        if(gc->imports.conformGLSpec)
         {
-            gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, gcvTRUE, gcvFALSE));
-        }
+            /* Bind the vertex array to the hardware. */
+            if ( gc->vertexArray.varrayDirty            ||
+                    instantDraw->indexBuffer == gcvNULL ||
+                    chipCtx->patchId != gcvPATCH_REALRACING)
+            {
+                gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, gcvTRUE, gcvFALSE));
+            }
 
-        /* Draw */
-        gcmONERROR(gco3D_DrawPrimitives(chipCtx->engine,
-                                        instantDraw->primMode,
-                                        instantDraw->first,
-                                        instantDraw->primCount));
+            /* Draw */
+            gcmONERROR(gco3D_DrawPrimitives(chipCtx->engine,
+                                            instantDraw->primMode,
+                                            instantDraw->first,
+                                            instantDraw->primCount));
+        }
+        else
+        {
+            gcsSPLIT_DRAW_INFO splitDrawInfo;
+
+            __GL_MEMZERO(&splitDrawInfo, sizeof(gcsSPLIT_DRAW_INFO));
+
+            /* Collect split draw info.*/
+            gcChipCollectSplitDrawArraysInfo(gc, instantDraw, &splitDrawInfo);
+
+            if (splitDrawInfo.splitDrawType != gcvSPLIT_DRAW_UNKNOWN)
+            {
+                gcmONERROR((*splitDrawInfo.splitDrawFunc)(gc, instantDraw, &splitDrawInfo));
+            }
+            else
+            {
+                /* Bind the vertex array to the hardware. */
+                if ( gc->vertexArray.varrayDirty            ||
+                        instantDraw->indexBuffer == gcvNULL ||
+                        chipCtx->patchId != gcvPATCH_REALRACING)
+                {
+                    gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, gcvTRUE, gcvFALSE));
+                }
+
+                /* Draw */
+                gcmONERROR(gco3D_DrawPrimitives(chipCtx->engine,
+                                                instantDraw->primMode,
+                                                instantDraw->first,
+                                                instantDraw->primCount));
+            }
+        }
     }
 
     /* Intentional fall through */
@@ -8643,7 +8676,7 @@ gcChipTraverseProgramStages(
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x call=0x%x", gc, chipCtx, callback);
 
 #ifdef OPENGL40
-    if (chipCtx->fixProgramFlag == gcvFALSE)
+    if ((gc->imports.conformGLSpec && chipCtx->fixProgramFlag == gcvFALSE) || (!gc->imports.conformGLSpec))
     {
 #endif
 
@@ -8693,7 +8726,7 @@ __glChipDrawBegin(
 
     do
     {
-        __GLchipSLProgram *vsProgram, *fsProgram;
+        __GLchipSLProgram *vsProgram, *fsProgram, *tcsProgram = gcvNULL, *tesProgram = gcvNULL, *gsProgram = gcvNULL;
         /* primitive mode in previous stage */
         GLenum primMode = gc->vertexArray.primMode;
 
@@ -8803,11 +8836,40 @@ __glChipDrawBegin(
 
         /*1, VS stage check */
         vsProgram = chipCtx->activePrograms[__GLSL_STAGE_VS];
+        if(!gc->imports.conformGLSpec)
+        {
+            fsProgram = chipCtx->activePrograms[__GLSL_STAGE_FS];
+
+            if (__glExtension[__GL_EXTID_EXT_tessellation_shader].bEnabled)
+            {
+                tcsProgram = chipCtx->activePrograms[__GLSL_STAGE_TCS];
+                tesProgram = chipCtx->activePrograms[__GLSL_STAGE_TES];
+            }
+
+            if (__glExtension[__GL_EXTID_EXT_geometry_shader].bEnabled)
+            {
+                gsProgram = chipCtx->activePrograms[__GLSL_STAGE_GS];
+            }
+        }
         if (!vsProgram)
         {
             if (!gc->imports.conformGLSpec)
             {
-                __GLES_PRINT("ES30:skip draw because of NULL VS program");
+                if (tcsProgram || tesProgram)
+                {
+                    __GLES_PRINT("ES30: tessellation is active and vertex shader is missing.");
+                    __GL_ERROR(GL_INVALID_OPERATION);
+                }
+                else if (gsProgram)
+                {
+                    __GLES_PRINT("ES30: geometry is active and vertex shader is missing.");
+                    __GL_ERROR(GL_INVALID_OPERATION);
+                }
+                else
+                {
+                    __GLES_PRINT("ES30:skip draw because of NULL VS program");
+                }
+                break;
             }
             break;
         }
@@ -8822,9 +8884,11 @@ __glChipDrawBegin(
         /*2, TS stage check */
         if (__glExtension[__GL_EXTID_EXT_tessellation_shader].bEnabled)
         {
-            __GLchipSLProgram *tcsProgram, *tesProgram;
-            tcsProgram = chipCtx->activePrograms[__GLSL_STAGE_TCS];
-            tesProgram = chipCtx->activePrograms[__GLSL_STAGE_TES];
+            if(gc->imports.conformGLSpec)
+            {
+                tcsProgram = chipCtx->activePrograms[__GLSL_STAGE_TCS];
+                tesProgram = chipCtx->activePrograms[__GLSL_STAGE_TES];
+            }
 
             if ((tcsProgram == gcvNULL) != (tesProgram == gcvNULL))
             {
@@ -8955,7 +9019,7 @@ __glChipDrawBegin(
                     break;
                 }
 
-                if (xfbObj->active && !xfbObj->paused)
+                if (gc->imports.conformGLSpec && xfbObj->active && !xfbObj->paused)
                 {
                     //TODO: This is max vertices, maybe need to capture GS output vertices after draw.
                     xfbObj->vertices += gsProgObj->bindingInfo.gsOutVertices;
@@ -8963,7 +9027,7 @@ __glChipDrawBegin(
             }
             else
             {
-                if (xfbObj->active && !xfbObj->paused)
+                if (gc->imports.conformGLSpec && xfbObj->active && !xfbObj->paused)
                 {
                     xfbObj->vertices += (GLuint)(gc->vertexArray.end - gc->vertexArray.start);
                 }
@@ -9311,6 +9375,7 @@ __glChipDrawEnd(
 
 #ifdef OPENGL40
     /* TODO check if this is needed */
+    if(gc->imports.conformGLSpec)
     {
         gcmONERROR(__gl4ChipFlush(gc));
     }
@@ -9350,15 +9415,23 @@ __glChipDrawEnd(
                | ((gctUINT8) gc->state.raster.colorMask[0].greenMask << 1)
                | ((gctUINT8) gc->state.raster.colorMask[0].blueMask  << 2)
                | ((gctUINT8) gc->state.raster.colorMask[0].alphaMask << 3);
-
-        for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
+        if(gc->imports.conformGLSpec)
         {
-            if (chipCtx->drawRtViews[i].surf && enable)
+            for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
             {
-                gcoSURF_SetFlags(chipCtx->drawRtViews[i].surf, gcvSURF_FLAG_CONTENT_UPDATED, gcvTRUE);
+                if (chipCtx->drawRtViews[i].surf && enable)
+                {
+                    gcoSURF_SetFlags(chipCtx->drawRtViews[i].surf, gcvSURF_FLAG_CONTENT_UPDATED, gcvTRUE);
+                }
             }
         }
-
+        else
+        {
+            if (chipCtx->drawRtViews[0].surf && enable)
+            {
+                gcoSURF_SetFlags(chipCtx->drawRtViews[0].surf, gcvSURF_FLAG_CONTENT_UPDATED, gcvTRUE);
+            }
+        }
         /*. Set the flag of depth.*/
         surface = chipCtx->drawDepthView.surf ? chipCtx->drawDepthView.surf : chipCtx->drawStencilView.surf;
 
@@ -9736,7 +9809,7 @@ __glChipDrawPattern(
                 /* For GLES_PATTERN_GFX0 or GLES_PATTERN_GFX1, there is no aliasing attribute. */
                 gcmASSERT(!attribLinkage->next);
 
-                bufObj = pAttribBinding->boundArrayObj;
+                bufObj = gc->imports.conformGLSpec ? pAttribBinding->boundArrayObj : __glGetCurrentVertexArrayBufObj(gc, pAttrib->attribBinding);
 
                 if (!(bufObj && bufObj->size > 0))
                 {
@@ -9893,7 +9966,7 @@ __glChipComputeBegin(
 #endif
 
 #ifdef OPENGL40
-    if (chipCtx->fixProgramFlag  == gcvFALSE)
+    if (((gc->imports.conformGLSpec) && (chipCtx->fixProgramFlag  == gcvFALSE)) || (!gc->imports.conformGLSpec))
     {
 #endif
     if (gc->globalDirtyState[__GL_PROGRAM_ATTRS] & (__GL_DIRTY_GLSL_PROGRAM_SWITCH |
@@ -10208,8 +10281,10 @@ __glChipDispatchCompute(
             break;
         }
 
-        if (gc->compute.indirect &&
+        if ((gc->imports.conformGLSpec && gc->compute.indirect &&
             gcvFALSE == gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMPUTE_INDIRECT))
+            || (!gc->imports.conformGLSpec && gc->compute.indirect &&
+             !chipCtx->chipFeature.hwFeature.hasComputeIndirect))
         {
             gcmERR_BREAK(gcChipLockOutComputeIndirectBuf(gc));
             gc->compute.indirect = gcvFALSE;
