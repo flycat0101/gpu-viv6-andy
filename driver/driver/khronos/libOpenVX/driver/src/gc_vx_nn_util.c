@@ -5325,7 +5325,7 @@ vx_status vxo_insertHandel(vxnne_execution_layer   executionLayer)
 
                     if(op->target == VXNNE_OPERATION_TARGET_SH)
                     {
-                        executionLayer->swapHandle[n]->u.nodeTable[0] = op->layer->node->nodeID;
+                        executionLayer->swapHandle[n]->u.nodeTable[0] = op->layer->node->id;
                         executionLayer->swapHandle[n]->isSH = vx_true_e;
                     }
 
@@ -5404,7 +5404,7 @@ vx_status vxo_insertHandel(vxnne_execution_layer   executionLayer)
 
                     if(op->target == VXNNE_OPERATION_TARGET_SH)
                     {
-                        executionLayer->swapHandle[n]->u.nodeTable[0] = op->layer->node->nodeID;
+                        executionLayer->swapHandle[n]->u.nodeTable[0] = op->layer->node->id;
                         executionLayer->swapHandle[n]->isSH = vx_true_e;
                     }
 
@@ -5639,5 +5639,81 @@ void alignTensorChannelToTransposeChannel(
             tensor->tensorBuffer->memory.strides[0][dimIndex] = TENSOR_STRIDE_INDEX(tensor, dimIndex);
         }
     }
+}
+
+vx_status patchNodeParamLocation(vx_node node)
+{
+    vx_uint32 j = 0;
+    vx_graph graph = node->graph;
+
+    for (j = 0; j < node->kernel->signature.paramCount; j++)
+    {
+        if (node->kernel->signature.stateTable[j] == VX_PARAMETER_STATE_OPTIONAL)
+        continue;
+
+        switch (node->paramTable[j]->type)
+        {
+        case VX_TYPE_TENSOR:
+            {
+                vx_tensor tensor = (vx_tensor)node->paramTable[j];
+                vx_uint32 commandSizeInUint = graph->commandBufferSizeInByte / 4;
+                vx_uint32 physical = tensor->tensorBuffer->memory.physicals[0];
+                vx_uint32 location = 0;
+                for (location = 0; location < commandSizeInUint; location++)
+                {
+                    if (physical == graph->commandBuffer[location])
+                        break;
+                }
+                if (location == commandSizeInUint)
+                    location = 0;
+                node->patchLocation[j][0] = location;
+
+                break;
+            }
+
+
+        case VX_TYPE_IMAGE:
+            {
+                vx_uint32 planeIndx = 0;
+                vx_image image = (vx_image)node->paramTable[j];
+                vx_uint32 commandSizeInUint = graph->commandBufferSizeInByte / 4;
+                for (planeIndx = 0; planeIndx < image->planeCount; planeIndx++)
+                {
+                    vx_uint32 physical = image->memory.physicals[planeIndx];
+                    vx_uint32 location = 0;
+                    for (location = 0; location < commandSizeInUint; location++)
+                    {
+                        if (physical == graph->commandBuffer[location])
+                            break;
+                    }
+                    if (location == commandSizeInUint)
+                        location = 0;
+                    node->patchLocation[j][planeIndx] = location;
+
+                }
+                break;
+            }
+        case VX_TYPE_SCALAR:
+            {
+                vx_uint32 location = 0;
+                vx_scalar scalar = (vx_scalar)node->paramTable[j];
+                vx_uint32 physical = scalar->physical;
+                vx_uint32 commandSizeInUint = graph->commandBufferSizeInByte / 4;
+                for (location = 0; location < commandSizeInUint; location++)
+                {
+                    if (physical == graph->commandBuffer[location])
+                        break;
+                }
+                if (location == commandSizeInUint)
+                    location = 0;
+                node->patchLocation[j][0] = location;
+            }
+            break;
+        default:
+            /* vxmASSERT(0); */
+            break;
+        }
+    }
+    return VX_SUCCESS;
 }
 

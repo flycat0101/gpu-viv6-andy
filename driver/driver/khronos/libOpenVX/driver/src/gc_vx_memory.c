@@ -243,9 +243,14 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
         desc.flag     = memory->wrapFlag;
         desc.logical  = gcmPTR_TO_UINT64(memory->logicals[planeIndex]);
         desc.physical = gcvINVALID_PHYSICAL_ADDRESS;
-        desc.size     = (gctUINT32)memory->sizes[planeIndex];
 
-        memory->wrappedSize[planeIndex] = memory->sizes[planeIndex];
+        /*TODO: add more check to make sure memory size 4k alignment*/
+        desc.size     = gcmALIGN((gctUINT32)memory->sizes[planeIndex], 0x1000);
+
+        /*page size alignment for CPU*/
+        if(desc.logical & 0x3f || desc.size & 0xfff ) goto ErrorExit;
+
+        memory->wrappedSize[planeIndex] = desc.size;
 
         /* Map the host ptr to a vidmem node. */
         status = gcoHAL_WrapUserMemory(&desc,

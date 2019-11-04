@@ -477,5 +477,5 @@ vx_status vxnnePreLoadWeightsBiases(
     );
 
 #endif
-
+vx_status patchNodeParamLocation(vx_node node);
 

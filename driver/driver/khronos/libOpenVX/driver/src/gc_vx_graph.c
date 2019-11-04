@@ -9481,6 +9481,7 @@ VX_PRIVATE_API void vxoGraph_GeneratePatchLocForInputs(vx_graph graph)
 {
     vx_uint32 i;
     vx_uint32 j;
+    vxnne_execution_layer   executionLayer = (vxnne_execution_layer)&graph->layer->base;
 
     gcmHEADER_ARG("graph=%p", graph);
 
@@ -9493,75 +9494,21 @@ VX_PRIVATE_API void vxoGraph_GeneratePatchLocForInputs(vx_graph graph)
     for (i = 0; i < graph->headNodeCount; i++)
     {
         vx_node node = graph->nodeTable[graph->headNodeIndexTable[i]];
-        for (j = 0; j < node->kernel->signature.paramCount; j++)
+        patchNodeParamLocation(node);
+    }
+
+    if(executionLayer == VX_NULL)
+        return;
+
+    for (j = 0; j < executionLayer->swapcount; ++j)
+    {
+        if(executionLayer->swapHandle[j]->isSH)
         {
-            if (node->kernel->signature.stateTable[j] == VX_PARAMETER_STATE_OPTIONAL)
-                continue;
-
-            switch (node->paramTable[j]->type)
-            {
-
-            case VX_TYPE_TENSOR:
-                {
-                    vx_tensor tensor = (vx_tensor)node->paramTable[j];
-                    vx_uint32 commandSizeInUint = graph->commandBufferSizeInByte / 4;
-                    vx_uint32 physical = tensor->tensorBuffer->memory.physicals[0];
-                    vx_uint32 location = 0;
-                    for (location = 0; location < commandSizeInUint; location++)
-                    {
-                        if (physical == graph->commandBuffer[location])
-                            break;
-                    }
-                    if (location == commandSizeInUint)
-                        location = 0;
-                    node->patchLocation[j][0] = location;
-
-                    break;
-                }
-
-            case VX_TYPE_IMAGE:
-                {
-                    vx_uint32 planeIndx = 0;
-                    vx_image image = (vx_image)node->paramTable[j];
-                    vx_uint32 commandSizeInUint = graph->commandBufferSizeInByte / 4;
-                    for (planeIndx = 0; planeIndx < image->planeCount; planeIndx++)
-                    {
-                        vx_uint32 physical = image->memory.physicals[planeIndx];
-                        vx_uint32 location = 0;
-                        for (location = 0; location < commandSizeInUint; location++)
-                        {
-                            if (physical == graph->commandBuffer[location])
-                                break;
-                        }
-                        if (location == commandSizeInUint)
-                            location = 0;
-                        node->patchLocation[j][planeIndx] = location;
-
-                    }
-                    break;
-                }
-            case VX_TYPE_SCALAR:
-                {
-                    vx_uint32 location = 0;
-                    vx_scalar scalar = (vx_scalar)node->paramTable[j];
-                    vx_uint32 physical = scalar->physical;
-                    vx_uint32 commandSizeInUint = graph->commandBufferSizeInByte / 4;
-                    for (location = 0; location < commandSizeInUint; location++)
-                    {
-                        if (physical == graph->commandBuffer[location])
-                            break;
-                    }
-                    if (location == commandSizeInUint)
-                        location = 0;
-                    node->patchLocation[j][0] = location;
-                }
-                break;
-            default:
-                /* vxmASSERT(0); */
-                break;
-            }
+            vx_node node = graph->nodeTable[executionLayer->swapHandle[j]->u.nodeTable[0]];
+            patchNodeParamLocation(node);
         }
     }
+
     gcmFOOTER_NO();
     return;
 }
@@ -10165,7 +10112,10 @@ OnError:
 
 VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
 {
-    vx_uint32 i, j;
+#if !defined(__linux__)
+    vx_uint32 i;
+    vx_uint32 nodeIndex;
+#endif
 
     gcmHEADER_ARG("graph=%p", graph);
     vxmASSERT(graph);
@@ -10192,9 +10142,10 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
     }
 
     /*copy data from gpu buffer to cpu buffer in the end*/
-    for (j = 0; j < graph->tailNodeCount; j++)
+#if !defined(__linux__)
+    for (nodeIndex = 0; nodeIndex <graph->nodeCount; nodeIndex++)
     {
-        vx_node node = graph->nodeTable[graph->tailNodeIndexTable[j]];
+        vx_node node = graph->nodeTable[nodeIndex];
         for (i = 0; i < node->kernel->signature.paramCount; i++)
         {
             vx_enum direction, type;
@@ -10206,7 +10157,6 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
                 vx_image image = (vx_image)node->paramTable[i];
                 vx_uint32 plane = 0;
 
-                if (!image ) continue;
                 if(image->importType != VX_MEMORY_TYPE_HOST || image->useInternalMem == vx_false_e)
                 {
                     continue;
@@ -10232,7 +10182,6 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
             {
                 vx_tensor tensor = (vx_tensor)node->paramTable[i];
 
-                if (!tensor ) continue;
                 if(tensor->useInternalMem == vx_true_e && tensor->tensorBuffer->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
                 {
                     gcoVX_Flush(gcvTRUE);
@@ -10241,7 +10190,7 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
             }
         }
     }
-
+#endif
 #if gcdDUMP
     {
         vx_uint32 i, j;
