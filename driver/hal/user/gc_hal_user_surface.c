@@ -7306,7 +7306,8 @@ OnError:
 gceSTATUS
 gcoSURF_Resample(
     IN gcoSURF SrcSurf,
-    IN gcoSURF DstSurf
+    IN gcoSURF DstSurf,
+    IN gctBOOL sRGBDecode
     )
 {
     gctUINT i;
@@ -7483,6 +7484,17 @@ OnError:
         if (patchID != gcvPATCH_GFXBENCH)
 #endif
         {
+            gctBOOL sRGBDecodeEnable = gcvFALSE;
+            if (sRGBDecode &&
+                ((SrcSurf->format == gcvSURF_SBGR8) ||
+                (SrcSurf->format == gcvSURF_A8_SBGR8) ||
+                (SrcSurf->format == gcvSURF_X8_SBGR8) ||
+                (SrcSurf->format == gcvSURF_A8_SRGB8) ||
+                (SrcSurf->format == gcvSURF_X8_SRGB8)))
+            {
+                sRGBDecodeEnable = gcvTRUE;
+            }
+
             gcoOS_ZeroMemory(&blitArgs, sizeof(blitArgs));
             blitArgs.srcX               = 0;
             blitArgs.srcY               = 0;
@@ -7503,6 +7515,7 @@ OnError:
             blitArgs.scissorTest        = gcvFALSE;
             blitArgs.srcNumSlice        = 1;
             blitArgs.dstNumSlice        = 1;
+            blitArgs.needDecode         = sRGBDecodeEnable;
             status = gcoSURF_BlitCPU(&blitArgs);
         }
 #if !gcdDUMP

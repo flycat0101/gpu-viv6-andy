@@ -3675,7 +3675,7 @@ __glChipGenerateMipMap(
             }
             else
             {
-                if (gcmIS_ERROR(gcoSURF_Resample(srcSurface, dstSurface)))
+                if (gcmIS_ERROR(gcoSURF_Resample(srcSurface, dstSurface, (texObj->params.sampler.sRGB != GL_SKIP_DECODE_EXT))))
                 {
                     /* record last succeeded level. */
                     if (lastLevel == -1)

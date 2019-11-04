@@ -1659,7 +1659,7 @@ static gceSTATUS _GenerateMipMap(
             &lod1
             ));
 
-        gcmERR_BREAK(gcoSURF_Resample(lod0, lod1));
+        gcmERR_BREAK(gcoSURF_Resample(lod0, lod1, gcvFALSE));
 
 #if gcdSYNC
         gcoSURF_GetFence(lod1, gcvFENCE_TYPE_ALL);

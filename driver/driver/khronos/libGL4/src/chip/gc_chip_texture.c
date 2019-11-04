@@ -5058,7 +5058,6 @@ __glChipGenerateMipMap(
         /* For split texture, we don't need the real data of other mips. Fix bug #8768 */
         if (CHIP_TEX_IMAGE_IS_UPTODATE(texInfo, baseLevel) && !splitTexture)
         {
-
             /* For blit engine, we generate mipmap in one shot */
             if (chipCtx->chipFeature.hwFeature.hasBlitEngine)
             {
@@ -5069,7 +5068,7 @@ __glChipGenerateMipMap(
             }
             else
             {
-                if (gcmIS_ERROR(gcoSURF_Resample(srcSurface, dstSurface)))
+                if (gcmIS_ERROR(gcoSURF_Resample(srcSurface, dstSurface, (texObj->params.sampler.sRGB != GL_SKIP_DECODE_EXT))))
                 {
                     /* record last succeeded level. */
                     if (lastLevel == -1)
