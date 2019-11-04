@@ -285,6 +285,8 @@ gcoSURF_AllocateTileStatus(
     gctUINT32 allocFlags = gcvALLOC_FLAG_NONE;
     gctUINT i = 0;
     gctSIZE_T sliceBytes = 0;
+    gceCHIPMODEL chipModel;
+    gctUINT32 chipRevision;
 
     gcmHEADER_ARG("Surface=0x%x", Surface);
 
@@ -469,9 +471,11 @@ gcoSURF_AllocateTileStatus(
     Surface->tileStatusSliceSize = (gctUINT)sliceBytes;
     bytes = sliceBytes * Surface->requestD;
 
+    gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
+
     /*gcvFEATURE_MC_FCCACHE_BYTEMASK feature is fix for v621 HW cache overlap bug*/
-    if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPRESSION_V4) || gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPRESSION_DEC400))
-    &&  !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MC_FCCACHE_BYTEMASK))
+    if (((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPRESSION_V4) || gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPRESSION_DEC400))
+    &&  !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MC_FCCACHE_BYTEMASK)) || (chipModel == gcv7000 && chipRevision == 0x6203))
     {
         bytes += 128;
     }
