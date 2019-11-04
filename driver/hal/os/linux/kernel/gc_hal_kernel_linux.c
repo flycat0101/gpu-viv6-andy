@@ -482,7 +482,7 @@ gckKERNEL_UnmapVideoMemory(
         gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    gcmkVERIFY(gckOS_UnlockPages(Kernel->os, physHandle, bytes, Logical));
+    status = gckOS_UnlockPages(Kernel->os, physHandle, bytes, Logical);
 
     /* Success. */
     gcmkFOOTER_NO();
