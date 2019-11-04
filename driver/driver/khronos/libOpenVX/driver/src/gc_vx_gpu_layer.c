@@ -8254,6 +8254,14 @@ vxnne_shader_executable vxnneGetGPUTensorPadShaderExecutable(
         borderMode->mode = VX_BORDER_CONSTANT;
         if (inputFormat == VX_TYPE_FLOAT16)
             borderMode->constant_value.S16 = (vx_int16)padConstv;
+        else if (TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE)
+        {
+            vx_float32 scale = TENSOR_TF_SCALE(inputs);
+            vx_int32 zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
+            vx_int32 padV = (vx_int32)vxnneRound(padConstv / scale  + (vx_uint8)zeroPoint, VX_NN_ROUNDING_MODE_RTNE);
+
+            borderMode->constant_value.U8 = (vx_uint8)(padV > 255 ? 255 : padV < 0 ? 0 : padV);
+        }
         else if (inputFormat == VX_TYPE_UINT8)
             borderMode->constant_value.U8 = (vx_uint8)padConstv;
         else if (inputFormat == VX_TYPE_FLOAT32)
