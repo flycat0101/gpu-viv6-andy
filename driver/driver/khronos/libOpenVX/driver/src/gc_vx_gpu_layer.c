@@ -77,8 +77,8 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
     vxnne_kernel_shaders             kernel;
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}};
 
-    vx_enum      inputFormat        = input->tensorBuffer->dataFormat;
-    vx_enum      outputFormat       = output->tensorBuffer->dataFormat;
+    vx_enum      inputFormat        = TENSOR_DATA_TYPE(input);
+    vx_enum      outputFormat       = TENSOR_DATA_TYPE(output);
     vx_uint32    width              = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32    height             = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32    depth              = TENSOR_VIEW_SIZE_INDEX(output, 2);
@@ -480,8 +480,8 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
     vxnne_shader_executable shaderExecutable = VX_NULL;
     vxnne_kernel_shaders        kernel;
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    vx_enum      inputFormat       = input->tensorBuffer->dataFormat;
-    vx_enum      outputFormat      = output->tensorBuffer->dataFormat;
+    vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
+    vx_enum      outputFormat      = TENSOR_DATA_TYPE(output);
     vx_uint32    dimCount          = TENSOR_VIEW_DIM_NUM(input);
     vx_uint32    width             = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32    height            = (dimCount > 1) ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
@@ -686,7 +686,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
     vx_uint32    width             = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32    height            = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32    depth             = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
-    vx_enum      inputFormat       = input->tensorBuffer->dataFormat;
+    vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
     vx_enum      outputFormat      = TENSOR_DATA_TYPE(output);
     vx_float32   input_scale       = TENSOR_TF_SCALE(input);
     vx_float32   output_scale      = TENSOR_TF_SCALE(output);
@@ -1201,8 +1201,8 @@ vxnne_shader_executable vxnneGetGPUEmbeddingLUTShaderExecutable(
     vxnne_kernel_shaders        kernel;
 
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    vx_enum       valueFormat                = value->tensorBuffer->dataFormat;
-    vx_enum       outputFormat               = output->tensorBuffer->dataFormat;
+    vx_enum       valueFormat                = TENSOR_DATA_TYPE(value);
+    vx_enum       outputFormat               = TENSOR_DATA_TYPE(output);
     vx_uint32     dims                       = TENSOR_DIM_NUM(input);
     vx_uint32     width                      = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32     input_count                = 0;
@@ -1387,7 +1387,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
     vxnne_kernel_shaders        kernel;
 
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}};
-    vx_enum      inputFormat       = input->tensorBuffer->dataFormat;
+    vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
     vx_scalar strideX = NULL;
     vx_scalar strideY = NULL;
     vx_scalar padX = NULL;
@@ -2017,7 +2017,7 @@ vxnne_shader_executable vxnneGPUGemm_noBiasShaderExecutable(
     vx_float32 weight_scale     = TENSOR_TF_SCALE(weight);
     vx_float32 output_scale     = (vx_float32)1.0/TENSOR_TF_SCALE(output);
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    vx_enum      inputFormat       = input->tensorBuffer->dataFormat;
+    vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
     vx_int32     size[]            = {1, 1, 1, 1};
     vx_scalar cycle = NULL;
     vx_scalar scaleIn = NULL;
@@ -2246,7 +2246,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     vx_float32  weight_scale             = TENSOR_TF_SCALE(weight);
     vx_float32  output_scale             = (vx_float32)1.0/TENSOR_TF_SCALE(output);
 
-    vx_enum     inputFormat              = input->tensorBuffer->dataFormat;
+    vx_enum     inputFormat              = TENSOR_DATA_TYPE(input);
     vx_int32    size[]                   = {1, 1, 1, 1};
     vx_scalar   scaleIn                  = NULL;
     vx_scalar   zpIn                     = NULL;
@@ -2457,13 +2457,15 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     {
         vx_float32 outZP        = (vx_float32)output_ZP;
         vx_float32 uint8_scale  = input_scale * weight_scale * output_scale;
+        vx_float32 inputZP      = (vx_float32)input_ZP;
+        vx_float32 weightZP      = (vx_float32)weight_ZP;
 
         vx_reference parameters[9] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)cycle,
                      (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output};
 
         scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &uint8_scale);
-        zpIn = vxCreateScalar(context, VX_TYPE_INT32, &input_ZP);
-        zpWeight = vxCreateScalar(context, VX_TYPE_INT32, &weight_ZP);
+        zpIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &inputZP);
+        zpWeight = vxCreateScalar(context, VX_TYPE_FLOAT32, &weightZP);
         zpOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &outZP);
         parameters[4] = (vx_reference)scaleIn;
         parameters[5] = (vx_reference)zpIn;
@@ -2705,7 +2707,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_uint32     output_width               = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
     vx_uint32     output_height              = (output_dimCount > 1) ? TENSOR_VIEW_SIZE_INDEX(outputs, 1) : 1;
     vx_uint32     output_depth               = (output_dimCount > 2) ? TENSOR_VIEW_SIZE_INDEX(outputs, 2) : 1;
-    vx_enum       inputFormat                = inputs->tensorBuffer->dataFormat;
+    vx_enum       inputFormat                = TENSOR_DATA_TYPE(inputs);
     vx_int32      kernel_width               = TENSOR_VIEW_SIZE_INDEX(weights, 0);
     vx_int32      kernel_height              = TENSOR_VIEW_SIZE_INDEX(weights, 1);
     vx_int32      padLeftv                   = padXLeft->value->n32;
@@ -3324,8 +3326,8 @@ vxnne_shader_executable vxnneGetGPUDepth2SpaceShaderExecutable(
     vx_uint32     output_width               = TENSOR_VIEW_SIZE_INDEX(output, 0);
     vx_uint32     output_height              = TENSOR_VIEW_SIZE_INDEX(output, 1);
     vx_uint32     output_depth               = TENSOR_VIEW_SIZE_INDEX(output, 2);
-    vx_enum       inputFormat                = input->tensorBuffer->dataFormat;
-    vx_enum       outputFormat               = output->tensorBuffer->dataFormat;
+    vx_enum       inputFormat                = TENSOR_DATA_TYPE(input);
+    vx_enum       outputFormat               = TENSOR_DATA_TYPE(output);
     vx_scalar zeroPointIn = NULL;
     vx_scalar zeroPointOut = NULL;
     vx_scalar scale = NULL;
@@ -3493,8 +3495,8 @@ vxnne_shader_executable vxnneGetGPUSpace2DepthShaderExecutable(
     vxnne_shader_executable shaderExecutable = VX_NULL;
     vxnne_kernel_shaders        kernel;
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    vx_enum       inputFormat                = input->tensorBuffer->dataFormat;
-    vx_enum       outputFormat               = output->tensorBuffer->dataFormat;
+    vx_enum       inputFormat                = TENSOR_DATA_TYPE(input);
+    vx_enum       outputFormat               = TENSOR_DATA_TYPE(output);
     vx_uint32     input_width                = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32     input_height               = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32     input_depth                = TENSOR_VIEW_SIZE_INDEX(input, 2);
@@ -10204,8 +10206,8 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
     vxnne_shader_executable shaderExecutable = VX_NULL;
     vxnne_kernel_shaders        kernel;
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}};
-    vx_enum      inputFormat       = input->tensorBuffer->dataFormat;
-    vx_enum      outputFormat      = output->tensorBuffer->dataFormat;
+    vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
+    vx_enum      outputFormat      = TENSOR_DATA_TYPE(output);
     vx_uint32    dimCount          = TENSOR_VIEW_DIM_NUM(input);
     vx_uint32    width             = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32    height            = (dimCount > 1) ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;

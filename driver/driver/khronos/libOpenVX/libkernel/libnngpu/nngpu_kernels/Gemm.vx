@@ -189,8 +189,8 @@ __kernel void gpuGemm_Quant8_non_static
     image2d_t bias,
     int input_width,
     float uint8Scale,
-    int zpIn,
-    int zpWeight,
+    float zpIn,
+    float zpWeight,
     float zpOut,
     image2d_array_t output
     )
@@ -215,8 +215,8 @@ __kernel void gpuGemm_Quant8_non_static
         coord_in.x += 1;
         coord.x += 1;
 
-        wPixel.x = (convert_int(tmp1.x - zpWeight));
-        inPixel.x = (convert_int(tmp0.x - zpIn));
+        wPixel.x = convert_float(tmp1.x) - zpWeight;
+        inPixel.x = convert_float(tmp0.x) - zpIn;
 
         sum += (inPixel * wPixel);
     } while (coord_in.x < input_width);
@@ -232,8 +232,8 @@ __kernel void gpuGemm_Quant8
     image2d_t bias,
     int input_width,
     float uint8Scale,
-    int zpIn,
-    int zpWeight,
+    float zpIn,
+    float zpWeight,
     float zpOut,
     image2d_array_t output
     )
@@ -259,7 +259,7 @@ __kernel void gpuGemm_Quant8
         coord_in.x += 4;
         coord.x += 4;
 
-        wPixel = convert_float4(convert_int4(tmp1 - zpWeight));
+        wPixel = convert_float4(tmp1) - zpWeight;
         inPixel = convert_float4(tmp0);
 
         sum += dot(inPixel, wPixel);
@@ -276,8 +276,8 @@ __kernel void gpuGemm_Quant8_2D
     image2d_t bias,
     int input_width,
     float uint8Scale,
-    int zpIn,
-    int zpWeight,
+    float zpIn,
+    float zpWeight,
     float zpOut,
     image2d_t output
     )
@@ -301,7 +301,7 @@ __kernel void gpuGemm_Quant8_2D
 
         coord.x += 4;
 
-        wPixel = convert_float4(convert_int4(tmp1 - zpWeight));
+        wPixel = convert_float4(tmp1) - zpWeight;
         inPixel = convert_float4(tmp0);
 
         sum += dot(inPixel, wPixel);
@@ -318,8 +318,8 @@ __kernel void gpuGemm_Quant8_2D_4X
     image2d_t bias,
     int input_width,
     float uint8Scale,
-    int zpIn,
-    int zpWeight,
+    float zpIn,
+    float zpWeight,
     float zpOut,
     image2d_t output
     )
@@ -358,7 +358,7 @@ __kernel void gpuGemm_Quant8_2D_4X
         inPixel2 = convert_float4(tmp2);
         inPixel3 = convert_float4(tmp3);
 
-        wPixel  = convert_float4(convert_int4(tmp - zpWeight));
+        wPixel  = convert_float4(tmp) - zpWeight;
 
         sum0 = inPixel0 * wPixel + sum0;
         sum1 = inPixel1 * wPixel + sum1;
@@ -384,8 +384,8 @@ __kernel void gpuGemm_Quant8_4X
     image2d_t bias,
     int input_width,
     float uint8Scale,
-    int zpIn,
-    int zpWeight,
+    float zpIn,
+    float zpWeight,
     float zpOut,
     image2d_array_t output
     )
@@ -427,7 +427,7 @@ __kernel void gpuGemm_Quant8_4X
         inPixel2 = convert_float4(tmp2);
         inPixel3 = convert_float4(tmp3);
 
-        wPixel  = convert_float4(convert_int4(tmp - zpWeight));
+        wPixel  = convert_float4(tmp) - zpWeight;
 
         sum0 = inPixel0 * wPixel + sum0;
         sum1 = inPixel1 * wPixel + sum1;
@@ -451,8 +451,8 @@ __kernel void gpuGemm_Quant8_2D_4S
     image2d_t bias,
     int input_width,
     float uint8Scale,
-    int zpIn,
-    int zpWeight,
+    float zpIn,
+    float zpWeight,
     float zpOut,
     image2d_t output
     )
@@ -482,10 +482,10 @@ __kernel void gpuGemm_Quant8_2D_4S
         tmp = read_imageui(input, coord.xz);
         coord.xy += (int2)(4, -3);
 
-        wPixel0 = convert_float4(convert_int4(tmp0 - zpWeight));
-        wPixel1 = convert_float4(convert_int4(tmp1 - zpWeight));
-        wPixel2 = convert_float4(convert_int4(tmp2 - zpWeight));
-        wPixel3 = convert_float4(convert_int4(tmp3 - zpWeight));
+        wPixel0 = convert_float4(tmp0) - zpWeight;
+        wPixel1 = convert_float4(tmp1) - zpWeight;
+        wPixel2 = convert_float4(tmp2) - zpWeight;
+        wPixel3 = convert_float4(tmp3) - zpWeight;
 
         inPixel  = convert_float4(tmp);
 
@@ -514,8 +514,8 @@ __kernel void gpuGemm_Quant8_2D_4XS
     image2d_t bias,
     int input_width,
     float uint8Scale,
-    int zpIn,
-    int zpWeight,
+    float zpIn,
+    float zpWeight,
     float zpOut,
     image2d_t output
     )
@@ -554,10 +554,10 @@ __kernel void gpuGemm_Quant8_2D_4XS
         tmpD = read_imageui(input, coord.xw);
         coord += (int4)(4, 0, -2, -2);
 
-        wPixel0 = convert_float4(convert_int4(tmp0 - zpWeight));
-        wPixel1 = convert_float4(convert_int4(tmp1 - zpWeight));
-        wPixel2 = convert_float4(convert_int4(tmp2 - zpWeight));
-        wPixel3 = convert_float4(convert_int4(tmp3 - zpWeight));
+        wPixel0 = convert_float4(tmp0) - zpWeight;
+        wPixel1 = convert_float4(tmp1) - zpWeight;
+        wPixel2 = convert_float4(tmp2) - zpWeight;
+        wPixel3 = convert_float4(tmp3) - zpWeight;
 
         inPixel  = convert_float4(tmpA);
         sum0.x += dot(wPixel0, inPixel);
