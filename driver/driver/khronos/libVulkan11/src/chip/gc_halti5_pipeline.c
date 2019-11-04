@@ -15,6 +15,68 @@
 
 #define __VK_SAVE_THEN_LOAD_SHADER_BIN  0
 
+#define __VK_VSC_DRV_FORMAT_MAP_NUM 54
+
+halti5_formatMapInfo mapTable[__VK_VSC_DRV_FORMAT_MAP_NUM] =
+{
+    {VSC_IMAGE_FORMAT_NONE, VK_FORMAT_UNDEFINED},
+    /*F32.*/
+    {VSC_IMAGE_FORMAT_RGBA32F, VK_FORMAT_R32G32B32A32_SFLOAT},
+    {VSC_IMAGE_FORMAT_RG32F, VK_FORMAT_R32G32_SFLOAT},
+    {VSC_IMAGE_FORMAT_R32F, VK_FORMAT_R32_SFLOAT},
+    /*I32.*/
+    {VSC_IMAGE_FORMAT_RGBA32I, VK_FORMAT_R32G32B32A32_SINT},
+    {VSC_IMAGE_FORMAT_RG32I, VK_FORMAT_R32G32_SINT},
+    {VSC_IMAGE_FORMAT_R32I, VK_FORMAT_R32_SINT},
+    /*UI32.*/
+    {VSC_IMAGE_FORMAT_RGBA32UI, VK_FORMAT_R32G32B32A32_UINT},
+    {VSC_IMAGE_FORMAT_RG32UI, VK_FORMAT_R32G32_UINT},
+    {VSC_IMAGE_FORMAT_R32UI, VK_FORMAT_R32_UINT},
+    /*F16.*/
+    {VSC_IMAGE_FORMAT_RGBA16F, VK_FORMAT_R16G16B16A16_SFLOAT},
+    {VSC_IMAGE_FORMAT_RG16F, VK_FORMAT_R16G16_SFLOAT},
+    {VSC_IMAGE_FORMAT_R16F, VK_FORMAT_R16_SFLOAT},
+    /*I16.*/
+    {VSC_IMAGE_FORMAT_RGBA16I, VK_FORMAT_R16G16B16A16_SINT},
+    {VSC_IMAGE_FORMAT_RG16I, VK_FORMAT_R16G16_SINT},
+    {VSC_IMAGE_FORMAT_R16I, VK_FORMAT_R16_SINT},
+    /*UI16.*/
+    {VSC_IMAGE_FORMAT_RGBA16UI, VK_FORMAT_R16G16B16A16_UINT},
+    {VSC_IMAGE_FORMAT_RG16UI, VK_FORMAT_R16G16_UINT},
+    {VSC_IMAGE_FORMAT_R16UI, VK_FORMAT_R16_UINT},
+    /*F16 SNORM/UNORM.*/
+    {VSC_IMAGE_FORMAT_RGBA16, VK_FORMAT_R16G16B16A16_UNORM},
+    {VSC_IMAGE_FORMAT_RGBA16_SNORM, VK_FORMAT_R16G16B16A16_SNORM},
+    {VSC_IMAGE_FORMAT_RG16, VK_FORMAT_R16G16_UNORM},
+    {VSC_IMAGE_FORMAT_RG16_SNORM, VK_FORMAT_R16G16_SNORM},
+    {VSC_IMAGE_FORMAT_R16, VK_FORMAT_R16_UNORM},
+    {VSC_IMAGE_FORMAT_R16_SNORM, VK_FORMAT_R16_SNORM},
+    /*F8 SNORM/UNORM.*/
+    {VSC_IMAGE_FORMAT_BGRA8_UNORM, VK_FORMAT_B8G8R8A8_UNORM},
+    {VSC_IMAGE_FORMAT_RGBA8, VK_FORMAT_R8G8B8A8_UNORM},
+    {VSC_IMAGE_FORMAT_RGBA8_SNORM, VK_FORMAT_R8G8B8A8_SNORM},
+    {VSC_IMAGE_FORMAT_RG8, VK_FORMAT_R8G8_UNORM},
+    {VSC_IMAGE_FORMAT_RG8_SNORM, VK_FORMAT_R8G8_SNORM},
+    {VSC_IMAGE_FORMAT_R8, VK_FORMAT_R8_UNORM},
+    {VSC_IMAGE_FORMAT_R8_SNORM, VK_FORMAT_R8_SNORM},
+    /*I8.*/
+    {VSC_IMAGE_FORMAT_RGBA8I, VK_FORMAT_R8G8B8A8_SINT},
+    {VSC_IMAGE_FORMAT_RG8I, VK_FORMAT_R8G8_SINT},
+    {VSC_IMAGE_FORMAT_R8I, VK_FORMAT_R8_SINT},
+    /*UI8.*/
+    {VSC_IMAGE_FORMAT_RGBA8UI, VK_FORMAT_R8G8B8A8_UINT},
+    {VSC_IMAGE_FORMAT_RG8UI, VK_FORMAT_R8G8_UINT},
+    {VSC_IMAGE_FORMAT_R8UI, VK_FORMAT_R8_UINT},
+    /*F-PACK.*/
+    {VSC_IMAGE_FORMAT_R5G6B5_UNORM_PACK16, VK_FORMAT_R5G6B5_UNORM_PACK16},
+    {VSC_IMAGE_FORMAT_ABGR8_UNORM_PACK32, VK_FORMAT_A8B8G8R8_UNORM_PACK32},
+    {VSC_IMAGE_FORMAT_ABGR8I_PACK32, VK_FORMAT_A8B8G8R8_SINT_PACK32},
+    {VSC_IMAGE_FORMAT_ABGR8UI_PACK32, VK_FORMAT_A8B8G8R8_UINT_PACK32},
+    {VSC_IMAGE_FORMAT_A2R10G10B10_UNORM_PACK32, VK_FORMAT_A2R10G10B10_UNORM_PACK32},
+    {VSC_IMAGE_FORMAT_A2B10G10R10_UNORM_PACK32, VK_FORMAT_A2B10G10R10_UNORM_PACK32},
+    {VSC_IMAGE_FORMAT_A2B10G10R10UI_PACK32, VK_FORMAT_A2B10G10R10_UINT_PACK32}
+};
+
 #if __VK_SAVE_THEN_LOAD_SHADER_BIN
 static VkResult __vkSaveThenLoadShaderBin(
     VkAllocationCallbacks *pAllocator,
@@ -5231,7 +5293,12 @@ static void halti5_pip_build_patchKeyMask(
                                 {
                                     patchKey |= HALTI5_PATCH_REPLACE_TXLD_WITH_IMGLD_BIT;
                                 }
+                                if (*pResOp & VSC_RES_OP_BIT_LOAD_STORE)
+                                {
+                                    patchKey |= HALTI5_PATCH_FORMAT_TO_COMPILER_BIT;
+                                }
                             }
+                            chipPipeline->patchTexBufFormat[setIdx][keyIndex] = tableEntry->imageFormat;
                             chipPipeline->patchKeys[setIdx][keyIndex++] = patchKey;
                         }
                     }
@@ -5643,9 +5710,14 @@ static VkResult halti5_pip_build_gfxshaders(
                 chipPipeline->patchKeys[i] =
                     (halti5_patch_key *)__VK_ALLOC(sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i], 8,
                                                    VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                chipPipeline->patchTexBufFormat[i] =
+                    (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i], 8,
+                                                   VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 
                 __VK_ONERROR(chipPipeline->patchKeys[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                __VK_ONERROR(chipPipeline->patchTexBufFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                 __VK_MEMZERO(chipPipeline->patchKeys[i], sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i]);
+                __VK_MEMZERO(chipPipeline->patchTexBufFormat[i], sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i]);
 
                 stateKey[keyCount] = (void *)chipPipeline->patchKeys[i];
                 stateKeySizeInBytes[keyCount] = sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i];
@@ -6973,6 +7045,7 @@ VkResult halti5_patch_pipeline(
     VkBool32 newInstance = VK_FALSE;
     struct _gcsHINT *vscHints = VK_NULL_HANDLE;
     VkBool32 txClearPendingFix = devCtx->database->TX_CLEAR_PENDING_FIX;
+    VkBool32 usedLibConsts = VK_FALSE;
 
     __VK_SET_ALLOCATIONCB(&pip->memCb);
     __VK_MEMZERO(hShaderArrayCopy, sizeof(hShaderArrayCopy));
@@ -7103,51 +7176,77 @@ VkResult halti5_patch_pipeline(
                     {
                         halti5_patch_key validPatchKey = chipDescSet->patchKeys[j] & chipPipeline->patchKeys[i][j];
                         halti5_patch_info *patchInfo = &chipDescSet->patchInfos[j];
-                        uint32_t k = 0;
+                        uint32_t k = 0, m = 0;
                         while (validPatchKey)
                         {
                             if (validPatchKey & (1 << k))
                             {
-                                VSC_RES_OP_BIT opTypeBits = 0;
-                                VSC_RES_ACT_BIT actBits = 0;
-                                uint32_t subType;
 
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.applyLevel = VSC_SHLEVEL_Post_Medium;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_RESOURCE;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc =
-                                    halti5_helper_patchFuc(patchInfo->patchFormat, k, patchInfo->viewType, &opTypeBits, &actBits, &subType);
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.set = i;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.binding = patchInfo->binding;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.arrayIndex = patchInfo->arrayIndex;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.opTypeBits = opTypeBits;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.actBits = actBits;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.subType = subType;
-                                switch (k)
+                                if (k == HALTI5_PATCH_FORMAT_TO_COMPILER)
                                 {
-                                case HALTI5_PATCH_TX_GATHER_PCF:
-                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount = 2;
-                                    break;
-                                default:
-                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount = 1;
-                                    break;
+                                    VSC_IMAGE_FORMAT texBufFormat = chipPipeline->patchTexBufFormat[i][j];
+                                    VSC_IMAGE_FORMAT mapedFormat = VSC_IMAGE_FORMAT_NONE;
+                                    if (mapTable[texBufFormat].drvFormat != (VkFormat)patchInfo->patchFormat)
+                                    {
+                                        for (m = 0; m < __VK_VSC_DRV_FORMAT_MAP_NUM; m++)
+                                        {
+                                            if ((VkFormat)patchInfo->patchFormat == mapTable[m].drvFormat)
+                                            {
+                                                mapedFormat = mapTable[m].vscFormat;
+                                                break;
+                                            }
+                                        }
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_IMAGE_FORMAT;
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc = gcvNULL;
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.imageFormat.binding = patchInfo->binding;
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.imageFormat.imageFormat = mapedFormat;
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.imageFormat.set = i;
+                                    }
                                 }
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts =
-                                              (VSC_LIB_SPECIALIZATION_CONSTANT *)__VK_ALLOC(sizeof(VSC_LIB_SPECIALIZATION_CONSTANT) *
-                                                                                            vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount,
-                                                                                            8,
-                                                                                            VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
-                                __VK_ONERROR(vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].varName = "swizzles";
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].type = VSC_SHADER_DATA_TYPE_INTEGER_X4;
-                                __VK_MEMCOPY(&vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].value, patchInfo->swizzles, sizeof(patchInfo->swizzles));
-                               if (k == HALTI5_PATCH_TX_GATHER_PCF)
-                               {
-                                   vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].varName = "comparemode";
-                                   vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].type = VSC_SHADER_DATA_TYPE_INTEGER_X4;
-                                   vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].value.uValue[0] = patchInfo->compareOp;
-                               }
+                                else
+                                {
+                                    VSC_RES_OP_BIT opTypeBits = 0;
+                                    VSC_RES_ACT_BIT actBits = 0;
+                                    uint32_t subType;
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_RESOURCE;
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc =
+                                        halti5_helper_patchFuc(patchInfo->patchFormat, k, patchInfo->viewType, &opTypeBits, &actBits, &subType);
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.set = i;
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.binding = patchInfo->binding;
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.arrayIndex = patchInfo->arrayIndex;
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.opTypeBits = opTypeBits;
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.actBits = actBits;
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.subType = subType;
+                                    switch (k)
+                                    {
+                                    case HALTI5_PATCH_TX_GATHER_PCF:
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount = 2;
+                                        break;
+                                    default:
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount = 1;
+                                        break;
+                                    }
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts =
+                                                  (VSC_LIB_SPECIALIZATION_CONSTANT *)__VK_ALLOC(sizeof(VSC_LIB_SPECIALIZATION_CONSTANT) *
+                                                                                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount,
+                                                                                                8,
+                                                                                                VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                                    usedLibConsts = VK_TRUE;
+                                    __VK_ONERROR(vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].varName = "swizzles";
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].type = VSC_SHADER_DATA_TYPE_INTEGER_X4;
+                                    __VK_MEMCOPY(&vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].value, patchInfo->swizzles, sizeof(patchInfo->swizzles));
+                                   if (k == HALTI5_PATCH_TX_GATHER_PCF)
+                                   {
+                                       vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].varName = "comparemode";
+                                       vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].type = VSC_SHADER_DATA_TYPE_INTEGER_X4;
+                                       vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].value.uValue[0] = patchInfo->compareOp;
+                                   }
+                                }
 
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPointCount = 1;
                                 vscLinkEntriesCur[entryIdx].mainShaderStageBits = (VSC_SHADER_STAGE_BIT)chipDescSet->patchInfos[j].patchStages;
@@ -7184,7 +7283,7 @@ VkResult halti5_patch_pipeline(
 
             for (i = 0; i < totalEntries; i ++)
             {
-                if (vscLinkEntries[i].shLibLinkEntry.pLibSpecializationConsts)
+                if (vscLinkEntries[i].shLibLinkEntry.pLibSpecializationConsts && usedLibConsts)
                 {
                     __VK_FREE(vscLinkEntries[i].shLibLinkEntry.pLibSpecializationConsts);
                 }

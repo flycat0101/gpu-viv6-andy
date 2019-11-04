@@ -333,6 +333,12 @@ typedef struct
     uint32_t clusterMaxID;
 }halti5_clusterInfo;
 
+typedef struct
+{
+    VSC_IMAGE_FORMAT vscFormat;
+    VkFormat drvFormat;
+}halti5_formatMapInfo;
+
 enum
 {
     HALTI5_BLIT_2D_UNORM_FLOAT = 0,
@@ -622,6 +628,7 @@ enum halti_patch_type
     HALTI5_PATCH_TX_GATHER               = 4,
     HALTI5_PATCH_TX_EXTRA_INPUT_GRAD     = 5,
     HALTI5_PATCH_TX_GATHER_PCF           = 6,
+    HALTI5_PATCH_FORMAT_TO_COMPILER      = 7,
 };
 
 enum
@@ -633,6 +640,7 @@ enum
     HALTI5_PATCH_TX_GATHER_BIT                = 1 << HALTI5_PATCH_TX_GATHER,
     HALTI5_PATCH_TX_EXTRA_INPUT_GRAD_BIT      = 1 << HALTI5_PATCH_TX_EXTRA_INPUT_GRAD,
     HALTI5_PATCH_TX_GATHER_PCF_BIT            = 1 << HALTI5_PATCH_TX_GATHER_PCF,
+    HALTI5_PATCH_FORMAT_TO_COMPILER_BIT       = 1 << HALTI5_PATCH_FORMAT_TO_COMPILER,
 
     HALTI5_PATCHKEY_ALL_BITS                = 0xFFFF,
 };
@@ -677,6 +685,7 @@ typedef struct
     halti5_patch_key *patchKeys[__VK_MAX_DESCRIPTOR_SETS];
     /* number of patch key for each descriptor set */
     uint32_t patchKeyCount[__VK_MAX_DESCRIPTOR_SETS];
+    VSC_IMAGE_FORMAT *patchTexBufFormat[__VK_MAX_DESCRIPTOR_SETS];
     /* number of valid key array */
     uint32_t keyCount;
 

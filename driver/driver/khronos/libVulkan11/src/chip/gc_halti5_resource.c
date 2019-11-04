@@ -11015,6 +11015,8 @@ VkResult halti5_createBufferView(
 
     if (buf->createInfo.usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT)
     {
+        chipBufv->patchFormat = bufv->createInfo.format;
+        chipBufv->patchKey |= HALTI5_PATCH_FORMAT_TO_COMPILER_BIT;
         switch (bufv->createInfo.format)
         {
         case VK_FORMAT_R32G32B32A32_SFLOAT:
