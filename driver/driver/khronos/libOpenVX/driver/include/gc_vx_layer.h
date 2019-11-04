@@ -487,6 +487,9 @@ typedef struct _vxnne_operation_s
     vx_uint32                       esitimateKernelCacheSize;
     vx_uint32                       esitimateImageCacheSize;
 
+    vx_uint32                       estimateInTransposeSize;
+    vx_uint32                       estimateOutTransposeSize;
+
     vx_uint32                       perCmdSize;
 
     /* all references pass through operations */

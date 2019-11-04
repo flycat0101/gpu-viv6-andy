@@ -1816,8 +1816,6 @@ VX_PRIVATE_API vx_status DetectABSegment(
         if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
         {
             vxnne_mem_request requestList;
-            vx_uint32 transposeSize = 0;
-            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[k];
 
             requestList = graph->layer->memRequestList  + k;
             if (!(requestList->inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM) || (requestList->inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_AXI_SRAM))
@@ -1825,26 +1823,12 @@ VX_PRIVATE_API vx_status DetectABSegment(
                 if (graph->layer->operations[k]->bTransposeIn)
                 {
                     vx_tensor input = (vx_tensor)(graph->layer->operations[k]->inputs[0]);
-                    vx_uint32 inputZ = 0;
 
                     alignTensorChannelToTransposeChannel(input, graph->layer->operations[k]->transposeInChannel);
 
-                    inputZ = TENSOR_STRIDE_INDEX(input, 3) / TENSOR_STRIDE_INDEX(input, 2);
-
-                    transposeSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
-                                                                     convOperation->resultInfo.outImageTileXSize,
-                                                                     convOperation->resultInfo.outImageTileYSize,
-                                                                     opInfo.weightsBiases->weights_sizes[0],
-                                                                     opInfo.weightsBiases->weights_sizes[1],
-                                                                     inputZ,
-                                                                     convOperation->resultInfo.interleaveMode,
-                                                                     graph->base.context->nnConfig.customizedFeature.ddrLatency,
-                                                                     graph->layer->operations[k]->transposeInChannel,
-                                                                     input->tensorBuffer->dataFormat);
-
                     gcoOS_ZeroMemory(&requestList->transposeIn, sizeof(vx_memory_s));
                     requestList->transposeIn.lastUseId = requestList->transposeIn.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
-                    requestList->transposeIn.sizes[0] = transposeSize;
+                    requestList->transposeIn.sizes[0] = graph->layer->operations[k]->estimateInTransposeSize;
                     requestList->transposeIn.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
                     requestList->transposeIn.allocPartial = vx_false_e;
                     requestList->transposeIn.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
@@ -1871,9 +1855,8 @@ VX_PRIVATE_API vx_status DetectABSegment(
 
                 alignTensorChannelToTransposeChannel(output, graph->layer->operations[k]->transposeOutChannel);
 
-                transposeSize = caculateOutTransposeBufferSize(convOperation->resultInfo.outImageTileXSize, convOperation->resultInfo.outImageTileYSize, output->tensorBuffer->dataFormat);
                 requestList->transposeOut.lastUseId = requestList->transposeOut.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
-                requestList->transposeOut.sizes[0] = transposeSize;
+                requestList->transposeOut.sizes[0] = graph->layer->operations[k]->estimateOutTransposeSize;
                 requestList->transposeOut.allocType = VXNNE_MEM_POOL_TYPE_SET_CACHE(VXNNE_MEM_POOL_TYPE_VIP_SRAM);
                 requestList->transposeOut.allocPartial = vx_false_e;
                 requestList->transposeOut.allocPriority = VXNNE_MEM_ALLOC_TYPE_SET_MUST_HAVE(VXNNE_MEM_ALLOC_OPTIONAL_PRIORITY_1);
@@ -3874,9 +3857,8 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
             {
                 vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
                 vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
-                vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
+                vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat, outputDataFormat;
                 vx_arch_perf_s archPerfHandle;
-                vxnne_convolution_relu_pooling_operation convOp = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[i];
 
                 memset(&archPerfHandle, 0, sizeof(vx_arch_perf_s));
                 calculateArchPerfFromWB(graph->base.context,
@@ -3899,12 +3881,34 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                 kernelY         = opInfo.weightsBiases->weights_sizes[1];
                 inImageZ        = TENSOR_SIZE_INDEX(opInfo.input, 2);
                 inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
-
-                convOp->resultInfo = archPerfHandle.resultInfo;
+                outputDataFormat = TENSOR_DATA_TYPE(opInfo.output);
 
                 graph->layer->operations[i]->esitimateImageCacheSize =
                     caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
                 graph->layer->operations[i]->esitimateKernelCacheSize = GetEsitimateWBSize(opInfo.weightsBiases);
+
+                if (graph->layer->operations[i]->bTransposeIn)
+                {
+                    graph->layer->operations[i]->estimateInTransposeSize = caculateInputTransposeBufferSize(
+                                                                                VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
+                                                                                outImageTileX,
+                                                                                outImageTileY,
+                                                                                kernelX,
+                                                                                kernelY,
+                                                                                gcmALIGN_NP2_SAFE(outputDims[2], graph->layer->operations[k]->transposeInChannel),
+                                                                                interleaveMode,
+                                                                                graph->base.context->nnConfig.customizedFeature.ddrLatency,
+                                                                                graph->layer->operations[i]->transposeInChannel,
+                                                                                inputDataFormat);
+                }
+
+                if (graph->layer->operations[i]->bTransposeOut)
+                {
+                    graph->layer->operations[i]->estimateOutTransposeSize = caculateOutTransposeBufferSize(
+                                                                                outImageTileX,
+                                                                                outImageTileY,
+                                                                                outputDataFormat);
+                }
             }
         }
 
