@@ -74,6 +74,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->productID                             = Hardware->config->productID;
     pVscHwCfg->customerID                            = Hardware->config->customerID;
     pVscHwCfg->maxCoreCount                          = Hardware->config->shaderCoreCount;
+    pVscHwCfg->maxClusterCount                       = (Hardware->config->clusterCount == 0) ? 1 : Hardware->config->clusterCount;
     pVscHwCfg->maxThreadCountPerCore                 = Hardware->config->threadCount/Hardware->config->shaderCoreCount;
     pVscHwCfg->maxVaryingCount                       = maxVaryingCount;
     pVscHwCfg->maxAttributeCount                     = maxAttribs;

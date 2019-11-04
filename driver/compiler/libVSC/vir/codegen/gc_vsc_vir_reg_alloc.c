@@ -8921,7 +8921,7 @@ _VIR_RA_LS_GetSpillSize(
 
     threadCount = hwConfig->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1);
     groupCount =  maxGPRPerWorkgroup / VIR_Shader_GetRegWatermark(pShader);
-    groupSize = groupCount * threadCount;
+    groupSize = groupCount * threadCount * hwConfig->maxClusterCount;
 
     /*
     ** Since we use the globalId as the index to MOD the groupSize, if we still use 16bit MOD,
