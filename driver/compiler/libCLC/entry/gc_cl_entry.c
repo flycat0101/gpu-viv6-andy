@@ -315,7 +315,19 @@ gcCompileKernel(
 
             if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "g", 1))
             {
-                gcmOPT_SetDebugLevel(4);
+                pos++;
+                if (*pos == ' ' || *pos == '\0')
+                {
+                    gcmOPT_SetDebugLevel(4);
+                }
+            }
+            else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "O0", 2))
+            {
+                pos += 2;
+                if (*pos == ' ' || *pos == '\0')
+                {
+                    gcmOPT_SetDisableOPTforDebugger(gcvTRUE);
+                }
             }
             gcoOS_StrStr(pos, "-", &pos);
         }

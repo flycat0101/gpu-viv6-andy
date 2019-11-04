@@ -27499,7 +27499,7 @@ gcSHADER_SetBuildOptions(
     Shader->optionsLen = gcoOS_StrLen(Options, NULL) + 1;
     gcmVERIFY_OK(gcoOS_Allocate(gcvNULL,
                                 Shader->optionsLen,
-                                &Shader->buildOptions));
+                                (gctPOINTER *)&Shader->buildOptions));
 
     gcmVERIFY_OK(gcoOS_StrCopySafe(Shader->buildOptions,
                                    Shader->optionsLen,

@@ -7809,10 +7809,12 @@ IN cloIR_EXPR RightOperand
                                       leftOperand,
                                       RightOperand);
         if (gcmIS_ERROR(status)) return gcvNULL;
-        if (_IsLeftAndRightOperandIdentical(Compiler,
-                                            leftOperand,
-                                            RightOperand)) {
-           return leftOperand;
+        if (!gcmOPT_DisableOPTforDebugger()) {
+            if (_IsLeftAndRightOperandIdentical(Compiler,
+                                                leftOperand,
+                                                RightOperand)) {
+                return leftOperand;
+            }
         }
 
         /*Check if left operand is a pointer and right operand is constant array:

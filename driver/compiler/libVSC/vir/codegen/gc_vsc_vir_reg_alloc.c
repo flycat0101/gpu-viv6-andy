@@ -3032,9 +3032,10 @@ void _VIR_RA_LS_MarkDef(
                                the web's channelmask, mark the LR dead
 
                                And since a LR is holding the entrie variable, if this variable is an array,
-                               we can't mark the entire LR dead. */
+                               we can't mark the entire LR dead except it doesn't have usage. */
                             if ((_VIR_RS_LS_MaskMatch(pRA, (0x1 << channel), defIdx) && pLR->regNoRange == 1) ||
-                                _VIR_RA_LS_InstNeedStoreDest(pRA, pInst))
+                                _VIR_RA_LS_InstNeedStoreDest(pRA, pInst) ||
+                                DU_CHAIN_GET_USAGE_COUNT(&pDef->duChain) == 0)
                             {
                                 _VIR_RS_LS_MarkLRDead(pRA, defIdx, (0x1 << channel), gcvFALSE);
 

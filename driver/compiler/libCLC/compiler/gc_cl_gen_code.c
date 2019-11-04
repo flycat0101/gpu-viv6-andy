@@ -21178,7 +21178,7 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters
 
     switch (Iteration->type) {
     case clvFOR:
-        if (gcmOPT_EnableDebug() || gcmOPT_hasFeature(FE_GENERATED_OFFLINE_COMPILER))
+        if (gcmOPT_EnableDebug())
         {
             return cloIR_ITERATION_GenForCode_Debug(Compiler,
                                 CodeGenerator,

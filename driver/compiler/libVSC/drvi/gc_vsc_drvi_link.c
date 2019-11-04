@@ -6145,6 +6145,7 @@ gceSTATUS vscCreateKernel(VSC_SHADER_COMPILER_PARAM*      pCompilerParam,
     VIR_Shader*                       pKernel = (VIR_Shader*)pCompilerParam->hShader;
 
     vscInitializePassMMPool(&passMemPool);
+
     if (pKernel->optionsLen && VIR_Shader_UseOfflineCompiler(pKernel))
     {
         gctSTRING pos = gcvNULL;
@@ -6158,11 +6159,16 @@ gceSTATUS vscCreateKernel(VSC_SHADER_COMPILER_PARAM*      pCompilerParam,
 
             if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "O0", 2))
             {
-                gcmOPT_SetDisableOPTforDebugger(gcvTRUE);
+                pos += 2;
+                if (*pos == ' ' || *pos == '\0')
+                {
+                    gcmOPT_SetDisableOPTforDebugger(gcvTRUE);
+                }
             }
             gcoOS_StrStr(pos, "-", &pos);
         }
     }
+
     vscInitializeOptions(&options,
                          &pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
                          pCompilerParam->cfg.cFlags,
