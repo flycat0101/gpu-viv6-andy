@@ -3358,7 +3358,8 @@ gckKERNEL_Dispatch(
     case gcvHAL_SET_FSCALE_VALUE:
 #if gcdENABLE_FSCALE_VAL_ADJUST
         status = gckHARDWARE_SetFscaleValue(Kernel->hardware,
-                                            Interface->u.SetFscaleValue.value);
+                                            Interface->u.SetFscaleValue.value,
+                                            Interface->u.SetFscaleValue.shValue);
 #else
         status = gcvSTATUS_NOT_SUPPORTED;
 #endif

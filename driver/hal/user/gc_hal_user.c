@@ -1384,7 +1384,8 @@ OnError:
 */
 gceSTATUS
 gcoHAL_SetFscaleValue(
-    IN gctUINT FscaleValue
+    IN gctUINT FscaleValue,
+    IN gctUINT ShaderFscaleValue
     )
 {
     gceSTATUS status;
@@ -1394,6 +1395,7 @@ gcoHAL_SetFscaleValue(
 
     iface.command = gcvHAL_SET_FSCALE_VALUE;
     iface.u.SetFscaleValue.value = FscaleValue;
+    iface.u.SetFscaleValue.shValue = ShaderFscaleValue;
 
     status = gcoHAL_Call(gcvNULL, &iface);
 

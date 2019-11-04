@@ -1109,6 +1109,7 @@ gcsHAL_QUERY_COMMAND_BUFFER;
 typedef struct _gcsHAL_SET_FSCALE_VALUE
 {
     IN gctUINT32                value;
+    IN gctUINT32                shValue;
 }
 gcsHAL_SET_FSCALE_VALUE;
 
