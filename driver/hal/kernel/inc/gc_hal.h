@@ -1705,16 +1705,15 @@ gckKERNEL_MapVideoMemory(
     OUT gctPOINTER * Logical
     );
 
-#ifdef __QNXNTO__
 /* Unmap dedicated video memory. */
 gceSTATUS
 gckKERNEL_UnmapVideoMemory(
     IN gckKERNEL Kernel,
+    IN gcePOOL Pool,
     IN gctPOINTER Logical,
     IN gctUINT32 Pid,
     IN gctUINT32 Bytes
     );
-#endif
 
 /* Map memory. */
 gceSTATUS

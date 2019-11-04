@@ -1093,13 +1093,11 @@ typedef union _gcuVIDMEM_NODE
         gctSIZE_T               bytes;
         gctUINT32               alignment;
 
-#ifdef __QNXNTO__
         /* Client virtual address. */
         gctPOINTER              logical;
 
         /* Process ID owning this memory. */
         gctUINT32               processID;
-#endif
 
         /* Locked counter. */
         gctINT32                locked;

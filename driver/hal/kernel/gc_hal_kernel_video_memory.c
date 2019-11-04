@@ -123,10 +123,8 @@ _Split(
     node->VidMem.locked    = 0;
     node->VidMem.parent    = Node->VidMem.parent;
     node->VidMem.pool      = Node->VidMem.pool;
-#ifdef __QNXNTO__
     node->VidMem.processID = 0;
     node->VidMem.logical   = gcvNULL;
-#endif
     node->VidMem.kvaddr    = gcvNULL;
 
     /* Insert node behind specified node. */
@@ -338,10 +336,8 @@ gckVIDMEM_Construct(
 
         node->VidMem.locked    = 0;
 
-#ifdef __QNXNTO__
         node->VidMem.processID = 0;
         node->VidMem.logical   = gcvNULL;
-#endif
 
 #if gcdENABLE_VG
         node->VidMem.kernelVirtual = gcvNULL;
@@ -874,10 +870,8 @@ gckVIDMEM_AllocateLinear(
     /* Fill in the information. */
     node->VidMem.alignment = alignment;
     node->VidMem.parent    = Memory;
-#ifdef __QNXNTO__
     node->VidMem.logical   = gcvNULL;
     gcmkONERROR(gckOS_GetProcessID(&node->VidMem.processID));
-#endif
 
     /* Adjust the number of free bytes. */
     Memory->freeBytes   -= node->VidMem.bytes;
@@ -1861,6 +1855,7 @@ gckVIDMEM_Free(
         {
             gckKERNEL_UnmapVideoMemory(
                 Kernel,
+                Node->VidMem.pool,
                 Node->VidMem.logical,
                 Node->VidMem.processID,
                 Node->VidMem.bytes
@@ -3544,7 +3539,6 @@ gckVIDMEM_NODE_LockCPU(
         if (FromUser)
         {
             /* Map video memory pool to user space. */
-#ifdef __QNXNTO__
             if (node->VidMem.logical == gcvNULL)
             {
                 gcmkONERROR(
@@ -3557,15 +3551,6 @@ gckVIDMEM_NODE_LockCPU(
             }
 
             logical = node->VidMem.logical;
-#else
-            gcmkONERROR(
-                gckKERNEL_MapVideoMemory(Kernel,
-                                         gcvTRUE,
-                                         node->VidMem.pool,
-                                         (gctUINT32)node->VidMem.offset,
-                                         (gctUINT32)node->VidMem.bytes,
-                                         &logical));
-#endif
         }
         else
         {
@@ -3688,7 +3673,26 @@ gckVIDMEM_NODE_UnlockCPU(
     {
         if (FromUser)
         {
+#ifdef __QNXNTO__
             /* Do nothing here. */
+#else
+            /* Unmap the video memory. */
+            if (node->VidMem.logical != gcvNULL)
+            {
+                gckKERNEL_UnmapVideoMemory(
+                    Kernel,
+                    node->VidMem.pool,
+                    node->VidMem.logical,
+                    node->VidMem.processID,
+                    node->VidMem.bytes
+                    );
+
+                node->VidMem.logical = gcvNULL;
+            }
+
+            /* Reset. */
+            node->VidMem.processID = 0;
+#endif
         }
         else
         {

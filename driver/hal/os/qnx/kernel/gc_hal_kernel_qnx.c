@@ -302,13 +302,14 @@ gckKERNEL_MapVideoMemory(
 gceSTATUS
 gckKERNEL_UnmapVideoMemory(
     IN gckKERNEL Kernel,
+    IN gcePOOL Pool,
     IN gctPOINTER Logical,
     IN gctUINT32 Pid,
     IN gctUINT32 Bytes
     )
 {
-    gcmkHEADER_ARG("Logical=0x%08x pid=%u Bytes=%u",
-                   Logical, Pid, Bytes);
+    gcmkHEADER_ARG("Pool=0x%x Logical=0x%08x pid=%u Bytes=%u",
+                   Pool, Logical, Pid, Bytes);
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Kernel, gcvOBJ_KERNEL);

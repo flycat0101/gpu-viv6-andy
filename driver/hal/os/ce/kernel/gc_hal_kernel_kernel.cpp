@@ -365,6 +365,45 @@ OnError:
 
 /*******************************************************************************
 **
+**  gckKERNEL_UnmapVideoMemory
+**
+**  Unmap video memory for the current process.
+**
+**  INPUT:
+**
+**      gckKERNEL Kernel
+**          Pointer to an gckKERNEL object.
+**
+**      gcePOOL Pool
+**          Specify pool type.
+**
+**      gctUINT32 Address
+**          Hardware specific memory address.
+**
+**      gctUINT32 Pid
+**          Process ID of the current process.
+**
+**      gctUINT32 Bytes
+**          Number of bytes to map.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gckKERNEL_UnmapVideoMemory(
+    IN gckKERNEL Kernel,
+    IN gcePOOL Pool,
+    IN gctPOINTER Logical,
+    IN gctUINT32 Pid,
+    IN gctUINT32 Bytes
+    )
+{
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+
+/*******************************************************************************
+**
 **    gckKERNEL_Notify
 **
 **    This function iscalled by clients to notify the gckKERNEL object of an event.
