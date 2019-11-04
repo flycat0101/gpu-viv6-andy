@@ -1962,7 +1962,7 @@ static halti5_vscprogram_blit* halti5_GetComputeBlitProg(
         decodeInfo.binary = (gctUINT*)gc_halti5_blit_comp;
         decodeInfo.sizeInByte = (gctUINT)sizeof(gc_halti5_blit_comp);
         decodeInfo.stageInfo = (gctPOINTER)(&stageInfo);
-        decodeInfo.specFlag = SPV_SPECFLAG_ENTRYPOINT | SPV_SPECFLAG_SPECIFIED_LOCAL_SIZE;
+        decodeInfo.specFlag = SPV_SPECFLAG_ENTRYPOINT | SPV_SPECFLAG_SPECIFIED_LOCAL_SIZE | SPV_SPECFLAG_INTERNAL_LIBRARY;
         decodeInfo.localSize[0] = VIV_LOCAL_X;
         decodeInfo.localSize[1] = VIV_LOCAL_Y;
         decodeInfo.localSize[2] = VIV_LOCAL_Z;

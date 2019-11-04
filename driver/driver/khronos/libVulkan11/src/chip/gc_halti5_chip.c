@@ -886,7 +886,7 @@ VkResult halti5_initializeChipModule(
     decodeInfo.binary = (gctUINT *)gc_halti5_patchlib_frag;
     decodeInfo.sizeInByte = (gctUINT)sizeof(gc_halti5_patchlib_frag);
     decodeInfo.stageInfo = gcvNULL;
-    decodeInfo.specFlag = SPV_SPECFLAG_NONE;
+    decodeInfo.specFlag = SPV_SPECFLAG_NONE | SPV_SPECFLAG_INTERNAL_LIBRARY;
     decodeInfo.tcsInputVertices = 0;
     decodeInfo.isLibraryShader = gcvTRUE;
 
