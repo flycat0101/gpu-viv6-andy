@@ -15161,7 +15161,6 @@ vxnne_shader_executable vxnneRPNRegressionShaderExecutable(
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP16toFP32", borderMode);
         else
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP16", borderMode);
-        if (!shaderExecutable) goto OnError;
     }
     else if (bboxsFormat == VX_TYPE_INT16)
     {
@@ -15169,7 +15168,6 @@ vxnne_shader_executable vxnneRPNRegressionShaderExecutable(
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_INT16toFP32", borderMode);
         else
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_INT16", borderMode);
-        if (!shaderExecutable) goto OnError;
     }
     else if (bboxsFormat == VX_TYPE_INT8)
     {
@@ -15181,7 +15179,6 @@ vxnne_shader_executable vxnneRPNRegressionShaderExecutable(
             if (!shaderExecutable) goto OnError;
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "UniformDP4x4_cvtInt8toFp16_low", 1, UniformDP4x4_cvtInt8toFp16_low);
         }
-        if (!shaderExecutable) goto OnError;
     }
     else if (bboxsFormat == VX_TYPE_UINT8)
     {
@@ -15189,8 +15186,8 @@ vxnne_shader_executable vxnneRPNRegressionShaderExecutable(
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_UINT8toFP32", borderMode);
         else
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_UINT8", borderMode);
-        if (!shaderExecutable) goto OnError;
     }
+    if (!shaderExecutable) goto OnError;
 
     status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "UniformDP4x4_cvtFP16ToFP32", 1, UniformDP4x4_cvtFP16ToFP32);
     status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "UniformDp2x8_packF16", 1, UniformDp2x8_packF16);
@@ -15226,11 +15223,7 @@ vxnne_shader_executable vxnneRPNRegressionShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "bboxZP", 1, &bboxZP);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "Uni4x4_Cvt2Float32_low", 1, &Uni4x4_Cvt2Float32_low);
     }
-    else
-    {
-        vxError("input or output's format is not support");
-        goto OnError;
-    }
+
     if (status != VX_SUCCESS) goto OnError;
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 9);
