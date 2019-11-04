@@ -1294,7 +1294,9 @@ __wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
     struct wl_display *wl_dpy = egl_surface->display->wl_dpy;
     struct wl_event_queue *wl_queue = egl_surface->wl_queue;
     int ret = 0;
+#ifdef gcdUSE_ZWP_SYNCHRONIZATION
     gcePATCH_ID patchId = gcvPATCH_INVALID;
+#endif
 
     if (egl_surface->indequeue)
     {
