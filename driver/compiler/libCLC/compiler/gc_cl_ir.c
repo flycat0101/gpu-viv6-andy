@@ -3074,7 +3074,7 @@ IN OUT clsNAME **RefParamName
       }
   }
 #endif
-  if(clmDECL_IsScalar(rDecl) && (ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType ||
+  if(clmDECL_IsScalar(rDecl) && ((!clmDECL_IsGenType(paramDecl) && ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) ||
      clmDECL_IsScalar(paramDecl) || !ParamName->u.variableInfo.builtinSpecific.s.hasGenType)) {
       ParamName->u.variableInfo.effectiveDecl = ParamName->decl;
       if(!clmDECL_IsPointerType(paramDecl)) {
