@@ -6819,14 +6819,14 @@ VSC_ErrCode __SpvEmitAccessChain(gcSPV spv, VIR_Shader * virShader)
         SpvCovDecorator*        pDec = spv->decorationList;
         SpvId                   baseSpvTypeId = SPV_ID_SYM_SPV_POINTER_TYPE(spv->operands[0]);
 
-        if (VIR_Type_isArray(pBaseType))
+        /*
+        ** According to spec:
+        ** If Base is originally typed to be a pointer an array, and the desired
+        ** operation is to select an element of that array, OpAccessChain should be
+        ** directly used, as its first Index will select the array element.
+        */
+        if (spv->operandSize > 2 && VIR_Type_isArray(pBaseType))
         {
-            /*
-            ** According to spec:
-            ** If Base is originally typed to be a pointer an array, and the desired
-            ** operation is to select an element of that array, OpAccessChain should be
-            ** directly used, as its first Index will select the array element.
-            */
             gcmASSERT(gcvFALSE);
         }
 
