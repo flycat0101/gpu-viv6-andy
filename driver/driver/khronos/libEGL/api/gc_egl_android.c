@@ -318,6 +318,9 @@ struct eglWindowInfo
         gcoSURF         surface;
         int             tsFd;
         EGLint          age;
+
+        int             requestW;
+        int             requestH;
     } bufferCache[32];
 };
 
@@ -1836,8 +1839,8 @@ _UpdateBufferCache(
         {
             if (info->bufferCache[i].fd == fd &&
                 info->bufferCache[i].data == data &&
-                Buffer->width == (int)info->bufferCache[i].surface->requestW &&
-                Buffer->height == (int)info->bufferCache[i].surface->requestH)
+                Buffer->width == info->bufferCache[i].requestW &&
+                Buffer->height == info->bufferCache[i].requestH)
             {
                 /* The buffer handle is already cached. */
                 *Surface = info->bufferCache[i].surface;
@@ -1890,6 +1893,8 @@ _UpdateBufferCache(
     info->bufferCache[i].surface = surface;
     info->bufferCache[i].tsFd    = tsFd;
     info->bufferCache[i].age     = 0;
+    info->bufferCache[i].requestW  = Buffer->width;
+    info->bufferCache[i].requestH  = Buffer->height;
 
     /* This assignment should be atomic to support concurrent. */
     info->bufferCacheCount = i + 1;
