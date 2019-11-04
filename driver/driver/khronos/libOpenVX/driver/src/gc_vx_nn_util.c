@@ -4140,7 +4140,7 @@ vx_status vxnneOperation_InitializeCommand(
                 requestList->inputCount++;
                 count++;
 
-                if (operation->bTransposeIn  && requestList->inputMemory[0]->transposed)
+                if (operation->bTransposeIn  /*&& requestList->inputMemory[0]->transposed*/)
                 {
                     vx_tensor input = (vx_tensor)(operation->inputs[0]);
                     vx_uint32 inputZ = 0;
@@ -4253,7 +4253,7 @@ vx_status vxnneOperation_InitializeCommand(
                 command->cmdInfo.transposeOutMode  = VXNNE_SRAM_CACHE_MODE_FULL_CACHE;
                 command->cmdInfo.transposeOutChannel = operation->transposeOutChannel;
 
-                requestList->outputMemory[0]->transposed = vx_true_e;
+                //requestList->outputMemory[0]->transposed = vx_true_e;
             }
             else
             {
