@@ -11017,13 +11017,17 @@ VkResult halti5_createBufferView(
     {
         chipBufv->patchFormat = bufv->createInfo.format;
         chipBufv->patchKey |= HALTI5_PATCH_FORMAT_TO_COMPILER_BIT;
+
+        if (!(buf->createInfo.usage & VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT))
+        {
+             __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, VK_NULL_HANDLE, bufv, gcvNULL, chipBufv->imgDesc));
+        }
+
         switch (bufv->createInfo.format)
         {
         case VK_FORMAT_R32G32B32A32_SFLOAT:
         case VK_FORMAT_R32G32B32A32_UINT:
         case VK_FORMAT_R32G32B32A32_SINT:
-            chipBufv->patchFormat = bufv->createInfo.format;
-            __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, VK_NULL_HANDLE, bufv, gcvNULL, chipBufv->imgDesc));
             chipBufv->patchKey |= HALTI5_PATCH_REPLACE_TXLD_WITH_IMGLD_BIT;
             break;
         default:
