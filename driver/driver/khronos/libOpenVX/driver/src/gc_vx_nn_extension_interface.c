@@ -6782,13 +6782,18 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReduceSum_Initializer(vx_node no
     if (reduceDim)
     {
         axis = reduceDim->value->u32;
-        axis = axis < 0 ? TENSOR_DIM_NUM(src) + axis : axis;
-        if (axis < 0 || axis >= (vx_int32)TENSOR_DIM_NUM(src))
+        if (axis >= (vx_uint32)TENSOR_DIM_NUM(src))
         {
             status = VX_ERROR_INVALID_PARAMETERS;
             vxError("Invalid input dimention %d the axis value must be in the range [0, %d) function %s line %d", axis, TENSOR_DIM_NUM(src), __FUNCTION__, __LINE__);
             goto exit;
         }
+    }
+    else
+    {
+        vxError("input params reduceDim is NULL function %s line %d", __FUNCTION__, __LINE__);
+        status = VX_ERROR_INVALID_PARAMETERS;
+        goto exit;
     }
 
     if(context->evisNoInst.supportEVIS)
