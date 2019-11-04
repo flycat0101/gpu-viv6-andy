@@ -1311,6 +1311,18 @@ _hasInteger_long_ulong_isRAEnabled_src0_not_sampler_src1_float(
 }
 
 static gctBOOL
+_hasInteger_long_ulong_isRAEnabled_dest_not_sampler_src0_float(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return (_hasInteger_long_ulong(Context, Inst) &&
+            VIR_Shader_isRAEnabled(Context->shader) &&
+            !VIR_TypeId_isSampler(VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst))) &&
+            (VIR_GetTypeFlag(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0))) & VIR_TYFLAG_ISFLOAT));
+}
+
+static gctBOOL
 _isRAEnabled_dest_not_sampler_src0_float(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -7176,19 +7188,40 @@ static VIR_PatternReplaceInst _starrRepInst0[] = {
 };
 
 static VIR_PatternMatchInst _starrPatInst1[] = {
-    { VIR_OP_STARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled_dest_not_sampler_src0_float }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_STARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled_dest_not_sampler_src0_float }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _starrRepInst1[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 2, 0, 0 }, { _setMOVAEnableFloat } },
-    { VIR_OP_STARR, 0, 0, {  1, -1, 3, 0 }, { _setSTARRSwizzleFloat } },
+    { VIR_OP_STARR, 0, 0, {  1, -1, 3, 0 }, { 0, _setSTARRSwizzleFloat, _long_ulong_first_mov } },
+    { VIR_OP_STARR, 0, 0, {  1, -1, 3, 0 }, { 0, _setSTARRSwizzleFloat, _long_ulong_second_mov } },
 };
 
 static VIR_PatternMatchInst _starrPatInst2[] = {
-    { VIR_OP_STARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_STARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled_dest_not_sampler_src0_float }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _starrRepInst2[] = {
+    { VIR_OP_MOVA, 0, 0, { -1, 2, 0, 0 }, { _setMOVAEnableFloat } },
+    { VIR_OP_STARR, 0, 0, {  1, -1, 3, 0 }, { _setSTARRSwizzleFloat } },
+};
+
+static VIR_PatternMatchInst _starrPatInst3[] = {
+    { VIR_OP_STARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasInteger_long_ulong_isRAEnabled }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _starrRepInst3[] = {
+    { VIR_OP_MOVA, 0, 0, { -1, 2, 0, 0 }, { _setMOVAEnableFloat } },
+    { VIR_OP_STARR, 0, 0, {  1, -1, 3, 0 }, { 0, _setSTARRSwizzleInt, _long_ulong_first_mov} },
+    { VIR_OP_STARR, 0, 0, {  1, -1, 3, 0 }, { 0, _setSTARRSwizzleInt, _long_ulong_second_mov } },
+};
+
+
+static VIR_PatternMatchInst _starrPatInst4[] = {
+    { VIR_OP_STARR, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isRAEnabled }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _starrRepInst4[] = {
     { VIR_OP_MOVA, 0, 0, { -1, 2, 0, 0 }, { _setMOVAEnableInt } },
     { VIR_OP_STARR, 0, 0, {  1, -1, 3, 0 }, { _setSTARRSwizzleInt } },
 };
@@ -7197,6 +7230,8 @@ static VIR_Pattern _starrPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_starr, 0) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_starr, 1) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_starr, 2) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_starr, 3) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_starr, 4) },
     { VIR_PATN_FLAG_NONE }
 };
 
