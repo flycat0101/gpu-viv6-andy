@@ -4345,12 +4345,13 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     vx_uint32 *                  sinfo_num_ptr
     )
 {
+#define TP_SPLIT_COUNT     64
     vx_nn_cmd_split_info_u * sinfoArray;
     vx_enum tpType, splitTypes[TP_TENSOR_COUNT] = {TP_SPLIT_Z_DIRECTION};
 
     vx_uint32 i, splitCount = 1;
-    vx_uint32 splitSizes[TP_TENSOR_COUNT] = {0};
-    vx_uint32 splitOffsets[TP_TENSOR_COUNT] = {0};
+    vx_uint32 splitSizes[TP_SPLIT_COUNT] = {0};
+    vx_uint32 splitOffsets[TP_SPLIT_COUNT] = {0};
     vxnne_tensor_sub_block input_splits = VX_NULL;
     vxnne_tensor_sub_block output_splits = VX_NULL;
 
@@ -4583,7 +4584,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
         vxFree(output_splits);
         output_splits = VX_NULL;
     }
-
+    vxmASSERT(splitCount < TP_SPLIT_COUNT);
     for (i = 0; i < splitCount; i++)
     {
         vx_uint64 outPixel;
