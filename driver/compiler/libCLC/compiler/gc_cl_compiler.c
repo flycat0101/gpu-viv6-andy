@@ -4111,6 +4111,7 @@ clsNAME *Variable
    gceSTATUS status = gcvSTATUS_OK;
    gctSIZE_T memoryReqd;
    gctSIZE_T memoryOffset = 0;
+   cltQUALIFIER  addrSpaceQualifier;
 
    gcmASSERT(Variable);
 
@@ -4118,7 +4119,10 @@ clsNAME *Variable
    if(Variable->u.variableInfo.allocated) return gcvSTATUS_OK;
 
    memoryReqd = clsDECL_GetByteSize(Compiler, &Variable->decl);
-   switch(Variable->decl.dataType->addrSpaceQualifier) {
+   addrSpaceQualifier = Variable->decl.dataType->addrSpaceQualifier;
+   if(Variable->decl.dataType->accessQualifier == clvQUALIFIER_CONST)
+       addrSpaceQualifier = clvQUALIFIER_CONSTANT;
+   switch(addrSpaceQualifier) {
    case clvQUALIFIER_GLOBAL:
       memoryOffset = clAlignMemory(Compiler,
                                    Variable,
