@@ -196,8 +196,9 @@ _NonContiguousFree(
     gcmkFOOTER_NO();
 }
 
-static struct page **
+static gceSTATUS
 _NonContiguousAlloc(
+    IN struct gfp_mdl_priv *MdlPriv,
     IN gctSIZE_T NumPages,
     IN gctUINT32 Gfp
     )
@@ -217,7 +218,7 @@ _NonContiguousAlloc(
 #endif
     {
         gcmkFOOTER_NO();
-        return gcvNULL;
+        return gcvSTATUS_INVALID_ARGUMENT;
     }
 
     size = NumPages * sizeof(struct page *);
@@ -231,7 +232,7 @@ _NonContiguousAlloc(
         if (!pages)
         {
             gcmkFOOTER_NO();
-            return gcvNULL;
+            return gcvSTATUS_OUT_OF_MEMORY;
         }
     }
 
@@ -243,7 +244,7 @@ _NonContiguousAlloc(
         {
             _NonContiguousFree(pages, i);
             gcmkFOOTER_NO();
-            return gcvNULL;
+            return gcvSTATUS_OUT_OF_MEMORY;
         }
 
 #if gcdDISCRETE_PAGES
@@ -264,7 +265,7 @@ _NonContiguousAlloc(
                 {
                     _NonContiguousFree(pages, i);
                     gcmkFOOTER_NO();
-                    return gcvNULL;
+                    return gcvSTATUS_OUT_OF_MEMORY;
                 }
             }
         }
@@ -273,8 +274,10 @@ _NonContiguousAlloc(
         pages[i] = p;
     }
 
+    MdlPriv->contiguousPages = (struct page *)pages;
+
     gcmkFOOTER_ARG("pages=0x%X", pages);
-    return pages;
+    return gcvSTATUS_OK;
 }
 
 static void
@@ -312,6 +315,7 @@ _NonContiguous1MPagesFree(
         {
             kfree(MdlPriv->Pages1M);
         }
+        MdlPriv->Pages1M = gcvNULL;
     }
 
     if (MdlPriv->isExact)
@@ -336,21 +340,25 @@ _NonContiguous1MPagesFree(
         {
             kfree(MdlPriv->nonContiguousPages);
         }
+        MdlPriv->nonContiguousPages = gcvNULL;
     }
 }
 
-static struct page **
+static gceSTATUS
 _NonContiguous1MPagesAlloc(
     IN struct gfp_mdl_priv *MdlPriv,
     IN gctSIZE_T *NumPages,
     IN gctUINT32 Gfp
     )
 {
+    gceSTATUS status;
     size_t numPages1M, num, size;
     struct page **pages;
     struct page *page;
     void *addr = NULL;
     gctINT i, j;
+
+    MdlPriv->numPages1M = 0;
 
     numPages1M = ((*NumPages << PAGE_SHIFT) + (gcd1M_PAGE_SIZE - 1)) >> gcd1M_PAGE_SHIFT;
 
@@ -364,7 +372,7 @@ _NonContiguous1MPagesAlloc(
         if (*NumPages > num_physpages)
 #endif
     {
-        return gcvNULL;
+        return gcvSTATUS_INVALID_ARGUMENT;
     }
 
     num = gcd1M_PAGE_SIZE / PAGE_SIZE;
@@ -377,7 +385,7 @@ _NonContiguous1MPagesAlloc(
 
         if (!MdlPriv->Pages1M)
         {
-            return gcvNULL;
+            gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
         }
     }
 
@@ -388,8 +396,7 @@ _NonContiguous1MPagesAlloc(
         MdlPriv->isExact = vmalloc(size);
         if (!MdlPriv->isExact)
         {
-            _NonContiguous1MPagesFree(MdlPriv, 0);
-            return gcvNULL;
+            gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
         }
     }
 
@@ -400,12 +407,11 @@ _NonContiguous1MPagesAlloc(
         pages = vmalloc(size);
         if (!pages)
         {
-            _NonContiguous1MPagesFree(MdlPriv, 0);
-            return gcvNULL;
+            gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
         }
     }
+    MdlPriv->contiguousPages = (struct page *)pages;
 
-    MdlPriv->numPages1M = 0;
     for (i = 0; i < numPages1M; i++)
     {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
@@ -424,8 +430,7 @@ _NonContiguous1MPagesAlloc(
 
             if (order >= MAX_ORDER)
             {
-                _NonContiguous1MPagesFree(MdlPriv, MdlPriv->numPages1M);
-                return gcvNULL;
+                gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
             }
 
             MdlPriv->Pages1M[i] = alloc_pages(Gfp, order);
@@ -433,8 +438,7 @@ _NonContiguous1MPagesAlloc(
 
         if (MdlPriv->Pages1M[i] == gcvNULL)
         {
-            _NonContiguous1MPagesFree(MdlPriv, MdlPriv->numPages1M);
-            return gcvNULL;
+            gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
         }
 
         MdlPriv->numPages1M += 1;
@@ -446,7 +450,11 @@ _NonContiguous1MPagesAlloc(
         }
     }
 
-    return pages;
+    return gcvSTATUS_OK;
+OnError:
+    _NonContiguous1MPagesFree(MdlPriv, MdlPriv->numPages1M);
+
+    return status;
 }
 
 /***************************************************************************\
@@ -588,16 +596,11 @@ _GFPAlloc(
     {
         if (Mdl->pageUnit1M)
         {
-            mdlPriv->nonContiguousPages = _NonContiguous1MPagesAlloc(mdlPriv, &NumPages, gfp);
+            gcmkONERROR(_NonContiguous1MPagesAlloc(mdlPriv, &NumPages, gfp));
         }
         else
         {
-            mdlPriv->nonContiguousPages = _NonContiguousAlloc(NumPages, gfp);
-        }
-
-        if (mdlPriv->nonContiguousPages == gcvNULL)
-        {
-            gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
+            gcmkONERROR(_NonContiguousAlloc(mdlPriv, NumPages, gfp));
         }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION (3,6,0) \
