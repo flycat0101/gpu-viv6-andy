@@ -1835,7 +1835,9 @@ _UpdateBufferCache(
         if (info->bufferCache[i].handle == handle)
         {
             if (info->bufferCache[i].fd == fd &&
-                info->bufferCache[i].data == data)
+                info->bufferCache[i].data == data &&
+                Buffer->width == (int)info->bufferCache[i].surface->requestW &&
+                Buffer->height == (int)info->bufferCache[i].surface->requestH)
             {
                 /* The buffer handle is already cached. */
                 *Surface = info->bufferCache[i].surface;
