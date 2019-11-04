@@ -104,6 +104,7 @@ gctINT
     {
         Program->objectType = clvOBJECT_UNKNOWN;
 
+        if (Program->ideOption.underIDE) gcOPT_ResetFeature(FE_GENERATED_OFFLINE_COMPILER);
         if (Program->buildOptions) gcoOS_Free(gcvNULL, Program->buildOptions);
         if (Program->origbuildOptions) gcoOS_Free(gcvNULL, Program->origbuildOptions);
         if (Program->linkOptions) gcoOS_Free(gcvNULL, Program->linkOptions);
@@ -126,6 +127,15 @@ OnError:
 }
 
 extern void doPatchCreateProgram(cl_program Program );
+
+static void clfInitIDEOption(cl_program program)
+{
+    program->ideOption.enbaleSymbol = gcvFALSE;
+    program->ideOption.optimize0 = gcvFALSE;
+    program->ideOption.optimize1 = gcvFALSE;
+    program->ideOption.underIDE = gcvFALSE;
+    program->ideOption.size = 0;
+}
 /*****************************************************************************\
 |*                       OpenCL Program Object API                           *|
 \*****************************************************************************/
@@ -208,6 +218,7 @@ clCreateProgramWithSource(
     program->origbuildOptions= gcvNULL;
     program->buildLog        = gcvNULL;
     program->buildStatus     = CL_BUILD_NONE;
+    clfInitIDEOption(program);
 
      /* Allocate source. */
     clmONERROR(gcoOS_Allocate(gcvNULL, size + 1, &pointer), CL_OUT_OF_HOST_MEMORY);
@@ -309,6 +320,8 @@ clCreateProgramWithBinary(
     gctINT          status;
     gctUINT         i;
     gcSHADER        binary;
+    gctUINT         sourceLength;
+    gctSTRING       source;
     gctUINT32       comVersion[2];
 
     gcmHEADER_ARG("Context=0x%x NumDevices=%u Binaries=0x%x Lengths=0x%x",
@@ -359,6 +372,7 @@ clCreateProgramWithBinary(
     program->origbuildOptions= gcvNULL;
     program->buildLog        = gcvNULL;
     program->buildStatus     = CL_BUILD_NONE;
+    clfInitIDEOption(program);
 
     /* Create a reference count object and set it to 1. */
     clmONERROR(gcoOS_AtomConstruct(gcvNULL, &program->referenceCount),
@@ -402,6 +416,16 @@ clCreateProgramWithBinary(
 
     program->binary = (gctUINT8_PTR) binary;
 
+    /* Copy the shader source if exist. */
+    source = GetShaderSourceCode(binary);
+    sourceLength = GetShaderSourceLength(binary);
+
+    if (source != gcvNULL && sourceLength != 0)
+    {
+        clmONERROR(gcoOS_Allocate(gcvNULL, sourceLength, &pointer), CL_OUT_OF_HOST_MEMORY);
+        gcoOS_MemCopy(pointer, source, sourceLength);
+        program->source = (gctSTRING) pointer;
+    }
     doPatchCreateProgram( program );
 
     if (ErrcodeRet)
@@ -589,6 +613,72 @@ OnError:
 }
 
 
+static void clfGetIDEOption(clsIDE_OPTION * option)
+{
+    char* p = gcvNULL;
+    gctSTRING pos = gcvNULL;
+
+    gcoOS_GetEnv(gcvNULL, "VIV_CL_EXT_OPTION", &p);
+    if (p)
+    {
+        gcoOS_StrStr(p, ":", &pos);
+        if (pos)
+        {
+            option->underIDE = gcvTRUE;
+        }
+
+        gcoOS_StrStr(p, "-g", &pos);
+        if(pos)
+        {
+            option->enbaleSymbol = gcvTRUE;
+            option->size += 3;
+        }
+
+        gcoOS_StrStr(p, "-O0", &pos);
+        if(pos)
+        {
+            option->optimize0 = gcvTRUE;
+            option->size += 4;
+        }
+
+        gcoOS_StrStr(p, "-O1", &pos);
+        if(pos)
+        {
+            option->optimize1 = gcvTRUE;
+            option->size += 4;
+        }
+    }
+}
+
+static void clfUpdateBuildOptionForIDE(gctSTRING *options, gctSIZE_T length)
+{
+    char * p, *q;
+    gctSIZE_T size = length;
+
+    p = q = *options;
+
+    gcoOS_StrStr(p, "-g ", &q);
+    if(q)
+    {
+        size = (size-(q-p)-3);
+        gcoOS_StrCopySafe(q, size, q+3);
+    }
+
+    gcoOS_StrStr(p, "-O0 ", &q);
+    if(q)
+    {
+        size = (size-(q-p)-4);
+        gcoOS_StrCopySafe(q, size, q+4);
+    }
+
+    gcoOS_StrStr(p, "-O1 ", &q);
+    if(q)
+    {
+        size = (size-(q-p)-4);
+        gcoOS_StrCopySafe(q, size, q+4);
+    }
+}
+
 static gceSTATUS clfUpdateCompileOption(clsPlatformId_PTR platform, gctSTRING *options)
 {
     gctSIZE_T extraOptionLength = 0;
@@ -646,6 +736,7 @@ clBuildProgram(
     gcSHADER            binary;
     gctUINT             binarySize;
     gctINT              status;
+    clsIDE_OPTION  *    currentIDEOption = &Program->ideOption;
 
     gcmHEADER_ARG("Program=0x%x NumDevices=%u DeviceList=0x%x Options=%s",
                   Program, NumDevices, DeviceList, Options);
@@ -718,6 +809,7 @@ clBuildProgram(
          */
         gcSHADER_Destroy((gcSHADER)Program->binary);
 
+        if (Program->ideOption.underIDE) gcOPT_ResetFeature(FE_GENERATED_OFFLINE_COMPILER);
         if (Program->buildOptions) gcoOS_Free(gcvNULL, Program->buildOptions);
         if (Program->origbuildOptions) gcoOS_Free(gcvNULL, Program->origbuildOptions);
         if (Program->buildLog) gcoOS_Free(gcvNULL, Program->buildLog);
@@ -729,37 +821,145 @@ clBuildProgram(
         Program->buildStatus     = CL_BUILD_NONE;
     }
 
-    /* Copy build options */
-    if (Options)
+    clfGetIDEOption(currentIDEOption);
+
+    if(currentIDEOption->underIDE)
     {
-        length = gcoOS_StrLen(Options, gcvNULL) + 1;
-
-        /* Allocate memory for the used build options. */
-        status = gcoOS_Allocate(gcvNULL, length, &pointer);
-        if (gcmIS_ERROR(status))
+        gcOPT_SetFeature(FE_GENERATED_OFFLINE_COMPILER);
+        if(Options)
         {
-            gcmUSER_DEBUG_ERROR_MSG(
-                "OCL-006015: (clBuildProgram) Run out of memory.\n");
-            clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
-        }
-        gcoOS_StrCopySafe((gctSTRING)pointer, length, Options);
-        Program->buildOptions = (gctSTRING) pointer;
+            gctPOINTER tempOption = gcvNULL;
+            length = gcoOS_StrLen(Options, gcvNULL) + 1;
 
-        /* Allocate memory for the original build options. */
-        status = gcoOS_Allocate(gcvNULL, length, &pointer);
-        if (gcmIS_ERROR(status))
-        {
-            gcmUSER_DEBUG_ERROR_MSG(
-                "OCL-006016: (clBuildProgram) Run out of memory.\n");
-            clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+            status = gcoOS_Allocate(gcvNULL, length, &pointer);
+            if (gcmIS_ERROR(status))
+            {
+                gcmUSER_DEBUG_ERROR_MSG(
+                    "OCL-006015i: (clBuildProgram) Run out of memory.\n");
+                clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+            }
+            gcoOS_StrCopySafe((gctSTRING)pointer, length, (gctSTRING)Options);
+            Program->origbuildOptions = (gctSTRING) pointer;
+
+            status = gcoOS_Allocate(gcvNULL, length+currentIDEOption->size, &tempOption);
+            if (gcmIS_ERROR(status))
+            {
+                gcmUSER_DEBUG_ERROR_MSG(
+                    "OCL-006016i (clBuildProgram) Run out of memory.\n");
+                clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+            }
+            gcoOS_MemFill(tempOption, 0, length+currentIDEOption->size);
+            gcoOS_StrCopySafe((gctSTRING)tempOption, length, (gctSTRING)Options);
+
+            clfUpdateBuildOptionForIDE((gctSTRING *)&tempOption, length);
+
+            if(currentIDEOption->size)
+            {
+                gctSTRING p = (gctSTRING)tempOption;
+
+                length += currentIDEOption->size;
+                if(currentIDEOption->enbaleSymbol)
+                {
+                    gcoOS_StrCatSafe((gctSTRING)p, length, " -g");
+                    length -= 3;
+                    p += 3;
+                }
+
+                if(currentIDEOption->optimize0)
+                {
+                    gcoOS_StrCatSafe((gctSTRING)p, length, " -O0");
+                    length -= 4;
+                    p += 4;
+                }
+
+                if(currentIDEOption->optimize1)
+                {
+                    gcoOS_StrCatSafe((gctSTRING)p, length, " -O1");
+                }
+            }
+            Program->buildOptions = (gctSTRING) tempOption;
         }
-        gcoOS_StrCopySafe((gctSTRING)pointer, length, Options);
-        Program->origbuildOptions = (gctSTRING) pointer;
+        else
+        {
+            if(currentIDEOption->size)
+            {
+                gctSTRING p = gcvNULL;
+                length = currentIDEOption->size+1;
+
+                status = gcoOS_Allocate(gcvNULL, length, &pointer);
+                if (gcmIS_ERROR(status))
+                {
+                    gcmUSER_DEBUG_ERROR_MSG(
+                        "OCL-006017i: (clBuildProgram) Run out of memory.\n");
+                    clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+                }
+                gcoOS_MemFill(pointer, 0, length);
+
+                p = (gctSTRING)pointer;
+
+                if(currentIDEOption->enbaleSymbol)
+                {
+                    gcoOS_StrCatSafe((gctSTRING)p, length, " -g");
+                    length -= 3;
+                    p += 3;
+                }
+
+                if(currentIDEOption->optimize0)
+                {
+                    gcoOS_StrCatSafe((gctSTRING)p, length, " -O0");
+                    length -= 4;
+                    p += 4;
+                }
+
+                if(currentIDEOption->optimize1)
+                {
+                    gcoOS_StrCatSafe((gctSTRING)p, length, " -O1");
+                }
+
+                Program->buildOptions = (gctSTRING)pointer;
+                Program->origbuildOptions = gcvNULL;
+            }
+            else
+            {
+                Program->buildOptions = gcvNULL;
+                Program->origbuildOptions = gcvNULL;
+            }
+        }
     }
     else
     {
-        Program->buildOptions = gcvNULL;
-        Program->origbuildOptions = gcvNULL;
+        /* Copy build options */
+        if (Options)
+        {
+            length = gcoOS_StrLen(Options, gcvNULL) + 1;
+
+            /* Allocate memory for the used build options. */
+            status = gcoOS_Allocate(gcvNULL, length, &pointer);
+            if (gcmIS_ERROR(status))
+            {
+                gcmUSER_DEBUG_ERROR_MSG(
+                    "OCL-006015: (clBuildProgram) Run out of memory.\n");
+                clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+            }
+            gcoOS_StrCopySafe((gctSTRING)pointer, length, Options);
+            Program->buildOptions = (gctSTRING) pointer;
+
+            /* Allocate memory for the original build options. */
+            status = gcoOS_Allocate(gcvNULL, length, &pointer);
+            if (gcmIS_ERROR(status))
+            {
+                gcmUSER_DEBUG_ERROR_MSG(
+                    "OCL-006016: (clBuildProgram) Run out of memory.\n");
+                clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+            }
+            gcoOS_StrCopySafe((gctSTRING)pointer, length, Options);
+            Program->origbuildOptions = (gctSTRING) pointer;
+        }
+        else
+        {
+            Program->buildOptions = gcvNULL;
+            Program->origbuildOptions = gcvNULL;
+        }
     }
 
     Program->buildStatus = CL_BUILD_IN_PROGRESS;

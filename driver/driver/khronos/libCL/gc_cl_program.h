@@ -22,6 +22,14 @@ extern "C" {
 /******************************************************************************\
 ************************* Program Object Definition *************************
 \******************************************************************************/
+typedef struct _cl_IDE_OPTION
+{
+    gctBOOL underIDE;
+    gctBOOL enbaleSymbol;
+    gctBOOL optimize0;
+    gctBOOL optimize1;
+    gctUINT size;
+}clsIDE_OPTION;
 
 typedef struct _cl_program
 {
@@ -49,6 +57,7 @@ typedef struct _cl_program
     cl_program_binary_type  binaryType;
     gctINT                  status;
     gctINT                  patchIndex;
+    clsIDE_OPTION           ideOption;
 }
 clsProgram;
 

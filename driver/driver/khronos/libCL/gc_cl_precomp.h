@@ -19,6 +19,7 @@
 #include <drvi/gc_vsc_drvi_interface.h>
 #include <gc_hal_user_os_memory.h>
 #include <gc_hal_cl.h>
+#include <old_impl/gc_vsc_old_drvi_interface.h>
 
 #if BUILD_OPENCL_ICD
 #ifndef WIN32
