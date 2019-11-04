@@ -469,6 +469,13 @@ PROG_GL_XFB_OUT_TABLE;
  **********************************        VK program mapping table definitions       *********************************
  **********************************************************************************************************************/
 
+typedef struct PROG_VK_IMAGE_FORMAT_INFO
+{
+    VSC_IMAGE_FORMAT                            imageFormat;
+    gctBOOL                                     bSetInSpriv;
+}
+PROG_VK_IMAGE_FORMAT_INFO;
+
 typedef struct PROG_VK_SUB_RESOURCE_BINDING
 {
     /* Pointer to original API resource binding */
@@ -668,7 +675,7 @@ typedef union PROG_VK_SEPARATED_TEXTURE_HW_MAPPING
            of image-size array. */
         SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize;
 
-        VSC_IMAGE_FORMAT                            imageFormat;
+        PROG_VK_IMAGE_FORMAT_INFO                   imageFormatInfo;
 
         /* Extra layer HW mapping. As currently, for images in in texBinding::arraySize
            array, if one image has extra image, all other images must have extra image, so
@@ -772,7 +779,7 @@ typedef struct PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY
     SHADER_PRIV_CONSTANT_ENTRY*                 pTextureSize[VSC_MAX_SHADER_STAGE_COUNT][2];
 
     /*----------------------------------Image-related----------------------------------*/
-    VSC_IMAGE_FORMAT                            imageFormat;
+    PROG_VK_IMAGE_FORMAT_INFO                   imageFormatInfo;
 
     /* Which kinds of inst operation acting on texture. The count of this
        resOpBit is same as utbBinding::arraySize */
@@ -833,7 +840,7 @@ typedef struct PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY
        of image-size array. */
     SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize[VSC_MAX_SHADER_STAGE_COUNT];
 
-    VSC_IMAGE_FORMAT                            imageFormat;
+    PROG_VK_IMAGE_FORMAT_INFO                   imageFormatInfo;
 
     /* Extra layer HW mapping. As currently, for images in in iaBinding::arraySize
        array, if one image has extra image, all other images must have extra image, so
@@ -897,7 +904,7 @@ typedef struct PROG_VK_STORAGE_TABLE_ENTRY
        of image-size array. */
     SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize[VSC_MAX_SHADER_STAGE_COUNT];
 
-    VSC_IMAGE_FORMAT                            imageFormat;
+    PROG_VK_IMAGE_FORMAT_INFO                   imageFormatInfo;
 
     /* Extra layer HW mapping. As currently, for images in in storageBinding::arraySize
        array, if one image has extra image, all other images must have extra image, so

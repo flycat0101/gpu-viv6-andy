@@ -1505,7 +1505,8 @@ _vscEP_Buffer_SaveVKSeparatedTextureHwMapping(
     )
 {
     _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pSeparatedTextureHwMapping->s.pImageSize);
-    VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pSeparatedTextureHwMapping->s.imageFormat);
+    VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pSeparatedTextureHwMapping->s.imageFormatInfo.imageFormat);
+    VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pSeparatedTextureHwMapping->s.imageFormatInfo.bSetInSpriv);
     _vscEP_Buffer_SavePrivUavEntry(pEPBuf, pSeparatedTextureHwMapping->s.pExtraLayer);
     _vscEP_Buffer_SaveUavSlotMapping(pEPBuf, &pSeparatedTextureHwMapping->s.hwMapping);
     _vscEP_Buffer_SaveVKPrivCombTexSampHwMappingList(pEPBuf, &pSeparatedTextureHwMapping->s.texHwMappingList);
@@ -1652,7 +1653,8 @@ _vscEP_Buffer_SaveVKUniformTexelBufferEntry(
         }
     }
 
-    VSC_IO_writeUint(pIoBuf, (gctUINT)pUniformTexelBufferEntry->imageFormat);
+    VSC_IO_writeUint(pIoBuf, (gctUINT)pUniformTexelBufferEntry->imageFormatInfo.imageFormat);
+    VSC_IO_writeUint(pIoBuf, (gctUINT)pUniformTexelBufferEntry->imageFormatInfo.bSetInSpriv);
 
     if (pUniformTexelBufferEntry->utbBinding.arraySize != 0)
     {
@@ -1749,7 +1751,8 @@ _vscEP_Buffer_SaveVKInutAttachmentEntry(
         }
     }
 
-    VSC_IO_writeUint(pIoBuf, (gctUINT)pInputAttachmentEntry->imageFormat);
+    VSC_IO_writeUint(pIoBuf, (gctUINT)pInputAttachmentEntry->imageFormatInfo.imageFormat);
+    VSC_IO_writeUint(pIoBuf, (gctUINT)pInputAttachmentEntry->imageFormatInfo.bSetInSpriv);
 
     /* Save extra layer size. */
     entryMask = 0;
@@ -1914,7 +1917,8 @@ _vscEP_Buffer_SaveVKStorageEntry(
         }
     }
 
-    VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pStorageEntry->imageFormat);
+    VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pStorageEntry->imageFormatInfo.imageFormat);
+    VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pStorageEntry->imageFormatInfo.bSetInSpriv);
 
     /* Save extra layer size. */
     entryMask = 0;
@@ -4414,7 +4418,8 @@ _vscEP_Buffer_LoadVKSeparatedTextureHwMapping(
     VSC_ErrCode errCode = VSC_ERR_NONE;
 
     ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pSeparatedTextureHwMapping->s.pImageSize));
-    VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pSeparatedTextureHwMapping->s.imageFormat);
+    VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pSeparatedTextureHwMapping->s.imageFormatInfo.imageFormat);
+    VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pSeparatedTextureHwMapping->s.imageFormatInfo.bSetInSpriv);
     ON_ERROR0(_vscEP_Buffer_LoadPrivUavEntry(pEPBuf, pSeparatedTextureHwMapping->s.pExtraLayer));
     ON_ERROR0(_vscEP_Buffer_LoadUavSlotMapping(pEPBuf, &pSeparatedTextureHwMapping->s.hwMapping));
     ON_ERROR0(_vscEP_Buffer_LoadVKPrivCombTexSampHwMappingList(pEPBuf, &pSeparatedTextureHwMapping->s.texHwMappingList));
@@ -4598,7 +4603,8 @@ _vscEP_Buffer_LoadVKUniformTexelBufferEntry(
         }
     }
 
-    VSC_IO_readUint(pIoBuf, (gctUINT *)&pUniformTexelBufferEntry->imageFormat);
+    VSC_IO_readUint(pIoBuf, (gctUINT *)&pUniformTexelBufferEntry->imageFormatInfo.imageFormat);
+    VSC_IO_readUint(pIoBuf, (gctUINT *)&pUniformTexelBufferEntry->imageFormatInfo.bSetInSpriv);
 
     if (pUniformTexelBufferEntry->utbBinding.arraySize != 0)
     {
@@ -4728,7 +4734,8 @@ _vscEP_Buffer_LoadVKInutAttachmentEntry(
         }
     }
 
-    VSC_IO_readUint(pIoBuf, (gctUINT *)&pInputAttachmentEntry->imageFormat);
+    VSC_IO_readUint(pIoBuf, (gctUINT *)&pInputAttachmentEntry->imageFormatInfo.imageFormat);
+    VSC_IO_readUint(pIoBuf, (gctUINT *)&pInputAttachmentEntry->imageFormatInfo.bSetInSpriv);
 
     /* Load extra layer. */
     entryMask = 0;
@@ -4900,7 +4907,8 @@ _vscEP_Buffer_LoadVKStorageEntry(
         }
     }
 
-    VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pStorageEntry->imageFormat);
+    VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pStorageEntry->imageFormatInfo.imageFormat);
+    VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pStorageEntry->imageFormatInfo.bSetInSpriv);
 
     /* Load extra layer. */
     VSC_IO_readUint(pIoBuf, &entryMask);

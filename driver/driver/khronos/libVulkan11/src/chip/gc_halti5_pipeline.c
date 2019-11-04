@@ -5301,7 +5301,7 @@ static void halti5_pip_build_patchKeyMask(
                                     patchKey |= HALTI5_PATCH_FORMAT_TO_COMPILER_BIT;
                                 }
                             }
-                            chipPipeline->patchTexBufFormat[setIdx][keyIndex] = tableEntry->imageFormat;
+                            chipPipeline->patchTexBufFormat[setIdx][keyIndex] = tableEntry->imageFormatInfo.imageFormat;
                             chipPipeline->patchKeys[setIdx][keyIndex++] = patchKey;
                         }
                     }

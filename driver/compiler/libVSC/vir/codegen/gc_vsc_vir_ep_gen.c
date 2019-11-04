@@ -3857,8 +3857,9 @@ static void _SetResOpBits(VIR_Shader* pShader,
     }
 }
 
-static VSC_IMAGE_FORMAT _GetImageFormat(VIR_Shader* pShader,
-                                        VSC_SHADER_RESOURCE_BINDING* pResBinding)
+static void _GetImageFormat(VIR_Shader* pShader,
+                            VSC_SHADER_RESOURCE_BINDING* pResBinding,
+                            PROG_VK_IMAGE_FORMAT_INFO* pImageFormatInfo)
 {
     gctUINT                                   virUniformIdx;
     gctUINT                                   resArraySize;
@@ -3867,6 +3868,7 @@ static VSC_IMAGE_FORMAT _GetImageFormat(VIR_Shader* pShader,
     VIR_UniformIdList*                        pVirUniformLsts = VIR_Shader_GetUniforms(pShader);
     VIR_Type*                                 pVirUniformSymType;
     VSC_IMAGE_FORMAT                          imageFormat = VSC_IMAGE_FORMAT_NONE;
+    gctBOOL                                   bSetInSpirv = gcvTRUE;
 
     for (virUniformIdx = 0; virUniformIdx < VIR_IdList_Count(pVirUniformLsts); virUniformIdx ++)
     {
@@ -3895,6 +3897,8 @@ static VSC_IMAGE_FORMAT _GetImageFormat(VIR_Shader* pShader,
             /* If there is no image format information in shader, compiler uses 16bit as the default value. */
             if (imageFormat == VSC_IMAGE_FORMAT_NONE)
             {
+                bSetInSpirv = gcvFALSE;
+
                 if (VIR_TypeId_isImageDataUnSignedInteger(VIR_Type_GetIndex(pVirUniformSymType)))
                 {
                     imageFormat = VSC_IMAGE_FORMAT_RGBA16UI;
@@ -3908,11 +3912,17 @@ static VSC_IMAGE_FORMAT _GetImageFormat(VIR_Shader* pShader,
                     imageFormat = VSC_IMAGE_FORMAT_RGBA16F;
                 }
             }
+
+            if (pImageFormatInfo)
+            {
+                pImageFormatInfo->imageFormat = imageFormat;
+                pImageFormatInfo->bSetInSpriv = bSetInSpirv;
+            }
             break;
         }
     }
 
-    return imageFormat;
+    return;
 }
 
 static PROG_VK_RESOURCE_SET* _GetVkResourceSetBySetIdx(PROGRAM_EXECUTABLE_PROFILE* pPEP, gctUINT setIndex)
@@ -4535,7 +4545,7 @@ static VSC_ErrCode _AddVkSeparatedTexEntryToSeparatedTexTableOfPEP(VSC_PEP_GEN_H
                       &pTextureEntry->texBinding,
                       pSep);
 
-        pTextureEntry->hwMappings[stageIdx].s.imageFormat = _GetImageFormat(pShader, &pTextureEntry->texBinding);
+        _GetImageFormat(pShader, &pTextureEntry->texBinding, &pTextureEntry->hwMappings[stageIdx].s.imageFormatInfo);
 
         /* Extra image layer */
         _AddPrivateImageUniform(&pTextureEntry->hwMappings[stageIdx].s.pExtraLayer,
@@ -4650,7 +4660,7 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* p
             _SetValidChannelForHwConstantLoc(pHwDirectAddrBase, hwChannel);
         }
 
-        pUtbEntry->imageFormat = _GetImageFormat(pShader, &pUtbEntry->utbBinding);
+        _GetImageFormat(pShader, &pUtbEntry->utbBinding, &pUtbEntry->imageFormatInfo);
     }
     else
     {
@@ -4804,7 +4814,7 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
                       &pIaEntry->iaBinding,
                       pSep);
 
-        pIaEntry->imageFormat = _GetImageFormat(pShader, &pIaEntry->iaBinding);
+        _GetImageFormat(pShader, &pIaEntry->iaBinding, &pIaEntry->imageFormatInfo);
 
         /* Extra image layer */
         _AddPrivateImageUniform(&pIaEntry->pExtraLayer[stageIdx],
@@ -4930,7 +4940,7 @@ static VSC_ErrCode _AddVkStorageEntryToStorageTableOfPEP(VSC_PEP_GEN_HELPER* pPe
                   &pStorageEntry->storageBinding,
                   pSep);
 
-    pStorageEntry->imageFormat = _GetImageFormat(pShader, &pStorageEntry->storageBinding);
+    _GetImageFormat(pShader, &pStorageEntry->storageBinding, &pStorageEntry->imageFormatInfo);
 
     /* Extra image layer */
     _AddPrivateImageUniform(&pStorageEntry->pExtraLayer[stageIdx],
