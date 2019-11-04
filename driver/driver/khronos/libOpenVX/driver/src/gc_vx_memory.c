@@ -225,7 +225,7 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
 
     for (planeIndex = 0; (vx_uint32) planeIndex < memory->planeCount; planeIndex++)
     {
-        gceSTATUS status;
+        gceSTATUS status, dimIndex;
 
         gcsUSER_MEMORY_DESC desc;
 
@@ -233,11 +233,19 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
         {
             gctUINT32 size = sizeof(vx_uint8);
 
-            size = memory->strides[planeIndex][VX_DIM_Y] * memory->dims[planeIndex][VX_DIM_Y];
+            if (memory->strides[planeIndex][VX_DIM_CHANNEL] != 0)
+            {
+                size = (gctUINT32)abs(memory->strides[planeIndex][VX_DIM_CHANNEL]);
+            }
+
+            for (dimIndex = 0; (vx_uint32)dimIndex < memory->dimCount; dimIndex++)
+            {
+                memory->strides[planeIndex][dimIndex] = (gctUINT32)size;
+                size *= (gctUINT32)abs(memory->dims[planeIndex][dimIndex]);
+            }
 
             memory->sizes[planeIndex] = size;
         }
-
         gcoOS_ZeroMemory(&desc, gcmSIZEOF(desc));
 
         desc.flag     = memory->wrapFlag;
