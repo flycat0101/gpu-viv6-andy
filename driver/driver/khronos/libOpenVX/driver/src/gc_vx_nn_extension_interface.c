@@ -17241,6 +17241,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                             enable_packed_weights = vx_true_e;
                     }
                     else if (!enable_conv2d_1x1 && biases != NULL
+                        && ((outputDepth % CONV2D_ALIGN_SIZE4) == 0)
                         && ((inputWidth * inputHeight < IMG_MAX_WIDTH) && inputDepth < IMG_MAX_WIDTH)
                         && (CHECK_LIFETIME_IS_STATIC(weights) && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE))
                     {
