@@ -429,7 +429,8 @@ __kernel void vxcSoftmax_Fp16toFp16_channel2_2D(
     VXC_WriteImage(output, coord.zw, dst, VXC_MODIFIER(4, 7, 0, VXC_RM_TowardZero, 0));
 }
 _viv_uniform VXC_512Bits uniExtractABAB_2x8;
-_viv_uniform VXC_512Bits uniDataEvenSubOdd_4x4;
+_viv_uniform VXC_512Bits uniConvF16toF32Even_4x4;
+_viv_uniform VXC_512Bits uniConvF16toF32Odd_4x4;
 __kernel void vxcSoftmax_Fp16toFp16_D2C2(
     __read_only image2d_array_t   input,
     __write_only image2d_array_t  output)
@@ -437,7 +438,7 @@ __kernel void vxcSoftmax_Fp16toFp16_D2C2(
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(1));
     vxc_short8 in0, in1;
     vxc_half8 vec0, vec1, vec2, vec3, max;
-    vxc_float4 data0, data1, fProbSum;
+    vxc_float4 data0, data1, fProbSum, maxVal, minVal;
 
     VXC_ReadImage(in0, input, coord.xy, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
     _viv_asm(COPY, vec0, in0, 16);
@@ -446,38 +447,52 @@ __kernel void vxcSoftmax_Fp16toFp16_D2C2(
 
     coord.zw += (int2)(8, 0);
 
-    VXC_DP4x4(data0, vec0, vec0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniDataEvenSubOdd_4x4);
-    data0 *= scaleLogE;
-    data0.x = exp2(data0.x);
-    data0.y = exp2(data0.y);
-    data0.z = exp2(data0.z);
-    data0.w = exp2(data0.w);
-    fProbSum = data0 + 1.0;
+    VXC_DP4x4(data0, vec0, vec0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvF16toF32Even_4x4);
+    VXC_DP4x4(data1, vec0, vec0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvF16toF32Odd_4x4);
+    maxVal = data1 >= data0 ? data1 : data0;
+    minVal = data1 < data0 ? data1 : data0;
+    minVal -= maxVal;
+    minVal *= scaleLogE;
+    minVal.x = exp2(minVal.x);
+    minVal.y = exp2(minVal.y);
+    minVal.z = exp2(minVal.z);
+    minVal.w = exp2(minVal.w);
+    fProbSum = minVal + 1.0;
     fProbSum = 1 / fProbSum;
+    data0 = data0 == maxVal ? 1.0 : minVal;
+    data1 = data1 == maxVal ? 1.0 : minVal;
     data0 *= fProbSum;
+    data1 *= fProbSum;
 
     half4 vect0, vect1;
     vxc_half8 tmp;
     vxc_short8 dst;
     _viv_asm(CONV, vect0, data0);
-    _viv_asm(CONV, vect1, fProbSum);
+    _viv_asm(CONV, vect1, data1);
 
     VXC_DP2x8(tmp, vect0, vect1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtractABAB_2x8);
     _viv_asm(COPY, dst, tmp, 16);
     VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 
-    VXC_DP4x4(data0, vec1, vec1, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniDataEvenSubOdd_4x4);
-    data0 *= scaleLogE;
-    data0.x = exp2(data0.x);
-    data0.y = exp2(data0.y);
-    data0.z = exp2(data0.z);
-    data0.w = exp2(data0.w);
-    fProbSum = data0 + 1.0;
+    VXC_DP4x4(data0, vec1, vec1, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvF16toF32Even_4x4);
+    VXC_DP4x4(data1, vec1, vec1, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvF16toF32Odd_4x4);
+    maxVal = data1 >= data0 ? data1 : data0;
+    minVal = data1 < data0 ? data1 : data0;
+    minVal -= maxVal;
+    minVal *= scaleLogE;
+    minVal.x = exp2(minVal.x);
+    minVal.y = exp2(minVal.y);
+    minVal.z = exp2(minVal.z);
+    minVal.w = exp2(minVal.w);
+    fProbSum = minVal + 1.0;
     fProbSum = 1 / fProbSum;
+    data0 = data0 == maxVal ? 1.0 : minVal;
+    data1 = data1 == maxVal ? 1.0 : minVal;
     data0 *= fProbSum;
+    data1 *= fProbSum;
 
     _viv_asm(CONV, vect0, data0);
-    _viv_asm(CONV, vect1, fProbSum);
+    _viv_asm(CONV, vect1, data1);
     VXC_DP2x8(tmp, vect0, vect1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtractABAB_2x8);
     _viv_asm(COPY, dst, tmp, 16);
     VXC_WriteImage(output, coord.zy, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));

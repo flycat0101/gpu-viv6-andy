@@ -10664,14 +10664,23 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
             0x00000100, // AccumType, ConstantType, and PostShift
             0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00, 0x00003c00 // Constant
         };
-        vx_uint32 uniDataEvenSubOdd_4x4[16] = {
-            0x09090909, // TCfg
+        vx_uint32 uniConvF16toF32Even_4x4[16] = {
+            0x01010101, // TCfg
             0x00000000, // ASelt
-            0x00320010, 0x00760054, // ABin
-            0x0a0a0a0a, // BSelt
+            0x00020000, 0x00060004, // ABin
+            0x02020202, // BSelt
             0x00000000, 0x00000000, // BBin
             0x00000100, // AccumType, ConstantType, and PostShift
-            0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000, 0x3c003c00, 0x00000000 // Constant
+            0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000 // Constant
+        };
+        vx_uint32 uniConvF16toF32Odd_4x4[16] = {
+            0x01010101, // TCfg
+            0x00000000, // ASelt
+            0x00030001, 0x00070005, // ABin
+            0x02020202, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000 // Constant
         };
 
         if (outputFormat == VX_TYPE_FLOAT16)
@@ -10680,7 +10689,8 @@ vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
             vxmONERROR_NULLPTR(shaderExecutable);
         }
 
-        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniDataEvenSubOdd_4x4", 1, uniDataEvenSubOdd_4x4);
+        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvF16toF32Even_4x4", 1, uniConvF16toF32Even_4x4);
+        status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvF16toF32Odd_4x4", 1, uniConvF16toF32Odd_4x4);
         status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtractABAB_2x8", 1, uniExtractABAB_2x8);
         status  |= vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleLogE", 1, &scaleLogE);
         vxmONERROR_STATUS(status);
