@@ -1516,7 +1516,67 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
 
         if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
         {
-            if ((kernelSize_x == 3 || kernelSize_x == 5 || kernelSize_x == 7)
+            if (kernelSize_x == 3 && kernelSize_y == 3 && (stride_x == 2 || stride_x == 1)
+             && padding_x == 0 && dilation_x == 1 && dilation_y == 1
+             && useImage2DFlag )
+            {
+                if (useImage2DFlag)
+                {
+                    vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                }
+                output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
+                input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
+                inputZp = 0;
+                input_zp = vxCreateScalar(context, VX_TYPE_UINT32, &inputZp);
+                parameters[6] = (vx_reference)input_zp;
+                parameters[7] = (vx_reference)input_width;
+                parameters[8] = (vx_reference)output_width;
+                parameters[9] = (vx_reference)dst;
+
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_3x3_dil1_Pad0", borderMode);
+                if (!shaderExecutable)
+                {
+                    goto OnError;
+                }
+                status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 9, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
+                if (status != VX_SUCCESS)
+                {
+                    goto OnError;
+                }
+            }
+            else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1
+                   && padding_x == 1 && dilation_x == 1 && dilation_y == 1
+                   && useImage2DFlag )
+            {
+                if (useImage2DFlag)
+                {
+                    vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                }
+                output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
+                input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
+                inputZp = 0;
+                input_zp = vxCreateScalar(context, VX_TYPE_UINT32, &inputZp);
+                parameters[6] = (vx_reference)input_zp;
+                parameters[7] = (vx_reference)input_width;
+                parameters[8] = (vx_reference)output_width;
+                parameters[9] = (vx_reference)dst;
+
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_3x3_s1_dil1_Pad1", borderMode);
+                if (!shaderExecutable)
+                {
+                    goto OnError;
+                }
+                status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 9, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
+                if (status != VX_SUCCESS)
+                {
+                    goto OnError;
+                }
+            }
+            else if ((kernelSize_x == 3 || kernelSize_x == 5 || kernelSize_x == 7)
               && kernelSize_y == 1 && stride_x == 1
               && dilation_x == 1 && dilation_y == 1 && useImage2DFlag)
             {
@@ -1633,7 +1693,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
         }
         else if (inputFormat == VX_TYPE_UINT8)
         {
-            if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2
+            if (kernelSize_x == 3 && kernelSize_y == 3 && (stride_x == 2 || stride_x == 1)
              && padding_x == 0 && dilation_x == 1 && dilation_y == 1
              && useImage2DFlag )
             {
@@ -1642,7 +1702,7 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                     vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
                     dst = vxoTensor_ReshapeTensor(output, sizes, dims);
                 }
-                if (width % 16 == 0)
+                if (width % 16 == 0 && stride_x == 2)
                 {
                     src = vxoTensor_ReformatTensor(input, VX_TYPE_UINT32);
                     parameters[0] = (vx_reference)src;
@@ -1663,8 +1723,36 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
                 }
                 else
                 {
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_3x3_s2_dil1_Pad0", borderMode);
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_3x3_dil1_Pad0", borderMode);
                 }
+                if (!shaderExecutable)
+                {
+                    goto OnError;
+                }
+                status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 9, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
+                if (status != VX_SUCCESS)
+                {
+                    goto OnError;
+                }
+            }
+            else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1
+                   && padding_x == 1 && dilation_x == 1 && dilation_y == 1
+                   && useImage2DFlag )
+            {
+                if (useImage2DFlag)
+                {
+                    vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                }
+                output_width  = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
+                input_width   = vxCreateScalar(context, VX_TYPE_INT32, &width);
+                input_zp      = vxCreateScalar(context, VX_TYPE_UINT32, &inputZp);
+                parameters[6] = (vx_reference)input_zp;
+                parameters[7] = (vx_reference)input_width;
+                parameters[8] = (vx_reference)output_width;
+                parameters[9] = (vx_reference)dst;
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_3x3_s1_dil1_Pad1", borderMode);
                 if (!shaderExecutable)
                 {
                     goto OnError;
@@ -1795,7 +1883,69 @@ vxnne_shader_executable vxnneGPUTensor2RowShaderExecutable(
         }
         else if (inputFormat == VX_TYPE_INT16)
         {
-            if ((kernelSize_x == 3 || kernelSize_x == 5 || kernelSize_x == 7)
+            if (kernelSize_x == 3 && kernelSize_y == 3 && (stride_x == 2 || stride_x == 1)
+             && padding_x == 0 && dilation_x == 1 && dilation_y == 1
+             && useImage2DFlag )
+            {
+                if (useImage2DFlag)
+                {
+                    vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                }
+                output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
+                input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
+                inputZp = 0;
+                input_zp = vxCreateScalar(context, VX_TYPE_UINT32, &inputZp);
+                parameters[6] = (vx_reference)input_zp;
+                parameters[7] = (vx_reference)input_width;
+                parameters[8] = (vx_reference)output_width;
+                parameters[9] = (vx_reference)dst;
+
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant16_3x3_dil1_Pad0", borderMode);
+                if (!shaderExecutable)
+                {
+                    goto OnError;
+                }
+
+                status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 9, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
+                if (status != VX_SUCCESS)
+                {
+                    goto OnError;
+                }
+            }
+            else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1
+                   && padding_x == 1 && dilation_x == 1 && dilation_y == 1
+                   && useImage2DFlag )
+            {
+                if (useImage2DFlag)
+                {
+                    vx_int32 sizes[4] = {out_width, outputWidth * outputHeight, 1, batch};
+                    dst = vxoTensor_ReshapeTensor(output, sizes, dims);
+                }
+                output_width = vxCreateScalar(context, VX_TYPE_INT32, &outputWidth);
+                input_width = vxCreateScalar(context, VX_TYPE_INT32, &width);
+                inputZp = 0;
+                input_zp = vxCreateScalar(context, VX_TYPE_UINT32, &inputZp);
+                parameters[6] = (vx_reference)input_zp;
+                parameters[7] = (vx_reference)input_width;
+                parameters[8] = (vx_reference)output_width;
+                parameters[9] = (vx_reference)dst;
+
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant16_3x3_s1_dil1_Pad1", borderMode);
+                if (!shaderExecutable)
+                {
+                    goto OnError;
+                }
+
+                status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 9, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
+                if (status != VX_SUCCESS)
+                {
+                    goto OnError;
+                }
+            }
+            else if ((kernelSize_x == 3 || kernelSize_x == 5 || kernelSize_x == 7)
                && kernelSize_y == 1 && stride_x == 1
                && dilation_x == 1 && dilation_y == 1 && useImage2DFlag)
             {

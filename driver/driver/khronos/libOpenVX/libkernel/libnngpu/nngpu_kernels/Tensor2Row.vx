@@ -159,34 +159,6 @@ __kernel void gpuTensor2Row_Q32_3x3_s2_dil1_Pad0_x8
 
 }
 
-__kernel void gpuTensor2Row_Quant8_3x3_s2_dil1_Pad0
-    (
-    image2d_array_t input, int strideX, int strideY, int padX, int padY, int kernelX, unsigned int inputZp,
-    int inputWidth, int outputWidth, image2d_t output
-    )
-{
-    int x = get_global_id(0);
-    int y = get_global_id(1);
-    int z = get_global_id(2);
-    int xx = 0, yy = 0;
-    int out_x = 9 * z;
-    uint4 pixel0, pixel1, pixel2;
-    int4 coord_in0 = (int4)(x * strideX, y * strideY - padY, z, 0);
-    int  x_left = coord_in0.x + 3 - inputWidth;
-    int4 coord = (int4)(out_x, y * outputWidth + x, out_x + 3, out_x + 6);
-    pixel0 = read_imageui(input, coord_in0);
-    coord_in0.y++;
-    pixel1 = read_imageui(input, coord_in0);
-    coord_in0.y++;
-    pixel2 = read_imageui(input, coord_in0);
-    pixel0.z = x_left > 0 ? inputZp : pixel0.z;
-    pixel1.z = x_left > 0 ? inputZp : pixel1.z;
-    pixel2.z = x_left > 0 ? inputZp : pixel2.z;
-    write_imageui(output, coord.xy, pixel0);
-    write_imageui(output, coord.zy, pixel1);
-    write_imageui(output, coord.wy, pixel2);
-}
-
 __kernel void gpuTensor2Row_Quant16
     (
     image2d_array_t input, int strideX, int strideY, int padX, int padY, int kernelX, int kernelY,
@@ -671,3 +643,80 @@ __kernel void gpuTensor2Row_##type_name##_1x7_s1_dil1_2D \
 GPUTENSOR2ROW_1x7_S1_DIL1_2D(Quant8, uint4, read_imageui, write_imageui, inputZp)
 GPUTENSOR2ROW_1x7_S1_DIL1_2D(Quant16, int4, read_imagei, write_imagei, 0)
 GPUTENSOR2ROW_1x7_S1_DIL1_2D(FP32, float4, read_imagef, write_imagef, 0.0f)
+
+#define GPUTENSOR2ROW_3x3_DIL1_PAD0_2D(type_name, src_type, read_fun, write_fun, ZpValue) \
+__kernel void gpuTensor2Row_##type_name##_3x3_dil1_Pad0 \
+    ( \
+    image2d_array_t input, int strideX, int strideY, int padX, int padY, int kernelX, unsigned int inputZp, \
+    int inputWidth, int outputWidth, image2d_t output \
+    ) \
+{ \
+    int x = get_global_id(0); \
+    int y = get_global_id(1); \
+    int z = get_global_id(2); \
+    int xx = 0, yy = 0; \
+    int out_x = 9 * z; \
+    src_type pixel0, pixel1, pixel2; \
+    int4 coord_in = (int4)(x * strideX, y * strideY - padY, z, 0); \
+    int  x_left = coord_in.x + 3 - inputWidth; \
+    int4 coord = (int4)(out_x, y * outputWidth + x, out_x + 3, out_x + 6); \
+    pixel0 = read_fun(input, coord_in); \
+    coord_in.y++; \
+    pixel1 = read_fun(input, coord_in); \
+    coord_in.y++; \
+    pixel2 = read_fun(input, coord_in); \
+    pixel0.z = x_left > 0 ? ZpValue : pixel0.z; \
+    pixel1.z = x_left > 0 ? ZpValue : pixel1.z; \
+    pixel2.z = x_left > 0 ? ZpValue : pixel2.z; \
+    write_fun(output, coord.xy, pixel0); \
+    write_fun(output, coord.zy, pixel1); \
+    write_fun(output, coord.wy, pixel2); \
+}
+
+GPUTENSOR2ROW_3x3_DIL1_PAD0_2D(Quant8, uint4, read_imageui, write_imageui, inputZp)
+GPUTENSOR2ROW_3x3_DIL1_PAD0_2D(Quant16, int4, read_imagei, write_imagei, 0)
+GPUTENSOR2ROW_3x3_DIL1_PAD0_2D(FP32, float4, read_imagef, write_imagef, 0.0f)
+
+#define GPUTENSOR2ROW_3x3_S1_DIL1_PAD1_2D(type_name, src_type, read_fun, write_fun, ZpValue) \
+__kernel void gpuTensor2Row_##type_name##_3x3_s1_dil1_Pad1 \
+    ( \
+    image2d_array_t input, int strideX, int strideY, int padX, int padY, int kernelX, unsigned int inputZp, \
+    int inputWidth, int outputWidth, image2d_t output \
+    ) \
+{ \
+    int x = get_global_id(0); \
+    int y = get_global_id(1); \
+    int z = get_global_id(2); \
+    int xx = 0, yy = 0; \
+    int out_x = 9 * z; \
+    src_type pixel0, pixel1, pixel2; \
+    int  x_in = x * strideX - padX; \
+    int4 coord_in = (int4)(x_in, y * strideY - padY, z, 0); \
+    int  x_left = coord_in.x + 3 - inputWidth; \
+    int4 coord = (int4)(out_x, y * outputWidth + x, out_x + 3, out_x + 6); \
+    coord_in.x = x_in < 0 ? 0 : x_in; \
+    pixel0 = read_fun(input, coord_in); \
+    coord_in.y++; \
+    pixel1 = read_fun(input, coord_in); \
+    coord_in.y++; \
+    pixel2 = read_fun(input, coord_in); \
+    if (x_in < 0) \
+    { \
+        pixel0.yzw = pixel0.xyz; \
+        pixel1.yzw = pixel1.xyz; \
+        pixel2.yzw = pixel2.xyz; \
+        pixel0.x   = ZpValue; \
+        pixel1.x   = ZpValue; \
+        pixel2.x   = ZpValue; \
+    } \
+    pixel0.z = x_left > 0 ? ZpValue : pixel0.z; \
+    pixel1.z = x_left > 0 ? ZpValue : pixel1.z; \
+    pixel2.z = x_left > 0 ? ZpValue : pixel2.z; \
+    write_fun(output, coord.xy, pixel0); \
+    write_fun(output, coord.zy, pixel1); \
+    write_fun(output, coord.wy, pixel2); \
+}
+
+GPUTENSOR2ROW_3x3_S1_DIL1_PAD1_2D(Quant8, uint4, read_imageui, write_imageui, inputZp)
+GPUTENSOR2ROW_3x3_S1_DIL1_PAD1_2D(Quant16, int4, read_imagei, write_imagei, 0)
+GPUTENSOR2ROW_3x3_S1_DIL1_PAD1_2D(FP32, float4, read_imagef, write_imagef, 0.0f)
