@@ -3872,6 +3872,15 @@ vxnne_shader_executable vxnneGetGPUTensorScaleShaderExecutable(
     vx_tensor               output
     );
 
+vxnne_shader_executable vxnneGetGPUResizeNearestNeighborShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_enum                 type,
+    vx_tensor               output
+    );
+
 vxnne_shader_executable vxnneGetGPUTensorMaxValueShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -4024,6 +4033,14 @@ vxnne_shader_executable vxnneGetGPUTensorStridedSliceShaderExecutable(
     vx_int32                stop[4],
     vx_int32                stride[4],
     vx_tensor               input,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPUPReluShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               alpha,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneGetGPUReverseShaderExecutable(

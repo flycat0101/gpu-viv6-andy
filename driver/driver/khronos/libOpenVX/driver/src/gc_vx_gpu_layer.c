@@ -5549,6 +5549,168 @@ OnError:
     return VX_NULL;
 }
 
+vxnne_shader_executable vxnneGetGPUResizeNearestNeighborShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_enum                 type,
+    vx_tensor               output
+    )
+{
+#if !gcdUSE_VXC_BINARY
+    vx_size    programLength = 0;
+    char        *programSources = NULL;
+#endif
+    vx_program program = VX_NULL;
+    vx_status  status = VX_FAILURE;
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vxnne_kernel_shaders        kernel;
+    vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    vx_enum      inputFormat        = TENSOR_DATA_TYPE(input);
+    vx_enum      outputFormat       = TENSOR_DATA_TYPE(output);
+    vx_uint32    in_width           = TENSOR_VIEW_SIZE_INDEX(input, 0);
+    vx_uint32    in_height          = TENSOR_VIEW_SIZE_INDEX(input, 1);
+    vx_uint32    depth              = TENSOR_VIEW_SIZE_INDEX(input, 2);
+    vx_int32     input_ZP           = TENSOR_TF_ZEROPOINT(input);
+    vx_uint32    out_width          = TENSOR_VIEW_SIZE_INDEX(output, 0);
+    vx_uint32    out_height         = TENSOR_VIEW_SIZE_INDEX(output, 1);
+    vx_int32     output_ZP          = TENSOR_TF_ZEROPOINT(output);
+    vx_float32   scaleInValue       = TENSOR_TF_SCALE(input);
+    vx_float32   scaleOutValue      = 1.0f/TENSOR_TF_SCALE(output);
+    vx_float32   scaleXValue        = (vx_float32)in_width / (vx_float32)out_width;
+    vx_float32   scaleYValue        = (vx_float32)in_height / (vx_float32)out_height;
+    vx_scalar    scaleX_s = VX_NULL, scaleY_s = VX_NULL;
+    vx_scalar inZP = NULL;
+    vx_scalar outZP = NULL;
+    vx_scalar scaleIn = NULL;
+    vx_scalar scaleOut = NULL;
+
+    gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
+
+    scaleX_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleXValue);
+    scaleY_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleYValue);
+    if(scaleX_s == VX_NULL || scaleY_s == VX_NULL)
+    {
+        vxError("Create scalar failed at function %s line %d", __FUNCTION__, __LINE__);
+        goto OnError;
+    }
+
+    borderMode->mode = VX_BORDER_REPLICATE;
+
+    kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
+
+    if (!kernel)
+    {
+        /* register an shader kernel */
+#if gcdUSE_VXC_BINARY
+        vx_uint32 len;
+        void * ptr = getGPUKernelInfo(context, ResizeNearestNeighbor, &len);
+        program = vxCreateProgramWithBinary(context, ptr, len);
+#else
+        char path[_vxcFILENAME_MAX];
+
+        vxmONERROR(getFilePath("nngpu_kernels/ResizeNearestNeighbor.vx", path));
+
+        vxmONERROR_NULLPTR(programSources = loadSources(path, &programLength));
+
+        vxmONERROR_NULLPTR(program = vxCreateProgramWithSource(context, 1, (const vx_char**)&programSources, &programLength));
+
+        if (programSources)
+        {
+            vxFree(programSources);
+            programSources = NULL;
+        }
+#endif /*gcdUSE_VXC_BINARY*/
+        status = vxGetStatus((vx_reference)program);
+        if (status != VX_SUCCESS) goto OnError;
+
+        status = vxBuildProgram(program, VX_NULL);
+        if (status != VX_SUCCESS) goto OnError;
+
+        kernel = vxnneAddKernelShadersInProgram(context, "gpuResizeNearNb", program, 0, kernelEnum);
+        if (!kernel) goto OnError;
+
+        vxReleaseProgram(&program);
+    }
+
+    if ((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
+        (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32))
+    {
+        vx_reference parameters[4] = {(vx_reference)input, (vx_reference)scaleX_s, (vx_reference)scaleY_s, (vx_reference)output};
+
+        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
+        if (!shaderExecutable) goto OnError;
+
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+    {
+        vx_reference parameters[8] = {(vx_reference)input, (vx_reference)scaleX_s, (vx_reference)scaleY_s, (vx_reference)NULL, (vx_reference)NULL,
+                                        (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output};
+
+        inZP = vxCreateScalar(context, VX_TYPE_INT32, &input_ZP);
+        outZP = vxCreateScalar(context, VX_TYPE_INT32, &output_ZP);
+        scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleInValue);
+        scaleOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleOutValue);
+        parameters[3] = (vx_reference)scaleIn;
+        parameters[4] = (vx_reference)scaleOut;
+        parameters[5] = (vx_reference)inZP;
+        parameters[6] = (vx_reference)outZP;
+
+        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+        if (!shaderExecutable)
+        {
+            goto OnError;
+        }
+
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
+    }
+
+    execution_parameters.globalWorkSize[0]   = out_width;
+    execution_parameters.globalWorkSize[1]   = out_height;
+    execution_parameters.globalWorkSize[2]   = depth;
+
+    status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
+    if (status != VX_SUCCESS) goto OnError;
+
+    if(scaleX_s) vxReleaseScalar(&scaleX_s);
+    if(scaleY_s) vxReleaseScalar(&scaleY_s);
+    if(scaleIn) vxReleaseScalar(&scaleIn);
+    if(scaleOut) vxReleaseScalar(&scaleOut);
+    if(inZP) vxReleaseScalar(&inZP);
+    if(outZP) vxReleaseScalar(&outZP);
+
+    gcmFOOTER_ARG("%p", shaderExecutable);
+    return shaderExecutable;
+
+OnError:
+    if(scaleIn) vxReleaseScalar(&scaleIn);
+    if(scaleOut) vxReleaseScalar(&scaleOut);
+    if(inZP) vxReleaseScalar(&inZP);
+    if(outZP) vxReleaseScalar(&outZP);
+    if (program) vxReleaseProgram(&program);
+    if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
+    if(scaleX_s) vxReleaseScalar(&scaleX_s);
+    if(scaleY_s) vxReleaseScalar(&scaleY_s);
+#if !gcdUSE_VXC_BINARY
+    if (programSources)
+    {
+        vxFree(programSources);
+        programSources = NULL;
+    }
+#endif
+    gcmFOOTER_NO();
+    return VX_NULL;
+}
+
 vxnne_shader_executable vxnneGetGPUTensorMaxValueShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -8598,6 +8760,7 @@ OnError:
     gcmFOOTER_NO();
     return VX_NULL;
 }
+
 /********gpuConv2D**********************************************/
 vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
     vx_context              context,
@@ -9099,6 +9262,232 @@ OnError:
     return VX_NULL;
 }
 
+/********gpuPrelu****************************************/
+vxnne_shader_executable vxnneGetGPUPReluShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_tensor               alpha,
+    vx_tensor               output)
+{
+#if !gcdUSE_VXC_BINARY
+    vx_size    programLength = 0;
+    char *programSources = NULL;
+#endif
+    vx_program program = VX_NULL;
+    vx_status  status = VX_FAILURE;
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vxnne_kernel_shaders        kernel;
+
+    vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    vx_enum       inputFormat                = TENSOR_DATA_TYPE(input);
+    vx_enum       outputFormat               = TENSOR_DATA_TYPE(output);
+    vx_uint32     dims                       = TENSOR_DIM_NUM(input);
+    vx_uint32     aDims                      = TENSOR_DIM_NUM(alpha);
+    vx_uint32     oDims                      = TENSOR_DIM_NUM(output);
+    vx_uint32     channel                    = dims < 3 ? 1 : TENSOR_VIEW_SIZE_INDEX(input, 2);
+    vx_uint32     height                     = dims < 2 ? 1 : TENSOR_VIEW_SIZE_INDEX(input, 1);
+    vx_uint32     width                      = TENSOR_VIEW_SIZE_INDEX(input, 0);
+    vx_uint32     aWidth                     = TENSOR_VIEW_SIZE_INDEX(alpha, 0);
+    vx_uint32     aheight                    = aDims < 2 ? 1 : TENSOR_VIEW_SIZE_INDEX(alpha, 1);
+    vx_uint32     achannel                   = aDims < 3 ? 1 : TENSOR_VIEW_SIZE_INDEX(alpha, 2);
+    vx_uint32     aSize                      = aWidth * aheight * achannel;
+    vx_float32    in_scale                   = TENSOR_TF_SCALE(input);
+    vx_float32    out_scale                  = 1.0f/TENSOR_TF_SCALE(output);
+    vx_int32      zpInValue                  = TENSOR_TF_ZEROPOINT(input);
+    vx_int32      zpOutValue                 = TENSOR_TF_ZEROPOINT(output);
+    vx_tensor     input_rs                   = NULL;
+    vx_tensor     alpha_rs                   = NULL;
+    vx_tensor     output_rs                  = NULL;
+    vx_int32      rs_sizes[4]                = {1, 1, 1, 1};
+    vx_scalar     scaleIn                    = NULL;
+    vx_scalar     scaleOut                   = NULL;
+    vx_scalar     zpIn                       = NULL;
+    vx_scalar     zpOut                      = NULL;
+
+    gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
+         context, kernelEnum, borderMode, input, output);
+    borderMode->mode = VX_BORDER_REPLICATE;
+
+    if (dims == 1)
+    {
+        rs_sizes[0]   = width;
+        input_rs      = vxoTensor_ReshapeTensor(input, rs_sizes, 2);
+    }
+
+    if (oDims == 1)
+    {
+        rs_sizes[0]   = width;
+        output_rs     = vxoTensor_ReshapeTensor(output, rs_sizes, 2);
+    }
+
+    if(aSize != aWidth)
+    {
+        rs_sizes[0] = aSize;
+        alpha_rs     = vxoTensor_ReshapeTensor(alpha, rs_sizes, 2);
+    }
+
+    kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
+
+    if (!kernel)
+    {
+        /* register an shader kernel */
+#if gcdUSE_VXC_BINARY
+        vx_uint32 len;
+        void * ptr = getGPUKernelInfo(context, Prelu, &len);
+        program = vxCreateProgramWithBinary(context, ptr, len);
+#else
+        char path[_vxcFILENAME_MAX];
+
+        vxmONERROR(getFilePath("nngpu_kernels/Prelu.vx", path));
+
+        vxmONERROR_NULLPTR(programSources = loadSources(path, &programLength));
+
+        vxmONERROR_NULLPTR(program = vxCreateProgramWithSource(context, 1, (const vx_char**)&programSources, &programLength));
+
+        if (programSources)
+        {
+            vxFree(programSources);
+            programSources = NULL;
+        }
+#endif /*gcdUSE_VXC_BINARY*/
+        status = vxGetStatus((vx_reference)program);
+        if (status != VX_SUCCESS) goto OnError;
+
+        status = vxBuildProgram(program, VX_NULL);
+        if (status != VX_SUCCESS) goto OnError;
+
+        kernel = vxnneAddKernelShadersInProgram(context, "gpuPrelu", program, 0, kernelEnum);
+        if (!kernel) goto OnError;
+
+        vxReleaseProgram(&program);
+    }
+
+    execution_parameters.globalWorkScale[0]  = 1;
+    execution_parameters.globalWorkScale[1]  = 1;
+    execution_parameters.globalWorkScale[2]  = 1;
+
+    if ((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+        || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32))
+    {
+        vx_reference parameters[3] = {(vx_reference)input, (vx_reference)alpha, (vx_reference)output};
+        if(input_rs)
+            parameters[0] = (vx_reference)input_rs;
+        if(alpha_rs)
+            parameters[1] = (vx_reference)alpha_rs;
+        if(output_rs)
+            parameters[2] = (vx_reference)output_rs;
+
+        if(width % 4 == 0)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_VecFP32", borderMode);
+            if (!shaderExecutable) goto OnError;
+
+            status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (status != VX_SUCCESS) goto OnError;
+
+            execution_parameters.globalWorkScale[0]  = 4;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
+            if (!shaderExecutable)
+            {
+                goto OnError;
+            }
+        }
+
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+    {
+        vx_reference parameters[7] = {(vx_reference)input, (vx_reference)alpha,
+                        (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output};
+        if(input_rs)
+            parameters[0] = (vx_reference)input_rs;
+        if(alpha_rs)
+            parameters[1] = (vx_reference)alpha_rs;
+        if(output_rs)
+            parameters[6] = (vx_reference)output_rs;
+        scaleIn    = vxCreateScalar(context, VX_TYPE_FLOAT32, &in_scale);
+        scaleOut   = vxCreateScalar(context, VX_TYPE_FLOAT32, &out_scale);
+        zpIn       = vxCreateScalar(context, VX_TYPE_INT32, &zpInValue);
+        zpOut      = vxCreateScalar(context, VX_TYPE_INT32, &zpOutValue);
+        parameters[2] = (vx_reference)scaleIn;
+        parameters[3] = (vx_reference)scaleOut;
+        parameters[4] = (vx_reference)zpIn;
+        parameters[5] = (vx_reference)zpOut;
+
+        if(width % 4 == 0)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_VecQuant8", borderMode);
+            if (!shaderExecutable) goto OnError;
+
+            status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 6, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (status != VX_SUCCESS) goto OnError;
+
+            execution_parameters.globalWorkScale[0]  = 4;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+            if (!shaderExecutable)
+            {
+                goto OnError;
+            }
+        }
+
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 7);
+        if (status != VX_SUCCESS) goto OnError;
+    }
+
+    execution_parameters.globalWorkSize[0]   = (width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
+    execution_parameters.globalWorkSize[1]   = height;
+    execution_parameters.globalWorkSize[2]   = channel;
+
+    status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
+    if (status != VX_SUCCESS) goto OnError;
+
+    if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
+    if (alpha_rs) vxoTensor_ReleaseTensor(&alpha_rs);
+    if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
+
+    if(scaleIn) vxReleaseScalar(&scaleIn);
+    if(scaleOut) vxReleaseScalar(&scaleOut);
+    if(zpIn) vxReleaseScalar(&zpIn);
+    if(zpOut) vxReleaseScalar(&zpOut);
+
+    gcmFOOTER_ARG("%p", shaderExecutable);
+    return shaderExecutable;
+
+OnError:
+    if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
+    if (alpha_rs) vxoTensor_ReleaseTensor(&alpha_rs);
+    if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
+
+    if(scaleIn) vxReleaseScalar(&scaleIn);
+    if(scaleOut) vxReleaseScalar(&scaleOut);
+    if(zpIn) vxReleaseScalar(&zpIn);
+    if(zpOut) vxReleaseScalar(&zpOut);
+
+    if (program)  vxReleaseProgram(&program);
+    if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
+
+#if !gcdUSE_VXC_BINARY
+    if (programSources)
+    {
+        vxFree(programSources);
+        programSources = NULL;
+    }
+#endif
+
+    gcmFOOTER_NO();
+    return VX_NULL;
+}
 
 vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
     vx_context              context,
