@@ -1791,6 +1791,7 @@ _AllocateInterfaceBlock(
             {
                 VIR_Uniform_SetFlag(symUniform, VIR_UNIFORMFLAG_PUSH_CONSTANT_BASE_ADDR);
                 VIR_Symbol_SetLayoutOffset(symbol, VIR_Symbol_GetLayoutOffset(IBSymbol));
+                VIR_Symbol_ClrFlag(symbol, VIR_SYMFLAG_COMPILER_GEN); /*push const uniform has different path in uniform allocation */
             }
 
             symUniform->u.parentSSBOOrUBO = uniformBlock->sym;
