@@ -5123,6 +5123,8 @@ static VSC_ErrCode _VIR_HL_FindAllUniformsWithinResourceLayout(
             pUniformSym = VIR_Shader_GetSymFromId(pShader, VIR_Uniform_GetSymID(pUniformArray[j]));
 
             VIR_Symbol_SetFlagExt(pUniformSym, VIR_SYMUNIFORMFLAGEXT_WITHIN_IN_RES_LAYOUT);
+
+            VIR_Uniform_CheckImageFormatMismatch(pShader, pUniformArray[j]);
         }
 
     }

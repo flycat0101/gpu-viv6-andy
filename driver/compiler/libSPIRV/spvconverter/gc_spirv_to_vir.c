@@ -2854,7 +2854,7 @@ static VIR_SymId __SpvAddIdSymbol(
             }
         }
 
-        VIR_Symbol_SetSpecificImageCompType(sym, SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_IMAGE_SAMPLED_TYPE(imageTypeId)));
+        VIR_Symbol_SetImageSampledType(sym, SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_IMAGE_SAMPLED_TYPE(imageTypeId)));
 
         /* The image format is saved in the base type id. */
         if (!treatSubPassAsSampler)

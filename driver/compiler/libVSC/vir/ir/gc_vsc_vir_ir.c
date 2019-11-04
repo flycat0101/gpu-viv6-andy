@@ -1194,6 +1194,40 @@ VIR_Uniform_UpdateResOpBits(
     return errCode;
 }
 
+VSC_ErrCode
+VIR_Uniform_CheckImageFormatMismatch(
+    IN VIR_Shader* Shader,
+    IN VIR_Uniform* Uniform
+    )
+{
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
+    VIR_Symbol*     pUniformSym = VIR_Shader_GetSymFromId(Shader, VIR_Uniform_GetSymID(Uniform));
+    VIR_ImageFormat imageFormat = VIR_Symbol_GetImageFormat(pUniformSym);
+    VIR_TypeId      imageSampledTypeId = VIR_Symbol_GetImageSampledType(pUniformSym);
+    VIR_TypeId      imageComponentTypeId = VIR_TYPE_UNKNOWN;
+
+    if (imageFormat == VIR_IMAGE_FORMAT_NONE)
+    {
+        return errCode;
+    }
+
+    if (imageSampledTypeId == VIR_TYPE_UNKNOWN)
+    {
+        return errCode;
+    }
+
+    imageComponentTypeId = VIR_ImageFormat_GetComponentTypeId(imageFormat);
+
+    if ((VIR_TypeId_isFloat(imageSampledTypeId) && !VIR_TypeId_isFloat(imageComponentTypeId))
+        ||
+        (VIR_TypeId_isInteger(imageSampledTypeId) && !VIR_TypeId_isInteger(imageComponentTypeId)))
+    {
+        VIR_Symbol_SetFlagExt(pUniformSym, VIR_SYMUNIFORMFLAGEXT_IMAGE_FORMAT_MISMATCH);
+    }
+
+    return errCode;
+}
+
 gctBOOL
 VIR_ConditionOp_Reversable(
     IN VIR_ConditionOp cond_op
@@ -19246,5 +19280,117 @@ VIR_Resouce_FindResUniform(
     }
 
     return uniformCount;
+}
+
+VIR_TypeId
+VIR_ImageFormat_GetComponentTypeId(
+    IN VIR_ImageFormat              imageFormat
+    )
+{
+    VIR_TypeId                      componentTypeId = VIR_TYPE_FLOAT32;
+
+    switch (imageFormat)
+    {
+    case VIR_IMAGE_FORMAT_NONE:
+        break;
+
+    case VIR_IMAGE_FORMAT_RGBA32F:
+    case VIR_IMAGE_FORMAT_RG32F:
+    case VIR_IMAGE_FORMAT_R32F:
+        componentTypeId = VIR_TYPE_FLOAT32;
+        break;
+
+    case VIR_IMAGE_FORMAT_RGBA32I:
+    case VIR_IMAGE_FORMAT_RG32I:
+    case VIR_IMAGE_FORMAT_R32I:
+        componentTypeId = VIR_TYPE_INT32;
+        break;
+
+    case VIR_IMAGE_FORMAT_RGBA32UI:
+    case VIR_IMAGE_FORMAT_RG32UI:
+    case VIR_IMAGE_FORMAT_R32UI:
+        componentTypeId = VIR_TYPE_UINT32;
+        break;
+
+    case VIR_IMAGE_FORMAT_RGBA16F:
+    case VIR_IMAGE_FORMAT_RG16F:
+    case VIR_IMAGE_FORMAT_R16F:
+        componentTypeId = VIR_TYPE_FLOAT16;
+        break;
+
+    case VIR_IMAGE_FORMAT_RGBA16I:
+    case VIR_IMAGE_FORMAT_RG16I:
+    case VIR_IMAGE_FORMAT_R16I:
+        componentTypeId = VIR_TYPE_INT16;
+        break;
+
+    case VIR_IMAGE_FORMAT_RGBA16UI:
+    case VIR_IMAGE_FORMAT_RG16UI:
+    case VIR_IMAGE_FORMAT_R16UI:
+        componentTypeId = VIR_TYPE_UINT16;
+        break;
+
+    case VIR_IMAGE_FORMAT_RGBA16:
+    case VIR_IMAGE_FORMAT_RGBA16_SNORM:
+    case VIR_IMAGE_FORMAT_RG16:
+    case VIR_IMAGE_FORMAT_RG16_SNORM:
+    case VIR_IMAGE_FORMAT_R16:
+    case VIR_IMAGE_FORMAT_R16_SNORM:
+    case VIR_IMAGE_FORMAT_BGRA8_UNORM:
+    case VIR_IMAGE_FORMAT_RGBA8:
+    case VIR_IMAGE_FORMAT_RGBA8_SNORM:
+    case VIR_IMAGE_FORMAT_RG8:
+    case VIR_IMAGE_FORMAT_RG8_SNORM:
+    case VIR_IMAGE_FORMAT_R8:
+    case VIR_IMAGE_FORMAT_R8_SNORM:
+        componentTypeId = VIR_TYPE_FLOAT16;
+        break;
+
+    case VIR_IMAGE_FORMAT_RGBA8I:
+    case VIR_IMAGE_FORMAT_RG8I:
+    case VIR_IMAGE_FORMAT_R8I:
+        componentTypeId = VIR_TYPE_INT8;
+        break;
+
+    case VIR_IMAGE_FORMAT_RGBA8UI:
+    case VIR_IMAGE_FORMAT_RG8UI:
+    case VIR_IMAGE_FORMAT_R8UI:
+        componentTypeId = VIR_TYPE_UINT8;
+        break;
+
+    case VIR_IMAGE_FORMAT_R5G6B5_UNORM_PACK16:
+        componentTypeId = VIR_TYPE_FLOAT32;
+        break;
+
+    case VIR_IMAGE_FORMAT_ABGR8_UNORM_PACK32:
+        componentTypeId = VIR_TYPE_FLOAT32;
+        break;
+
+    case VIR_IMAGE_FORMAT_ABGR8I_PACK32:
+        componentTypeId = VIR_TYPE_INT8;
+        break;
+
+    case VIR_IMAGE_FORMAT_ABGR8UI_PACK32:
+        componentTypeId = VIR_TYPE_UINT8;
+        break;
+
+    case VIR_IMAGE_FORMAT_A2R10G10B10_UNORM_PACK32:
+        componentTypeId = VIR_TYPE_FLOAT32;
+        break;
+
+    case VIR_IMAGE_FORMAT_A2B10G10R10_UNORM_PACK32:
+        componentTypeId = VIR_TYPE_FLOAT32;
+        break;
+
+    case VIR_IMAGE_FORMAT_A2B10G10R10UI_PACK32:
+        componentTypeId = VIR_TYPE_UINT32;
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+
+    return componentTypeId;
 }
 

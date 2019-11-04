@@ -1253,6 +1253,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_GetLayout(Sym)           (&(Sym)->layout)
 #define VIR_Symbol_GetLayoutQualifier(Sym)  ((Sym)->layout.layoutQualifier)
 #define VIR_Symbol_GetImageFormat(Sym)      (VIR_Layout_GetImageFormat(VIR_Symbol_GetLayout(Sym)))
+#define VIR_Symbol_GetImageSampledType(Sym) (VIR_Layout_GetImageSampledType(VIR_Symbol_GetLayout(Sym)))
 #define VIR_Symbol_GetLocation(Sym)         ((Sym)->layout.location)
 #define VIR_Symbol_GetMasterLocation(Sym)   ((Sym)->layout.masterLocation)
 #define VIR_Symbol_GetLlResSlot(Sym)        ((Sym)->layout.llResSlot)
@@ -1297,11 +1298,11 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
             VIR_Symbol_SetOneLayoutQualifier(Sym, VIR_LAYQUAL_IMAGE_FORMAT);\
         }                                                                   \
     } while(0)
-#define VIR_Symbol_SetSpecificImageCompType(Sym, Val)                       \
+#define VIR_Symbol_SetImageSampledType(Sym, Val)                            \
     do                                                                      \
     {                                                                       \
-        (Sym)->layout.specificImageComponentType = (Val);                   \
-        VIR_Symbol_SetOneLayoutQualifier(Sym, VIR_LAYQUAL_SPECIFIC_IMAGE_COMPONENT_TYPE); \
+        (Sym)->layout.imageSampledType = (Val);                             \
+        VIR_Symbol_SetOneLayoutQualifier(Sym, VIR_LAYQUAL_IMAGE_SAMPLED_TYPE); \
     } while(0)
 #define VIR_Symbol_SetLocation(Sym, Val)                                    \
     do                                                                      \
@@ -2832,7 +2833,7 @@ typedef enum _VIR_LAYOUTQUAL
     VIR_LAYQUAL_BLEND                                = 0x200,
     VIR_LAYQUAL_IMAGE_FORMAT                         = 0x400,
     VIR_LAYQUAL_COMPONENT                            = 0x800,
-    VIR_LAYQUAL_SPECIFIC_IMAGE_COMPONENT_TYPE        = 0x1000,
+    VIR_LAYQUAL_IMAGE_SAMPLED_TYPE                   = 0x1000,
 
     VIR_LAYQUAL_BLEND_MASK                           = 0xf00000,
     VIR_LAYQUAL_BLEND_SUPPORT_NONE                   = 0x0,
@@ -2857,7 +2858,7 @@ typedef struct _VIR_LAYOUT
 {
     VIR_LayoutQual layoutQualifier;     /* layout quliafiers */
     VIR_ImageFormat imageFormat;        /* Image format qualilfier. */
-    VIR_TypeId     specificImageComponentType;
+    VIR_TypeId     imageSampledType;
     gctINT         location;            /* location of in/out variable, uniform, interface block */
     gctINT         component;           /* Indicates which component within a Location input/output will be taken by the decorated entity. */
     gctINT         masterLocation;      /* If the sym is derived from other symbol (master), record the location of master */
@@ -2877,6 +2878,7 @@ typedef struct _VIR_LAYOUT
         (Layout)->location = NOT_ASSIGNED;                              \
         (Layout)->component = NOT_ASSIGNED;                             \
         (Layout)->imageFormat = VIR_IMAGE_FORMAT_NONE;                  \
+        (Layout)->imageSampledType = VIR_TYPE_UNKNOWN;                  \
         (Layout)->masterLocation = NOT_ASSIGNED;                        \
         (Layout)->binding = NOT_ASSIGNED;                               \
         (Layout)->inputAttachmentIndex = NOT_ASSIGNED;                  \
@@ -2911,8 +2913,8 @@ typedef struct _VIR_LAYOUT
 #define VIR_Layout_GetBlend(Layout)         ((Layout)->layoutQualifier & VIR_LAYQUAL_BLEND_MASK)
 #define VIR_Layout_HasImageFormat(Layout)        ((Layout)->layoutQualifier & VIR_LAYQUAL_IMAGE_FORMAT)
 #define VIR_Layout_GetImageFormat(Layout)        ((Layout)->imageFormat)
-#define VIR_Layout_HasSpecificImageCompType(Layout)        ((Layout)->layoutQualifier & VIR_LAYQUAL_SPECIFIC_IMAGE_COMPONENT_TYPE)
-#define VIR_Layout_GetSpecificImageCompType(Layout)        ((Layout)->specificImageComponentType)
+#define VIR_Layout_HasImageSampledType(Layout)   ((Layout)->layoutQualifier & VIR_LAYQUAL_IMAGE_SAMPLED_TYPE)
+#define VIR_Layout_GetImageSampledType(Layout)   ((Layout)->imageSampledType)
 #define VIR_Layout_GetLlFirstSlot(Layout)       ((Layout)->llFirstSlot)
 #define VIR_Layout_GetLlArraySlot(Layout)       ((Layout)->llArraySlot)
 #define VIR_Layout_GetHwFirstCompIndex(Layout)  ((Layout)->hwFirstCompIndex)
@@ -3047,10 +3049,11 @@ typedef enum VIR_SYMFLAGEXT
     VIR_SYMFLAGEXT_NOPERSPECTIVE                = 0x00000001, /* noperspective */
 
     /* TransformFeedback next buffer flag */
-    VIR_SYMFLAGEXT_ENDOFINTERLEAVEDBUF          = 0x00000010,
+    VIR_SYMFLAGEXT_ENDOFINTERLEAVEDBUF          = 0x00001000,
 
     /* Uniform flags. */
-    VIR_SYMUNIFORMFLAGEXT_WITHIN_IN_RES_LAYOUT  = 0x00001000, /* within the resource layout. */
+    VIR_SYMUNIFORMFLAGEXT_WITHIN_IN_RES_LAYOUT  = 0x00010000, /* within the resource layout. */
+    VIR_SYMUNIFORMFLAGEXT_IMAGE_FORMAT_MISMATCH = 0x00020000, /* The sampled type and the image format mismatch. */
 } VIR_SymFlagExt;
 
 #define isSymEnabled(sym)                       (((sym)->flags & VIR_SYMFLAG_ENABLED) != 0)
@@ -3093,6 +3096,7 @@ typedef enum VIR_SYMFLAGEXT
 #define isSymUniformTreatSamplerAsConst(u)      (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_TREAT_SAMPLER_AS_CONST) != 0)
 #define isSymUniformTreatImageAsSampler(u)      (VIR_Symbol_UseUniform(u) && ((u)->flags & VIR_SYMUNIFORMFLAG_TREAT_IMAGE_AS_SAMPLER) != 0)
 #define isSymUniformWithResLayout(u)            (VIR_Symbol_UseUniform(u) && ((u)->flagsExt & VIR_SYMUNIFORMFLAGEXT_WITHIN_IN_RES_LAYOUT) != 0)
+#define isSymUniformImageFormatMismatch(u)      (VIR_Symbol_UseUniform(u) && ((u)->flagsExt & VIR_SYMUNIFORMFLAGEXT_IMAGE_FORMAT_MISMATCH) != 0)
 
 #define isSymCentroid(sym)                      (((sym)->flags & VIR_SYMFLAG_ISCENTROID) != 0)
 #define isSymSample(sym)                        (((sym)->flags & VIR_SYMFLAG_ISSAMPLE) != 0)
@@ -6092,6 +6096,12 @@ VIR_Uniform_UpdateResOpBits(
     IN gctUINT index
     );
 
+VSC_ErrCode
+VIR_Uniform_CheckImageFormatMismatch(
+    IN VIR_Shader* Shader,
+    IN VIR_Uniform* Uniform
+    );
+
 /* UBO-related functions. */
 VSC_ErrCode
 VIR_UBO_Member_Identical(
@@ -8104,6 +8114,12 @@ VIR_Resouce_FindResUniform(
     IN VSC_SHADER_RESOURCE_BINDING* pResBinding,
     IN VIR_FIND_RES_MODE            findResMode,
     INOUT VIR_Uniform**             ppUniformArray
+    );
+
+/* Image format. */
+VIR_TypeId
+VIR_ImageFormat_GetComponentTypeId(
+    IN VIR_ImageFormat              imageFormat
     );
 
 END_EXTERN_C()
