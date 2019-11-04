@@ -1675,12 +1675,15 @@ Pragma
 gceSTATUS
 ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
 {
-    ppoTOKEN     ntoken  = gcvNULL;
-    ppoTOKEN     ntoken1 = gcvNULL;
-    gceSTATUS    status  = gcvSTATUS_OK;
+    ppoTOKEN     ntoken   = gcvNULL;
+    ppoTOKEN     extToken = gcvNULL;
+    ppoTOKEN     ntoken1  = gcvNULL;
+    gceSTATUS    status   = gcvSTATUS_OK;
     gctBOOL      prevValidStatus = PP->doWeInValidArea;
-    cleEXTENSION Extension = clvEXTENSION_NONE;
-    gctBOOL      Enable = gcvFALSE;
+    cleEXTENSION oclExtension = clvEXTENSION_NONE;
+    cleOPENCLSetting  setting = OPENCL_INVALID;
+    gctCHAR      settingStr[1024] = {0};
+    gctUINT      len = 0, offset = 0;
 
     /* Set current area as invalid so we can accept invalid tokens. */
     PP->doWeInValidArea = gcvFALSE;
@@ -1698,6 +1701,7 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
         if (ntoken != gcvNULL)
         {
             gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+            ntoken = gcvNULL;
         }
         return status;
     }
@@ -1706,140 +1710,241 @@ ppoPREPROCESSOR_Pragma(ppoPREPROCESSOR PP)
         gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
         ntoken = gcvNULL;
 
-        /* #pragma OPENCL FP_CONTRACT do nothing.
-
-           #pragma OPENCL EXTENSION XXX:
-             Supported: all, CL_VIV_asm, cl_viv_bitfield_extension, cl_viv_cmplx_extension
-             other extensions will be ignored silently.
-         */
         gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
+        /* #pragma OPENCL EXTENSION ...*/
         if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "EXTENSION")))
         {
+            gctBOOL isVX2 = gcGetHWCaps()->hwFeatureFlags.supportEVISVX2;
             gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
             ntoken = gcvNULL;
             gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
+
             if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "all")))
-            {
-                Extension = clvEXTENSION_ALL;
-            }
+                oclExtension = clvEXTENSION_ALL;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_fp64")))
+                oclExtension = clvEXTENSION_CL_KHR_FP64;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cles_khr_int64")))
+                oclExtension = clvEXTENSION_ES_KHR_INT64;
             else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_fp16")))
-            {
-                Extension = clvEXTENSION_CL_KHR_FP16;
-            }
+                oclExtension =  clvEXTENSION_CL_KHR_FP16;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_global_int32_extended_atomics")))
+                oclExtension = clvEXTENSION_CL_KHR_GLOBAL_INT32_EXTENDED_ATOMICS;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_global_int32_base_atomics")))
+                oclExtension = clvEXTENSION_CL_KHR_GLOBAL_INT32_BASE_ATOMICS;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_local_int32_extended_atomics")))
+                oclExtension = clvEXTENSION_CL_KHR_LOCAL_INT32_EXTENDED_ATOMICS;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_local_int32_base_atomics")))
+                oclExtension = clvEXTENSION_CL_KHR_LOCAL_INT32_BASE_ATOMICS;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_int64_base_atomics")))
+                oclExtension = clvEXTENSION_CL_KHR_INT64_BASE_ATOMICS;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_int64_extended_atomics")))
+                oclExtension = clvEXTENSION_CL_KHR_INT64_EXTENDED_ATOMICS;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_byte_addressable_store")))
+                oclExtension = clvEXTENSION_CL_KHR_BYTE_ADDRESSABLE_STORE;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_3d_image_writes")))
+                oclExtension = clvEXTENSION_CL_KHR_3D_IMAGE_WRITES;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_gl_sharing")))
+                oclExtension = clvEXTENSION_CL_KHR_GL_SHARING;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_gl_event")))
+                oclExtension = clvEXTENSION_CL_KHR_GL_EVENT;
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_khr_d3d10_sharing")))
+                oclExtension = clvEXTENSION_CL_KHR_D3D10_SHARING;
             else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "CL_VIV_asm")))
-            {
-                Extension = clvEXTENSION_VASM;
-            }
+                oclExtension = clvEXTENSION_VASM;
             else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_viv_bitfield_extension")))
-            {
-                Extension = clvEXTENSION_VIV_BITFIELD;
-            }
+                oclExtension = clvEXTENSION_VIV_BITFIELD;
             else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_viv_cmplx_extension")))
-            {
-                Extension = clvEXTENSION_VIV_CMPLX;
-            }
+                oclExtension = clvEXTENSION_VIV_CMPLX;
             else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "cl_viv_vx_extension")))
-            {
-                Extension = clvEXTENSION_VIV_VX;
-            }
+                oclExtension = clvEXTENSION_VIV_VX;
             else
             {
+                ppoPREPROCESSOR_Report(PP,
+                                       clvREPORT_WARN,
+                                       "Expected OPENCL EXTENSION name in pragma."
+                                      );
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
             }
 
             gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken1, !ppvICareWhiteSpace));
-
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken1->poolString, ":")))
+            if (!gcmIS_SUCCESS(gcoOS_StrCmp(ntoken1->poolString, ":")))
             {
-                gcmONERROR(ppoTOKEN_Destroy(PP, ntoken1));
-                ntoken1 = gcvNULL;
-                gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken1, !ppvICareWhiteSpace));
-                if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken1->poolString, "enable")))
-                {
-                    Enable = gcvTRUE;
-                }
+                ppoPREPROCESSOR_Report(PP,
+                        clvREPORT_WARN,
+                        "Expected ':' in OPENCL EXTENSION pragma.\n %s",
+                        ntoken->poolString
+                        );
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
             }
 
-            if (Extension == clvEXTENSION_ALL)
+            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken1));
+            ntoken1 = gcvNULL;
+            extToken = ntoken;
+            ntoken = gcvNULL;
+
+            setting = ppoPREPROCESSOR_SetExtBehaviorSwitch(PP,  extToken->poolString, gcvFALSE);
+            if(setting == OPENCL_INVALID)
             {
-                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
-                        PP->compiler,
-                        clvEXTENSION_CL_KHR_FP16,
-                        Enable));
-                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
-                        PP->compiler,
-                        clvEXTENSION_VASM,
-                        Enable));
-
-                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
-                        PP->compiler,
-                        clvEXTENSION_VIV_BITFIELD,
-                        Enable));
-
-                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
-                        PP->compiler,
-                        clvEXTENSION_VIV_CMPLX,
-                        Enable));
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
             }
-            else
+
+            len = gcmSIZEOF(setting) + 1;
+            gcmVERIFY_OK(gcoOS_PrintStrSafe((gctSTRING)settingStr, len, &offset, "%d", setting));
+
+            switch(oclExtension)
             {
-                gcmVERIFY_OK(cloCOMPILER_EnableExtension(
-                        PP->compiler,
-                        Extension,
-                        Enable));
-                if (Enable)
-                {
-                    if (Extension == clvEXTENSION_VIV_VX)
+                case clvEXTENSION_CL_KHR_FP64:
+                case clvEXTENSION_CL_KHR_INT64_BASE_ATOMICS:
+                case clvEXTENSION_CL_KHR_INT64_EXTENDED_ATOMICS:
+                case clvEXTENSION_CL_KHR_GL_EVENT:
+                case clvEXTENSION_CL_KHR_D3D10_SHARING:
+                   if(setting == OPENCL_ENABLE)
+                   {
+                       ppoPREPROCESSOR_Report(PP,
+                                              clvREPORT_ERROR,
+                                              "Can't enable a non-supported extension in pragma.",
+                                              extToken->poolString
+                                              );
+                   }
+                   break;
+
+                case clvEXTENSION_CL_KHR_GLOBAL_INT32_EXTENDED_ATOMICS:
+                case clvEXTENSION_CL_KHR_GLOBAL_INT32_BASE_ATOMICS:
+                case clvEXTENSION_CL_KHR_LOCAL_INT32_EXTENDED_ATOMICS:
+                case clvEXTENSION_CL_KHR_LOCAL_INT32_BASE_ATOMICS:
+                   if(cldSupportOpenCLAtomicExtension)
+                   {
+                      gcmONERROR(ppoPREPROCESSOR_DefineUndefMacro(PP, extToken->poolString, setting, settingStr));
+                   }
+                   else
+                   {
+                      if(setting == OPENCL_ENABLE)
+                      {
+                          ppoPREPROCESSOR_Report(PP,
+                                                 clvREPORT_WARN,
+                                                 "Pragma OPENCL EXTENSION is not supported, ignoring pragma.",
+                                                 extToken->poolString
+                                                );
+                      }
+                   }
+                   break;
+                case clvEXTENSION_VASM:
+                case clvEXTENSION_CL_KHR_FP16:
+                case clvEXTENSION_VIV_BITFIELD:
+                case clvEXTENSION_VIV_CMPLX:
+                    gcmONERROR(ppoPREPROCESSOR_DefineUndefMacro(PP, extToken->poolString, setting, settingStr));
+                    if (setting == OPENCL_ENABLE)
                     {
-                        gctBOOL isVX2 = gcGetHWCaps()->hwFeatureFlags.supportEVISVX2;
-                        if (isVX2)
-                            status = ppoPREPROCESSOR_addMacroDef_Int(PP, "VX_VERSION", "2");
-                        else
-                            status =  ppoPREPROCESSOR_addMacroDef_Int(PP, "VX_VERSION", "1");
-                        status = ppoPREPROCESSOR_addMacroDef_Int(PP, "_VIV_VX_EXTENSION", "1");
-                        status = ppoPREPROCESSOR_AddSdkDirToPath(PP);
-                        if (gcmIS_ERROR(status))
-                            return status;
+                        gcmVERIFY_OK(cloCOMPILER_EnableExtension(PP->compiler, oclExtension, gcvTRUE));
+                    }
+                    break;
+
+                case clvEXTENSION_ALL:
+                    gcmONERROR(ppoPREPROCESSOR_DefineUndefMacro(PP, "cl_khr_byte_addressable_store", setting, settingStr));
+                    gcmONERROR(ppoPREPROCESSOR_DefineUndefMacro(PP, "cl_khr_3d_image_writes", setting, settingStr));
+                    break;
+
+                case clvEXTENSION_CL_KHR_BYTE_ADDRESSABLE_STORE:
+                case clvEXTENSION_CL_KHR_3D_IMAGE_WRITES:
+                case clvEXTENSION_CL_KHR_GL_SHARING:
+                    gcmONERROR(ppoPREPROCESSOR_DefineUndefMacro(PP, extToken->poolString, setting, settingStr));
+                    break;
+                case clvEXTENSION_VIV_VX:
+                    gcmONERROR(ppoPREPROCESSOR_DefineUndefMacro(PP, extToken->poolString, setting, settingStr));
+                    if (isVX2)
+                    {
+                        gcmONERROR(ppoPREPROCESSOR_DefineUndefMacro(PP, "VX_VERSION", setting, "2"));
                     }
                     else
                     {
-                        ppoPREPROCESSOR_addMacroDef_Int(PP, ntoken->poolString, "1");
+                        gcmONERROR(ppoPREPROCESSOR_DefineUndefMacro(PP, "VX_VERSION", setting, "1"));
                     }
+                    gcmONERROR(ppoPREPROCESSOR_DefineUndefMacro(PP, "_VIV_VX_EXTENSION", setting, "1"));
+                    gcmONERROR(ppoPREPROCESSOR_AddSdkDirToPath(PP));
+                    if (setting == OPENCL_ENABLE)
+                    {
+                        gcmVERIFY_OK(cloCOMPILER_EnableExtension(PP->compiler, clvEXTENSION_VIV_VX, gcvTRUE));
+                    }
+                    break;
+
+                default:
+                    gcmONERROR(ppoPREPROCESSOR_DefineUndefMacro(PP, extToken->poolString, setting, settingStr));
+                    break;
                 }
-                else
-                {
-                    /* TODO: need to undef the macro */
-                }
-            }
-            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
-            ntoken = gcvNULL;
-            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken1));
-            ntoken1 = gcvNULL;
         }
+        /* #pragma OPENCL FP_CONTRACT ...*/
         else if(gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "FP_CONTRACT")))
         {
-            /* ignore it for now */
+            /* We just ignore the setting of FP_CONTRACT. Since we don't do contractions
+               at all, our default is OFF and setting it to ON is an optimization hint
+               we can safely ignore.  When we support -ffma or something, we would need
+               to diagnose that we are ignoring FMA.
+               */
+            setting = ppoPREPROCESSOR_SetExtBehaviorSwitch(PP, ntoken->poolString, gcvTRUE);
         }
+        /* #pragma OPENCL FENV_ACCESS ...*/
+        else if(gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "FENV_ACCESS")))
+        {
+            /* ignore it for now */
+            setting = ppoPREPROCESSOR_SetExtBehaviorSwitch(PP, ntoken->poolString, gcvTRUE);
+            if (setting == OPENCL_ON)
+            {
+                ppoPREPROCESSOR_Report(PP,
+                        clvREPORT_WARN,
+                        "Pragma OPENCL FENV_ACCESS ON is not supported, ignoring pragma.",
+                        extToken->poolString
+                        );
+            }
+        }
+        /* #pragma OPENCL ...*/
         else
         {
             ppoPREPROCESSOR_Report(PP,
-                                    clvREPORT_ERROR,
-                                    "OpenCL not support this pragma directive."
-                                    );
+                    clvREPORT_WARN,
+                    "Uknown pragma in OPENCL namespace."
+                    );
         }
     }
 
     /* Reset invalid area. */
     PP->doWeInValidArea = prevValidStatus;
+    if (extToken != gcvNULL)
+    {
+        gcmONERROR(ppoTOKEN_Destroy(PP, extToken));
+        extToken = gcvNULL;
+    }
     if (ntoken != gcvNULL)
     {
         gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+        ntoken = gcvNULL;
+    }
+    if (ntoken1 != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken1));
+        ntoken1 = gcvNULL;
     }
     return ppoPREPROCESSOR_ToEOL(PP);
 
 OnError:
+    PP->doWeInValidArea = prevValidStatus;
+    if (extToken != gcvNULL)
+    {
+        gcmONERROR(ppoTOKEN_Destroy(PP, extToken));
+        extToken = gcvNULL;
+    }
     if (ntoken != gcvNULL)
     {
         gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken));
+        ntoken = gcvNULL;
+    }
+    if (ntoken1 != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken1));
+        ntoken1 = gcvNULL;
+    }
+    if (status == gcvSTATUS_INVALID_ARGUMENT)
+    {
+        status = gcvSTATUS_OK;
     }
     return status;
 }

@@ -437,24 +437,40 @@ cloCOMPILER_FindPoolString(
     OUT cltPOOL_STRING * PoolString
     );
 
+typedef enum _cleOPENCLSetting {
+  OPENCL_INVALID,
+  OPENCL_ENABLE,
+  OPENCL_DISABLE,
+  OPENCL_ON,
+  OPENCL_OFF,
+  OPENCL_DEFAULT
+}
+cleOPENCLSetting;
+
 /* Extensions */
 typedef enum _cleEXTENSION
 {
-    clvEXTENSION_NONE                        = 0x00000000,
-
-    clvEXTENSION_STANDARD_DERIVATIVES        = 0x00000001,
-
-    clvEXTENSION_VASM                        = 0x00000002,
-
-    clvEXTENSION_VIV_VX                      = 0x00000004,
-
-    clvEXTENSION_VIV_BITFIELD                = 0x00000008,
-
-    clvEXTENSION_VIV_CMPLX                   = 0x00000010,
-
-    clvEXTENSION_CL_KHR_FP16                 = 0x00000020,
-
-    clvEXTENSION_ALL                        = clvEXTENSION_STANDARD_DERIVATIVES
+    clvEXTENSION_NONE                             = 0x00000000,
+    clvEXTENSION_STANDARD_DERIVATIVES             = 0x00000001,
+    clvEXTENSION_VASM                             = 0x00000002,
+    clvEXTENSION_VIV_VX                           = 0x00000004,
+    clvEXTENSION_VIV_BITFIELD                     = 0x00000008,
+    clvEXTENSION_VIV_CMPLX                        = 0x00000010,
+    clvEXTENSION_CL_KHR_FP16                      = 0x00000020,
+    clvEXTENSION_CL_KHR_3D_IMAGE_WRITES           = 0x00000040,
+    clvEXTENSION_CL_KHR_BYTE_ADDRESSABLE_STORE    = 0x00000080,
+    clvEXTENSION_CL_KHR_GL_SHARING                = 0x00000100,
+    clvEXTENSION_CL_KHR_FP64                      = 0x00000200,
+    clvEXTENSION_ES_KHR_INT64                     = 0x00000400,
+    clvEXTENSION_CL_KHR_GLOBAL_INT32_EXTENDED_ATOMICS = 0x00000800,
+    clvEXTENSION_CL_KHR_GLOBAL_INT32_BASE_ATOMICS     = 0x00001000,
+    clvEXTENSION_CL_KHR_LOCAL_INT32_EXTENDED_ATOMICS  = 0x00002000,
+    clvEXTENSION_CL_KHR_LOCAL_INT32_BASE_ATOMICS  = 0x00004000,
+    clvEXTENSION_CL_KHR_INT64_BASE_ATOMICS        = 0x00008000,
+    clvEXTENSION_CL_KHR_INT64_EXTENDED_ATOMICS    = 0x00010000,
+    clvEXTENSION_CL_KHR_GL_EVENT                  = 0x00020000,
+    clvEXTENSION_CL_KHR_D3D10_SHARING             = 0x00040000,
+    clvEXTENSION_ALL                              = clvEXTENSION_STANDARD_DERIVATIVES
 }
 cleEXTENSION;
 

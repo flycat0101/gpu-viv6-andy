@@ -764,6 +764,21 @@ ppoPREPROCESSOR_Report(
                        ...
                        );
 
+cleOPENCLSetting
+ppoPREPROCESSOR_SetExtBehaviorSwitch(
+                                     ppoPREPROCESSOR PP,
+                                     gctSTRING TokenStr,
+                                     gctBOOL OnOff
+                                    );
+
+gceSTATUS
+ppoPREPROCESSOR_DefineUndefMacro(
+                                 ppoPREPROCESSOR PP,
+                                 gctSTRING TokenStr,
+                                 cleOPENCLSetting Setting,
+                                 gctCHAR* SettingStr
+                                 );
+
 gctINT
 ppoPREPROCESSOR_Pow(
                     gctINT x,

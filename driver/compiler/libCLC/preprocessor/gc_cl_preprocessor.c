@@ -412,6 +412,141 @@ ppoPREPROCESSOR_Report(ppoPREPROCESSOR PP,
 
     return status;
 }
+
+cleOPENCLSetting
+ppoPREPROCESSOR_SetExtBehaviorSwitch(
+IN ppoPREPROCESSOR PP,
+IN gctSTRING TokenStr,
+IN gctBOOL OnOff
+)
+{
+    ppoTOKEN         ntoken = gcvNULL;
+    gceSTATUS        status = gcvSTATUS_OK;
+    cleOPENCLSetting Result = OPENCL_INVALID;
+
+    gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
+
+    if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "\n")))
+    {
+        if(OnOff)
+        {
+            ppoPREPROCESSOR_Report(PP,
+                        clvREPORT_WARN,
+                        "Expected 'ON' or 'OFF' or 'DEFAULT' in pragma.\n %s.",
+                        TokenStr
+                        );
+        }
+        else
+        {
+            ppoPREPROCESSOR_Report(PP,
+                            clvREPORT_WARN,
+                            "Expected 'ENABLE' or 'DISABLE' behavior in OPENCL EXTENSION pragma."
+                            );
+        }
+        if (ntoken != gcvNULL)
+        {
+            gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken));
+            ntoken = gcvNULL;
+        }
+        return OPENCL_INVALID;
+    }
+
+    if(OnOff)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString,"ON")))
+            Result = OPENCL_ON;
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString,"OFF")))
+            Result = OPENCL_OFF;
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString,"DEFAULT")))
+            Result = OPENCL_DEFAULT;
+        else
+        {
+            ppoPREPROCESSOR_Report(PP,
+                                   clvREPORT_WARN,
+                                   "Expected 'ON' or 'OFF' or 'DEFAULT' in pragma.\n %s.",
+                                   TokenStr
+                                  );
+            if (ntoken != gcvNULL)
+            {
+                gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken));
+            }
+            return OPENCL_INVALID;
+        }
+    }
+    else
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString,"enable")))
+            Result = OPENCL_ENABLE;
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString,"disable")))
+            Result = OPENCL_DISABLE;
+        else
+        {
+            ppoPREPROCESSOR_Report(PP,
+                            clvREPORT_WARN,
+                            "Expected 'ENABLE' or 'DISABLE' behavior in OPENCL EXTENSION pragma."
+                            );
+            if (ntoken != gcvNULL)
+            {
+                gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken));
+            }
+            return OPENCL_INVALID;
+        }
+    }
+
+OnError:
+    if (ntoken != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, ntoken));
+    }
+    return Result;
+}
+
+gceSTATUS
+ppoPREPROCESSOR_DefineUndefMacro(
+IN ppoPREPROCESSOR PP,
+IN gctSTRING TokenStr,
+IN cleOPENCLSetting Setting,
+IN gctCHAR* SettingStr
+)
+{
+    gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+    ppoMACRO_SYMBOL ms = gcvNULL;
+
+    status = ppoMACRO_MANAGER_GetMacroSymbol(PP, PP->macroManager, TokenStr, &ms);
+    if (gcmIS_ERROR(status))
+    return status;
+
+    if (ms == gcvNULL)
+    {
+        if (Setting != OPENCL_DISABLE)
+        {
+            status = ppoPREPROCESSOR_addMacroDef_Int(PP, TokenStr, SettingStr);
+            if (gcmIS_ERROR(status))
+                return status;
+        }
+    }
+    else
+    {
+        if (Setting == OPENCL_DISABLE)
+        {
+            if (!ms->undefined)
+            {
+                ppoPREPROCESSOR_Report(PP,
+                        clvREPORT_WARN,
+                        "Pragma macro is not used.\n %s",
+                        TokenStr
+                    );
+            }
+            ms->undefined = gcvTRUE;
+            ppoMACRO_MANAGER_DestroyMacroSymbol(
+                    PP,
+                    PP->macroManager,
+                    ms);
+        }
+    }
+  return status;
+}
+
 /*
 x * x ...  x * x
 ----------------

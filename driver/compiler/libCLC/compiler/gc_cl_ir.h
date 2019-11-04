@@ -1071,8 +1071,9 @@ typedef struct _clsNAME
     cltPOOL_STRING  symbol;
     cleNAME_TYPE    type      : 6;
     gctBOOL         isBuiltin : 2;
-    cleEXTENSION    extension : 8;
     gctUINT16       die       : 16;
+    gctINT          reserved  : 8;
+    cleEXTENSION    extension;
     union {
       clsVARIABLE_INFO variableInfo;
       struct { /* enum, struct, union or typedefs */
