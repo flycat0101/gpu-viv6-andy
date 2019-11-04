@@ -6953,7 +6953,8 @@ VIR_Lib_UpdateImageFormat(
         if (VIR_Symbol_GetDescriptorSet(pVirUniformSym) == pImageFormatInfo->set &&
             VIR_Symbol_GetBinding(pVirUniformSym) == pImageFormatInfo->binding)
         {
-            gcmASSERT(VIR_Symbol_GetImageFormat(pVirUniformSym) != imageFormat);
+            gcmASSERT(VIR_Symbol_GetImageFormat(pVirUniformSym) == VIR_IMAGE_FORMAT_NONE ||
+                      VIR_Symbol_GetImageFormat(pVirUniformSym) == imageFormat);
 
             VIR_Symbol_SetImageFormat(pVirUniformSym, imageFormat);
             break;
