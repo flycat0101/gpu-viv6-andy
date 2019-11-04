@@ -2172,6 +2172,41 @@ OnError:
     return VX_NULL;
 }
 
+vx_uint32 _getConvolutionLocalWorkGroupSize(vx_uint32 worksz, vx_uint32 minLz, vx_uint32 maxLz)
+{
+    vx_uint32 bestLz = maxLz;
+    vx_uint32 minRem = worksz;
+    vx_uint32 i = 0;
+
+    if (worksz < gcmMIN(maxLz, 8))
+        return worksz;
+    if (worksz % 8 == 0)
+        return 8;
+
+    for (i = maxLz; i > minLz; i--)
+    {
+        vx_uint32 rem = worksz % i;
+
+        if (rem == 0)
+        {
+            bestLz = i;
+            break;
+        }
+
+        if (rem < minRem)
+        {
+            minRem = rem;
+            bestLz = i;
+        }
+    }
+
+    if (bestLz > 8)
+    {
+        bestLz = _getConvolutionLocalWorkGroupSize(bestLz, 4, gcmMIN(bestLz - 1, 11));
+    }
+
+    return gcmMIN(bestLz, worksz);
+}
 /********gpuGEMM**********************************************/
 vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     vx_context              context,
@@ -2318,12 +2353,19 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
 
     if (enable_reorgWeights)
     {
-        vx_reference parameters[4] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)output};
+        vx_reference parameters[8] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)output};
         vx_float32 uint8Scale  = input_scale * weight_scale * output_scale;
-        vx_uint32 weightsSize = kernel_x * kernel_y * ifm;
         vx_float32 outputZP = (vx_float32)output_ZP + 0.5f;
         vx_float32 weightZP = (vx_float32)weight_ZP;
 
+        scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &uint8Scale);
+        zpWeight = vxCreateScalar(context, VX_TYPE_FLOAT32, &weightZP);
+        zpOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &outputZP);
+
+        parameters[4] = (vx_reference)cycle;
+        parameters[5] = (vx_reference)scaleIn;
+        parameters[6] = (vx_reference)zpWeight;
+        parameters[7] = (vx_reference)zpOut;
 
         if (enable_2d_img)
         {
@@ -2333,28 +2375,23 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
 
         if (enable_2d_img)
         {
-            execution_parameters.globalWorkScale[0] = 4;
-            execution_parameters.globalWorkScale[1] = 16;
+            execution_parameters.globalWorkScale[0] = 8;
+            execution_parameters.globalWorkScale[1] = 8;
             if (output_width % 4 == 0)
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_ReorgWeights_2D_4x", borderMode);
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8x_Wpacked", borderMode);
             else
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_ReorgWeights_2D_4s", borderMode);
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8s_Wpacked", borderMode);
         }
 
         if (!shaderExecutable) goto OnError;
 
-        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uint8Scale", 1, &uint8Scale);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputSize", 1, &inputSize);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "weightsSize", 1, &weightsSize);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "weight_ZP", 1, &weightZP);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outputZP", 1, &outputZP);
-        if (status != VX_SUCCESS) goto OnError;
-
-        status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
         if (output_width % 4 == 0)
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
 
-        status |= vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+        status |= vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
         if (status != VX_SUCCESS) goto OnError;
     }
     else if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
@@ -2463,6 +2500,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
                 }
                 else if (enable_four_pixel)
                 {
+                    execution_parameters.globalWorkScale[0] = 4;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4X", borderMode);
                     if (!shaderExecutable) goto OnError;
                     status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -2473,7 +2511,10 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
             else
             {
                 if (enable_four_pixel)
+                {
+                    execution_parameters.globalWorkScale[0] = 4;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4X", borderMode);
+                }
                 else
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
             }
@@ -2550,24 +2591,31 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     if (enable_2d_img)
     {
         execution_parameters.workDim = 2;
-        if (enable_four_pixel)
-            execution_parameters.globalWorkScale[0] = 4;
 
         if (enable_small_kernel && enable_2d_img)
             output_depth = depth;
 
 
-        execution_parameters.localWorkSize[0]  = 1;
-        execution_parameters.localWorkSize[1]  = 8;
+        if (enable_reorgWeights)
+        {
+            vx_uint32 maxWkGroupSz = shaderExecutable->kernelShader->maxWorkGroupSize;
+            vx_uint32 glbWkSclY = (output_depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
 
-        execution_parameters.globalWorkSize[0] = gcmALIGN((output_width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], execution_parameters.localWorkSize[0]);
-        execution_parameters.globalWorkSize[1] = gcmALIGN((output_depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1], execution_parameters.localWorkSize[1]);
+            execution_parameters.localWorkSize[0]  = output_depth <= 32 ? 2 : 1;
+            execution_parameters.localWorkSize[1]  = _getConvolutionLocalWorkGroupSize(glbWkSclY, 4, maxWkGroupSz / execution_parameters.localWorkSize[0]);
+
+        }
+        else
+        {
+            execution_parameters.localWorkSize[0]  = 1;
+            execution_parameters.localWorkSize[1]  = 8;
+        }
+
+        execution_parameters.globalWorkSize[0] = gcmALIGN_NP2_SAFE((output_width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], execution_parameters.localWorkSize[0]);
+        execution_parameters.globalWorkSize[1] = gcmALIGN_NP2_SAFE((output_depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1], execution_parameters.localWorkSize[1]);
     }
     else
     {
-        if (enable_four_pixel)
-            execution_parameters.globalWorkScale[0] = 4;
-
         execution_parameters.localWorkSize[0]  = SHADER_THREAD_COUNT;
         execution_parameters.localWorkSize[1]  = context->nnConfig.fixedFeature.shaderCoreCount;
         execution_parameters.localWorkSize[2]  =1;
@@ -9741,6 +9789,8 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
 
     if (enable_2d_img)
     {
+        vx_uint32 maxWkGroupSz = shaderExecutable->kernelShader->maxWorkGroupSize;
+        vx_uint32 glbWkSclY = (depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
         execution_parameters.workDim = 2;
 
         if (input_width != output_width)
@@ -9753,7 +9803,7 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
             else if (context->nnConfig.fixedFeature.shaderCoreCount > 2)
             {
                 execution_parameters.localWorkSize[0]  = 1;
-                execution_parameters.localWorkSize[1]  = 2;
+                execution_parameters.localWorkSize[1]  = _getConvolutionLocalWorkGroupSize(glbWkSclY, 4, maxWkGroupSz);
             }
             else
             {
@@ -9771,14 +9821,14 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
             else if (context->nnConfig.fixedFeature.shaderCoreCount > 2)
             {
                 execution_parameters.localWorkSize[0]  = 1;
-                execution_parameters.localWorkSize[1]  = 8;
+                execution_parameters.localWorkSize[1]  = _getConvolutionLocalWorkGroupSize(glbWkSclY, 4, maxWkGroupSz);
             }
             else
             {
                 if (enable_packed_weights)
                 {
                     execution_parameters.localWorkSize[0]  = 1;
-                    execution_parameters.localWorkSize[1]  = 8;
+                    execution_parameters.localWorkSize[1]  = _getConvolutionLocalWorkGroupSize(glbWkSclY, 4, maxWkGroupSz);
                 }
                 else
                 {
@@ -9799,14 +9849,14 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
                 else if (context->nnConfig.fixedFeature.shaderCoreCount > 2)
                 {
                     execution_parameters.localWorkSize[0]  = 1;
-                    execution_parameters.localWorkSize[1]  = 2;
+                    execution_parameters.localWorkSize[1]  = _getConvolutionLocalWorkGroupSize(glbWkSclY, 4, maxWkGroupSz);
                 }
                 else
                 {
                     if (enable_packed_weights)
                     {
                         execution_parameters.localWorkSize[0]  = 1;
-                        execution_parameters.localWorkSize[1]  = 8;
+                        execution_parameters.localWorkSize[1]  = _getConvolutionLocalWorkGroupSize(glbWkSclY, 4, maxWkGroupSz);
                     }
                     else
                     {
@@ -9818,12 +9868,12 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
             else
             {
                 execution_parameters.localWorkSize[0]  = 2;
-                execution_parameters.localWorkSize[1]  = 4;
+                execution_parameters.localWorkSize[1]  = _getConvolutionLocalWorkGroupSize(glbWkSclY, 4, maxWkGroupSz/2);
             }
         }
 
-        execution_parameters.globalWorkSize[0] = gcmALIGN((input_width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], execution_parameters.localWorkSize[0]);
-        execution_parameters.globalWorkSize[1] = gcmALIGN((depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1], execution_parameters.localWorkSize[1]);
+        execution_parameters.globalWorkSize[0] = gcmALIGN_NP2_SAFE((input_width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], execution_parameters.localWorkSize[0]);
+        execution_parameters.globalWorkSize[1] = gcmALIGN_NP2_SAFE((depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1], execution_parameters.localWorkSize[1]);
     }
     else
     {

@@ -17323,8 +17323,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                      && TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8
                      )
                     {
-                        if (inputWidth * inputHeight < inputDepth
-                          && (inputWidth * inputHeight % CONV2D_ALIGN_SIZE16 != 0))
+                        if (/*inputWidth * inputHeight < inputDepth
+                          && */(inputWidth * inputHeight % CONV2D_ALIGN_SIZE16 != 0))
                         {
                             if ((outputDepth % CONV2D_ALIGN_SIZE16 == 0) && (input_size % CONV2D_ALIGN_SIZE4 == 0))
                             {
@@ -17348,7 +17348,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                         }
                     }
                     else if (enable_conv2d_1x1
-                             && (inputWidth * inputHeight < inputDepth)
+                             /*&& (inputWidth * inputHeight < inputDepth)*/
                              && (inputWidth * inputHeight % CONV2D_ALIGN_SIZE4 != 0)
                              && (outputDepth % CONV2D_ALIGN_SIZE16 == 0)
                              && (input_size % CONV2D_ALIGN_SIZE4 == 0)
@@ -17359,8 +17359,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                             enable_packed_weights = vx_true_e;
                     }
                     else if (!enable_conv2d_1x1 && biases != NULL
-                        && ((outputDepth % CONV2D_ALIGN_SIZE4) == 0)
-                        && ((inputWidth * inputHeight < IMG_MAX_WIDTH) && inputDepth < IMG_MAX_WIDTH)
+                        && ((outputWidth * outputHeight < IMG_MAX_WIDTH) && outputDepth < IMG_MAX_WIDTH && input_size < IMG_MAX_WIDTH)
                         && (CHECK_LIFETIME_IS_STATIC(weights) && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE))
                     {
                         enable_packed_weights = vx_true_e;
@@ -17438,13 +17437,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
 
                         if (enable_packed_weights)
                         {
-                            weights_new_rs = vxoNNTensor_ReorgWeights(weights_new, node->graph, ifm_rs, ofm);
-                            if (weights_new_rs == VX_NULL)
-                            {
-                                vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
-                                status = VX_ERROR_NO_MEMORY;
-                                goto exit;
-                            }
+                            vx_tensor t = NULL;
+                            t = vxoNNTensor_ReorgWeights(weights_new, node->graph, ifm_rs, ofm);
+                            convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
+                            weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
                         }
                         else
                         {
@@ -17550,15 +17546,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                         }
                         else if (enable_packed_weights)
                         {
+                            vx_tensor t = NULL;
                             vx_uint32 ifm = k_w * k_h * TENSOR_VIEW_SIZE_INDEX(weights, 2);
                             vx_uint32 ofm = TENSOR_VIEW_SIZE_INDEX(weights, 3);
-                            weights_new_rs = vxoNNTensor_ReorgWeights(weights, node->graph, ifm, ofm);
-                            if (weights_new_rs == VX_NULL)
-                            {
-                                vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
-                                status = VX_ERROR_NO_MEMORY;
-                                goto exit;
-                            }
+                            t = vxoNNTensor_ReorgWeights(weights, node->graph, ifm, ofm);
+                            convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
+                            weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
                         }
                         else
                         {
