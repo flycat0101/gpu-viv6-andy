@@ -535,7 +535,6 @@ VX_API_ENTRY vx_object_array VX_API_CALL vxCreateTensorObjectArray(vx_context co
         for(i = 0; i < count; i++)
         {
             arr->itemsTable[i] = (vx_reference)tensor[i];
-            ((vx_reference)tensor[i])->scope = (vx_reference)arr;
 
             vxoReference_Increment((vx_reference)tensor[i], VX_REF_EXTERNAL);
         }

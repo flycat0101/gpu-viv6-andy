@@ -511,6 +511,9 @@ vxoTensor_Create(
     if (tensorType & VX_TENSOR_VIRTUAL)
     {
         tensor->base.isVirtual = vx_true_e;
+        tensor->base.scope = (vx_reference)graph;
+        TENSOR_GRAPH(tensor) = graph;
+        graph->virtTensorNum++;
     }
 
     tensor->tensorBuffer->bufRefCount++;
@@ -553,12 +556,6 @@ vxoTensor_Create(
 
     tensor->useInternalMem  = vx_true_e;
 
-    if (tensorType & VX_TENSOR_VIRTUAL)
-    {
-        tensor->base.scope = (vx_reference)graph;
-        TENSOR_GRAPH(tensor) = graph;
-        graph->virtTensorNum++;
-    }
     gcmFOOTER_NO();
 
     return tensor;
@@ -1786,7 +1783,6 @@ vxCreateVirtualTensor(
         }
         return VX_NULL;
     }
-    tensor->base.scope = (vx_reference)graph;
 
     if (dimSizes)
     {
