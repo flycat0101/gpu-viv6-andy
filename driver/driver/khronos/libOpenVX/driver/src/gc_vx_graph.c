@@ -2969,7 +2969,7 @@ VX_PRIVATE_API vx_status DetectSegmentsWithOption(
     )
 {
     vx_status status = VX_SUCCESS;
-    /* vx_context context = graph->base.context; */
+    vx_context context = graph->base.context;
 
     vxmASSERT(graph->base.context->vipSRAM.size > VX_VIP_SRAM_IMAGE_STREAM_SIZE);
 
