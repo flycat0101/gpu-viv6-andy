@@ -1553,7 +1553,7 @@ vxoMemoryPool_RequestList(
         }
     }
 
-    gcmASSERT((atype & VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR) || (atype & VXNNE_MEM_POOL_TYPE_SRAM));
+    gcmASSERT(!((atype & VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR) && (atype & VXNNE_MEM_POOL_TYPE_SRAM)));
 
     for (i = 0; i < VXNNE_MEM_POOL_TYPE_END; i++)
     {
