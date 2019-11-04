@@ -11656,7 +11656,7 @@ VkResult halti5_updateDescriptorSet(
                     {
                         patchKeys[entryIdx] = chipSampler->patchKey;
                         patchInfos[entryIdx].patchStages = binding->std.stageFlags;
-                        patchInfos[entryIdx].binding = i;
+                        patchInfos[entryIdx].binding = binding->std.binding;
                         patchInfos[entryIdx].arrayIndex = j;
                         patchInfos[entryIdx].viewType = VK_IMAGE_VIEW_TYPE_1D;
                         patchInfos[entryIdx].compareOp = sampler->createInfo.compareOp;
@@ -11703,7 +11703,7 @@ VkResult halti5_updateDescriptorSet(
                         patchKeys[entryIdx] = patchKey;
                         patchInfos[entryIdx].patchStages = binding->std.stageFlags;
                         patchInfos[entryIdx].patchFormat = patchFormat;
-                        patchInfos[entryIdx].binding = i;
+                        patchInfos[entryIdx].binding = binding->std.binding;
                         patchInfos[entryIdx].arrayIndex = j;
                         patchInfos[entryIdx].viewType = viewType;
                         __VK_ASSERT(compareOp != VK_COMPARE_OP_MAX_ENUM);
@@ -11725,7 +11725,7 @@ VkResult halti5_updateDescriptorSet(
                     if (chipImgv->patchKey)
                     {
                         patchKeys[entryIdx] = chipImgv->patchKey;
-                        patchInfos[entryIdx].binding = i;
+                        patchInfos[entryIdx].binding = binding->std.binding;
                         patchInfos[entryIdx].arrayIndex = j;
                         patchInfos[entryIdx].patchStages = binding->std.stageFlags;
                         patchInfos[entryIdx].patchFormat = chipImgv->patchFormat;
@@ -11763,7 +11763,7 @@ VkResult halti5_updateDescriptorSet(
                         patchKeys[entryIdx] = chipBufv->patchKey;
                         patchInfos[entryIdx].patchFormat = chipBufv->patchFormat;
                         patchInfos[entryIdx].patchStages = binding->std.stageFlags;
-                        patchInfos[entryIdx].binding = i;
+                        patchInfos[entryIdx].binding = binding->std.binding;
                         patchInfos[entryIdx].arrayIndex = j;
                         patchInfos[entryIdx].viewType = VK_IMAGE_VIEW_TYPE_1D;
                         patchIdx++;
