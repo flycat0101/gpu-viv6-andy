@@ -5904,33 +5904,57 @@ vxnne_shader_executable vxnneGetGPUMaxPoolingShaderExecutable(
         }
         else
         {
-            vx_reference parameters[12] = {(vx_reference)input, (vx_reference)poolSizeX, (vx_reference)poolSizeY, (vx_reference)stride_x,
-                (vx_reference)NULL, (vx_reference)padX, (vx_reference)padY, (vx_reference)NULL, (vx_reference)NULL,
-                (vx_reference)NULL, (vx_reference)NULL,(vx_reference)output};
-
-            stride_y = vxCreateScalar(context, VX_TYPE_INT32, &stride_h);
-            inZP = vxCreateScalar(context, VX_TYPE_INT32, &input_ZP);
-            outZP = vxCreateScalar(context, VX_TYPE_INT32, &output_ZP);
-            scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleInValue);
-            scaleOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleOutValue);
-
-            parameters[4] = (vx_reference)stride_y;
-            parameters[7] = (vx_reference)scaleIn;
-            parameters[8] = (vx_reference)scaleOut;
-            parameters[9] = (vx_reference)inZP;
-            parameters[10] = (vx_reference)outZP;
-
-
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "PadQuant8", borderMode);
-            if (!shaderExecutable)
+            if (_IsSameType(input, output))
             {
-                goto OnError;
+                vx_reference parameters[8] = {(vx_reference)input, (vx_reference)poolSizeX, (vx_reference)poolSizeY, (vx_reference)stride_x,
+                    (vx_reference)NULL, (vx_reference)padX, (vx_reference)padY,(vx_reference)output};
+
+                stride_y = vxCreateScalar(context, VX_TYPE_INT32, &stride_h);
+
+                parameters[4] = (vx_reference)stride_y;
+
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "PadQuant8_SameFL", borderMode);
+                if (!shaderExecutable)
+                {
+                    goto OnError;
+                }
+
+                status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
+                if (status != VX_SUCCESS)
+                {
+                    goto OnError;
+                }
             }
-
-            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 12);
-            if (status != VX_SUCCESS)
+            else
             {
-                goto OnError;
+                vx_reference parameters[12] = {(vx_reference)input, (vx_reference)poolSizeX, (vx_reference)poolSizeY, (vx_reference)stride_x,
+                    (vx_reference)NULL, (vx_reference)padX, (vx_reference)padY, (vx_reference)NULL, (vx_reference)NULL,
+                    (vx_reference)NULL, (vx_reference)NULL,(vx_reference)output};
+
+                stride_y = vxCreateScalar(context, VX_TYPE_INT32, &stride_h);
+                inZP = vxCreateScalar(context, VX_TYPE_INT32, &input_ZP);
+                outZP = vxCreateScalar(context, VX_TYPE_INT32, &output_ZP);
+                scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleInValue);
+                scaleOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleOutValue);
+
+                parameters[4] = (vx_reference)stride_y;
+                parameters[7] = (vx_reference)scaleIn;
+                parameters[8] = (vx_reference)scaleOut;
+                parameters[9] = (vx_reference)inZP;
+                parameters[10] = (vx_reference)outZP;
+
+
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "PadQuant8", borderMode);
+                if (!shaderExecutable)
+                {
+                    goto OnError;
+                }
+
+                status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 12);
+                if (status != VX_SUCCESS)
+                {
+                    goto OnError;
+                }
             }
         }
     }

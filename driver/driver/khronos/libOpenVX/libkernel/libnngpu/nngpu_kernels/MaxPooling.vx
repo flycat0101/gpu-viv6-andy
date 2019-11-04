@@ -128,6 +128,7 @@ __kernel void gpuPooling_MaxPadQuant8(__read_only image2d_array_t   input,
     int iStart, iEnd, jStart, jEnd, count = 0;
     int w, h;
     uint4 tmp;
+    uint4 maxVal = 0;
 
     iStart = max(coordinX, 0);
     iEnd   = min(coordinX+filterX, inWidth);
@@ -141,12 +142,55 @@ __kernel void gpuPooling_MaxPadQuant8(__read_only image2d_array_t   input,
         for(w = iStart; w < iEnd; w++)
         {
             tmp = read_imageui(input, (int4)(w, h, z, 0));
-            tmpOut.x = max(tmpOut.x, (convert_int(tmp.x-zeroPointIn))*scaleIn);
+            maxVal.x = max(maxVal.x, tmp.x);
         }
     }
 
+    tmpOut.x = convert_float(convert_int(maxVal.x) - zeroPointIn) * scaleIn;
     tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
     write_imageui(output, (int4)(x, y, z, 0), tmp);
+}
+
+__kernel void gpuPooling_MaxPadQuant8_SameFL
+    (
+    __read_only image2d_array_t   input,
+    int                           filterX,
+    int                           filterY,
+    int                           strideX,
+    int                           strideY,
+    int                           padX,
+    int                           padY,
+    __write_only image2d_array_t  output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0) * strideX - padX, get_global_id(1) * strideY - padY, get_global_id(2), get_global_id(0));
+
+    float4 tmpOut = {0.0};
+    int inWidth = get_image_width(input);
+    int inHeight = get_image_height(input);
+    int iStart, iEnd, jStart, jEnd, count = 0;
+    int w, h;
+    uint4 tmp;
+    uint4 maxVal = 0;
+
+    iStart = max(coord_in.x, 0);
+    iEnd   = min(coord_in.x + filterX, inWidth);
+    jStart = max(coord_in.y, 0);
+    jEnd   = min(coord_in.y + filterY, inHeight);
+
+    tmp = 0;
+    for(h = jStart; h < jEnd; h++)
+    {
+        for(w = iStart; w < iEnd; )
+        {
+            tmp = read_imageui(input, (int4)(w, h, coord_in.z, 0));
+            w++;
+            maxVal.x = max(maxVal.x, tmp.x);
+        }
+    }
+
+    write_imageui(output, coord, maxVal);
 }
 
 
