@@ -1143,6 +1143,10 @@ _DumpLayout(
     {
         VERIFY_OK(VIR_LOG(Dumper, "binding=%d ", VIR_Layout_GetBinding(Layout)));
     }
+    if (VIR_Layout_GetDescriptorSet(Layout) != -1)
+    {
+        VERIFY_OK(VIR_LOG(Dumper, "set=%d ", VIR_Layout_GetDescriptorSet(Layout)));
+    }
     if(VIR_Layout_HasOffset(Layout))
     {
         VERIFY_OK(VIR_LOG(Dumper, "offset=%d ", VIR_Layout_GetOffset(Layout)));
@@ -1154,10 +1158,6 @@ _DumpLayout(
     if(VIR_Layout_HasImageFormat(Layout))
     {
         VERIFY_OK(VIR_LOG(Dumper, "image_format=%x ", VIR_Layout_GetImageFormat(Layout)));
-    }
-    if (VIR_Layout_GetDescriptorSet(Layout) != -1)
-    {
-        VERIFY_OK(VIR_LOG(Dumper, "set=%d ", VIR_Layout_GetDescriptorSet(Layout)));
     }
 
     VERIFY_OK(VIR_LOG(Dumper, ") "));
