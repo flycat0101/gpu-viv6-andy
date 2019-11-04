@@ -358,6 +358,16 @@ VKAPI_ATTR VkResult VKAPI_CALL vkResetEvent(VkDevice device, VkEvent event)
     return __vkApiDispatchTable.ResetEvent(device, event);
 }
 
+VKAPI_ATTR VkResult VKAPI_CALL vkGetSemaphoreFdKHR(VkDevice device, const VkSemaphoreGetFdInfoKHR* pGetFdInfo, int* pFd)
+{
+    return __vkApiDispatchTable.GetSemaphoreFdKHR(device, pGetFdInfo, pFd);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL vkImportSemaphoreFdKHR(VkDevice device, const VkImportSemaphoreFdInfoKHR* pImportSemaphoreFdInfo)
+{
+    return __vkApiDispatchTable.ImportSemaphoreFdKHR(device, pImportSemaphoreFdInfo);
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool)
 {
     return __vkApiDispatchTable.CreateQueryPool(device, pCreateInfo, pAllocator, pQueryPool);
@@ -1285,6 +1295,16 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateWin32SurfaceKHR(VkInstance instance, cons
 VKAPI_ATTR VkBool32 VKAPI_CALL vkGetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex)
 {
     return __vkApiDispatchTable.GetPhysicalDeviceWin32PresentationSupportKHR(physicalDevice, queueFamilyIndex);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL vkGetSemaphoreWin32HandleKHR(VkDevice device, const VkSemaphoreGetWin32HandleInfoKHR* pGetWin32HandleInfo, HANDLE* pHandle)
+{
+    return __vkApiDispatchTable.GetSemaphoreWin32HandleKHR(device, pGetWin32HandleInfo, pHandle);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL vkImportSemaphoreWin32HandleKHR(VkDevice device, const VkImportSemaphoreWin32HandleInfoKHR* pImportSemaphoreWin32HandleInfo)
+{
+    return __vkApiDispatchTable.ImportSemaphoreWin32HandleKHR(device, pImportSemaphoreWin32HandleInfo);
 }
 #endif
 

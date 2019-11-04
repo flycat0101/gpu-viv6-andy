@@ -125,6 +125,10 @@ struct __vkDevContextRec
     uint32_t fenceCount;
     VkBuffer fenceBuffer;
 
+    /*record the signal related with Native fence*/
+    void *fdSignal[8];
+    uint32_t fdCount;
+
     /* All VK objects created through vkCreate*() API with this devContext. */
     __vkObjectList vkObject[__VK_DEV_OBJECT_COUNT];
 

@@ -261,6 +261,18 @@ VKAPI_ATTR VkResult VKAPI_CALL __nop_ResetEvent(VkDevice device, VkEvent event)
     return VK_SUCCESS;
 }
 
+VKAPI_ATTR VkResult VKAPI_CALL __nop_GetSemaphoreFdKHR(VkDevice device, const VkSemaphoreGetFdInfoKHR* pGetFdInfo, int* pFd)
+{
+    __VK_NOP_MESSAGE();
+    return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __nop_ImportSemaphoreFdKHR(VkDevice device, const VkImportSemaphoreFdInfoKHR* pImportSemaphoreFdInfo)
+{
+    __VK_NOP_MESSAGE();
+    return VK_SUCCESS;
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL __nop_CreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool)
 {
     __VK_NOP_MESSAGE();
@@ -1118,6 +1130,18 @@ VKAPI_ATTR VkBool32 VKAPI_CALL __nop_GetPhysicalDeviceWin32PresentationSupportKH
 {
     __VK_NOP_MESSAGE();
     return VK_TRUE;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __nop_GetSemaphoreWin32HandleKHR(VkDevice device, const VkSemaphoreGetWin32HandleInfoKHR* pGetWin32HandleInfo, HANDLE* pHandle)
+{
+    __VK_NOP_MESSAGE();
+    return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __nop_ImportSemaphoreWin32HandleKHR(VkDevice device, const VkImportSemaphoreWin32HandleInfoKHR* pImportSemaphoreWin32HandleInfo)
+{
+    __VK_NOP_MESSAGE();
+    return VK_SUCCESS;
 }
 #endif
 

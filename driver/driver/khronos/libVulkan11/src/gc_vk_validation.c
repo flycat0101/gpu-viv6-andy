@@ -1794,6 +1794,53 @@ vk_Exit:
     return result;
 }
 
+
+VKAPI_ATTR VkResult VKAPI_CALL __valid_ImportSemaphoreFdKHR(VkDevice device, const VkImportSemaphoreFdInfoKHR* pImportSemaphoreFdInfo)
+{
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%p): vkImportSemaphoreFdKHR(%p, %p)", gcoOS_GetCurrentThreadID(), device, pImportSemaphoreFdInfo);
+
+    /* API validation logic that can be skipped at runtime */
+    if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
+    {
+        result = __VK_ERROR_INVALID_HANDLE;
+        goto vk_Exit;
+    }
+
+    result = __vk_ImportSemaphoreFdKHR(device, pImportSemaphoreFdInfo);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
+    devCtx->currentResult = result;
+
+    return result;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __valid_GetSemaphoreFdKHR(VkDevice device, const VkSemaphoreGetFdInfoKHR* pGetFdInfo, int* pFd)
+{
+     __vkDevContext *devCtx = (__vkDevContext *)device;
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%p): vkGetSemaphoreFdKHR(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pGetFdInfo, pFd);
+
+    /* API validation logic that can be skipped at runtime */
+    if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
+    {
+        result = __VK_ERROR_INVALID_HANDLE;
+        goto vk_Exit;
+    }
+
+    result = __vk_GetSemaphoreFdKHR(device, pGetFdInfo, pFd);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
+    devCtx->currentResult = result;
+
+    return result;
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool)
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
@@ -6732,6 +6779,50 @@ VKAPI_ATTR VkBool32 VKAPI_CALL __valid_GetPhysicalDeviceWin32PresentationSupport
     }
 
     result = __vk_GetPhysicalDeviceWin32PresentationSupportKHR(physicalDevice, queueFamilyIndex);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
+
+    return result;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __valid_GetSemaphoreWin32HandleKHR(VkDevice device, const VkSemaphoreGetWin32HandleInfoKHR* pGetWin32HandleInfo, HANDLE* pHandle)
+{
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%p): vkGetSemaphoreWin32HandleKHR(%p, %u, %p)", gcoOS_GetCurrentThreadID(), device, pGetWin32HandleInfo, pHandle);
+
+    /* API validation logic that can be skipped at runtime */
+    if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
+    {
+        result = __VK_ERROR_INVALID_HANDLE;
+        goto vk_Exit;
+    }
+
+    result = __vk_GetSemaphoreWin32HandleKHR(device, pGetWin32HandleInfo, pHandle);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
+
+    return result;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __valid_ImportSemaphoreWin32HandleKHR(VkDevice device, const VkImportSemaphoreWin32HandleInfoKHR* pImportSemaphoreWin32HandleInfo)
+{
+   __vkDevContext *devCtx = (__vkDevContext *)device;
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%p): vkImportSemaphoreWin32HandleKHR(%p, %u)", gcoOS_GetCurrentThreadID(), device, pImportSemaphoreWin32HandleInfo);
+
+    /* API validation logic that can be skipped at runtime */
+    if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
+    {
+        result = __VK_ERROR_INVALID_HANDLE;
+        goto vk_Exit;
+    }
+
+    result = __vk_ImportSemaphoreWin32HandleKHR(device, pImportSemaphoreWin32HandleInfo);
 
 vk_Exit:
     __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));

@@ -349,6 +349,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateSemaphore(
     }
 
     result = __vk_AllocateHwFence(device, &sph->fenceIndex);
+    sph->signalIndex = -1;
 
     if (result == VK_SUCCESS)
     {
@@ -359,7 +360,34 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateSemaphore(
         __vk_DestroyObject(devCtx, __VK_OBJECT_SEMAPHORE, (__vkObject*)sph);
     }
 
+    if (pCreateInfo->pNext != VK_NULL_HANDLE)
+    {
+         VkExportSemaphoreCreateInfo *exportInfo = (VkExportSemaphoreCreateInfo *)pCreateInfo->pNext;
+         __VK_ASSERT(exportInfo->sType == VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO);
+
+         sph->handleType = (VkExternalSemaphoreHandleTypeFlagBits)exportInfo->handleTypes;
+
+        if (sph->handleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT ||
+            sph->handleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT)
+        {
+            /* create semaphore's windows handle with signal*/
+            __VK_ONERROR(gcoOS_CreateSignal(gcvNULL, VK_TRUE, &sph->winHandle));
+        }
+#if defined(LINUX) || defined(ANDROID)
+        if (sph->handleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT ||
+            sph->handleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT)
+        {
+            /*use the fenceFd to represent semaphore's fd*/
+            __VK_ONERROR(gcoOS_CreateSignal(gcvNULL, VK_TRUE, &devCtx->fdSignal[devCtx->fdCount]));
+            __VK_ONERROR(gcoOS_CreateNativeFence(gcvNULL, devCtx->fdSignal[devCtx->fdCount], &sph->fenceFd));
+            sph->signalIndex = devCtx->fdCount++;
+        }
+#endif
+    }
+
     return result;
+ OnError:
+    return VK_INCOMPLETE;
 }
 
 VKAPI_ATTR void VKAPI_CALL __vk_DestroySemaphore(
@@ -373,6 +401,17 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroySemaphore(
     {
         __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, semaphore);
 
+#if defined(LINUX) || defined(ANDROID)
+        if (sph->fenceFd)
+        {
+            close(sph->fenceFd);
+        }
+
+        if (sph->signalIndex >= 0)
+        {
+            gcoOS_DestroySignal(gcvNULL, devCtx->fdSignal[sph->signalIndex]);
+        }
+#endif
         __vk_FreeHwFence(device, sph->fenceIndex);
 
         __vk_DestroyObject(devCtx, __VK_OBJECT_SEMAPHORE, (__vkObject *)sph);
@@ -470,6 +509,82 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ResetEvent(
 
     return result;
 }
+
+VkResult VKAPI_CALL __vk_GetSemaphoreFdKHR(
+    VkDevice device,
+    const VkSemaphoreGetFdInfoKHR* pGetFdInfo,
+    int* pFd
+    )
+{
+    __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, pGetFdInfo->semaphore);
+    VkResult result = VK_SUCCESS;
+
+    if (sph->fenceFd != VK_NULL_HANDLE)
+    {
+        *pFd = sph->fenceFd;
+        return result;
+    }
+    else
+    {
+        result = VK_INCOMPLETE;
+    }
+
+   return result;
+
+}
+
+VkResult VKAPI_CALL __vk_ImportSemaphoreFdKHR(
+    VkDevice device,
+    const VkImportSemaphoreFdInfoKHR* pImportSemaphoreFdInfo
+    )
+{
+    __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, pImportSemaphoreFdInfo->semaphore);
+    VkResult result = VK_SUCCESS;
+
+    sph->fenceFd = pImportSemaphoreFdInfo->fd;
+    sph->handleType = pImportSemaphoreFdInfo->handleType;
+    sph->signalIndex = -1;
+
+    return result;
+}
+
+#if defined(_WIN32)
+VkResult VKAPI_CALL __vk_GetSemaphoreWin32HandleKHR(
+    VkDevice device,
+    const VkSemaphoreGetWin32HandleInfoKHR* pGetWin32HandleInfo,
+    HANDLE* pHandle
+    )
+{
+    __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, pGetWin32HandleInfo->semaphore);
+    VkResult result = VK_SUCCESS;
+
+    if (sph->winHandle != VK_NULL_HANDLE)
+    {
+        *pHandle = sph->winHandle;
+        return result;
+    }
+    else
+    {
+        result = VK_INCOMPLETE;
+    }
+
+    return result;
+}
+
+VkResult VKAPI_CALL __vk_ImportSemaphoreWin32HandleKHR(
+    VkDevice device,
+    const VkImportSemaphoreWin32HandleInfoKHR* pImportSemaphoreWin32HandleInfo
+    )
+{
+    __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, pImportSemaphoreWin32HandleInfo->semaphore);
+    VkResult result = VK_SUCCESS;
+
+    sph->winHandle = pImportSemaphoreWin32HandleInfo->handle;
+    sph->handleType = pImportSemaphoreWin32HandleInfo->handleType;
+
+    return result;
+}
+#endif
 
 
 

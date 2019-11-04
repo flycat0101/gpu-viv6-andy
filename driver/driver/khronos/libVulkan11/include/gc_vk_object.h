@@ -96,6 +96,16 @@ typedef struct __vkSemaphoreRec
     /* Semaphore specific fields */
     uint32_t fenceIndex;
 
+    /*support semaphore_win32 extention */
+    void *winHandle;
+
+    VkExternalSemaphoreHandleTypeFlagBits handleType;
+
+    /*support semaphore_fd extension*/
+    int fenceFd;
+
+    int32_t signalIndex;
+
 } __vkSemaphore;
 
 typedef struct __vkEventRec

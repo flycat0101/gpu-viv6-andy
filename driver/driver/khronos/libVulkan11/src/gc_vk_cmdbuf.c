@@ -599,21 +599,34 @@ VkResult __vk_InsertSemaphoreWaits(
 
     fenceAddress = memory->devAddr;
 
-    stateSize = 2 * semaphoreCount * sizeof(uint32_t);
-
-    states = (uint32_t *)__vk_QueueGetSpace(devQueue, stateSize);
-
-    __VK_ONERROR(states ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-
     for (i = 0; i < semaphoreCount; i++)
     {
         __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, pSemaphores[i]);
 
-        *states++ = __VK_CMD_HW_FENCE_WAIT(10);
-        *states++ = fenceAddress + sph->fenceIndex * sizeof(__vkHwFenceData);
-    }
+        if (sph->winHandle)
+        {
+            __VK_ONERROR(gcoOS_WaitSignal(gcvNULL, sph->winHandle, gcvINFINITE));
+        }
+#if defined(LINUX) || defined(ANDROID)
+        else if (sph->fenceFd)
+        {
+            __VK_ONERROR(gcoOS_WaitNativeFence(gcvNULL, sph->fenceFd, gcvINFINITE));
+        }
+#endif
+        else
+        {
+            stateSize = 2 * sizeof(uint32_t);
 
-    __vk_QueueReleaseSpace(devQueue, stateSize);
+            states = (uint32_t *)__vk_QueueGetSpace(devQueue, stateSize);
+
+            __VK_ONERROR(states ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+
+            *states++ = __VK_CMD_HW_FENCE_WAIT(10);
+            *states++ = fenceAddress + sph->fenceIndex * sizeof(__vkHwFenceData);
+
+            __vk_QueueReleaseSpace(devQueue, stateSize);
+        }
+    }
 
 OnError:
 
@@ -661,6 +674,28 @@ VkResult __vk_InsertSemaphoreSignals(
             0x0E1A, VK_FALSE, (fenceAddress + sph->fenceIndex * sizeof(__vkHwFenceData)));
         __vkCmdLoadSingleHWState(&states, 0x0E26, VK_FALSE, 0);
         __vkCmdLoadSingleHWState(&states, 0x0E1B, VK_FALSE, 1);
+
+        if (sph->winHandle)
+        {
+            gcmVERIFY_OK(gcoOS_Signal(gcvNULL, sph->winHandle, gcvTRUE));
+        }
+#if defined(LINUX) || defined(ANDROID)
+        uint32_t j = 0;
+        if (sph->fenceFd && devQueue->pDevContext->fdSignal)
+        {
+            if (sph->signalIndex >= 0)
+            {
+                gcmVERIFY_OK(gcoOS_Signal(gcvNULL, devQueue->pDevContext->fdSignal[sph->signalIndex], gcvTRUE));
+            }
+            else if (sph->signalIndex == -1)
+            {
+                for (j = 0; j < devQueue->pDevContext->fdCount; j++)
+                {
+                    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, devQueue->pDevContext->fdSignal[j], gcvTRUE));
+                }
+            }
+        }
+#endif
     }
 
     __vk_QueueReleaseSpace(devQueue, stateSize);
