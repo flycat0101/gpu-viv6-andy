@@ -1691,10 +1691,14 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
        one here */
     vsOutputCount = vscMAX(vsOutputCount, pVSOutputLinkageInfo->vtxPxlLinkage.totalLinkNoCount);
 
-    /* Output must include position (explicit or implicit) */
+    /* Output must include position (explicit or implicit) and pointSize if present, just following the driver bypass mode. */
     if (vsOutputCount == 0)
     {
-        vsOutputCount ++;
+        vsOutputCount++;
+        if (pVsSEP->outputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_POINTSIZE].ioIndexMask != 0)
+        {
+            vsOutputCount++;
+        }
     }
 
     _GetMinMaxUscSize(pShHwInfo, pStatesPgmer, &minUscSize, &maxUscSize, &extraUscSize);
