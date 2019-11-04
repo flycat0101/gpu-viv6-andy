@@ -10629,8 +10629,8 @@ vx_status vxnneExecuteSWBatchNormalization(struct _vxnne_operation_s *operation)
     vx_uint8_ptr inputLogic, outputLogic;
     vx_uint8_ptr meanLogic, varianceLogic, gammaLogic, betaLogic;
 
-    vx_uint32  width, height, channel;
-    vx_uint32  c, i, spatial;
+    vx_uint32  width, height, channel, batch;
+    vx_uint32  c, i, spatial, b;
     vx_float32 meanf, variancef, gammaf, betaf;
     vx_float32 inputf, outputf;
     vx_type_e  inFormat, outFormat, meanFormat, varianceFormat, gammaFormat, betaFormat;
@@ -10653,6 +10653,7 @@ vx_status vxnneExecuteSWBatchNormalization(struct _vxnne_operation_s *operation)
     width       = TENSOR_VIEW_SIZE_INDEX(input, 0);
     height      = TENSOR_VIEW_SIZE_INDEX(input, 1);
     channel     = TENSOR_VIEW_SIZE_INDEX(input, 2);
+    batch       = TENSOR_VIEW_SIZE_INDEX(input, 3);
     spatial     = width * height;
 
     inFormat        = (vx_type_e)(TENSOR_DATA_TYPE(input));
@@ -10669,25 +10670,26 @@ vx_status vxnneExecuteSWBatchNormalization(struct _vxnne_operation_s *operation)
     vxoTensor_GetTensorViewMemory(gamma, (gctPOINTER*)&gammaLogic, VX_NULL);
     vxoTensor_GetTensorViewMemory(beta, (gctPOINTER*)&betaLogic, VX_NULL);
 
-    for(c = 0; c < channel; c ++)
+    for(b = 0; b < batch; ++b)
     {
-        meanf     = vxnneGetDataExt(meanFormat, TENSOR_QUANT_TYPE(means), c, meanLogic, TENSOR_POS(means), TENSOR_TF_ZEROPOINT(means), TENSOR_TF_SCALE(means));
-        variancef = vxnneGetDataExt(varianceFormat, TENSOR_QUANT_TYPE(variances), c, varianceLogic, TENSOR_POS(variances), TENSOR_TF_ZEROPOINT(variances), TENSOR_TF_SCALE(variances));
-        gammaf    = vxnneGetDataExt(gammaFormat, TENSOR_QUANT_TYPE(gamma), c, gammaLogic, TENSOR_POS(gamma), TENSOR_TF_ZEROPOINT(gamma), TENSOR_TF_SCALE(gamma));
-        betaf     = vxnneGetDataExt(betaFormat, TENSOR_QUANT_TYPE(beta), c, betaLogic, TENSOR_POS(beta), TENSOR_TF_ZEROPOINT(beta), TENSOR_TF_SCALE(beta));
-
-        for(i = 0; i < spatial; i ++)
+        meanf     = vxnneGetDataExt(meanFormat, TENSOR_QUANT_TYPE(means), b, meanLogic, TENSOR_POS(means), TENSOR_TF_ZEROPOINT(means), TENSOR_TF_SCALE(means));
+        variancef = vxnneGetDataExt(varianceFormat, TENSOR_QUANT_TYPE(variances), b, varianceLogic, TENSOR_POS(variances), TENSOR_TF_ZEROPOINT(variances), TENSOR_TF_SCALE(variances));
+        gammaf    = vxnneGetDataExt(gammaFormat, TENSOR_QUANT_TYPE(gamma), b, gammaLogic, TENSOR_POS(gamma), TENSOR_TF_ZEROPOINT(gamma), TENSOR_TF_SCALE(gamma));
+        betaf     = vxnneGetDataExt(betaFormat, TENSOR_QUANT_TYPE(beta), b, betaLogic, TENSOR_POS(beta), TENSOR_TF_ZEROPOINT(beta), TENSOR_TF_SCALE(beta));
+        for(c = 0; c < channel; c ++)
         {
-            index       = c * spatial + i;
-            inputf  = vxnneGetDataExt(inFormat, TENSOR_QUANT_TYPE(input), index, inputLogic, TENSOR_POS(input), TENSOR_TF_ZEROPOINT(input), TENSOR_TF_SCALE(input));
-            /* Compute Normalize */
-            normalize   = (inputf - meanf)/sqrtf(variancef + eps);
-            /* Scale and Shift */
-            outputf     = gammaf * normalize + betaf;
-            vxnneSaveDataExt(outFormat, TENSOR_QUANT_TYPE(output), index, outputf, outputLogic, TENSOR_POS(output), TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output), TENSOR_ROUNDING_MODE(output));
+            for(i = 0; i < spatial; i ++)
+            {
+                index       = b * channel * spatial + c * spatial + i;
+                inputf  = vxnneGetDataExt(inFormat, TENSOR_QUANT_TYPE(input), index, inputLogic, TENSOR_POS(input), TENSOR_TF_ZEROPOINT(input), TENSOR_TF_SCALE(input));
+                /* Compute Normalize */
+                normalize   = (inputf - meanf)/sqrtf(variancef + eps);
+                /* Scale and Shift */
+                outputf     = gammaf * normalize + betaf;
+                vxnneSaveDataExt(outFormat, TENSOR_QUANT_TYPE(output), index, outputf, outputLogic, TENSOR_POS(output), TENSOR_TF_ZEROPOINT(output), TENSOR_TF_SCALE(output), TENSOR_ROUNDING_MODE(output));
+            }
         }
     }
-
     return status;
 }
 
@@ -10867,7 +10869,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
                                            VXNNE_OPERATOR_BATCHNORM,
                                            vxnneExecuteSWBatchNormalization,
                                            VX_NULL,
-                                           batchCount,
+                                           1/*batchCount*/,
                                            0);
         if (status != VX_SUCCESS) goto exit;
 
