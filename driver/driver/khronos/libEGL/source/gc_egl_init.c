@@ -472,12 +472,14 @@ _FillIn(
                     config->renderableType &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR | EGL_OPENGL_BIT);
                     config->conformant     &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR | EGL_OPENGL_BIT);
                 }
-                else if (!printed)
-                {
-                    gcmPRINT("EGL: enable all configs for conformance test");
-                    printed = gcvTRUE;
-                }
             }
+            else if (!printed)
+            {
+                gcmPRINT("EGL: enable all configs for conformance test");
+                printed = gcvTRUE;
+            }
+            config->renderableType &= ~EGL_OPENGL_BIT;
+            config->conformant     &= ~EGL_OPENGL_BIT;
         }
     }
 #endif
