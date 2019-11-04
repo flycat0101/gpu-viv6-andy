@@ -3914,8 +3914,8 @@ vxnne_shader_executable vxnneGetEmbeddingLUTShaderExecutable(
 
     if (oDims == 3)
     {
-        rs_sizes[0] = ow;
-        rs_sizes[1] = oh * oc;
+        rs_sizes[0] = ow * oh;
+        rs_sizes[1] = oc;
         output_rs = vxoTensor_ReshapeTensor(output, rs_sizes, 2);
         parameters[2] = (vx_reference)output_rs;
     }
