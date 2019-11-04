@@ -5043,10 +5043,11 @@ gceSTATUS
 gcoHARDWARE_QuerySRAM(
     IN gcoHARDWARE Hardware,
     IN gcePOOL  Type,
-    OUT gctUINT32 *Base,
     OUT gctUINT32 *Size,
-    OUT gctPHYS_ADDR_T *gpuPhysical,
-    OUT gctPHYS_ADDR_T *cpuPhysical
+    OUT gctUINT32 *GPUVirtAddr,
+    OUT gctPHYS_ADDR_T *GPUPhysAddr,
+    OUT gctUINT32 *GPUPhysName,
+    OUT gctPHYS_ADDR_T *CPUPhysAddr
     );
 
 /******************************************************************************

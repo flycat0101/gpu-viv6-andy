@@ -1528,9 +1528,10 @@ gcoHAL_QuerySRAM(
     OUT gctUINT32 *Base,
     OUT gctUINT32 *Size,
     OUT gctPHYS_ADDR_T *gpuPhysical,
+    OUT gctUINT32 *gpuPhysicalName,
     OUT gctPHYS_ADDR_T *cpuPhysical
     )
 {
-    return gcoHARDWARE_QuerySRAM(gcvNULL, Type, Base, Size, gpuPhysical, cpuPhysical);
+    return gcoHARDWARE_QuerySRAM(gcvNULL, Type, Base, Size, gpuPhysical, gpuPhysicalName, cpuPhysical);
 }
 

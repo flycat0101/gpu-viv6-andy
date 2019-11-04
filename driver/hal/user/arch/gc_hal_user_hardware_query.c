@@ -7381,38 +7381,52 @@ gceSTATUS
 gcoHARDWARE_QuerySRAM(
     IN gcoHARDWARE Hardware,
     IN gcePOOL Type,
-    OUT gctUINT32 *Base,
     OUT gctUINT32 *Size,
-    OUT gctPHYS_ADDR_T *gpuPhysical,
-    OUT gctPHYS_ADDR_T *cpuPhysical
+    OUT gctUINT32 *GPUVirtAddr,
+    OUT gctPHYS_ADDR_T *GPUPhysAddr,
+    OUT gctUINT32 *GPUPhysName,
+    OUT gctPHYS_ADDR_T *CPUPhysAddr
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcmHEADER_ARG("Hardware=%p Type=%d Base=%p Size=%p", Hardware, Type, Base, Size);
+
+    gcmHEADER_ARG("Hardware=%p Type=%d Size=%p, GPUVirtAddr=%p, GPUPhysAddr=%p, GPUPhysName=%p, GPUPhysAddr=%p",
+                  Hardware, Type, Size, GPUVirtAddr, GPUPhysAddr, GPUPhysName, GPUPhysAddr);
 
     gcmGETHARDWARE(Hardware);
 
-    if ((Type == gcvPOOL_INTERNAL_SRAM) || (Type == gcvPOOL_EXTERNAL_SRAM))
+    if ((Type != gcvPOOL_INTERNAL_SRAM) &&
+        (Type != gcvPOOL_EXTERNAL_SRAM))
     {
-        if (Base)
-            *Base = 0;
-
-        if (Size)
-            *Size = (Type == gcvPOOL_INTERNAL_SRAM ? Hardware->options.sRAMSizes[0] : Hardware->options.extSRAMSizes[0]);
-
-        if (gpuPhysical)
-        {
-            *gpuPhysical = 0;
-        }
-
-        if (cpuPhysical)
-        {
-            *cpuPhysical = 0;
-        }
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
-    else
+
+    if (Size)
     {
-        status = gcvSTATUS_INVALID_ARGUMENT;
+        *Size = (Type == gcvPOOL_EXTERNAL_SRAM) ? Hardware->options.extSRAMSizes[0] :
+                                                  Hardware->options.sRAMSizes[0];
+    }
+
+    if (GPUVirtAddr)
+    {
+        *GPUVirtAddr = (Type == gcvPOOL_EXTERNAL_SRAM) ? Hardware->options.extSRAMGPUVirtAddrs[0] :
+                                                         Hardware->options.sRAMGPUVirtAddrs[0];
+    }
+
+    if (GPUPhysAddr)
+    {
+        *GPUPhysAddr = (Type == gcvPOOL_EXTERNAL_SRAM) ? Hardware->options.extSRAMGPUPhysAddrs[0] :
+                                                         gcvINVALID_PHYSICAL_ADDRESS;
+    }
+
+    if (GPUPhysName)
+    {
+        *GPUPhysName = (Type == gcvPOOL_EXTERNAL_SRAM) ? Hardware->options.extSRAMGPUPhysNames[0] : 0;
+    }
+    if (CPUPhysAddr)
+    {
+        *CPUPhysAddr = (Type == gcvPOOL_EXTERNAL_SRAM)? Hardware->options.extSRAMCPUPhysAddrs[0] :
+                                                        gcvINVALID_PHYSICAL_ADDRESS;
     }
 
 OnError:

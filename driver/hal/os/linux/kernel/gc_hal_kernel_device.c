@@ -1492,7 +1492,7 @@ gckGALDEVICE_Construct(
 {
     gckKERNEL kernel = gcvNULL;
     gckGALDEVICE device;
-    gctINT32 i;
+    gctINT32 i, j;
     gceHARDWARE_TYPE type;
     gceSTATUS status = gcvSTATUS_OK;
 
@@ -1808,6 +1808,15 @@ gckGALDEVICE_Construct(
                         ));
 
                 device->extSRAMVidMem[i]->physical = device->extSRAMPhysical[i];
+                device->device->extSRAMPhysical[i] = device->extSRAMPhysical[i];
+
+                for (j = 0; j < gcdMAX_GPU_COUNT; j++)
+                {
+                    if (device->irqLines[j] != -1 && device->kernels[j])
+                    {
+                        device->kernels[j]->hardware->options.extSRAMGPUPhysNames[i] = gckKERNEL_AllocateNameFromPointer(device->kernels[j], device->extSRAMPhysical[i]);
+                    }
+                }
             }
         }
     }

@@ -1114,89 +1114,119 @@ VX_PRIVATE_API vx_status QuerySRAM(
     vx_status vxStatus = VX_SUCCESS;
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcsSURF_NODE_PTR    node = VX_NULL;
-    gctPOINTER          logical = VX_NULL;
-    gctUINT32           physical = 0xFFFFFFFF;
     gctUINT32           size = 0;
-    gctPHYS_ADDR_T      gpuPhysical = ~0ull;
+    gctPOINTER          cpuLogical = gcvNULL;
+    gctPHYS_ADDR_T      cpuPhysical = gcvINVALID_PHYSICAL_ADDRESS;
+    gctPHYS_ADDR_T      gpuPhysical = gcvINVALID_PHYSICAL_ADDRESS;
+    gctUINT32           gpuVirtual = gcvINVALID_ADDRESS;
+    gctUINT32           gpuPhysicalName;
 
     gcmHEADER_ARG("globalData=%p, type=%p, sRamPhysical=%p, sRamLogical=%p, sRamSize=%p, sRamNode=%p",
         globalData, type, sRamPhysical, sRamLogical, sRamSize, sRamNode);
 
-    status = gcoHAL_QuerySRAM(gcvNULL, type, gcvNULL, &size, gcvNULL, gcvNULL);
-    if (gcmIS_ERROR(status))
+    gcmONERROR(gcoHAL_QuerySRAM(gcvNULL,
+                                type,
+                                &size,
+                                gcvNULL,
+                                gcvNULL,
+                                gcvNULL,
+                                gcvNULL
+                                ));
+
+    if ((type != gcvPOOL_EXTERNAL_SRAM) &&
+        (type != gcvPOOL_INTERNAL_SRAM))
     {
-        vxStatus = VX_FAILURE;
-        goto OnError;
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
     if (type == gcvPOOL_EXTERNAL_SRAM)
     {
-        if (globalData->options.axiSRAMSize != VX_INVALID_VALUE )
+        if (globalData->options.axiSRAMSize != VX_INVALID_VALUE)
         {
             size = gcmMIN(size, globalData->options.axiSRAMSize);
         }
 
-        globalData->nnConfig.customizedFeature.axiSRAMSize = size;
-
         if (size != 0)
         {
-            gctUINT32 tempSize = size;
+            globalData->nnConfig.customizedFeature.axiSRAMSize = size;
 
-            status = gcoVX_AllocateMemoryEx(&tempSize, gcvSURF_VERTEX, type, 256, &physical, &logical, &node);
-            if (gcmIS_ERROR(status))
-            {
-                vxStatus = VX_ERROR_NO_MEMORY;
-                goto OnError;
-            }
+            gcmONERROR(gcoHAL_QuerySRAM(gcvNULL,
+                                        type,
+                                        &size,
+                                        &gpuVirtual,
+                                        &gpuPhysical,
+                                        &gpuPhysicalName,
+                                        &cpuPhysical
+                                        ));
 
-            gpuPhysical = physical;
+            gcmONERROR(gcoHAL_MapMemory(gcvNULL,
+                                        gpuPhysicalName,
+                                        size,
+                                        &cpuLogical
+                                        ));
         }
     }
     else if (type == gcvPOOL_INTERNAL_SRAM)
     {
-        if (globalData->options.vipSRAMSize != VX_INVALID_VALUE )
+        if (globalData->options.vipSRAMSize != VX_INVALID_VALUE)
         {
             size = gcmMIN(size, globalData->options.vipSRAMSize);
         }
 
+        if (size == 0)
+        {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+
         globalData->nnConfig.customizedFeature.vipSRAMSize = size;
 
-        if (size != 0)
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
         {
-            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
-            {
-                /* on Cmodel */
-                gctUINT32 tempSize = size;
-                status = gcoVX_AllocateMemoryEx(&tempSize, gcvSURF_VERTEX, type, 256, &physical, &logical, &node);
-                if (gcmIS_ERROR(status))
-                {
-                    vxStatus = VX_ERROR_NO_MEMORY;
-                    goto OnError;
-                }
-            }
-        }
-        else
-        {
-            vxStatus = VX_ERROR_INVALID_VALUE;
-            goto OnError;
+            gcmONERROR(gcoHAL_QuerySRAM(gcvNULL,
+                                        type,
+                                        &size,
+                                        &gpuVirtual,
+                                        VX_NULL,
+                                        VX_NULL,
+                                        VX_NULL
+                                        ));
         }
     }
-    else
+
+    if (sRamPhysical)
     {
-        vxStatus = VX_ERROR_INVALID_VALUE;
-        goto OnError;
+        *sRamPhysical = gpuVirtual;
     }
 
-    *sRamPhysical = physical;
-    *sRamLogical = logical;
-    *sRamSize = size;
-    *sRamNode = node;
+    if (sRamLogical)
+    {
+        *sRamLogical = cpuLogical;
+    }
 
-    if (sRamGpuPhysical) *sRamGpuPhysical = (gctUINT32)gpuPhysical;
+    if (sRamGpuPhysical)
+    {
+        *sRamGpuPhysical = (gctUINT32)gpuPhysical;
+    }
+
+    if (sRamSize)
+    {
+        *sRamSize = size;
+    }
+
+    if (sRamNode)
+    {
+        *sRamNode = VX_NULL;
+    }
+
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+
+    return VX_SUCCESS;
 
 OnError:
+    vxStatus = VX_FAILURE;
+
     gcmFOOTER_ARG("%d", vxStatus);
+
     return vxStatus;
 }
 
@@ -1208,26 +1238,25 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitSRAM(
     vx_status           status = VX_SUCCESS;
     gcsSURF_NODE_PTR    axiSRAMNode = VX_NULL;
     gctPOINTER          axiSRAMLogical = VX_NULL;
-    gctUINT32           axiSRAMPhysical = ~0u;
+    gctUINT32           axiSRAMPhysical = gcvINVALID_ADDRESS;
     gctUINT32           axiSRAMSize = 0;
-    gctUINT32           axiSRAMGpuPhysical = ~0u;
+    gctUINT32           axiSRAMGpuPhysical = gcvINVALID_ADDRESS;
 
     gcsSURF_NODE_PTR    vipSRAMNode = VX_NULL;
-    gctPOINTER          vipSRAMLogical = VX_NULL;
-    gctUINT32           vipSRAMPhysical = ~0u;
+    gctUINT32           vipSRAMPhysical = gcvINVALID_ADDRESS;
     gctUINT32           vipSRAMSize = 0;
 
     gcmHEADER_ARG("globalData=%p", globalData);
 
     vxmONERROR(QuerySRAM(globalData, gcvPOOL_EXTERNAL_SRAM, &axiSRAMPhysical, &axiSRAMLogical, &axiSRAMGpuPhysical, &axiSRAMSize, &axiSRAMNode));
-    vxmONERROR(QuerySRAM(globalData, gcvPOOL_INTERNAL_SRAM, &vipSRAMPhysical, &vipSRAMLogical, gcvNULL, &vipSRAMSize, &vipSRAMNode));
+    vxmONERROR(QuerySRAM(globalData, gcvPOOL_INTERNAL_SRAM, &vipSRAMPhysical, gcvNULL, gcvNULL, &vipSRAMSize, &vipSRAMNode));
 
     vxmASSERT(vipSRAMSize != 0);
-    vxmASSERT(axiSRAMSize == 0 || (axiSRAMPhysical != ~0u && axiSRAMGpuPhysical != ~0u));
+    vxmASSERT(axiSRAMSize == 0 || (axiSRAMPhysical != gcvINVALID_ADDRESS && axiSRAMGpuPhysical != gcvINVALID_PHYSICAL_ADDRESS));
 
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
     {
-        vxmASSERT(vipSRAMPhysical != 0xFFFFFFFF);
+        vxmASSERT(vipSRAMPhysical != gcvINVALID_ADDRESS);
         gcmVERIFY_OK(gcoVX_SetRemapAddress(vipSRAMPhysical, 0, gcvVX_SRAM_REMAP));
     }
 
@@ -1285,8 +1314,8 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitSRAM(
     {
         globalData->vipSRAM.size        = (vipSRAMSize <= VX_VIP_SRAM_IMAGE_STREAM_SIZE) ? vipSRAMSize : (vipSRAMSize - VX_VIP_SRAM_IMAGE_STREAM_SIZE);
         globalData->vipSRAM.logical     = gcvNULL;
-        globalData->vipSRAM.physBase    = vipSRAMPhysical != 0xFFFFFFFF ? vipSRAMPhysical : 0;
-        globalData->vipSRAM.physical    = vipSRAMPhysical != 0xFFFFFFFF ?
+        globalData->vipSRAM.physBase    = vipSRAMPhysical != gcvINVALID_ADDRESS ? vipSRAMPhysical : 0;
+        globalData->vipSRAM.physical    = vipSRAMPhysical != gcvINVALID_ADDRESS ?
                                            vipSRAMPhysical + VX_VIP_SRAM_IMAGE_STREAM_SIZE : VX_VIP_SRAM_IMAGE_STREAM_SIZE;
         globalData->vipSRAM.used        = 0;
         globalData->vipSRAM.node        = vipSRAMNode;
@@ -1351,6 +1380,7 @@ VX_PRIVATE_API vx_uint32 vxoGlobalData_Release(vx_global_data globalData);
 VX_PRIVATE_API vx_uint32 vxoGlobalData_AddRef(vx_global_data globalData)
 {
     vx_uint32 refCount = globalData->refGlobalDataCount;
+
     if (refCount == 0)
     {
          vxoGlobalData_Initialize(globalData);

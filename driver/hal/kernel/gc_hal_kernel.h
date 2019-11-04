@@ -1406,6 +1406,8 @@ typedef struct _gcsDEVICE
     gctUINT32                   extSRAMSizes[gcvSRAM_EXT_COUNT];
     /* GPU/VIP virtual address of external SRAMs. */
     gctUINT32                   extSRAMBaseAddresses[gcvSRAM_EXT_COUNT];
+    /* MDL. */
+    gctPHYS_ADDR                extSRAMPhysical[gcvSRAM_EXT_COUNT];
 
     /* Show SRAM mapping info or not. */
     gctUINT                     showSRAMMapInfo;

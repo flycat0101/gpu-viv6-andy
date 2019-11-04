@@ -3189,6 +3189,8 @@ gckMMU_SetupSRAM(
 
                     Device->sRAMPhysFaked[i][j] = gcvTRUE;
                 }
+
+                Hardware->options.sRAMGPUVirtAddrs[j] = Device->sRAMBaseAddresses[i][j];
             }
         }
 
@@ -3201,11 +3203,16 @@ gckMMU_SetupSRAM(
 
                 Device->extSRAMBaseAddresses[i] = 0;
 
+                Hardware->options.extSRAMCPUPhysAddrs[i] = Device->extSRAMBases[i];
+
                 gcmkONERROR(gckOS_CPUPhysicalToGPUPhysical(
                     Mmu->os,
                     Device->extSRAMBases[i],
                     &Device->extSRAMBases[i]
                     ));
+
+                Hardware->options.extSRAMGPUPhysAddrs[i] = Device->extSRAMBases[i];
+
                 gcmkONERROR(_FillFlatMapping(
                     Mmu,
                     Device->extSRAMBases[i],
@@ -3216,6 +3223,8 @@ gckMMU_SetupSRAM(
                     ));
 
                 kernel->extSRAMBaseAddresses[i] = Device->extSRAMBaseAddresses[i];
+
+                Hardware->options.extSRAMGPUVirtAddrs[i] = Device->extSRAMBaseAddresses[i];
                 Hardware->options.extSRAMSizes[i] = Device->extSRAMSizes[i];
 
                 if (Device->showSRAMMapInfo)
