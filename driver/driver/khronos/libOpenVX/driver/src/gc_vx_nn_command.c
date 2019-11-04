@@ -1138,6 +1138,7 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
             if (!value->e32[0])
             {
                 vxmASSERT(otherRef != VX_NULL);
+                size = input->width * input->height * input->depth;
                 slice = ((vx_weights_biases_parameter)otherRef)->slice_num;
             }
             else
