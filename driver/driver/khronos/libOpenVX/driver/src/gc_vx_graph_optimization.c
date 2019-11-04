@@ -2578,7 +2578,7 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
     {
         if(TENSOR_DATA_TYPE(input) == VX_TYPE_FLOAT16)
             quantizedData = Fp32toFp16(fill_data);
-        if(TENSOR_DATA_TYPE(input) == VX_TYPE_BFLOAT16)
+        else if(TENSOR_DATA_TYPE(input) == VX_TYPE_BFLOAT16)
             quantizedData = Fp32toBF16(fill_data);
         else
         {
