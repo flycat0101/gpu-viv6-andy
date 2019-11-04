@@ -2242,6 +2242,9 @@ vxnne_shader_executable vxnneGetSpace2DepthShaderExecutable(
     borderMode->constant_value.U8 = 0;
     borderMode->constant_value.S16 = 0;
 
+    if(inputFormat == VX_TYPE_UINT8)
+        borderMode->constant_value.U8 = (vx_uint8)in_zeros_point;
+
     if (!((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
        || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
        || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
@@ -2728,6 +2731,9 @@ vxnne_shader_executable vxnneGetSpace2BatchShaderExecutable(
     borderMode->constant_value.U8 = 0;
     borderMode->constant_value.S16 = 0;
 
+    if(inputFormat == VX_TYPE_UINT8)
+        borderMode->constant_value.U8 = (vx_uint8)in_zeros_point;
+
     if (!((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
        || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
        || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
@@ -2933,6 +2939,9 @@ vxnne_shader_executable vxnneGetBatch2SpaceShaderExecutable(
     borderMode->mode = VX_BORDER_CONSTANT;
     borderMode->constant_value.U8 = 0;
     borderMode->constant_value.S16 = 0;
+
+    if(inputFormat == VX_TYPE_UINT8)
+        borderMode->constant_value.U8 = (vx_uint8)in_zeros_point;
 
     if (!((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
        || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
@@ -13585,12 +13594,17 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
     vx_float32   output_scale      = TENSOR_TF_SCALE(output);
     vx_int32     inputZP           = TENSOR_TF_ZEROPOINT(input);
     vx_int32     outputZP          = TENSOR_TF_ZEROPOINT(output);
+    vx_int8      srcFixPointPos    = TENSOR_POS(input);
+    vx_int8      dstFixPointPos    = TENSOR_POS(output);
     vx_tensor    src               = NULL;
     vx_tensor    dst               = NULL;
     vx_uint32    maxWorkGroupSize  = 8;
     vx_float32   mixScale          = 1.0;
     vx_float32   mixZp             = 0.0;
     vx_int32     flFlg             = 0;
+    vx_int32     fpFlg             = 0;
+    vx_uint8     postshift         = 0;
+    vx_uint32    multiplier        = 0;
 
     vx_bool      enable_preprocess = vx_false_e;
     vx_bool      enable_preprocess_2d = vx_false_e;
@@ -13602,6 +13616,25 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
     {
         inputFormat  = VX_TYPE_FLOAT16;
         outputFormat = VX_TYPE_FLOAT16;
+    }
+
+    if((inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
+        ||(inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16))
+    {
+        if(srcFixPointPos != dstFixPointPos)
+            fpFlg = 1;
+
+        if(fpFlg)
+        {
+            if (srcFixPointPos > dstFixPointPos)
+            {
+                postshift      = gcmMIN(srcFixPointPos - dstFixPointPos, MAX_POST_SHIFT_BITS);
+            }
+            else
+            {
+                multiplier = gcmMIN(1 << (dstFixPointPos - srcFixPointPos), MAX_MULTIPLIER_NUM);
+            }
+        }
     }
 
     if(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
@@ -13928,8 +13961,33 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
                 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
             };
 
+            if(fpFlg)
+            {
+                if (srcFixPointPos > dstFixPointPos)
+                {
+                    uniExchange8Bits_part0_2x8[7] |= (postshift & 0x1F);
+                    uniExchange8Bits_part1_2x8[7] |= (postshift & 0x1F);
+                    uniExchange8Bits_part2_2x8[7] |= (postshift & 0x1F);
+                    uniExchange8Bits_part3_2x8[7] |= (postshift & 0x1F);
+                }
+                else
+                {
+                    vx_uint32 i          = 0;
+
+                    for (i = 0; i < 8; i++)
+                    {
+                        uniExchange8Bits_part0_2x8[i + 8] = multiplier;
+                        uniExchange8Bits_part1_2x8[i + 8] = multiplier;
+                        uniExchange8Bits_part2_2x8[i + 8] = multiplier;
+                        uniExchange8Bits_part3_2x8[i + 8] = multiplier;
+                    }
+                }
+            }
+
             if(flFlg)
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8Bits_2D", borderMode);
+            else if(fpFlg)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I8Bits_2D", borderMode);
             else
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_8Bits_2D", borderMode);
             if (!shaderExecutable) goto OnError;
@@ -14008,7 +14066,29 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
                 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
             };
 
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_16Bits_2D", borderMode);
+            if(fpFlg)
+            {
+                if (srcFixPointPos > dstFixPointPos)
+                {
+                    uniExchangeStride4_part0_2x8[7] |= (postshift & 0x1F);
+                    uniExchangeStride4_part1_2x8[7] |= (postshift & 0x1F);
+                }
+                else
+                {
+                    vx_uint32 i          = 0;
+
+                    for (i = 0; i < 8; i++)
+                    {
+                        uniExchangeStride4_part0_2x8[i + 8] = multiplier;
+                        uniExchangeStride4_part1_2x8[i + 8] = multiplier;
+                    }
+                }
+            }
+
+            if(fpFlg)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16Bits_2D", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_16Bits_2D", borderMode);
             if (!shaderExecutable) goto OnError;
 
             status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExchangeStride1_part0_2x8", 1, uniExchangeStride1_part0_2x8);
@@ -14045,11 +14125,35 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
             0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
         };
 
+        if(fpFlg)
+        {
+            if (srcFixPointPos > dstFixPointPos)
+            {
+                uniPackDataABCD_01[7] |= (postshift & 0x1F);
+                uniPackDataABCD_23[7] |= (postshift & 0x1F);
+            }
+            else
+            {
+                vx_uint32 i          = 0;
+
+                for (i = 0; i < 8; i++)
+                {
+                    uniPackDataABCD_01[i + 8] = multiplier;
+                    uniPackDataABCD_23[i + 8] = multiplier;
+                }
+            }
+        }
+
         execution_parameters.globalWorkScale[0]    = 8;
         execution_parameters.globalWorkScale[1]    = 1;
         execution_parameters.globalWorkScale[2]    = 4;
         if (perm[0] == 2 && perm[1] == 0 && perm[2] == 1)
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2CWH", borderMode);
+        {
+            if(fpFlg)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2CWH_i16", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2CWH", borderMode);
+        }
         else if (perm[0] == 2 && perm[1] == 1 && perm[2] == 0)
         {
             vx_uint32 uniPackedABAB_2x8[16] = {
@@ -14098,7 +14202,27 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
                 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
             };
 
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2CHW", borderMode);
+            if(fpFlg)
+            {
+                if (srcFixPointPos > dstFixPointPos)
+                {
+                    uniPacked01234567Lo_2x8[7] |= (postshift & 0x1F);
+                    uniPacked01234567Hi_2x8[7] |= (postshift & 0x1F);
+                }
+                else
+                {
+                    vx_uint32 i          = 0;
+
+                    for (i = 0; i < 8; i++)
+                    {
+                        uniPacked01234567Lo_2x8[i + 8] = multiplier;
+                        uniPacked01234567Hi_2x8[i + 8] = multiplier;
+                    }
+                }
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2CHW_i16", borderMode);
+            }
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2CHW", borderMode);
             if (!shaderExecutable) goto OnError;
 
             status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackedABAB_2x8", 1, uniPackedABAB_2x8);
@@ -14114,11 +14238,46 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
         }
         else if (perm[0] == 0 && perm[1] == 2 && perm[2] == 1)
         {
+            vx_uint32 uniCopyUshort_2x8[16] = {
+                0x11111111, // TCfg
+                0x00000000, // ASelt
+                0x03020100, 0x07060504, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000600, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+
+            if(fpFlg)
+            {
+                if (srcFixPointPos > dstFixPointPos)
+                {
+                    uniCopyUshort_2x8[7] |= (postshift & 0x1F);
+                }
+                else
+                {
+                    vx_uint32 i          = 0;
+
+                    for (i = 0; i < 8; i++)
+                    {
+                        uniCopyUshort_2x8[i + 8] = multiplier;
+                    }
+                }
+
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2WCH_Fp", borderMode);
+                if (!shaderExecutable) goto OnError;
+
+                status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniCopyUshort_2x8", 1, uniCopyUshort_2x8);
+                if (status != VX_SUCCESS) goto OnError;
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2WCH", borderMode);
+                if (!shaderExecutable) goto OnError;
+            }
             execution_parameters.globalWorkScale[0]    = 8;
             execution_parameters.globalWorkScale[1]    = 4;
             execution_parameters.globalWorkScale[2]    = 1;
-
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2WCH", borderMode);
         }
         else if ((perm[0] == 1 && perm[1] == 2 && perm[2] == 0) || (perm[0] == 1 && perm[1] == 0 && perm[2] == 2))
         {
@@ -14177,14 +14336,43 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
                 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
             };
 
+            if(fpFlg)
+            {
+                if (srcFixPointPos > dstFixPointPos)
+                {
+                    uniExchangeStride4_part0_2x8[7] |= (postshift & 0x1F);
+                    uniExchangeStride4_part1_2x8[7] |= (postshift & 0x1F);
+                }
+                else
+                {
+                    vx_uint32 i          = 0;
+
+                    for (i = 0; i < 8; i++)
+                    {
+                        uniExchangeStride4_part0_2x8[i + 8] = multiplier;
+                        uniExchangeStride4_part1_2x8[i + 8] = multiplier;
+                    }
+                }
+            }
+
             execution_parameters.globalWorkScale[0]    = 8;
             execution_parameters.globalWorkScale[1]    = 8;
             execution_parameters.globalWorkScale[2]    = 1;
 
             if (perm[0] == 1 && perm[1] == 2 && perm[2] == 0)
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2HCW", borderMode);
+            {
+                if(fpFlg)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2HCW_i16", borderMode);
+                else
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2HCW", borderMode);
+            }
             else
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2HWC", borderMode);
+            {
+                if(fpFlg)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2HWC_i16", borderMode);
+                else
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2HWC", borderMode);
+            }
             if (!shaderExecutable) goto OnError;
 
             status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExchangeStride1_part0_2x8", 1, uniExchangeStride1_part0_2x8);
@@ -14251,6 +14439,25 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
             0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
         };
 
+        if(fpFlg)
+        {
+            if (srcFixPointPos > dstFixPointPos)
+            {
+                uniPackDataABCD_01[7] |= (postshift & 0x1F);
+                uniPackDataABCD_23[7] |= (postshift & 0x1F);
+            }
+            else
+            {
+                vx_uint32 i          = 0;
+
+                for (i = 0; i < 8; i++)
+                {
+                    uniPackDataABCD_01[i + 8] = multiplier;
+                    uniPackDataABCD_23[i + 8] = multiplier;
+                }
+            }
+        }
+
         execution_parameters.globalWorkScale[0]    = 8;
         execution_parameters.globalWorkScale[1]    = 1;
         execution_parameters.globalWorkScale[2]    = 4;
@@ -14259,6 +14466,8 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
         {
             if(flFlg)
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2CWH_Uint8", borderMode);
+            else if(fpFlg)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2CWH_int8_fp", borderMode);
             else
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2CWH_int8", borderMode);
         }
@@ -14266,6 +14475,8 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
         {
             if(flFlg)
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2CHW_Uint8", borderMode);
+            else if(fpFlg)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2CHW_int8_fp", borderMode);
             else
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2CHW_int8", borderMode);
         }
@@ -14277,6 +14488,38 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
 
             if(flFlg)
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2WCH_Uint8", borderMode);
+            else if(fpFlg)
+            {
+                vx_uint32 uniCopyInt8_2x8[16] = {
+                    0x11111111, // TCfg
+                    0x00000000, // ASelt
+                    0x03020100, 0x07060504, // ABin
+                    0x22222222, // BSelt
+                    0x00000000, 0x00000000, // BBin
+                    0x00000700, // AccumType, ConstantType, and PostShift
+                    0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+                };
+
+                if (srcFixPointPos > dstFixPointPos)
+                {
+                    uniCopyInt8_2x8[7] |= (postshift & 0x1F);
+                }
+                else
+                {
+                    vx_uint32 i          = 0;
+
+                    for (i = 0; i < 8; i++)
+                    {
+                        uniCopyInt8_2x8[i + 8] = multiplier;
+                    }
+                }
+
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2WCH_int8_fp", borderMode);
+                if (!shaderExecutable) goto OnError;
+
+                status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniCopyInt8_2x8", 1, uniCopyInt8_2x8);
+                if (status != VX_SUCCESS) goto OnError;
+            }
             else
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2WCH_int8", borderMode);
         }
@@ -14337,6 +14580,29 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
                 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
             };
 
+            if(fpFlg)
+            {
+                if (srcFixPointPos > dstFixPointPos)
+                {
+                    uniExchange8Bits_part0_2x8[7] |= (postshift & 0x1F);
+                    uniExchange8Bits_part1_2x8[7] |= (postshift & 0x1F);
+                    uniExchange8Bits_part2_2x8[7] |= (postshift & 0x1F);
+                    uniExchange8Bits_part3_2x8[7] |= (postshift & 0x1F);
+                }
+                else
+                {
+                    vx_uint32 i          = 0;
+
+                    for (i = 0; i < 8; i++)
+                    {
+                        uniExchange8Bits_part0_2x8[i + 8] = multiplier;
+                        uniExchange8Bits_part1_2x8[i + 8] = multiplier;
+                        uniExchange8Bits_part2_2x8[i + 8] = multiplier;
+                        uniExchange8Bits_part3_2x8[i + 8] = multiplier;
+                    }
+                }
+            }
+
             execution_parameters.globalWorkScale[0]    = 8;
             execution_parameters.globalWorkScale[1]    = 8;
             execution_parameters.globalWorkScale[2]    = 1;
@@ -14345,6 +14611,8 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
             {
                 if(flFlg)
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2HWC_Uint8", borderMode);
+                else if(fpFlg)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2HWC_int8_fp", borderMode);
                 else
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2HWC_int8", borderMode);
             }
@@ -14352,6 +14620,8 @@ vxnne_shader_executable vxnneTensorTransposeShaderExecutable(
             {
                 if(flFlg)
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2HCW_Uint8", borderMode);
+                else if(fpFlg)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2HCW_int8_fp", borderMode);
                 else
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_WHC2HCW_int8", borderMode);
             }

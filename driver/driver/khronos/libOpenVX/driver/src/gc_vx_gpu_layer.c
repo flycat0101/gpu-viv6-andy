@@ -3038,6 +3038,7 @@ vxnne_shader_executable vxnneGetGPUSpace2DepthShaderExecutable(
     vx_uint32     input_width                = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32     input_height               = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32     input_depth                = TENSOR_VIEW_SIZE_INDEX(input, 2);
+    vx_int32      in_zeros_point             = TENSOR_TF_ZEROPOINT(input);
     vx_scalar zeroPointIn = NULL;
     vx_scalar zeroPointOut = NULL;
     vx_scalar scale = NULL;
@@ -3058,7 +3059,7 @@ vxnne_shader_executable vxnneGetGPUSpace2DepthShaderExecutable(
     borderMode->mode = VX_BORDER_CONSTANT;
     if (inputFormat == VX_TYPE_UINT8)
     {
-        borderMode->constant_value.U8 = 0;
+        borderMode->constant_value.U8 = (vx_uint8)in_zeros_point;
     }
     else if (inputFormat == VX_TYPE_FLOAT32)
     {
@@ -7722,6 +7723,7 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
     vx_scalar     blockh                     = NULL;
     vx_scalar     padX                       = NULL;
     vx_scalar     padY                       = NULL;
+    vx_int32      in_zeros_point             = TENSOR_TF_ZEROPOINT(input);
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -7750,7 +7752,7 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
 
     borderMode->mode = VX_BORDER_CONSTANT;
     if(inputFormat == VX_TYPE_UINT8)
-        borderMode->constant_value.U8 = 0;
+        borderMode->constant_value.U8 = (vx_uint8)in_zeros_point;
     else if(inputFormat == VX_TYPE_FLOAT16)
         borderMode->constant_value.S16 = 0;
     else
