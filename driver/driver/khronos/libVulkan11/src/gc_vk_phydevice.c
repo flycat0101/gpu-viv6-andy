@@ -1265,8 +1265,7 @@ static VkResult __vki_InitializePhysicalDevice(
                                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     phyDev->phyDevMemProp.memoryTypes[1].heapIndex = 0;
-    phyDev->phyDevMemProp.memoryTypes[1].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
-                                                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    phyDev->phyDevMemProp.memoryTypes[1].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
     /* Initialize VkPhysicalDeviceFeatures here */
     __vki_InitializePhysicalDeviceFeatures(physicalDevice);
