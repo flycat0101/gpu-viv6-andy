@@ -4723,7 +4723,8 @@ IN clsNAME * Variable
                 decl = &(Variable->decl);
 
                 /* struct and enum will not fall into here, so, we don't need set tag = TYPE for these two */
-                if (decl->dataType->accessQualifier == clvQUALIFIER_CONST)
+                if (decl->dataType->accessQualifier == clvQUALIFIER_CONST
+                    && parent == 0) /* const variables in the program scope */
                 {
                     tag = VSC_DI_TAG_CONSTANT;
                 }
