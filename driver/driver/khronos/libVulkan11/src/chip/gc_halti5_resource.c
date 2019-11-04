@@ -10919,7 +10919,6 @@ VkResult halti5_createImageView(
 
     if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
     {
-        chipImgv->patchFormat = residentImgFormat;
         chipImgv->patchKey = HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
     }
 
@@ -11772,7 +11771,7 @@ VkResult halti5_updateDescriptorSet(
                         patchInfos[entryIdx].binding = binding->std.binding;
                         patchInfos[entryIdx].arrayIndex = j;
                         patchInfos[entryIdx].patchStages = binding->std.stageFlags;
-                        patchInfos[entryIdx].patchFormat = chipImgv->patchFormat;
+                        patchInfos[entryIdx].patchFormat = imgv->createInfo.format;
                         patchInfos[entryIdx].viewType = imgv->createInfo.viewType;
                         patchIdx++;
                     }

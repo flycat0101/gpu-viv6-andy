@@ -7491,9 +7491,8 @@ VkResult halti5_patch_pipeline(
                 patchMask &= ~(1<< i);
                 i++;
             }
-            __VK_ASSERT(entryIdx == (totalEntries - chipPipeline->linkEntryCount));
 
-            vscLibLinkTable.progLinkEntryCount = totalEntries;
+            vscLibLinkTable.progLinkEntryCount = entryIdx + chipPipeline->linkEntryCount;
             vscLibLinkTable.pProgLibLinkEntries = vscLinkEntries;
             vscLinkParams.pProgLibLinkTable = &vscLibLinkTable;
 
@@ -7512,7 +7511,7 @@ VkResult halti5_patch_pipeline(
                 }
             }
 
-            for (i = 0; i < totalEntries; i ++)
+            for (i = 0; i < entryIdx; i ++)
             {
                 if (vscLinkEntries[i].shLibLinkEntry.pLibSpecializationConsts)
                 {
