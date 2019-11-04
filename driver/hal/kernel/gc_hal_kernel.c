@@ -1369,8 +1369,10 @@ _AllocateLinearMemory(
     gckOS_QueryOption(Kernel->os, "allMapInOne", &mappingInOne);
     if (mappingInOne == 0)
     {
-        /* it should page align if driver uses dynamic mapping for mapped user memory */
-        alignment = gcmALIGN(alignment, PAGE_SIZE);
+        /* TODO: it should page align if driver uses dynamic mapping for mapped user memory.
+         * it should be adjusted with different os.
+         */
+        alignment = gcmALIGN(alignment, 4096);
     }
 
     /* Allocate video memory node. */
