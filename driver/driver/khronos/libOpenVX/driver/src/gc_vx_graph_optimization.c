@@ -3076,6 +3076,10 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
             if(node->numParents != 2 || tensorIn[0]->isViewed || tensorIn[1]->isViewed )
                 continue;
 
+            if(TENSOR_DATA_TYPE(tensorIn[0]) != TENSOR_DATA_TYPE(tensorIn[1]) ||
+                TENSOR_DATA_TYPE(tensorIn[0]) != TENSOR_DATA_TYPE(output) )
+                continue;
+
             if(node->kernel->enumeration == VX_KERNEL_TENSOR_SUBTRACT)
                 factor = -1;
             {
