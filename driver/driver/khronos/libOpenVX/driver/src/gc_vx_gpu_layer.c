@@ -5125,7 +5125,7 @@ vxnne_shader_executable vxnneGetGPUActivationShaderExecutable(
                 goto OnError;
             }
 
-            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 6);
+            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 7);
             if (status != VX_SUCCESS)
             {
                 goto OnError;
