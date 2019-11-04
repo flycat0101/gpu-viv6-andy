@@ -2010,7 +2010,7 @@ gctUINT vscDIGetDieOffset(
     gctINT usedNum;
     gctSIZE_T Strlen = 0;
     gctUINT offset = 0;
-    VSC_DI_ARRAY_DESC arrDesc;
+    VSC_DI_ARRAY_DESC arrDesc = {0};
     gctINT arrlength[VSC_DI_MAX_ARRAY_DIM];
     gcoOS_StrToInt(varIdStr, &varId);
     gcoOS_StrLen(varIdStr, &Strlen);
