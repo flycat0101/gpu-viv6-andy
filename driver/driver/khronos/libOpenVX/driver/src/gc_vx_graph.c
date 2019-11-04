@@ -1514,8 +1514,8 @@ VX_PRIVATE_API vx_status GetMemoryParamList(
     {
         k = i - start;
 
-        if (graph->layer->operations[i]->inputsNum > VX_MAX_MEM_PARAM ||
-            graph->layer->operations[i]->outputsNum > VX_MAX_MEM_PARAM)
+        if (graph->layer->operations[i]->inputsNum > VX_MAX_MEM_PARAM_INPUT ||
+            graph->layer->operations[i]->outputsNum > VX_MAX_MEM_PARAM_OUTPUT)
         {
             continue;
         }
@@ -1570,11 +1570,11 @@ VX_PRIVATE_API vx_status RestoreMemoryParamList(
     {
         requestList = graph->layer->memRequestList  + i;
 
-        vxmASSERT(graph->layer->operations[i]->inputsNum <= VX_MAX_MEM_PARAM
-                  && graph->layer->operations[i]->outputsNum <= VX_MAX_MEM_PARAM);
+        vxmASSERT(graph->layer->operations[i]->inputsNum <= VX_MAX_MEM_PARAM_INPUT
+                  && graph->layer->operations[i]->outputsNum <= VX_MAX_MEM_PARAM_OUTPUT);
 
-        vxmASSERT(memParamList[k].inputCount <= VX_MAX_MEM_PARAM
-                   && memParamList[k].outputCount <= VX_MAX_MEM_PARAM);
+        vxmASSERT(memParamList[k].inputCount <= VX_MAX_MEM_PARAM_INPUT
+                   && memParamList[k].outputCount <= VX_MAX_MEM_PARAM_OUTPUT);
 
         requestList->inputCount = memParamList[k].inputCount;
 
@@ -1611,86 +1611,6 @@ VX_PRIVATE_API vx_status RestoreMemoryParamList(
         gcoOS_ZeroMemory(&requestList->transposeOut, sizeof(vx_memory_s));
     }
 
-    return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_status RestorePartialMemoryParamList(
-    vx_graph                graph,
-    vx_uint32               start,
-    vx_uint32               count,
-    vxnne_mem_param         memParamList
-    )
-{
-    vx_uint32 i, j, k, dimIndex;
-    vx_memory_s memory;
-
-    gcmHEADER_ARG("graph=%p, start=0x%x, count=0x%x, memParamList=%p", graph, start, count, memParamList);
-
-    for (i = start; i < start + count; i++)
-    {
-        k = i - start;
-
-        vxmASSERT(graph->layer->operations[i]->inputsNum <= VX_MAX_MEM_PARAM
-                  && graph->layer->operations[i]->outputsNum <= VX_MAX_MEM_PARAM);
-
-        vxmASSERT(memParamList[k].inputCount <= VX_MAX_MEM_PARAM
-                   && memParamList[k].outputCount <= VX_MAX_MEM_PARAM);
-
-        for(j = 0; j < memParamList[k].inputCount; j++)
-        {
-            vxmASSERT(graph->layer->operations[i]->inputs[j]->type == VX_TYPE_TENSOR || graph->layer->operations[i]->inputs[j]->type == VX_TYPE_IMAGE);
-            if (graph->layer->operations[i]->inputs[j]->type == VX_TYPE_TENSOR)
-            {
-                memory = ((vx_tensor)graph->layer->operations[i]->inputs[j])->tensorBuffer->memory;
-
-                ((vx_tensor)graph->layer->operations[i]->inputs[j])->tensorBuffer->memory = memParamList[k].inputMemory[j];
-
-                ((vx_tensor)graph->layer->operations[i]->inputs[j])->tensorBuffer->memory.allocType = memory.allocType;
-                ((vx_tensor)graph->layer->operations[i]->inputs[j])->tensorBuffer->memory.physicals[0] = memory.physicals[0];
-                ((vx_tensor)graph->layer->operations[i]->inputs[j])->tensorBuffer->memory.logicals[0] = memory.logicals[0];
-            }
-            else if (graph->layer->operations[i]->inputs[j]->type == VX_TYPE_IMAGE)
-            {
-                memory = ((vx_image)graph->layer->operations[i]->inputs[j])->memory;
-
-                ((vx_image)graph->layer->operations[i]->inputs[j])->memory = memParamList[k].inputMemory[j];
-                ((vx_image)graph->layer->operations[i]->inputs[j])->memory.allocType = memory.allocType;
-                ((vx_image)graph->layer->operations[i]->inputs[j])->memory.physicals[0] = memory.physicals[0];
-                ((vx_image)graph->layer->operations[i]->inputs[j])->memory.logicals[0] = memory.logicals[0];
-            }
-        }
-
-        for(j = 0; j < memParamList[k].outputCount; j++)
-        {
-            vxmASSERT(graph->layer->operations[i]->outputs[j]->type == VX_TYPE_TENSOR || graph->layer->operations[i]->outputs[j]->type == VX_TYPE_IMAGE);
-            if (graph->layer->operations[i]->outputs[j]->type == VX_TYPE_TENSOR)
-            {
-                memory = ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory;
-
-                ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory = memParamList[k].outputMemory[j];
-                for (dimIndex = 0; dimIndex < VX_CONTEXT_TENSOR_MAX_DIMENSION; dimIndex++)
-                {
-                    ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.dims[0][dimIndex] = memory.dims[0][dimIndex];
-                    ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.strides[0][dimIndex] = memory.strides[0][dimIndex];
-                }
-                ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.transposed = memory.transposed;
-                ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.allocType = memory.allocType;
-                ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.physicals[0] = memory.physicals[0];
-                ((vx_tensor)graph->layer->operations[i]->outputs[j])->tensorBuffer->memory.logicals[0] = memory.logicals[0];
-            }
-            else if (graph->layer->operations[i]->outputs[j]->type == VX_TYPE_IMAGE)
-            {
-                memory = ((vx_image)graph->layer->operations[i]->outputs[j])->memory;
-
-                ((vx_image)graph->layer->operations[i]->outputs[j])->memory = memParamList[k].outputMemory[j];
-                ((vx_image)graph->layer->operations[i]->outputs[j])->memory.allocType = memory.allocType;
-                ((vx_image)graph->layer->operations[i]->outputs[j])->memory.physicals[0] = memory.physicals[0];
-                ((vx_image)graph->layer->operations[i]->outputs[j])->memory.logicals[0] = memory.logicals[0];
-            }
-        }
-    }
-
-    gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
 }
 
@@ -1742,7 +1662,8 @@ VX_PRIVATE_API vx_bool SupportAB(
            operation->operatorType != VXNNE_OPERATOR_DILATION_UPSAMPLE2 &&
            operation->operatorType != VXNNE_OPERATOR_ROIPOOL
        )))
-       && operation->inputsNum == 1 && operation->outputsNum == 1
+       && ((operation->target == VXNNE_OPERATION_TARGET_SH && operation->inputsNum <= VX_MAX_MEM_PARAM_INPUT && operation->outputsNum <= VX_MAX_MEM_PARAM_OUTPUT)
+           || (operation->inputsNum == 1 && operation->outputsNum == 1))
        && operation->batchCount == 1
        && TENSOR_SIZE_INDEX(opInfo.input, 3) == 1 && TENSOR_SIZE_INDEX(opInfo.output, 3) == 1
        )

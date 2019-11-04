@@ -202,7 +202,8 @@
 #define PRELOAD_WB_ALIGNMENT                64
 #define VX_MAX_MEM_REQUEST_INPUT            64
 #define VX_MAX_MEM_REQUEST_OUTPUT           32
-#define VX_MAX_MEM_PARAM                     2
+#define VX_MAX_MEM_PARAM_INPUT              16
+#define VX_MAX_MEM_PARAM_OUTPUT             8
 #define VX_KERNEL_PATTERN_BIT_SIZE          64
 
 #define VX_TRANSPOSE_MAX_INTERLEAVE_CH      16
@@ -1762,9 +1763,9 @@ vxnne_mem_request_s;
 typedef struct _vxnne_mem_param_s
 {
     vx_uint32   inputCount;
-    vx_memory_s inputMemory[VX_MAX_MEM_PARAM];
+    vx_memory_s inputMemory[VX_MAX_MEM_PARAM_INPUT];
     vx_uint32   outputCount;
-    vx_memory_s outputMemory[VX_MAX_MEM_PARAM];
+    vx_memory_s outputMemory[VX_MAX_MEM_PARAM_OUTPUT];
 }
 vxnne_mem_param_s;
 
