@@ -6364,6 +6364,10 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
     vx_scalar    scale_s            = NULL;
     vx_scalar    scaleout           = NULL;
     vx_scalar    zpOut              = NULL;
+    vx_tensor    input_rs           = NULL;
+    vx_tensor    output_rs          = NULL;
+    vx_tensor    input_ts           = NULL;
+    vx_tensor    output_ts          = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
@@ -6371,6 +6375,28 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
     {
         scaleOutValue = 1.0f / TENSOR_TF_SCALE(output);
         zpOutValue    = (vx_float32)TENSOR_TF_ZEROPOINT(output);
+    }
+
+    if (inDims == 1)
+    {
+        vx_uint32 sizes[4] = {1, 1, 1, 1};
+
+        inDims = 2;
+        sizes[0] = in_width;
+        input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, inDims);
+        output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, inDims);
+
+        input_ts = input_rs;
+        output_ts = output_rs;
+
+        execution_parameters.workDim = 2;
+    }
+    else
+    {
+        input_ts = input;
+        output_ts = output;
+
+        execution_parameters.workDim = 3;
     }
 
     borderMode->mode = VX_BORDER_REPLICATE;
@@ -6411,7 +6437,7 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
 
     if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
     {
-        vx_reference parameters[3] = {(vx_reference)input, (vx_reference)NULL, (vx_reference)output};
+        vx_reference parameters[3] = {(vx_reference)input_ts, (vx_reference)NULL, (vx_reference)output_ts};
 
         scale_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleValue);
         parameters[1] = (vx_reference)scale_s;
@@ -6428,8 +6454,8 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
     else if (inputFormat == VX_TYPE_UINT8)
     {
         vx_float32 scaleInValue = TENSOR_TF_SCALE(input);
-        vx_reference parameters[5] = {(vx_reference)input, (vx_reference)NULL,
-                                        (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output};
+        vx_reference parameters[5] = {(vx_reference)input_ts, (vx_reference)NULL,
+                                        (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output_ts};
 
         scaleValue *= scaleInValue;
         scale_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleValue);
@@ -6486,6 +6512,8 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
     if (scale_s) vxReleaseScalar(&scale_s);
     if (scaleout) vxReleaseScalar(&scaleout);
     if (zpOut) vxReleaseScalar(&zpOut);
+    if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
+    if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
 
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
@@ -6493,9 +6521,11 @@ vxnne_shader_executable vxnneGetGPUSoftmaxShaderExecutable(
 OnError:
     if (scaleout) vxReleaseScalar(&scaleout);
     if (zpOut) vxReleaseScalar(&zpOut);
+    if (scale_s) vxReleaseScalar(&scale_s);
+    if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
+    if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
-    if (scale_s) vxReleaseScalar(&scale_s);
 #if !gcdUSE_VXC_BINARY
     if (programSources)
     {
