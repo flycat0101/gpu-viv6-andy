@@ -55,7 +55,7 @@
 
 #define _clmConvROperandToSpecialVectorSuperSourceConstant(Compiler, ROperand, SuperSource, Status) \
    do { \
-    Status =_ConvROperandToSpecialVectorSourceConstant(Compiler, ROperand, (SuperSource)->sources); \
+    Status =_ConvROperandToSpecialVectorSourceConstant(Compiler, ROperand, 0, 0, (SuperSource)->sources); \
     (SuperSource)->numSources = 1; \
    } while (gcvFALSE)
 
@@ -8814,6 +8814,8 @@ static gceSTATUS
 _ConvROperandToSpecialVectorSourceConstant(
     IN cloCOMPILER Compiler,
     IN clsROPERAND * ROperand,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
     OUT gcsSOURCE * Source
     );
 
@@ -8878,6 +8880,8 @@ _ConvROperandToSourceConstant(
        if(ROperand->u.constant.allValuesEqual) {
            return _ConvROperandToSpecialVectorSourceConstant(Compiler,
                                                              ROperand,
+                                                             LineNo,
+                                                             StringNo,
                                                              Source);
        }
        gcmASSERT(ROperand->vectorIndex.mode == clvINDEX_CONSTANT);
@@ -8934,6 +8938,8 @@ static gceSTATUS
 _ConvROperandToSpecialVectorSourceConstant(
     IN cloCOMPILER Compiler,
     IN clsROPERAND * ROperand,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
     OUT gcsSOURCE * Source
     )
 {
@@ -8956,8 +8962,8 @@ _ConvROperandToSpecialVectorSourceConstant(
            return _ConvLongConstantToSource(Compiler,
                                             &ROperand->u.constant.values[0],
                                             dataType,
-                                            0,
-                                            0,
+                                            LineNo,
+                                            StringNo,
                                             Source);
        }
        if(clmIsElementTypeFloating(elementType)) {
@@ -9540,6 +9546,8 @@ _SpecialGenAssignCode(
 #endif
                 status = _ConvROperandToSpecialVectorSourceConstant(Compiler,
                                                                     ROperand,
+                                                                    LineNo,
+                                                                    StringNo,
                                                                     superSource.sources);
                 if(gcmIS_ERROR(status)) return status;
 
@@ -9960,6 +9968,8 @@ _ConvNormalROperandToSource(
     {
         status = _ConvROperandToSpecialVectorSourceConstant(Compiler,
                                                             ROperand,
+                                                            LineNo,
+                                                            StringNo,
                                                             Source);
         if (gcmIS_ERROR(status)) return status;
     }

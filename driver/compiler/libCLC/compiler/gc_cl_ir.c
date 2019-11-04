@@ -10427,6 +10427,10 @@ IN OUT cluCONSTANT_VALUE * Value
         Value->floatValue = -Value->floatValue;
         break;
 
+    case clvTYPE_LONG:
+        Value->longValue = -Value->longValue;
+        break;
+
     default:
         gcmASSERT(0);
         return gcvSTATUS_INVALID_ARGUMENT;

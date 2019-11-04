@@ -598,7 +598,9 @@ void vscDISetHwLocToSWLoc(VSC_DIContext * context, VSC_DI_SW_LOC * swLoc, VSC_DI
                         sl->u.reg.start > swLoc->u.reg.end ||
                         sl->u.reg.end < swLoc->u.reg.start)
                     {
+                        /* swloc not in sl's range */
                         breakFlag = gcvFALSE;
+                        /* add hwloc for union, have some problem */
                         for (j = 0; j < i; j ++)
                         {
                             sl_tmp = &context->swLocTable.loc[j];
@@ -609,7 +611,8 @@ void vscDISetHwLocToSWLoc(VSC_DIContext * context, VSC_DI_SW_LOC * swLoc, VSC_DI
                                 {
                                     sl_tmp1 = &context->swLocTable.loc[k];
                                     if (sl_tmp1->hwLoc != VSC_DI_INVALID_HW_LOC &&
-                                        sl->u.reg.end == sl_tmp1->u.reg.end)
+                                        sl->u.reg.end == sl_tmp1->u.reg.end &&
+                                        sl->u.reg.start == sl_tmp1->u.reg.start)
                                     {
                                         sl->hwLoc = sl_tmp1->hwLoc;
                                         breakFlag = gcvTRUE;
@@ -905,10 +908,7 @@ void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT tag)
         unsigned int highPC;
         unsigned int hwLocCount;
         unsigned int childrenCount, childrenCount1, childrenCount2, childrenCount3, childrenCount4;
-        unsigned int data0, data1, data2, data3;
         int variableCount, argCount, i, j, k, l, m;
-        gctBOOL isReg;
-        gctBOOL isConst;
         int funcId = 1; /* please change this function id when changing the test case */
         char funIdStr[1024];
         char varIdStr[1024];
@@ -939,10 +939,6 @@ void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT tag)
                     }
                 }
             }
-            for (j = 0; j < (int) hwLocCount; j++)
-            {
-                vscDIGetVariableHWLoc((void *)context, varIdStr, j, &isReg, &isConst, &lowPC, &highPC, &data0, &data1, &data2, &data3);
-            }
         }
         for (i = 0; i < variableCount; i++)
         {
@@ -962,10 +958,6 @@ void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT tag)
                         }
                     }
                 }
-            }
-            for (j = 0; j < (int) hwLocCount; j++)
-            {
-                vscDIGetVariableHWLoc((void *)context, varIdStr, j, &isReg, &isConst, &lowPC, &highPC, &data0, &data1, &data2, &data3);
             }
         }
     }
@@ -2063,7 +2055,10 @@ gctUINT vscDIGetDieOffset(
                 {
                     size_t size;
                     if(die->u.type.isPrimitiveType)
-                        size = VIR_GetTypeAlignment(die->u.type.type);
+                    {
+                        size =  ((VIR_GetTypeSize(die->u.type.type) - 1) / VIR_GetTypeAlignment(die->u.type.type) + 1)
+                                * VIR_GetTypeAlignment(die->u.type.type);
+                    }
                     else/*need more judge to judge struct or union*/
                         size = die->size;
                     offset += size * vscGetArrayRelativeAddr(arrDesc, arrlength, arrNum);
@@ -2142,6 +2137,7 @@ void vscDIGetArrayTempReg(
     gctINT eachDepthLength[4] = {1,1,1,1};
     gctINT arrayLength = 1;
     gctINT elemCount = 4;
+    gctUINT useRegNum = 1;
     if(sl && dimDepth + 1 >= (gctUINT)die->u.variable.type.array.numDim)
     {
         /* calculate the array width*/
@@ -2160,6 +2156,8 @@ void vscDIGetArrayTempReg(
         {
             elemCount = VIR_GetTypeLogicalComponents(die->u.variable.type.type);
         }
+        useRegNum = ((VIR_GetTypeSize(VIR_GetTypeComponentType(die->u.variable.type.type)))/4);
+        elemCount = elemCount * useRegNum;
         /*find the array start position in sw reg*/
         regStart = sl->u.reg.start;
 
@@ -2210,6 +2208,7 @@ void vscDIGetVariableInfo(
     gctUINT structDepth = 0;
     gctUINT dotIndex[10];
     gctINT dimNum[10];
+    gctUINT useRegNum = 0;
 
     vscDIGetIdStrInfo(parentIdStr,
                       &parentId,
@@ -2224,6 +2223,7 @@ void vscDIGetVariableInfo(
 
     die = VSC_DI_DIE_PTR(parentId);
     Vdie = VSC_DI_DIE_PTR(vscDIGetDieIdByStrInfo(ptr, parentIdStr));
+    useRegNum = ((VIR_GetTypeSize(VIR_GetTypeComponentType(Vdie->u.variable.type.type)))/4);
 
     if (!die || (die->tag != VSC_DI_TAG_SUBPROGRAM && die->tag != VSC_DI_TAG_VARIABE && die->tag != VSC_DI_TAG_PARAMETER))
         return;
@@ -2433,7 +2433,7 @@ void vscDIGetVariableInfo(
                                 if(hl->reg)
                                 {
                                     if(hl->u.reg.end - hl->u.reg.start == sl->u.reg.end - sl->u.reg.start)
-                                        *hwLocCount = *hwLocCount + 1;
+                                        *hwLocCount = *hwLocCount + useRegNum;
                                 }
                                 else
                                     *hwLocCount = *hwLocCount + 1;
@@ -2615,7 +2615,7 @@ void vscDIGetVariableInfo(
                 }
                 if(sl->reg)
                 {
-                    tempReg = sl->u.reg.start + idx/4;
+                    tempReg = sl->u.reg.start + idx/4 * useRegNum;
                 }
             }
 
@@ -2641,11 +2641,11 @@ void vscDIGetVariableInfo(
                             /* when r(0,0) < 3 ,can't get s1,s2,s3*/
                             if(hl && pointerDepth > 0)
                             {
-                                *hwLocCount = 1;
+                                *hwLocCount = useRegNum;
                             }
                             else if(hl && hl->u1.hwShift + idx % 4 < 4)
                             {
-                                *hwLocCount = 1;
+                                *hwLocCount = useRegNum;
                                 break;
                             }
                         }
@@ -2833,6 +2833,7 @@ void vscDIGetVariableHWLoc(
     gctINT tempReg = 0;
     gctINT regSOffset = 0;
     gctINT regEOffset = 0;
+    gctUINT useRegNum = 0;
     vscDIGetIdStrInfo(varIdStr,
                       &varId,
                       &dimDepth,
@@ -2846,6 +2847,7 @@ void vscDIGetVariableHWLoc(
 
     die = VSC_DI_DIE_PTR(varId);
     Vdie = VSC_DI_DIE_PTR(vscDIGetDieIdByStrInfo(ptr, varIdStr));
+    useRegNum = ((VIR_GetTypeSize(VIR_GetTypeComponentType(Vdie->u.variable.type.type)))/4);
 
     if (!die || (die->tag != VSC_DI_TAG_VARIABE && die->tag != VSC_DI_TAG_PARAMETER))
         return;
@@ -2865,13 +2867,15 @@ void vscDIGetVariableHWLoc(
 
             if(die->u.variable.type.array.numDim > 0)
             {
+                tempReg = idx;
+                idx = 0;
                 vscDIGetArrayTempReg(ptr,
-                                     die,
+                                     Vdie,
                                      idx,
                                      dimDepth-1,
                                      dimNum,
                                      &arrayTempReg);
-                tempReg = arrayTempReg + dimNum[dimDepth-1]/4;
+                tempReg += arrayTempReg + dimNum[dimDepth-1]/4 * useRegNum;
             }
             else if (pointerDepth > 0)
             {
@@ -2886,18 +2890,21 @@ void vscDIGetVariableHWLoc(
                 }
                 if(sl->reg)
                 {
-                    tempReg = sl->u.reg.start  + dimNum[dimDepth-1]/4;
+                    tempReg = sl->u.reg.start  + (dimNum[dimDepth-1]/4) * useRegNum +idx;
+                    idx = 0;
                 }
             }
         }
         else
         {
             vscDIGetArrayTempReg(ptr,
-                                 die,
-                                 idx,
+                                 Vdie,
+                                 0,
                                  dimDepth,
                                  dimNum,
                                  &tempReg);
+            tempReg += idx;
+            idx = 0;
         }
 
         if(pointerDepth == 0 && tempReg == 0)
@@ -2986,7 +2993,10 @@ void vscDIGetVariableHWLoc(
             if(dimDepth == 0 && !vscDIGetDieisPrimitiveType(Vdie))
                 *data2 = *data1 + Vdie->size;
             else if(dimDepth == 0 || (gctINT)dimDepth == Vdie->u.type.array.numDim)/*only vector and array need find the type*/
-                *data2 = *data1 + VIR_GetTypeRows(Vdie->u.variable.type.type) * VIR_GetTypeAlignment(Vdie->u.variable.type.type);
+            {
+                *data2 = *data1 + ((VIR_GetTypeSize(Vdie->u.type.type) - 1) / VIR_GetTypeAlignment(Vdie->u.type.type) + 1)
+                                * VIR_GetTypeAlignment(Vdie->u.type.type);
+            }
             else
                 *data2 = *data1 + VIR_GetTypeSize(VIR_GetTypeComponentType(Vdie->u.variable.type.type));
         }
@@ -3038,7 +3048,10 @@ void vscDIGetVariableHWLoc(
             if(dimDepth == 0 || !vscDIGetDieisPrimitiveType(Vdie))
                 *data2 = *data1 + Vdie->size;
             else if((gctINT)dimDepth == Vdie->u.type.array.numDim)/*only vector and array need find the type*/
-                *data2 = *data1 + VIR_GetTypeRows(Vdie->u.variable.type.type) * VIR_GetTypeAlignment(Vdie->u.variable.type.type);
+            {
+                *data2 = *data1 + ((VIR_GetTypeSize(Vdie->u.type.type) - 1) / VIR_GetTypeAlignment(Vdie->u.type.type) + 1)
+                                * VIR_GetTypeAlignment(Vdie->u.type.type);
+            }
             else
                 *data2 = *data1 + VIR_GetTypeSize(VIR_GetTypeComponentType(Vdie->u.variable.type.type));
         }
