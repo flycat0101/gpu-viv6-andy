@@ -7208,6 +7208,10 @@ gckOS_QueryOption(
     {
         *Value = device->args.pageTablePool;
     }
+    else if (!strcmp(Option, "mmuDynamicMap"))
+    {
+        *Value = device->args.dynamicMap;
+    }
     else if (!strcmp(Option, "allMapInOne"))
     {
         *Value = device->args.allMapInOne;

@@ -121,6 +121,8 @@ typedef struct _gcsMODULE_PARAMETERS
 
     /* mmu page table pool, 0 mean auto, 1 means virsual*/
     gctUINT                 pageTablePool;
+
+    gctUINT                 dynamicMap;
     gctUINT                 allMapInOne;
 }
 gcsMODULE_PARAMETERS;

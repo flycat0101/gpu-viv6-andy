@@ -266,6 +266,10 @@ static uint sRAMLoopMode = 0;
 module_param(sRAMLoopMode, uint, 0644);
 MODULE_PARM_DESC(sRAMLoopMode, "Default 0 means SRAM pool must be specified when allocating SRAM memory, 1 means SRAM memory will be looped as default pool.");
 
+static uint mmuDynamicMap = 1;
+module_param(mmuDynamicMap, uint, 0644);
+MODULE_PARM_DESC(mmuDynamicMap, "Default 1 means enable mmu dynamic mapping in virsual memory, 0 means disable dynnamic mapping.");
+
 #if USE_LINUX_PCIE
 static int bar = 1;
 module_param(bar, int, 0644);
@@ -424,6 +428,7 @@ _InitModuleParam(
 
     p->pageTablePool = mmuPageTablePool;
 
+    p->dynamicMap = mmuDynamicMap;
     p->allMapInOne = allMapInOne;
 #if !gcdENABLE_3D
     p->irqs[gcvCORE_MAJOR]          = irqLine = -1;
@@ -536,6 +541,7 @@ _SyncModuleParam(
     showArgs    = p->showArgs;
 
     mmuPageTablePool = p->pageTablePool;
+    mmuDynamicMap = p->dynamicMap;
     allMapInOne = p->allMapInOne;
 }
 
