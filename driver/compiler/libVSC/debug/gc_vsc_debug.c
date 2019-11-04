@@ -884,17 +884,17 @@ void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT tag)
         unsigned int highPC;
         unsigned int hwLocCount;
         unsigned int childrenCount, childrenCount1, childrenCount2, childrenCount3, childrenCount4;
-        unsigned int data0, data1, data2;
+        unsigned int data0, data1, data2, data3;
         int variableCount, argCount, i, j, k, l, m;
         gctBOOL isReg;
         gctBOOL isConst;
         int funcId = 1; /* please change this function id when changing the test case */
-        char * funIdStr = "            ";
-        char * varIdStr = "            ";
-        char * varIdStr2 = "            ";
-        char * varIdStr3 = "            ";
-        char * varIdStr4 = "            ";
-        char * varIdStr5 = "            ";
+        char funIdStr[1024];
+        char varIdStr[1024];
+        char varIdStr2[1024];
+        char varIdStr3[1024];
+        char varIdStr4[1024];
+        char varIdStr5[1024];
         vscDIGetFunctionInfo((void *)context, funcId, funcName, 1024, &lowPC, &highPC);
         argCount      = vscDIGetVariableCount((void *)context, funcId, gcvTRUE);
         variableCount = vscDIGetVariableCount((void *)context, funcId, gcvFALSE);
@@ -902,13 +902,17 @@ void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT tag)
         for (i = 0; i < argCount; i++)
         {
             vscDIGetVariableInfo((void *)context, funIdStr, i, gcvTRUE, varName, typeName, 1024, varIdStr, &lowPC, &highPC, &hwLocCount, &childrenCount);
-             for (j = 0; j < (int)childrenCount; j++)
+            for (j = 0; j < (int)childrenCount; j++)
             {
                 vscDIGetVariableInfo((void *)context, varIdStr, j, gcvFALSE, varName, typeName, 1024, varIdStr2, &lowPC, &highPC, &hwLocCount, &childrenCount1);
+                for (k = 0; k < (int)childrenCount1; k++)
+                {
+                    vscDIGetVariableInfo((void *)context, varIdStr2, k, gcvFALSE, varName, typeName, 1024, varIdStr3, &lowPC, &highPC, &hwLocCount, &childrenCount2);
+                }
             }
             for (j = 0; j < (int) hwLocCount; j++)
             {
-                vscDIGetVariableHWLoc((void *)context, varIdStr, j, &isReg, &isConst, &lowPC, &highPC, &data0, &data1, &data2);
+                vscDIGetVariableHWLoc((void *)context, varIdStr, j, &isReg, &isConst, &lowPC, &highPC, &data0, &data1, &data2, &data3);
             }
         }
         for (i = 0; i < variableCount; i++)
@@ -932,7 +936,7 @@ void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT tag)
             }
             for (j = 0; j < (int) hwLocCount; j++)
             {
-                vscDIGetVariableHWLoc((void *)context, varIdStr, j, &isReg, &isConst, &lowPC, &highPC, &data0, &data1, &data2);
+                vscDIGetVariableHWLoc((void *)context, varIdStr, j, &isReg, &isConst, &lowPC, &highPC, &data0, &data1, &data2, &data3);
             }
         }
     }
@@ -2094,7 +2098,6 @@ void vscDIGetVariableInfo(
                 *childrenCount = child->u.variable.type.array.length[0];
             else if((child->tag == VSC_DI_TAG_VARIABE || child->tag == VSC_DI_TAG_PARAMETER) && child->u.variable.type.isPointer)
             {
-                *hwLocCount = 0;
                 *childrenCount = 1;
             }
             else if(VSC_DI_DIETYPE_IS_VECTOR(child))
@@ -2154,7 +2157,13 @@ void vscDIGetVariableInfo(
                             hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, sl->hwLoc);
                             while(hl)
                             {
-                                *hwLocCount = *hwLocCount + 1;
+                                if(hl->reg)
+                                {
+                                    if(hl->u.reg.end - hl->u.reg.start == sl->u.reg.end - sl->u.reg.start)
+                                        *hwLocCount = *hwLocCount + 1;
+                                }
+                                else
+                                    *hwLocCount = *hwLocCount + 1;
                                 hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, hl->next);
                             }
                         }
@@ -2225,11 +2234,6 @@ void vscDIGetVariableInfo(
                 while(hl)
                 {
                     *hwLocCount = *hwLocCount + 1;
-                    if(hl->reg)
-                    {
-                        offset = 0;
-                        gcoOS_PrintStrSafe(varIdStr, nameLength, &offset, "%s+%d", parentIdStr,hl->u1.hwShift);
-                    }
                     hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, hl->next);
                 }
                 sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
@@ -2317,7 +2321,7 @@ void vscDIGetVariableInfo(
                 }
             }
 
-            if(tempReg > 0)
+            if(pointerDepth > 0 || tempReg > 0)
             {
                 /*calculate the hwLocCount*/
                 *hwLocCount = 0;
@@ -2376,9 +2380,10 @@ void vscDIGetVariableInfo(
         unsigned int data0; /* regStart or baseAdd*/
         unsigned int data1; /* regEnd or offset */
         unsigned int data2;  /*swizzle, HwShift or endOffset */
+        unsigned int data3;
         for (j = 0; j < (int)*hwLocCount; j++)
         {
-            vscDIGetVariableHWLoc(ptr, varIdStr, j, &bIsReg, &bIsConst, &lowPC, &highPC, &data0, &data1, &data2);
+            vscDIGetVariableHWLoc(ptr, varIdStr, j, &bIsReg, &bIsConst, &lowPC, &highPC, &data0, &data1, &data2, &data3);
         }
     }
 
@@ -2395,7 +2400,8 @@ void vscDIGetVariableHWLoc(
     unsigned int * highPC,
     unsigned int * data0, /* regStart or baseAdd*/
     unsigned int * data1, /* regEnd or offset */
-    unsigned int * data2  /*swizzle, HwShift or endOffset */
+    unsigned int * data2, /*swizzle, HwShift or endOffset */
+    unsigned int * data3  /*indicate chanel when store in memory*/
     )
 {
     VSC_DIContext * context = (VSC_DIContext *)ptr;
@@ -2429,7 +2435,7 @@ void vscDIGetVariableHWLoc(
 
     if (!die || (die->tag != VSC_DI_TAG_VARIABE && die->tag != VSC_DI_TAG_PARAMETER))
         return;
-    isPointer = (die->tag == VSC_DI_TAG_VARIABE || die->tag == VSC_DI_TAG_PARAMETER) && die->u.variable.type.isPointer;
+    isPointer = (die->tag == VSC_DI_TAG_VARIABE || die->tag == VSC_DI_TAG_PARAMETER) && die->u.variable.type.isPointer && pointerDepth > 0;
 
     if(dimDepth > 0)
     {
@@ -2477,7 +2483,7 @@ void vscDIGetVariableHWLoc(
                                  &tempReg);
         }
 
-        if(tempReg == 0)
+        if(pointerDepth == 0 && tempReg == 0)
             return;
 
         sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
@@ -2557,6 +2563,13 @@ void vscDIGetVariableHWLoc(
         {
             *data2 = VIR_GetTypeSize(VIR_GetTypeComponentType(die->u.variable.type.type));
         }
+        if (data3)
+        {
+            if (hl->u.reg.type == VSC_DIE_HW_REG_CONST)
+                *data3 = hl->u1.swizzle;
+            else
+                *data3 = hl->u1.hwShift;
+        }
     }
     else
     {
@@ -2607,6 +2620,10 @@ void vscDIGetVariableHWLoc(
                 *data2 = hl->u.offset.endOffset;
             }
         }
+        if (data3)
+        {
+            *data3 = 0;
+        }
 
         if(!(*bIsReg) && isVector && *data2 - *data1 > 4)
         {
@@ -2621,8 +2638,8 @@ void vscDIGetVariableHWLoc(
 
 
 #if vsdTEST_API
-    gcmPRINT("id: %s, idx: %d, pc(%d %d), bIsReg: %d, bIsConst: %d, loc info: %d, %d, %d\n",
-        varIdStr, idx, *lowPC, *highPC, *bIsReg, *bIsConst, *data0, *data1, *data2);
+    gcmPRINT("id: %s, idx: %d, pc(%d %d), bIsReg: %d, bIsConst: %d, loc info: %d, %d, %d, %d\n",
+        varIdStr, idx, *lowPC, *highPC, *bIsReg, *bIsConst, *data0, *data1, *data2, *data3);
 #endif
 }
 

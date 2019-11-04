@@ -159,7 +159,8 @@ void vscDIGetVariableHWLoc(
     unsigned int * highPC,
     unsigned int * data0, /* regStart or baseAdd */
     unsigned int * data1, /* regEnd or offset */
-    unsigned int * data2  /*swizzle, HwShift or endOffset */
+    unsigned int * data2, /*swizzle, HwShift or endOffset */
+    unsigned int * data3 /*indicate chanel when store in memory*/
     );
 
 #endif
