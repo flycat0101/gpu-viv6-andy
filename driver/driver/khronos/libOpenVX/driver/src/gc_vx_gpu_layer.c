@@ -7391,9 +7391,7 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
         parameters[2] = (vx_reference)dst;
     }
 
-    if (depth == 1 && TENSOR_VIEW_SIZE_INDEX(input0, 0) == TENSOR_VIEW_SIZE_INDEX(input1, 0)
-        && (width % 4 == 0)
-        && operation == VX_TENSOR_OP_ADD)
+    if (depth == 1 && operation == VX_TENSOR_OP_ADD)
     {
         useImage2DFlag = vx_true_e;
     }
@@ -7459,12 +7457,16 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
     {
         if (useImage2DFlag)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D_4X", borderMode);
-
+            if (width % 4 == 0)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D_4X", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D_4S", borderMode);
             if (!shaderExecutable) goto OnError;
+
             status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (width % 4 == 0)
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             if (status != VX_SUCCESS) goto OnError;
 
             execution_parameters.globalWorkScale[0] = 4;
@@ -7516,7 +7518,10 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
 
         if (useImage2DFlag)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4X", borderMode);
+            if (width % 4 == 0)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4X", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4S", borderMode);
             if (!shaderExecutable)
             {
                 goto OnError;
@@ -7524,7 +7529,8 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
 
             status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (width % 4 == 0)
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             if (status != VX_SUCCESS) goto OnError;
 
             execution_parameters.globalWorkScale[0] = 4;

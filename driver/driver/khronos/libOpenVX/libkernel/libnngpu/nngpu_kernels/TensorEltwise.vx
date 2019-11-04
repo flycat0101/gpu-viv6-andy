@@ -38,6 +38,27 @@ __kernel void gpuTensorAdd_FP32_2D_4X
     write_imagef(output, coord, dst);
 }
 
+__kernel void gpuTensorAdd_FP32_2D_4S
+    (
+    __read_only     image2d_t input0,
+    __read_only     image2d_t input1,
+    __write_only    image2d_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(0));
+    float4 src0, src1, dst;
+
+    src0 = read_imagef(input0, coord.xy);
+    src1 = read_imagef(input1, coord.xy);
+    coord.zw = coord.xx + (int2)(1, 2);
+    dst = src0 + src1;
+    write_imagef(output, coord.xy, dst.xxxx);
+    write_imagef(output, coord.zy, dst.yyyy);
+    write_imagef(output, coord.wy, dst.zzzz);
+    coord.x += 3;
+    write_imagef(output, coord.xy, dst.wwww);
+}
+
 __kernel void gpuTensorAdd_Quant8
     (
     __read_only     image2d_array_t input0,
@@ -94,6 +115,41 @@ __kernel void gpuTensorAdd_Quant8_2D_4X
 
     dst = convert_uint4(outPixel);
     write_imageui(output, coord, dst);
+}
+
+__kernel void gpuTensorAdd_Quant8_2D_4S
+    (
+    __read_only     image2d_t input0,
+    __read_only     image2d_t input1,
+    __write_only    image2d_t output,
+    float           scaleIn0,
+    float           scaleIn1,
+    float           scaleOut,
+    float           zpIn0,
+    float           zpIn1,
+    float           zpOut
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), get_global_id(0));
+    uint4 src0, src1, dst = {0.0};
+    float4 inPixel0, inPixel1, outPixel;
+
+    src0 = read_imageui(input0, coord.xy);
+    src1 = read_imageui(input1, coord.xy);
+
+    coord.zw = coord.xx + (int2)(1, 2);
+
+    inPixel0 = convert_float4(src0) * scaleIn0 - zpIn0;
+    inPixel1 = convert_float4(src1) * scaleIn1;
+
+    outPixel = inPixel0 + inPixel1;
+
+    dst = convert_uint4(outPixel);
+    write_imageui(output, coord.xy, dst.xxxx);
+    write_imageui(output, coord.zy, dst.yyyy);
+    write_imageui(output, coord.wy, dst.zzzz);
+    coord.x += 3;
+    write_imageui(output, coord.xy, dst.wwww);
 }
 
 /*tensor sub*/
