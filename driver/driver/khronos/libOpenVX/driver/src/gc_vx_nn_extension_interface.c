@@ -17568,7 +17568,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                             {
                                 vx_tensor t = NULL;
 
-                                sizes[0] = inputWidth * inputHeight;
+                                sizes[0] = outputWidth * outputHeight;
                                 sizes[1] = 1;
                                 sizes[2] = outputDepth;
                                 sizes[3] = batchCount;
