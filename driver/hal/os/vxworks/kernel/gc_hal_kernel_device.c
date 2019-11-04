@@ -906,6 +906,7 @@ gckGALDEVICE_Destroy(
                 Device->os,
                 Device->externalPhysical
                 );
+            Device->externalPhysical = gcvNULL;
         }
 
         if (Device->externalLogical != gcvNULL)
@@ -936,7 +937,7 @@ gckGALDEVICE_Destroy(
                     Device->os,
                     Device->contiguousPhysical
                     );
-
+                Device->contiguousPhysical = gcvNULL;
                 Device->requestedContiguousBase = 0;
                 Device->requestedContiguousSize = 0;
             }

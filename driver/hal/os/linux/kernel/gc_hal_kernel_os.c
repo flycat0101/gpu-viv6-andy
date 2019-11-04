@@ -1651,7 +1651,11 @@ gckOS_ReleaseReservedMemory(
     /* If no allocator, how comes the memory? */
     BUG_ON(!allocator);
 
-    gcmALLOCATOR_Free(allocator, mdl);
+    if (mdl)
+    {
+        gcmkVERIFY_OK(gcmALLOCATOR_Free(allocator, mdl));
+        gcmkVERIFY_OK(_DestroyMdl(mdl));
+    }
 }
 
 /*******************************************************************************

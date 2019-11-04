@@ -2018,6 +2018,7 @@ gckGALDEVICE_Destroy(
                     Device->os,
                     Device->extSRAMPhysical[i]
                     );
+                Device->extSRAMPhysical[i] = gcvNULL;
             }
 
             if (Device->extSRAMVidMem[i] != gcvNULL)
@@ -2033,6 +2034,7 @@ gckGALDEVICE_Destroy(
                 Device->os,
                 Device->externalPhysical
                 );
+            Device->externalPhysical = gcvNULL;
         }
 
         if (Device->externalLogical != gcvNULL)
@@ -2083,7 +2085,7 @@ gckGALDEVICE_Destroy(
                     Device->os,
                     Device->contiguousPhysical
                     );
-
+                Device->contiguousPhysical = gcvNULL;
                 Device->requestedContiguousBase = 0;
                 Device->requestedContiguousSize = 0;
             }
