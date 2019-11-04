@@ -61,7 +61,9 @@
 #include <asm/atomic.h>
 #include <linux/dma-mapping.h>
 #include <linux/slab.h>
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,12,0)
+#include <asm/set_memory.h>
+#endif
 #include "gc_hal_kernel_platform.h"
 
 #define _GC_OBJ_ZONE    gcvZONE_OS
