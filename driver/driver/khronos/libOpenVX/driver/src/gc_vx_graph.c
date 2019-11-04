@@ -6501,15 +6501,15 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyVirtualBuffer(vx_graph graph)
     {
         vxnne_operation op = graph->layer->operations[graph->layer->opIndices[i].operationID];
 
-        if (!graph->layer->opIndices[i].inputTile.sRAM)
+        for (j = 0; j < op->inputsNum; j++)
         {
-            for (j = 0; j < op->inputsNum; j++)
+            if (op->inputs[j] != VX_NULL && op->inputs[j]->type == VX_TYPE_TENSOR)
             {
-                if (op->inputs[j] != VX_NULL && op->inputs[j]->type == VX_TYPE_TENSOR)
-                {
-                    vx_tensor input = (vx_tensor)op->inputs[j];
-                    vx_memory inmem = &input->tensorBuffer->memory;
+                vx_tensor input = (vx_tensor)op->inputs[j];
+                vx_memory inmem = &input->tensorBuffer->memory;
 
+                if (!(inmem->allocType & VXNNE_MEM_POOL_TYPE_SRAM))
+                {
                     if (!vxoTensor_IsVirtualTensor(input) || !enablePool)
                     {
                         vxmONERROR(vxoTensor_AllocateMemory(input));
@@ -6534,15 +6534,15 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyVirtualBuffer(vx_graph graph)
             }
         }
 
-        if (!graph->layer->opIndices[i].outputTile.sRAM)
+        for (j = 0; j < op->outputsNum; j++)
         {
-            for (j = 0; j < op->outputsNum; j++)
+            if (op->outputs[j] != VX_NULL && op->outputs[j]->type == VX_TYPE_TENSOR)
             {
-                if (op->outputs[j] != VX_NULL && op->outputs[j]->type == VX_TYPE_TENSOR)
-                {
-                    vx_tensor output = (vx_tensor)op->outputs[j];
-                    vx_memory outmem = &output->tensorBuffer->memory;
+                vx_tensor output = (vx_tensor)op->outputs[j];
+                vx_memory outmem = &output->tensorBuffer->memory;
 
+                if (!(outmem->allocType & VXNNE_MEM_POOL_TYPE_SRAM))
+                {
                     if (!vxoTensor_IsVirtualTensor(output) || !enablePool)
                     {
                         vxmONERROR(vxoTensor_AllocateMemory(output));
