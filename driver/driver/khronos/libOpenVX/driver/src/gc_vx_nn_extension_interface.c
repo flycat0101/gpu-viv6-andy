@@ -17104,6 +17104,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                 if (node->base.context->evisNoInst.supportEVIS == vx_false_e
                     && ((inputWidth * inputHeight < IMG_MAX_WIDTH) && inputDepth < IMG_MAX_WIDTH)
                     && (k_w == k_h && k_w == 1)
+                    && (strideX == strideY && strideX == 1)
                     && (paddingLeft == paddingRight && paddingLeft == 0)
                     && (paddingTop == paddingBottom && paddingTop == 0)
                     && biases != NULL
