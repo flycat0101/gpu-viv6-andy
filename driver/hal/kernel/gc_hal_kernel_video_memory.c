@@ -3697,7 +3697,7 @@ gckVIDMEM_NODE_UnlockCPU(
 #else
             gctUINT64 mappingInOne  = 1;
 
-            gcmkONERROR(gckOS_QueryOption(os, "allMapInOne", &mappingInOne));
+            gckOS_QueryOption(os, "allMapInOne", &mappingInOne);
             /* only unmap it in dynamic mapping, otherwise it will be unmapped
              * in Vidmm free function
              */
