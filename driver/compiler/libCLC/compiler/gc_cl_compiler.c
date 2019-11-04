@@ -4893,6 +4893,8 @@ IN clsNAME * Variable
             if (tag == VSC_DI_TAG_TYPE)
             {
                 ptr->u.type = type;
+                if (clmDECL_IsPointerType(&(Variable->decl)))
+                    ptr->u.variable.type.isPointer = gcvTRUE;
             }
             else if (tag == VSC_DI_TAG_SUBPROGRAM)
             {
@@ -4903,6 +4905,8 @@ IN clsNAME * Variable
             {
                 ptr->u.variable.type = type;
                 if (clmDECL_IsPointerType(&(Variable->decl)))
+                    ptr->u.variable.type.isPointer = gcvTRUE;
+                if (clmDECL_IsPointerArray(&(Variable->decl)))
                     ptr->u.variable.type.isPointer = gcvTRUE;
             }
             else if (tag == VSC_DI_TAG_CONSTANT)

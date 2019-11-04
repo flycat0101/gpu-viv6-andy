@@ -2079,6 +2079,10 @@ gctUINT vscDIGetDieOffset(
                 offset += usedNum * VIR_GetTypeSize(VIR_GetTypeComponentType(die->u.type.type));
             }
         }
+        else if(varIdStr[index] == '+')
+        {
+            offset = 0;
+        }
     }
     return offset;
 }
@@ -2411,7 +2415,7 @@ void vscDIGetVariableInfo(
                                  dimNum,
                                  &tempReg);
 
-            if(tempReg > 0 && !die->useMemory && !die->u.type.isPointer)
+            if(tempReg > 0 && !die->useMemory)
             {
                 /*calculate the hwLocCount*/
                 *hwLocCount = 0;
@@ -2440,7 +2444,7 @@ void vscDIGetVariableInfo(
                     sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
                 }
             }
-            else if(die->useMemory || die->u.type.isPointer)
+            else if(die->useMemory)
             {
                 if((gctINT)dimDepth +1 < Vdie->u.type.array.numDim)
                     *hwLocCount = 0;
@@ -2463,6 +2467,10 @@ void vscDIGetVariableInfo(
         {
             if(dimDepth + 1 < (gctUINT)Vdie->u.variable.type.array.numDim)
                 *childrenCount = Vdie->u.variable.type.array.length[dimDepth + 1];
+            else if(isPointerChild)
+            {
+                *childrenCount = 1;
+            }
             else if(isVectorChild)
             {
                 *childrenCount = VIR_GetTypeLogicalComponents(Vdie->u.variable.type.type);
@@ -2907,7 +2915,7 @@ void vscDIGetVariableHWLoc(
                     regEOffset = sl->u.reg.end - tempReg;
                     break;
                 }
-                if(die->useMemory || die->u.type.isPointer)
+                if(die->useMemory || isPointer)
                     break;
             }
             sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
@@ -2958,7 +2966,10 @@ void vscDIGetVariableHWLoc(
 
         if (data0)
         {
-            *data0 = hl->u.reg.start;
+            if (hl->reg)
+                *data0 = hl->u.reg.start + regSOffset;
+            else
+                *data0 = hl->u.offset.baseAddr.start + regSOffset;
         }
 
         if (data1)
