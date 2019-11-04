@@ -6972,6 +6972,10 @@ VSC_ErrCode __SpvEmitVectorShuffle(gcSPV spv, VIR_Shader * virShader)
 
     gcmEMIT_GET_ARGS();
 
+    (void)nameId;
+    (void)dstVirType;
+    (void)dstVirTypeId;
+
     for (i = 0; i < 2; i++)
     {
         if (SPV_ID_TYPE(spv->operands[i]) == SPV_ID_TYPE_SYMBOL)
@@ -7117,6 +7121,8 @@ VSC_ErrCode __SpvEmitPhi(gcSPV spv, VIR_Shader * virShader)
 
     gcmEMIT_GET_ARGS();
 
+    (void)nameId;
+
     if (SPV_ID_IS_MEM_ADDR_CALC(resultId))
     {
         dstVirTypeId = VIR_TYPE_UINT32;
@@ -7232,6 +7238,8 @@ VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
     gcmASSERT(spvTypeId != SPV_INVALID_ID);
 
     gcmEMIT_GET_ARGS();
+
+    (void)dstVirType;
 
     /* If the composite is a vector, then it must be a variable. */
     if (SPV_ID_TYPE_IS_VECTOR(spvTypeId))
@@ -8074,6 +8082,10 @@ VSC_ErrCode __SpvEmitCompositeConstruct(gcSPV spv, VIR_Shader * virShader)
     (void)operand;
     (void)virInst;
     (void)virOpcode;
+    (void)dstVirSym;
+    (void)nameId;
+    (void)dstVirTypeId;
+    (void)dstVirType;
 
     /* Initialize sym list. */
     spvAllocate(spv->spvMemPool, spv->operandSize * gcmSIZEOF(VIR_SymId), (gctPOINTER *)&compositeSymId);
@@ -8506,6 +8518,8 @@ VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
     gcmEMIT_HEADER();
 
     gcmEMIT_GET_ARGS();
+
+    (void)nameId;
 
     if (spv->opCode == SpvOpImageSampleDrefImplicitLod      ||
         spv->opCode == SpvOpImageSampleDrefExplicitLod      ||
@@ -9895,7 +9909,6 @@ VSC_ErrCode __SpvEmitArrayLength(gcSPV spv, VIR_Shader * virShader)
     VIR_Swizzle virSwizzle;
     VIR_Enable virEnableMask;
     gctBOOL hasDest;
-    gctBOOL isWorkGroup = gcvFALSE;
     SpvId spvOperand;
 
     /* map spvopcode to vir opcode, if not support, add more inst */
@@ -9910,8 +9923,6 @@ VSC_ErrCode __SpvEmitArrayLength(gcSPV spv, VIR_Shader * virShader)
 
         dstVirTypeId = SPV_ID_TYPE_VIR_TYPE_ID(resultTypeId);
         dstVirType = SPV_ID_TYPE_VIR_TYPE(resultTypeId);
-
-        isWorkGroup = SPV_ID_SYM_IS_WORKGROUP(spv->operands[0]);
     }
     else
     {
@@ -10190,7 +10201,6 @@ VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
     for (i = 0; i < spv->operandSize; i++)
     {
         SpvId spvOperand = spv->operands[i];
-        SpvId resultTypeId = spv->operands[i];
 
         virSwizzle = __SpvID2Swizzle(spv, spvOperand);
 
@@ -10199,11 +10209,6 @@ VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
         {
             VIR_SymbolKind  baseOffsetType = SPV_ID_SYM_OFFSET_TYPE(spvOperand);
             gctUINT         baseOffset = SPV_ID_SYM_OFFSET_VALUE(spvOperand);
-
-            if (SPV_ID_TYPE(spv->operands[i]) == SPV_ID_TYPE_FUNC_DEFINE)
-            {
-                resultTypeId = SPV_ID_FUNC_TYPE_ID(spvOperand);
-            }
 
             operand = virInst->src[virOpndId];
 
@@ -10318,7 +10323,6 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
     VIR_Swizzle virSwizzle;
     VIR_Enable virEnableMask;
     gctBOOL hasDest;
-    gctBOOL isWorkGroup = gcvFALSE;
     gctBOOL bSourceUnsignedInteger = gcvFALSE, bSourceSignedInteger = gcvFALSE;
     gctBOOL bDestUnsignedInteger = gcvFALSE, bDestSignedInteger = gcvFALSE;
     gctUINT virOpndId = 0;
@@ -10373,8 +10377,6 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
 
         dstVirTypeId = SPV_ID_TYPE_VIR_TYPE_ID(resultTypeId);
         dstVirType = SPV_ID_TYPE_VIR_TYPE(resultTypeId);
-
-        isWorkGroup = SPV_ID_SYM_IS_WORKGROUP(spv->operands[0]);
     }
     else
     {
@@ -10541,7 +10543,6 @@ VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
     VIR_TypeId          virDstTypeId = SPV_ID_VIR_TYPE_ID(targetId);
     SpvId               srcId = spv->operands[1];
     gctBOOL             sized = (spvOpCode == SpvOpCopyMemorySized);
-    SpvMemoryAccessMask memoryAccessMask = SpvMemoryAccessMaskNone;
     gctBOOL             isDstMemory = SPV_ID_IS_MEM_ADDR_CALC(targetId);
     gctBOOL             isSrcMemory = SPV_ID_IS_MEM_ADDR_CALC(srcId);
     VIR_Symbol         *dstBlockSym = gcvNULL;
@@ -10551,16 +10552,6 @@ VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
     VIR_Operand        *operand = gcvNULL;
     VIR_Enable          virDstEnable = __SpvGenEnable(spv, VIR_Shader_GetTypeFromId(virShader, virDstTypeId), targetTypeId);
     VIR_Swizzle         virSrcSwizzle = __SpvID2Swizzle(spv, srcId);
-
-    /* Get memory access mask. */
-    if (sized && spv->operandSize == 4)
-    {
-        memoryAccessMask = (SpvMemoryAccessMask)spv->operands[3];
-    }
-    else if (!sized && spv->operandSize == 3)
-    {
-        memoryAccessMask = (SpvMemoryAccessMask)spv->operands[2];
-    }
 
     /* Check if target is a block symbol. */
     dstBlockSym = __SpvGetBlockSymbol(spv, virShader, targetId);
@@ -11870,6 +11861,12 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
                 case SpvExecutionModeLocalSizeHintId:
                 case SpvExecutionModePostDepthCoverage:
                 case SpvExecutionModeStencilRefReplacingEXT:
+                case SpvExecutionModeMax:
+                    /* TODO */
+                    gcmASSERT(0);
+                    break;
+
+                default:
                     /* TODO */
                     gcmASSERT(0);
                     break;
@@ -11989,12 +11986,12 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
             case OperandScope:
                 if (scopeId < SPV_MAX_SCOPE_ID_NUM)
                 {
-                    spv->scope[scopeId] = SPV_NEXT_WORD_WO_OPERAND;
+                    spv->scope[scopeId] = (SpvScope)SPV_NEXT_WORD_WO_OPERAND;
                     scopeId ++;
                 }
                 else
                 {
-                    SPV_NEXT_WORD_WO_OPERAND;
+                    SPV_NEXT_WORD_NO_OPERAND;
                     gcmASSERT(0);
                 }
                 break;
@@ -12002,12 +11999,12 @@ static VSC_ErrCode __SpvDecodeInstruction(gcSPV spv, VIR_Shader * virShader)
             case OperandMemorySemantics:
                 if (memSematicId < SPV_MAX_MEM_SEMANTIC_ID_NUM)
                 {
-                    spv->memSematic[memSematicId] = SPV_NEXT_WORD_WO_OPERAND;
+                    spv->memSematic[memSematicId] = (SpvMemorySemanticsMask)SPV_NEXT_WORD_WO_OPERAND;
                     memSematicId ++;
                 }
                 else
                 {
-                    SPV_NEXT_WORD_WO_OPERAND;
+                    SPV_NEXT_WORD_NO_OPERAND;
                     gcmASSERT(0);
                 }
                 break;
@@ -12109,7 +12106,6 @@ static gceSTATUS __SpvConstructAndInitializeVIRShader(
     )
 {
     gctUINT8 shaderStage = VSC_SHADER_STAGE_UNKNOWN;
-    gctBOOL  isCLKernel = gcvFALSE;
     static int theShaderId = 0;
 
     /* Create VIR_SHADER */
@@ -12135,7 +12131,6 @@ static gceSTATUS __SpvConstructAndInitializeVIRShader(
         break;
     case SpvExecutionModelKernel:
         shaderStage = VSC_SHADER_STAGE_CS;
-        isCLKernel = gcvTRUE;
         break;
 
     default:

@@ -22,6 +22,8 @@
 
 #define SPV_NEXT_WORD (spv->numOperands--, spv->src[spv->word++])
 
+#define SPV_NEXT_WORD_NO_OPERAND (spv->word++)
+
 #define SPV_NEXT_WORD_WO_OPERAND (spv->src[spv->word++])
 
 #define SPV_NEXT_WORD_TO_STRING (spv->numOperands--, (gctCHAR*)(gcmINT2PTR(&spv->src[spv->word])))
