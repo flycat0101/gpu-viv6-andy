@@ -3220,7 +3220,7 @@ void vscDIGetNearPCBySrcLine(void * ptr, unsigned int src,unsigned int * newSrc,
         for (i = 0 ; i < context->lineTable.count; i++)
         {
             if (/*(context->lineTable.map[i].sourcLoc.fileId == src.fileId) && */
-                (context->lineTable.map[i].sourcLoc.lineNo == chosenLine))
+                context->lineTable.map[i].sourcLoc.lineNo == chosenLine)
             {
                 if (*start == VSC_DI_INVALID_PC)
                 {
