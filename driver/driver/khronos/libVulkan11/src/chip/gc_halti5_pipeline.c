@@ -6371,6 +6371,15 @@ static VkResult halti5_pip_build_computeshader(
                     (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i], 8,
                                                    VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 
+                if (descSetLayout->storageDescriptorCount)
+                {
+                    chipPipeline->patchStorageImgFormat[i] =
+                        (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * descSetLayout->storageDescriptorCount, 8,
+                                                       VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                    __VK_ONERROR(chipPipeline->patchStorageImgFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                    __VK_MEMZERO(chipPipeline->patchStorageImgFormat[i], sizeof(VSC_IMAGE_FORMAT) * descSetLayout->storageDescriptorCount);
+                }
+
                 __VK_ONERROR(chipPipeline->patchKeys[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                 __VK_ONERROR(chipPipeline->patchTexBufFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                 __VK_MEMZERO(chipPipeline->patchKeys[i], sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i]);
