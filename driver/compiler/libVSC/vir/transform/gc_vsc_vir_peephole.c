@@ -5468,7 +5468,7 @@ static gctBOOL _VSC_PH_LocalVariable(
         {
             VIR_Instruction* defInst = defKey->defKey.pDefInst;
             gctUINT i;
-            if (defInst != VIR_INPUT_DEF_INST)
+            if (defInst != VIR_INPUT_DEF_INST && defInst && (!VIR_OPCODE_Loads(VIR_Inst_GetOpcode(defInst))))
             {
                 for (i = 0; i < VIR_Inst_GetSrcNum(defInst);i++)
                 {
