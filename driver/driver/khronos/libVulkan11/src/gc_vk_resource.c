@@ -1673,6 +1673,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
 #endif
         }
     } while (gcvFALSE);
+#else
+    dedicatedInfo = dedicatedInfo;
+    exportInfo    = exportInfo;
 #endif
 
     if (!bExternalMemory)
@@ -2766,6 +2769,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
             residentFormat = __vk_GetVkFormatInfo(VK_FORMAT_R8G8B8A8_UNORM)->residentImgFormat;
             img->formatInfo = *__vk_GetVkFormatInfo((VkFormat) residentFormat);
         }
+#else
+        externalCreateInfo = externalCreateInfo;
 #endif
 
         if (img->formatInfo.residentImgFormat == VK_FORMAT_UNDEFINED)
