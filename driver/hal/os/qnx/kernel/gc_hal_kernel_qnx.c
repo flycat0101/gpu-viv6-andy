@@ -292,7 +292,7 @@ gckKERNEL_MapVideoMemory(
 **      gctUINT32 Pid
 **          Process ID of the current process.
 **
-**      gctUINT32 Bytes
+**      gctSIZE_T Bytes
 **          Number of bytes to map.
 **
 **  OUTPUT:
@@ -305,7 +305,7 @@ gckKERNEL_UnmapVideoMemory(
     IN gcePOOL Pool,
     IN gctPOINTER Logical,
     IN gctUINT32 Pid,
-    IN gctUINT32 Bytes
+    IN gctSIZE_T Bytes
     )
 {
     gcmkHEADER_ARG("Pool=0x%x Logical=0x%08x pid=%u Bytes=%u",

@@ -402,7 +402,7 @@ OnError:
 **      gctUINT32 Pid
 **          Process ID of the current process.
 **
-**      gctUINT32 Bytes
+**      gctSIZE_T Bytes
 **          Number of bytes to map.
 **
 **  OUTPUT:
@@ -415,7 +415,7 @@ gckKERNEL_UnmapVideoMemory(
     IN gcePOOL Pool,
     IN gctPOINTER Logical,
     IN gctUINT32 Pid,
-    IN gctUINT32 Bytes
+    IN gctSIZE_T Bytes
     )
 {
     gceSTATUS status      = gcvSTATUS_OK;

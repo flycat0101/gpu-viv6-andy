@@ -1712,7 +1712,7 @@ gckKERNEL_UnmapVideoMemory(
     IN gcePOOL Pool,
     IN gctPOINTER Logical,
     IN gctUINT32 Pid,
-    IN gctUINT32 Bytes
+    IN gctSIZE_T Bytes
     );
 
 /* Map memory. */
