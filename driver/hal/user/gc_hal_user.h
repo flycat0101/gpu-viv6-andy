@@ -2496,7 +2496,8 @@ gcoHARDWARE_SetQuery(
     IN gctUINT32 QueryHeader,
     IN gceQueryType Type,
     IN gceQueryCmd QueryCmd,
-    IN gctPOINTER *Memory
+    IN gctPOINTER *Memory,
+    IN gctUINT32 Index
     );
 
 gceSTATUS

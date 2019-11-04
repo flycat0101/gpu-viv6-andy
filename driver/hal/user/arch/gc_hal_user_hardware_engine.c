@@ -11574,7 +11574,8 @@ gcoHARDWARE_FlushDepth(
                                             0,
                                             gcvQUERY_OCCLUSION,
                                             gcvQUERYCMD_PAUSE,
-                                            (gctPOINTER *)&memory));
+                                            (gctPOINTER *)&memory,
+                                            0));
 
             /* If Z Mode changed, OQ Mode should also be changed. */
             if(raDepth)
@@ -11618,7 +11619,8 @@ gcoHARDWARE_FlushDepth(
                                             0,
                                             gcvQUERY_OCCLUSION,
                                             gcvQUERYCMD_RESUME,
-                                            (gctPOINTER *)&memory));
+                                            (gctPOINTER *)&memory,
+                                            0));
         }
         else
         {
@@ -18395,7 +18397,8 @@ gcoHARDWARE_SetQuery(
     IN gctUINT32 QueryHeader,
     IN gceQueryType Type,
     IN gceQueryCmd QueryCmd,
-    IN gctPOINTER *Memory
+    IN gctPOINTER *Memory,
+    IN gctUINT32 Index
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -18567,7 +18570,7 @@ gcoHARDWARE_SetQuery(
  ~0U : (~(~0U << ((1 ?
  7:4) - (0 ?
  7:4) + 1))))))) << (0 ?
- 7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 7:4))) | (((gctUINT32) ((gctUINT32) (Index) & ((gctUINT32) ((((1 ?
  7:4) - (0 ?
  7:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ? 7:4)))
@@ -18634,7 +18637,7 @@ gcoHARDWARE_SetQuery(
  ~0U : (~(~0U << ((1 ?
  7:4) - (0 ?
  7:4) + 1))))))) << (0 ?
- 7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 7:4))) | (((gctUINT32) ((gctUINT32) (Index) & ((gctUINT32) ((((1 ?
  7:4) - (0 ?
  7:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ? 7:4)))
@@ -18782,7 +18785,7 @@ gcoHARDWARE_SetQuery(
  ~0U : (~(~0U << ((1 ?
  7:4) - (0 ?
  7:4) + 1))))))) << (0 ?
- 7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 7:4))) | (((gctUINT32) ((gctUINT32) (Index) & ((gctUINT32) ((((1 ?
  7:4) - (0 ?
  7:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ? 7:4)))
@@ -18871,7 +18874,7 @@ gcoHARDWARE_SetQuery(
  ~0U : (~(~0U << ((1 ?
  7:4) - (0 ?
  7:4) + 1))))))) << (0 ?
- 7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 7:4))) | (((gctUINT32) ((gctUINT32) (Index) & ((gctUINT32) ((((1 ?
  7:4) - (0 ?
  7:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ? 7:4)))

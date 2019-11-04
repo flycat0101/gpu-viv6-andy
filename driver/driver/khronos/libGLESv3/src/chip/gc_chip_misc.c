@@ -139,7 +139,7 @@ __glChipBeginQuery(
                    0,
                    queryHeader->headerSize);
 
-    gcmONERROR(gco3D_SetQuery(chipCtx->engine, physical, chipQuery->type, gcvTRUE));
+    gcmONERROR(gco3D_SetQuery(chipCtx->engine, physical, chipQuery->type, gcvTRUE, 0));
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
@@ -193,7 +193,7 @@ __glChipEndQuery(
     }
 
     /* Send value to data addr reg to end QUERY mode. */
-    gcmONERROR(gco3D_SetQuery(chipCtx->engine, 0, chipQuery->type, gcvFALSE));
+    gcmONERROR(gco3D_SetQuery(chipCtx->engine, 0, chipQuery->type, gcvFALSE, 0));
 
     /* Send an event to signal that the data is in the buffer. */
     iface.command            = gcvHAL_SIGNAL;

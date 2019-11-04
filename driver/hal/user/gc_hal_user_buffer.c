@@ -2205,11 +2205,13 @@ gcoBUFFER_Reserve(
         {
             gctUINT64 resumeCommand, resumeCommandSaved;
             resumeCommand = resumeCommandSaved = commandBuffer->lastReserve;
+            /* If need to setquery index from 0 to 4 (or current index) while type is gcvQUERY_XFB_WRITTEN or gcvQUERY_PRIM_GENERATED only for OGL? */
             gcoHARDWARE_SetQuery(Buffer->hardware,
                                  ~0U,
-                                 queryType,
+                                 (gceQueryType)queryType,
                                  gcvQUERYCMD_RESUME,
-                                 (gctPOINTER *)&resumeCommand);
+                                 (gctPOINTER *)&resumeCommand,
+                                 0);
             gcmASSERT((resumeCommand - resumeCommandSaved) == Buffer->queryResumeBytes[queryType]);
             commandBuffer->lastReserve = resumeCommand;
             commandBuffer->lastOffset += (gctUINT32)(resumeCommand - resumeCommandSaved);
@@ -2389,7 +2391,8 @@ gcoBUFFER_Commit(
                         pauseQueryCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
                                                         + tailCommandBuffer->offset);
 
-                        gcoHARDWARE_SetQuery(gcvNULL, ~0U, (gceQueryType)type, gcvQUERYCMD_PAUSE, (gctPOINTER*)&pauseQueryCommand);
+                        /* If need to setquery index from 0 to 4 (or current index) while type is gcvQUERY_XFB_WRITTEN or gcvQUERY_PRIM_GENERATED only for OGL? */
+                        gcoHARDWARE_SetQuery(gcvNULL, ~0U, (gceQueryType)type, gcvQUERYCMD_PAUSE, (gctPOINTER*)&pauseQueryCommand, 0);
                         if ((pauseQueryCommand - pauseQueryCommandsaved) > 0)
                         {
                             tailCommandBuffer->offset += (gctUINT32)(pauseQueryCommand - pauseQueryCommandsaved);

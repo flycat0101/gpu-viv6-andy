@@ -5518,7 +5518,8 @@ gco3D_SetQuery(
     IN gco3D Engine,
     IN gctUINT32 QueryHeader,
     IN gceQueryType Type,
-    IN gctBOOL Enable
+    IN gctBOOL Enable,
+    IN gctUINT32 Index
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -5529,11 +5530,11 @@ gco3D_SetQuery(
 
     if (Enable)
     {
-        status = gcoHARDWARE_SetQuery(Engine->hardware, QueryHeader, Type, gcvQUERYCMD_BEGIN, gcvNULL);
+        status = gcoHARDWARE_SetQuery(Engine->hardware, QueryHeader, Type, gcvQUERYCMD_BEGIN, gcvNULL, Index);
     }
     else
     {
-        status = gcoHARDWARE_SetQuery(Engine->hardware, QueryHeader, Type, gcvQUERYCMD_END, gcvNULL);
+        status = gcoHARDWARE_SetQuery(Engine->hardware, QueryHeader, Type, gcvQUERYCMD_END, gcvNULL, Index);
     }
 
     gcmFOOTER();
@@ -7080,7 +7081,8 @@ gco3D_SetQuery(
     IN gco3D Engine,
     IN gctUINT32 QueryHeader,
     IN gceQueryType Type,
-    IN gctBOOL Enable
+    IN gctBOOL Enable,
+    IN gctUINT32 Index
     )
 {
     return gcvSTATUS_OK;
