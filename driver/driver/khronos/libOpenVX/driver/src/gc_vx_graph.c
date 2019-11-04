@@ -2044,7 +2044,7 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                 vx_uint32 j;
 
                 j = 0;
-                op = operation->mGpuHead;
+                op = (operation->mGpuHead != NULL) ? operation->mGpuHead : operation;
                 while (op != VX_NULL)
                 {
                     vxnne_convolution_relu_pooling_operation convOperationT = (vxnne_convolution_relu_pooling_operation)op;
@@ -2069,7 +2069,7 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                                                         graph->base.context->vipSRAM.size);
 
                 j = 0;
-                op = operation->mGpuHead;
+                op = (operation->mGpuHead != NULL) ? operation->mGpuHead : operation;
                 while (op != VX_NULL)
                 {
                     vxnne_convolution_relu_pooling_operation convOperationT = (vxnne_convolution_relu_pooling_operation)op;
@@ -3999,7 +3999,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                     vx_uint32 j;
 
                     j = 0;
-                    op = operation->mGpuHead;
+                    op = (operation->mGpuHead != NULL) ? operation->mGpuHead : operation;
                     while (op != VX_NULL)
                     {
                         vxnne_convolution_relu_pooling_operation convOperationT = (vxnne_convolution_relu_pooling_operation)op;
@@ -4024,7 +4024,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                                                            graph->base.context->vipSRAM.size);
 
                     j = 0;
-                    op = operation->mGpuHead;
+                    op = (operation->mGpuHead != NULL) ? operation->mGpuHead : operation;
                     while (op != VX_NULL)
                     {
                         vxnne_convolution_relu_pooling_operation convOperationT = (vxnne_convolution_relu_pooling_operation)op;
