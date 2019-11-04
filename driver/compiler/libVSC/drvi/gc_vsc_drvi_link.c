@@ -370,12 +370,13 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
                 {
                     for (j = 0; j < pPEP->u.vk.pResourceSets[i].storageTable.countOfEntries; j ++)
                     {
+                        PROG_VK_STORAGE_TABLE_ENTRY storageEntry = pPEP->u.vk.pResourceSets[i].storageTable.pStorageEntries[j];
+
                         for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
                         {
-                            if (pPEP->u.vk.pResourceSets[i].storageTable.pStorageEntries[j].stageBits &
-                                VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx))
+                            if (storageEntry.stageBits & VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx))
                             {
-                                pUavSlotMapping = &pPEP->u.vk.pResourceSets[i].storageTable.pStorageEntries[j].hwMappings[stageIdx];
+                                pUavSlotMapping = &storageEntry.hwMappings[stageIdx];
 
                                 if (pUavSlotMapping->hwMemAccessMode != SHADER_HW_MEM_ACCESS_MODE_PLACE_HOLDER)
                                 {
@@ -385,6 +386,12 @@ gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
                                     pUavSlotMapping->hwLoc.pHwDirectAddrBase = gcvNULL;
                                 }
                             }
+                        }
+
+                        if (storageEntry.pResOpBits)
+                        {
+                            gcoOS_Free(gcvNULL, storageEntry.pResOpBits);
+                            storageEntry.pResOpBits = gcvNULL;
                         }
                     }
 

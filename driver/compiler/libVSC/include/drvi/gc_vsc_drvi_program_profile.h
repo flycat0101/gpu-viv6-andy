@@ -906,6 +906,10 @@ typedef struct PROG_VK_STORAGE_TABLE_ENTRY
 
     PROG_VK_IMAGE_FORMAT_INFO                   imageFormatInfo;
 
+    /* Which kinds of inst operation acting on texture. The count of this
+       resOpBit is same as storageBinding::arraySize */
+    VSC_RES_OP_BIT*                             pResOpBits;
+
     /* Extra layer HW mapping. As currently, for images in in storageBinding::arraySize
        array, if one image has extra image, all other images must have extra image, so
        this is the first entry of extra-image */

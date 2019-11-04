@@ -4774,8 +4774,6 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
     if (bIsSampler)
     {
         pIaEntry->hwMappings[stageIdx].uavMapping.hwSamplerSlot = pResAllocEntry->hwRegNo;
-
-        _SetResOpBits(pShader, &pIaEntry->iaBinding, &pIaEntry->pResOpBits);
     }
     else
     {
@@ -4822,6 +4820,8 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
                                 pSep,
                                 SHS_PRIV_MEM_KIND_EXTRA_UAV_LAYER);
     }
+
+    _SetResOpBits(pShader, &pIaEntry->iaBinding, &pIaEntry->pResOpBits);
 
     return VSC_ERR_NONE;
 }
@@ -4947,6 +4947,8 @@ static VSC_ErrCode _AddVkStorageEntryToStorageTableOfPEP(VSC_PEP_GEN_HELPER* pPe
                             &pStorageEntry->storageBinding,
                             pSep,
                             SHS_PRIV_MEM_KIND_EXTRA_UAV_LAYER);
+
+    _SetResOpBits(pShader, &pStorageEntry->storageBinding, &pStorageEntry->pResOpBits);
 
     return VSC_ERR_NONE;
 }

@@ -1845,16 +1845,11 @@ _vscEP_Buffer_SaveVKInutAttachmentEntry(
     }
 
     /* Save resOpBits. */
-    if (pInputAttachmentEntry->pResOpBits != gcvNULL && pInputAttachmentEntry->iaBinding.arraySize != 0)
+    if (pInputAttachmentEntry->iaBinding.arraySize != 0)
     {
-        VSC_IO_writeUint(pIoBuf, 1);
         VSC_IO_writeBlock(pIoBuf,
                           (gctCHAR*)pInputAttachmentEntry->pResOpBits,
                           sizeof(gctUINT) * pInputAttachmentEntry->iaBinding.arraySize);
-    }
-    else
-    {
-        VSC_IO_writeUint(pIoBuf, 0);
     }
 
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
@@ -1919,6 +1914,14 @@ _vscEP_Buffer_SaveVKStorageEntry(
 
     VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pStorageEntry->imageFormatInfo.imageFormat);
     VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pStorageEntry->imageFormatInfo.bSetInSpriv);
+
+    /* Save resOpBits. */
+    if (pStorageEntry->storageBinding.arraySize != 0)
+    {
+        VSC_IO_writeBlock(pIoBuf,
+                          (gctCHAR*)pStorageEntry->pResOpBits,
+                          sizeof(gctUINT) * pStorageEntry->storageBinding.arraySize);
+    }
 
     /* Save extra layer size. */
     entryMask = 0;
@@ -4706,7 +4709,6 @@ _vscEP_Buffer_LoadVKInutAttachmentEntry(
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
-    gctUINT uVal = 0;
     gctUINT i, j;
     gctUINT entryMask = 0;
 
@@ -4819,8 +4821,7 @@ _vscEP_Buffer_LoadVKInutAttachmentEntry(
     }
 
     /* Load ResOpBits. */
-    VSC_IO_readUint(pIoBuf, &uVal);
-    if (uVal != 0)
+    if (pInputAttachmentEntry->iaBinding.arraySize != 0)
     {
         VSC_EP_ALLOC_MEM(pInputAttachmentEntry->pResOpBits,
                          VSC_RES_OP_BIT,
@@ -4828,6 +4829,10 @@ _vscEP_Buffer_LoadVKInutAttachmentEntry(
         VSC_IO_readBlock(pIoBuf,
                          (gctCHAR*)pInputAttachmentEntry->pResOpBits,
                          sizeof(gctUINT) * pInputAttachmentEntry->iaBinding.arraySize);
+    }
+    else
+    {
+        pInputAttachmentEntry->pResOpBits = gcvNULL;
     }
 
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
@@ -4909,6 +4914,21 @@ _vscEP_Buffer_LoadVKStorageEntry(
 
     VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pStorageEntry->imageFormatInfo.imageFormat);
     VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pStorageEntry->imageFormatInfo.bSetInSpriv);
+
+    /* Load ResOpBits. */
+    if (pStorageEntry->storageBinding.arraySize != 0)
+    {
+        VSC_EP_ALLOC_MEM(pStorageEntry->pResOpBits,
+                         VSC_RES_OP_BIT,
+                         sizeof(gctUINT) * pStorageEntry->storageBinding.arraySize);
+        VSC_IO_readBlock(pIoBuf,
+                         (gctCHAR*)pStorageEntry->pResOpBits,
+                         sizeof(gctUINT) * pStorageEntry->storageBinding.arraySize);
+    }
+    else
+    {
+        pStorageEntry->pResOpBits = gcvNULL;
+    }
 
     /* Load extra layer. */
     VSC_IO_readUint(pIoBuf, &entryMask);
