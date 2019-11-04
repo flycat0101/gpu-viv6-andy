@@ -1700,13 +1700,13 @@ static void _GetTypeStr(
 void vscDIGetVariableInfo(
     void * ptr,
     int functionId,
+    unsigned int parentId,
     int idx,
     gctBOOL bArgument,
     char * varName,
     char * typeStr,
     unsigned int nameLength,
     unsigned int * varId,
-    unsigned int * parentId,
     unsigned int * lowPC,
     unsigned int * highPC,
     unsigned int * hwLocCount,
@@ -1788,8 +1788,8 @@ void vscDIGetVariableInfo(
     if (varId)
         *varId = child->id;
 
-    if (parentId)
-        *parentId = child->parent;
+  /*  if (parentId)
+        *parentId = child->parent;*/
 
     if (hwLocCount)
     {
