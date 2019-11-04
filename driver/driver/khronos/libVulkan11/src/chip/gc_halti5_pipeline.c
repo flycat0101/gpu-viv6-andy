@@ -6331,9 +6331,14 @@ static VkResult halti5_pip_build_computeshader(
                 chipPipeline->patchKeys[i] =
                     (halti5_patch_key *)__VK_ALLOC(sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i], 8,
                     VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                chipPipeline->patchTexBufFormat[i] =
+                    (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i], 8,
+                                                   VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
 
                 __VK_ONERROR(chipPipeline->patchKeys[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                __VK_ONERROR(chipPipeline->patchTexBufFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                 __VK_MEMZERO(chipPipeline->patchKeys[i], sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i]);
+                __VK_MEMZERO(chipPipeline->patchTexBufFormat[i], sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i]);
 
                 stateKey[keyCount] = (void *)chipPipeline->patchKeys[i];
                 stateKeySizeInBytes[keyCount] = sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i];
@@ -6420,6 +6425,10 @@ static VkResult halti5_pip_build_computeshader(
                                     ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
         virShader = halti5_CreateVkShader(vscShader);
         __VK_ASSERT(virShader);
+
+        /*save the decoded shader info before compile*/
+        __VK_ONERROR((VK_SUCCESS == halti5_CopyVkShader(&chipPipeline->vkShaderDecoded[VSC_SHADER_STAGE_CS], virShader))
+                                ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
 
         __VK_ONERROR(halti5_helper_createVscShaderResLayout(pip, chipPipeline->vscResLayout, VSC_SHADER_STAGE_CS, &vscShaderResLayout));
         vscCompileParams.hShader = vscShader;
@@ -7247,7 +7256,7 @@ VkResult halti5_patch_pipeline(
                                                     }
                                                 }
 
-                                                if (patchInfo->patchStages - 1 == stageIdx)
+                                                if (patchInfo->patchStages & (1 << stageIdx))
                                                 {
                                                     __VK_ASSERT(linkIdx < 4);
 
