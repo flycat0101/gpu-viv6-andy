@@ -7,6 +7,9 @@
 _viv_uniform int inputSize_aln8;
 _viv_uniform VXC_512Bits uniMulAcc;
 _viv_uniform VXC_512Bits uniFp16toFp32_16x1;
+_viv_uniform float bias_scale;
+_viv_uniform int is_bias_uint8;
+
 __kernel void gemm_fp16_bias_fp16
     (
     image2d_array_t input,
@@ -120,7 +123,7 @@ _viv_uniform VXC_512Bits uniMulAcc_Int8;
 _viv_uniform int Cycles_uint8;
 _viv_uniform VXC_512Bits uniAccQ1MulQ2_16x1;
 _viv_uniform VXC_512Bits uniAccQaMulZb_16x2;
-_viv_uniform int nZ1Z2;
+_viv_uniform float nZ1Z2;
 _viv_uniform float uint8Scale;
 _viv_uniform float outputZP;
 #ifdef ENABLE_RELUN
@@ -142,8 +145,15 @@ __kernel void gemm_uint8
     float4 sum = 0;
     int temp = 0;
     float dst;
-    temp = read_imagei(bias, coord_in.ywww).x + nZ1Z2;
-    dst = convert_float(temp);
+    if (is_bias_uint8)
+    {
+        temp = read_imageui(bias, coord_in.ywww).x;
+    }
+    else
+    {
+        temp = read_imagei(bias, coord_in.ywww).x;
+    }
+    dst = convert_float(temp) * bias_scale + nZ1Z2;
     do
     {
         VXC_ReadImage(v0, input,  coord_in.xz, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
@@ -347,8 +357,16 @@ __kernel void gemm_Tensor_uint8
     float4 sum = 0;
     int temp = 0;
     float dst;
-    temp = read_imagei(bias, coord.ywww).x + nZ1Z2;
-    dst = convert_float(temp);
+
+    if (is_bias_uint8)
+    {
+        temp = read_imageui(bias, coord.ywww).x;
+    }
+    else
+    {
+        temp = read_imagei(bias, coord.ywww).x;
+    }
+    dst  = convert_float(temp) * bias_scale + nZ1Z2;
     do
     {
         VXC_ReadImage2DArray(v0, input,  coord_in.xzyw, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
@@ -516,6 +534,7 @@ __kernel void gemm_I16
     float4 sum = 0;
     float4 dst;
     dst = convert_float4(read_imagei(bias, coord_in.yw));
+    dst.x = dst.x * bias_scale;
     dst = dst.xxxx;
 
     do
@@ -651,6 +670,7 @@ __kernel void gemm_Tensor_I16
     float4 sum = 0;
     float4 dst;
     dst = convert_float4(read_imagei(bias, coord.yw));
+    dst.x = dst.x * bias_scale;
     dst = dst.xxxx;
 
     do
@@ -1030,7 +1050,7 @@ __kernel void gemm_Tensor_I16_4x
     float4 sum;
     float4 dst;
 
-    dst = convert_float4(read_imagei(bias, coord.zw));
+    dst = convert_float4(read_imagei(bias, coord.zw)) * bias_scale;;
 
     do
     {

@@ -15341,7 +15341,7 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
             /* Calculate stride = (w + padXLeft + padXRight - weight)/(output_w - 1) */
             if (1 == outputWidth)
             {
-                stride_x = inputWidth + padXLeft + padXRight - kernelXSize;
+                stride_x = 1;
             }
             else
             {
@@ -15349,7 +15349,7 @@ vx_status vxnneExecuteSWConvolution(vxnne_operation operation)
             }
             if (1 == outputHeight)
             {
-                stride_y = inputHeight + padYTop + padYBottom - kernelYSize;
+                stride_y = 1;
             }
             else
             {
@@ -16143,6 +16143,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT64 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32)
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_UINT8 && outputFormat != VX_TYPE_FLOAT32)
                     || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16));
             }
             else
@@ -16153,6 +16154,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
             }
+
             enable_shader = (vx_bool)(convsize < IMG_MAX_WIDTH && support_type && has_pool == vx_false_e);
             enable_2dTensor = (vx_bool)(size < IMG_MAX_WIDTH && dilation_x == 1 && dilation_y == 1);
         }
@@ -16193,8 +16195,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
         ((dilation_x > 1) || (dilation_y > 1)))
     {
         mode = gcoNNE_CONV_MODE_NNE_TP2;
-        enable_shader = vx_false_e;
-        enable_2dTensor = vx_false_e;
     }
     else if (enable_shader && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER))
     {
@@ -17101,6 +17101,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                 {
                     is_static_weights_biases = (vx_bool)(CHECK_LIFETIME_IS_STATIC(weights) && CHECK_LIFETIME_IS_STATIC(biases));
                     enable_adjust_biases     = is_static_weights_biases && TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE && TENSOR_QUANT_TYPE(biases);
+                    enable_adjust_biases     = enable_adjust_biases && (TENSOR_DATA_TYPE(biases) != VX_TYPE_UINT8);
 
                     if (enable_adjust_biases)
                     {
