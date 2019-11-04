@@ -18902,7 +18902,7 @@ IN gctBOOL HasReturn
                     CodeGenerator->currentFuncDefContext.mainEndLabel);
         if (gcmIS_ERROR(status)) return status;
         status = clEmitAlwaysBranchCode(Compiler,
-                        FuncBody->base.lineNo,
+                        FuncBody->base.endLineNo,
                         FuncBody->base.stringNo,
                         clvOPCODE_RETURN,
                         0);
@@ -18913,7 +18913,7 @@ IN gctBOOL HasReturn
                                            FuncBody->funcName);
         if (gcmIS_ERROR(status))  {
             gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                            FuncBody->base.lineNo,
+                                            FuncBody->base.endLineNo,
                                             FuncBody->base.stringNo,
                                             clvREPORT_ERROR,
                                             "internal error: failed to make kernel function epilog"));
@@ -18924,14 +18924,14 @@ IN gctBOOL HasReturn
         if (!HasReturn) {
             if (!clmDECL_IsVoid(&FuncBody->funcName->decl)) {
                 gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                                FuncBody->base.lineNo,
+                                                FuncBody->base.endLineNo,
                                                 FuncBody->base.stringNo,
                                                 clvREPORT_WARN,
                                                 "non-void function: '%s' must return a value",
                                                 FuncBody->funcName->symbol));
             }
             status = clEmitAlwaysBranchCode(Compiler,
-                                            FuncBody->base.lineNo,
+                                            FuncBody->base.endLineNo,
                                             FuncBody->base.stringNo,
                                             clvOPCODE_RETURN,
                                             0);
@@ -20666,7 +20666,9 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters
 static gceSTATUS
 _DefineIterationRestExprBegin_Debug(
 IN cloCOMPILER Compiler,
-IN cloCODE_GENERATOR CodeGenerator
+IN cloCODE_GENERATOR CodeGenerator,
+IN gctUINT LineNo,
+IN gctUINT StringNo
 )
 {
     gceSTATUS    status;
@@ -20680,8 +20682,8 @@ IN cloCODE_GENERATOR CodeGenerator
     gcmASSERT(CodeGenerator->currentIterationContext->u.genericInfo.hasRestExpr);
 
     status = clEmitAlwaysBranchCode(Compiler,
-                    0,
-                    0,
+                    LineNo,
+                    StringNo,
                     clvOPCODE_JUMP,
                     CodeGenerator->currentIterationContext->
                     u.genericInfo.restLabel);
@@ -20689,8 +20691,8 @@ IN cloCODE_GENERATOR CodeGenerator
     if (gcmIS_ERROR(status)) return status;
 
     status = clSetLabel(Compiler,
-                0,
-                0,
+                LineNo,
+                StringNo,
                 CodeGenerator->currentIterationContext->u.genericInfo.loopBeginLabel);
 
     if (gcmIS_ERROR(status)) return status;
@@ -20764,7 +20766,7 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters
 
     /* The rest part */
     if (Iteration->forRestExpr != gcvNULL) {
-        status = _DefineIterationRestExprBegin_Debug(Compiler, CodeGenerator);
+        status = _DefineIterationRestExprBegin_Debug(Compiler, CodeGenerator,Iteration->base.lineNo,Iteration->base.stringNo);
         if (gcmIS_ERROR(status)) return status;
 
         clsGEN_CODE_PARAMETERS_Initialize(&restParameters, gcvFALSE, gcvFALSE);
