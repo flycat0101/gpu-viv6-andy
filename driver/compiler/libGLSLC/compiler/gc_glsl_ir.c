@@ -8398,6 +8398,21 @@ sloIR_BINARY_EXPR_Construct(
     {
         gctPOINTER pointer = gcvNULL;
 
+        if (sloCOMPILER_IsOGLVersion(Compiler) &&
+            (Type == slvBINARY_EQUAL || Type == slvBINARY_NOT_EQUAL) &&
+            (slsDATA_TYPE_IsArray(LeftOperand->dataType) || slsDATA_TYPE_IsArray(RightOperand->dataType)))
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(
+                                            Compiler,
+                                            LineNo,
+                                            StringNo,
+                                            slvREPORT_ERROR,
+                                            "Binary operator does not work on arrays."));
+            status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            gcmFOOTER();
+            return status;
+        }
+
         status = _GetBinaryExprDataType(
                                         Compiler,
                                         Type,
