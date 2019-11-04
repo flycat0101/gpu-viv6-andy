@@ -2296,7 +2296,17 @@ static VSC_ErrCode __SpvAddSharedSymbol(
     }
     else if (SPV_ID_TYPE_IS_STRUCT(elementType))
     {
-        /* Need to compute the size for the struct */
+        /* compute the size for the struct */
+        VIR_Type *Type = SPV_ID_TYPE_VIR_TYPE(elementType);
+        VIR_SymIdList      *fields = VIR_Type_GetFields(Type);
+        gctUINT             i;
+        size = 0;
+        for (i = 0; i < VIR_IdList_Count(fields); i++)
+        {
+            VIR_Symbol     *field_sym = VIR_Shader_GetSymFromId(virShader, fields->ids[i]);
+            VIR_Type       *field_type = VIR_Symbol_GetType(field_sym);
+            size += VIR_Type_GetTypeByteSize(virShader, field_type);
+        }
     }
     else
     {
