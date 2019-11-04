@@ -3211,34 +3211,37 @@ VX_PRIVATE_API vx_status binaryGenerateStatesBuffer(
 
             case VX_BINARY_OPERATION_TYPE_SW:
             {
-                /*1. gpu segment */
-                segment = &binLoad->segments[layerIndex];
-                segment->statesStartPos = preSegmentStatesPos;
-                segment->statesSize = sumSegmentStatesSize;
-                segment->layerId = preLayerId;
-                segment->isSWSegment = vx_false_e;
-                segment->startOperationIndex = startOPIndex;
-                segment->endOperationIndex = i + 1;
+                if (!binLoad->context->options.enableNNLayerDump)
+                {
+                    /*1. gpu segment */
+                    segment = &binLoad->segments[layerIndex];
+                    segment->statesStartPos = preSegmentStatesPos;
+                    segment->statesSize = sumSegmentStatesSize;
+                    segment->layerId = preLayerId;
+                    segment->isSWSegment = vx_false_e;
+                    segment->startOperationIndex = startOPIndex;
+                    segment->endOperationIndex = i + 1;
 
-                startOPIndex = i;
-                endStatesPos = segment->statesStartPos + segment->statesSize;
-                preSegmentStatesPos += sumSegmentStatesSize;
-                sumSegmentStatesSize = 0;
-                opStateSize = 0;
-                layerIndex++;
+                    startOPIndex = i;
+                    endStatesPos = segment->statesStartPos + segment->statesSize;
+                    preSegmentStatesPos += sumSegmentStatesSize;
+                    sumSegmentStatesSize = 0;
+                    opStateSize = 0;
+                    layerIndex++;
 
-                /*2. cpu segment */
-                swOpData = &binLoad->swOpsData[operation->operationIndex];
-                vxmASSERT(layerIndex < binLoad->segmentsCount);
-                segment = &binLoad->segments[layerIndex];
-                segment->isSWSegment = vx_true_e;
-                segment->layerId = operation->layerId;
-                segment->startOperationIndex = i;
-                segment->endOperationIndex = i;
+                    /*2. cpu segment */
+                    swOpData = &binLoad->swOpsData[operation->operationIndex];
+                    vxmASSERT(layerIndex < binLoad->segmentsCount);
+                    segment = &binLoad->segments[layerIndex];
+                    segment->isSWSegment = vx_true_e;
+                    segment->layerId = operation->layerId;
+                    segment->startOperationIndex = i;
+                    segment->endOperationIndex = i;
 
-                layerIndex++;
+                    layerIndex++;
 
-                vxmONERROR(vxoBinaryGraph_patchSW(node, swOpData, operation, binLoad, segment));
+                    vxmONERROR(vxoBinaryGraph_patchSW(node, swOpData, operation, binLoad, segment));
+                }
             }
             break;
 
