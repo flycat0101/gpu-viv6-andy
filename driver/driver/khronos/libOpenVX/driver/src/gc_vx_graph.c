@@ -3895,7 +3895,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                                                                                 outImageTileY,
                                                                                 kernelX,
                                                                                 kernelY,
-                                                                                gcmALIGN_NP2_SAFE(outputDims[2], graph->layer->operations[k]->transposeInChannel),
+                                                                                gcmALIGN_NP2_SAFE(outputDims[2], graph->layer->operations[i]->transposeInChannel),
                                                                                 interleaveMode,
                                                                                 graph->base.context->nnConfig.customizedFeature.ddrLatency,
                                                                                 graph->layer->operations[i]->transposeInChannel,
