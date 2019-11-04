@@ -1853,13 +1853,28 @@ veglCreatePlatformWindowSurface(
     /* Hardware relevant thread data initialization. */
     veglInitDeviceThreadData(thread);
 
-    /* Test for valid config. */
-    if (((EGLint)(intptr_t)config <= __EGL_INVALID_CONFIG__)
-    ||  ((EGLint)(intptr_t)config > dpy->configCount)
-    )
+    if (config != EGL_NO_CONFIG_KHR)
     {
-        veglSetEGLerror(thread,  EGL_BAD_CONFIG);
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        /* Test for valid config. */
+        if (((EGLint)(intptr_t)config <= __EGL_INVALID_CONFIG__)
+        ||  ((EGLint)(intptr_t)config > dpy->configCount)
+        )
+       {
+            veglSetEGLerror(thread,  EGL_BAD_CONFIG);
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+
+        eglConfig = VEGL_CONFIG(&dpy->config[(EGLint)(intptr_t)config - 1]);
+    }
+    else
+    {
+
+        if (!_IsExtSuppored(VEGL_EXTID_KHR_no_config_context))
+        {
+            veglSetEGLerror(thread,  EGL_BAD_CONFIG);
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+        eglConfig = VEGL_CONFIG(&dpy->config[0]);
     }
 
     /* Test for valid native window handle. */
@@ -1868,8 +1883,6 @@ veglCreatePlatformWindowSurface(
         veglSetEGLerror(thread,  EGL_BAD_NATIVE_WINDOW);
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
-
-    eglConfig = VEGL_CONFIG(&dpy->config[(EGLint)(intptr_t)config - 1]);
 
     /* Parse attributes. */
     if (attrib_list != gcvNULL)
