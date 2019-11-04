@@ -1742,7 +1742,11 @@ VkResult __VK_constructAHardwareBuffer(
 
     if (vkImgCreateFlags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT)
     {
+#if ANDROID_SDK_VERSION > 26
         usage |= AHARDWAREBUFFER_USAGE_GPU_CUBE_MAP;
+#else
+        return VK_ERROR_FORMAT_NOT_SUPPORTED;
+#endif
     }
     if (vkImgCreateFlags & VK_IMAGE_CREATE_PROTECTED_BIT)
     {
