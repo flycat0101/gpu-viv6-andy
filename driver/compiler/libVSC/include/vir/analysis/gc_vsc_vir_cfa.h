@@ -256,6 +256,8 @@ struct _VIR_BASIC_BLOCK
 #define BB_SET_START_INST(pBB, pInst)  ((pBB)->pStartInst = (pInst))
 #define BB_SET_END_INST(pBB, pInst)    ((pBB)->pEndInst = (pInst))
 
+#define BB_FLAGS_GET(pBB)               ((pBB)->flags)
+#define BB_FLAGS_SET(pBB, V)            ((pBB)->flags = (V))
 #define BB_FLAGS_GET_LLI(pBB)           ((pBB)->flags & VIR_BBFLAG_HAS_LLI)
 #define BB_FLAGS_SET_LLI(pBB)           ((pBB)->flags |= VIR_BBFLAG_HAS_LLI)
 #define BB_FLAGS_RESET_LLI(pBB)         ((pBB)->flags &= ~((gctUINT32)VIR_BBFLAG_HAS_LLI))

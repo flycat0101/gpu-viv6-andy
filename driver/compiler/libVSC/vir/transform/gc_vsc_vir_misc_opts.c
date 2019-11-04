@@ -12504,7 +12504,72 @@ _vscVIR_FinalizeCutDownWGS(
 }
 
 static VSC_ErrCode
-vscVIR_DetectSingleLoopInfo(
+_vscVIR_MoveJmpOutOfBB(
+    IN VIR_Function*    pFunc,
+    IN VIR_BB*          pBB
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_CONTROL_FLOW_GRAPH* pCfg = VIR_Function_GetCFG(pFunc);
+    VIR_BB*             pNewBB = gcvNULL;
+    VSC_ADJACENT_LIST_ITERATOR  prevEdgeIter;
+    VIR_CFG_EDGE*       pPrevEdge;
+    VIR_Instruction*    pIterInst = gcvNULL;
+    VIR_Instruction*    pMoveInst = gcvNULL;
+
+    /* Create a new BB to hold the left instructions. */
+    errCode = VIR_BB_InsertBBBefore(pBB,
+                                    VIR_OP_NOP,
+                                    &pNewBB);
+    ON_ERROR(errCode, "Insert a new BB.");
+    BB_FLAGS_SET(pNewBB, BB_FLAGS_GET(pBB));
+    BB_FLAGS_SET(pBB, VIR_BBFLAG_NONE);
+
+    /* Move the instructions. */
+    pIterInst = BB_GET_END_INST(pNewBB);
+    pMoveInst = VIR_Inst_GetPrev(BB_GET_END_INST(pBB));
+    while (gcvTRUE)
+    {
+        errCode = VIR_Function_MoveInstructionBefore(pFunc,
+                                                     pIterInst,
+                                                     pMoveInst);
+        ON_ERROR(errCode, "Move a instruction");
+
+        if (BB_GET_END_INST(pBB) == BB_GET_START_INST(pBB))
+        {
+            break;
+        }
+
+        pIterInst = VIR_Inst_GetPrev(pIterInst);
+        pMoveInst = VIR_Inst_GetPrev(BB_GET_END_INST(pBB));
+    };
+
+    /* Update the edges. */
+    VSC_ADJACENT_LIST_ITERATOR_INIT(&prevEdgeIter, &pBB->dgNode.predList);
+    pPrevEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&prevEdgeIter);
+    for (; pPrevEdge != gcvNULL; pPrevEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&prevEdgeIter))
+    {
+        errCode = vscVIR_AddEdgeToCFG(pCfg, CFG_EDGE_GET_TO_BB(pPrevEdge), pNewBB, CFG_EDGE_GET_TYPE(pPrevEdge));
+        ON_ERROR(errCode, "Add a new edge.");
+    }
+
+    VSC_ADJACENT_LIST_ITERATOR_INIT(&prevEdgeIter, &pNewBB->dgNode.predList);
+    pPrevEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&prevEdgeIter);
+    for (; pPrevEdge != gcvNULL; pPrevEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&prevEdgeIter))
+    {
+        errCode = vscVIR_RemoveEdgeFromCFG(pCfg, CFG_EDGE_GET_TO_BB(pPrevEdge), pBB);
+        ON_ERROR(errCode, "Remove a old edge.");
+    }
+
+    errCode = vscVIR_AddEdgeToCFG(pCfg, pNewBB, pBB, VIR_CFG_EDGE_TYPE_ALWAYS);
+    ON_ERROR(errCode, "Add a new edge.");
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_vscVIR_DetectSingleLoopInfo(
     IN VSC_CutDownWGS*  pContext,
     IN VIR_LoopInfo*    pLoopInfo,
     IN VSC_HASH_TABLE*  pSameJmpBBSet,
@@ -12524,6 +12589,7 @@ vscVIR_DetectSingleLoopInfo(
     VIR_CFG_EDGE*       pEdge;
     VIR_CFG_EDGE*       pEdge2;
     VIR_Function*       pFunc = BB_GET_FUNC(pLoopHeadBB);
+    gctBOOL             bHasInitJmp = gcvFALSE;
 
     /* Skip the processed loop info. */
     if (vscHTBL_DirectTestAndGet(pLoopInfoWorkingSet, (void *)pLoopInfo, gcvNULL))
@@ -12544,7 +12610,7 @@ vscVIR_DetectSingleLoopInfo(
         {
             VIR_LoopInfo* pChildLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(pNode);
 
-            vscVIR_DetectSingleLoopInfo(pContext, pChildLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet);
+            _vscVIR_DetectSingleLoopInfo(pContext, pChildLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet);
         }
     }
 
@@ -12598,16 +12664,86 @@ vscVIR_DetectSingleLoopInfo(
         vscHTBL_DirectSet(pBBWorkingSet, (void *)pWorkingBB, gcvNULL);
     }
 
+    vscHTBL_DirectSet(pLoopInfoWorkingSet, (void *)pLoopInfo, gcvNULL);
+
+    if (!bHasBarrier)
+    {
+        return errCode;
+    }
+
     /*
     ** Find the initialize jmp and the back jmp of this loop.
     ** Note that the initialize jmp may be not existed("do{}while{}" statement), but the back jmp is always existed.
     ** VIV:TODO: we also need to add all break/continue.
     */
-    if (bHasBarrier)
+    VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, &pLoopHeadBB->dgNode.predList);
+    for (pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
+         pEdge != gcvNULL;
+         pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter))
     {
-        gctBOOL     bHasInitJmp = gcvFALSE;
+        pWorkingBB = CFG_EDGE_GET_TO_BB(pEdge);
 
         /* The initialize jmp should have the same successful list as the loop end. */
+        if (pWorkingBB != pLoopEndBB)
+        {
+            gctBOOL     bValid = gcvFALSE;
+
+            VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter2, &pWorkingBB->dgNode.succList);
+            for (pEdge2 = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter2);
+                 pEdge2 != gcvNULL;
+                 pEdge2 = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter2))
+            {
+                if (CFG_EDGE_GET_TO_BB(pEdge2) == pSuccBBOfLoopEnd)
+                {
+                    bValid = gcvTRUE;
+                    break;
+                }
+            }
+
+            if (!bValid)
+            {
+                continue;
+            }
+            bHasInitJmp = gcvTRUE;
+        }
+
+        /* Move the other instructions to another BB. */
+        if (VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(BB_GET_END_INST(pWorkingBB))))
+        {
+            errCode = _vscVIR_MoveJmpOutOfBB(VIR_Shader_GetMainFunction(pContext->pShader),
+                                             pWorkingBB);
+            ON_ERROR(errCode, "Move JMP out of BB.");
+        }
+
+        vscHTBL_DirectSet(pSameJmpBBSet, (void *)pWorkingBB, gcvNULL);
+    }
+
+    /* If there is no initialized JMP, we need to create a fake one. */
+    if (!bHasInitJmp && VIR_Inst_GetOpcode(BB_GET_START_INST(pLoopHeadBB)) == VIR_OP_LABEL)
+    {
+        VIR_BB*             pNewBB = gcvNULL;
+        VIR_Instruction*    pNewLabelInst = gcvNULL;
+        VIR_Instruction*    pJmpInst = gcvNULL;
+        VIR_Label*          pOrigLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(BB_GET_START_INST(pLoopHeadBB)));
+        VIR_Label*          pLabel = gcvNULL;
+        VIR_Link*           pLink = gcvNULL;
+        VIR_Label*          pNewLabel = gcvNULL;
+        gctBOOL             bMatched = gcvFALSE;
+
+        errCode = VIR_BB_InsertBBAfter(VIR_Inst_GetBasicBlock(VIR_Inst_GetPrev(BB_GET_START_INST(pLoopHeadBB))),
+                                       VIR_OP_NOP,
+                                       &pNewBB);
+        ON_ERROR(errCode, "Insert a new BB.");
+
+        errCode = VIR_Function_AddCopiedInstructionAfter(pFunc,
+                                                         BB_GET_START_INST(pLoopHeadBB),
+                                                         BB_GET_START_INST(pNewBB),
+                                                         gcvTRUE,
+                                                         &pNewLabelInst);
+        ON_ERROR(errCode, "Insert a new instruction.");
+        pNewLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(pNewLabelInst));
+
+        /* Update the label. */
         VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, &pLoopHeadBB->dgNode.predList);
         for (pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
              pEdge != gcvNULL;
@@ -12615,106 +12751,44 @@ vscVIR_DetectSingleLoopInfo(
         {
             pWorkingBB = CFG_EDGE_GET_TO_BB(pEdge);
 
-            if (pWorkingBB != pLoopEndBB)
+            if (pWorkingBB == pLoopEndBB)
             {
-                gctBOOL     bValid = gcvFALSE;
-
-                VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter2, &pWorkingBB->dgNode.succList);
-                for (pEdge2 = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter2);
-                     pEdge2 != gcvNULL;
-                     pEdge2 = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter2))
-                {
-                    if (CFG_EDGE_GET_TO_BB(pEdge2) == pSuccBBOfLoopEnd)
-                    {
-                        bValid = gcvTRUE;
-                        break;
-                    }
-                }
-
-                if (!bValid)
-                {
-                    continue;
-                }
-                bHasInitJmp = gcvTRUE;
+                continue;
             }
 
-            vscHTBL_DirectSet(pSameJmpBBSet, (void *)pWorkingBB, gcvNULL);
+            pJmpInst = BB_GET_END_INST(pWorkingBB);
+
+            if (!VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(pJmpInst)) &&
+                pEdge->type == VIR_CFG_EDGE_TYPE_ALWAYS)
+            {
+                vscHTBL_DirectSet(pSameJmpBBSet, (void *)pNewBB, gcvNULL);
+                continue;
+            }
+
+            if (!VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(pJmpInst)))
+            {
+                continue;
+            }
+
+            pLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(pJmpInst));
+            if (pLabel != pOrigLabel)
+            {
+                continue;
+            }
+
+            VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(pLabel), (gctUINTPTR_T)pJmpInst);
+            VIR_Operand_SetLabel(VIR_Inst_GetDest(pJmpInst), pNewLabel);
+            VIR_Function_NewLink(pFunc, &pLink);
+            VIR_Link_SetReference(pLink, (gctUINTPTR_T)pJmpInst);
+            VIR_Link_AddLink(VIR_Label_GetReferenceAddr(pNewLabel), pLink);
+            bMatched = gcvTRUE;
         }
 
-        /* If there is no initialized JMP, we need to create a fake one. */
-        if (!bHasInitJmp && VIR_Inst_GetOpcode(BB_GET_START_INST(pLoopHeadBB)) == VIR_OP_LABEL)
+        if (bMatched)
         {
-            VIR_BB*             pNewBB = gcvNULL;
-            VIR_Instruction*    pNewLabelInst = gcvNULL;
-            VIR_Instruction*    pJmpInst = gcvNULL;
-            VIR_Label*          pOrigLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(BB_GET_START_INST(pLoopHeadBB)));
-            VIR_Label*          pLabel = gcvNULL;
-            VIR_Link*           pLink = gcvNULL;
-            VIR_Label*          pNewLabel = gcvNULL;
-            gctBOOL             bMatched = gcvFALSE;
-
-            errCode = VIR_BB_InsertBBAfter(VIR_Inst_GetBasicBlock(VIR_Inst_GetPrev(BB_GET_START_INST(pLoopHeadBB))),
-                                           VIR_OP_NOP,
-                                           &pNewBB);
-            ON_ERROR(errCode, "Insert a new BB.");
-
-            errCode = VIR_Function_AddCopiedInstructionAfter(pFunc,
-                                                             BB_GET_START_INST(pLoopHeadBB),
-                                                             BB_GET_START_INST(pNewBB),
-                                                             gcvTRUE,
-                                                             &pNewLabelInst);
-            ON_ERROR(errCode, "Insert a new instruction.");
-            pNewLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(pNewLabelInst));
-
-            /* Update the label. */
-            VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, &pLoopHeadBB->dgNode.predList);
-            for (pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
-                 pEdge != gcvNULL;
-                 pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter))
-            {
-                pWorkingBB = CFG_EDGE_GET_TO_BB(pEdge);
-
-                if (pWorkingBB == pLoopEndBB)
-                {
-                    continue;
-                }
-
-                pJmpInst = BB_GET_END_INST(pWorkingBB);
-
-                if (!VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(pJmpInst)) &&
-                    pEdge->type == VIR_CFG_EDGE_TYPE_ALWAYS)
-                {
-                    vscHTBL_DirectSet(pSameJmpBBSet, (void *)pNewBB, gcvNULL);
-                    continue;
-                }
-
-                if (!VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(pJmpInst)))
-                {
-                    continue;
-                }
-
-                pLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(pJmpInst));
-                if (pLabel != pOrigLabel)
-                {
-                    continue;
-                }
-
-                VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(pLabel), (gctUINTPTR_T)pJmpInst);
-                VIR_Operand_SetLabel(VIR_Inst_GetDest(pJmpInst), pNewLabel);
-                VIR_Function_NewLink(pFunc, &pLink);
-                VIR_Link_SetReference(pLink, (gctUINTPTR_T)pJmpInst);
-                VIR_Link_AddLink(VIR_Label_GetReferenceAddr(pNewLabel), pLink);
-                bMatched = gcvTRUE;
-            }
-
-            if (bMatched)
-            {
-                vscHTBL_DirectSet(pSameJmpBBSet, (void *)pLoopHeadBB, gcvNULL);
-            }
+            vscHTBL_DirectSet(pSameJmpBBSet, (void *)pLoopHeadBB, gcvNULL);
         }
     }
-
-    vscHTBL_DirectSet(pLoopInfoWorkingSet, (void *)pLoopInfo, gcvNULL);
 
 OnError:
     return errCode;
@@ -12897,7 +12971,7 @@ _vscVIR_DetectBarrierWithinLoop(
              pLoopInfo != gcvNULL;
              pLoopInfo = (VIR_LoopInfo*)vscULIterator_Next(&iter))
         {
-            errCode = vscVIR_DetectSingleLoopInfo(pContext, pLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet);
+            errCode = _vscVIR_DetectSingleLoopInfo(pContext, pLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet);
             ON_ERROR(errCode, "Detect single loop info.");
         }
     }
@@ -13000,7 +13074,7 @@ _vscVIR_MoveBarrierOutOfBB(
         for (; pSuccEdge != gcvNULL; pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succEdgeIter))
         {
             errCode = vscVIR_RemoveEdgeFromCFG(pCfg, pCurrentBB, CFG_EDGE_GET_TO_BB(pSuccEdge));
-            ON_ERROR(errCode, "Remove a new edge.");
+            ON_ERROR(errCode, "Remove an old edge.");
         }
 
         /* Update the BB flags. */
