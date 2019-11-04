@@ -475,6 +475,7 @@ EXPORTS
     VIR_GetSymFromId
     VIR_Shader_AddFunction
     VIR_Shader_AddString
+    VIR_Shader_FindString
     VIR_Shader_AddSymbol
     VIR_Shader_AddConstant
     VIR_Shader_AddStructType

@@ -2672,6 +2672,27 @@ VIR_Shader_AddString(
     return errCode;
 }
 
+gctBOOL
+VIR_Shader_FindString(
+    IN  VIR_Shader *    Shader,
+    IN  gctCONST_STRING String
+    )
+{
+    VIR_StringTable* pStringTbl = &Shader->stringTable;
+    VIR_NameId sid;
+
+    /* search hash table in Block table */
+    gcmASSERT(BT_HAS_HASHTABLE(pStringTbl));
+    sid = (VIR_NameId)vscBT_HashSearch(pStringTbl, (void *)String);
+
+    if (VIR_Id_isInvalid(sid))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
 VSC_ErrCode
 VIR_Shader_AddBuiltinType(
     IN  VIR_Shader *          Shader,
