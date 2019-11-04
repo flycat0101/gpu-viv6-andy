@@ -1726,6 +1726,9 @@ struct _gckMMU
     /* mtlb physical address. */
     gctPHYS_ADDR_T              mtlbPhysical;
 
+    /* memory pool used for page table */
+    gcePOOL                     pool;
+
     gctPOINTER                  staticSTLB;
     gctBOOL                     enabled;
 

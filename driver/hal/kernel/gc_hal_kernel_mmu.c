@@ -629,6 +629,7 @@ OnError:
 
     return status;
 }
+
 static gcePOOL _GetPageTablePool(IN gckOS Os)
 {
     gcePOOL pool = gcvPOOL_DEFAULT;
@@ -952,7 +953,7 @@ _FillFlatMapping(
         /* Need allocate a new chunk of stlbs */
         if (totalNewStlbs)
         {
-            gcePOOL pool = _GetPageTablePool(Mmu->os);
+            gcePOOL pool = Mmu->pool;
             gctUINT32 allocFlag = gcvALLOC_FLAG_CONTIGUOUS;
 
             gcmkONERROR(
@@ -1265,7 +1266,7 @@ _ConstructDynamicStlb(
     gctBOOL acquired = gcvFALSE;
     gckKERNEL kernel = Mmu->hardware->kernel;
     gctUINT32 allocFlag = gcvALLOC_FLAG_CONTIGUOUS;
-    gcePOOL pool = _GetPageTablePool(Mmu->os);
+    gcePOOL pool = Mmu->pool;
     gctUINT32 address;
     gctUINT32 mtlbEntry;
     gctUINT32 i;
@@ -1637,7 +1638,7 @@ _Construct(
     mmu->enabled          = gcvFALSE;
 
     mmu->dynamicAreaSetuped = gcvFALSE;
-
+    mmu->pool = _GetPageTablePool(mmu->os);
     gcsLIST_Init(&mmu->hardwareList);
 
     /* Use 4K page size for MMU version 0. */
@@ -1661,7 +1662,7 @@ _Construct(
 
         area->mapLogical = pointer;
 
-        pool = _GetPageTablePool(mmu->os);
+        pool = mmu->pool;
 
 #if gcdENABLE_CACHEABLE_COMMAND_BUFFER
         allocFlag |= gcvALLOC_FLAG_CACHEABLE;
@@ -1738,7 +1739,7 @@ _Construct(
     {
         mmu->mtlbSize = gcdMMU_MTLB_SIZE;
 
-        pool = _GetPageTablePool(mmu->os);
+        pool = mmu->pool;
 
 #if gcdENABLE_CACHEABLE_COMMAND_BUFFER
         allocFlag |= gcvALLOC_FLAG_CACHEABLE;
@@ -1883,7 +1884,7 @@ _Construct(
     /* A 64 byte for safe address, we use 256 here. */
     mmu->safePageSize = 256;
 
-    pool = _GetPageTablePool(mmu->os);
+    pool = mmu->pool;
 
     /* Allocate safe page from video memory. */
     gcmkONERROR(gckKERNEL_AllocateVideoMemory(
