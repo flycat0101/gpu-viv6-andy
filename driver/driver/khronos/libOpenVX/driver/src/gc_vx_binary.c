@@ -714,19 +714,6 @@ static vx_status readAxiSram(
     axiTable->sramBase = readuInt(reader, 1);
     axiTable->sramSize = readuInt(reader, 1);
 
-    if (axiTable->sramSize != reader->binLoad->context->axiSRAM[0].size)
-    {
-        vxError("%s[%d]: binary sramSize: 0x%x, context size: 0x%x\n",
-            __FUNCTION__, __LINE__, axiTable->sramSize, reader->binLoad->context->axiSRAM[0].size);
-
-        if (axiTable->sramSize > reader->binLoad->context->axiSRAM[0].size)
-        {
-            vxError("%s[%d]: binary sram more than context sram\n", __FUNCTION__, __LINE__);
-            vxmONERROR(VX_ERROR_INVALID_VALUE);
-        }
-    }
-
-OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -3415,6 +3402,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_GenerateStatesBuffer(
     vx_uint32 nntpCmdsSize = 0;
     vx_uint32 stateSize = 0;
     vx_uint32 shCmdsSize = 0;
+    vx_graph graph = VX_NULL;
+    vx_context context = VX_NULL;
     gcmHEADER_ARG("node=%p, binLoad=%p", node, binLoad);
 
     vxmASSERT(node != VX_NULL);
@@ -3431,6 +3420,22 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_GenerateStatesBuffer(
         vxError("%s[%d]: error: binary buffer is NULL\n", __FUNCTION__, __LINE__);
         gcmFOOTER_ARG("%d", VX_ERROR_NOT_ALLOCATED);
         return VX_ERROR_NOT_ALLOCATED;
+    }
+
+    graph = node->graph;
+    context = node->base.context;
+    /* check AXI-SRAM size */
+    if (binLoad->fixed.axiSramTable.sramSize != context->axiSRAM[graph->deviceID].size)
+    {
+        vxError("%s[%d]: binary sramSize: 0x%x, context size: 0x%x\n",
+            __FUNCTION__, __LINE__, binLoad->fixed.axiSramTable.sramSize,
+            context->axiSRAM[graph->deviceID].size);
+
+        if (binLoad->fixed.axiSramTable.sramSize > context->axiSRAM[graph->deviceID].size)
+        {
+            vxError("%s[%d]: binary sram more than context sram\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_ERROR_INVALID_VALUE);
+        }
     }
 
     /* 1. Create memory pool*/
