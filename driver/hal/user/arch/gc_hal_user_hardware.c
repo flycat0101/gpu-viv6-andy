@@ -34835,6 +34835,15 @@ gcoHARDWARE_DrawClear(
     }
     else
     {
+        /* when using 3d draw clear to clear a depth/stencil buffer only,
+         The render target must set be to NULL since it decide if use the temp RT or not */
+        gcmONERROR(gcoHARDWARE_SetRenderTarget(hardware,
+                                                   0,
+                                                   gcvNULL,
+                                                   0,
+                                                   1,
+                                                   0));
+
         gcmONERROR(gcoHARDWARE_SetColorWrite(hardware, 0, 0));
         gcmONERROR(gcoHARDWARE_SetColorOutCount(hardware, 0));
     }
