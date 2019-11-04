@@ -118,6 +118,8 @@ typedef struct _gcsMODULE_PARAMETERS
     /* device type, 0 for char device, 1 for misc device. */
     gctUINT                 deviceType;
     gctUINT                 showArgs;
+
+    gctUINT                 allMapInOne;
 }
 gcsMODULE_PARAMETERS;
 

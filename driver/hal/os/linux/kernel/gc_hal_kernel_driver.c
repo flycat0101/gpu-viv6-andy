@@ -223,6 +223,9 @@ static int smallBatch = 1;
 module_param(smallBatch, int, 0644);
 MODULE_PARM_DESC(smallBatch, "Enable/disable small batch");
 
+static int allMapInOne = 1;
+module_param(allMapInOne, int, 0644);
+MODULE_PARM_DESC(allMapInOne, "Mapping kernel video memory to user, 0 means mapping every time, otherwise only mapping one time");
 /*******************************************************************************
 ***************************** SRAM description *********************************
 *******************************************************************************/
@@ -415,6 +418,8 @@ _InitModuleParam(
     p->deviceType  = type;
     p->showArgs    = showArgs;
 
+
+    p->allMapInOne = allMapInOne;
 #if !gcdENABLE_3D
     p->irqs[gcvCORE_MAJOR]          = irqLine = -1;
     p->registerBases[gcvCORE_MAJOR] = registerMemBase = 0;
@@ -524,6 +529,7 @@ _SyncModuleParam(
 
     type        = p->deviceType;
     showArgs    = p->showArgs;
+    allMapInOne = p->allMapInOne;
 }
 
 void
@@ -588,6 +594,7 @@ gckOS_DumpParam(
     printk("  gpuProfiler       = %d\n",      gpuProfiler);
     printk("  userClusterMask   = 0x%x\n",    userClusterMask);
     printk("  smallBatch        = %d\n",      smallBatch);
+    printk("  allMapInOne       = %d\n",      allMapInOne);
 
     printk("  irqs              = ");
     for (i = 0; i < gcvCORE_COUNT; i++)

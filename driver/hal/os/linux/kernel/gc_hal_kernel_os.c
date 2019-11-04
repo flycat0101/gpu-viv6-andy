@@ -7211,6 +7211,10 @@ gckOS_QueryOption(
     {
         *Value = device->platform->flagBits;
     }
+    else if (!strcmp(Option, "allMapInOne"))
+    {
+        *Value = device->args.allMapInOne;
+    }
     else
     {
         status = gcvSTATUS_NOT_SUPPORTED;
