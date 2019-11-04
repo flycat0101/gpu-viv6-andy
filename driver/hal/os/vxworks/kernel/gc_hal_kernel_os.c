@@ -856,7 +856,7 @@ gckOS_UnmapMemoryEx(
 
         mdlMap = FindMdlMap(mdl, PID);
 
-        if (mdlMap == gcvNULL || mdlMap->vmaAddr == gcvNULL)
+        if (mdlMap == gcvNULL)
         {
             pthread_mutex_unlock(&mdl->mapsMutex);
 
@@ -864,9 +864,11 @@ gckOS_UnmapMemoryEx(
             return gcvSTATUS_INVALID_ARGUMENT;
         }
 
-        gcmkBUG_ON(!allocator || !allocator->ops->UnmapUser);
-
-        allocator->ops->UnmapUser(allocator, mdl, mdlMap, mdl->bytes);
+        if (mdlMap->vmaAddr != gcvNULL)
+        {
+            gcmkBUG_ON(!allocator || !allocator->ops->UnmapUser);
+            allocator->ops->UnmapUser(allocator, mdl, mdlMap, mdl->bytes);
+        }
 
         gcmkVERIFY_OK(_DestroyMdlMap(mdl, mdlMap));
 
