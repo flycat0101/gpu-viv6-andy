@@ -86,9 +86,9 @@ __kernel void gpuActivation_ReluFP32 (
 __kernel void gpuActivation_ReluQuant8 (
     __read_only image2d_array_t   input,
     float                         scaleIn,
-    int                           zpIn,
+    float                         input_tail,
     float                         scaleOut,
-    int                           zpOut,
+    float                         zpOut,
     __write_only image2d_array_t  output)
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
@@ -96,9 +96,9 @@ __kernel void gpuActivation_ReluQuant8 (
     float inPixel, outPixel;
 
     tmp = read_imageui(input, coord);
-    inPixel = (convert_int(tmp.x-zpIn))*scaleIn;
-    outPixel = max(0.0, inPixel);
-    dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
+    inPixel = convert_float(tmp.x) * scaleIn - input_tail;
+    outPixel = inPixel >= 0.0 ? inPixel : 0.0;
+    dst.x = floor(outPixel * scaleOut + zpOut + 0.5);
     write_imageui(output, coord, dst);
 }
 
@@ -118,9 +118,9 @@ __kernel void gpuActivation_Relu1FP32 (
 __kernel void gpuActivation_Relu1Quant8 (
     __read_only image2d_array_t   input,
     float                         scaleIn,
-    int                           zpIn,
+    float                         input_tail,
     float                         scaleOut,
-    int                           zpOut,
+    float                         zpOut,
     __write_only image2d_array_t  output)
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
@@ -128,7 +128,7 @@ __kernel void gpuActivation_Relu1Quant8 (
     float inPixel, outPixel;
 
     tmp = read_imageui(input, coord);
-    inPixel = (convert_int(tmp.x-zpIn))*scaleIn;
+    inPixel = convert_float(tmp.x) * scaleIn - input_tail;
     outPixel = clamp(inPixel, -1.0, 1.0);
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
     write_imageui(output, coord, dst);
@@ -150,9 +150,9 @@ __kernel void gpuActivation_Relu6FP32 (
 __kernel void gpuActivation_Relu6Quant8 (
     __read_only image2d_array_t   input,
     float                         scaleIn,
-    int                           zpIn,
+    float                         input_tail,
     float                         scaleOut,
-    int                           zpOut,
+    float                         zpOut,
     __write_only image2d_array_t  output)
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
@@ -160,7 +160,7 @@ __kernel void gpuActivation_Relu6Quant8 (
     float inPixel, outPixel;
 
     tmp = read_imageui(input, coord);
-    inPixel = (convert_int(tmp.x-zpIn))*scaleIn;
+    inPixel = convert_float(tmp.x) * scaleIn - input_tail;
     outPixel = clamp(inPixel, 0.0, 6.0);
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
     write_imageui(output, coord, dst);

@@ -2172,11 +2172,11 @@ OnError:
     return VX_NULL;
 }
 
-vx_uint32 _getConvolutionLocalWorkGroupSize(vx_uint32 worksz, vx_uint32 minLz, vx_uint32 maxLz)
+vx_size _getConvolutionLocalWorkGroupSize(vx_size worksz, vx_size minLz, vx_size maxLz)
 {
-    vx_uint32 bestLz = maxLz;
-    vx_uint32 minRem = worksz;
-    vx_uint32 i = 0;
+    vx_size bestLz = maxLz;
+    vx_size minRem = worksz;
+    vx_size i = 0;
 
     if (worksz < gcmMIN(maxLz, 8))
         return worksz;
@@ -2185,7 +2185,7 @@ vx_uint32 _getConvolutionLocalWorkGroupSize(vx_uint32 worksz, vx_uint32 minLz, v
 
     for (i = maxLz; i > minLz; i--)
     {
-        vx_uint32 rem = worksz % i;
+        vx_size rem = worksz % i;
 
         if (rem == 0)
         {
@@ -2603,8 +2603,8 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
 
         if (enable_reorgWeights)
         {
-            vx_uint32 maxWkGroupSz = shaderExecutable->kernelShader->maxWorkGroupSize;
-            vx_uint32 glbWkSclY = (output_depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
+            vx_size maxWkGroupSz = shaderExecutable->kernelShader->maxWorkGroupSize;
+            vx_size glbWkSclY = (output_depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
 
             execution_parameters.localWorkSize[0]  = output_depth <= 32 ? 2 : 1;
             execution_parameters.localWorkSize[1]  = _getConvolutionLocalWorkGroupSize(glbWkSclY, 4, maxWkGroupSz / execution_parameters.localWorkSize[0]);
@@ -5403,13 +5403,15 @@ vxnne_shader_executable vxnneGetGPUActivationShaderExecutable(
         }
         else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
         {
-
+            vx_float32 inputZP = (vx_float32)zpInValue;
+            vx_float32 input_tail = inputZP * scaleInValue;
+            vx_float32 outputZP = (vx_float32)zpOutValue;
             vx_reference   parameters[6] = {(vx_reference)input, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output};
 
             scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleInValue);
-            zpIn = vxCreateScalar(context, VX_TYPE_INT32, &zpInValue);
+            zpIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &input_tail);
             scaleOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleOutValue);
-            zpOut = vxCreateScalar(context, VX_TYPE_INT32, &zpOutValue);
+            zpOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &outputZP);
             parameters[1] = (vx_reference)scaleIn;
             parameters[2] = (vx_reference)zpIn;
             parameters[3] = (vx_reference)scaleOut;
@@ -9820,8 +9822,8 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
 
     if (enable_2d_img)
     {
-        vx_uint32 maxWkGroupSz = shaderExecutable->kernelShader->maxWorkGroupSize;
-        vx_uint32 glbWkSclY = (depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
+        vx_size maxWkGroupSz = shaderExecutable->kernelShader->maxWorkGroupSize;
+        vx_size glbWkSclY = (depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
         execution_parameters.workDim = 2;
 
         if (input_width != output_width)
