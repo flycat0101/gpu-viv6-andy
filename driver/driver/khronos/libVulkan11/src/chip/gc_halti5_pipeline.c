@@ -5323,7 +5323,19 @@ static void halti5_pip_build_patchKeyMask(
                         }
                         __VK_ASSERT(entryIdx < resSet->storageTable.countOfEntries);
 
-                        patchKey |= HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
+                        for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; arrayIdx++)
+                        {
+                            VSC_RES_OP_BIT *pResOp = &tableEntry->pResOpBits[arrayIdx];
+                            halti5_patch_key patchKey = 0;
+
+                            if (pResOp != gcvNULL)
+                            {
+                                if (*pResOp & VSC_RES_OP_BIT_IMAGE_OP)
+                                {
+                                    patchKey |=  HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
+                                }
+                            }
+                         }
 
                         chipPipeline->patchStorageImgFormat[setIdx][keyIndex] = tableEntry->imageFormatInfo.imageFormat;
                         chipPipeline->patchKeys[setIdx][keyIndex++] = patchKey;
@@ -5743,10 +5755,10 @@ static VkResult halti5_pip_build_gfxshaders(
                 if (descSetLayout->storageDescriptorCount)
                 {
                     chipPipeline->patchStorageImgFormat[i] =
-                        (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * descSetLayout->storageDescriptorCount, 8,
+                        (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i], 8,
                                                        VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                     __VK_ONERROR(chipPipeline->patchStorageImgFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-                    __VK_MEMZERO(chipPipeline->patchStorageImgFormat[i], sizeof(VSC_IMAGE_FORMAT) * descSetLayout->storageDescriptorCount);
+                    __VK_MEMZERO(chipPipeline->patchStorageImgFormat[i], sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i]);
                 }
 
                 __VK_ONERROR(chipPipeline->patchKeys[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
@@ -6382,10 +6394,10 @@ static VkResult halti5_pip_build_computeshader(
                 if (descSetLayout->storageDescriptorCount)
                 {
                     chipPipeline->patchStorageImgFormat[i] =
-                        (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * descSetLayout->storageDescriptorCount, 8,
+                        (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i], 8,
                                                        VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                     __VK_ONERROR(chipPipeline->patchStorageImgFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-                    __VK_MEMZERO(chipPipeline->patchStorageImgFormat[i], sizeof(VSC_IMAGE_FORMAT) * descSetLayout->storageDescriptorCount);
+                    __VK_MEMZERO(chipPipeline->patchStorageImgFormat[i], sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i]);
                 }
 
                 __VK_ONERROR(chipPipeline->patchKeys[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
@@ -7366,12 +7378,23 @@ VkResult halti5_patch_pipeline(
                                         {
                                             VSC_IMAGE_FORMAT storeImgFormat = chipPipeline->patchStorageImgFormat[i][j];
                                             VSC_IMAGE_FORMAT mapedFormat = VSC_IMAGE_FORMAT_NONE;
+                                            VkFormat shaderFormat = mapTable[storeImgFormat].drvFormat;
+                                            VkFormat imageFormat = (VkFormat)patchInfo->originalFormat;
+                                            VkBool32 needPatch = VK_TRUE;
 
-                                            if (mapTable[storeImgFormat].drvFormat != (VkFormat)patchInfo->originalFormat)
+                                            if ((shaderFormat <= VK_FORMAT_R32G32B32A32_SFLOAT &&
+                                                shaderFormat >= VK_FORMAT_R32G32B32A32_UINT) &&
+                                                (imageFormat <= VK_FORMAT_R8G8B8A8_SINT &&
+                                                imageFormat >= VK_FORMAT_R8G8B8A8_UNORM))
+                                            {
+                                                needPatch = VK_FALSE;
+                                            }
+
+                                            if ((shaderFormat != imageFormat) && needPatch)
                                             {
                                                 for (m = 0; m < __VK_VSC_DRV_FORMAT_MAP_NUM; m++)
                                                 {
-                                                    if ((VkFormat)patchInfo->originalFormat == mapTable[m].drvFormat)
+                                                    if (imageFormat == mapTable[m].drvFormat)
                                                     {
                                                         mapedFormat = mapTable[m].vscFormat;
                                                         break;
