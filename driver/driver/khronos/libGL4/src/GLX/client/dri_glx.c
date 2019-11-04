@@ -196,12 +196,12 @@ static __DRIdriver *OpenDriver(const char *driverName)
       libPaths = DEFAULT_DRIVER_DIR;
 
    for (i = 0; ; i++) {
-      char libDir[1000], realDriverName[200];
+      char libDir[200], realDriverName[220];
       GLvoid *handle;
-      ExtractDir(i, libPaths, 1000, libDir);
+      ExtractDir(i, libPaths, 200, libDir);
       if (!libDir[0])
          break; /* ran out of paths to search */
-      snprintf(realDriverName, 200, "%s_dri.so", driverName);
+      snprintf(realDriverName, 220, "%s/%s_dri.so", libDir, driverName);
       InfoMessageF("OpenDriver: trying %s\n", realDriverName);
       handle = dlopen(realDriverName, RTLD_NOW | RTLD_GLOBAL);
       if ((error = dlerror()) != NULL) {
