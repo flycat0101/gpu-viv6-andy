@@ -5258,33 +5258,30 @@ static void halti5_pip_build_patchKeyMask(
 
                             if (pResOp != gcvNULL)
                             {
-                                if (*pResOp != gcvNULL)
+                                if (*pResOp & (VSC_RES_OP_BIT_TEXLD_GRAD | VSC_RES_OP_BIT_TEXLDP_GRAD))
                                 {
-                                    if (*pResOp & (VSC_RES_OP_BIT_TEXLD_GRAD | VSC_RES_OP_BIT_TEXLDP_GRAD))
-                                    {
-                                        patchKey |= HALTI5_PATCH_TX_EXTRA_INPUT_GRAD_BIT;
-                                    }
-                                    if (*pResOp & VSC_RES_OP_BIT_GATHER)
-                                    {
-                                        patchKey |= HALTI5_PATCH_TX_GATHER_BIT;
-                                    }
-                                    if (*pResOp & (VSC_RES_OP_BIT_GATHER_PCF | VSC_RES_OP_BIT_TEXLD_BIAS_PCF | VSC_RES_OP_BIT_TEXLD_LOD_PCF))
-                                    {
-                                        patchKey |= HALTI5_PATCH_TX_GATHER_PCF_BIT;
-                                    }
-                                    if (*pResOp & (VSC_RES_OP_BIT_TEXLD
-                                        | VSC_RES_OP_BIT_TEXLD_BIAS
-                                        | VSC_RES_OP_BIT_TEXLD_LOD
-                                        | VSC_RES_OP_BIT_TEXLDP
-                                        | VSC_RES_OP_BIT_TEXLDP_BIAS
-                                        | VSC_RES_OP_BIT_TEXLDP_LOD))
-                                    {
-                                        patchKey |= HALTI5_PATCH_TX_EXTRA_INPUT_BIT | HALTI5_PATCH_UNORMALIZED_SAMPLER_BIT;
-                                    }
-                                    if (*pResOp & (VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS))
-                                    {
-                                        patchKey |= HALTI5_PATCH_TX_EXTRA_INPUT_BIT;
-                                    }
+                                    patchKey |= HALTI5_PATCH_TX_EXTRA_INPUT_GRAD_BIT;
+                                }
+                                if (*pResOp & VSC_RES_OP_BIT_GATHER)
+                                {
+                                    patchKey |= HALTI5_PATCH_TX_GATHER_BIT;
+                                }
+                                if (*pResOp & (VSC_RES_OP_BIT_GATHER_PCF | VSC_RES_OP_BIT_TEXLD_BIAS_PCF | VSC_RES_OP_BIT_TEXLD_LOD_PCF))
+                                {
+                                    patchKey |= HALTI5_PATCH_TX_GATHER_PCF_BIT;
+                                }
+                                if (*pResOp & (VSC_RES_OP_BIT_TEXLD
+                                    | VSC_RES_OP_BIT_TEXLD_BIAS
+                                    | VSC_RES_OP_BIT_TEXLD_LOD
+                                    | VSC_RES_OP_BIT_TEXLDP
+                                    | VSC_RES_OP_BIT_TEXLDP_BIAS
+                                    | VSC_RES_OP_BIT_TEXLDP_LOD))
+                                {
+                                    patchKey |= HALTI5_PATCH_TX_EXTRA_INPUT_BIT | HALTI5_PATCH_UNORMALIZED_SAMPLER_BIT;
+                                }
+                                if (*pResOp & (VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS))
+                                {
+                                    patchKey |= HALTI5_PATCH_TX_EXTRA_INPUT_BIT;
                                 }
                             }
                             chipPipeline->patchKeys[setIdx][keyIndex++] = patchKey;
