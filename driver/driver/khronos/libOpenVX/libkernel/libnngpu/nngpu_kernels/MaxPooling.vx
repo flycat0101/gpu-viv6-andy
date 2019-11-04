@@ -1,9 +1,15 @@
-__kernel void gpuPooling_MaxNoPadFP32(__read_only image2d_array_t   input,
-                                      int filterX,
-                                      int filterY,
-                                      int strideX,
-                                      int strideY,
-                                      __write_only image2d_array_t  output)
+#pragma OPENCL EXTENSION CL_VIV_asm : enable
+#pragma OPENCL EXTENSION cl_viv_vx_extension : enable
+
+__kernel void gpuPooling_MaxNoPadFP32
+    (
+    __read_only image2d_array_t   input,
+    int                           filterX,
+    int                           filterY,
+    int                           strideX,
+    int                           strideY,
+    __write_only image2d_array_t  output
+    )
 {
     int x = get_global_id(0);
     int y = get_global_id(1);
@@ -141,4 +147,139 @@ __kernel void gpuPooling_MaxPadQuant8(__read_only image2d_array_t   input,
 
     tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
     write_imageui(output, (int4)(x, y, z, 0), tmp);
+}
+
+
+inline int get_image2D_array_strideX(image2d_array_t  input)
+{
+    int8 desc;
+    int stride_x = 1;
+
+    _viv_asm(COPY, desc, input, sizeof(desc));
+    stride_x = desc.y;
+
+    return stride_x;
+}
+
+inline int get_image2D_array_sliceSZ(image2d_array_t  input)
+{
+    int8 desc;
+    int sliceSz = 1;
+
+    _viv_asm(COPY, desc, input, sizeof(desc));
+    sliceSz = desc.s4;
+
+    return sliceSz;
+}
+
+inline uchar* get_image2D_array_ptr(image2d_array_t  input)
+{
+    int8 desc;
+    _viv_asm(COPY, desc, input, sizeof(desc));
+    uchar *src_ptr = (uchar*)desc.s0;
+
+    return src_ptr;
+}
+typedef _viv_uchar16_packed   vxc_uchar16;
+
+__kernel void gpuPooling_MaxNoPadSameFLQuant8_k3_s2
+    (
+    __read_only  image2d_array_t  input,
+    __write_only image2d_array_t  output
+    )
+{
+    int4 coord_out = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_in = (int4)(coord_out.x << 1, coord_out.y << 1, coord_out.z, 0);
+
+    int strideX = get_image2D_array_strideX(input);
+    uchar *src_ptr = get_image2D_array_ptr(input) + coord_in.z * get_image2D_array_sliceSZ(input) + coord_in.y * strideX + coord_in.x;
+    uchar *src_ptr_line0 = src_ptr;
+    uchar *src_ptr_line1 = src_ptr_line0 + strideX;
+    uchar *src_ptr_line2 = src_ptr_line1 + strideX;
+
+    vxc_uchar16 src0 = vload16(0, (_viv_uchar_packed *)src_ptr_line0);
+    vxc_uchar16 src1 = vload16(0, (_viv_uchar_packed *)src_ptr_line1);
+    vxc_uchar16 src2 = vload16(0, (_viv_uchar_packed *)src_ptr_line2);
+
+    vxc_uchar16 maxVal = max(src0, src1);
+    maxVal = max(maxVal, src2);
+    src0 = maxVal.s02468ac000000000;
+    src1 = maxVal.s13579bd000000000;
+    src2 = maxVal.s2468ace000000000;
+
+    maxVal = max(src0, src1);
+    maxVal = max(maxVal, src2);
+
+    uint4 dst;
+    dst.x = maxVal.s0;
+    write_imageui(output, coord_out, dst.xxxx);
+    dst.x = maxVal.s1;
+    coord_out.x ++;
+    write_imageui(output, coord_out, dst.xxxx);
+    dst.x = maxVal.s2;
+    coord_out.x ++;
+    write_imageui(output, coord_out, dst.xxxx);
+    dst.x = maxVal.s3;
+    coord_out.x ++;
+    write_imageui(output, coord_out, dst.xxxx);
+    dst.x = maxVal.s4;
+    coord_out.x ++;
+    write_imageui(output, coord_out, dst.xxxx);
+    dst.x = maxVal.s5;
+    coord_out.x ++;
+    write_imageui(output, coord_out, dst.xxxx);
+    dst.x = maxVal.s6;
+    coord_out.x ++;
+    write_imageui(output, coord_out, dst.xxxx);
+}
+
+__kernel void gpuPooling_MaxNoPadSameFLQuant8_k3_s2_2D
+    (
+    __read_only  image2d_array_t  input,
+    __write_only image2d_t        output,
+    int                           output_height
+    )
+{
+    int4 coord_out = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(2));
+    int4 coord_in = (int4)(coord_out.x << 1, coord_out.y << 1, coord_out.z, 0);
+
+    int strideX = get_image2D_array_strideX(input);
+    uchar *src_ptr = get_image2D_array_ptr(input) + coord_in.z * get_image2D_array_sliceSZ(input) + coord_in.y * strideX + coord_in.x;
+    uchar *src_ptr_line0 = src_ptr;
+    uchar *src_ptr_line1 = src_ptr_line0 + strideX;
+    uchar *src_ptr_line2 = src_ptr_line1 + strideX;
+
+    vxc_uchar16 src0 = vload16(0, (_viv_uchar_packed *)src_ptr_line0);
+    vxc_uchar16 src1 = vload16(0, (_viv_uchar_packed *)src_ptr_line1);
+    vxc_uchar16 src2 = vload16(0, (_viv_uchar_packed *)src_ptr_line2);
+
+    coord_out.y = coord_out.z * output_height + coord_out.y;
+    coord_out.zw = coord_out.xx + (int2)(1, 2);
+
+    vxc_uchar16 maxVal = max(src0, src1);
+    maxVal = max(maxVal, src2);
+    src0 = maxVal.s02468ac000000000;
+    src1 = maxVal.s13579bd000000000;
+    src2 = maxVal.s2468ace000000000;
+
+    maxVal = max(src0, src1);
+    maxVal = max(maxVal, src2);
+
+    uint4 dst;
+    dst.x = maxVal.s0;
+    write_imageui(output, coord_out.xy, dst.xxxx);
+    dst.x = maxVal.s1;
+    write_imageui(output, coord_out.zy, dst.xxxx);
+    dst.x = maxVal.s2;
+    write_imageui(output, coord_out.wy, dst.xxxx);
+    dst.x = maxVal.s3;
+    coord_out.xyzw += (int4)(3, 0, 3, 3);
+    write_imageui(output, coord_out.xy, dst.xxxx);
+    dst.x = maxVal.s4;
+    write_imageui(output, coord_out.zy, dst.xxxx);
+    dst.x = maxVal.s5;
+    write_imageui(output, coord_out.wy, dst.xxxx);
+    dst.x = maxVal.s6;
+    coord_out.x += 3;
+    write_imageui(output, coord_out.xy, dst.xxxx);
 }

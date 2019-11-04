@@ -3856,7 +3856,7 @@ vxnne_shader_executable vxnneGetGPUMaxPoolingShaderExecutable(
     vx_tensor               input,
     vx_scalar               poolType,
     vx_scalar               stride_x,
-    vx_scalar               stride_y,
+    vx_uint32               stride_h,
     vx_scalar               poolSizeX,
     vx_scalar               poolSizeY,
     vx_uint32               pad_left,

@@ -9337,7 +9337,9 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                     vx_uint32 stride_y_value = vxoNNExternsionConvlutionRound((vx_float32)(inputsHeight + pool_pad_y_top + pool_pad_y_bottom - poolSizeYValue) / (outputsHeight - 1), roundingValue);
                     vx_scalar stride_y = NULL;
 
-                    stride_y = vxCreateScalar(node->base.context, VX_TYPE_UINT32, &stride_y_value);
+                    if (!maxPool_flag)
+                        stride_y = vxCreateScalar(node->base.context, VX_TYPE_UINT32, &stride_y_value);
+
                     if(avgPool_flag)
                     {
                         shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_AVGPOOLING, &node->kernelAttributes.borderMode,
@@ -9353,11 +9355,14 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                     else if (maxPool_flag)
                     {
                         shaderExecutable = vxnneGetGPUMaxPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_MAXPOOLING, &node->kernelAttributes.borderMode,
-                                       inputs, pool_type_s, stride_s, stride_y, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
+                                       inputs, pool_type_s, stride_s, stride_y_value, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
                                        pool_pad_y_bottom,rounding_s, outputs);
                     }
 
-                    if (stride_y) (vxReleaseScalar(&stride_y));
+                    if (!maxPool_flag)
+                    {
+                        if (stride_y) (vxReleaseScalar(&stride_y));
+                    }
                 }
 
                 if (!shaderExecutable)
@@ -10683,7 +10688,6 @@ vx_status vxnneExecuteSWBatchNormalization(struct _vxnne_operation_s *operation)
             betaf     = vxnneGetDataExt(betaFormat, TENSOR_QUANT_TYPE(beta), c, betaLogic, TENSOR_POS(beta), TENSOR_TF_ZEROPOINT(beta), TENSOR_TF_SCALE(beta));
             for(i = 0; i < spatial; i ++)
             {
-
                 index       = b * channel * spatial + c * spatial + i;
                 inputf  = vxnneGetDataExt(inFormat, TENSOR_QUANT_TYPE(input), index, inputLogic, TENSOR_POS(input), TENSOR_TF_ZEROPOINT(input), TENSOR_TF_SCALE(input));
                 /* Compute Normalize */
