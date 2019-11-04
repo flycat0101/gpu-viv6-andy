@@ -1834,7 +1834,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
         {
             execution_parameters.globalWorkScale[0] = 4;
             execution_parameters.globalWorkScale[1] = 16;
-            if (inputSize % 4 == 0)
+            if (output_width % 4 == 0)
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_ReorgWeights_2D_4x", borderMode);
             else
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_ReorgWeights_2D_4s", borderMode);
@@ -1850,7 +1850,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
         if (status != VX_SUCCESS) goto OnError;
 
         status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-        if (inputSize % 4 == 0)
+        if (output_width % 4 == 0)
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
 
         status |= vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
