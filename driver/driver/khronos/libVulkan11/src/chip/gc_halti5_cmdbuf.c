@@ -7921,10 +7921,41 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
                         chipBufv->imgDesc[0].imageInfo);
                 }
 
-                for (layerIdx = 0; layerIdx < 2; layerIdx++)
+                /* Set the texture-related private constants. */
+                if (hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER)
                 {
-                    SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerBufEntry->pTextureSize[stageIdx][layerIdx];
+                    for (layerIdx = 0; layerIdx < 2; layerIdx++)
+                    {
+                        /* Set the texture size. */
+                        SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerBufEntry->pTextureSize[stageIdx][layerIdx];
 
+                        if (privEntry)
+                        {
+                            if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
+                            {
+                                uint32_t data[4] = {0};
+                                uint32_t hwConstRegNoForSize = privEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.constReg.hwRegNo;
+                                uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
+                                                        + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+
+                                __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_TEXTURE_SIZE);
+
+                                data[0] = chipBufv->txDesc[0].baseWidth;
+                                data[1] = chipBufv->txDesc[0].baseHeight;
+                                data[2] = chipBufv->txDesc[0].baseDepth;
+                                data[3] = chipBufv->txDesc[0].baseSlice;
+
+                                __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
+                            }
+                        }
+                    }
+                }
+                /* Set the image-related private constants. */
+                else
+                {
+                    SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerBufEntry->pImageSize[stageIdx];
+
+                    /* Set the image size. */
                     if (privEntry)
                     {
                         if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
@@ -7934,22 +7965,13 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
                             uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNoForSize * 4)
                                                     + privEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
 
-                            __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_TEXTURE_SIZE);
+                            __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_IMAGE_SIZE);
 
-                            if (hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER)
-                            {
-                                data[0] = chipBufv->txDesc[0].baseWidth;
-                                data[1] = chipBufv->txDesc[0].baseHeight;
-                                data[2] = chipBufv->txDesc[0].baseDepth;
-                                data[3] = chipBufv->txDesc[0].baseSlice;
-                            }
-                            else
-                            {
-                                data[0] = chipBufv->imgDesc[0].baseWidth;
-                                data[1] = chipBufv->imgDesc[0].baseHeight;
-                                data[2] = chipBufv->imgDesc[0].baseDepth;
-                                data[3] = chipBufv->imgDesc[0].baseSlice;
-                            }
+                            data[0] = chipBufv->imgDesc[0].baseWidth;
+                            data[1] = chipBufv->imgDesc[0].baseHeight;
+                            data[2] = chipBufv->imgDesc[0].baseDepth;
+                            data[3] = chipBufv->imgDesc[0].baseSlice;
+
                             __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
                         }
                     }

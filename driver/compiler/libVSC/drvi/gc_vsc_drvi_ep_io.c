@@ -1653,6 +1653,24 @@ _vscEP_Buffer_SaveVKUniformTexelBufferEntry(
         }
     }
 
+    /* Save image size. */
+    entryMask = 0;
+    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
+    {
+        if (pUniformTexelBufferEntry->pImageSize[i])
+        {
+            entryMask |= (1 << i);
+        }
+    }
+    VSC_IO_writeUint(pIoBuf, entryMask);
+    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
+    {
+        if (pUniformTexelBufferEntry->pImageSize[i])
+        {
+            _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pUniformTexelBufferEntry->pImageSize[i]);
+        }
+    }
+
     VSC_IO_writeUint(pIoBuf, (gctUINT)pUniformTexelBufferEntry->imageFormatInfo.imageFormat);
     VSC_IO_writeUint(pIoBuf, (gctUINT)pUniformTexelBufferEntry->imageFormatInfo.bSetInSpriv);
 
@@ -4603,6 +4621,24 @@ _vscEP_Buffer_LoadVKUniformTexelBufferEntry(
             {
                 pUniformTexelBufferEntry->pTextureSize[i][j] = gcvNULL;
             }
+        }
+    }
+
+    /* Load image size. */
+    entryMask = 0;
+    VSC_IO_readUint(pIoBuf, &entryMask);
+    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
+    {
+        if (entryMask & (1 << i))
+        {
+            VSC_EP_ALLOC_MEM(pUniformTexelBufferEntry->pImageSize[i],
+                             SHADER_PRIV_CONSTANT_ENTRY,
+                             sizeof(SHADER_PRIV_CONSTANT_ENTRY));
+            ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pUniformTexelBufferEntry->pImageSize[i]));
+        }
+        else
+        {
+            pUniformTexelBufferEntry->pImageSize[i] = gcvNULL;
         }
     }
 

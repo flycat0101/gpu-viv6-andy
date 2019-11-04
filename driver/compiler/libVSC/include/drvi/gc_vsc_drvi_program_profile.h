@@ -779,6 +779,8 @@ typedef struct PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY
     SHADER_PRIV_CONSTANT_ENTRY*                 pTextureSize[VSC_MAX_SHADER_STAGE_COUNT][2];
 
     /*----------------------------------Image-related----------------------------------*/
+    SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize[VSC_MAX_SHADER_STAGE_COUNT];
+
     PROG_VK_IMAGE_FORMAT_INFO                   imageFormatInfo;
 
     /* Which kinds of inst operation acting on texture. The count of this

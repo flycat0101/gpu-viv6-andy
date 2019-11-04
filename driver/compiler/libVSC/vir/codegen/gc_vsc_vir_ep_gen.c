@@ -4668,11 +4668,20 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* p
     }
 
     /* Set texture size */
-    _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
-                                gcvNULL,
-                                gcvNULL,
-                                &pUtbEntry->utbBinding,
-                                pSep);
+    if (!(pResAllocEntry->resFlag & VIR_SRE_FLAG_TEXELBUFFER_AN_IMAGE_NATIVELY))
+    {
+        _AddTextureSizeAndLodMinMax(pUtbEntry->pTextureSize[stageIdx],
+                                    gcvNULL,
+                                    gcvNULL,
+                                    &pUtbEntry->utbBinding,
+                                    pSep);
+    }
+    else
+    {
+        _AddImageSize(&pUtbEntry->pImageSize[stageIdx],
+                      &pUtbEntry->utbBinding,
+                      pSep);
+    }
 
     pUtbEntry->activeStageMask |= pResAllocEntry->bUse ? (1 << stageIdx) : 0;
     pUtbEntry->stageBits |= VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx);
