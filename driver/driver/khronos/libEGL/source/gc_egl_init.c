@@ -573,7 +573,7 @@ _FillIn(
             ((Color->formatFlags & VEGL_8888) == VEGL_8888) ||
             ((Color->formatFlags & VEGL_888) == VEGL_888)))
         {
-            if (gcoOS_DetectProcessByName("\x98\x9a\x91\x9a\x8d\x9e\x8b\x90\x8d"))
+            if (!gcoOS_DetectProcessByName("\x98\x9a\x91\x9a\x8d\x9e\x8b\x90\x8d"))
             {
                 config->renderableType |= EGL_OPENVG_BIT;
             }
