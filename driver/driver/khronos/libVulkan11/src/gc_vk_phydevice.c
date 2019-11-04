@@ -2100,13 +2100,15 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties2(
             {
                 extMemProp->compatibleHandleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
                 extMemProp->exportFromImportedHandleTypes = 0;
+#if (ANDROID_SDK_VERSION >= 26)
                 extMemProp->externalMemoryFeatures = VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT
                                                    | VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT;
-#if (ANDROID_SDK_VERSION >= 26)
                 if (output_ahw_usage)
                 {
                     extMemProp->externalMemoryFeatures |= VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT;
                 }
+#else
+                extMemProp->externalMemoryFeatures = VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT;
 #endif
 
                 pImageFormatProperties->imageFormatProperties.maxArrayLayers       = (type == VK_IMAGE_TYPE_3D) ? 1 : 1;
@@ -2200,8 +2202,12 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceExternalBufferProperties(
         pExternalBufferProperties->externalMemoryProperties.externalMemoryFeatures = 0;
         break;
     case VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID:
+#if (ANDROID_SDK_VERSION >= 26)
         pExternalBufferProperties->externalMemoryProperties.externalMemoryFeatures =  VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT
                                                                                     | VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT;
+#else
+        pExternalBufferProperties->externalMemoryProperties.externalMemoryFeatures = VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT;
+#endif
         break;
     default:
         __VK_ASSERT(!"invalid external memory handle types");
