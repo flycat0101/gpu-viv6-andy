@@ -134,15 +134,23 @@ int vscDIGetVariableCount(
     gctBOOL bArgument
     );
 
+void vscDIGetIdStrInfo(
+    const char * varIdStr,
+    int * varId,
+    gctUINT * PdimDepth,
+    gctUINT * pointIndex,
+    gctINT * dimNum
+    );
+
 void vscDIGetVariableInfo(
     void * ptr,
-    int parentId,
+    const char * parentIdStr,
     int idx,
     gctBOOL bArgument,
     char * varName,
     char * typeStr,
     unsigned int nameLength,
-    unsigned int * varId,
+    char * varIdStr,
     unsigned int * lowPC,
     unsigned int * highPC,
     unsigned int * hwLocCount,
@@ -151,7 +159,7 @@ void vscDIGetVariableInfo(
 
 void vscDIGetVariableHWLoc(
     void * ptr,
-    int varId,
+    const char * varIdStr,
     int idx,
     gctBOOL * bIsReg,
     gctBOOL * bIsConst,

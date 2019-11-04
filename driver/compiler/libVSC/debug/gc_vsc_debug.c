@@ -847,35 +847,54 @@ void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT tag)
         char typeName[1024];
         unsigned int lowPC;
         unsigned int highPC;
-        unsigned int varId, varId1;
         unsigned int hwLocCount;
-        unsigned int childrenCount, childrenCount1;
+        unsigned int childrenCount, childrenCount1, childrenCount2, childrenCount3, childrenCount4;
         unsigned int data0, data1, data2;
-        int variableCount, argCount, i, j;
+        int variableCount, argCount, i, j, k, l, m;
         gctBOOL isReg;
         gctBOOL isConst;
-        int funcId = 5; /* please change this function id when changing the test case */
+        int funcId = 1; /* please change this function id when changing the test case */
+        char * funIdStr = "            ";
+        char * varIdStr = "            ";
+        char * varIdStr2 = "            ";
+        char * varIdStr3 = "            ";
+        char * varIdStr4 = "            ";
+        char * varIdStr5 = "            ";
         vscDIGetFunctionInfo((void *)context, funcId, funcName, 1024, &lowPC, &highPC);
         argCount      = vscDIGetVariableCount((void *)context, funcId, gcvTRUE);
         variableCount = vscDIGetVariableCount((void *)context, funcId, gcvFALSE);
+        gcoOS_PrintStrSafe(funIdStr, 10, 0, "%d",funcId);
         for (i = 0; i < argCount; i++)
         {
-            vscDIGetVariableInfo((void *)context, funcId, i, gcvTRUE, varName, typeName, 1024, &varId, &lowPC, &highPC, &hwLocCount, &childrenCount);
+            vscDIGetVariableInfo((void *)context, funIdStr, i, gcvTRUE, varName, typeName, 1024, varIdStr, &lowPC, &highPC, &hwLocCount, &childrenCount);
+
             for (j = 0; j < (int) hwLocCount; j++)
             {
-                vscDIGetVariableHWLoc((void *)context, varId, j, &isReg, &isConst, &lowPC, &highPC, &data0, &data1, &data2);
+                vscDIGetVariableHWLoc((void *)context, varIdStr, j, &isReg, &isConst, &lowPC, &highPC, &data0, &data1, &data2);
             }
         }
         for (i = 0; i < variableCount; i++)
         {
-            vscDIGetVariableInfo((void *)context, funcId, i, gcvFALSE, varName, typeName, 1024, &varId, &lowPC, &highPC, &hwLocCount, &childrenCount);
+            vscDIGetVariableInfo((void *)context, funIdStr, i, gcvFALSE, varName, typeName, 1024, varIdStr, &lowPC, &highPC, &hwLocCount, &childrenCount);
             for (j = 0; j < (int)childrenCount; j++)
             {
-                vscDIGetVariableInfo((void *)context, varId, j, gcvFALSE, varName, typeName, 1024, &varId1, &lowPC, &highPC, &hwLocCount, &childrenCount1);
+                vscDIGetVariableInfo((void *)context, varIdStr, j, gcvFALSE, varName, typeName, 1024, varIdStr2, &lowPC, &highPC, &hwLocCount, &childrenCount1);
+                for (k = 0; k < (int)childrenCount1; k++)
+                {
+                    vscDIGetVariableInfo((void *)context, varIdStr2, k, gcvFALSE, varName, typeName, 1024, varIdStr3, &lowPC, &highPC, &hwLocCount, &childrenCount2);
+                    for (l = 0; l < (int)childrenCount2; l++)
+                    {
+                        vscDIGetVariableInfo((void *)context, varIdStr3, l, gcvFALSE, varName, typeName, 1024, varIdStr4, &lowPC, &highPC, &hwLocCount, &childrenCount3);
+                        for (m = 0; m < (int)childrenCount3; m++)
+                        {
+                            vscDIGetVariableInfo((void *)context, varIdStr4, m, gcvFALSE, varName, typeName, 1024, varIdStr5, &lowPC, &highPC, &hwLocCount, &childrenCount4);
+                        }
+                    }
+                }
             }
             for (j = 0; j < (int) hwLocCount; j++)
             {
-                vscDIGetVariableHWLoc((void *)context, varId, j, &isReg, &isConst, &lowPC, &highPC, &data0, &data1, &data2);
+                vscDIGetVariableHWLoc((void *)context, varIdStr, j, &isReg, &isConst, &lowPC, &highPC, &data0, &data1, &data2);
             }
         }
     }
@@ -1720,7 +1739,8 @@ static void _GetTypeStr(
     VSC_DIContext * context,
     VSC_DIE * die,
     char *typeStr,
-    unsigned int strLength)
+    unsigned int strLength,
+    unsigned int dimDepth)
 {
     if (!die)
         return;
@@ -1748,23 +1768,94 @@ static void _GetTypeStr(
     if (die->u.variable.type.array.numDim > 0)
     {
         gctUINT offset = 0;
-        gctINT i = 0;
+        gctINT i = dimDepth;
         for (; i < die->u.variable.type.array.numDim; i++)
         {
-            gcoOS_PrintStrSafe(typeStr, strLength, &offset, "%s [%d]", typeStr, die->u.variable.type.array.length[i]);
+            offset = 0;
+            gcoOS_PrintStrSafe(typeStr, strLength, &offset, "%s%s[%d]", typeStr, (unsigned int)i == dimDepth ? " " : "", die->u.variable.type.array.length[i]);
         }
     }
 }
 
+void vscDIGetIdStrInfo(
+    const char * varIdStr,
+    int * varId,
+    gctUINT * PdimDepth,
+    gctUINT * pointIndex,
+    gctINT * dimNum
+    )
+{
+    gctUINT index = 0;
+    gctSIZE_T Strlen = 0;
+    *PdimDepth = 0;
+    gcoOS_StrToInt(varIdStr, varId);
+    gcoOS_StrLen(varIdStr, &Strlen);
+    for(; index < Strlen; index++)
+    {
+        if(varIdStr[index]=='.')
+        {
+            pointIndex[*PdimDepth] = index;
+            gcoOS_StrToInt(varIdStr+index+1, &dimNum[*PdimDepth]);
+            (*PdimDepth)++;
+        }
+    }
+}
+
+void vscDIGetArrayTempReg(
+     void * ptr,
+     VSC_DIE * die,
+     int idx,
+     gctUINT dimDepth,
+     const gctINT * dimNum,
+     gctINT * PtempReg
+     )
+{
+    VSC_DIContext * context = (VSC_DIContext *)ptr;
+    VSC_DI_SW_LOC * sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
+    gctINT index = 0;
+    gctUINT16 regStart = 0;
+    gctINT tempReg = 0;
+    gctINT eachDepthLength[4] = {1,1,1,1};
+    gctINT arrayLength = 1;
+    if(sl && dimDepth + 1 >= (gctUINT)die->u.variable.type.array.numDim)
+    {
+        /* calculate the array width*/
+        for(index = (gctUINT)die->u.variable.type.array.numDim - 1; index >= 0; index--)
+        {
+            eachDepthLength[index] = arrayLength;
+            arrayLength = arrayLength * die->u.variable.type.array.length[index];
+        }
+        while (sl->next < context->swLocTable.usedCount)
+        {
+            sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
+        }
+
+        if(sl->reg && sl->u.reg.end - sl->u.reg.start + 1 == arrayLength)
+        {
+            /*find the array start position in sw reg*/
+            regStart = sl->u.reg.start;
+
+            /*calculate the relative location*/
+            for(index = 0; index < (gctINT)dimDepth; index++)
+            {
+                tempReg = tempReg + eachDepthLength[index] * dimNum[index];
+            }
+            /*the absolute sw location*/
+            tempReg = regStart + tempReg + idx;
+        }
+    }
+    *PtempReg = tempReg;
+}
+
 void vscDIGetVariableInfo(
     void * ptr,
-    int parentId,
+    const char * parentIdStr,
     int idx,
     gctBOOL bArgument,
     char * varName,
     char * typeStr,
     unsigned int nameLength,
-    unsigned int * varId,
+    char * varIdStr,
     unsigned int * lowPC,
     unsigned int * highPC,
     unsigned int * hwLocCount,
@@ -1776,6 +1867,21 @@ void vscDIGetVariableInfo(
     VSC_DIE * child;
     int curIdx = 0;
     gctSIZE_T i;
+    int parentId;
+
+    /*variables for idStr has '.'*/
+    gctBOOL isArrayChild;
+    gctUINT index = 0;
+    gctUINT offset = 0;
+    gctUINT dimDepth = 0;
+    gctUINT pointIndex[10];
+    gctINT dimNum[10];
+
+    vscDIGetIdStrInfo(parentIdStr,
+                      &parentId,
+                      &dimDepth,
+                      pointIndex,
+                      dimNum);
 
     if (context == gcvNULL)
         return;
@@ -1785,126 +1891,231 @@ void vscDIGetVariableInfo(
     if (!die || (die->tag != VSC_DI_TAG_SUBPROGRAM && die->tag != VSC_DI_TAG_VARIABE))
         return;
 
-    child = VSC_DI_DIE_PTR(die->child);
+    isArrayChild = die->tag == VSC_DI_TAG_VARIABE && die->u.variable.type.array.numDim > 0;
 
-    if (!child)
-        return;
-
-    if (die->tag == VSC_DI_TAG_SUBPROGRAM)
+    if(!isArrayChild)
     {
-        /* function */
-        if (bArgument)
+        child = VSC_DI_DIE_PTR(die->child);
+
+        if (!child)
+            return;
+
+        if (die->tag == VSC_DI_TAG_SUBPROGRAM)
         {
-            while (child)
+            /* function */
+            if (bArgument)
             {
-                if (child->tag == VSC_DI_TAG_PARAMETER)
+                while (child)
                 {
-                    if (curIdx == idx)
-                        break;
-                    curIdx++;
+                    if (child->tag == VSC_DI_TAG_PARAMETER)
+                    {
+                        if (curIdx == idx)
+                            break;
+                        curIdx++;
+                    }
+                    child = VSC_DI_DIE_PTR(child->sib);
                 }
-                child = VSC_DI_DIE_PTR(child->sib);
+            }
+            else
+            {
+                child = gcvNULL;
+                for (i = parentId + 1; i < context->dieTable.usedCount; i++)
+                {
+                    VSC_DIE curDie = context->dieTable.die[i];
+                    VSC_DIE parent;
+
+                    if (curDie.tag != VSC_DI_TAG_VARIABE)
+                        continue;
+
+                    /* if parent is block, find the function parent */
+                    parent = context->dieTable.die[curDie.parent];
+                    while (parent.tag == VSC_DI_TAG_LEXICALBLOCK)
+                    {
+                        if (parent.id == VSC_DI_INVALIDE_DIE)
+                            break;
+                        parent = context->dieTable.die[parent.parent];
+                    }
+
+                    if (parent.id == parentId)
+                    {
+                        if (curIdx == idx)
+                        {
+                            child = &curDie;
+                            break;
+                        }
+                        curIdx++;
+                    }
+                }
             }
         }
         else
         {
-            child = gcvNULL;
-            for (i = parentId + 1; i < context->dieTable.usedCount; i++)
+            /* variable */
+            curIdx = 0;
+            while (child)
             {
-                VSC_DIE curDie = context->dieTable.die[i];
-                VSC_DIE parent;
-
-                if (curDie.tag != VSC_DI_TAG_VARIABE)
-                    continue;
-
-                /* if parent is block, find the function parent */
-                parent = context->dieTable.die[curDie.parent];
-                while (parent.tag == VSC_DI_TAG_LEXICALBLOCK)
-                {
-                    if (parent.id == VSC_DI_INVALIDE_DIE)
-                        break;
-                    parent = context->dieTable.die[parent.parent];
-                }
-
-                if (parent.id == parentId)
-                {
-                    if (curIdx == idx)
-                    {
-                        child = &curDie;
-                        break;
-                    }
-                    curIdx++;
-                }
+                if (curIdx == idx)
+                    break;
+                curIdx++;
+                child = VSC_DI_DIE_PTR(child->sib);
             }
+        }
+
+        if (!child)
+            return;
+
+        if (varName)
+            gcoOS_StrCopySafe(varName, nameLength, _GetNameStr(context, child->name));
+
+        _GetTypeStr(context, child, typeStr, nameLength,0);
+
+        if (varIdStr)
+        {
+            offset = 0;
+            gcoOS_PrintStrSafe(varIdStr, 50, &offset, "%d", child->id);
+        }
+
+        if (hwLocCount)
+        {
+            VSC_DI_SW_LOC * sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, child->u.variable.swLoc);
+            VSC_DI_HW_LOC * hl;
+            *hwLocCount = 0;
+            while (sl)
+            {
+                hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, sl->hwLoc);
+                while(hl)
+                {
+                    *hwLocCount = *hwLocCount + 1;
+                    hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, hl->next);
+                }
+                sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
+            }
+        }
+
+        if (lowPC)
+            *lowPC = child->u.variable.pcLine[0];
+
+        if (highPC)
+            *highPC = child->u.variable.pcLine[1];
+
+        if (childrenCount)
+        {
+            VSC_DIE *curChild = VSC_DI_DIE_PTR(child->child);
+            *childrenCount = 0;
+            while(curChild)
+            {
+                (*childrenCount)++;
+                curChild = VSC_DI_DIE_PTR(curChild->sib);
+            }
+            if(child->tag == VSC_DI_TAG_VARIABE && child->u.variable.type.array.numDim > 0)
+                *childrenCount = child->u.variable.type.array.length[0];
         }
     }
     else
     {
-        /* variable */
-        curIdx = 0;
-        while (child)
+
+        if (varName)
         {
-            if (curIdx == idx)
-                break;
-            curIdx++;
-            child = VSC_DI_DIE_PTR(child->sib);
-        }
-    }
-
-    if (!child)
-        return;
-
-    if (varName)
-        gcoOS_StrCopySafe(varName, nameLength, _GetNameStr(context, child->name));
-
-    _GetTypeStr(context, child, typeStr, nameLength);
-
-    if (varId)
-        *varId = child->id;
-
-    if (hwLocCount)
-    {
-        VSC_DI_SW_LOC * sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, child->u.variable.swLoc);
-        VSC_DI_HW_LOC * hl;
-        *hwLocCount = 0;
-        while (sl)
-        {
-            hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, sl->hwLoc);
-            while(hl)
+            gcoOS_StrCopySafe(varName, nameLength, _GetNameStr(context, die->name));
+            for (index = 0; index < dimDepth; index++)
             {
-                *hwLocCount = *hwLocCount + 1;
-                hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, hl->next);
+                offset = 0;
+                gcoOS_PrintStrSafe(varName, nameLength, &offset, "%s[%d]", varName, dimNum[index]);
             }
-            sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
+            offset = 0;
+            gcoOS_PrintStrSafe(varName, nameLength, &offset, "%s[%d]", varName, idx);
         }
-    }
 
-    if (lowPC)
-        *lowPC = child->u.variable.pcLine[0];
+         _GetTypeStr(context, die, typeStr, nameLength, dimDepth + 1);
 
-    if (highPC)
-        *highPC = child->u.variable.pcLine[1];
-
-    if (childrenCount)
-    {
-        VSC_DIE *curChild = VSC_DI_DIE_PTR(child->child);
-        *childrenCount = 0;
-        while(curChild)
+        if (varIdStr)
         {
-            (*childrenCount)++;
-            curChild = VSC_DI_DIE_PTR(curChild->sib);
+            offset = 0;
+            gcoOS_PrintStrSafe(varIdStr, nameLength, &offset, "%s.%d", parentIdStr, idx);
+        }
+
+        if (hwLocCount)
+        {
+            VSC_DI_HW_LOC * hl;
+            VSC_DI_SW_LOC * sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
+            gctINT tempReg = 0;
+
+            vscDIGetArrayTempReg(ptr,
+                                 die,
+                                 idx,
+                                 dimDepth,
+                                 dimNum,
+                                 &tempReg);
+
+            if(tempReg > 0)
+            {
+                /*calculate the hwLocCount*/
+                *hwLocCount = 0;
+                sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
+                while (sl)
+                {
+                    if (sl->reg)
+                    {
+                        if (sl->u.reg.start <= tempReg &&
+                            sl->u.reg.end >= tempReg)
+                        {
+                            hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, sl->hwLoc);
+                            while(hl)
+                            {
+                                *hwLocCount = *hwLocCount + 1;
+                                hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, hl->next);
+                            }
+                        }
+                    }
+                    sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
+                }
+            }
+            else
+            {
+                *hwLocCount = 0;
+            }
+        }
+
+        if (lowPC)
+            *lowPC = die->u.variable.pcLine[0];
+
+        if (highPC)
+            *highPC = die->u.variable.pcLine[1];
+
+        if (childrenCount)
+        {
+            if(dimDepth + 1 < (gctUINT)die->u.variable.type.array.numDim)
+                *childrenCount = die->u.variable.type.array.length[dimDepth + 1];
+            else
+                *childrenCount = 0;
+        }
+
+    }
+#if vsdTEST_API
+    gcmPRINT("id: %s, bArgument: %d, idx: %d, varName: %s, typeStr: %s, varId: %s, hwLocCount: %d, pc(%d %d), childrenCount: %d\n",
+        parentIdStr, bArgument, idx, varName, typeStr, varIdStr, *hwLocCount, *lowPC, *highPC, *childrenCount);
+    if(*hwLocCount != 0)
+    {
+        int j = 0;
+        gctBOOL bIsReg;
+        gctBOOL bIsConst;
+        unsigned int lowPC;
+        unsigned int highPC;
+        unsigned int data0; /* regStart or baseAdd*/
+        unsigned int data1; /* regEnd or offset */
+        unsigned int data2;  /*swizzle, HwShift or endOffset */
+        for (j = 0; j < (int)*hwLocCount; j++)
+        {
+            vscDIGetVariableHWLoc(ptr, varIdStr, j, &bIsReg, &bIsConst, &lowPC, &highPC, &data0, &data1, &data2);
         }
     }
 
-#if vsdTEST_API
-    gcmPRINT("id: %d, bArgument: %d, idx: %d, varName: %s, typeStr: %s, varId: %d, hwLocCount: %d, pc(%d %d), childrenCount: %d\n",
-        parentId, bArgument, idx, varName, typeStr, *varId, *hwLocCount, *lowPC, *highPC, *childrenCount);
 #endif
 }
 
 void vscDIGetVariableHWLoc(
     void * ptr,
-    int varId,
+    const char * varIdStr,
     int idx,
     gctBOOL * bIsReg,
     gctBOOL * bIsConst,
@@ -1917,10 +2128,20 @@ void vscDIGetVariableHWLoc(
 {
     VSC_DIContext * context = (VSC_DIContext *)ptr;
     VSC_DIE * die;
+    int varId = 0;
     int i = 0;
     VSC_DI_SW_LOC * sl = gcvNULL;
     VSC_DI_HW_LOC * hl = gcvNULL;
     gctBOOL found = gcvFALSE;
+
+    gctUINT dimDepth = 0;
+    gctUINT pointIndex[10];
+    gctINT dimNum[10];
+    vscDIGetIdStrInfo(varIdStr,
+                      &varId,
+                      &dimDepth,
+                      pointIndex,
+                      dimNum);
 
     if (context == gcvNULL)
         return;
@@ -1930,7 +2151,38 @@ void vscDIGetVariableHWLoc(
     if (!die || (die->tag != VSC_DI_TAG_VARIABE && die->tag != VSC_DI_TAG_PARAMETER))
         return;
 
-    sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
+    if(dimDepth > 0)
+    {
+        gctINT tempReg = 0;
+        vscDIGetArrayTempReg(ptr,
+                             die,
+                             idx,
+                             dimDepth,
+                             dimNum,
+                             &tempReg);
+
+        if(tempReg == 0)
+            return;
+
+        sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
+        while (sl)
+        {
+            if (sl->reg)
+            {
+                if (sl->u.reg.start <= tempReg &&
+                    sl->u.reg.end >= tempReg)
+                {
+                    break;
+                }
+            }
+            sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
+        }
+    }
+    else/*normal case*/
+    {
+        sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
+    }
+
     while (sl)
     {
         hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, sl->hwLoc);
@@ -1996,8 +2248,8 @@ void vscDIGetVariableHWLoc(
     }
 
 #if vsdTEST_API
-    gcmPRINT("id: %d, idx: %d, pc(%d %d), bIsReg: %d, bIsConst: %d, loc info: %d, %d, %d\n",
-        varId, idx, *lowPC, *highPC, *bIsReg, *bIsConst, *data0, *data1, *data2);
+    gcmPRINT("id: %s, idx: %d, pc(%d %d), bIsReg: %d, bIsConst: %d, loc info: %d, %d, %d\n",
+        varIdStr, idx, *lowPC, *highPC, *bIsReg, *bIsConst, *data0, *data1, *data2);
 #endif
 }
 
@@ -2042,7 +2294,7 @@ void vscDIGetPCBySrcLine(void * ptr, unsigned int src, unsigned int refPC, unsig
     for (i = 0 ; i < context->lineTable.count; i++)
     {
         if (/*(context->lineTable.map[i].sourcLoc.fileId == src.fileId) && */
-            context->lineTable.map[i].sourcLoc.lineNo == src)
+            (context->lineTable.map[i].sourcLoc.lineNo == src))
         {
             if (*start == VSC_DI_INVALID_PC)
             {
@@ -2086,7 +2338,7 @@ void vscDIGetNearPCBySrcLine(void * ptr, unsigned int src,unsigned int * newSrc,
         for (i = 0 ; i < context->lineTable.count; i++)
         {
             if (/*(context->lineTable.map[i].sourcLoc.fileId == src.fileId) && */
-                context->lineTable.map[i].sourcLoc.lineNo == chosenLine)
+                (context->lineTable.map[i].sourcLoc.lineNo == chosenLine))
             {
                 if (*start == VSC_DI_INVALID_PC)
                 {
