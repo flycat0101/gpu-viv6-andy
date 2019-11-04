@@ -10442,7 +10442,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPReluLayer_Initializer(vx_node node, c
                           pReluLayer->operations,
                           vxnneLayer_Deinitialize);
 
-    shExe_flag  = (vx_bool)(((srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+    if(node->base.context->evisNoInst.supportEVIS)
+    {
+        shExe_flag  = (vx_bool)(((srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
                           || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT16)
                           || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_INT8)
                           || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT16)
@@ -10450,12 +10452,23 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPReluLayer_Initializer(vx_node node, c
                           || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT16)
                           || (srcFormat == VX_TYPE_FLOAT16 && dstFormat != VX_TYPE_FLOAT32))
                          && alphaFormat == VX_TYPE_FLOAT16);
+    }
+    else
+    {
+        shExe_flag  = (vx_bool)(((srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+                          || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+                          || (srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_FLOAT32))
+                         && (alphaFormat == VX_TYPE_FLOAT16 || alphaFormat == VX_TYPE_FLOAT32));
+    }
 
     if(shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
         vxnne_shader_executable shaderExecutable = VX_NULL;
 
-        shaderExecutable = vxnneGetPReluShaderExecutable(node->base.context, VXNNE_KERNEL_PRELU, &node->kernelAttributes.borderMode, inputs, alpha, outputs);
+        if(node->base.context->evisNoInst.supportEVIS)
+            shaderExecutable = vxnneGetPReluShaderExecutable(node->base.context, VXNNE_KERNEL_PRELU, &node->kernelAttributes.borderMode, inputs, alpha, outputs);
+        else
+            shaderExecutable = vxnneGetGPUPReluShaderExecutable(node->base.context, VXNNE_KERNEL_PRELU, &node->kernelAttributes.borderMode, inputs, alpha, outputs);
 
         if (!shaderExecutable)
         {
@@ -23266,7 +23279,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorScale_Initializer(vx_node node, co
         }
         else
         {
-            shaderExecutable = vxnneGetResizeNearestNeighborShaderExecutable(node->base.context, VXNNE_KERNEL_RESIZE_NEAREST_NEIGHBOR, &node->kernelAttributes.borderMode, inputs, type, outputs);
+            if(node->base.context->evisNoInst.supportEVIS)
+            {
+                shaderExecutable = vxnneGetResizeNearestNeighborShaderExecutable(node->base.context, VXNNE_KERNEL_RESIZE_NEAREST_NEIGHBOR, &node->kernelAttributes.borderMode, inputs, type, outputs);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetGPUResizeNearestNeighborShaderExecutable(node->base.context, VXNNE_KERNEL_RESIZE_NEAREST_NEIGHBOR, &node->kernelAttributes.borderMode, inputs, type, outputs);
+            }
+
         }
 
         if (!shaderExecutable)

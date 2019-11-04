@@ -25,7 +25,7 @@ __kernel void vxcNormalization_AcrossMapsNs11Uint8toUint8(
     int4 coordIn = (int4)(get_global_id(0), get_global_id(1), 0, 0);
     int4 coordOut = (int4)(get_global_id(0), get_global_id(1), 0, 0);
     vxc_uchar4  din0, din1, din2, din3, din4, din5, din;
-    vxc_uchar4  input_zp, output_zp;
+    vxc_uchar4  input_zp;
     float4      din0Fl32, din1Fl32, din2Fl32, din3Fl32,
         din4Fl32, din5Fl32, din6Fl32, din7Fl32,
         din8Fl32, din9Fl32, din10Fl32, dinFl32, doutFl32;
