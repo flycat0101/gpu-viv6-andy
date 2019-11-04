@@ -4730,11 +4730,13 @@ vx_status vxnneOperation_NodeDump(
                 if (fpLayer)
                 {
                     fclose(fpLayer);
+                    fpLayer = VX_NULL;
                 }
 
                 if (fpOperation)
                 {
                     fclose(fpOperation);
+                    fpOperation = VX_NULL;
                 }
 
                 if (opCommand->operation->transposeOutChannel > 1)
