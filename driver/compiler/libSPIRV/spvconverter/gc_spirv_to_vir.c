@@ -5371,77 +5371,95 @@ VSC_ErrCode __SpvEmitConstant(gcSPV spv, VIR_Shader * virShader)
     /* If this is a vector constant, just mark this result as a constant. */
     else if (SPV_ID_TYPE_IS_VECTOR(spv->resultTypeId))
     {
-        VIR_TypeId typeID = SPV_ID_TYPE_VIR_TYPE_ID(spv->resultTypeId);
-        gctUINT compType = SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultTypeId);
         gctUINT i, compCount = spv->operandSize;
+        gctBOOL isConstant = gcvTRUE;
         gctBOOL isConstantNull = (spv->opCode == SpvOpConstantNull);
 
-        /* Get the vir type. */
-        type = VIR_Shader_GetTypeFromId(virShader, typeID);
-
-        /* Set the ID as a constant. */
-        SPV_ID_TYPE(targetId) = SPV_ID_TYPE_CONST;
-
-        if (isConstantNull)
+        for (i = 0; i < compCount; i++)
         {
-            compCount = SPV_ID_TYPE_VEC_COMP_NUM(spv->resultTypeId);
-        }
-
-        if (SPV_ID_TYPE_IS_FLOAT(compType))
-        {
-            for (i = 0; i < compCount; i++)
+            if(SPV_ID_TYPE(spv->operands[i]) != SPV_ID_TYPE_CONST)
             {
-                SPV_ID_VIR_CONST(targetId).vecVal.f32Value[i] =
-                    isConstantNull ? 0.0f : SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.fValue;
+                isConstant = gcvFALSE;
+                break;
             }
         }
-        else if (SPV_ID_TYPE_IS_UNSIGNEDINTEGER(SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultTypeId)))
+        if(!(isConstant || isConstantNull))
         {
-            for (i = 0; i < compCount; i++)
-            {
-                SPV_ID_VIR_CONST(targetId).vecVal.u32Value[i] =
-                    isConstantNull ? 0 : SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.uValue;
-            }
-        }
-        else if (SPV_ID_TYPE_IS_SIGNEDINTEGER(SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultTypeId)))
-        {
-            for (i = 0; i < compCount; i++)
-            {
-                SPV_ID_VIR_CONST(targetId).vecVal.i32Value[i] =
-                    isConstantNull ? 0 : SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.iValue;
-            }
-        }
-        else if (SPV_ID_TYPE_IS_BOOLEAN(SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultTypeId)))
-        {
-            for (i = 0; i < compCount; i++)
-            {
-                if (isConstantNull)
-                {
-                    SPV_ID_VIR_CONST(targetId).vecVal.u32Value[i] = 0;
-                }
-                else
-                {
-                    SPV_ID_VIR_CONST(targetId).vecVal.u32Value[i] =
-                        (SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.iValue == 0) ? 0 : 1;
-                }
-            }
+            virErrCode = __SpvEmitCompositeConstruct(spv, virShader);
+            if (virErrCode != VSC_ERR_NONE) return virErrCode;
         }
         else
         {
-            gcmASSERT(gcvFALSE);
-        }
+            VIR_TypeId typeID = SPV_ID_TYPE_VIR_TYPE_ID(spv->resultTypeId);
+            gctUINT compType = SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultTypeId);
 
-        VIR_Shader_AddConstant(virShader, typeID, &SPV_ID_VIR_CONST(targetId), &cstId);
-        addSym = gcvTRUE;
+            /* Get the vir type. */
+            type = VIR_Shader_GetTypeFromId(virShader, typeID);
 
-        SPV_ID_VIR_CONST_ID(targetId) = cstId;
-        SPV_ID_VIR_TYPE_ID(targetId) = typeID;
-        SPV_ID_CST_SPV_TYPE(targetId) = spv->resultTypeId;
+            /* Set the ID as a constant. */
+            SPV_ID_TYPE(targetId) = SPV_ID_TYPE_CONST;
 
-        /* save the spv id of components */
-        for (i = 0; i < compCount; i++)
-        {
-            SPV_ID_CST_VEC_SPVID(targetId, i) = spv->operands[i];
+            if (isConstantNull)
+            {
+                compCount = SPV_ID_TYPE_VEC_COMP_NUM(spv->resultTypeId);
+            }
+
+            if (SPV_ID_TYPE_IS_FLOAT(compType))
+            {
+                for (i = 0; i < compCount; i++)
+                {
+                    SPV_ID_VIR_CONST(targetId).vecVal.f32Value[i] =
+                        isConstantNull ? 0.0f : SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.fValue;
+                }
+            }
+            else if (SPV_ID_TYPE_IS_UNSIGNEDINTEGER(SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultTypeId)))
+            {
+                for (i = 0; i < compCount; i++)
+                {
+                    SPV_ID_VIR_CONST(targetId).vecVal.u32Value[i] =
+                        isConstantNull ? 0 : SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.uValue;
+                }
+            }
+            else if (SPV_ID_TYPE_IS_SIGNEDINTEGER(SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultTypeId)))
+            {
+                for (i = 0; i < compCount; i++)
+                {
+                    SPV_ID_VIR_CONST(targetId).vecVal.i32Value[i] =
+                        isConstantNull ? 0 : SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.iValue;
+                }
+            }
+            else if (SPV_ID_TYPE_IS_BOOLEAN(SPV_ID_TYPE_VEC_COMP_TYPE(spv->resultTypeId)))
+            {
+                for (i = 0; i < compCount; i++)
+                {
+                    if (isConstantNull)
+                    {
+                        SPV_ID_VIR_CONST(targetId).vecVal.u32Value[i] = 0;
+                    }
+                    else
+                    {
+                        SPV_ID_VIR_CONST(targetId).vecVal.u32Value[i] =
+                            (SPV_ID_VIR_CONST(spv->operands[i]).scalarVal.iValue == 0) ? 0 : 1;
+                    }
+                }
+            }
+            else
+            {
+                gcmASSERT(gcvFALSE);
+            }
+
+            VIR_Shader_AddConstant(virShader, typeID, &SPV_ID_VIR_CONST(targetId), &cstId);
+            addSym = gcvTRUE;
+
+            SPV_ID_VIR_CONST_ID(targetId) = cstId;
+            SPV_ID_VIR_TYPE_ID(targetId) = typeID;
+            SPV_ID_CST_SPV_TYPE(targetId) = spv->resultTypeId;
+
+            /* save the spv id of components */
+            for (i = 0; i < compCount; i++)
+            {
+                SPV_ID_CST_VEC_SPVID(targetId, i) = spv->operands[i];
+            }
         }
     }
     /* If this is a matrix/array/struct constant,
