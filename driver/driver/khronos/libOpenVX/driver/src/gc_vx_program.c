@@ -257,7 +257,7 @@ static gceSTATUS _LoadCompiler(vx_context context)
 
     gcmHEADER();
     {
-        if (context->compileKernel == gcvNULL)
+        if (context->globalData->compileKernel == gcvNULL)
         {
 #if !gcdSTATIC_LINK
             status = gcoOS_LoadLibrary(gcvNULL,
@@ -268,7 +268,7 @@ static gceSTATUS _LoadCompiler(vx_context context)
 #else
                                        "libCLC.so",
 #endif
-                                       &context->libCLC);
+                                       &context->globalData->libCLC);
 
             if (gcmIS_ERROR(status))
             {
@@ -276,28 +276,28 @@ static gceSTATUS _LoadCompiler(vx_context context)
             }
 
              gcmONERROR(gcoOS_GetProcAddress(gcvNULL,
-                                          context->libCLC,
+                                          context->globalData->libCLC,
                                           "gcCompileKernel",
-                                          (gctPOINTER*)&context->compileKernel));
+                                          (gctPOINTER*)&context->globalData->compileKernel));
 
             gcmONERROR(gcoOS_GetProcAddress(gcvNULL,
-                                          context->libCLC,
+                                          context->globalData->libCLC,
                                           "gcLoadKernelCompiler",
-                                          (gctPOINTER*)&context->loadCompiler));
+                                          (gctPOINTER*)&context->globalData->loadCompiler));
 
             gcmONERROR(gcoOS_GetProcAddress(gcvNULL,
-                                          context->libCLC,
+                                          context->globalData->libCLC,
                                           "gcUnloadKernelCompiler",
-                                          (gctPOINTER*)&context->unloadCompiler));
+                                          (gctPOINTER*)&context->globalData->unloadCompiler));
 #else
-            context->unloadCompiler = gcUnloadKernelCompiler;
-            context->loadCompiler = gcLoadKernelCompiler;
-            context->compileKernel = gcCompileKernel;
+            context->globalData->unloadCompiler = gcUnloadKernelCompiler;
+            context->globalData->loadCompiler = gcLoadKernelCompiler;
+            context->globalData->compileKernel = gcCompileKernel;
 #endif
             gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg));
             gcmONERROR(gcoHAL_GetPatchID(gcvNULL, &patchId));
 
-            gcmONERROR((*context->loadCompiler)(&hwCfg, patchId));
+            gcmONERROR((*context->globalData->loadCompiler)(&hwCfg, patchId));
         }
     }
 
@@ -369,7 +369,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_s
          /* change to VIR shader as default path for hw hasHalti2 */
         vscSetDriverVIRPath(gcGetHWCaps()->hwFeatureFlags.hasHalti2);
 #endif
-        status = (*program->base.context->compileKernel) (
+        status = (*program->base.context->globalData->compileKernel) (
                                         gcvNULL,
                                         0,
                                         program->source,

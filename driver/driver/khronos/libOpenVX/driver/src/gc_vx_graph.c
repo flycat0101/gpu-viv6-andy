@@ -4206,7 +4206,6 @@ OnError:
 
 VX_INTERNAL_API vx_status vxoGraph_AllocateContiguousMemory(vx_graph graph)
 {
-    vxnne_execution_layer layer = VX_NULL;
     vxnne_operation_info_s opInfo;
     vx_uint32 i, SumTotalKernelBufferSize;
     vx_uint64 CpuPhysicalAddr, GpuPhysicalAddr;
@@ -4219,7 +4218,6 @@ VX_INTERNAL_API vx_status vxoGraph_AllocateContiguousMemory(vx_graph graph)
         gcmFOOTER_ARG("%d", VX_SUCCESS);
         return VX_SUCCESS;
     }
-    layer = (vxnne_execution_layer)graph->layer;
 
     for(i = 0; i < graph->layer->base.num_operations; i++)
     {
@@ -5394,7 +5392,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_Handle(
             {
                 layer->operations[layer->base.num_operations]->mGpuSync = vx_false_e;
             }
-
+            tpOperation->base.absoluteOperationID = layer->base.num_operations;
             layer->base.num_operations++;
             node->mGpuTpOpCnt++;
         }
@@ -5427,6 +5425,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_Handle(
                 {
                     layer->operations[layer->base.num_operations]->mGpuSync = vx_false_e;
                 }
+                nnOperation->base.absoluteOperationID = layer->base.num_operations;
                 layer->base.num_operations++;
                 node->mGpuNNOpCnt++;
             }
@@ -5450,6 +5449,7 @@ OnError:
     layer->operations[layer->base.num_operations] = operation;
     layer->operations[layer->base.num_operations]->gpuId = 0;
     layer->operations[layer->base.num_operations]->mGpuSync = vx_true_e;
+    operation->absoluteOperationID = layer->base.num_operations;
     layer->base.num_operations++;
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -9591,7 +9591,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyNNTranspose(vx_graph graph)
             {
                 vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
                 vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
-                vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
+                vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY;
                 vx_arch_perf_s archPerfHandle;
                 vx_uint8 transposeInChannel = 0;
 
@@ -9623,8 +9623,6 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyNNTranspose(vx_graph graph)
                 interleaveMode  = archPerfHandle.resultInfo.interleaveMode;
                 kernelX         = opInfo.weightsBiases->weights_sizes[0];
                 kernelY         = opInfo.weightsBiases->weights_sizes[1];
-                inImageZ        = TENSOR_SIZE_INDEX(opInfo.input, 2);
-                inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
 
                 operation->transposeInSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
                                                 outImageTileX,
@@ -10341,7 +10339,7 @@ VX_PRIVATE_API vx_status vxoGraph_Sort(vx_graph graph)
 
             vxoNode_EnableVirtualAccessible(node);
 
-            if (context->callback.enable && node != NULL && node->kernel->name != NULL)
+            if (context->globalData->callback.enable && node != NULL && node->kernel->name != NULL)
             {
                 gcSHADER shader = NULL;
                 gctPOINTER debugInfo = NULL;

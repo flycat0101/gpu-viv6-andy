@@ -1068,7 +1068,7 @@ void reshuffleData(vx_nn_reshuffle_s *src, vx_uint32 strideStepX, vx_uint32 stri
     }
 }
 
-void initUndefinedHardwareConfig(vx_context context)
+void initUndefinedHardwareConfig(vx_global_data globalData)
 {
 #ifdef USE_LIB_NN_ARCH_PERF
     char *useLibNNArchPerf = VX_NULL;
@@ -1094,199 +1094,199 @@ void initUndefinedHardwareConfig(vx_context context)
 #define MAX_SOC_OUT_STANDING_NUMBER            32
 #define NN_WRITE_WITHOUT_USC                   0
 
-    context->nnConfig.unifiedFeature.coefDeltaCordOverFlowZRL8BitFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COEF_DELTA_CORD_OVERFLOW_ZRL_8BIT_FIX) ? 1 : 0;
-    context->nnConfig.unifiedFeature.imageNotPackedInSram = !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX) ? 1 : 0;
-    context->nnConfig.unifiedFeature.nnUSCCacheSize = USC_CACHE_SIZE;
-    context->nnConfig.unifiedFeature.nnCmdSizeInBytes = NNE_COMMAND_SIZE;
-    context->nnConfig.unifiedFeature.tpCmdSizeInBytes = TP_COMMAND_SIZE;
-    context->nnConfig.unifiedFeature.singlePortAccBuffer = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_SINGLEPORT_ACCUMBUFFER) ? 1 : 0;
-    if (context->nnConfig.derivedFeature.nnDPAmount == 0)
+    globalData->nnConfig.unifiedFeature.coefDeltaCordOverFlowZRL8BitFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COEF_DELTA_CORD_OVERFLOW_ZRL_8BIT_FIX) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.imageNotPackedInSram = !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.nnUSCCacheSize = USC_CACHE_SIZE;
+    globalData->nnConfig.unifiedFeature.nnCmdSizeInBytes = NNE_COMMAND_SIZE;
+    globalData->nnConfig.unifiedFeature.tpCmdSizeInBytes = TP_COMMAND_SIZE;
+    globalData->nnConfig.unifiedFeature.singlePortAccBuffer = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_SINGLEPORT_ACCUMBUFFER) ? 1 : 0;
+    if (globalData->nnConfig.derivedFeature.nnDPAmount == 0)
     {
         /*for V8 HW: FEATURE_XYDP0 = 1, set XYDPX=XYDPY=0*/
-        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0))
+        if (vxoGlobalData_IsFeatureAvailable(globalData, VX_NN_FEATURE_XYDP0))
         {
-            context->nnConfig.derivedFeature.nnXYDPX =  0;
-            context->nnConfig.derivedFeature.nnXYDPY =  0;
-            context->nnConfig.derivedFeature.nnDPAmount = 3;
+            globalData->nnConfig.derivedFeature.nnXYDPX =  0;
+            globalData->nnConfig.derivedFeature.nnXYDPY =  0;
+            globalData->nnConfig.derivedFeature.nnDPAmount = 3;
         }
-        else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP9))
+        else if (vxoGlobalData_IsFeatureAvailable(globalData, VX_NN_FEATURE_XYDP9))
         {
-            context->nnConfig.derivedFeature.nnXYDPX =  3;
-            context->nnConfig.derivedFeature.nnXYDPY =  3;
-            context->nnConfig.derivedFeature.nnDPAmount = 9;
+            globalData->nnConfig.derivedFeature.nnXYDPX =  3;
+            globalData->nnConfig.derivedFeature.nnXYDPY =  3;
+            globalData->nnConfig.derivedFeature.nnDPAmount = 9;
         }
-        else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP6))
+        else if (vxoGlobalData_IsFeatureAvailable(globalData, VX_NN_FEATURE_XYDP6))
         {
-            context->nnConfig.derivedFeature.nnXYDPX =  3;
-            context->nnConfig.derivedFeature.nnXYDPY =  2;
-            context->nnConfig.derivedFeature.nnDPAmount = 6;
+            globalData->nnConfig.derivedFeature.nnXYDPX =  3;
+            globalData->nnConfig.derivedFeature.nnXYDPY =  2;
+            globalData->nnConfig.derivedFeature.nnDPAmount = 6;
         }
         else
         {
             if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7))
             {
-                context->nnConfig.derivedFeature.nnDPAmount = 3;
-                context->nnConfig.derivedFeature.nnXYDPX =  3;
-                context->nnConfig.derivedFeature.nnXYDPY =  1;
+                globalData->nnConfig.derivedFeature.nnDPAmount = 3;
+                globalData->nnConfig.derivedFeature.nnXYDPX =  3;
+                globalData->nnConfig.derivedFeature.nnXYDPY =  1;
             }
             else {
-                context->nnConfig.derivedFeature.nnDPAmount = 1;
-                context->nnConfig.derivedFeature.nnXYDPX =  1;
-                context->nnConfig.derivedFeature.nnXYDPY =  1;
+                globalData->nnConfig.derivedFeature.nnDPAmount = 1;
+                globalData->nnConfig.derivedFeature.nnXYDPX =  1;
+                globalData->nnConfig.derivedFeature.nnXYDPY =  1;
             }
         }
 
-        context->nnConfig.derivedFeature.nnZDP =
-            vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) ? 3
-            : vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6) ? 6
+        globalData->nnConfig.derivedFeature.nnZDP =
+            vxoGlobalData_IsFeatureAvailable(globalData, VX_NN_FEATURE_ZDP3) ? 3
+            : vxoGlobalData_IsFeatureAvailable(globalData, VX_NN_FEATURE_ZDP6) ? 6
             : 1;
     }
 
-    context->nnConfig.unifiedFeature.smallBatchEnable = (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_SMALLBATCH) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_SMALLBATCH)) ? 1 : 0;
-    context->nnConfig.unifiedFeature.convOutFifoDepthFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_CONVOUT_FIFO_DEPTH_FIX) ? 1 : 0;
-    context->nnConfig.unifiedFeature.vipCoefDecodePerf = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_COEF_DECOMPRESS_PERF2X) ? 2 : 1;
-    context->nnConfig.unifiedFeature.vipCachedReadFromSram = CACHED_DATA_READ_FROM_SRAM;
-    context->nnConfig.unifiedFeature.vipImagePartialCache = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATUER_IMAGE_PARTIAL_CACHE) ? 1 : 0;
-    context->nnConfig.unifiedFeature.fullCacheKernelHeadFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FULLCACHE_KERNELHEAD_FIX) ? 1 : 0;
-    context->nnConfig.unifiedFeature.conv1x1HalfPerformance = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_CONV1x1_PERF_FIX) ? 0 : 1;
-    context->nnConfig.unifiedFeature.cacheLineModeDisabled = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_CACHELINE_MODE_PERF_FIX) ? 0 : 1;
-    context->nnConfig.unifiedFeature.per3DTileBubbleFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER3DTILE_BUBBLE_FIX) ? 1 : 0;
-    context->nnConfig.unifiedFeature.kernelPerCoreLTOneThirdCoefFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_KERNEL_PER_CORE_LESS_THAN_THIRD_COEF_BUFF_DEPTH_FIX) ? 1 : 0;
-    context->nnConfig.unifiedFeature.lowEfficiencyOfIDWriteImgBufFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_LOW_EFFICIENCY_OF_ID_WRITE_IMGBUF_FIX) ? 1 : 0;
-    context->nnConfig.unifiedFeature.tpReOrderFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_REORDER_FIX) ? 1 : 0;
-    context->nnConfig.unifiedFeature.zdp3NoCompressFix = ((vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) || vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6))
+    globalData->nnConfig.unifiedFeature.smallBatchEnable = (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_SMALLBATCH) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_SMALLBATCH)) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.convOutFifoDepthFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_CONVOUT_FIFO_DEPTH_FIX) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.vipCoefDecodePerf = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_COEF_DECOMPRESS_PERF2X) ? 2 : 1;
+    globalData->nnConfig.unifiedFeature.vipCachedReadFromSram = CACHED_DATA_READ_FROM_SRAM;
+    globalData->nnConfig.unifiedFeature.vipImagePartialCache = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATUER_IMAGE_PARTIAL_CACHE) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.fullCacheKernelHeadFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FULLCACHE_KERNELHEAD_FIX) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.conv1x1HalfPerformance = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_CONV1x1_PERF_FIX) ? 0 : 1;
+    globalData->nnConfig.unifiedFeature.cacheLineModeDisabled = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_CACHELINE_MODE_PERF_FIX) ? 0 : 1;
+    globalData->nnConfig.unifiedFeature.per3DTileBubbleFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER3DTILE_BUBBLE_FIX) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.kernelPerCoreLTOneThirdCoefFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_KERNEL_PER_CORE_LESS_THAN_THIRD_COEF_BUFF_DEPTH_FIX) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.lowEfficiencyOfIDWriteImgBufFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_LOW_EFFICIENCY_OF_ID_WRITE_IMGBUF_FIX) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.tpReOrderFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_REORDER_FIX) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.zdp3NoCompressFix = ((vxoGlobalData_IsFeatureAvailable(globalData, VX_NN_FEATURE_ZDP3) || vxoGlobalData_IsFeatureAvailable(globalData, VX_NN_FEATURE_ZDP6))
                                                           && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ZDP3_NO_COMPRESS_FIX)) ? 1 : 0;
-    context->nnConfig.unifiedFeature.asyncCopyPerfFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ASYNC_COPY_PERF_FIX) ? 1 : 0;
-    context->nnConfig.unifiedFeature.zxdp3KernelReadConflictFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ZXDP3_KERNEL_READ_CONFLICT_FIX) ? 1 : 0;
-    context->nnConfig.unifiedFeature.xyOffsetLimitationFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_XY_OFFSET_LIMITATION_FIX) ? 1 : 0;
-    context->nnConfig.unifiedFeature.accurateTileBW = ACCURATE_TILE_BW;
-    context->nnConfig.unifiedFeature.lanesPerConv = LANES_PER_CORE;
-    context->nnConfig.unifiedFeature.maxTileSize = MAX_TILE_XSIZE;
-    context->nnConfig.unifiedFeature.axiSramSlowedDownByAddr = AXI_SRAM_SLOWED_DOWN_BY_DDR;
-    context->nnConfig.unifiedFeature.slowNNReqArbitrationFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_REQ_SLOWARBITRATION_FIX) ? 1 : 0;
-    context->nnConfig.unifiedFeature.diffConditionForCachelineModePreFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DR_JD_DIFF_CONDITION_FOR_CACHELINE_MODE_PRE_FIX) ? 1 : 0;
-    context->nnConfig.customizedFeature.vipSWTiling = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE1) ? 1 : 0;
-    context->nnConfig.unifiedFeature.axiSramOnlySWTiling = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE3) ? 0 :
-                                                           vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE1) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.asyncCopyPerfFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ASYNC_COPY_PERF_FIX) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.zxdp3KernelReadConflictFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ZXDP3_KERNEL_READ_CONFLICT_FIX) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.xyOffsetLimitationFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_XY_OFFSET_LIMITATION_FIX) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.accurateTileBW = ACCURATE_TILE_BW;
+    globalData->nnConfig.unifiedFeature.lanesPerConv = LANES_PER_CORE;
+    globalData->nnConfig.unifiedFeature.maxTileSize = MAX_TILE_XSIZE;
+    globalData->nnConfig.unifiedFeature.axiSramSlowedDownByAddr = AXI_SRAM_SLOWED_DOWN_BY_DDR;
+    globalData->nnConfig.unifiedFeature.slowNNReqArbitrationFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_REQ_SLOWARBITRATION_FIX) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.diffConditionForCachelineModePreFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DR_JD_DIFF_CONDITION_FOR_CACHELINE_MODE_PRE_FIX) ? 1 : 0;
+    globalData->nnConfig.customizedFeature.vipSWTiling = vxoGlobalData_IsFeatureAvailable(globalData, VX_NN_FEATURE_SWTILING_PHASE1) ? 1 : 0;
+    globalData->nnConfig.unifiedFeature.axiSramOnlySWTiling = vxoGlobalData_IsFeatureAvailable(globalData, VX_NN_FEATURE_SWTILING_PHASE3) ? 0 :
+                                                           vxoGlobalData_IsFeatureAvailable(globalData, VX_NN_FEATURE_SWTILING_PHASE1) ? 1 : 0;
 
-    if (context->nnConfig.customizedFeature.ddrReadBWLimit == 0)
+    if (globalData->nnConfig.customizedFeature.ddrReadBWLimit == 0)
     {
-        if (context->options.ddrReadBWLimit != 0)
-            context->nnConfig.customizedFeature.ddrReadBWLimit = context->options.ddrReadBWLimit;
+        if (globalData->options.ddrReadBWLimit != 0)
+            globalData->nnConfig.customizedFeature.ddrReadBWLimit = globalData->options.ddrReadBWLimit;
         else
-            context->nnConfig.customizedFeature.ddrReadBWLimit = DDR_READ_BANDWIDTH_LIMIT;
+            globalData->nnConfig.customizedFeature.ddrReadBWLimit = DDR_READ_BANDWIDTH_LIMIT;
     }
-    if (context->nnConfig.customizedFeature.ddrWriteBWLimit == 0)
+    if (globalData->nnConfig.customizedFeature.ddrWriteBWLimit == 0)
     {
-        if (context->options.ddrWriteBWLimit != 0)
-            context->nnConfig.customizedFeature.ddrWriteBWLimit = context->options.ddrWriteBWLimit;
+        if (globalData->options.ddrWriteBWLimit != 0)
+            globalData->nnConfig.customizedFeature.ddrWriteBWLimit = globalData->options.ddrWriteBWLimit;
         else
-            context->nnConfig.customizedFeature.ddrWriteBWLimit = DDR_WRITE_BANDWIDTH_LIMIT;
+            globalData->nnConfig.customizedFeature.ddrWriteBWLimit = DDR_WRITE_BANDWIDTH_LIMIT;
     }
-    if (context->nnConfig.customizedFeature.ddrTotalBWLimit == 0)
+    if (globalData->nnConfig.customizedFeature.ddrTotalBWLimit == 0)
     {
-        if (context->options.ddrTotalBWLimit != 0)
-            context->nnConfig.customizedFeature.ddrTotalBWLimit = context->options.ddrTotalBWLimit;
+        if (globalData->options.ddrTotalBWLimit != 0)
+            globalData->nnConfig.customizedFeature.ddrTotalBWLimit = globalData->options.ddrTotalBWLimit;
         else
-            context->nnConfig.customizedFeature.ddrTotalBWLimit = DDR_TOTAL_BANDWIDTH_LIMIT;
+            globalData->nnConfig.customizedFeature.ddrTotalBWLimit = DDR_TOTAL_BANDWIDTH_LIMIT;
     }
-    if (context->nnConfig.customizedFeature.axiSramReadBWLimit == 0)
+    if (globalData->nnConfig.customizedFeature.axiSramReadBWLimit == 0)
     {
-        if (context->options.axiSramReadBWLimit != 0)
-            context->nnConfig.customizedFeature.axiSramReadBWLimit = context->options.axiSramReadBWLimit;
+        if (globalData->options.axiSramReadBWLimit != 0)
+            globalData->nnConfig.customizedFeature.axiSramReadBWLimit = globalData->options.axiSramReadBWLimit;
         else
-            context->nnConfig.customizedFeature.axiSramReadBWLimit = AXI_SRAM_READ_BANDWIDTH_LIMIT;
+            globalData->nnConfig.customizedFeature.axiSramReadBWLimit = AXI_SRAM_READ_BANDWIDTH_LIMIT;
     }
-    if (context->nnConfig.customizedFeature.axiSramWriteBWLimit == 0)
+    if (globalData->nnConfig.customizedFeature.axiSramWriteBWLimit == 0)
     {
-        if (context->options.axiSramWriteBWLimit != 0)
-            context->nnConfig.customizedFeature.axiSramWriteBWLimit = context->options.axiSramWriteBWLimit;
+        if (globalData->options.axiSramWriteBWLimit != 0)
+            globalData->nnConfig.customizedFeature.axiSramWriteBWLimit = globalData->options.axiSramWriteBWLimit;
         else
-            context->nnConfig.customizedFeature.axiSramWriteBWLimit = AXI_SRAM_WRITE_BANDWIDTH_LIMIT;
+            globalData->nnConfig.customizedFeature.axiSramWriteBWLimit = AXI_SRAM_WRITE_BANDWIDTH_LIMIT;
     }
-    if (context->nnConfig.customizedFeature.axiSramTotalBWLimit == 0)
+    if (globalData->nnConfig.customizedFeature.axiSramTotalBWLimit == 0)
     {
-        if (context->options.axiSramTotalBWLimit != 0)
-            context->nnConfig.customizedFeature.axiSramTotalBWLimit = context->options.axiSramTotalBWLimit;
+        if (globalData->options.axiSramTotalBWLimit != 0)
+            globalData->nnConfig.customizedFeature.axiSramTotalBWLimit = globalData->options.axiSramTotalBWLimit;
         else
-            context->nnConfig.customizedFeature.axiSramTotalBWLimit = AXI_SRAM_TOTAL_BANDWIDTH_LIMIT;
+            globalData->nnConfig.customizedFeature.axiSramTotalBWLimit = AXI_SRAM_TOTAL_BANDWIDTH_LIMIT;
     }
-    if (context->nnConfig.customizedFeature.axiBusReadBWLimit == 0)
+    if (globalData->nnConfig.customizedFeature.axiBusReadBWLimit == 0)
     {
-        if (context->options.axiBusReadBWLimit != 0)
-            context->nnConfig.customizedFeature.axiBusReadBWLimit = context->options.axiBusReadBWLimit;
+        if (globalData->options.axiBusReadBWLimit != 0)
+            globalData->nnConfig.customizedFeature.axiBusReadBWLimit = globalData->options.axiBusReadBWLimit;
         else
-            context->nnConfig.customizedFeature.axiBusReadBWLimit = AXI_BUS_READ_BANDWIDTH_LIMIT;
+            globalData->nnConfig.customizedFeature.axiBusReadBWLimit = AXI_BUS_READ_BANDWIDTH_LIMIT;
     }
-    if (context->nnConfig.customizedFeature.axiBusWriteBWLimit == 0)
+    if (globalData->nnConfig.customizedFeature.axiBusWriteBWLimit == 0)
     {
-        if (context->options.axiBusWriteBWLimit != 0)
-            context->nnConfig.customizedFeature.axiBusWriteBWLimit = context->options.axiBusWriteBWLimit;
+        if (globalData->options.axiBusWriteBWLimit != 0)
+            globalData->nnConfig.customizedFeature.axiBusWriteBWLimit = globalData->options.axiBusWriteBWLimit;
         else
-            context->nnConfig.customizedFeature.axiBusWriteBWLimit = AXI_BUS_WRITE_BANDWIDTH_LIMIT;
+            globalData->nnConfig.customizedFeature.axiBusWriteBWLimit = AXI_BUS_WRITE_BANDWIDTH_LIMIT;
     }
-    if (context->nnConfig.customizedFeature.axiBusTotalBWLimit == 0)
+    if (globalData->nnConfig.customizedFeature.axiBusTotalBWLimit == 0)
     {
-        if (context->options.axiBusTotalBWLimit != 0)
-            context->nnConfig.customizedFeature.axiBusTotalBWLimit = context->options.axiBusTotalBWLimit;
+        if (globalData->options.axiBusTotalBWLimit != 0)
+            globalData->nnConfig.customizedFeature.axiBusTotalBWLimit = globalData->options.axiBusTotalBWLimit;
         else
-            context->nnConfig.customizedFeature.axiBusTotalBWLimit = AXI_BUS_TOTAL_BANDWIDTH_LIMIT;
-    }
-
-    if (context->options.vipSRAMSize != VX_INVALID_VALUE)
-        context->nnConfig.customizedFeature.vipSRAMSize = context->options.vipSRAMSize;
-    if (context->options.axiSRAMSize != VX_INVALID_VALUE)
-        context->nnConfig.customizedFeature.axiSRAMSize = context->options.axiSRAMSize;
-
-    if (context->nnConfig.customizedFeature.ddrLatency == 0)
-    {
-        if (context->options.ddrLatency != 0)
-            context->nnConfig.customizedFeature.ddrLatency = context->options.ddrLatency;
-        else
-            context->nnConfig.customizedFeature.ddrLatency = DDR_LATENCY;
+            globalData->nnConfig.customizedFeature.axiBusTotalBWLimit = AXI_BUS_TOTAL_BANDWIDTH_LIMIT;
     }
 
-    if (context->nnConfig.customizedFeature.freqInMHZ == 0)
+    if (globalData->options.vipSRAMSize != VX_INVALID_VALUE)
+        globalData->nnConfig.customizedFeature.vipSRAMSize = globalData->options.vipSRAMSize;
+    if (globalData->options.axiSRAMSize != VX_INVALID_VALUE)
+        globalData->nnConfig.customizedFeature.axiSRAMSize = globalData->options.axiSRAMSize;
+
+    if (globalData->nnConfig.customizedFeature.ddrLatency == 0)
     {
-        if (context->options.freqInMHZ != 0)
-            context->nnConfig.customizedFeature.freqInMHZ = context->options.freqInMHZ;
+        if (globalData->options.ddrLatency != 0)
+            globalData->nnConfig.customizedFeature.ddrLatency = globalData->options.ddrLatency;
         else
-            context->nnConfig.customizedFeature.freqInMHZ = FREQ_IN_MHZ;
+            globalData->nnConfig.customizedFeature.ddrLatency = DDR_LATENCY;
     }
 
-    if (context->nnConfig.customizedFeature.maxSocOTNumber == 0)
+    if (globalData->nnConfig.customizedFeature.freqInMHZ == 0)
     {
-        if (context->options.maxSocOTNumber != 0)
-            context->nnConfig.customizedFeature.maxSocOTNumber = context->options.maxSocOTNumber;
+        if (globalData->options.freqInMHZ != 0)
+            globalData->nnConfig.customizedFeature.freqInMHZ = globalData->options.freqInMHZ;
         else
-            context->nnConfig.customizedFeature.maxSocOTNumber = MAX_SOC_OUT_STANDING_NUMBER;
+            globalData->nnConfig.customizedFeature.freqInMHZ = FREQ_IN_MHZ;
+    }
+
+    if (globalData->nnConfig.customizedFeature.maxSocOTNumber == 0)
+    {
+        if (globalData->options.maxSocOTNumber != 0)
+            globalData->nnConfig.customizedFeature.maxSocOTNumber = globalData->options.maxSocOTNumber;
+        else
+            globalData->nnConfig.customizedFeature.maxSocOTNumber = MAX_SOC_OUT_STANDING_NUMBER;
     }
 
 
-    if (context->nnConfig.customizedFeature.axiClockFreqInMHZ == 0)
+    if (globalData->nnConfig.customizedFeature.axiClockFreqInMHZ == 0)
     {
-        if (context->options.axiClockFreqInMHZ != 0)
-            context->nnConfig.customizedFeature.axiClockFreqInMHZ = context->options.axiClockFreqInMHZ;
+        if (globalData->options.axiClockFreqInMHZ != 0)
+            globalData->nnConfig.customizedFeature.axiClockFreqInMHZ = globalData->options.axiClockFreqInMHZ;
         else
-            context->nnConfig.customizedFeature.axiClockFreqInMHZ = AXI_CLK_FREQ_IN_MHZ;
+            globalData->nnConfig.customizedFeature.axiClockFreqInMHZ = AXI_CLK_FREQ_IN_MHZ;
     }
 
-    context->nnConfig.customizedFeature.nnWriteWithoutUSC = NN_WRITE_WITHOUT_USC;
-    context->nnConfig.customizedFeature.depthWiseSupport = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_NN_DEPTHWISE_SUPPORT) ? 1 : 0;;
-    context->nnConfig.customizedFeature.vipVectorPrune = context->options.enableVectorPrune;
+    globalData->nnConfig.customizedFeature.nnWriteWithoutUSC = NN_WRITE_WITHOUT_USC;
+    globalData->nnConfig.customizedFeature.depthWiseSupport = vxoGlobalData_IsFeatureAvailable(globalData, VX_NN_FEATURE_NN_DEPTHWISE_SUPPORT) ? 1 : 0;;
+    globalData->nnConfig.customizedFeature.vipVectorPrune = globalData->options.enableVectorPrune;
 
 
     {
-        vx_float32 maxOutstandingCycle = (vx_float32)context->nnConfig.fixedFeature.maxOTNumber * 4;
-        context->nnConfig.derivedFeature.internalLatency = (vx_float32)(20.0 + (11.0 + 6.0) * context->nnConfig.customizedFeature.freqInMHZ / context->nnConfig.customizedFeature.axiClockFreqInMHZ);
-        context->nnConfig.derivedFeature.totalLatency = 1.0f * (vx_uint32)(context->nnConfig.customizedFeature.ddrLatency + context->nnConfig.derivedFeature.internalLatency + 0.5f);
-        context->nnConfig.derivedFeature.ddrReadBWInBytePerCycle = context->nnConfig.customizedFeature.ddrReadBWLimit;
-        context->nnConfig.derivedFeature.ddrWriteBWInBytePerCycle = context->nnConfig.customizedFeature.ddrWriteBWLimit;
-        if (context->nnConfig.derivedFeature.totalLatency > maxOutstandingCycle)
+        vx_float32 maxOutstandingCycle = (vx_float32)globalData->nnConfig.fixedFeature.maxOTNumber * 4;
+        globalData->nnConfig.derivedFeature.internalLatency = (vx_float32)(20.0 + (11.0 + 6.0) * globalData->nnConfig.customizedFeature.freqInMHZ / globalData->nnConfig.customizedFeature.axiClockFreqInMHZ);
+        globalData->nnConfig.derivedFeature.totalLatency = 1.0f * (vx_uint32)(globalData->nnConfig.customizedFeature.ddrLatency + globalData->nnConfig.derivedFeature.internalLatency + 0.5f);
+        globalData->nnConfig.derivedFeature.ddrReadBWInBytePerCycle = globalData->nnConfig.customizedFeature.ddrReadBWLimit;
+        globalData->nnConfig.derivedFeature.ddrWriteBWInBytePerCycle = globalData->nnConfig.customizedFeature.ddrWriteBWLimit;
+        if (globalData->nnConfig.derivedFeature.totalLatency > maxOutstandingCycle)
         {
-            vx_float32 ddrBWLimitedByLatency = (16 * maxOutstandingCycle) / context->nnConfig.derivedFeature.totalLatency;
-            context->nnConfig.derivedFeature.ddrReadBWInBytePerCycle = gcmMIN(context->nnConfig.derivedFeature.ddrReadBWInBytePerCycle, ddrBWLimitedByLatency);
-            context->nnConfig.derivedFeature.ddrWriteBWInBytePerCycle = gcmMIN(context->nnConfig.derivedFeature.ddrWriteBWInBytePerCycle, ddrBWLimitedByLatency);
+            vx_float32 ddrBWLimitedByLatency = (16 * maxOutstandingCycle) / globalData->nnConfig.derivedFeature.totalLatency;
+            globalData->nnConfig.derivedFeature.ddrReadBWInBytePerCycle = gcmMIN(globalData->nnConfig.derivedFeature.ddrReadBWInBytePerCycle, ddrBWLimitedByLatency);
+            globalData->nnConfig.derivedFeature.ddrWriteBWInBytePerCycle = gcmMIN(globalData->nnConfig.derivedFeature.ddrWriteBWInBytePerCycle, ddrBWLimitedByLatency);
         }
     }
 
@@ -1294,12 +1294,12 @@ void initUndefinedHardwareConfig(vx_context context)
     if ((gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "USE_LIB_NN_ARCH_PERF", &useLibNNArchPerf)) && useLibNNArchPerf && atoi(useLibNNArchPerf)))
     {
         BWL_T bwl = {
-            /*ddr bw limit*/context->nnConfig.customizedFeature.ddrReadBWLimit, context->nnConfig.customizedFeature.ddrWriteBWLimit, context->nnConfig.customizedFeature.ddrTotalBWLimit,
-            /*axi bw limit*/context->nnConfig.customizedFeature.axiSramReadBWLimit,context->nnConfig.customizedFeature.axiSramWriteBWLimit,context->nnConfig.customizedFeature.axiSramTotalBWLimit,
-            /*axi-bus bw limit*/context->nnConfig.customizedFeature.axiBusReadBWLimit,context->nnConfig.customizedFeature.axiBusWriteBWLimit,context->nnConfig.customizedFeature.axiBusTotalBWLimit,
-            /*internal write bw limite*/ (vx_float32)context->nnConfig.fixedFeature.nnLanesPerOutCycle,
-            /*ddr latency*/context->nnConfig.customizedFeature.ddrLatency,
-            /*total latency*/context->nnConfig.derivedFeature.totalLatency
+            /*ddr bw limit*/globalData->nnConfig.customizedFeature.ddrReadBWLimit, globalData->nnConfig.customizedFeature.ddrWriteBWLimit, globalData->nnConfig.customizedFeature.ddrTotalBWLimit,
+            /*axi bw limit*/globalData->nnConfig.customizedFeature.axiSramReadBWLimit,globalData->nnConfig.customizedFeature.axiSramWriteBWLimit,globalData->nnConfig.customizedFeature.axiSramTotalBWLimit,
+            /*axi-bus bw limit*/globalData->nnConfig.customizedFeature.axiBusReadBWLimit,globalData->nnConfig.customizedFeature.axiBusWriteBWLimit,globalData->nnConfig.customizedFeature.axiBusTotalBWLimit,
+            /*internal write bw limite*/ (vx_float32)globalData->nnConfig.fixedFeature.nnLanesPerOutCycle,
+            /*ddr latency*/globalData->nnConfig.customizedFeature.ddrLatency,
+            /*total latency*/globalData->nnConfig.derivedFeature.totalLatency
         };
         APM_IN_PARAM_T inParam;
         gcsHAL_CHIPIDENTITY chipIdentity;
@@ -1311,7 +1311,7 @@ void initUndefinedHardwareConfig(vx_context context)
         inParam.chipDef.CustomerID = chipIdentity.customerID;
 
         memcpy(&inParam.bwl, &bwl, sizeof(bwl));
-        context->apm = CreateAPModel(inParam);
+        globalData->apm = CreateAPModel(inParam);
     }
 #endif
 }

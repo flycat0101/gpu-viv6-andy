@@ -28949,7 +28949,7 @@ vxnne_shader_executable vxnneGetUserShaderExecutable(
     for (i = 1; i <= VXNNE_KERNEL_DYNAMIC_COUNT; i++)
     {
         kernelEnum = VXNNE_KERNEL_FIXED_COUNT + i;
-        kernelWrap = &context->kernels[kernelEnum];
+        kernelWrap = &context->globalData->kernels[kernelEnum];
         if (!kernelWrap->kernelEnum) break;
     }
 

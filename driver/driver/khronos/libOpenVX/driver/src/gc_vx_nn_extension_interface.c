@@ -1936,9 +1936,9 @@ error:
 
 vxnne_kernel_shaders vxnneGetKernelShadersByEnum(vx_context context, vx_enum kernelEnum)
 {
-    if (context->kernels[kernelEnum].kernelShader)
+    if (context->globalData->kernels[kernelEnum].kernelShader)
     {
-        return &context->kernels[kernelEnum];
+        return &context->globalData->kernels[kernelEnum];
     }
     else
     {
@@ -1948,7 +1948,7 @@ vxnne_kernel_shaders vxnneGetKernelShadersByEnum(vx_context context, vx_enum ker
 
 vxnne_kernel_shaders vxnneAddKernelShadersInProgram(vx_context context, vx_char* kernelName, vx_program program, vx_uint32  paramNum, vx_enum kernelEnum)
 {
-    vxnne_kernel_shaders kernel = &context->kernels[kernelEnum];
+    vxnne_kernel_shaders kernel = &context->globalData->kernels[kernelEnum];
 
     /* if exists then failed to add */
     if (kernel->kernelShader) return VX_NULL;

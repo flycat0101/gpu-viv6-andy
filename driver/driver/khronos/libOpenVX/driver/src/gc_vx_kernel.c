@@ -2845,7 +2845,7 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
     /* Assume all dead code is removed by optimizer. */
     flags = gcvSHADER_RESOURCE_USAGE /*| gcvSHADER_DEAD_CODE */ | gcvSHADER_OPTIMIZER;
 #if (!VSC_LITE_BUILD)
-    gcSetCLCompiler(program->base.context->compileKernel);
+    gcSetCLCompiler(program->base.context->globalData->compileKernel);
 
     if (constBorder)
     {

@@ -2767,7 +2767,7 @@ vx_status calculateArchPerf(
                                         outputDataSize, imageCompressRatio, uscCacheSize, poolingStride, outImageStride, outImageSlice, isNNWriteWithoutUSC);
 
 #ifdef USE_LIB_NN_ARCH_PERF
-                                    if (context->apm)
+                                    if (context->globalData->apm)
                                     {
                                         APM_IN_PERF_PARAMS inPerfParams = {0};
                                         APM_COMM_INFO_T   *cmdInfo = &inPerfParams.cmdInfo;
@@ -2814,7 +2814,7 @@ vx_status calculateArchPerf(
                                         compInfo->imageCompression = imageCompressRatio;
                                         compInfo->imageNonZeroRatio = imageNonZeroRatio;
 
-                                        newCycleCount = APMCalcNNCycleCountBandWidth(context->apm, inPerfParams, &outBandWidth);
+                                        newCycleCount = APMCalcNNCycleCountBandWidth(context->globalData->apm, inPerfParams, &outBandWidth);
                                         ddrKernelReadBandWidth = outBandWidth.ddr_kernel_read_bandwidth;
                                         ddrInImageReadBandWidth = outBandWidth.ddr_in_image_read_bandwidth;
                                         ddrRDBandWidth = outBandWidth.ddr_read_bandwidth;
@@ -2933,7 +2933,7 @@ vx_status calculateArchPerf(
                 else
                 {
 #ifdef USE_LIB_NN_ARCH_PERF
-                    if (context->apm)
+                    if (context->globalData->apm)
                     {
                         APM_IN_PERF_PARAMS inPerfParams = {0};
                         APM_COMM_INFO_T   *cmdInfo = &inPerfParams.cmdInfo;
@@ -2980,7 +2980,7 @@ vx_status calculateArchPerf(
                         compInfo->imageCompression = imageCompressRatio;
                         compInfo->imageNonZeroRatio = imageNonZeroRatio;
 
-                        perf->resultInfo.perfCycleCount = APMCalcNNCycleCountBandWidth(context->apm, inPerfParams, &outBandWidth);
+                        perf->resultInfo.perfCycleCount = APMCalcNNCycleCountBandWidth(context->globalData->apm, inPerfParams, &outBandWidth);
                         ddrKernelReadBandWidth = outBandWidth.ddr_kernel_read_bandwidth;
                         ddrInImageReadBandWidth = outBandWidth.ddr_in_image_read_bandwidth;
                         ddrRDBandWidth = outBandWidth.ddr_read_bandwidth;
@@ -3081,7 +3081,7 @@ vx_status calculateArchPerf(
                 perf->resultInfo.kernelsPerCore     = 0;
 
 #ifdef USE_LIB_NN_ARCH_PERF
-                if (context->apm)
+                if (context->globalData->apm)
                 {
                     APM_IN_PERF_PARAMS inPerfParams = {0};
                     APM_COMM_INFO_T   *cmdInfo   = &inPerfParams.cmdInfo;
@@ -3120,7 +3120,7 @@ vx_status calculateArchPerf(
                     compInfo->imageCompression = imageCompressRatio;
                     compInfo->imageNonZeroRatio = imageNonZeroRatio;
 
-                    newCycleCount = APMCalcTPCycleCountCore(context->apm, inPerfParams, &outBandWidth);
+                    newCycleCount = APMCalcTPCycleCountCore(context->globalData->apm, inPerfParams, &outBandWidth);
                     ddrKernelReadBandWidth = outBandWidth.ddr_kernel_read_bandwidth;
                     ddrInImageReadBandWidth = outBandWidth.ddr_in_image_read_bandwidth;
                     ddrRDBandWidth = outBandWidth.ddr_read_bandwidth;
@@ -3175,7 +3175,7 @@ vx_status calculateArchPerf(
                                   vip7_16bit,
                                   interleave8);
 #ifdef USE_LIB_NN_ARCH_PERF
-            if (context->apm)
+            if (context->globalData->apm)
             {
                 APM_IN_PERF_PARAMS inPerfParams = {0};
                 APM_COMM_INFO_T   *cmdInfo = &inPerfParams.cmdInfo;
@@ -3224,7 +3224,7 @@ vx_status calculateArchPerf(
                 compInfo->imageCompression = imageCompressRatio;
                 compInfo->imageNonZeroRatio = imageNonZeroRatio;
 
-                perf->swTilingInfo.perfNonFirstCycleCount = APMCalcNNCycleCountBandWidth(context->apm, inPerfParams, &outBandWidth);
+                perf->swTilingInfo.perfNonFirstCycleCount = APMCalcNNCycleCountBandWidth(context->globalData->apm, inPerfParams, &outBandWidth);
                 ddrKernelReadBandWidth = outBandWidth.ddr_kernel_read_bandwidth;
                 ddrInImageReadBandWidth = outBandWidth.ddr_in_image_read_bandwidth;
                 ddrRDBandWidth = outBandWidth.ddr_read_bandwidth;

@@ -3051,6 +3051,7 @@ typedef struct _vx_drv_option
     gctUINT enableForce64BitsBiasNN;
     gctUINT enableAllocateContigousMemForKernel;
     gctUINT enableNNTranspose;
+    gctUINT disableTPNNEvis;
 }
 vx_drv_option;
 

@@ -170,7 +170,7 @@ vx_float32 vxnneGetDataExt(vx_type_e format, vx_enum quant_format, vx_int32 inde
 vx_status vxnneSaveDataExt(vx_type_e format, vx_enum quant_format, vx_int32 index, vx_float64 data, vx_ptr dst_data, vx_int8 fixedPointPos, vx_int32 zeroPoint, vx_float32 scale, vx_enum roundMode);
 vx_int32 vxoNNExternsionConvlutionRound(vx_float32 in, vx_enum round_type);
 void reshuffleData(vx_nn_reshuffle_s *src, vx_uint32 strideStepX, vx_uint32 strideStepY, vx_nn_reshuffle_s *dst);
-void initUndefinedHardwareConfig(vx_context context);
+void initUndefinedHardwareConfig(vx_global_data globalData);
 vx_bool WeightBiasBufferAllocate(vx_context context, vx_weights_biases_parameter weight_bias, vx_size size);
 void writeBits(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 data, vx_uint32 dataBits);
 void replaceBits(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 data, vx_uint32 dataBits);

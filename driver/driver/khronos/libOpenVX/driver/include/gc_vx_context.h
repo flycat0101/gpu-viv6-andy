@@ -77,6 +77,7 @@ VX_INTERNAL_API vx_bool vxoContext_FindMemoryMap(
 VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id map_id);
 
 VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_feature_e feature);
+VX_INTERNAL_API vx_bool vxoGlobalData_IsFeatureAvailable(vx_global_data globalData, vx_nn_feature_e feature);
 
 EXTERN_C_END
 

@@ -1261,10 +1261,38 @@ typedef struct _vx_reference_item
     struct _vx_reference_item *             next;
 } vx_reference_item_s, *vx_reference_item;
 
+typedef struct _vx_global_data_s
+{
+    vx_uint32                               refGlobalDataCount;
+
+    vxnne_kernel_shaders_s                  kernels[VXNNE_KERNEL_FIXED_COUNT + VXNNE_KERNEL_DYNAMIC_COUNT + 1];
+
+    /* gcCompileKernel */
+    gctCLCompiler                           compileKernel;
+    gctHANDLE                               libCLC;
+    gceSTATUS                               (*loadCompiler)(IN gcsHWCaps *HWCaps, IN gcePATCH_ID PatchId);
+    gceSTATUS                               (*unloadCompiler)(void);
+
+#ifdef USE_LIB_NN_ARCH_PERF
+    APMHandle                               apm;
+#endif
+    vxnne_sram_s                            axiSRAM[MAX_GPU_CORE_COUNT];
+    vxnne_sram_s                            vipSRAM;
+#if gcdUSE_VXC_BINARY
+    void *                                  libNNVXCKernelHandle;
+    void *                                  libOvx12VXCBinaryHandle;
+    void *                                  libNNGPUKernelHandle;
+#endif
+
+
+    vx_drv_option                           options;
+    vx_nn_config                            nnConfig;
+} vx_global_data_s, *vx_global_data;
+
 typedef struct _vx_context
 {
     vx_reference_s                          base;
-
+    vx_global_data                          globalData;
     vx_uint32                               refTotalCount;
     vx_uint32                               refFreeCount;
     vx_reference_item                       refListHead;
@@ -1327,42 +1355,15 @@ typedef struct _vx_context
 
     vx_uint32                               memoryCount;
 
-    /* vx_nn_config*                           config; */
-    vx_nn_config                            nnConfig;
-
     /* hw chip info */
     vx_hw_chip_info                         hwChipInfo;
-
     vx_uint32                               cnnAvailableEventID;
 
-    vxnne_kernel_shaders_s                  kernels[VXNNE_KERNEL_FIXED_COUNT + VXNNE_KERNEL_DYNAMIC_COUNT + 1];
-
-    /* gcCompileKernel */
-    gctCLCompiler                           compileKernel;
-    gctHANDLE                               libCLC;
-    gceSTATUS                               (*loadCompiler)(IN gcsHWCaps *HWCaps, IN gcePATCH_ID PatchId);
-    gceSTATUS                               (*unloadCompiler)(void);
-
-    vx_drv_option                           options;
-
-
-#ifdef USE_LIB_NN_ARCH_PERF
-    APMHandle                               apm;
-#endif
-
     vx_uint32                               allTensorNum;
-
-    vxnne_sram_s                            axiSRAM[MAX_GPU_CORE_COUNT];
-    vxnne_sram_s                            vipSRAM;
 
     vx_char                                 productName[32];
     vx_uint32                               pid;
     vx_uint32                               graphCount;
-#if gcdUSE_VXC_BINARY
-    void *                                  libNNVXCKernelHandle;
-    void *                                  libOvx12VXCBinaryHandle;
-    void *                                  libNNGPUKernelHandle;
-#endif
     vx_ptr_ptr                              binaryGraphInitBuffer;
     vx_uint32_ptr                           binaryGraphInitSize;
     vx_uint32                               SumTotalKernelBufferSize;
@@ -1370,6 +1371,14 @@ typedef struct _vx_context
     vx_uint8_ptr*                           Logical;
     vx_uint32_ptr                           Physical;
     gcsSURF_NODE_PTR*                       Node;
+
+    /*COPY_FROM_GLOBAL_DATA*/
+    vxnne_sram_s                            axiSRAM[MAX_GPU_CORE_COUNT];
+    vxnne_sram_s                            vipSRAM;
+    vx_drv_option                           options;
+    vx_nn_config                            nnConfig;
+    /*end COPY_FROM_GLOBAL_DATA*/
+
 }
 vx_context_s;
 

@@ -22,6 +22,7 @@
 gceSTATUS gcLoadKernelCompiler(IN gcsHWCaps *HWCaps, IN gcePATCH_ID PatchId);
 gceSTATUS gcUnloadKernelCompiler(void);
 static vx_int32 vxDebugLevel = VX_DEBUG_LEVEL_NONE;
+static vx_global_data vxGlobalData = VX_NULL;
 
 VX_INTERNAL_API vx_bool vxIsValidImportType(vx_enum type)
 {
@@ -338,13 +339,13 @@ VX_PRIVATE_API vx_bool vxoContext_CreateAllPredefinedErrorObjects(vx_context con
 }
 
 
-VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, gctSTRING envctrl)
+VX_PRIVATE_API void vxoGlobalData_FetchOptionsForTransferGraph(vx_global_data globalData, gctSTRING envctrl)
 {
     gctSTRING pos = gcvNULL;
-    gcmHEADER_ARG("context=%p, envctrl=%s", context, envctrl);
+    gcmHEADER_ARG("globalData=%p, envctrl=%s", globalData, envctrl);
     if(gcoOS_StrStr(envctrl, "-closeAll", &pos) && pos)
     {
-        context->options.enableGraphTranform = 0;
+        globalData->options.enableGraphTranform = 0;
         gcmFOOTER_NO();
         return;
     }
@@ -352,48 +353,48 @@ VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, 
     if(gcoOS_StrStr(envctrl, "-Merge:", &pos) && pos)
     {
         pos += sizeof("-Merge:") -1;
-        context->options.enableGraphMerge  = atoi(pos);
+        globalData->options.enableGraphMerge  = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-Dump", &pos) && pos)
     {
-        context->options.enableGraphDump = 1;
+        globalData->options.enableGraphDump = 1;
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-ConvertBatchFC:", &pos) && pos)
     {
         pos += sizeof("-ConvertBatchFC:") -1;
-        context->options.enableGraphConvertBatchFC2NNConv = atoi(pos);
+        globalData->options.enableGraphConvertBatchFC2NNConv = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-ConvertAvgPool:", &pos) && pos)
     {
         pos += sizeof("-ConvertAvgPool:") -1;
-        context->options.enableGraphConvertAvgPool2Conv = atoi(pos);
+        globalData->options.enableGraphConvertAvgPool2Conv = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-unrollDWConv:", &pos) && pos)
     {
         pos += sizeof("-unrollDWConv:") -1;
-        context->options.enableGraphUnrollDWConv = atoi(pos);
+        globalData->options.enableGraphUnrollDWConv = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-tensorAdd:", &pos) && pos)
     {
         pos += sizeof("-tensorAdd:") -1;
-        context->options.enableGraphConvertTensorAdd = atoi(pos);
+        globalData->options.enableGraphConvertTensorAdd = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-eltwiseOp:", &pos) && pos)
     {
         pos += sizeof("-eltwiseOp:") -1;
-        context->options.enableGraphEltwiseOpShape = atoi(pos);
+        globalData->options.enableGraphEltwiseOpShape = atoi(pos);
     }
 
 
@@ -401,69 +402,69 @@ VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, 
     if(gcoOS_StrStr(envctrl, "-swap:", &pos) && pos)
     {
         pos += sizeof("-swap:") -1;
-        context->options.enableGraphSwaplayer = atoi(pos);
+        globalData->options.enableGraphSwaplayer = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-deleteReshape:", &pos) && pos)
     {
         pos += sizeof("-deleteReshape:") -1;
-        context->options.enableGraphReshapelayer = atoi(pos);
+        globalData->options.enableGraphReshapelayer = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-deleteConcat:", &pos) && pos)
     {
         pos += sizeof("-deleteConcat:") -1;
-        context->options.enableGraphConcalayer = atoi(pos);
+        globalData->options.enableGraphConcalayer = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-alignNMConv:", &pos) && pos)
     {
         pos += sizeof("-alignNMConv:") -1;
-        context->options.enableTransformNMConv = atoi(pos);
+        globalData->options.enableTransformNMConv = atoi(pos);
     }
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-conv2fc:", &pos) && pos)
     {
         pos += sizeof("-conv2fc:") -1;
-        context->options.enableGraphConvertConv2Fc = atoi(pos);
+        globalData->options.enableGraphConvertConv2Fc = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-mergeTranspose:", &pos) && pos)
     {
         pos += sizeof("-mergeTranspose:") -1;
-        context->options.enableGraphMergeTranspose = atoi(pos);
+        globalData->options.enableGraphMergeTranspose = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-padConv:", &pos) && pos)
     {
         pos += sizeof("-padConv:") -1;
-        context->options.enableGraphPadConv = atoi(pos);
+        globalData->options.enableGraphPadConv = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-deleteRelu:", &pos) && pos)
     {
         pos += sizeof("-deleteRelu:") - 1;
-        context->options.enableGraphDeleteRelu = atoi(pos);
+        globalData->options.enableGraphDeleteRelu = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-deleteSqueeze:", &pos) && pos)
     {
         pos += sizeof("-deleteSqueeze:") - 1;
-        context->options.enableGraphDeleteSqueeze = atoi(pos);
+        globalData->options.enableGraphDeleteSqueeze = atoi(pos);
     }
 
     pos = gcvNULL;
     if(gcoOS_StrStr(envctrl, "-war1x1x1weight:", &pos) && pos)
     {
         pos += sizeof("-war1x1x1weight:") - 1;
-        context->options.enableGraphWar1x1x1weight = atoi(pos);
+        globalData->options.enableGraphWar1x1x1weight = atoi(pos);
     }
 
 
@@ -475,10 +476,10 @@ VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, 
         {
             ++pos;
             vxInfo("doing WAR%d\n", atoi(pos));
-            switch(atoi(pos) )
+            switch( atoi(pos) )
             {
             case 7:
-                context->options.enableGraphWAR7 = 1;
+                globalData->options.enableGraphWAR7 = 1;
                 ++pos;
                 break;
             default:
@@ -489,24 +490,24 @@ VX_PRIVATE_API void vxoContext_FetchOptionsForTransferGraph(vx_context context, 
     gcmFOOTER_NO();
 }
 
-vx_status gcoVX_ForceTpCoreCount(vx_context context)
+vx_status gcoVX_ForceTpCoreCount(vx_global_data globalData)
 {
 
-    if(context->options.tpCoreCount <= context->nnConfig.fixedFeature.tpCoreCount)
-        context->nnConfig.fixedFeature.tpCoreCount = context->options.tpCoreCount;
+    if(globalData->options.tpCoreCount <= globalData->nnConfig.fixedFeature.tpCoreCount)
+        globalData->nnConfig.fixedFeature.tpCoreCount = globalData->options.tpCoreCount;
     else
-        vxInfo("\nWARNING: VIV_VX_TP_CORE_COUNT(%d) beyound HW configure(%d)\n", context->options.tpCoreCount, context->nnConfig.fixedFeature.tpCoreCount);
+        vxInfo("\nWARNING: VIV_VX_TP_CORE_COUNT(%d) beyound HW configure(%d)\n", globalData->options.tpCoreCount, globalData->nnConfig.fixedFeature.tpCoreCount);
 
-    if(context->options.tpLiteCoreCount <= context->nnConfig.fixedFeature.tpliteCoreCount)
-        context->nnConfig.fixedFeature.tpliteCoreCount = context->options.tpLiteCoreCount;
+    if(globalData->options.tpLiteCoreCount <= globalData->nnConfig.fixedFeature.tpliteCoreCount)
+        globalData->nnConfig.fixedFeature.tpliteCoreCount = globalData->options.tpLiteCoreCount;
     else
-        vxInfo("\nWARNING: VIV_VX_TPLITE_CORE_COUNT(%d) beyound HW configure(%d)\n", context->options.tpLiteCoreCount, context->nnConfig.fixedFeature.tpliteCoreCount);
+        vxInfo("\nWARNING: VIV_VX_TPLITE_CORE_COUNT(%d) beyound HW configure(%d)\n", globalData->options.tpLiteCoreCount, globalData->nnConfig.fixedFeature.tpliteCoreCount);
 
     return VX_SUCCESS;
 
 }
 
-VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
+VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
 {
     gctSTRING envctrl = gcvNULL;
     gctUINT i;
@@ -548,472 +549,472 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
         "VIV_VX_ENABLE_TP_TENSOR_STRIDED_SLICE",
         "VIV_VX_ENABLE_TP_TENSOR_SVDF_MAP",
     };
-    vx_bool isV8 = (context->nnConfig.derivedFeature.nnXYDPX == 0
-                   && context->nnConfig.derivedFeature.nnXYDPY == 0)
+    vx_bool isV8 = (globalData->nnConfig.derivedFeature.nnXYDPX == 0
+                   && globalData->nnConfig.derivedFeature.nnXYDPY == 0)
                    ? vx_true_e : vx_false_e;
 
-    gcmHEADER_ARG("context=%p", context);
+    gcmHEADER_ARG("globalData=%p", globalData);
 
     /* Enable driver TP path by default if HW has this feature */
-    context->options.enableTP = 1;
+    globalData->options.enableTP = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_TP", &envctrl)) && envctrl)
     {
-        context->options.enableTP = atoi(envctrl);
+        globalData->options.enableTP = atoi(envctrl);
     }
 
     gcmASSERT(gcmCOUNTOF(tpFuncName) == TP_TENSOR_COUNT);
 
-    context->options.flagTPFunc = (vx_uint8_ptr)vxAllocateAndZeroMemory(gcmCOUNTOF(tpFuncName) * sizeof(vx_uint8));
-    context->options.typeTPFunc = (vx_uint32_ptr)vxAllocateAndZeroMemory(gcmCOUNTOF(tpFuncName) * sizeof(vx_uint32));
+    globalData->options.flagTPFunc = (vx_uint8_ptr)vxAllocateAndZeroMemory(gcmCOUNTOF(tpFuncName) * sizeof(vx_uint8));
+    globalData->options.typeTPFunc = (vx_uint32_ptr)vxAllocateAndZeroMemory(gcmCOUNTOF(tpFuncName) * sizeof(vx_uint32));
 
-    gcmASSERT(context->options.flagTPFunc != VX_NULL);
-    gcmASSERT(context->options.typeTPFunc != VX_NULL);
+    gcmASSERT(globalData->options.flagTPFunc != VX_NULL);
+    gcmASSERT(globalData->options.typeTPFunc != VX_NULL);
 
     /* All TP functions are enabled by default. */
     for (i = 0; i < gcmCOUNTOF(tpFuncName); i++)
     {
-        context->options.flagTPFunc[i] = 1;
-        context->options.typeTPFunc[i] = 0;
+        globalData->options.flagTPFunc[i] = 1;
+        globalData->options.typeTPFunc[i] = 0;
     }
     /* Disable TP add to wait for HW ready. */
-    context->options.flagTPFunc[TP_ADD] = 0;
+    globalData->options.flagTPFunc[TP_ADD] = 0;
 
     for (i = 0; i < gcmCOUNTOF(tpFuncName); i++)
     {
         envctrl = gcvNULL;
         if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, tpFuncName[i], &envctrl)) && envctrl)
         {
-            context->options.flagTPFunc[i] = (vx_uint8)atoi(envctrl);
+            globalData->options.flagTPFunc[i] = (vx_uint8)atoi(envctrl);
         }
     }
     envctrl = gcvNULL;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_TP_RESHUFFLE_SEQUENCE", &envctrl)) && envctrl)
     {
-        context->options.typeTPFunc[TP_RESHUFFLE] = atoi(envctrl);
+        globalData->options.typeTPFunc[TP_RESHUFFLE] = atoi(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.enableMultiTP = 1;
+    globalData->options.enableMultiTP = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_MULTI_TP", &envctrl)) && envctrl)
     {
-        context->options.enableMultiTP = atoi(envctrl);
+        globalData->options.enableMultiTP = atoi(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.enableTPReorder = 1;
+    globalData->options.enableTPReorder = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_TP_REORDER", &envctrl)) && envctrl)
     {
-        context->options.enableTPReorder = atoi(envctrl);
+        globalData->options.enableTPReorder = atoi(envctrl);
     }
 
     /* Enable driver SRAM path by default if HW has this feature */
     envctrl = gcvNULL;
-    context->options.enableSRAM = 1;
+    globalData->options.enableSRAM = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_SRAM", &envctrl)) && envctrl)
     {
-        context->options.enableSRAM = atoi(envctrl);
+        globalData->options.enableSRAM = atoi(envctrl);
     }
     envctrl = gcvNULL;
 
-    context->options.enableSramStreamMode = 0;
+    globalData->options.enableSramStreamMode = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_SRAM_STREAM_MODE", &envctrl)) && envctrl)
     {
-        context->options.enableSramStreamMode = atoi(envctrl);
+        globalData->options.enableSramStreamMode = atoi(envctrl);
     }
 
     /* Disable CNN performance by default */
     envctrl = gcvNULL;
-    context->options.enableCNNPerf = 0;
+    globalData->options.enableCNNPerf = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "CNN_PERF", &envctrl)) && envctrl)
     {
-        context->options.enableCNNPerf = atoi(envctrl);
+        globalData->options.enableCNNPerf = atoi(envctrl);
     }
 
-    context->options.graphPerfLogFile = gcvNULL;
-    gcoOS_GetEnv(gcvNULL, "VIV_VX_GRAPH_PERF", &context->options.graphPerfLogFile);
+    globalData->options.graphPerfLogFile = gcvNULL;
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_GRAPH_PERF", &globalData->options.graphPerfLogFile);
 
 
     envctrl = gcvNULL;
-    context->options.nnZeroRunLen = 6;
+    globalData->options.nnZeroRunLen = 6;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_ZERO_RUN_LEN", &envctrl)) && envctrl)
     {
-        context->options.nnZeroRunLen = atoi(envctrl);
+        globalData->options.nnZeroRunLen = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.tpZeroRunLen = -1;
+    globalData->options.tpZeroRunLen = -1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_TP_ZERO_RUN_LEN", &envctrl)) && envctrl)
     {
         gctINT value = atoi(envctrl);
         if ((value >= 0) && (value <= 9))
         {
-            context->options.tpZeroRunLen = value;
+            globalData->options.tpZeroRunLen = value;
         }
     }
 
     envctrl = gcvNULL;
-    context->options.ddrReadBWLimit = 0;
+    globalData->options.ddrReadBWLimit = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_DDR_READ_BW_LIMIT", &envctrl)) && envctrl)
     {
-        context->options.ddrReadBWLimit = (gctFLOAT) atof(envctrl);
+        globalData->options.ddrReadBWLimit = (gctFLOAT) atof(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.ddrWriteBWLimit = 0;
+    globalData->options.ddrWriteBWLimit = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_DDR_WRITE_BW_LIMIT", &envctrl)) && envctrl)
     {
-        context->options.ddrWriteBWLimit = (gctFLOAT) atof(envctrl);
+        globalData->options.ddrWriteBWLimit = (gctFLOAT) atof(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.ddrTotalBWLimit = 0;
+    globalData->options.ddrTotalBWLimit = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_DDR_TOTAL_BW_LIMIT", &envctrl)) && envctrl)
     {
-        context->options.ddrTotalBWLimit = (gctFLOAT) atof(envctrl);
+        globalData->options.ddrTotalBWLimit = (gctFLOAT) atof(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.axiSramReadBWLimit = 0;
+    globalData->options.axiSramReadBWLimit = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_AXI_SRAM_READ_BW_LIMIT", &envctrl)) && envctrl)
     {
-        context->options.axiSramReadBWLimit = (gctFLOAT) atof(envctrl);
+        globalData->options.axiSramReadBWLimit = (gctFLOAT) atof(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.axiSramWriteBWLimit = 0;
+    globalData->options.axiSramWriteBWLimit = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_AXI_SRAM_WRITE_BW_LIMIT", &envctrl)) && envctrl)
     {
-        context->options.axiSramWriteBWLimit = (gctFLOAT) atof(envctrl);
+        globalData->options.axiSramWriteBWLimit = (gctFLOAT) atof(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.axiSramTotalBWLimit = 0;
+    globalData->options.axiSramTotalBWLimit = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_AXI_SRAM_TOTAL_BW_LIMIT", &envctrl)) && envctrl)
     {
-        context->options.axiSramTotalBWLimit = (gctFLOAT) atof(envctrl);
+        globalData->options.axiSramTotalBWLimit = (gctFLOAT) atof(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.axiBusReadBWLimit = 0;
+    globalData->options.axiBusReadBWLimit = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_AXI_BUS_READ_BW_LIMIT", &envctrl)) && envctrl)
     {
-        context->options.axiBusReadBWLimit = (gctFLOAT) atof(envctrl);
+        globalData->options.axiBusReadBWLimit = (gctFLOAT) atof(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.axiBusWriteBWLimit = 0;
+    globalData->options.axiBusWriteBWLimit = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_AXI_BUS_WRITE_BW_LIMIT", &envctrl)) && envctrl)
     {
-        context->options.axiBusWriteBWLimit = (gctFLOAT) atof(envctrl);
+        globalData->options.axiBusWriteBWLimit = (gctFLOAT) atof(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.axiBusTotalBWLimit = 0;
+    globalData->options.axiBusTotalBWLimit = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_AXI_BUS_TOTAL_BW_LIMIT", &envctrl)) && envctrl)
     {
-        context->options.axiBusTotalBWLimit = (gctFLOAT) atof(envctrl);
+        globalData->options.axiBusTotalBWLimit = (gctFLOAT) atof(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.vipSRAMSize = VX_INVALID_VALUE;
+    globalData->options.vipSRAMSize = VX_INVALID_VALUE;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_VIP_SRAM_SIZE", &envctrl)) && envctrl)
     {
-        context->options.vipSRAMSize = atoi(envctrl);
+        globalData->options.vipSRAMSize = atoi(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.axiSRAMSize = VX_INVALID_VALUE;
+    globalData->options.axiSRAMSize = VX_INVALID_VALUE;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_AXI_SRAM_SIZE", &envctrl)) && envctrl)
     {
-        context->options.axiSRAMSize = atoi(envctrl);
+        globalData->options.axiSRAMSize = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableNNArchPerfPrint = 0;
+    globalData->options.enableNNArchPerfPrint = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_EXT_SHOW_PERF", &envctrl)) && envctrl)
     {
-        context->options.enableNNArchPerfPrint = atoi(envctrl);
+        globalData->options.enableNNArchPerfPrint = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableNNLayerDump = 0;
+    globalData->options.enableNNLayerDump = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_LAYER_DUMP", &envctrl)) && envctrl)
     {
-        context->options.enableNNLayerDump = atoi(envctrl);
+        globalData->options.enableNNLayerDump = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableBrickMode = 0;
+    globalData->options.enableBrickMode = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_BRICK_MODE", &envctrl)) && envctrl)
     {
-        context->options.enableBrickMode = atoi(envctrl);
+        globalData->options.enableBrickMode = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableNonZeroBalance = 1;
+    globalData->options.enableNonZeroBalance = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NON_ZERO_BALANCE", &envctrl)) && envctrl)
     {
-        context->options.enableNonZeroBalance = atoi(envctrl);
+        globalData->options.enableNonZeroBalance = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableBorderMode = 1;
+    globalData->options.enableBorderMode = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_BORDER_MODE", &envctrl)) && envctrl)
     {
-        context->options.enableBorderMode = atoi(envctrl);
+        globalData->options.enableBorderMode = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableInterleave8 = 1;
+    globalData->options.enableInterleave8 = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_INTERLEAVE8", &envctrl)) && envctrl)
     {
-        context->options.enableInterleave8 = atoi(envctrl);
+        globalData->options.enableInterleave8 = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableShader = 1;
+    globalData->options.enableShader = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SHADER", &envctrl)) && envctrl)
     {
-        context->options.enableShader = atoi(envctrl);
+        globalData->options.enableShader = atoi(envctrl);
     }
 
-    context->options.nnRoundingMode = gcvNULL;
-    gcoOS_GetEnv(gcvNULL, "NN_ROUNDING_MODE", &context->options.nnRoundingMode);
+    globalData->options.nnRoundingMode = gcvNULL;
+    gcoOS_GetEnv(gcvNULL, "NN_ROUNDING_MODE", &globalData->options.nnRoundingMode);
 
-    context->options.vxcShaderSourcePath = gcvNULL;
-    gcoOS_GetEnv(gcvNULL, "VX_SHADER_SOURCE_PATH", &context->options.vxcShaderSourcePath);
+    globalData->options.vxcShaderSourcePath = gcvNULL;
+    gcoOS_GetEnv(gcvNULL, "VX_SHADER_SOURCE_PATH", &globalData->options.vxcShaderSourcePath);
 
-    context->options.fcZMax = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7) ? (1<<20) - 1 : (1<<14) - 1;
+    globalData->options.fcZMax = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7) ? (1<<20) - 1 : (1<<14) - 1;
 
     envctrl = gcvNULL;
-    context->options.enableMemPool = 1;
+    globalData->options.enableMemPool = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_VIRTUAL_BUFFER", &envctrl)) && envctrl)
     {
-        context->options.enableMemPool = atoi(envctrl);
+        globalData->options.enableMemPool = atoi(envctrl);
     }
     envctrl = gcvNULL;
-    context->options.memPoolSize = 0;
+    globalData->options.memPoolSize = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_VIRTUAL_BUFFER_SIZE", &envctrl)) && envctrl)
     {
-        context->options.memPoolSize = atoi(envctrl);
+        globalData->options.memPoolSize = atoi(envctrl);
     }
-    if (context->options.enableNNLayerDump) context->options.enableMemPool = 0;
+    if (globalData->options.enableNNLayerDump) globalData->options.enableMemPool = 0;
 
     envctrl = gcvNULL;
-    context->options.enablePrintOperaTarget = 0;
+    globalData->options.enablePrintOperaTarget = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_PRINT_TARGET", &envctrl)) && envctrl)
     {
-        context->options.enablePrintOperaTarget = atoi(envctrl);
+        globalData->options.enablePrintOperaTarget = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.collectPerfType = 0;
+    globalData->options.collectPerfType = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_COLLECT_PERF_TYPE", &envctrl)) && envctrl)
     {
-        context->options.collectPerfType = atoi(envctrl);
+        globalData->options.collectPerfType = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableHandleBranch = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HI_REORDER_FIX) ? 1 : 0;
+    globalData->options.enableHandleBranch = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HI_REORDER_FIX) ? 1 : 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_HANDLE_BRANCH", &envctrl)) && envctrl)
     {
-        context->options.enableHandleBranch = atoi(envctrl);
+        globalData->options.enableHandleBranch = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableSaveBinary = 0;
+    globalData->options.enableSaveBinary = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SAVE_NETWORK_BINARY", &envctrl)) && envctrl)
     {
-        context->options.enableSaveBinary = atoi(envctrl);
+        globalData->options.enableSaveBinary = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableGraphAdapter = 1;
+    globalData->options.enableGraphAdapter = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_GRAPH_ADAPTER", &envctrl)) && envctrl)
     {
-        context->options.enableGraphAdapter = atoi(envctrl);
+        globalData->options.enableGraphAdapter = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableNNTranspose = 1;
+    globalData->options.enableNNTranspose = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NN_TRANSPOSE", &envctrl)) && envctrl)
     {
-        context->options.enableNNTranspose = atoi(envctrl);
+        globalData->options.enableNNTranspose = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableZdpOpt = vxoContext_IsFeatureAvailable(context,VX_NN_FEATURE_NN_TRANSPOSE) ? 0 : 1;
+    globalData->options.enableZdpOpt = vxoGlobalData_IsFeatureAvailable(globalData,VX_NN_FEATURE_NN_TRANSPOSE) ? 0 : 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_ZDP_OPT", &envctrl)) && envctrl)
     {
-        context->options.enableZdpOpt = atoi(envctrl);
+        globalData->options.enableZdpOpt = atoi(envctrl);
     }
 
-    context->options.enableGraphCommandBuffer = 1;
+    globalData->options.enableGraphCommandBuffer = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_GRAPH_COMMANDBUFFER", &envctrl)) && envctrl)
     {
-        context->options.enableGraphCommandBuffer = atoi(envctrl);
+        globalData->options.enableGraphCommandBuffer = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableNNXYDP9 = 1;
+    globalData->options.enableNNXYDP9 = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NN_XYDP9", &envctrl)) && envctrl)
     {
-        context->options.enableNNXYDP9 = atoi(envctrl);
+        globalData->options.enableNNXYDP9 = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableNNFirstPixelPooling = 1;
+    globalData->options.enableNNFirstPixelPooling = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NN_FIRST_PIXEL_POOLING", &envctrl)) && envctrl)
     {
-        context->options.enableNNFirstPixelPooling = atoi(envctrl);
+        globalData->options.enableNNFirstPixelPooling = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableSwtilingPhase1 = VX_SWTILING_OPTION_ALL;
+    globalData->options.enableSwtilingPhase1 = VX_SWTILING_OPTION_ALL;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SWTILING_PHASE1", &envctrl)) && envctrl)
     {
-        context->options.enableSwtilingPhase1 = atoi(envctrl);
+        globalData->options.enableSwtilingPhase1 = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableSwtilingPhase2 = 1;
+    globalData->options.enableSwtilingPhase2 = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SWTILING_PHASE2", &envctrl)) && envctrl)
     {
-        context->options.enableSwtilingPhase2 = atoi(envctrl);
+        globalData->options.enableSwtilingPhase2 = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableSwtilingPhase3 = 1;
+    globalData->options.enableSwtilingPhase3 = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SWTILING_PHASE3", &envctrl)) && envctrl)
     {
-        context->options.enableSwtilingPhase3 = atoi(envctrl);
+        globalData->options.enableSwtilingPhase3 = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.ddrLatency = 0;
+    globalData->options.ddrLatency = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DDR_LATENCY", &envctrl)) && envctrl)
     {
-        context->options.ddrLatency = (gctFLOAT) atof(envctrl);
+        globalData->options.ddrLatency = (gctFLOAT) atof(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.freqInMHZ = 0;
+    globalData->options.freqInMHZ = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_FREQ_IN_MHZ", &envctrl)) && envctrl)
     {
-        context->options.freqInMHZ = atoi(envctrl);
+        globalData->options.freqInMHZ = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.axiClockFreqInMHZ = 0;
+    globalData->options.axiClockFreqInMHZ = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_AXI_CLOCK_FREQ_IN_MHZ", &envctrl)) && envctrl)
     {
-        context->options.axiClockFreqInMHZ = atoi(envctrl);
+        globalData->options.axiClockFreqInMHZ = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableVectorPrune = 1;
+    globalData->options.enableVectorPrune = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_VECTOR_PRUNE", &envctrl)) && envctrl)
     {
-        context->options.enableVectorPrune = atoi(envctrl);
+        globalData->options.enableVectorPrune = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.maxSocOTNumber = 0;/*max SOC outstanding transfer number*/
+    globalData->options.maxSocOTNumber = 0;/*max SOC outstanding transfer number*/
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_MAX_SOC_OT_NUMBER", &envctrl)) && envctrl)
     {
-        context->options.maxSocOTNumber = atoi(envctrl);
+        globalData->options.maxSocOTNumber = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableNNXYDP6 = 1;
+    globalData->options.enableNNXYDP6 = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NN_XYDP6", &envctrl)) && envctrl)
     {
-        context->options.enableNNXYDP6 = atoi(envctrl);
+        globalData->options.enableNNXYDP6 = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.nn1x1To1xN = 1;
+    globalData->options.nn1x1To1xN = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_NN_1X1_TO_1XN", &envctrl)) && envctrl)
     {
-        context->options.nn1x1To1xN = atoi(envctrl);
+        globalData->options.nn1x1To1xN = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.do1xnAfterSwtiling = isV8 ? 0 : 1;
+    globalData->options.do1xnAfterSwtiling = isV8 ? 0 : 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DO_1XN_AFTER_SWTILING", &envctrl)) && envctrl)
     {
-        context->options.do1xnAfterSwtiling = atoi(envctrl);
+        globalData->options.do1xnAfterSwtiling = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
 
-    context->options.enableHuffmanEnhancement = 1;
+    globalData->options.enableHuffmanEnhancement = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_HUFFMAN", &envctrl)) && envctrl)
     {
-        context->options.enableHuffmanEnhancement = atoi(envctrl);
+        globalData->options.enableHuffmanEnhancement = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableTPHuffman = 1;
+    globalData->options.enableTPHuffman = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_TP_HUFFMAN", &envctrl)) && envctrl)
     {
-        context->options.enableTPHuffman = atoi(envctrl);
+        globalData->options.enableTPHuffman = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableNNDepthWiseSupport = 1;
+    globalData->options.enableNNDepthWiseSupport = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NN_DEPTHWISE_SUPPORT", &envctrl)) && envctrl)
     {
-        context->options.enableNNDepthWiseSupport = atoi(envctrl);
+        globalData->options.enableNNDepthWiseSupport = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableGraphTranform = 1;
-    context->options.enableGraphMerge = 1;
-    context->options.enableGraphDump = 0;
-    context->options.enableGraphWAR7 = 0;
-    context->options.enableGraphOptimizationToTest = 0;
-    context->options.enableGraphConvertBatchFC2NNConv = 1;
-    context->options.enableGraphConvertAvgPool2Conv = 1;
-    context->options.enableGraphConvertTensorAdd = 1;
-    context->options.enableGraphEltwiseOpShape = 1;
-    context->options.enableGraphUnrollDWConv = 1;
-    context->options.enableGraphConvertConv2Fc = 1;
-    context->options.enableGraphSwaplayer = 1;
-    context->options.enableGraphReshapelayer = 1;
-    context->options.enableGraphConcalayer = 0;
-    context->options.enableTransformNMConv = 1;
-    context->options.enableGraphMergeTranspose = 1;
-    context->options.enableGraphPadConv = 1;
-    context->options.enableGraphDeleteRelu = 1;
-    context->options.enableGraphDeleteSqueeze = 1;
-    context->options.enableGraphWar1x1x1weight = 1;
+    globalData->options.enableGraphTranform = 1;
+    globalData->options.enableGraphMerge = 1;
+    globalData->options.enableGraphDump = 0;
+    globalData->options.enableGraphWAR7 = 0;
+    globalData->options.enableGraphOptimizationToTest = 0;
+    globalData->options.enableGraphConvertBatchFC2NNConv = 1;
+    globalData->options.enableGraphConvertAvgPool2Conv = 1;
+    globalData->options.enableGraphConvertTensorAdd = 1;
+    globalData->options.enableGraphEltwiseOpShape = 1;
+    globalData->options.enableGraphUnrollDWConv = 1;
+    globalData->options.enableGraphConvertConv2Fc = 1;
+    globalData->options.enableGraphSwaplayer = 1;
+    globalData->options.enableGraphReshapelayer = 1;
+    globalData->options.enableGraphConcalayer = 0;
+    globalData->options.enableTransformNMConv = 1;
+    globalData->options.enableGraphMergeTranspose = 1;
+    globalData->options.enableGraphPadConv = 1;
+    globalData->options.enableGraphDeleteRelu = 1;
+    globalData->options.enableGraphDeleteSqueeze = 1;
+    globalData->options.enableGraphWar1x1x1weight = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_GRAPH_TRANSFORM", &envctrl)) && envctrl)
     {
-        vxoContext_FetchOptionsForTransferGraph(context, envctrl);
+        vxoGlobalData_FetchOptionsForTransferGraph(globalData, envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableMultiVIPCombined = 1;
+    globalData->options.enableMultiVIPCombined = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_MULTIVIP_COMBINED", &envctrl)) && envctrl)
     {
-        context->options.enableMultiVIPCombined = atoi(envctrl);
+        globalData->options.enableMultiVIPCombined = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableNNTPParallel = 0;
+    globalData->options.enableNNTPParallel = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NNTP_PARALLEL", &envctrl)) && envctrl)
     {
-        context->options.enableNNTPParallel = atoi(envctrl);
+        globalData->options.enableNNTPParallel = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableYUV2RGBScaler = 1;
+    globalData->options.enableYUV2RGBScaler = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_YUV2RGB_SCALER", &envctrl)) && envctrl)
     {
-        context->options.enableYUV2RGBScaler = atoi(envctrl);
+        globalData->options.enableYUV2RGBScaler = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableVIPDEC400 = 1;
+    globalData->options.enableVIPDEC400 = 1;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_VIP_DEC400", &envctrl)) && envctrl)
     {
-        context->options.enableVIPDEC400 = atoi(envctrl);
+        globalData->options.enableVIPDEC400 = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableCacheBinaryGraph = 0;
+    globalData->options.enableCacheBinaryGraph = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_CACHE_GRAPH_BINARY", &envctrl)) && envctrl)
     {
-        context->options.enableCacheBinaryGraph = atoi(envctrl);
+        globalData->options.enableCacheBinaryGraph = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
@@ -1028,56 +1029,52 @@ VX_PRIVATE_API vx_status vxoContext_InitOptions(vx_context context)
     }
 
 
-    context->options.enableOpsDebugInfo = gcvNULL;
-    gcoOS_GetEnv(gcvNULL, "VIV_VX_OPS_DUMP_PATH", &context->options.enableOpsDebugInfo);
+    globalData->options.enableOpsDebugInfo = gcvNULL;
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_OPS_DUMP_PATH", &globalData->options.enableOpsDebugInfo);
 
     envctrl = gcvNULL;
-    context->options.tpCoreCount = context->nnConfig.fixedFeature.tpCoreCount;
+    globalData->options.tpCoreCount = globalData->nnConfig.fixedFeature.tpCoreCount;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_TP_CORE_COUNT", &envctrl)) && envctrl)
     {
-        context->options.tpCoreCount = atoi(envctrl);
+        globalData->options.tpCoreCount = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.tpLiteCoreCount = context->nnConfig.fixedFeature.tpliteCoreCount;
+    globalData->options.tpLiteCoreCount = globalData->nnConfig.fixedFeature.tpliteCoreCount;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_TPLITE_CORE_COUNT", &envctrl)) && envctrl)
     {
-        context->options.tpLiteCoreCount = atoi(envctrl);
+        globalData->options.tpLiteCoreCount = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableForce64BitsBiasNN = 0;
+    globalData->options.enableForce64BitsBiasNN = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_64BITS_BIAS_NN", &envctrl)) && envctrl)
     {
-        context->options.enableForce64BitsBiasNN = atoi(envctrl);
+        globalData->options.enableForce64BitsBiasNN = atoi(envctrl);
     }
 
     envctrl = gcvNULL;
-    context->options.enableAllocateContigousMemForKernel = 0;
+    globalData->options.enableAllocateContigousMemForKernel = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_CONTIGOUS_MEM_FOR_KERNEL", &envctrl)) && envctrl)
     {
-        context->options.enableAllocateContigousMemForKernel = atoi(envctrl);
+        globalData->options.enableAllocateContigousMemForKernel = atoi(envctrl);
     }
 
+    globalData->options.disableTPNNEvis = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_DISABLE_TP_NN_EVIS", &envctrl)) && envctrl)
     {
-        vx_bool disable = (atoi(envctrl) == 0) ? vx_false_e : vx_true_e;
-        if (disable)
+        globalData->options.disableTPNNEvis = (atoi(envctrl) == 0) ? 0 : 1;
+        if (globalData->options.disableTPNNEvis)
         {
-            context->evisNoInst.isVX2       = vx_false_e;
-            context->evisNoInst.supportEVIS = vx_false_e;
-
-            context->nnConfig.fixedFeature.nnCoreCount        =
-            context->nnConfig.fixedFeature.nnCoreCountFloat16 =
-            context->nnConfig.fixedFeature.nnCoreCountInt16   =
-            context->nnConfig.fixedFeature.nnCoreCountInt8    =
-            context->nnConfig.fixedFeature.nnMadPerCore       =
-            context->nnConfig.fixedFeature.tpCoreCount        =
-            context->nnConfig.fixedFeature.tpliteCoreCount    =
-            context->nnConfig.fixedFeature.tpPwlLUTCount      =
-            context->nnConfig.fixedFeature.vipCoreCount       = 0;
-
-            context->deviceCount = 1;
+            globalData->nnConfig.fixedFeature.nnCoreCount        =
+            globalData->nnConfig.fixedFeature.nnCoreCountFloat16 =
+            globalData->nnConfig.fixedFeature.nnCoreCountInt16   =
+            globalData->nnConfig.fixedFeature.nnCoreCountInt8    =
+            globalData->nnConfig.fixedFeature.nnMadPerCore       =
+            globalData->nnConfig.fixedFeature.tpCoreCount        =
+            globalData->nnConfig.fixedFeature.tpliteCoreCount    =
+            globalData->nnConfig.fixedFeature.tpPwlLUTCount      =
+            globalData->nnConfig.fixedFeature.vipCoreCount       = 0;
         }
     }
 
@@ -1105,7 +1102,7 @@ void vxPRINT(vx_uint32 level, const char *msg, ...)
 
 
 VX_PRIVATE_API vx_status QuerySRAM(
-    vx_context          context,
+    vx_global_data      globalData,
     gcePOOL             type,
     gctUINT32*          sRamPhysical,
     gctPOINTER*         sRamLogical,
@@ -1123,8 +1120,8 @@ VX_PRIVATE_API vx_status QuerySRAM(
     gctUINT32           size = 0;
     gctPHYS_ADDR_T      gpuPhysical = ~0ull;
 
-    gcmHEADER_ARG("context=%p, type=%p, sRamPhysical=%p, sRamLogical=%p, sRamSize=%p, sRamNode=%p",
-        context, type, sRamPhysical, sRamLogical, sRamSize, sRamNode);
+    gcmHEADER_ARG("globalData=%p, type=%p, sRamPhysical=%p, sRamLogical=%p, sRamSize=%p, sRamNode=%p",
+        globalData, type, sRamPhysical, sRamLogical, sRamSize, sRamNode);
 
     status = gcoHAL_QuerySRAM(gcvNULL, type, gcvNULL, &size, gcvNULL, gcvNULL);
     if (gcmIS_ERROR(status))
@@ -1135,12 +1132,12 @@ VX_PRIVATE_API vx_status QuerySRAM(
 
     if (type == gcvPOOL_EXTERNAL_SRAM)
     {
-        if (context->options.axiSRAMSize != VX_INVALID_VALUE )
+        if (globalData->options.axiSRAMSize != VX_INVALID_VALUE )
         {
-            size = gcmMIN(size, context->options.axiSRAMSize);
+            size = gcmMIN(size, globalData->options.axiSRAMSize);
         }
 
-        context->nnConfig.customizedFeature.axiSRAMSize = size;
+        globalData->nnConfig.customizedFeature.axiSRAMSize = size;
 
         if (size != 0)
         {
@@ -1158,12 +1155,12 @@ VX_PRIVATE_API vx_status QuerySRAM(
     }
     else if (type == gcvPOOL_INTERNAL_SRAM)
     {
-        if (context->options.vipSRAMSize != VX_INVALID_VALUE )
+        if (globalData->options.vipSRAMSize != VX_INVALID_VALUE )
         {
-            size = gcmMIN(size, context->options.vipSRAMSize);
+            size = gcmMIN(size, globalData->options.vipSRAMSize);
         }
 
-        context->nnConfig.customizedFeature.vipSRAMSize = size;
+        globalData->nnConfig.customizedFeature.vipSRAMSize = size;
 
         if (size != 0)
         {
@@ -1204,8 +1201,8 @@ OnError:
 }
 
 
-VX_PRIVATE_API vx_status vxoContext_InitSRAM(
-    vx_context context
+VX_PRIVATE_API vx_status vxoGlobalData_InitSRAM(
+    vx_global_data globalData
     )
 {
     vx_status           status = VX_SUCCESS;
@@ -1220,10 +1217,10 @@ VX_PRIVATE_API vx_status vxoContext_InitSRAM(
     gctUINT32           vipSRAMPhysical = ~0u;
     gctUINT32           vipSRAMSize = 0;
 
-    gcmHEADER_ARG("context=%p", context);
+    gcmHEADER_ARG("globalData=%p", globalData);
 
-    vxmONERROR(QuerySRAM(context, gcvPOOL_EXTERNAL_SRAM, &axiSRAMPhysical, &axiSRAMLogical, &axiSRAMGpuPhysical, &axiSRAMSize, &axiSRAMNode));
-    vxmONERROR(QuerySRAM(context, gcvPOOL_INTERNAL_SRAM, &vipSRAMPhysical, &vipSRAMLogical, gcvNULL, &vipSRAMSize, &vipSRAMNode));
+    vxmONERROR(QuerySRAM(globalData, gcvPOOL_EXTERNAL_SRAM, &axiSRAMPhysical, &axiSRAMLogical, &axiSRAMGpuPhysical, &axiSRAMSize, &axiSRAMNode));
+    vxmONERROR(QuerySRAM(globalData, gcvPOOL_INTERNAL_SRAM, &vipSRAMPhysical, &vipSRAMLogical, gcvNULL, &vipSRAMSize, &vipSRAMNode));
 
     vxmASSERT(vipSRAMSize != 0);
     vxmASSERT(axiSRAMSize == 0 || (axiSRAMPhysical != ~0u && axiSRAMGpuPhysical != ~0u));
@@ -1269,30 +1266,30 @@ VX_PRIVATE_API vx_status vxoContext_InitSRAM(
         quot = axiSRAMSize / gpuTotalCount;
         vxmASSERT(quot % 64 == 0);
 
-        context->axiSRAM[0].size     = quot * gpuCountArray[0];
-        context->axiSRAM[0].logical  = axiSRAMLogical;
-        context->axiSRAM[0].physical = axiSRAMPhysical;
-        context->axiSRAM[0].used     = 0;
-        context->axiSRAM[0].node     = axiSRAMNode;
+        globalData->axiSRAM[0].size     = quot * gpuCountArray[0];
+        globalData->axiSRAM[0].logical  = axiSRAMLogical;
+        globalData->axiSRAM[0].physical = axiSRAMPhysical;
+        globalData->axiSRAM[0].used     = 0;
+        globalData->axiSRAM[0].node     = axiSRAMNode;
 
         for (i = 1; i < deviceCount; i++)
         {
-            context->axiSRAM[i].size     = quot * gpuCountArray[i];
-            context->axiSRAM[i].logical  = (vx_uint8_ptr)axiSRAMLogical + context->axiSRAM[i-1].size;
-            context->axiSRAM[i].physical = axiSRAMPhysical + context->axiSRAM[i-1].size;
-            context->axiSRAM[i].used     = 0;
+            globalData->axiSRAM[i].size     = quot * gpuCountArray[i];
+            globalData->axiSRAM[i].logical  = (vx_uint8_ptr)axiSRAMLogical + globalData->axiSRAM[i-1].size;
+            globalData->axiSRAM[i].physical = axiSRAMPhysical + globalData->axiSRAM[i-1].size;
+            globalData->axiSRAM[i].used     = 0;
         }
     }
 
     if (vipSRAMSize != 0)
     {
-        context->vipSRAM.size        = (vipSRAMSize <= VX_VIP_SRAM_IMAGE_STREAM_SIZE) ? vipSRAMSize : (vipSRAMSize - VX_VIP_SRAM_IMAGE_STREAM_SIZE);
-        context->vipSRAM.logical     = gcvNULL;
-        context->vipSRAM.physBase    = vipSRAMPhysical != 0xFFFFFFFF ? vipSRAMPhysical : 0;
-        context->vipSRAM.physical    = vipSRAMPhysical != 0xFFFFFFFF ?
+        globalData->vipSRAM.size        = (vipSRAMSize <= VX_VIP_SRAM_IMAGE_STREAM_SIZE) ? vipSRAMSize : (vipSRAMSize - VX_VIP_SRAM_IMAGE_STREAM_SIZE);
+        globalData->vipSRAM.logical     = gcvNULL;
+        globalData->vipSRAM.physBase    = vipSRAMPhysical != 0xFFFFFFFF ? vipSRAMPhysical : 0;
+        globalData->vipSRAM.physical    = vipSRAMPhysical != 0xFFFFFFFF ?
                                            vipSRAMPhysical + VX_VIP_SRAM_IMAGE_STREAM_SIZE : VX_VIP_SRAM_IMAGE_STREAM_SIZE;
-        context->vipSRAM.used        = 0;
-        context->vipSRAM.node        = vipSRAMNode;
+        globalData->vipSRAM.used        = 0;
+        globalData->vipSRAM.node        = vipSRAMNode;
     }
 
 OnError:
@@ -1328,18 +1325,50 @@ OnError:
     return status;
 }
 
+VX_PRIVATE_API vx_global_data vxoGlobalData_Create()
+{
+    vx_global_data globalData = VX_NULL;
+    globalData = (vx_global_data)vxAllocate(sizeof(vx_global_data_s));
+    if (globalData == VX_NULL) return VX_NULL;
+    memset(globalData, 0, sizeof(vx_global_data_s));
+    return globalData;
+}
+
+VX_PRIVATE_API void vxoGlobalData_Initialize(vx_global_data globalData)
+{
+    if (globalData->refGlobalDataCount != 0) return;
+
+    gcoVX_GetNNConfig(&globalData->nnConfig);
+    vxoGlobalData_InitOptions(globalData);
+    gcoVX_ForceTpCoreCount(globalData);
+    initUndefinedHardwareConfig(globalData);
+
+    vxoGlobalData_InitSRAM(globalData);
+
+}
+
+VX_PRIVATE_API vx_uint32 vxoGlobalData_Release(vx_global_data globalData);
+VX_PRIVATE_API vx_uint32 vxoGlobalData_AddRef(vx_global_data globalData)
+{
+    vx_uint32 refCount = globalData->refGlobalDataCount;
+    if (refCount == 0)
+    {
+         vxoGlobalData_Initialize(globalData);
+    }
+    globalData->refGlobalDataCount++;
+    refCount = globalData->refGlobalDataCount;
+    return refCount;
+}
+
 VX_PRIVATE_API vx_context vxoContext_Create()
 {
     vx_context context = VX_NULL;
     gcsPLS_PTR pls;
     gcmHEADER_ARG("context=%p", context);
-
     gcoHAL_GetPLS(&pls);
     vxmASSERT(pls->vxContextGlobalLock);
 
     vxAcquireMutex(pls->vxContextGlobalLock);
-
-
     gcoVX_ZeroMemorySize();
 
 #if gcdUSE_SINGLE_CONTEXT
@@ -1349,14 +1378,22 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         gctSTRING  oldEnv = gcvNULL;
         gctCHAR    newEnv[128] = {0};
         gctSTRING productName = gcvNULL;
-
         vxEnableAllTraceTargets(vx_false_e);
-
         context = (vx_context)vxAllocate(sizeof(vx_context_s));
-
         if (context == VX_NULL) goto ErrorExit;
 
         memset(context, 0, sizeof(vx_context_s));
+
+        if (vxGlobalData == NULL)
+        {
+            vxGlobalData = vxoGlobalData_Create();
+            if (vxGlobalData == NULL) goto ErrorExit;
+            context->globalData = vxGlobalData;
+        }
+        else
+        {
+            context->globalData = vxGlobalData;
+        }
 
         vxoReference_Initialize(&context->base, VX_NULL, VX_TYPE_CONTEXT, VX_NULL);
 
@@ -1381,8 +1418,8 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         vxoContext_CreateAllPredefinedErrorObjects(context);
 
         if (vxoTarget_Load(context, VX_NULL) != VX_SUCCESS) goto ErrorExit;
-
         context->targetCount++;
+
         if (context->targetTable[0].funcs.initialize(&context->targetTable[0]) != VX_SUCCESS)
         {
             vxoTarget_Unload(context, 0, vx_true_e);
@@ -1400,24 +1437,31 @@ VX_PRIVATE_API vx_context vxoContext_Create()
 
         context->cnnAvailableEventID = 1;
 
-        gcoVX_QueryDeviceCount(&context->deviceCount);
-
-        gcoVX_GetNNConfig(&context->nnConfig);
-
         gcoVX_QueryHWChipInfo(&context->hwChipInfo);
 
-        vxoContext_InitOptions(context);
-        gcoVX_ForceTpCoreCount(context);
+        vxoGlobalData_AddRef(vxGlobalData);
+
+        memcpy(&context->options, &vxGlobalData->options, sizeof(vx_drv_option));
+        memcpy(&context->nnConfig, &vxGlobalData->nnConfig, sizeof(vx_nn_config));
+        memcpy(&context->axiSRAM, &vxGlobalData->axiSRAM, sizeof(vxnne_sram_s) * MAX_GPU_CORE_COUNT);
+        memcpy(&context->vipSRAM, &vxGlobalData->vipSRAM, sizeof(vxnne_sram_s));
+
+        if (context->options.disableTPNNEvis)
+        {
+            context->evisNoInst.isVX2       = vx_false_e;
+            context->evisNoInst.supportEVIS = vx_false_e;
+            context->deviceCount = 1;
+        }
 
         gcoHAL_GetProductName(gcvNULL, &productName, &context->pid);
-        initUndefinedHardwareConfig(context);
-        gcoOS_StrCopySafe(context->productName, 32, productName);
+        gcoOS_StrCopySafe(context->productName, 32 , productName);
         gcmOS_SAFE_FREE(gcvNULL, productName);
+        vxInfo("#productname=%s, pid=0x%x\n", context->productName, context->pid);
         if (context->options.enableCNNPerf || context->options.enableNNArchPerfPrint)
         {
-            vxInfo("#productname=%s, pid=0x%x\n", context->productName, context->pid);
+            gcmDUMP(gcvNULL, "#[info: productname=%s, pid=0x%x", context->productName, context->pid);
         }
-        gcmDUMP(gcvNULL, "#[info: productname=%s, pid=0x%x", context->productName, context->pid);
+
         /* memory maps table lock */
         vxCreateMutex(&context->memoryMapsLock);
 
@@ -1430,7 +1474,6 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         gcoOS_SetEnv(gcvNULL, "VC_OPTION", newEnv);
 
 #if gcdUSE_SINGLE_CONTEXT
-
         vxSingletonContext = context;
 #endif
 
@@ -1442,7 +1485,6 @@ VX_PRIVATE_API vx_context vxoContext_Create()
                 vxError("VX_EXTENSION_LIBS = %s, but load library failed!", oldEnv);
             }
         }
-        vxoContext_InitSRAM(context);
     }
 #if gcdUSE_SINGLE_CONTEXT
     else
@@ -1471,6 +1513,11 @@ ErrorExit:
 
     if (context != VX_NULL)
     {
+        if (context->globalData != VX_NULL)
+        {
+            vxoGlobalData_Release(context->globalData);
+        }
+
         if ((&context->base)->lock != VX_NULL)
         {
             vxDestroyMutex((&context->base)->lock);
@@ -1545,22 +1592,22 @@ VX_PRIVATE_API void vxoContext_ForceReleaseAllObjects(vx_context context)
 
 gceSTATUS
 gcfVX_UnloadCompiler(
-    vx_context context
+    vx_global_data globalData
     )
 {
     gceSTATUS   status = gcvSTATUS_OK;
-    gcmHEADER_ARG("context=%p", context);
+    gcmHEADER_ARG("globalData=%p", globalData);
     {
-        if (context->unloadCompiler != gcvNULL)
+        if (globalData->unloadCompiler != gcvNULL)
         {
-            gcmONERROR((*context->unloadCompiler)());
+            gcmONERROR((*globalData->unloadCompiler)());
 
-            gcmVERIFY_OK(gcoOS_FreeLibrary(gcvNULL, context->libCLC));
+            gcmVERIFY_OK(gcoOS_FreeLibrary(gcvNULL, globalData->libCLC));
 
-            context->libCLC             = gcvNULL;
-            context->compileKernel      = gcvNULL;
-            context->loadCompiler       = gcvNULL;
-            context->unloadCompiler     = gcvNULL;
+            globalData->libCLC             = gcvNULL;
+            globalData->compileKernel      = gcvNULL;
+            globalData->loadCompiler       = gcvNULL;
+            globalData->unloadCompiler     = gcvNULL;
         }
     }
 
@@ -1569,10 +1616,61 @@ OnError:
     return status;
 }
 
+VX_PRIVATE_API vx_uint32 vxoGlobalData_Release(vx_global_data globalData)
+{
+    vx_uint32 i, j, refCount;
+    globalData->refGlobalDataCount--;
+    refCount = globalData->refGlobalDataCount;
+    if (refCount == 0)
+    {
+        if (globalData->options.flagTPFunc)
+            vxFree(globalData->options.flagTPFunc);
+
+        if (globalData->options.typeTPFunc)
+            vxFree(globalData->options.typeTPFunc);
+
+        if (globalData->axiSRAM[0].node)
+        {
+            gcoVX_FreeMemoryEx(globalData->axiSRAM[0].node, gcvSURF_VERTEX);
+        }
+
+        if (globalData->vipSRAM.node)
+        {
+            gcoVX_FreeMemoryEx(globalData->vipSRAM.node, gcvSURF_VERTEX);
+        }
+
+        for (i = 0; i < VXNNE_KERNEL_FIXED_COUNT; i++)
+        {
+            for (j = 0; j < globalData->kernels[i].kernelShaderCount*2; j++)
+            {
+                vxoShader_Free(globalData->kernels[i].kernelShader[j]);
+            }
+
+            if (globalData->kernels[i].kernelShader) gcoOS_Free(gcvNULL, globalData->kernels[i].kernelShader);
+        }
+
+        /* Destroy vir intrinsic library. */
+#if (!VSC_LITE_BUILD)
+        vscFreeVirIntrinsicLib();
+#endif
+        gcfVX_UnloadCompiler(globalData);
+
+#ifdef USE_LIB_NN_ARCH_PERF
+        if (globalData->apm)
+            DestroyAPModel(globalData->apm);
+#endif
+
+        vxFree(vxGlobalData);
+        vxGlobalData = NULL;
+    }
+
+    return refCount;
+}
+
 VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 {
     vx_context context;
-    vx_uint32 i, j;
+    vx_uint32 i, refCount;
     vx_reference_item next, current;
     vx_char* flag;
     gcsPLS_PTR pls;
@@ -1652,11 +1750,6 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 #if VX_USE_THREADPOOL
         if (context->threadPool != VX_NULL) vxoThreadPool_Destroy(&context->threadPool);
 #endif
-        if (context->options.flagTPFunc)
-            vxFree(context->options.flagTPFunc);
-
-        if (context->options.typeTPFunc)
-            vxFree(context->options.typeTPFunc);
 
         context->processor.running = vx_false_e;
         vxoQueue_Stop(&context->processor.input);
@@ -1666,16 +1759,6 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
         vxoQueue_Deinitialize(&context->processor.input);
 
         vxRegisterLogCallback(context, VX_NULL, vx_false_e);
-
-        if (context->axiSRAM[0].node)
-        {
-            gcoVX_FreeMemoryEx(context->axiSRAM[0].node, gcvSURF_VERTEX);
-        }
-
-        if (context->vipSRAM.node)
-        {
-            gcoVX_FreeMemoryEx(context->vipSRAM.node, gcvSURF_VERTEX);
-        }
 
         vxoContext_ForceReleaseAllObjects(context);
 
@@ -1723,44 +1806,21 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
         vxmASSERT(context->base.lock);
         vxDestroyMutex(context->base.lock);
 
-        vxReleaseMutex(context->memoryMapsLock);
         vxDestroyMutex(context->memoryMapsLock);
 
-        for (i = 0; i < VXNNE_KERNEL_FIXED_COUNT; i++)
-        {
-            for (j = 0; j < context->kernels[i].kernelShaderCount*2; j++)
-            {
-                vxoShader_Free(context->kernels[i].kernelShader[j]);
-            }
-
-            if (context->kernels[i].kernelShader) gcoOS_Free(gcvNULL, context->kernels[i].kernelShader);
-        }
-
-        /* Destroy vir intrinsic library. */
-#if (!VSC_LITE_BUILD)
-        vscFreeVirIntrinsicLib();
-#endif
-
-        gcfVX_UnloadCompiler(context);
-
-        if (vxInRuntimeDebugMode()) vxZeroMemory(context, sizeof(vx_context_s));
-
-        context->base.signature = VX_REF_SIGNATURE_RELEASED;
-
-#ifdef USE_LIB_NN_ARCH_PERF
-        if (context->apm)
-            DestroyAPModel(context->apm);
-#endif
+        refCount = vxoGlobalData_Release(context->globalData);
 
         vxFree(context);
 
         /* Free the global resources */
         vxReleaseMutex(pls->vxContextGlobalLock);
 #if gcdUSE_SINGLE_CONTEXT
-
         vxSingletonContext = VX_NULL;
 #endif
 
+        if (refCount == 0)
+        {
+        }
         gcmFOOTER_ARG("%d", VX_SUCCESS);
         return VX_SUCCESS;
     }
@@ -2889,80 +2949,85 @@ VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id m_id)
 
 VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_feature_e feature)
 {
+    return vxoGlobalData_IsFeatureAvailable(context->globalData, feature);
+}
+
+VX_INTERNAL_API vx_bool vxoGlobalData_IsFeatureAvailable(vx_global_data globalData, vx_nn_feature_e feature)
+{
     switch (feature)
     {
     case VX_NN_FEATURE_SHADER:
-        return (context->nnConfig.fixedFeature.shaderCoreCount && context->options.enableShader) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.shaderCoreCount && globalData->options.enableShader) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_MULTI_TP:
-        return ((context->nnConfig.fixedFeature.tpCoreCount > 1) && context->options.enableMultiTP) ? vx_true_e : vx_false_e;
+        return ((globalData->nnConfig.fixedFeature.tpCoreCount > 1) && globalData->options.enableMultiTP) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_RESHUFFLE:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP &&
-                context->options.flagTPFunc[TP_RESHUFFLE]) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP &&
+                globalData->options.flagTPFunc[TP_RESHUFFLE]) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_SINGLE_FC:
-        return ((context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount) &&
-                context->options.enableTP && context->options.flagTPFunc[TP_SINGLE_FC]) ? vx_true_e : vx_false_e;
+        return ((globalData->nnConfig.fixedFeature.tpCoreCount + globalData->nnConfig.fixedFeature.tpliteCoreCount) &&
+                globalData->options.enableTP && globalData->options.flagTPFunc[TP_SINGLE_FC]) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_MAX_POOLING:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP &&
-                context->options.flagTPFunc[TP_MAX_POOLING]) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP &&
+                globalData->options.flagTPFunc[TP_MAX_POOLING]) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_ACTIVATION:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP &&
-                context->options.flagTPFunc[TP_ACTIVATION]) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP &&
+                globalData->options.flagTPFunc[TP_ACTIVATION]) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_LRN:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP &&
-                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_LRN) && context->options.flagTPFunc[TP_LRN]) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP &&
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_LRN) && globalData->options.flagTPFunc[TP_LRN]) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_TRANSPOSE:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP &&
-                context->options.flagTPFunc[TP_TRANSPOSE]) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP &&
+                globalData->options.flagTPFunc[TP_TRANSPOSE]) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_ROI_POOLING:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP &&
-                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_ROI_POOLING) && context->options.flagTPFunc[TP_ROI_POOLING]) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP &&
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_ROI_POOLING) && globalData->options.flagTPFunc[TP_ROI_POOLING]) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_UPSAMPLE:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP &&
-                context->options.flagTPFunc[TP_UPSAMPLE]) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP &&
+                globalData->options.flagTPFunc[TP_UPSAMPLE]) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_REORG:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP &&
-                context->options.flagTPFunc[TP_REORG]) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP &&
+                globalData->options.flagTPFunc[TP_REORG]) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_ADD:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP &&
-                context->options.flagTPFunc[TP_ADD]) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP &&
+                globalData->options.flagTPFunc[TP_ADD]) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_REVERSE:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP &&
-                context->options.flagTPFunc[TP_REVERSE]) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP &&
+                globalData->options.flagTPFunc[TP_REVERSE]) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_REORDER:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP &&
-                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_REORDER) && context->options.enableTPReorder) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP &&
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_REORDER) && globalData->options.enableTPReorder) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_RTNE:
-        return (context->nnConfig.fixedFeature.tpCoreCount && context->options.enableTP &&
-                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_RTNE) && context->options.enableTPRTNE) ? vx_true_e : vx_false_e;
+        return (globalData->nnConfig.fixedFeature.tpCoreCount && globalData->options.enableTP &&
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_RTNE) && globalData->options.enableTPRTNE) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_BRICK_MODE:
-        return context->options.enableBrickMode ? vx_true_e : vx_false_e;
+        return globalData->options.enableBrickMode ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_INTERLEVE8:
-        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_INTERLEAVE8) && context->options.enableInterleave8) ? vx_true_e : vx_false_e;
+        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_INTERLEAVE8) && globalData->options.enableInterleave8) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_SRAM:
-        return ((context->nnConfig.customizedFeature.vipSRAMSize > 0) && context->options.enableSRAM) ? vx_true_e : vx_false_e;
+        return ((globalData->nnConfig.customizedFeature.vipSRAMSize > 0) && globalData->options.enableSRAM) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_BORDER_MODE:
-        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_BORDER_MODE) && context->options.enableBorderMode) ? vx_true_e : vx_false_e;
+        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_BORDER_MODE) && globalData->options.enableBorderMode) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_ZDP3:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ZDP3)
@@ -2974,55 +3039,55 @@ VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_
 
     case VX_NN_FEATURE_XYDP9:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_XYDP9)
-            && context->options.enableNNXYDP9 ) ? vx_true_e : vx_false_e;
+            && globalData->options.enableNNXYDP9 ) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_SWTILING_PHASE1:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1)
-             && (context->options.enableSwtilingPhase1 != VX_SWTILING_OPTION_OFF)
-             && (context->nnConfig.customizedFeature.axiSRAMSize > 0 || gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
+             && (globalData->options.enableSwtilingPhase1 != VX_SWTILING_OPTION_OFF)
+             && (globalData->nnConfig.customizedFeature.axiSRAMSize > 0 || gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3))
              && gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_ENABLE_NN_STRIDE)) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_SWTILING_PHASE2:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE2)
-             && context->options.enableSwtilingPhase2 ) ? vx_true_e : vx_false_e;
+             && globalData->options.enableSwtilingPhase2 ) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_SWTILING_PHASE3:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE3)
-             && context->options.enableSwtilingPhase3 ) ? vx_true_e : vx_false_e;
+             && globalData->options.enableSwtilingPhase3 ) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TF_QUANT:
         return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TF_QUANTIZATION) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_FIRST_PIXEL_POOLING:
-        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FIRST_PIXEL_POOLING) && context->options.enableNNFirstPixelPooling) ? vx_true_e : vx_false_e;
+        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_FIRST_PIXEL_POOLING) && globalData->options.enableNNFirstPixelPooling) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_NN_STRIDE_SUPPORT:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_STRIDE_SUPPORT)
             && gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_ENABLE_NN_STRIDE)) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_XYDP6:
-        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_XYDP6) && context->options.enableNNXYDP6) ? vx_true_e : vx_false_e;
+        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_XYDP6) && globalData->options.enableNNXYDP6) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_COEF_COMPRESSION_ENHANCEMENT:
-        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COEF_COMPRESSION_ENHANCEMENT) && context->options.enableHuffmanEnhancement) ? vx_true_e : vx_false_e;
+        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COEF_COMPRESSION_ENHANCEMENT) && globalData->options.enableHuffmanEnhancement) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_TP_COMPRESSION_ENHANCEMENT:
-        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_COEF_COMPRESSION_ENHANCEMENT) && context->options.enableTPHuffman) ? vx_true_e : vx_false_e;
+        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_COEF_COMPRESSION_ENHANCEMENT) && globalData->options.enableTPHuffman) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_NN_DEPTHWISE_SUPPORT:
-        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_DEPTHWISE_SUPPORT) && context->options.enableNNDepthWiseSupport) ? vx_true_e : vx_false_e;
+        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_DEPTHWISE_SUPPORT) && globalData->options.enableNNDepthWiseSupport) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_XYDP0:
         return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_XYDP0) ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_SCALER:
-        return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VIP_SCALER) && context->options.enableYUV2RGBScaler ? vx_true_e : vx_false_e;
+        return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VIP_SCALER) && globalData->options.enableYUV2RGBScaler ? vx_true_e : vx_false_e;
 
     case VX_NN_FEATURE_VIP_DEC400:
-        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VIP_DEC400) && context->options.enableVIPDEC400) ? vx_true_e : vx_false_e;
+        return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VIP_DEC400) && globalData->options.enableVIPDEC400) ? vx_true_e : vx_false_e;
 
     case VX_NN_TP_PARALLEL:
-        return (!context->options.enableSwtilingPhase1 && context->options.enableNNTPParallel) ? vx_true_e : vx_false_e;
+        return (!globalData->options.enableSwtilingPhase1 && globalData->options.enableNNTPParallel) ? vx_true_e : vx_false_e;
 
 
         /*if feature ready, add it*/
@@ -3031,7 +3096,7 @@ VX_INTERNAL_API vx_bool vxoContext_IsFeatureAvailable(vx_context context, vx_nn_
 
     case VX_NN_FEATURE_NN_TRANSPOSE:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_TRANSPOSE)
-             && context->options.enableNNTranspose ) ? vx_true_e : vx_false_e;
+             && globalData->options.enableNNTranspose ) ? vx_true_e : vx_false_e;
 
     default:
         return vx_false_e;
