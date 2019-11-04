@@ -493,7 +493,7 @@ GLvoid __glBindFramebuffer(__GLcontext *gc, GLenum target, GLuint name)
         gc->drawableDirtyMask |= __GL_BUFFER_DRAW_BIT;
         gc->frameBuffer.drawFramebufObj = curDrawObj;
         retVal = (*gc->dp.bindDrawFramebuffer)(gc, prevDrawObj, curDrawObj);
-        if(!retVal)
+        if (!retVal)
         {
             __GL_ERROR((*gc->dp.getError)(gc));
         }
@@ -769,11 +769,10 @@ GLvoid __eglImageTargetRenderbufferStorageOES(__GLcontext* gc, GLenum target, GL
     formatInfo = __glGetFormatInfo(curRbo->internalFormat);
     curRbo->formatInfo      = formatInfo;
     curRbo->samples         = 0;
-    curRbo->eglImage = eglImage;
 
     retVal = (*gc->dp.eglImageTargetRenderbufferStorageOES)(gc, curRbo, target, eglImage);
 
-    if(!retVal)
+    if (!retVal)
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -865,7 +864,7 @@ GLvoid __glFramebufferTexture(__GLcontext *gc,
         __GL_ERROR((*gc->dp.getError)(gc));
     }
 
-    if(texObj)
+    if (texObj)
     {
         texObj->params.mipHint = __GL_TEX_MIP_HINT_AUTO;
     }
@@ -912,7 +911,7 @@ GLvoid __glFramebufferRenderbuffer(__GLcontext *gc,
         else if (attachPoint->objName == renderbufferObj->name)
         {
             /* Skip if bound with same object */
-            __GL_EXIT();;
+            __GL_EXIT();
         }
     }
 
@@ -1276,7 +1275,7 @@ GLvoid GL_APIENTRY __gles_GetRenderbufferParameteriv(__GLcontext *gc, GLenum tar
         *params = gc->frameBuffer.boundRenderbufObj->internalFormat;
         break;
     case GL_RENDERBUFFER_RED_SIZE:
-        if(gc->frameBuffer.boundRenderbufObj->formatInfo)
+        if (gc->frameBuffer.boundRenderbufObj->formatInfo)
         {
             *params = gc->frameBuffer.boundRenderbufObj->formatInfo->redSize;
         }
@@ -1286,7 +1285,7 @@ GLvoid GL_APIENTRY __gles_GetRenderbufferParameteriv(__GLcontext *gc, GLenum tar
         }
         break;
     case GL_RENDERBUFFER_GREEN_SIZE:
-        if(gc->frameBuffer.boundRenderbufObj->formatInfo)
+        if (gc->frameBuffer.boundRenderbufObj->formatInfo)
         {
             *params = gc->frameBuffer.boundRenderbufObj->formatInfo->greenSize;
         }
@@ -1296,7 +1295,7 @@ GLvoid GL_APIENTRY __gles_GetRenderbufferParameteriv(__GLcontext *gc, GLenum tar
         }
         break;
     case GL_RENDERBUFFER_BLUE_SIZE:
-        if(gc->frameBuffer.boundRenderbufObj->formatInfo)
+        if (gc->frameBuffer.boundRenderbufObj->formatInfo)
         {
             *params = gc->frameBuffer.boundRenderbufObj->formatInfo->blueSize;
         }
@@ -1306,7 +1305,7 @@ GLvoid GL_APIENTRY __gles_GetRenderbufferParameteriv(__GLcontext *gc, GLenum tar
         }
         break;
     case GL_RENDERBUFFER_ALPHA_SIZE:
-        if(gc->frameBuffer.boundRenderbufObj->formatInfo)
+        if (gc->frameBuffer.boundRenderbufObj->formatInfo)
         {
             *params = gc->frameBuffer.boundRenderbufObj->formatInfo->alphaSize;
         }
@@ -1316,7 +1315,7 @@ GLvoid GL_APIENTRY __gles_GetRenderbufferParameteriv(__GLcontext *gc, GLenum tar
         }
         break;
     case GL_RENDERBUFFER_DEPTH_SIZE:
-        if(gc->frameBuffer.boundRenderbufObj->formatInfo)
+        if (gc->frameBuffer.boundRenderbufObj->formatInfo)
         {
             *params = gc->frameBuffer.boundRenderbufObj->formatInfo->depthSize;
         }
@@ -1326,7 +1325,7 @@ GLvoid GL_APIENTRY __gles_GetRenderbufferParameteriv(__GLcontext *gc, GLenum tar
         }
         break;
     case GL_RENDERBUFFER_STENCIL_SIZE:
-        if(gc->frameBuffer.boundRenderbufObj->formatInfo)
+        if (gc->frameBuffer.boundRenderbufObj->formatInfo)
         {
             *params = gc->frameBuffer.boundRenderbufObj->formatInfo->stencilSize;
         }
@@ -1713,7 +1712,7 @@ GLvoid GL_APIENTRY __gles_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
 
     /* According to the ES2.0 spec, if the value of FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE is NONE,
     then querying any other pname will generate INVALID_ENUM */
-    if((2 == gc->constants.majorVersion) &&
+    if ((2 == gc->constants.majorVersion) &&
        (GL_NONE == attachPoint->object) &&
        (GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE != pname))
     {
@@ -1871,7 +1870,7 @@ __GL_INLINE GLvoid __glBlitFramebufferValidateState(__GLcontext *gc, GLbitfield 
 
     __GL_HEADER();
 
-    if(!retVal)
+    if (!retVal)
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -1889,7 +1888,7 @@ __GL_INLINE GLvoid __glBlitFramebufferEnd(__GLcontext *gc)
 
     retVal = (*gc->dp.blitFramebufferEnd)(gc);
 
-    if(!retVal)
+    if (!retVal)
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }

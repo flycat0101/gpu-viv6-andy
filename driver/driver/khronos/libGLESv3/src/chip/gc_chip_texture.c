@@ -816,7 +816,7 @@ gcChipResidentTextureLevel(
         {
             patchCase = __GL_CHIP_FMT_PATCH_ASTC;
         }
-        else if((mipmap->requestedFormat == GL_COMPRESSED_RGBA8_ETC2_EAC || mipmap->requestedFormat ==  GL_COMPRESSED_RGB8_ETC2) &&
+        else if ((mipmap->requestedFormat == GL_COMPRESSED_RGBA8_ETC2_EAC || mipmap->requestedFormat ==  GL_COMPRESSED_RGB8_ETC2) &&
                 (chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653))
         {
             patchCase = __GL_CHIP_FMT_PATCH_ETC2_EAC;
@@ -972,7 +972,7 @@ gcChipResidentTextureLevel(
                             {
                                 __GLchipResourceShadow *shadow = &chipMipLevel->shadow[attachPoint->slice];
 
-                                if(shadow && shadow->surface)
+                                if (shadow && shadow->surface)
                                 {
                                     gcoSURF_Destroy(shadow->surface);
                                     shadow->surface = gcvNULL;
@@ -4801,7 +4801,7 @@ GLboolean __glChipCopyImageSubData(
 
                 if (srcView.surf->format !=dstView.surf->format)
                 {
-                    if((srcFormatInfo->glFormat == GL_RGBA8 &&
+                    if ((srcFormatInfo->glFormat == GL_RGBA8 &&
                         srcView.surf->format == gcvSURF_A8R8G8B8)  ||
                         (srcFormatInfo->glFormat == GL_RGB8&&
                         srcView.surf->format == gcvSURF_X8R8G8B8)  ||
@@ -4811,7 +4811,7 @@ GLboolean __glChipCopyImageSubData(
                         rlvArgs.uArgs.v2.srcSwizzle = gcvTRUE;
                     }
 
-                    if((dstFormatInfo->glFormat == GL_RGBA8 &&
+                    if ((dstFormatInfo->glFormat == GL_RGBA8 &&
                         dstView.surf->format == gcvSURF_A8R8G8B8)  ||
                         (dstFormatInfo->glFormat == GL_RGB8&&
                         dstView.surf->format == gcvSURF_X8R8G8B8)  ||
@@ -5310,7 +5310,7 @@ __glChipCreateEglImageTexture(
     texInfo = (__GLchipTextureInfo*)texObj->privateData;
 
     /* Test if surface is a sibling of any eglImage. */
-    if ((face == 0) && (texInfo->eglImage.image != gcvNULL))
+    if (texInfo->eglImage.image != gcvNULL)
     {
         gcmFOOTER_ARG("return=0x%04x", EGL_BAD_ACCESS);
         return EGL_BAD_ACCESS;
@@ -5412,15 +5412,8 @@ __glChipCreateEglImageTexture(
     gcmONERROR(gcoSURF_SetResolvability(texView.surf, gcvFALSE));
 
     /* Reference EGLImage. */
-    if (texInfo->eglImage.image != eglImage)
+    if (texInfo->eglImage.image == gcvNULL)
     {
-        if (texInfo->eglImage.image != gcvNULL)
-        {
-            /* Dereference old EGLImageKHR. */
-            gc->imports.dereferenceImage(texInfo->eglImage.image);
-        }
-
-        /* Reference new EGLImageKHR. */
         texInfo->eglImage.image = eglImage;
         gc->imports.referenceImage(eglImage);
     }
@@ -5912,7 +5905,7 @@ __glChipEglImageTargetTexture2DOES(
             }
         }
 
-        if(srcFormat == gcvSURF_L8_RAW  || srcFormat == gcvSURF_A8L8_RAW)
+        if (srcFormat == gcvSURF_L8_RAW  || srcFormat == gcvSURF_A8L8_RAW)
         {
             texInfo->eglImage.directSample = gcvTRUE;
         }
@@ -6164,7 +6157,7 @@ __glChipEglImageTargetTexture2DOES(
                         {
                             __GLchipResourceShadow *shadow = &chipMipLevel->shadow[attachPoint->slice];
 
-                            if(shadow && shadow->surface)
+                            if (shadow && shadow->surface)
                             {
                                 gcoSURF_Destroy(shadow->surface);
                                 shadow->surface = gcvNULL;

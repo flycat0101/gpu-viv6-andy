@@ -581,7 +581,7 @@ gceSTATUS gcChipFBOSyncAttachment(__GLcontext *gc, __GLfboAttachPoint * attachPo
     if (attachPoint->objType == GL_TEXTURE)
     {
         __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
-        if(texObj)
+        if (texObj)
         {
             __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
             if ((texInfo && texInfo->eglImage.image) ||
@@ -594,7 +594,7 @@ gceSTATUS gcChipFBOSyncAttachment(__GLcontext *gc, __GLfboAttachPoint * attachPo
                     attachPoint->layer));
             }
             /* Sync Master to direct source. */
-            if(texInfo && texInfo->direct.source &&
+            if (texInfo && texInfo->direct.source &&
                 !texInfo->direct.directSample &&
                 attachPoint->level == 0
                 )
@@ -1027,7 +1027,7 @@ __glChipIsFramebufferComplete(
             fbLayeredTarget = layeredTarget;
         }
         /* Make the latest cts case follow the ES3.2 spec. */
-        else if((gc->apiVersion == __GL_API_VERSION_ES20) &&
+        else if ((gc->apiVersion == __GL_API_VERSION_ES20) &&
                 (fbwidth != width || fbheight != height) &&
                 ((chipCtx->patchId != gcvPATCH_GTFES30) || (gc->constants.majorVersion == 2)))
         {
@@ -1404,7 +1404,7 @@ gcChipBlitFramebuffer3Dblit(
     blitArgs.dstRect.top    = dstY0;
     blitArgs.dstRect.right  = dstX1;
     blitArgs.dstRect.bottom = dstY1;
-    blitArgs.filterMode     = gcChipUtilConvertFilter(filter);;
+    blitArgs.filterMode     = gcChipUtilConvertFilter(filter);
     blitArgs.xReverse       = xReverse;
     blitArgs.yReverse       = yReverse;
 
@@ -1921,6 +1921,7 @@ __glChipDeleteRenderbuffer(
     )
 {
     gcmHEADER_ARG("gc=0x%x rbo=0x%x", gc, rbo);
+
     if (rbo->privateData)
     {
         __GLchipRenderbufferObject *chipRBO = (__GLchipRenderbufferObject*)rbo->privateData;
@@ -1946,6 +1947,14 @@ __glChipDeleteRenderbuffer(
         (gc->imports.free)(NULL, chipRBO);
         rbo->privateData = NULL;
     }
+
+    /* Dereference EGLImageKHR. */
+    if (rbo->eglImage)
+    {
+        gc->imports.dereferenceImage(rbo->eglImage);
+        rbo->eglImage = gcvNULL;
+    }
+
     gcmFOOTER_NO();
 }
 
@@ -2308,12 +2317,18 @@ __glChipCreateEglImageRenderbuffer(
     __GLchipRenderbufferObject *chipRBO = (__GLchipRenderbufferObject*)rbo->privateData;
     gcoSURF surface = gcvNULL;
     khrEGL_IMAGE * eglImage = gcvNULL;
-    gctINT32 referenceCount = 0;
     GLenum ret;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gceSURF_FORMAT format;
     gcmHEADER_ARG("gc=0x%x rbo=0x%x image=0x%x", gc, rbo, image);
 
+    /* Test if rbo is a sibling of any eglImage. */
+    if (rbo->eglImage != gcvNULL)
+    {
+        ret = EGL_BAD_ACCESS;
+        gcmFOOTER_ARG("return=0x%04x", ret);
+        return ret;
+    }
 
     if (chipRBO == gcvNULL)
     {
@@ -2325,17 +2340,6 @@ __glChipCreateEglImageRenderbuffer(
     /* Get render buffer surface. */
     surface = chipRBO->surface;
     if (!surface)
-    {
-        ret = EGL_BAD_ACCESS;
-        gcmFOOTER_ARG("return=0x%04x", ret);
-        return ret;
-    }
-
-    /* Get source surface reference count. */
-    gcoSURF_QueryReferenceCount(surface, &referenceCount);
-
-    /* Test if surface is a sibling of any eglImage. */
-    if (referenceCount > 1)
     {
         ret = EGL_BAD_ACCESS;
         gcmFOOTER_ARG("return=0x%04x", ret);
@@ -2359,6 +2363,13 @@ __glChipCreateEglImageRenderbuffer(
     gcoSURF_GetFormat(surface, gcvNULL, &format);
 
     chipCtx->needRTRecompile = chipCtx->needRTRecompile || gcChipCheckRecompileEnable(gc, format);
+
+    /* Reference EGLImage. */
+    if (rbo->eglImage == NULL)
+    {
+        rbo->eglImage = eglImage;
+        gc->imports.referenceImage(eglImage);
+    }
 
     ret = EGL_SUCCESS;
     gcmFOOTER_ARG("return=0x%04x", ret);
@@ -2389,6 +2400,14 @@ __glChipEglImageTargetRenderbufferStorageOES(
     gcmHEADER_ARG("gc=0x%x rbo=0x%x target=0x%x eglImage=0x%x", gc, rbo, target, eglImage);
 
     GL_ASSERT(chipRBO);
+
+    /* Test if rbo is a sibling of any eglImage. */
+    if (rbo->eglImage != gcvNULL)
+    {
+        gcChipSetError(chipCtx, EGL_BAD_ACCESS);;
+        gcmFOOTER_ARG("return=0x%04x", GL_FALSE);
+        return GL_FALSE;
+    }
 
     gcmONERROR(gcChipGetRenderBufferAttribFromImage(image,
                                                     &stride,
@@ -2495,6 +2514,13 @@ __glChipEglImageTargetRenderbufferStorageOES(
                                           (gctUINT)stride,
                                           address,
                                           gcvINVALID_PHYSICAL_ADDRESS));
+    }
+
+    /* Reference EGLImage. */
+    if (rbo->eglImage == NULL)
+    {
+        rbo->eglImage = eglImage;
+        gc->imports.referenceImage(eglImage);
     }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
@@ -2899,7 +2925,7 @@ gcChipTexMipSliceSyncFromShadow(
                 gcmONERROR(gcoHAL_Commit(gcvNULL, gcvFALSE));
 
                 /* Get fence for master surface if needed. */
-                if(!(chipCtx->chipFeature.hwFeature.hasBlitEngine))
+                if (!(chipCtx->chipFeature.hwFeature.hasBlitEngine))
                 {
                     gcmONERROR(gcoSURF_GetFence(texView.surf, gcvFENCE_TYPE_WRITE));
                 }

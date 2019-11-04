@@ -8778,7 +8778,7 @@ __glChipBindAttributeLocation(
         {
             binding->index = index;
             gcmFOOTER_ARG("return=%d", GL_TRUE);
-            return GL_TRUE;;
+            return GL_TRUE;
         }
         /* Check aliased attrib */
         else if (binding->index == (GLint)index)
