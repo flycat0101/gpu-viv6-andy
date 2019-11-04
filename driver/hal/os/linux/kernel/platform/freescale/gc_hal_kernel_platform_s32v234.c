@@ -290,11 +290,11 @@ static int thermal_hot_pm_notify(struct notifier_block *nb, unsigned long event,
 
     if (event && !bAlreadyTooHot) {
         gckHARDWARE_GetFscaleValue(hardware,&orgFscale,&minFscale, &maxFscale);
-        gckHARDWARE_SetFscaleValue(hardware, minFscale);
+        gckHARDWARE_SetFscaleValue(hardware, minFscale, ~0U);
         bAlreadyTooHot = gcvTRUE;
         gckOS_Print("System is too hot. GPU3D will work at %d/64 clock.\n", minFscale);
     } else if (!event && bAlreadyTooHot) {
-        gckHARDWARE_SetFscaleValue(hardware, orgFscale);
+        gckHARDWARE_SetFscaleValue(hardware, orgFscale, ~0U);
         gckOS_Print("Hot alarm is canceled. GPU3D clock will return to %d/64\n", orgFscale);
         bAlreadyTooHot = gcvFALSE;
     }
