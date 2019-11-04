@@ -1221,6 +1221,7 @@ typedef struct _vxnne_pooling_layer_s
     vxnne_pooling_operation_s                       pooling_sw_operation;
     vxnne_pooling_operation_s                       pooling_nne_operation;
     vxnne_tp_operation_s                            pooling_tp_operation;
+    vxnne_shader_operation_s                        pooling_tensorcopy_sh_operation;
     vxnne_shader_operation_s                        pooling_sh_operation;
 }
 vxnne_pooling_layer_s, *vxnne_pooling_layer;
@@ -3657,6 +3658,9 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
     vx_uint32               pool_pad_x_right,
     vx_uint32               pool_pad_y_bottom,
     vx_scalar               rounding,
+    vx_bool                 is_roi_copy,
+    vx_uint32               input_width,
+    vx_uint32               input_height,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(

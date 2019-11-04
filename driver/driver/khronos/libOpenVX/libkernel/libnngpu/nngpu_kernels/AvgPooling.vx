@@ -1,3 +1,7 @@
+#pragma OPENCL EXTENSION cl_viv_bitfield_extension : enable
+#pragma OPENCL EXTENSION CL_VIV_asm : enable
+#pragma OPENCL EXTENSION cl_viv_vx_extension : enable
+
 __kernel void gpuPooling_AvgNoPadFP32(__read_only image2d_array_t   input,
                                       int filterX,
                                       int filterY,
@@ -611,4 +615,468 @@ __kernel void gpuPooling_AvgPadQuant8_opt(__read_only image2d_array_t   input,
     tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
 
     write_imageui(output, (int4)(x, y, z, 0), tmp);
+}
+
+typedef _viv_uchar16_packed   vxc_uchar16;
+typedef _viv_ushort8_packed   vxc_ushort8;
+
+inline int get_image2D_array_sliceSZ(image2d_array_t  input)
+{
+    int8 desc;
+    int sliceSz = 1;
+
+    _viv_asm(COPY, desc, input, sizeof(desc));
+    sliceSz = desc.s4;
+
+    return sliceSz;
+}
+
+inline int get_image2D_array_strideX(image2d_array_t  input)
+{
+    int8 desc;
+    int stride_x = 1;
+
+    _viv_asm(COPY, desc, input, sizeof(desc));
+    stride_x = desc.y;
+
+    return stride_x;
+}
+
+inline uchar* get_image2D_array_ptr(image2d_array_t  input)
+{
+    int8 desc;
+    _viv_asm(COPY, desc, input, sizeof(desc));
+    uchar *src_ptr = (uchar*)desc.s0;
+
+    return src_ptr;
+}
+
+float4 calculate_avg_scale4(const int pool_size, const int upper_bound_w, const int upper_bound_h,
+                     const int pad_x, const int pad_y, const int stride_x, const int stride_y)
+{
+    int4       start_x = ((int4)get_global_id(0) + (int4)(0, 1, 2, 3)) * (int4)stride_x - (int4)pad_x;
+    int        start_y = get_global_id(1) * stride_y - pad_y;
+    const int4 end_x   = min(start_x + (int4)pool_size, (int4)upper_bound_w);
+    const int  end_y   = min(start_y + pool_size, upper_bound_h);
+
+    start_x = max((int4)0, start_x);
+    start_y = max(0, start_y);
+
+    return ((float4)(1.f) / convert_float4(((int4)(end_y - start_y)) * (end_x - start_x)));
+}
+
+__kernel void gpuPooling_AvgNoPadQuant8_K3S1_M1_2D
+    (
+    __read_only  image2d_array_t  input,
+    __write_only image2d_t        output,
+    int                           inputWidth,
+    int                           inputHeight,
+    int                           inputHeightPad,
+    int                           pad_left,
+    int                           pad_top,
+    int                           outputHeight,
+    float                         input_scale,
+    float                         input_tail,
+    float                         output_scale,
+    float                         output_zp
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1) + coord.z * inputHeightPad, get_global_id(0), get_global_id(0));
+
+    //coord_in.zw = coord_in.xy + (int2)(4, 1);
+
+    int strideX = get_image2D_array_strideX(input);
+    uchar *src_ptr = get_image2D_array_ptr(input) + coord_in.y * strideX + coord_in.x;
+    uchar *src_ptr_line0 = src_ptr;
+    uchar *src_ptr_line1 = src_ptr_line0 + strideX;
+    uchar *src_ptr_line2 = src_ptr_line1 + strideX;
+
+    vxc_uchar16 src0 = vload16(0, (_viv_uchar_packed *)src_ptr_line0);
+    vxc_uchar16 src1 = vload16(0, (_viv_uchar_packed *)src_ptr_line1);
+    vxc_uchar16 src2 = vload16(0, (_viv_uchar_packed *)src_ptr_line2);
+
+    coord.y = coord.z * outputHeight + coord.y;
+    coord.zw = coord.xx + (int2)(1, 2);
+    float4 scale = calculate_avg_scale4(3, inputWidth, inputHeight, pad_left, pad_top, 1, 1);
+
+    vxc_ushort8 src0_u16, src1_u16, src2_u16;
+    vxc_ushort8 data00, data10, data20;
+    src0 = src0.s08192a3b4c5d6e7f;
+    src1 = src1.s08192a3b4c5d6e7f;
+    src2 = src2.s08192a3b4c5d6e7f;
+    vxc_ushort8 bits = (vxc_ushort8)(8, 8, 8, 8, 8, 8, 8, 8);
+    vxc_ushort8 cfg =  (vxc_ushort8)(0, 0, 0, 0, 0, 0, 0, 0);
+
+    _viv_asm(COPY, src0_u16, src0, 16);
+    _viv_asm(COPY, src1_u16, src1, 16);
+    _viv_asm(COPY, src2_u16, src2, 16);
+    data00 = viv_bitfieldExtract(src0_u16, cfg, bits);
+    data10 = viv_bitfieldExtract(src1_u16, cfg, bits);
+    data20 = viv_bitfieldExtract(src2_u16, cfg, bits);
+
+    vxc_ushort8 value00 = data00 + data10 + data20;
+
+    value00 = value00 + value00.s12345670 + value00.s23456701;
+
+    uint4 bits1 = (uint4)(16, 16, 16, 16);
+    uint4 cfg1 = (uint4)(0, 16, 0, 16);
+    uint4 src;
+
+    _viv_asm(COPY, src, value00, 16);
+    uint4 result = viv_bitfieldExtract(src.xxyy, cfg1, bits1);
+
+    result = convert_uint4((convert_float4(result) * input_scale - (float4)input_tail) * (float4) scale * (float4) output_scale + output_zp);
+
+    write_imageui(output, coord.xy, result.xxxx);
+    coord.x += 3;
+    write_imageui(output, coord.zy, result.yyyy);
+    write_imageui(output, coord.wy, result.zzzz);
+    write_imageui(output, coord.xy, result.wwww);
+}
+
+__kernel void gpuPooling_AvgNoPadQuant8_K3S1_M2_2D
+    (
+    __read_only  image2d_array_t  input,
+    __write_only image2d_t        output,
+    int                           inputWidth,
+    int                           inputHeight,
+    int                           inputHeightPad,
+    int                           pad_left,
+    int                           pad_top,
+    int                           outputHeight,
+    float                         input_scale,
+    float                         input_tail,
+    float                         output_scale,
+    float                         output_zp
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1) + coord.z * inputHeightPad, get_global_id(0), get_global_id(0));
+
+    //coord_in.zw = coord_in.xy + (int2)(4, 1);
+
+    int strideX = get_image2D_array_strideX(input);
+    uchar *src_ptr = get_image2D_array_ptr(input) + coord_in.y * strideX + coord_in.x;
+    uchar *src_ptr_line0 = src_ptr;
+    uchar *src_ptr_line1 = src_ptr_line0 + strideX;
+    uchar *src_ptr_line2 = src_ptr_line1 + strideX;
+
+    vxc_uchar16 src0 = vload16(0, (_viv_uchar_packed *)src_ptr_line0);
+    vxc_uchar16 src1 = vload16(0, (_viv_uchar_packed *)src_ptr_line1);
+    vxc_uchar16 src2 = vload16(0, (_viv_uchar_packed *)src_ptr_line2);
+
+    coord.y = coord.z * outputHeight + coord.y;
+    coord.zw = coord.xx + (int2)(1, 2);
+    float4 scale = calculate_avg_scale4(3, inputWidth, inputHeight, pad_left, pad_top, 1, 1);
+
+    vxc_ushort8 src0_u16, src1_u16, src2_u16;
+    vxc_ushort8 data00, data10, data20;
+    src0 = src0.s08192a3b4c5d6e7f;
+    src1 = src1.s08192a3b4c5d6e7f;
+    src2 = src2.s08192a3b4c5d6e7f;
+    vxc_ushort8 bits = (vxc_ushort8)(8, 8, 8, 8, 8, 8, 8, 8);
+    vxc_ushort8 cfg =  (vxc_ushort8)(0, 0, 0, 0, 0, 0, 0, 0);
+
+    _viv_asm(COPY, src0_u16, src0, 16);
+    _viv_asm(COPY, src1_u16, src1, 16);
+    _viv_asm(COPY, src2_u16, src2, 16);
+    data00 = viv_bitfieldExtract(src0_u16, cfg, bits);
+    data10 = viv_bitfieldExtract(src1_u16, cfg, bits);
+    data20 = viv_bitfieldExtract(src2_u16, cfg, bits);
+
+    vxc_ushort8 value00 = data00 + data10 + data20;
+
+    value00 = value00 + value00.s12345670 + value00.s23456701;
+
+    uint4 bits1 = (uint4)(16, 16, 16, 16);
+    uint4 cfg1 = (uint4)(0, 16, 0, 16);
+    uint4 src;
+
+    _viv_asm(COPY, src, value00, 16);
+    uint4 result = viv_bitfieldExtract(src.xxyy, cfg1, bits1);
+
+    result = convert_uint4((convert_float4(result) * input_scale - (float4)input_tail) * (float4) scale * (float4) output_scale + output_zp);
+
+    write_imageui(output, coord.xy, result.xyxy);
+    write_imageui(output, coord.wy, result.zwzw);
+}
+
+__kernel void gpuPooling_AvgNoPadQuant8_K3S1_M4_2D
+    (
+    __read_only  image2d_array_t  input,
+    __write_only image2d_t        output,
+    int                           inputWidth,
+    int                           inputHeight,
+    int                           inputHeightPad,
+    int                           pad_left,
+    int                           pad_top,
+    int                           outputHeight,
+    float                         input_scale,
+    float                         input_tail,
+    float                         output_scale,
+    float                         output_zp
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1) + coord.z * inputHeightPad, get_global_id(0), get_global_id(0));
+
+    int strideX = get_image2D_array_strideX(input);
+    uchar *src_ptr = get_image2D_array_ptr(input) + coord_in.y * strideX + coord_in.x;
+    uchar *src_ptr_line0 = src_ptr;
+    uchar *src_ptr_line1 = src_ptr_line0 + strideX;
+    uchar *src_ptr_line2 = src_ptr_line1 + strideX;
+
+    vxc_uchar16 src0 = vload16(0, (_viv_uchar_packed *)src_ptr_line0);
+    vxc_uchar16 src1 = vload16(0, (_viv_uchar_packed *)src_ptr_line1);
+    vxc_uchar16 src2 = vload16(0, (_viv_uchar_packed *)src_ptr_line2);
+
+    coord.y = coord.z * outputHeight + coord.y;
+    float4 scale = calculate_avg_scale4(3, inputWidth, inputHeight, pad_left, pad_top, 1, 1);
+
+    vxc_ushort8 src0_u16, src1_u16, src2_u16;
+    vxc_ushort8 data00, data10, data20;
+    src0 = src0.s08192a3b4c5d6e7f;
+    src1 = src1.s08192a3b4c5d6e7f;
+    src2 = src2.s08192a3b4c5d6e7f;
+    vxc_ushort8 bits = (vxc_ushort8)(8, 8, 8, 8, 8, 8, 8, 8);
+    vxc_ushort8 cfg =  (vxc_ushort8)(0, 0, 0, 0, 0, 0, 0, 0);
+
+    _viv_asm(COPY, src0_u16, src0, 16);
+    _viv_asm(COPY, src1_u16, src1, 16);
+    _viv_asm(COPY, src2_u16, src2, 16);
+    data00 = viv_bitfieldExtract(src0_u16, cfg, bits);
+    data10 = viv_bitfieldExtract(src1_u16, cfg, bits);
+    data20 = viv_bitfieldExtract(src2_u16, cfg, bits);
+
+    vxc_ushort8 value00 = data00 + data10 + data20;
+
+    value00 = value00 + value00.s12345670 + value00.s23456701;
+
+    uint4 bits1 = (uint4)(16, 16, 16, 16);
+    uint4 cfg1 = (uint4)(0, 16, 0, 16);
+    uint4 src;
+
+    _viv_asm(COPY, src, value00, 16);
+    uint4 result = viv_bitfieldExtract(src.xxyy, cfg1, bits1);
+
+    result = convert_uint4((convert_float4(result) * input_scale - (float4)input_tail) * (float4) scale * (float4) output_scale + output_zp);
+
+    write_imageui(output, coord.xy, result);
+}
+
+__kernel void gpuPooling_AvgNoPadQuant8_K3S2_M1_2D
+    (
+    __read_only  image2d_array_t  input,
+    __write_only image2d_t        output,
+    int                           inputWidth,
+    int                           inputHeight,
+    int                           inputHeightPad,
+    int                           pad_left,
+    int                           pad_top,
+    int                           outputHeight,
+    float                         input_scale,
+    float                         input_tail,
+    float                         output_scale,
+    float                         output_zp
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0) << 1, (get_global_id(1) << 1) + coord.z * inputHeightPad, get_global_id(0), get_global_id(0));
+
+    int strideX = get_image2D_array_strideX(input);
+    uchar *src_ptr = get_image2D_array_ptr(input) + coord_in.y * strideX + coord_in.x;
+    uchar *src_ptr_line0 = src_ptr;
+    uchar *src_ptr_line1 = src_ptr_line0 + strideX;
+    uchar *src_ptr_line2 = src_ptr_line1 + strideX;
+
+    vxc_uchar16 src0 = vload16(0, (_viv_uchar_packed *)src_ptr_line0);
+    vxc_uchar16 src1 = vload16(0, (_viv_uchar_packed *)src_ptr_line1);
+    vxc_uchar16 src2 = vload16(0, (_viv_uchar_packed *)src_ptr_line2);
+
+    coord.y = coord.z * outputHeight + coord.y;
+    coord.zw = coord.xx + (int2)(1, 2);
+    float4 scale = calculate_avg_scale4(3, inputWidth, inputHeight, pad_left, pad_top, 2, 2);
+
+    vxc_ushort8 src0_u16, src1_u16, src2_u16;
+    vxc_ushort8 data00, data10, data20;
+    vxc_ushort8 data01, data11, data21;
+    src0 = src0.s08192a3b4c5d6e7f;
+    src1 = src1.s08192a3b4c5d6e7f;
+    src2 = src2.s08192a3b4c5d6e7f;
+    vxc_ushort8 bits = (vxc_ushort8)(8, 8, 8, 8, 8, 8, 8, 8);
+    vxc_ushort8 cfg =  (vxc_ushort8)(0, 0, 0, 0, 0, 0, 0, 0);
+
+    _viv_asm(COPY, src0_u16, src0, 16);
+    _viv_asm(COPY, src1_u16, src1, 16);
+    _viv_asm(COPY, src2_u16, src2, 16);
+    data00 = viv_bitfieldExtract(src0_u16, cfg, bits);
+    data10 = viv_bitfieldExtract(src1_u16, cfg, bits);
+    data20 = viv_bitfieldExtract(src2_u16, cfg, bits);
+    data01 = viv_bitfieldExtract(src0_u16, bits, bits);
+    data11 = viv_bitfieldExtract(src1_u16, bits, bits);
+    data21 = viv_bitfieldExtract(src2_u16, bits, bits);
+
+    vxc_ushort8 value00 = data00 + data10 + data20;
+    vxc_ushort8 value01 = data01 + data11 + data21;
+
+    value01 = (vxc_ushort8)(value00.s2, value00.s4, value00.s6, value01.s0, value01.s1, value01.s2, value01.s3, value01.s4);
+    value00 = value00.s02461357 + value00.s13570246 + value01;
+
+    uint4 bits1 = (uint4)(16, 16, 16, 16);
+    uint4 cfg1 = (uint4)(0, 16, 0, 16);
+    uint4 src;
+
+    _viv_asm(COPY, src, value00, 16);
+    uint4 result = viv_bitfieldExtract(src.xxyy, cfg1, bits1);
+
+    result = convert_uint4((convert_float4(result) * input_scale - (float4)input_tail) * (float4) scale * (float4) output_scale + output_zp);
+
+    write_imageui(output, coord.xy, result.xxxx);
+    coord.x += 3;
+    write_imageui(output, coord.zy, result.yyyy);
+    write_imageui(output, coord.wy, result.zzzz);
+    write_imageui(output, coord.xy, result.wwww);
+}
+
+
+__kernel void gpuPooling_AvgNoPadQuant8_K3S2_M2_2D
+    (
+    __read_only  image2d_array_t  input,
+    __write_only image2d_t        output,
+    int                           inputWidth,
+    int                           inputHeight,
+    int                           inputHeightPad,
+    int                           pad_left,
+    int                           pad_top,
+    int                           outputHeight,
+    float                         input_scale,
+    float                         input_tail,
+    float                         output_scale,
+    float                         output_zp
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0) << 1, (get_global_id(1) << 1) + coord.z * inputHeightPad, get_global_id(0), get_global_id(0));
+
+    int strideX = get_image2D_array_strideX(input);
+    uchar *src_ptr = get_image2D_array_ptr(input) + coord_in.y * strideX + coord_in.x;
+    uchar *src_ptr_line0 = src_ptr;
+    uchar *src_ptr_line1 = src_ptr_line0 + strideX;
+    uchar *src_ptr_line2 = src_ptr_line1 + strideX;
+
+    vxc_uchar16 src0 = vload16(0, (_viv_uchar_packed *)src_ptr_line0);
+    vxc_uchar16 src1 = vload16(0, (_viv_uchar_packed *)src_ptr_line1);
+    vxc_uchar16 src2 = vload16(0, (_viv_uchar_packed *)src_ptr_line2);
+
+    coord.y = coord.z * outputHeight + coord.y;
+    coord.zw = coord.xx + (int2)(1, 2);
+    float4 scale = calculate_avg_scale4(3, inputWidth, inputHeight, pad_left, pad_top, 2, 2);
+
+    vxc_ushort8 src0_u16, src1_u16, src2_u16;
+    vxc_ushort8 data00, data10, data20;
+    vxc_ushort8 data01, data11, data21;
+    src0 = src0.s08192a3b4c5d6e7f;
+    src1 = src1.s08192a3b4c5d6e7f;
+    src2 = src2.s08192a3b4c5d6e7f;
+    vxc_ushort8 bits = (vxc_ushort8)(8, 8, 8, 8, 8, 8, 8, 8);
+    vxc_ushort8 cfg =  (vxc_ushort8)(0, 0, 0, 0, 0, 0, 0, 0);
+
+    _viv_asm(COPY, src0_u16, src0, 16);
+    _viv_asm(COPY, src1_u16, src1, 16);
+    _viv_asm(COPY, src2_u16, src2, 16);
+    data00 = viv_bitfieldExtract(src0_u16, cfg, bits);
+    data10 = viv_bitfieldExtract(src1_u16, cfg, bits);
+    data20 = viv_bitfieldExtract(src2_u16, cfg, bits);
+    data01 = viv_bitfieldExtract(src0_u16, bits, bits);
+    data11 = viv_bitfieldExtract(src1_u16, bits, bits);
+    data21 = viv_bitfieldExtract(src2_u16, bits, bits);
+
+    vxc_ushort8 value00 = data00 + data10 + data20;
+    vxc_ushort8 value01 = data01 + data11 + data21;
+
+    value01 = (vxc_ushort8)(value00.s2, value00.s4, value00.s6, value01.s0, value01.s1, value01.s2, value01.s3, value01.s4);
+    value00 = value00.s02461357 + value00.s13570246 + value01;
+
+    uint4 bits1 = (uint4)(16, 16, 16, 16);
+    uint4 cfg1 = (uint4)(0, 16, 0, 16);
+    uint4 src;
+
+    _viv_asm(COPY, src, value00, 16);
+    uint4 result = viv_bitfieldExtract(src.xxyy, cfg1, bits1);
+
+    result = convert_uint4((convert_float4(result) * input_scale - (float4)input_tail) * (float4) scale * (float4) output_scale + output_zp);
+
+    write_imageui(output, coord.xy, result.xyxy);
+    write_imageui(output, coord.wy, result.zwzw);
+}
+
+
+__kernel void gpuPooling_AvgNoPadQuant8_K3S2_M4_2D
+    (
+    __read_only  image2d_array_t  input,
+    __write_only image2d_t        output,
+    int                           inputWidth,
+    int                           inputHeight,
+    int                           inputHeightPad,
+    int                           pad_left,
+    int                           pad_top,
+    int                           outputHeight,
+    float                         input_scale,
+    float                         input_tail,
+    float                         output_scale,
+    float                         output_zp
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0) << 1, (get_global_id(1) << 1) + coord.z * inputHeightPad, get_global_id(0), get_global_id(0));
+
+    int strideX = get_image2D_array_strideX(input);
+    uchar *src_ptr = get_image2D_array_ptr(input) + coord_in.y * strideX + coord_in.x;
+    uchar *src_ptr_line0 = src_ptr;
+    uchar *src_ptr_line1 = src_ptr_line0 + strideX;
+    uchar *src_ptr_line2 = src_ptr_line1 + strideX;
+
+    vxc_uchar16 src0 = vload16(0, (_viv_uchar_packed *)src_ptr_line0);
+    vxc_uchar16 src1 = vload16(0, (_viv_uchar_packed *)src_ptr_line1);
+    vxc_uchar16 src2 = vload16(0, (_viv_uchar_packed *)src_ptr_line2);
+
+    coord.y = coord.z * outputHeight + coord.y;
+    float4 scale = calculate_avg_scale4(3, inputWidth, inputHeight, pad_left, pad_top, 2, 2);
+
+    vxc_ushort8 src0_u16, src1_u16, src2_u16;
+    vxc_ushort8 data00, data10, data20;
+    vxc_ushort8 data01, data11, data21;
+    src0 = src0.s08192a3b4c5d6e7f;
+    src1 = src1.s08192a3b4c5d6e7f;
+    src2 = src2.s08192a3b4c5d6e7f;
+    vxc_ushort8 bits = (vxc_ushort8)(8, 8, 8, 8, 8, 8, 8, 8);
+    vxc_ushort8 cfg =  (vxc_ushort8)(0, 0, 0, 0, 0, 0, 0, 0);
+
+    _viv_asm(COPY, src0_u16, src0, 16);
+    _viv_asm(COPY, src1_u16, src1, 16);
+    _viv_asm(COPY, src2_u16, src2, 16);
+    data00 = viv_bitfieldExtract(src0_u16, cfg, bits);
+    data10 = viv_bitfieldExtract(src1_u16, cfg, bits);
+    data20 = viv_bitfieldExtract(src2_u16, cfg, bits);
+    data01 = viv_bitfieldExtract(src0_u16, bits, bits);
+    data11 = viv_bitfieldExtract(src1_u16, bits, bits);
+    data21 = viv_bitfieldExtract(src2_u16, bits, bits);
+
+    vxc_ushort8 value00 = data00 + data10 + data20;
+    vxc_ushort8 value01 = data01 + data11 + data21;
+
+    value01 = (vxc_ushort8)(value00.s2, value00.s4, value00.s6, value01.s0, value01.s1, value01.s2, value01.s3, value01.s4);
+    value00 = value00.s02461357 + value00.s13570246 + value01;
+
+    uint4 bits1 = (uint4)(16, 16, 16, 16);
+    uint4 cfg1 = (uint4)(0, 16, 0, 16);
+    uint4 src;
+
+    _viv_asm(COPY, src, value00, 16);
+    uint4 result = viv_bitfieldExtract(src.xxyy, cfg1, bits1);
+
+    result = convert_uint4((convert_float4(result) * input_scale - (float4)input_tail) * (float4) scale * (float4) output_scale + output_zp);
+
+    write_imageui(output, coord.xy, result);
 }

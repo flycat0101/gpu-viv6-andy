@@ -9190,6 +9190,8 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
         }
         else
         {
+            vx_uint32  operation_idx           = 0;
+            vx_uint32  numTmpTensor            = 0;
             vx_bool kernel_MaxPool_flag[5]     = {vx_false_e};
             vx_bool dataformat_MaxPool_flag[6] = {vx_false_e};
             vx_bool maxPool_flag               = vx_false_e;
@@ -9342,9 +9344,118 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
 
                     if(avgPool_flag)
                     {
-                        shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_AVGPOOLING, &node->kernelAttributes.borderMode,
-                                        inputs, pool_type_s, stride_s, stride_y, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
-                                        pool_pad_y_bottom, rounding_s, outputs);
+                        vx_tensor tensorCopy       = NULL;
+                        vx_bool enable_2d_img  = (vx_bool)(TENSOR_VIEW_SIZE_INDEX(inputs, 1) * TENSOR_VIEW_SIZE_INDEX(inputs, 2) < IMG_MAX_WIDTH);
+                        vx_bool is_copy_tensor = ((inputdata_format == VX_TYPE_UINT8) && (3 == poolSizeXValue) && (3 == poolSizeYValue)
+                            && (stride == 1 || stride == 2) && enable_2d_img && outputdata_format == VX_TYPE_UINT8
+                            && (pool_pad_x_left == 1 || pool_pad_x_right == 1 || pool_pad_y_top == 1 || pool_pad_y_bottom == 1));
+
+                        if (is_copy_tensor)
+                        {
+                            vx_tensor_create_params_t tensor_create_params;
+                            vx_uint32 sizes[]       = {1, 1, 1, 1};
+                            vx_uint32 inputWidth   = 0;
+                            vx_uint32 copy_dims     = TENSOR_DIM_NUM(inputs);
+                            gctPOINTER inputLogical = VX_NULL;
+                            vx_uint8   inputZP      = (vx_uint8)TENSOR_TF_ZEROPOINT(inputs);
+                            vx_uint32  copy_size     = 0;
+                            vx_int32      padLeftv                       = 0;
+                            vx_int32      padRightv                      = 0;
+                            vx_int32      padTopv                        = 0;
+                            vx_int32      padBottomv                     = 0;
+                            vx_scalar     padLeft                        = VX_NULL;
+                            vx_scalar     padTop                         = VX_NULL;
+                            vx_scalar     padXLeft                       = VX_NULL;
+                            vx_scalar     padYTop                        = VX_NULL;
+
+
+                            sizes[0] = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+                            sizes[1] = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+                            sizes[2] = copy_dims > 2 ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
+                            sizes[3] = copy_dims > 3 ? TENSOR_VIEW_SIZE_INDEX(inputs, 3) : 1;
+                            sizes[0] = sizes[0] + pool_pad_x_left + pool_pad_x_right;
+                            inputWidth = sizes[0];
+                            sizes[1] = sizes[1] + pool_pad_y_top + pool_pad_y_bottom;
+                            if (sizes[0] % 4 != 0)
+                            {
+                                sizes[0] = gcmALIGN(sizes[0], 4);
+                            }
+                            gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+                            tensor_create_params.num_of_dims = copy_dims;
+                            tensor_create_params.sizes = sizes;
+                            tensor_create_params.data_format = TENSOR_DATA_TYPE(inputs);
+                            tensor_create_params.quant_format = TENSOR_QUANT_TYPE(inputs);
+                            if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+                            {
+                                tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(inputs);
+                            }
+                            else
+                            {
+                                tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(inputs);
+                                tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
+                            }
+                            tensorCopy = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_false_e);
+                            if (tensorCopy == VX_NULL || vxoTensor_AllocateMemory(tensorCopy) != VX_SUCCESS)
+                            {
+                                vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+                                status = VX_ERROR_NO_MEMORY;
+                                goto exit;
+                            }
+                            vxoTensor_GetTensorViewMemory(tensorCopy, &inputLogical, VX_NULL);
+                            copy_size = sizes[0] * sizes[1] * sizes[2] * sizes[3];
+                            gcoOS_MemFill(inputLogical, inputZP, copy_size);
+                            padLeftv   = 0;
+                            padRightv  = 0;
+                            padTopv    = 0;
+                            padBottomv = 0;
+                            padLeft   = vxCreateScalar(context, VX_TYPE_INT32, &padLeftv);
+                            padTop  = vxCreateScalar(context, VX_TYPE_INT32, &padTopv);
+                            padXLeft    = vxCreateScalar(context, VX_TYPE_INT32, &pool_pad_x_left);
+                            padYTop = vxCreateScalar(context, VX_TYPE_INT32, &pool_pad_y_top);
+
+                            shaderExecutable = vxnneGPUTensorCopyROIShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPYROI,
+                                &node->kernelAttributes.borderMode,
+                                padLeft, padTop, padXLeft, padYTop, inputs, tensorCopy);
+                            if (!shaderExecutable)
+                            {
+                                status = VX_FAILURE;
+                                goto exit;
+                            }
+
+                            status = vxnneShaderOperation_Initialize(&poolingLayer->pooling_tensorcopy_sh_operation,
+                                &poolingLayer->base,
+                                VXNNE_OPERATOR_DEPTHWISE_CONV,
+                                batchCount,
+                                shaderExecutable);
+
+                            if (status != VX_SUCCESS) goto exit;
+
+                            vxnneLayer_SetOperation(
+                                &poolingLayer->base,
+                                &poolingLayer->pooling_tensorcopy_sh_operation.base,
+                                operation_idx++);
+
+                            vxnneOperation_AddReference(&poolingLayer->pooling_tensorcopy_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+                            vxnneOperation_AddReference(&poolingLayer->pooling_tensorcopy_sh_operation.base, (vx_reference)tensorCopy, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+
+                            if(padLeft) vxReleaseScalar(&padLeft);
+                            if(padTop) vxReleaseScalar(&padTop);
+                            if(padXLeft) vxReleaseScalar(&padXLeft);
+                            if(padYTop) vxReleaseScalar(&padYTop);
+                            poolingLayer->base.temp_tensors[numTmpTensor++] = tensorCopy;
+                            poolingLayer->base.num_temp_tensors = numTmpTensor;
+                        }
+                        else
+                        {
+                            tensorCopy = inputs;
+                        }
+
+                        shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(
+                        node->base.context, VXNNE_KERNEL_AVGPOOLING, &node->kernelAttributes.borderMode,
+                        tensorCopy, pool_type_s, stride_s, stride_y, pool_size_x_s, pool_size_y_s, pool_pad_x_left,
+                        pool_pad_y_top, pool_pad_x_right, pool_pad_y_bottom, rounding_s, is_copy_tensor,
+                        TENSOR_VIEW_SIZE_INDEX(inputs, 0), TENSOR_VIEW_SIZE_INDEX(inputs, 1), outputs);
                     }
                     else if (enable_L2Pool_SH)
                     {
@@ -9390,7 +9501,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                 vxnneLayer_SetOperation(
                     &poolingLayer->base,
                     &poolingLayer->pooling_sh_operation.base,
-                    0);
+                    operation_idx++);
 
                 if (stride_s) (vxReleaseScalar(&stride_s));
             }
@@ -26764,7 +26875,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
             else
             {
                 shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_AVGPOOLING, &node->kernelAttributes.borderMode,
-                    transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, pad_x_left, pad_y_top, NULL, dst);
+                    transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, pad_x_left, pad_y_top, NULL, vx_false_e, 0, 0, dst);
             }
 
             if (stride_s)  vxReleaseScalar(&stride_s);
