@@ -4840,28 +4840,30 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
 
         case TP_MAX_POOLING:
         {
+            vx_uint32 poolSize = gcmMAX(conv_cmd_ptr->pool_size_x, conv_cmd_ptr->pool_size_y);/*HW only support 2*2 3*3*/
             poolingStride = conv_cmd_ptr->pool_stride;
 
             if (poolingStride == 1)
             {
                 info->vx_nn_tp_cmd_info.aluHorzProcessing = 0x1;
-                info->vx_nn_tp_cmd_info.aluHorzProcCount = conv_cmd_ptr->pool_size_x - 1;
+                info->vx_nn_tp_cmd_info.aluHorzProcCount = poolSize - 1;
                 info->vx_nn_tp_cmd_info.aluHorzProcStride = 0;
                 info->vx_nn_tp_cmd_info.aluVertProcessing = 0x1;
-                info->vx_nn_tp_cmd_info.aluVertProcCount = conv_cmd_ptr->pool_size_y - 1;
+                info->vx_nn_tp_cmd_info.aluVertProcCount = poolSize - 1;
                 info->vx_nn_tp_cmd_info.aluVertProcStride = 0;
             }
             else if (conv_cmd_ptr->pool_size_x != 1)
             {
                 info->vx_nn_tp_cmd_info.aluHorzProcessing = 0x3;
-                info->vx_nn_tp_cmd_info.aluHorzProcCount = conv_cmd_ptr->pool_size_x - 1;
-                info->vx_nn_tp_cmd_info.aluHorzProcStride = conv_cmd_ptr->pool_size_x == poolingStride ?
+                info->vx_nn_tp_cmd_info.aluHorzProcCount = poolSize - 1;
+                info->vx_nn_tp_cmd_info.aluHorzProcStride = ((info->vx_nn_tp_cmd_info.aluHorzProcCount + 1) == poolingStride) ?
                     0x0 : 0x1;
                 info->vx_nn_tp_cmd_info.aluVertProcessing = 0x3;
-                info->vx_nn_tp_cmd_info.aluVertProcCount = conv_cmd_ptr->pool_size_y - 1;
-                info->vx_nn_tp_cmd_info.aluVertProcStride = conv_cmd_ptr->pool_size_y == poolingStride ?
+                info->vx_nn_tp_cmd_info.aluVertProcCount = poolSize - 1;
+                info->vx_nn_tp_cmd_info.aluVertProcStride = ((info->vx_nn_tp_cmd_info.aluVertProcCount + 1) == poolingStride) ?
                     0x0 : 0x1;
             }
+            vxmASSERT(info->vx_nn_tp_cmd_info.aluHorzProcCount == info->vx_nn_tp_cmd_info.aluVertProcCount);
 
             info->vx_nn_tp_cmd_info.inImageGlobalMem = 1;
             info->vx_nn_tp_cmd_info.aluSquarePreshift = 0;
