@@ -3692,27 +3692,6 @@ gckVIDMEM_NODE_UnlockCPU(
     {
         if (FromUser)
         {
-#ifdef __QNXNTO__
-            /* Do nothing here. */
-#else
-            /* Unmap the video memory. */
-            if (node->VidMem.logical != gcvNULL)
-            {
-                gckKERNEL_UnmapVideoMemory(
-                    Kernel,
-                    node->VidMem.pool,
-                    node->VidMem.physical,
-                    node->VidMem.logical,
-                    node->VidMem.processID,
-                    node->VidMem.bytes
-                    );
-
-                node->VidMem.logical = gcvNULL;
-            }
-
-            /* Reset. */
-            node->VidMem.processID = 0;
-#endif
         }
         else
         {
