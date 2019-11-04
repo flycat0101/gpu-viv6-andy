@@ -10140,7 +10140,7 @@ VkResult halti5_bindDescriptors(
         __VK_ASSERT(!"unknown pipeline binding point");
         break;
     }
-    __VK_ASSERT(firstSet + setCount < __VK_MAX_DESCRIPTOR_SETS);
+    __VK_ASSERT(firstSet + setCount - 1 < __VK_MAX_DESCRIPTOR_SETS);
     for (i = 0; i < setCount; i++)
     {
         uint32_t setIdx = i + firstSet;
