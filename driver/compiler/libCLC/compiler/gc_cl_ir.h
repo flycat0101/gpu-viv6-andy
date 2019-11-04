@@ -220,11 +220,17 @@ typedef enum _cleELEMENT_TYPE
     clvTYPE_IU_GEN,
     clvTYPE_F_GEN,
     clvTYPE_GEN,
+    clvTYPE_I_GEN_PACKED,
+    clvTYPE_U_GEN_PACKED,
+    clvTYPE_IU_GEN_PACKED,
+    clvTYPE_F_GEN_PACKED,
     clvTYPE_GEN_PACKED,
 } cltELEMENT_TYPE;
 
 #define cldFirstGenType clvTYPE_SIU_GEN
-#define cldLastGenType clvTYPE_GEN
+#define cldLastGenType clvTYPE_GEN_PACKED
+#define cldFirstGenTypePacked clvTYPE_I_GEN_PACKED
+#define cldLastGenTypePacked clvTYPE_GEN_PACKED
 #define cldLowestRankedInteger  clvTYPE_BOOL
 #define cldHighestRankedInteger clvTYPE_ULONG
 #define cldLowestRankedFloat clvTYPE_HALF
@@ -237,7 +243,7 @@ typedef enum _cleELEMENT_TYPE
 #define cldArithmeticTypeCount (cldHighestRankedFloat - cldLowestRankedInteger + 1)
 
 #define clmIsElementTypePackedGenType(EType)    \
-    ((EType) == clvTYPE_GEN_PACKED)
+  ((EType) >= cldFirstGenTypePacked && (EType) <= cldLastGenTypePacked)
 
 #define clmIsElementTypeBoolean(EType) \
    (((EType) == clvTYPE_BOOL) || \
@@ -661,7 +667,7 @@ IN clsDECL * RDecl
   clmIsElementTypeGenType((D)->elementType)
 
 #define clmDATA_TYPE_IsPackedGenType(D) \
-  ((D)->elementType == clvTYPE_GEN_PACKED)
+  clmIsElementTypePackedGenType((D)->elementType)
 
 #define clmDATA_TYPE_vectorSize_GET(d) ((d)->matrixSize.columnCount? (gctUINT)0 : (d)->matrixSize.rowCount)
 #define clmDATA_TYPE_vectorSize_NOCHECK_GET(d) ((d)->matrixSize.rowCount)

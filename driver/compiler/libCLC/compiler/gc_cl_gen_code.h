@@ -116,6 +116,8 @@ clsGEN_CODE_DATA_TYPE;
 
 #define clmGEN_CODE_IsVectorDataType(d) ((clmGEN_CODE_vectorSize_GET(d) !=0) || clmIsElementTypePackedGenType((d).elementType))
 
+#define clmGEN_CODE_IsGenTypeDataType(d)  clmIsElementTypeGenType((d).elementType)
+
 #define clmGEN_CODE_IsExtendedVectorType(d) \
   (clmIsElementTypePacked((d).elementType) || \
    (clmGEN_CODE_IsVectorDataType(d) && \

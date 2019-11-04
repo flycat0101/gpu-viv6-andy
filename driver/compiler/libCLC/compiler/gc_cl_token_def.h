@@ -13,7 +13,6 @@
 
 #ifndef __gc_cl_token_def_h_
 #define __gc_cl_token_def_h_
-
 /* Tokens.  */
 #ifndef YYTOKENTYPE
 # define YYTOKENTYPE
@@ -177,89 +176,93 @@
      T_HALF16_PACKED = 412,
      T_HALF32_PACKED = 413,
      T_GENTYPE_PACKED = 414,
-     T_FLOATNXM = 415,
-     T_DOUBLENXM = 416,
-     T_BUILTIN_DATA_TYPE = 417,
-     T_RESERVED_DATA_TYPE = 418,
-     T_VIV_PACKED_DATA_TYPE = 419,
-     T_IDENTIFIER = 420,
-     T_TYPE_NAME = 421,
-     T_FLOATCONSTANT = 422,
-     T_UINTCONSTANT = 423,
-     T_INTCONSTANT = 424,
-     T_BOOLCONSTANT = 425,
-     T_CHARCONSTANT = 426,
-     T_STRING_LITERAL = 427,
-     T_FIELD_SELECTION = 428,
-     T_LSHIFT_OP = 429,
-     T_RSHIFT_OP = 430,
-     T_INC_OP = 431,
-     T_DEC_OP = 432,
-     T_LE_OP = 433,
-     T_GE_OP = 434,
-     T_EQ_OP = 435,
-     T_NE_OP = 436,
-     T_AND_OP = 437,
-     T_OR_OP = 438,
-     T_XOR_OP = 439,
-     T_MUL_ASSIGN = 440,
-     T_DIV_ASSIGN = 441,
-     T_ADD_ASSIGN = 442,
-     T_MOD_ASSIGN = 443,
-     T_LEFT_ASSIGN = 444,
-     T_RIGHT_ASSIGN = 445,
-     T_AND_ASSIGN = 446,
-     T_XOR_ASSIGN = 447,
-     T_OR_ASSIGN = 448,
-     T_SUB_ASSIGN = 449,
-     T_STRUCT_UNION_PTR = 450,
-     T_INITIALIZER_END = 451,
-     T_BREAK = 452,
-     T_CONTINUE = 453,
-     T_RETURN = 454,
-     T_GOTO = 455,
-     T_WHILE = 456,
-     T_FOR = 457,
-     T_DO = 458,
-     T_ELSE = 459,
-     T_IF = 460,
-     T_SWITCH = 461,
-     T_CASE = 462,
-     T_DEFAULT = 463,
-     T_CONST = 464,
-     T_RESTRICT = 465,
-     T_VOLATILE = 466,
-     T_STATIC = 467,
-     T_EXTERN = 468,
-     T_CONSTANT = 469,
-     T_GLOBAL = 470,
-     T_LOCAL = 471,
-     T_PRIVATE = 472,
-     T_KERNEL = 473,
-     T_UNIFORM = 474,
-     T_READ_ONLY = 475,
-     T_WRITE_ONLY = 476,
-     T_PACKED = 477,
-     T_ALIGNED = 478,
-     T_ENDIAN = 479,
-     T_VEC_TYPE_HINT = 480,
-     T_ATTRIBUTE__ = 481,
-     T_REQD_WORK_GROUP_SIZE = 482,
-     T_WORK_GROUP_SIZE_HINT = 483,
-     T_KERNEL_SCALE_HINT = 484,
-     T_ALWAYS_INLINE = 485,
-     T_UNSIGNED = 486,
-     T_STRUCT = 487,
-     T_UNION = 488,
-     T_TYPEDEF = 489,
-     T_ENUM = 490,
-     T_INLINE = 491,
-     T_SIZEOF = 492,
-     T_TYPE_CAST = 493,
-     T_VEC_STEP = 494,
-     T_TYPEOF = 495,
-     T_ASM_OPND_BRACKET = 496,
-     T_VERY_LAST_TERMINAL = 497
+     T_F_GENTYPE_PACKED = 415,
+     T_IU_GENTYPE_PACKED = 416,
+     T_I_GENTYPE_PACKED = 417,
+     T_U_GENTYPE_PACKED = 418,
+     T_FLOATNXM = 419,
+     T_DOUBLENXM = 420,
+     T_BUILTIN_DATA_TYPE = 421,
+     T_RESERVED_DATA_TYPE = 422,
+     T_VIV_PACKED_DATA_TYPE = 423,
+     T_IDENTIFIER = 424,
+     T_TYPE_NAME = 425,
+     T_FLOATCONSTANT = 426,
+     T_UINTCONSTANT = 427,
+     T_INTCONSTANT = 428,
+     T_BOOLCONSTANT = 429,
+     T_CHARCONSTANT = 430,
+     T_STRING_LITERAL = 431,
+     T_FIELD_SELECTION = 432,
+     T_LSHIFT_OP = 433,
+     T_RSHIFT_OP = 434,
+     T_INC_OP = 435,
+     T_DEC_OP = 436,
+     T_LE_OP = 437,
+     T_GE_OP = 438,
+     T_EQ_OP = 439,
+     T_NE_OP = 440,
+     T_AND_OP = 441,
+     T_OR_OP = 442,
+     T_XOR_OP = 443,
+     T_MUL_ASSIGN = 444,
+     T_DIV_ASSIGN = 445,
+     T_ADD_ASSIGN = 446,
+     T_MOD_ASSIGN = 447,
+     T_LEFT_ASSIGN = 448,
+     T_RIGHT_ASSIGN = 449,
+     T_AND_ASSIGN = 450,
+     T_XOR_ASSIGN = 451,
+     T_OR_ASSIGN = 452,
+     T_SUB_ASSIGN = 453,
+     T_STRUCT_UNION_PTR = 454,
+     T_INITIALIZER_END = 455,
+     T_BREAK = 456,
+     T_CONTINUE = 457,
+     T_RETURN = 458,
+     T_GOTO = 459,
+     T_WHILE = 460,
+     T_FOR = 461,
+     T_DO = 462,
+     T_ELSE = 463,
+     T_IF = 464,
+     T_SWITCH = 465,
+     T_CASE = 466,
+     T_DEFAULT = 467,
+     T_CONST = 468,
+     T_RESTRICT = 469,
+     T_VOLATILE = 470,
+     T_STATIC = 471,
+     T_EXTERN = 472,
+     T_CONSTANT = 473,
+     T_GLOBAL = 474,
+     T_LOCAL = 475,
+     T_PRIVATE = 476,
+     T_KERNEL = 477,
+     T_UNIFORM = 478,
+     T_READ_ONLY = 479,
+     T_WRITE_ONLY = 480,
+     T_PACKED = 481,
+     T_ALIGNED = 482,
+     T_ENDIAN = 483,
+     T_VEC_TYPE_HINT = 484,
+     T_ATTRIBUTE__ = 485,
+     T_REQD_WORK_GROUP_SIZE = 486,
+     T_WORK_GROUP_SIZE_HINT = 487,
+     T_KERNEL_SCALE_HINT = 488,
+     T_ALWAYS_INLINE = 489,
+     T_UNSIGNED = 490,
+     T_STRUCT = 491,
+     T_UNION = 492,
+     T_TYPEDEF = 493,
+     T_ENUM = 494,
+     T_INLINE = 495,
+     T_SIZEOF = 496,
+     T_TYPE_CAST = 497,
+     T_VEC_STEP = 498,
+     T_TYPEOF = 499,
+     T_ASM_OPND_BRACKET = 500,
+     T_VERY_LAST_TERMINAL = 501
    };
 #endif
 #define T_VERY_FIRST_TERMINAL 258
@@ -419,89 +422,93 @@
 #define T_HALF16_PACKED 412
 #define T_HALF32_PACKED 413
 #define T_GENTYPE_PACKED 414
-#define T_FLOATNXM 415
-#define T_DOUBLENXM 416
-#define T_BUILTIN_DATA_TYPE 417
-#define T_RESERVED_DATA_TYPE 418
-#define T_VIV_PACKED_DATA_TYPE 419
-#define T_IDENTIFIER 420
-#define T_TYPE_NAME 421
-#define T_FLOATCONSTANT 422
-#define T_UINTCONSTANT 423
-#define T_INTCONSTANT 424
-#define T_BOOLCONSTANT 425
-#define T_CHARCONSTANT 426
-#define T_STRING_LITERAL 427
-#define T_FIELD_SELECTION 428
-#define T_LSHIFT_OP 429
-#define T_RSHIFT_OP 430
-#define T_INC_OP 431
-#define T_DEC_OP 432
-#define T_LE_OP 433
-#define T_GE_OP 434
-#define T_EQ_OP 435
-#define T_NE_OP 436
-#define T_AND_OP 437
-#define T_OR_OP 438
-#define T_XOR_OP 439
-#define T_MUL_ASSIGN 440
-#define T_DIV_ASSIGN 441
-#define T_ADD_ASSIGN 442
-#define T_MOD_ASSIGN 443
-#define T_LEFT_ASSIGN 444
-#define T_RIGHT_ASSIGN 445
-#define T_AND_ASSIGN 446
-#define T_XOR_ASSIGN 447
-#define T_OR_ASSIGN 448
-#define T_SUB_ASSIGN 449
-#define T_STRUCT_UNION_PTR 450
-#define T_INITIALIZER_END 451
-#define T_BREAK 452
-#define T_CONTINUE 453
-#define T_RETURN 454
-#define T_GOTO 455
-#define T_WHILE 456
-#define T_FOR 457
-#define T_DO 458
-#define T_ELSE 459
-#define T_IF 460
-#define T_SWITCH 461
-#define T_CASE 462
-#define T_DEFAULT 463
-#define T_CONST 464
-#define T_RESTRICT 465
-#define T_VOLATILE 466
-#define T_STATIC 467
-#define T_EXTERN 468
-#define T_CONSTANT 469
-#define T_GLOBAL 470
-#define T_LOCAL 471
-#define T_PRIVATE 472
-#define T_KERNEL 473
-#define T_UNIFORM 474
-#define T_READ_ONLY 475
-#define T_WRITE_ONLY 476
-#define T_PACKED 477
-#define T_ALIGNED 478
-#define T_ENDIAN 479
-#define T_VEC_TYPE_HINT 480
-#define T_ATTRIBUTE__ 481
-#define T_REQD_WORK_GROUP_SIZE 482
-#define T_WORK_GROUP_SIZE_HINT 483
-#define T_KERNEL_SCALE_HINT 484
-#define T_ALWAYS_INLINE 485
-#define T_UNSIGNED 486
-#define T_STRUCT 487
-#define T_UNION 488
-#define T_TYPEDEF 489
-#define T_ENUM 490
-#define T_INLINE 491
-#define T_SIZEOF 492
-#define T_TYPE_CAST 493
-#define T_VEC_STEP 494
-#define T_TYPEOF 495
-#define T_ASM_OPND_BRACKET 496
-#define T_VERY_LAST_TERMINAL 497
+#define T_F_GENTYPE_PACKED 415
+#define T_IU_GENTYPE_PACKED 416
+#define T_I_GENTYPE_PACKED 417
+#define T_U_GENTYPE_PACKED 418
+#define T_FLOATNXM 419
+#define T_DOUBLENXM 420
+#define T_BUILTIN_DATA_TYPE 421
+#define T_RESERVED_DATA_TYPE 422
+#define T_VIV_PACKED_DATA_TYPE 423
+#define T_IDENTIFIER 424
+#define T_TYPE_NAME 425
+#define T_FLOATCONSTANT 426
+#define T_UINTCONSTANT 427
+#define T_INTCONSTANT 428
+#define T_BOOLCONSTANT 429
+#define T_CHARCONSTANT 430
+#define T_STRING_LITERAL 431
+#define T_FIELD_SELECTION 432
+#define T_LSHIFT_OP 433
+#define T_RSHIFT_OP 434
+#define T_INC_OP 435
+#define T_DEC_OP 436
+#define T_LE_OP 437
+#define T_GE_OP 438
+#define T_EQ_OP 439
+#define T_NE_OP 440
+#define T_AND_OP 441
+#define T_OR_OP 442
+#define T_XOR_OP 443
+#define T_MUL_ASSIGN 444
+#define T_DIV_ASSIGN 445
+#define T_ADD_ASSIGN 446
+#define T_MOD_ASSIGN 447
+#define T_LEFT_ASSIGN 448
+#define T_RIGHT_ASSIGN 449
+#define T_AND_ASSIGN 450
+#define T_XOR_ASSIGN 451
+#define T_OR_ASSIGN 452
+#define T_SUB_ASSIGN 453
+#define T_STRUCT_UNION_PTR 454
+#define T_INITIALIZER_END 455
+#define T_BREAK 456
+#define T_CONTINUE 457
+#define T_RETURN 458
+#define T_GOTO 459
+#define T_WHILE 460
+#define T_FOR 461
+#define T_DO 462
+#define T_ELSE 463
+#define T_IF 464
+#define T_SWITCH 465
+#define T_CASE 466
+#define T_DEFAULT 467
+#define T_CONST 468
+#define T_RESTRICT 469
+#define T_VOLATILE 470
+#define T_STATIC 471
+#define T_EXTERN 472
+#define T_CONSTANT 473
+#define T_GLOBAL 474
+#define T_LOCAL 475
+#define T_PRIVATE 476
+#define T_KERNEL 477
+#define T_UNIFORM 478
+#define T_READ_ONLY 479
+#define T_WRITE_ONLY 480
+#define T_PACKED 481
+#define T_ALIGNED 482
+#define T_ENDIAN 483
+#define T_VEC_TYPE_HINT 484
+#define T_ATTRIBUTE__ 485
+#define T_REQD_WORK_GROUP_SIZE 486
+#define T_WORK_GROUP_SIZE_HINT 487
+#define T_KERNEL_SCALE_HINT 488
+#define T_ALWAYS_INLINE 489
+#define T_UNSIGNED 490
+#define T_STRUCT 491
+#define T_UNION 492
+#define T_TYPEDEF 493
+#define T_ENUM 494
+#define T_INLINE 495
+#define T_SIZEOF 496
+#define T_TYPE_CAST 497
+#define T_VEC_STEP 498
+#define T_TYPEOF 499
+#define T_ASM_OPND_BRACKET 500
+#define T_VERY_LAST_TERMINAL 501
 
 
 
@@ -531,8 +538,8 @@ typedef union YYSTYPE {
     clsASM_MODIFIER     asmModifier;
     clsASM_MODIFIERS    asmModifiers;
 } YYSTYPE;
-/* Line 1250 of yacc.c.  */
-#line 544 "gc_cl.tab.h"
+/* Line 1275 of yacc.c.  */
+#line 553 "gc_cl.tab.h"
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1

@@ -108,7 +108,7 @@ clsBUILTIN_DATATYPE_INFO clBuiltinDataTypes[] =
     {T_MAT8,  T_MAT8, T_FLOAT8, {clvTYPE_FLOAT, {8,8}}, clvPOLYNARY_CONSTRUCT_MATRIX, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
     {T_MAT16, T_MAT16, T_FLOAT16, {clvTYPE_FLOAT, {16,16}}, clvPOLYNARY_CONSTRUCT_MATRIX, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
 
-    {T_BOOL,   T_BOOL, T_BOOL, {clvTYPE_BOOL, {0, 0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvFALSE, {{gcvNULL, }, }, "b", VIR_TYPE_BOOLEAN},
+    {T_BOOL,   T_BOOL_PACKED, T_BOOL, {clvTYPE_BOOL, {0, 0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvFALSE, {{gcvNULL, }, }, "b", VIR_TYPE_BOOLEAN},
     {T_BOOL2,  T_BOOL2_PACKED, T_BOOL, {clvTYPE_BOOL, {2, 0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv2_b", VIR_TYPE_BOOLEAN_X2},
     {T_BOOL3,  T_BOOL3_PACKED, T_BOOL, {clvTYPE_BOOL, {3, 0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv3_b", VIR_TYPE_BOOLEAN_X3},
     {T_BOOL4,  T_BOOL4_PACKED, T_BOOL, {clvTYPE_BOOL, {4, 0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv4_b", VIR_TYPE_BOOLEAN_X4},
@@ -116,7 +116,7 @@ clsBUILTIN_DATATYPE_INFO clBuiltinDataTypes[] =
     {T_BOOL16, T_BOOL16_PACKED, T_BOOL, {clvTYPE_BOOL, {16, 0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv16_b", VIR_TYPE_BOOLEAN_X16},
     {T_BOOL32, T_BOOL32_PACKED, T_BOOL, {clvTYPE_BOOL, {32, 0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv32_b", VIR_TYPE_BOOLEAN_X32},
 
-    {T_HALF,   T_HALF, T_HALF, {clvTYPE_HALF, {0,0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvFALSE, {{gcvNULL, }, }, "Dh", VIR_TYPE_FLOAT16},
+    {T_HALF,   T_HALF_PACKED, T_HALF, {clvTYPE_HALF, {0,0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvFALSE, {{gcvNULL, }, }, "Dh", VIR_TYPE_FLOAT16},
     {T_HALF2,  T_HALF2_PACKED, T_HALF, {clvTYPE_HALF, {2,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv2_Dh", VIR_TYPE_FLOAT16_X2},
     {T_HALF3,  T_HALF3_PACKED, T_HALF, {clvTYPE_HALF, {3,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv3_Dh", VIR_TYPE_FLOAT16_X3},
     {T_HALF4,  T_HALF4_PACKED, T_HALF, {clvTYPE_HALF, {4,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv4_Dh", VIR_TYPE_FLOAT16_X4},
@@ -145,7 +145,7 @@ clsBUILTIN_DATATYPE_INFO clBuiltinDataTypes[] =
     {T_QUAD8,   T_QUAD8, T_QUAD, {clvTYPE_QUAD, {8,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv8_g", VIR_TYPE_UNKNOWN},
     {T_QUAD16,  T_QUAD16, T_QUAD, {clvTYPE_QUAD, {16,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv16_g", VIR_TYPE_UNKNOWN},
 
-    {T_CHAR,   T_CHAR, T_CHAR, {clvTYPE_CHAR, {0,0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvFALSE, {{gcvNULL, }, }, "c", VIR_TYPE_INT8},
+    {T_CHAR,   T_CHAR_PACKED, T_CHAR, {clvTYPE_CHAR, {0,0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvFALSE, {{gcvNULL, }, }, "c", VIR_TYPE_INT8},
     {T_CHAR2,  T_CHAR2_PACKED, T_CHAR, {clvTYPE_CHAR, {2,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv2_c", VIR_TYPE_INT8_X2},
     {T_CHAR3,  T_CHAR3_PACKED, T_CHAR, {clvTYPE_CHAR, {3,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv3_c", VIR_TYPE_INT8_X3},
     {T_CHAR4,  T_CHAR4_PACKED, T_CHAR, {clvTYPE_CHAR, {4,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv4_c", VIR_TYPE_INT8_X4},
@@ -153,7 +153,7 @@ clsBUILTIN_DATATYPE_INFO clBuiltinDataTypes[] =
     {T_CHAR16, T_CHAR16_PACKED, T_CHAR, {clvTYPE_CHAR, {16,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv16_c", VIR_TYPE_INT8_X16},
     {T_CHAR32, T_CHAR32_PACKED, T_CHAR, {clvTYPE_CHAR, {32,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv32_c", VIR_TYPE_INT8_X32},
 
-    {T_UCHAR,   T_UCHAR, T_UCHAR,  {clvTYPE_UCHAR, {0,0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvTRUE, {{gcvNULL, }, }, "h", VIR_TYPE_UINT8},
+    {T_UCHAR,   T_UCHAR_PACKED, T_UCHAR,  {clvTYPE_UCHAR, {0,0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvTRUE, {{gcvNULL, }, }, "h", VIR_TYPE_UINT8},
     {T_UCHAR2,  T_UCHAR2_PACKED, T_UCHAR, {clvTYPE_UCHAR, {2,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvTRUE, {{gcvNULL, }, }, "Dv2_h", VIR_TYPE_UINT8_X2},
     {T_UCHAR3,  T_UCHAR3_PACKED, T_UCHAR, {clvTYPE_UCHAR, {3,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvTRUE, {{gcvNULL, }, }, "Dv3_h", VIR_TYPE_UINT8_X3},
     {T_UCHAR4,  T_UCHAR4_PACKED, T_UCHAR, {clvTYPE_UCHAR, {4,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvTRUE, {{gcvNULL, }, }, "Dv4_h", VIR_TYPE_UINT8_X4},
@@ -161,7 +161,7 @@ clsBUILTIN_DATATYPE_INFO clBuiltinDataTypes[] =
     {T_UCHAR16, T_UCHAR16_PACKED, T_UCHAR, {clvTYPE_UCHAR, {16,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvTRUE, {{gcvNULL, }, }, "Dv16_h", VIR_TYPE_UINT8_X16},
     {T_UCHAR32, T_UCHAR32_PACKED, T_UCHAR, {clvTYPE_UCHAR, {32,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvTRUE, {{gcvNULL, }, }, "Dv32_h", VIR_TYPE_UINT8_X32},
 
-    {T_SHORT,   T_SHORT, T_SHORT, {clvTYPE_SHORT, {0,0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvFALSE, {{gcvNULL, }, }, "s", VIR_TYPE_INT16},
+    {T_SHORT,   T_SHORT_PACKED, T_SHORT, {clvTYPE_SHORT, {0,0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvFALSE, {{gcvNULL, }, }, "s", VIR_TYPE_INT16},
     {T_SHORT2,  T_SHORT2_PACKED, T_SHORT, {clvTYPE_SHORT, {2,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv2_s", VIR_TYPE_INT16_X2},
     {T_SHORT3,  T_SHORT3_PACKED, T_SHORT, {clvTYPE_SHORT, {3,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv3_s", VIR_TYPE_INT16_X3},
     {T_SHORT4,  T_SHORT4_PACKED, T_SHORT, {clvTYPE_SHORT, {4,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv4_s", VIR_TYPE_INT16_X4},
@@ -169,7 +169,7 @@ clsBUILTIN_DATATYPE_INFO clBuiltinDataTypes[] =
     {T_SHORT16, T_SHORT16_PACKED, T_SHORT, {clvTYPE_SHORT, {16,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv16_s", VIR_TYPE_INT16_X16},
     {T_SHORT32, T_SHORT32_PACKED, T_SHORT, {clvTYPE_SHORT, {32,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "Dv32_s", VIR_TYPE_INT16_X32},
 
-    {T_USHORT,   T_USHORT, T_USHORT, {clvTYPE_USHORT, {0,0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvTRUE, {{gcvNULL, }, }, "t", VIR_TYPE_UINT16},
+    {T_USHORT,   T_USHORT_PACKED, T_USHORT, {clvTYPE_USHORT, {0,0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvTRUE, {{gcvNULL, }, }, "t", VIR_TYPE_UINT16},
     {T_USHORT2,  T_USHORT2_PACKED, T_USHORT, {clvTYPE_USHORT, {2,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvTRUE, {{gcvNULL, }, }, "Dv2_t", VIR_TYPE_UINT16_X2},
     {T_USHORT3,  T_USHORT3_PACKED, T_USHORT, {clvTYPE_USHORT, {3,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvTRUE, {{gcvNULL, }, }, "Dv3_t", VIR_TYPE_UINT16_X3},
     {T_USHORT4,  T_USHORT4_PACKED, T_USHORT, {clvTYPE_USHORT, {4,0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvTRUE, {{gcvNULL, }, }, "Dv4_t", VIR_TYPE_UINT16_X4},
@@ -224,10 +224,10 @@ clsBUILTIN_DATATYPE_INFO clBuiltinDataTypes[] =
     {T_INTPTR_T, T_INTPTR_T, T_INTPTR_T, {clvTYPE_INT, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "i", VIR_TYPE_UINT32},
     {T_UINTPTR_T, T_UINTPTR_T, T_UINTPTR_T, {clvTYPE_UINT, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvTRUE, {{gcvNULL, }, }, "j", VIR_TYPE_UINT32},
     {T_GENTYPE,   T_GENTYPE_PACKED, T_FLOAT, {clvTYPE_GEN, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
-    {T_F_GENTYPE, T_F_GENTYPE, T_FLOAT, {clvTYPE_F_GEN, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
-    {T_IU_GENTYPE, T_IU_GENTYPE, T_INT, {clvTYPE_IU_GEN, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
-    {T_I_GENTYPE, T_I_GENTYPE, T_INT, {clvTYPE_I_GEN, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
-    {T_U_GENTYPE, T_U_GENTYPE, T_UINT, {clvTYPE_U_GEN, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvTRUE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
+    {T_F_GENTYPE, T_F_GENTYPE_PACKED, T_FLOAT, {clvTYPE_F_GEN, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
+    {T_IU_GENTYPE, T_IU_GENTYPE_PACKED, T_INT, {clvTYPE_IU_GEN, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
+    {T_I_GENTYPE, T_I_GENTYPE_PACKED, T_INT, {clvTYPE_I_GEN, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
+    {T_U_GENTYPE, T_U_GENTYPE_PACKED, T_UINT, {clvTYPE_U_GEN, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvTRUE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
     {T_SIU_GENTYPE, T_SIU_GENTYPE, T_INT, {clvTYPE_SIU_GEN, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
 
     {T_BOOL_PACKED,   T_BOOL, T_BOOL_PACKED, {clvTYPE_BOOL_PACKED, {0, 0}}, clvPOLYNARY_CONSTRUCT_SCALAR, gcvFALSE, {{gcvNULL, }, }, "16_viv_bool_packed", VIR_TYPE_BOOLEAN},
@@ -278,7 +278,11 @@ clsBUILTIN_DATATYPE_INFO clBuiltinDataTypes[] =
     {T_HALF16_PACKED, T_HALF16, T_HALF_PACKED, {clvTYPE_HALF_PACKED, {16, 0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "18_viv_half16_packed", VIR_TYPE_FLOAT16_P16},
     {T_HALF32_PACKED, T_HALF32, T_HALF_PACKED, {clvTYPE_HALF_PACKED, {32, 0}}, clvPOLYNARY_CONSTRUCT_VECTOR, gcvFALSE, {{gcvNULL, }, }, "18_viv_half32_packed", VIR_TYPE_FLOAT16_P32},
 
-    {T_GENTYPE_PACKED, T_GENTYPE, T_GENTYPE_PACKED, {clvTYPE_GEN_PACKED, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "19_viv_gentype_packed", VIR_TYPE_UNKNOWN}
+    {T_GENTYPE_PACKED, T_GENTYPE, T_GENTYPE_PACKED, {clvTYPE_GEN_PACKED, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "19_viv_gentype_packed", VIR_TYPE_UNKNOWN},
+    {T_F_GENTYPE_PACKED, T_F_GENTYPE, T_HALF_PACKED, {clvTYPE_F_GEN_PACKED, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
+    {T_IU_GENTYPE_PACKED, T_IU_GENTYPE, T_IU_GENTYPE_PACKED, {clvTYPE_IU_GEN_PACKED, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
+    {T_I_GENTYPE_PACKED, T_I_GENTYPE, T_I_GENTYPE_PACKED, {clvTYPE_I_GEN_PACKED, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
+    {T_U_GENTYPE_PACKED, T_U_GENTYPE, T_U_GENTYPE_PACKED, {clvTYPE_U_GEN_PACKED, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvTRUE, {{gcvNULL, }, }, "", VIR_TYPE_UNKNOWN},
 };
 
 #define _cldBuiltinDataTypeCount  (sizeof(clBuiltinDataTypes) / sizeof(clsBUILTIN_DATATYPE_INFO))
@@ -1101,21 +1105,21 @@ clsINTRINSIC_BUILTIN_FUNCTION;
 static gctINT
 _ConvVectorBasicTypeToPacked(
 cloCOMPILER Compiler,
-gctINT TypeToken
+gctINT TypeToken,
+gctBOOL ForPointer
 )
 {
 /* treat vx as packed */
-    if((cloCOMPILER_IsBasicTypePacked(Compiler) ||
-       cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))) {
-        clsBUILTIN_DATATYPE_INFO *typeInfo;
+    clsBUILTIN_DATATYPE_INFO *typeInfo;
 
-        typeInfo = clGetBuiltinDataTypeInfo(TypeToken);
-        if(typeInfo &&
-           typeInfo->type != typeInfo->dualType &&
-           clmGEN_CODE_IsVectorDataType(typeInfo->dataType) &&
-           !clmIsElementTypePacked(typeInfo->dataType.elementType)) {
-           TypeToken = typeInfo->dualType;
-        }
+    typeInfo = clGetBuiltinDataTypeInfo(TypeToken);
+    if(typeInfo &&
+       typeInfo->type != typeInfo->dualType &&
+       (clmGEN_CODE_IsVectorDataType(typeInfo->dataType) ||
+        clmGEN_CODE_IsGenTypeDataType(typeInfo->dataType) ||
+        ForPointer) &&
+       !clmIsElementTypePacked(typeInfo->dataType.elementType)) {
+       TypeToken = typeInfo->dualType;
     }
     return TypeToken;
 }
@@ -1147,7 +1151,8 @@ IN gctBOOL *CheckForPacked
     if(*CheckForPacked)
     {
         tok = _ConvVectorBasicTypeToPacked(Compiler,
-                                           tok);
+                                           tok,
+                                           gcvFALSE);
         if(tok != BuiltinFunction->returnType)
         {
            convertedToPacked = gcvTRUE;
@@ -1169,8 +1174,7 @@ IN gctBOOL *CheckForPacked
                                       &decl,
                                       symbolInPool,
                                       gcvNULL,
-                                      (convertedToPacked && cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))
-                                      ? clvEXTENSION_VIV_VX : BuiltinFunction->extension,
+                                      convertedToPacked ? clvEXTENSION_VIV_VX : BuiltinFunction->extension,
                                       &funcName));
     funcName->u.funcInfo.hasGenType = clmDATA_TYPE_IsGenType(dataType);
 
@@ -1186,7 +1190,8 @@ IN gctBOOL *CheckForPacked
         if(*CheckForPacked)
         {
              tok = _ConvVectorBasicTypeToPacked(Compiler,
-                                                tok);
+                                                tok,
+                                                BuiltinFunction->ptrLevels[j]);
              if(tok != BuiltinFunction->paramTypes[j])
              {
                 convertedToPacked = gcvTRUE;

@@ -15,6 +15,7 @@
 #include "gc_cl_ir.h"
 #include "gc_cl_built_ins.h"
 #include "gc_cl_gen_code.h"
+#include "gc_cl_compiler.h"
 
 #define cldCONSTANT_minBufferSize 16 * 16;
 static cluCONSTANT_VALUE * clResultBuffer = gcvNULL;
@@ -662,9 +663,10 @@ IN clsDECL *Decl
               localSize = clmALIGN(localSize, alignment, packed);
 
               if(Decl->dataType->elementType == clvTYPE_UNION) {
-             if(curSize > localSize) localSize = curSize;
-          }
-              else localSize += curSize;
+                  if(curSize > localSize) localSize = curSize;
+              }
+              else
+                  localSize += curSize;
            }
 
            size += clmALIGN(localSize, structAlignment, packed);
@@ -2604,14 +2606,25 @@ cloIR_InitializeVecCompSelTypes(IN cloCOMPILER Compiler)
 }
 
 #define _clmDATA_TYPE_IsValidGenType(dataType) \
-        (clmIsElementTypeArithmetic((dataType)->elementType) && \
-           (clmDATA_TYPE_matrixColumnCount_GET(dataType) ==  0))
+    (clmIsElementTypeArithmetic((dataType)->elementType) && \
+     (clmDATA_TYPE_matrixColumnCount_GET(dataType) ==  0))
+
+#define _clmDATA_TYPE_IsValidPackedGenType(dataType) \
+    (((dataType)->elementType >= cldFirstPackedType && (dataType)->elementType <= cldLastPackedType) && \
+      (clmDATA_TYPE_matrixColumnCount_GET(dataType) ==  0))
 
 #define _clmDATA_TYPE_InitializeGenType(to, from) \
    do { \
        (to)->type = (from)->type; \
        (to)->elementType = (from)->elementType; \
        (to)->matrixSize = (from)->matrixSize; \
+   } while (gcvFALSE)
+
+#define _clmDATA_TYPE_InitializeVoid(d) \
+   do { \
+       (d)->type = T_VOID; \
+       (d)->elementType = clvTYPE_VOID; \
+       clmDATA_TYPE_vectorSize_SET((d), 0); \
    } while (gcvFALSE)
 
 #define _clmDATA_TYPE_InitializeGenTypeWithCheck(compiler, to, from, ref, refParamName, updateRef) \
@@ -2667,7 +2680,26 @@ IN gctINT8 NumComponents
    clsVecCompSelType *vectorSel;
 
    if(clmIsElementTypePackedGenType(ElementType)) {
-       return T_GENTYPE_PACKED;
+       switch(ElementType) {
+       case clvTYPE_I_GEN_PACKED:
+           return T_I_GENTYPE_PACKED;
+
+       case clvTYPE_U_GEN_PACKED:
+           return T_U_GENTYPE_PACKED;
+
+       case clvTYPE_IU_GEN_PACKED:
+           return T_IU_GENTYPE_PACKED;
+
+       case clvTYPE_F_GEN_PACKED:
+           return T_F_GENTYPE_PACKED;
+
+       case clvTYPE_GEN:
+           return T_GENTYPE_PACKED;
+
+       default:
+           gcmASSERT(0);
+           return T_GENTYPE_PACKED;
+       }
    }
    else if(clmIsElementTypeGenType(ElementType)) {
        switch(ElementType) {
@@ -2828,9 +2860,14 @@ IN OUT clsDECL *CandidateType
    gcmASSERT(GenTypeParam);
 
    genTypeDecl = &GenTypeParam->decl;
-   if(_clmDATA_TYPE_IsValidGenType(RefDecl->dataType)) {
+   _clmDATA_TYPE_InitializeVoid(CandidateType->dataType);
+   if((!clmDECL_IsPackedGenType(genTypeDecl) &&
+       _clmDATA_TYPE_IsValidGenType(RefDecl->dataType)) ||
+      (clmDECL_IsPackedGenType(genTypeDecl) &&
+       _clmDATA_TYPE_IsValidPackedGenType(RefDecl->dataType))) {
        _clmDATA_TYPE_InitializeGenType(CandidateType->dataType, RefDecl->dataType);
    }
+   else return;
 
    switch(genTypeDecl->dataType->elementType) {
    case clvTYPE_SIU_GEN:
@@ -2909,6 +2946,74 @@ IN OUT clsDECL *CandidateType
         }
         break;
 
+   case clvTYPE_IU_GEN_PACKED:
+        if(clmDECL_IsIntegerType(RefDecl)) {
+             ;
+        }
+        else {
+           if(!clmDECL_IsPointerType(RefDecl)) {
+              _clmInitGenType(clvTYPE_UINT,
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
+                              CandidateType->dataType);
+           }
+        }
+        break;
+
+   case clvTYPE_I_GEN_PACKED:
+        if(clmDECL_IsIntegerType(RefDecl)) {
+           if(clmIsElementTypeUnsigned(RefDecl->dataType->elementType)) {
+              _clmInitGenType(_clmConvElementTypeToSigned(RefDecl->dataType->elementType),
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
+                              CandidateType->dataType);
+           }
+        }
+        else {
+           if(!clmDECL_IsPointerType(RefDecl)) {
+              _clmInitGenType(clvTYPE_INT,
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
+                              CandidateType->dataType);
+           }
+        }
+        break;
+
+   case clvTYPE_U_GEN_PACKED:
+        if(clmDECL_IsIntegerType(RefDecl)) {
+           if(clmIsElementTypeSigned(RefDecl->dataType->elementType)) {
+              _clmInitGenType(_clmConvElementTypeToUnsigned(RefDecl->dataType->elementType),
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
+                              CandidateType->dataType);
+           }
+        }
+        else {
+           if(!clmDECL_IsPointerType(RefDecl)) {
+              _clmInitGenType(clvTYPE_UINT,
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
+                              CandidateType->dataType);
+           }
+        }
+        break;
+
+   case clvTYPE_F_GEN_PACKED:
+        if(!cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_CL_KHR_FP16) &&
+           (!clmDECL_IsFloat(RefDecl) ||
+            (RefDecl->dataType->elementType == clvTYPE_HALF_PACKED &&
+            GenTypeParam->u.variableInfo.builtinSpecific.s.isConvertibleType))) {
+            _clmInitGenType(clvTYPE_FLOAT,
+                            clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
+                            CandidateType->dataType);
+        }
+        break;
+
+   case clvTYPE_GEN_PACKED:
+        if(RefDecl->dataType->elementType == clvTYPE_HALF_PACKED &&
+           !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_CL_KHR_FP16) &&
+           GenTypeParam->u.variableInfo.builtinSpecific.s.isConvertibleType) {
+           _clmInitGenType(clvTYPE_FLOAT,
+                           clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDecl->dataType),
+                           CandidateType->dataType);
+        }
+        break;
+
    default:
         break;
    }
@@ -2919,6 +3024,7 @@ IN OUT clsDECL *CandidateType
 gctBOOL
 clsDECL_IsMatchingBuiltinArg(
 IN cloCOMPILER Compiler,
+IN gctBOOL NotFirstParam,
 IN clsNAME * ParamName,
 IN cloIR_EXPR Argument,
 IN OUT clsNAME **RefParamName
@@ -2968,46 +3074,41 @@ IN OUT clsNAME **RefParamName
       }
   }
 #endif
-  if(clmDECL_IsScalar(rDecl) &&
-     (clmDECL_IsScalar(paramDecl) || !ParamName->u.variableInfo.builtinSpecific.s.hasGenType)) {
+  if(clmDECL_IsScalar(rDecl) && (ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType ||
+     clmDECL_IsScalar(paramDecl) || !ParamName->u.variableInfo.builtinSpecific.s.hasGenType)) {
       ParamName->u.variableInfo.effectiveDecl = ParamName->decl;
       if(!clmDECL_IsPointerType(paramDecl)) {
-          if(paramDecl->dataType->elementType == clvTYPE_BOOL) {
-              return gcvTRUE;
-          }
-          else if(!clmDECL_IsPointerType(rDecl)
-                  && !clmDECL_IsGenType(paramDecl)
-                  && ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) {
-              if(clmDECL_IsIntegerType(rDecl)
-                 && clmDECL_IsCompatibleIntegerType(paramDecl)) {  /*implicit integer conversion */
-                   return gcvTRUE;
+          if(clmDECL_IsScalar(paramDecl)) {
+              if(paramDecl->dataType->elementType == clvTYPE_BOOL) {
+                  return gcvTRUE;
               }
-              else if(clmDECL_IsHalfType(rDecl)
-                 && clmDECL_IsFloatingType(paramDecl)) {  /*implicit half type to float conversion */
-                   return gcvTRUE;
-              }
-              else if(clmDECL_IsArithmeticType(paramDecl)
-                      && rDecl->dataType->elementType <= paramDecl->dataType->elementType) {
-                   return gcvTRUE;
+              else if(!clmDECL_IsPointerType(rDecl)
+                      && !clmDECL_IsGenType(paramDecl)
+                      && ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) {
+                  if(clmDECL_IsIntegerType(rDecl)
+                     && clmDECL_IsCompatibleIntegerType(paramDecl)) {  /*implicit integer conversion */
+                       return gcvTRUE;
+                  }
+                  else if(clmDECL_IsHalfType(rDecl)
+                     && clmDECL_IsFloatingType(paramDecl)) {  /*implicit half type to float conversion */
+                       return gcvTRUE;
+                  }
+                  else if(clmDECL_IsArithmeticType(paramDecl)
+                          && rDecl->dataType->elementType <= paramDecl->dataType->elementType) {
+                       return gcvTRUE;
+                  }
               }
           }
-          else {
-             if(clmDECL_IsPointerType(rDecl)) {
-                 if(clmIsElementTypePacked(rDecl->dataType->elementType)) {
-                    clsBUILTIN_DATATYPE_INFO *typeInfo;
-
-                    typeInfo = clGetBuiltinDataTypeInfo(rDecl->dataType->type);
-                    if(typeInfo->dualType == paramDecl->dataType->type) return gcvTRUE;
-                 }
-                 else if(clmIsElementTypePacked(paramDecl->dataType->elementType)) {
-                    clsBUILTIN_DATATYPE_INFO *typeInfo;
-
-                    typeInfo = clGetBuiltinDataTypeInfo(paramDecl->dataType->type);
-                    if(typeInfo->dualType == rDecl->dataType->type) return gcvTRUE;
-                 }
-             }
+          else if (clmDECL_IsVectorType(paramDecl)) {
+              if(NotFirstParam &&
+                 !clmDECL_IsPointerType(rDecl) &&
+                 clmDECL_IsVectorType(paramDecl) &&
+                 (rDecl->dataType->elementType <= paramDecl->dataType->elementType) &&
+                 ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) { /*implicit conversion */
+                  return gcvTRUE;
+              }
           }
-      }
+     }
   }
 
   *dataType = *(paramDecl->dataType);
@@ -3274,12 +3375,236 @@ IN OUT clsNAME **RefParamName
            break;
         }
         break;
+
+     case clvTYPE_GEN_PACKED:
+        switch(refElementType) {
+        case clvTYPE_SIU_GEN:
+           if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
+              _clmDATA_TYPE_InitializeGenType(lDecl->dataType, refDataType);
+           }
+           updateRefDataType = gcvTRUE;
+           break;
+
+        case clvTYPE_I_GEN_PACKED:
+        case clvTYPE_U_GEN_PACKED:
+        case clvTYPE_IU_GEN_PACKED:
+        case clvTYPE_F_GEN_PACKED:
+           if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
+              _clmInitGenType(rDecl->dataType->elementType,
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
+           }
+           updateRefDataType = gcvTRUE;
+           break;
+
+        case clvTYPE_GEN_PACKED:
+           _clmDATA_TYPE_InitializeGenTypeWithCheck(Compiler,
+                                                    lDecl->dataType,
+                                                    refDataType,
+                                                    rDecl->dataType,
+                                                    *RefParamName,
+                                                    updateRefDataType);
+           break;
+        default:
+           break;
+        }
+        break;
+
+     case clvTYPE_I_GEN_PACKED:
+        switch(refElementType) {
+        case clvTYPE_IU_GEN_PACKED:
+        case clvTYPE_U_GEN_PACKED:
+           _clmInitGenType(_clmConvElementTypeToSigned(refDataType->elementType),
+                           clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                           dataType);
+           break;
+
+        case clvTYPE_SIU_GEN:
+           if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
+              _clmInitGenType(_clmConvElementTypeToSigned(refDataType->elementType),
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType),
+                              dataType);
+           }
+           updateRefDataType = gcvTRUE;
+           break;
+
+        case clvTYPE_I_GEN_PACKED:
+           _clmDATA_TYPE_InitializeGenTypeWithCheck(Compiler,
+                                                    lDecl->dataType,
+                                                    refDataType,
+                                                    rDecl->dataType,
+                                                    *RefParamName,
+                                                    updateRefDataType);
+           break;
+
+        case clvTYPE_F_GEN_PACKED:
+        case clvTYPE_GEN_PACKED:
+           if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType) &&
+              clmIsElementTypeInteger(rDecl->dataType->elementType)) {
+              _clmInitGenType(_clmConvElementTypeToSigned(rDecl->dataType->elementType),
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
+           }
+           break;
+        default:
+           break;
+        }
+        break;
+
+     case clvTYPE_U_GEN_PACKED:
+        switch(refElementType) {
+        case clvTYPE_IU_GEN_PACKED:
+        case clvTYPE_I_GEN_PACKED:
+           _clmInitGenType(_clmConvElementTypeToUnsigned(refDataType->elementType),
+                           clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                           dataType);
+           break;
+
+        case clvTYPE_U_GEN_PACKED:
+           _clmDATA_TYPE_InitializeGenTypeWithCheck(Compiler,
+                                                    lDecl->dataType,
+                                                    refDataType,
+                                                    rDecl->dataType,
+                                                    *RefParamName,
+                                                    updateRefDataType);
+           break;
+
+        case clvTYPE_SIU_GEN:
+           if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
+              _clmInitGenType(_clmConvElementTypeToUnsigned(refDataType->elementType),
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType),
+                              dataType);
+           }
+           updateRefDataType = gcvTRUE;
+           break;
+
+        case clvTYPE_F_GEN_PACKED:
+        case clvTYPE_GEN_PACKED:
+           if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType) &&
+              clmIsElementTypeInteger(rDecl->dataType->elementType)) {
+              _clmInitGenType(_clmConvElementTypeToUnsigned(rDecl->dataType->elementType),
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
+           }
+           break;
+        default:
+           break;
+        }
+        break;
+
+     case clvTYPE_IU_GEN_PACKED:
+        switch(refElementType) {
+        case clvTYPE_IU_GEN_PACKED:
+           _clmDATA_TYPE_InitializeGenTypeWithCheck(Compiler,
+                                                    lDecl->dataType,
+                                                    refDataType,
+                                                    rDecl->dataType,
+                                                    *RefParamName,
+                                                    updateRefDataType);
+           break;
+
+        case clvTYPE_I_GEN_PACKED:
+           if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
+              if(clmIsElementTypeUnsigned(rDecl->dataType->elementType)) {
+                 dataType->elementType =_clmConvElementTypeToUnsigned(refDataType->elementType);
+              }
+              else {
+                 dataType->elementType = refDataType->elementType;
+              }
+              _clmInitGenType(dataType->elementType,
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
+           }
+           updateRefDataType = gcvTRUE;
+           break;
+
+        case clvTYPE_U_GEN_PACKED:
+           if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
+              if(clmIsElementTypeSigned(rDecl->dataType->elementType)) {
+                 dataType->elementType =_clmConvElementTypeToSigned(refDataType->elementType);
+              }
+              else {
+                 dataType->elementType = refDataType->elementType;
+              }
+              _clmInitGenType(dataType->elementType,
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
+           }
+           updateRefDataType = gcvTRUE;
+           break;
+
+        case clvTYPE_SIU_GEN:
+           if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
+              _clmInitGenType(refDataType->elementType,
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType),
+                              dataType);
+           }
+           updateRefDataType = gcvTRUE;
+           break;
+
+        case clvTYPE_F_GEN_PACKED:
+        case clvTYPE_GEN_PACKED:
+           if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType) &&
+              clmIsElementTypeInteger(rDecl->dataType->elementType)) {
+              _clmInitGenType(rDecl->dataType->elementType,
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
+           }
+           break;
+        default:
+           break;
+        }
+        break;
+
+     case clvTYPE_F_GEN_PACKED:
+        switch(refElementType) {
+        case clvTYPE_SIU_GEN:
+           if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType) &&
+              clmIsElementTypeFloating(rDecl->dataType->elementType)) {
+              _clmDATA_TYPE_InitializeGenType(lDecl->dataType, rDecl->dataType);
+           }
+           updateRefDataType = gcvTRUE;
+           break;
+
+        case clvTYPE_I_GEN_PACKED:
+        case clvTYPE_U_GEN_PACKED:
+        case clvTYPE_IU_GEN_PACKED:
+           if(clmIsElementTypeHalf(rDecl->dataType->elementType)) {
+              _clmInitGenType(rDecl->dataType->elementType,
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
+           }
+           updateRefDataType = gcvTRUE;
+           break;
+
+        case clvTYPE_F_GEN_PACKED:
+           _clmDATA_TYPE_InitializeGenTypeWithCheck(Compiler,
+                                                    lDecl->dataType,
+                                                    refDataType,
+                                                    rDecl->dataType,
+                                                    *RefParamName,
+                                                    updateRefDataType);
+           break;
+
+        case clvTYPE_GEN_PACKED:
+           if(clmIsElementTypeHalf(rDecl->dataType->elementType)) {
+              _clmInitGenType(rDecl->dataType->elementType,
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
+           }
+           break;
+        default:
+           break;
+        }
+        break;
+
      default:
         break;
      }
 
      if(clmDECL_IsScalar(rDecl) &&
         !clmDECL_IsPointerType(rDecl) &&
+        !clmDECL_IsVoid(lDecl) &&
         ParamName->u.variableInfo.builtinSpecific.s.isConvertibleType) {  /*implicit conversion */
         sameType = gcvTRUE;
      }
@@ -3499,7 +3824,7 @@ OUT clsNAME **NewFuncName
                                           clvEXTENSION_NONE,
                                           &newParamName));
         newParamName->u.variableInfo.effectiveDecl = newParamName->decl;
-        newParamName->u.variableInfo.builtinSpecific.s.isConvertibleType = gcvFALSE;
+        newParamName->u.variableInfo.builtinSpecific.s.isConvertibleType = paramName->u.variableInfo.builtinSpecific.s.isConvertibleType;
         newParamName->u.variableInfo.builtinSpecific.s.hasGenType = paramName->u.variableInfo.builtinSpecific.s.hasGenType;
       }
 OnError:
@@ -3633,6 +3958,7 @@ OUT clsDATA_TYPE *FuncDataType
 
     if(FuncName->isBuiltin) {
        clsNAME *refParamName = gcvNULL;
+       gctBOOL notFirstParam = gcvFALSE;
 
        for (paramName = (clsNAME *)FuncName->u.funcInfo.localSpace->names.next,
             argument = (cloIR_EXPR)PolynaryExpr->operands->members.next;
@@ -3643,12 +3969,14 @@ OUT clsDATA_TYPE *FuncDataType
             if (paramName->type != clvPARAMETER_NAME) break;
 
             if (!clsDECL_IsMatchingBuiltinArg(Compiler,
+                                              notFirstParam,
                                               paramName,
                                               argument,
                                               &refParamName)) {
                 return gcvFALSE;
             }
 
+            notFirstParam = gcvTRUE;
             if (clmDECL_IsPointerType(&paramName->decl) && clmDECL_IsArray(&argument->decl)) {
                 slsDLINK_NODE *nextArgument = ((slsDLINK_NODE *)argument)->next;
 
@@ -4172,7 +4500,7 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
             }
 
             if(name->isBuiltin) {
-                if(hasGenType) {
+                if(hasGenType && name->u.funcInfo.refCount == 0) {
 /** KLC - may want to rebind func name */
                      status = _CloneBuiltinFuncName(Compiler,
                                                     PolynaryExpr,
@@ -4210,6 +4538,7 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
                      }
 #endif
                      if(name->u.funcInfo.refCount == 1) {
+                          if(!PolynaryExpr->funcName)PolynaryExpr->funcName = name;
                           status = cloCOMPILER_AddReferencedBuiltinFunc(Compiler,
                                                                         PolynaryExpr);
                           if (gcmIS_ERROR(status)) return status;

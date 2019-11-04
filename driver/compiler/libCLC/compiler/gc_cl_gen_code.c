@@ -15495,7 +15495,9 @@ IN OUT clsGEN_CODE_PARAMETERS *FromParameters
    if(ResExpr) {
        *ResExpr = FromExpr;
    }
-   if(clmDECL_IsArithmeticType(ToDecl) &&
+   if((!clmDECL_IsPointerType(ToDecl) ||
+       !clmDECL_IsPointerType(&FromExpr->decl)) &&
+      clmDECL_IsArithmeticType(ToDecl) &&
       clmDECL_IsScalar(&FromExpr->decl)) {
       gceSTATUS status;
       cltELEMENT_TYPE fromElementType, toElementType;
