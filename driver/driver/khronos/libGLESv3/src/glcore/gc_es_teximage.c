@@ -494,7 +494,6 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
 
     switch (internalFormat)
     {
-        case GL_RED:
         case GL_R8_SNORM:
         case GL_R8I:
         case GL_R8UI:
@@ -505,7 +504,6 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_R32UI:
         case GL_R32F:
 
-        case GL_RG:
         case GL_RG8_SNORM:
         case GL_RG8I:
         case GL_RG8UI:
@@ -574,6 +572,8 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         ** only RED_EXT & RG_EXT Accepted by the <internalformat> parameter of TexImage2D and CopyTexImage2D.
         ** GL_R8 & GL_RG8 are invalid internaformat under es2 context
         */
+        case GL_RED:
+        case GL_RG:
         case GL_R8:
         case GL_RG8:
             if((gc->apiVersion == __GL_API_VERSION_ES20) && (gc->constants.majorVersion == 2))
@@ -2448,6 +2448,15 @@ GLvoid GL_APIENTRY __gles_TexImage3D(__GLcontext *gc,
     }
 
     if (!__glCheckTexImgInternalFmtArg(gc, tex, internalFormat))
+    {
+        __GL_EXIT();
+    }
+
+    /* According to GL_EXT_texture_rg spec:
+    ** only RED_EXT & RG_EXT Accepted by the <internalformat> parameter of TexImage2D and CopyTexImage2D,
+    ** Not include TexImage3D.
+    */
+    if (internalFormat == GL_RED || internalFormat == GL_RG)
     {
         __GL_EXIT();
     }
