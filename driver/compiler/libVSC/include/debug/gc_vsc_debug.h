@@ -119,20 +119,26 @@ struct _VSC_DIE
     gctUINT16 lineNo;
     gctUINT16 endLineNo;
 
+    /*add info for CompositeType*/
+    gctBOOL useMemory;
+    gctUINT alignmentSize;
+    gctUINT alignmenOffset;
+    gctUINT size;
+
     union
     {
         struct
         {
+            VSC_DI_TYPE type;
             gctUINT16 pcLine[2];
             gctUINT16 swLoc;
-            VSC_DI_TYPE type;
         }
         variable;
 
         struct
         {
-            gctUINT16 pcLine[2];
             VSC_DI_TYPE retType;
+            gctUINT16 pcLine[2];
         }
         func;
 
@@ -391,6 +397,22 @@ VSC_DI_SW_LOC *
 vscDIFindSWLoc(
     VSC_DIContext * context,
     gctUINT32 regId
+    );
+
+void
+vscDISetAlignment(
+    VSC_DIContext * context,
+    gctUINT16 DieId,
+    gctUINT alignmentSize,
+    gctUINT alignmenOffset,
+    gctUINT size,
+    VIR_TypeId typeId
+    );
+
+void
+vscDISetUseMemory(
+    VSC_DIContext * context,
+    gctUINT16 DieId
     );
 
 #endif

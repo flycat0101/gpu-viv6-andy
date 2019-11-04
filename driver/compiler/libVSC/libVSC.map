@@ -451,6 +451,8 @@
     vscDIGetVariableCount;
     vscDIGetVariableInfo;
     vscDIGetVariableHWLoc;
+    vscDISetAlignment;
+    vscDISetUseMemory;
 
     VIR_GetSymFromId;
     VIR_Shader_AddFunction;

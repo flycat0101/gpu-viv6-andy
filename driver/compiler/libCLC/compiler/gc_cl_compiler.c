@@ -4168,6 +4168,11 @@ clsNAME *Variable
       gcmASSERT(0);
    }
    clmNAME_VariableMemoryOffset_SET(Variable, (gctINT)memoryOffset);
+   if(gcmOPT_EnableDebug() && Variable->die != VSC_DI_INVALIDE_DIE)
+   {
+       cloCOMPILER_SetDIEAlignment(Compiler, Variable->die, 4, memoryOffset, memoryReqd, VIR_TYPE_UNKNOWN);
+       vscDISetUseMemory(Compiler->context.debugInfo, Variable->die);
+   }
    Variable->u.variableInfo.allocated = gcvTRUE;
    return gcvSTATUS_OK;
 }
@@ -4596,6 +4601,40 @@ IN gctUINT mask
 }
 
 void
+cloCOMPILER_SetDIEArray(
+IN cloCOMPILER Compiler,
+IN gctUINT16 Id,
+IN clsNAME * Variable
+)
+{
+    VSC_DIE * die;
+    gctINT i;
+
+    if (Compiler->context.debugInfo == gcvNULL)  return;
+
+    die = vscDIGetDIE(Compiler->context.debugInfo, Id);
+
+    if (die && Variable &&
+        ((die->tag == VSC_DI_TAG_VARIABE) ||
+        (die->tag == VSC_DI_TAG_PARAMETER)||
+        (die->tag == VSC_DI_TAG_TYPE))
+        )
+    {
+        if(Variable->decl.dataType->virPrimitiveType > VIR_TYPE_UNKNOWN
+           && Variable->decl.dataType->virPrimitiveType < VIR_TYPE_LAST_PRIMITIVETYPE)
+            die->u.variable.type.type = Variable->decl.dataType->virPrimitiveType;
+        die->u.variable.type.array.numDim = Variable->decl.array.numDim;
+
+        for (i = 0 ; i < die->u.variable.type.array.numDim; i++)
+        {
+            die->u.variable.type.array.length[i] = Variable->decl.array.length[i];
+        }
+        if (clmDECL_IsPointerType(&(Variable->decl)))
+            die->u.variable.type.isPointer = gcvTRUE;
+    }
+}
+
+void
 cloCOMPILER_SetStructDIELogicalReg(
 IN cloCOMPILER Compiler,
 IN clsNAME * Variable,
@@ -4871,6 +4910,19 @@ IN  gctUINT16   Id
         Die->u.type = type;
         Die->u.variable.type = type;
     }
+}
+
+void
+cloCOMPILER_SetDIEAlignment(
+IN cloCOMPILER Compiler,
+IN gctUINT16 Id,
+IN gctUINT alignmentSize,
+IN gctUINT alignmenOffset,
+IN gctUINT size,
+IN VIR_TypeId typeId
+)
+{
+    vscDISetAlignment(Compiler->context.debugInfo, Id, alignmentSize, alignmenOffset, size, typeId);
 }
 
 gctBOOL

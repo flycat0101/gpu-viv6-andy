@@ -4119,6 +4119,7 @@ OUT gctUINT *NumRegNeeded
             }
             else
             {
+                cloCOMPILER_SetDIEArray(Compiler, Name->die, Name);
                 cloCOMPILER_SetDIELogicalReg(Compiler, Name->die, tempRegIndex,
                     numRegNeeded, (gctUINT)_ConvComponentSelectionToEnable(&LogicalRegs->componentSelection));
             }

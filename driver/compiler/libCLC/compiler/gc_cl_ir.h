@@ -1340,6 +1340,13 @@ IN gctUINT mask
 );
 
 void
+cloCOMPILER_SetDIEArray(
+IN cloCOMPILER Compiler,
+IN gctUINT16 Id,
+IN clsNAME * Variable
+);
+
+void
 cloCOMPILER_SetStructDIELogicalReg(
 IN cloCOMPILER Compiler,
 IN clsNAME * Variable,
@@ -1348,6 +1355,16 @@ IN gctCONST_STRING Symbol,
 IN gctUINT32 regIndex,
 IN gctUINT num,
 IN gctUINT mask
+);
+
+void
+cloCOMPILER_SetDIEAlignment(
+IN cloCOMPILER Compiler,
+IN gctUINT16 Id,
+IN gctUINT alignmentSize,
+IN gctUINT alignmenOffset,
+IN gctUINT size,
+IN VIR_TypeId typeId
 );
 
 gctBOOL

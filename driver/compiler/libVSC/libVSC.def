@@ -459,6 +459,8 @@ EXPORTS
     vscDIGetVariableCount
     vscDIGetVariableInfo
     vscDIGetVariableHWLoc
+    vscDISetAlignment
+    vscDISetUseMemory
 
     vscERR_ReportError
     vscERR_ReportWarning

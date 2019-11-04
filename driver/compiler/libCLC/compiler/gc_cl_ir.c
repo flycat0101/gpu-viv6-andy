@@ -661,7 +661,23 @@ IN clsDECL *Decl
 
               curSize = clsDECL_GetByteSize(Compiler, &fieldName->decl);
               localSize = clmALIGN(localSize, alignment, packed);
-
+              if (gcmOPT_EnableDebug())
+              {
+                  /*localSize means alignmentSizeOffset*/
+                  if(fieldName->die != VSC_DI_INVALIDE_DIE)
+                  {
+                      VIR_TypeId typeId = VIR_TYPE_UNKNOWN;
+                      if(fieldName->decl.dataType->virPrimitiveType
+                         && fieldName->decl.dataType->virPrimitiveType != VIR_TYPE_MAX_TYPE_INDEX
+                         && fieldName->decl.dataType->virPrimitiveType < VIR_TYPE_PRIMITIVETYPE_COUNT)
+                      {
+                          typeId = fieldName->decl.dataType->virPrimitiveType;
+                      }
+                      cloCOMPILER_SetDIEAlignment(Compiler, fieldName->die, alignment, localSize, curSize, typeId);
+                      if(fieldName->decl.array.numDim > 0)
+                        cloCOMPILER_SetDIEArray(Compiler, fieldName->die, fieldName);
+                  }
+              }
               if(Decl->dataType->elementType == clvTYPE_UNION) {
                   if(curSize > localSize) localSize = curSize;
               }
@@ -670,6 +686,13 @@ IN clsDECL *Decl
            }
 
            size += clmALIGN(localSize, structAlignment, packed);
+           if (gcmOPT_EnableDebug())
+           {
+               if(Decl->dataType->u.fieldSpace->die != VSC_DI_INVALIDE_DIE)
+               {
+                   cloCOMPILER_SetDIEAlignment(Compiler, Decl->dataType->u.fieldSpace->die, structAlignment, localSize, size, VIR_TYPE_UNKNOWN);
+               }
+           }
          }
          break;
 
@@ -755,6 +778,8 @@ IN clsDECL *Decl
          size *= clmDATA_TYPE_matrixRowCount_GET(Decl->dataType) * clmDATA_TYPE_matrixColumnCount_GET(Decl->dataType);
       }
    }
+
+   /* if(fieldName && fieldName->die){} */
 
    if (clmDECL_IsArray(Decl)) {
       gctUINT elementCount;
