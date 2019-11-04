@@ -4647,8 +4647,32 @@ IN clsNAME * Variable
 }
 
 void
+cloCOMPILER_SetDIEType(
+IN  cloCOMPILER Compiler,
+IN  clsDECL     *Decl,
+IN  gctUINT16   Id
+)
+{
+    VSC_DIE     *Die;
+    struct _VSC_DI_TYPE type = {0};
+    if(Compiler->context.debugInfo)
+    {
+        if (clmDECL_IsStructOfPointers(Decl))
+        {
+            type.isPointer = gcvTRUE;
+        }
+        type.type = Decl->dataType->u.fieldSpace->die;
+        type.isPrimitiveType = gcvFALSE;
+        Die = vscDIGetDIE(Compiler->context.debugInfo, Id);
+        Die->u.type = type;
+        Die->u.variable.type = type;
+    }
+}
+
+void
 cloCOMPILER_SetStructDIELogicalReg(
 IN cloCOMPILER Compiler,
+IN clsDECL * Decl,
 IN clsNAME * Variable,
 IN gctUINT16 ParentId,
 IN gctCONST_STRING Symbol,
@@ -4664,10 +4688,14 @@ IN gctUINT mask
 
     die = vscDIGetDIE(Compiler->context.debugInfo, vscDIAddDIE(Compiler->context.debugInfo, VSC_DI_TAG_VARIABE, ParentId, Symbol, 0, 0, 0, 0));
 
+    if (clmDECL_IsStructOfPointers(Decl))
+    {
+        cloCOMPILER_SetDIEType(Compiler, Decl, die->id);
+    }
     cloCOMPILER_SetDIELogicalReg(Compiler, die->id, regIndex, num, mask);
 
     /* set the member of structure to primitive */
-    if (die->tag == VSC_DI_TAG_VARIABE)
+    if ((die->tag == VSC_DI_TAG_VARIABE) && !clmDECL_IsStructOfPointers(Decl))
     {
         die->u.variable.type.isPrimitiveType = gcvTRUE;
 
@@ -4902,25 +4930,6 @@ gctBOOL collect
     if (Compiler->context.debugInfo)
     {
         Compiler->context.debugInfo->collect = collect;
-    }
-}
-
-void
-cloCOMPILER_SetDIEType(
-IN  cloCOMPILER Compiler,
-IN  clsDECL     *Decl,
-IN  gctUINT16   Id
-)
-{
-    VSC_DIE     *Die;
-    struct _VSC_DI_TYPE type = {0};
-    if(Compiler->context.debugInfo)
-    {
-        type.type = Decl->dataType->u.fieldSpace->die;
-        type.isPrimitiveType = gcvFALSE;
-        Die = vscDIGetDIE(Compiler->context.debugInfo, Id);
-        Die->u.type = type;
-        Die->u.variable.type = type;
     }
 }
 

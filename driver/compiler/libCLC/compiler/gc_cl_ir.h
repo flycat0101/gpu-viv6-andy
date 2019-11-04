@@ -871,6 +871,11 @@ IN clsDECL * RDecl
                 (Decl)->ptrDscr == gcvNULL && \
         (Decl)->array.numDim == 0)
 
+#define clmDECL_IsStructOfPointers(Decl) \
+    ((Decl)->dataType->elementType == clvTYPE_STRUCT && \
+                (Decl)->ptrDscr != gcvNULL && \
+        (Decl)->array.numDim == 0)
+
 #define clmDECL_IsUnion(Decl) \
     ((Decl)->dataType->elementType == clvTYPE_UNION && \
                 (Decl)->ptrDscr == gcvNULL && \
@@ -1349,6 +1354,7 @@ IN clsNAME * Variable
 void
 cloCOMPILER_SetStructDIELogicalReg(
 IN cloCOMPILER Compiler,
+IN clsDECL * Decl,
 IN clsNAME * Variable,
 IN gctUINT16 ParentId,
 IN gctCONST_STRING Symbol,

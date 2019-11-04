@@ -13911,6 +13911,11 @@ IN slsDLINK_LIST * FieldDeclList
               name = fieldDecl->field;
               cloCOMPILER_SetDIEType(Compiler, declPtr, name->die);
           }
+          if (clmDECL_IsStructOfPointers(declPtr) && clmDECL_IsStructOrUnion(&declPtr->dataType->u.fieldSpace->scopeName->decl))
+          {
+              name = fieldDecl->field;
+              cloCOMPILER_SetDIEType(Compiler, declPtr, name->die);
+          }
       }
    } while (gcvFALSE);
 

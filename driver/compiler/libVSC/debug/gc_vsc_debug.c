@@ -909,7 +909,7 @@ void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT tag)
         int variableCount, argCount, i, j, k, l, m;
         gctBOOL isReg;
         gctBOOL isConst;
-        int funcId = 12; /* please change this function id when changing the test case */
+        int funcId = 1; /* please change this function id when changing the test case */
         char funIdStr[1024];
         char varIdStr[1024];
         char varIdStr2[1024];
@@ -1123,6 +1123,15 @@ void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift, gctUINT 
                         sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
                     }
                 }
+                if(die->useMemory == gcvTRUE)
+                {
+                    tmp = shift;
+                    VSC_DI_DUMP_DIE_LINE_HEADER();
+                    gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                                "| useMemory = %d size = %d Offset = %d |",
+                                die->useMemory, die->size, die->alignmenOffset);
+                    gcmPRINT(context->tmpLog);
+                }
             }
             else if (die->tag == VSC_DI_TAG_TYPE)
             {
@@ -1179,6 +1188,25 @@ void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift, gctUINT 
                     }
                 }
                 gcmPRINT(context->tmpLog);
+                if(die->size > 0)
+                {
+                    tmp = shift;
+                    VSC_DI_DUMP_DIE_LINE_HEADER();
+                    if(die->u.type.type == 0)
+                    {
+                        gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                            "| size = %d alignment = %d |",
+                             die->size, die->alignmentSize);
+                    }
+                    else
+                    {
+                        gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                            "| size = %d alignment = %d alignmentOffset = %d |",
+                             die->size, die->alignmentSize, die->alignmenOffset);
+                    }
+
+                    gcmPRINT(context->tmpLog);
+                }
             }
             else if (die->tag == VSC_DI_TAG_SUBPROGRAM)
             {
@@ -1201,11 +1229,6 @@ void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift, gctUINT 
                     die->id, _GetTagNameStr(context, die->tag),die->parent,die->fileNo,die->lineNo, die->colNo, _GetNameStr(context,die->name));
                 gcmPRINT(context->tmpLog);
             }
-            offset = 0;
-            gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
-                        "  useMemory = %d size = %d alignment = %d alignmentOffset = %d ",
-                        die->useMemory, die->size, die->alignmentSize, die->alignmenOffset);
-            gcmPRINT(context->tmpLog);
         }
     }
 }
@@ -2388,7 +2411,7 @@ void vscDIGetVariableInfo(
                                  dimNum,
                                  &tempReg);
 
-            if(tempReg > 0 && !die->useMemory)
+            if(tempReg > 0 && !die->useMemory && !die->u.type.isPointer)
             {
                 /*calculate the hwLocCount*/
                 *hwLocCount = 0;
@@ -2417,7 +2440,7 @@ void vscDIGetVariableInfo(
                     sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
                 }
             }
-            else if(die->useMemory)
+            else if(die->useMemory || die->u.type.isPointer)
             {
                 if((gctINT)dimDepth +1 < Vdie->u.type.array.numDim)
                     *hwLocCount = 0;
@@ -2458,7 +2481,7 @@ void vscDIGetVariableInfo(
             gcoOS_AllocateMemory(NULL, nameLength*sizeof(char), &memory);
             tempstr = (char*)memory;
 
-            gcoOS_StrCopySafe(tempstr, nameLength, _GetNameStr(context, die->name));
+            gcoOS_StrCopySafe(tempstr, nameLength, _GetNameStr(context, Vdie->name));
             varName[0]='*';
             for(index = 0; tempstr[index]!=0; index++)
                 varName[index + 1] = tempstr[index];
@@ -2467,7 +2490,7 @@ void vscDIGetVariableInfo(
 
         if(typeStr)
         {
-            _GetTypeStr(context, die, typeStr, nameLength,0);
+            _GetTypeStr(context, Vdie, typeStr, nameLength,0);
             for(index = 0; typeStr[index]!=0; index++)
             {
                 if(index > 0 && typeStr[index] == '*')
@@ -2588,7 +2611,13 @@ void vscDIGetVariableInfo(
                 }
             }
 
-            if(pointerDepth > 0 || tempReg > 0)
+            if(die->useMemory || die->u.type.isPointer)
+            {
+                sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
+                if(sl && sl->hwLoc != VSC_DI_INVALID_HW_LOC)
+                    *hwLocCount = 1;
+            }
+            else if(pointerDepth > 0 || tempReg > 0)
             {
                 /*calculate the hwLocCount*/
                 *hwLocCount = 0;
@@ -2819,7 +2848,7 @@ void vscDIGetVariableHWLoc(
 
     if(dimDepth > 0)
     {
-        isVector = VSC_DI_DIETYPE_IS_VECTOR(die) ;
+        isVector = VSC_DI_DIETYPE_IS_VECTOR(Vdie) ;
 
         if(isVector)
         {
@@ -2878,7 +2907,7 @@ void vscDIGetVariableHWLoc(
                     regEOffset = sl->u.reg.end - tempReg;
                     break;
                 }
-                if(die->useMemory)
+                if(die->useMemory || die->u.type.isPointer)
                     break;
             }
             sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
@@ -2938,15 +2967,17 @@ void vscDIGetVariableHWLoc(
                 *data1 = 0;
             else
             {
-                *data1 = 0 + dimNum[dimDepth - 1] * VIR_GetTypeSize(VIR_GetTypeComponentType(die->u.variable.type.type));
+                *data1 = vscDIGetDieOffset(ptr, varIdStr);
             }
         }
         if (data2)
         {
-            if(die->u.variable.type.isPrimitiveType)
-                *data2 = VIR_GetTypeSize(VIR_GetTypeComponentType(die->u.variable.type.type));
+            if(dimDepth == 0 && !vscDIGetDieisPrimitiveType(Vdie))
+                *data2 = *data1 + Vdie->size;
+            else if(dimDepth == 0 || (gctINT)dimDepth == Vdie->u.type.array.numDim)/*only vector and array need find the type*/
+                *data2 = *data1 + VIR_GetTypeRows(Vdie->u.variable.type.type) * VIR_GetTypeAlignment(Vdie->u.variable.type.type);
             else
-                *data2 = VSC_DI_DIE_PTR(die->u.variable.type.type)->size;
+                *data2 = *data1 + VIR_GetTypeSize(VIR_GetTypeComponentType(Vdie->u.variable.type.type));
         }
         if (data3)
         {
@@ -2996,7 +3027,7 @@ void vscDIGetVariableHWLoc(
             if(dimDepth == 0 || !vscDIGetDieisPrimitiveType(Vdie))
                 *data2 = *data1 + Vdie->size;
             else if((gctINT)dimDepth == Vdie->u.type.array.numDim)/*only vector and array need find the type*/
-                *data2 = *data1 + VIR_GetTypeAlignment(Vdie->u.variable.type.type);
+                *data2 = *data1 + VIR_GetTypeRows(Vdie->u.variable.type.type) * VIR_GetTypeAlignment(Vdie->u.variable.type.type);
             else
                 *data2 = *data1 + VIR_GetTypeSize(VIR_GetTypeComponentType(Vdie->u.variable.type.type));
         }

@@ -4112,7 +4112,7 @@ OUT gctUINT *NumRegNeeded
                 {
                     Symbol = Name->symbol;
                 }
-                cloCOMPILER_SetStructDIELogicalReg(Compiler, Name, ParentName->die, Symbol, tempRegIndex,
+                cloCOMPILER_SetStructDIELogicalReg(Compiler, Decl, Name, ParentName->die, Symbol, tempRegIndex,
                     numRegNeeded, (gctUINT)_ConvComponentSelectionToEnable(&fieldComponentSelection));
 
                 cloCOMPILER_SetCollectDIE(Compiler, gcvFALSE);
