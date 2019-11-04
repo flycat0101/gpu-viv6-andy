@@ -1663,6 +1663,8 @@ _vscEP_Buffer_SaveVKUniformTexelBufferEntry(
     VSC_IO_writeUint(pIoBuf, pUniformTexelBufferEntry->stageBits);
     VSC_IO_writeUint(pIoBuf, pUniformTexelBufferEntry->activeStageMask);
 
+    VSC_IO_writeUint(pIoBuf, (gctUINT)pUniformTexelBufferEntry->utbEntryFlag);
+
     /* Save texture size. */
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
@@ -4592,6 +4594,8 @@ _vscEP_Buffer_LoadVKUniformTexelBufferEntry(
     VSC_IO_readUint(pIoBuf, &pUniformTexelBufferEntry->utbEntryIndex);
     VSC_IO_readUint(pIoBuf, (gctUINT*)&pUniformTexelBufferEntry->stageBits);
     VSC_IO_readUint(pIoBuf, &pUniformTexelBufferEntry->activeStageMask);
+
+    VSC_IO_readUint(pIoBuf, (gctUINT*)&pUniformTexelBufferEntry->utbEntryFlag);
 
     VSC_IO_readUint(pIoBuf, &entryMask);
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)

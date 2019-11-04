@@ -4629,6 +4629,11 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* p
     {
         pUtbEntry->hwMappings[stageIdx].u.s.hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR;
         bIsImage = gcvTRUE;
+
+        if (pResAllocEntry->resFlag & VIR_SRE_FLAG_TREAT_TEXELBUFFER_AS_IMAGE)
+        {
+            pUtbEntry->utbEntryFlag |= PROG_VK_UTB_ENTRY_FLAG_TREAT_TEXELBUFFER_AS_IMAGE;
+        }
     }
     else
     {

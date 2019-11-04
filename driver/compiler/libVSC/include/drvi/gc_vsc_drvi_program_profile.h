@@ -765,6 +765,13 @@ typedef struct PROG_VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING
 }
 PROG_VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING;
 
+typedef enum PROG_VK_UNIFORM_TEXEL_BUFFER_ENTRY_FLAG
+{
+    PROG_VK_UTB_ENTRY_FLAG_NONE                         = 0x0000,
+    /* Treat a texelBuffer as an image, now from a recompilation only. */
+    PROG_VK_UTB_ENTRY_FLAG_TREAT_TEXELBUFFER_AS_IMAGE   = 0x0002,
+} PROG_VK_UNIFORM_TEXEL_BUFFER_ENTRY_FLAG;
+
 typedef struct PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY
 {
     /* API resource binding */
@@ -778,6 +785,8 @@ typedef struct PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY
 
     /* Is this entry really used by shader */
     gctUINT                                     activeStageMask;
+
+    PROG_VK_UNIFORM_TEXEL_BUFFER_ENTRY_FLAG     utbEntryFlag;
 
     /*----------------------------------Sampler-related----------------------------------*/
     /* For texel buffer, it might need a texture-size attached. As each texel buffer in
