@@ -3189,8 +3189,6 @@ gckMMU_SetupSRAM(
 
                     Device->sRAMPhysFaked[i][j] = gcvTRUE;
                 }
-
-                Hardware->options.sRAMGPUVirtAddrs[j] = Device->sRAMBaseAddresses[i][j];
             }
         }
 
@@ -3253,6 +3251,7 @@ gckMMU_SetupSRAM(
                                  = Device->sRAMSizes[Hardware->core][i];
 
             kernel->sRAMPhysFaked[i] = Device->sRAMPhysFaked[Hardware->core][i];
+            Hardware->options.sRAMGPUVirtAddrs[i] = Device->sRAMBaseAddresses[Hardware->core][i];
 
             /* If the internal SRAM usage is reserve. */
             if (kernel->sRAMPhysFaked[i])

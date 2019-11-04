@@ -681,7 +681,7 @@ VkResult __vk_InsertSemaphoreSignals(
         }
 #if defined(LINUX) || defined(ANDROID)
         uint32_t j = 0;
-        if (sph->fenceFd && devQueue->pDevContext->fdSignal)
+        if (sph->fenceFd)
         {
             if (sph->signalIndex >= 0)
             {
