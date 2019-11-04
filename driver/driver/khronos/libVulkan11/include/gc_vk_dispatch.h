@@ -242,6 +242,11 @@
     vkApiMacro(AcquireImageANDROID) \
     vkApiMacro(QueueSignalReleaseImageANDROID)
 
+/* VK_ANDROID_external_memory_android_hardware_buffer extension. */
+#define __VK_EXT_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_ENTRIES(vkApiMacro) \
+    vkApiMacro(GetAndroidHardwareBufferPropertiesANDROID) \
+    vkApiMacro(GetMemoryAndroidHardwareBufferANDROID)
+
 #define __VK_WSI_WIN32_ENTRIES(vkApiMacro) \
     vkApiMacro(CreateWin32SurfaceKHR) \
     vkApiMacro(GetPhysicalDeviceWin32PresentationSupportKHR)\
@@ -277,6 +282,9 @@ typedef struct __vkDispatchTableRec
     __VK_WSI_ANDROID_ENTRIES(__vkDisp_)
 #if (ANDROID_SDK_VERSION >= 24)
     __VK_WSI_ANDROID_NATIVE_BUFFER_ENTRIES(__vkDisp_)
+#  endif
+#if (ANDROID_SDK_VERSION >= 26)
+    __VK_EXT_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_ENTRIES(__vkDisp_)
 #  endif
 #endif
 #ifdef VK_USE_PLATFORM_WIN32_KHR
@@ -538,6 +546,10 @@ extern VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateAndroidSurfaceKHR(VkInstance in
 extern VKAPI_ATTR VkResult VKAPI_CALL __vk_GetSwapchainGrallocUsageANDROID(VkDevice device, VkFormat format, VkImageUsageFlags imageUsage, int* grallocUsage);
 extern VKAPI_ATTR VkResult VKAPI_CALL __vk_AcquireImageANDROID(VkDevice device, VkImage image, int nativeFenceFd, VkSemaphore semaphore, VkFence fence);
 extern VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSignalReleaseImageANDROID(VkQueue queue, uint32_t waitSemaphoreCount, const VkSemaphore* pWaitSemaphores, VkImage image, int* pNativeFenceFd);
+#  endif
+#if (ANDROID_SDK_VERSION >= 26)
+extern VKAPI_ATTR VkResult VKAPI_CALL __vk_GetAndroidHardwareBufferPropertiesANDROID(VkDevice device, const struct AHardwareBuffer* buffer, VkAndroidHardwareBufferPropertiesANDROID* pProperties);
+extern VKAPI_ATTR VkResult VKAPI_CALL __vk_GetMemoryAndroidHardwareBufferANDROID(VkDevice device, const VkMemoryGetAndroidHardwareBufferInfoANDROID* pInfo, struct AHardwareBuffer** pBuffer);
 #  endif
 #endif
 #ifdef VK_USE_PLATFORM_WIN32_KHR

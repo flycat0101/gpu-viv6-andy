@@ -127,6 +127,9 @@ __vkDispatchTable __vkDrvEntryFuncTable = {
 #if (ANDROID_SDK_VERSION >= 24)
     __VK_WSI_ANDROID_NATIVE_BUFFER_ENTRIES(__vkEntry_)
 #  endif
+#if (ANDROID_SDK_VERSION >= 26)
+    __VK_EXT_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_ENTRIES(__vkEntry_)
+#  endif
 #endif
 #ifdef VK_USE_PLATFORM_WIN32_KHR
     __VK_WSI_WIN32_ENTRIES(__vkEntry_)

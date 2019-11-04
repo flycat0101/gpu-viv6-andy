@@ -1575,4 +1575,226 @@ __vkSurfaceOperation __vkAndroidSurfaceOperation =
 
 #endif
 
+#if (ANDROID_SDK_VERSION >= 26)
+
+#include <vndk/hardware_buffer.h>
+
+static struct {
+    VkFormat  vkFormat;
+    uint32_t  androidFormat;
+} androidFormatMap[] =
+{
+    {VK_FORMAT_R8G8B8A8_UNORM, AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM},
+    {VK_FORMAT_R8G8B8_UNORM, AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM},
+    {VK_FORMAT_R5G6B5_UNORM_PACK16, AHARDWAREBUFFER_FORMAT_R5G6B5_UNORM},
+    {VK_FORMAT_R16G16B16A16_SFLOAT, AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT},
+    {VK_FORMAT_A2B10G10R10_UNORM_PACK32, AHARDWAREBUFFER_FORMAT_R10G10B10A2_UNORM},
+};
+
+static uint32_t android_format_from_vk(VkFormat vkFormat)
+{
+    size_t i = 0;
+
+    for (i = 0; i < sizeof(androidFormatMap) / sizeof(androidFormatMap[0]); i++)
+    {
+        if (androidFormatMap[i].vkFormat == vkFormat)
+        {
+            return androidFormatMap[i].androidFormat;
+        }
+    }
+    return AHARDWAREBUFFER_FORMAT_BLOB;
+}
+
+static VkFormat vk_format_from_android(uint32_t androidFormat)
+{
+    size_t i = 0;
+
+    for (i = 0; i < sizeof(androidFormatMap) / sizeof(androidFormatMap[0]); i++)
+    {
+        if (androidFormatMap[i].androidFormat == androidFormat)
+        {
+            return androidFormatMap[i].vkFormat;
+        }
+    }
+    return VK_FORMAT_UNDEFINED;
+}
+
+uint64_t getAndroidHardwareBufferUsageFromVkUsage(const VkImageCreateFlags vk_create, const VkImageUsageFlags vk_usage)
+{
+  return AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __vk_GetAndroidHardwareBufferPropertiesANDROID(VkDevice device, const struct AHardwareBuffer* buffer, VkAndroidHardwareBufferPropertiesANDROID* pProperties)
+{
+    VkAndroidHardwareBufferFormatPropertiesANDROID *ahbFormatProps = VK_NULL_HANDLE;
+    VkDeviceSize allocationSize = 0;
+    VkBaseInStructure *pBaseIn = (VkBaseInStructure *)pProperties->pNext;
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+
+    while (pBaseIn)
+    {
+        if (pBaseIn->sType == VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_FORMAT_PROPERTIES_ANDROID)
+        {
+            ahbFormatProps = (VkAndroidHardwareBufferFormatPropertiesANDROID *)pBaseIn;
+        }
+        pBaseIn = (VkBaseInStructure *)pBaseIn->pNext;
+    }
+
+    if (ahbFormatProps)
+    {
+        AHardwareBuffer_Desc desc;
+        AHardwareBuffer_describe(buffer, &desc);
+
+        const uint64_t gpu_usage =
+          AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
+          AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT |
+          AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER;
+
+        if (!(desc.usage & (gpu_usage))) {
+            return VK_ERROR_INVALID_EXTERNAL_HANDLE;
+        }
+
+        ahbFormatProps->format = vk_format_from_android(desc.format);
+        ahbFormatProps->externalFormat = desc.format;
+
+        ahbFormatProps->formatFeatures =
+            VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT |
+            VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT;
+
+        ahbFormatProps->samplerYcbcrConversionComponents.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        ahbFormatProps->samplerYcbcrConversionComponents.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        ahbFormatProps->samplerYcbcrConversionComponents.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        ahbFormatProps->samplerYcbcrConversionComponents.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+        ahbFormatProps->suggestedYcbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY;
+        ahbFormatProps->suggestedYcbcrRange = VK_SAMPLER_YCBCR_RANGE_ITU_FULL;
+
+        ahbFormatProps->suggestedXChromaOffset = VK_CHROMA_LOCATION_MIDPOINT;
+        ahbFormatProps->suggestedYChromaOffset = VK_CHROMA_LOCATION_MIDPOINT;
+    }
+#ifdef DRM_GRALLOC
+    {
+        struct private_handle_t *handle = (struct private_handle_t*)AHardwareBuffer_getNativeHandle(buffer);
+        allocationSize = handle->size;
+    }
+#else
+    {
+        gc_native_handle_t *handle = gc_native_handle_get((buffer_handle_t)AHardwareBuffer_getNativeHandle(buffer) );
+        allocationSize = handle->nodeSize;
+    }
+#endif
+    __VK_ASSERT(allocationSize);
+    __VK_ASSERT(devCtx && devCtx->pPhyDevice);
+
+    pProperties->memoryTypeBits = devCtx->pPhyDevice->phyDevMemProp.memoryTypes[0].propertyFlags;
+    pProperties->allocationSize = allocationSize;
+
+    return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __vk_GetMemoryAndroidHardwareBufferANDROID(VkDevice device, const VkMemoryGetAndroidHardwareBufferInfoANDROID* pInfo, struct AHardwareBuffer** pBuffer)
+{
+    __vkDeviceMemory *dvm;
+    VkResult status = VK_ERROR_OUT_OF_HOST_MEMORY;
+
+    dvm = (__vkDeviceMemory *) pInfo->memory;
+    if (dvm && dvm->ahwBuffer)
+    {
+        AHardwareBuffer_acquire(dvm->ahwBuffer);
+        *pBuffer = dvm->ahwBuffer;
+
+        status = VK_SUCCESS;
+    }
+
+    return status;
+}
+
+VkResult __VK_constructAHardwareBuffer(
+    uint32_t Width,
+    uint32_t Height,
+    uint32_t Layers,
+    VkFormat vkFormat,
+    VkImageCreateFlags vkImgCreateFlags,
+    VkImageUsageFlags  vkUsage,
+    struct AHardwareBuffer **ahw
+    )
+{
+    uint32_t  format    = AHARDWAREBUFFER_FORMAT_BLOB;
+    uint64_t  usage     = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
+    struct AHardwareBuffer_Desc desc = { 0 };
+
+    /* VK format -> android format */
+    format = android_format_from_vk(vkFormat);
+
+    /* VK usage -> android usage */
+    if (vkUsage & VK_IMAGE_USAGE_SAMPLED_BIT)
+    {
+        usage |= AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
+    }
+    if (vkUsage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
+    {
+        usage |= AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
+    }
+    if (vkUsage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+    {
+        usage |= AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT;
+    }
+
+    if (vkImgCreateFlags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT)
+    {
+        usage |= AHARDWAREBUFFER_USAGE_GPU_CUBE_MAP;
+    }
+    if (vkImgCreateFlags & VK_IMAGE_CREATE_PROTECTED_BIT)
+    {
+        usage |= AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT;
+    }
+
+    if (format == AHARDWAREBUFFER_FORMAT_BLOB)
+    {
+       usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN |
+               AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
+               AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER;
+    }
+
+    desc.width  = Width;
+    desc.height = Height;
+    desc.layers = Layers;
+    desc.format = format;
+    desc.usage  = usage;
+
+    if (AHardwareBuffer_allocate(&desc, ahw) != 0)
+    {
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+
+    return VK_SUCCESS;
+}
+
+VkResult __VK_releaseAHardwareBuffer(struct AHardwareBuffer *ahw)
+{
+    VkResult status = VK_ERROR_INVALID_EXTERNAL_HANDLE;
+
+    if (ahw != NULL)
+    {
+        AHardwareBuffer_release(ahw);
+        status = VK_SUCCESS;
+    }
+
+    return status;
+}
+
+VkResult __VK_acquireAHardwareBuffer(struct AHardwareBuffer *ahw)
+{
+    VkResult status = VK_ERROR_INVALID_EXTERNAL_HANDLE;
+
+    if (ahw)
+    {
+        AHardwareBuffer_acquire(ahw);
+        status = VK_SUCCESS;
+    }
+
+    return status;
+}
+#endif
+
 

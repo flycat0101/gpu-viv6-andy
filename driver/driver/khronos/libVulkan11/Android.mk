@@ -108,6 +108,11 @@ LOCAL_SHARED_LIBRARIES := \
 	libhardware \
 	libsync
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 26),1)
+LOCAL_SHARED_LIBRARIES += \
+	libnativewindow
+endif
+
 LOCAL_SHARED_LIBRARIES += \
 	libSPIRV_viv \
 	libVSC \

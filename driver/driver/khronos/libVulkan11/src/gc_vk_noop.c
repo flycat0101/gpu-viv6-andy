@@ -1117,6 +1117,19 @@ VKAPI_ATTR VkResult VKAPI_CALL __nop_QueueSignalReleaseImageANDROID(VkQueue queu
     return VK_SUCCESS;
 }
 #  endif
+#if (ANDROID_SDK_VERSION >= 26)
+VKAPI_ATTR VkResult VKAPI_CALL __nop_GetAndroidHardwareBufferPropertiesANDROID(VkDevice device, const struct AHardwareBuffer* buffer, VkAndroidHardwareBufferPropertiesANDROID* pProperties)
+{
+    __VK_NOP_MESSAGE();
+    return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __nop_GetMemoryAndroidHardwareBufferANDROID(VkDevice device, const VkMemoryGetAndroidHardwareBufferInfoANDROID* pInfo, struct AHardwareBuffer** pBuffer)
+{
+    __VK_NOP_MESSAGE();
+    return VK_SUCCESS;
+}
+#  endif
 #endif
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
@@ -1180,6 +1193,9 @@ __vkDispatchTable __vkNopDispatchTable = {
 #if (ANDROID_SDK_VERSION >= 24)
     __VK_WSI_ANDROID_NATIVE_BUFFER_ENTRIES(__vkNop_)
 #  endif
+#if (ANDROID_SDK_VERSION >= 26)
+    __VK_EXT_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_ENTRIES(__vkNop_)
+#  endif
 #endif
 #ifdef VK_USE_PLATFORM_WIN32_KHR
     __VK_WSI_WIN32_ENTRIES(__vkNop_)
@@ -1206,6 +1222,9 @@ __vkDispatchTable __vkApiDispatchTable = {
     __VK_WSI_ANDROID_ENTRIES(__vkNop_)
 #if (ANDROID_SDK_VERSION >= 24)
     __VK_WSI_ANDROID_NATIVE_BUFFER_ENTRIES(__vkNop_)
+#  endif
+#if (ANDROID_SDK_VERSION >= 26)
+    __VK_EXT_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_ENTRIES(__vkNop_)
 #  endif
 #endif
 #ifdef VK_USE_PLATFORM_WIN32_KHR

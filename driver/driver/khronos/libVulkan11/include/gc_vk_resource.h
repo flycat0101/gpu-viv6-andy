@@ -118,6 +118,9 @@ typedef struct __vkDeviceMemoryRec
     /* ts related information. */
     __vkTileStatus *ts;
 #endif
+#if (ANDROID_SDK_VERSION >= 26)
+    struct AHardwareBuffer  *ahwBuffer;
+#endif
 } __vkDeviceMemory;
 
 typedef struct __vkBufferRec

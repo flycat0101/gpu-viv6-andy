@@ -6728,6 +6728,52 @@ vk_Exit:
 
     return result;
 }
+#endif
+#if (ANDROID_SDK_VERSION >= 26)
+
+VKAPI_ATTR VkResult VKAPI_CALL __valid_GetAndroidHardwareBufferPropertiesANDROID(VkDevice device, const struct AHardwareBuffer* buffer, VkAndroidHardwareBufferPropertiesANDROID* pProperties)
+{
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%p): vkGetAndroidHardwareBufferPropertiesANDROID(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, buffer, pProperties);
+
+    if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
+    {
+        result = __VK_ERROR_INVALID_HANDLE;
+        goto vk_Exit;
+    }
+
+    result = __vk_GetAndroidHardwareBufferPropertiesANDROID(device, buffer, pProperties);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s (property=%p)\n", __vkiGetResultString(result), pProperties);
+    devCtx->currentResult = result;
+
+    return result;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __valid_GetMemoryAndroidHardwareBufferANDROID(VkDevice device, const VkMemoryGetAndroidHardwareBufferInfoANDROID* pInfo, struct AHardwareBuffer** pBuffer)
+{
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    VkResult result = VK_SUCCESS;
+
+    __VK_LOG_API("(tid=%p): vkGetMemoryAndroidHardwareBufferANDROID(%p, %p, %p)", gcoOS_GetCurrentThreadID(), device, pInfo, pBuffer);
+
+    if (!devCtx || devCtx->sType != __VK_OBJECT_TYPE_DEV_CONTEXT)
+    {
+        result = __VK_ERROR_INVALID_HANDLE;
+        goto vk_Exit;
+    }
+
+    result = __vk_GetMemoryAndroidHardwareBufferANDROID(device, pInfo, pBuffer);
+
+vk_Exit:
+    __VK_LOG_API(" ==> %s (buffer=%p)\n", __vkiGetResultString(result), *pBuffer);
+    devCtx->currentResult = result;
+
+    return result;
+}
 #  endif
 #endif
 
@@ -6911,6 +6957,9 @@ __vkDispatchTable __vkValidEntryFuncTable = {
     __VK_WSI_ANDROID_ENTRIES(__vkValid_)
 #if (ANDROID_SDK_VERSION >= 24)
     __VK_WSI_ANDROID_NATIVE_BUFFER_ENTRIES(__vkValid_)
+#  endif
+#if (ANDROID_SDK_VERSION >= 26)
+    __VK_EXT_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_ENTRIES(__vkValid_)
 #  endif
 #endif
 #ifdef VK_USE_PLATFORM_WIN32_KHR

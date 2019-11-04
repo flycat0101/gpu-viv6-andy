@@ -1285,6 +1285,17 @@ VKAPI_ATTR VkResult VKAPI_CALL vkQueueSignalReleaseImageANDROID(VkQueue queue, u
     return __vkApiDispatchTable.QueueSignalReleaseImageANDROID(queue, waitSemaphoreCount, pWaitSemaphores, image, pNativeFenceFd);
 }
 #  endif
+#if (ANDROID_SDK_VERSION >= 26)
+VKAPI_ATTR VkResult VKAPI_CALL vkGetAndroidHardwareBufferPropertiesANDROID(VkDevice device, const struct AHardwareBuffer* buffer, VkAndroidHardwareBufferPropertiesANDROID* pProperties)
+{
+    return __vkApiDispatchTable.GetAndroidHardwareBufferPropertiesANDROID(device, buffer, pProperties);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL vkGetMemoryAndroidHardwareBufferANDROID(VkDevice device, const VkMemoryGetAndroidHardwareBufferInfoANDROID* pInfo, struct AHardwareBuffer** pBuffer)
+{
+    return __vkApiDispatchTable.GetMemoryAndroidHardwareBufferANDROID(device, pInfo, pBuffer);
+}
+#  endif
 #endif
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateWin32SurfaceKHR(VkInstance instance, const VkWin32SurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)

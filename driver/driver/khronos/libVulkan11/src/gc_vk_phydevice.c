@@ -17,6 +17,10 @@
 #  include <vulkan/vk_android_native_buffer.h>
 #endif
 
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 26)
+#  include <vulkan/vulkan_android.h>
+#endif
+
 const VkExtensionProperties g_DeviceExtensions[] =
 {
     {VK_KHR_16BIT_STORAGE_EXTENSION_NAME, VK_KHR_16BIT_STORAGE_SPEC_VERSION},
@@ -35,8 +39,14 @@ const VkExtensionProperties g_DeviceExtensions[] =
 #if defined(_WIN32)
     {VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME, VK_KHR_EXTERNAL_SEMAPHORE_WIN32_SPEC_VERSION},
 #endif
-#if defined(VK_USE_PLATFORM_ANDROID_KHR) && (ANDROID_SDK_VERSION >= 24)
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+#if (ANDROID_SDK_VERSION >= 24)
     {VK_ANDROID_NATIVE_BUFFER_EXTENSION_NAME, VK_ANDROID_NATIVE_BUFFER_SPEC_VERSION},
+#endif
+#if (ANDROID_SDK_VERSION >= 26)
+    {VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME, VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_SPEC_VERSION},
+#endif
+
 #else
     {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_SWAPCHAIN_SPEC_VERSION}
 #endif
@@ -61,8 +71,14 @@ __vkExtension g_EnabledExtensions[] =
 #if defined(_WIN32)
     {VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME, VK_FALSE},
 #endif
-#if defined(VK_USE_PLATFORM_ANDROID_KHR) && (ANDROID_SDK_VERSION >= 24)
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+#if (ANDROID_SDK_VERSION >= 24)
     {VK_ANDROID_NATIVE_BUFFER_EXTENSION_NAME, VK_FALSE},
+#endif
+#if (ANDROID_SDK_VERSION >= 26)
+    {VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME, VK_FALSE},
+#endif
+
 #else
     {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_FALSE}
 #endif
@@ -1881,6 +1897,45 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties2(
     VkPhysicalDeviceExternalImageFormatInfo * externalInfo = (VkPhysicalDeviceExternalImageFormatInfo *)pImageFormatInfo->pNext;
     VkExternalImageFormatProperties * extImgFormatProp = (VkExternalImageFormatProperties *)pImageFormatProperties->pNext;
     VkExternalMemoryProperties * extMemProp = &extImgFormatProp->externalMemoryProperties;
+#if (ANDROID_SDK_VERSION >= 26)
+    VkAndroidHardwareBufferUsageANDROID* output_ahw_usage = VK_NULL_HANDLE;
+#endif
+
+    VkBaseInStructure *pBaseIn = (VkBaseInStructure *)pImageFormatInfo->pNext;
+
+    while (pBaseIn)
+    {
+        if (pBaseIn->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO)
+        {
+            externalInfo = (VkPhysicalDeviceExternalImageFormatInfo *)pBaseIn;
+        }
+        pBaseIn = (VkBaseInStructure *)pBaseIn->pNext;
+    }
+
+    pBaseIn = (VkBaseInStructure *)pImageFormatProperties->pNext;
+    while (pBaseIn)
+    {
+        if (pBaseIn->sType == VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES)
+        {
+            extImgFormatProp = (VkExternalImageFormatProperties *)pBaseIn;
+        }
+#if (ANDROID_SDK_VERSION >= 26)
+        else if (pBaseIn->sType == VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_USAGE_ANDROID)
+        {
+            output_ahw_usage = (VkAndroidHardwareBufferUsageANDROID *)pBaseIn;
+        }
+#endif
+        pBaseIn = (VkBaseInStructure *)pBaseIn->pNext;
+    }
+
+#if (ANDROID_SDK_VERSION >= 26)
+    extern uint64_t getAndroidHardwareBufferUsageFromVkUsage(const VkImageCreateFlags vk_create, const VkImageUsageFlags vk_usage);
+    if (output_ahw_usage)
+    {
+        output_ahw_usage->androidHardwareBufferUsage =
+                getAndroidHardwareBufferUsageFromVkUsage(pImageFormatInfo->flags,pImageFormatInfo->usage);
+    }
+#endif
 
     formatInfo = __vk_GetVkFormatInfo(format);
     formatFeatures = (tiling == VK_IMAGE_TILING_LINEAR)
@@ -2122,8 +2177,11 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceExternalBufferProperties(
     case VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT:
     case VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT:
     case VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_HEAP_BIT:
-    case VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID:
         pExternalBufferProperties->externalMemoryProperties.externalMemoryFeatures = 0;
+        break;
+    case VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID:
+        pExternalBufferProperties->externalMemoryProperties.externalMemoryFeatures =  VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT
+                                                                                    | VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT;
         break;
     default:
         __VK_ASSERT(!"invalid external memory handle types");

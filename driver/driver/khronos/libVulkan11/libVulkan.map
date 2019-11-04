@@ -226,6 +226,8 @@
         vkGetSwapchainGrallocUsageANDROID*;
         vkAcquireImageANDROID*;
         vkQueueSignalReleaseImageANDROID*;
+        vkGetAndroidHardwareBufferPropertiesANDROID*;
+        vkGetMemoryAndroidHardwareBufferANDROID*;
 
         vk_icdGetInstanceProcAddr*;
         vk_icdNegotiateLoaderICDInterfaceVersion*;
