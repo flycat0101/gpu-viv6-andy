@@ -971,7 +971,7 @@ static vx_float32 _calcImageIdealCacheInPixel(
 {
     vx_float32 imageIdealCache;
     vx_uint32 inx = x + kx - 1 + 2 * xoffset;
-    vx_uint32 iny = y + ky - 1 + 2 * yoffset;
+    vx_uint32 iny = ((y + ky - 1 + 2 * yoffset) == 0) ? -yoffset : (y + ky - 1 + 2 * yoffset);
     vx_uint32 inSIX = gcmMIN(inx, sub_x + kx - 1);
     vx_uint32 inSIY = gcmMIN(iny, sub_y + ky - 1);
 
@@ -2636,6 +2636,7 @@ vx_status calculateArchPerf(
                 /* init to default */
                 vx_uint32 tmpInX = perf->swTilingInfo.origInX + perf->info.kx - 1 + 2 * xOffSet;
                 vx_uint32 tmpInY = perf->swTilingInfo.origInY + perf->info.ky - 1 + 2 * yOffSet;
+                tmpInY = (tmpInY == 0) ? -yOffSet : tmpInY;
                 inSIXRefined = gcmMIN(tmpInX, perf->info.inx + perf->info.kx - 1);
                 inSIYRefined = gcmMIN(tmpInY, perf->info.iny + perf->info.ky - 1);
                 inImageStride = tmpInX;
