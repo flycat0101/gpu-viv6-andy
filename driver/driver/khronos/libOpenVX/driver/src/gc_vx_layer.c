@@ -15570,7 +15570,8 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
     vx_reference parameters[2]     = {(vx_reference)input, (vx_reference)output};
     vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
     vx_bool      useImage2DFlag    = (vx_bool)(outputWidth * outputHeight < IMG_MAX_WIDTH);
-    vx_bool      is_use_k3_fast    = vx_true_e;
+    vx_bool      is_use_fast_mode  = vx_true_e;
+    vx_bool      is_1xN_mode       = vx_false_e;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
@@ -15583,7 +15584,7 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
         borderMode->constant_value.S16 = 0;
         if ((padding_x > 0)  && ((width + padding_x) < 8))
         {
-            is_use_k3_fast = vx_false_e;
+            is_use_fast_mode = vx_false_e;
         }
     }
     else if (inputFormat == VX_TYPE_INT8)
@@ -15591,7 +15592,7 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
         borderMode->constant_value.U8 = 0;
         if ((padding_x > 0)  && ((width + padding_x) < 16))
         {
-            is_use_k3_fast = vx_false_e;
+            is_use_fast_mode = vx_false_e;
         }
     }
     else if (inputFormat == VX_TYPE_UINT8)
@@ -15599,7 +15600,7 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
         borderMode->constant_value.U8 = (vx_uint8)TENSOR_TF_ZEROPOINT(input);
         if ((padding_x > 0)  && ((width + padding_x) < 16))
         {
-            is_use_k3_fast = vx_false_e;
+            is_use_fast_mode = vx_false_e;
         }
     }
 
@@ -15617,6 +15618,7 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
 
         borderMode->mode = VX_BORDER_REPLICATE;
     }
+
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
 
     if (!kernel)
@@ -15730,12 +15732,12 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
     else if (inputFormat == VX_TYPE_BFLOAT16 || inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT16 || inputFormat == VX_TYPE_UINT8 || inputFormat == VX_TYPE_INT8)
     {
         vx_uint32 kernelSizeXY = kernelSize_x * kernelSize_y;
-
         vx_int32 padding_xy[2] = {padding_x, padding_y};
         vx_int32 strideXY[]    = {stride_x, stride_y};
         vx_uint32 offset = 0;
         vx_bool   set_order_uniform      = vx_false_e;
         vx_bool   set_order_uniform_u8   = vx_false_e;
+
         execution_parameters.workDim             = 3;
         execution_parameters.globalWorkScale[0]  = 1;
         execution_parameters.globalWorkScale[1]  = 1;
@@ -15746,19 +15748,52 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             char kernelName[100];
             if (kernelSize_x < 17 && useImage2DFlag)
             {
-                if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_k3_fast)
+                if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_fast_mode)
                 {
                     gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_3_S1");
                     set_order_uniform = vx_true_e;
                 }
-                else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_k3_fast)
+                else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_fast_mode)
                 {
                     gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_3_S2");
                     set_order_uniform = vx_true_e;
                 }
+                else if (kernelSize_x == 7 && kernelSize_y == 1 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_7x1_S1");
+                    execution_parameters.globalWorkScale[0] = 2;
+                }
+                else if (kernelSize_x == 5 && kernelSize_y == 1 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_5x1_S1");
+                    execution_parameters.globalWorkScale[0] = 4;
+                }
+                else if (kernelSize_x == 3 && kernelSize_y == 1 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_3x1_S1");
+                    execution_parameters.globalWorkScale[0] = 6;
+                }
+               else if (kernelSize_x == 1 && kernelSize_y == 7 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_1x7_S1");
+                    execution_parameters.globalWorkScale[0] = 8;
+                    is_1xN_mode = vx_true_e;
+                }
+                else if (kernelSize_x == 1 && kernelSize_y == 5 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_1x5_S1");
+                    execution_parameters.globalWorkScale[0] = 8;
+                    is_1xN_mode = vx_true_e;
+                }
+                else if (kernelSize_x == 1 && kernelSize_y == 3 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_1x3_S1");
+                    execution_parameters.globalWorkScale[0] = 8;
+                    is_1xN_mode = vx_true_e;
+                }
                 else
                 {
-                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_%d", kernelSize_x);
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer16_%d", kernelSize_x);
                 }
             }
             else if (kernelSize_x > 16 && useImage2DFlag)
@@ -15767,19 +15802,52 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             }
             else if (kernelSize_x < 17 && !useImage2DFlag && dilation_x == 1 && dilation_y == 1)
             {
-                if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_k3_fast)
+                if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_fast_mode)
                 {
                     gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_3_S1");
                     set_order_uniform = vx_true_e;
                 }
-                else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_k3_fast)
+                else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_fast_mode)
                 {
                     gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_3_S2");
                     set_order_uniform = vx_true_e;
                 }
+                else if (kernelSize_x == 7 && kernelSize_y == 1 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_7x1_S1");
+                    execution_parameters.globalWorkScale[0] = 2;
+                }
+                else if (kernelSize_x == 5 && kernelSize_y == 1 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_5x1_S1");
+                    execution_parameters.globalWorkScale[0] = 4;
+                }
+                else if (kernelSize_x == 3 && kernelSize_y == 1 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_3x1_S1");
+                    execution_parameters.globalWorkScale[0] = 6;
+                }
+                else if (kernelSize_x == 1 && kernelSize_y == 7 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_1x7_S1");
+                    execution_parameters.globalWorkScale[0] = 8;
+                    is_1xN_mode = vx_true_e;
+                }
+                else if (kernelSize_x == 1 && kernelSize_y == 5 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_1x5_S1");
+                    execution_parameters.globalWorkScale[0] = 8;
+                    is_1xN_mode = vx_true_e;
+                }
+                else if (kernelSize_x == 1 && kernelSize_y == 3 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_1x3_S1");
+                    execution_parameters.globalWorkScale[0] = 8;
+                    is_1xN_mode = vx_true_e;
+                }
                 else
                 {
-                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_%d", kernelSize_x);
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer16_%d", kernelSize_x);
                 }
             }
             else
@@ -15795,15 +15863,48 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             char kernelName[100];
             if (kernelSize_x < 17 && useImage2DFlag)
             {
-                if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_k3_fast)
+                if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_fast_mode)
                 {
                     gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer8_3_S1");
                     set_order_uniform_u8 = vx_true_e;
                 }
-                else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_k3_fast)
+                else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_fast_mode)
                 {
                     gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer8_3_S2");
                     set_order_uniform_u8 = vx_true_e;
+                }
+                else if (kernelSize_x == 7 && kernelSize_y == 1 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer8_7x1_S1");
+                    execution_parameters.globalWorkScale[0] = 10;
+                }
+                else if (kernelSize_x == 5 && kernelSize_y == 1 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer8_5x1_S1");
+                    execution_parameters.globalWorkScale[0] = 12;
+                }
+                else if (kernelSize_x == 3 && kernelSize_y == 1 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer8_3x1_S1");
+                    execution_parameters.globalWorkScale[0] = 14;
+                }
+                else if (kernelSize_x == 1 && kernelSize_y == 7 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer8_1x7_S1");
+                    execution_parameters.globalWorkScale[0] = 16;
+                    is_1xN_mode = vx_true_e;
+                }
+                else if (kernelSize_x == 1 && kernelSize_y == 5 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer8_1x5_S1");
+                    execution_parameters.globalWorkScale[0] = 16;
+                    is_1xN_mode = vx_true_e;
+                }
+                else if (kernelSize_x == 1 && kernelSize_y == 3 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Integer8_1x3_S1");
+                    execution_parameters.globalWorkScale[0] = 16;
+                    is_1xN_mode = vx_true_e;
                 }
                 else
                 {
@@ -15816,19 +15917,52 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             }
             else if (kernelSize_x < 17 && !useImage2DFlag && dilation_x == 1 && dilation_y == 1)
             {
-                if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_k3_fast)
+                if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 1 && is_use_fast_mode)
                 {
                     gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_3_S1");
                     set_order_uniform_u8 = vx_true_e;
                 }
-                else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_k3_fast)
+                else if (kernelSize_x == 3 && kernelSize_y == 3 && stride_x == 2 && is_use_fast_mode)
                 {
                     gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_3_S2");
                     set_order_uniform_u8 = vx_true_e;
                 }
+                else if (kernelSize_x == 7 && kernelSize_y == 1 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_7x1_S1");
+                    execution_parameters.globalWorkScale[0] = 10;
+                }
+                else if (kernelSize_x == 5 && kernelSize_y == 1 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_5x1_S1");
+                    execution_parameters.globalWorkScale[0] = 12;
+                }
+                else if (kernelSize_x == 3 && kernelSize_y == 1 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_3x1_S1");
+                    execution_parameters.globalWorkScale[0] = 14;
+                }
+                else if (kernelSize_x == 1 && kernelSize_y == 7 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_1x7_S1");
+                    execution_parameters.globalWorkScale[0] = 16;
+                    is_1xN_mode = vx_true_e;
+                }
+                else if (kernelSize_x == 1 && kernelSize_y == 5 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_1x5_S1");
+                    execution_parameters.globalWorkScale[0] = 16;
+                    is_1xN_mode = vx_true_e;
+                }
+                else if (kernelSize_x == 1 && kernelSize_y == 3 && stride_x == 1 && is_use_fast_mode)
+                {
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_1x3_S1");
+                    execution_parameters.globalWorkScale[0] = 16;
+                    is_1xN_mode = vx_true_e;
+                }
                 else
                 {
-                gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_%d", kernelSize_x);
+                    gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_Tensor_Integer8_%d", kernelSize_x);
                 }
             }
             else
@@ -15839,6 +15973,7 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, kernelName, borderMode);
             if (!shaderExecutable) goto OnError;
         }
+
         if (set_order_uniform || set_order_uniform_u8)
         {
             vx_uint32 uniTensor2RowOrder0K3_2x8[16] = {
@@ -16012,6 +16147,121 @@ vxnne_shader_executable vxnneTensor2RowShaderExecutable(
             }
             if (status != VX_SUCCESS) goto OnError;
         }
+
+        if (is_1xN_mode)
+        {
+            vx_uint32 uniTensor2Row1Pack0_2x8[16] = {
+                0x11111111, // TCfg
+                0x10101010, // ASelt
+                0x01010000, 0x03030202, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+            vx_uint32 uniTensor2Row2Pack0_2x8[16] = {
+                0x11111111, // TCfg
+                0x11001100, // ASelt
+                0x01000100, 0x03020302, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+            vx_uint32 uniTensor2Row2Pack1_2x8[16] = {
+                0x11111111, // TCfg
+                0x11001100, // ASelt
+                0x05040504, 0x07060706, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+            vx_uint32 uniTensor2Row4Pack0_2x8[16] = {
+                0x11111111, // TCfg
+                0x11110000, // ASelt
+                0x03020100, 0x03020100, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+            vx_uint32 uniTensor2Row4Pack1_2x8[16] = {
+                0x11111111, // TCfg
+                0x11110000, // ASelt
+                0x07060504, 0x07060504, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+            vx_uint32 uniTensor2Row1Pack1_2x8[16] = {
+                0x11111111, // TCfg
+                0x10101010, // ASelt
+                0x05050404, 0x07070606, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+            vx_uint32 uniTensor2Row1Pack2_2x8[16] = {
+                0x11111111, // TCfg
+                0x10101010, // ASelt
+                0x09090808, 0x0b0b0a0a, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+            vx_uint32 uniTensor2Row1Pack3_2x8[16] = {
+                0x11111111, // TCfg
+                0x10101010, // ASelt
+                0x0d0d0c0c, 0x0f0f0e0e, // ABin
+                0x22222222, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00000400, // AccumType, ConstantType, and PostShift
+                0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+            };
+
+            if (kernelSize_x == 1 && kernelSize_y == 7 && stride_x == 1)
+            {
+                status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row1Pack0_2x8", 1, uniTensor2Row1Pack0_2x8);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row2Pack0_2x8", 1, uniTensor2Row2Pack0_2x8);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row4Pack0_2x8", 1, uniTensor2Row4Pack0_2x8);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row4Pack1_2x8", 1, uniTensor2Row4Pack1_2x8);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row2Pack1_2x8", 1, uniTensor2Row2Pack1_2x8);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row1Pack1_2x8", 1, uniTensor2Row1Pack1_2x8);
+                if (inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_UINT8)
+                {
+                    status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row1Pack2_2x8", 1, uniTensor2Row1Pack2_2x8);
+                    status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row1Pack3_2x8", 1, uniTensor2Row1Pack3_2x8);
+                }
+            }
+            else if (kernelSize_x == 1 && kernelSize_y == 5 && stride_x == 1)
+            {
+                status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row1Pack0_2x8", 1, uniTensor2Row1Pack0_2x8);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row2Pack0_2x8", 1, uniTensor2Row2Pack0_2x8);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row2Pack1_2x8", 1, uniTensor2Row2Pack1_2x8);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row1Pack1_2x8", 1, uniTensor2Row1Pack1_2x8);
+                if (inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_UINT8)
+                {
+                    status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row1Pack2_2x8", 1, uniTensor2Row1Pack2_2x8);
+                    status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row1Pack3_2x8", 1, uniTensor2Row1Pack3_2x8);
+                }
+            }
+            else if (kernelSize_x == 1 && kernelSize_y == 3 && stride_x == 1)
+            {
+                status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row1Pack0_2x8", 1, uniTensor2Row1Pack0_2x8);
+                status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row1Pack1_2x8", 1, uniTensor2Row1Pack1_2x8);
+                if (inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_UINT8)
+                {
+                    status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row1Pack2_2x8", 1, uniTensor2Row1Pack2_2x8);
+                    status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniTensor2Row1Pack3_2x8", 1, uniTensor2Row1Pack3_2x8);
+                }
+            }
+            if (status != VX_SUCCESS) goto OnError;
+        }
+
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "outputWidth", 1, &outputWidth);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "kernelSizeXY", 1, &kernelSizeXY);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "kernelSizeX", 1, &kernelSize_x);
