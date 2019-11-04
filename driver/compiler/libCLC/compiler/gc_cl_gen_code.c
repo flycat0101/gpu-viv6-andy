@@ -47,9 +47,9 @@
 
 #define _clmGetSectionalComponent(component) ((component) & 0x3)
 
-#define _clmConvROperandToSuperSourceConstant(Compiler, ROperand, SuperSource, Status) \
+#define _clmConvROperandToSuperSourceConstant(Compiler, ROperand, LineNo, StringNo, SuperSource, Status) \
    do { \
-    Status = _ConvROperandToSourceConstant(Compiler, ROperand, (SuperSource)->sources); \
+    Status = _ConvROperandToSourceConstant(Compiler, ROperand, LineNo, StringNo, (SuperSource)->sources); \
     (SuperSource)->numSources = 1; \
    } while (gcvFALSE)
 
@@ -4120,6 +4120,12 @@ OUT gctUINT *NumRegNeeded
             else
             {
                 cloCOMPILER_SetDIEArray(Compiler, Name->die, Name);
+                if(!cldHandleHighPrecisionInFrontEnd &&
+                    clmIsElementTypeHighPrecision(Name->decl.dataType->elementType))
+                {
+                    /* need to reserve double the number of registers */
+                    numRegNeeded <<= 1;
+                }
                 cloCOMPILER_SetDIELogicalReg(Compiler, Name->die, tempRegIndex,
                     numRegNeeded, (gctUINT)_ConvComponentSelectionToEnable(&LogicalRegs->componentSelection));
             }
@@ -8766,6 +8772,8 @@ _ConvLongConstantToSource(
     IN cloCOMPILER Compiler,
     cluCONSTANT_VALUE * ConstantValue,
     clsGEN_CODE_DATA_TYPE DataType,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
     OUT gcsSOURCE * Source
     )
 {
@@ -8787,8 +8795,8 @@ _ConvLongConstantToSource(
                                          uint,
                                          ConstantValue->uintArray[1]);
     status = clGenGenericCode2(Compiler,
-                               0,
-                               0,
+                               LineNo,
+                               StringNo,
                                clvOPCODE_MOV_LONG,
                                iOperand,
                                lower,
@@ -8813,6 +8821,8 @@ static gceSTATUS
 _ConvROperandToSourceConstant(
     IN cloCOMPILER Compiler,
     IN clsROPERAND * ROperand,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
     OUT gcsSOURCE * Source
     )
 {
@@ -8833,6 +8843,8 @@ _ConvROperandToSourceConstant(
            return _ConvLongConstantToSource(Compiler,
                                             &ROperand->u.constant.values[0],
                                             ROperand->u.constant.dataType,
+                                            LineNo,
+                                            StringNo,
                                             Source);
        }
        if(clmIsElementTypeFloating(elementType)) {
@@ -8873,6 +8885,8 @@ _ConvROperandToSourceConstant(
            return _ConvLongConstantToSource(Compiler,
                                             &ROperand->u.constant.values[ROperand->vectorIndex.u.constant],
                                             ROperand->dataType,
+                                            LineNo,
+                                            StringNo,
                                             Source);
        }
        if(clmIsElementTypeFloating(elementType)) {
@@ -8942,6 +8956,8 @@ _ConvROperandToSpecialVectorSourceConstant(
            return _ConvLongConstantToSource(Compiler,
                                             &ROperand->u.constant.values[0],
                                             dataType,
+                                            0,
+                                            0,
                                             Source);
        }
        if(clmIsElementTypeFloating(elementType)) {
@@ -9047,6 +9063,8 @@ _ConvROperandToVectorComponentSourceConstant(
             return _ConvLongConstantToSource(Compiler,
                                              &ROperand->u.constant.values[VectorIndex],
                                              dataType,
+                                             0,
+                                             0,
                                              Source);
         }
 
@@ -9277,6 +9295,8 @@ _SpecialGenAssignCode(
         else {
             status = _ConvROperandToSourceConstant(Compiler,
                                                    ROperand,
+                                                   LineNo,
+                                                   StringNo,
                                                    superSource.sources);
             if (gcmIS_ERROR(status)) return status;
         }
@@ -9419,6 +9439,8 @@ _SpecialGenAssignCode(
             if(!ROperand->isReg) {
                 status = _ConvROperandToSourceConstant(Compiler,
                                                        ROperand,
+                                                       LineNo,
+                                                       StringNo,
                                                        source0);
                 if(gcmIS_ERROR(status)) return status;
             }
@@ -9675,6 +9697,8 @@ _GenCopyArrayCode(
     if(!ROperand->isReg) {
         status = _ConvROperandToSourceConstant(Compiler,
                                                ROperand,
+                                               LineNo,
+                                               StringNo,
                                                source0);
         if(gcmIS_ERROR(status)) return status;
     }
@@ -9925,6 +9949,8 @@ _ConvNormalROperandToSource(
     {
         status = _ConvROperandToSourceConstant(Compiler,
                             ROperand,
+                            LineNo,
+                            StringNo,
                             Source);
         if (gcmIS_ERROR(status)) return status;
     }
@@ -9993,6 +10019,8 @@ _ConvNormalROperandToSuperSource(
     {
         _clmConvROperandToSuperSourceConstant(Compiler,
                                               ROperand,
+                                              LineNo,
+                                              StringNo,
                                               SuperSource,
                                               status);
         if(gcmIS_ERROR(status)) return status;
@@ -10067,6 +10095,8 @@ OUT gcsSUPER_SOURCE * SuperSource
     {
         _clmConvROperandToSuperSourceConstant(Compiler,
                               ROperand,
+                              LineNo,
+                              StringNo,
                               SuperSource,
                               status);
         if (gcmIS_ERROR(status)) return status;

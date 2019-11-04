@@ -1031,37 +1031,16 @@ VSC_ErrCode VSC_IL_TopDownInline(
 
     /* Seperate the hueristic with the transformation */
 
-    /* 1. select the ALWAYSINLINE/recompile-stub function into the worklist first. */
-    for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
+    if (gcmOPT_DisableOPTforDebugger())
     {
-        pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
-
-        /* Check ALWAYSINLINE functions. */
-        if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_ALWAYSINLINE) ||
-            VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_RECOMPILER_STUB))
-        {
-            if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
-                VSC_OPTN_ILOptions_TRACE))
-            {
-                VIR_LOG(pDumper, "\nSelect Inline Candidate for Function:\t[%s]\n",
-                    VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
-                VIR_LOG_FLUSH(pDumper);
-            }
-            VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvTRUE);
-        }
-    }
-
-    /* 2. select the inline candidates into the worklist */
-    if (!inlineAlwaysInlineFuncOnly)
-    {
+        /* 1. select the recompiler functions into the worklist in debug mode. */
         for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
         {
             pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
 
-            /* Skip ALWAYSINLINE and NOINLIEN, recompile stub functions. */
-            if (!VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_ALWAYSINLINE) &&
-                ! VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_RECOMPILER_STUB) &&
-                !VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_NOINLINE))
+            /* Check recompiler functions. */
+            if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_RECOMPILER) ||
+                VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_RECOMPILER_STUB))
             {
                 if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
                     VSC_OPTN_ILOptions_TRACE))
@@ -1070,7 +1049,53 @@ VSC_ErrCode VSC_IL_TopDownInline(
                         VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
                     VIR_LOG_FLUSH(pDumper);
                 }
-                VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvFALSE);
+                VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvTRUE);
+            }
+        }
+    }
+    else
+    {
+        /* 1. select the ALWAYSINLINE/recompile-stub function into the worklist first. */
+        for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
+        {
+            pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
+
+            /* Check ALWAYSINLINE functions. */
+            if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_ALWAYSINLINE) ||
+                VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_RECOMPILER_STUB))
+            {
+                if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
+                    VSC_OPTN_ILOptions_TRACE))
+                {
+                    VIR_LOG(pDumper, "\nSelect Inline Candidate for Function:\t[%s]\n",
+                        VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
+                    VIR_LOG_FLUSH(pDumper);
+                }
+                VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvTRUE);
+            }
+        }
+
+        /* 2. select the inline candidates into the worklist */
+        if (!inlineAlwaysInlineFuncOnly)
+        {
+            for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
+            {
+                pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
+
+                /* Skip ALWAYSINLINE and NOINLIEN, recompile stub functions. */
+                if (!VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_ALWAYSINLINE) &&
+                    ! VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_RECOMPILER_STUB) &&
+                    !VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_NOINLINE))
+                {
+                    if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
+                        VSC_OPTN_ILOptions_TRACE))
+                    {
+                        VIR_LOG(pDumper, "\nSelect Inline Candidate for Function:\t[%s]\n",
+                            VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
+                        VIR_LOG_FLUSH(pDumper);
+                    }
+                    VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvFALSE);
+                }
             }
         }
     }

@@ -3877,7 +3877,7 @@ void VSC_OPTN_Options_MergeVCEnvOption(
             VSC_OPTN_LoopOptsOptions_SetSwitchOn(VSC_OPTN_Options_GetLoopOptsOptions(options, 0), gcvFALSE);
             VSC_OPTN_CFOOptions_SetSwitchOn(VSC_OPTN_Options_GetCFOOptions(options, 0), gcvFALSE);
             VSC_OPTN_CFOOptions_SetSwitchOn(VSC_OPTN_Options_GetCFOOptions(options, 1), gcvFALSE);
-            VSC_OPTN_ILOptions_SetSwitchOn(VSC_OPTN_Options_GetInlinerOptions(options, 0), gcvFALSE);
+            /* do not turn off IL because we need to inline recompiler functions in this pass */
             VSC_OPTN_SCLOptions_SetSwitchOn(VSC_OPTN_Options_GetSCLOptions(options, 0), gcvFALSE);
             VSC_OPTN_PHOptions_SetSwitchOn(VSC_OPTN_Options_GetPHOptions(options, 0), gcvFALSE);
             VSC_OPTN_SIMPOptions_SetSwitchOn(VSC_OPTN_Options_GetSIMPOptions(options, 0), gcvFALSE);
