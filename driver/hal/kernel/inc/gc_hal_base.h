@@ -144,6 +144,8 @@ typedef struct _gcsNN_FIXED_FEATURE
     gctUINT  maxOTNumber;
     gctUINT  equivalentVipsramWidthInByte;
     gctUINT  shaderCoreCount;
+    gctUINT  latencyHidingAtFullAxiBw;
+    gctUINT  axiBusWidth;
 } gcsNN_FIXED_FEATURE;
 
 /* Features can be customized from outside */

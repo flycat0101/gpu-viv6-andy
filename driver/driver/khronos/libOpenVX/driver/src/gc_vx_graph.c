@@ -2969,6 +2969,7 @@ VX_PRIVATE_API vx_status DetectSegmentsWithOption(
     )
 {
     vx_status status = VX_SUCCESS;
+    vx_context context = graph->base.context;
 
     vxmASSERT(graph->base.context->vipSRAM.size > VX_VIP_SRAM_IMAGE_STREAM_SIZE);
 
@@ -3716,6 +3717,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
     vx_uint32 s = 0, e = 0, maxOpCommandCount = 0;
     vxnne_operation_info_s opInfo;
     gctSTRING blocksConfig = gcvNULL;
+    vx_context context = graph->base.context;
 
     gcmHEADER_ARG("graph=%p", graph);
 

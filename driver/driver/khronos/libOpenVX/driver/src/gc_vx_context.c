@@ -1312,13 +1312,14 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitSRAM(
 
     if (vipSRAMSize != 0)
     {
-        globalData->vipSRAM.size        = (vipSRAMSize <= VX_VIP_SRAM_IMAGE_STREAM_SIZE) ? vipSRAMSize : (vipSRAMSize - VX_VIP_SRAM_IMAGE_STREAM_SIZE);
-        globalData->vipSRAM.logical     = gcvNULL;
-        globalData->vipSRAM.physBase    = vipSRAMPhysical != gcvINVALID_ADDRESS ? vipSRAMPhysical : 0;
-        globalData->vipSRAM.physical    = vipSRAMPhysical != gcvINVALID_ADDRESS ?
-                                           vipSRAMPhysical + VX_VIP_SRAM_IMAGE_STREAM_SIZE : VX_VIP_SRAM_IMAGE_STREAM_SIZE;
-        globalData->vipSRAM.used        = 0;
-        globalData->vipSRAM.node        = vipSRAMNode;
+        vx_uint32 vipSramImageStreamSize = globalData->nnConfig.fixedFeature.latencyHidingAtFullAxiBw * globalData->nnConfig.fixedFeature.axiBusWidth;
+        globalData->vipSRAM.size         = (vipSRAMSize <= vipSramImageStreamSize) ? vipSRAMSize : (vipSRAMSize - vipSramImageStreamSize);
+        globalData->vipSRAM.logical      = gcvNULL;
+        globalData->vipSRAM.physBase     = vipSRAMPhysical != gcvINVALID_ADDRESS ? vipSRAMPhysical : 0;
+        globalData->vipSRAM.physical     = vipSRAMPhysical != gcvINVALID_ADDRESS ?
+                                           vipSRAMPhysical + vipSramImageStreamSize : vipSramImageStreamSize;
+        globalData->vipSRAM.used         = 0;
+        globalData->vipSRAM.node         = vipSRAMNode;
     }
 
 OnError:

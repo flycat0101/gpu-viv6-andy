@@ -31,7 +31,9 @@ extern "C" {
 #define VX_MAX_SEGMENT_COUNT                4 * 1024
 #define VX_MAX_BLOCK_SEGMENT_COUNT          64
 
-#define VX_VIP_SRAM_IMAGE_STREAM_SIZE       2048
+#define VX_VIP_SRAM_IMAGE_STREAM_SIZE \
+    (context->nnConfig.fixedFeature.latencyHidingAtFullAxiBw * context->nnConfig.fixedFeature.axiBusWidth)
+
 #define SW_TILING_DEBUG                     1
 
 struct _vxnne_operation_s;

@@ -1963,6 +1963,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchNN(
                 {
                     vx_uint32 srcAddr = 0;
                     vx_uint32 dstAddr = 0;
+                    vx_context context = binLoad->context;
                     memAddr = (vx_uint32 *)(NNCommand + nnPatchData->offset);
                     srcAddr = *memAddr;
                     if (nnPatchData->transformation == VX_BINARY_PATCH_TRANSFORMATION_RIGHT_SHIFT_6)
@@ -2300,6 +2301,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchTP(
                 {
                     vx_uint32 srcAddr = 0;
                     vx_uint32 dstAddr = 0;
+                    vx_context context = binLoad->context;
                     memAddr = (vx_uint32 *)(TPCommand + tpPatchData->offset);
                     srcAddr = *memAddr;
                     if (tpPatchData->transformation== VX_BINARY_PATCH_TRANSFORMATION_RIGHT_SHIFT_6)
@@ -2727,6 +2729,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
 
             case VX_BINARY_SOURCE_VIP_SRAM:
             {
+                vx_context context = binLoad->context;
                 memAddr = (vx_uint32 *)(SHStates + shPatchData->offset);
                 if (shPatchData->transformation== VX_BINARY_PATCH_TRANSFORMATION_RIGHT_SHIFT_6)
                 {
@@ -3038,6 +3041,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
 
                 case VX_BINARY_SOURCE_VIP_SRAM:
                 {
+                    vx_context context = binLoad->context;
                     memAddr = (vx_uint32 *)(SCStates + scPatchData->offset);
                     *memAddr =  (*memAddr - scPatchData->originalBaseAddress) + binLoad->context->vipSRAM.physical - VX_VIP_SRAM_IMAGE_STREAM_SIZE;
                     if (binLoad->context->options.enableNNLayerDump)
@@ -4528,6 +4532,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveShaderPatchTable(
     vx_uint32 offsetArray[VX_MAX_SHADER_PARAMETERS] = {0};
     vx_binary_patch_info_s patchInfo;
     vx_binary_save_s *binarySave = node->graph->binarySave;
+    vx_context context = node->base.context;
     gcmHEADER_ARG("node=%p, operation=%p, basePhysical=0x%x, baseLogical=0x%x, wholeSize=0x%x, batchPhysical=0x%x",
         node, operation, basePhysical, baseLogical, wholeSize, batchPhysical);
 
@@ -5988,6 +5993,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveScalerOperation(
     vx_int32 LCDTindex = -1;
     vx_enum sourceType = VX_BINARY_SOURCE_MAX;
     vx_uint32 layerId = 0;
+    vx_context context = node->base.context;
 
     gcmHEADER_ARG("operation=%p, stateBuffer=%p, stateSize=0x%x", operation, stateBuffer, stateSize);
 
@@ -6729,6 +6735,7 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
     vx_int32 ret = 0;
     vx_uint32 index = 0, layerId = 0;
     vx_status status = VX_SUCCESS;
+    vx_context context = node->base.context;
     gcmHEADER_ARG("node=%p, cmdLogicalAddress=0x%x, cmdPhysicalAddress=0x%x, cmdSize=0x%x, cmdType=0x%x",
         node, cmdLogicalAddress, cmdPhysicalAddress, cmdSize, cmdType);
 
