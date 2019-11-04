@@ -16682,7 +16682,7 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
 
     is_static_weights_biases = (vx_bool)(TENSOR_DATA_LIFETIME(weight) == VX_TENSOR_LIFE_TIME_STATIC && TENSOR_DATA_LIFETIME(bias) == VX_TENSOR_LIFE_TIME_STATIC);
     enable_adjust_biases     = is_static_weights_biases && TENSOR_QUANT_TYPE(weight) == VX_QUANT_AFFINE_SCALE && TENSOR_QUANT_TYPE(bias);
-    enable_adjust_biases     = enable_adjust_biases && (TENSOR_DATA_TYPE(biases) != VX_TYPE_UINT8);
+    enable_adjust_biases     = enable_adjust_biases && (TENSOR_DATA_TYPE(bias) != VX_TYPE_UINT8);
 
     vxmONERROR_NULLPTR(relu_s  = vxCreateScalar(context, VX_TYPE_INT32, &dRelu));
 
