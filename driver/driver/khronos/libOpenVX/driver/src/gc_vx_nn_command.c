@@ -2056,6 +2056,14 @@ void _fill_TP_MAX_POOLING_Command(
 
     for (i = 0; i < split_count; i++)
     {
+        vx_uint32 pad_x_right = (outXSize - 1) * poolingStride + parameter->pool_size_x - parameter->pad_x_left - inXSize;
+        vx_uint32 pad_y_bottom = (outYSize - 1) * poolingStride + parameter->pool_size_y - parameter->pad_y_top - inYSize;
+        vx_uint32 pool_size_y = parameter->pool_size_y;
+        if(parameter->pool_size_x ==2 && parameter->pool_size_y == 1 && pad_y_bottom == 0)/*HW not support 2*1*/
+        {
+                pad_y_bottom = 1;
+                pool_size_y = 2;
+        }
         if (parameter->pool_size_x != 1)
         {
             info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
@@ -2065,13 +2073,13 @@ void _fill_TP_MAX_POOLING_Command(
             info_array[i].vx_tp_general_cmd_split_info.inImageSlice = inZStride / inputElemSize;
             info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = (-1) * (vx_int32)parameter->pad_x_left;
             info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = (-1) * (vx_int32)parameter->pad_y_top;
-            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = (outXSize - 1) * poolingStride + parameter->pool_size_x - 1 - parameter->pad_x_left;
-            info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = (outYSize - 1) * poolingStride + parameter->pool_size_y - 1 - parameter->pad_y_top;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = (inXSize - 1) + pad_x_right;
+            info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = (inYSize - 1) + pad_y_bottom;
 
             info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
             info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
             info_array[i].vx_tp_general_cmd_split_info.inTileXSize = outTileXSize * poolingStride + parameter->pool_size_x - poolingStride;
-            info_array[i].vx_tp_general_cmd_split_info.inTileYSize = outTileYSize * poolingStride + parameter->pool_size_y - poolingStride;
+            info_array[i].vx_tp_general_cmd_split_info.inTileYSize = outTileYSize * poolingStride + pool_size_y - poolingStride;
             info_array[i].vx_tp_general_cmd_split_info.inTileXInc = outTileXSize * poolingStride;
             info_array[i].vx_tp_general_cmd_split_info.inTileYInc = outTileYSize * poolingStride;
             info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i];
@@ -2132,7 +2140,7 @@ void _fill_TP_MAX_POOLING_Command(
         /* Select the correct border mode if padding is not specified. */
         if (parameter->orig_no_pad &&
             ((inXSize - parameter->pool_size_x) % parameter->pool_stride ||
-             (inYSize - parameter->pool_size_y) % parameter->pool_stride))
+             (inYSize - pool_size_y) % parameter->pool_stride))
         {
             general_info->vx_nn_tp_cmd_info.inImageBorderMode = 0x1;
         }

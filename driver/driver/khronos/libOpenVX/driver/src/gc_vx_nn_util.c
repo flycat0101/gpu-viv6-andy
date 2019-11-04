@@ -2407,7 +2407,7 @@ vx_status vxnneOperation_GetInfo(vxnne_operation operation, vxnne_operation_info
 
     vxmASSERT(info->poolStrideX == 1 ||  info->reshuffStrideX == 1);
     vxmASSERT(!info->enablePooling  || (info->poolSizeX != 0 && info->poolSizeY != 0));
-    vxmASSERT(info->poolSizeX == info->poolSizeY);
+    //vxmASSERT(info->poolSizeX == info->poolSizeY);
     vxmASSERT(info->poolStrideX == info->poolStrideY);
     vxmASSERT(info->reshuffStrideX >= 1 && info->reshuffStrideY >= 1);
     vxmASSERT(info->poolStrideX >= 1&& info->poolStrideY >= 1);
