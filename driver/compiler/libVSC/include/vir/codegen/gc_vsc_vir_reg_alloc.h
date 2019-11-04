@@ -309,6 +309,7 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
     /* Save the current max register count. */
     gctUINT                     currentMaxRegCount;
 
+    gctBOOL                     bEnableDebug;
     VSC_DIContext               *DIContext;
 
 } VIR_RA_LS;
@@ -346,6 +347,8 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
 #define VIR_RA_LS_SetExtendLSEndPoint(ra, h)    ((ra)->bExtendedLSEndPoint = (h))
 #define VIR_RA_LS_GetInstIdChanged(ra)          ((ra)->bInstIdChanged)
 #define VIR_RA_LS_SetInstIdChanged(ra, h)       ((ra)->bInstIdChanged = (h))
+#define VIR_RA_LS_GetEnableDebug(ra)            ((ra)->bEnableDebug)
+#define VIR_RA_LS_SetEnableDebug(ra, h)         ((ra)->bEnableDebug = (h))
 
 extern VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
     IN VSC_SH_PASS_WORKER* pPassWorker);

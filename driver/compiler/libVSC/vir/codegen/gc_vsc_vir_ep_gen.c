@@ -115,7 +115,7 @@ static gctUINT _GenerateShaderVersionAndType(VIR_Shader* pShader)
 
 #define _DUMP_REG 0
 
-static VSC_ErrCode _UpdateDIEPcRange(VIR_Shader *pShader, VIR_Instruction* pInst, gctUINT curPC)
+static VSC_ErrCode _UpdateHWLocPcRange(VIR_Shader *pShader, VIR_Instruction* pInst, gctUINT curPC)
 {
     VIR_OpCode virOpcode    = VIR_Inst_GetOpcode(pInst);
     gctSIZE_T  i = 0;
@@ -246,6 +246,125 @@ static VSC_ErrCode _UpdateDIEPcRange(VIR_Shader *pShader, VIR_Instruction* pInst
             }
         }
     } while (gcvFALSE);
+
+    return VSC_ERR_NONE;
+}
+
+static VSC_ErrCode _UpdateDIEPcRange(VIR_Shader *pShader, gctUINT16 endPC)
+{
+    VSC_DIContext *diContext;
+    gctSIZE_T      i = 0;
+    VSC_DI_SW_LOC  SWLoc;
+    VSC_DI_HW_LOC  HWLoc;
+    VIR_Symbol     *sym;
+
+    if (!pShader)
+        return VSC_ERR_NONE;
+
+    diContext = (VSC_DIContext *)pShader->debugInfo;
+    if (!diContext)
+        return VSC_ERR_NONE;
+
+    for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++i)
+    {
+        VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
+        VIR_Uniform *symUniform;
+        sym = VIR_Shader_GetSymFromId(pShader, id);
+        symUniform = VIR_Symbol_GetUniformPointer(pShader, sym);
+
+        if (symUniform == gcvNULL)
+        {
+            continue;
+        }
+
+        if (!isSymCompilerGen(sym) && symUniform->physical != -1)
+        {
+            /* find the temp reg for the uniform */
+            SWLoc.reg = gcvTRUE;
+            SWLoc.u.reg.type = VSC_DIE_REG_TYPE_CONST;
+            SWLoc.u.reg.start = (gctUINT16) symUniform->index;
+            SWLoc.u.reg.end = (gctUINT16)(symUniform->index + symUniform->realUseArraySize - 1);
+
+            HWLoc.beginPC = 0;
+            HWLoc.endPC = endPC;
+            HWLoc.next = VSC_DI_INVALID_HW_LOC;
+
+            HWLoc.reg = gcvTRUE;
+            HWLoc.u.reg.type = VSC_DIE_HW_REG_CONST;
+            HWLoc.u.reg.start = (gctUINT16) symUniform->physical;
+            HWLoc.u.reg.end = (gctUINT16) symUniform->physical;
+            HWLoc.u1.swizzle = (gctUINT) symUniform->swizzle;
+
+            vscDISetHwLocToSWLoc((VSC_DIContext *)(pShader->debugInfo), &SWLoc, &HWLoc);
+        }
+    }
+
+    for (i = 0; i < diContext->dieTable.usedCount; i++)
+    {
+        VSC_DIE die = diContext->dieTable.die[i];
+        VSC_DIE parent;
+        VSC_DI_SW_LOC * sl;
+        VSC_DI_HW_LOC * hl;
+        gctBOOL isUniform = gcvFALSE;
+
+        if (die.tag != VSC_DI_TAG_VARIABE &&
+            die.tag != VSC_DI_TAG_PARAMETER)
+            continue;
+
+        /* if parent is block, find the function parent */
+        parent = diContext->dieTable.die[die.parent];
+        while (parent.tag != VSC_DI_TAG_SUBPROGRAM)
+        {
+            if (parent.id == VSC_DI_INVALIDE_DIE)
+                break;
+            parent = diContext->dieTable.die[parent.parent];
+        }
+
+        /* check if the variable is uniform or not */
+        sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(diContext, die.u.variable.swLoc);
+        while (sl)
+        {
+            if (sl->u.reg.type == VSC_DIE_REG_TYPE_CONST)
+            {
+                diContext->dieTable.die[i].u.variable.pcLine[0] = 0;
+                diContext->dieTable.die[i].u.variable.pcLine[1] = endPC;
+                isUniform = gcvTRUE;
+                break;
+            }
+            sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(diContext, sl->next);
+        }
+
+        if (isUniform)
+            continue;
+
+        if (die.tag == VSC_DI_TAG_VARIABE)
+        {
+            sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(diContext, die.u.variable.swLoc);
+
+            while (sl)
+            {
+                hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(diContext, sl->hwLoc);
+
+                while(hl)
+                {
+                    if (diContext->dieTable.die[i].u.variable.pcLine[0] == 0 ||
+                        diContext->dieTable.die[i].u.variable.pcLine[0] > hl->beginPC)
+                    {
+                        diContext->dieTable.die[i].u.variable.pcLine[0] = hl->beginPC;
+                    }
+                    hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(diContext, hl->next);
+                }
+                sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(diContext, sl->next);
+            }
+            diContext->dieTable.die[i].u.variable.pcLine[1] = parent.u.func.pcLine[1];
+        }
+
+        if (die.tag == VSC_DI_TAG_PARAMETER)
+        {
+            diContext->dieTable.die[i].u.variable.pcLine[0] = parent.u.func.pcLine[0];
+            diContext->dieTable.die[i].u.variable.pcLine[1] = parent.u.func.pcLine[1];
+        }
+    }
 
     return VSC_ERR_NONE;
 }
@@ -451,7 +570,7 @@ static VSC_ErrCode _CollectMachineCodeToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper, S
                         /* set hw loc's pc range in debug info */
                         if (diContext != gcvNULL)
                         {
-                            _UpdateDIEPcRange(pShader, pInst, curPC);
+                            _UpdateHWLocPcRange(pShader, pInst, curPC);
                             vscDIAddLineMap(diContext, diLineMapCount, pInst->sourceLoc,curPC - pInst->mcInstCount, curPC - 1);
                             diLineMapCount++;
                         }
@@ -474,47 +593,9 @@ static VSC_ErrCode _CollectMachineCodeToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper, S
         gcmASSERT(curPC == pOutSEP->countOfMCInst);
     }
 
-    /* set uniform PC range in debug info */
     if (pShader->debugInfo)
     {
-        gctSIZE_T      i = 0;
-        VSC_DI_SW_LOC       SWLoc;
-        VSC_DI_HW_LOC       HWLoc;
-        VIR_Symbol *sym;
-
-        for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++i)
-        {
-            VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
-            VIR_Uniform *symUniform;
-            sym = VIR_Shader_GetSymFromId(pShader, id);
-            symUniform = VIR_Symbol_GetUniformPointer(pShader, sym);
-
-            if (symUniform == gcvNULL)
-            {
-                continue;
-            }
-
-            if (!isSymCompilerGen(sym) && symUniform->physical != -1)
-            {
-                /* find the temp reg for the uniform */
-                SWLoc.reg = gcvTRUE;
-                SWLoc.u.reg.type = VSC_DIE_REG_TYPE_CONST;
-                SWLoc.u.reg.start = (gctUINT16) symUniform->index;
-                SWLoc.u.reg.end = (gctUINT16)(symUniform->index + symUniform->realUseArraySize - 1);
-
-                HWLoc.beginPC = 0;
-                HWLoc.endPC = (gctUINT16) (gctUINT16)curPC -1;
-                HWLoc.next = VSC_DI_INVALID_HW_LOC;
-
-                HWLoc.reg = gcvTRUE;
-                HWLoc.u.reg.type = VSC_DIE_HW_REG_CONST;
-                HWLoc.u.reg.start = (gctUINT16) symUniform->physical;
-                HWLoc.u.reg.end = (gctUINT16) symUniform->physical;
-                HWLoc.u1.swizzle = (gctUINT) symUniform->swizzle;
-
-                vscDISetHwLocToSWLoc((VSC_DIContext *)(pShader->debugInfo), &SWLoc, &HWLoc);
-            }
-        }
+        _UpdateDIEPcRange(pShader, (gctUINT16)curPC -1);
     }
 
     return VSC_ERR_NONE;

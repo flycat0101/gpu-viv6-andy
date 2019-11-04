@@ -1414,6 +1414,7 @@ static void _VIR_RA_LS_Init(
     pRA->DIContext = gcvNULL;
     VIR_RA_LS_SetExtendLSEndPoint(pRA, gcvFALSE);
     VIR_RA_LS_SetInstIdChanged(pRA, gcvFALSE);
+    VIR_RA_LS_SetEnableDebug(pRA, gcvFALSE);
 }
 
 /* ===========================================================================
@@ -6929,7 +6930,12 @@ VSC_ErrCode  _VIR_RA_LS_AssignColorLR(
                 }
                 else
                 {
-                    if (!debugEnabled || !_VIR_RA_LS_isSpillable(pRA, pLR))
+                    VIR_RA_HWReg_Type regType = pLR->hwType;
+                    if (!debugEnabled ||
+                        /* allocation register if still has register to use */
+                        (!VIR_RA_LS_GetEnableDebug(pRA) &&
+                         (VIR_RA_LS_GetColorPool(pRA)->colorMap[regType].maxAllocReg) <  _VIR_RA_LS_GetMaxReg(pRA, regType, reservedDataReg)) ||
+                        !_VIR_RA_LS_isSpillable(pRA, pLR))
                     {
                         curColor = _VIR_RA_LS_FindNewColor(pRA, webIdx, needHI, reservedDataReg, -1, gcvNULL);
                         newColor = gcvTRUE;
@@ -12905,8 +12911,6 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
     VIR_FunctionNode*   func_node;
     gctBOOL             colorSucceed = gcvFALSE;
 
-    gctBOOL             debugEnabled = gcmOPT_EnableDebug();
-
     if (needBoundsCheck)
     {
         VIR_Shader_SetFlagsExt1(pShader, VIR_SHFLAG_EXT1_ENABLE_ROBUST_CHECK);
@@ -12929,9 +12933,16 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
     ra.needBoundsCheck = needBoundsCheck;
     ra.scratchChannel = needBoundsCheck ? VIR_CHANNEL_W : VIR_CHANNEL_Y;
 
-    if (debugEnabled)
+    if (VIR_RA_LS_GetEnableDebug(&ra))
     {
-        /* TODO */
+        /* set the reserved data to be 4, could be smarter */
+        reservedDataReg = 4;
+        pShader->hasRegisterSpill   = gcvTRUE;
+        ra.resDataRegisterCount = 4;
+        _VIR_RA_LS_SetReservedReg(&ra);
+    }
+    if (gcmOPT_EnableDebug())
+    {
         ra.DIContext = (VSC_DIContext *)pShader->debugInfo;
     }
 
@@ -13166,10 +13177,9 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
         pPassWorker->pResDestroyReq->s.bInvalidateCfg= gcvTRUE;
     }
 
-    if (debugEnabled)
+    if (gcmOPT_EnableDebug() && ra.DIContext)
     {
-        if (ra.DIContext)
-            _VIR_RA_LS_WriteDebugInfo(&ra);
+        _VIR_RA_LS_WriteDebugInfo(&ra);
     }
 
     /* dump after */

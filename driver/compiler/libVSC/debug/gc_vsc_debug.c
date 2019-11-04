@@ -843,10 +843,11 @@ void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT tag)
         unsigned int varId;
         unsigned int parentId;
         unsigned int hwLocCount;
-        vscDIGetFunctionInfo((void *)context, 5, funcName, 1024, &lowPC, &highPC);
-        vscDIGetVariableCount((void *)context, 5, gcvTRUE);
-        vscDIGetVariableCount((void *)context, 5, gcvFALSE);
-        vscDIGetVariableInfo((void *)context, 5, 1, gcvTRUE, varName, typeName, 1024, &varId, &parentId, &hwLocCount);
+        unsigned int childrenCount;
+        vscDIGetFunctionInfo((void *)context, 3, funcName, 1024, &lowPC, &highPC);
+        vscDIGetVariableCount((void *)context, 3, gcvTRUE);
+        vscDIGetVariableCount((void *)context, 3, gcvFALSE);
+        vscDIGetVariableInfo((void *)context, 3, 3, gcvTRUE, varName, typeName, 1024, &varId, &parentId, &hwLocCount, &lowPC, &highPC, &childrenCount);
     }
 #endif
 }
@@ -899,9 +900,10 @@ void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift, gctUINT 
                 die->tag == VSC_DI_TAG_PARAMETER)
             {
                 gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
-                   "id = %d tag = %s parent = %d line (%d,%d,%d) name = \"%s\", type(%d, %d, %d, %d, %d)\n",
+                   "id = %d tag = %s parent = %d line (%d,%d,%d) name = \"%s\", type(%d, %d, %d, %d, %d), pc(%d,%d)\n",
                    die->id, _GetTagNameStr(context, die->tag),die->parent, die->fileNo, die->lineNo, die->colNo, _GetNameStr(context,die->name),
-                   die->u.variable.type.primitiveType, die->u.variable.type.isPointer, die->u.variable.type.type, die->u.variable.type.array.numDim, die->u.variable.type.array.length[0]);
+                   die->u.variable.type.primitiveType, die->u.variable.type.isPointer, die->u.variable.type.type, die->u.variable.type.array.numDim, die->u.variable.type.array.length[0],
+                   die->u.variable.pcLine[0], die->u.variable.pcLine[1]);
 
                 gcmPRINT(context->tmpLog);
 
@@ -1603,7 +1605,6 @@ void vscDIGetFunctionInfo(
 #endif
 }
 
-/* TODO: need to count the varaible in lex block */
 int vscDIGetVariableCount(
     void * ptr,
     int functionId,
@@ -1614,7 +1615,7 @@ int vscDIGetVariableCount(
     VSC_DIContext * context = (VSC_DIContext *)ptr;
     VSC_DIE * die;
     VSC_DIE * child;
-    VSC_DIE_TAG tag;
+    gctSIZE_T i;
 
     if (context == gcvNULL)
         return ret;
@@ -1624,25 +1625,41 @@ int vscDIGetVariableCount(
     if (!die || die->tag != VSC_DI_TAG_SUBPROGRAM)
         return ret;
 
-    if (bArgument)
-    {
-        tag = VSC_DI_TAG_PARAMETER;
-    }
-    else
-    {
-        tag = VSC_DI_TAG_VARIABE;
-    }
-
     child = VSC_DI_DIE_PTR(die->child);
 
     if (!child)
         return ret;
 
-    while (child)
+    if (bArgument)
     {
-        if (child->tag == tag)
+        while (child)
+        {
+            if (child->tag == VSC_DI_TAG_PARAMETER)
+                ret++;
+            child = VSC_DI_DIE_PTR(child->sib);
+        }
+        return ret;
+    }
+
+    for (i = functionId + 1; i < context->dieTable.usedCount; i++)
+    {
+        VSC_DIE die = context->dieTable.die[i];
+        VSC_DIE parent;
+
+        if (die.tag != VSC_DI_TAG_VARIABE)
+            continue;
+
+        /* if parent is block, find the function parent */
+        parent = context->dieTable.die[die.parent];
+        while (parent.tag != VSC_DI_TAG_SUBPROGRAM)
+        {
+            if (parent.id == VSC_DI_INVALIDE_DIE)
+                break;
+            parent = context->dieTable.die[parent.parent];
+        }
+
+        if (parent.id == functionId)
             ret++;
-        child = VSC_DI_DIE_PTR(child->sib);
     }
 
 #if vsdTEST_API
@@ -1678,7 +1695,6 @@ static void _GetTypeStr(
             gcoOS_PrintStrSafe(typeStr, strLength, &offset, "[%d]", die->u.variable.type.array.length[i]);
         }
     }
-
 }
 
 void vscDIGetVariableInfo(
@@ -1691,14 +1707,17 @@ void vscDIGetVariableInfo(
     unsigned int nameLength,
     unsigned int * varId,
     unsigned int * parentId,
-    unsigned int * hwLocCount
+    unsigned int * lowPC,
+    unsigned int * highPC,
+    unsigned int * hwLocCount,
+    unsigned int * childrenCount
     )
 {
     VSC_DIContext * context = (VSC_DIContext *)ptr;
     VSC_DIE * die;
     VSC_DIE * child;
-    VSC_DIE_TAG tag;
     int curIdx = 0;
+    gctSIZE_T i;
 
     if (context == gcvNULL)
         return;
@@ -1708,27 +1727,54 @@ void vscDIGetVariableInfo(
     if (!die || die->tag != VSC_DI_TAG_SUBPROGRAM)
         return;
 
-    if (bArgument)
-    {
-        tag = VSC_DI_TAG_PARAMETER;
-    }
-    else
-    {
-        tag = VSC_DI_TAG_VARIABE;
-    }
-
     child = VSC_DI_DIE_PTR(die->child);
 
     if (!child)
         return;
 
-    while (child)
+    if (bArgument)
     {
-        if (curIdx == idx)
-            break;
-        if (child->tag == tag)
-            curIdx++;
-        child = VSC_DI_DIE_PTR(child->sib);
+        while (child)
+        {
+            if (child->tag == VSC_DI_TAG_PARAMETER)
+            {
+                if (curIdx == idx)
+                    break;
+                curIdx++;
+            }
+            child = VSC_DI_DIE_PTR(child->sib);
+        }
+    }
+    else
+    {
+        child = gcvNULL;
+        for (i = functionId + 1; i < context->dieTable.usedCount; i++)
+        {
+            VSC_DIE curDie = context->dieTable.die[i];
+            VSC_DIE parent;
+
+            if (curDie.tag != VSC_DI_TAG_VARIABE)
+                continue;
+
+            /* if parent is block, find the function parent */
+            parent = context->dieTable.die[curDie.parent];
+            while (parent.tag != VSC_DI_TAG_SUBPROGRAM)
+            {
+                if (parent.id == VSC_DI_INVALIDE_DIE)
+                    break;
+                parent = context->dieTable.die[parent.parent];
+            }
+
+            if (parent.id == functionId)
+            {
+                if (curIdx == idx)
+                {
+                    child = &curDie;
+                    break;
+                }
+                curIdx++;
+            }
+        }
     }
 
     if (!child)
@@ -1757,9 +1803,15 @@ void vscDIGetVariableInfo(
         }
     }
 
+    if (lowPC)
+        *lowPC = child->u.variable.pcLine[0];
+
+    if (highPC)
+        *highPC = child->u.variable.pcLine[1];
+
 #if vsdTEST_API
-    gcmPRINT("id: %d, bArgument: %d, idx: %d, varName: %s, typeStr: %s, varId: %d, parentId: %d, hwLocCount: %d\n",
-        functionId, bArgument, idx, varName, typeStr, *varId, *parentId, *hwLocCount);
+    gcmPRINT("id: %d, bArgument: %d, idx: %d, varName: %s, typeStr: %s, varId: %d, parentId: %d, hwLocCount: %d, pc(%d %d)\n",
+        functionId, bArgument, idx, varName, typeStr, *varId, *parentId, *hwLocCount, *lowPC, *highPC);
 #endif
 }
 

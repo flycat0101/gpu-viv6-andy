@@ -144,7 +144,10 @@ void vscDIGetVariableInfo(
     unsigned int nameLength,
     unsigned int * varId,
     unsigned int * parentId,
-    unsigned int * hwLocCount
+    unsigned int * lowPC,
+    unsigned int * highPC,
+    unsigned int * hwLocCount,
+    unsigned int * childrenCount
     );
 
 #endif

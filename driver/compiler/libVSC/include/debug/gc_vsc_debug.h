@@ -123,6 +123,7 @@ struct _VSC_DIE
     {
         struct
         {
+            gctUINT16 pcLine[2];
             gctUINT16 swLoc;
             VSC_DI_TYPE type;
         }
