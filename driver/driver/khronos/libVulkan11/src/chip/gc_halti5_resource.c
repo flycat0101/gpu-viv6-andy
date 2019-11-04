@@ -3666,7 +3666,8 @@ VkResult halti5_copyImage(
         __VK_ONERROR(halti5_helper_convertHwBltDesc(VK_FALSE, dstFormat, &dstBltDesc));
 
         /* Disable srgb if both srgb source and destination (Multiple conversion is not needed and can cause errors */
-        if (srcBltDesc.sRGB && dstBltDesc.sRGB)
+        /* When do down sample, don't disable srgb, BLT module need convert srgb to linear for caculating correct average value. */
+        if (srcBltDesc.sRGB && dstBltDesc.sRGB && (srcMsaa == dstMsaa || !srcRes->isImage || !dstRes->isImage))
         {
             srcBltDesc.sRGB = dstBltDesc.sRGB = VK_FALSE;
         }
