@@ -4976,19 +4976,19 @@ _SetTempDefineInput(
                    Optimizer, TempDefine, Enable, Index);
 
     /* Set temp defines according to enable. */
-    if (Enable & gcSL_ENABLE_X)
+    if ((Enable & gcSL_ENABLE_X) && (TempDefine->xDefines == gcvNULL))
     {
         gcmERR_RETURN(_SetDefineInput(Optimizer, &TempDefine->xDefines, Index));
     }
-    if (Enable & gcSL_ENABLE_Y)
+    if ((Enable & gcSL_ENABLE_Y) && (TempDefine->yDefines == gcvNULL))
     {
         gcmERR_RETURN(_SetDefineInput(Optimizer, &TempDefine->yDefines, Index));
     }
-    if (Enable & gcSL_ENABLE_Z)
+    if ((Enable & gcSL_ENABLE_Z) && (TempDefine->zDefines == gcvNULL))
     {
         gcmERR_RETURN(_SetDefineInput(Optimizer, &TempDefine->zDefines, Index));
     }
-    if (Enable & gcSL_ENABLE_W)
+    if ((Enable & gcSL_ENABLE_W) && (TempDefine->wDefines == gcvNULL))
     {
         gcmERR_RETURN(_SetDefineInput(Optimizer, &TempDefine->wDefines, Index));
     }
