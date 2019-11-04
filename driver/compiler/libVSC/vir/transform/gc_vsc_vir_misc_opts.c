@@ -13046,14 +13046,14 @@ _vscVIR_MoveBarrierOutOfBB(
 
             if (pInst == BB_GET_END_INST(pCurrentBB))
             {
-                errCode = VIR_Function_RemoveInstruction(pMainFunc, pInst);
+                errCode = VIR_Function_RemoveInstruction(pMainFunc, pInst, gcvTRUE);
                 ON_ERROR(errCode, "Remove a instruction.");
 
                 pInst = BB_GET_START_INST(pLeftBB);
                 break;
             }
 
-            errCode = VIR_Function_RemoveInstruction(pMainFunc, pInst);
+            errCode = VIR_Function_RemoveInstruction(pMainFunc, pInst, gcvTRUE);
             ON_ERROR(errCode, "Remove a instruction.");
 
             pInst = pTempInst;

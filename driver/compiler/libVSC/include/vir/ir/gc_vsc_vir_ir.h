@@ -6579,7 +6579,8 @@ VIR_Function_AddCopiedInstructionBefore(
 VSC_ErrCode
 VIR_Function_RemoveInstruction(
     IN VIR_Function *   Function,
-    IN VIR_Instruction *Inst
+    IN VIR_Instruction *Inst,
+    IN gctBOOL          bRemoveLabelOrLink
     );
 
 VSC_ErrCode

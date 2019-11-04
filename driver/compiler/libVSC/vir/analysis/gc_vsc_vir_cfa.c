@@ -1247,7 +1247,7 @@ VIR_BB_RemoveBranch(
     }
     else
     {
-        VIR_Function_RemoveInstruction(BB_GET_FUNC(bb), bbEnd);
+        VIR_Function_RemoveInstruction(BB_GET_FUNC(bb), bbEnd, gcvTRUE);
     }
     {
         VSC_ADJACENT_LIST_ITERATOR succEdgeIter;

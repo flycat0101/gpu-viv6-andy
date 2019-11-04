@@ -2873,7 +2873,7 @@ _handleParamChain(
         VIR_Operand_SetParameters(opnd, parm);
 
         /* delete the curParamChianHead */
-        VIR_Function_RemoveInstruction(curFunction, curParamChianHead);
+        VIR_Function_RemoveInstruction(curFunction, curParamChianHead, gcvTRUE);
         curParamChianHead = nextInst;
         if (VIR_Inst_GetOpcode(nextInst) == VIR_OP_INTRINSIC)
         {

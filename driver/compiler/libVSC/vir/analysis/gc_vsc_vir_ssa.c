@@ -100,7 +100,7 @@ VSC_ErrCode vscVIR_TransformFromSSA(VIR_Shader* pShader)
             {
                 if(VIR_Inst_GetOpcode(inst) == VIR_OP_PHI)
                 {
-                    VIR_Function_RemoveInstruction(func, inst);
+                    VIR_Function_RemoveInstruction(func, inst, gcvTRUE);
                     continue;
                 }
 
@@ -262,7 +262,7 @@ VSC_ErrCode vscVIR_TransformFromSpvSSA(VIR_Shader* pShader)
                         vscHTBL_DirectSet(movFromDupMap, (void*)VIR_PhiOperand_GetLabel(phiOperand), (void*)movFromDupInst);
                     }
 
-                    VIR_Function_RemoveInstruction(func, inst);
+                    VIR_Function_RemoveInstruction(func, inst, gcvTRUE);
                 }
             }
 

@@ -10962,34 +10962,38 @@ VIR_Function_AddCopiedInstructionBefore(
 VSC_ErrCode
 VIR_Function_RemoveInstruction(
     IN VIR_Function *   Function,
-    IN VIR_Instruction *Inst
+    IN VIR_Instruction *Inst,
+    IN gctBOOL          bRemoveLabelOrLink
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
 
     vscBILST_Remove((VSC_BI_LIST *)&Function->instList, (VSC_BI_LIST_NODE *)Inst);
 
-    if(VIR_Inst_GetOpcode(Inst) == VIR_OP_LABEL)
+    if (bRemoveLabelOrLink)
     {
-        VIR_Operand* dest = VIR_Inst_GetDest(Inst);
-        VIR_Label* label = VIR_Operand_GetLabel(dest);
-
-        VIR_Function_FreeLabel(Function, label);
-    }
-
-    if(VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(Inst)))
-    {
-        VIR_Operand* dest = VIR_Inst_GetDest(Inst);
-        VIR_Label* label = VIR_Operand_GetLabel(dest);
-        VIR_Link* link = VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(label), (gctUINTPTR_T)Inst);
-
-        if(link)
+        if (VIR_Inst_GetOpcode(Inst) == VIR_OP_LABEL)
         {
-            VIR_Function_FreeLink(Function, link);
+            VIR_Operand* dest = VIR_Inst_GetDest(Inst);
+            VIR_Label* label = VIR_Operand_GetLabel(dest);
+
+            VIR_Function_FreeLabel(Function, label);
+        }
+
+        if (VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(Inst)))
+        {
+            VIR_Operand* dest = VIR_Inst_GetDest(Inst);
+            VIR_Label* label = VIR_Operand_GetLabel(dest);
+            VIR_Link* link = VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(label), (gctUINTPTR_T)Inst);
+
+            if (link)
+            {
+                VIR_Function_FreeLink(Function, link);
+            }
         }
     }
 
-    if((VIR_Function *)Inst->parent.BB != Function)
+    if (VIR_Inst_GetParentUseBB(Inst))
     {
         VIR_BB* bb = Inst->parent.BB;
         if(Inst == BB_GET_START_INST(bb) && Inst == BB_GET_END_INST(bb))
@@ -11010,7 +11014,6 @@ VIR_Function_RemoveInstruction(
     return errCode;
 }
 
-
 /* delete instruction and free its operands */
 VSC_ErrCode
 VIR_Function_DeleteInstruction(
@@ -11019,7 +11022,7 @@ VIR_Function_DeleteInstruction(
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    errCode = VIR_Function_RemoveInstruction(Function, Inst);
+    errCode = VIR_Function_RemoveInstruction(Function, Inst, gcvTRUE);
 
     /* free operands */
     if (errCode == VSC_ERR_NONE)
@@ -11055,7 +11058,7 @@ VIR_Function_MoveInstructionBefore(
     /* These two instruction must from the same function. */
     gcmASSERT(MoveFunction == VIR_Inst_GetFunction(BeforeMe));
 
-    errCode = VIR_Function_RemoveInstruction(MoveFunction, Inst);
+    errCode = VIR_Function_RemoveInstruction(MoveFunction, Inst, gcvFALSE);
     if (errCode == VSC_ERR_NONE)
     {
         /* link nodes */
@@ -19007,7 +19010,7 @@ VIR_Pass_RemoveInstruction(
     VSC_ErrCode         errCode  = VSC_ERR_NONE;
     VIR_BASIC_BLOCK*    pBB = VIR_Inst_GetBasicBlock(pInst);
 
-    VIR_Function_RemoveInstruction(pFunction, pInst);
+    VIR_Function_RemoveInstruction(pFunction, pInst, gcvTRUE);
 
     /* If there is no instruction within one BB, we need to rebuild CFG. */
     if (pInvalidCFG && pBB && BB_GET_LENGTH(pBB) == 0)
