@@ -355,6 +355,9 @@ EXPORTS
     gcoSURF_GetInfo
     gcoSURF_QueryHints
     gcoSURF_UpdateMetadata
+    gcoSURF_QueryVidMemNode
+    gcoSURF_Set2DSource
+    gcoSURF_Set2DTarget
 
 !IF "$(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG)" != "0_0"
 ;   Both 3D & VG have these functions.

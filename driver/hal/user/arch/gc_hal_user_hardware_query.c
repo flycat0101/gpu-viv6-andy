@@ -6710,7 +6710,7 @@ gcoHARDWARE_QueryTileStatus(
     gcmDEBUG_VERIFY_ARGUMENT(Size != gcvNULL);
 
     /* See if tile status is supported. */
-    if (!Hardware->features[gcvFEATURE_FAST_CLEAR])
+    if (!Hardware->features[gcvFEATURE_FAST_CLEAR] && !Hardware->features[gcvFEATURE_2D_FAST_CLEAR])
     {
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
