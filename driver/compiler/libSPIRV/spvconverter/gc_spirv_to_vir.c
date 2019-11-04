@@ -1029,6 +1029,9 @@ static void __SpvSetCapability(gcSPV spv, SpvCapability cap)
     case SpvCapabilityDeviceGroup:
         /* TODO*/
         break;
+
+    default:
+        break;
     }
 }
 
@@ -2250,7 +2253,6 @@ static VSC_ErrCode __SpvAddSharedSymbol(
     SpvId id,
     SpvId type)
 {
-    gctSTRING               structName;
     VIR_SymId               symId;
     VIR_NameId              nameId;
     gctUINT                 arrayLength = 1;
@@ -2325,7 +2327,6 @@ static VSC_ErrCode __SpvAddSharedSymbol(
     SPV_ADD_WORKGROUP_MEMBER(spv, spv->resultId, SPV_WORKGROUP_INFO()->groupSize);
     SPV_WORKGROUP_INFO()->groupSize += size;
 
-    structName = VIR_Shader_GetStringFromId(virShader, SPV_WORKGROUP_INFO()->sharedSboNameId);
     virBlockType = VIR_Shader_GetTypeFromId(virShader, SPV_WORKGROUP_INFO()->sharedSboTypeId);
 
     VIR_Shader_AddFieldSymbol(virShader,
@@ -3073,6 +3074,9 @@ static VSC_ErrCode __SpvIDCopy(gcSPV spv, VIR_Shader * virShader, SpvId from, Sp
     case SPV_ID_TYPE_CONST:
         VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
         VIR_Operand_SetConstId(operand, SPV_ID_VIR_CONST_ID(from));
+        break;
+
+    default:
         break;
     }
 
@@ -4651,7 +4655,7 @@ static VSC_ErrCode __SpvConstructWorkgroup(
         VIR_Symbol         *sym;
         VIR_StorageBlock   *sbo;
 
-        spvAllocate(spv->spvMemPool, gcmSIZEOF(SpvWorkGroupInfo), &spv->workgroupInfo);
+        spvAllocate(spv->spvMemPool, gcmSIZEOF(SpvWorkGroupInfo), (gctPOINTER *)&spv->workgroupInfo);
         gcoOS_MemFill(spv->workgroupInfo, 0, gcmSIZEOF(SpvWorkGroupInfo));
         SPV_WORKGROUP_INFO()->curOffsetSymId = VIR_INVALID_ID;
         SPV_WORKGROUP_INFO()->groupOffsetSymId = VIR_INVALID_ID;
@@ -5509,13 +5513,10 @@ VSC_ErrCode __SpvEmitLabel(gcSPV spv, VIR_Shader * virShader)
         (SPV_IDDESCRIPTOR_LABEL(spv, spv->resultId).phiCount > 0) ||
         needSetCaller)
     {
-        gctUINT label;
         VIR_Instruction *virCallInst;
         VIR_Operand *virDest;
         VIR_Link* link;
         VIR_PhiOperand * phiOperand;
-
-        label = spv->resultId;
 
         if (needSetCaller)
         {
@@ -5584,7 +5585,6 @@ VSC_ErrCode __SpvEmitFunctionCall(gcSPV spv, VIR_Shader * virShader)
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
 
     VIR_Instruction * virInst;
-    VIR_Label *virLabel;
     gctUINT func = spv->operands[0];
     gctUINT i;
     gctBOOL funcDef;
@@ -5699,8 +5699,8 @@ VSC_ErrCode __SpvEmitFunctionCall(gcSPV spv, VIR_Shader * virShader)
 
         if (SPV_ID_FUNC_ARG_NUM(func) > 0)
         {
-            spvAllocate(spv->spvMemPool,sizeof (SpvId) * SPV_ID_FUNC_ARG_NUM(func), &SPV_ID_FUNC_SPV_ARG(func));
-            spvAllocate(spv->spvMemPool,sizeof (SpvParameterStorage) * SPV_ID_FUNC_ARG_NUM(func), &SPV_ID_FUNC_ARG_STORAGE(func));
+            spvAllocate(spv->spvMemPool,sizeof (SpvId) * SPV_ID_FUNC_ARG_NUM(func), (gctPOINTER *)&SPV_ID_FUNC_SPV_ARG(func));
+            spvAllocate(spv->spvMemPool,sizeof (SpvParameterStorage) * SPV_ID_FUNC_ARG_NUM(func), (gctPOINTER *)&SPV_ID_FUNC_ARG_STORAGE(func));
         }
     }
 
@@ -5728,15 +5728,13 @@ VSC_ErrCode __SpvEmitFunctionCall(gcSPV spv, VIR_Shader * virShader)
 
     if (funcDef)
     {
-        /* Label */
-        virLabel = SPV_ID_FUNC_VIR_LABEL(func);
         VIR_Operand_SetFunction(VIR_Inst_GetDest(virInst), SPV_ID_FUNC_VIR_FUNCION(func));
     }
 
     if (spv->operandSize > 1)
     {
         /* not define, add parameter to caller */
-        spvAllocate(spv->spvMemPool, sizeof(SpvId) * (spv->operandSize - 1), &SPV_ID_FUNC_CALLER_SPV_ARG(func, index));
+        spvAllocate(spv->spvMemPool, sizeof(SpvId) * (spv->operandSize - 1), (gctPOINTER *)&SPV_ID_FUNC_CALLER_SPV_ARG(func, index));
 
         for (i = 1; i < spv->operandSize; i++)
         {
@@ -6641,8 +6639,8 @@ VSC_ErrCode __SpvEmitFunction(gcSPV spv, VIR_Shader * virShader)
         SPV_ID_FUNC_ARG_NUM(spv->resultId) = SPV_ID_TYPE_FUNC_ARG_NUM(spv->operands[1]);
         if (SPV_ID_FUNC_ARG_NUM(spv->resultId) > 0)
         {
-            spvAllocate(spv->spvMemPool,sizeof (SpvId) * SPV_ID_FUNC_ARG_NUM(spv->resultId), &SPV_ID_FUNC_SPV_ARG(spv->resultId));
-            spvAllocate(spv->spvMemPool,sizeof (SpvParameterStorage) * SPV_ID_FUNC_ARG_NUM(spv->resultId), &SPV_ID_FUNC_ARG_STORAGE(spv->resultId));
+            spvAllocate(spv->spvMemPool,sizeof (SpvId) * SPV_ID_FUNC_ARG_NUM(spv->resultId), (gctPOINTER *)&SPV_ID_FUNC_SPV_ARG(spv->resultId));
+            spvAllocate(spv->spvMemPool,sizeof (SpvParameterStorage) * SPV_ID_FUNC_ARG_NUM(spv->resultId), (gctPOINTER *)&SPV_ID_FUNC_ARG_STORAGE(spv->resultId));
 
             for(i = 0; i < SPV_ID_FUNC_ARG_NUM(spv->resultId); i++)
             {
@@ -7005,7 +7003,6 @@ VSC_ErrCode __SpvEmitVectorShuffle(gcSPV spv, VIR_Shader * virShader)
         gctUINT src0Component[4] = { 0 };
         gctUINT src1Component[4] = { 0 };
         gctUINT componentCount[2] = {0, 0};
-        gctBOOL bHasUndef = gcvFALSE;
 
         emitRound = (spv->operands[0] == spv->operands[1] ? 1 : 2);
 
@@ -7014,7 +7011,7 @@ VSC_ErrCode __SpvEmitVectorShuffle(gcSPV spv, VIR_Shader * virShader)
         {
             if (spv->operands[i] == 0xFFFFFFFF)
             {
-                bHasUndef = gcvTRUE;
+                /* Meet a undefined component.*/
             }
             else if (spv->operands[i] < srcVec0CompNum)
             {
@@ -13341,7 +13338,7 @@ gceSTATUS __SpvCreateFuncCallTable(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    spvAllocate(MemPool, gcmSIZEOF(SpvFuncCallTable), FuncCallTable);
+    spvAllocate(MemPool, gcmSIZEOF(SpvFuncCallTable), (gctPOINTER *)FuncCallTable);
 
     (*FuncCallTable)->funcAllocated = 0;
     (*FuncCallTable)->funcCount = 0;
