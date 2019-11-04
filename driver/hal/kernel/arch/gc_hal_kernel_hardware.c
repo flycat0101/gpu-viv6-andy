@@ -1875,12 +1875,13 @@ gckHARDWARE_StartTimerReset(
     IN gckHARDWARE Hardware
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
     gcmkHEADER();
 
     gckSTATETIMER_Reset(&Hardware->powerStateCounter, 0);
 
     gcmkFOOTER();
-    return gcvSTATUS_OK;
+    return status;
 }
 
 static void
