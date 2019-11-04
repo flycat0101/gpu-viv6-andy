@@ -669,6 +669,12 @@ VkResult __vk_InsertSemaphoreSignals(
     for (i = 0; i < semaphoreCount; i++)
     {
         __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, pSemaphores[i]);
+        gcsHAL_INTERFACE iface;
+
+        iface.command            = gcvHAL_SIGNAL;
+        iface.u.Signal.auxSignal = 0;
+        iface.u.Signal.process   = devQueue->pDevContext->threadId;
+        iface.u.Signal.fromWhere = devQueue->pDevContext->database->REG_BltEngine ? gcvKERNEL_BLT : gcvKERNEL_PIXEL;
 
         __vkCmdLoadSingleHWState(&states,
             0x0E1A, VK_FALSE, (fenceAddress + sph->fenceIndex * sizeof(__vkHwFenceData)));
@@ -677,7 +683,10 @@ VkResult __vk_InsertSemaphoreSignals(
 
         if (sph->winHandle)
         {
-            gcmVERIFY_OK(gcoOS_Signal(gcvNULL, sph->winHandle, gcvTRUE));
+            iface.u.Signal.signal = gcmPTR_TO_UINT64(sph->winHandle);
+
+            __VK_ONERROR(__vk_QueueAppendEvent(devQueue, &iface));
+            __VK_ONERROR(__vk_QueueCommitEvents(devQueue, VK_FALSE));
         }
 #if defined(LINUX) || defined(ANDROID)
         uint32_t j = 0;
@@ -685,13 +694,19 @@ VkResult __vk_InsertSemaphoreSignals(
         {
             if (sph->signalIndex >= 0)
             {
-                gcmVERIFY_OK(gcoOS_Signal(gcvNULL, devQueue->pDevContext->fdSignal[sph->signalIndex], gcvTRUE));
+                iface.u.Signal.signal = gcmPTR_TO_UINT64(devQueue->pDevContext->fdSignal[sph->signalIndex]);
+
+                __VK_ONERROR(__vk_QueueAppendEvent(devQueue, &iface));
+                __VK_ONERROR(__vk_QueueCommitEvents(devQueue, VK_FALSE));
             }
             else if (sph->signalIndex == -1)
             {
                 for (j = 0; j < devQueue->pDevContext->fdCount; j++)
                 {
-                    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, devQueue->pDevContext->fdSignal[j], gcvTRUE));
+                    iface.u.Signal.signal = gcmPTR_TO_UINT64(devQueue->pDevContext->fdSignal[j]);
+
+                    __VK_ONERROR(__vk_QueueAppendEvent(devQueue, &iface));
+                    __VK_ONERROR(__vk_QueueCommitEvents(devQueue, VK_FALSE));
                 }
             }
         }
