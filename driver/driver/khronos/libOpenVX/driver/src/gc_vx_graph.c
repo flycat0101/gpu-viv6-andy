@@ -1014,7 +1014,7 @@ VX_INTERNAL_API vx_bool ComputeMNEx(
 
     if (tilingInVIP)
     {
-        if (layer->operations[start]->bTransposeOut)
+        if (layer->operations[start + count -1]->bTransposeOut)
         {
             vipSRAMsize -= 32 * 1024;
         }
