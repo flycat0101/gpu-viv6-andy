@@ -782,7 +782,8 @@ VivComposite(PixmapPtr pxDst, int srcX, int srcY, int maskX, int maskY,
 
         if (_last_hw_composite > 0)
             VIV2DGPUBlitComplete(&pViv->mGrCtx,TRUE);
-            _last_hw_composite = 0;
+
+        _last_hw_composite = 0;
 
         pBlt->mSwcmp = TRUE;
         VIVSWComposite(pxDst, srcX, srcY, maskX, maskY, dstX, dstY, width, height);

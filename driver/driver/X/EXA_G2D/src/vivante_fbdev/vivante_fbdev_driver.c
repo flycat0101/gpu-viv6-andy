@@ -1419,7 +1419,7 @@ VivScreenInit(SCREEN_INIT_ARGS_DECL)
     else {
         xf86DrvMsg(pScrn->scrnIndex, X_INFO, "display rotated; disabling DGA\n");
         xf86DrvMsg(pScrn->scrnIndex, X_INFO, "using driver rotation; disabling XRandR\n");
-        xf86DisableRandR();
+        /* xf86DisableRandR(); */
         if (pScrn->bitsPerPixel == 24)
         xf86DrvMsg(pScrn->scrnIndex, X_WARNING, "rotation might be broken at 24 bits per pixel\n");
     }

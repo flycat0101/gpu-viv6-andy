@@ -1213,11 +1213,6 @@ static GLvoid *driCreateNewDrawable(Display *dpy,
     __DRIscreenPrivate *psp;
     __DRIdrawablePrivate *pdp;
 
-#if defined(DRI_PIXMAPRENDER_GL)
-    wPixData *pPixdata = NULL;
-    gceSURF_FORMAT hwFormat;
-    vvtDeviceInfo *pDevInfo;
-#endif
 
     pdraw->private = NULL;
 
