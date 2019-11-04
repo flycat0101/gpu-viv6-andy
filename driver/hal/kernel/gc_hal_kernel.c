@@ -405,6 +405,7 @@ gckKERNEL_Construct(
     gctUINT64 data;
     gctUINT32 recovery;
     gctUINT32 stuckDump;
+    gctUINT64 dynamicMap = 1;
 
     gcmkHEADER_ARG("Os=%p Context=%p", Os, Context);
 
@@ -609,7 +610,8 @@ gckKERNEL_Construct(
         gcmkONERROR(
             gckMMU_SetupSRAM(kernel->mmu, kernel->hardware, kernel->device));
 
-        if (kernel->hardware->mmuVersion && !kernel->mmu->dynamicAreaSetuped)
+        status = gckOS_QueryOption(Os, "mmuDynamicMap", &dynamicMap);
+        if (dynamicMap && kernel->hardware->mmuVersion && !kernel->mmu->dynamicAreaSetuped)
         {
             gcmkONERROR(
                 gckMMU_SetupDynamicSpace(kernel->mmu));
