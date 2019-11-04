@@ -7062,14 +7062,28 @@ VkResult halti5_patch_pipeline(
     if (patchMask)
     {
         keyCount = chipPipeline->keyCount;
+        j = 0;
         for (i = 0; i < keyCount; i++)
         {
-            __vkDescriptorSet *descSet = descSetInfo->descSets[i];
-            halti5_descriptorSet *chipDescSet = (halti5_descriptorSet *)descSet->chipPriv;
-            stateKey[i] = (void*)chipDescSet->patchKeys;
-            stateKeyMask[i] = (void*)chipPipeline->patchKeys[i];
-            __VK_ASSERT(chipDescSet->numofEntries == chipPipeline->patchKeyCount[i]);
-            stateKeySizeInBytes[i] = chipDescSet->numofEntries * sizeof(halti5_patch_key);
+            while (j < __VK_MAX_DESCRIPTOR_SETS)
+            {
+                __vkDescriptorSet *descSet = descSetInfo->descSets[j];
+
+                if (descSet == VK_NULL_HANDLE)
+                {
+                    j++;
+                }
+                else
+                {
+                    halti5_descriptorSet *chipDescSet = (halti5_descriptorSet *)descSet->chipPriv;
+                    stateKey[i] = (void*)chipDescSet->patchKeys;
+                    stateKeyMask[i] = (void*)chipPipeline->patchKeys[j];
+                    __VK_ASSERT(chipDescSet->numofEntries == chipPipeline->patchKeyCount[j]);
+                    stateKeySizeInBytes[i] = chipDescSet->numofEntries * sizeof(halti5_patch_key);
+                    j++;
+                    break;
+                }
+            }
         }
     }
 
@@ -7250,6 +7264,7 @@ VkResult halti5_patch_pipeline(
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.arrayIndex = patchInfo->arrayIndex;
 
                                                     compileFlag = VK_TRUE;
+                                                    totalEntries--;
                                                 }
                                             }
                                         }
@@ -7270,7 +7285,6 @@ VkResult halti5_patch_pipeline(
                                                       ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
 
                         vscLinkParams.hShaderArray[stageIdx] =  shaderInfo->vscHandle;
-                        totalEntries--;
                     }
 
                     halti5_helper_destroyVscShaderResLayout(pip, &vscShaderResLayout);
