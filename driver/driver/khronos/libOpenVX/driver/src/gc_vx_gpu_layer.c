@@ -4599,15 +4599,14 @@ vxnne_shader_executable vxnneGPUL2NormSumSqrtShaderExecutable(
 
     if (srcFormat == VX_TYPE_UINT8)
     {
-        vx_float32 outputScale = (vx_float32)1.0/inputScale;
-        vx_reference  parameters[5] = {(vx_reference)input, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output};
+        vx_float32    input_ZP = (vx_float32)inputZP;
+        vx_float32 r_inputScale = 1.0f / inputScale;
+        vx_reference  parameters[5] = {(vx_reference)input, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output};
 
-        scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &inputScale);
-        scaleOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &outputScale);
-        zp = vxCreateScalar(context, VX_TYPE_INT32, &inputZP);
+        scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &r_inputScale);
+        zp = vxCreateScalar(context, VX_TYPE_FLOAT32, &input_ZP);
         parameters[1] = (vx_reference)scaleIn;
-        parameters[2] = (vx_reference)scaleOut;
-        parameters[3] = (vx_reference)zp;
+        parameters[2] = (vx_reference)zp;
 
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_SumRsqrtQuant8", borderMode);
         if (!shaderExecutable)
@@ -4615,7 +4614,7 @@ vxnne_shader_executable vxnneGPUL2NormSumSqrtShaderExecutable(
             goto OnError;
         }
 
-        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 5);
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
         if (status != VX_SUCCESS) goto OnError;
     }
     else if (srcFormat == VX_TYPE_FLOAT16 || srcFormat == VX_TYPE_FLOAT32)
@@ -4745,12 +4744,15 @@ vxnne_shader_executable vxnneGPUL2NormSumScaleShaderExecutable(
     }
     else if (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
     {
+        vx_float32 input_ZP = (vx_float32)inputZP;
+        vx_float32 output_ZP = (vx_float32)outputZP + 0.5f;
         vx_reference  parameters[7] = {(vx_reference)input, (vx_reference)sumTmp, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output};
 
+        outputScale = 1.0f / outputScale;
         scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &inputScale);
         scaleOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &outputScale);
-        inZP = vxCreateScalar(context, VX_TYPE_INT32, &inputZP);
-        outZP = vxCreateScalar(context, VX_TYPE_INT32, &outputZP);
+        inZP = vxCreateScalar(context, VX_TYPE_FLOAT32, &input_ZP);
+        outZP = vxCreateScalar(context, VX_TYPE_FLOAT32, &output_ZP);
         parameters[2] = (vx_reference)scaleIn;
         parameters[3] = (vx_reference)scaleOut;
         parameters[4] = (vx_reference)inZP;
