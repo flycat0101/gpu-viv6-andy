@@ -1641,7 +1641,7 @@ _VSC_MC_GEN_GenInstCtrl(
     McInstCtrl->roundingMode                    = _VSC_MC_GEN_GenRound(Gen, Inst);
     McInstCtrl->threadType                      = _VSC_MC_GEN_GenThreadType(Gen, Inst);
     McInstCtrl->instType                        = _VSC_MC_GEN_GenInstType(Gen, Inst);
-    McInstCtrl->bSkipForHelperKickoff           = _VSC_MC_GEN_GenSkipHelperFlag(Gen, Inst);
+    McInstCtrl->bSkipForHelperKickoff           = (Gen->Shader->shaderKind == VIR_SHADER_FRAGMENT) ? _VSC_MC_GEN_GenSkipHelperFlag(Gen, Inst) : gcvFALSE;
     McInstCtrl->bDenorm                         = _VSC_MC_GEN_GenDenormFlag(Gen, Inst);
     McInstCtrl->bResultSat                      = _VSC_MC_GEN_GenResultSat(Gen, Inst);
     McInstCtrl->packMode                        = VIR_Inst_GetFlags(Inst) & VIR_INSTFLAG_PACKEDMODE ?
