@@ -391,13 +391,12 @@ gceSTATUS _getCLFormatFromInternalFormat(gcsVX_IMAGE_INFO_PTR info, gctUINT32_PT
         break;
 
     case gcvSURF_R32:
-        /*if((info->format == 0x2) && (info->componentCount == 2))
+        if((info->format == 0x2) && (info->componentCount == 2))
         {
             *channelOrder = CLK_Rx;
             *channelDataType = CLK_UNSIGNED_INT32;
         }
-        else */
-        if(info->format == 0x2)
+        else if(info->format == 0x2)
         {
             *channelOrder = CLK_R;
             *channelDataType = CLK_SIGNED_INT32;

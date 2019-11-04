@@ -664,7 +664,7 @@ gcfVX_GetImageInfoFromTensor(
         Info->internalFormat = gcvSURF_R16F;
         Info->isFloat = gcvTRUE;
         break;
-   /* case VX_TYPE_INT64:
+    case VX_TYPE_INT64:
         Info->format = 0x2;
         Info->planes = 1;
         Info->bpp = 32;
@@ -673,7 +673,7 @@ gcfVX_GetImageInfoFromTensor(
         Info->internalFormat = gcvSURF_R32;
         Info->isFloat = gcvFALSE;
         break;
-        */
+
     default:
         status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;
