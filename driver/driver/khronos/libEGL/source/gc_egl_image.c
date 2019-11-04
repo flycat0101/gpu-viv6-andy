@@ -270,6 +270,12 @@ veglDereferenceImage(
 
     /* Decrement reference. */
     gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, Image->reference, &oldValue));
+
+    if (oldValue == 1)
+    {
+        /* Destroy image. */
+        _DestroyImage(Thread, Display, Image, EGL_FALSE);
+    }
 }
 
 static gcmINLINE EGLAttrib
