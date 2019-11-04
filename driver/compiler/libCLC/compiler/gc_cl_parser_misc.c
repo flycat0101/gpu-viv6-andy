@@ -12148,10 +12148,12 @@ IN cloIR_BASE LoopBody
 {
     gceSTATUS    status;
     cloIR_ITERATION    iteration;
+    clsNAME_SPACE *    forBodySpace=gcvNULL;
     clsNAME_SPACE *    forSpace=gcvNULL;
 
     gcmASSERT(StartToken);
 
+    cloCOMPILER_PopCurrentNameSpace(Compiler, &forBodySpace);
     cloCOMPILER_PopCurrentNameSpace(Compiler, &forSpace);
 
     if (ForExprPair.condExpr != gcvNULL) {
@@ -12189,6 +12191,15 @@ clParseForControl(
     )
 {
     clsForExprPair pair;
+    gctUINT16   die = VSC_DI_INVALIDE_DIE;
+    clsNAME_SPACE *    nameSpace;
+    clsNAME_SPACE *    parentSpace = gcvNULL;
+
+    parentSpace = cloCOMPILER_GetCurrentSpace(Compiler);
+    die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_LEXICALBLOCK, parentSpace->die, gcvNULL, 0, 0, 0, 0);
+
+    cloCOMPILER_CreateNameSpace(Compiler,
+                         &nameSpace);
 
     pair.condExpr    = CondExpr;
     pair.restExpr    = RestExpr;
