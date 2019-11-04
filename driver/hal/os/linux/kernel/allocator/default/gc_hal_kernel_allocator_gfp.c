@@ -796,12 +796,12 @@ _GFPFree(
     if (Mdl->contiguous)
     {
         dma_unmap_page(galcore_device, mdlPriv->dma_addr,
-                Mdl->numPages << PAGE_SHIFT, DMA_TO_DEVICE);
+                Mdl->numPages << PAGE_SHIFT, DMA_FROM_DEVICE);
     }
     else
     {
         dma_unmap_sg(galcore_device, mdlPriv->sgt.sgl, mdlPriv->sgt.nents,
-                DMA_TO_DEVICE);
+                DMA_FROM_DEVICE);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION (3,6,0) \
     && (defined (ARCH_HAS_SG_CHAIN) || defined (CONFIG_ARCH_HAS_SG_CHAIN))
