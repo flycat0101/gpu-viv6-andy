@@ -1360,6 +1360,210 @@ OnError:
     return result;
 }
 
+#if defined(ANDROID)
+#if (ANDROID_SDK_VERSION >= 24)
+
+#ifdef DRM_GRALLOC
+
+#include <gralloc_handle.h>
+
+/* VK_ANDROID_native_buffer. */
+static VkResult __BindAndroidNativeBufferMemory(
+    VkDevice device,
+    const VkNativeBufferANDROID* pNativeBuffer,
+    const VkAllocationCallbacks* pAllocator,
+    __vkImage* image
+    )
+{
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    VkResult result = VK_SUCCESS;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkMemoryAllocateInfo allocInfo;
+    __VkMemoryImportInfo importInfo;
+    native_handle_t * handle = (native_handle_t*)pNativeBuffer->handle;
+    int err, fd;
+
+    err = gralloc_handle_validate(handle);
+    if (err)
+    {
+        /* Invalid handle. */
+        ALOGE("%s(%d): invalid buffer=%p", __func__, __LINE__, pNativeBuffer);
+        return VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR;
+    }
+
+    /* Set the allocator to the parent allocator or API defined allocator if valid */
+    fd = (handle && handle->numFds) ? (int)handle->data[0] : -1;
+    if (fd < 0)
+    {
+        ALOGE("%s(%d): invalid fd=%d", __func__, __LINE__, fd);
+        return VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR;
+    }
+
+    allocInfo = (VkMemoryAllocateInfo) {
+        .sType              = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .pNext              = NULL,
+        .allocationSize     = 0,
+        .memoryTypeIndex    = 0,
+    };
+
+    importInfo = (__VkMemoryImportInfo) {
+        .type              = __VK_MEMORY_IMPORT_TYPE_LINUX_DMA_BUF,
+        .u.dmaBuf.dmaBufFd = fd,
+    };
+
+    __VK_ONERROR(__vk_ImportMemory(device, &allocInfo, &importInfo, pAllocator, &memory));
+
+    image->memory    = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory*, memory);
+    image->memOffset = 0;
+    image->residentMemory = VK_TRUE;
+
+OnError:
+    return result;
+}
+
+#else
+
+#include <gc_gralloc_priv.h>
+
+/* VK_ANDROID_native_buffer. */
+static VkResult __BindAndroidNativeBufferMemory(
+    VkDevice device,
+    const VkNativeBufferANDROID* pNativeBuffer,
+    const VkAllocationCallbacks* pAllocator,
+    __vkImage* image
+    )
+{
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    VkResult result = VK_SUCCESS;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkMemoryAllocateInfo allocInfo;
+    __VkMemoryImportInfo importInfo;
+    gc_native_handle_t*  handle;
+
+    /* Set the allocator to the parent allocator or API defined allocator if valid */
+    handle = gc_native_handle_get(pNativeBuffer->handle);
+
+    allocInfo = (VkMemoryAllocateInfo) {
+        .sType              = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .pNext              = NULL,
+        .allocationSize     = handle->nodeSize,
+        .memoryTypeIndex    = 0,
+    };
+
+    importInfo = (__VkMemoryImportInfo) {
+        .type               = __VK_MEMORY_IMPORT_TYPE_VIDEO_NODE,
+        .u.videoMemNode.nodeName           = handle->node,
+        .u.videoMemNode.nodePool           = handle->nodePool,
+    };
+
+    __VK_ONERROR(__vk_ImportMemory(device, &allocInfo, &importInfo, pAllocator, &memory));
+
+    image->memory    = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory*, memory);
+    image->memOffset = 0;
+    image->residentMemory = VK_TRUE;
+
+
+OnError:
+    return result;
+}
+#endif
+#endif /* ANDROID_SDK_VERSION >= 24 */
+
+
+#if ANDROID_SDK_VERSION >= 26
+
+#include <vndk/hardware_buffer.h>
+
+extern VkResult __VK_constructAHardwareBuffer(
+    uint32_t Width,
+    uint32_t Height,
+    uint32_t Layers,
+    VkFormat vkFormat,
+    VkImageCreateFlags vkImgCreateFlags,
+    VkImageUsageFlags  vkUsage,
+    struct AHardwareBuffer **ahw
+    );
+
+extern VkResult __VK_releaseAHardwareBuffer(struct AHardwareBuffer *ahw);
+extern VkResult __VK_acquireAHardwareBuffer(struct AHardwareBuffer *ahw);
+
+static VkResult __ImportMemoryFromAHardware(
+    VkDevice device,
+    struct AHardwareBuffer* buffer,
+    VkDeviceMemory *memory
+    )
+{
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    VkResult result = VK_SUCCESS;
+    VkMemoryAllocateInfo allocInfo;
+    __VkMemoryImportInfo importInfo;
+
+    ALOGV("%s(%d): AHardwareBuffer =%p", __func__, __LINE__, buffer);
+#ifdef DRM_GRALLOC
+    native_handle_t    *handle = (native_handle_t*)AHardwareBuffer_getNativeHandle(buffer);
+#else
+    gc_native_handle_t *handle = gc_native_handle_get((buffer_handle_t)AHardwareBuffer_getNativeHandle(buffer) );
+#endif
+    __VK_ASSERT(handle);
+
+#ifdef DRM_GRALLOC
+    {
+        int err, fd;
+
+        err = gralloc_handle_validate(handle);
+        if (err)
+        {
+            /* Invalid handle. */
+            ALOGE("%s(%d): invalid AHardwareBuffer =%p", __func__, __LINE__, buffer);
+            return VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR;
+        }
+
+        /* Set the allocator to the parent allocator or API defined allocator if valid */
+        fd = (handle && handle->numFds) ? (int)handle->data[0] : -1;
+        if (fd < 0)
+        {
+            ALOGE("%s(%d): invalid fd=%d", __func__, __LINE__, fd);
+            return VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR;
+        }
+
+        allocInfo = (VkMemoryAllocateInfo) {
+            .sType              = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .pNext              = NULL,
+            .allocationSize     = 0,
+            .memoryTypeIndex    = 0,
+        };
+
+        importInfo = (__VkMemoryImportInfo) {
+            .type              = __VK_MEMORY_IMPORT_TYPE_LINUX_DMA_BUF,
+            .u.dmaBuf.dmaBufFd = fd,
+        };
+    }
+#else
+    {
+        allocInfo = (VkMemoryAllocateInfo) {
+            .sType              = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .pNext              = NULL,
+            .allocationSize     = handle->nodeSize,
+            .memoryTypeIndex    = 0,
+        };
+
+        importInfo = (__VkMemoryImportInfo) {
+            .type               = __VK_MEMORY_IMPORT_TYPE_VIDEO_NODE,
+            .u.videoMemNode.nodeName           = handle->node,
+            .u.videoMemNode.nodePool           = handle->nodePool,
+        };
+    }
+#endif
+
+    __VK_ONERROR(__vk_ImportMemory(device, &allocInfo, &importInfo, VK_NULL_HANDLE, memory));
+
+OnError:
+    return result;
+}
+#endif /* ANDROID_SDK_VERSION >= 26 */
+
+#endif /* defined(ANDROID) */
+
 VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
     VkDevice device,
     const VkMemoryAllocateInfo* pAllocateInfo,
@@ -1372,74 +1576,184 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
     __vkDeviceMemory *dvm = gcvNULL;
     __vkDevContext *devCtx = (__vkDevContext*)device;
     gctSIZE_T size = 0u;
+    VkBaseInStructure *pBaseIn = (VkBaseInStructure *)pAllocateInfo->pNext;
+    VkBool32  bAllocated = VK_FALSE;
+    VkExportMemoryAllocateInfo    *exportInfo = VK_NULL_HANDLE;
+    VkMemoryDedicatedAllocateInfo *dedicatedInfo = VK_NULL_HANDLE;
 
+#if (ANDROID_SDK_VERSION >= 26)
+    VkImportAndroidHardwareBufferInfoANDROID  *ahwImported  = VK_NULL_HANDLE;
+#endif
+
+    while (pBaseIn)
+    {
+        if (pBaseIn->sType == VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO)
+        {
+            exportInfo = (VkExportMemoryAllocateInfo *)pBaseIn;
+        }
+#if (ANDROID_SDK_VERSION >= 26)
+        else if (pBaseIn->sType == VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID)
+        {
+            ahwImported = (VkImportAndroidHardwareBufferInfoANDROID *)pBaseIn;
+        }
+#endif
+        else if (pBaseIn->sType == VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO)
+        {
+            dedicatedInfo = (VkMemoryDedicatedAllocateInfo *)pBaseIn;
+        }
+        pBaseIn = (VkBaseInStructure *)pBaseIn->pNext;
+    }
+
+#if (ANDROID_SDK_VERSION >= 26)
     do {
-        /* Set the allocator to the parent allocator or API defined allocator if valid */
-        __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
-
-        result = __vk_CreateObject(devCtx, __VK_OBJECT_DEVICE_MEMORY, sizeof(__vkDeviceMemory), (__vkObject**)&dvm);
-        if (result != VK_SUCCESS)
+        if (!bAllocated && ahwImported)
         {
-            break;
+            __VK_ASSERT(ahwImported->buffer);
+            __VK_ERR_BREAK(__ImportMemoryFromAHardware(device, ahwImported->buffer, pMemory));
+            dvm = (__vkDeviceMemory *)*pMemory;
+
+            __VK_acquireAHardwareBuffer(ahwImported->buffer);
+            dvm->ahwBuffer    = ahwImported->buffer;
+            bAllocated = VK_TRUE;
         }
 
-        dvm->devCtx = devCtx;
-        dvm->mapped = VK_FALSE;
-        dvm->memCb = __VK_ALLOCATIONCB;
-        /* Vulkan need guarantee maximum alignment (256) for all usage. */
-        dvm->align  = 256;
-        dvm->size   = (gctSIZE_T)pAllocateInfo->allocationSize;
-        size        = dvm->size;
-
-        if (devCtx->enabledFeatures.robustBufferAccess &&
-            !devCtx->database->ROBUSTNESS)
+        if (!bAllocated && exportInfo && (exportInfo->handleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID) != 0)
         {
-            size = __VK_ALIGN(size, 4096);
+            uint32_t width = 0, height = 1, layers = 1;
+            VkFormat            imgFormat = VK_FORMAT_UNDEFINED;
+            VkImageCreateFlags  imgFlags = 0;
+            VkImageUsageFlags   imgUsage = 0;
+            struct AHardwareBuffer *aBuffer;
+
+            if (dedicatedInfo && dedicatedInfo->image)
+            {
+                __vkImage *img = (__vkImage*)dedicatedInfo->image;
+                width  = img->createInfo.extent.width;
+                height = img->createInfo.extent.height;
+                layers = img->createInfo.arrayLayers;
+
+                imgFormat = img->createInfo.format;
+                imgFlags  = img->createInfo.flags;
+                imgUsage  = img->createInfo.usage;
+            }
+            else if (dedicatedInfo && dedicatedInfo->buffer)
+            {
+                __vkBuffer *buffer = (__vkBuffer*)dedicatedInfo->buffer;
+                width  = buffer->createInfo.size;
+                height = 1;
+                layers = 1;
+            }
+            else
+            {
+                width  = pAllocateInfo->allocationSize;
+                height = 1;
+                layers = 1;
+            }
+
+            __VK_ERR_BREAK(__VK_constructAHardwareBuffer(width, height, layers, imgFormat, imgFlags, imgUsage, &aBuffer));
+            __VK_ERR_BREAK(__ImportMemoryFromAHardware(device, aBuffer, pMemory));
+
+            dvm = (__vkDeviceMemory* )*pMemory;
+            dvm->ahwBuffer    = aBuffer;
+
+            bAllocated = VK_TRUE;
         }
 
-        gcoOS_MemCopy(&dvm->allocInfo, pAllocateInfo, gcmSIZEOF(VkMemoryAllocateInfo));
-
-        __VK_ERR_BREAK(__vki_CreateSurfNode(devCtx, &dvm->node, size, dvm->align, gcvSURF_TYPE_UNKNOWN,
-                                            gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
-
-        __VK_ERR_BREAK(__vki_LockSurfNode(devCtx, &dvm->node, &dvm->devAddr, &dvm->hostAddr));
-
-        if ((devCtx->enabledFeatures.robustBufferAccess &&
-            !devCtx->database->ROBUSTNESS) ||
-            (devCtx->enabledFeatures.robustBufferAccess &&
-            devCtx->database->ROBUSTNESS &&
-            !devCtx->database->SH_ROBUSTNESS_FIX) )
+        if (bAllocated && dvm)
         {
-            __VK_MEMZERO(dvm->hostAddr, size);
+            gcoOS_MemCopy(&dvm->allocInfo, pAllocateInfo, gcmSIZEOF(VkMemoryAllocateInfo));
+#if gcdDUMP
+            __VK_MEMZERO(dvm->hostAddr, dvm->size);
+
+            gcmDUMP(gcvNULL, "#[info: initialize device memory(android hardware buffer)=%d]", dvm->obj.id);
+            gcmDUMP_BUFFER(gcvNULL,
+                            gcvDUMP_BUFFER_MEMORY,
+                            dvm->devAddr,
+                            dvm->hostAddr,
+                            0,
+                            dvm->size);
+#endif
         }
+    } while (gcvFALSE);
+#endif
+
+    if (!bAllocated)
+    {
+        do {
+            /* Set the allocator to the parent allocator or API defined allocator if valid */
+            __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
+            result = __vk_CreateObject(devCtx, __VK_OBJECT_DEVICE_MEMORY, sizeof(__vkDeviceMemory), (__vkObject**)&dvm);
+            if (result != VK_SUCCESS)
+            {
+                break;
+            }
+
+            dvm->devCtx = devCtx;
+            dvm->mapped = VK_FALSE;
+            dvm->memCb = __VK_ALLOCATIONCB;
+            /* Vulkan need guarantee maximum alignment (256) for all usage. */
+            dvm->align  = 256;
+            dvm->size   = (gctSIZE_T)pAllocateInfo->allocationSize;
+            size        = dvm->size;
+
+            if (devCtx->enabledFeatures.robustBufferAccess &&
+                !devCtx->database->ROBUSTNESS)
+            {
+                size = __VK_ALIGN(size, 4096);
+            }
+
+            gcoOS_MemCopy(&dvm->allocInfo, pAllocateInfo, gcmSIZEOF(VkMemoryAllocateInfo));
+
+            __VK_ERR_BREAK(__vki_CreateSurfNode(devCtx, &dvm->node, size, dvm->align, gcvSURF_TYPE_UNKNOWN,
+                                                gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
+
+            __VK_ERR_BREAK(__vki_LockSurfNode(devCtx, &dvm->node, &dvm->devAddr, &dvm->hostAddr));
+
+            if ((devCtx->enabledFeatures.robustBufferAccess &&
+                !devCtx->database->ROBUSTNESS) ||
+                (devCtx->enabledFeatures.robustBufferAccess &&
+                devCtx->database->ROBUSTNESS &&
+                !devCtx->database->SH_ROBUSTNESS_FIX) )
+            {
+                __VK_MEMZERO(dvm->hostAddr, size);
+            }
 
 #if gcdDUMP
-        __VK_MEMZERO(dvm->hostAddr, dvm->size);
+            __VK_MEMZERO(dvm->hostAddr, dvm->size);
 
-        gcmDUMP(gcvNULL, "#[info: initialize device memory=%d]", dvm->obj.id);
-        gcmDUMP_BUFFER(gcvNULL,
-                       gcvDUMP_BUFFER_MEMORY,
-                       dvm->devAddr,
-                       dvm->hostAddr,
-                       0,
-                       dvm->size);
+            gcmDUMP(gcvNULL, "#[info: initialize device memory=%d]", dvm->obj.id);
+            gcmDUMP_BUFFER(gcvNULL,
+                           gcvDUMP_BUFFER_MEMORY,
+                           dvm->devAddr,
+                           dvm->hostAddr,
+                           0,
+                           dvm->size);
 #endif
-        /* Return the object pointer as a 64-bit handle */
-        *pMemory = (VkDeviceMemory)(uintptr_t)dvm;
-    } while (VK_FALSE);
+            /* Return the object pointer as a 64-bit handle */
+            *pMemory = (VkDeviceMemory)(uintptr_t)dvm;
+        } while (VK_FALSE);
 
-    if (gcmIS_ERROR(status) && dvm)
-    {
-        if (dvm->hostAddr)
+        if (gcmIS_ERROR(status) && dvm)
         {
-            __VK_VERIFY_OK(__vki_UnlockSurfNode(devCtx, &dvm->node));
-        }
+#if (ANDROID_SDK_VERSION >= 26)
+            if (dvm->ahwBuffer)
+            {
+                __VK_releaseAHardwareBuffer(dvm->ahwBuffer);
+                dvm->ahwBuffer = VK_NULL_HANDLE;
+            }
+#endif
+            if (dvm->hostAddr)
+            {
+                __VK_VERIFY_OK(__vki_UnlockSurfNode(devCtx, &dvm->node));
+            }
 
-        if (dvm->node.pool != gcvPOOL_UNKNOWN)
-        {
-            __VK_VERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->node));
+            if (dvm->node.pool != gcvPOOL_UNKNOWN)
+            {
+                __VK_VERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->node));
+            }
+            __vk_DestroyObject(devCtx, __VK_OBJECT_DEVICE_MEMORY, (__vkObject *)dvm);
         }
-        __vk_DestroyObject(devCtx, __VK_OBJECT_DEVICE_MEMORY, (__vkObject *)dvm);
     }
 
     return result;
@@ -1561,6 +1875,15 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeMemory(
         /* Set the allocator to the parent allocator or API defined allocator if valid */
         __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
 #endif
+
+#if (ANDROID_SDK_VERSION >= 26)
+        if (dvm->ahwBuffer)
+        {
+            __VK_releaseAHardwareBuffer(dvm->ahwBuffer);
+            dvm->ahwBuffer = VK_NULL_HANDLE;
+        }
+#endif
+
         __VK_VERIFY_OK(__vki_UnlockSurfNode(devCtx, &dvm->node));
         __VK_VERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->node));
 #if __VK_ENABLETS
@@ -2342,113 +2665,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyBufferView(
         __vk_DestroyObject(devCtx, __VK_OBJECT_BUFFER_VIEW, (__vkObject *)bfv);
     }
 }
-
-#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 24)
-#ifdef DRM_GRALLOC
-
-#include <gralloc_handle.h>
-
-/* VK_ANDROID_native_buffer. */
-static VkResult __BindAndroidNativeBufferMemory(
-    VkDevice device,
-    const VkNativeBufferANDROID* pNativeBuffer,
-    const VkAllocationCallbacks* pAllocator,
-    __vkImage* image
-    )
-{
-    __vkDevContext *devCtx = (__vkDevContext *)device;
-    VkResult result = VK_SUCCESS;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
-    VkMemoryAllocateInfo allocInfo;
-    __VkMemoryImportInfo importInfo;
-    native_handle_t * handle = (native_handle_t*)pNativeBuffer->handle;
-    int err, fd;
-
-    err = gralloc_handle_validate(handle);
-    if (err)
-    {
-        /* Invalid handle. */
-        ALOGE("%s(%d): invalid buffer=%p", __func__, __LINE__, pNativeBuffer);
-        return VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR;
-    }
-
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    fd = (handle && handle->numFds) ? (int)handle->data[0] : -1;
-    if (fd < 0)
-    {
-        ALOGE("%s(%d): invalid fd=%d", __func__, __LINE__, fd);
-        return VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR;
-    }
-
-    allocInfo = (VkMemoryAllocateInfo) {
-        .sType              = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .pNext              = NULL,
-        .allocationSize     = 0,
-        .memoryTypeIndex    = 0,
-    };
-
-    importInfo = (__VkMemoryImportInfo) {
-        .type              = __VK_MEMORY_IMPORT_TYPE_LINUX_DMA_BUF,
-        .u.dmaBuf.dmaBufFd = fd,
-    };
-
-    __VK_ONERROR(__vk_ImportMemory(device, &allocInfo, &importInfo, pAllocator, &memory));
-
-    image->memory    = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory*, memory);
-    image->memOffset = 0;
-    image->residentMemory = VK_TRUE;
-
-OnError:
-    return result;
-}
-
-#else
-
-#include <gc_gralloc_priv.h>
-
-/* VK_ANDROID_native_buffer. */
-static VkResult __BindAndroidNativeBufferMemory(
-    VkDevice device,
-    const VkNativeBufferANDROID* pNativeBuffer,
-    const VkAllocationCallbacks* pAllocator,
-    __vkImage* image
-    )
-{
-    __vkDevContext *devCtx = (__vkDevContext *)device;
-    VkResult result = VK_SUCCESS;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
-    VkMemoryAllocateInfo allocInfo;
-    __VkMemoryImportInfo importInfo;
-    gc_native_handle_t*  handle;
-
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    handle = gc_native_handle_get(pNativeBuffer->handle);
-
-    allocInfo = (VkMemoryAllocateInfo) {
-        .sType              = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .pNext              = NULL,
-        .allocationSize     = handle->nodeSize,
-        .memoryTypeIndex    = 0,
-    };
-
-    importInfo = (__VkMemoryImportInfo) {
-        .type               = __VK_MEMORY_IMPORT_TYPE_VIDEO_NODE,
-        .u.videoMemNode.nodeName           = handle->node,
-        .u.videoMemNode.nodePool           = handle->nodePool,
-    };
-
-    __VK_ONERROR(__vk_ImportMemory(device, &allocInfo, &importInfo, pAllocator, &memory));
-
-    image->memory    = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory*, memory);
-    image->memOffset = 0;
-    image->residentMemory = VK_TRUE;
-
-
-OnError:
-    return result;
-}
-#endif
-#endif
 
 VkResult __vkCreateShadowImage(
     VkDevice device,
