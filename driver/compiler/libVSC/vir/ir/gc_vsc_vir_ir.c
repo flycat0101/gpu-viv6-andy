@@ -18750,7 +18750,19 @@ VIR_Shader_GenInvocationIndex(
     if (bUpdateSlot)
     {
         VIR_Symbol  *pVregSym = VIR_Shader_FindSymbolByTempIndex(Shader, VIR_Symbol_GetVariableVregIndex(VariableSym));
+        VIR_SymId  newSymId;
         IndexSymId = VIR_Symbol_GetIndex(pVregSym);
+        /* original pVregSym will be used as a temp variable while VariableSym "gl_LocalInvocationIndex" will be tagged with UNUSED
+         * create a temp for invocation index for VariableSym */
+        regId = VIR_Shader_NewVirRegId(Shader, 1);
+        errCode = VIR_Shader_AddSymbol(Shader,
+                    VIR_SYM_VIRREG,
+                    regId,
+                    VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_UINT32),
+                    VIR_STORAGE_UNKNOWN,
+                    &newSymId);
+        VIR_Symbol_SetVariableVregIndex(VariableSym, regId);
+        VIR_Symbol_SetVregVarSymId(pVregSym, VIR_INVALID_ID); /* VregSym is no attribute anymore */
     }
     else
     {
