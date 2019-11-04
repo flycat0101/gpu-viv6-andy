@@ -24,7 +24,7 @@ BEGIN_EXTERN_C()
 
 #define VIR_RS_LS_MEM_BLK_SIZE      2048
 
-#define VIR_RA_LS_POS_MAX           (2048*5)
+#define VIR_RA_LS_POS_MAX           (2048*6)
 #define VIR_RA_LS_POS_MIN           0
 
 #define VIR_RA_LS_REG_MAX           0xFFFFFFFF
