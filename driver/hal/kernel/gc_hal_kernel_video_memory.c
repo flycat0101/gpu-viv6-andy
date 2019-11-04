@@ -1868,6 +1868,7 @@ gckVIDMEM_Free(
             gckKERNEL_UnmapVideoMemory(
                 Kernel,
                 Node->VidMem.pool,
+                Node->VidMem.physical,
                 Node->VidMem.logical,
                 Node->VidMem.processID,
                 Node->VidMem.bytes
