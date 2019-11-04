@@ -3788,6 +3788,13 @@ gckKERNEL_AttachProcessEx(
                                             gcvBROADCAST_LAST_PROCESS));
             }
         }
+
+        if (Kernel->timeoutPID == PID)
+        {
+            Kernel->timeOut = Kernel->hardware->type == gcvHARDWARE_2D
+                            ? gcdGPU_2D_TIMEOUT
+                            : gcdGPU_TIMEOUT;
+        }
     }
 
     /* Success. */
@@ -5417,6 +5424,10 @@ gckDEVICE_SetTimeOut(
     gctUINT i;
     gceHARDWARE_TYPE type = Interface->hardwareType;
     gcsCORE_LIST *coreList;
+    gctUINT32 processID = 0;
+
+    /* Get the current process ID. */
+    gckOS_GetProcessID(&processID);
 
     coreList = &Device->map[type];
 
@@ -5425,6 +5436,8 @@ gckDEVICE_SetTimeOut(
         kernel = coreList->kernels[i];
 
         kernel->timeOut = Interface->u.SetTimeOut.timeOut;
+
+        kernel->timeoutPID = processID;
     }
 #endif
 
