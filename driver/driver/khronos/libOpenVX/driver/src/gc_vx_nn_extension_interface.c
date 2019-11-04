@@ -10672,14 +10672,15 @@ vx_status vxnneExecuteSWBatchNormalization(struct _vxnne_operation_s *operation)
 
     for(b = 0; b < batch; ++b)
     {
-        meanf     = vxnneGetDataExt(meanFormat, TENSOR_QUANT_TYPE(means), b, meanLogic, TENSOR_POS(means), TENSOR_TF_ZEROPOINT(means), TENSOR_TF_SCALE(means));
-        variancef = vxnneGetDataExt(varianceFormat, TENSOR_QUANT_TYPE(variances), b, varianceLogic, TENSOR_POS(variances), TENSOR_TF_ZEROPOINT(variances), TENSOR_TF_SCALE(variances));
-        gammaf    = vxnneGetDataExt(gammaFormat, TENSOR_QUANT_TYPE(gamma), b, gammaLogic, TENSOR_POS(gamma), TENSOR_TF_ZEROPOINT(gamma), TENSOR_TF_SCALE(gamma));
-        betaf     = vxnneGetDataExt(betaFormat, TENSOR_QUANT_TYPE(beta), b, betaLogic, TENSOR_POS(beta), TENSOR_TF_ZEROPOINT(beta), TENSOR_TF_SCALE(beta));
         for(c = 0; c < channel; c ++)
         {
+            meanf     = vxnneGetDataExt(meanFormat, TENSOR_QUANT_TYPE(means), c, meanLogic, TENSOR_POS(means), TENSOR_TF_ZEROPOINT(means), TENSOR_TF_SCALE(means));
+            variancef = vxnneGetDataExt(varianceFormat, TENSOR_QUANT_TYPE(variances), c, varianceLogic, TENSOR_POS(variances), TENSOR_TF_ZEROPOINT(variances), TENSOR_TF_SCALE(variances));
+            gammaf    = vxnneGetDataExt(gammaFormat, TENSOR_QUANT_TYPE(gamma), c, gammaLogic, TENSOR_POS(gamma), TENSOR_TF_ZEROPOINT(gamma), TENSOR_TF_SCALE(gamma));
+            betaf     = vxnneGetDataExt(betaFormat, TENSOR_QUANT_TYPE(beta), c, betaLogic, TENSOR_POS(beta), TENSOR_TF_ZEROPOINT(beta), TENSOR_TF_SCALE(beta));
             for(i = 0; i < spatial; i ++)
             {
+
                 index       = b * channel * spatial + c * spatial + i;
                 inputf  = vxnneGetDataExt(inFormat, TENSOR_QUANT_TYPE(input), index, inputLogic, TENSOR_POS(input), TENSOR_TF_ZEROPOINT(input), TENSOR_TF_SCALE(input));
                 /* Compute Normalize */
