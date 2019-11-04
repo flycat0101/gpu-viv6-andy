@@ -8,8 +8,8 @@ _viv_uniform VXC_512Bits UniFp16MulHi_dp4x4;
 _viv_uniform VXC_512Bits PackLo16bitF32toF16_dp2x8;
 __kernel void vxcL2NormScale_SumRsqrt
     (
-    image2d_array_t input,
-    image2d_array_t output
+    __read_only  image2d_array_t input,
+    __write_only image2d_t output
     )
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), 0);
@@ -38,9 +38,9 @@ __kernel void vxcL2NormScale_SumRsqrt
     }
     sum_lo = rsqrt(sum_lo);
     sum_hi = rsqrt(sum_hi);
-    write_imagef(output, coord.zwww, sum_lo);
+    write_imagef(output, coord.zw, sum_lo);
     coord.z += 4;
-    write_imagef(output, coord.zwww, sum_hi);
+    write_imagef(output, coord.zw, sum_hi);
 }
 //int8 version
 _viv_uniform float r_inputScale;
@@ -50,8 +50,8 @@ _viv_uniform VXC_512Bits uniDataSquareAddU32Lo_4x4;
 _viv_uniform VXC_512Bits uniDataSquareAddU32Hi_4x4;
 __kernel void vxcL2NormScale_SumRsqrt_int8
     (
-    image2d_array_t input,
-    image2d_array_t output
+    __read_only  image2d_array_t input,
+    __write_only image2d_t output
     )
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), 0);
@@ -72,14 +72,14 @@ __kernel void vxcL2NormScale_SumRsqrt_int8
     sum_hi = convert_float4(dst1);
     sum_lo = rsqrt(sum_lo) * r_inputScale;
     sum_hi = rsqrt(sum_hi) * r_inputScale;
-    write_imagef(output, coord.zwww, sum_lo);
+    write_imagef(output, coord.zw, sum_lo);
     coord.z += 4;
-    write_imagef(output, coord.zwww, sum_hi);
+    write_imagef(output, coord.zw, sum_hi);
 }
 __kernel void vxcL2NormScale_SumRsqrt_int16
     (
-    image2d_array_t input,
-    image2d_array_t output
+    __read_only  image2d_array_t input,
+    __write_only image2d_t output
     )
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), 0);
@@ -101,17 +101,17 @@ __kernel void vxcL2NormScale_SumRsqrt_int16
     }
     sum_lo = rsqrt(sum_lo) * r_inputScale;
     sum_hi = rsqrt(sum_hi) * r_inputScale;
-    write_imagef(output, coord.zwww, sum_lo);
+    write_imagef(output, coord.zw, sum_lo);
     coord.z += 4;
-    write_imagef(output, coord.zwww, sum_hi);
+    write_imagef(output, coord.zw, sum_hi);
 }
 _viv_uniform VXC_512Bits uniUInt8SquareLo_4x4;
 _viv_uniform VXC_512Bits uniUInt8SquareHi_4x4;
 _viv_uniform int inputZP;
 __kernel void vxcL2NormScale_SumRsqrt_uint8
     (
-    image2d_array_t input,
-    image2d_array_t output
+    __read_only  image2d_array_t input,
+    __write_only image2d_t output
     )
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), 0);
@@ -135,7 +135,51 @@ __kernel void vxcL2NormScale_SumRsqrt_uint8
     }
     sum_lo = rsqrt(sum_lo) * r_inputScale;
     sum_hi = rsqrt(sum_hi) * r_inputScale;
-    write_imagef(output, coord.zwww, sum_lo);
+    write_imagef(output, coord.zw, sum_lo);
     coord.z += 4;
-    write_imagef(output, coord.zwww, sum_hi);
+    write_imagef(output, coord.zw, sum_hi);
+}
+
+_viv_uniform VXC_512Bits uniConvBF16toF32_Part0_2x8;
+_viv_uniform VXC_512Bits uniConvBF16toF32_Part1_2x8;
+__kernel void vxcL2NormScale_SumRsqrt_BF16
+    (
+    __read_only  image2d_array_t input,
+    __write_only image2d_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(0), 0);
+    vxc_ushort8 src0, src1, src2;
+    vxc_float4 squr, sum_lo = 0, sum_hi = 0;
+
+    for(int i = 0; i < L2NorS_depth; i += 2)
+    {
+        VXC_ReadImage(src0, input, coord.xy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(src1, input, coord.xy, VXC_5BITOFFSET_XY(0, 1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        coord.y += 2;
+
+        vxc_float4 vectA, vectB;
+        vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0);
+        VXC_DP2x8(src2, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8);
+        _viv_asm(COPY, vectA, src2, 16);
+        VXC_DP2x8(src0, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8);
+        _viv_asm(COPY, vectB, src0, 16);
+
+        sum_lo = vectA * vectA + sum_lo;
+        sum_hi = vectB * vectB + sum_hi;
+
+        VXC_DP2x8(src0, src1, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8);
+        _viv_asm(COPY, vectA, src0, 16);
+        VXC_DP2x8(src1, src1, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8);
+        _viv_asm(COPY, vectB, src1, 16);
+
+        sum_lo = vectA * vectA + sum_lo;
+        sum_hi = vectB * vectB + sum_hi;
+    }
+
+    sum_lo = rsqrt(sum_lo);
+    sum_hi = rsqrt(sum_hi);
+    write_imagef(output, coord.zw, sum_lo);
+    coord.z += 4;
+    write_imagef(output, coord.zw, sum_hi);
 }

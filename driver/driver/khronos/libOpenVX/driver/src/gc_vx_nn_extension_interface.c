@@ -4735,8 +4735,10 @@ VX_PRIVATE_API vx_status vxnneConvolutionReluPoolingInitializer(
             vx_bool        padMode_flag            = (vx_bool)(padMode == VX_PAD_CONSTANT || padMode == VX_PAD_REPLICATE || (pad_x_left == 0 && pad_x_right == 0 && pad_y_top == 0 && pad_y_bottom == 0));
 
             shExe_flag    = (vx_bool)(((_IsSameType(inputs, reshuffleTensor) && stride_x == 2 && stride_y == 2)
-                                    ||(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && stride_x == 4 && stride_y == 4)
-                                    ||(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && stride_x == 3 && stride_y == 3))
+                                    || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && stride_x == 4 && stride_y == 4)
+                                    || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16 && stride_x == 4 && stride_y == 4)
+                                    || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && stride_x == 3 && stride_y == 3)
+                                    || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16 && stride_x == 3 && stride_y == 3))
                                     && (kx != 1 || ky != 1));
             if(shExe_flag && padMode_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
             {
@@ -5905,8 +5907,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_Initializer(vx_node node, c
 
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_tensor  outputs                    = (vx_tensor)parameters[1];
-    vx_enum    inputFormat                = TENSOR_DATA_TYPE(inputs);
-    vx_enum    outputFormat               = TENSOR_DATA_TYPE(outputs);
+    vx_enum    srcFormat                  = TENSOR_DATA_TYPE(inputs);
+    vx_enum    dstFormat                  = TENSOR_DATA_TYPE(outputs);
     vx_uint32  dims                       = TENSOR_DIM_NUM(inputs);
     vx_uint32  width                      = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
     vx_uint32  height                     = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
@@ -5964,15 +5966,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_Initializer(vx_node node, c
 
     if(node->base.context->evisNoInst.supportEVIS)
     {
-        enable_float32 = (vx_bool)(outputFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
-        enable_format = (((inputFormat == VX_TYPE_INT8 ||  inputFormat == VX_TYPE_FLOAT16) && (outputFormat == VX_TYPE_FLOAT16 || enable_float32)) || (inputFormat == VX_TYPE_INT16 && (outputFormat == VX_TYPE_INT16 || outputFormat == VX_TYPE_FLOAT16))
-                         || (inputFormat == VX_TYPE_INT8 &&  outputFormat == VX_TYPE_INT8));
-        enable_tf_quantize = ((inputFormat == VX_TYPE_UINT8) && (outputFormat == VX_TYPE_FLOAT16 || enable_float32 || outputFormat == VX_TYPE_UINT8));
+        enable_float32 = (vx_bool)(dstFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
+        enable_format = (((srcFormat == VX_TYPE_INT8 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32))
+                         || ((srcFormat == VX_TYPE_BFLOAT16) && (dstFormat == VX_TYPE_BFLOAT16 || dstFormat == VX_TYPE_FLOAT16 || enable_float32))
+                         || (srcFormat == VX_TYPE_INT16 && (dstFormat == VX_TYPE_INT16 || dstFormat == VX_TYPE_FLOAT16))
+                         || (srcFormat == VX_TYPE_INT8 &&  dstFormat == VX_TYPE_INT8));
+        enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32 || dstFormat == VX_TYPE_UINT8));
     }
     else
     {
-        enable_format = ((inputFormat == VX_TYPE_FLOAT32 ||  inputFormat == VX_TYPE_FLOAT16) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32));
-        enable_tf_quantize = ((inputFormat == VX_TYPE_UINT8) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32 || outputFormat == VX_TYPE_UINT8));
+        enable_format = ((srcFormat == VX_TYPE_FLOAT32 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || dstFormat == VX_TYPE_FLOAT32));
+        enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || dstFormat == VX_TYPE_FLOAT32 || dstFormat == VX_TYPE_UINT8));
     }
     /* Current the SH layer only process 3D tensor*/
     useShadeExe  = (enable_format || enable_tf_quantize);
@@ -6080,12 +6084,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcat2Layer_ValidateOutput(vx_node no
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcat2Layer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
-    vx_status  status                     = VX_SUCCESS;
-
-    vx_tensor  in0                     = (vx_tensor)parameters[0];
-    vx_tensor  in1                     = (vx_tensor)parameters[1];
-    vx_tensor  out                     = (vx_tensor)parameters[2];
-    vx_uint32 batchCount               = TENSOR_SIZE_INDEX(in0, 3);
+    vx_status  status                  = VX_SUCCESS;
+    vx_tensor  inputs[2]               = { (vx_tensor)parameters[0], (vx_tensor)parameters[1]};
+    vx_tensor  output_s                = (vx_tensor)parameters[2];
+    vx_uint32  batchCount              = TENSOR_SIZE_INDEX(inputs[0], 3);
+    vx_bool    enable_SHExe            = vx_false_e;
+    vx_uint32  opIdx                   = 0;
+    vx_uint32  operationIndex          = 0;
+    vx_uint32  tmpTensorIndex          = 0;
+    vxnne_concat2_layer  concatLayer = VX_NULL;
 
     /* destroy the existing layer */
     if (node->layer)
@@ -6094,48 +6101,147 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcat2Layer_Initializer(vx_node node,
         node->layer = VX_NULL;
     }
 
+    if(node->base.context->evisNoInst.supportEVIS)
     {
-        vxnne_concat2_layer  concatLayer = VX_NULL;
+        enable_SHExe = (vx_bool)(TENSOR_DATA_TYPE(output_s) != VX_TYPE_FLOAT32);
 
-        gcoOS_Allocate(gcvNULL, sizeof(vxnne_concat2_layer_s), (gctPOINTER*)&concatLayer);
-        if (!concatLayer)
-        {
-            status = VX_ERROR_NO_MEMORY;
-            vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
-            goto exit;
-        }
-
-        gcoOS_ZeroMemory(concatLayer, sizeof(vxnne_concat2_layer_s));
-
-        vxnneLayer_Initialize(&concatLayer->base,
-                              "ConcatLayer",
-                              node,
-                              vxmOPERATION_COUNT(concatLayer),
-                              concatLayer->operations,
-                              VX_NULL);
-
-        vxnneOperation_Initialize(&concatLayer->concat2_operation.base,
-                                  &concatLayer->base,
-                                  VXNNE_OPERATION_TARGET_SW,
-                                  VXNNE_OPERATOR_CONCAT2,
-                                  vxnneExecuteSWConcat2,
-                                  VX_NULL,
-                                  batchCount,
-                                  0);
-
-        vxnneLayer_SetOperation(&concatLayer->base, &concatLayer->concat2_operation.base, 0);
-        concatLayer->concat2_operation.inputs0           = in0;
-        concatLayer->concat2_operation.inputs1           = in1;
-        concatLayer->concat2_operation.outputs           = out;
-
-        vxnneOperation_AddReference(&concatLayer->concat2_operation.base, (vx_reference)in0, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&concatLayer->concat2_operation.base, (vx_reference)in1, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&concatLayer->concat2_operation.base, (vx_reference)out, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-
-        node->layer = &concatLayer->base;
+        enable_SHExe = (vx_bool)(TENSOR_DATA_TYPE(inputs[0]) != VX_TYPE_FLOAT32 && enable_SHExe);
+        enable_SHExe = (vx_bool)(TENSOR_DATA_TYPE(inputs[1]) != VX_TYPE_FLOAT32 && enable_SHExe);
     }
 
-exit:
+    gcoOS_Allocate(gcvNULL, sizeof(vxnne_concat2_layer_s), (gctPOINTER*)&concatLayer);
+    if (!concatLayer)
+    {
+        status = VX_ERROR_NO_MEMORY;
+        vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+        goto OnError;
+    }
+
+    gcoOS_ZeroMemory(concatLayer, sizeof(vxnne_concat2_layer_s));
+
+    vxnneLayer_Initialize(&concatLayer->base,
+        "ConcatLayer",
+        node,
+        vxmOPERATION_COUNT(concatLayer),
+        concatLayer->operations,
+        VX_NULL);
+
+    if (enable_SHExe)
+    {
+        vxnne_shader_executable shaderExecutable = VX_NULL;
+        vx_uint32 i          = 0;
+        vx_uint32 w         = TENSOR_VIEW_SIZE_INDEX(output_s, 0);
+        vx_uint32 h         = TENSOR_VIEW_SIZE_INDEX(output_s, 1);
+        vx_uint32 c         = TENSOR_VIEW_SIZE_INDEX(output_s, 2);
+        vx_uint32 n         = TENSOR_VIEW_SIZE_INDEX(output_s, 3);
+        vx_uint32 sizes[4]  = {w, h, c, n};
+        vx_uint32 start[4]  = {0, 0, 0, 0};
+        vx_uint32 end[4]    = {0, 0, 0, 0};
+
+        if (1)
+        {
+            vx_uint32 dimCount = TENSOR_DIM_NUM(inputs[0]);
+            vx_uint32 axis = dimCount - 1;
+
+            for (i = 0; i < axis; i ++)
+            {
+                end[i] = sizes[i];
+            }
+            for (i = 0; i < 2; i ++)
+            {
+                vx_tensor input = (vx_tensor)inputs[i];
+                vx_tensor_view  tensor_view  = NULL;
+                vx_tensor       subtensor    = NULL;
+                vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+                vx_uint32  reshpTensor_Dims           = 2;
+                vx_tensor input_rs      = NULL;
+                vx_tensor output_rs     = NULL;
+
+                vxoElementOptimization_GetTensorShape(input, reshpTensor_Sizes, &reshpTensor_Dims);
+
+                batchCount     = TENSOR_VIEW_DIM_NUM(input) > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+
+                start[axis]    = end[axis];
+                end[axis]      += TENSOR_VIEW_SIZE_INDEX(input, axis);
+
+                tensor_view = vxCreateTensorView(node->base.context, start, end, (vx_uint8)dimCount);
+                if (tensor_view == NULL)
+                {
+                    vxError("vxCreateTensorView failure! at line %d\n", __LINE__);
+                    vxmONERROR(VX_ERROR_NO_MEMORY);
+                }
+
+                subtensor           = vxoTensor_CreateTensorFromView(output_s, tensor_view);
+
+                input_rs  = vxoTensor_ReshapeTensor(input, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+                output_rs = vxoTensor_ReshapeTensor(subtensor, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+                concatLayer->base.temp_tensors[tmpTensorIndex++] = input_rs;
+                concatLayer->base.temp_tensors[tmpTensorIndex++] = output_rs;
+
+                if(node->base.context->evisNoInst.supportEVIS)
+                {
+                    shaderExecutable    = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input_rs, output_rs);
+                }
+                else
+                {
+                    shaderExecutable    = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input_rs, output_rs);
+                }
+
+                if (!shaderExecutable)
+                {
+                    vxmONERROR(VX_FAILURE);
+                }
+
+                vxmONERROR(vxnneShaderOperation_Initialize(&concatLayer->concat_sh_unit_operation[operationIndex],
+                    &concatLayer->base,
+                    VXNNE_OPERATOR_TENSOR_COPY,
+                    batchCount,
+                    shaderExecutable));
+
+                vxnneOperation_AddReference(&concatLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)input_rs, VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&concatLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)output_rs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+                vxnneLayer_SetOperation(
+                    &concatLayer->base,
+                    &concatLayer->concat_sh_unit_operation[operationIndex].base,
+                    opIdx++);
+                operationIndex ++;
+
+                concatLayer->base.temp_tensors[tmpTensorIndex++] = subtensor;
+                if (tensor_view) vxReleaseTensorView(&tensor_view);
+            }
+
+        }
+
+        concatLayer->base.num_temp_tensors = tmpTensorIndex;
+    }
+    else
+    {
+        vxnneOperation_Initialize(&concatLayer->concat2_operation.base,
+            &concatLayer->base,
+            VXNNE_OPERATION_TARGET_SW,
+            VXNNE_OPERATOR_CONCAT2,
+            vxnneExecuteSWConcat2,
+            VX_NULL,
+            batchCount,
+            0);
+
+        vxnneLayer_SetOperation(&concatLayer->base, &concatLayer->concat2_operation.base, 0);
+        concatLayer->concat2_operation.inputs0           = inputs[0];
+        concatLayer->concat2_operation.inputs1           = inputs[1];
+        concatLayer->concat2_operation.outputs           = output_s;
+
+        vxnneOperation_AddReference(&concatLayer->concat2_operation.base, (vx_reference)inputs[0], VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&concatLayer->concat2_operation.base, (vx_reference)inputs[1], VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&concatLayer->concat2_operation.base, (vx_reference)output_s, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
+
+    node->layer = &concatLayer->base;
+    return status;
+OnError:
+    if(concatLayer)
+        gcoOS_Free(gcvNULL, (gctPOINTER)concatLayer);
+
     return status;
 
 }
@@ -6236,6 +6342,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
                                  || (inputFormat == VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
+                                 || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
                                  || enable_dataConv2F32)
                                  && src_elementCount == dst_elementCount);
         }
@@ -6245,6 +6352,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
 
             shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
                                  || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                                 || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
+                                 || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32)
+                                 || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_UINT8)
+                                 || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT32)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16))
@@ -6650,6 +6761,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReduceSum_Initializer(vx_node no
     }
 
     shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+        || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
         || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)
         || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8)
         || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
@@ -7872,7 +7984,8 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
     dataformat_flag[4] = (vx_bool)(inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32);
     dataformat_flag[5] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16);
-    isuint8_flag       = (vx_bool)(acrossmap_flag && (dataformat_flag[2] || dataformat_flag[5]));
+    isuint8_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[5])
+                                    || dataformat_flag[2]);
     generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3])
                                     ||(acrossmap_flag && dataformat_flag[5]));
     norm_shader_flag   = (vx_bool)((sammap_flag && norm_config[0] && dataformat_flag[0])
@@ -8117,7 +8230,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_Initializer(vx_node node, 
     vx_enum    output_format              = TENSOR_DATA_TYPE(outputs);
     vx_bool    sammap_flag                = vx_false_e;
     vx_bool    acrossmap_flag             = vx_false_e;
-    vx_bool    dataformat_flag[6]         = {vx_false_e};
+    vx_bool    dataformat_flag[7]         = {vx_false_e};
     vx_bool    norm_config[3]             = {vx_false_e};
     vx_bool    generic_flag               = vx_false_e;
     vx_bool    isuint8_flag               = vx_false_e;
@@ -8164,12 +8277,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_Initializer(vx_node node, 
     dataformat_flag[3] = (vx_bool)(input_format == VX_TYPE_FLOAT16 && output_format == VX_TYPE_FLOAT16);
     dataformat_flag[4] = (vx_bool)(input_format == VX_TYPE_FLOAT32 && output_format == VX_TYPE_FLOAT32);
     dataformat_flag[5] = (vx_bool)(input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_FLOAT16);
+    dataformat_flag[6] = (vx_bool)(input_format == VX_TYPE_BFLOAT16 && output_format == VX_TYPE_BFLOAT16);
     isuint8_flag       = (vx_bool)((acrossmap_flag && norm_config[0] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[2])
-        || (acrossmap_flag && norm_config[2] && dataformat_flag[2]));
+        || (acrossmap_flag && norm_config[2] && dataformat_flag[2])
+        || dataformat_flag[2]);
     generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3])
                                     || (dataformat_flag[1])
-                                    || (acrossmap_flag && dataformat_flag[5]));
+                                    || (acrossmap_flag && dataformat_flag[5])
+                                    || (dataformat_flag[6]));
     norm_shader_flag   = (vx_bool)((sammap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[0])
@@ -8260,7 +8376,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Initializer(vx_node 
     vx_enum    output_format              = TENSOR_DATA_TYPE(outputs);
     vx_bool    sammap_flag                = vx_false_e;
     vx_bool    acrossmap_flag             = vx_false_e;
-    vx_bool    dataformat_flag[6]         = {vx_false_e};
+    vx_bool    dataformat_flag[7]         = {vx_false_e};
     vx_bool    norm_config[3]             = {vx_false_e};
     vx_bool    generic_flag               = vx_false_e;
     vx_bool    isuint8_flag               = vx_false_e;
@@ -8307,12 +8423,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Initializer(vx_node 
     dataformat_flag[3] = (vx_bool)(input_format == VX_TYPE_FLOAT16 && output_format == VX_TYPE_FLOAT16);
     dataformat_flag[4] = (vx_bool)(input_format == VX_TYPE_FLOAT32 && output_format == VX_TYPE_FLOAT32);
     dataformat_flag[5] = (vx_bool)(input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_FLOAT16);
+    dataformat_flag[6] = (vx_bool)(input_format == VX_TYPE_BFLOAT16 && output_format == VX_TYPE_BFLOAT16);
     isuint8_flag       = (vx_bool)((acrossmap_flag && norm_config[0] && dataformat_flag[2])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[2])
-        || (acrossmap_flag && norm_config[2] && dataformat_flag[2]));
+        || (acrossmap_flag && norm_config[2] && dataformat_flag[2])
+        || dataformat_flag[2]);
     generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3])
                                     || (dataformat_flag[1])
-                                    || (acrossmap_flag && dataformat_flag[5]));
+                                    || (acrossmap_flag && dataformat_flag[5])
+                                    || (dataformat_flag[6]));
     norm_shader_flag   = (vx_bool)((sammap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[0] && dataformat_flag[0])
         || (acrossmap_flag && norm_config[1] && dataformat_flag[0])
@@ -8436,6 +8555,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
     vx_enum outputdata_format                = TENSOR_DATA_TYPE(outputs);
     vx_bool dataFormat_AvgPool_flag[6]       = {vx_false_e};
     vx_bool avgPool_flag                     = vx_false_e;
+    vx_bool avgPool_BF_flag                  = vx_false_e;
     vx_bool enable_tf_quantize               = vx_false_e;
     vx_bool enable_int16_sh                  = vx_false_e;
     vx_context context                       = vxGetContext((vx_reference)node);
@@ -8500,6 +8620,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
         dataFormat_AvgPool_flag[3] = (vx_bool)(inputdata_format == VX_TYPE_FLOAT16 && outputdata_format == VX_TYPE_FLOAT16);
         dataFormat_AvgPool_flag[4] = (vx_bool)(inputdata_format == VX_TYPE_INT16);
         dataFormat_AvgPool_flag[5] = (vx_bool)(inputdata_format == VX_TYPE_UINT8 );
+        avgPool_BF_flag            = (vx_bool)(inputdata_format == VX_TYPE_BFLOAT16 && outputdata_format == VX_TYPE_BFLOAT16);
     }
     else
     {
@@ -8529,7 +8650,8 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
         (poolTypeValue == VX_NN_POOLING_AVG) &&
         (stride == 1) &&
         (totalSize <= maxAllocateSize) &&
-        (avgPool_flag == vx_false_e))
+        (avgPool_flag == vx_false_e) &&
+        (avgPool_BF_flag == vx_false_e))
     {
         status = vxnneOperation_Initialize(&poolingLayer->pooling_nne_operation.base,
                                            &poolingLayer->base,
@@ -8886,7 +9008,8 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
             isTpSupportFormat &&
             vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_MAX_POOLING) &&
             (isStride1Support || isStride2Support || isPoolSizeSupport) &&
-            (poolSizeXValue <= 64))
+            (poolSizeXValue <= 64) &&
+            (avgPool_BF_flag == vx_false_e))
         {
             vx_op_param_s conv = {0};
 
@@ -8935,6 +9058,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
             vx_bool maxPool_flag               = vx_false_e;
             vx_bool enable_L2Pool_SH           = vx_false_e;
             vx_bool generic_flag               = vx_false_e;
+            vx_bool maxPool_BF_flag            = vx_false_e;
             vx_bool enable_outputALU           = checkOutputTensorDoAlu(inputs, outputs);
             vx_bool enable_downSampleSH        = (vx_bool)(stride == 2 && poolSizeXValue == 1 && poolSizeYValue == 1 && (!enable_outputALU));
             vx_bool enable_tf_avgPool          = (vx_bool)(pool_pad_x_left || pool_pad_x_right ||pool_pad_y_top || pool_pad_y_bottom);
@@ -8954,8 +9078,11 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                 dataformat_MaxPool_flag[3]         = (vx_bool)(inputdata_format == VX_TYPE_FLOAT16 && outputdata_format == VX_TYPE_FLOAT16);
                 dataformat_MaxPool_flag[4]         = (vx_bool)(inputdata_format == VX_TYPE_INT8 && outputdata_format == VX_TYPE_INT8);
                 dataformat_MaxPool_flag[5]         = (vx_bool)(inputdata_format == VX_TYPE_INT16 && outputdata_format == VX_TYPE_INT16);
-                enable_L2Pool_SH                   = (vx_bool)((inputdata_format == VX_TYPE_FLOAT16 || inputdata_format == VX_TYPE_UINT8) && (outputdata_format == VX_TYPE_FLOAT16 || outputdata_format == VX_TYPE_UINT8) && (poolTypeValue == VX_NN_POOLING_L2));
-
+                enable_L2Pool_SH                   = (vx_bool)(((inputdata_format == VX_TYPE_BFLOAT16 && outputdata_format == VX_TYPE_BFLOAT16)
+                                                            || ((inputdata_format == VX_TYPE_FLOAT16  || inputdata_format == VX_TYPE_UINT8)
+                                                            && (outputdata_format == VX_TYPE_FLOAT16  || outputdata_format == VX_TYPE_UINT8)))
+                                                            && (poolTypeValue == VX_NN_POOLING_L2));
+                maxPool_BF_flag                    = (vx_bool)(inputdata_format == VX_TYPE_BFLOAT16 && outputdata_format == VX_TYPE_BFLOAT16);
             }
             else
             {
@@ -8974,17 +9101,18 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                                                || (kernel_MaxPool_flag[3] && dataformat_MaxPool_flag[1])
                                                || ((kernel_MaxPool_flag[3] || kernel_MaxPool_flag[0]) && dataformat_MaxPool_flag[2])
                                                || (kernel_MaxPool_flag[4] && dataformat_MaxPool_flag[4])
-                                               || generic_flag)
+                                               || generic_flag || maxPool_BF_flag)
                                                && (poolTypeValue == VX_NN_POOLING_MAX));
 
             enable_downSampleSH = enable_downSampleSH && (poolTypeValue == VX_NN_POOLING_MAX || poolTypeValue == VX_NN_POOLING_AVG) && (pool_pad_x_left == 0 && pool_pad_y_top == 0);
 
-            enable_tf_avgPool  = enable_tf_avgPool && avgPool_flag && (poolTypeValue == VX_NN_POOLING_AVG_ANDROID);
+            enable_tf_avgPool  = enable_tf_avgPool && (avgPool_flag || avgPool_BF_flag) && (poolTypeValue == VX_NN_POOLING_AVG_ANDROID);
 
             /* tf pad avgpool, now only support fp16 to fp16 and u8 to u8*/
-            enable_tf_avgPool  = enable_tf_avgPool && (dataFormat_AvgPool_flag[1] || dataFormat_AvgPool_flag[3] || dataFormat_AvgPool_flag[5]);
+            enable_tf_avgPool  = enable_tf_avgPool && (dataFormat_AvgPool_flag[1] || dataFormat_AvgPool_flag[3] || dataFormat_AvgPool_flag[5] || avgPool_BF_flag);
 
-            if ((avgPool_flag || maxPool_flag || enable_L2Pool_SH || enable_downSampleSH) && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
+            if ((avgPool_flag || maxPool_flag || enable_L2Pool_SH || enable_downSampleSH || avgPool_BF_flag)
+               && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
             {
                 vxnne_shader_executable shaderExecutable = NULL;
                 vx_scalar stride_s = NULL;
@@ -9521,14 +9649,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
     vx_enum   outputFormat                = TENSOR_DATA_TYPE(outputs);
     vx_uint32 batchCount                  = (TENSOR_DIM_NUM(inputs) > 3) ? TENSOR_SIZE_INDEX(inputs, 3) : 1;
     vx_enum   func_v                      = func_s->value->e;
-    vx_bool   support_dataType[3]         = {vx_false_e, vx_false_e, vx_false_e};
+    vx_bool   support_dataType[4]         = {vx_false_e, vx_false_e, vx_false_e};
     vx_bool   enable_tf_quantize          = vx_false_e;
     vx_bool   shExe_flag                  = vx_false_e;
     vx_bool   enable_tensorABS_SHExe      = vx_false_e;
     vx_bool   enable_tensorTR_SHExe       = vx_false_e;
-    vx_uint32 input_width                 = TENSOR_SIZE_INDEX(inputs, 0);
-    vx_uint32 input_height                = TENSOR_SIZE_INDEX(inputs, 1);
-    vx_uint32 img2DSize                   = input_width * input_height;
+    vx_bool   enable_Leaky_SHExe          = vx_false_e;
     vxnne_activation_layer  activationLayer = gcvNULL;
 
     /* destroy the existing layer */
@@ -9561,8 +9687,20 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
         support_dataType[1] = (vx_bool)((inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8) || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16));
         support_dataType[2] = (vx_bool)((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
 
-        enable_tensorABS_SHExe = (vx_bool)(inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32 && func_v == VX_NN_ACTIVATION_ABS);
-        enable_tensorTR_SHExe  = (vx_bool)(inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32 &&
+        support_dataType[3] = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                                        || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8)
+                                        || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)
+                                        || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
+                                        || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
+                                        || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
+                                        || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
+                                        || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+                                        || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16)
+                                        || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                                        || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16));
+
+        enable_tensorABS_SHExe = (vx_bool)(support_dataType[3] && func_v == VX_NN_ACTIVATION_ABS);
+        enable_tensorTR_SHExe  = (vx_bool)(support_dataType[3] &&
                                            (func_v == VX_NN_ACTIVATION_SQRT  ||
                                             func_v == VX_NN_ACTIVATION_RSQRT ||
                                             /*func_v == VX_NN_ACTIVATION_EXP ||*/
@@ -9572,6 +9710,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
                                             func_v == VX_NN_ACTIVATION_LOGISTIC ||
                                             func_v == VX_NN_ACTIVATION_SQUARE ||
                                             func_v == VX_NN_ACTIVATION_HYPERBOLIC_TAN));
+
+        enable_Leaky_SHExe = (vx_bool)((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                                     || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
+                                     || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
+                                     || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
+                                     || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+                                     || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16)
+                                     || (inputFormat == VX_TYPE_FLOAT16 && outputFormat != VX_TYPE_FLOAT32));
     }
     else
     {
@@ -9590,6 +9736,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
                            (func_v == VX_NN_ACTIVATION_RELU6 && support_dataType[1]) ||
                            (func_v == VX_NN_ACTIVATION_LOGISTIC && (support_dataType[1] || support_dataType[2])) ||
                            (func_v == VX_NN_ACTIVATION_HYPERBOLIC_TAN && (support_dataType[1] || support_dataType[2])) ||
+                           (func_v == VX_NN_ACTIVATION_RSQRT && (support_dataType[1] || support_dataType[2])) ||
+                           (func_v == VX_NN_ACTIVATION_SQRT && (support_dataType[1] || support_dataType[2])) ||
+                           (func_v == VX_NN_ACTIVATION_ABS && (support_dataType[1] || support_dataType[2])) ||
                            enable_tensorABS_SHExe ||
                            enable_tensorTR_SHExe  ||
                            enable_tf_quantize);
@@ -9733,11 +9882,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
             &activationLayer->activation_SHoperation.base,
             0);
     }
-    else if(img2DSize < IMG_MAX_WIDTH && func_v == VX_NN_ACTIVATION_SOFTRELU && support_dataType[0] && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
+    else if(enable_Leaky_SHExe && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
         vxnne_shader_executable shaderExecutable = VX_NULL;
+        vx_float32 val = 0.1f;
+        vx_scalar negative_slopes = vxCreateScalar(context, VX_TYPE_FLOAT32, &val);
 
-        shaderExecutable = vxnneGetActivationSoftReluShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION_SOFTRELU, &node->kernelAttributes.borderMode, inputs, outputs);
+        if (negative_slopes != NULL)
+            shaderExecutable = vxnneGetLeakyReluShaderExecutable(node->base.context, VXNNE_KERNEL_NN_LEAKY, &node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
 
         if (!shaderExecutable)
         {
@@ -9746,20 +9898,22 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
         }
 
         status = vxnneShaderOperation_Initialize(&activationLayer->activation_SHoperation,
-            &activationLayer->base,
-            VXNNE_OPERATOR_ACTIVATION,
-            batchCount,
-            shaderExecutable);
+                                        &activationLayer->base,
+                                        VXNNE_OPERATOR_ACTIVATION,
+                                        batchCount,
+                                        shaderExecutable);
 
         if (status != VX_SUCCESS) goto exit;
+
+        vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
         vxnneLayer_SetOperation(
             &activationLayer->base,
             &activationLayer->activation_SHoperation.base,
             0);
 
-        vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+        if (negative_slopes) vxReleaseScalar(&negative_slopes);
     }
     else
     {
@@ -10434,7 +10588,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
                           batchnormLayer->operations,
                           vxnneLayer_Deinitialize);
 
-    shExe_flag = (vx_bool)((inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32));
+      shExe_flag = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
+                          || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
+                          || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+                          || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                          || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16));
 
     if (shExe_flag && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER))
     {
@@ -11786,12 +11950,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
                                         || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
                                         || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
                                         || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                                        || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
                                         || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)));
         }
         else
         {
             shExe_copy_flag &= (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
                                         || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                                        || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32)
+                                        || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
                                         || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT32)
                                         || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
                                         || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)));
@@ -15770,8 +15937,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
                     || (inputFormat == VX_TYPE_INT8  && weightFormat == VX_TYPE_INT8  && outputFormat == VX_TYPE_INT8)
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
-                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
-                    || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16));
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
             }
             enable_shader = (vx_bool)(convsize < IMG_MAX_WIDTH && support_type && has_pool == vx_false_e);
             enable_2dTensor = (vx_bool)(size < IMG_MAX_WIDTH && dilation_x == 1 && dilation_y == 1);
@@ -20076,7 +20242,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNL2NormalizeLayer_Initializer(vx_node n
 
     if(node->base.context->evisNoInst.supportEVIS)
     {
-        enableShader = (vx_bool)((inputFormat != VX_TYPE_FLOAT32) && (outputFormat != VX_TYPE_FLOAT32));
+        enableShader = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
+                          || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
+                          || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+                          || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                          || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16));
         enableShader  = enableShader && (width * height < IMG_MAX_WIDTH);
     }
     else
@@ -21722,16 +21898,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorRounding_Initializer(vx_node node,
 
     if(node->base.context->evisNoInst.supportEVIS)
     {
-        dataFormat_flag = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
-                                    (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8) ||
-                                    (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16) ||
-                                    (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8) ||
-                                    (inputFormat == VX_TYPE_INT8    && outputFormat == VX_TYPE_FLOAT16) ||
-                                    (inputFormat == VX_TYPE_INT16   && outputFormat == VX_TYPE_FLOAT16) ||
-                                    (inputFormat == VX_TYPE_UINT8   && outputFormat == VX_TYPE_FLOAT16) ||
-                                    (inputFormat == VX_TYPE_UINT8   && outputFormat == VX_TYPE_UINT8  ) ||
-                                    (inputFormat == VX_TYPE_INT8    && outputFormat == VX_TYPE_INT8   ) ||
-                                    (inputFormat == VX_TYPE_INT16   && outputFormat == VX_TYPE_INT16  ) );
+        dataFormat_flag = (vx_bool)((inputFormat == VX_TYPE_FLOAT16  && outputFormat == VX_TYPE_FLOAT16) ||
+                                    (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16) ||
+                                    (inputFormat == VX_TYPE_FLOAT16  && outputFormat == VX_TYPE_INT8) ||
+                                    (inputFormat == VX_TYPE_FLOAT16  && outputFormat == VX_TYPE_INT16) ||
+                                    (inputFormat == VX_TYPE_FLOAT16  && outputFormat == VX_TYPE_UINT8) ||
+                                    (inputFormat == VX_TYPE_INT8     && outputFormat == VX_TYPE_FLOAT16) ||
+                                    (inputFormat == VX_TYPE_INT16    && outputFormat == VX_TYPE_FLOAT16) ||
+                                    (inputFormat == VX_TYPE_UINT8    && outputFormat == VX_TYPE_FLOAT16) ||
+                                    (inputFormat == VX_TYPE_UINT8    && outputFormat == VX_TYPE_UINT8  ) ||
+                                    (inputFormat == VX_TYPE_INT8     && outputFormat == VX_TYPE_INT8   ) ||
+                                    (inputFormat == VX_TYPE_INT16    && outputFormat == VX_TYPE_INT16  ) );
     }
     else
     {
@@ -22457,7 +22634,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReshape_Initializer(vx_node node, const 
             || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
             || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
             || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
-            || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16))
+            || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
+            || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16))
             && src_elementCount == dst_elementCount);
     }
     else
@@ -22857,7 +23035,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorScale_Initializer(vx_node node, co
                                          ||(srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
                                          ||(srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_INT8)
                                          ||(srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
-                                         ||(srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8));
+                                         ||(srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+                                         ||(srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_BFLOAT16));
         enable_nearest_format   = (vx_bool)(!checkOutputTensorDoAlu(inputs, outputs)
                                         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
                                         || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
@@ -22866,6 +23045,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorScale_Initializer(vx_node node, co
         enable_tmp_format       = (vx_bool)((srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
                                          || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
                                          || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_INT8)
+                                         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_BFLOAT16)
                                          || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8));
     }
     else
@@ -23828,7 +24008,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer2_Initializer(vx_node node, 
     if(node->base.context->evisNoInst.supportEVIS)
     {
         enable_float32 = (vx_bool)(dstFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
-        enable_format = (((srcFormat == VX_TYPE_INT8 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32)) || (srcFormat == VX_TYPE_INT16 && (dstFormat == VX_TYPE_INT16 || dstFormat == VX_TYPE_FLOAT16))
+        enable_format = (((srcFormat == VX_TYPE_INT8 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32))
+                         || ((srcFormat == VX_TYPE_BFLOAT16) && (dstFormat == VX_TYPE_BFLOAT16 || dstFormat == VX_TYPE_FLOAT16 || enable_float32))
+                         || (srcFormat == VX_TYPE_INT16 && (dstFormat == VX_TYPE_INT16 || dstFormat == VX_TYPE_FLOAT16))
                          || (srcFormat == VX_TYPE_INT8 &&  dstFormat == VX_TYPE_INT8));
         enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32 || dstFormat == VX_TYPE_UINT8));
     }
@@ -25974,17 +26156,18 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
 
     if(context->evisNoInst.supportEVIS)
     {
-        shExe_flag = (vx_bool)((inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32 && resolved_dim_count == 2)
-                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1)
-                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16 && resolved_dim_count == 1)
-                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8 && resolved_dim_count == 1)
-                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 1)
-                           || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16 && resolved_dim_count == 1)
-                           || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1)
-                           || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && resolved_dim_count == 1)
-                           || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1)
-                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 1)
-                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1));
+        shExe_flag = (vx_bool)((inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32 && resolved_dim_count == 2 && resolved_dim[0] <= 3 && resolved_dim[1] <= 3)
+                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                           || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                           || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                           || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                           || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                           || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3));
     }
     else
     {
@@ -27245,6 +27428,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorSqueeze_Initializer(vx_node node
                             || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
                             || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
                             || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                            || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
                             || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16));
     }
     else

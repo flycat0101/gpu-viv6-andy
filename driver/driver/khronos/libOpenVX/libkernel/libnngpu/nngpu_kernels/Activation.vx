@@ -199,3 +199,98 @@ __kernel void gpuActivation_TanhQuant8 (
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
     write_imageui(output, coord, dst);
 }
+
+__kernel void gpuActivation_RSqrtFP32 (
+    __read_only image2d_array_t   input,
+    __write_only image2d_array_t  output)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    float4 tmp = {0.0}, dst = {0.0};
+
+    tmp = read_imagef(input, coord);
+    dst.x = rsqrt(tmp.x);
+    write_imagef(output, coord, dst);
+}
+
+__kernel void gpuActivation_RSqrtQuant8 (
+    __read_only image2d_array_t   input,
+    __write_only image2d_array_t  output,
+    float                         scaleIn,
+    float                         zpIn,
+    float                         scaleOut,
+    float                         zpOut)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    uint4 tmp = {0.0}, dst = {0.0};
+    float inPixel, outPixel;
+
+    tmp = read_imageui(input, coord);
+    inPixel = (convert_float(tmp.x) - zpIn) * scaleIn;
+    outPixel = rsqrt(inPixel);
+    dst.x = floor(outPixel*scaleOut + zpOut);
+    write_imageui(output, coord, dst);
+}
+
+__kernel void gpuActivation_SqrtFP32 (
+    __read_only image2d_array_t   input,
+    __write_only image2d_array_t  output)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    float4 tmp = {0.0}, dst = {0.0};
+
+    tmp = read_imagef(input, coord);
+    dst.x = sqrt(tmp.x);
+    write_imagef(output, coord, dst);
+}
+
+__kernel void gpuActivation_SqrtQuant8 (
+    __read_only image2d_array_t   input,
+    __write_only image2d_array_t  output,
+    float                         scaleIn,
+    float                         zpIn,
+    float                         scaleOut,
+    float                         zpOut)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    uint4 tmp = {0.0}, dst = {0.0};
+    float inPixel, outPixel;
+
+    tmp = read_imageui(input, coord);
+    inPixel = (convert_float(tmp.x) - zpIn) * scaleIn;
+    outPixel = sqrt(inPixel);
+    dst.x = floor(outPixel*scaleOut + zpOut);
+    write_imageui(output, coord, dst);
+}
+
+__kernel void gpuActivation_AbsFP32 (
+    __read_only image2d_array_t   input,
+    __write_only image2d_array_t  output)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    float4 tmp = {0.0}, dst = {0.0};
+
+    tmp = read_imagef(input, coord);
+    tmp.y = -tmp.x;
+    dst.x = tmp.x >= 0 ? tmp.x : tmp.y;
+    write_imagef(output, coord, dst);
+}
+
+__kernel void gpuActivation_AbsQuant8 (
+    __read_only image2d_array_t   input,
+    __write_only image2d_array_t  output,
+    float                         scaleIn,
+    float                         zpIn,
+    float                         scaleOut,
+    float                         zpOut)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    uint4 tmp = {0.0}, dst = {0.0};
+    float inPixel0, inPixel1, outPixel;
+
+    tmp = read_imageui(input, coord);
+    inPixel0 = (convert_float(tmp.x) - zpIn) * scaleIn;
+    inPixel1 = -inPixel0;
+    outPixel = inPixel0 > 0 ? inPixel0 : inPixel1;
+    dst.x = floor(outPixel*scaleOut + zpOut);
+    write_imageui(output, coord, dst);
+}

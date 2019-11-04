@@ -85,3 +85,53 @@ TENSOR_FLOOR_2D(I8, F16, half4, vxc_short8, vxc_char16, vxc_char16, CONV, 1, 0, 
 TENSOR_FLOOR_2D(U8, U8, uchar4, vxc_uchar8, vxc_uchar16, vxc_uchar16, CONV_SAT_RTE, inputScale, input_offset_asymmetric, outputScale, output_offset_asymmetric)
 TENSOR_FLOOR_2D(U8, F16, half4, vxc_short8, vxc_uchar16, vxc_uchar16, CONV, inputScale, input_offset_asymmetric, 1, 0)
 
+
+_viv_uniform VXC_512Bits uniConvBF16toF32_Part0_2x8;
+_viv_uniform VXC_512Bits uniConvBF16toF32_Part1_2x8;
+_viv_uniform VXC_512Bits uniExtractOddData_2x8;
+
+#define FLOOR_BF16_PROCESS(read_fun, write_fun) \
+    vxc_short8 read_data, vec0; \
+    vxc_float4 tmpVal1, tmpVal2; \
+    vxc_ushort8 dst0, dst1; \
+    vxc_ushort8 vect; \
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0); \
+    read_fun(read_data, input, coord, VXC_5BITOFFSET_XY(0,0), \
+    VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+    VXC_DP2x8(vec0, read_data, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+    _viv_asm(COPY, tmpVal1, vec0, 16); \
+    VXC_DP2x8(vec0, read_data, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8); \
+    _viv_asm(COPY, tmpVal2, vec0, 16); \
+    tmpVal1 = floor(tmpVal1); \
+    tmpVal2 = floor(tmpVal2); \
+    _viv_asm(COPY, dst0, tmpVal1, 16); \
+    _viv_asm(COPY, dst1, tmpVal2, 16); \
+    VXC_DP2x8(vect, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtractOddData_2x8); \
+    write_fun(output, coord, vect, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+__kernel void vxcFloor_BF16toBF16
+    (
+    image2d_array_t input,
+    int type,
+    image2d_array_t output
+    )
+{
+    int gidx = get_global_id(0);
+    int gidy = get_global_id(1);
+    int gidz = get_global_id(2);
+    int4 coord = (int4)(gidx, gidy, gidz, 0);
+    FLOOR_BF16_PROCESS(VXC_ReadImage2DArray, VXC_WriteImage2DArray);
+}
+
+__kernel void vxcFloor_BF16toBF16_2D
+    (
+    image2d_array_t input,
+    int type,
+    image2d_array_t output
+    )
+{
+    int gidx = get_global_id(0);
+    int gidy = get_global_id(1);
+    int2 coord = (int2)(gidx, gidy);
+    FLOOR_BF16_PROCESS(VXC_ReadImage, VXC_WriteImage);
+}

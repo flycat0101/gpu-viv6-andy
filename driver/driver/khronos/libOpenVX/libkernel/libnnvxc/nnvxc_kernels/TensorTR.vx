@@ -2,11 +2,14 @@
 
 #include "cl_viv_vx_ext.h"
 
+//#define VX_NN_SUPPORT_EXP_LOG_SIN_OP
+
 _viv_uniform float logE;
 _viv_uniform float twoLogE;
 _viv_uniform float rlogE;
 _viv_uniform float a_val;
 
+#ifdef VX_NN_SUPPORT_EXP_LOG_SIN_OP
 float4 exp_(float4 x)
 {
     x *= logE;
@@ -24,7 +27,7 @@ float4 sin_(float4 x)
 {
     return sin(x);
 }
-
+#endif
 float4 sigmoid_(float4 x)
 {
     x *= -logE;
@@ -104,6 +107,7 @@ _viv_uniform VXC_512Bits uniDatatoFp32Part1_4x4;
     _viv_asm(COPY, dst, dst2, 16); \
     VXC_WriteImage2DArray(output, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
 }
+#ifdef VX_NN_SUPPORT_EXP_LOG_SIN_OP
 //EXP
 TENSOR_TRANSCENDENTAL(exp, F16, F16, vxc_short8, vxc_half8,  half4, vxc_half8,  vxc_short8)
 TENSOR_TRANSCENDENTAL(exp, F16, I8,  vxc_short8, vxc_half8,  int4,  vxc_char8,  vxc_char8)
@@ -137,6 +141,7 @@ TENSOR_TRANSCENDENTAL(sin, U8,  U8,  vxc_uchar8, vxc_uchar8, int4,  vxc_uchar8, 
 TENSOR_TRANSCENDENTAL(sin, U8,  F16, vxc_uchar8, vxc_uchar8, half4, vxc_half8,  vxc_short8)
 TENSOR_TRANSCENDENTAL(sin, I16, I16, vxc_short8, vxc_short8, int4,  vxc_short8, vxc_short8)
 TENSOR_TRANSCENDENTAL(sin, I16, F16, vxc_short8, vxc_short8, half4, vxc_half8,  vxc_short8)
+#endif
 //SIGMOID
 TENSOR_TRANSCENDENTAL(sigmoid, F16, F16, vxc_short8, vxc_half8,  half4, vxc_half8,  vxc_short8)
 TENSOR_TRANSCENDENTAL(sigmoid, F16, I8,  vxc_short8, vxc_half8,  int4,  vxc_char8,  vxc_char8)
@@ -236,6 +241,7 @@ TENSOR_TRANSCENDENTAL(square, I16, F16, vxc_short8, vxc_short8, half4, vxc_half8
     _viv_asm(COPY, dst, dst2, 16); \
     VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
 }
+#ifdef VX_NN_SUPPORT_EXP_LOG_SIN_OP
 //EXP
 TENSOR_TRANSCENDENTAL_2D(exp, F16, F16, vxc_short8, vxc_half8, half4, vxc_half8,  vxc_short8)
 TENSOR_TRANSCENDENTAL_2D(exp, F16, I8,  vxc_short8, vxc_half8, int4,  vxc_char8,  vxc_char8)
@@ -269,6 +275,7 @@ TENSOR_TRANSCENDENTAL_2D(sin, U8,  U8,  vxc_uchar8, vxc_uchar8, int4,  vxc_uchar
 TENSOR_TRANSCENDENTAL_2D(sin, U8,  F16, vxc_uchar8, vxc_uchar8, half4, vxc_half8,  vxc_short8)
 TENSOR_TRANSCENDENTAL_2D(sin, I16, I16, vxc_short8, vxc_short8, int4,  vxc_short8, vxc_short8)
 TENSOR_TRANSCENDENTAL_2D(sin, I16, F16, vxc_short8, vxc_short8, half4, vxc_half8,  vxc_short8)
+#endif
 //SIGMOID
 TENSOR_TRANSCENDENTAL_2D(sigmoid, F16, F16, vxc_short8, vxc_half8,  half4, vxc_half8,  vxc_short8)
 TENSOR_TRANSCENDENTAL_2D(sigmoid, F16, I8,  vxc_short8, vxc_half8,  int4,  vxc_char8,  vxc_char8)
@@ -335,3 +342,104 @@ TENSOR_TRANSCENDENTAL_2D(square, U8,  U8,  vxc_uchar8, vxc_uchar8, int4,  vxc_uc
 TENSOR_TRANSCENDENTAL_2D(square, U8,  F16, vxc_uchar8, vxc_uchar8, half4, vxc_half8,  vxc_short8)
 TENSOR_TRANSCENDENTAL_2D(square, I16, I16, vxc_short8, vxc_short8, int4,  vxc_short8, vxc_short8)
 TENSOR_TRANSCENDENTAL_2D(square, I16, F16, vxc_short8, vxc_short8, half4, vxc_half8,  vxc_short8)
+
+_viv_uniform VXC_512Bits uniConvBF16toF32_Part0_2x8;
+_viv_uniform VXC_512Bits uniConvBF16toF32_Part1_2x8;
+_viv_uniform VXC_512Bits uniExtractOddData_2x8;
+#define TENSOR_TRANSCENDENTAL_BF16(funcName) \
+    __kernel void vxTensorTR_##funcName##_BF16toBF16( \
+    __read_only  image2d_array_t  input, \
+    __write_only image2d_array_t  output \
+    ) \
+{ \
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0); \
+    vxc_ushort8   src0, src1, dst; \
+    VXC_ReadImage2DArray(src0, input, coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+ \
+    float4 vecA; \
+    float4 vecB; \
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0); \
+    VXC_DP2x8(src1, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+    _viv_asm(COPY, vecA, src1, 16); \
+    VXC_DP2x8(src1, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8); \
+    _viv_asm(COPY, vecB, src1, 16); \
+    vecA = funcName##_(vecA); \
+    vecB = funcName##_(vecB); \
+ \
+    _viv_asm(COPY, src0, vecA, 16); \
+    _viv_asm(COPY, src1, vecB, 16); \
+ \
+    VXC_DP2x8(dst, src0, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtractOddData_2x8); \
+    VXC_WriteImage2DArray(output, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+}
+
+#ifdef VX_NN_SUPPORT_EXP_LOG_SIN_OP
+//EXP
+TENSOR_TRANSCENDENTAL_BF16(exp)
+//LOG
+TENSOR_TRANSCENDENTAL_BF16(log)
+//SIN
+TENSOR_TRANSCENDENTAL_BF16(sin)
+#endif
+//SIGMOID
+TENSOR_TRANSCENDENTAL_BF16(sigmoid)
+//SQRT
+TENSOR_TRANSCENDENTAL_BF16(sqrt)
+//RSQRT
+TENSOR_TRANSCENDENTAL_BF16(rsqrt)
+//TANH
+TENSOR_TRANSCENDENTAL_BF16(tanh)
+//SOFTRELU
+TENSOR_TRANSCENDENTAL_BF16(softRelu)
+//SQUARE
+TENSOR_TRANSCENDENTAL_BF16(square)
+
+#define TENSOR_TRANSCENDENTAL_BF16_2D(funcName) \
+    __kernel void vxTensorTR_##funcName##_BF16toBF16_2D( \
+    __read_only  image2d_array_t  input, \
+    __write_only image2d_array_t  output \
+    ) \
+{ \
+    int2 coord = (int2)(get_global_id(0), get_global_id(1)); \
+    vxc_ushort8   src0, src1, dst; \
+    VXC_ReadImage(src0, input, coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+ \
+    float4 vecA; \
+    float4 vecB; \
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0); \
+    VXC_DP2x8(src1, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+    _viv_asm(COPY, vecA, src1, 16); \
+    VXC_DP2x8(src1, src0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8); \
+    _viv_asm(COPY, vecB, src1, 16); \
+    vecA = funcName##_(vecA); \
+    vecB = funcName##_(vecB); \
+ \
+    _viv_asm(COPY, src0, vecA, 16); \
+    _viv_asm(COPY, src1, vecB, 16); \
+ \
+    VXC_DP2x8(dst, src0, src1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtractOddData_2x8); \
+    VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+}
+
+
+#ifdef VX_NN_SUPPORT_EXP_LOG_SIN_OP
+//EXP
+TENSOR_TRANSCENDENTAL_BF16_2D(exp)
+//LOG
+TENSOR_TRANSCENDENTAL_BF16_2D(log)
+//SIN
+TENSOR_TRANSCENDENTAL_BF16_2D(sin)
+#endif
+//SIGMOID
+TENSOR_TRANSCENDENTAL_BF16_2D(sigmoid)
+//SQRT
+TENSOR_TRANSCENDENTAL_BF16_2D(sqrt)
+//RSQRT
+TENSOR_TRANSCENDENTAL_BF16_2D(rsqrt)
+//TANH
+TENSOR_TRANSCENDENTAL_BF16_2D(tanh)
+//SOFTRELU
+TENSOR_TRANSCENDENTAL_BF16_2D(softRelu)
+//SQUARE
+TENSOR_TRANSCENDENTAL_BF16_2D(square)
+

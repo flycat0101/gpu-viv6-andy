@@ -1420,3 +1420,97 @@ __kernel void vxcPooling_globalAvgPooling_Int8toInt8
     VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
 }
 
+
+_viv_uniform VXC_512Bits uniConvBF16toF32_Part0_2x8;
+_viv_uniform VXC_512Bits uniConvBF16toF32_Part1_2x8;
+_viv_uniform VXC_512Bits uniConvBF16toF32_Rem_Part0_2x8;
+_viv_uniform VXC_512Bits uniConvBF16toF32_Rem_Part1_2x8;
+
+__kernel void vxcPooling_generic_BF16
+    (
+    image2d_array_t input,
+    int height,
+    image2d_array_t output
+    )
+{
+    int4 coord_out  =  (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    int4 coord_in   =  (int4)(coord_out.x *stride.x - padding.x, coord_out.y * stride.y - padding.y, coord_out.z, 0);
+    float sum = 0;
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0);
+
+
+    for (int y = 0; y < kernelsize.y; y++)
+    {
+        float4 vecA;
+        float4 vecB;
+        vxc_ushort8  src1;
+        vxc_short8 pixel;
+        float4 sum0;
+        float4 ones = (float4)(1.0, 1.0, 1.0, 1.0);
+        for (int x = 0; x < x_len_8x; x += 8)
+        {
+            VXC_ReadImage2DArray(pixel, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+            VXC_DP2x8(src1, pixel, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8);
+            _viv_asm(COPY, vecA, src1, 16);
+            VXC_DP2x8(src1, pixel, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8);
+            _viv_asm(COPY, vecB, src1, 16);
+            coord_in.x += 8;
+            sum0 = vecA + vecB;
+            sum += dot(sum0, ones);
+        }
+        if (x_len_remain)
+        {
+            VXC_ReadImage2DArray(pixel, input, coord_in, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+            VXC_DP2x8(src1, pixel, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Rem_Part0_2x8);
+            _viv_asm(COPY, vecA, src1, 16);
+            VXC_DP2x8(src1, pixel, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Rem_Part1_2x8);
+            _viv_asm(COPY, vecB, src1, 16);
+            sum0 = vecA + vecB;
+            sum += dot(sum0, ones);
+        }
+        coord_in.x -= x_len_8x;
+        coord_in.y ++;
+    }
+    vxc_short8 dst;
+    sum *= genericAvgScale;
+    _viv_asm(COPY, dst, sum, 4);
+    dst.s0 = dst.s1;
+    VXC_WriteImage2DArray(output, coord_out, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+
+}
+
+__kernel void vxcPooling_globalAvgPooling_BF16toBF16
+    (
+    image2d_array_t input,
+    int height,
+    image2d_array_t output
+    )
+{
+    int4 coord  =  (int4)(0, get_global_id(1), 0, 0);
+    float sum = 0;
+    float4 sum0 = 0;
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0);
+    float4 ones = (float4)(1.0, 1.0, 1.0, 1.0);
+
+    do
+    {
+        float4 vecA;
+        float4 vecB;
+        vxc_ushort8 src1;
+        vxc_short8  pixel;
+
+        VXC_ReadImage(pixel, input, coord.zy, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_DP2x8(src1, pixel, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8);
+        _viv_asm(COPY, vecA, src1, 16);
+        VXC_DP2x8(src1, pixel, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8);
+        _viv_asm(COPY, vecB, src1, 16);
+        sum0 += (vecA + vecB);
+        coord.z += 8;
+    } while (coord.z < pool_size);
+    sum = dot(sum0, ones);
+    sum = sum * genericAvgScale;
+    vxc_short8 dst;
+    _viv_asm(COPY, dst, sum, 4);
+    dst.s0 = dst.s1;
+    VXC_WriteImage(output, coord.xy, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+}

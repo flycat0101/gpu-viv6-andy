@@ -1446,3 +1446,136 @@ __kernel void vxcTensorMeanAxis2_U8toF16(
     _viv_asm(COPY, dst_copy, dst, 16);
     VXC_WriteImage2DArray(outputs, coord, dst_copy, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
+
+_viv_uniform VXC_512Bits uniConvBF16toF32_Part0_2x8;
+_viv_uniform VXC_512Bits uniConvBF16toF32_Part1_2x8;
+
+#define TENSORMEAN_BF16_AXIS0_PROCESS(read_fun, write_fun) \
+    for (coord.x = 16; coord.x < line_align; ) \
+    { \
+        vxc_short8 vec0, val0; \
+        read_fun(vec0, inputs, coord, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        VXC_DP2x8(val0, vec0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+        _viv_asm(COPY, tmpSum, val0, 16); \
+        sum += tmpSum; \
+        VXC_DP2x8(val0, vec0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8); \
+        _viv_asm(COPY, tmpSum, val0, 16); \
+        sum += tmpSum; \
+        read_fun(vec0, inputs, coord, VXC_5BITOFFSET_XY(-8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        VXC_DP2x8(val0, vec0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+        _viv_asm(COPY, tmpSum, val0, 16); \
+        sum += tmpSum; \
+        VXC_DP2x8(val0, vec0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8); \
+        _viv_asm(COPY, tmpSum, val0, 16); \
+        sum += tmpSum; \
+        read_fun(vec0, inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        VXC_DP2x8(val0, vec0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+        _viv_asm(COPY, tmpSum, val0, 16); \
+        sum += tmpSum; \
+        VXC_DP2x8(val0, vec0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8); \
+        _viv_asm(COPY, tmpSum, val0, 16); \
+        sum += tmpSum; \
+        read_fun(vec0, inputs, coord, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        VXC_DP2x8(val0, vec0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+        _viv_asm(COPY, tmpSum, val0, 16); \
+        sum += tmpSum; \
+        VXC_DP2x8(val0, vec0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8); \
+        _viv_asm(COPY, tmpSum, val0, 16); \
+        sum += tmpSum; \
+        coord.x += 32; \
+    } \
+    vxc_float4 one = {1.0, 1.0, 1.0, 1.0}; \
+    resultSum.x = dot(sum, one); \
+    resultSum.x = resultSum.x * axis_scale + offset_asymmetric; \
+    vxc_ushort8 dst; \
+    _viv_asm(COPY, dst, resultSum, 16); \
+    dst.s0 = dst.s1; \
+    coord.x = 0; \
+    write_fun(outputs, coord, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+
+__kernel void vxcTensorMeanAxis0_BF16toBF16_2D
+    (
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int2 coord = (int2)(16, get_global_id(1));
+    float4 sum = {0, 0, 0, 0}, tmpSum, resultSum;
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0);
+    TENSORMEAN_BF16_AXIS0_PROCESS(VXC_ReadImage, VXC_WriteImage)
+}
+
+__kernel void vxcTensorMeanAxis0_BF16toBF16
+    (
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(16, get_global_id(1), get_global_id(2), 0);
+    float4 sum = {0, 0, 0, 0}, tmpSum, resultSum;
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0);
+    TENSORMEAN_BF16_AXIS0_PROCESS(VXC_ReadImage2DArray, VXC_WriteImage2DArray)
+}
+
+_viv_uniform VXC_512Bits uniExtractOddData_2x8;
+
+#define TENSORMEAN_BF16_AXIS_PROCESS(read_fun, write_fun, COORD) \
+    for (COORD = 0; COORD < line_align; COORD++) \
+    { \
+        vxc_short8 vec0, val0; \
+        read_fun(vec0, inputs, coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0)); \
+        VXC_DP2x8(val0, vec0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part0_2x8); \
+        _viv_asm(COPY, sum0_1, val0, 16); \
+        sum0 += sum0_1; \
+        VXC_DP2x8(val0, vec0, zero, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniConvBF16toF32_Part1_2x8); \
+        _viv_asm(COPY, sum1_1, val0, 16); \
+        sum1 += sum1_1; \
+    } \
+    vxc_ushort8 dst0, dst1; \
+    vxc_ushort8 dst; \
+    COORD = 0; \
+    sum0 = sum0 * axis_scale + offset_asymmetric; \
+    sum1 = sum1 * axis_scale + offset_asymmetric; \
+    _viv_asm(COPY, dst0, sum0, 16); \
+    _viv_asm(COPY, dst1, sum1, 16); \
+    VXC_DP2x8(dst, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtractOddData_2x8); \
+    write_fun(outputs, coord, dst, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+
+__kernel void vxcTensorMeanAxis1_BF16toBF16_2D(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int2 coord = (int2)(get_global_id(0), 0);
+    float4 sum0 = (float4)(0, 0, 0, 0), sum0_1;
+    float4 sum1 = (float4)(0, 0, 0, 0), sum1_1;
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0);
+    TENSORMEAN_BF16_AXIS_PROCESS(VXC_ReadImage, VXC_WriteImage, coord.y)
+}
+
+__kernel void vxcTensorMeanAxis1_BF16toBF16(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(get_global_id(0), 0, get_global_id(2), 0);
+    float4 sum0 = (float4)(0, 0, 0, 0), sum0_1;
+    float4 sum1 = (float4)(0, 0, 0, 0), sum1_1;
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0);
+    TENSORMEAN_BF16_AXIS_PROCESS(VXC_ReadImage2DArray, VXC_WriteImage2DArray, coord.y)
+}
+
+__kernel void vxcTensorMeanAxis2_BF16toBF16(
+    __read_only  image2d_array_t inputs,
+    __write_only image2d_array_t outputs
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), 0, 0);
+    float4 sum0 = (float4)(0, 0, 0, 0), sum0_1;
+    float4 sum1 = (float4)(0, 0, 0, 0), sum1_1;
+    vxc_short8 zero = (vxc_short8)(0, 0, 0, 0, 0, 0, 0, 0);
+    TENSORMEAN_BF16_AXIS_PROCESS(VXC_ReadImage2DArray, VXC_WriteImage2DArray, coord.z)
+}
+
+

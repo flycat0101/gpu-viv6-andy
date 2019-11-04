@@ -1294,8 +1294,9 @@ vxnne_concat2_sw_operation_s, *vxnne_concat2_sw_operation;
 typedef struct _vxnne_concat2_layer_s
 {
     vxnne_layer_s                                   base;
-    vxnne_operation                                 operations[1];
+    vxnne_operation                                 operations[2];
     vxnne_concat2_sw_operation_s                    concat2_operation;
+    vxnne_shader_operation_s                        concat_sh_unit_operation[2];
 }
 vxnne_concat2_layer_s, *vxnne_concat2_layer;
 
@@ -2917,13 +2918,6 @@ vxnne_shader_executable vxnneGetActivation_UInt8ShaderExecutable(
     vx_tensor               input,
     vx_float32              minVal,
     vx_float32              maxVal,
-    vx_tensor               output);
-
-vxnne_shader_executable vxnneGetActivationSoftReluShaderExecutable(
-    vx_context              context,
-    vx_enum                 kernelEnum,
-    vx_border_mode_t        *borderMode,
-    vx_tensor               input,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneGetSoftmaxShaderExecutable(
