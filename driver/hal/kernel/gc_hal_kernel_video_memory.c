@@ -1855,7 +1855,7 @@ gckVIDMEM_Free(
         {
             gcmkONERROR(
                 gckOS_DestroyKernelMapping(Kernel->os,
-                                           Node->VidMem.physical,
+                                           Node->VidMem.parent->physical,
                                            Node->VidMem.kvaddr));
 
             Node->VidMem.kvaddr = gcvNULL;
