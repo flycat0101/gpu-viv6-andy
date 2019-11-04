@@ -2827,33 +2827,46 @@ static VIR_SymId __SpvAddIdSymbol(
         VIR_Symbol_SetFlag(sym, VIR_SYMUNIFORMFLAG_TREAT_IMAGE_AS_SAMPLER);
     }
 
-    /* Set some uniform flags if needed. */
-    pUniform = VIR_Symbol_GetUniformPointer(virShader, sym);
-    if (pUniform)
-    {
-        /* This image can be used with a sampler, no matter at run time or at compile time. */
-        if (SPV_ID_TYPE_IMAGE_SAMPLED(baseTypeId) != 2)
-        {
-            VIR_Uniform_SetFlag(pUniform, VIR_UNIFORMFLAG_IMAGE_CAN_BE_SAMPLED);
-        }
-    }
-
     /* duplicated variable already has location information */
     if (setLocation)
     {
         VIR_Symbol_SetLocation(sym, -1);
     }
 
-    /* The image format is saved in the base type id. */
-    if (SPV_ID_TYPE_IS_IMAGE(baseTypeId) && !treatSubPassAsSampler)
+    /* Set the image-related information. */
+    if (SPV_ID_TYPE_IS_IMAGE(baseTypeId))
     {
-        if (attachmentDesc != gcvNULL)
+        SpvId imageTypeId = baseTypeId;
+
+        if (SPV_ID_TYPE_IS_SAMPLER(baseTypeId))
         {
-            VIR_Symbol_SetImageFormat(sym, __SpvVkFormat2VirImageFormat(attachmentDesc->format));
+            imageTypeId = SPV_ID_TYPE_SAMPLEDIMAGE_IMAGETYPEID(baseTypeId);
         }
-        else
+
+        /* Set some uniform flags if needed. */
+        pUniform = VIR_Symbol_GetUniformPointer(virShader, sym);
+        if (pUniform)
         {
-            VIR_Symbol_SetImageFormat(sym, __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(baseTypeId)));
+            /* This image can be used with a sampler, no matter at run time or at compile time. */
+            if (SPV_ID_TYPE_IMAGE_SAMPLED(imageTypeId) != 2)
+            {
+                VIR_Uniform_SetFlag(pUniform, VIR_UNIFORMFLAG_IMAGE_CAN_BE_SAMPLED);
+            }
+        }
+
+        VIR_Symbol_SetSpecificImageCompType(sym, SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_IMAGE_SAMPLED_TYPE(imageTypeId)));
+
+        /* The image format is saved in the base type id. */
+        if (!treatSubPassAsSampler)
+        {
+            if (attachmentDesc != gcvNULL)
+            {
+                VIR_Symbol_SetImageFormat(sym, __SpvVkFormat2VirImageFormat(attachmentDesc->format));
+            }
+            else
+            {
+                VIR_Symbol_SetImageFormat(sym, __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(imageTypeId)));
+            }
         }
     }
 
@@ -4611,6 +4624,8 @@ VSC_ErrCode __SpvEmitType(gcSPV spv, VIR_Shader * virShader)
         /* This typs is an image, and also a sampler. */
         SPV_ID_TYPE_IS_IMAGE(spv->resultId) = gcvTRUE;
         SPV_ID_TYPE_IS_SAMPLER(spv->resultId) = gcvTRUE;
+        SPV_ID_TYPE_SAMPLEDIMAGE_IMAGETYPEID(spv->resultId) = spv->operands[0];
+
         /* Get the sampler type from type image. */
         virTypeId = SPV_ID_TYPE_IMAGE_SAMPLER_IMAGE_TYPE(spv->operands[0]);
         gcmASSERT(VIR_TypeId_isSampler(virTypeId));

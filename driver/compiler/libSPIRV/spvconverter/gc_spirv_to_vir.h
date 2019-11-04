@@ -104,6 +104,7 @@
 #define SPV_ID_TYPE_IMAGE_FORMAT(id) (spv->idDescriptor[id].u.type.u.image.format)
 #define SPV_ID_TYPE_IMAGE_SAMPLER_IMAGE_TYPE(id) (spv->idDescriptor[id].u.type.u.image.sampledImageType)
 #define SPV_ID_TYPE_IMAGE_ACCESS_QULIFIER(id) (spv->idDescriptor[id].u.type.u.image.qualifier)
+#define SPV_ID_TYPE_SAMPLEDIMAGE_IMAGETYPEID(id) (spv->idDescriptor[id].u.type.u.sampledImage.imageTypeId)
 #define SPV_ID_TYPE_ARRAY_BASE_TYPE_ID(id) (spv->idDescriptor[id].u.type.u.array.baseTypeId)
 #define SPV_ID_TYPE_ARRAY_LENGTH(id) (spv->idDescriptor[id].u.type.u.array.length)
 #define SPV_ID_TYPE_ARRAY_SAMPLER_IMAGE_TYPE(id) (spv->idDescriptor[id].u.type.u.array.sampledImageType)

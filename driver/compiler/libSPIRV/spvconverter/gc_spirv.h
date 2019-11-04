@@ -176,6 +176,11 @@ typedef struct _SpvTypeDescriptor
             /* the vir type used for opTypeSampledImage. */
             VIR_TypeId sampledImageType;
         }image;
+
+        struct
+        {
+            SpvId imageTypeId;
+        }sampledImage;
     }u;
 }SpvTypeDescriptor;
 

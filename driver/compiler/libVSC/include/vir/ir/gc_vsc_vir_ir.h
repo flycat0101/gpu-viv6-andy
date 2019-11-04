@@ -1297,6 +1297,12 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
             VIR_Symbol_SetOneLayoutQualifier(Sym, VIR_LAYQUAL_IMAGE_FORMAT);\
         }                                                                   \
     } while(0)
+#define VIR_Symbol_SetSpecificImageCompType(Sym, Val)                       \
+    do                                                                      \
+    {                                                                       \
+        (Sym)->layout.specificImageComponentType = (Val);                   \
+        VIR_Symbol_SetOneLayoutQualifier(Sym, VIR_LAYQUAL_SPECIFIC_IMAGE_COMPONENT_TYPE); \
+    } while(0)
 #define VIR_Symbol_SetLocation(Sym, Val)                                    \
     do                                                                      \
     {                                                                       \
@@ -2826,6 +2832,7 @@ typedef enum _VIR_LAYOUTQUAL
     VIR_LAYQUAL_BLEND                                = 0x200,
     VIR_LAYQUAL_IMAGE_FORMAT                         = 0x400,
     VIR_LAYQUAL_COMPONENT                            = 0x800,
+    VIR_LAYQUAL_SPECIFIC_IMAGE_COMPONENT_TYPE        = 0x1000,
 
     VIR_LAYQUAL_BLEND_MASK                           = 0xf00000,
     VIR_LAYQUAL_BLEND_SUPPORT_NONE                   = 0x0,
@@ -2850,6 +2857,7 @@ typedef struct _VIR_LAYOUT
 {
     VIR_LayoutQual layoutQualifier;     /* layout quliafiers */
     VIR_ImageFormat imageFormat;        /* Image format qualilfier. */
+    VIR_TypeId     specificImageComponentType;
     gctINT         location;            /* location of in/out variable, uniform, interface block */
     gctINT         component;           /* Indicates which component within a Location input/output will be taken by the decorated entity. */
     gctINT         masterLocation;      /* If the sym is derived from other symbol (master), record the location of master */
@@ -2903,6 +2911,8 @@ typedef struct _VIR_LAYOUT
 #define VIR_Layout_GetBlend(Layout)         ((Layout)->layoutQualifier & VIR_LAYQUAL_BLEND_MASK)
 #define VIR_Layout_HasImageFormat(Layout)        ((Layout)->layoutQualifier & VIR_LAYQUAL_IMAGE_FORMAT)
 #define VIR_Layout_GetImageFormat(Layout)        ((Layout)->imageFormat)
+#define VIR_Layout_HasSpecificImageCompType(Layout)        ((Layout)->layoutQualifier & VIR_LAYQUAL_SPECIFIC_IMAGE_COMPONENT_TYPE)
+#define VIR_Layout_GetSpecificImageCompType(Layout)        ((Layout)->specificImageComponentType)
 #define VIR_Layout_GetLlFirstSlot(Layout)       ((Layout)->llFirstSlot)
 #define VIR_Layout_GetLlArraySlot(Layout)       ((Layout)->llArraySlot)
 #define VIR_Layout_GetHwFirstCompIndex(Layout)  ((Layout)->hwFirstCompIndex)
