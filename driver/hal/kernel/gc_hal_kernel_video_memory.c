@@ -894,7 +894,6 @@ gckVIDMEM_AllocateLinear(
             node->VidMem.bytes,
             "gal reserved memory",
             gcvTRUE,
-            !(gctBOOL)(Flag & gcvALLOC_FLAG_NON_CPU_ACCESS),
             &node->VidMem.physical
             ));
 
