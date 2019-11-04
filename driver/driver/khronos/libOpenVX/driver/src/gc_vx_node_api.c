@@ -4508,11 +4508,12 @@ VX_API_ENTRY vx_node VX_API_CALL vxYUV2RGBScaleNode(
         VX_NULL,
         VX_NULL,
         VX_NULL,
+        VX_NULL,
         (vx_reference)output
     };
 
     vx_array rect_a = VX_NULL;
-    vx_scalar r_mean_s, g_mean_s, b_mean_s, rgb_scale_s, y_only_s;
+    vx_scalar r_mean_s, g_mean_s, b_mean_s, rgb_scale_s, y_only_s, output_rgb_s;
     vx_node node = VX_NULL;
     vx_context context = vxGetContext((vx_reference)graph);
 
@@ -4566,12 +4567,19 @@ VX_API_ENTRY vx_node VX_API_CALL vxYUV2RGBScaleNode(
         gcmFOOTER_NO();
         return (vx_node)y_only_s;
     }
+    output_rgb_s = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_BOOL, &yuv2rgb_scale_params->output_rgb);
+    if (vxoReference_GetStatus((vx_reference)output_rgb_s) != VX_SUCCESS)
+    {
+        gcmFOOTER_NO();
+        return (vx_node)output_rgb_s;
+    }
     parameters[1]  = (vx_reference)rect_a;
     parameters[2]  = (vx_reference)r_mean_s;
     parameters[3]  = (vx_reference)g_mean_s;
     parameters[4]  = (vx_reference)b_mean_s;
     parameters[5]  = (vx_reference)rgb_scale_s;
     parameters[6]  = (vx_reference)y_only_s;
+    parameters[7]  = (vx_reference)output_rgb_s;
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_YUV2RGB_SCALE, parameters, vxmLENGTH_OF(parameters));
 
@@ -4581,6 +4589,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxYUV2RGBScaleNode(
     vxReleaseScalar(&b_mean_s);
     vxReleaseScalar(&rgb_scale_s);
     vxReleaseScalar(&y_only_s);
+    vxReleaseScalar(&output_rgb_s);
     gcmFOOTER_NO();
     return node;
 }

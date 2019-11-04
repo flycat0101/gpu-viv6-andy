@@ -2045,6 +2045,7 @@ typedef struct _vxnne_yuv2rgb_scale_operation_s
     vx_scalar                        b_mean;
     vx_scalar                        rgb_scale;
     vx_scalar                        y_only;
+    vx_scalar                        output_rgb;
     vx_rectangle_t                   rect;
     vx_uint32                        x_scale;
     vx_uint32                        y_scale;

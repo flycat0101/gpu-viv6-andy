@@ -1176,6 +1176,7 @@ static vx_param_description_s nn_yuv2rgbscale_params[] = {
     {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
     {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
     {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED, vx_true_e},
     {VX_OUTPUT, VX_TYPE_TENSOR, VX_PARAMETER_STATE_REQUIRED, vx_false_e}
 };
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNYUV2RGBScale(vx_node node, const vx_reference *parameters, vx_uint32 num);

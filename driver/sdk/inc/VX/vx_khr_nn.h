@@ -1330,7 +1330,8 @@ typedef struct _vx_nn_yuv2rgb_scale_params_t
     vx_float32  mean_g;     /*!< \brief  Mean coefficient for output g channel; */
     vx_float32  mean_b;     /*!< \brief  Mean coefficient for output b channel; */
     vx_float32  scale_rgb;  /*!< \brief  Scale coefficient value for output rgb; Not the scale ratio; */
-    vx_bool     y_only;     /*!< \brief YUV mode, Y only or normal YUV.  */
+    vx_bool     y_only;     /*!< \brief  YUV mode, Y only or normal YUV.  */
+    vx_bool     output_rgb; /*!< \brief  Output mode, BGR or RGB.  */
 } vx_nn_yuv2rgb_scale_params_t, * vx_nn_yuv2rgb_scale_params;
 
 /*! \brief [Graph] Creates a scale Layer Node.

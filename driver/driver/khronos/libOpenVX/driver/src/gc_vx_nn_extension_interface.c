@@ -23424,6 +23424,7 @@ vx_status vxnneExecuteSWYUV2RGBScale(struct _vxnne_operation_s *operation)
     vx_float32 b_mean = scaleOperation->b_mean->value->f32;
     vx_float32 rgb_scale = scaleOperation->rgb_scale->value->f32;
     vx_bool y_only = scaleOperation->y_only->value->b;
+    vx_bool output_rgb = scaleOperation->output_rgb->value->b;
 
     vx_rectangle_t rect = scaleOperation->rect;
 
@@ -23553,9 +23554,18 @@ vx_status vxnneExecuteSWYUV2RGBScale(struct _vxnne_operation_s *operation)
                         b  = (vx_float32)((yy * c0           + uu * c4 + c7) >> post_shift);
                     }
 
-                    status |= vxnneSaveDataExt((vx_type_e)output_format, out_tf_format, 0 * output_width * output_height + h * output_width + w, b, output_base, out_fixpoint, out_tf_zp, out_tf_scale, out_rounding_mode);
-                    status |= vxnneSaveDataExt((vx_type_e)output_format, out_tf_format, 1 * output_width * output_height + h * output_width + w, g, output_base, out_fixpoint, out_tf_zp, out_tf_scale, out_rounding_mode);
-                    status |= vxnneSaveDataExt((vx_type_e)output_format, out_tf_format, 2 * output_width * output_height + h * output_width + w, r, output_base, out_fixpoint, out_tf_zp, out_tf_scale, out_rounding_mode);
+                    if (output_rgb)
+                    {
+                        status |= vxnneSaveDataExt((vx_type_e)output_format, out_tf_format, 0 * output_width * output_height + h * output_width + w, b, output_base, out_fixpoint, out_tf_zp, out_tf_scale, out_rounding_mode);
+                        status |= vxnneSaveDataExt((vx_type_e)output_format, out_tf_format, 1 * output_width * output_height + h * output_width + w, g, output_base, out_fixpoint, out_tf_zp, out_tf_scale, out_rounding_mode);
+                        status |= vxnneSaveDataExt((vx_type_e)output_format, out_tf_format, 2 * output_width * output_height + h * output_width + w, r, output_base, out_fixpoint, out_tf_zp, out_tf_scale, out_rounding_mode);
+                    }
+                    else /* ouput bgr */
+                    {
+                        status |= vxnneSaveDataExt((vx_type_e)output_format, out_tf_format, 2 * output_width * output_height + h * output_width + w, b, output_base, out_fixpoint, out_tf_zp, out_tf_scale, out_rounding_mode);
+                        status |= vxnneSaveDataExt((vx_type_e)output_format, out_tf_format, 1 * output_width * output_height + h * output_width + w, g, output_base, out_fixpoint, out_tf_zp, out_tf_scale, out_rounding_mode);
+                        status |= vxnneSaveDataExt((vx_type_e)output_format, out_tf_format, 0 * output_width * output_height + h * output_width + w, r, output_base, out_fixpoint, out_tf_zp, out_tf_scale, out_rounding_mode);
+                    }
                 }
                 else
                 {
@@ -23586,6 +23596,7 @@ vx_status vxnneExecuteSCYUV2RGBScale(struct _vxnne_operation_s *operation)
     vx_float32 b_mean = ((vx_scalar)operation->layer->node->paramTable[4])->value->f32;
     vx_float32 rgb_scale = ((vx_scalar)operation->layer->node->paramTable[5])->value->f32;
     vx_bool y_only = ((vx_scalar)operation->layer->node->paramTable[6])->value->b;
+    vx_bool output_rgb = ((vx_scalar)operation->layer->node->paramTable[7])->value->b;
 
     vx_rectangle_t rect = scaleOperation->rect;
     vx_uint32 scale_x = scaleOperation->x_scale;
@@ -23796,9 +23807,18 @@ vx_status vxnneExecuteSCYUV2RGBScale(struct _vxnne_operation_s *operation)
 
     info.vx_yuv2rgb_scaler_cmd_info.inImageStrideY   = (vx_uint16)input_hstride_y;
 
-    info.vx_yuv2rgb_scaler_cmd_info.outImageBaseR    = !y_only ? output_address_b : output_address_r;
-    info.vx_yuv2rgb_scaler_cmd_info.outImageBaseG    = output_address_g;
-    info.vx_yuv2rgb_scaler_cmd_info.outImageBaseB    = !y_only ? output_address_r : output_address_b;
+    if (output_rgb)
+    {
+        info.vx_yuv2rgb_scaler_cmd_info.outImageBaseR    = output_address_r;
+        info.vx_yuv2rgb_scaler_cmd_info.outImageBaseG    = output_address_g;
+        info.vx_yuv2rgb_scaler_cmd_info.outImageBaseB    = output_address_b;
+    }
+    else /* output bgr */
+    {
+        info.vx_yuv2rgb_scaler_cmd_info.outImageBaseR    = !y_only ? output_address_b : output_address_r;
+        info.vx_yuv2rgb_scaler_cmd_info.outImageBaseG    = output_address_g;
+        info.vx_yuv2rgb_scaler_cmd_info.outImageBaseB    = !y_only ? output_address_r : output_address_b;
+    }
 
     info.vx_yuv2rgb_scaler_cmd_info.outImageWidth    = (vx_uint16)output_width;
     info.vx_yuv2rgb_scaler_cmd_info.outImageHeight   = (vx_uint16)output_height;
@@ -23916,7 +23936,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoYUV2RGBScale_Initializer(vx_node node, c
     vx_scalar  b_mean                     = (vx_scalar)parameters[4];
     vx_scalar  rgb_scale                  = (vx_scalar)parameters[5];
     vx_scalar  y_only                     = (vx_scalar)parameters[6];
-    vx_tensor  outputs                    = (vx_tensor)parameters[7];
+    vx_scalar  output_rgb                 = (vx_scalar)parameters[7];
+    vx_tensor  outputs                    = (vx_tensor)parameters[8];
 
     vx_rectangle_t rect;
     vx_uint32 input_rect_width, input_rect_height, output_width, output_height, scale_x, scale_y;
@@ -23998,6 +24019,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoYUV2RGBScale_Initializer(vx_node node, c
         yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.b_mean     = b_mean;
         yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.rgb_scale  = rgb_scale;
         yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.y_only     = y_only;
+        yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.output_rgb = output_rgb;
         yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.rect       = rect;
         yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.x_scale    = scale_x;
         yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.y_scale    = scale_y;
@@ -24023,16 +24045,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoYUV2RGBScale_Initializer(vx_node node, c
             &yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.base,
             0);
 
-        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.inputs    = image;
-        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.r_mean    = r_mean;
-        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.g_mean    = g_mean;
-        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.b_mean    = b_mean;
-        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.rgb_scale = rgb_scale;
-        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.y_only    = y_only;
-        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.rect      = rect;
-        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.x_scale   = scale_x;
-        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.y_scale   = scale_y;
-        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.outputs   = outputs;
+        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.inputs     = image;
+        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.r_mean     = r_mean;
+        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.g_mean     = g_mean;
+        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.b_mean     = b_mean;
+        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.rgb_scale  = rgb_scale;
+        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.y_only     = y_only;
+        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.output_rgb = output_rgb;
+        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.rect       = rect;
+        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.x_scale    = scale_x;
+        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.y_scale    = scale_y;
+        yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.outputs    = outputs;
 
         vxnneOperation_AddReference(&yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.base, (vx_reference)image, VXNNE_OPERATION_REFENRENCE_INPUT);
         vxnneOperation_AddReference(&yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
