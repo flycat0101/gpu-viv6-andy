@@ -5492,7 +5492,9 @@ vx_status vxoNNFullyConnectedLayerInitializer(
         aligned64)
     {
         vx_op_param conv = VX_NULL;
-        vx_uint32 kzgroup = weights_biases->weights_sizes[2] / weights_biases->slice_array[0].kz_count;
+        vx_uint32 kzgroup = weights_biases->weights_sizes[2] % weights_biases->slice_array[0].kz_count == 0 ?
+ weights_biases->weights_sizes[2] / weights_biases->slice_array[0].kz_count :
+ weights_biases->weights_sizes[2] / weights_biases->slice_array[0].kz_count + 1;
         vx_uint32 zoffset = 0;
 
        vxmONERROR(vxnneOperation_Initialize(&tp_operation0->base,

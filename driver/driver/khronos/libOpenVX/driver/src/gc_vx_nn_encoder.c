@@ -15057,7 +15057,7 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
             if (i > MAX_ZGROUP_COUNT)
                 goto exit;
             zNum = i;
-            kzNum = (sliceCount % (0x1 << 16) == 0 ) ? sliceCount / (0x1 << 16) : sliceCount / (0x1 << 16) + 1;
+            //kzNum = (sliceCount % (0x1 << 16) == 0 ) ? sliceCount / (0x1 << 16) : sliceCount / (0x1 << 16) + 1;
             kzNum = (sliceCount % (0x1 << MAX_KZGROUP_COUNT) == 0 ) ? sliceCount / (0x1 << MAX_KZGROUP_COUNT) : sliceCount / (0x1 << MAX_KZGROUP_COUNT) + 1;
             for(splitIndex = 0; splitIndex < kzNum; splitIndex ++)
             {
