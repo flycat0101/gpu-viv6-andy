@@ -2712,9 +2712,20 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
     __vkDevContext *devCtx = (__vkDevContext *)device;
     VkResult result = VK_SUCCESS;
     __vkImage *img = VK_NULL_HANDLE;
+    VkExternalMemoryImageCreateInfo *externalCreateInfo = VK_NULL_HANDLE;
+    VkBaseInStructure *pBaseIn = (VkBaseInStructure *)pCreateInfo->pNext;
 
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
+    while (pBaseIn)
+    {
+        if (pBaseIn->sType == VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO)
+        {
+            externalCreateInfo = (VkExternalMemoryImageCreateInfo *)pBaseIn;
+        }
+        pBaseIn = (VkBaseInStructure *)pBaseIn->pNext;
+    }
 
     do
     {
@@ -2746,6 +2757,16 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImage(
             residentFormat = __vk_GetVkFormatInfo(pCreateInfo->format)->residentImgFormat;
             img->formatInfo = *__vk_GetVkFormatInfo((VkFormat) residentFormat);
         }
+
+#if ANDROID_SDK_VERSION >= 26
+        if (externalCreateInfo &&
+            externalCreateInfo->handleTypes == VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID &&
+            img->createInfo.format == VK_FORMAT_R8G8B8_UNORM)
+        {
+            residentFormat = __vk_GetVkFormatInfo(VK_FORMAT_R8G8B8A8_UNORM)->residentImgFormat;
+            img->formatInfo = *__vk_GetVkFormatInfo((VkFormat) residentFormat);
+        }
+#endif
 
         if (img->formatInfo.residentImgFormat == VK_FORMAT_UNDEFINED)
         {

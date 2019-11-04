@@ -1940,6 +1940,13 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties2(
         output_ahw_usage->androidHardwareBufferUsage =
                 getAndroidHardwareBufferUsageFromVkUsage(pImageFormatInfo->flags,pImageFormatInfo->usage);
     }
+
+    if (externalInfo &&
+        externalInfo->handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID &&
+        format == VK_FORMAT_R8G8B8_UNORM)
+    {
+        format = VK_FORMAT_R8G8B8A8_UNORM;
+    }
 #endif
 
     formatInfo = __vk_GetVkFormatInfo(format);

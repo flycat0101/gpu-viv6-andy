@@ -5323,19 +5323,7 @@ static void halti5_pip_build_patchKeyMask(
                         }
                         __VK_ASSERT(entryIdx < resSet->storageTable.countOfEntries);
 
-                        for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; arrayIdx++)
-                        {
-                            VSC_RES_OP_BIT *pResOp = &tableEntry->pResOpBits[arrayIdx];
-                            halti5_patch_key patchKey = 0;
-
-                            if (pResOp != gcvNULL)
-                            {
-                                if (*pResOp & VSC_RES_OP_BIT_IMAGE_OP)
-                                {
-                                    patchKey |=  HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
-                                }
-                            }
-                         }
+                        patchKey |=  HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
 
                         chipPipeline->patchStorageImgFormat[setIdx][keyIndex] = tableEntry->imageFormatInfo.imageFormat;
                         chipPipeline->patchKeys[setIdx][keyIndex++] = patchKey;
