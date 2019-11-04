@@ -12704,12 +12704,11 @@ _VIR_RA_LS_WriteDebugInfo(
     gctUINT             webIdx;
     VSC_DI_SW_LOC       SWLoc;
     VSC_DI_HW_LOC       HWLoc;
-    gctUINT             *instMapping;
     VIR_FuncIterator    func_iter;
     VIR_FunctionNode    *func_node;
     VIR_Function        *pFunc;
-    gctUINT             instIdx = 0;
     gctUINT             instCount, totalInstCount = 0;
+
 
     gcmASSERT(pRA->DIContext);
 
@@ -12721,33 +12720,10 @@ _VIR_RA_LS_WriteDebugInfo(
     for (func_node = VIR_FuncIterator_First(&func_iter);
         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
     {
-        VIR_InstIterator inst_iter;
-        VIR_Instruction* inst;
-
         pFunc = func_node->function;
         instCount = VIR_Function_GetInstCount(pFunc);
         totalInstCount += instCount;
 
-        if (instCount > 0)
-        {
-            /* since load/store are inserted because of spilling, the instruction order is changed.
-               thus we need to reorder the instructions and record the instruction mapping */
-            instMapping = (gctUINT*)vscMM_Alloc(VIR_RA_LS_GetMM(pRA), instCount * sizeof(gctUINT));
-        }
-        else
-        {
-            instMapping = gcvNULL;
-        }
-
-        instIdx = 0;
-        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pFunc));
-        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
-             inst != gcvNULL; inst = VIR_InstIterator_Next(&inst_iter))
-        {
-            instMapping[VIR_Inst_GetId(inst)] = instIdx;
-            VIR_Inst_SetId(inst, instIdx++);
-        }
-        gcmASSERT(instIdx == instCount);
 
         for (webIdx = 0; webIdx < VIR_RA_LS_GetNumWeb(pRA); webIdx++)
         {
@@ -12787,11 +12763,6 @@ _VIR_RA_LS_WriteDebugInfo(
             }
 
             vscDISetHwLocToSWLoc(pRA->DIContext, &SWLoc, &HWLoc);
-        }
-
-        if (instMapping)
-        {
-            vscMM_Free(VIR_RA_LS_GetMM(pRA), instMapping);
         }
     }
 
