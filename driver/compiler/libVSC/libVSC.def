@@ -458,6 +458,7 @@ EXPORTS
     vscDIGetFunctionInfo
     vscDIGetVariableCount
     vscDIGetVariableInfo
+    vscDIGetVariableHWLoc
 
     vscERR_ReportError
     vscERR_ReportWarning

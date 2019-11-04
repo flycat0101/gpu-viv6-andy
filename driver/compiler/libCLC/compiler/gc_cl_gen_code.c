@@ -4101,7 +4101,7 @@ OUT gctUINT *NumRegNeeded
                 cloCOMPILER_SetCollectDIE(Compiler, gcvTRUE);
 
                 /* for structure, we need append the swloc to the parent die */
-                cloCOMPILER_SetStructDIELogicalReg(Compiler, ParentName->die, Symbol, tempRegIndex,
+                cloCOMPILER_SetStructDIELogicalReg(Compiler, Name, ParentName->die, Symbol, tempRegIndex,
                     numRegNeeded, (gctUINT)_ConvComponentSelectionToEnable(&fieldComponentSelection));
 
                 cloCOMPILER_SetCollectDIE(Compiler, gcvFALSE);

@@ -136,8 +136,7 @@ int vscDIGetVariableCount(
 
 void vscDIGetVariableInfo(
     void * ptr,
-    int functionId,
-    unsigned int parentId,
+    int parentId,
     int idx,
     gctBOOL bArgument,
     char * varName,
@@ -148,6 +147,19 @@ void vscDIGetVariableInfo(
     unsigned int * highPC,
     unsigned int * hwLocCount,
     unsigned int * childrenCount
+    );
+
+void vscDIGetVariableHWLoc(
+    void * ptr,
+    int varId,
+    int idx,
+    gctBOOL * bIsReg,
+    gctBOOL * bIsConst,
+    unsigned int * lowPC,
+    unsigned int * highPC,
+    unsigned int * data0, /* regStart or baseAdd */
+    unsigned int * data1, /* regEnd or offset */
+    unsigned int * data2  /*swizzle, HwShift or endOffset */
     );
 
 #endif

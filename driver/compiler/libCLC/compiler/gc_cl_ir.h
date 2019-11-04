@@ -1342,6 +1342,7 @@ IN gctUINT mask
 void
 cloCOMPILER_SetStructDIELogicalReg(
 IN cloCOMPILER Compiler,
+IN clsNAME * Variable,
 IN gctUINT16 ParentId,
 IN gctCONST_STRING Symbol,
 IN gctUINT32 regIndex,

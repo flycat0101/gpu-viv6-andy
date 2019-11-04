@@ -99,7 +99,7 @@ typedef struct _VSC_DI_ARRAY_DESC{
 typedef struct _VSC_DI_TYPE{
     gctINT  type;
     VSC_DI_ARRAY_DESC array;
-    gctBOOL primitiveType;
+    gctBOOL isPrimitiveType;
     gctBOOL isPointer;
 }VSC_DI_TYPE;
 

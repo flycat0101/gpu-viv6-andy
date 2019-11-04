@@ -450,6 +450,7 @@
     vscDIGetFunctionInfo;
     vscDIGetVariableCount;
     vscDIGetVariableInfo;
+    vscDIGetVariableHWLoc;
 
     VIR_GetSymFromId;
     VIR_Shader_AddFunction;

@@ -4598,6 +4598,7 @@ IN gctUINT mask
 void
 cloCOMPILER_SetStructDIELogicalReg(
 IN cloCOMPILER Compiler,
+IN clsNAME * Variable,
 IN gctUINT16 ParentId,
 IN gctCONST_STRING Symbol,
 IN gctUINT32 regIndex,
@@ -4606,6 +4607,7 @@ IN gctUINT mask
 )
 {
     VSC_DIE * die;
+    gctINT i;
 
     if (Compiler->context.debugInfo == gcvNULL)  return;
 
@@ -4616,7 +4618,17 @@ IN gctUINT mask
     /* set the member of structure to primitive */
     if (die->tag == VSC_DI_TAG_VARIABE)
     {
-        die->u.variable.type.primitiveType = gcvTRUE;
+        die->u.variable.type.isPrimitiveType = gcvTRUE;
+
+        die->u.variable.type.type = Variable->decl.dataType->virPrimitiveType;
+        die->u.variable.type.array.numDim = Variable->decl.array.numDim;
+
+        for (i = 0 ; i < die->u.variable.type.array.numDim; i++)
+        {
+            die->u.variable.type.array.length[i] = Variable->decl.array.length[i];
+        }
+        if (clmDECL_IsPointerType(&(Variable->decl)))
+            die->u.variable.type.isPointer = gcvTRUE;
     }
 }
 
@@ -4699,7 +4711,7 @@ IN clsNAME * Variable
     if (gen)
     {
         parent = Variable->mySpace->die;
-        type.primitiveType = gcvTRUE;
+        type.isPrimitiveType = gcvTRUE;
         type.type = VIR_TYPE_UNKNOWN;
 
         if (parent != VSC_DI_INVALIDE_DIE)
@@ -4731,7 +4743,7 @@ IN clsNAME * Variable
                 if (decl->dataType->type == T_STRUCT ||
                     decl->dataType->type == T_UNION)
                 {
-                    type.primitiveType = gcvFALSE;
+                    type.isPrimitiveType = gcvFALSE;
                     type.type = (gctINT)_GetStructUnionType(Compiler,Variable);
                 }
                 else
@@ -4739,7 +4751,7 @@ IN clsNAME * Variable
                     /* As for primitive type, I don't add DIE for every one, so,
                     for array, that don't have die, we record full type info.
                     Struct/Union or some other compound type, they must have die type!!!!*/
-                    type.primitiveType = gcvTRUE;
+                    type.isPrimitiveType = gcvTRUE;
                     type.type = Variable->decl.dataType->virPrimitiveType;
                     type.array.numDim = Variable->decl.array.numDim;
 
@@ -4753,7 +4765,7 @@ IN clsNAME * Variable
             case clvFUNC_NAME:
             case clvKERNEL_FUNC_NAME:
                 tag = VSC_DI_TAG_SUBPROGRAM;
-                type.primitiveType = gcvTRUE;
+                type.isPrimitiveType = gcvTRUE;
                 type.type = Variable->decl.dataType->virPrimitiveType;
                 break;
 
