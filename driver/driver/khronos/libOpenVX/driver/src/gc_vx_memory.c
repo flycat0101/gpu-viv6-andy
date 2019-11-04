@@ -1489,7 +1489,7 @@ vxoMemoryPool_RequestList(
                 }
 
                 ntype = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(list[i].outputMemory[j]->allocType);
-                if (ntype != VXNNE_MEM_POOL_TYPE_ORIG_DDR && !list[i].outputMemory[j]->allocated)
+                if (ntype != VXNNE_MEM_POOL_TYPE_ORIG_DDR && list[i].outputMemory[j]->sizes[1] == 0)
                 {
                     vxmASSERT(maxs[ntype] != 0);
                     tcount++;
@@ -1506,10 +1506,9 @@ vxoMemoryPool_RequestList(
                         list[i].outputMemory[j]->allocTypeTmp = ntype;
                     }
                     list[i].outputMemory[j]->sizes[1] = list[i].outputMemory[j]->sizes[0];
-
-                    atype |= ntype;
                 }
 
+                atype |= ntype;
                 gcmASSERT(!VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(list[i].outputMemory[j]->allocPriority) ||
                           list[i].outputMemory[j]->allocPartial == vx_false_e);
             }
@@ -1534,7 +1533,7 @@ vxoMemoryPool_RequestList(
                     goto exit;
                 }
                 ntype = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(list[i].inputMemory[j]->allocType);
-                if (ntype != VXNNE_MEM_POOL_TYPE_ORIG_DDR && !list[i].inputMemory[j]->allocated)
+                if (ntype != VXNNE_MEM_POOL_TYPE_ORIG_DDR && list[i].inputMemory[j]->sizes[1] == 0)
                 {
                     vxmASSERT(maxs[ntype] != 0);
                     tcount++;
@@ -1552,9 +1551,9 @@ vxoMemoryPool_RequestList(
                     }
                     list[i].inputMemory[j]->sizes[1] = list[i].inputMemory[j]->sizes[0];
 
-                    atype |= ntype;
                 }
 
+                atype |= ntype;
                 gcmASSERT(!VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(list[i].inputMemory[j]->allocPriority) ||
                           list[i].inputMemory[j]->allocPartial == vx_false_e);
             }
@@ -1601,7 +1600,7 @@ again:
                 if (ntype == VXNNE_MEM_POOL_TYPE_ORIG_DDR) continue;
 
                 gcmASSERT(ntype < VXNNE_MEM_POOL_TYPE_END);
-                gcmASSERT(mcounts[ntype] > 0 || mem->allocated == vx_true_e);
+                gcmASSERT(mcounts[ntype] > 0);
 
                 if (mem->allocated == vx_false_e && i > mem->firstUseId && mustHave)
                 {
