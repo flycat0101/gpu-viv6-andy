@@ -1050,9 +1050,10 @@ eglCreateContext(
         {
             switch (attrib_list[i])
             {
+            case EGL_CONTEXT_PRIORITY_LEVEL_IMG:
             case 0x4098:
-                /* This check is added here for bug 7297. The app sends an unknown attribute 0x4098.
-                 * This is most probably an extension they are using and we need to let it go.
+                /* Ignored EGL attributes here.
+                 * 0x4098 is for bug 7297. The app sends an unknown attribute 0x4098.
                  */
                 break;
 
