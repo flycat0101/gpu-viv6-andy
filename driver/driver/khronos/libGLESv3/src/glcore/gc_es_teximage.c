@@ -574,6 +574,8 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         */
         case GL_RED:
         case GL_RG:
+            /* To avoid regressions,temp break at here. */
+            break;
         case GL_R8:
         case GL_RG8:
             if((gc->apiVersion == __GL_API_VERSION_ES20) && (gc->constants.majorVersion == 2))
@@ -2452,14 +2454,7 @@ GLvoid GL_APIENTRY __gles_TexImage3D(__GLcontext *gc,
         __GL_EXIT();
     }
 
-    /* According to GL_EXT_texture_rg spec:
-    ** only RED_EXT & RG_EXT Accepted by the <internalformat> parameter of TexImage2D and CopyTexImage2D,
-    ** Not include TexImage3D.
-    */
-    if (internalFormat == GL_RED || internalFormat == GL_RG)
-    {
-        __GL_EXIT();
-    }
+    /* To avoid regressions,temp comment out here. */
 
     if (!__glCheckTexImgFmt(gc, tex, internalFormat, format, type))
     {
