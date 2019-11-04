@@ -36,7 +36,7 @@ __kernel void gpuTensorCopy_Quant8 (__read_only image2d_array_t  input,
 
 __kernel void gpuTensorCopy_Q8toFP32 (__read_only image2d_array_t  input,
                                       float scale,
-                                      int zp,
+                                      float offset,
                                     __write_only image2d_array_t output)
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
@@ -44,7 +44,7 @@ __kernel void gpuTensorCopy_Q8toFP32 (__read_only image2d_array_t  input,
     float4 tmpOut = {0.0};
 
     tmp = read_imageui(input, coord);
-    tmpOut.x = (tmp.x - zp) * scale;
+    tmpOut.x = convert_float(tmp.x) * scale + offset;
     write_imagef(output, coord, tmpOut);
 }
 

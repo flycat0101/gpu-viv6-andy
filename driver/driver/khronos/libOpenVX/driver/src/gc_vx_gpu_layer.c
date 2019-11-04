@@ -480,11 +480,11 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
     else if (inputFormat == VX_TYPE_UINT8 && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32))
     {
         vx_float32 scaleValue = TENSOR_TF_SCALE(input);
-        vx_int32 zpValue = TENSOR_TF_ZEROPOINT(input);
+        vx_float32 offset = (vx_float32)TENSOR_TF_ZEROPOINT(input) * (-1.0) * scaleValue;
         vx_reference parameters[4] = {(vx_reference)input_rs, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output_rs};
 
         scale = vxCreateScalar(context, VX_TYPE_FLOAT32, &scaleValue);
-        zp = vxCreateScalar(context, VX_TYPE_INT32, &zpValue);
+        zp = vxCreateScalar(context, VX_TYPE_FLOAT32, &offset);
         parameters[1] = (vx_reference)scale;
         parameters[2] = (vx_reference)zp;
 
