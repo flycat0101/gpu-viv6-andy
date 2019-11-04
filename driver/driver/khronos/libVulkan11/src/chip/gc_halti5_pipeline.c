@@ -5020,6 +5020,26 @@ void halti5_free_vscprogram_instance(
     return;
 }
 
+static VSC_IMAGE_FORMAT halti5_pip_getImageFormat(
+    PROG_VK_IMAGE_DERIVED_INFO* pImageDerivedInfo,
+    uint32_t imageDerivedInfoCount
+    )
+{
+    uint32_t i;
+    VSC_IMAGE_FORMAT imageFormat = VSC_IMAGE_FORMAT_NONE;
+
+    for (i = 0; i < imageDerivedInfoCount; i++)
+    {
+        if (pImageDerivedInfo[i].imageFormatInfo.imageFormat != VSC_IMAGE_FORMAT_NONE)
+        {
+            imageFormat = pImageDerivedInfo[i].imageFormatInfo.imageFormat;
+            break;
+        }
+    }
+
+    return imageFormat;
+}
+
 static void halti5_pip_build_patchKeyMask(
     __vkPipeline *pip
     )
@@ -5302,7 +5322,7 @@ static void halti5_pip_build_patchKeyMask(
                                     patchKey |= HALTI5_PATCH_FORMAT_TO_COMPILER_BIT;
                                 }
                             }
-                            chipPipeline->patchTexBufFormat[setIdx][keyIndex] = tableEntry->imageFormatInfo.imageFormat;
+                            chipPipeline->patchTexBufFormat[setIdx][keyIndex] = halti5_pip_getImageFormat(tableEntry->imageDerivedInfo, VSC_MAX_SHADER_STAGE_COUNT);
                             chipPipeline->patchKeys[setIdx][keyIndex++] = patchKey;
                         }
                     }
@@ -5325,7 +5345,7 @@ static void halti5_pip_build_patchKeyMask(
 
                         patchKey |=  HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
 
-                        chipPipeline->patchStorageImgFormat[setIdx][keyIndex] = tableEntry->imageFormatInfo.imageFormat;
+                        chipPipeline->patchStorageImgFormat[setIdx][keyIndex] = halti5_pip_getImageFormat(tableEntry->imageDerivedInfo, VSC_MAX_SHADER_STAGE_COUNT);
                         chipPipeline->patchKeys[setIdx][keyIndex++] = patchKey;
                     }
                     break;

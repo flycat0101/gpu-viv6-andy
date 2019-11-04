@@ -853,6 +853,42 @@ _vscEP_Buffer_SaveDefaultUboMapping(
     VSC_IO_writeUint(pIoBuf, DUBOEND_SIG);
 }
 
+/* Save the image derived information. */
+static void
+_vscEP_Buffer_SaveImageDerivedInfo(
+    VSC_EP_IO_BUFFER*       pEPBuf,
+    PROG_VK_IMAGE_DERIVED_INFO* pImageDerivedInfo
+    )
+{
+    VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
+
+    /* Save the image size. */
+    if (pImageDerivedInfo->pImageSize)
+    {
+        VSC_IO_writeUint(pIoBuf, 1);
+        _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pImageDerivedInfo->pImageSize);
+    }
+    else
+    {
+        VSC_IO_writeUint(pIoBuf, 0);
+    }
+
+    /* Save the extra layer image. */
+    if (pImageDerivedInfo->pExtraLayer)
+    {
+        VSC_IO_writeUint(pIoBuf, 1);
+        _vscEP_Buffer_SavePrivUavEntry(pEPBuf, pImageDerivedInfo->pExtraLayer);
+    }
+    else
+    {
+        VSC_IO_writeUint(pIoBuf, 0);
+    }
+
+    /* Save the image format. */
+    VSC_IO_writeUint(pIoBuf, (gctUINT)pImageDerivedInfo->imageFormatInfo.imageFormat);
+    VSC_IO_writeUint(pIoBuf, (gctUINT)pImageDerivedInfo->imageFormatInfo.bSetInSpriv);
+}
+
 /****************************************Save PEP-related functions****************************************/
 /****************************************GL-related functions****************************************/
 /* Save attribute table entry. */
@@ -1504,10 +1540,7 @@ _vscEP_Buffer_SaveVKSeparatedTextureHwMapping(
     PROG_VK_SEPARATED_TEXTURE_HW_MAPPING* pSeparatedTextureHwMapping
     )
 {
-    _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pSeparatedTextureHwMapping->s.pImageSize);
-    VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pSeparatedTextureHwMapping->s.imageFormatInfo.imageFormat);
-    VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pSeparatedTextureHwMapping->s.imageFormatInfo.bSetInSpriv);
-    _vscEP_Buffer_SavePrivUavEntry(pEPBuf, pSeparatedTextureHwMapping->s.pExtraLayer);
+    _vscEP_Buffer_SaveImageDerivedInfo(pEPBuf, &pSeparatedTextureHwMapping->s.imageDerivedInfo);
     _vscEP_Buffer_SaveUavSlotMapping(pEPBuf, &pSeparatedTextureHwMapping->s.hwMapping);
     _vscEP_Buffer_SaveVKPrivCombTexSampHwMappingList(pEPBuf, &pSeparatedTextureHwMapping->s.texHwMappingList);
 }
@@ -1653,26 +1686,11 @@ _vscEP_Buffer_SaveVKUniformTexelBufferEntry(
         }
     }
 
-    /* Save image size. */
-    entryMask = 0;
+    /* Save the image derived information. */
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        if (pUniformTexelBufferEntry->pImageSize[i])
-        {
-            entryMask |= (1 << i);
-        }
+        _vscEP_Buffer_SaveImageDerivedInfo(pEPBuf, &pUniformTexelBufferEntry->imageDerivedInfo[i]);
     }
-    VSC_IO_writeUint(pIoBuf, entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        if (pUniformTexelBufferEntry->pImageSize[i])
-        {
-            _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pUniformTexelBufferEntry->pImageSize[i]);
-        }
-    }
-
-    VSC_IO_writeUint(pIoBuf, (gctUINT)pUniformTexelBufferEntry->imageFormatInfo.imageFormat);
-    VSC_IO_writeUint(pIoBuf, (gctUINT)pUniformTexelBufferEntry->imageFormatInfo.bSetInSpriv);
 
     if (pUniformTexelBufferEntry->utbBinding.arraySize != 0)
     {
@@ -1751,43 +1769,10 @@ _vscEP_Buffer_SaveVKInutAttachmentEntry(
     VSC_IO_writeUint(pIoBuf, pInputAttachmentEntry->stageBits);
     VSC_IO_writeUint(pIoBuf, pInputAttachmentEntry->activeStageMask);
 
-    /* Save image size. */
-    entryMask = 0;
+    /* Save the image derived information. */
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        if (pInputAttachmentEntry->pImageSize[i])
-        {
-            entryMask |= (1 << i);
-        }
-    }
-    VSC_IO_writeUint(pIoBuf, entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        if (pInputAttachmentEntry->pImageSize[i])
-        {
-            _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pInputAttachmentEntry->pImageSize[i]);
-        }
-    }
-
-    VSC_IO_writeUint(pIoBuf, (gctUINT)pInputAttachmentEntry->imageFormatInfo.imageFormat);
-    VSC_IO_writeUint(pIoBuf, (gctUINT)pInputAttachmentEntry->imageFormatInfo.bSetInSpriv);
-
-    /* Save extra layer size. */
-    entryMask = 0;
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        if (pInputAttachmentEntry->pExtraLayer[i])
-        {
-            entryMask |= (1 << i);
-        }
-    }
-    VSC_IO_writeUint(pIoBuf, entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        if (pInputAttachmentEntry->pExtraLayer[i])
-        {
-            _vscEP_Buffer_SavePrivUavEntry(pEPBuf, pInputAttachmentEntry->pExtraLayer[i]);
-        }
+        _vscEP_Buffer_SaveImageDerivedInfo(pEPBuf, &pInputAttachmentEntry->imageDerivedInfo[i]);
     }
 
     /* Save texture size. */
@@ -1905,33 +1890,17 @@ _vscEP_Buffer_SaveVKStorageEntry(
 {
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
     gctUINT i;
-    gctUINT entryMask = 0;
 
     _vscEP_Buffer_SaveShaderResourceBinding(pEPBuf, &pStorageEntry->storageBinding);
     VSC_IO_writeUint(pIoBuf, pStorageEntry->storageEntryIndex);
     VSC_IO_writeUint(pIoBuf, pStorageEntry->stageBits);
     VSC_IO_writeUint(pIoBuf, pStorageEntry->activeStageMask);
 
-    /* Save image size. */
-    entryMask = 0;
+    /* Save the image derived information. */
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        if (pStorageEntry->pImageSize[i])
-        {
-            entryMask |= (1 << i);
-        }
+        _vscEP_Buffer_SaveImageDerivedInfo(pEPBuf, &pStorageEntry->imageDerivedInfo[i]);
     }
-    VSC_IO_writeUint(pIoBuf, entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        if (pStorageEntry->pImageSize[i])
-        {
-            _vscEP_Buffer_SavePrivConstEntry(pEPBuf, pStorageEntry->pImageSize[i]);
-        }
-    }
-
-    VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pStorageEntry->imageFormatInfo.imageFormat);
-    VSC_IO_writeUint(pEPBuf->pIoBuf, (gctUINT)pStorageEntry->imageFormatInfo.bSetInSpriv);
 
     /* Save resOpBits. */
     if (pStorageEntry->storageBinding.arraySize != 0)
@@ -1939,24 +1908,6 @@ _vscEP_Buffer_SaveVKStorageEntry(
         VSC_IO_writeBlock(pIoBuf,
                           (gctCHAR*)pStorageEntry->pResOpBits,
                           sizeof(gctUINT) * pStorageEntry->storageBinding.arraySize);
-    }
-
-    /* Save extra layer size. */
-    entryMask = 0;
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        if (pStorageEntry->pExtraLayer[i])
-        {
-            entryMask |= (1 << i);
-        }
-    }
-    VSC_IO_writeUint(pIoBuf, entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        if (pStorageEntry->pExtraLayer[i])
-        {
-            _vscEP_Buffer_SavePrivUavEntry(pEPBuf, pStorageEntry->pExtraLayer[i]);
-        }
     }
 
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
@@ -3496,6 +3447,45 @@ OnError:
     return errCode;
 }
 
+/* Load the image derived information. */
+static void
+_vscEP_Buffer_LoadImageDerivedInfo(
+    VSC_EP_IO_BUFFER*       pEPBuf,
+    PROG_VK_IMAGE_DERIVED_INFO* pImageDerivedInfo
+    )
+{
+    VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
+    gctUINT uVal = 0;
+
+    /* Load the image size. */
+    VSC_IO_readUint(pIoBuf, &uVal);
+    if (uVal == 1)
+    {
+        VSC_EP_ALLOC_MEM(pImageDerivedInfo->pImageSize, SHADER_PRIV_CONSTANT_ENTRY, sizeof(SHADER_PRIV_CONSTANT_ENTRY));
+        _vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pImageDerivedInfo->pImageSize);
+    }
+    else
+    {
+        pImageDerivedInfo->pImageSize = gcvNULL;
+    }
+
+    /* Load the extra layer image. */
+    VSC_IO_readUint(pIoBuf, &uVal);
+    if (uVal == 1)
+    {
+        VSC_EP_ALLOC_MEM(pImageDerivedInfo->pExtraLayer, SHADER_PRIV_UAV_ENTRY, sizeof(SHADER_PRIV_UAV_ENTRY));
+        _vscEP_Buffer_LoadPrivUavEntry(pEPBuf, pImageDerivedInfo->pExtraLayer);
+    }
+    else
+    {
+        pImageDerivedInfo->pExtraLayer = gcvNULL;
+    }
+
+    /* Load the image format. */
+    VSC_IO_readUint(pIoBuf, (gctUINT*)&pImageDerivedInfo->imageFormatInfo.imageFormat);
+    VSC_IO_readUint(pIoBuf, (gctUINT*)&pImageDerivedInfo->imageFormatInfo.bSetInSpriv);
+}
+
 /****************************************Load PEP-related functions****************************************/
 /****************************************GL-related functions****************************************/
 /* Load attribute table entry. */
@@ -4438,10 +4428,8 @@ _vscEP_Buffer_LoadVKSeparatedTextureHwMapping(
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
 
-    ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pSeparatedTextureHwMapping->s.pImageSize));
-    VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pSeparatedTextureHwMapping->s.imageFormatInfo.imageFormat);
-    VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pSeparatedTextureHwMapping->s.imageFormatInfo.bSetInSpriv);
-    ON_ERROR0(_vscEP_Buffer_LoadPrivUavEntry(pEPBuf, pSeparatedTextureHwMapping->s.pExtraLayer));
+    /* Load the image derived information. */
+    _vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pSeparatedTextureHwMapping->s.imageDerivedInfo);
     ON_ERROR0(_vscEP_Buffer_LoadUavSlotMapping(pEPBuf, &pSeparatedTextureHwMapping->s.hwMapping));
     ON_ERROR0(_vscEP_Buffer_LoadVKPrivCombTexSampHwMappingList(pEPBuf, &pSeparatedTextureHwMapping->s.texHwMappingList));
 
@@ -4624,26 +4612,11 @@ _vscEP_Buffer_LoadVKUniformTexelBufferEntry(
         }
     }
 
-    /* Load image size. */
-    entryMask = 0;
-    VSC_IO_readUint(pIoBuf, &entryMask);
+    /* Load the image derived information. */
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        if (entryMask & (1 << i))
-        {
-            VSC_EP_ALLOC_MEM(pUniformTexelBufferEntry->pImageSize[i],
-                             SHADER_PRIV_CONSTANT_ENTRY,
-                             sizeof(SHADER_PRIV_CONSTANT_ENTRY));
-            ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pUniformTexelBufferEntry->pImageSize[i]));
-        }
-        else
-        {
-            pUniformTexelBufferEntry->pImageSize[i] = gcvNULL;
-        }
+        _vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pUniformTexelBufferEntry->imageDerivedInfo[i]);
     }
-
-    VSC_IO_readUint(pIoBuf, (gctUINT *)&pUniformTexelBufferEntry->imageFormatInfo.imageFormat);
-    VSC_IO_readUint(pIoBuf, (gctUINT *)&pUniformTexelBufferEntry->imageFormatInfo.bSetInSpriv);
 
     if (pUniformTexelBufferEntry->utbBinding.arraySize != 0)
     {
@@ -4754,43 +4727,10 @@ _vscEP_Buffer_LoadVKInutAttachmentEntry(
     VSC_IO_readUint(pIoBuf, (gctUINT*)&pInputAttachmentEntry->stageBits);
     VSC_IO_readUint(pIoBuf, &pInputAttachmentEntry->activeStageMask);
 
-    /* Load image size. */
-    entryMask = 0;
-    VSC_IO_readUint(pIoBuf, &entryMask);
+    /* Load the image derived information. */
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        if (entryMask & (1 << i))
-        {
-            VSC_EP_ALLOC_MEM(pInputAttachmentEntry->pImageSize[i],
-                             SHADER_PRIV_CONSTANT_ENTRY,
-                             sizeof(SHADER_PRIV_CONSTANT_ENTRY));
-            ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pInputAttachmentEntry->pImageSize[i]));
-        }
-        else
-        {
-            pInputAttachmentEntry->pImageSize[i] = gcvNULL;
-        }
-    }
-
-    VSC_IO_readUint(pIoBuf, (gctUINT *)&pInputAttachmentEntry->imageFormatInfo.imageFormat);
-    VSC_IO_readUint(pIoBuf, (gctUINT *)&pInputAttachmentEntry->imageFormatInfo.bSetInSpriv);
-
-    /* Load extra layer. */
-    entryMask = 0;
-    VSC_IO_readUint(pIoBuf, &entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        if (entryMask & (1 << i))
-        {
-            VSC_EP_ALLOC_MEM(pInputAttachmentEntry->pExtraLayer[i],
-                             SHADER_PRIV_UAV_ENTRY,
-                             sizeof(SHADER_PRIV_UAV_ENTRY));
-            ON_ERROR0(_vscEP_Buffer_LoadPrivUavEntry(pEPBuf, pInputAttachmentEntry->pExtraLayer[i]));
-        }
-        else
-        {
-            pInputAttachmentEntry->pExtraLayer[i] = gcvNULL;
-        }
+        _vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pInputAttachmentEntry->imageDerivedInfo[i]);
     }
 
     /* Load texture size. */
@@ -4924,32 +4864,17 @@ _vscEP_Buffer_LoadVKStorageEntry(
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_IO_BUFFER* pIoBuf = pEPBuf->pIoBuf;
     gctUINT i;
-    gctUINT entryMask = 0;
 
     ON_ERROR0(_vscEP_Buffer_LoadShaderResourceBinding(pEPBuf, &pStorageEntry->storageBinding));
     VSC_IO_readUint(pIoBuf, &pStorageEntry->storageEntryIndex);
     VSC_IO_readUint(pIoBuf, (gctUINT*)&pStorageEntry->stageBits);
     VSC_IO_readUint(pIoBuf, &pStorageEntry->activeStageMask);
 
-    /* Load image size. */
-    VSC_IO_readUint(pIoBuf, &entryMask);
+    /* Load the image derived information. */
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
     {
-        if (entryMask & (1 << i))
-        {
-            VSC_EP_ALLOC_MEM(pStorageEntry->pImageSize[i],
-                             SHADER_PRIV_CONSTANT_ENTRY,
-                             sizeof(SHADER_PRIV_CONSTANT_ENTRY));
-            ON_ERROR0(_vscEP_Buffer_LoadPrivConstEntry(pEPBuf, pStorageEntry->pImageSize[i]));
-        }
-        else
-        {
-            pStorageEntry->pImageSize[i] = gcvNULL;
-        }
+        _vscEP_Buffer_LoadImageDerivedInfo(pEPBuf, &pStorageEntry->imageDerivedInfo[i]);
     }
-
-    VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pStorageEntry->imageFormatInfo.imageFormat);
-    VSC_IO_readUint(pEPBuf->pIoBuf, (gctUINT *)&pStorageEntry->imageFormatInfo.bSetInSpriv);
 
     /* Load ResOpBits. */
     if (pStorageEntry->storageBinding.arraySize != 0)
@@ -4964,23 +4889,6 @@ _vscEP_Buffer_LoadVKStorageEntry(
     else
     {
         pStorageEntry->pResOpBits = gcvNULL;
-    }
-
-    /* Load extra layer. */
-    VSC_IO_readUint(pIoBuf, &entryMask);
-    for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
-    {
-        if (entryMask & (1 << i))
-        {
-            VSC_EP_ALLOC_MEM(pStorageEntry->pExtraLayer[i],
-                             SHADER_PRIV_UAV_ENTRY,
-                             sizeof(SHADER_PRIV_UAV_ENTRY));
-            ON_ERROR0(_vscEP_Buffer_LoadPrivUavEntry(pEPBuf, pStorageEntry->pExtraLayer[i]));
-        }
-        else
-        {
-            pStorageEntry->pExtraLayer[i] = gcvNULL;
-        }
     }
 
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)

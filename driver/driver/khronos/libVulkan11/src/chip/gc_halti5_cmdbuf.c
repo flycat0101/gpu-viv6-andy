@@ -7319,9 +7319,9 @@ static VkResult halti5_helper_setDescSetSeperateImage(
                     __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4,
                         chipImgv->imgDesc[0].imageInfo);
 
-                    if (texEntry->hwMappings[stageIdx].s.pImageSize)
+                    if (texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pImageSize)
                     {
-                        SHADER_PRIV_CONSTANT_ENTRY *privEntry = texEntry->hwMappings[stageIdx].s.pImageSize;
+                        SHADER_PRIV_CONSTANT_ENTRY *privEntry = texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pImageSize;
 
                         if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
                         {
@@ -7341,9 +7341,9 @@ static VkResult halti5_helper_setDescSetSeperateImage(
                         }
                     }
 
-                    if (texEntry->hwMappings[stageIdx].s.pExtraLayer)
+                    if (texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pExtraLayer)
                     {
-                        SHADER_PRIV_UAV_ENTRY* privEntry = texEntry->hwMappings[stageIdx].s.pExtraLayer;
+                        SHADER_PRIV_UAV_ENTRY* privEntry = texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pExtraLayer;
                         uint32_t hwConstRegNoForExtraLayer = privEntry->pBuffer->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo;
                         uint32_t hwConstRegAddrForExtraLayer = (hwConstRegAddrBase >> 2) + (hwConstRegNoForExtraLayer * 4)
                                                 + privEntry->pBuffer->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
@@ -7754,9 +7754,9 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
                     __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4,
                         chipImgv->imgDesc[0].imageInfo);
 
-                    if (texEntry->hwMappings[stageIdx].s.pImageSize)
+                    if (texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pImageSize)
                     {
-                        SHADER_PRIV_CONSTANT_ENTRY *privEntry = texEntry->hwMappings[stageIdx].s.pImageSize;
+                        SHADER_PRIV_CONSTANT_ENTRY *privEntry = texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pImageSize;
 
                         if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
                         {
@@ -7776,9 +7776,9 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
                         }
                     }
 
-                    if (texEntry->hwMappings[stageIdx].s.pExtraLayer)
+                    if (texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pExtraLayer)
                     {
-                        SHADER_PRIV_UAV_ENTRY* privEntry = texEntry->hwMappings[stageIdx].s.pExtraLayer;
+                        SHADER_PRIV_UAV_ENTRY* privEntry = texEntry->hwMappings[stageIdx].s.imageDerivedInfo.pExtraLayer;
                         uint32_t hwConstRegNoForExtraLayer = privEntry->pBuffer->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo;
                         uint32_t hwConstRegAddrForExtraLayer = (hwConstRegAddrBase >> 2) + (hwConstRegNoForExtraLayer * 4)
                                                 + privEntry->pBuffer->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
@@ -7953,7 +7953,7 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
                 /* Set the image-related private constants. */
                 else
                 {
-                    SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerBufEntry->pImageSize[stageIdx];
+                    SHADER_PRIV_CONSTANT_ENTRY *privEntry = samplerBufEntry->imageDerivedInfo[stageIdx].pImageSize;
 
                     /* Set the image size. */
                     if (privEntry)
@@ -8158,9 +8158,9 @@ static VkResult halti5_helper_setDescSetInputAttach(
                             __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4,
                                 chipImgv->imgDesc[0].imageInfo);
 
-                            if (inputAttachEntry->pImageSize[stageIdx])
+                            if (inputAttachEntry->imageDerivedInfo[stageIdx].pImageSize)
                             {
-                                SHADER_PRIV_CONSTANT_ENTRY *privEntry = inputAttachEntry->pImageSize[stageIdx];
+                                SHADER_PRIV_CONSTANT_ENTRY *privEntry = inputAttachEntry->imageDerivedInfo[stageIdx].pImageSize;
 
                                 if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
                                 {
@@ -8180,9 +8180,9 @@ static VkResult halti5_helper_setDescSetInputAttach(
                                 }
                             }
 
-                            if (inputAttachEntry->pExtraLayer[stageIdx])
+                            if (inputAttachEntry->imageDerivedInfo[stageIdx].pExtraLayer)
                             {
-                                SHADER_PRIV_UAV_ENTRY* privEntry = inputAttachEntry->pExtraLayer[stageIdx];
+                                SHADER_PRIV_UAV_ENTRY* privEntry = inputAttachEntry->imageDerivedInfo[stageIdx].pExtraLayer;
                                 uint32_t hwConstRegNoForExtraLayer = privEntry->pBuffer->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo;
                                 uint32_t hwConstRegAddrForExtraLayer = (hwConstRegAddrBase >> 2) + (hwConstRegNoForExtraLayer * 4)
                                     + privEntry->pBuffer->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
@@ -8288,9 +8288,9 @@ static VkResult halti5_helper_setDescSetStorage(
                         __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4,
                             chipImgv->imgDesc[0].imageInfo);
 
-                        if (storageEntry->pImageSize[stageIdx])
+                        if (storageEntry->imageDerivedInfo[stageIdx].pImageSize)
                         {
-                            SHADER_PRIV_CONSTANT_ENTRY *privEntry = storageEntry->pImageSize[stageIdx];
+                            SHADER_PRIV_CONSTANT_ENTRY *privEntry = storageEntry->imageDerivedInfo[stageIdx].pImageSize;
 
                             if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
                             {
@@ -8310,9 +8310,9 @@ static VkResult halti5_helper_setDescSetStorage(
                             }
                         }
 
-                        if (storageEntry->pExtraLayer[stageIdx])
+                        if (storageEntry->imageDerivedInfo[stageIdx].pExtraLayer)
                         {
-                            SHADER_PRIV_UAV_ENTRY* privEntry = storageEntry->pExtraLayer[stageIdx];
+                            SHADER_PRIV_UAV_ENTRY* privEntry = storageEntry->imageDerivedInfo[stageIdx].pExtraLayer;
                             uint32_t hwConstRegNoForExtraLayer = privEntry->pBuffer->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo;
                             uint32_t hwConstRegAddrForExtraLayer = (hwConstRegAddrBase >> 2) + (hwConstRegNoForExtraLayer * 4)
                                                     + privEntry->pBuffer->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
@@ -8334,9 +8334,9 @@ static VkResult halti5_helper_setDescSetStorage(
                         __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4,
                             chipBufv->imgDesc[0].imageInfo);
 
-                        if (storageEntry->pImageSize[stageIdx])
+                        if (storageEntry->imageDerivedInfo[stageIdx].pImageSize)
                         {
-                            SHADER_PRIV_CONSTANT_ENTRY *privEntry = storageEntry->pImageSize[stageIdx];
+                            SHADER_PRIV_CONSTANT_ENTRY *privEntry = storageEntry->imageDerivedInfo[stageIdx].pImageSize;
 
                             if (arrayIdx < privEntry->u.pSubCBMapping->subArrayRange)
                             {

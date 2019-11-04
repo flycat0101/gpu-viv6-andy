@@ -4541,14 +4541,14 @@ static VSC_ErrCode _AddVkSeparatedTexEntryToSeparatedTexTableOfPEP(VSC_PEP_GEN_H
         }
 
         /* Set image size */
-        _AddImageSize(&pTextureEntry->hwMappings[stageIdx].s.pImageSize,
+        _AddImageSize(&pTextureEntry->hwMappings[stageIdx].s.imageDerivedInfo.pImageSize,
                       &pTextureEntry->texBinding,
                       pSep);
 
-        _GetImageFormat(pShader, &pTextureEntry->texBinding, &pTextureEntry->hwMappings[stageIdx].s.imageFormatInfo);
+        _GetImageFormat(pShader, &pTextureEntry->texBinding, &pTextureEntry->hwMappings[stageIdx].s.imageDerivedInfo.imageFormatInfo);
 
         /* Extra image layer */
-        _AddPrivateImageUniform(&pTextureEntry->hwMappings[stageIdx].s.pExtraLayer,
+        _AddPrivateImageUniform(&pTextureEntry->hwMappings[stageIdx].s.imageDerivedInfo.pExtraLayer,
                                 &pTextureEntry->texBinding,
                                 pSep,
                                 SHS_PRIV_MEM_KIND_EXTRA_UAV_LAYER);
@@ -4660,7 +4660,7 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* p
             _SetValidChannelForHwConstantLoc(pHwDirectAddrBase, hwChannel);
         }
 
-        _GetImageFormat(pShader, &pUtbEntry->utbBinding, &pUtbEntry->imageFormatInfo);
+        _GetImageFormat(pShader, &pUtbEntry->utbBinding, &pUtbEntry->imageDerivedInfo[stageIdx].imageFormatInfo);
     }
     else
     {
@@ -4678,9 +4678,14 @@ static VSC_ErrCode _AddVkUtbEntryToUniformTexBufTableOfPEP(VSC_PEP_GEN_HELPER* p
     }
     else
     {
-        _AddImageSize(&pUtbEntry->pImageSize[stageIdx],
+        _AddImageSize(&pUtbEntry->imageDerivedInfo[stageIdx].pImageSize,
                       &pUtbEntry->utbBinding,
                       pSep);
+
+        _AddPrivateImageUniform(&pUtbEntry->imageDerivedInfo[stageIdx].pExtraLayer,
+                                &pUtbEntry->utbBinding,
+                                pSep,
+                                SHS_PRIV_MEM_KIND_EXTRA_UAV_LAYER);
     }
 
     pUtbEntry->activeStageMask |= pResAllocEntry->bUse ? (1 << stageIdx) : 0;
@@ -4817,14 +4822,14 @@ static VSC_ErrCode _AddVkInputAttachmentTableOfPEP(VSC_PEP_GEN_HELPER* pPepGenHe
     else
     {
         /* Set image size */
-        _AddImageSize(&pIaEntry->pImageSize[stageIdx],
+        _AddImageSize(&pIaEntry->imageDerivedInfo[stageIdx].pImageSize,
                       &pIaEntry->iaBinding,
                       pSep);
 
-        _GetImageFormat(pShader, &pIaEntry->iaBinding, &pIaEntry->imageFormatInfo);
+        _GetImageFormat(pShader, &pIaEntry->iaBinding, &pIaEntry->imageDerivedInfo[stageIdx].imageFormatInfo);
 
         /* Extra image layer */
-        _AddPrivateImageUniform(&pIaEntry->pExtraLayer[stageIdx],
+        _AddPrivateImageUniform(&pIaEntry->imageDerivedInfo[stageIdx].pExtraLayer,
                                 &pIaEntry->iaBinding,
                                 pSep,
                                 SHS_PRIV_MEM_KIND_EXTRA_UAV_LAYER);
@@ -4945,14 +4950,14 @@ static VSC_ErrCode _AddVkStorageEntryToStorageTableOfPEP(VSC_PEP_GEN_HELPER* pPe
     }
 
     /* Set image size */
-    _AddImageSize(&pStorageEntry->pImageSize[stageIdx],
+    _AddImageSize(&pStorageEntry->imageDerivedInfo[stageIdx].pImageSize,
                   &pStorageEntry->storageBinding,
                   pSep);
 
-    _GetImageFormat(pShader, &pStorageEntry->storageBinding, &pStorageEntry->imageFormatInfo);
+    _GetImageFormat(pShader, &pStorageEntry->storageBinding, &pStorageEntry->imageDerivedInfo[stageIdx].imageFormatInfo);
 
     /* Extra image layer */
-    _AddPrivateImageUniform(&pStorageEntry->pExtraLayer[stageIdx],
+    _AddPrivateImageUniform(&pStorageEntry->imageDerivedInfo[stageIdx].pExtraLayer,
                             &pStorageEntry->storageBinding,
                             pSep,
                             SHS_PRIV_MEM_KIND_EXTRA_UAV_LAYER);
@@ -5569,7 +5574,7 @@ static VSC_ErrCode _PostProcessVkSeparatedTexEntryTable(VSC_PEP_GEN_HELPER* pPep
         if (!pPepGenHelper->baseEpGen.pHwCfg->hwFeatureFlags.supportSeparatedTex)
         {
             /* Image size */
-            pPrivCnstEntry = pTexEntry->hwMappings[stageIdx].s.pImageSize;
+            pPrivCnstEntry = pTexEntry->hwMappings[stageIdx].s.imageDerivedInfo.pImageSize;
             if (pPrivCnstEntry)
             {
                 gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
@@ -5577,7 +5582,7 @@ static VSC_ErrCode _PostProcessVkSeparatedTexEntryTable(VSC_PEP_GEN_HELPER* pPep
             }
 
             /* Extra image layer */
-            pPrivUavEntry = pTexEntry->hwMappings[stageIdx].s.pExtraLayer;
+            pPrivUavEntry = pTexEntry->hwMappings[stageIdx].s.imageDerivedInfo.pExtraLayer;
             if (pPrivUavEntry)
             {
                 for (j = 0; j < pTexEntry->texBinding.arraySize; j ++)
@@ -5597,8 +5602,9 @@ static VSC_ErrCode _PostProcessVkUtbEntryTable(VSC_PEP_GEN_HELPER* pPepGenHelper
 {
     VSC_ErrCode                               errCode = VSC_ERR_NONE;
     PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY* pUtbEntry = gcvNULL;
-    gctUINT                                   i, layerIdx;
+    gctUINT                                   i, j, layerIdx;
     SHADER_PRIV_CONSTANT_ENTRY*               pPrivCnstEntry;
+    SHADER_PRIV_UAV_ENTRY*                    pPrivUavEntry;
 
     for (i = 0; i < pUniformTexBufTable->countOfEntries; i ++)
     {
@@ -5612,6 +5618,27 @@ static VSC_ErrCode _PostProcessVkUtbEntryTable(VSC_PEP_GEN_HELPER* pPepGenHelper
             {
                 gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
                 *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pUtbEntry->utbEntryIndex;
+            }
+
+            /* Image size */
+            pPrivCnstEntry = pUtbEntry->imageDerivedInfo[stageIdx].pImageSize;
+            if (pPrivCnstEntry)
+            {
+                gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
+                *(gctUINT*)pPrivCnstEntry->commonPrivm.pPrivateData = pUtbEntry->utbEntryIndex;
+            }
+
+            /* Extra image layer */
+            pPrivUavEntry = pUtbEntry->imageDerivedInfo[stageIdx].pExtraLayer;
+            if (pPrivUavEntry)
+            {
+                for (j = 0; j < pUtbEntry->utbBinding.arraySize; j ++)
+                {
+                    gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivUavEntry->commonPrivm.pPrivateData);
+                    *(gctUINT*)pPrivUavEntry->commonPrivm.pPrivateData = pUtbEntry->utbEntryIndex;
+
+                    pPrivUavEntry ++;
+                }
             }
         }
     }
@@ -5632,7 +5659,7 @@ static VSC_ErrCode _PostProcessVkStorageTable(VSC_PEP_GEN_HELPER* pPepGenHelper,
         pStorageEntry = &pStorageTable->pStorageEntries[i];
 
         /* Image size */
-        pPrivCnstEntry = pStorageEntry->pImageSize[stageIdx];
+        pPrivCnstEntry = pStorageEntry->imageDerivedInfo[stageIdx].pImageSize;
         if (pPrivCnstEntry)
         {
             gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
@@ -5640,7 +5667,7 @@ static VSC_ErrCode _PostProcessVkStorageTable(VSC_PEP_GEN_HELPER* pPepGenHelper,
         }
 
         /* Extra image layer */
-        pPrivUavEntry = pStorageEntry->pExtraLayer[stageIdx];
+        pPrivUavEntry = pStorageEntry->imageDerivedInfo[stageIdx].pExtraLayer;
         if (pPrivUavEntry)
         {
             for (j = 0; j < pStorageEntry->storageBinding.arraySize; j ++)
@@ -5718,7 +5745,7 @@ static VSC_ErrCode _PostProcessVkInputAttachmentTable(VSC_PEP_GEN_HELPER* pPepGe
         else
         {
             /* Image size */
-            pPrivCnstEntry = pIaEntries->pImageSize[stageIdx];
+            pPrivCnstEntry = pIaEntries->imageDerivedInfo[stageIdx].pImageSize;
             if (pPrivCnstEntry)
             {
                 gcoOS_Allocate(gcvNULL, sizeof(gctUINT), (gctPOINTER*)&pPrivCnstEntry->commonPrivm.pPrivateData);
@@ -5726,7 +5753,7 @@ static VSC_ErrCode _PostProcessVkInputAttachmentTable(VSC_PEP_GEN_HELPER* pPepGe
             }
 
             /* Extra image layer */
-            pPrivUavEntry = pIaEntries->pExtraLayer[stageIdx];
+            pPrivUavEntry = pIaEntries->imageDerivedInfo[stageIdx].pExtraLayer;
             if (pPrivUavEntry)
             {
                 for (j = 0; j < pIaEntries->iaBinding.arraySize; j ++)

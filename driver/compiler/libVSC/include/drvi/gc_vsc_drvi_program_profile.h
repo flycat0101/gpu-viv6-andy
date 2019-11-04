@@ -476,6 +476,23 @@ typedef struct PROG_VK_IMAGE_FORMAT_INFO
 }
 PROG_VK_IMAGE_FORMAT_INFO;
 
+typedef struct PROG_VK_IMAGE_DERIVED_INFO
+{
+    /* For a image, it might need a image-size attached. As each image in
+       Binding::arraySize array has image-size, so this is the first entry
+       of image-size array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize;
+
+    /* Extra layer HW mapping. As currently, for images in in tBinding::arraySize
+       array, if one image has extra image, all other images must have extra image, so
+       this is the first entry of extra-image */
+    SHADER_PRIV_UAV_ENTRY*                      pExtraLayer;
+
+    /* ImageFormat, can be NONE. */
+    PROG_VK_IMAGE_FORMAT_INFO                   imageFormatInfo;
+}
+PROG_VK_IMAGE_DERIVED_INFO;
+
 typedef struct PROG_VK_SUB_RESOURCE_BINDING
 {
     /* Pointer to original API resource binding */
@@ -670,17 +687,7 @@ typedef union PROG_VK_SEPARATED_TEXTURE_HW_MAPPING
     /* For HW does not natively supports separated texture */
     struct
     {
-        /* For a separated image, it might need a image-size attached. As each image in
-           storageBinding::arraySize array has image-size, so this is the first entry
-           of image-size array. */
-        SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize;
-
-        PROG_VK_IMAGE_FORMAT_INFO                   imageFormatInfo;
-
-        /* Extra layer HW mapping. As currently, for images in in texBinding::arraySize
-           array, if one image has extra image, all other images must have extra image, so
-           this is the first entry of extra-image */
-        SHADER_PRIV_UAV_ENTRY*                      pExtraLayer;
+        PROG_VK_IMAGE_DERIVED_INFO                  imageDerivedInfo;
 
         /* We still need to allocate a constant image for this separated texture for the imageFetch operation.*/
         SHADER_UAV_SLOT_MAPPING                     hwMapping;
@@ -779,9 +786,7 @@ typedef struct PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY
     SHADER_PRIV_CONSTANT_ENTRY*                 pTextureSize[VSC_MAX_SHADER_STAGE_COUNT][2];
 
     /*----------------------------------Image-related----------------------------------*/
-    SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize[VSC_MAX_SHADER_STAGE_COUNT];
-
-    PROG_VK_IMAGE_FORMAT_INFO                   imageFormatInfo;
+    PROG_VK_IMAGE_DERIVED_INFO                  imageDerivedInfo[VSC_MAX_SHADER_STAGE_COUNT];
 
     /* Which kinds of inst operation acting on texture. The count of this
        resOpBit is same as utbBinding::arraySize */
@@ -837,17 +842,7 @@ typedef struct PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY
     ** it is treated as a sampler, otherwise it is treated as an image.
     */
     /*----------------------------------Image-related----------------------------------*/
-    /* For image storage, it might need a image-size attached. As each image in
-       iaBinding::arraySize array has image-size, so this is the first entry
-       of image-size array. */
-    SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize[VSC_MAX_SHADER_STAGE_COUNT];
-
-    PROG_VK_IMAGE_FORMAT_INFO                   imageFormatInfo;
-
-    /* Extra layer HW mapping. As currently, for images in in iaBinding::arraySize
-       array, if one image has extra image, all other images must have extra image, so
-       this is the first entry of extra-image */
-    SHADER_PRIV_UAV_ENTRY*                      pExtraLayer[VSC_MAX_SHADER_STAGE_COUNT];
+    PROG_VK_IMAGE_DERIVED_INFO                  imageDerivedInfo[VSC_MAX_SHADER_STAGE_COUNT];
 
     /*----------------------------------Sampler-related----------------------------------*/
     /* For texel buffer, it might need a texture-size attached. As each texel buffer in
@@ -901,21 +896,12 @@ typedef struct PROG_VK_STORAGE_TABLE_ENTRY
     /* Is this entry really used by shader */
     gctUINT                                     activeStageMask;
 
-    /* For image storage, it might need a image-size attached. As each image in
-       storageBinding::arraySize array has image-size, so this is the first entry
-       of image-size array. */
-    SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize[VSC_MAX_SHADER_STAGE_COUNT];
-
-    PROG_VK_IMAGE_FORMAT_INFO                   imageFormatInfo;
+    /*----------------------------------Image-related----------------------------------*/
+    PROG_VK_IMAGE_DERIVED_INFO                  imageDerivedInfo[VSC_MAX_SHADER_STAGE_COUNT];
 
     /* Which kinds of inst operation acting on texture. The count of this
        resOpBit is same as storageBinding::arraySize */
     VSC_RES_OP_BIT*                             pResOpBits;
-
-    /* Extra layer HW mapping. As currently, for images in in storageBinding::arraySize
-       array, if one image has extra image, all other images must have extra image, so
-       this is the first entry of extra-image */
-    SHADER_PRIV_UAV_ENTRY*                      pExtraLayer[VSC_MAX_SHADER_STAGE_COUNT];
 
     /* Different shader stage may have different HW mappings. */
     SHADER_UAV_SLOT_MAPPING                     hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
