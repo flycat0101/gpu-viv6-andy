@@ -197,7 +197,8 @@ void veglPopResObj(
 }
 
 void _InitDispatchTables(
-    VEGLThreadData Thread
+    VEGLThreadData Thread,
+    veglAPIINDEX index
     )
 {
 #if gcdSTATIC_LINK
@@ -221,20 +222,6 @@ void _InitDispatchTables(
     Thread->dispatchTables[vegl_OPENVG]         = &OpenVG_DISPATCH_TABLE;
 #  endif
 #else
-    veglAPIINDEX index = 0;
-
-    switch (Thread->api)
-    {
-    case EGL_OPENGL_ES_API:
-        index = vegl_OPENGL_ES11;
-        break;
-    case EGL_OPENGL_API:
-        index = vegl_OPENGL;
-        break;
-    case EGL_OPENVG_API:
-        index = vegl_OPENVG;
-        break;
-    }
 
 Loopback:
 #if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
@@ -312,7 +299,10 @@ veglGetThreadData(
 #endif
 
         /* Initialize GLES client API dispatch tables. */
-        _InitDispatchTables(thread);
+        _InitDispatchTables(thread, vegl_OPENGL_ES11);
+
+        /* Initialize OpenVG API dispatch table to query 2D or 3D VG pipe. */
+        _InitDispatchTables(thread, vegl_OPENVG);
 
         /* Set driver tls. */
         gcoOS_SetDriverTLS(gcvTLS_KEY_EGL, &thread->base);

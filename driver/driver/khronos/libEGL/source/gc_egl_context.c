@@ -13,7 +13,7 @@
 
 #include "gc_egl_precomp.h"
 
-extern void _InitDispatchTables(VEGLThreadData Thread);
+extern void _InitDispatchTables(VEGLThreadData Thread, veglAPIINDEX index);
 
 #if defined(ANDROID) && !defined(GPU_VENDOR)
 #  define GPU_VENDOR "VIVANTE"
@@ -788,15 +788,11 @@ veglBindAPI(
     switch (api)
     {
     case EGL_OPENGL_ES_API:
-        /* Bind OpenGL ES API. */
-        thread->api = api;
-        thread->context = thread->esContext;
-
         if (!thread->dispatchTables[vegl_OPENGL_ES11] ||
             !thread->dispatchTables[vegl_OPENGL_ES20])
         {
             /* Initialize client dispatch tables. */
-            _InitDispatchTables(thread);
+            _InitDispatchTables(thread, vegl_OPENGL_ES11);
         }
         if (!thread->dispatchTables[vegl_OPENGL_ES11_CL] &&
             !thread->dispatchTables[vegl_OPENGL_ES11] &&
@@ -807,18 +803,19 @@ veglBindAPI(
             gcmFOOTER_ARG("%d", EGL_FALSE);
             return EGL_FALSE;
         }
+
+        /* Bind OpenGL ES API. */
+        thread->api = api;
+        thread->context = thread->esContext;
+
         gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
         break;
 
     case EGL_OPENGL_API:
-        /* Bind OpenGL API. */
-        thread->api = api;
-        thread->context = thread->glContext;
-
         if (!thread->dispatchTables[vegl_OPENGL])
         {
             /* Initialize client dispatch tables. */
-            _InitDispatchTables(thread);
+            _InitDispatchTables(thread, vegl_OPENGL);
         }
         if (!thread->dispatchTables[vegl_OPENGL])
         {
@@ -827,18 +824,19 @@ veglBindAPI(
             gcmFOOTER_ARG("%d", EGL_FALSE);
             return EGL_FALSE;
         }
+
+        /* Bind OpenGL API. */
+        thread->api = api;
+        thread->context = thread->glContext;
+
         gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
         break;
 
     case EGL_OPENVG_API:
-        /* Bind OpenVG API. */
-        thread->api = api;
-        thread->context = thread->vgContext;
-
         if (!thread->dispatchTables[vegl_OPENVG])
         {
             /* Initialize client dispatch tables. */
-            _InitDispatchTables(thread);
+            _InitDispatchTables(thread, vegl_OPENVG);
         }
         if (!thread->dispatchTables[vegl_OPENVG])
         {
@@ -847,6 +845,11 @@ veglBindAPI(
             gcmFOOTER_ARG("%d", EGL_FALSE);
             return EGL_FALSE;
         }
+
+        /* Bind OpenVG API. */
+        thread->api = api;
+        thread->context = thread->vgContext;
+
 #if gcdENABLE_VG
         if (thread->openVGpipe)
         {
