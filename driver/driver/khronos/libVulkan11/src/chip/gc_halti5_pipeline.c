@@ -5258,7 +5258,7 @@ static void halti5_pip_build_patchKeyMask(
 
                             if (pResOp != gcvNULL)
                             {
-                                if (pResOp != gcvNULL)
+                                if (*pResOp != gcvNULL)
                                 {
                                     if (*pResOp & (VSC_RES_OP_BIT_TEXLD_GRAD | VSC_RES_OP_BIT_TEXLDP_GRAD))
                                     {
@@ -5331,7 +5331,7 @@ static void halti5_pip_build_patchKeyMask(
                     {
                         uint32_t entryIdx;
                         PROG_VK_STORAGE_TABLE_ENTRY *tableEntry = VK_NULL_HANDLE;
-                        halti5_patch_key patchKey = 0;
+
                         for (entryIdx = 0; entryIdx < resSet->storageTable.countOfEntries; entryIdx++)
                         {
                             tableEntry = &resSet->storageTable.pStorageEntries[entryIdx];
@@ -5355,10 +5355,10 @@ static void halti5_pip_build_patchKeyMask(
                                     patchKey |=  HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
                                 }
                             }
-                        }
 
-                        chipPipeline->patchStorageImgFormat[setIdx][keyIndex] = halti5_pip_getImageFormat(tableEntry->imageDerivedInfo, VSC_MAX_SHADER_STAGE_COUNT);
-                        chipPipeline->patchKeys[setIdx][keyIndex++] = patchKey;
+                            chipPipeline->patchStorageImgFormat[setIdx][keyIndex] = halti5_pip_getImageFormat(tableEntry->imageDerivedInfo, VSC_MAX_SHADER_STAGE_COUNT);
+                            chipPipeline->patchKeys[setIdx][keyIndex++] = patchKey;
+                        }
                     }
                     break;
                 default:
