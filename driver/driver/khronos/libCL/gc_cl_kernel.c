@@ -836,6 +836,9 @@ clfLoadKernelArgValues(
     clsPrivateBuffer_PTR tempNode = gcvNULL;
     gcSHADER             Shader = (gcSHADER)Instance->binary;
     gcsHINT_PTR          hints = Instance->programState.hints;
+    gctUINT32            origGlobalWorkSize[3];
+    gctINT               origTotalNumItems = 0;
+    gctUINT16            *factor = hints ? hints->workGroupSizeFactor : gcvNULL;
 
     gcmHEADER_ARG("Kernel=0x%x Arg=0x%x WorkDim=%d",
                   Kernel, Arg, WorkDim);
@@ -846,6 +849,12 @@ clfLoadKernelArgValues(
         gcmFOOTER_ARG("%d", status);
         return status;
     }
+
+    /* for get_global_size() in shader, it should be original size */
+    origGlobalWorkSize[0] = GlobalWorkSize[0] ? GlobalWorkSize[0] * (factor && factor[0] ? factor[0] : 1) : 1;
+    origGlobalWorkSize[1] = GlobalWorkSize[1] ? GlobalWorkSize[1] * (factor && factor[1] ? factor[1] : 1) : 1;
+    origGlobalWorkSize[2] = GlobalWorkSize[2] ? GlobalWorkSize[2] * (factor && factor[2] ? factor[2] : 1) : 1;
+    origTotalNumItems = (gctINT)(origGlobalWorkSize[0] * origGlobalWorkSize[1] * origGlobalWorkSize[2]);
 
     clmONERROR(gcUNIFORM_GetType(Arg->uniform, &type, &length),
                CL_INVALID_VALUE);
@@ -1543,17 +1552,7 @@ clfLoadKernelArgValues(
     }
     else if (isUniformGlobalSize(Arg->uniform))
     {
-        /* TODO - For 64-bit GPU. */
-        /*gcoOS_MemCopy(Arg->data, GlobalWorkSize, gcmSIZEOF(size_t) * 3);*/
-        gctUINT32 globalWorkSize[3];
-
-        /* for get_global_size() in shader, it should be original size */
-        gctUINT16 *factor = hints ? hints->workGroupSizeFactor : gcvNULL;
-
-        globalWorkSize[0] = GlobalWorkSize[0] ? GlobalWorkSize[0] * (factor && factor[0] ? factor[0] : 1) : 1;
-        globalWorkSize[1] = GlobalWorkSize[1] ? GlobalWorkSize[1] * (factor && factor[1] ? factor[1] : 1) : 1;
-        globalWorkSize[2] = GlobalWorkSize[2] ? GlobalWorkSize[2] * (factor && factor[2] ? factor[2] : 1) : 1;
-        gcoOS_MemCopy(Arg->data, globalWorkSize, gcmSIZEOF(gctUINT32) * 3);
+        gcoOS_MemCopy(Arg->data, origGlobalWorkSize, gcmSIZEOF(gctUINT32) * 3);
 
         clmONERROR(clfSetUniformValue(Arg->uniform,
                                       length,
@@ -1939,21 +1938,17 @@ clfLoadKernelArgValues(
             clsArgument_PTR tempArg;
             gctBOOL isFirstPrivateArg = gcvTRUE;
 
-            gctINT totalNumItems  = GlobalWorkSize[0]
-                                  * (WorkDim > 1 ? GlobalWorkSize[1] : 1)
-                                  * (WorkDim > 2 ? GlobalWorkSize[2] : 1);
-
             clmASSERT(Arg->isMemAlloc == gcvTRUE, CL_INVALID_VALUE);
 
             /* Compare the workThreadCount with total item number and choose the smaller one. */
             if (hints->workThreadCount != 0 &&
-                (gctINT)hints->workThreadCount < totalNumItems)
+                (gctINT)hints->workThreadCount < origTotalNumItems)
             {
                 memAllocInfo->allocatedSize *= hints->workThreadCount;
             }
             else
             {
-                memAllocInfo->allocatedSize *= totalNumItems;
+                memAllocInfo->allocatedSize *= origTotalNumItems;
             }
 
             gcoCL_GetHWConfigGpuCount(&gpuCount);
@@ -2200,9 +2195,6 @@ clfLoadKernelArgValues(
     {
         clsMemAllocInfo_PTR memAllocInfo = (clsMemAllocInfo_PTR) Arg->data;
         gctINT * data;
-        gctINT totalNumItems  = GlobalWorkSize[0]
-                                  * (WorkDim > 1 ? GlobalWorkSize[1] : 1)
-                                  * (WorkDim > 2 ? GlobalWorkSize[2] : 1);
 
         clmASSERT(Arg->isMemAlloc == gcvTRUE, CL_INVALID_VALUE);
         memAllocInfo->allocatedSize = Kernel->context->devices[0]->deviceInfo.maxPrintfBufferSize;
@@ -2222,17 +2214,13 @@ clfLoadKernelArgValues(
         data = (gctINT *) &memAllocInfo->physical;
         clmONERROR(clfSetUniformValue(Arg->uniform, length, data),
                    CL_INVALID_VALUE);
-        Arg->printThreadNum = totalNumItems;
+        Arg->printThreadNum = origTotalNumItems;
 
         gcoCL_MemWaitAndGetFence(memAllocInfo->node, gcvENGINE_RENDER, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_WRITE);
     }
     else if (isUniformWorkItemPrintfBufferSize(Arg->uniform))
     {
-        gctINT totalNumItems  = GlobalWorkSize[0]
-                                  * (WorkDim > 1 ? GlobalWorkSize[1] : 1)
-                                  * (WorkDim > 2 ? GlobalWorkSize[2] : 1);
-
-        gctINT printBufferSize = Kernel->context->devices[0]->deviceInfo.maxPrintfBufferSize / totalNumItems;
+        gctINT printBufferSize = Kernel->context->devices[0]->deviceInfo.maxPrintfBufferSize / origTotalNumItems;
         gcoOS_MemCopy(Arg->data, &printBufferSize, gcmSIZEOF(printBufferSize));
 
         clmONERROR(clfSetUniformValue(Arg->uniform,
@@ -2263,14 +2251,10 @@ clfLoadKernelArgValues(
         gctINT i;
         gctPOINTER pointer;
 
-        gctINT totalNumItems  = GlobalWorkSize[0]
-                              * (WorkDim > 1 ? GlobalWorkSize[1] : 1)
-                              * (WorkDim > 2 ? GlobalWorkSize[2] : 1);
-
         clmASSERT(Arg->isMemAlloc == gcvTRUE, CL_INVALID_VALUE);
         clmASSERT(memAllocInfo->allocatedSize > 0, CL_INVALID_VALUE);
 
-        memAllocInfo->allocatedSize *= totalNumItems;
+        memAllocInfo->allocatedSize *= origTotalNumItems;
 
         /* Allocate the physical buffer */
         clmONERROR(gcoCL_AllocateMemory(&memAllocInfo->allocatedSize,
@@ -2288,7 +2272,7 @@ clfLoadKernelArgValues(
         gcoCL_MemWaitAndGetFence(memAllocInfo->node, gcvENGINE_RENDER, gcvFENCE_TYPE_ALL, gcvFENCE_TYPE_ALL);
 
         /* Copy the private data to the buffer */
-        for (i = 0; i < totalNumItems; i++)
+        for (i = 0; i < origTotalNumItems; i++)
         {
             pointer = (gctPOINTER)((gctUINTPTR_T)memAllocInfo->logical + i*Arg->size);
             gcoOS_MemCopy(pointer, memAllocInfo->data, Arg->size);
@@ -3594,6 +3578,15 @@ clfFlushVIRKernelResource(
         gctUINT                     localKernelArgSize = 0;
         gctINT                      totalArgSize = 0;
         gctINT                      totalArgAlignSize = 0;
+        gctUINT32                   origGlobalWorkSize[3];
+        gctINT                      origTotalNumItems = 0;
+        gctUINT16                   *factor = hints ? hints->workGroupSizeFactor : gcvNULL;
+
+        /* for get_global_size() in shader, it should be original size */
+        origGlobalWorkSize[0] = NDRangeKernel->globalWorkSize[0] ? NDRangeKernel->globalWorkSize[0] * (factor && factor[0] ? factor[0] : 1) : 1;
+        origGlobalWorkSize[1] = NDRangeKernel->globalWorkSize[1] ? NDRangeKernel->globalWorkSize[1] * (factor && factor[1] ? factor[1] : 1) : 1;
+        origGlobalWorkSize[2] = NDRangeKernel->globalWorkSize[2] ? NDRangeKernel->globalWorkSize[2] * (factor && factor[2] ? factor[2] : 1) : 1;
+        origTotalNumItems = (gctINT)(origGlobalWorkSize[0] * origGlobalWorkSize[1] * origGlobalWorkSize[2]);
 
         /* collect the size of local kernel args */
         for (i = 0; i < kep->resourceTable.uniformTable.countOfEntries; i++)
@@ -3709,14 +3702,13 @@ clfFlushVIRKernelResource(
                     gctINT i, privateItemsNum = 0;
                     gctPOINTER pointer;
 
-                    if (hints->workThreadCount != 0 &&
-                    (gctINT)hints->workThreadCount < totalNumItems)
+                    if (hints->workThreadCount != 0 && (gctINT)hints->workThreadCount < origTotalNumItems)
                     {
                          privateItemsNum = hints->workThreadCount;
                     }
                     else
                     {
-                        privateItemsNum = totalNumItems;
+                        privateItemsNum = origTotalNumItems;
                     }
 
                     memAllocInfo->allocatedSize *= privateItemsNum;
@@ -3952,7 +3944,7 @@ clfFlushVIRKernelResource(
             gctPOINTER pointer = gcvNULL;
             gctSIZE_T bytes = sizeof(clsMemAllocInfo);
             gctUINT32 workThreadCount, workGroupCount;
-            gctUINT32 numGroups[3], globalWorkSize[3], localWorkSize[3], globalOffset[3];
+            gctUINT32 numGroups[3], localWorkSize[3], globalOffset[3];
             clsMemAllocInfo_PTR memAllocInfo;
             gctBOOL   isCombinedMode = gcvFALSE;
 
@@ -4127,14 +4119,13 @@ clfFlushVIRKernelResource(
                     memAllocInfo =  (clsMemAllocInfo_PTR) NDRangeKernel->privateAddressSpace;
 
                     /* Compare the workThreadCount with total item number and choose the smaller one. */
-                    if (hints->workThreadCount != 0 &&
-                        (gctINT)hints->workThreadCount < totalNumItems)
+                    if (hints->workThreadCount != 0 && (gctINT)hints->workThreadCount < origTotalNumItems)
                     {
                         memAllocInfo->allocatedSize = kep->kernelHints.privateMemorySize * hints->workThreadCount;
                     }
                     else
                     {
-                        memAllocInfo->allocatedSize = kep->kernelHints.privateMemorySize * totalNumItems;
+                        memAllocInfo->allocatedSize = kep->kernelHints.privateMemorySize * origTotalNumItems;
                     }
 
                     gcoCL_GetHWConfigGpuCount(&gpuCount);
@@ -4178,13 +4169,7 @@ clfFlushVIRKernelResource(
                 break;
             case SHS_PRIV_CONSTANT_KIND_GLOBAL_SIZE:
                 {
-                     /* for get_global_size() in shader, it should be original size */
-                    gctUINT16 *factor = hints ? hints->workGroupSizeFactor : gcvNULL;
-
-                    globalWorkSize[0] = NDRangeKernel->globalWorkSize[0] ? NDRangeKernel->globalWorkSize[0] * (factor && factor[0] ? factor[0] : 1) : 1;
-                    globalWorkSize[1] = NDRangeKernel->globalWorkSize[1] ? NDRangeKernel->globalWorkSize[1] * (factor && factor[1] ? factor[1] : 1) : 1;
-                    globalWorkSize[2] = NDRangeKernel->globalWorkSize[2] ? NDRangeKernel->globalWorkSize[2] * (factor && factor[2] ? factor[2] : 1) : 1;
-                    data = (gctPOINTER)globalWorkSize;
+                    data = (gctPOINTER)origGlobalWorkSize;
                     Columns = 3;
                 }
                 break;
@@ -4228,11 +4213,11 @@ clfFlushVIRKernelResource(
                 /* Initialize printf buffer with 0xFF so we can use it to check if it is written. */
                 gcoOS_MemFill(memAllocInfo->logical, 0xFF, memAllocInfo->allocatedSize);
                 data = (gctINT *) &memAllocInfo->physical;
-                NDRangeKernel->printThreadNum = totalNumItems;
+                NDRangeKernel->printThreadNum = origTotalNumItems;
                 gcoCL_MemWaitAndGetFence(memAllocInfo->node, gcvENGINE_RENDER, gcvFENCE_TYPE_WRITE, gcvFENCE_TYPE_WRITE);
                 break;
             case SHS_PRIV_CONSTANT_KIND_WORKITEM_PRINTF_BUFFER_SIZE:
-                NDRangeKernel->printbufferSize = NDRangeKernel->kernel->context->devices[0]->deviceInfo.maxPrintfBufferSize / totalNumItems;
+                NDRangeKernel->printbufferSize = NDRangeKernel->kernel->context->devices[0]->deviceInfo.maxPrintfBufferSize / origTotalNumItems;
                 data = &NDRangeKernel->printbufferSize;
                 break;
             case SHS_PRIV_CONSTANT_KIND_WORK_THREAD_COUNT:
@@ -4573,32 +4558,28 @@ clfNeedGlobalWorkSizeWorkaround(clsCommandNDRangeKernel_PTR NDRangeKernel)
         while(i < GetShaderUniformCount((gcSHADER)NDRangeKernel->currentInstance->binary))
         {
             gcUNIFORM uniform = GetShaderUniform((gcSHADER)NDRangeKernel->currentInstance->binary, i);
-            gctCONST_STRING tmpName=gcvNULL;
-            gctUINT8 uniformName[128]={0};
+
             if (uniform == gcvNULL) break;
 
-            gcUNIFORM_GetName(uniform, gcvNULL, &tmpName);
-            gcoOS_StrCopySafe((gctSTRING)uniformName, gcmSIZEOF(uniformName), tmpName);
-
-            if (gcoOS_MemCmp(uniformName, "#global_size", 12) == gcvSTATUS_OK)
+            if (isUniformGlobalSize(uniform))
             {
                 globalWorkSizeWorkaroundNeed = gcvFALSE;
                 break;
             }
 
-            if (gcoOS_MemCmp(uniformName, "#local_size", 11) == gcvSTATUS_OK)
+            if (isUniformLocalSize(uniform))
             {
                 globalWorkSizeWorkaroundNeed = gcvFALSE;
                 break;
             }
 
-            if (gcoOS_MemCmp(uniformName, "#num_groups",11) == gcvSTATUS_OK)
+            if (isUniformNumGroups(uniform))
             {
                 globalWorkSizeWorkaroundNeed = gcvFALSE;
                 break;
             }
 
-            if (gcoOS_MemCmp(uniformName, "#global_offset",14) == gcvSTATUS_OK)
+            if (isUniformGlobalOffset(uniform))
             {
                 globalWorkSizeWorkaroundNeed = gcvFALSE;
                 break;
