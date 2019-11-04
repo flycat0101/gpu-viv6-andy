@@ -1998,6 +1998,14 @@ gckHARDWARE_ReadInterrupt(
     OUT gctUINT32_PTR IDs
     );
 
+/*
+* State timer helper.
+*/
+gceSTATUS
+gckHARDWARE_StartTimerReset(
+    IN gckHARDWARE Hardware
+    );
+
 /* Power management. */
 gceSTATUS
 gckHARDWARE_SetPowerState(

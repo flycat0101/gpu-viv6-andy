@@ -2219,6 +2219,8 @@ gckGALDEVICE_Start(
             gcmkONERROR(gckHARDWARE_SetPowerState(
                 Device->kernels[i]->hardware, gcvPOWER_OFF_BROADCAST
                 ));
+
+            gcmkONERROR(gckHARDWARE_StartTimerReset(Device->kernels[i]->hardware));
         }
     }
 
@@ -2285,6 +2287,8 @@ gckGALDEVICE_Stop(
             gcmkONERROR(gckHARDWARE_SetPowerState(
                 Device->kernels[i]->hardware, gcvPOWER_OFF
                 ));
+
+            gckHARDWARE_StartTimerReset(Device->kernels[i]->hardware);
         }
 
         /* Stop the ISR routine. */

@@ -1870,6 +1870,18 @@ gckSTATETIMER_Reset(
     gckOS_ZeroMemory(StateTimer->elapse, gcmSIZEOF(StateTimer->elapse));
 }
 
+gceSTATUS
+gckHARDWARE_StartTimerReset(
+    IN gckHARDWARE Hardware
+    )
+{
+    gcmkHEADER();
+
+    gckSTATETIMER_Reset(&Hardware->powerStateCounter, 0);
+
+    gcmkFOOTER();
+    return gcvSTATUS_OK;
+}
 
 static void
 gckSTATETIMER_Accumulate(
@@ -2271,8 +2283,6 @@ gckHARDWARE_Construct(
 
     hardware->minFscaleValue = 1;
     hardware->waitCount = 200;
-
-    gckSTATETIMER_Reset(&hardware->powerStateCounter, 0);
 
 #if gcdLINK_QUEUE_SIZE
     gcmkONERROR(gckQUEUE_Allocate(hardware->os, &hardware->linkQueue, gcdLINK_QUEUE_SIZE));
