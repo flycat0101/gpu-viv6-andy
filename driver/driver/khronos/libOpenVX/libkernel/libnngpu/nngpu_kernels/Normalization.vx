@@ -24,7 +24,7 @@ __kernel void gpuNormalization_AcrossMapsFP32(
     }
 
     tmp = read_imagef(input, coord);
-    divider = pow(bias+alpha*sqrSum, beta);
+    divider = exp2(beta * log2(bias+alpha*sqrSum));
     dst.x = tmp.x/divider;
     write_imagef(output, coord, dst);
 }
@@ -61,7 +61,7 @@ __kernel void gpuNormalization_AcrossMapsQuant8(
 
     tmp = read_imageui(input, coord);
     inPixel = (convert_int(tmp.x-zpIn))*scaleIn;
-    divider = pow(bias+alpha*sqrSum, beta);
+    divider = exp2(beta * log2(bias+alpha*sqrSum));
     dst.x = floor(inPixel/divider*scaleOut + zpOut + 0.5);
     write_imageui(output, coord, dst);
 }
@@ -99,7 +99,7 @@ __kernel void gpuNormalization_SameMapsFP32(
     }
 
     tmp = read_imagef(input, coord);
-    divider = pow(1+alpha*sqrSum, beta);
+    divider = exp2(beta * log2(1+alpha*sqrSum));
     dst.x = tmp.x/divider;
     write_imagef(output, coord, dst);
 }
@@ -142,7 +142,7 @@ __kernel void gpuNormalization_SameMapsQuant8(
 
     tmp = read_imageui(input, coord);
     inPixel = (convert_int(tmp.x-zpIn))*scaleIn;
-    divider = pow(1+alpha*sqrSum, beta);
+    divider = exp2(beta * log2(1+alpha*sqrSum));
     dst.x = floor(inPixel/divider*scaleOut + zpOut + 0.5);
     write_imageui(output, coord, dst);
 }

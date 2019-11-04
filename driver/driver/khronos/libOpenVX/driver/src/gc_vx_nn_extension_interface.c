@@ -8148,6 +8148,17 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
             alpha = alpha * (vx_float32)(norm_size * norm_size);
         }
     }
+    else
+    {
+        if (acrossmap_flag)
+        {
+            if(!context->evisNoInst.supportEVIS)
+            {
+                alpha = alpha / (vx_float32)div;
+                norm_size = norm_size / 2;
+            }
+        }
+    }
 
     type_s      = vxCreateScalar(context, VX_TYPE_ENUM, &norm_type);
     norm_size_s = vxCreateScalar(context, VX_TYPE_UINT32, &norm_size);
