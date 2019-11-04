@@ -7196,6 +7196,9 @@ VkResult halti5_patch_pipeline(
                 i++;
             }
 
+            if (totalEntries == 0)
+                return result;
+
             /*handle all the Post_High level patch per shader stage*/
             for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx++)
             {
