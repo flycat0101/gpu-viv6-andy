@@ -6594,7 +6594,8 @@ _Clear(
             }
 
             if ((gcoSURF_IsRenderable(surf) == gcvSTATUS_OK) &&
-                (!(patchID == gcvPATCH_SKIA_SKQP && chipModel == gcv600 && chipRevision == 0x4653)))
+                (!(patchID == gcvPATCH_SKIA_SKQP && chipModel == gcv600 && chipRevision == 0x4653)) &&
+                (!(patchID == gcvPATCH_NATIVEHARDWARE_CTS && chipModel == gcv7000 && chipRevision == 0x6203 && surf->format == gcvSURF_A16B16G16R16F)))
             {
                 /* 4. Try 3D draw clear.
                  * Resolve clear will need to decompress and disable tile status
