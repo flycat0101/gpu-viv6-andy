@@ -1556,7 +1556,6 @@ slsPREDEFINED_MACRO;
 static slsPREDEFINED_MACRO _PredefinedMacros[] =
 {
    {"GL_ES", "1", gcvNULL, gcvFALSE},
-   {"GL_OES_standard_derivatives", gcvNULL, gcvNULL, gcvFALSE},
    {"GL_EXT_texture_array", gcvNULL, gcvNULL, gcvFALSE},
    {"GL_OES_texture_3D", gcvNULL, gcvNULL, gcvFALSE},
    {"GL_EXT_frag_depth", gcvNULL, gcvNULL, gcvFALSE},
@@ -1568,6 +1567,7 @@ static slsPREDEFINED_MACRO _PredefinedMacros[] =
    {"_VIV_IMG_RD_WR_NEED_SW_BORDERCOLOR", gcvNULL, vivImgRdWrNeedSWBordercolor, gcvFALSE},
 
    /* The extensions below need to check if they are enabled. */
+   {"GL_OES_standard_derivatives", gcvNULL, gcvNULL, gcvTRUE},
    {"GL_KHR_blend_equation_advanced", "1", gcvNULL, gcvTRUE},
    {"GL_OES_texture_storage_multisample_2d_array", "1", gcvNULL, gcvTRUE},
    {"GL_OES_sample_variables", "1", gcvNULL, gcvTRUE},
