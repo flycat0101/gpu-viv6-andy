@@ -10057,10 +10057,18 @@ VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
 
     hasDest = VIR_OPCODE_hasDest(virOpcode);
 
-    if (spv->resultId)
+     if (spv->resultId || (hasDest && spv->opCode == SpvOpAtomicStore))
     {
-        resultId = spv->resultId;
-        resultTypeId = spv->resultTypeId;
+        if (spv->resultId)
+        {
+            resultId = spv->resultId;
+            resultTypeId = spv->resultTypeId;
+        }
+        else
+        {
+            /* SpvOpAtomicStore has no resultID, use type of src1 as the dstVirType */
+            resultTypeId = spv->operands[1];
+        }
 
         dstVirTypeId = SPV_ID_TYPE_VIR_TYPE_ID(resultTypeId);
         dstVirType = SPV_ID_TYPE_VIR_TYPE(resultTypeId);
