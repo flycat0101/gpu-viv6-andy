@@ -541,6 +541,9 @@ struct _ppoPREPROCESSOR
     gctFILE                    ppLogFile;
     gctINT                     ppLineNumber;
     gctUINT                    logCurrentSize;
+    gctBOOL                    addToTempStream;
+    ppoTOKEN                   tempTokenStreamHead;
+    ppoTOKEN                   tempTokenStreamEnd;
 
     /*
     ** to skip undefined identifiers error,

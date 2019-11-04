@@ -416,6 +416,7 @@ gceSTATUS
 ppoPREPROCESSOR_BufferActualArgs(ppoPREPROCESSOR PP, ppoINPUT_STREAM *IS, ppoTOKEN* Head, ppoTOKEN* End)
 {
     ppoTOKEN            ntoken        = gcvNULL;
+    ppoTOKEN            ntoken2       = gcvNULL;
     gctINT                locallevel    = 0;
     gceSTATUS            status        = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 
@@ -521,6 +522,54 @@ ppoPREPROCESSOR_BufferActualArgs(ppoPREPROCESSOR PP, ppoINPUT_STREAM *IS, ppoTOK
         else if(ntoken->poolString == PP->keyword->rpara)
         {
             --locallevel;
+        }
+        else if (ntoken->poolString == PP->keyword->sharp &&
+            ntoken->hideSet == gcvNULL)
+        {
+            /*#*/
+            gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken2, !ppvICareWhiteSpace));
+            /*hideSet should be gcvNULL*/
+            gcmASSERT(ntoken2->hideSet == gcvNULL);
+
+            /*# if/ifdef/ifndef*/
+            if (ntoken2->poolString == PP->keyword->if_    ||
+                ntoken2->poolString == PP->keyword->ifdef  ||
+                ntoken2->poolString == PP->keyword->ifndef)
+            {
+                PP->addToTempStream = gcvTRUE;
+                PP->tempTokenStreamHead = gcvNULL;
+                PP->tempTokenStreamEnd = gcvNULL;
+                gcmONERROR(ppoPREPROCESSOR_IfSection(PP, ntoken2));
+                PP->addToTempStream = gcvFALSE;
+                /* add temp stream to input stream */
+                if(PP->tempTokenStreamHead)
+                {
+                    ppoTOKEN expanded_id_head = PP->tempTokenStreamHead;
+                    ppoTOKEN expanded_id_end = PP->tempTokenStreamEnd;
+                    gcmASSERT(PP->tempTokenStreamEnd != gcvNULL);
+                    PP->inputStream->base.node.next = (void*)expanded_id_end;
+                    expanded_id_end->inputStream.base.node.prev = (void*)PP->inputStream;
+                    PP->inputStream = (void*)expanded_id_head;
+                    expanded_id_head->inputStream.base.node.next = gcvNULL;
+                }
+                if(*IS)
+                {
+                    status = (*IS)->GetToken(PP, IS, &ntoken, !ppvICareWhiteSpace);            ppmCheckOK();
+                }
+                else
+                {
+                    gcmONERROR(
+                        ppoTOKEN_Destroy(PP, ntoken)
+                        );
+
+                    ppoPREPROCESSOR_Report(PP,clvREPORT_ERROR, "unexpected end of file.");
+
+                    status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+                    gcmFOOTER();
+                    return status;
+                }
+                continue;
+            }
         }
 
         if((*Head) == gcvNULL)

@@ -1135,6 +1135,58 @@ ppoPREPROCESSOR_TextLine_AddToInputAfterMacroExpand(
     return gcvSTATUS_OK;
 }
 
+/*******************************************************************************
+**
+**    ppoPREPROCESSOR_TextLine_AddToTempStream
+**
+*/
+
+gceSTATUS
+ppoPREPROCESSOR_TextLine_AddToTempStream(
+    ppoPREPROCESSOR PP,
+    ppoTOKEN Token
+    )
+{
+    ppoTOKEN ntoken = gcvNULL;
+    gceSTATUS status = gcvSTATUS_INVALID_ARGUMENT;
+
+    gcmASSERT(PP && Token);
+
+    status = ppoTOKEN_Colon(
+        PP,
+        Token,
+        __FILE__,
+        __LINE__,
+        "Dump for adding this token to the temp stream of cpp.",
+        &ntoken);                                                                ppmCheckOK();
+
+    if ((PP->tempTokenStreamEnd == PP->tempTokenStreamHead) &&
+        (PP->tempTokenStreamEnd == gcvNULL))
+    {
+        /*empty list*/
+
+        PP->tempTokenStreamEnd = PP->tempTokenStreamHead = ntoken;
+
+        ntoken->inputStream.base.node.prev = gcvNULL;
+
+        ntoken->inputStream.base.node.next = gcvNULL;
+    }
+    else
+    {
+        /*not empty list, link the ntoken to the prev of the end one.*/
+
+        ntoken->inputStream.base.node.next = (void*)PP->tempTokenStreamEnd;
+
+        ntoken->inputStream.base.node.prev = gcvNULL;
+
+        PP->tempTokenStreamEnd->inputStream.base.node.prev = (void*)ntoken;
+
+        PP->tempTokenStreamEnd = ntoken;
+    }
+
+    return gcvSTATUS_OK;
+}
+
 gceSTATUS
 ppoPREPROCESSOR_TextLine_CheckSelfContainAndIsMacroOrNot(
     ppoPREPROCESSOR PP,
@@ -1286,10 +1338,21 @@ ppoPREPROCESSOR_TextLine(ppoPREPROCESSOR PP)
             }/*else if(ntoken->type == ppvTokenType_ID)*/
             else
             {
-                /*Not ID*/
-                ppmCheckFuncOk( ppoPREPROCESSOR_AddToOutputStreamOfPP(PP, ntoken) );
+                if (PP->addToTempStream)
+                {
+                    status = ppoPREPROCESSOR_TextLine_AddToTempStream(
+                            PP,
+                            ntoken);
 
-                ppmCheckFuncOk( ppoTOKEN_Destroy(PP, ntoken) );
+                    if(status != gcvSTATUS_OK) return status;
+                }
+                else
+                {
+                    /*Not ID*/
+                    ppmCheckFuncOk( ppoPREPROCESSOR_AddToOutputStreamOfPP(PP, ntoken) );
+
+                    ppmCheckFuncOk( ppoTOKEN_Destroy(PP, ntoken) );
+                }
 
             }
 
