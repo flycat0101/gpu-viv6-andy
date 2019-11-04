@@ -3719,7 +3719,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
-    vx_bool                 enable_cast_format,
+    vx_bool                 enable_reorgWeights,
     vx_tensor               input,
     vx_tensor               weight,
     vx_tensor               bias,
