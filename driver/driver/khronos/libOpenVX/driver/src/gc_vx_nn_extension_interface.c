@@ -17553,7 +17553,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                             convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
                             weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
                         }
-                        else
+                        else if (!enable_ofm_gt_xy)
                         {
                             weights_new_rs = weights;
                         }
