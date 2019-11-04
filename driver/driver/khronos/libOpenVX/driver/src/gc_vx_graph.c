@@ -2054,14 +2054,14 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                                         TENSOR_VIEW_SIZE_INDEX(opInfo.output, 2)};
             vx_uint32 transposeSize = 0;
 
-            if (convOperation->resultInfo.kernelsPerCore == 0)
+            /*if (convOperation->resultInfo.kernelsPerCore == 0)*/
             {
                 vxnne_tiling_info_s tilingsInfo[8];
                 vxnne_operation op;
                 vx_uint32 j;
 
                 j = 0;
-                op = operation;
+                op = operation->mGpuHead;
                 while (op != VX_NULL)
                 {
                     vxnne_convolution_relu_pooling_operation convOperationT = (vxnne_convolution_relu_pooling_operation)op;
@@ -2086,7 +2086,7 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                                                         graph->base.context->vipSRAM.size);
 
                 j = 0;
-                op = operation;
+                op = operation->mGpuHead;
                 while (op != VX_NULL)
                 {
                     vxnne_convolution_relu_pooling_operation convOperationT = (vxnne_convolution_relu_pooling_operation)op;
@@ -3995,7 +3995,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                     vx_uint32 j;
 
                     j = 0;
-                    op = operation;
+                    op = operation->mGpuHead;
                     while (op != VX_NULL)
                     {
                         vxnne_convolution_relu_pooling_operation convOperationT = (vxnne_convolution_relu_pooling_operation)op;
@@ -4020,7 +4020,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                                                            graph->base.context->vipSRAM.size);
 
                     j = 0;
-                    op = operation;
+                    op = operation->mGpuHead;
                     while (op != VX_NULL)
                     {
                         vxnne_convolution_relu_pooling_operation convOperationT = (vxnne_convolution_relu_pooling_operation)op;
@@ -5346,6 +5346,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_Handle(
     }
     else if (VXNNE_OPERATION_TARGET_NN == operation->target)
     {
+        struct _vxnne_operation_s*      gpuHead = NULL;
         for (gpuIndex = 0; gpuIndex < splitCount; gpuIndex++)
         {
             vxmONERROR(vxoMultiGPU_SplitOperation(node, operation));
@@ -5360,10 +5361,16 @@ VX_PRIVATE_API vx_status vxoMultiGPU_Handle(
                                                      splitCount, gpuIndex));
                 layer->operations[layer->base.num_operations] = &nnOperation->base;
                 layer->operations[layer->base.num_operations]->gpuId = gpuIndex;
+                if (gpuIndex == 0)
+                {
+                    gpuHead = layer->operations[layer->base.num_operations];
+                }
                 if (gpuIndex > 0)
                 {
                     layer->operations[layer->base.num_operations-1]->mGpuNext = layer->operations[layer->base.num_operations];
                 }
+                layer->operations[layer->base.num_operations]->mGpuHead = gpuHead;
+
                 if (gpuIndex == splitCount - 1)
                 {
                     layer->operations[layer->base.num_operations]->mGpuSync = vx_true_e;

@@ -522,6 +522,7 @@ typedef struct _vxnne_operation_s
     vx_uint32                       gpuId;
     vx_bool                         mGpuSync;
     struct _vxnne_operation_s*      mGpuNext;
+    struct _vxnne_operation_s*      mGpuHead;
 
     vx_uint32                       opDepth;
     vx_uint32                       opSequence;
