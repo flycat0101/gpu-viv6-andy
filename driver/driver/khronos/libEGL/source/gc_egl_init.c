@@ -478,6 +478,8 @@ _FillIn(
                 gcmPRINT("EGL: enable all configs for conformance test");
                 printed = gcvTRUE;
             }
+            config->renderableType &= ~EGL_OPENGL_BIT;
+            config->conformant     &= ~EGL_OPENGL_BIT;
         }
     }
 #endif
