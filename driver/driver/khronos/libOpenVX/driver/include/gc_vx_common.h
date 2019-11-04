@@ -1916,7 +1916,6 @@ typedef struct _vx_tensor_t
     vx_uint32                               viewOffset;
 
     vx_tensor_buffer_s *                    tensorBuffer; /* shared by all related tensors */
-    vx_bool                                 isVirtual;
 
     /* they are same as those in memory structure in most time unless reshaped */
     vx_uint32                               dimCount;

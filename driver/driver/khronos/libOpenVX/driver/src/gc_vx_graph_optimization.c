@@ -1072,7 +1072,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_LayerSwaping(vx_graph graph)
             if(NULL == intermediaTensor)
                 continue;
 
-            intermediaTensor->isVirtual = vx_true_e; // set intermedia Tensor to b be virtual.
+            intermediaTensor->base.isVirtual = vx_true_e; // set intermedia Tensor to b be virtual.
 
             vxoNode_SetParameter(maxPoolNode, 0, (vx_reference)leakyInput);
             vxoNode_SetParameter(leakyReluNode, leakyReluNode->numParameters - 1, (vx_reference)maxpoolOutput);
@@ -3979,7 +3979,7 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_multiTranspose_mergeTransposes(vx_
     if(sync)
     {
         /*if input can not be repalced, replace the casted node's input*/
-        if(input->isViewed || !input->isVirtual)
+        if(input->isViewed || !input->base.isVirtual)
         {
             vx_node* nodeTable = transposeNodes[0]->graph->nodeTable;
             vx_node tailnode = transposeNodes[nodeCnt - 1];

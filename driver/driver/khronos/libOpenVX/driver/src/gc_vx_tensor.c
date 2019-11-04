@@ -488,7 +488,7 @@ vxoTensor_Create(
         tensor->elementSize = elementSize;
 
         tensor->tensorBuffer = tensorBuffer;
-        tensor->isVirtual = vx_false_e;
+        tensor->base.isVirtual = vx_false_e;
         tensor->baseAddressOffset = baseOffset;
 
         if (viewRegion != VX_NULL)
@@ -509,7 +509,7 @@ vxoTensor_Create(
 
     if (tensorType & VX_TENSOR_VIRTUAL)
     {
-        tensor->isVirtual = vx_true_e;
+        tensor->base.isVirtual = vx_true_e;
     }
 
     tensor->tensorBuffer->bufRefCount++;
@@ -1929,7 +1929,7 @@ _CreateTensorFromView(
                     &viewMerged.viewRegion,
                     tensor->tensorBuffer,
                     tensor->baseAddressOffset,
-                    tensor->isVirtual ? VX_TENSOR_SHARED | VX_TENSOR_VIRTUAL : VX_TENSOR_SHARED,
+                    tensor->base.isVirtual ? VX_TENSOR_SHARED | VX_TENSOR_VIRTUAL : VX_TENSOR_SHARED,
                     kind
                     );
 
@@ -2294,7 +2294,7 @@ vxCopyTensorPatchForNN11(
         }
     }
 
-    if (tensor->isVirtual)
+    if (tensor->base.isVirtual)
     {
         gcmFOOTER_NO();
         return VX_ERROR_OPTIMIZED_AWAY;
@@ -2487,7 +2487,7 @@ vxoCopyTensorPatch(
         if (!vxoTensor_CheckValidTensorAddressing(tensor, user_addr)) return VX_ERROR_INVALID_REFERENCE;
     }
 
-    if (tensor->isVirtual) return VX_ERROR_OPTIMIZED_AWAY;
+    if (tensor->base.isVirtual) return VX_ERROR_OPTIMIZED_AWAY;
 
     if (user_ptr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -2622,7 +2622,7 @@ _ReshapeTensor(
                 VX_NULL,
                 tensor->tensorBuffer,
                 tensor->baseAddressOffset + offset,
-                tensor->isVirtual ? VX_TENSOR_SHARED | VX_TENSOR_VIRTUAL : VX_TENSOR_SHARED,
+                tensor->base.isVirtual ? VX_TENSOR_SHARED | VX_TENSOR_VIRTUAL : VX_TENSOR_SHARED,
                 kind
                 );
 }
@@ -2802,7 +2802,7 @@ vxoTensor_IsVirtualTensor(
     vx_tensor tensor
     )
 {
-    return tensor->isVirtual;
+    return tensor->base.isVirtual;
 }
 
 VX_INTERNAL_API vx_bool
@@ -3336,12 +3336,12 @@ _AllocateMemory(
     }
     else if (real)
     {
-        if (!tensor->isVirtual &&
+        if (!tensor->base.isVirtual &&
             !vxoMemory_Allocate(tensor->base.context, &tensor->tensorBuffer->memory))
         {
             status = VX_FAILURE;
         }
-        else if (tensor->isVirtual &&
+        else if (tensor->base.isVirtual &&
                  !vxoMemory_AllocateEx(tensor->base.context, &tensor->tensorBuffer->memory))
         {
             status = VX_FAILURE;
@@ -3389,12 +3389,12 @@ _ReleaseMemory(
     }
     if (real)
     {
-        if (!tensor->isVirtual &&
+        if (!tensor->base.isVirtual &&
             !vxoMemory_Free(tensor->base.context, &tensor->tensorBuffer->memory))
         {
             status = VX_FAILURE;
         }
-        else if (tensor->isVirtual &&
+        else if (tensor->base.isVirtual &&
                  !vxoMemory_FreeEx(tensor->base.context, &tensor->tensorBuffer->memory))
         {
             status = VX_FAILURE;
@@ -3880,7 +3880,7 @@ VX_INTERNAL_API vx_tensor vxoTensor_ReformatTensor(vx_tensor tensor, vx_enum for
                             VX_NULL,
                             tensor->tensorBuffer,
                             tensor->baseAddressOffset + offset,
-                            tensor->isVirtual ? VX_TENSOR_SHARED | VX_TENSOR_VIRTUAL : VX_TENSOR_SHARED,
+                            tensor->base.isVirtual ? VX_TENSOR_SHARED | VX_TENSOR_VIRTUAL : VX_TENSOR_SHARED,
                             VX_REF_INTERNAL);
 }
 
