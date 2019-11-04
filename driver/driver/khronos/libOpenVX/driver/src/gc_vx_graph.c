@@ -9572,7 +9572,16 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyNNTranspose(vx_graph graph)
                 }
             }
 
-            operation->bTransposeOut = (transposeOutChannel > 0) ? vx_true_e : vx_false_e;
+            if ((transposeOutChannel > 0) &&
+                (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_OUTIMAGE_X_BITWIDTH_LIMIT_FOR_NN_TRANSPOSE_FIX) || (transposeOutChannel * TENSOR_SIZE_INDEX(output, 0) < NN_IMAGE_XSIZE_MAX)))
+            {
+                operation->bTransposeOut = vx_true_e;
+            }
+            else
+            {
+                operation->bTransposeOut = vx_false_e;
+            }
+
             operation->transposeOutChannel = transposeOutChannel;
             output->tensorBuffer->memory.transposeChannel = operation->transposeOutChannel;
         }
