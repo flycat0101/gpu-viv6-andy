@@ -5044,7 +5044,8 @@ static void halti5_pip_build_patchKeyMask(
             PROG_VK_RESOURCE_SET *resSet;
             __vkDescriptorSetLayout *descSetLayout  = pip->pipelineLayout->descSetLayout[setIdx];
             __VK_ASSERT((descSetLayout->samplerDescriptorCount + descSetLayout->samplerBufferDescriptorCount
-                       + descSetLayout->inputAttachmentDescriptorCount) ==chipPipeline->patchKeyCount[setIdx]);
+                        + descSetLayout->inputAttachmentDescriptorCount + descSetLayout->storageDescriptorCount)
+                        == chipPipeline->patchKeyCount[setIdx]);
 
             if (chipPipeline->masterInstance->pep.u.vk.pResourceSets == VK_NULL_HANDLE)
             {
@@ -5304,6 +5305,28 @@ static void halti5_pip_build_patchKeyMask(
                             chipPipeline->patchTexBufFormat[setIdx][keyIndex] = tableEntry->imageFormatInfo.imageFormat;
                             chipPipeline->patchKeys[setIdx][keyIndex++] = patchKey;
                         }
+                    }
+                    break;
+                case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+                    {
+                        uint32_t entryIdx;
+                        PROG_VK_STORAGE_TABLE_ENTRY *tableEntry = VK_NULL_HANDLE;
+                        halti5_patch_key patchKey = 0;
+                        for (entryIdx = 0; entryIdx < resSet->storageTable.countOfEntries; entryIdx++)
+                        {
+                            tableEntry = &resSet->storageTable.pStorageEntries[entryIdx];
+                            if ((tableEntry->storageBinding.set == setIdx) &&
+                                (tableEntry->storageBinding.binding == binding->std.binding))
+                            {
+                                break;
+                            }
+                        }
+                        __VK_ASSERT(entryIdx < resSet->storageTable.countOfEntries);
+
+                        patchKey |= HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
+
+                        chipPipeline->patchStorageImgFormat[setIdx][keyIndex] = tableEntry->imageFormatInfo.imageFormat;
+                        chipPipeline->patchKeys[setIdx][keyIndex++] = patchKey;
                     }
                     break;
                 default:
@@ -5707,7 +5730,8 @@ static VkResult halti5_pip_build_gfxshaders(
             __vkDescriptorSetLayout *descSetLayout = pip->pipelineLayout->descSetLayout[i];
             chipPipeline->patchKeyCount[i] = descSetLayout->samplerDescriptorCount
                                            + descSetLayout->samplerBufferDescriptorCount
-                                           + descSetLayout->inputAttachmentDescriptorCount;
+                                           + descSetLayout->inputAttachmentDescriptorCount
+                                           + descSetLayout->storageDescriptorCount;
             if (chipPipeline->patchKeyCount[i])
             {
                 chipPipeline->patchKeys[i] =
@@ -5716,6 +5740,14 @@ static VkResult halti5_pip_build_gfxshaders(
                 chipPipeline->patchTexBufFormat[i] =
                     (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i], 8,
                                                    VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                if (descSetLayout->storageDescriptorCount)
+                {
+                    chipPipeline->patchStorageImgFormat[i] =
+                        (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * descSetLayout->storageDescriptorCount, 8,
+                                                       VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                    __VK_ONERROR(chipPipeline->patchStorageImgFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                    __VK_MEMZERO(chipPipeline->patchStorageImgFormat[i], sizeof(VSC_IMAGE_FORMAT) * descSetLayout->storageDescriptorCount);
+                }
 
                 __VK_ONERROR(chipPipeline->patchKeys[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                 __VK_ONERROR(chipPipeline->patchTexBufFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
@@ -6328,7 +6360,8 @@ static VkResult halti5_pip_build_computeshader(
             __vkDescriptorSetLayout *descSetLayout = pip->pipelineLayout->descSetLayout[i];
             chipPipeline->patchKeyCount[i] = descSetLayout->samplerDescriptorCount
                                            + descSetLayout->samplerBufferDescriptorCount
-                                           + descSetLayout->inputAttachmentDescriptorCount;
+                                           + descSetLayout->inputAttachmentDescriptorCount
+                                           + descSetLayout->storageDescriptorCount;
             if (chipPipeline->patchKeyCount[i])
             {
                 chipPipeline->patchKeys[i] =
@@ -7033,6 +7066,14 @@ VkResult halti5_destroyPipeline(
         {
             __VK_FREE(chipPipeline->patchKeys[i]);
         }
+        if (chipPipeline->patchTexBufFormat[i])
+        {
+            __VK_FREE(chipPipeline->patchTexBufFormat[i]);
+        }
+        if (chipPipeline->patchStorageImgFormat[i])
+        {
+            __VK_FREE(chipPipeline->patchStorageImgFormat[i]);
+        }
     }
 
     __VK_FREE(pip->chipPriv);
@@ -7235,7 +7276,7 @@ VkResult halti5_patch_pipeline(
                     vscCompileParams.pShLibLinkTable = (VSC_SHADER_LIB_LINK_TABLE *)__VK_ALLOC(sizeof(VSC_SHADER_LIB_LINK_TABLE), 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                     shaderLinkTable = vscCompileParams.pShLibLinkTable;
                     __VK_ONERROR(shaderLinkTable ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-                    shaderLinkTable->pShLibLinkEntries = (VSC_SHADER_LIB_LINK_ENTRY *)__VK_ALLOC(sizeof(VSC_SHADER_LIB_LINK_ENTRY) * 4, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                    shaderLinkTable->pShLibLinkEntries = (VSC_SHADER_LIB_LINK_ENTRY *)__VK_ALLOC(sizeof(VSC_SHADER_LIB_LINK_ENTRY) * 8, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                     __VK_ONERROR(shaderLinkTable->pShLibLinkEntries ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
 
                     __VK_MEMZERO(shaderLinkTable->pShLibLinkEntries, sizeof(VSC_SHADER_LIB_LINK_ENTRY) * 4);
@@ -7265,6 +7306,42 @@ VkResult halti5_patch_pipeline(
                                             VSC_IMAGE_FORMAT mapedFormat = VSC_IMAGE_FORMAT_NONE;
 
                                             if (mapTable[texBufFormat].drvFormat != (VkFormat)patchInfo->patchFormat)
+                                            {
+                                                for (m = 0; m < __VK_VSC_DRV_FORMAT_MAP_NUM; m++)
+                                                {
+                                                    if ((VkFormat)patchInfo->patchFormat == mapTable[m].drvFormat)
+                                                    {
+                                                        mapedFormat = mapTable[m].vscFormat;
+                                                        break;
+                                                    }
+                                                }
+
+                                                if (patchInfo->patchStages & (1 << stageIdx))
+                                                {
+                                                    __VK_ASSERT(linkIdx < 4);
+
+                                                    shaderLinkTable->shLinkEntryCount = linkIdx + 1;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].applyLevel = VSC_SHLEVEL_Post_High;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].linkPointCount = 1;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].hShaderLib = gcvNULL;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].pTempHashTable = gcvNULL;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_IMAGE_FORMAT;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].strFunc = gcvNULL;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.binding = patchInfo->binding;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.imageFormat = mapedFormat;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.set = i;
+                                                    shaderLinkTable->pShLibLinkEntries[linkIdx].linkPoint[0].u.imageFormat.arrayIndex = patchInfo->arrayIndex;
+
+                                                    compileFlag = VK_TRUE;
+                                                }
+                                            }
+                                            totalEntries--;
+                                        }else if (k == HALTI5_PATCH_STORAGE_IMAGE_FORMAT)
+                                        {
+                                            VSC_IMAGE_FORMAT storeImgFormat = chipPipeline->patchStorageImgFormat[i][j];
+                                            VSC_IMAGE_FORMAT mapedFormat = VSC_IMAGE_FORMAT_NONE;
+
+                                            if (mapTable[storeImgFormat].drvFormat != (VkFormat)patchInfo->patchFormat)
                                             {
                                                 for (m = 0; m < __VK_VSC_DRV_FORMAT_MAP_NUM; m++)
                                                 {

@@ -102,6 +102,7 @@ typedef struct __vkDescriptorSetLayoutRec
 
     uint32_t inputAttachmentDescriptorCount; /* input attachment descriptor count */
 
+    uint32_t storageDescriptorCount;
     uint32_t totalEntries;
 
     uint32_t validFlag; /* used to mark whether valid for this descriptorSetLayout*/

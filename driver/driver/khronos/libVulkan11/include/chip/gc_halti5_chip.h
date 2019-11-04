@@ -629,6 +629,7 @@ enum halti_patch_type
     HALTI5_PATCH_TX_EXTRA_INPUT_GRAD     = 5,
     HALTI5_PATCH_TX_GATHER_PCF           = 6,
     HALTI5_PATCH_FORMAT_TO_COMPILER      = 7,
+    HALTI5_PATCH_STORAGE_IMAGE_FORMAT    = 8,
 };
 
 enum
@@ -641,6 +642,7 @@ enum
     HALTI5_PATCH_TX_EXTRA_INPUT_GRAD_BIT      = 1 << HALTI5_PATCH_TX_EXTRA_INPUT_GRAD,
     HALTI5_PATCH_TX_GATHER_PCF_BIT            = 1 << HALTI5_PATCH_TX_GATHER_PCF,
     HALTI5_PATCH_FORMAT_TO_COMPILER_BIT       = 1 << HALTI5_PATCH_FORMAT_TO_COMPILER,
+    HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT      = 1 << HALTI5_PATCH_STORAGE_IMAGE_FORMAT,
 
     HALTI5_PATCHKEY_ALL_BITS                = 0xFFFF,
 };
@@ -687,6 +689,7 @@ typedef struct
     /* number of patch key for each descriptor set */
     uint32_t patchKeyCount[__VK_MAX_DESCRIPTOR_SETS];
     VSC_IMAGE_FORMAT *patchTexBufFormat[__VK_MAX_DESCRIPTOR_SETS];
+    VSC_IMAGE_FORMAT *patchStorageImgFormat[__VK_MAX_DESCRIPTOR_SETS];
     /* number of valid key array */
     uint32_t keyCount;
 

@@ -10917,6 +10917,12 @@ VkResult halti5_createImageView(
         }
     }
 
+    if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
+    {
+        chipImgv->patchFormat = residentImgFormat;
+        chipImgv->patchKey = HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
+    }
+
     switch (residentImgFormat)
     {
     case __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT:
@@ -11107,7 +11113,8 @@ VkResult halti5_allocDescriptorSet(
     __vkDescriptorSet *descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet*, descriptorSet);
     uint32_t numofEntries = descSet->descSetLayout->samplerDescriptorCount
                           + descSet->descSetLayout->samplerBufferDescriptorCount
-                          + descSet->descSetLayout->inputAttachmentDescriptorCount;
+                          + descSet->descSetLayout->inputAttachmentDescriptorCount
+                          + descSet->descSetLayout->storageDescriptorCount;
     size_t bytes = __VK_ALIGN(sizeof(halti5_descriptorSet), 8)
                  + __VK_ALIGN(sizeof(halti5_patch_key)  * numofEntries, 8)
                  + __VK_ALIGN(sizeof(halti5_patch_info) * numofEntries, 8);
@@ -11754,6 +11761,23 @@ VkResult halti5_updateDescriptorSet(
                 break;
 
             case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+                if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                {
+                    __vkImageView *imgv = resInfo->u.imageInfo.imageView;
+                    halti5_imageView *chipImgv = (halti5_imageView *)imgv->chipPriv;
+                    __VK_ASSERT(resInfo->type == __VK_DESC_RESOURCE_IMAGEVIEW_INFO);
+                    if (chipImgv->patchKey)
+                    {
+                        patchKeys[entryIdx] = chipImgv->patchKey;
+                        patchInfos[entryIdx].binding = binding->std.binding;
+                        patchInfos[entryIdx].arrayIndex = j;
+                        patchInfos[entryIdx].patchStages = binding->std.stageFlags;
+                        patchInfos[entryIdx].patchFormat = chipImgv->patchFormat;
+                        patchInfos[entryIdx].viewType = imgv->createInfo.viewType;
+                        patchIdx++;
+                    }
+                }
+                entryIdx++;
                 break;
 
             case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:

@@ -818,6 +818,12 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDescriptorSetLayout(
                 break;
             case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
                 dsl->inputAttachmentDescriptorCount += pBinding->std.descriptorCount;
+                break;
+            case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+                dsl->storageDescriptorCount += pBinding->std.descriptorCount;
+                break;
+            case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+                break;
             default:
                 break;
             }
