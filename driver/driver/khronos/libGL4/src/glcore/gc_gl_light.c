@@ -309,7 +309,7 @@ GLvoid APIENTRY __glim_LightModelfv(__GLcontext *gc, GLenum pname, const GLfloat
 
 GLvoid APIENTRY __glim_LightModelf(__GLcontext *gc, GLenum pname, GLfloat f)
 {
-    GLfloat tmpf[4] ;
+    GLfloat tmpf[4] = {0.0, 0.0, 0.0, 0.0};
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
     /* Accept only enumerants that correspond to single values */
@@ -352,7 +352,7 @@ GLvoid APIENTRY __glim_LightModeliv(__GLcontext *gc, GLenum pname, const GLint *
 
 GLvoid APIENTRY __glim_LightModeli(__GLcontext *gc, GLenum pname, GLint i)
 {
-    GLfloat tmpf[4] ;
+    GLfloat tmpf[4] = {0.0, 0.0, 0.0, 0.0};
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
     /* Accept only enumerants that correspond to single values */

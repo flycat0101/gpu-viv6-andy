@@ -33,7 +33,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  */
 
-
 #include <unistd.h>
 #include <X11/Xlibint.h>
 #include <X11/extensions/Xext.h>
@@ -202,7 +201,7 @@ static __DRIdriver *OpenDriver(const char *driverName)
       ExtractDir(i, libPaths, 1000, libDir);
       if (!libDir[0])
          break; /* ran out of paths to search */
-      snprintf(realDriverName, 200, "%s/%s_dri.so", libDir, driverName);
+      snprintf(realDriverName, 200, "%s_dri.so", driverName);
       InfoMessageF("OpenDriver: trying %s\n", realDriverName);
       handle = dlopen(realDriverName, RTLD_NOW | RTLD_GLOBAL);
       if ((error = dlerror()) != NULL) {
@@ -240,8 +239,8 @@ static __DRIdriver *OpenDriver(const char *driverName)
              */
             ErrorMessageF("Neither __driCreateScreen or __driCreateNewScreen "
                           "are defined in %s_dri.so!\n", driverName);
-            Xfree(driver->name);
-            Xfree(driver);
+            Xfree((void *)driver->name);
+            Xfree((void *)driver);
             dlclose(handle);
             continue;
          }

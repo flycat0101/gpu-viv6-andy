@@ -128,7 +128,7 @@ __GL_INLINE GLvoid __glColor3fv(__GLcontext *gc, GLfloat *v)
                 __glSwitchToInconsistentFormat(gc);
             }
 
-            if(!(vertexFormat & (__GL_C4F_BIT | __GL_C4UB_BIT)))
+            if (!(vertexFormat & (__GL_C4F_BIT | __GL_C4UB_BIT)))
             {
                 gc->input.color.currentPtrDW = (GLfloat*)gc->input.color.pointer +
                 gc->input.color.index * gc->input.vertTotalStrideDW;
@@ -237,7 +237,7 @@ __GL_INLINE GLvoid __glColor4fv(__GLcontext *gc, GLfloat *v)
                 __glSwitchToInconsistentFormat(gc);
             }
 
-            if(!(vertexFormat & (__GL_C3F_BIT | __GL_C4UB_BIT)))
+            if (!(vertexFormat & (__GL_C3F_BIT | __GL_C4UB_BIT)))
             {
                 gc->input.color.currentPtrDW = (GLfloat*)gc->input.color.pointer +
                 gc->input.color.index * gc->input.vertTotalStrideDW;
@@ -345,7 +345,7 @@ __GL_INLINE GLvoid __glColor4ub(__GLcontext *gc, GLubyte r, GLubyte g, GLubyte b
                 __glSwitchToInconsistentFormat(gc);
             }
 
-            if(!(vertexFormat & (__GL_C3F_BIT | __GL_C4F_BIT)))
+            if (!(vertexFormat & (__GL_C3F_BIT | __GL_C4F_BIT)))
             {
                 gc->input.color.currentPtrDW = (GLfloat*)gc->input.color.pointer +
                 gc->input.color.index * gc->input.vertTotalStrideDW;

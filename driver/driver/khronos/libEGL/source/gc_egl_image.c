@@ -270,12 +270,6 @@ veglDereferenceImage(
 
     /* Decrement reference. */
     gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, Image->reference, &oldValue));
-
-    if (oldValue == 1)
-    {
-        /* Destroy image. */
-        _DestroyImage(Thread, Display, Image, EGL_FALSE);
-    }
 }
 
 static gcmINLINE EGLAttrib
@@ -354,7 +348,7 @@ _CreateImageTex2D(
                 break;
 
             case EGL_PROTECTED_CONTENT_EXT:
-                if(_AttribValue(attrib_list, intAttrib, i + 1) == EGL_TRUE)
+                if (_AttribValue(attrib_list, intAttrib, i + 1) == EGL_TRUE)
                 {
                     protectedContent = EGL_TRUE;
                 }
@@ -480,7 +474,7 @@ _CreateImageTexCube(
                 break;
 
             case EGL_PROTECTED_CONTENT_EXT:
-                if(value == EGL_TRUE)
+                if (value == EGL_TRUE)
                 {
                     protectedContent = EGL_TRUE;
                 }
@@ -604,7 +598,7 @@ _CreateImagePixmap(
                 break;
 
             case EGL_PROTECTED_CONTENT_EXT:
-                if(value == EGL_TRUE)
+                if (value == EGL_TRUE)
                 {
                     protectedContent = EGL_TRUE;
                 }
@@ -722,10 +716,6 @@ _CreateImagePixmap(
         gcoSURF_ReferenceSurface(image->image.surface);
     }
 
-#ifdef EGL_API_XXX
-    /* Reset the sequence NO. */
-    image->image.u.pixmap.seqNo = 0;
-#endif
     return image;
 
 OnError:
@@ -2263,7 +2253,7 @@ struct wl_buffer *eglCreateWaylandBufferFromImageWL(EGLDisplay Dpy, EGLImageKHR 
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
     /*Currently KHR_IMAGE_WAYLAND_BUFFER is needed for subsurface */
-    if(image->image.type != KHR_IMAGE_WAYLAND_BUFFER)
+    if (image->image.type != KHR_IMAGE_WAYLAND_BUFFER)
     {
         veglSetEGLerror(thread,  EGL_BAD_MATCH);
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);

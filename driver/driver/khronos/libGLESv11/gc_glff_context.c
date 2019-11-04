@@ -1088,6 +1088,97 @@ glfSetContext(
 
 /*******************************************************************************
 **
+**  glfFlushContext/glfFlush/glfFinish
+**
+**  Context flushing functions.
+**
+**  INPUT:
+**
+**      Context
+**          Pointer to the current context.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+
+static EGLBoolean
+glfFlushContext(
+    void * Context
+    )
+{
+    glmENTER()
+    {
+        /* Flush the frame buffer. */
+        if (gcmIS_ERROR(gcoSURF_Flush(context->draw)))
+        {
+            glmERROR(GL_INVALID_OPERATION);
+            break;
+        }
+
+        /* Commit command buffer. */
+        if (gcmIS_ERROR(gcoHAL_Commit(context->hal, gcvFALSE)))
+        {
+            glmERROR(GL_INVALID_OPERATION);
+            break;
+        }
+    }
+    glmLEAVE();
+    return EGL_TRUE;
+}
+
+static void
+glfFlush(
+    void
+    )
+{
+    glmENTER()
+    {
+        glfUpdateFrameBuffer(context);
+
+        /* Flush the frame buffer. */
+        if (gcmIS_ERROR(gcoSURF_Flush(context->draw)))
+        {
+            glmERROR(GL_INVALID_OPERATION);
+            break;
+        }
+
+        /* Commit command buffer. */
+        if (gcmIS_ERROR(gcoHAL_Commit(context->hal, gcvFALSE)))
+        {
+            glmERROR(GL_INVALID_OPERATION);
+            break;
+        }
+    }
+    glmLEAVE();
+}
+
+static void
+glfFinish(
+    void
+    )
+{
+    glmENTER()
+    {
+        /* Flush the frame buffer. */
+        if (gcmIS_ERROR(gcoSURF_Flush(context->draw)))
+        {
+            glmERROR(GL_INVALID_OPERATION);
+            break;
+        }
+
+        /* Commit command buffer. */
+        if (gcmIS_ERROR(gcoHAL_Commit(context->hal, gcvTRUE)))
+        {
+            glmERROR(GL_INVALID_OPERATION);
+            break;
+        }
+    }
+    glmLEAVE();
+}
+
+/*******************************************************************************
+**
 **  glfUnsetContext
 **
 **  Unset current context.
@@ -1112,6 +1203,9 @@ glfUnsetContext(
     glsCONTEXT_PTR context = (glsCONTEXT_PTR) Context;
 
     gcmHEADER_ARG("Context=0x%x", Context);
+
+    /* To maintain the previous EGL flushContext;loseCurrent; call sequence */
+    glfFlushContext(Context);
 
     do
     {
@@ -1196,97 +1290,6 @@ glfUpdateBufferPreserve(
     return gcvSTATUS_OK;
 }
 #endif
-
-/*******************************************************************************
-**
-**  glfFlushContext/glfFlush/glfFinish
-**
-**  Context flushing functions.
-**
-**  INPUT:
-**
-**      Context
-**          Pointer to the current context.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-
-static EGLBoolean
-glfFlushContext(
-    void * Context
-    )
-{
-    glmENTER()
-    {
-        /* Flush the frame buffer. */
-        if (gcmIS_ERROR(gcoSURF_Flush(context->draw)))
-        {
-            glmERROR(GL_INVALID_OPERATION);
-            break;
-        }
-
-        /* Commit command buffer. */
-        if (gcmIS_ERROR(gcoHAL_Commit(context->hal, gcvFALSE)))
-        {
-            glmERROR(GL_INVALID_OPERATION);
-            break;
-        }
-    }
-    glmLEAVE();
-    return EGL_TRUE;
-}
-
-static void
-glfFlush(
-    void
-    )
-{
-    glmENTER()
-    {
-        glfUpdateFrameBuffer(context);
-
-        /* Flush the frame buffer. */
-        if (gcmIS_ERROR(gcoSURF_Flush(context->draw)))
-        {
-            glmERROR(GL_INVALID_OPERATION);
-            break;
-        }
-
-        /* Commit command buffer. */
-        if (gcmIS_ERROR(gcoHAL_Commit(context->hal, gcvFALSE)))
-        {
-            glmERROR(GL_INVALID_OPERATION);
-            break;
-        }
-    }
-    glmLEAVE();
-}
-
-static void
-glfFinish(
-    void
-    )
-{
-    glmENTER()
-    {
-        /* Flush the cache. */
-        if (gcmIS_ERROR(gcoSURF_Flush(context->draw)))
-        {
-            glmERROR(GL_INVALID_OPERATION);
-            break;
-        }
-
-        /* Commit command buffer. */
-        if (gcmIS_ERROR(gcoHAL_Commit(context->hal, gcvTRUE)))
-        {
-            glmERROR(GL_INVALID_OPERATION);
-            break;
-        }
-    }
-    glmLEAVE();
-}
 
 static gctBOOL
 glfProfiler(
@@ -1841,7 +1844,6 @@ GLES_CM_DISPATCH_TABLE =
     /* makeCurrent              */  glfSetContext,
     /* loseCurrent              */  glfUnsetContext,
     /* setDrawable              */  glfSetContext,
-    /* flushContext             */  glfFlushContext,
     /* flush                    */  glfFlush,
     /* finish                   */  glfFinish,
     /* getClientBuffer          */  gcvNULL,

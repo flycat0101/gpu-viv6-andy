@@ -77,25 +77,25 @@ __vivError(const GLbyte *str)
 }
 
 GLvoid *
-__vivImpMalloc(__GLcontext *gc, size_t size)
+__vivImpMalloc(void *gc, size_t size)
 {
     return (GLvoid *)malloc(size);
 }
 
 GLvoid *
-__vivImpCalloc(__GLcontext *gc, size_t numElements, size_t elementSize)
+__vivImpCalloc(void *gc, size_t numElements, size_t elementSize)
 {
     return (GLvoid *)calloc(numElements, elementSize);
 }
 
 GLvoid *
-__vivImpRealloc(__GLcontext *gc, GLvoid *oldPtr, size_t newSize)
+__vivImpRealloc(void *gc, GLvoid *oldPtr, size_t newSize)
 {
     return (GLvoid *)realloc(oldPtr, newSize);
 }
 
 GLvoid
-__vivImpFree(__GLcontext *gc, GLvoid *ptr)
+__vivImpFree(void *gc, GLvoid *ptr)
 {
     free(ptr);
 }
@@ -125,13 +125,13 @@ __vivFree(GLvoid *ptr)
 }
 
 GLvoid
-__vivImpWarning(__GLcontext *gc, const GLbyte* msg)
+__vivImpWarning(void *gc, const void* msg)
 {
     __vivError((GLbyte *) msg);
 }
 
 GLvoid
-__vivImpFatal(__GLcontext *gc, const GLbyte* msg)
+__vivImpFatal(void *gc, const void* msg)
 {
     __vivError((GLbyte *) msg);
     abort();
@@ -158,20 +158,24 @@ __vivImpGetMemoryStatus(__GLmemoryStatus option)
     return 0;
 }
 
-GLvoid *__vivImpGetHWND(__GLcontext *gc)
+GLvoid *__vivImpGetHWND(void *gc)
 {
     return NULL;
 }
 
-GLvoid __vivImpNoop()
+GLvoid __vivImpNoop(void)
 {
 }
 
-GLvoid __vivBltImageToScreen(__GLcontext *gc,
+GLvoid __vivImpLockNoop(VEGLLock * lock)
+{
+}
+
+GLvoid __vivBltImageToScreen(void *gc,
       GLint bitsAlignedWidth,
       GLint bitsAlignedHeight,
       GLint bitsPerPixel,
-      GLvoid * bits,
+      GLint * bits,
       GLint left,
       GLint top,
       GLint width,
@@ -189,7 +193,7 @@ GLvoid __vivBltImageToScreen(__GLcontext *gc,
     GLuint xDepth;
 
 
-    pDriMirror = (vivDriMirror *)gc->imports.other;
+    pDriMirror = (vivDriMirror *)((__GLcontext *)gc)->imports.other;
     driDrawPriv = pDriMirror->drawable;
     dpy = driDrawPriv->display;
     d = driDrawPriv->draw;
@@ -311,10 +315,10 @@ VEGLimports imports = {
     __vivImpCalloc,
     __vivImpRealloc,
     __vivImpFree,
-    __vivImpNoop,
-    __vivImpNoop,
-    __vivImpNoop,
-    __vivImpNoop,
+    __vivImpLockNoop,
+    __vivImpLockNoop,
+    __vivImpLockNoop,
+    __vivImpLockNoop,
     gcvNULL,                 /* config */
     gcvFALSE,                /* robustAccess */
     0,                       /* resetNotification */
@@ -328,23 +332,25 @@ VEGLimports imports = {
     __vivImpGetMemoryStatus,
     __vivImpWarning,
     __vivImpFatal,
-    __vivImpNoop,
-    __vivImpNoop,
-    __vivImpNoop,
+    (void (*)(void *, void *))__vivImpNoop,
+    (void (*)(void *))__vivImpNoop,
+    (void (*)(void *))__vivImpNoop,
     __vivImpGetHWND,
-    __vivImpNoop,
-    __vivImpNoop,
-    __vivImpInternalSwapBuffers,
-    __vivImpNoop,
-    __vivImpNoop,
-    __vivImpNoop,
+    (void * (*)(void *))__vivImpNoop,
+    (void (*)(void *, void *))__vivImpNoop,
+    (void (*)(void *, gctBOOL,  gctBOOL))__vivImpInternalSwapBuffers,
+    (void (*)(gctUINT *, gctUINT *, gctUINT *))__vivImpNoop,
+    (void * (*)(void *, EGLenum))__vivImpNoop,
+    (void (*)(void *))__vivImpNoop,
     __vivBltImageToScreen,
-    gcvFALSE,
     0x14,
     &__glDevicePipeEntry[0],/*device*/
     0,/*deviceIndex*/
-    gcvFALSE,
     gcvNULL,/*other*/
+
+    gcvFALSE,
+    gcvFALSE,
+    gcvFALSE,
 };
 
 

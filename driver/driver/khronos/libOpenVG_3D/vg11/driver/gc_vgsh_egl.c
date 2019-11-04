@@ -342,16 +342,6 @@ veglDestroyContext(
 }
 
 static EGLBoolean
-veglFlushContext(
-    void * Context
-    )
-{
-    gcmHEADER_ARG("Context=0x%x", Context);
-    gcmFOOTER_ARG("return=%s", "EGL_TRUE");
-    return EGL_TRUE;
-}
-
-static EGLBoolean
 veglSetContext(
     void       * Thread,
     void       * Context,
@@ -1174,7 +1164,6 @@ OpenVG_DISPATCH_TABLE =
     /* makeCurrent              */  veglSetContext,
     /* loseCurrent              */  veglUnsetContext,
     /* setDrawable              */  veglSetContext,
-    /* flushContext             */  veglFlushContext,
     /* flush                    */  veglFlush,
     /* finish                   */  veglFinish,
     /* getClientBuffer          */  veglGetClientBuffer,

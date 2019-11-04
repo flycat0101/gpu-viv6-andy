@@ -647,7 +647,7 @@ GLvoid GL_APIENTRY __glim_ShaderSource(__GLcontext *gc, GLuint shader, GLsizei c
 
         len = (length && length[i] >= 0) ? (GLsizei)length[i] : (GLsizei)strlen(string[i]);
 
-        strncat(source, string[i], len);
+        gcoOS_StrCatSafe(source, len + 1, string[i]);
     }
 
     /* Free the previsou shader source. */
@@ -1015,7 +1015,7 @@ GLvoid GL_APIENTRY __glim_LinkProgram(__GLcontext *gc,  GLuint program)
          programObject->programInfo.attachedShader[__GLSL_STAGE_TES] ||
          programObject->programInfo.attachedShader[__GLSL_STAGE_GS]))
     {
-        strncpy(programObject->programInfo.infoLog, "Other shaderType exist with compute shader", __GLSL_LOG_INFO_SIZE);
+        gcoOS_StrCopySafe(programObject->programInfo.infoLog, __GLSL_LOG_INFO_SIZE, "Other shaderType exist with compute shader");
         programObject->programInfo.linkedStatus = GL_FALSE;
         __GL_EXIT();
     }
@@ -1030,7 +1030,7 @@ GLvoid GL_APIENTRY __glim_LinkProgram(__GLcontext *gc,  GLuint program)
             {
                if (!programObject->programInfo.attachedShader[i]->shader->shaderInfo.compiledStatus)
                {
-                   strncpy(programObject->programInfo.infoLog, "one attached shader in program is bad", __GLSL_LOG_INFO_SIZE);
+                   gcoOS_StrCopySafe(programObject->programInfo.infoLog, __GLSL_LOG_INFO_SIZE, "one attached shader in program is bad");
                    programObject->programInfo.linkedStatus = GL_FALSE;
                    __GL_EXIT();
                }
@@ -1040,7 +1040,7 @@ GLvoid GL_APIENTRY __glim_LinkProgram(__GLcontext *gc,  GLuint program)
 
         if (!hasShaderObj)
         {
-            strncpy(programObject->programInfo.infoLog, "no shader is attached in program", __GLSL_LOG_INFO_SIZE);
+            gcoOS_StrCopySafe(programObject->programInfo.infoLog, __GLSL_LOG_INFO_SIZE, "no shader is attached in program");
             programObject->programInfo.linkedStatus = GL_FALSE;
             __GL_EXIT();
         }
@@ -1054,7 +1054,7 @@ GLvoid GL_APIENTRY __glim_LinkProgram(__GLcontext *gc,  GLuint program)
             {
                if (!programObject->programInfo.attachedShader[i]->shader->shaderInfo.compiledStatus)
                {
-                   strncpy(programObject->programInfo.infoLog, "one attached shader in program is bad", __GLSL_LOG_INFO_SIZE);
+                   gcoOS_StrCopySafe(programObject->programInfo.infoLog, __GLSL_LOG_INFO_SIZE, "one attached shader in program is bad");
                    programObject->programInfo.linkedStatus = GL_FALSE;
                    __GL_EXIT();
                }
@@ -1085,67 +1085,73 @@ GLvoid GL_APIENTRY __glim_LinkProgram(__GLcontext *gc,  GLuint program)
            )
 #endif
         {
-            strncpy(programObject->programInfo.infoLog, "either vs or ps or cs in program is missed or bad", __GLSL_LOG_INFO_SIZE);
+            gcoOS_StrCopySafe(programObject->programInfo.infoLog, __GLSL_LOG_INFO_SIZE, "either vs or ps or cs in program is missed or bad");
             programObject->programInfo.linkedStatus = GL_FALSE;
             __GL_EXIT();
         }
 
  #ifdef OPENGL40
-        if (programObject->programInfo.attachedShader[__GLSL_STAGE_VS] &&
-            programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.hBinary)
+        if (gc->imports.conformGLSpec)
         {
-            programObject->programInfo.vertShaderEnable = GL_TRUE;
-            if((gc->state.light.clampVertexColor == GL_TRUE) || (gc->state.light.clampVertexColor == GL_FIXED_ONLY && !gc->modes.rgbFloatMode))
+            if (programObject->programInfo.attachedShader[__GLSL_STAGE_VS] &&
+                programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.hBinary)
             {
-                gcShaderSetClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.hBinary);
+                programObject->programInfo.vertShaderEnable = GL_TRUE;
+                if ((gc->state.light.clampVertexColor == GL_TRUE) || (gc->state.light.clampVertexColor == GL_FIXED_ONLY && !gc->modes.rgbFloatMode))
+                {
+                    gcShaderSetClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.hBinary);
+                }
+                else
+                {
+                    gcShaderClrClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.hBinary);
+                }
             }
-            else
+
+            if (programObject->programInfo.attachedShader[__GLSL_STAGE_FS] &&
+                programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary)
             {
-                gcShaderClrClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shader->shaderInfo.hBinary);
+                programObject->programInfo.fragShaderEnable = GL_TRUE;
+                if (gc->state.enables.program.vpTwoSize)
+                {
+                    gcShaderSetVPTwoSideEnable((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary);
+                }
+                else
+                {
+                    gcShaderClrVPTwoSideEnable((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary);
+                }
+                if ((gc->state.raster.clampFragColor == GL_TRUE) || (gc->state.raster.clampFragColor == GL_FIXED_ONLY && !gc->modes.rgbFloatMode))
+                {
+                    gcShaderSetClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary);
+                }
+                else
+                {
+                    gcShaderClrClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary);
+                }
+            }
+
+            if (programObject->programInfo.attachedShader[__GLSL_STAGE_GS])
+            {
+                    programObject->programInfo.geomShaderEnable = GL_TRUE;
             }
         }
-
-        if (programObject->programInfo.attachedShader[__GLSL_STAGE_FS] &&
-            programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary)
-        {
-            programObject->programInfo.fragShaderEnable = GL_TRUE;
-            if (gc->state.enables.program.vpTwoSize)
-            {
-                gcShaderSetVPTwoSideEnable((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary);
-            }
-            else
-            {
-                gcShaderClrVPTwoSideEnable((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary);
-            }
-            if((gc->state.raster.clampFragColor == GL_TRUE) || (gc->state.raster.clampFragColor == GL_FIXED_ONLY && !gc->modes.rgbFloatMode))
-            {
-                gcShaderSetClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary);
-            }
-            else
-            {
-                gcShaderClrClampOutputColor((gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shader->shaderInfo.hBinary);
-            }
-        }
-
-        if (programObject->programInfo.attachedShader[__GLSL_STAGE_GS])
-        {
-                programObject->programInfo.geomShaderEnable = GL_TRUE;
-        }
-  #endif
-
+#endif
     }
 
     /* Exception handling for repeated varying of xfb*/
-    if(programObject->xfbVaryingNum > 1){
+    if (programObject->xfbVaryingNum > 1)
+    {
         GLuint i,j;
-        for(i = 0; i < programObject->xfbVaryingNum; i++){
-            if(strcmp(programObject->ppXfbVaryingNames[i], "gl_SkipComponents1") && strcmp(programObject->ppXfbVaryingNames[i], "gl_SkipComponents2") &&
-               strcmp(programObject->ppXfbVaryingNames[i], "gl_SkipComponents3") && strcmp(programObject->ppXfbVaryingNames[i], "gl_SkipComponents4") &&
-               strcmp(programObject->ppXfbVaryingNames[i], "gl_NextBuffer"))
+        for (i = 0; i < programObject->xfbVaryingNum; i++)
+        {
+            if (strcmp(programObject->ppXfbVaryingNames[i], "gl_SkipComponents1") && strcmp(programObject->ppXfbVaryingNames[i], "gl_SkipComponents2") &&
+                strcmp(programObject->ppXfbVaryingNames[i], "gl_SkipComponents3") && strcmp(programObject->ppXfbVaryingNames[i], "gl_SkipComponents4") &&
+                strcmp(programObject->ppXfbVaryingNames[i], "gl_NextBuffer"))
             {
-                for(j = i + 1; j < programObject->xfbVaryingNum; j++){
-                    if(!strcmp(programObject->ppXfbVaryingNames[i], programObject->ppXfbVaryingNames[j])){
-                        strncpy(programObject->programInfo.infoLog, "repeated varying of xfb", __GLSL_LOG_INFO_SIZE);
+                for (j = i + 1; j < programObject->xfbVaryingNum; j++)
+                {
+                    if (!strcmp(programObject->ppXfbVaryingNames[i], programObject->ppXfbVaryingNames[j]))
+                    {
+                        gcoOS_StrCopySafe(programObject->programInfo.infoLog, __GLSL_LOG_INFO_SIZE, "repeated varying of xfb");
                         programObject->programInfo.linkedStatus = GL_FALSE;
                         __GL_EXIT();
                     }
@@ -1176,13 +1182,13 @@ GLvoid GL_APIENTRY __glim_LinkProgram(__GLcontext *gc,  GLuint program)
         {
             (*gc->dp.useProgram)(gc, programObject, gcvNULL);
 #ifdef OPENGL40
-    if(programObject)
-    {
-        gc->shaderProgram.vertShaderEnable = programObject->programInfo.vertShaderEnable;
-        gc->shaderProgram.geomShaderEnable = programObject->programInfo.geomShaderEnable;
-        gc->shaderProgram.fragShaderEnable = programObject->programInfo.fragShaderEnable;
-//        gc->shaderProgram.geomOutputType   = programObject->programInfo.geomRealOutputType;
-    }
+            if (gc->imports.conformGLSpec && programObject)
+            {
+                gc->shaderProgram.vertShaderEnable = programObject->programInfo.vertShaderEnable;
+                gc->shaderProgram.geomShaderEnable = programObject->programInfo.geomShaderEnable;
+                gc->shaderProgram.fragShaderEnable = programObject->programInfo.fragShaderEnable;
+        //      gc->shaderProgram.geomOutputType   = programObject->programInfo.geomRealOutputType;
+            }
 #endif
             __GL_SET_ATTR_DIRTY_BIT(gc, __GL_PROGRAM_ATTRS, __GL_DIRTY_GLSL_PROGRAM_SWITCH);
         }
@@ -1310,21 +1316,25 @@ GLvoid GL_APIENTRY __glim_UseProgram(__GLcontext *gc, GLuint program)
     (*gc->dp.useProgram)(gc, programObject, gcvNULL);
 
 #ifdef OPENGL40
-    if(programObject)
+    if (gc->imports.conformGLSpec)
     {
-        gc->shaderProgram.vertShaderEnable = programObject->programInfo.vertShaderEnable;
-        gc->shaderProgram.geomShaderEnable = programObject->programInfo.geomShaderEnable;
-        gc->shaderProgram.fragShaderEnable = programObject->programInfo.fragShaderEnable;
-//        gc->shaderProgram.geomOutputType   = programObject->programInfo.geomRealOutputType;
-    }
-    else
-    {
-        gc->shaderProgram.vertShaderEnable = GL_FALSE;
-        gc->shaderProgram.geomShaderEnable = GL_FALSE;
-        gc->shaderProgram.fragShaderEnable = GL_FALSE;
-//        gc->shaderProgram.geomOutputType   = GL_TRIANGLE_STRIP;
+        if (programObject)
+        {
+            gc->shaderProgram.vertShaderEnable = programObject->programInfo.vertShaderEnable;
+            gc->shaderProgram.geomShaderEnable = programObject->programInfo.geomShaderEnable;
+            gc->shaderProgram.fragShaderEnable = programObject->programInfo.fragShaderEnable;
+    //        gc->shaderProgram.geomOutputType   = programObject->programInfo.geomRealOutputType;
+        }
+        else
+        {
+            gc->shaderProgram.vertShaderEnable = GL_FALSE;
+            gc->shaderProgram.geomShaderEnable = GL_FALSE;
+            gc->shaderProgram.fragShaderEnable = GL_FALSE;
+    //        gc->shaderProgram.geomOutputType   = GL_TRIANGLE_STRIP;
+        }
     }
 #endif
+
 OnError:
     __GL_FOOTER();
 }
@@ -1494,7 +1504,7 @@ GLvoid GL_APIENTRY __glim_GetShaderSource(__GLcontext *gc, GLuint shader, GLsize
         len = __GL_MIN(shaderObject->shaderInfo.sourceSize, bufSize - 1);
         if (len > 0)
         {
-            strncpy(source, shaderObject->shaderInfo.source, len);
+            gcoOS_StrCopySafe(source, len + 1, shaderObject->shaderInfo.source);
         }
         source[len] = '\0';
     }
@@ -1549,7 +1559,7 @@ GLvoid GL_APIENTRY __glim_GetShaderInfoLog(__GLcontext *gc, GLuint shader, GLsiz
 
         if (len > 0)
         {
-            strncpy(infoLog, shaderObject->shaderInfo.compiledLog, len);
+            gcoOS_StrCopySafe(infoLog, len + 1, shaderObject->shaderInfo.compiledLog);
         }
         infoLog[len] = '\0';
     }
@@ -1911,7 +1921,7 @@ GLvoid GL_APIENTRY __glim_GetProgramInfoLog(__GLcontext *gc, GLuint program, GLs
     */
     if (infoLog && bufSize > 0)
     {
-        if(programObject->programInfo.infoLog)
+        if (programObject->programInfo.infoLog)
         {
             GLsizei length = (GLsizei)strlen(programObject->programInfo.infoLog);
             len = __GL_MIN(length, bufSize - 1);
@@ -1923,7 +1933,7 @@ GLvoid GL_APIENTRY __glim_GetProgramInfoLog(__GLcontext *gc, GLuint program, GLs
 
         if (len > 0)
         {
-            strncpy(infoLog, programObject->programInfo.infoLog, len);
+            gcoOS_StrCopySafe(infoLog, len + 1, programObject->programInfo.infoLog);
         }
         infoLog[len] = '\0';
     }
@@ -4158,7 +4168,7 @@ GLvoid GL_APIENTRY __glim_DrawTransformFeedbackStream(__GLcontext *gc, GLenum mo
 {
     __GL_HEADER();
 
-    if(stream > gc->constants.shaderCaps.maxVertStreams)
+    if (stream < 0 || stream >= gc->constants.shaderCaps.maxVertStreams)
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
@@ -4197,12 +4207,12 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
-    if(count < 0)
+    if (count < 0)
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    if(bufferMode != GL_INTERLEAVED_ATTRIBS)
+    if (bufferMode != GL_INTERLEAVED_ATTRIBS)
     {
         for (i = 0; i < (GLuint)count; i++)
         {
@@ -4217,14 +4227,14 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
 
     invalidPos = (GLboolean*)(*gc->imports.malloc)(gc, count*sizeof(GLboolean));
 
-    if(bufferMode == GL_INTERLEAVED_ATTRIBS && count > 0)
+    if (bufferMode == GL_INTERLEAVED_ATTRIBS && count > 0)
     {
         for (i = 0; i < (GLuint)count; i++)
         {
             if (!strcmp(varyings[i], "gl_NextBuffer"))
             {
                 //varyings start as gl_NextBuffer
-                if(i == invalidIdentifierCount)
+                if (i == invalidIdentifierCount)
                 {
                     invalidPos[i] = GL_TRUE;
                     invalidIdentifierCount++;
@@ -4241,7 +4251,7 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
         ** 2.GL_INVALID_OPERATION is generated if the number of "gl_NextBuffer" names in varyings
         ** is greater than or equal to the limit GL_MAX_TRANSFORM_FEEDBACK_BUFFERS.
         */
-        if(invalidIdentifierCount == (GLuint)count || (invalidIdentifierCount + nextBufferCount) >= gc->constants.shaderCaps.maxXfbBuffers)
+        if (invalidIdentifierCount == (GLuint)count || (invalidIdentifierCount + nextBufferCount) >= gc->constants.shaderCaps.maxXfbBuffers)
         {
             __GL_ERROR_EXIT(GL_INVALID_OPERATION);
         }
@@ -4262,7 +4272,7 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
         }
     }
 
-    if(!(nextBufferCount < (GLint)gc->constants.shaderCaps.maxXfbSeparateAttribs))
+    if (!(nextBufferCount < (GLint)gc->constants.shaderCaps.maxXfbSeparateAttribs))
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
@@ -4302,7 +4312,7 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
     for (i = 0; i < (GLuint)count; i++)
     {
         GLuint nameLen = 0;
-        if(invalidPos[i])
+        if (invalidPos[i])
         {
             continue;
         }
@@ -4313,7 +4323,7 @@ GLvoid GL_APIENTRY __glim_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
     }
 
 OnError:
-    if(invalidPos)
+    if (invalidPos)
     {
         (*gc->imports.free)(gc, invalidPos);
         invalidPos = gcvNULL;
@@ -4933,7 +4943,7 @@ GLuint GL_APIENTRY __glim_CreateShaderProgramv(__GLcontext *gc, GLenum type, GLs
 
 OnError:
     /* Append shader infoLog to program infoLog */
-    if(shaderObj)
+    if (shaderObj)
     {
         if (shaderObj->shaderInfo.compiledLog)
         {
@@ -5283,7 +5293,7 @@ GLvoid GL_APIENTRY __glim_GetProgramPipelineInfoLog(__GLcontext *gc, GLuint pipe
 
         if (len > 0)
         {
-            strncpy(infoLog, ppObj->infoLog, len);
+            gcoOS_StrCopySafe(infoLog, len + 1, ppObj->infoLog);
         }
         infoLog[len] = '\0';
     }
@@ -5510,11 +5520,11 @@ GLvoid GL_APIENTRY __glim_BindFragDataLocation(__GLcontext *gc, GLuint program, 
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
 
-    if((program <= 0) || (name == NULL) || (colorNumber >=  __GL_MAX_DRAW_BUFFERS)) {
+    if ((program <= 0) || (name == NULL) || (colorNumber >=  __GL_MAX_DRAW_BUFFERS)) {
         __glSetError(gc, GL_INVALID_VALUE);
         return;
     }
-    else if(!strncmp(name, "gl_", 3)) {
+    else if (!strncmp(name, "gl_", 3)) {
         __glSetError(gc, GL_INVALID_OPERATION);
         return;
     }
@@ -5522,18 +5532,16 @@ GLvoid GL_APIENTRY __glim_BindFragDataLocation(__GLcontext *gc, GLuint program, 
     GL_ASSERT(gc->shaderProgram.spShared);
 
     programObject = (__GLprogramObject *)__glGetObject(gc, gc->shaderProgram.spShared, program);
-    if(!programObject) {
+    if (!programObject) {
         __glSetError(gc, GL_INVALID_VALUE);
         return;
     }
-    else if(programObject->objectInfo.objectType != __GL_PROGRAM_OBJECT_TYPE) {
+    else if (programObject->objectInfo.objectType != __GL_PROGRAM_OBJECT_TYPE) {
         __glSetError(gc, GL_INVALID_OPERATION);
         return;
     }
 
    (*gc->dp.bindFragDataLocation)(gc, programObject, colorNumber, name);
-
-
 }
 
 GLvoid GL_APIENTRY __glim_GetActiveUniformName(__GLcontext *gc, GLuint program, GLuint uniformIndex, GLsizei bufSize, GLsizei *length, GLchar *uniformName)

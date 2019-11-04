@@ -887,6 +887,31 @@ gcChipUtilGetImageFormat(
         }
         break;
 #endif
+    case GL_GREEN:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            bpp = 8;
+            imageFormat = gcvSURF_G8;
+            break;
+        case GL_FLOAT:
+            bpp = 32;
+            imageFormat = gcvSURF_G32F;
+            break;
+        default:
+            break;
+        }
+        break;
+    case GL_BLUE:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            bpp = 8;
+            imageFormat = gcvSURF_B8;
+            break;
+        default:
+            break;
+        }
     case GL_RED:
         switch (type)
         {
@@ -1322,7 +1347,10 @@ gcChipResidentTextureLevel(
 #endif
 
 #ifdef OPENGL40
-    gcmONERROR(setTextureWrapperFormat(gc, texObj, mipmap->baseFormat));
+    if (gc->imports.conformGLSpec)
+    {
+        gcmONERROR(setTextureWrapperFormat(gc, texObj, mipmap->baseFormat));
+    }
 #endif
     gcmONERROR(gcChipResetTextureWrapper(gc, texObj));
 
@@ -1447,6 +1475,7 @@ gcChipResidentTextureLevel(
         chipMipLevel->formatMapInfo = formatMapInfo;
 
         GL_ASSERT((formatMapInfo->flags & __GL_CHIP_FMTFLAGS_CANT_FOUND_HAL_FORMAT) == GL_FALSE);
+        GL_ASSERT(formatMapInfo->readFormat != gcvSURF_UNKNOWN);
 
         /* For non-compress source image, now we can construct its HAL format for late surface blit.
         ** For compressed format, it will be determined later.
@@ -1586,7 +1615,7 @@ gcChipResidentTextureLevel(
                             {
                                 __GLchipResourceShadow *shadow = &chipMipLevel->shadow[attachPoint->slice];
 
-                                if(shadow && shadow->surface)
+                                if (shadow && shadow->surface)
                                 {
                                     gcoSURF_Destroy(shadow->surface);
                                     shadow->surface = gcvNULL;
@@ -1605,7 +1634,7 @@ gcChipResidentTextureLevel(
             }
         }
 
-        if (buf && (mipmap->width * mipmap->height * mipmap->depth))
+        if (buf && ((mipmap->width * mipmap->height * mipmap->depth) != 0))
         {
             gctSIZE_T rowStride = 0;
             gctSIZE_T imgHeight = (gctSIZE_T)mipmap->height;
@@ -2444,9 +2473,11 @@ gcChipCopyTexImage(
     gcmHEADER_ARG("gc=0x%x texObj=0x%x face=%d level=%d x=%d y=%d",
                    gc, texObj, face, level, x, y);
 
-
 #ifdef OPENGL40
-    gcmONERROR(setTextureWrapperFormat(gc, texObj, mipmap->baseFormat));
+    if (gc->imports.conformGLSpec)
+    {
+        gcmONERROR(setTextureWrapperFormat(gc, texObj, mipmap->baseFormat));
+    }
 #endif
     gcmONERROR(gcChipResetTextureWrapper(gc, texObj));
 
@@ -2492,7 +2523,7 @@ gcChipCopyTexImage(
         /* Currently no 3Dblit shader for INT sampling. No need check dst for GLcore guarantees. */
         (mipmap->formatInfo->category != GL_INT && mipmap->formatInfo->category != GL_UNSIGNED_INT) &&
         gcmIS_SUCCESS(gcoSURF_IsRenderable(texView.surf)) &&
-        chipCtx->chipFeature.hasSupertiledTx
+        chipCtx->chipFeature.hwFeature.hasSupertiledTx
         )
     {
         tryShader = gcvTRUE;
@@ -2952,7 +2983,7 @@ gcChipCopyTexSubImage(
         /* Currently no 3Dblit shader for INT sampling. No need check dst for GLcore guarantees. */
         (mipmap->formatInfo->category != GL_INT && mipmap->formatInfo->category != GL_UNSIGNED_INT) &&
         ((chipMipLevel->formatMapInfo->flags & __GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE) == 0) &&
-        chipCtx->chipFeature.hasSupertiledTx
+        chipCtx->chipFeature.hwFeature.hasSupertiledTx
         )
     {
         tryShader = gcvTRUE;
@@ -3278,6 +3309,480 @@ gcChipTexNeedShadow(
     gcmFOOTER_ARG("return=%d", need);
     return need;
 }
+
+GLvoid
+__glGetWrapFormat(
+    GLenum format,
+    GLenum type,
+    gceSURF_FORMAT *wrapformat
+)
+{
+    switch (format)
+    {
+    case GL_DEPTH_COMPONENT:
+        switch (type)
+        {
+        case GL_UNSIGNED_SHORT:
+            (*wrapformat) = gcvSURF_D16;
+            break;
+
+        case GL_DEPTH_COMPONENT24_OES:
+            (*wrapformat) = gcvSURF_D24X8;
+            break;
+
+        case GL_DEPTH_COMPONENT32_OES:
+        case GL_UNSIGNED_INT:
+            (*wrapformat) = gcvSURF_D32;
+            break;
+
+        case GL_FLOAT:
+            (*wrapformat) = gcvSURF_D32F;
+            break;
+        }
+        break;
+
+    case GL_ALPHA:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_A8;
+            break;
+
+        case GL_UNSIGNED_SHORT:
+            (*wrapformat) = gcvSURF_A16;
+            break;
+
+        case GL_UNSIGNED_INT:
+            (*wrapformat) = gcvSURF_A32;
+            break;
+
+        case GL_HALF_FLOAT:
+        case GL_HALF_FLOAT_OES:
+            (*wrapformat) = gcvSURF_A16F;
+            break;
+
+        case GL_FLOAT:
+            (*wrapformat) = gcvSURF_A32F;
+            break;
+        }
+        break;
+
+    case GL_RGB:
+        switch (type)
+        {
+        case GL_UNSIGNED_SHORT_4_4_4_4:
+            (*wrapformat) = gcvSURF_X4R4G4B4;
+            break;
+
+        case GL_UNSIGNED_SHORT_5_5_5_1:
+            (*wrapformat) = gcvSURF_X1R5G5B5;
+            break;
+
+        case GL_UNSIGNED_SHORT_5_6_5:
+            (*wrapformat) = gcvSURF_R5G6B5;
+            break;
+
+        case GL_UNSIGNED_SHORT_5_6_5_REV:
+            (*wrapformat) = gcvSURF_B5G6R5;
+            break;
+
+        case GL_BYTE:
+            (*wrapformat) = gcvSURF_B8G8R8_SNORM;
+            break;
+
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_B8G8R8;
+            break;
+
+        case GL_UNSIGNED_BYTE_3_3_2:
+            (*wrapformat)=gcvSURF_R3G3B2;
+            break;
+
+        case GL_UNSIGNED_INT:
+            (*wrapformat)=gcvSURF_B32G32R32;
+            break;
+
+        case GL_UNSIGNED_INT_2_10_10_10_REV:
+            (*wrapformat) = gcvSURF_X2B10G10R10;
+            break;
+
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+            (*wrapformat) = gcvSURF_B10G11R11F;
+            break;
+
+        case GL_HALF_FLOAT:
+        case GL_HALF_FLOAT_OES:
+            (*wrapformat) = gcvSURF_B16G16R16F;
+            break;
+
+        case GL_UNSIGNED_SHORT:
+            (*wrapformat) = gcvSURF_B16G16R16;
+            break;
+
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+            (*wrapformat) = gcvSURF_E5B9G9R9;
+            break;
+        }
+        break;
+
+    case GL_RGB_INTEGER:
+        switch(type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_B8G8R8UI;
+            break;
+
+        case GL_BYTE:
+            (*wrapformat) = gcvSURF_B8G8R8I;
+            break;
+
+        case GL_UNSIGNED_SHORT:
+            (*wrapformat) = gcvSURF_B16G16R16UI;
+            break;
+
+        case GL_SHORT:
+            (*wrapformat) = gcvSURF_B16G16R16I;
+            break;
+
+        case GL_UNSIGNED_INT:
+            (*wrapformat) = gcvSURF_B32G32R32UI;
+            break;
+
+        case GL_INT:
+            (*wrapformat) = gcvSURF_B32G32R32I;
+            break;
+#ifdef OPENGL40
+        case GL_UNSIGNED_SHORT_5_6_5:
+            (*wrapformat) = gcvSURF_R5G6B5;
+            break;
+#endif
+         }
+         break;
+
+    case GL_RGBA:
+        switch (type)
+        {
+        case GL_UNSIGNED_SHORT:
+            (*wrapformat) = gcvSURF_A16B16G16R16;
+            break;
+
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_A8B8G8R8;
+            break;
+
+        case GL_BYTE:
+            (*wrapformat) = gcvSURF_A8B8G8R8_SNORM;
+            break;
+
+        case GL_UNSIGNED_SHORT_4_4_4_4:
+            (*wrapformat) = gcvSURF_R4G4B4A4;
+            break;
+
+        case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+            (*wrapformat)=gcvSURF_A4B4G4R4;
+            break;
+
+        case GL_UNSIGNED_SHORT_5_5_5_1:
+            (*wrapformat) = gcvSURF_R5G5B5A1;
+            break;
+
+        case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+            (*wrapformat)=gcvSURF_A1B5G5R5;
+            break;
+
+        case GL_UNSIGNED_INT_10_10_10_2:
+            (*wrapformat) = gcvSURF_R10G10B10A2;
+            break;
+
+        case GL_UNSIGNED_INT_2_10_10_10_REV:
+            (*wrapformat) = gcvSURF_A2B10G10R10;
+            break;
+
+        case GL_INT:
+        case GL_UNSIGNED_INT:
+            (*wrapformat)=gcvSURF_A32B32G32R32;
+            break;
+
+        case GL_HALF_FLOAT:
+        case GL_HALF_FLOAT_OES:
+            (*wrapformat) = gcvSURF_A16B16G16R16F;
+            break;
+
+        case GL_FLOAT:
+            (*wrapformat) = gcvSURF_A32B32G32R32F;
+            break;
+#ifdef OPENGL40
+        case GL_UNSIGNED_INT_8_8_8_8:
+            (*wrapformat) = gcvSURF_R8G8B8A8;
+            break;
+        case GL_UNSIGNED_INT_8_8_8_8_REV:
+            (*wrapformat) = gcvSURF_A8B8G8R8;
+            break;
+
+#endif
+        }
+        break;
+
+    case GL_RGBA_INTEGER:
+        switch(type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_A8B8G8R8UI;
+            break;
+
+        case GL_BYTE:
+            (*wrapformat) = gcvSURF_A8B8G8R8I;
+            break;
+
+        case GL_UNSIGNED_SHORT:
+            (*wrapformat) = gcvSURF_A16B16G16R16UI;
+            break;
+
+        case GL_SHORT:
+            (*wrapformat) = gcvSURF_A16B16G16R16I;
+            break;
+
+        case GL_UNSIGNED_INT:
+            (*wrapformat) = gcvSURF_A32B32G32R32UI;
+            break;
+
+        case GL_INT:
+            (*wrapformat) = gcvSURF_A32B32G32R32I;
+            break;
+
+        case GL_UNSIGNED_INT_2_10_10_10_REV:
+            (*wrapformat) = gcvSURF_A2B10G10R10UI;
+            break;
+#ifdef OPENGL40
+        case GL_UNSIGNED_INT_8_8_8_8:
+            (*wrapformat) = gcvSURF_A8B8G8R8UI;
+            break;
+#endif
+         }
+         break;
+
+    case GL_BGRA_EXT:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_A8R8G8B8;
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+            (*wrapformat)=gcvSURF_R4G4B4A4;
+            break;
+        }
+        break;
+#ifdef OPENGL40
+    case GL_BGR:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_R8G8B8;
+            break;
+
+        case GL_UNSIGNED_SHORT_5_6_5:
+            (*wrapformat)=gcvSURF_B5G6R5;
+            break;
+        case GL_UNSIGNED_SHORT_5_6_5_REV:
+            (*wrapformat)=gcvSURF_R5G6B5;
+            break;
+        }
+        break;
+#endif
+    case GL_RED:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_R8;
+            break;
+
+        case GL_BYTE:
+            (*wrapformat) = gcvSURF_R8_SNORM;
+            break;
+
+        case GL_UNSIGNED_SHORT:
+            (*wrapformat) = gcvSURF_R16;
+            break;
+
+        case GL_UNSIGNED_INT:
+            (*wrapformat)=gcvSURF_R32;
+            break;
+
+        case GL_HALF_FLOAT:
+        case GL_HALF_FLOAT_OES:
+            (*wrapformat) = gcvSURF_R16F;
+            break;
+
+        case GL_FLOAT:
+            (*wrapformat) = gcvSURF_R32F;
+            break;
+
+        default:
+            break;
+        }
+        break;
+
+    case GL_RED_INTEGER:
+        switch(type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_R8UI;
+            break;
+
+        case GL_BYTE:
+            (*wrapformat) = gcvSURF_R8I;
+            break;
+
+        case GL_UNSIGNED_SHORT:
+            (*wrapformat) = gcvSURF_R16UI;
+            break;
+
+        case GL_SHORT:
+            (*wrapformat) = gcvSURF_R16I;
+            break;
+
+        case GL_UNSIGNED_INT:
+            (*wrapformat) = gcvSURF_R32UI;
+            break;
+
+        case GL_INT:
+            (*wrapformat) = gcvSURF_R32I;
+            break;
+        }
+        break;
+
+    case GL_RG:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_G8R8;
+            break;
+
+        case GL_BYTE:
+            (*wrapformat) = gcvSURF_G8R8_SNORM;
+            break;
+
+        case GL_UNSIGNED_SHORT:
+            (*wrapformat)=gcvSURF_G16R16;
+            break;
+        case GL_HALF_FLOAT:
+        case GL_HALF_FLOAT_OES:
+            (*wrapformat) = gcvSURF_G16R16F;
+            break;
+
+        case GL_UNSIGNED_INT:
+            (*wrapformat)=gcvSURF_G32R32;
+            break;
+
+        case GL_FLOAT:
+            (*wrapformat) = gcvSURF_G32R32F;
+            break;
+
+        default:
+            break;
+        }
+        break;
+
+    case GL_RG_INTEGER:
+        switch(type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_G8R8UI;
+            break;
+
+        case GL_BYTE:
+            (*wrapformat) = gcvSURF_G8R8I;
+            break;
+
+        case GL_UNSIGNED_SHORT:
+            (*wrapformat) = gcvSURF_G16R16UI;
+            break;
+
+        case GL_SHORT:
+            (*wrapformat) = gcvSURF_G16R16I;
+            break;
+
+        case GL_UNSIGNED_INT:
+            (*wrapformat) = gcvSURF_G32R32UI;
+            break;
+
+        case GL_INT:
+            (*wrapformat) = gcvSURF_G32R32I;
+            break;
+        }
+        break;
+
+    case GL_LUMINANCE:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_L8;
+            break;
+        case GL_UNSIGNED_SHORT:
+            (*wrapformat) = gcvSURF_L16;
+            break;
+
+        case GL_UNSIGNED_INT:
+            (*wrapformat) = gcvSURF_L32;
+            break;
+
+        case GL_HALF_FLOAT:
+        case GL_HALF_FLOAT_OES:
+            (*wrapformat) = gcvSURF_L16F;
+            break;
+
+        case GL_FLOAT:
+            (*wrapformat) = gcvSURF_L32F;
+            break;
+        }
+        break;
+
+    case GL_LUMINANCE_ALPHA:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_A8L8;
+            break;
+
+        case GL_UNSIGNED_SHORT:
+            (*wrapformat) = gcvSURF_A16L16;
+            break;
+
+        case GL_HALF_FLOAT:
+        case GL_HALF_FLOAT_OES:
+            (*wrapformat) = gcvSURF_A16L16F;
+            break;
+
+        case GL_FLOAT:
+            (*wrapformat) = gcvSURF_A32L32F;
+            break;
+        }
+        break;
+
+    case GL_DEPTH_STENCIL:
+        switch (type)
+        {
+        case GL_UNSIGNED_INT_24_8:
+            (*wrapformat) = gcvSURF_D24S8;
+            break;
+
+        case GL_FLOAT_32_UNSIGNED_INT_24_8_REV:
+            (*wrapformat) = gcvSURF_S8D32F;
+            break;
+        }
+        break;
+
+    case GL_STENCIL_INDEX:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_S8;
+            break;
+        }
+        break;
+    }
+}
+
 
 gcsSURF_VIEW
 gcChipGetTextureSurface(
@@ -4555,7 +5060,7 @@ __glChipGenerateMipMap(
         {
 
             /* For blit engine, we generate mipmap in one shot */
-            if (chipCtx->chipFeature.hasBlitEngine)
+            if (chipCtx->chipFeature.hwFeature.hasBlitEngine)
             {
                 if (level == *maxLevel)
                 {
@@ -4690,6 +5195,7 @@ __glChipGetTexImage(
     __GLtextureObject *texObj,
     GLint face,
     GLint level,
+    GLenum format,
     GLenum type,
     GLvoid *buf
     )
@@ -4710,7 +5216,6 @@ __glChipGetTexImage(
         texObj->targetIndex == __GL_TEXTURE_3D_INDEX) ?
         (gctSIZE_T)gc->clientState.pixel.packModes.skipImages : 0;
     GLuint i,j;
-    GLenum format = mipmap->format;
     gceSURF_FORMAT wrapformat = gcvSURF_UNKNOWN;
     gceSURF_FORMAT srcFormat = gcvSURF_UNKNOWN;
     __GLformatInfo *formatInfo = mipmap->formatInfo;
@@ -4734,55 +5239,7 @@ __glChipGetTexImage(
 
     srcView = gcChipGetTextureSurface(chipCtx, texObj, gcvFALSE, level, slice);
 
-    switch (mipmap->type)
-    {
-    case GL_UNSIGNED_BYTE:
-        if (format == GL_RGBA)
-        {
-            wrapformat = gcvSURF_A8B8G8R8;
-        }
-        else if (format == GL_BGRA_EXT)
-        {
-            wrapformat = gcvSURF_A8R8G8B8;
-        }
-        break;
-    case GL_UNSIGNED_INT_2_10_10_10_REV:
-        if (format == GL_RGBA)
-        {
-            wrapformat = gcvSURF_A2B10G10R10;
-        }
-        break;
-    case GL_FLOAT:
-        if (format == GL_RGBA)
-        {
-            wrapformat = gcvSURF_A32B32G32R32F;
-        }
-        break;
-    case GL_UNSIGNED_INT:
-        if (format == GL_RGBA_INTEGER)
-        {
-            wrapformat = gcvSURF_A32B32G32R32UI;
-        }
-        break;
-    case GL_INT:
-        if (format == GL_RGBA_INTEGER)
-        {
-            wrapformat = gcvSURF_A32B32G32R32I;
-        }
-        break;
-    case GL_UNSIGNED_SHORT_4_4_4_4_REV_EXT:
-        {
-            wrapformat = gcvSURF_A4R4G4B4;
-        }
-        break;
-    case GL_UNSIGNED_SHORT_1_5_5_5_REV_EXT:
-        {
-            wrapformat = gcvSURF_A1R5G5B5;
-        }
-        break;
-    default:
-        break;
-    }
+    __glGetWrapFormat(format ,type, &wrapformat);
 
     if (formatInfo == gcvNULL)
     {
@@ -4827,6 +5284,7 @@ __glChipGetTexImage(
 
     switch (texObj->targetIndex)
     {
+    case __GL_TEXTURE_1D_INDEX:
     case __GL_TEXTURE_2D_INDEX:
     case __GL_TEXTURE_2D_MS_INDEX:
     case __GL_TEXTURE_CUBEMAP_INDEX:
@@ -5337,8 +5795,8 @@ __glChipTexDirectVIV(
          * or yuv-assembler.
          */
         if (planarYuv &&
-            !chipCtx->chipFeature.hasYuv420Tiler &&
-            !chipCtx->chipFeature.hasYuvAssembler)
+            !chipCtx->chipFeature.hwFeature.hasYuv420Tiler &&
+            !chipCtx->chipFeature.hwFeature.hasYuvAssembler)
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
@@ -5346,7 +5804,7 @@ __glChipTexDirectVIV(
         if ((format == GL_VIV_YUV420_10_ST ||
              format == GL_VIV_YUV420_TILE_ST ||
              format == GL_VIV_YUV420_TILE_10_ST) &&
-            (!chipCtx->chipFeature.hasYuvAssembler10bit))
+            (!chipCtx->chipFeature.hwFeature.hasYuvAssembler10bit))
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
@@ -5361,8 +5819,8 @@ __glChipTexDirectVIV(
          * YUV assembler for planar yuv.
          * Linear texture for interleaved yuv. */
         if (
-            (planarYuv && chipCtx->chipFeature.hasYuvAssembler) ||
-            (!planarYuv && chipCtx->chipFeature.hasLinearTx))
+            (planarYuv && chipCtx->chipFeature.hwFeature.hasYuvAssembler) ||
+            (!planarYuv && chipCtx->chipFeature.hwFeature.hasLinearTx))
         {
             texInfo->direct.directSample = gcvTRUE;
         }
@@ -5370,8 +5828,8 @@ __glChipTexDirectVIV(
     else
     {
         /* RGB class texture. */
-        if ((chipCtx->chipFeature.hasLinearTx) &&
-            (chipCtx->chipFeature.hasTxSwizzle || sourceFormat == textureFormat))
+        if ((chipCtx->chipFeature.hwFeature.hasLinearTx) &&
+            (chipCtx->chipFeature.hwFeature.hasTxSwizzle || sourceFormat == textureFormat))
         {
             /* Direct if format supported. */
             texInfo->direct.directSample = gcvTRUE;
@@ -5612,7 +6070,7 @@ __glChipTexDirectVIVMap(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if (sourceYuv && planarYuv && !chipCtx->chipFeature.hasYuv420Tiler)
+    if (sourceYuv && planarYuv && !chipCtx->chipFeature.hwFeature.hasYuv420Tiler)
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
@@ -5626,8 +6084,8 @@ __glChipTexDirectVIVMap(
          * YUV assembler for planar yuv.
          * Linear texture for interleaved yuv. */
         if (
-            (planarYuv && chipCtx->chipFeature.hasYuvAssembler) ||
-            (!planarYuv && chipCtx->chipFeature.hasLinearTx))
+            (planarYuv && chipCtx->chipFeature.hwFeature.hasYuvAssembler) ||
+            (!planarYuv && chipCtx->chipFeature.hwFeature.hasLinearTx))
         {
             texInfo->direct.directSample = gcvTRUE;
         }
@@ -5635,8 +6093,8 @@ __glChipTexDirectVIVMap(
     else
     {
         /* RGB class texture. */
-        if ((chipCtx->chipFeature.hasLinearTx) &&
-            (chipCtx->chipFeature.hasTxSwizzle || sourceFormat == textureFormat))
+        if ((chipCtx->chipFeature.hwFeature.hasLinearTx) &&
+            (chipCtx->chipFeature.hwFeature.hasTxSwizzle || sourceFormat == textureFormat))
         {
             /* Direct if format supported. */
             texInfo->direct.directSample = gcvTRUE;
@@ -5909,7 +6367,7 @@ GLboolean __glChipCopyImageSubData(
 
                 if (srcView.surf->format !=dstView.surf->format)
                 {
-                    if((srcFormatInfo->glFormat == GL_RGBA8 &&
+                    if ((srcFormatInfo->glFormat == GL_RGBA8 &&
                         srcView.surf->format == gcvSURF_A8R8G8B8)  ||
                         (srcFormatInfo->glFormat == GL_RGB8&&
                         srcView.surf->format == gcvSURF_X8R8G8B8)  ||
@@ -5919,7 +6377,7 @@ GLboolean __glChipCopyImageSubData(
                         rlvArgs.uArgs.v2.srcSwizzle = gcvTRUE;
                     }
 
-                    if((dstFormatInfo->glFormat == GL_RGBA8 &&
+                    if ((dstFormatInfo->glFormat == GL_RGBA8 &&
                         dstView.surf->format == gcvSURF_A8R8G8B8)  ||
                         (dstFormatInfo->glFormat == GL_RGB8&&
                         dstView.surf->format == gcvSURF_X8R8G8B8)  ||
@@ -6926,8 +7384,8 @@ __glChipEglImageTargetTexture2DOES(
          * YUV assembler for planar yuv.
          * Linear texture for interleaved yuv. */
         if (
-            (planarYuv && chipCtx->chipFeature.hasYuvAssembler) ||
-            (!planarYuv && chipCtx->chipFeature.hasLinearTx))
+            (planarYuv && chipCtx->chipFeature.hwFeature.hasYuvAssembler) ||
+            (!planarYuv && chipCtx->chipFeature.hwFeature.hasLinearTx))
         {
             texInfo->eglImage.directSample = gcvTRUE;
         }
@@ -6935,16 +7393,16 @@ __glChipEglImageTargetTexture2DOES(
     else
     {
         /* RGB class texture. */
-        if ((srcType == gcvSURF_BITMAP && chipCtx->chipFeature.hasLinearTx) ||
+        if ((srcType == gcvSURF_BITMAP && chipCtx->chipFeature.hwFeature.hasLinearTx) ||
             (srcType == gcvSURF_TEXTURE) ||
-            (srcType == gcvSURF_RENDER_TARGET && chipCtx->chipFeature.hasSupertiledTx))
+            (srcType == gcvSURF_RENDER_TARGET && chipCtx->chipFeature.hwFeature.hasSupertiledTx))
         {
             /* Direct if format supported. */
             if (srcFormat == dstFormat)
             {
                 texInfo->eglImage.directSample = gcvTRUE;
             }
-            else if (chipCtx->chipFeature.hasTxSwizzle)
+            else if (chipCtx->chipFeature.hwFeature.hasTxSwizzle)
             {
                 switch (srcFormat)
                 {
@@ -6970,12 +7428,12 @@ __glChipEglImageTargetTexture2DOES(
         {
             /* Check tile status. */
             texView.surf = surface;
-            if (!chipCtx->chipFeature.hasTxTileStatus && gcoSURF_IsTileStatusEnabled(&texView))
+            if (!chipCtx->chipFeature.hwFeature.hasTxTileStatus && gcoSURF_IsTileStatusEnabled(&texView))
             {
                 texInfo->eglImage.directSample = gcvFALSE;
             }
             /* Check compression. */
-            else if (!chipCtx->chipFeature.hasTxDecompressor && gcoSURF_IsCompressed(&texView))
+            else if (!chipCtx->chipFeature.hwFeature.hasTxDecompressor && gcoSURF_IsCompressed(&texView))
             {
                 texInfo->eglImage.directSample = gcvFALSE;
             }
@@ -7212,7 +7670,7 @@ __glChipEglImageTargetTexture2DOES(
                         {
                             __GLchipResourceShadow *shadow = &chipMipLevel->shadow[attachPoint->slice];
 
-                            if(shadow && shadow->surface)
+                            if (shadow && shadow->surface)
                             {
                                 gcoSURF_Destroy(shadow->surface);
                                 shadow->surface = gcvNULL;
@@ -7254,7 +7712,6 @@ gcChipInitializeSampler(
     do
     {
         GLint i;
-
 #ifdef OPENGL40
         GLuint samplerSize = 0;
         gctPOINTER pointer = gcvNULL;
@@ -7273,77 +7730,81 @@ gcChipInitializeSampler(
         {
             gcmONERROR(gcoTEXTURE_InitParams(chipCtx->hal, &chipCtx->texture.halTexture[i]));
         }
+
 #ifdef OPENGL40
-        /* Enable DrawTex position stream. */
-        chipCtx->attributeInfo[gldATTRIBUTE_DRAWTEX_POSITION].streamEnabled = GL_TRUE;
-
-        chipCtx->hwPointSprite = gcvFALSE;
-
-        /* Allocate and init texture sampler structures. */
-        samplerSize = gc->constants.shaderCaps.maxTextureSamplers * gcmSIZEOF(glsTEXTURESAMPLER);
-        gcmERR_BREAK(gcoOS_Allocate(
-            gcvNULL,
-            samplerSize,
-            &pointer
-            ));
-
-        chipCtx->texture.sampler = pointer;
-
-        /* Reset to zero. */
-        gcoOS_ZeroMemory(chipCtx->texture.sampler, samplerSize);
-
-        /* Init the samplers. */
-        for (i = 0; i < (GLint)gc->constants.shaderCaps.maxTextureSamplers; i++)
+        if (gc->imports.conformGLSpec)
         {
-            /* Get a shortcut to the current sampler. */
-            glsTEXTURESAMPLER_PTR sampler = &chipCtx->texture.sampler[i];
+            /* Enable DrawTex position stream. */
+            chipCtx->attributeInfo[gldATTRIBUTE_DRAWTEX_POSITION].streamEnabled = GL_TRUE;
 
-            /* Set the index. */
-            sampler->index = i;
+            chipCtx->hwPointSprite = gcvFALSE;
 
-            /* Initialize default bindings. */
-            sampler->combColor.combineFlow = &sampler->colorDataFlow;
-            sampler->combAlpha.combineFlow = &sampler->alphaDataFlow;
+            /* Allocate and init texture sampler structures. */
+            samplerSize = gc->constants.shaderCaps.maxTextureSamplers * gcmSIZEOF(glsTEXTURESAMPLER);
+            gcmERR_BREAK(gcoOS_Allocate(
+                gcvNULL,
+                samplerSize,
+                &pointer
+                ));
 
-            /* Set defaults for alapha data flow. */
-            sampler->alphaDataFlow.targetEnable = gcSL_ENABLE_W;
-            sampler->alphaDataFlow.tempEnable   = gcSL_ENABLE_X;
-            sampler->alphaDataFlow.tempSwizzle  = gcSL_SWIZZLE_XXXX;
-            sampler->alphaDataFlow.argSwizzle   = gcSL_SWIZZLE_WWWW;
+            chipCtx->texture.sampler = pointer;
 
-            /* Set default states. */
-            sampler->coordReplace = GL_FALSE;
-            tes = &gc->state.texture.texUnits[i].env;
-            es = &gc->state.enables.texUnits[i];
-            tex = &gc->state.texture.texUnits[i];
-            setTextureFunction(chipCtx, sampler, &tes->mode, glvINT);
-            setCurrentColor(chipCtx, sampler, &tes->color, glvFLOAT);
-            setCombineAlphaFunction(chipCtx, sampler, &tes->function.alpha, glvINT);
-            setCombineColorFunction(chipCtx, sampler, &tes->function.rgb, glvINT);
-            setCombineColorSource(chipCtx, GL_SRC0_RGB, sampler, &tes->source[0].rgb, glvINT);
-            setCombineColorSource(chipCtx, GL_SRC1_RGB, sampler, &tes->source[1].rgb, glvINT);
-            setCombineColorSource(chipCtx, GL_SRC2_RGB, sampler, &tes->source[2].rgb, glvINT);
-            setCombineAlphaSource(chipCtx, GL_SRC0_ALPHA, sampler, &tes->source[0].alpha, glvINT);
-            setCombineAlphaSource(chipCtx, GL_SRC1_ALPHA, sampler, &tes->source[1].alpha, glvINT);
-            setCombineAlphaSource(chipCtx, GL_SRC2_ALPHA, sampler, &tes->source[2].alpha, glvINT);
-            setCombineColorOperand(chipCtx, GL_OPERAND0_RGB, sampler, &tes->operand[0].rgb, glvINT);
-            setCombineColorOperand(chipCtx, GL_OPERAND1_RGB, sampler, &tes->operand[1].rgb, glvINT);
-            setCombineColorOperand(chipCtx, GL_OPERAND2_RGB, sampler, &tes->operand[2].rgb, glvINT);
-            setCombineAlphaOperand(chipCtx, GL_OPERAND0_ALPHA, sampler, &tes->operand[0].alpha, glvINT);
-            setCombineAlphaOperand(chipCtx, GL_OPERAND1_ALPHA, sampler, &tes->operand[1].alpha, glvINT);
-            setCombineAlphaOperand(chipCtx, GL_OPERAND2_ALPHA, sampler, &tes->operand[2].alpha, glvINT);
-            setColorScale(chipCtx, sampler, &tes->rgbScale, glvFLOAT);
-            setAlphaScale(chipCtx, sampler, &tes->alphaScale, glvFLOAT);
+            /* Reset to zero. */
+            gcoOS_ZeroMemory(chipCtx->texture.sampler, samplerSize);
 
-            /* right now if one of them is enabled, texture gen will be enabled. */
-            sampler->genEnable = (es->texGen[0] || (es->texGen[1] << 1) || (es->texGen[2] << 2) || (es->texGen[3] << 3));
-            /* Update the hash key. */
-            glmSETHASH_4BITS(hashTexCoordGenEnable, sampler->genEnable, i);
+            /* Init the samplers. */
+            for (i = 0; i < (GLint)gc->constants.shaderCaps.maxTextureSamplers; i++)
+            {
+                /* Get a shortcut to the current sampler. */
+                glsTEXTURESAMPLER_PTR sampler = &chipCtx->texture.sampler[i];
 
-            setTexCoordGenMode(chipCtx, sampler, &tex->s.mode, glvINT, 0);
-            setTexCoordGenMode(chipCtx, sampler, &tex->t.mode, glvINT, 1);
-            setTexCoordGenMode(chipCtx, sampler, &tex->r.mode, glvINT, 2);
-            setTexCoordGenMode(chipCtx, sampler, &tex->q.mode, glvINT, 3);
+                /* Set the index. */
+                sampler->index = i;
+
+                /* Initialize default bindings. */
+                sampler->combColor.combineFlow = &sampler->colorDataFlow;
+                sampler->combAlpha.combineFlow = &sampler->alphaDataFlow;
+
+                /* Set defaults for alapha data flow. */
+                sampler->alphaDataFlow.targetEnable = gcSL_ENABLE_W;
+                sampler->alphaDataFlow.tempEnable   = gcSL_ENABLE_X;
+                sampler->alphaDataFlow.tempSwizzle  = gcSL_SWIZZLE_XXXX;
+                sampler->alphaDataFlow.argSwizzle   = gcSL_SWIZZLE_WWWW;
+
+                /* Set default states. */
+                sampler->coordReplace = GL_FALSE;
+                tes = &gc->state.texture.texUnits[i].env;
+                es = &gc->state.enables.texUnits[i];
+                tex = &gc->state.texture.texUnits[i];
+                setTextureFunction(chipCtx, sampler, &tes->mode, glvINT);
+                setCurrentColor(chipCtx, sampler, &tes->color, glvFLOAT);
+                setCombineAlphaFunction(chipCtx, sampler, &tes->function.alpha, glvINT);
+                setCombineColorFunction(chipCtx, sampler, &tes->function.rgb, glvINT);
+                setCombineColorSource(chipCtx, GL_SRC0_RGB, sampler, &tes->source[0].rgb, glvINT);
+                setCombineColorSource(chipCtx, GL_SRC1_RGB, sampler, &tes->source[1].rgb, glvINT);
+                setCombineColorSource(chipCtx, GL_SRC2_RGB, sampler, &tes->source[2].rgb, glvINT);
+                setCombineAlphaSource(chipCtx, GL_SRC0_ALPHA, sampler, &tes->source[0].alpha, glvINT);
+                setCombineAlphaSource(chipCtx, GL_SRC1_ALPHA, sampler, &tes->source[1].alpha, glvINT);
+                setCombineAlphaSource(chipCtx, GL_SRC2_ALPHA, sampler, &tes->source[2].alpha, glvINT);
+                setCombineColorOperand(chipCtx, GL_OPERAND0_RGB, sampler, &tes->operand[0].rgb, glvINT);
+                setCombineColorOperand(chipCtx, GL_OPERAND1_RGB, sampler, &tes->operand[1].rgb, glvINT);
+                setCombineColorOperand(chipCtx, GL_OPERAND2_RGB, sampler, &tes->operand[2].rgb, glvINT);
+                setCombineAlphaOperand(chipCtx, GL_OPERAND0_ALPHA, sampler, &tes->operand[0].alpha, glvINT);
+                setCombineAlphaOperand(chipCtx, GL_OPERAND1_ALPHA, sampler, &tes->operand[1].alpha, glvINT);
+                setCombineAlphaOperand(chipCtx, GL_OPERAND2_ALPHA, sampler, &tes->operand[2].alpha, glvINT);
+                setColorScale(chipCtx, sampler, &tes->rgbScale, glvFLOAT);
+                setAlphaScale(chipCtx, sampler, &tes->alphaScale, glvFLOAT);
+
+                /* right now if one of them is enabled, texture gen will be enabled. */
+                sampler->genEnable = ((es->texGen[0]) | (es->texGen[1] << 1) | (es->texGen[2] << 2) | (es->texGen[3] << 3));
+                /* Update the hash key. */
+                glmSETHASH_4BITS(hashTexCoordGenEnable, sampler->genEnable, i);
+
+                setTexCoordGenMode(chipCtx, sampler, &tex->s.mode, glvINT, 0);
+                setTexCoordGenMode(chipCtx, sampler, &tex->t.mode, glvINT, 1);
+                setTexCoordGenMode(chipCtx, sampler, &tex->r.mode, glvINT, 2);
+                setTexCoordGenMode(chipCtx, sampler, &tex->q.mode, glvINT, 3);
+            }
         }
 #endif
         for (i = 0; i < (GLint)gc->constants.shaderCaps.maxTextureSamplers; ++i)

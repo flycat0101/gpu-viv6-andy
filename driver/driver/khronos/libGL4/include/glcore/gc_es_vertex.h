@@ -198,7 +198,7 @@ enum {
 extern GLsizei minVertexNumber[];
 
 #define CHECK_VERTEX_COUNT()                \
-    if(count < minVertexNumber[mode] ) {    \
+    if (count < minVertexNumber[mode] ) {   \
         return;                             \
     }                                       \
     switch (mode ) {                        \
@@ -217,7 +217,7 @@ extern GLsizei minVertexNumber[];
     }
 
 #define CHECK_INSTANCE_COUNT()              \
-    if(primCount < 1 ) {                    \
+    if (primCount < 1 ) {                   \
         return;                             \
     }
 #define __GL_DIRTY_VARRAY_ENABLE_BIT        (1 << __GL_DIRTY_VARRAY_ENABLE)
@@ -573,6 +573,6 @@ __GL_INLINE GLsizei __glUtilCalculateStride(GLint size, GLenum type)
 
 }
 
-
+__GLbufferObject* __glGetCurrentVertexArrayBufObj(__GLcontext *gc, GLuint binding);
 
 #endif /* __gc_es_vertex_h__ */

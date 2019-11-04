@@ -375,6 +375,8 @@ _DumpTGA(
     VEGLSurface Draw
     )
 {
+/* Nop if gcdDUMP is enabled to avoid extra BLT in dump trace */
+#if !gcdDUMP
     gcsPOINT origin = {0, 0};
     gcsPOINT size   = {Draw->config.width, Draw->config.height};
 
@@ -408,6 +410,7 @@ _DumpTGA(
         _SaveFrameTGA(Thread, Draw, &origin, &size);
     }
 #  endif
+#endif
 }
 
 #  define VEGL_DUMP_TGA(thread, draw) \
@@ -2042,7 +2045,7 @@ _SwapBuffersRegion(
 
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
             gcoOS_GetEnv(NULL,"WL_EGL_GBM_FENCE",&p);
-            if((p != gcvNULL) && (p[0] == '0'))
+            if ((p != gcvNULL) && (p[0] == '0'))
             {
                 gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
             }
@@ -2517,7 +2520,7 @@ veglSwapBuffers(
 #endif
 
 
-    if(dpy && dpy->platform && dpy->platform->platform == EGL_PLATFORM_DRI_VIV)
+    if (dpy && dpy->platform && dpy->platform->platform == EGL_PLATFORM_DRI_VIV)
     {
         result = _eglSwapBuffersRegionDRI(Dpy, Draw, gcvNULL, gcvNULL);
     }
@@ -2668,7 +2671,7 @@ eglSwapBuffersWithDamageEXT(
                   Dpy, Surface, (void *)Rects, NumRects);
     gcmDUMP_API("${EGL eglSwapBuffersWithDamageEXT 0x%p 0x%p 0x%p 0x%X}",
                 Dpy, Surface, (void *)Rects, NumRects);
-    VEGL_TRACE_API(SwapBuffersWithDamageKHR)(Dpy, Surface, Rects, NumRects);
+    VEGL_TRACE_API(SwapBuffersWithDamageEXT)(Dpy, Surface, Rects, NumRects);
 
     result = veglSwapBuffers(Dpy, Surface, gcvNULL, &region);
 

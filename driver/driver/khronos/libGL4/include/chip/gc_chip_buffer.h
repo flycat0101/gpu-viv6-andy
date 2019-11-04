@@ -377,6 +377,12 @@ gcChipGetFormatMapInfo(
     __GLchipFmtPatch patchCase
     );
 
+extern GLvoid
+__glGetWrapFormat(
+    GLenum format,
+    GLenum type,
+    gceSURF_FORMAT *wrapformat
+);
 
 #ifdef __cplusplus
 }

@@ -660,8 +660,8 @@ _FlushChannelOfPatchedUniformImm(
 
     address = psBase + hwPatchedConstRegAddr * 16 + patchedSingleChannel * 4;
 
-    gcoSHADER_ProgramUniformEx(gcvNULL, address, 1, 1, 1, gcvFALSE, 4, 4,
-                               (gctPOINTER)&channelData, gcvUNIFORMCVT_NONE, gcSHADER_TYPE_FRAGMENT);
+    gcoSHADER_BindUniform(gcvNULL, address, hwPatchedConstRegAddr, 1, 1, 1, gcvFALSE, 4, 4,
+                         (gctPOINTER)&channelData, gcvUNIFORMCVT_NONE, gcSHADER_TYPE_FRAGMENT);
 }
 
 __GL_INLINE void
@@ -1779,13 +1779,13 @@ gcChipProcessUniforms(
                 {
                 case __GL_CHIP_UNIFORM_SUB_USAGE_XFB_ENABLE:
                     GL_ASSERT(stageIdx == __GLSL_STAGE_VS);
-                    GL_ASSERT(chipCtx->chipFeature.hasHwTFB == GL_FALSE);
+                    GL_ASSERT(chipCtx->chipFeature.hwFeature.hasHwTFB == GL_FALSE);
                     pgInstance->xfbActiveUniform = slot;
                     break;
                 case __GL_CHIP_UNIFORM_SUB_USAGE_XFB_BUFFER:
                     GL_ASSERT(stageIdx == __GLSL_STAGE_VS);
                     GL_ASSERT(pgInstance->xfbBufferCount < __GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS);
-                    GL_ASSERT(chipCtx->chipFeature.hasHwTFB == GL_FALSE);
+                    GL_ASSERT(chipCtx->chipFeature.hwFeature.hasHwTFB == GL_FALSE);
                     pgInstance->xfbBufferUniforms[pgInstance->xfbBufferCount++] = slot;
                     break;
                 case __GL_CHIP_UNIFORM_SUB_USAGE_STARTVERTEX:
@@ -2096,7 +2096,7 @@ gcChipProcessUniforms(
                         pgInstance->extraSamplerMap[samplerIdx].auxiliary = (subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_MULTILAYER_SAMPLER);
                         pgInstance->extraSamplerMap[samplerIdx].subUsage = subUsage;
                         pgInstance->extraSamplerMap[samplerIdx].isInteger = isInteger;
-                        if(subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_SAMPLER)
+                        if (subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_SAMPLER)
                         {
                             pgInstance->rtSampler = samplerIdx;
                         }
@@ -5300,7 +5300,7 @@ gcChipProgramBuildBindingInfo(
         /* Count buffer variables in SSB and build buffer variable table */
         gcChipCountBufferVariables(program);
 
-        if(program->bufVariableCount)
+        if (program->bufVariableCount)
         {
             GL_ASSERT(program->bufVariableCount);
 
@@ -6084,6 +6084,8 @@ gcChipSetUniformData(
         }
         break;
 
+    case gcSHADER_SAMPLER_1D:
+    case gcSHADER_SAMPLER_1D_ARRAY:
     case gcSHADER_SAMPLER_2D:
     case gcSHADER_SAMPLER_2D_SHADOW:
     case gcSHADER_SAMPLER_2D_ARRAY:
@@ -6580,7 +6582,7 @@ gcChipLTCGetUserUniformSourceValue(
             uniformStorage = gcChipUniformMapStorage(gc, program, Shader, uniform, glUniform, &bufObj);
             gcmASSERT(uniformStorage != gcvNULL);
 
-            if(uniformStorage == gcvNULL)
+            if (uniformStorage == gcvNULL)
             {
                 status = gcvSTATUS_INVALID_DATA;
                 break;
@@ -6854,7 +6856,7 @@ gcChipLTCGetResultArray(
     status = gcoOS_Allocate(Os,
                             chipCtx->curLTCResultArraySize,
                             (gctPOINTER *)&chipCtx->cachedLTCResultArray);
-    if(status == gcvSTATUS_OK)
+    if (status == gcvSTATUS_OK)
     {
         gcoOS_ZeroMemory(chipCtx->cachedLTCResultArray, chipCtx->curLTCResultArraySize);
         *Memory = chipCtx->cachedLTCResultArray;
@@ -7296,7 +7298,6 @@ gcChipFlushSingleUniform(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctUINT8* uniformData = (gctUINT8*)data;
 
     gcmHEADER_ARG("gc=0x%x program=0x%x uniform=0x%x data=0x%x", gc, program, uniform, data);
 
@@ -7323,21 +7324,13 @@ gcChipFlushSingleUniform(
         matrixStride = columns * 4;
         arrayStride = matrixStride * rows;
 
-        /*
-        ** For those uniforms that haven't been set the data by user, check if they have a initializer in shader,
-        ** if so, find this initializer and use it as the data.
-        */
-        if (!uniform->usrDef && uniform->initializerData != gcvNULL)
-        {
-            uniformData = uniform->initializerData;
-        }
-
         for (stageIdx = 0; stageIdx < __GLSL_STAGE_LAST; ++stageIdx)
         {
             gcUNIFORM halUniform = uniform->halUniform[stageIdx];
 
             if (halUniform && isUniformUsedInShader(halUniform))
             {
+                gctINT32 index;
                 GL_ASSERT(GetUniformPhysical(halUniform) != -1);
 
                 arraySize = GetUniformUsedArraySize(halUniform);
@@ -7363,9 +7356,12 @@ gcChipFlushSingleUniform(
                     convert = gcvUNIFORMCVT_NONE;
                 }
 
-                gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, uniform->stateAddress[stageIdx] + uniform->regOffset,
-                                                      columns, rows, arraySize, gcvFALSE, matrixStride,
-                                                      arrayStride, uniformData, convert, GetUniformShaderKind(halUniform)));
+                index = GetUniformPhysical(halUniform) + (uniform->regOffset >> 4);
+
+                gcmONERROR(gcoSHADER_BindUniform(gcvNULL, uniform->stateAddress[stageIdx] + uniform->regOffset, index,
+                                                 columns, rows, arraySize, gcvFALSE, matrixStride,
+                                                 arrayStride, data, convert, GetUniformShaderKind(halUniform)));
+
                 if (gcmOPT_DUMP_UNIFORM())
                 {
                     gcChipDumpGLUniform(uniform, uniform->dataType, 1, 0);
@@ -8002,9 +7998,6 @@ __glChipLinkProgram(
     const gctCHAR *patchedSrcs[__GLSL_STAGE_LAST] = {gcvNULL};
 #endif
 
-#ifdef OPENGL40
-    GLuint i;
-#endif
     gcmHEADER_ARG("gc=0x%x programObject=0x%x", gc, programObject);
 
 #if __GL_CHIP_PATCH_ENABLED
@@ -8100,7 +8093,7 @@ __glChipLinkProgram(
                 gcSHADER_Copy(masterPgInstance->savedBinaries[stage], masterPgInstance->binaries[stage]);
                 while (i < shaderNum)
                 {
-                    if(masterPgInstance->binaries[stage] != binaries[stage][i])
+                    if (masterPgInstance->binaries[stage] != binaries[stage][i])
                     {
                         gcmONERROR(gcSHADER_Destroy(binaries[stage][i]));
                     }
@@ -8299,17 +8292,22 @@ __glChipLinkProgram(
     gcmONERROR(gcChipProgramBuildBindingInfo(gc, programObject));
 
 #ifdef OPENGL40
-    programObject->bindingInfo.vsInputMask = 0;
-    vsInputMaskForBuiltIns( gc, &(programObject->bindingInfo.vsInputMask));
-    for (i = 0; i < gc->constants.shaderCaps.maxUserVertAttributes; ++i)
+    if (gc->imports.conformGLSpec)
     {
-        __GLchipSLLinkage* attribLinkage = gcvNULL;
-        /* currently the compiler does not support build in input, so we only can */
-        /* use generic attributes, immediate mode and conventional inputs won't work */
-        attribLinkage =  ((__GLchipSLProgram *)programObject->privateData)->attribLinkage[i];
-        if (attribLinkage)
+        GLuint i;
+
+        programObject->bindingInfo.vsInputMask = 0;
+        vsInputMaskForBuiltIns( gc, &(programObject->bindingInfo.vsInputMask));
+        for (i = 0; i < gc->constants.shaderCaps.maxUserVertAttributes; ++i)
         {
-            programObject->bindingInfo.vsInputMask |= __GL_ONE_64 << (i + __GL_VARRAY_ATT0_INDEX);
+            __GLchipSLLinkage* attribLinkage = gcvNULL;
+            /* currently the compiler does not support build in input, so we only can */
+            /* use generic attributes, immediate mode and conventional inputs won't work */
+            attribLinkage =  ((__GLchipSLProgram *)programObject->privateData)->attribLinkage[i];
+            if (attribLinkage)
+            {
+                programObject->bindingInfo.vsInputMask |= __GL_ONE_64 << (i + __GL_VARRAY_ATT0_INDEX);
+            }
         }
     }
 #endif
@@ -8395,6 +8393,7 @@ __glChipUseProgram(
     gcmHEADER_ARG("gc=0x%x programObject=0x%x valid=0x%x", gc, programObject, valid);
 
 #ifdef OPENGL40
+    if (gc->imports.conformGLSpec)
     {
         __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
         chipCtx->fixProgramFlag = programObject ? gcvFALSE : gcvTRUE;
@@ -8482,7 +8481,7 @@ gcChipGetProgramBinary_V0(
     GL_ASSERT(masterPgInstance);
 
     /* Get size of program binary. */
-    if(masterPgInstance->savedBinaries[__GLSL_STAGE_CS])
+    if (masterPgInstance->savedBinaries[__GLSL_STAGE_CS])
     {
         gcmONERROR(gcSaveComputeProgram(masterPgInstance->savedBinaries[__GLSL_STAGE_CS],
                                         masterPgInstance->programState, gcvNULL, (gctUINT32 *)&size));
@@ -8501,7 +8500,7 @@ gcChipGetProgramBinary_V0(
         }
 
         /* Save program binary. */
-        if(masterPgInstance->savedBinaries[__GLSL_STAGE_CS])
+        if (masterPgInstance->savedBinaries[__GLSL_STAGE_CS])
         {
             gcmONERROR(gcSaveComputeProgram(masterPgInstance->savedBinaries[__GLSL_STAGE_CS],
                                             masterPgInstance->programState, gcvNULL, (gctUINT32 *)&size));
@@ -8613,7 +8612,7 @@ gcChipProgramBinary_V0(
         gcmONERROR(gcSHADER_Construct(shaderTypes[stage], &masterPgInstance->savedBinaries[stage]));
     }
 
-    if(masterPgInstance->binaries[__GLSL_STAGE_CS])
+    if (masterPgInstance->binaries[__GLSL_STAGE_CS])
     {
         gcmONERROR(gcLoadComputeProgram((gctPOINTER)binary,
                                         (gctUINT32)length,
@@ -9184,7 +9183,7 @@ __glChipShaderBinary(
             {
                 found = fragmentShader;
             }
-            else if(shaderType == gcSHADER_TYPE_COMPUTE && computeShader)
+            else if (shaderType == gcSHADER_TYPE_COMPUTE && computeShader)
             {
                 found = computeShader;
             }
@@ -9196,7 +9195,7 @@ __glChipShaderBinary(
             {
                 found = tesShader;
             }
-            else if(shaderType == gcSHADER_TYPE_GEOMETRY && gsShader)
+            else if (shaderType == gcSHADER_TYPE_GEOMETRY && gsShader)
             {
                 found = gsShader;
             }
@@ -9228,7 +9227,7 @@ __glChipShaderBinary(
         }
     }
 
-    if((binaryformat == GL_PROGRAM_BINARY_VIV) && vertexShader)
+    if ((binaryformat == GL_PROGRAM_BINARY_VIV) && vertexShader)
     {
         if ((vertexShader == gcvNULL) || (fragmentShader == gcvNULL))
         {
@@ -10475,6 +10474,9 @@ gcChipFlushUniformBlock(
         if (ub->mapFlags[stageIdx] & gcdUB_MAPPED_TO_MEM)
         {
             gctUINT32 physicalAddress = 0;
+            gctINT32 index;
+            gctUINT32 data;
+            gctUINT32 baseOffset;
 
             if (gc->shaderProgram.boundPPO || chipCtx->chipDirty.uDefer.sDefer.pgInsChanged)
             {
@@ -10484,18 +10486,21 @@ gcChipFlushUniformBlock(
             }
 
             physicalAddress = ub->stateAddress[stageIdx];
+            index = GetUniformPhysical(ubUniform);
 
             if (-1 != GetUBArrayIndex(ub->halUB[stageIdx]))
             {
                 physicalAddress += GetUBArrayIndex(ub->halUB[stageIdx]) * 16;
+                index += GetUBArrayIndex(ub->halUB[stageIdx]);
             }
 
-            gcmONERROR(gcoSHADER_BindBufferBlock(gcvNULL,
-                                                 physicalAddress,
-                                                 physical,
-                                                 offset,
-                                                 size,
-                                                 GetUniformShaderKind(ubUniform)));
+            gcmSAFECASTSIZET(baseOffset, offset);
+
+            data = physical + baseOffset;
+
+            gcmONERROR(gcoSHADER_BindUniform(gcvNULL, physicalAddress, index,
+                                             1, 1, 1, gcvFALSE, 1, 4,
+                                             &data, gcvFALSE, GetUniformShaderKind(ubUniform)));
 
             if (program->progFlags.robustEnabled)
             {
@@ -10509,12 +10514,12 @@ gcChipFlushUniformBlock(
                 addressLimit[0] = physical;
                 addressLimit[1] = physical + bufSize - 1;
 
-                gcmONERROR(gcoSHADER_ProgramUniformEx(
-                    gcvNULL, (physicalAddress + 4),
-                    2, 1, 1, gcvFALSE,
-                    1,
-                    4,
-                    addressLimit, gcvFALSE, GetUniformShaderKind(ubUniform)));
+                /*the base channel of the ubo must be x or y*/
+                gcmASSERT((physicalAddress & 0xF) == 0x0 || (physicalAddress & 0xF) == 0x4);
+
+                gcmONERROR(gcoSHADER_BindUniform(gcvNULL, physicalAddress + 4, index,
+                                                 2, 1, 1, gcvFALSE, 0, 0,
+                                                 addressLimit, gcvFALSE, GetUniformShaderKind(ubUniform)));
             }
         }
 
@@ -10575,11 +10580,11 @@ gcChipFlushUniformBlock(
                     entries = gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, gcvNULL, &arraySize);
                     arraySize *= entries;   /* Expand array size for array of arrays to one dimension */
 
-                    gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, physicalAddress,
-                                                          numCols, numRows, arraySize, isRowMajor,
-                                                          (gctSIZE_T)GetUniformMatrixStride(uniform),
-                                                          (gctSIZE_T)GetUniformArrayStride(uniform),
-                                                          pData, convert, GetUniformShaderKind(uniform)));
+                    gcmONERROR(gcoSHADER_BindUniform(gcvNULL, physicalAddress, GetUniformPhysical(uniform),
+                                                     numCols, numRows, arraySize, isRowMajor,
+                                                     (gctSIZE_T)GetUniformMatrixStride(uniform),
+                                                     (gctSIZE_T)GetUniformArrayStride(uniform),
+                                                     pData, convert, GetUniformShaderKind(uniform)));
                 }
             }
         }
@@ -12248,17 +12253,18 @@ gcChipFlushAtomicCounterBuffers(
                     if (acb->halUniform[stageIdx])
                     {
                         gctUINT32 physicalAddr;
+                        gctINT32 index;
+                        gctUINT32 data;
 
                         gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->hwConstRegBases,
                                                                           acb->halUniform[stageIdx],
                                                                           &physicalAddr));
+                        data = physical + (gctUINT32)pBindingPoint->bufOffset;
+                        index = GetUniformPhysical(acb->halUniform[stageIdx]);
 
-                        gcmERR_BREAK(gcoSHADER_BindBufferBlock(gcvNULL,
-                                                              physicalAddr,
-                                                              physical,
-                                                              pBindingPoint->bufOffset,
-                                                              requiredSize,
-                                                              __glChipGLShaderStageToShaderKind[stageIdx]));
+                        gcmONERROR(gcoSHADER_BindUniform(gcvNULL, physicalAddr, index,
+                                                         1, 1, 1, gcvFALSE, 1, 4,
+                                                         &data, gcvFALSE, __glChipGLShaderStageToShaderKind[stageIdx]));
 
                         if (program->progFlags.robustEnabled)
                         {
@@ -12272,12 +12278,12 @@ gcChipFlushAtomicCounterBuffers(
                             addressLimit[0] = physical;
                             addressLimit[1] = physical + bufSize - 1;
 
-                            gcmONERROR(gcoSHADER_ProgramUniformEx(
-                                gcvNULL, (physicalAddr + 4),
-                                1, 1, 2, gcvFALSE,
-                                1,
-                                4,
-                                addressLimit, gcvFALSE, __glChipGLShaderStageToShaderKind[stageIdx]));
+                            /*the base channel of the ubo must be x or y*/
+                            gcmASSERT((physicalAddr & 0xF) == 0x0 || (physicalAddr & 0xF) == 0x4);
+
+                            gcmONERROR(gcoSHADER_BindUniform(gcvNULL, physicalAddr + 4, index,
+                                                             2, 1, 1, gcvFALSE, 0, 0,
+                                                             addressLimit, gcvFALSE, __glChipGLShaderStageToShaderKind[stageIdx]));
                         }
                     }
                 }
@@ -12378,6 +12384,7 @@ gcChipFlushUserDefSSBs(
             {
                 gcUNIFORM sbUniform = sb->halUniform[stageIdx];
                 gctUINT32 unsizedArrayLength = 0;
+                gctINT32 data, index;
 
                 if (!(sbUniform && isUniformUsedInShader(sbUniform)))
                 {
@@ -12404,12 +12411,12 @@ gcChipFlushUserDefSSBs(
                                                                       &sb->stateAddress[stageIdx]));
                 }
 
-                gcmONERROR(gcoSHADER_BindBufferBlock(gcvNULL,
-                                                     sb->stateAddress[stageIdx],
-                                                     physical,
-                                                     pBindingPoint->bufOffset,
-                                                     requiredSize,
-                                                     GetUniformShaderKind(sbUniform)));
+                data = physical + (gctUINT32)pBindingPoint->bufOffset;
+                index = GetUniformPhysical(sbUniform);
+
+                gcmONERROR(gcoSHADER_BindUniform(gcvNULL, sb->stateAddress[stageIdx], index,
+                                                 1, 1, 1, gcvFALSE, 1, 4,
+                                                 &data, gcvFALSE, GetUniformShaderKind(sbUniform)));
 
                 if (program->progFlags.robustEnabled)
                 {
@@ -12424,19 +12431,23 @@ gcChipFlushUserDefSSBs(
                     addressLimit[1] = physical + bufSize - 1; /* upper limit */
                     addressLimit[2] = unsizedArrayLength;     /* size */
 
-                    gcmONERROR(gcoSHADER_ProgramUniformEx(
-                        gcvNULL, (sb->stateAddress[stageIdx] + 4),
-                        3, 1, 1, gcvFALSE,
-                        1,
-                        4,
-                        addressLimit, gcvFALSE, GetUniformShaderKind(sbUniform)));
+                    /*the base channel of the ubo must be x*/
+                    gcmASSERT((sb->stateAddress[stageIdx] & 0xF) == 0x0);
+
+                    gcmONERROR(gcoSHADER_BindUniform(gcvNULL, sb->stateAddress[stageIdx] + 4, index,
+                                                     3, 1, 1, gcvFALSE, 0, 0,
+                                                     addressLimit, gcvFALSE, GetUniformShaderKind(sbUniform)));
                 }
                 else
                 {
-                    gcmONERROR(gcoSHADER_ProgramUniformEx(
-                        gcvNULL, sb->stateAddress[stageIdx] + 4,
-                        1, 1, 1, gcvFALSE, 1,
-                        1, &unsizedArrayLength, gcvFALSE, GetUniformShaderKind(sbUniform)));
+                    if ((sb->stateAddress[stageIdx] & 0xF) == 0xC)
+                    {
+                        index += 1;
+                    }
+
+                    gcmONERROR(gcoSHADER_BindUniform(gcvNULL, sb->stateAddress[stageIdx] + 4, index,
+                                                     1, 1, 1, gcvFALSE, 1, 4,
+                                                     &unsizedArrayLength, gcvFALSE, GetUniformShaderKind(sbUniform)));
                 }
             }
 
@@ -12518,6 +12529,7 @@ gcChipFlushPrivateSSBs(
             for (stageIdx = __GLSL_STAGE_VS; stageIdx < __GLSL_STAGE_LAST; ++stageIdx)
             {
                 gcUNIFORM sbUniform = sb->halUniform[stageIdx];
+                gctINT32 index;
 
                 if (!(sbUniform && isUniformUsedInShader(sbUniform)))
                 {
@@ -12532,12 +12544,12 @@ gcChipFlushPrivateSSBs(
                                                                       &sb->stateAddress[stageIdx]));
                 }
 
-                gcmONERROR(gcoSHADER_BindBufferBlock(gcvNULL,
-                                                     sb->stateAddress[stageIdx],
-                                                     physical,
-                                                     0,
-                                                     dataSize,
-                                                     GetUniformShaderKind(sbUniform)));
+                index = GetUniformPhysical(sbUniform);
+
+                gcmONERROR(gcoSHADER_BindUniform(gcvNULL, sb->stateAddress[stageIdx], index,
+                                                 1, 1, 1, gcvFALSE, 1, 4,
+                                                 &physical, gcvFALSE, GetUniformShaderKind(sbUniform)));
+
                 if (program->progFlags.robustEnabled)
                 {
                     gctUINT32 addressLimit[2];
@@ -12550,12 +12562,12 @@ gcChipFlushPrivateSSBs(
                     addressLimit[0] = physical;               /* low limit */
                     addressLimit[1] = physical + bufSize - 1; /* upper limit */
 
-                    gcmONERROR(gcoSHADER_ProgramUniformEx(
-                        gcvNULL, (sb->stateAddress[stageIdx] + 4),
-                        1, 1, 2, gcvFALSE,
-                        1,
-                        4,
-                        addressLimit, gcvFALSE, GetUniformShaderKind(sbUniform)));
+                    /*the base channel of the ubo must be x or y*/
+                    gcmASSERT((sb->stateAddress[stageIdx] & 0xF) == 0x0 || (sb->stateAddress[stageIdx] & 0xF) == 0x4);
+
+                    gcmONERROR(gcoSHADER_BindUniform(gcvNULL, sb->stateAddress[stageIdx] + 4, index,
+                                                     2, 1, 1, gcvFALSE, 0, 0,
+                                                     addressLimit, gcvFALSE, GetUniformShaderKind(sbUniform)));
                 }
 
 

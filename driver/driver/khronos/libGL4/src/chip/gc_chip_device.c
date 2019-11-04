@@ -249,11 +249,11 @@ GLuint constructNoneDislayablePixelFormatTable(__VIV2DPixelFormat * pPixelFormat
 
 GLboolean __glDpGetPixelFormats(GLint numPixelFormat, GLvoid* pixelFormats, GLboolean bFloat)
 {
-    if(numPixelFormat)
+    if (numPixelFormat)
     {
         GL_ASSERT(pixelFormats);
         GL_ASSERT(dpGlobalInfo.__glPFDTable);
-        if(bFloat) {
+        if (bFloat) {
             __GL_MEMCOPY(pixelFormats, (__VIV2DPixelFormat*)dpGlobalInfo.__glPFDTable + dpGlobalInfo.dPFDSize, numPixelFormat);
         }
         else {
@@ -271,7 +271,7 @@ GLboolean __glDpInitPixelFormats(GLvoid)
     __VIV2DPixelFormat *VIVpf;
     GLint i;
 
-    if(dpGlobalInfo.__glPFDTable) {
+    if (dpGlobalInfo.__glPFDTable) {
         (*imports.free)(NULL, dpGlobalInfo.__glPFDTable);
     }
 
@@ -297,7 +297,7 @@ GLboolean __glDpInitPixelFormats(GLvoid)
     for(i = 0; i < dpGlobalInfo.dPFDSize + dpGlobalInfo.dPFDSizeNonDisplay; i++)
     {
         VIVpf = (__VIV2DPixelFormat*)dpGlobalInfo.__glPFDTable + i;
-        if(i < dpGlobalInfo.dPFDSize) {
+        if (i < dpGlobalInfo.dPFDSize) {
             VIVpf->index = i + 1;
         } else {
             VIVpf->index = -1;
@@ -331,19 +331,19 @@ GLint __glDpDescribePixelFormat(GLint iPixelFormat,
         GL_ASSERT(iPixelFormat); /* should start from 1*/
         pCurrent = (__VIV2DPixelFormat *)dpGlobalInfo.__glPFDTable;
 
-        if(iPixelFormat - 1 < dpGlobalInfo.dPFDSize) {
+        if (iPixelFormat - 1 < dpGlobalInfo.dPFDSize) {
             pCurrent += iPixelFormat-1;
         } else {
             for(i = 0; i < dpGlobalInfo.dPFDSizeNonDisplay; i++) {
                 pCurrent = (__VIV2DPixelFormat *)dpGlobalInfo.__glPFDTable + dpGlobalInfo.dPFDSize + i;
-                if(pCurrent->index == iPixelFormat) {
+                if (pCurrent->index == iPixelFormat) {
                     break;
                 }
             }
         }
         pixelformat = *pCurrent;
 
-        if(bDisplayableOnly &&
+        if (bDisplayableOnly &&
           (pixelformat.extFlags!= 0 || pixelformat.sampleQuality!= 0)) {
             pixelformat.pixelformatDesc.dwFlags &= ~ PFD_SUPPORT_OPENGL;
         }
@@ -353,7 +353,7 @@ GLint __glDpDescribePixelFormat(GLint iPixelFormat,
 
     }
 
-    if(bDisplayableOnly) {
+    if (bDisplayableOnly) {
         return dpGlobalInfo.dPFDSize;
     } else {
         return dpGlobalInfo.dPFDSize + dpGlobalInfo.dPFDSizeNonDisplay;
@@ -396,7 +396,7 @@ GLvoid __gldevInitialize(void *pdata)
     {
         scrn = DefaultScreen(dpy);
         bpp = DefaultDepth(dpy, scrn);
-        if(bpp == 24)
+        if (bpp == 24)
             bpp = 32;
         dpGlobalInfo.bpp = bpp/8;
     }
@@ -442,9 +442,7 @@ __glDpInitialize(
     deviceEntry->devSetPixelFormat = __glDpSetPixelFormat;
 #endif
 
-#ifdef OPENGL40
     gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
-#endif
 
     __GL_MEMZERO(&dpGlobalInfo, sizeof(__GLchipGlobal));
     dpGlobalInfo.processID = (GLuint)(gctUINTPTR_T)gcoOS_GetCurrentProcessID();

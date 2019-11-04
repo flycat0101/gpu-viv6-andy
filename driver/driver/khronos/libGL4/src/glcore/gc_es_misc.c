@@ -26,14 +26,14 @@ GLvoid __glSetTexEnableDimension(__GLcontext *gc, GLuint unit)
     __GLTextureEnableState *textureEnable = &gc->state.enables.texUnits[unit];
     GLuint origEnabledDim = textureEnable->enabledDimension;
     gc->texture.enabledMask |= (1 << unit);
-    if(textureEnable->textureCubeMap)
+    if (textureEnable->textureCubeMap)
         textureEnable->enabledDimension = __GL_TEXTURE_CUBEMAP_INDEX + 1;
-    else if(textureEnable->texture3D)
+    else if (textureEnable->texture3D)
         textureEnable->enabledDimension = __GL_TEXTURE_3D_INDEX + 1;
-    else if(textureEnable->textureRec)
+    else if (textureEnable->textureRec)
         textureEnable->enabledDimension = __GL_TEXTURE_RECTANGLE_INDEX + 1;
-    else if(textureEnable->texture2D)        textureEnable->enabledDimension = __GL_TEXTURE_2D_INDEX + 1;
-    else if(textureEnable->texture1D)        textureEnable->enabledDimension = __GL_TEXTURE_1D_INDEX + 1;
+    else if (textureEnable->texture2D)        textureEnable->enabledDimension = __GL_TEXTURE_2D_INDEX + 1;
+    else if (textureEnable->texture1D)        textureEnable->enabledDimension = __GL_TEXTURE_1D_INDEX + 1;
     else
     {
         textureEnable->enabledDimension = 0;
@@ -50,10 +50,7 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
 {
     __GLenableState *es = &gc->state.enables;
     GLint capOffset;
-
-#ifdef OPENGL40
     GLuint unit;
-#endif
 
     switch (cap)
     {
@@ -404,11 +401,13 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
     case GL_MAP1_TEXTURE_COORD_4:
     case GL_MAP1_VERTEX_3:
     case GL_MAP1_VERTEX_4:
-        cap = __GL_EVAL1D_INDEX(cap);
-        if (es->eval.map1[cap] ^ val) {
-          __GL_VERTEX_BUFFER_FLUSH(gc);
-          es->eval.map1[cap] = val;
-          __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_3, __GL_MAP1_ENDISABLE_BIT);
+        {
+            GLint capIndex = __GL_EVAL1D_INDEX(cap);
+            if (es->eval.map1[capIndex] ^ val) {
+                __GL_VERTEX_BUFFER_FLUSH(gc);
+                es->eval.map1[capIndex] = val;
+                __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_3, __GL_MAP1_ENDISABLE_BIT);
+            }
         }
         break;
 
@@ -421,11 +420,13 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
     case GL_MAP2_TEXTURE_COORD_4:
     case GL_MAP2_VERTEX_3:
     case GL_MAP2_VERTEX_4:
-        cap = __GL_EVAL2D_INDEX(cap);
-        if (es->eval.map2[cap] ^ val) {
-          __GL_VERTEX_BUFFER_FLUSH(gc);
-          es->eval.map2[cap] = val;
-          __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_3, __GL_MAP2_ENDISABLE_BIT);
+        {
+            GLint capIndex = __GL_EVAL2D_INDEX(cap);
+            if (es->eval.map2[capIndex] ^ val) {
+                __GL_VERTEX_BUFFER_FLUSH(gc);
+                es->eval.map2[capIndex] = val;
+                __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_3, __GL_MAP2_ENDISABLE_BIT);
+            }
         }
         break;
 
@@ -494,7 +495,7 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
           if (es->colorBuffer.logicOp ^ val) {
               __GL_VERTEX_BUFFER_FLUSH(gc);
               es->colorBuffer.indexLogicOp = val;
-              if(!gc->modes.rgbMode)
+              if (!gc->modes.rgbMode)
               {
                   es->colorBuffer.logicOp = val;
                   __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1, __GL_LOGICOP_ENDISABLE_BIT);
@@ -510,7 +511,7 @@ GLvoid __glEnableDisable(__GLcontext *gc, GLenum cap, GLboolean val)
           if (es->colorBuffer.logicOp ^ val) {
               __GL_VERTEX_BUFFER_FLUSH(gc);
               es->colorBuffer.colorLogicOp = val;
-              if(gc->modes.rgbMode)
+              if (gc->modes.rgbMode)
               {
                   es->colorBuffer.logicOp = val;
                   __GL_SET_ATTR_DIRTY_BIT(gc, __GL_DIRTY_ATTRS_1, __GL_LOGICOP_ENDISABLE_BIT);
@@ -722,11 +723,19 @@ GLboolean GL_APIENTRY __glim_IsEnabled(__GLcontext *gc, GLenum cap)
         break;
 
     case GL_TEXTURE_GEN_S:
+        ret = es->texUnits[gc->state.texture.activeTexIndex].texGen[0];
+        break;
+
     case GL_TEXTURE_GEN_T:
+        ret = es->texUnits[gc->state.texture.activeTexIndex].texGen[1];
+        break;
+
     case GL_TEXTURE_GEN_R:
+        ret = es->texUnits[gc->state.texture.activeTexIndex].texGen[2];
+        break;
+
     case GL_TEXTURE_GEN_Q:
-        cap = __GL_EVAL2D_INDEX(cap);
-        ret = es->eval.map2[cap];
+        ret = es->texUnits[gc->state.texture.activeTexIndex].texGen[3];
         break;
 
     case GL_TEXTURE_1D:
@@ -773,8 +782,10 @@ GLboolean GL_APIENTRY __glim_IsEnabled(__GLcontext *gc, GLenum cap)
     case GL_MAP1_TEXTURE_COORD_4:
     case GL_MAP1_VERTEX_3:
     case GL_MAP1_VERTEX_4:
-        cap = __GL_EVAL1D_INDEX(cap);
-        ret = es->eval.map1[cap];
+        {
+            GLint capIndex = __GL_EVAL1D_INDEX(cap);
+            ret = es->eval.map1[capIndex];
+        }
         break;
 
     case GL_MAP2_COLOR_4:
@@ -786,8 +797,10 @@ GLboolean GL_APIENTRY __glim_IsEnabled(__GLcontext *gc, GLenum cap)
     case GL_MAP2_TEXTURE_COORD_4:
     case GL_MAP2_VERTEX_3:
     case GL_MAP2_VERTEX_4:
-        cap = __GL_EVAL1D_INDEX(cap);
-        ret = es->eval.map2[cap];
+        {
+            GLint capIndex = __GL_EVAL2D_INDEX(cap);
+            ret = es->eval.map2[capIndex];
+        }
         break;
 
     case GL_AUTO_NORMAL:
@@ -922,7 +935,7 @@ GLvoid GL_APIENTRY __glim_Clear(__GLcontext *gc, GLbitfield mask)
     }
 
 #ifdef OPENGL40
-    if (!gc->modes.haveAccumBuffer) {
+    if (gc->imports.conformGLSpec && !gc->modes.haveAccumBuffer) {
         mask &= ~GL_ACCUM_BUFFER_BIT;
     }
 #endif
@@ -952,7 +965,7 @@ GLvoid GL_APIENTRY __glim_Clear(__GLcontext *gc, GLbitfield mask)
         retVal = (*gc->dp.clear)(gc, mask);
         __glClearEnd(gc, mask, -1);
 
-        if(!retVal)
+        if (!retVal)
         {
             __GL_ERROR((*gc->dp.getError)(gc));
         }
@@ -1030,7 +1043,7 @@ void __glClearBuffer(__GLcontext *gc, GLenum buffer, GLint drawbuffer, GLvoid *v
 
         __glClearEnd(gc, mask, drawbuffer);
 
-        if(!retVal)
+        if (!retVal)
         {
             __GL_ERROR((*gc->dp.getError)(gc));
         }
@@ -1054,7 +1067,7 @@ GLvoid GL_APIENTRY __glim_ClearBufferfi(__GLcontext *gc, GLenum buffer, GLint dr
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
-    if(drawbuffer != 0)
+    if (drawbuffer != 0)
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
@@ -1172,7 +1185,7 @@ GLvoid GL_APIENTRY __glim_Finish(__GLcontext *gc)
 
     retVal = (*gc->dp.finish)(gc);
 
-    if(!retVal)
+    if (!retVal)
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -1291,7 +1304,7 @@ GLboolean __glDeleteSyncObj(__GLcontext *gc, __GLsyncObject *syncObj)
 
     retVal = (*gc->dp.deleteSync)(gc, syncObj);
 
-    if(!retVal)
+    if (!retVal)
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -1378,7 +1391,7 @@ GLsync GL_APIENTRY __glim_FenceSync(__GLcontext *gc, GLenum condition, GLbitfiel
 
     retVal = (*gc->dp.createSync)(gc, syncObject);
 
-    if(!retVal)
+    if (!retVal)
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -2951,7 +2964,7 @@ __GL_INLINE GLvoid __glEnableDisableIndexedEXT(__GLcontext* gc, GLenum target, G
 
     es = &gc->state.enables;
 
-    if(index >= __GL_MAX_DRAW_BUFFERS)
+    if (index >= __GL_MAX_DRAW_BUFFERS)
     {
         __glSetError(gc, GL_INVALID_ENUM);
 
@@ -2962,7 +2975,7 @@ __GL_INLINE GLvoid __glEnableDisableIndexedEXT(__GLcontext* gc, GLenum target, G
     {
     case GL_BLEND:
         {
-            if(es->colorBuffer.blend[index] ^ val)
+            if (es->colorBuffer.blend[index] ^ val)
             {
                 __GL_VERTEX_BUFFER_FLUSH(gc);
 
@@ -3022,15 +3035,23 @@ GLboolean APIENTRY __glim_IsEnabledIndexedEXT(__GLcontext *gc, GLenum target, GL
 /* GL_VERSION_1_0 */
 GLvoid GL_APIENTRY __glim_GetPixelMapfv(__GLcontext *gc, GLenum map, GLfloat *values)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_GetPixelMapuiv(__GLcontext *gc, GLenum map, GLuint *values)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_GetPixelMapusv(__GLcontext *gc, GLenum map, GLushort *values)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_DepthRange(__GLcontext *gc, GLclampd near_val, GLclampd far_val)
 {
+    __GL_HEADER();
+
+    __glim_DepthRangef(gc, (GLfloat)near_val, (GLfloat)far_val);
+
+    __GL_FOOTER();
 }
 
 /* GL_VERSION_3_0 */
@@ -3038,6 +3059,7 @@ GLvoid GL_APIENTRY __glim_BeginConditionalRender(__GLcontext *gc, GLuint id, GLe
 {
     __GLqueryObject *queryObj;
     GLuint queryIdx;
+    GLuint queryStream;
 
     __GL_HEADER();
 
@@ -3050,7 +3072,7 @@ GLvoid GL_APIENTRY __glim_BeginConditionalRender(__GLcontext *gc, GLuint id, GLe
     }
 
     /* If id is the name of a query object with a target other than GL_SAMPLES_PASSED or GL_ANY_SAMPLES_PASSED, return error*/
-    if((queryObj->target != GL_SAMPLES_PASSED ) && (queryObj->target != GL_ANY_SAMPLES_PASSED))
+    if ((queryObj->target != GL_SAMPLES_PASSED ) && (queryObj->target != GL_ANY_SAMPLES_PASSED))
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
@@ -3058,16 +3080,19 @@ GLvoid GL_APIENTRY __glim_BeginConditionalRender(__GLcontext *gc, GLuint id, GLe
     /* Where id is the name of a query currently in progress, return error*/
     for (queryIdx = __GL_QUERY_ANY_SAMPLES_PASSED; queryIdx < __GL_QUERY_LAST; ++queryIdx)
     {
-        if (gc->query.currQuery[queryIdx] &&
-            !(gc->query.currQuery[queryIdx]->flag & __GL_OBJECT_IS_DELETED) &&
-            gc->query.currQuery[queryIdx]->name == id)
+        for (queryStream = 0; queryStream < gc->constants.shaderCaps.maxVertStreams; ++queryStream)
         {
-            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+            if (gc->query.currQuery[queryIdx][queryStream] &&
+                !(gc->query.currQuery[queryIdx][queryStream]->flag & __GL_OBJECT_IS_DELETED) &&
+                gc->query.currQuery[queryIdx][queryStream]->name == id)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+            }
         }
     }
 
     /* If glBeginConditionalRender is called while conditional rendering is active, return error*/
-    if(gc->conditionalRenderDiscard == GL_TRUE)
+    if (gc->conditionalRenderDiscard == GL_TRUE)
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
@@ -3091,7 +3116,7 @@ GLvoid GL_APIENTRY __glim_BeginConditionalRender(__GLcontext *gc, GLuint id, GLe
             return;
     }
 
-    if(queryObj->count == 0)
+    if (queryObj->count == 0)
     {
         gc->conditionalRenderDiscard = GL_TRUE;
     }
@@ -3104,7 +3129,7 @@ GLvoid GL_APIENTRY __glim_EndConditionalRender(__GLcontext *gc)
     __GL_HEADER();
 
     /* If glEndConditionalRender is called while conditional rendering is not in progress, return error */
-    if(gc->conditionalRenderDiscard == GL_FALSE)
+    if (gc->conditionalRenderDiscard == GL_FALSE)
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
@@ -3122,183 +3147,236 @@ GLvoid GL_APIENTRY __glim_PrimitiveRestartIndex(__GLcontext *gc, GLuint index)
     gc->state.primRestart.restartElement = index;
 
     __GL_FOOTER();
-
-    return;
 }
 
 /* GL_VERSION_3_2 */
 GLvoid GL_APIENTRY __glim_ProvokingVertex(__GLcontext *gc, GLenum mode)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 /* GL_VERSION_3_3 */
 GLvoid GL_APIENTRY __glim_BindFragDataLocationIndexed(__GLcontext *gc, GLuint program, GLuint colorNumber, GLuint index, const GLchar *name)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLint GL_APIENTRY __glim_GetFragDataIndex(__GLcontext *gc, GLuint program, const GLchar *name)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
     return -1;
 }
 GLvoid GL_APIENTRY __glim_QueryCounter(__GLcontext *gc, GLuint id, GLenum target)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_GetQueryObjecti64v(__GLcontext *gc, GLuint id, GLenum pname, GLint64 *params)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_GetQueryObjectui64v(__GLcontext *gc, GLuint id, GLenum pname, GLuint64 *params)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP1ui(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, GLuint value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP1uiv(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, const GLuint *value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP2ui(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, GLuint value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP2uiv(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, const GLuint *value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP3ui(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, GLuint value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP3uiv(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, const GLuint *value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP4ui(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, GLuint value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP4uiv(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, const GLuint *value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexP2ui(__GLcontext *gc, GLenum type, GLuint value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexP2uiv(__GLcontext *gc, GLenum type, const GLuint *value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexP3ui(__GLcontext *gc, GLenum type, GLuint value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexP3uiv(__GLcontext *gc, GLenum type, const GLuint *value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexP4ui(__GLcontext *gc, GLenum type, GLuint value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_VertexP4uiv(__GLcontext *gc, GLenum type, const GLuint *value)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_TexCoordP1ui(__GLcontext *gc, GLenum type, GLuint coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_TexCoordP1uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_TexCoordP2ui(__GLcontext *gc, GLenum type, GLuint coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_TexCoordP2uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_TexCoordP3ui(__GLcontext *gc, GLenum type, GLuint coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_TexCoordP3uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_TexCoordP4ui(__GLcontext *gc, GLenum type, GLuint coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_TexCoordP4uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP1ui(__GLcontext *gc, GLenum texture, GLenum type, GLuint coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP1uiv(__GLcontext *gc, GLenum texture, GLenum type, const GLuint *coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP2ui(__GLcontext *gc, GLenum texture, GLenum type, GLuint coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP2uiv(__GLcontext *gc, GLenum texture, GLenum type, const GLuint *coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP3ui(__GLcontext *gc, GLenum texture, GLenum type, GLuint coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP3uiv(__GLcontext *gc, GLenum texture, GLenum type, const GLuint *coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP4ui(__GLcontext *gc, GLenum texture, GLenum type, GLuint coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP4uiv(__GLcontext *gc, GLenum texture, GLenum type, const GLuint *coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_NormalP3ui(__GLcontext *gc, GLenum type, GLuint coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_NormalP3uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_ColorP3ui(__GLcontext *gc, GLenum type, GLuint color)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_ColorP3uiv(__GLcontext *gc, GLenum type, const GLuint *color)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_ColorP4ui(__GLcontext *gc, GLenum type, GLuint color)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_ColorP4uiv(__GLcontext *gc, GLenum type, const GLuint *color)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_SecondaryColorP3ui(__GLcontext *gc, GLenum type, GLuint color)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_SecondaryColorP3uiv(__GLcontext *gc, GLenum type, const GLuint *color)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 
 /* GL_VERSION_4_0 */
 GLint GL_APIENTRY __glim_GetSubroutineUniformLocation(__GLcontext *gc, GLuint program, GLenum shadertype, const GLchar *name)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
     return -1;
 }
 GLuint GL_APIENTRY __glim_GetSubroutineIndex(__GLcontext *gc, GLuint program, GLenum shadertype, const GLchar *name)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
     return (GLuint)-1;
 }
 GLvoid GL_APIENTRY __glim_GetActiveSubroutineUniformiv(__GLcontext *gc, GLuint program, GLenum shadertype, GLuint index, GLenum pname, GLint *values)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_GetActiveSubroutineUniformName(__GLcontext *gc, GLuint program, GLenum shadertype, GLuint index, GLsizei bufsize, GLsizei *length, GLchar *name)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_GetActiveSubroutineName(__GLcontext *gc, GLuint program, GLenum shadertype, GLuint index, GLsizei bufsize, GLsizei *length, GLchar *name)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_UniformSubroutinesuiv(__GLcontext *gc, GLenum shadertype, GLsizei count, const GLuint *indices)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_GetUniformSubroutineuiv(__GLcontext *gc, GLenum shadertype, GLint location, GLuint *params)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_GetProgramStageiv(__GLcontext *gc, GLuint program, GLenum shadertype, GLenum pname, GLint *values)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_PatchParameterfv(__GLcontext *gc, GLenum pname, const GLfloat *values)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 
 /* GL_ARB_shader_objects */
 GLvoid GL_APIENTRY __glim_DeleteObjectARB(__GLcontext *gc, GLhandleARB obj)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 GLvoid GL_APIENTRY __glim_GetInfoLogARB(__GLcontext *gc, GLhandleARB obj, GLsizei maxLength, GLsizei *length, GLcharARB *infoLog)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 
 

@@ -19,6 +19,8 @@ VERSION 1.100
 
 EXPORTS
         GL_DISPATCH_TABLE
+        GLESv2_DISPATCH_TABLE
+
         DrvDeleteContext
         DrvSetContext
         DrvReleaseContext

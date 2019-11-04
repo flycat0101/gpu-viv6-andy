@@ -107,7 +107,7 @@ typedef struct __GLdevicePipelineRec
     GLboolean (*compressedTexSubImage2D)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLint, GLint, GLint, GLint, const GLvoid*, GLsizei);
     GLboolean (*compressedTexSubImage3D)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLint, GLint, GLint, GLint, GLint, const GLvoid*, GLsizei);
     GLboolean (*generateMipmaps)(__GLcontext*, __GLtextureObject*, GLint, GLint*);
-    GLboolean (*getTexImage)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLenum, GLvoid*);
+    GLboolean (*getTexImage)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLenum, GLenum, GLvoid*);
 #ifdef OPENGL40
     GLboolean (*getCompressedTexImage)(__GLcontext*, __GLtextureObject*, __GLmipMapLevel *, GLint , GLvoid *);
 #endif

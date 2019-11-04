@@ -552,11 +552,18 @@ _GetGLAPIHook(
 
     if (thread->esContext)
     {
-        index = MAJOR_API_VER(thread->esContext->client) - 1;
+        if (MAJOR_API_VER(thread->esContext->client) == 1)
+        {
+            index = (vegl_OPENGL_ES11 - vegl_OPENGL_ES11);
+        }
+        else
+        {
+            index = (vegl_OPENGL_ES20 - vegl_OPENGL_ES11);
+        }
     }
-    else if(thread->glContext)
+    else if (thread->glContext)
     {
-        index = vegl_OPENGL - vegl_OPENGL_ES11;
+        index = (vegl_OPENGL - vegl_OPENGL_ES11);
     }
 
     if (glHoolInitialized[index])

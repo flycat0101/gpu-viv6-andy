@@ -486,19 +486,12 @@ enum
     __GL_SAMPLE_MIN_SHADING_VALUE_BIT           = (1 << 13),
 #ifdef OPENGL40
     __GL_FOGCOLOR_BIT                           = (1 << 14),
-
     __GL_FOGINDEX_BIT                           = (1 << 15),
-
     __GL_FOGDENSITY_BIT                         = (1 << 16),
-
     __GL_FOGSTART_BIT                           = (1 << 17),
-
     __GL_FOGEND_BIT                             = (1 << 18),
-
     __GL_FOGMODE_BIT                            = (1 << 19),
-
     __GL_FOGCOORDSRC_BIT                        = (1 << 20),
-
     __GL_FOG_ENDISABLE_BIT                      = (1 << 21),
     __GL_PRIMMODE_BIT                           = (1 << 22),
     __GL_CLEARCOLOR_BIT                         = (1 << 23),
@@ -510,7 +503,6 @@ enum
     __GL_LINESMOOTH_ENDISABLE_BIT               = (1 << 29),
     __GL_LINESTIPPLE_BIT                        = (1 << 30),
     __GL_LINESTIPPLE_ENDISABLE_BIT              = (1 << 31),
-
 #endif
 };
 
@@ -1036,7 +1028,7 @@ typedef struct __GLexportsRec
 typedef struct __GLcontextInterfaceRec {
     /* The first Int of __GLcontext stores a unique context ID */
     GLuint magic;
-    VEGLEXimports imports;
+    VEGLimports imports;
     __GLexports exports;
 } __GLcontextInterface;
 #endif
@@ -1354,13 +1346,15 @@ __GL_INLINE GLvoid __glEvaluateDrawableChange(__GLcontext *gc, GLbitfield flags)
     }
 
 #if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
-    /* Get the latest drawable information */
-    LINUX_LOCK_FRAMEBUFFER(gc);
-    __glDispatchDrawableChange(gc);
-    /* Get the latest drawable information */
-    LINUX_UNLOCK_FRAMEBUFFER(gc);
+    if (gc->imports.conformGLSpec)
+    {
+        /* Get the latest drawable information */
+        LINUX_LOCK_FRAMEBUFFER(gc);
+        __glDispatchDrawableChange(gc);
+        /* Get the latest drawable information */
+        LINUX_UNLOCK_FRAMEBUFFER(gc);
+    }
 #endif
-
 }
 
 __GL_INLINE GLboolean __glIsStageProgramActive(__GLcontext *gc, __GLprogramObject *progObj, GLbitfield stages)

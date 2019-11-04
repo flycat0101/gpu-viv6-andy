@@ -427,18 +427,22 @@ GLvoid GL_APIENTRY __glim_VertexAttribI3uiv(__GLcontext *gc, GLuint index, const
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4bv(__GLcontext *gc, GLuint index, const GLbyte *v)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4sv(__GLcontext *gc, GLuint index, const GLshort *v)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4ubv(__GLcontext *gc, GLuint index, const GLubyte *v)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4usv(__GLcontext *gc, GLuint index, const GLushort *v)
 {
+    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
 }
 
 GLvoid APIENTRY __glim_GetVertexAttribdv(__GLcontext *gc,  GLuint index, GLenum pname, GLdouble *params)
@@ -450,14 +454,17 @@ GLvoid APIENTRY __glim_GetVertexAttribdv(__GLcontext *gc,  GLuint index, GLenum 
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
 
-    if((index >= __GL_MAX_PROGRAM_VERTEX_ATTRIBUTES) || (params == NULL))
+    if ((index >= __GL_MAX_PROGRAM_VERTEX_ATTRIBUTES) || (params == NULL))
     {
         __glSetError(gc, GL_INVALID_VALUE);
         return;
     }
 
 #ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        index = index + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     pVertexArrayState = &gc->clientState.vertexArray;
@@ -491,19 +498,24 @@ GLvoid APIENTRY __glim_GetVertexAttribdv(__GLcontext *gc,  GLuint index, GLenum 
         break;
 
     case GL_CURRENT_VERTEX_ATTRIB:
-        if(index > 0)
+        if (index > 0)
         {
 #ifdef OPENGL40
-            *params++ = gc->state.current.currentState[index].f.x;
-            *params++ = gc->state.current.currentState[index].f.y;
-            *params++ = gc->state.current.currentState[index].f.z;
-            *params++ = gc->state.current.currentState[index].f.w;
-#else
-            *params++ = gc->state.current.attribute[index].f.x;
-            *params++ = gc->state.current.attribute[index].f.y;
-            *params++ = gc->state.current.attribute[index].f.z;
-            *params++ = gc->state.current.attribute[index].f.w;
+            if (gc->imports.conformGLSpec)
+            {
+                *params++ = gc->state.current.currentState[index].f.x;
+                *params++ = gc->state.current.currentState[index].f.y;
+                *params++ = gc->state.current.currentState[index].f.z;
+                *params++ = gc->state.current.currentState[index].f.w;
+            }
+            else  /* Running OES api */
 #endif
+            {
+                *params++ = gc->state.current.attribute[index].f.x;
+                *params++ = gc->state.current.attribute[index].f.y;
+                *params++ = gc->state.current.attribute[index].f.z;
+                *params++ = gc->state.current.attribute[index].f.w;
+            }
         }
         else
             __glSetError(gc, GL_INVALID_OPERATION);
@@ -731,7 +743,8 @@ static GLboolean __glCheckXFBState(__GLcontext *gc, GLboolean allowXFB, GLenum m
                 GLuint numPrims = vertexCount;
                 GLuint numVerts = vertexCount;
 
-                __GLqueryObject *queryObj = gc->query.currQuery[__GL_QUERY_XFB_PRIMITIVES_WRITTEN];
+                /* VIV TODO: Stream index */
+                __GLqueryObject *queryObj = gc->query.currQuery[__GL_QUERY_XFB_PRIMITIVES_WRITTEN][0];
 
                 switch (mode)
                 {
@@ -788,8 +801,11 @@ __GL_INLINE GLvoid __glDrawRangeElements(__GLcontext *gc, GLenum mode, GLsizei c
 
 #ifdef OPENGL40
      /* Config __GLvertexStreamMachine */
-    if ( gc->input.beginMode != __GL_IN_BEGIN && gc->input.beginMode != __GL_SMALL_LIST_BATCH )
+    if (gc->imports.conformGLSpec &&
+        gc->input.beginMode != __GL_IN_BEGIN && gc->input.beginMode != __GL_SMALL_LIST_BATCH)
+    {
         __glConfigArrayVertexStream(gc, mode);
+    }
 #endif
 
     __glDrawPrimitive(gc, mode);
@@ -806,7 +822,10 @@ GLvoid GL_APIENTRY __glim_VertexAttribPointer(__GLcontext *gc, GLuint index, GLi
     }
 
 #ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        index = index + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     if ((stride < 0) || (stride > (GLsizei)gc->constants.maxVertexAttribStride)|| (size < 1) || (size > 4))
@@ -878,7 +897,10 @@ GLvoid GL_APIENTRY __glim_VertexAttribIPointer(__GLcontext *gc, GLuint index, GL
     }
 
 #ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        index = index + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     if ((stride < 0) || (stride > (GLsizei)gc->constants.maxVertexAttribStride) || (size <= 0) || (size > 4))
@@ -924,7 +946,10 @@ GLvoid GL_APIENTRY __glim_EnableVertexAttribArray(__GLcontext *gc, GLuint index)
     }
 
 #ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        index = index + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     if ((pVertexArrayState->attribEnabled & (__GL_ONE_64 << index)) == 0)
@@ -949,7 +974,10 @@ GLvoid GL_APIENTRY __glim_DisableVertexAttribArray(__GLcontext *gc, GLuint index
     }
 
 #ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        index = index + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     if (pVertexArrayState->attribEnabled & (__GL_ONE_64 << index))
@@ -982,20 +1010,20 @@ GLvoid GL_APIENTRY __glim_DrawElements(__GLcontext *gc, GLenum mode, GLsizei cou
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-#ifndef OPENGL40
-    if ((mode > GL_TRIANGLE_FAN) &&
-        ((mode < GL_LINES_ADJACENCY_EXT) ||
-         (mode > GL_PATCHES_EXT)))
-    {
-        __GL_ERROR_EXIT(GL_INVALID_ENUM);
-    }
-#else
-    if (mode > GL_TRIANGLE_STRIP_ADJACENCY_EXT)
+#ifdef OPENGL40
+    if (gc->imports.conformGLSpec &&
+        mode > GL_TRIANGLE_STRIP_ADJACENCY_EXT)
     {
         __glSetError(gc, GL_INVALID_ENUM);
         return;
     }
+    else
 #endif
+    if ((mode > GL_TRIANGLE_FAN) &&
+        (mode < GL_LINES_ADJACENCY_EXT || mode > GL_PATCHES_EXT))
+    {
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
+    }
 
     if (!__glCheckVAOState(gc, GL_FALSE, GL_FALSE))
     {
@@ -1037,14 +1065,17 @@ GLvoid GL_APIENTRY __glim_VertexAttribDivisor(__GLcontext *gc, GLuint index, GLu
     }
 
 #ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        index = index + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     pAttrib = &vertexArrayState->attribute[index];
     pAttribBinding = &vertexArrayState->attributeBinding[index];
     pAttrib->attribBinding = index;
 
-    if(pAttribBinding->divisor != divisor)
+    if (pAttribBinding->divisor != divisor)
     {
         pAttribBinding->divisor = divisor;
         __GL_SET_VARRAY_DIVISOR_BIT(gc);
@@ -1095,8 +1126,11 @@ __GL_INLINE GLvoid __glDrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint f
 
 #ifdef OPENGL40
      /* Config __GLvertexStreamMachine */
-    if ( gc->input.beginMode != __GL_IN_BEGIN && gc->input.beginMode != __GL_SMALL_LIST_BATCH )
+    if (gc->imports.conformGLSpec &&
+        gc->input.beginMode != __GL_IN_BEGIN && gc->input.beginMode != __GL_SMALL_LIST_BATCH)
+    {
         __glConfigArrayVertexStream(gc, mode);
+    }
 #endif
 
     __glDrawPrimitive(gc, mode);
@@ -1747,7 +1781,10 @@ GLvoid GL_APIENTRY __glim_GetVertexAttribfv(__GLcontext *gc,  GLuint index, GLen
     }
 
 #ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        index = index + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     pAttrib = &pVertexArrayState->attribute[index];
@@ -1785,16 +1822,21 @@ GLvoid GL_APIENTRY __glim_GetVertexAttribfv(__GLcontext *gc,  GLuint index, GLen
 
     case GL_CURRENT_VERTEX_ATTRIB:
 #ifdef OPENGL40
-        *params++ = gc->state.current.currentState[index].f.x;
-        *params++ = gc->state.current.currentState[index].f.y;
-        *params++ = gc->state.current.currentState[index].f.z;
-        *params++ = gc->state.current.currentState[index].f.w;
-#else
-        *params++ = gc->state.current.attribute[index].f.x;
-        *params++ = gc->state.current.attribute[index].f.y;
-        *params++ = gc->state.current.attribute[index].f.z;
-        *params++ = gc->state.current.attribute[index].f.w;
+        if (gc->imports.conformGLSpec)
+        {
+            *params++ = gc->state.current.currentState[index].f.x;
+            *params++ = gc->state.current.currentState[index].f.y;
+            *params++ = gc->state.current.currentState[index].f.z;
+            *params++ = gc->state.current.currentState[index].f.w;
+        }
+        else  /* Running OES api */
 #endif
+        {
+            *params++ = gc->state.current.attribute[index].f.x;
+            *params++ = gc->state.current.attribute[index].f.y;
+            *params++ = gc->state.current.attribute[index].f.z;
+            *params++ = gc->state.current.attribute[index].f.w;
+        }
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_DIVISOR:
@@ -1831,7 +1873,10 @@ GLvoid GL_APIENTRY __glim_GetVertexAttribiv(__GLcontext *gc,  GLuint index, GLen
     }
 
 #ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        index = index + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     pAttrib = &pVertexArrayState->attribute[index];
@@ -1869,16 +1914,21 @@ GLvoid GL_APIENTRY __glim_GetVertexAttribiv(__GLcontext *gc,  GLuint index, GLen
 
     case GL_CURRENT_VERTEX_ATTRIB:
 #ifdef OPENGL40
-        *params++ = (GLint) gc->state.current.currentState[index].f.x;
-        *params++ = (GLint) gc->state.current.currentState[index].f.y;
-        *params++ = (GLint) gc->state.current.currentState[index].f.z;
-        *params++ = (GLint) gc->state.current.currentState[index].f.w;
-#else
-        *params++ = (GLint) gc->state.current.attribute[index].f.x;
-        *params++ = (GLint) gc->state.current.attribute[index].f.y;
-        *params++ = (GLint) gc->state.current.attribute[index].f.z;
-        *params++ = (GLint) gc->state.current.attribute[index].f.w;
+        if (gc->imports.conformGLSpec)
+        {
+            *params++ = (GLint) gc->state.current.currentState[index].f.x;
+            *params++ = (GLint) gc->state.current.currentState[index].f.y;
+            *params++ = (GLint) gc->state.current.currentState[index].f.z;
+            *params++ = (GLint) gc->state.current.currentState[index].f.w;
+        }
+        else  /* Running OES api */
 #endif
+        {
+            *params++ = (GLint) gc->state.current.attribute[index].f.x;
+            *params++ = (GLint) gc->state.current.attribute[index].f.y;
+            *params++ = (GLint) gc->state.current.attribute[index].f.z;
+            *params++ = (GLint) gc->state.current.attribute[index].f.w;
+        }
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_DIVISOR:
@@ -1913,7 +1963,10 @@ GLvoid GL_APIENTRY __glim_GetVertexAttribPointerv(__GLcontext *gc, GLuint index,
     }
 
 #ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        index = index + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     pAttrib = &gc->vertexArray.boundVAO->vertexArray.attribute[index];
@@ -1946,7 +1999,10 @@ GLvoid GL_APIENTRY __glim_GetVertexAttribIiv(__GLcontext *gc, GLuint index, GLen
     }
 
 #ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        index = index + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     pAttrib = &pVertexArrayState->attribute[index];
@@ -1980,16 +2036,21 @@ GLvoid GL_APIENTRY __glim_GetVertexAttribIiv(__GLcontext *gc, GLuint index, GLen
 
     case GL_CURRENT_VERTEX_ATTRIB:
 #ifdef OPENGL40
+        if (gc->imports.conformGLSpec)
+        {
             *uparams++ = gc->state.current.currentState[index].i.ix;
             *uparams++ = gc->state.current.currentState[index].i.iy;
             *uparams++ = gc->state.current.currentState[index].i.iz;
             *uparams++ = gc->state.current.currentState[index].i.iw;
-#else
+        }
+        else  /* Running OES api */
+#endif
+        {
             *uparams++ = gc->state.current.attribute[index].i.ix;
             *uparams++ = gc->state.current.attribute[index].i.iy;
             *uparams++ = gc->state.current.attribute[index].i.iz;
             *uparams++ = gc->state.current.attribute[index].i.iw;
-#endif
+        }
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_DIVISOR:
@@ -2031,7 +2092,10 @@ GLvoid GL_APIENTRY __glim_GetVertexAttribIuiv(__GLcontext *gc, GLuint index, GLe
     }
 
 #ifdef OPENGL40
-    index = index + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        index = index + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     pAttrib = &pVertexArrayState->attribute[index];
@@ -2065,16 +2129,21 @@ GLvoid GL_APIENTRY __glim_GetVertexAttribIuiv(__GLcontext *gc, GLuint index, GLe
 
     case GL_CURRENT_VERTEX_ATTRIB:
 #ifdef OPENGL40
+        if (gc->imports.conformGLSpec)
+        {
             *params++ = gc->state.current.currentState[index].i.ix;
             *params++ = gc->state.current.currentState[index].i.iy;
             *params++ = gc->state.current.currentState[index].i.iz;
             *params++ = gc->state.current.currentState[index].i.iw;
-#else
+        }
+        else  /* Running OES api */
+#endif
+        {
             *params++ = gc->state.current.attribute[index].i.ix;
             *params++ = gc->state.current.attribute[index].i.iy;
             *params++ = gc->state.current.attribute[index].i.iz;
             *params++ = gc->state.current.attribute[index].i.iw;
-#endif
+        }
         break;
 
     case GL_VERTEX_ATTRIB_ARRAY_DIVISOR:
@@ -2299,6 +2368,30 @@ void __glFreeVertexArrayState(__GLcontext *gc)
     __GL_FOOTER();
 }
 
+__GLbufferObject* __glGetCurrentVertexArrayBufObj(__GLcontext *gc, GLuint binding)
+{
+    __GLbufferObject *bufObj = gcvNULL;
+    __GLvertexAttribBinding *pAttribBinding = gcvNULL;
+
+    GL_ASSERT(binding < __GL_MAX_VERTEX_ATTRIBUTE_BINDINGS);
+
+    pAttribBinding = &gc->vertexArray.boundVAO->vertexArray.attributeBinding[binding];
+    if (gc->vertexArray.boundVertexArray)
+    {
+        /* For named vao, get the bound bufobj of binding time. */
+        bufObj = pAttribBinding->boundArrayObj;
+    }
+    else if (pAttribBinding->boundArrayName)
+    {
+        /* For default vao, since bufobj will not be kept when it was bound to default vao,
+        ** need to retrieve bufobj from its name.
+        */
+        bufObj = (__GLbufferObject*)__glGetObject(gc, gc->bufferObject.shared, pAttribBinding->boundArrayName);
+    }
+
+    return bufObj;
+}
+
 GLvoid GL_APIENTRY __glim_BindVertexArray(__GLcontext *gc, GLuint array)
 {
     __GL_HEADER();
@@ -2521,7 +2614,10 @@ GLvoid GL_APIENTRY __glim_VertexAttribFormat(__GLcontext *gc, GLuint attribindex
     }
 
 #ifdef OPENGL40
-    attribindex = attribindex + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        attribindex = attribindex + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     if ((size < 1) || (size > 4))
@@ -2595,8 +2691,12 @@ GLvoid GL_APIENTRY __glim_VertexAttribIFormat(__GLcontext *gc, GLuint attribinde
     }
 
 #ifdef OPENGL40
-    attribindex = attribindex + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        attribindex = attribindex + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
+
     if ((size < 1) || (size > 4))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
@@ -2653,7 +2753,10 @@ GLvoid GL_APIENTRY __glim_VertexAttribBinding(__GLcontext *gc, GLuint attribinde
     }
 
 #ifdef OPENGL40
-    attribindex = attribindex + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        attribindex = attribindex + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     if (gc->vertexArray.boundVertexArray == 0)
@@ -2682,7 +2785,10 @@ GLvoid GL_APIENTRY __glim_VertexBindingDivisor(__GLcontext *gc, GLuint bindingin
     }
 
 #ifdef OPENGL40
-    bindingindex = bindingindex + __GL_VARRAY_ATT0_INDEX;
+    if (gc->imports.conformGLSpec)
+    {
+        bindingindex = bindingindex + __GL_VARRAY_ATT0_INDEX;
+    }
 #endif
 
     if (gc->vertexArray.boundVertexArray == 0)
@@ -2974,7 +3080,7 @@ __GL_INLINE GLvoid __glValidateVertexArrays(__GLcontext *gc)
     /* requiredInputMask  set only bit 0 on for vertexinput, while vertexarray enable bit are saparate for vertex and attrib 0.
     Case attribarray 0 enable, vertexarray disabled. attribarray 0 bit will be cleared.
     Solution: set on attrib 0 when it's enabled and vertex input is required. */
-    if(gc->input.requiredInputMask & __GL_VARRAY_VERTEX && gc->vertexArray.boundVAO->vertexArray.attribEnabled & __GL_VARRAY_ATT0)
+    if (gc->input.requiredInputMask & __GL_VARRAY_VERTEX && gc->vertexArray.boundVAO->vertexArray.attribEnabled & __GL_VARRAY_ATT0)
         currentEnabled |= __GL_VARRAY_ATT0;
 
     if (currentEnabled != gc->vertexArray.boundVAO->vertexArray.attribEnabled)

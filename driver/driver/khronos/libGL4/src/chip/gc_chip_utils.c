@@ -139,7 +139,7 @@ gcChipUtilsHashCreate(
 
     pHash = (__GLchipUtilsHash*)(*gc->imports.calloc)(gc, 1, sizeof(__GLchipUtilsHash));
     gcmASSERT(pHash != gcvNULL);
-    if(pHash == gcvNULL)
+    if (pHash == gcvNULL)
     {
         gcmFOOTER_ARG("return=0x%x", pHash);
         return gcvNULL;

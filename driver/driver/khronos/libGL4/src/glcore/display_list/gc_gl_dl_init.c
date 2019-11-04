@@ -59,7 +59,7 @@ __GL_INLINE GLvoid __glFreeListConcatDraw(__GLcontext *gc, __GLDlistConcatDraw *
             listConcatDraw->primBegin->privateData = NULL;
         }
 
-        if(listConcatDraw->primBegin->ibPrivateData)
+        if (listConcatDraw->primBegin->ibPrivateData)
         {
             /* to do */
             /*(*gc->dp.deletePrimData)(gc, listConcatDraw->primBegin->ibPrivateData);*/

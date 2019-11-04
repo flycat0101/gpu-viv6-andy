@@ -3565,7 +3565,7 @@ static gceSTATUS lightDetermineVPpli(
                     glmOPCODE(MOV, ShaderControl->rVPpli, XYZ);
                         glmLIGHTING_UNIFORM(VS, uVPpli, XYZZ, LightIndex);
             }
-            else if(LightIndex >= 0)
+            else if (LightIndex >= 0)
             {
                 /***************************************************************
                 ** Normalize VPpli vector (make it into a unit vector).

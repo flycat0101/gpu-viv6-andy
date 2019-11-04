@@ -153,7 +153,6 @@ typedef enum _veglAPIINDEX
     vegl_OPENGL_ES11_CL,
     vegl_OPENGL_ES11,
     vegl_OPENGL_ES20,
-    vegl_OPENGL_ES30,
     vegl_OPENGL,
     vegl_OPENVG,
 
@@ -358,6 +357,23 @@ struct eglConfig
     EGLBoolean                  swizzleRB;
     /* EGL_ANDROID_recordable extension. */
     EGLBoolean                  recordableConfig;
+
+    EGLint rgbMode;
+    EGLint rgbFloatMode;
+    EGLint doubleBufferMode;
+    EGLint tripleBufferMode;
+    EGLint stereoMode;
+    EGLint haveAccumBuffer;
+    EGLint haveDepthBuffer;
+    EGLint haveStencilBuffer;
+
+    EGLint redMask, greenMask, blueMask, alphaMask;
+
+    EGLint  accumBits; /*total accumulation buffer bits */
+    EGLint  accumRedBits, accumGreenBits, accumBlueBits, accumAlphaBits;
+
+
+    EGLint  numAuxBuffers;
 
 #if defined(ANDROID)
     /* Bool for EGL_ANDROID_framebuffer_target */
@@ -662,6 +678,7 @@ typedef enum _VEGL_EXTID
     VEGL_EXTID_KHR_create_context,
     VEGL_EXTID_KHR_no_config_context,
     VEGL_EXTID_KHR_surfaceless_context,
+    VEGL_EXTID_KHR_get_all_proc_addresses,
     VEGL_EXTID_EXT_create_context_robustness,
     VEGL_EXTID_EXT_protected_surface,
     VEGL_EXTID_EXT_protected_content,
@@ -958,9 +975,7 @@ gctHANDLE
 veglGetModule(
     IN gcoOS           Os,
     IN veglAPIINDEX    Index,
-#if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
     IN gctCONST_STRING Name,
-#endif
     IN veglDISPATCH ** Dispatch
     );
 
@@ -984,13 +999,6 @@ _CreateApiContext(
 
 EGLBoolean
 _DestroyApiContext(
-    VEGLThreadData Thread,
-    VEGLContext    Context,
-    void         * ApiContext
-    );
-
-EGLBoolean
-_FlushApiContext(
     VEGLThreadData Thread,
     VEGLContext    Context,
     void         * ApiContext

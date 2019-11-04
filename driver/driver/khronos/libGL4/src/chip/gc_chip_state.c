@@ -1199,7 +1199,7 @@ gcChipSetTextureParameters(
     }
 
     /* (TBR) create gcoTEXTURE and its mipmaps as texture descriptor need them */
-    if ((texInfo->eglImage.source) && chipCtx->chipFeature.hasTxDescriptor)
+    if ((texInfo->eglImage.source) && chipCtx->chipFeature.hwFeature.hasTxDescriptor)
     {
         gcmONERROR(gcChipTexSyncEGLImage(gc, tex, gcvFALSE));
     }
@@ -1247,7 +1247,7 @@ gcChipSetTextureParameters(
         halTexture->dsMode = gcChipUtilConvertDSMode(tex->params.dsTexMode);
     }
 
-    if(localMask & __GL_TEXPARAM_SRGB_BIT)
+    if (localMask & __GL_TEXPARAM_SRGB_BIT)
     {
         halTexture->sRGB = gcChipUtilConvertSRGB(samplerStates->sRGB);
     }
@@ -1371,7 +1371,7 @@ gcChipSetTextureParameters(
         __GL_MEMCOPY(halTexture->borderColor, samplerStates->borderColor.fv, 4 * gcmSIZEOF(GLfloat));
     }
 
-    if (chipCtx->chipFeature.hasTxDescriptor)
+    if (chipCtx->chipFeature.hwFeature.hasTxDescriptor)
     {
         /* Update texture descriptors if object-only state dirties */
         if (tex->uObjStateDirty.objStateDirty)
@@ -1498,7 +1498,7 @@ GLvoid loadLineStippleImage(__GLcontext *gc, __GLchipContext *chipCtx)
     }
 
     /* pattern is solid, do not need to upload the pattern */
-    if(chipCtx->isSolidLineStipple)
+    if (chipCtx->isSolidLineStipple)
         return;
 
     if (chipCtx->drawRT[0]) {
@@ -1692,7 +1692,7 @@ GLvoid loadPolygonStippleImage(__GLcontext *gc, __GLchipContext *chipCtx)
     }
 
     /* pattern is same or pattern is solid, do not need to upload the pattern */
-    if(!diff || chipCtx->isSolidPolygonStipple)
+    if (!diff || chipCtx->isSolidPolygonStipple)
         return;
 
     if (chipCtx->drawRtViews[0].surf) {
@@ -1897,7 +1897,7 @@ gcChipValidateAttribGroup1(
         {
             gcmONERROR(gcChipSetRasterDiscard(gc, chipCtx));
 
-            if (!chipCtx->chipFeature.hasHwTFB)
+            if (!chipCtx->chipFeature.hwFeature.hasHwTFB)
             {
                 chipCtx->chipDirty.uDefer.sDefer.viewportScissor = 1;
             }
@@ -1946,7 +1946,7 @@ gcChipValidateAttribGroup2(
             gcmONERROR(gco3D_SetAALineWidth(chipCtx->engine, (GLfloat)gc->state.line.aliasedWidth));
         }
 
-        if(localMask & __GL_PRIMITIVE_RESTART_BIT)
+        if (localMask & __GL_PRIMITIVE_RESTART_BIT)
         {
             gcmONERROR(gco3D_PrimitiveRestart(chipCtx->engine, gc->state.enables.primitiveRestart));
         }
@@ -1980,7 +1980,7 @@ gcChipValidateAttribGroup2(
                 gcmONERROR(gco3D_SetSampleMask(chipCtx->engine, gc->state.multisample.sampleMaskValue));
             }
 
-            if(localMask & __GL_SAMPLE_SHADING_ENDISABLE_BIT)
+            if (localMask & __GL_SAMPLE_SHADING_ENDISABLE_BIT)
             {
                 gcmONERROR(gco3D_EnableSampleShading(chipCtx->engine, gc->state.enables.multisample.sampleShading));
             }
@@ -2128,11 +2128,11 @@ gcChipValidateAttribGroup3(
     gceSTATUS status = gcvSTATUS_OK;
     gcmHEADER_ARG("Context=0x%x",
                     chipCtx);
-    if(gc->globalDirtyState[__GL_DIRTY_ATTRS_3])
+    if (gc->globalDirtyState[__GL_DIRTY_ATTRS_3])
     {
         GLbitfield localMask = gc->globalDirtyState[__GL_DIRTY_ATTRS_3];
 
-        if(localMask & (__GL_PROJECTION_TRANSFORM_BIT | __GL_MODELVIEW_TRANSFORM_BIT)) {
+        if (localMask & (__GL_PROJECTION_TRANSFORM_BIT | __GL_MODELVIEW_TRANSFORM_BIT)) {
             glmSETHASH_1BIT(hashProjectionIdentity,
                 (gc->transform.projection->matrix.matrixType == __GL_MT_IDENTITY),
                 0);
@@ -2152,16 +2152,16 @@ gcChipValidateAttribGroup3(
             }
         }
 
-        if(localMask & (__GL_POINTSIZE_BIT | __GL_POINTSMOOTH_ENDISABLE_BIT |
+        if (localMask & (__GL_POINTSIZE_BIT | __GL_POINTSMOOTH_ENDISABLE_BIT |
             __GL_POINT_SIZE_MIN_BIT | __GL_POINT_SIZE_MAX_BIT)) {
             validatePointState(gc, localMask);
         }
 
-        if(localMask & __GL_NORMALIZE_ENDISABLE_BIT) {
+        if (localMask & __GL_NORMALIZE_ENDISABLE_BIT) {
             glmSETHASH_1BIT(hashNormalizeNormal, gc->state.enables.transform.normalize, 0);
         }
 
-        if(localMask & __GL_RESCALENORMAL_ENDISABLE_BIT) {
+        if (localMask & __GL_RESCALENORMAL_ENDISABLE_BIT) {
             glmSETHASH_1BIT(hashRescaleNormal, gc->state.enables.transform.rescaleNormal, 0);
         }
 
@@ -2175,7 +2175,7 @@ gcChipValidateAttribGroup3(
             glmSETHASH_1BIT(hasColorSum, gc->state.enables.colorSum, 0);
         }
 
-        if(localMask & __GL_RENDERMODE_BIT)
+        if (localMask & __GL_RENDERMODE_BIT)
         {
         }
     }
@@ -2235,7 +2235,7 @@ static gceSTATUS validateShader(__GLcontext *gc,
             gcmONERROR(gco3D_SetEarlyDepthFromAPP(chipCtx->hw, enableEarlyTest));
         }
 
-        if(gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_RA_DEPTH_WRITE))
+        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_RA_DEPTH_WRITE))
         {
             gcmONERROR(gco3D_SetRADepthWrite(chipCtx->hw, enableEarlyTest ?
                                                         gcvFALSE : psHints->psHasFragDepthOut || psHints->hasKill || hasMemoryAccess,
@@ -2486,7 +2486,7 @@ gcChipValidateGL4FixState(
 
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
-    if(chipCtx->fixProgramFlag == gcvFALSE)
+    if (chipCtx->fixProgramFlag == gcvFALSE)
     {
         gcmFOOTER();
         return status;
@@ -2511,11 +2511,11 @@ gcChipValidateGL4FixState(
                 );
         }
 
-        if(localMask & __GL_POLYGONSTIPPLE_BIT) {
+        if (localMask & __GL_POLYGONSTIPPLE_BIT) {
             loadPolygonStippleImage(gc, chipCtx);
         }
 
-        if(localMask & (__GL_POLYGONSTIPPLE_ENDISABLE_BIT | __GL_POLYGONSTIPPLE_BIT | __GL_POLYGONMODE_BIT)) {
+        if (localMask & (__GL_POLYGONSTIPPLE_ENDISABLE_BIT | __GL_POLYGONSTIPPLE_BIT | __GL_POLYGONMODE_BIT)) {
             if ((gc->state.enables.polygon.stipple) && isFillRendering(gc) && !chipCtx->isSolidPolygonStipple) {
                 glmSETHASH_1BIT(hasPolygonStippleEnabled, 1, 0);
             } else {
@@ -2568,7 +2568,7 @@ gcChipValidateGL4FixState(
             updatePrimitive(gc, chipCtx);
         }
 
-        if(localMask & __GL_PRIMMODE_BIT) {
+        if (localMask & __GL_PRIMMODE_BIT) {
             if ((gc->state.enables.polygon.stipple) && isFillRendering(gc) && !chipCtx->isSolidPolygonStipple) {
                 glmSETHASH_1BIT(hasPolygonStippleEnabled, 1, 0);
             } else {
@@ -2642,7 +2642,7 @@ gcChipValidateShader(
                     gcmONERROR(gco3D_SetEarlyDepthFromAPP(chipCtx->engine, enableEarlyTest));
                 }
 
-                if(gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_RA_DEPTH_WRITE))
+                if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_RA_DEPTH_WRITE))
                 {
                     gcmONERROR(gco3D_SetRADepthWrite(chipCtx->engine, enableEarlyTest ?
                                                         gcvFALSE : psHints->psHasFragDepthOut || psHints->hasKill || hasMemoryAccess,
@@ -2759,7 +2759,6 @@ gcChipValidateProgramSamplersCB(
         if ((program->samplerMap[sampler].stage == __GLSL_STAGE_LAST) &&
             (pgInstance->extraSamplerMap[sampler].stage == __GLSL_STAGE_LAST))
         {
-            gcmONERROR(gcoTEXTURE_Disable(chipCtx->hal, sampler, gcvFALSE));
             continue;
         }
 
@@ -2838,7 +2837,7 @@ gcChipValidateProgramSamplersCB(
             gcmONERROR(gcoTEXTURE_InitParams(chipCtx->hal, &texParams));
             texParams.s = texParams.t = texParams.r = gcvTEXTURE_CLAMP;
             texParams.minFilter = texParams.magFilter = gcvTEXTURE_POINT;
-            if (chipCtx->chipFeature.hasTxDescriptor)
+            if (chipCtx->chipFeature.hwFeature.hasTxDescriptor)
             {
                 gcmONERROR(gcoTEXTURE_BindTextureDesc(chipCtx->rtTexture,
                                 sampler, &texParams, 0));
@@ -2943,7 +2942,7 @@ gcChipValidateProgramSamplersCB(
                 {
                     if (samplers[layers] != (gctUINT)-1)
                     {
-                        if (chipCtx->chipFeature.hasTxDescriptor)
+                        if (chipCtx->chipFeature.hwFeature.hasTxDescriptor)
                         {
                             gcmERR_BREAK(
                                 gcoTEXTURE_BindTextureDesc(
@@ -2975,7 +2974,7 @@ gcChipValidateProgramSamplersCB(
             }
             else
             {
-                if (chipCtx->chipFeature.hasTxDescriptor)
+                if (chipCtx->chipFeature.hwFeature.hasTxDescriptor)
                 {
                     gcmONERROR(
                         gcoTEXTURE_BindTextureDesc(
@@ -3044,7 +3043,7 @@ gcChipValidateProgramSamplersCB(
             /* Disable the sampler */
             gcmONERROR(gcoTEXTURE_Disable(chipCtx->hal, sampler, (gctBOOL)program->samplerMap[sampler].isInteger));
 
-            if (!chipCtx->chipFeature.txDefaultValueFix && program->samplerMap[sampler].isInteger)
+            if (!chipCtx->chipFeature.hwFeature.txDefaultValueFix && program->samplerMap[sampler].isInteger)
             {
                 __GLES_PRINT("ES30(todo): need recompilation for alpha channel.");
             }
@@ -3058,11 +3057,11 @@ gcChipValidateProgramSamplersCB(
         gcoSURF map = gcvNULL;
 #endif
 
-        if((texUnit2SamplerTmp->numSamplers > 0) &&
+        if ((texUnit2SamplerTmp->numSamplers > 0) &&
             (pgInstance->extraSamplerMap[index].subUsage != __GL_CHIP_UNIFORM_SUB_USAGE_ADVANCED_BLEND_SAMPLER))
         {
             __GLtextureObject *texObjTmp = gc->texture.units[index].currentTexture;
-            if(texObjTmp != gcvNULL)
+            if (texObjTmp != gcvNULL)
             {
 #if gcdSYNC
                 if (texObjTmp->bufObj)
@@ -3113,7 +3112,7 @@ gcChipBindFixSamplers(
 
     gcmHEADER_ARG("gc=0x%",gc);
 
-    if(chipCtx->fixProgramFlag == gcvFALSE)
+    if (chipCtx->fixProgramFlag == gcvFALSE)
     {
         gcmFOOTER();
         return status;
@@ -3174,7 +3173,7 @@ gcChipBindFixSamplers(
                 }
 
 
-                if (chipCtx->chipFeature.hasTxDescriptor)
+                if (chipCtx->chipFeature.hwFeature.hasTxDescriptor)
                 {
                     gcmONERROR(
                     gcoTEXTURE_BindTextureDesc(
@@ -3753,7 +3752,7 @@ gceSTATUS gcChipValidateGL4Texture(__GLcontext *gc, __GLchipContext *chipCtx)
 
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
-    if(chipCtx->fixProgramFlag == gcvFALSE)
+    if (chipCtx->fixProgramFlag == gcvFALSE)
     {
         gcmFOOTER();
         return status;
@@ -3774,7 +3773,7 @@ gceSTATUS gcChipValidateGL4Texture(__GLcontext *gc, __GLchipContext *chipCtx)
             localMask = gc->texUnitAttrState[unit];
             tex = gc->texture.units[unit].currentTexture;
 
-            if(unit >= __GL_MIN((GLint)gc->constants.shaderCaps.maxTextureSamplers, 8)) {
+            if (unit >= __GL_MIN((GLint)gc->constants.shaderCaps.maxTextureSamplers, 8)) {
                 break;
             }
 
@@ -3826,7 +3825,7 @@ gceSTATUS gcChipValidateGL4Texture(__GLcontext *gc, __GLchipContext *chipCtx)
             }
 
             /* hardware does not support border color */
-            if(localMask & __GL_TEXPARAM_BORDER_COLOR_BIT) {
+            if (localMask & __GL_TEXPARAM_BORDER_COLOR_BIT) {
                 updateTextureBorderColor(gc, tex, unit);
             }
 
@@ -3909,14 +3908,15 @@ gcChipValidateXFB(
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
 #ifdef OPENGL40
-    if (gc->input.beginMode == __GL_IN_BEGIN || gc->input.beginMode == __GL_SMALL_LIST_BATCH)
+    if (gc->imports.conformGLSpec &&
+        (gc->input.beginMode == __GL_IN_BEGIN || gc->input.beginMode == __GL_SMALL_LIST_BATCH))
     {
         gcmFOOTER();
         return status;
     }
 #endif
 
-    if (chipCtx->chipFeature.hasHwTFB && xfbObj->active)
+    if (chipCtx->chipFeature.hwFeature.hasHwTFB && xfbObj->active)
     {
         GLuint i;
         __GLprogramObject *progObj = __glGetLastNonFragProgram(gc);
@@ -4125,7 +4125,7 @@ gcChipValidateMiscState(
     }
 
 #ifdef OPENGL40
-    if (!chipCtx->fixProgramFlag)
+    if (chipCtx->fixProgramFlag == gcvFALSE)
 #endif
     {
         if (pointPrimTypeSwitch || (gc->globalDirtyState[__GL_PROGRAM_ATTRS] & __GL_DIRTY_GLSL_PROGRAM_SWITCH))
@@ -4321,7 +4321,7 @@ gcChipSetViewportScissor(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    if (gc->state.enables.rasterizerDiscard && !chipCtx->chipFeature.hasHwTFB)
+    if (gc->state.enables.rasterizerDiscard && !chipCtx->chipFeature.hwFeature.hasHwTFB)
     {
         static __GLscissor zeroScissor = {0, 0, 0, 0};
 
@@ -4466,12 +4466,12 @@ gcChipSetDrawBuffers(
             gcsSURF_FORMAT_INFO_PTR formatInfo;
             gcmONERROR(gcoSURF_GetSize(rtViews[i].surf, &tmpWidth, &tmpHeight, gcvNULL));
 
-            if(tmpWidth < rtWidth)
+            if (tmpWidth < rtWidth)
             {
                 rtWidth = tmpWidth;
             }
 
-            if(tmpHeight < rtHeight)
+            if (tmpHeight < rtHeight)
             {
                 rtHeight = tmpHeight;
             }
@@ -4635,7 +4635,7 @@ gcChipSetReadBuffers(
         chipCtx->readRTWidth  = (gctSIZE_T)width;
         chipCtx->readRTHeight = (gctSIZE_T)height;
     }
-    else if(dView->surf == sView->surf)
+    else if (dView->surf && (dView->surf == sView->surf))
     {
         gctUINT width, height;
         gcmONERROR(gcoSURF_GetSize(dView->surf, &width, &height, gcvNULL));
@@ -5249,7 +5249,7 @@ gcChipRecompileEvaluateKeyStates(
                     texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_A] = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_A]);
                 }
 
-                if(texFmt >= gcvSURF_A32F_1_R32F && texFmt <= gcvSURF_A32L32F_1_G32R32F)
+                if (texFmt >= gcvSURF_A32F_1_R32F && texFmt <= gcvSURF_A32L32F_1_G32R32F)
                 {
 
                     static const gceTEXTURE_SWIZZLE baseComponents_000r[] =
@@ -5303,7 +5303,7 @@ gcChipRecompileEvaluateKeyStates(
 
                     swizzle = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_R]);
 
-                    if(swizzle >= gcvTEXTURE_SWIZZLE_0)
+                    if (swizzle >= gcvTEXTURE_SWIZZLE_0)
                     {
                         texPatchInfo.swizzle[gcvTEXTURE_COMPONENT_R] = swizzle;
                     }
@@ -5314,7 +5314,7 @@ gcChipRecompileEvaluateKeyStates(
 
                     swizzle = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_G]);
 
-                    if(swizzle >= gcvTEXTURE_SWIZZLE_0)
+                    if (swizzle >= gcvTEXTURE_SWIZZLE_0)
                     {
                         texPatchInfo.swizzle[__GL_TEX_COMPONENT_G] = swizzle;
                     }
@@ -5325,7 +5325,7 @@ gcChipRecompileEvaluateKeyStates(
 
                     swizzle = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_B]);
 
-                    if(swizzle >= gcvTEXTURE_SWIZZLE_0)
+                    if (swizzle >= gcvTEXTURE_SWIZZLE_0)
                     {
                         texPatchInfo.swizzle[__GL_TEX_COMPONENT_B] = swizzle;
                     }
@@ -5335,7 +5335,7 @@ gcChipRecompileEvaluateKeyStates(
                     }
                     swizzle = gcChipUtilConvertTexSwizzle(texObj->params.swizzle[__GL_TEX_COMPONENT_A]);
 
-                    if(swizzle >= gcvTEXTURE_SWIZZLE_0)
+                    if (swizzle >= gcvTEXTURE_SWIZZLE_0)
                     {
                         texPatchInfo.swizzle[__GL_TEX_COMPONENT_A] = swizzle;
                     }
@@ -5368,7 +5368,7 @@ gcChipRecompileEvaluateKeyStates(
                 /* 3. NPOT key state. Only for 2D texture for now */
                 if ((texInfo->isNP2) &&
                     (texObj->targetIndex == __GL_TEXTURE_2D_INDEX) &&
-                    (chipCtx->chipFeature.patchNP2Texture))
+                    (chipCtx->chipFeature.hwFeature.patchNP2Texture))
                 {
                     gcoTEXTURE tex = texInfo->object;
                     gcoSURF     mip = gcvNULL;
@@ -5557,7 +5557,7 @@ gcChipRecompileEvaluateKeyStates(
                 pgKeyDirty = GL_TRUE;
             }
 
-            if(!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PSIO_DUAL16_32bpc_FIX))
+            if (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PSIO_DUAL16_32bpc_FIX))
             {
                 gctBOOL highpConversion = gcvFALSE;
                 for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
@@ -5667,7 +5667,7 @@ gcChipRecompileEvaluateKeyStates(
             }
         }
 
-        if (!chipCtx->chipFeature.msaaFragmentOperation)
+        if (!chipCtx->chipFeature.hwFeature.msaaFragmentOperation)
         {
             if ((gc->globalDirtyState[__GL_DIRTY_ATTRS_2] & __GL_SAMPLE_MASK_ENDISABLE_BIT) ||
                 progSwitched || chipDirty->uBuffer.sBuffer.rtSurfDirty)
@@ -5757,7 +5757,7 @@ gcChipRecompileEvaluateKeyStates(
             (program->progFlags.alphaBlend == 1) &&
             (gc->vertexArray.indexCount == 6))
         {
-            if( pgKeyState->staticKey->alphaBlend != gcvTRUE)
+            if ( pgKeyState->staticKey->alphaBlend != gcvTRUE)
             {
                 pgKeyDirty = gcvTRUE;
             }
@@ -5765,7 +5765,7 @@ gcChipRecompileEvaluateKeyStates(
         }
         else
         {
-            if(pgKeyState->staticKey->alphaBlend != gcvFALSE)
+            if (pgKeyState->staticKey->alphaBlend != gcvFALSE)
             {
                 pgKeyDirty = gcvTRUE;
             }

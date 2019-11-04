@@ -1614,7 +1614,7 @@ static gceSTATUS getArgumentSource(
                         glmCONST(1.0f);
                         glmVARYINGV_INDEXED(FS, vTexCoord0, SamplerNumber, sampler->coordSwizzle);
 
-                    if(sampler->coordType == gcSHADER_FLOAT_X4)
+                    if (sampler->coordType == gcSHADER_FLOAT_X4)
                     /* Define a pre-transform texture coordinate temp register. */
                     {
                         glmALLOCATE_LOCAL_TEMP(predivTexCoord);
@@ -1663,7 +1663,7 @@ static gceSTATUS getArgumentSource(
                 }
                 else
                 {
-                    if(sampler->coordType == gcSHADER_FLOAT_X4)
+                    if (sampler->coordType == gcSHADER_FLOAT_X4)
                     /* Define a pre-transform texture coordinate temp register. */
                     {
                         glmALLOCATE_LOCAL_TEMP(predivTexCoord);

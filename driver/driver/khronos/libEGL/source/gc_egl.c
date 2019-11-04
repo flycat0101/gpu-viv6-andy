@@ -19,10 +19,11 @@
 
 #define _GC_OBJ_ZONE            gcdZONE_EGL_API
 
-#if !gcdSTATIC_LINK
 #if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
 static pthread_mutex_t client_handles_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
+#if !gcdSTATIC_LINK
 static gctHANDLE client_handles[vegl_API_LAST] = {NULL};
 
 static gctCONST_STRING _dispatchNames[] =
@@ -31,11 +32,9 @@ static gctCONST_STRING _dispatchNames[] =
     "GLES_CL_DISPATCH_TABLE",           /* OpenGL ES 1.1 Common Lite */
     "GLES_CM_DISPATCH_TABLE",           /* OpenGL ES 1.1 Common */
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 2.0 */
-    "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 3.0 */
     "GL_DISPATCH_TABLE",                /* OpenGL */
     "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
 };
-#endif
 #endif
 /*******************************************************************************
 ***** Version Signature *******************************************************/
@@ -197,8 +196,7 @@ void veglPopResObj(
     return;
 }
 
-static void
-_InitDispatchTables(
+void _InitDispatchTables(
     VEGLThreadData Thread
     )
 {
@@ -217,53 +215,60 @@ _InitDispatchTables(
     Thread->dispatchTables[vegl_OPENGL_ES11_CL] = gcvNULL;
     Thread->dispatchTables[vegl_OPENGL_ES11]    = &GLES_CM_DISPATCH_TABLE;
     Thread->dispatchTables[vegl_OPENGL_ES20]    = &GLESv2_DISPATCH_TABLE;
-    Thread->dispatchTables[vegl_OPENGL_ES30]    = &GLESv2_DISPATCH_TABLE;
     Thread->dispatchTables[vegl_OPENGL] = &GL_DISPATCH_TABLE;
 #  endif
 #ifndef VIVANTE_NO_VG
     Thread->dispatchTables[vegl_OPENVG]         = &OpenVG_DISPATCH_TABLE;
 #  endif
 #else
-    gctSIZE_T i;
-#if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
-    gceSTATUS status;
-#endif
+    veglAPIINDEX index = 0;
 
-    for (i = 0; i < vegl_API_LAST; i++)
+    switch (Thread->api)
     {
-        veglAPIINDEX index = (veglAPIINDEX) i;
-#if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
-        gcmONERROR(gcoOS_AcquireMutex(gcvNULL, &client_handles_lock, gcvINFINITE));
+    case EGL_OPENGL_ES_API:
+        index = vegl_OPENGL_ES11;
+        break;
+    case EGL_OPENGL_API:
+        index = vegl_OPENGL;
+        break;
+    case EGL_OPENVG_API:
+        index = vegl_OPENVG;
+        break;
+    }
 
-        if (client_handles[i] == NULL)
+Loopback:
+#if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
+        gcoOS_AcquireMutex(gcvNULL, &client_handles_lock, gcvINFINITE);
+#endif
+        if (client_handles[index] == NULL)
         {
-            client_handles[i] = Thread->clientHandles[i] =
-                    veglGetModule(gcvNULL, index, _dispatchNames[i], &Thread->dispatchTables[i]);
+            client_handles[index] = Thread->clientHandles[index] =
+                veglGetModule(gcvNULL, index, _dispatchNames[index], &Thread->dispatchTables[index]);
         }
         else
         {
-            Thread->clientHandles[i] = client_handles[i];
-            gcoOS_GetProcAddress(NULL, client_handles[i], _dispatchNames[i],
-                    (gctPOINTER*) &Thread->dispatchTables[i]);
+            Thread->clientHandles[index] = client_handles[index];
+            gcoOS_GetProcAddress(NULL, client_handles[index], _dispatchNames[index],
+                    (gctPOINTER*) &Thread->dispatchTables[index]);
         }
-
-        gcmONERROR(gcoOS_ReleaseMutex(gcvNULL, &client_handles_lock));
-#else
-        Thread->clientHandles[i] =
-            veglGetModule(gcvNULL, index, &Thread->dispatchTables[i]);
+#if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
+        gcoOS_ReleaseMutex(gcvNULL, &client_handles_lock);
 #endif
         gcmTRACE_ZONE(
             gcvLEVEL_VERBOSE, gcdZONE_EGL_API,
             "%s(%d): APIIndex=%d library=%p dispatch=%p",
             __FUNCTION__, __LINE__,
-            index, Thread->clientHandles[i], Thread->dispatchTables[i]
+            index, Thread->clientHandles[index], Thread->dispatchTables[index]
             );
-    }
-#if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
-OnError:
+
+        if (vegl_OPENGL_ES11 == index)
+        {
+            index = vegl_OPENGL_ES20;
+            goto Loopback;
+        }
+
     return;
-#endif
-#endif
+#endif /* gcdSTATIC_LINK */
 }
 
 
@@ -306,7 +311,7 @@ veglGetThreadData(
         thread->fbMemSize         = 0;
 #endif
 
-        /* Initialize client dispatch tables. */
+        /* Initialize GLES client API dispatch tables. */
         _InitDispatchTables(thread);
 
         /* Set driver tls. */

@@ -475,11 +475,8 @@ typedef struct __GLtextureUnitStateRec
     GLuint realEnableDim;
 #ifdef OPENGL40
     __GLtextureCoordState s;
-
     __GLtextureCoordState t;
-
     __GLtextureCoordState r;
-
     __GLtextureCoordState q;
 
     /* Texture environment state */
@@ -535,14 +532,9 @@ typedef struct __GLtextureMachineRec
     __GLbitmask texConflict;
 
 #ifdef OPENGL40
-       /* If a stage has any texture target enabled
-
-    ** (gc->state.enables.texUnits[unit].enabledDimension > 0)
-
-    ** the corresponding bit will be set.
-
+    /* If a stage has any texture target enabled (texUnits[unit].enabledDimension > 0)
+    ** then corresponding bit will be set.
     */
-
     GLbitfield enabledMask;
     /* Texture objects for proxy textures */
     __GLtextureObject proxyTextures[__GL_MAX_TEXTURE_BINDINGS];
@@ -795,7 +787,7 @@ typedef struct __GLsamplerMachineRec
 extern GLvoid __glBindTexture(__GLcontext *gc, GLuint unitIdx, GLuint targetIndex, GLuint texture);
 extern GLboolean __glSetMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint face,
                                         GLint lod, GLint internalFormat, GLenum format,
-                                        GLenum type, GLsizei width, GLsizei height, GLsizei depth);
+                                        GLenum type, GLsizei width, GLsizei height, GLsizei depth, GLint border);
 extern GLvoid __glSetFBOAttachedTexDirty(__GLcontext *gc, GLbitfield mask, GLint drawbuffer);
 
 enum __GL_IMAGE_TYPE

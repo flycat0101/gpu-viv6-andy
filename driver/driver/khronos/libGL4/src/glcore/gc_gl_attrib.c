@@ -485,13 +485,13 @@ GLvoid APIENTRY __glim_ClampColor(__GLcontext *gc, GLenum target, GLenum clamp)
         return;
     }
 
-    if(clamp != GL_TRUE && clamp != GL_FALSE && clamp != GL_FIXED_ONLY_ARB)
+    if (clamp != GL_TRUE && clamp != GL_FALSE && clamp != GL_FIXED_ONLY_ARB)
     {
         __glSetError(gc, GL_INVALID_ENUM);
         return;
     }
 
-    if(*pClampColor ^ clamp)
+    if (*pClampColor ^ clamp)
     {
         __GL_VERTEX_BUFFER_FLUSH(gc);
         *pClampColor = clamp;

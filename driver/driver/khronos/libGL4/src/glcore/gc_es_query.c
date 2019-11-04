@@ -22,7 +22,7 @@
 #define __CHECK_GET_COLOR_CLAMP(dstColor, srcColor) \
     { \
         GLboolean clamp; \
-        if(gc->state.raster.clampFragColor == GL_FIXED_ONLY_ARB) \
+        if (gc->state.raster.clampFragColor == GL_FIXED_ONLY_ARB) \
         { \
             clamp = !gc->modes.rgbFloatMode; \
         } \
@@ -30,7 +30,7 @@
         { \
            clamp = (GLboolean)(gc->state.raster.clampFragColor); \
         } \
-       if(clamp) \
+       if (clamp) \
        { \
            __glClampColor(dstColor, srcColor); \
        } \
@@ -505,7 +505,7 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *fp++ = gc->state.rasterPos.rPos.texture[index].f.w;
         break;
     case GL_CURRENT_RASTER_POSITION:
-        if(DRAW_FRAMEBUFFER_BINDING_NAME == 0 && gc->drawablePrivate->yInverted)
+        if (DRAW_FRAMEBUFFER_BINDING_NAME == 0 && gc->drawablePrivate->yInverted)
         {
             *fp++ = gc->state.rasterPos.rPos.winPos.f.x;
             *fp++ = ((GLfloat)gc->drawablePrivate->height - gc->state.rasterPos.rPos.winPos.f.y);
@@ -845,7 +845,19 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->state.raster.blendEquationAlpha[0];
         break;
     case GL_BLEND_COLOR:
-#ifndef OPENGL40
+#ifdef OPENGL40
+        if (gc->imports.conformGLSpec)
+        {
+            __GLcolor blendColor;
+            __CHECK_GET_COLOR_CLAMP(&blendColor, &gc->state.raster.blendColor);
+
+            *cp++ = blendColor.r;
+            *cp++ = blendColor.g;
+            *cp++ = blendColor.b;
+            *cp++ = blendColor.a;
+        }
+        else  /* Running OES api */
+#endif
         {
             __GLcolor *blendColor = &gc->state.raster.blendColor;
             if (__GL_INT32 == type || __GL_INT64 == type)
@@ -863,18 +875,6 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
                 *fp++ = blendColor->a;
             }
         }
-#else
-        {
-            __GLcolor blendColor;
-            __CHECK_GET_COLOR_CLAMP(&blendColor, &gc->state.raster.blendColor);
-
-            *cp++ = blendColor.r;
-            *cp++ = blendColor.g;
-            *cp++ = blendColor.b;
-            *cp++ = blendColor.a;
-        }
-
-#endif
         break;
     case GL_SCISSOR_BOX:
         *ip++ = gc->state.scissor.scissorX;
@@ -883,7 +883,18 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->state.scissor.scissorHeight;
         break;
     case GL_COLOR_CLEAR_VALUE:
-#ifndef OPENGL40
+#ifdef OPENGL40
+        if (gc->imports.conformGLSpec)
+        {
+            __GLcolor clearColor;
+            __CHECK_GET_COLOR_CLAMP(&clearColor, &gc->state.raster.clearColor.clear);
+            *cp++ = clearColor.r;
+            *cp++ = clearColor.g;
+            *cp++ = clearColor.b;
+            *cp++ = clearColor.a;
+        }
+        else  /* Running OES api */
+#endif
         {
             __GLcolor *clearColor = &gc->state.raster.clearColor.clear;
             if (__GL_INT32 == type || __GL_INT64 == type)
@@ -901,16 +912,6 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
                 *fp++ = clearColor->a;
             }
         }
-#else
-        {
-            __GLcolor clearColor;
-            __CHECK_GET_COLOR_CLAMP(&clearColor, &gc->state.raster.clearColor.clear);
-            *cp++ = clearColor.r;
-            *cp++ = clearColor.g;
-            *cp++ = clearColor.b;
-            *cp++ = clearColor.a;
-        }
-#endif
         break;
     case GL_COLOR_WRITEMASK:
         *bp++ = gc->state.raster.colorMask[0].redMask;
@@ -1086,7 +1087,7 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         break;
     case GL_TEXTURE_BUFFER_DATA_STORE_BINDING_EXT:
         index = gc->state.texture.activeTexIndex;
-        if(gc->texture.units[index].boundTextures[__GL_TEXTURE_BUFFER_INDEX]->bufObj)
+        if (gc->texture.units[index].boundTextures[__GL_TEXTURE_BUFFER_INDEX]->bufObj)
             *ip++ = gc->texture.units[index].boundTextures[__GL_TEXTURE_BUFFER_INDEX]->bufObj->name;
         else
             *ip++ = 0;
@@ -1135,7 +1136,7 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_TEX0_INDEX + index].usr_stride;
         break;
     case GL_EDGE_FLAG_ARRAY_STRIDE:
-        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_EDGEFLAG].usr_stride;
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_EDGEFLAG_INDEX].usr_stride;
         break;
     case GL_FEEDBACK_BUFFER_SIZE:
         *ip++ = gc->feedback.resultLength;
@@ -1564,13 +1565,18 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         }
         break;
     case GL_READ_BUFFER:
-        *ip++ = READ_FRAMEBUFFER_BINDING_NAME
-            ? gc->frameBuffer.readFramebufObj->readBuffer
 #ifdef OPENGL40
-            : gc->state.pixel.readBuffer;
-#else
-            : gc->state.raster.readBuffer;
+        if (gc->imports.conformGLSpec)
+        {
+            *ip++ = READ_FRAMEBUFFER_BINDING_NAME ?
+                    gc->frameBuffer.readFramebufObj->readBuffer : gc->state.pixel.readBuffer;
+        }
+        else  /* Running OES api */
 #endif
+        {
+            *ip++ = READ_FRAMEBUFFER_BINDING_NAME ?
+                    gc->frameBuffer.readFramebufObj->readBuffer : gc->state.raster.readBuffer;
+        }
         break;
 
     case GL_SHADER_COMPILER:
@@ -2549,7 +2555,17 @@ const GLubyte * GL_APIENTRY __glim_GetString(__GLcontext *gc, GLenum name)
     case GL_SHADING_LANGUAGE_VERSION:
         return (GLubyte*)gc->constants.GLSLVersion;
     case GL_EXTENSIONS:
-        /* glGetString can't support GL_EXTENSIONS */
+        /* glGetString can't support GL_EXTENSIONS in core profile.
+        ** glGetString can   support GL_EXTENSIONS in compatibility profile.
+        */
+        if (gc->imports.conformGLSpec && gc->imports.coreProfile)
+        {
+            __GL_ERROR_RET_VAL(GL_INVALID_ENUM, gcvNULL);
+        }
+        else
+        {
+            return(GLubyte*)gc->constants.extensions;
+        }
     default:
         __GL_ERROR_RET_VAL(GL_INVALID_ENUM, gcvNULL);
     }
@@ -2637,24 +2653,30 @@ static GLvoid __glBeginQueryIndexed(__GLcontext *gc, GLenum target, GLuint index
     ** Another query is already in progress with the same target.
     ** note: GL_ANY_SAMPLES_PASSED and GL_ANY_SAMPLES_PASSED_CONSERVATIVE alias to the same target for this purposes.
     */
-    if (gc->query.currQuery[targetIndex] ||
-        (targetIndex == __GL_QUERY_ANY_SAMPLES_PASSED && gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE]) ||
-        (targetIndex == __GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE && gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED])
-#ifdef OPENGL40
-        || (gc->query.currQuery[__GL_QUERY_OCCLUSION] && (gc->query.currQuery[__GL_QUERY_OCCLUSION]->name == id)) ||
-        (gc->query.currQuery[__GL_QUERY_TIME_ELAPSED] && (gc->query.currQuery[__GL_QUERY_TIME_ELAPSED]->name == id))
-#endif
+    if (gc->query.currQuery[targetIndex][index] ||
+        (targetIndex == __GL_QUERY_ANY_SAMPLES_PASSED && gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE][index]) ||
+        (targetIndex == __GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE && gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED][index])
        )
     {
         __GL_ERROR_RET(GL_INVALID_OPERATION);
     }
 
+#ifdef OPENGL40
+    if (gc->imports.conformGLSpec &&
+        ((gc->query.currQuery[__GL_QUERY_OCCLUSION][index] && (gc->query.currQuery[__GL_QUERY_OCCLUSION][index]->name == id)) ||
+         (gc->query.currQuery[__GL_QUERY_TIME_ELAPSED][index] && (gc->query.currQuery[__GL_QUERY_TIME_ELAPSED][index]->name == id)))
+       )
+    {
+        __GL_ERROR_RET(GL_INVALID_OPERATION);
+    }
+#endif
+
     /* Where id is the name of a query currently in progress */
     for (queryIdx = __GL_QUERY_ANY_SAMPLES_PASSED; queryIdx < __GL_QUERY_LAST; ++queryIdx)
     {
-        if (gc->query.currQuery[queryIdx] &&
-            !(gc->query.currQuery[queryIdx]->flag & __GL_OBJECT_IS_DELETED) &&
-            gc->query.currQuery[queryIdx]->name == id)
+        if (gc->query.currQuery[queryIdx][index] &&
+            !(gc->query.currQuery[queryIdx][index]->flag & __GL_OBJECT_IS_DELETED) &&
+            gc->query.currQuery[queryIdx][index]->name == id)
         {
             __GL_ERROR_RET(GL_INVALID_OPERATION);
         }
@@ -2695,7 +2717,8 @@ static GLvoid __glBeginQueryIndexed(__GLcontext *gc, GLenum target, GLuint index
     queryObj->count = 0;
     queryObj->resultAvailable = GL_FALSE;
     queryObj->active = GL_TRUE;
-    gc->query.currQuery[targetIndex] = queryObj;
+    queryObj->index = index;
+    gc->query.currQuery[targetIndex][index] = queryObj;
 
     /* Notify DP to begin query on the query object */
     retVal = (*gc->dp.beginQuery)(gc, queryObj);
@@ -2712,12 +2735,12 @@ static GLvoid __glEndQueryIndexed(__GLcontext *gc, GLuint targetIndex, GLuint in
     GLboolean retVal;
 
     /* If there is no active query */
-    if (gc->query.currQuery[targetIndex] == gcvNULL)
+    if (gc->query.currQuery[targetIndex][index] == gcvNULL)
     {
         __GL_ERROR_RET(GL_INVALID_OPERATION);
     }
 
-    queryObj = gc->query.currQuery[targetIndex];
+    queryObj = gc->query.currQuery[targetIndex][index];
     if (!queryObj->active)
     {
         __GL_ERROR_RET(GL_INVALID_OPERATION);
@@ -2732,7 +2755,7 @@ static GLvoid __glEndQueryIndexed(__GLcontext *gc, GLuint targetIndex, GLuint in
     }
 
     queryObj->active = GL_FALSE;
-    gc->query.currQuery[targetIndex] = gcvNULL;
+    gc->query.currQuery[targetIndex][index] = gcvNULL;
 
     if (queryObj->flag & __GL_OBJECT_IS_DELETED)
     {
@@ -2770,7 +2793,7 @@ static GLvoid __glGetQueryIndexediv(__GLcontext *gc, GLenum target, GLuint index
         __GL_ERROR_RET(GL_INVALID_ENUM);
     }
 
-    queryObj = gc->query.currQuery[targetIndex];
+    queryObj = gc->query.currQuery[targetIndex][index];
 
     switch (pname)
     {
@@ -2798,6 +2821,7 @@ static GLvoid __glGetQueryIndexediv(__GLcontext *gc, GLenum target, GLuint index
 GLvoid GL_APIENTRY __glim_GenQueries(__GLcontext *gc, GLsizei n, GLuint *ids)
 {
     GLint start, i;
+    GLuint queryStream;
 
     __GL_HEADER();
 
@@ -2811,11 +2835,14 @@ GLvoid GL_APIENTRY __glim_GenQueries(__GLcontext *gc, GLsizei n, GLuint *ids)
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    if (gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED] ||
-        gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE] ||
-        gc->query.currQuery[__GL_QUERY_XFB_PRIMITIVES_WRITTEN])
+    for (queryStream = 0; queryStream < gc->constants.shaderCaps.maxVertStreams; queryStream++)
     {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        if (gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED][queryStream] ||
+            gc->query.currQuery[__GL_QUERY_ANY_SAMPLES_PASSED_CONSERVATIVE][queryStream] ||
+            gc->query.currQuery[__GL_QUERY_XFB_PRIMITIVES_WRITTEN][queryStream])
+        {
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
     }
 
     start = __glGenerateNames(gc, gc->query.noShare, n);
@@ -2868,26 +2895,24 @@ GLvoid GL_APIENTRY __glim_BeginQueryIndexed(__GLcontext *gc, GLenum target, GLui
 {
     __GL_HEADER();
 
-    if((target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN || target == GL_PRIMITIVES_GENERATED)
-        && (index < 0 || index > gc->constants.shaderCaps.maxVertStreams))
+    if ((target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN || target == GL_PRIMITIVES_GENERATED)
+        && (index < 0 || index >= gc->constants.shaderCaps.maxVertStreams))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    if((target == GL_SAMPLES_PASSED || target == GL_ANY_SAMPLES_PASSED || target == GL_TIME_ELAPSED)
+    if ((target == GL_SAMPLES_PASSED || target == GL_ANY_SAMPLES_PASSED || target == GL_TIME_ELAPSED)
         && (index != 0))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    if(target == GL_ANY_SAMPLES_PASSED_CONSERVATIVE)
+    if (target == GL_ANY_SAMPLES_PASSED_CONSERVATIVE)
     {
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
     __glBeginQueryIndexed(gc, target, index, id);
-
-    /* VIV TODO: need to refine and implement more operations for index */
 
 OnError:
     __GL_FOOTER();
@@ -2942,13 +2967,13 @@ GLvoid GL_APIENTRY __glim_EndQueryIndexed(__GLcontext *gc, GLenum target, GLuint
 
     __GL_HEADER();
 
-    if((target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN || target == GL_PRIMITIVES_GENERATED)
-        && (index < 0 || index > gc->constants.shaderCaps.maxVertStreams))
+    if ((target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN || target == GL_PRIMITIVES_GENERATED)
+        && (index < 0 || index >= gc->constants.shaderCaps.maxVertStreams))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    if((target == GL_SAMPLES_PASSED || target == GL_ANY_SAMPLES_PASSED || target == GL_TIME_ELAPSED)
+    if ((target == GL_SAMPLES_PASSED || target == GL_ANY_SAMPLES_PASSED || target == GL_TIME_ELAPSED)
         && (index != 0))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
@@ -2984,8 +3009,6 @@ GLvoid GL_APIENTRY __glim_EndQueryIndexed(__GLcontext *gc, GLenum target, GLuint
 
     __glEndQueryIndexed(gc, targetIndex, index);
 
-    /* VIV TODO: need to refine and implement more operations for index */
-
 OnError:
     __GL_FOOTER();
 }
@@ -3003,15 +3026,13 @@ GLvoid GL_APIENTRY __glim_GetQueryIndexediv(__GLcontext *gc, GLenum target, GLui
 {
     __GL_HEADER();
 
-    if((target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN || target == GL_PRIMITIVES_GENERATED)
+    if ((target == GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN || target == GL_PRIMITIVES_GENERATED)
         && (index < 0 || index >= gc->constants.shaderCaps.maxVertStreams))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
     __glGetQueryIndexediv(gc, target, index, pname, params);
-
-    /* VIV TODO: need to refine and implement more operations for index */
 
 OnError:
     __GL_FOOTER();
@@ -3172,11 +3193,15 @@ GLvoid __glInitQueryState(__GLcontext *gc)
 GLvoid __glFreeQueryState(__GLcontext *gc)
 {
     GLuint targetIdx;
+    GLuint queryStream;
     for (targetIdx = 0; targetIdx < __GL_QUERY_LAST; ++targetIdx)
     {
-        if (gc->query.currQuery[targetIdx])
+        for (queryStream = 0; queryStream < gc->constants.shaderCaps.maxVertStreams; queryStream++)
         {
-            __glEndQueryIndexed(gc, targetIdx, 0);
+            if (gc->query.currQuery[targetIdx][queryStream])
+            {
+                __glEndQueryIndexed(gc, targetIdx, queryStream);
+            }
         }
     }
 

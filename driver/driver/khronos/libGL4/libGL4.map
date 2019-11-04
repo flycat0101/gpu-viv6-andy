@@ -1,6 +1,7 @@
 {
     global:
-        GLESv2_DISPATCH_TABLE;
+        GL_DISPATCH_TABLE;
+        GLESv2_DISPATCH_TABLE
 
         glActiveTexture;
         glAttachShader;

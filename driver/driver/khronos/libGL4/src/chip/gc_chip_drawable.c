@@ -527,7 +527,8 @@ __glChipDestroyDrawable(
     gcmHEADER_ARG("drawable=0x%x", drawable);
 
 #if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
-    if (drawable->dp.privateData) {
+    if (drawable->dp.privateData)
+    {
         (*drawable->free)(drawable->dp.privateData);
     }
 
@@ -593,19 +594,19 @@ GLboolean initDrawable(glsCHIPDRAWABLE *chipDrawable, __GLdrawablePrivate *draw)
 
     chipDrawable->resolveBuffer = (glsCHIPRENDERBUFFER*)draw->backBuffer[__GL_RESOLVE_BUFFER].privateData;
 
-    if(draw->modes.haveDepthBuffer)
+    if (draw->modes.haveDepthBuffer)
     {
        chipDrawable->haveDepthBuffer = GL_TRUE;
        chipDrawable->depthBuffer = (glsCHIPDEPTHBUFFER*)(draw->depthBuffer.privateData);
     }
 
-    if(draw->modes.haveStencilBuffer)
+    if (draw->modes.haveStencilBuffer)
     {
        chipDrawable->haveStencilBuffer = GL_TRUE;
        chipDrawable->stencilBuffer = (glsCHIPSTENCILBUFFER*)(draw->stencilBuffer.privateData);
     }
 
-    if(draw->modes.haveAccumBuffer)
+    if (draw->modes.haveAccumBuffer)
     {
        chipDrawable->haveAccumBuffer = GL_TRUE;
        chipDrawable->accumBuffer = (glsCHIPACCUMBUFFER*)(draw->accumBuffer.privateData);
@@ -658,7 +659,7 @@ void __glChipUpdateDrawableInfo(__GLdrawablePrivate* draw)
     updateDrawableBufferInfo(draw, &draw->frontBuffer2, draw->modes.rgbaBits);
     updateDrawableBufferInfo(draw, &draw->backBuffer[__GL_RESOLVE_BUFFER], draw->modes.rgbaBits);
 
-    if(draw->modes.haveDepthBuffer)
+    if (draw->modes.haveDepthBuffer)
     {
         updateDrawableBufferInfo(draw, &draw->depthBuffer, draw->modes.depthBits);
         switch (draw->modes.depthBits)
@@ -673,7 +674,7 @@ void __glChipUpdateDrawableInfo(__GLdrawablePrivate* draw)
         }
     }
 
-    if(draw->modes.haveStencilBuffer)
+    if (draw->modes.haveStencilBuffer)
     {
         updateDrawableBufferInfo(draw, &draw->stencilBuffer, draw->modes.stencilBits);
         switch (draw->modes.stencilBits)
@@ -686,7 +687,7 @@ void __glChipUpdateDrawableInfo(__GLdrawablePrivate* draw)
         }
     }
 
-    if(draw->modes.haveAccumBuffer)
+    if (draw->modes.haveAccumBuffer)
     {
         updateDrawableBufferInfo(draw, &draw->accumBuffer, draw->modes.accumBits);
     }
@@ -702,7 +703,7 @@ GLvoid notifyChangeBufferSizePBuffer(__GLcontext * gc)
     glsCHIPDRAWABLE* chipDraw = (glsCHIPDRAWABLE*)(draw->dp.privateData);
 
     /* If the drawable already have the required width and height, just return */
-    if(draw->width != chipDraw->width || draw->height != chipDraw->height)
+    if (draw->width != chipDraw->width || draw->height != chipDraw->height)
     {
 
 /*
@@ -716,7 +717,7 @@ GLvoid notifyChangeBufferSizePBuffer(__GLcontext * gc)
         if (draw->dp.freeBuffers)
             draw->dp.freeBuffers(draw, GL_TRUE);
 
-        if(draw->width != 0 && draw->height != 0)
+        if (draw->width != 0 && draw->height != 0)
         {
             __glChipCreatePbuffer(gc, draw);
         }
@@ -743,7 +744,7 @@ GLvoid notifyChangeBufferSizeDrawable(__GLcontext * gc)
     /* __GL_DRAWABLE_PENDING_PRIMARY_LOST means that the primary surface handle was invalidated because of a display mode change. If
        the OpenGL installable client driver (ICD) receives this error code, it should reopen or recreate the primary handle, replace
        all references in the command buffer to the old handle with the new handle, and then resubmit the buffer. */
-    if(draw->width != chipDraw->width || draw->height != chipDraw->height || draw->internalFormatColorBuffer != chipDraw->internalFormatColorBuffer || (gc->changeMask & __GL_DRAWABLE_PENDING_PRIMARY_LOST))
+    if (draw->width != chipDraw->width || draw->height != chipDraw->height || draw->internalFormatColorBuffer != chipDraw->internalFormatColorBuffer || (gc->changeMask & __GL_DRAWABLE_PENDING_PRIMARY_LOST))
     {
 /*
         detachDrawable(chipCtx, draw);
@@ -759,7 +760,7 @@ GLvoid notifyChangeBufferSizeDrawable(__GLcontext * gc)
 
         /*Flush before destroy,since maybe command buffer still refer to these resources*/
 
-        if(draw->dp.freeBuffers) {
+        if (draw->dp.freeBuffers) {
             draw->dp.freeBuffers(draw, GL_TRUE);
         }
 
@@ -793,7 +794,7 @@ GLvoid notifyChangeBufferSizeDrawable(__GLcontext * gc)
                 retValue = createRenderBuffer(gc, &chipCreateInfo, (gcoSURF*)&draw->rtHandles[__GL_DRAWBUFFER_FRONTRIGHT_INDEX]);
             }
 
-            if((draw->modes.doubleBufferMode) && (retValue))
+            if ((draw->modes.doubleBufferMode) && (retValue))
             {
                 /*backleftbuffer: create the first back buffer*/
                 draw->backBuffer[__GL_BACK_BUFFER0].deviceFormatInfo = pformatInfo;
@@ -901,7 +902,7 @@ GLvoid notifyChangeBufferSizeDrawable(__GLcontext * gc)
     }
 
     if (!retValue) {
-        if(draw->dp.freeBuffers) {
+        if (draw->dp.freeBuffers) {
             draw->dp.freeBuffers(draw, GL_FALSE);
         }
     }
@@ -942,7 +943,7 @@ void getDrawableBufInfo(__GLdrawablePrivate *draw, __GLdrawableInfo infoType, gc
         break;
     }
 
-    if(chipRenderBuffer)
+    if (chipRenderBuffer)
     {
         *pSurf = chipRenderBuffer->renderTarget;
     }
@@ -962,7 +963,7 @@ GLvoid exchangeBufferHandles(__GLcontext *gc, __GLdrawablePrivate * draw, GLbool
         glsCHIPRENDERBUFFER *pTemp = NULL;
         void *pRtSurf = gcvNULL;
 
-        if(draw->modes.doubleBufferMode)
+        if (draw->modes.doubleBufferMode)
         {
             pTemp = *(chipDraw->drawBuffers[__GL_BACK_BUFFER0_INDEX]);
             pRtSurf = draw->rtHandles[__GL_BACK_BUFFER0_INDEX];
@@ -974,7 +975,7 @@ GLvoid exchangeBufferHandles(__GLcontext *gc, __GLdrawablePrivate * draw, GLbool
             draw->rtHandles[__GL_FRONT_BUFFER_INDEX] = pRtSurf;
 
         }
-        else if(draw->modes.tripleBufferMode)
+        else if (draw->modes.tripleBufferMode)
         {
             pTemp = *(chipDraw->drawBuffers[__GL_BACK_BUFFER0_INDEX]);
             pRtSurf = draw->rtHandles[__GL_BACK_BUFFER0_INDEX];
@@ -1037,8 +1038,6 @@ GLvoid resolveBuffer(__GLcontext * gc,  GLboolean swapFront)
 
 GLvoid resolveRenderTargetToScreen(__GLcontext * gc)
 {
-    __GLdrawablePrivate *draw = gc->drawablePrivate;
-
     vivDriMirror *pDriMirror = (vivDriMirror *)gc->imports.other;
     __DRIdrawablePrivate *dPriv = pDriMirror->drawable;
 
@@ -1086,10 +1085,10 @@ GLvoid __glChipFreeDrawableBuffers(__GLdrawablePrivate *draw, GLboolean bWaitDra
 
     chipDrawable = (glsCHIPDRAWABLE*)(draw->dp.privateData);
 
-    if(draw->type == __GL_PBUFFER)
+    if (draw->type == __GL_PBUFFER)
     {
         GL_ASSERT(draw->pbufferTex);
-        if(draw->pbufferTex->renderTexture)
+        if (draw->pbufferTex->renderTexture)
         {
             chipDestroyInfo.flags = __GL_PBUFFERTEX_BUFFER;
         }
@@ -1128,14 +1127,14 @@ GLvoid __glChipFreeDrawableBuffers(__GLdrawablePrivate *draw, GLboolean bWaitDra
     __glChipDestroyRenderBuffer(&chipDestroyInfo);
 
     /* Free depth buffer */
-    if(draw->modes.haveDepthBuffer)
+    if (draw->modes.haveDepthBuffer)
     {
         chipDestroyInfo.bufInfo = (void*)(&(draw->depthBuffer));
         chipDestroyInfo.flags = __GL_DEPTH_BUFFER;
         __glChipDestroyRenderBuffer(&chipDestroyInfo);
     }
 
-    if(draw->modes.haveStencilBuffer)
+    if (draw->modes.haveStencilBuffer)
     {
         chipDestroyInfo.bufInfo = (void*)(&(draw->stencilBuffer));
         chipDestroyInfo.flags = __GL_STENCIL_BUFFER;
@@ -1143,7 +1142,7 @@ GLvoid __glChipFreeDrawableBuffers(__GLdrawablePrivate *draw, GLboolean bWaitDra
     }
 
     /* Free video memory for accumulator buffer */
-    if(draw->modes.haveAccumBuffer)
+    if (draw->modes.haveAccumBuffer)
     {
         chipDestroyInfo.bufInfo = (void*)(&(draw->accumBuffer));
         chipDestroyInfo.flags = __GL_ACCUM_BUFFER;
@@ -1163,9 +1162,8 @@ GLvoid __glChipFreeDrawableBuffers(__GLdrawablePrivate *draw, GLboolean bWaitDra
 GLvoid __glChipNotifyChangeBufferSize(__GLcontext * gc)
 {
     __GLdrawablePrivate* draw = gc->drawablePrivate;
-    glsCHIPDRAWABLE* chipDraw = (glsCHIPDRAWABLE*)(draw->dp.privateData);
 
-    GL_ASSERT(draw && chipDraw);
+    GL_ASSERT(draw && draw->dp.privateData);
 
     if (draw->type == __GL_PBUFFER)
         notifyChangeBufferSizePBuffer(gc);
@@ -1186,7 +1184,7 @@ GLvoid __glChipNotifyDestroyBuffers(__GLcontext *gc)
 
 GLvoid __glChipNotifySwapBuffers(__GLcontext *gc)
 {
-    if(gc->flags & __GL_FULL_SCREEN)
+    if (gc->flags & __GL_FULL_SCREEN)
     {
         /* Update render target after flip */
     __glChipChangeDrawBuffers(gc);
@@ -1203,7 +1201,7 @@ GLvoid __glChipNotifyDrawableSwitch(__GLcontext *gc)
 
 void __glChipRestoreFrontBuffer(__GLdrawablePrivate *draw)
 {
-    if(draw->flipOn)
+    if (draw->flipOn)
     {
     }
 }
@@ -1241,56 +1239,56 @@ GLboolean __glChipSetDisplayMode(__GLcontext *gc)
 
     getDrawableBufInfo(draw, __GL_DRAW_FRONTBUFFER_ALLOCATION, &pSurf);
 
-    if(!pSurf)
+    if (!pSurf)
     {
         return GL_FALSE; /*Surface is not residented*/
     }
 
     //status = __glDpSetDisplayMode(chipCtx, pSurf);
 
-    if(status != gcvSTATUS_OK)
+    if (status != gcvSTATUS_OK)
     {
         GL_ASSERT(0);
         return GL_FALSE;
     }
 
-    if(draw->modes.doubleBufferMode)
+    if (draw->modes.doubleBufferMode)
     {
         getDrawableBufInfo(draw, __GL_DRAW_BACKBUFFER0_ALLOCATION, &pSurf);
 
-        if(!pSurf)
+        if (!pSurf)
         {
             return GL_FALSE; /*Surface is not residented*/
         }
 
         //status = __glDpSetDisplayMode(chipCtx, pSurf);
     }
-    else if(draw->modes.tripleBufferMode)
+    else if (draw->modes.tripleBufferMode)
     {
         getDrawableBufInfo(draw, __GL_DRAW_BACKBUFFER0_ALLOCATION, &pSurf);
 
-        if(!pSurf)
+        if (!pSurf)
         {
             return GL_FALSE; /*Surface is not residented*/
         }
 
         //status = __glDpSetDisplayMode(chipCtx, pSurf);
 
-        if(status != gcvSTATUS_OK)
+        if (status != gcvSTATUS_OK)
         {
             GL_ASSERT(0);
             return GL_FALSE;
         }
 
         getDrawableBufInfo(draw, __GL_DRAW_BACKBUFFER1_ALLOCATION,&pSurf);
-        if(!pSurf)
+        if (!pSurf)
         {
             return GL_FALSE; /*Surface is not residented*/
         }
         //status = __glDpSetDisplayMode(chipCtx, pSurf);
     }
 
-    if(status != gcvSTATUS_OK)
+    if (status != gcvSTATUS_OK)
     {
         GL_ASSERT(0);
         return GL_FALSE;
@@ -1312,7 +1310,7 @@ GLvoid __glChipNotifyChangeExclusiveMode(__GLcontext * gc)
 {
     __GLdrawablePrivate *draw = gc->drawablePrivate;
 
-    if(draw->fullScreenMode && (draw->type == __GL_WINDOW) && (draw->bFocus) && (!__glDevice->IsRotated))
+    if (draw->fullScreenMode && (draw->type == __GL_WINDOW) && (draw->bFocus) && (!__glDevice->IsRotated))
     {
         __glChipSetExclusiveDisplay(GL_TRUE);
         __glChipSetDisplayMode(gc);

@@ -50,7 +50,7 @@ GLvoid APIENTRY __glim_PushAttrib(__GLcontext *gc, GLuint mask)
             sp->state.raster = gc->state.raster;
 #if GL_EXT_framebuffer_object
             /* Per spec.: Save the drawbuffer state of current FBO */
-            if(DRAW_FRAMEBUFFER_BINDING_NAME != 0)
+            if (DRAW_FRAMEBUFFER_BINDING_NAME != 0)
             {
                 sp->state.raster.drawBuffers[0] = gc->frameBuffer.drawFramebufObj->drawBuffers[0];
             }
@@ -177,7 +177,7 @@ GLvoid APIENTRY __glim_PopAttrib(__GLcontext *gc)
 
 #if GL_EXT_framebuffer_object
             /* Per spec.: Restore  the drawbuffer state of current FBO. gc's drawbuffer state not changed. */
-            if(DRAW_FRAMEBUFFER_BINDING_NAME != 0){
+            if (DRAW_FRAMEBUFFER_BINDING_NAME != 0){
                 GLenum drawbuffer = gc->state.raster.drawBuffers[0];
                 gc->frameBuffer.drawFramebufObj->drawBuffers[0] = sp->state.raster.drawBuffers[0];
                 gc->state.raster = sp->state.raster;
@@ -407,7 +407,7 @@ GLvoid APIENTRY __glim_PopAttrib(__GLcontext *gc)
 
                 GLuint maxbinding;
 
-                if(__glExtension[__GL_EXTID_ARB_texture_array].bEnabled)
+                if (__glExtension[__GL_EXTID_ARB_texture_array].bEnabled)
                     maxbinding = __GL_MAX_TEXTURE_BINDINGS;
                 else
                     maxbinding = __GL_TEXTURE_RECTANGLE_INDEX + 1;

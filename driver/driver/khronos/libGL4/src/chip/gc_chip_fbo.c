@@ -110,7 +110,7 @@ gcChipUtilGetPixelPlane(
 
         /* Downsample to pixel plane surface. */
 #ifdef OPENGL40
-        if (ssbView->numSlices > 1)
+        if (gc->imports.conformGLSpec && ssbView->numSlices > 1)
         {
             gcsSURF_VIEW fsssbView;
             fsssbView.firstSlice = ssbView->firstSlice;
@@ -118,7 +118,7 @@ gcChipUtilGetPixelPlane(
             fsssbView.surf = ssbView->surf;
             gcmONERROR(gcoSURF_ResolveRect(&fsssbView, pixelPlaneView, gcvNULL));
         }
-        else
+        else  /* Running OES api */
 #endif
         {
             gcmONERROR(gcoSURF_ResolveRect(ssbView, pixelPlaneView, gcvNULL));
@@ -584,7 +584,7 @@ gceSTATUS gcChipFBOSyncAttachment(__GLcontext *gc, __GLfboAttachPoint * attachPo
     if (attachPoint->objType == GL_TEXTURE)
     {
         __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
-        if(texObj)
+        if (texObj)
         {
             __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
             if ((texInfo && texInfo->eglImage.image) ||
@@ -597,7 +597,7 @@ gceSTATUS gcChipFBOSyncAttachment(__GLcontext *gc, __GLfboAttachPoint * attachPo
                     attachPoint->layer));
             }
             /* Sync Master to direct source. */
-            if(texInfo && texInfo->direct.source &&
+            if (texInfo && texInfo->direct.source &&
                 !texInfo->direct.directSample &&
                 attachPoint->level == 0
                 )
@@ -659,7 +659,7 @@ __glChipFramebufferTexture(
     gcmONERROR(gcChipFBOSyncAttachment(gc, preAttach));
     mipmap = texObj ? &texObj->faceMipmap[face][level] : gcvNULL;
 
-    if (mipmap && (mipmap->width * mipmap->height * mipmap->depth))
+    if (mipmap && ((mipmap->width * mipmap->height * mipmap->depth) != 0))
     {
         __GLchipContext         *chipCtx        = CHIP_CTXINFO(gc);
         __GLchipTextureInfo     *texInfo        = (__GLchipTextureInfo*)texObj->privateData;
@@ -1038,7 +1038,7 @@ __glChipIsFramebufferComplete(
             fbLayered = layered;
             fbLayeredTarget = layeredTarget;
         }
-        else if((gc->apiVersion == __GL_API_VERSION_ES20) && (fbwidth != width || fbheight != height))
+        else if ((gc->apiVersion == __GL_API_VERSION_ES20) && (fbwidth != width || fbheight != height))
         {
             /* ES30 will not generate the error */
             error = GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS;
@@ -1067,11 +1067,7 @@ __glChipIsFramebufferComplete(
         ** required to support framebuffer objects where both attachments refer to the same image."
         ** Thus, it is accepatable for an implementation returning GL_FRAMEBUFFER_UNSUPPORTED.
         */
-        if ((gc->apiVersion == __GL_API_VERSION_ES30
-#ifdef OPENGL40
-            || gc->apiVersion >= __GL_API_VERSION_OGL30
-#endif
-            ) && depthObjSet && stencilObjSet)
+        if (depthObjSet && stencilObjSet)
         {
             if ((depthObjType != stencilObjType) ||
                 (depthObjName != stencilObjName))
@@ -1409,7 +1405,7 @@ gcChipBlitFramebufferResolve(
             gcsSURF_VIEW rtView = {chipCtx->drawRtViews[i].surf, chipCtx->drawRtViews[i].firstSlice, chipCtx->drawRtViews[i].numSlices};
             if (rtView.surf)
             {
-                if(rtView.surf->isMsaa)
+                if (rtView.surf->isMsaa)
                 {
                     /*
                     ** Destination framebuffer is MSAA, using CPUBlit to solve it.
@@ -1480,7 +1476,7 @@ gcChipBlitFramebufferResolve(
         /* Consider stencil and depth sharing same surface */
         if (readDsView->surf && drawDsView->surf)
         {
-            if(drawDsView->surf->isMsaa)
+            if (drawDsView->surf->isMsaa)
             {
                 /*
                 ** Destination framebuffer is MSAA, using CPUBlit to solve it.
@@ -1632,7 +1628,7 @@ gcChipBlitFramebuffer3Dblit(
 
         masterView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
 
-        if (!masterView.surf || ((masterView.surf->tiling == gcvMULTI_SUPERTILED) && (chipCtx->chipFeature.indirectRTT)))
+        if (!masterView.surf || ((masterView.surf->tiling == gcvMULTI_SUPERTILED) && (chipCtx->chipFeature.hwFeature.indirectRTT)))
         {
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }

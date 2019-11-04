@@ -225,12 +225,6 @@ static EGLBoolean veglLoseCurrent_es3(void *thrData, void *pCtxPriv)
     return EGL_TRUE;
 }
 
-
-static EGLBoolean veglFlushContext_es3(void * Context)
-{
-    return EGL_TRUE;
-}
-
 static void veglFlush_es3(void)
 {
     __GLcontext *gc = __glGetGLcontext();
@@ -377,7 +371,6 @@ veglDISPATCH GLESv2_DISPATCH_TABLE =
     /* makeCurrent              */  veglMakeCurrent_es3,
     /* loseCurrent              */  veglLoseCurrent_es3,
     /* setDrawable              */  veglSetDrawable_es3,
-    /* flushContext             */  veglFlushContext_es3,
     /* flush                    */  veglFlush_es3,
     /* finish                   */  veglFinish_es3,
     /* getClientBuffer          */  gcvNULL,

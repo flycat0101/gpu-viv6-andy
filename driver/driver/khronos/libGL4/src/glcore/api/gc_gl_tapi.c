@@ -124,7 +124,7 @@ __GL_INLINE GLvoid __glTexCoord2fv(__GLcontext *gc, GLuint unit, GLfloat *v)
                 __glSwitchToInconsistentFormat(gc);
             }
 
-            if(!(vertexFormat & (tc3fMask | tc4fMask)))
+            if (!(vertexFormat & (tc3fMask | tc4fMask)))
             {
                 gc->input.texture[unit].currentPtrDW = (GLfloat*)gc->input.texture[unit].pointer +
                 gc->input.texture[unit].index * gc->input.vertTotalStrideDW;
@@ -244,7 +244,7 @@ __GL_INLINE GLvoid __glTexCoord3fv(__GLcontext *gc, GLuint unit, GLfloat *v)
                 __glSwitchToInconsistentFormat(gc);
             }
 
-            if(!(vertexFormat & (tc2fMask | tc4fMask)))
+            if (!(vertexFormat & (tc2fMask | tc4fMask)))
             {
                 gc->input.texture[unit].currentPtrDW = (GLfloat*)gc->input.texture[unit].pointer +
                 gc->input.texture[unit].index * gc->input.vertTotalStrideDW;
@@ -350,7 +350,7 @@ __GL_INLINE GLvoid __glTexCoord4fv(__GLcontext *gc, GLuint unit, GLfloat *v)
                 __glSwitchToInconsistentFormat(gc);
             }
 
-            if(!(vertexFormat & (tc2fMask | tc3fMask)))
+            if (!(vertexFormat & (tc2fMask | tc3fMask)))
             {
                 gc->input.texture[unit].currentPtrDW = (GLfloat*)gc->input.texture[unit].pointer +
                 gc->input.texture[unit].index * gc->input.vertTotalStrideDW;

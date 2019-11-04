@@ -920,7 +920,7 @@ __glUtilDecodeISE(
         for (itemsleft = ItemCount; itemsleft != 0;)
         {
             GLubyte Q = 0;
-            GLubyte C;
+            GLubyte C = 0;
             GLubyte q0, q1, q2;
             GLuint packedbits;
             /* Determine the number of bits to read. */

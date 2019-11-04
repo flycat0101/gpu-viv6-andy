@@ -101,7 +101,7 @@ GLvoid __glConvertToScreenSpacePos(__GLcontext* gc, GLfloat* clipPos, GLfloat* s
     rhw = 1.0f / (clipW);
     *screenPos++ = (px/2)*clipX *rhw + ox;
     y = (py/2)*clipY *rhw + oy;
-    if(invertY)
+    if (invertY)
         y = gc->drawablePrivate->height - y;
     *screenPos++ = y;
     z = (fSn/2) * clipZ * rhw + fAn/2;
@@ -117,7 +117,7 @@ GLvoid __glConvertToScreenSpacePos(__GLcontext* gc, GLfloat* clipPos, GLfloat* s
 
 __GL_INLINE GLboolean __glCanDoFastRasterPos(__GLcontext* gc)
 {
-    if(gc->shaderProgram.vertShaderEnable || gc->state.enables.program.vertexProgram || /* vertex shader is active */
+    if (gc->shaderProgram.vertShaderEnable || gc->state.enables.program.vertexProgram || /* vertex shader is active */
        gc->state.enables.lighting.lighting || /* Enable lighting */
        gc->state.enables.transform.clipPlanesMask || /* Enable user clip plane*/
        gc->state.enables.fog || /* Enable fog */
@@ -146,7 +146,7 @@ void __glRasterPos4fvFast(__GLcontext* gc, GLfloat *fv4)
 
     __glTransformCoord(&clipCoord,  &objCoord, &mvp);
 
-    if((clipCoord.f.x > clipCoord.f.w || clipCoord.f.x < -clipCoord.f.w) ||
+    if ((clipCoord.f.x > clipCoord.f.w || clipCoord.f.x < -clipCoord.f.w) ||
        (clipCoord.f.y > clipCoord.f.w || clipCoord.f.y < -clipCoord.f.w) ||
        (clipCoord.f.z > clipCoord.f.w || clipCoord.f.z < -clipCoord.f.w))
     {
@@ -435,7 +435,7 @@ __GL_INLINE GLvoid __glWindowPos3fv(__GLcontext* gc, GLfloat *v)
     rp->rPos.winPos.f.x = v[0];
     rp->rPos.winPos.f.y = v[1];
 
-    if(v[2] <= 0)
+    if (v[2] <= 0)
         rp->rPos.winPos.f.z = gc->state.viewport.zNear;
     else if (v[2] >= 1)
         rp->rPos.winPos.f.z = gc->state.viewport.zFar;

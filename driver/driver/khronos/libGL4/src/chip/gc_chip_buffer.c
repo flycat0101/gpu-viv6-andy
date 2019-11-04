@@ -208,6 +208,11 @@ static __GLchipFmtMapInfo __glChipFmtMapInfo[__GL_FMT_MAX + 1] =
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_SRGB_ALPHA_S3TC_DXT3 */
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_COMPRESSED_SRGB_ALPHA_S3TC_DXT5 */
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_R16),             /* __GL_FMT_R16 */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_RG16),             /* __GL_FMT_RG16 */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_B16G16R16),             /* __GL_FMT_RGB16 */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),             /* __GL_FMT_R16_SNORM */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN),     /* __GL_FMT_RG16_SNORM */
+
 #endif
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_UNKNOWN)        /* __GL_FMT_MAX */
 };
@@ -251,7 +256,7 @@ gcChipSetFmtMapAttribs(
         fmtMapInfo->flags |= __GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE;
     }
 
-    if (chipCtx->chipFeature.indirectRTT)
+    if (chipCtx->chipFeature.hwFeature.indirectRTT)
     {
         fmtMapInfo->flags |= __GL_CHIP_FMTFLAGS_LAYOUT_DIFF_READ_WRITE;
     }
@@ -385,7 +390,7 @@ gcChipInitFormatMapInfo(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    if (chipCtx->chipFeature.supportMSAA2X)
+    if (chipCtx->chipFeature.hwFeature.supportMSAA2X)
     {
         chipCtx->numSamples = 2;
         chipCtx->samples[0] = 2;
@@ -412,8 +417,11 @@ gcChipInitFormatMapInfo(
     for (i = 0; i < __GL_FMT_MAX; ++i)
     {
 #ifdef OPENGL40
-        if ( __glChipFmtMapInfo[i].requestFormat == gcvSURF_UNKNOWN )
+        if (/* TODO fix: gc->imports.conformGLSpec && */
+            __glChipFmtMapInfo[i].requestFormat == gcvSURF_UNKNOWN)
+        {
             continue;
+        }
 #endif
         gcmONERROR(gcoTEXTURE_GetClosestFormat(chipCtx->hal, __glChipFmtMapInfo[i].requestFormat, &__glChipFmtMapInfo[i].readFormat));
         gcmONERROR(gco3D_GetClosestRenderFormat(chipCtx->engine, __glChipFmtMapInfo[i].requestFormat, &__glChipFmtMapInfo[i].writeFormat));
@@ -428,7 +436,7 @@ gcChipInitFormatMapInfo(
         }
 
         /* count SRGB rendering */
-        if(gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_SRGB_RT_SUPPORT) == gcvFALSE)
+        if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_SRGB_RT_SUPPORT) == gcvFALSE)
         {
             if ((__glChipFmtMapInfo[i].requestFormat == gcvSURF_A8_SBGR8) &&
                 (__glChipFmtMapInfo[i].writeFormat != gcvSURF_A16B16G16R16F))
@@ -517,8 +525,11 @@ gcChipInitFormatMapInfo(
             for (i = 0; i < __GL_FMT_MAX; i++)
             {
 #ifdef OPENGL40
-                if ( __glChipFmtMapInfo[i].requestFormat == gcvSURF_UNKNOWN )
+                if (/* TODO fix: gc->imports.conformGLSpec && */
+                    __glChipFmtMapInfo[i].requestFormat == gcvSURF_UNKNOWN)
+                {
                     continue;
+                }
 #endif
                 gcmONERROR(gcoTEXTURE_GetClosestFormatEx(chipCtx->hal, __glChipFmtMapInfo[i].requestFormat, gcvTEXTURE_3D, &patch3DFormat));
 
@@ -926,7 +937,7 @@ __glChipMapBufferRange(
 
 
             GL_ASSERT(bufInfo->bufferMapPointer);
-            if(!bufInfo->bufferMapPointer)
+            if (!bufInfo->bufferMapPointer)
             {
                 break;
             }
@@ -1182,9 +1193,8 @@ __glChipBufferSubData(
         __GLimageUser *bindUser;
 
         gctBOOL bPatch = gcvFALSE;
-        if(chipCtx->patchInfo.patchFlags.isNavi &&
-           chipCtx->chipModel == gcv2000        &&
-           chipCtx->chipRevision == 0x5108)
+        if (chipCtx->patchInfo.patchFlags.isNavi &&
+            chipCtx->chipModel == gcv2000 && chipCtx->chipRevision == 0x5108)
         {
             bPatch = gcvTRUE;
         }
@@ -1556,7 +1566,7 @@ gceSTATUS __glChipDestroyRenderBuffer(glCHIPBUFFERDESSTROY* chipDestroyInfo)
 
     drawableBuf = (__GLdrawableBuffer*)(chipDestroyInfo->bufInfo);
 
-    if(drawableBuf->privateData == gcvNULL)
+    if (drawableBuf->privateData == gcvNULL)
     {
         gcmFOOTER_NO();
         return gcvSTATUS_INVALID_ARGUMENT;

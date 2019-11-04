@@ -1126,31 +1126,6 @@ veglSetContext(
 
 /*******************************************************************************
 **
-** veglUnsetContext
-**
-** Unset current context for the specified one.
-**
-** INPUT:
-**
-**    Context
-**       Pointer to the context to be unset from current.
-**/
-static EGLBoolean
-veglUnsetContext(
-    void * Thread,
-    void * Context
-    )
-{
-    /*
-     * No surfaceless context supported for openvg. veglSetContext function
-     * can handle lose current.
-     */
-    return veglSetContext(Thread, Context, gcvNULL, gcvNULL);
-}
-
-
-/*******************************************************************************
-**
 ** vgGetError
 **
 ** vgGetError returns the oldest error code provided by an API call on the
@@ -1450,6 +1425,33 @@ veglFinish(
 #else
     vgFinish();
 #endif
+}
+
+/*******************************************************************************
+**
+** veglUnsetContext
+**
+** Unset current context for the specified one.
+**
+** INPUT:
+**
+**    Context
+**       Pointer to the context to be unset from current.
+**/
+static EGLBoolean
+veglUnsetContext(
+    void * Thread,
+    void * Context
+    )
+{
+    /* To maintain the previous EGL flushContext;loseCurrent; call sequence */
+    veglFlushContext(Context);
+
+    /*
+     * No surfaceless context supported for openvg. veglSetContext function
+     * can handle lose current.
+     */
+    return veglSetContext(Thread, Context, gcvNULL, gcvNULL);
 }
 
 /*******************************************************************************
@@ -2091,7 +2093,6 @@ OpenVG_DISPATCH_TABLE =
     /* makeCurrent              */  veglSetContext,
     /* loseCurrent              */  veglUnsetContext,
     /* setDrawable              */  veglSetContext,
-    /* flushContext             */  veglFlushContext,
     /* flush                    */  veglFlush,
     /* finish                   */  veglFinish,
     /* getClientBuffer          */  veglGetClientBuffer,

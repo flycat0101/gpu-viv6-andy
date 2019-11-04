@@ -133,7 +133,7 @@ gceSTATUS gcChipclearAccumBuffer(__GLcontext* gc,
                             ((gctUINT8) pRasterState->colorMask[i].blueMask  << 2)  |
                             ((gctUINT8) pRasterState->colorMask[i].alphaMask << 3);
 
-        if((!gcoSURF_QueryFlags(accumView.surf, gcvSURF_FLAG_CONTENT_PRESERVED)) &&
+        if ((!gcoSURF_QueryFlags(accumView.surf, gcvSURF_FLAG_CONTENT_PRESERVED)) &&
             (!gcoSURF_QueryFlags(accumView.surf, gcvSURF_FLAG_CONTENT_UPDATED))
             )
         {
@@ -207,8 +207,8 @@ gcChipClearRenderTarget(
                                 ((gctUINT8) pRasterState->colorMask[i].blueMask  << 2)  |
                                 ((gctUINT8) pRasterState->colorMask[i].alphaMask << 3);
 
-            if((!gcoSURF_QueryFlags(chipCtx->drawRtViews[i].surf, gcvSURF_FLAG_CONTENT_PRESERVED)) &&
-               (!gcoSURF_QueryFlags(chipCtx->drawRtViews[i].surf, gcvSURF_FLAG_CONTENT_UPDATED))
+            if ((!gcoSURF_QueryFlags(chipCtx->drawRtViews[i].surf, gcvSURF_FLAG_CONTENT_PRESERVED)) &&
+                (!gcoSURF_QueryFlags(chipCtx->drawRtViews[i].surf, gcvSURF_FLAG_CONTENT_UPDATED))
               )
             {
                 clearArg.colorMask = (clearArg.colorMask) ? 0xF: 0x0;
@@ -286,8 +286,8 @@ gcChipClearDepthAndStencil(
         clearArg.stencil = (gc->state.stencil.clear & chipCtx->drawStencilMask);
         clearArg.stencilMask = (gc->state.stencil.front.writeMask & 0xFF);
 
-        if((!gcoSURF_QueryFlags(dsView->surf, gcvSURF_FLAG_CONTENT_PRESERVED)) &&
-           (!gcoSURF_QueryFlags(dsView->surf, gcvSURF_FLAG_CONTENT_UPDATED))
+        if ((!gcoSURF_QueryFlags(dsView->surf, gcvSURF_FLAG_CONTENT_PRESERVED)) &&
+            (!gcoSURF_QueryFlags(dsView->surf, gcvSURF_FLAG_CONTENT_UPDATED))
           )
         {
             clearArg.stencilMask = clearArg.stencilMask ? 0xFF : 0x0;
@@ -345,7 +345,7 @@ gcChipClearDrawable(
     gcmONERROR(gcChipClearDepthAndStencil(gc, mask));
 
 #ifdef OPENGL40
-    if (mask & GL_ACCUM_BUFFER_BIT)
+    if (gc->imports.conformGLSpec && (mask & GL_ACCUM_BUFFER_BIT))
     {
         gcmONERROR(gcChipclearAccumBuffer(gc, (glsCHIPACCUMBUFFER *)(gc->drawablePrivate->accumBuffer.privateData)));
     }
@@ -739,6 +739,7 @@ __glChipClearBuffer(
         clearArg.flags |= chipCtx->drawLayered ? gcvCLEAR_MULTI_SLICES : 0;
 
 #ifdef OPENGL40
+        if (gc->imports.conformGLSpec)
         {
             GLuint i;
             switch (buffer)
@@ -760,9 +761,11 @@ __glChipClearBuffer(
                 break;
             }
         }
-#else
-        gcmONERROR(gcoSURF_Clear(surfView, &clearArg));
+        else /* Running OES api */
 #endif
+        {
+            gcmONERROR(gcoSURF_Clear(surfView, &clearArg));
+        }
     }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);

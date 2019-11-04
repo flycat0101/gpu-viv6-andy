@@ -127,10 +127,6 @@ typedef struct _khrEGL_IMAGE
             /* Native pixmap information. */
             gctUINT             width;
             gctUINT             height;
-
-#ifdef EGL_API_XXX
-            gctINT              seqNo;
-#endif
         } pixmap;
 
         struct _khrEGL_IMAGE_VGIMAGE
@@ -291,16 +287,17 @@ typedef struct __VEGLimports
                               gctINT width,
                               gctINT height);
 
-
-    gctBOOL  coreProfile;
-
     gctINT   version;
     /* Device DLL interface */
     void *device;
     gctUINT deviceIndex;
-    EGLBoolean  fromEGL;
     /* Operating system dependent data goes here */
     void *other;
+
+    gctBOOL  conformGLSpec;
+    gctBOOL  coreProfile;
+    gctBOOL  fromEGL;
+
 } VEGLimports;
 
 
@@ -314,8 +311,8 @@ typedef struct EGLDrawableRec
     EGLint      width;
     EGLint      height;
 
-    void      * rtHandles[gcdMAX_DRAW_BUFFERS/4];        /* gco surface handle of render target */
-    void      * prevRtHandles[gcdMAX_DRAW_BUFFERS/4];    /* gco surface handle of previous render target */
+    void      * rtHandles[gcdMAX_DRAW_BUFFERS];        /* gco surface handle of render target */
+    void      * prevRtHandles[gcdMAX_DRAW_BUFFERS];    /* gco surface handle of previous render target */
     void      * depthHandle;     /* gco surface handle of depth */
     void      * stencilHandle;   /* gco surface handle of stencil */
 
@@ -446,7 +443,6 @@ typedef struct _veglDISPATCH
     veglMAKECURRENT              makeCurrent;
     veglLOSECURRENT              loseCurrent;
     veglSETDRAWABLE              setDrawable;
-    veglFLUSHCONTEXT             flushContext;
     veglFLUSH                    flush;
     veglFINISH                   finish;
     veglGETCLIENTBUFFER          getClientBuffer;

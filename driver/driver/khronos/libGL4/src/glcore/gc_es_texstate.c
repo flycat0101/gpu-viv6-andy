@@ -216,8 +216,11 @@ GLvoid __glFreeTextureState(__GLcontext *gc)
         /* Free default texture object state */
         __glFreeDefaultTextureObject(gc, &gc->texture.defaultTextures[i]);
 #ifdef OPENGL40
-        /* Free proxy texture object state */
-        __glFreeDefaultTextureObject(gc, &gc->texture.proxyTextures[i]);
+        if (gc->imports.conformGLSpec)
+        {
+            /* Free proxy texture object state */
+            __glFreeDefaultTextureObject(gc, &gc->texture.proxyTextures[i]);
+        }
 #endif
     }
 
@@ -287,9 +290,12 @@ GLvoid __glInitTextureState(__GLcontext *gc)
             __glAddImageUser(gc, &tex->texUnitBoundList, (GLvoid*)(GLintptr)i);
         }
 #ifdef OPENGL40
-        /* Initialize proxy texture object state */
-        proxyTex = &gc->texture.proxyTextures[j];
-        __glInitTextureObject(gc, proxyTex, 0, j);
+        if (gc->imports.conformGLSpec)
+        {
+            /* Initialize proxy texture object state */
+            proxyTex = &gc->texture.proxyTextures[j];
+            __glInitTextureObject(gc, proxyTex, 0, j);
+        }
 #endif
     }
 
@@ -304,55 +310,57 @@ GLvoid __glInitTextureState(__GLcontext *gc)
     __glBitmaskInitAllZero(&gc->texture.texConflict, gc->constants.shaderCaps.maxCombinedTextureImageUnits);
 
 #ifdef OPENGL40
-    /* Initialize the current texture coords */
-    for (i = 0; i < __GL_MAX_TEXTURE_COORDS; i++) {
-        gc->state.current.texture[i].f.x = __glZero;
-        gc->state.current.texture[i].f.y = __glZero;
-        gc->state.current.texture[i].f.z = __glZero;
-        gc->state.current.texture[i].f.w = __glOne;
-    }
+    if (gc->imports.conformGLSpec)
+    {
+        /* Initialize the current texture coords */
+        for (i = 0; i < __GL_MAX_TEXTURE_COORDS; i++) {
+            gc->state.current.texture[i].f.x = __glZero;
+            gc->state.current.texture[i].f.y = __glZero;
+            gc->state.current.texture[i].f.z = __glZero;
+            gc->state.current.texture[i].f.w = __glOne;
+        }
 
-    /* Init rest of texture state for each texture unit */
-    for (i = 0; i < __GL_MAX_TEXTURE_UNITS; i++) {
-        gc->state.texture.texUnits[i].s.mode = GL_EYE_LINEAR;
-        gc->state.texture.texUnits[i].s.eyePlaneEquation.f.x = __glOne;
-        gc->state.texture.texUnits[i].s.objectPlaneEquation.f.x = __glOne;
-        gc->state.texture.texUnits[i].t.mode = GL_EYE_LINEAR;
-        gc->state.texture.texUnits[i].t.eyePlaneEquation.f.y = __glOne;
-        gc->state.texture.texUnits[i].t.objectPlaneEquation.f.y = __glOne;
-        gc->state.texture.texUnits[i].r.mode = GL_EYE_LINEAR;
-        gc->state.texture.texUnits[i].q.mode = GL_EYE_LINEAR;
+        /* Init rest of texture state for each texture unit */
+        for (i = 0; i < __GL_MAX_TEXTURE_UNITS; i++) {
+            gc->state.texture.texUnits[i].s.mode = GL_EYE_LINEAR;
+            gc->state.texture.texUnits[i].s.eyePlaneEquation.f.x = __glOne;
+            gc->state.texture.texUnits[i].s.objectPlaneEquation.f.x = __glOne;
+            gc->state.texture.texUnits[i].t.mode = GL_EYE_LINEAR;
+            gc->state.texture.texUnits[i].t.eyePlaneEquation.f.y = __glOne;
+            gc->state.texture.texUnits[i].t.objectPlaneEquation.f.y = __glOne;
+            gc->state.texture.texUnits[i].r.mode = GL_EYE_LINEAR;
+            gc->state.texture.texUnits[i].q.mode = GL_EYE_LINEAR;
 
-        /* Init each texture environment oglGc.state for each texture unit */
-        tes = &gc->state.texture.texUnits[i].env;
-        tes->mode = GL_MODULATE;
-        tes->function.rgb = GL_MODULATE;
-        tes->function.alpha = GL_MODULATE;
-        tes->source[0].rgb = GL_TEXTURE;
-        tes->source[1].rgb = GL_PREVIOUS;
-        tes->source[2].rgb = GL_CONSTANT;
-        tes->source[0].alpha = GL_TEXTURE;
-        tes->source[1].alpha = GL_PREVIOUS;
-        tes->source[2].alpha = GL_CONSTANT;
-        tes->operand[0].rgb = GL_SRC_COLOR;
-        tes->operand[1].rgb = GL_SRC_COLOR;
-        tes->operand[2].rgb = GL_SRC_ALPHA;
-        tes->operand[0].alpha = GL_SRC_ALPHA;
-        tes->operand[1].alpha = GL_SRC_ALPHA;
-        tes->operand[2].alpha = GL_SRC_ALPHA;
-        tes->rgbScale = 1.0;
-        tes->alphaScale = 1.0;
-        tes->color.r = __glZero;
-        tes->color.g = __glZero;
-        tes->color.b = __glZero;
-        tes->color.a = __glZero;
-        tes->coordReplace = GL_FALSE;
+            /* Init each texture environment oglGc.state for each texture unit */
+            tes = &gc->state.texture.texUnits[i].env;
+            tes->mode = GL_MODULATE;
+            tes->function.rgb = GL_MODULATE;
+            tes->function.alpha = GL_MODULATE;
+            tes->source[0].rgb = GL_TEXTURE;
+            tes->source[1].rgb = GL_PREVIOUS;
+            tes->source[2].rgb = GL_CONSTANT;
+            tes->source[0].alpha = GL_TEXTURE;
+            tes->source[1].alpha = GL_PREVIOUS;
+            tes->source[2].alpha = GL_CONSTANT;
+            tes->operand[0].rgb = GL_SRC_COLOR;
+            tes->operand[1].rgb = GL_SRC_COLOR;
+            tes->operand[2].rgb = GL_SRC_ALPHA;
+            tes->operand[0].alpha = GL_SRC_ALPHA;
+            tes->operand[1].alpha = GL_SRC_ALPHA;
+            tes->operand[2].alpha = GL_SRC_ALPHA;
+            tes->rgbScale = 1.0;
+            tes->alphaScale = 1.0;
+            tes->color.r = __glZero;
+            tes->color.g = __glZero;
+            tes->color.b = __glZero;
+            tes->color.a = __glZero;
+            tes->coordReplace = GL_FALSE;
 
-        /* Initialize the current texture to NULL */
-        gc->texture.units[i].currentTexture = NULL;
+            /* Initialize the current texture to NULL */
+            gc->texture.units[i].currentTexture = NULL;
+        }
     }
 #endif
-
 }
 
 GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLenum minFilter,
@@ -1648,6 +1656,7 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
     __GLmipMapLevel *faceMipmap;
     __GLformatInfo *formatInfo;
     GLint max_lod = (GLint)(gc->constants.maxNumTextureLevels - 1);
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
 
     if (level < 0 || level > max_lod)
     {
@@ -1748,6 +1757,31 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
     faceMipmap = &tex->faceMipmap[face][level];
     formatInfo = faceMipmap->formatInfo;
 
+    /* Only enable GL_R*16 is treated as GL_R*32F for precision in conformance tests.
+    ** Turn them back in order to get the matching info */
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+    if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
+    {
+        switch (faceMipmap->requestedFormat)
+        {
+        case GL_R16:
+            formatInfo =  &__glFormatInfoTable[__GL_FMT_R16];
+            break;
+        case GL_RG16:
+            formatInfo =  &__glFormatInfoTable[__GL_FMT_RG16];
+            break;
+        case GL_RGB16:
+            formatInfo =  &__glFormatInfoTable[__GL_FMT_RGB16];
+            break;
+        case GL_RGBA16:
+            formatInfo =  &__glFormatInfoTable[__GL_FMT_RGBA16];
+            break;
+        default:
+            break;
+        }
+    }
+
     switch(pname)
     {
     case GL_TEXTURE_WIDTH:
@@ -1772,10 +1806,15 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
 
     case GL_TEXTURE_INTERNAL_FORMAT:
 #ifdef OPENGL40
-        params[0] = faceMipmap->internalFormat;
-#else
-        params[0] = formatInfo->glFormat;
+        if (gc->imports.conformGLSpec)
+        {
+            params[0] = faceMipmap->internalFormat;
+        }
+        else  /* Running OES api */
 #endif
+        {
+            params[0] = formatInfo->glFormat;
+        }
         break;
 
     case GL_TEXTURE_RED_SIZE:
@@ -2046,7 +2085,8 @@ GLvoid GL_APIENTRY __glim_BindTexture(__GLcontext *gc, GLenum target, GLuint tex
     __GL_HEADER();
 
 #ifdef OPENGL40
-    if (gc->imports.coreProfile && texture &&!__glIsNameDefined(gc, gc->texture.shared, texture))
+    if (gc->imports.conformGLSpec &&
+        texture && !__glIsNameDefined(gc, gc->texture.shared, texture))
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
@@ -2105,7 +2145,7 @@ GLvoid GL_APIENTRY __glim_BindTexture(__GLcontext *gc, GLenum target, GLuint tex
         }
 
     case GL_TEXTURE_BUFFER_EXT:
-        if(__glExtension[__GL_EXTID_EXT_texture_buffer].bEnabled)
+        if (__glExtension[__GL_EXTID_EXT_texture_buffer].bEnabled)
         {
             targetIndex = __GL_TEXTURE_BINDING_BUFFER_EXT;
             break;

@@ -101,42 +101,44 @@ GLvoid __glInitPixelState(__GLcontext *gc)
     cps->unpackModes.skipImages = 0;
 
 #ifdef OPENGL40
-    cps->unpackModes.swapEndian = GL_FALSE;
-    cps->unpackModes.lsbFirst = GL_FALSE;
-    cps->packModes.swapEndian = GL_FALSE;
-    cps->packModes.lsbFirst = GL_FALSE;
-    ps->transferMode.r_scale = 1.0;
-    ps->transferMode.g_scale = 1.0;
-    ps->transferMode.b_scale = 1.0;
-    ps->transferMode.a_scale = 1.0;
-    ps->transferMode.d_scale = 1.0;
-    ps->transferMode.zoomX = 1.0;
-    ps->transferMode.zoomY = 1.0;
+    if (gc->imports.conformGLSpec)
+    {
+        cps->unpackModes.swapEndian = GL_FALSE;
+        cps->unpackModes.lsbFirst = GL_FALSE;
+        cps->packModes.swapEndian = GL_FALSE;
+        cps->packModes.lsbFirst = GL_FALSE;
+        ps->transferMode.r_scale = 1.0;
+        ps->transferMode.g_scale = 1.0;
+        ps->transferMode.b_scale = 1.0;
+        ps->transferMode.a_scale = 1.0;
+        ps->transferMode.d_scale = 1.0;
+        ps->transferMode.zoomX = 1.0;
+        ps->transferMode.zoomY = 1.0;
 
-    ps->transferMode.postColorMatrixScale.r = 1.0;
-    ps->transferMode.postColorMatrixScale.g = 1.0;
-    ps->transferMode.postColorMatrixScale.b = 1.0;
-    ps->transferMode.postColorMatrixScale.a = 1.0;
-    ps->transferMode.postColorMatrixBias.r  = 0.0;
-    ps->transferMode.postColorMatrixBias.g  = 0.0;
-    ps->transferMode.postColorMatrixBias.b  = 0.0;
-    ps->transferMode.postColorMatrixBias.a  = 0.0;
+        ps->transferMode.postColorMatrixScale.r = 1.0;
+        ps->transferMode.postColorMatrixScale.g = 1.0;
+        ps->transferMode.postColorMatrixScale.b = 1.0;
+        ps->transferMode.postColorMatrixScale.a = 1.0;
+        ps->transferMode.postColorMatrixBias.r  = 0.0;
+        ps->transferMode.postColorMatrixBias.g  = 0.0;
+        ps->transferMode.postColorMatrixBias.b  = 0.0;
+        ps->transferMode.postColorMatrixBias.a  = 0.0;
 
-    /* Initialize pixel maps with default sizes and values.
-    */
-    for (m = GL_PIXEL_MAP_I_TO_I; m <= GL_PIXEL_MAP_A_TO_A; m++) {
-        __glInitDefaultPixelMap(gc, m);
+        /* Initialize pixel maps with default sizes and values.
+        */
+        for (m = GL_PIXEL_MAP_I_TO_I; m <= GL_PIXEL_MAP_A_TO_A; m++) {
+            __glInitDefaultPixelMap(gc, m);
+        }
+
+        /* Setup to use the correct read buffer */
+        if (gc->modes.doubleBufferMode) {
+            ps->readBuffer = GL_BACK;
+        }
+        else {
+            ps->readBuffer = GL_FRONT;
+        }
+        ps->readBufferReturn = ps->readBuffer;
     }
-
-    /* Setup to use the correct read buffer */
-    if (gc->modes.doubleBufferMode) {
-        ps->readBuffer = GL_BACK;
-    }
-    else {
-        ps->readBuffer = GL_FRONT;
-    }
-    ps->readBufferReturn = ps->readBuffer;
-
 #endif
 }
 
@@ -282,7 +284,8 @@ GLvoid GL_APIENTRY __glim_DrawBuffers(__GLcontext *gc, GLsizei n, const GLenum *
     {
         __GLframebufferObject *drawFBO = gc->frameBuffer.drawFramebufObj;
 
-        if (gcvNULL == bufs)
+        if ((gcvNULL == bufs) &&
+            (gc->imports.conformGLSpec || !(gc->constants.majorVersion == 3 && gc->constants.minorVersion >= 1)))
         {
             __GL_ERROR_EXIT(GL_INVALID_OPERATION);
         }
@@ -292,53 +295,57 @@ GLvoid GL_APIENTRY __glim_DrawBuffers(__GLcontext *gc, GLsizei n, const GLenum *
             __GL_ERROR_EXIT(GL_INVALID_VALUE);
         }
 
-        for (i = 0; i < n; ++i)
+        if (gc->imports.conformGLSpec)
         {
             /* An INVALID_ENUM error is generated if any value in bufs is not one of the
             ** values in tables 15.3, BACK, or NONE
             */
-#ifdef OPENGL40
-            if ((bufs[i] >= GL_COLOR_ATTACHMENT0 + gc->constants.shaderCaps.maxDrawBuffers) ||
-                (bufs[i] >= GL_FRONT_LEFT && bufs[i] <= GL_BACK_RIGHT) ||
-                ((bufs[i] >= GL_AUX0) && ((GLint)bufs[i] < gc->modes.numAuxBuffers + GL_AUX0)))
+            for (i = 0; i < n; ++i)
             {
-                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-            }
-            else
-            {
-                if (bufs[i] != GL_NONE && !((bufs[i] >= GL_COLOR_ATTACHMENT0) && (bufs[i] < GL_COLOR_ATTACHMENT0 + gc->constants.shaderCaps.maxDrawBuffers)))
+                if ((bufs[i] >= GL_COLOR_ATTACHMENT0 + gc->constants.shaderCaps.maxDrawBuffers) ||
+                    (bufs[i] >= GL_FRONT_LEFT && bufs[i] <= GL_BACK_RIGHT) ||
+                    ((bufs[i] >= GL_AUX0) && ((GLint)bufs[i] < gc->modes.numAuxBuffers + GL_AUX0)))
                 {
-                    __GL_ERROR_EXIT(GL_INVALID_ENUM);
+                    __GL_ERROR_EXIT(GL_INVALID_OPERATION);
                 }
                 else
                 {
-                    if(bufs[i] != GL_NONE)
+                    if (bufs[i] != GL_NONE && !((bufs[i] >= GL_COLOR_ATTACHMENT0) && (bufs[i] < GL_COLOR_ATTACHMENT0 + gc->constants.shaderCaps.maxDrawBuffers)))
                     {
-                        GLuint j = bufs[i] - GL_COLOR_ATTACHMENT0;
-                        if (AttachTime[j])
+                        __GL_ERROR_EXIT(GL_INVALID_ENUM);
+                    }
+                    else
+                    {
+                        if (bufs[i] != GL_NONE)
                         {
-                            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-                        }
-                        else
-                        {
-                            AttachTime[j]++;
+                            GLuint j = bufs[i] - GL_COLOR_ATTACHMENT0;
+                            if (AttachTime[j])
+                            {
+                                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+                            }
+                            else
+                            {
+                                AttachTime[j]++;
+                            }
                         }
                     }
                 }
             }
-
-#else
-            if (bufs[i] != GL_NONE && bufs[i] != GL_BACK &&
-                ((bufs[i] < GL_COLOR_ATTACHMENT0) || (bufs[i] > GL_COLOR_ATTACHMENT0 + gc->constants.shaderCaps.maxDrawBuffers - 1)))
+        }
+        else
+        {
+            for (i = 0; i < n; ++i)
             {
-                __GL_ERROR_EXIT(GL_INVALID_ENUM);
+                if (bufs[i] != GL_NONE && bufs[i] != GL_BACK &&
+                    ((bufs[i] < GL_COLOR_ATTACHMENT0) || (bufs[i] > GL_COLOR_ATTACHMENT0 + gc->constants.shaderCaps.maxDrawBuffers - 1)))
+                {
+                    __GL_ERROR_EXIT(GL_INVALID_ENUM);
+                }
+                if ((bufs[i] != GL_NONE) && (bufs[i] != (GLenum)(GL_COLOR_ATTACHMENT0 + i)))
+                {
+                    __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+                }
             }
-
-            if ((bufs[i] != GL_NONE) && (bufs[i] != (GLenum)(GL_COLOR_ATTACHMENT0 + i)))
-            {
-                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-            }
-#endif
         }
 
         drawFBO->drawBufferCount = n;
@@ -351,67 +358,65 @@ GLvoid GL_APIENTRY __glim_DrawBuffers(__GLcontext *gc, GLsizei n, const GLenum *
             __GL_ERROR_EXIT(GL_INVALID_OPERATION);
         }
 
-
         /* Error check */
-#ifdef OPENGL40
-        if((n <= 0) || (n > (GLsizei)gc->constants.maxDrawBuffers ))
+        if (gc->imports.conformGLSpec)
         {
-            __GL_ERROR_EXIT(GL_INVALID_VALUE);
-        }
-#else
-        if (n != 1 || !(GL_NONE == *bufs || GL_BACK == *bufs))
-        {
-            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-        }
-#endif
-
-#ifdef OPENGL40
-        for (i = 0; i < n; i++)
-        {
-            if (bufs[i] != GL_NONE && !((bufs[i] >= GL_COLOR_ATTACHMENT0) && (bufs[i] < GL_COLOR_ATTACHMENT0 + gc->constants.shaderCaps.maxDrawBuffers)) &&
-                !(bufs[i] >= GL_FRONT_LEFT && bufs[i] <= GL_BACK_RIGHT) && !(bufs[i] >= GL_AUX0 && gc->modes.numAuxBuffers > (GLint)(bufs[i] - GL_AUX0)))
+            if ((n <= 0) || (n > (GLsizei)gc->constants.maxDrawBuffers ))
             {
-                __GL_ERROR_EXIT(GL_INVALID_ENUM);
+                __GL_ERROR_EXIT(GL_INVALID_VALUE);
             }
-            else
+
+            for (i = 0; i < n; i++)
             {
-                if ((bufs[i] >= GL_COLOR_ATTACHMENT0) && (bufs[i] < GL_COLOR_ATTACHMENT0 + gc->constants.shaderCaps.maxDrawBuffers))
+                if (bufs[i] != GL_NONE && !((bufs[i] >= GL_COLOR_ATTACHMENT0) && (bufs[i] < GL_COLOR_ATTACHMENT0 + gc->constants.shaderCaps.maxDrawBuffers)) &&
+                    !(bufs[i] >= GL_FRONT_LEFT && bufs[i] <= GL_BACK_RIGHT) && !(bufs[i] >= GL_AUX0 && gc->modes.numAuxBuffers > (GLint)(bufs[i] - GL_AUX0)))
+                {
+                    __GL_ERROR_EXIT(GL_INVALID_ENUM);
+                }
+                else
+                {
+                    if ((bufs[i] >= GL_COLOR_ATTACHMENT0) && (bufs[i] < GL_COLOR_ATTACHMENT0 + gc->constants.shaderCaps.maxDrawBuffers))
+                    {
+                        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+                    }
+                }
+                if (!gc->modes.stereoMode && ((bufs[i] == GL_FRONT_RIGHT)||(bufs[i] == GL_BACK_RIGHT)))
+                {
+                    __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+                }
+                if (!gc->modes.doubleBufferMode && ((bufs[i] == GL_BACK_LEFT) ||(bufs[i] == GL_BACK_RIGHT)))
                 {
                     __GL_ERROR_EXIT(GL_INVALID_OPERATION);
                 }
             }
 
-            if(!gc->modes.stereoMode && ((bufs[i] == GL_FRONT_RIGHT)||(bufs[i] == GL_BACK_RIGHT)))
+            for (i = GL_FRONT_LEFT; i <= GL_AUX3; i++)
             {
-                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-            }
-            if(!gc->modes.doubleBufferMode && ((bufs[i] == GL_BACK_LEFT) ||(bufs[i] == GL_BACK_RIGHT)))
-            {
-                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-            }
-
-        }
-
-        for (i = GL_FRONT_LEFT; i <= GL_AUX3; i++)
-        {
-            GLsizei j;
-            times = 0;
-            if ((i <= GL_BACK_RIGHT) || (i >= GL_AUX0))
-            {
-                for (j = 0; j < n; j++)
+                GLsizei j;
+                times = 0;
+                if ((i <= GL_BACK_RIGHT) || (i >= GL_AUX0))
                 {
-                    if (bufs[j] == (GLenum)i)
+                    for (j = 0; j < n; j++)
                     {
-                        times++;
-                        if (times > 1)
+                        if (bufs[j] == (GLenum)i)
                         {
-                            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+                            times++;
+                            if (times > 1)
+                            {
+                                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+                            }
                         }
                     }
                 }
             }
         }
-#endif
+        else
+        {
+            if (n != 1 || !(GL_NONE == *bufs || GL_BACK == *bufs))
+            {
+                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+            }
+        }
 
         pDrawBuffers = gc->state.raster.drawBuffers;
     }
@@ -448,10 +453,14 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
     __GL_HEADER();
 
 #ifndef OPENGL40
-    if ((mode != GL_NONE) && (mode != GL_BACK) &&
-        (mode < GL_COLOR_ATTACHMENT0 || mode > __GL_COLOR_ATTACHMENT31))
+    /* Fullfill ES Spec requirements */
+    if (!gc->imports.conformGLSpec)
     {
-        __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        if ((mode != GL_NONE) && (mode != GL_BACK) &&
+            (mode < GL_COLOR_ATTACHMENT0 || mode > __GL_COLOR_ATTACHMENT31))
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
     }
 #endif
 
@@ -475,123 +484,106 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
     }
     else
     {
-        if (!gc->imports.fromEGL)
-        {
-            GLenum modeOffset = 0;
-            GLenum originalReadBuffer;
-                /*
-            ** gc binding to the window buffer */
+        GLenum modeOffset = 0;
+        GLenum originalReadBuffer;
+            /*
+        ** gc binding to the window buffer */
 
-            __GL_REDUNDANT_ATTR(gc->state.pixel.readBufferReturn, mode);
+        __GL_REDUNDANT_ATTR(gc->state.pixel.readBufferReturn, mode);
 
-            __GL_VERTEX_BUFFER_FLUSH(gc);
+        __GL_VERTEX_BUFFER_FLUSH(gc);
 
-            if ((mode & GL_FRONT_LEFT) && (mode >= GL_AUX0)) {
-                modeOffset = mode - GL_AUX0;
-                mode = GL_AUX0;
-            }
+        if ((mode & GL_FRONT_LEFT) && (mode >= GL_AUX0)) {
+            modeOffset = mode - GL_AUX0;
+            mode = GL_AUX0;
+        }
 
-            originalReadBuffer = gc->state.pixel.readBuffer;
-            gc->state.pixel.readBuffer = mode;
+        originalReadBuffer = gc->state.pixel.readBuffer;
+        gc->state.pixel.readBuffer = mode;
 
-            switch (mode) {
-              case GL_NONE:
-                  gc->state.pixel.readBuffer = GL_NONE;
-                  break;
+        switch (mode) {
+          case GL_NONE:
+              gc->state.pixel.readBuffer = GL_NONE;
+              break;
 
-              case GL_FRONT_RIGHT:
-                  if (!gc->modes.stereoMode) {
-                      __glSetError(gc, GL_INVALID_OPERATION);
-                      gc->state.pixel.readBuffer = originalReadBuffer;
-                      return;
-                  }
-                  break;
-
-              case GL_FRONT_LEFT:
-                  break;
-
-              case GL_BACK_RIGHT:
-                  if (!(gc->modes.stereoMode && gc->modes.doubleBufferMode)) {
-                      __glSetError(gc, GL_INVALID_OPERATION);
-                      gc->state.pixel.readBuffer = originalReadBuffer;
-                      return;
-                  }
-                  break;
-
-              case GL_BACK_LEFT:
-                  if (!gc->modes.doubleBufferMode) {
-                      __glSetError(gc, GL_INVALID_OPERATION);
-                      gc->state.pixel.readBuffer = originalReadBuffer;
-                      return;
-                  }
-                  break;
-
-              case GL_FRONT:
-                  gc->state.pixel.readBuffer = GL_FRONT_LEFT;
-                  break;
-
-              case GL_BACK:
-                  if (!gc->modes.doubleBufferMode) {
-                      __glSetError(gc, GL_INVALID_OPERATION);
-                      gc->state.pixel.readBuffer = originalReadBuffer;
-                      return;
-                  }
-                  gc->state.pixel.readBuffer = GL_BACK_LEFT;
-                  break;
-
-              case GL_LEFT:
-                      gc->state.pixel.readBuffer = GL_FRONT_LEFT;
-                  break;
-
-              case GL_RIGHT:
-                  if (!gc->modes.stereoMode) {
-                      __glSetError(gc, GL_INVALID_OPERATION);
-                      gc->state.pixel.readBuffer = originalReadBuffer;
-                      return;
-                  }
-                  gc->state.pixel.readBuffer = GL_FRONT_RIGHT;
-                  break;
-
-              case GL_AUX0:
-                  if (modeOffset >= (GLenum)gc->modes.numAuxBuffers) {
-                      __glSetError(gc, GL_INVALID_OPERATION);
-                      gc->state.pixel.readBuffer = originalReadBuffer;
-                      return;
-                  }
-                  mode = modeOffset + GL_AUX0;
-                  gc->state.pixel.readBuffer = mode;
-                  break;
-
-              default:
-                  __glSetError(gc, GL_INVALID_ENUM);
+          case GL_FRONT_RIGHT:
+              if (!gc->modes.stereoMode) {
+                  __glSetError(gc, GL_INVALID_OPERATION);
+                  gc->state.pixel.readBuffer = originalReadBuffer;
                   return;
-            }
+              }
+              break;
 
-            if (mode != gc->state.pixel.readBuffer)
-            {
-                gc->drawableDirtyMask |= __GL_BUFFER_READ_BIT;
-            }
+          case GL_FRONT_LEFT:
+              break;
 
-            /* Update GL state */
-            gc->state.pixel.readBufferReturn = mode;
+          case GL_BACK_RIGHT:
+              if (!(gc->modes.stereoMode && gc->modes.doubleBufferMode)) {
+                  __glSetError(gc, GL_INVALID_OPERATION);
+                  gc->state.pixel.readBuffer = originalReadBuffer;
+                  return;
+              }
+              break;
 
-            /* flip attribute dirty bit */
-            __GL_SET_SWP_DIRTY_ATTR(gc, __GL_SWP_READBUFFER_BIT);
+          case GL_BACK_LEFT:
+              if (!gc->modes.doubleBufferMode) {
+                  __glSetError(gc, GL_INVALID_OPERATION);
+                  gc->state.pixel.readBuffer = originalReadBuffer;
+                  return;
+              }
+              break;
+
+          case GL_FRONT:
+              gc->state.pixel.readBuffer = GL_FRONT_LEFT;
+              break;
+
+          case GL_BACK:
+              if (!gc->modes.doubleBufferMode) {
+                  __glSetError(gc, GL_INVALID_OPERATION);
+                  gc->state.pixel.readBuffer = originalReadBuffer;
+                  return;
+              }
+              gc->state.pixel.readBuffer = GL_BACK_LEFT;
+              break;
+
+          case GL_LEFT:
+                  gc->state.pixel.readBuffer = GL_FRONT_LEFT;
+              break;
+
+          case GL_RIGHT:
+              if (!gc->modes.stereoMode) {
+                  __glSetError(gc, GL_INVALID_OPERATION);
+                  gc->state.pixel.readBuffer = originalReadBuffer;
+                  return;
+              }
+              gc->state.pixel.readBuffer = GL_FRONT_RIGHT;
+              break;
+
+          case GL_AUX0:
+              if (modeOffset >= (GLenum)gc->modes.numAuxBuffers) {
+                  __glSetError(gc, GL_INVALID_OPERATION);
+                  gc->state.pixel.readBuffer = originalReadBuffer;
+                  return;
+              }
+              mode = modeOffset + GL_AUX0;
+              gc->state.pixel.readBuffer = mode;
+              break;
+
+          default:
+              __glSetError(gc, GL_INVALID_ENUM);
+              return;
         }
-        else
+
+        if (mode != gc->state.pixel.readBuffer)
         {
-            if (mode != GL_NONE && mode != GL_BACK)
-            {
-                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-            }
-
-            /* If gc binds to default FBO. */
-            if (mode != gc->state.raster.readBuffer)
-            {
-                gc->state.raster.readBuffer = mode;
-                gc->drawableDirtyMask |= __GL_BUFFER_READ_BIT;
-            }
+            gc->drawableDirtyMask |= __GL_BUFFER_READ_BIT;
         }
+
+        /* Update GL state */
+        gc->state.pixel.readBufferReturn = mode;
+
+        /* flip attribute dirty bit */
+        __GL_SET_SWP_DIRTY_ATTR(gc, __GL_SWP_READBUFFER_BIT);
     }
 
 OnError:
@@ -732,7 +724,7 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
             }
 
             /* Disable multi-samples check for tex RT to support EXT_multisampled_render_to_texture */
-            if(readFBO->fbSamples > 0 && !(attachPoint->isExtMode))
+            if (readFBO->fbSamples > 0 && !(attachPoint->isExtMode))
             {
                  __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
             }
@@ -751,249 +743,256 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
         __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
     }
 
-#ifndef OPENGL40
-    /* Implementation-chosen format information */
-    if ((formatInfo->dataType == type) && (formatInfo->dataFormat == format))
+#ifdef OPENGL40
+    if (gc->imports.conformGLSpec)
     {
-        return GL_TRUE;
-    }
+        switch (format)
+        {
+          case GL_STENCIL_INDEX:
+              if (READ_FRAMEBUFFER_BINDING_NAME ?
+                 !gc->frameBuffer.readFramebufObj->attachPoint[__GL_STENCIL_ATTACHMENT_POINT_INDEX].objName : !gc->modes.haveStencilBuffer) {
+                  __glSetError(gc, GL_INVALID_OPERATION);
+                  return GL_FALSE;
+              }
+              break;
+          case GL_COLOR_INDEX:
+              //        if (gc->modes.rgbMode) {
+              /* Can't convert RGB to color index */
+              __glSetError(gc, GL_INVALID_OPERATION);
+              return GL_FALSE;
+              //        }
+              //        break;
+          case GL_DEPTH_COMPONENT:
+              if (READ_FRAMEBUFFER_BINDING_NAME ?
+                 !gc->frameBuffer.readFramebufObj->attachPoint[__GL_DEPTH_ATTACHMENT_POINT_INDEX].objName : !gc->modes.haveDepthBuffer) {
+                  __glSetError(gc, GL_INVALID_OPERATION);
+                  return GL_FALSE;
+              }
+              break;
+          case GL_DEPTH_STENCIL_EXT:
+              if (READ_FRAMEBUFFER_BINDING_NAME ?
+                (!gc->frameBuffer.readFramebufObj->attachPoint[__GL_DEPTH_ATTACHMENT_POINT_INDEX].objName ||
+                !gc->frameBuffer.readFramebufObj->attachPoint[__GL_STENCIL_ATTACHMENT_POINT_INDEX].objName) :
+                (!gc->modes.haveDepthBuffer || !gc->modes.haveStencilBuffer)) {
+                  __glSetError(gc, GL_INVALID_OPERATION);
+                  return GL_FALSE;
+              }
+              if (!((type == GL_UNSIGNED_INT_24_8) || (type == GL_FLOAT_32_UNSIGNED_INT_24_8_REV)))
+              {
+                  __GL_ERROR_RET_VAL(GL_INVALID_ENUM, GL_FALSE);
+              }
+              break;
+          case GL_RED:
+          case GL_GREEN:
+          case GL_BLUE:
+          case GL_ALPHA:
+          case GL_RGB:
+          case GL_RGBA:
+          case GL_ABGR_EXT:
+          case GL_BGR:
+          case GL_BGRA:
+          case GL_LUMINANCE:
+          case GL_LUMINANCE_ALPHA:
+              break;
 
-    switch (formatInfo->category)
-    {
-    case GL_SIGNED_NORMALIZED:
-    case GL_UNSIGNED_NORMALIZED:
-        if (GL_RGBA != format && GL_BGRA_EXT != format)
-        {
+          case GL_RED_INTEGER_EXT:
+          case GL_GREEN_INTEGER_EXT:
+          case GL_BLUE_INTEGER_EXT:
+          case GL_ALPHA_INTEGER_EXT:
+          case GL_RGB_INTEGER_EXT:
+          case GL_RGBA_INTEGER_EXT:
+          case GL_BGR_INTEGER_EXT:
+          case GL_BGRA_INTEGER_EXT:
+          case GL_LUMINANCE_INTEGER_EXT:
+          case GL_LUMINANCE_ALPHA_INTEGER_EXT:
+              if (!__glExtension[__GL_EXTID_EXT_texture_integer].bEnabled || (type == GL_FLOAT ))
+              {
+                 __glSetError(gc, GL_INVALID_ENUM);
+                 return GL_FALSE;
+              }
+
+              if ((!gc->frameBuffer.readFramebufObj->fbIntMask)||(READ_FRAMEBUFFER_BINDING_NAME == 0))
+              {
+                 __glSetError(gc, GL_INVALID_OPERATION);
+                 return GL_FALSE;
+              }
+              break;
+        case GL_RG_INTEGER:
             __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
-        }
-        if (__GL_FMT_RGB10_A2 == formatInfo->drvFormat)
-        {
-            if (GL_UNSIGNED_BYTE != type && GL_UNSIGNED_INT_2_10_10_10_REV != type)
+            break;
+        case GL_RG:
+            if (((type == GL_UNSIGNED_INT_24_8) || (type == GL_FLOAT_32_UNSIGNED_INT_24_8_REV)))
             {
                 __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
             }
+            break;
+        default:
+              __glSetError(gc, GL_INVALID_ENUM);
+              return GL_FALSE;
         }
-        else if (GL_BGRA_EXT == format)
+
+        switch (type)
         {
-            if(GL_UNSIGNED_BYTE != type &&
-                GL_UNSIGNED_SHORT_4_4_4_4_REV_EXT != type &&
-                GL_UNSIGNED_SHORT_1_5_5_5_REV_EXT != type)
+          case GL_BITMAP:
+              if (format != GL_STENCIL_INDEX && format != GL_COLOR_INDEX) {
+                  __glSetError(gc, GL_INVALID_OPERATION);
+                  return GL_FALSE;
+              }
+              break;
+          case GL_BYTE:
+          case GL_UNSIGNED_BYTE:
+          case GL_SHORT:
+          case GL_UNSIGNED_SHORT:
+          case GL_INT:
+          case GL_UNSIGNED_INT:
+          case GL_FLOAT:
+              break;
+          case GL_UNSIGNED_INT_24_8_EXT:
+          case GL_FLOAT_32_UNSIGNED_INT_24_8_REV:
+              /*currently only for GL_DEPTH_STENCIL_EXT , to do more if needed*/
+              if ( format != GL_DEPTH_STENCIL_EXT)
+              {
+                      __glSetError(gc, GL_INVALID_OPERATION);
+                      return GL_FALSE;
+              }
+              break;
+          case GL_UNSIGNED_BYTE_3_3_2:
+          case GL_UNSIGNED_SHORT_5_6_5:
+          case GL_UNSIGNED_BYTE_2_3_3_REV:
+          case GL_UNSIGNED_SHORT_5_6_5_REV:
+              switch (format) {
+                  case GL_RGB:
+                      break;
+                  default:
+                      __glSetError(gc, GL_INVALID_OPERATION);
+                      return GL_FALSE;
+              }
+              break;
+          case GL_UNSIGNED_SHORT_4_4_4_4:
+          case GL_UNSIGNED_SHORT_5_5_5_1:
+          case GL_UNSIGNED_INT_8_8_8_8:
+          case GL_UNSIGNED_INT_10_10_10_2:
+          case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+          case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+          case GL_UNSIGNED_INT_8_8_8_8_REV:
+          case GL_UNSIGNED_INT_2_10_10_10_REV:
+              switch (format) {
+                  case GL_RGBA:
+                  case GL_ABGR_EXT:
+                  case GL_BGRA:
+                      break;
+                  default:
+                      __glSetError(gc, GL_INVALID_OPERATION);
+                      return GL_FALSE;
+              }
+              break;
+        case GL_UNSIGNED_INT_5_9_9_9_REV_EXT:
+            if (!__glExtension[__GL_EXTID_EXT_texture_shared_exponent].bEnabled)
             {
-                __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                __glSetError(gc, GL_INVALID_ENUM);
+                return GL_FALSE;
             }
-        }
-        else
-        {
-            if (GL_UNSIGNED_BYTE != type)
+
+            if (format != GL_RGB)
             {
-                __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                __glSetError(gc, GL_INVALID_ENUM);
+                return GL_FALSE;
             }
-        }
-        break;
+            break;
+        case GL_HALF_FLOAT_ARB:
+            if (!__glExtension[__GL_EXTID_ARB_half_float_pixel].bEnabled)
+            {
+                __glSetError(gc, GL_INVALID_ENUM);
+                return GL_FALSE;
+            }
+            break;
 
-    case GL_FLOAT:
-        if (GL_RGBA != format || GL_FLOAT != type)
-        {
-            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
-        }
-        break;
+        case GL_UNSIGNED_INT_10F_11F_11F_REV_EXT:
+            if (!__glExtension[__GL_EXTID_EXT_packed_float].bEnabled)
+            {
+                __glSetError(gc, GL_INVALID_ENUM);
+                return GL_FALSE;
+            }
 
-    case GL_UNSIGNED_INT:
-        if (GL_RGBA_INTEGER != format || GL_UNSIGNED_INT != type)
-        {
-            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
-        }
-        break;
+            if (format != GL_RGB)
+            {
+                __glSetError(gc, GL_INVALID_ENUM);
+                return GL_FALSE;
+            }
+            break;
 
-    case GL_INT:
-        if (GL_RGBA_INTEGER != format || GL_INT != type)
-        {
-            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+        default:
+              __glSetError(gc, GL_INVALID_ENUM);
+              return GL_FALSE;
         }
-        break;
-
-    default:
-        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
     }
-#else
-    switch (format)
-    {
-      case GL_STENCIL_INDEX:
-          if (READ_FRAMEBUFFER_BINDING_NAME ?
-             !gc->frameBuffer.readFramebufObj->attachPoint[__GL_STENCIL_ATTACHMENT_POINT_INDEX].objName : !gc->modes.haveStencilBuffer) {
-              __glSetError(gc, GL_INVALID_OPERATION);
-              return GL_FALSE;
-          }
-          break;
-      case GL_COLOR_INDEX:
-          //        if (gc->modes.rgbMode) {
-          /* Can't convert RGB to color index */
-          __glSetError(gc, GL_INVALID_OPERATION);
-          return GL_FALSE;
-          //        }
-          //        break;
-      case GL_DEPTH_COMPONENT:
-          if (READ_FRAMEBUFFER_BINDING_NAME ?
-             !gc->frameBuffer.readFramebufObj->attachPoint[__GL_DEPTH_ATTACHMENT_POINT_INDEX].objName : !gc->modes.haveDepthBuffer) {
-              __glSetError(gc, GL_INVALID_OPERATION);
-              return GL_FALSE;
-          }
-          break;
-      case GL_DEPTH_STENCIL_EXT:
-          if (READ_FRAMEBUFFER_BINDING_NAME ?
-            (!gc->frameBuffer.readFramebufObj->attachPoint[__GL_DEPTH_ATTACHMENT_POINT_INDEX].objName ||
-            !gc->frameBuffer.readFramebufObj->attachPoint[__GL_STENCIL_ATTACHMENT_POINT_INDEX].objName) :
-            (!gc->modes.haveDepthBuffer || !gc->modes.haveStencilBuffer)) {
-              __glSetError(gc, GL_INVALID_OPERATION);
-              return GL_FALSE;
-          }
-          if (!((type == GL_UNSIGNED_INT_24_8) || (type == GL_FLOAT_32_UNSIGNED_INT_24_8_REV)))
-          {
-              __GL_ERROR_RET_VAL(GL_INVALID_ENUM, GL_FALSE);
-          }
-          break;
-      case GL_RED:
-      case GL_GREEN:
-      case GL_BLUE:
-      case GL_ALPHA:
-      case GL_RGB:
-      case GL_RGBA:
-      case GL_ABGR_EXT:
-      case GL_BGR:
-      case GL_BGRA:
-      case GL_LUMINANCE:
-      case GL_LUMINANCE_ALPHA:
-          break;
-
-      case GL_RED_INTEGER_EXT:
-      case GL_GREEN_INTEGER_EXT:
-      case GL_BLUE_INTEGER_EXT:
-      case GL_ALPHA_INTEGER_EXT:
-      case GL_RGB_INTEGER_EXT:
-      case GL_RGBA_INTEGER_EXT:
-      case GL_BGR_INTEGER_EXT:
-      case GL_BGRA_INTEGER_EXT:
-      case GL_LUMINANCE_INTEGER_EXT:
-      case GL_LUMINANCE_ALPHA_INTEGER_EXT:
-          if (!__glExtension[__GL_EXTID_EXT_texture_integer].bEnabled || (type == GL_FLOAT ))
-          {
-             __glSetError(gc, GL_INVALID_ENUM);
-             return GL_FALSE;
-          }
-
-          if ((!gc->frameBuffer.readFramebufObj->fbIntMask)||(READ_FRAMEBUFFER_BINDING_NAME == 0))
-          {
-             __glSetError(gc, GL_INVALID_OPERATION);
-             return GL_FALSE;
-          }
-          break;
-      case GL_RG:
-      case GL_RG_INTEGER:
-          if (((type == GL_UNSIGNED_INT_24_8) || (type == GL_FLOAT_32_UNSIGNED_INT_24_8_REV)))
-          {
-              __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
-          }
-      default:
-          __glSetError(gc, GL_INVALID_ENUM);
-          return GL_FALSE;
-    }
-
-    switch (type)
-    {
-      case GL_BITMAP:
-          if (format != GL_STENCIL_INDEX && format != GL_COLOR_INDEX) {
-              __glSetError(gc, GL_INVALID_OPERATION);
-              return GL_FALSE;
-          }
-          break;
-      case GL_BYTE:
-      case GL_UNSIGNED_BYTE:
-      case GL_SHORT:
-      case GL_UNSIGNED_SHORT:
-      case GL_INT:
-      case GL_UNSIGNED_INT:
-      case GL_FLOAT:
-          break;
-      case GL_UNSIGNED_INT_24_8_EXT:
-      case GL_FLOAT_32_UNSIGNED_INT_24_8_REV:
-          /*currently only for GL_DEPTH_STENCIL_EXT , to do more if needed*/
-          if ( format != GL_DEPTH_STENCIL_EXT)
-          {
-                  __glSetError(gc, GL_INVALID_OPERATION);
-                  return GL_FALSE;
-          }
-          break;
-      case GL_UNSIGNED_BYTE_3_3_2:
-      case GL_UNSIGNED_SHORT_5_6_5:
-      case GL_UNSIGNED_BYTE_2_3_3_REV:
-      case GL_UNSIGNED_SHORT_5_6_5_REV:
-          switch (format) {
-              case GL_RGB:
-              case GL_BGR:
-                  break;
-              default:
-                  __glSetError(gc, GL_INVALID_OPERATION);
-                  return GL_FALSE;
-          }
-          break;
-      case GL_UNSIGNED_SHORT_4_4_4_4:
-      case GL_UNSIGNED_SHORT_5_5_5_1:
-      case GL_UNSIGNED_INT_8_8_8_8:
-      case GL_UNSIGNED_INT_10_10_10_2:
-      case GL_UNSIGNED_SHORT_4_4_4_4_REV:
-      case GL_UNSIGNED_SHORT_1_5_5_5_REV:
-      case GL_UNSIGNED_INT_8_8_8_8_REV:
-      case GL_UNSIGNED_INT_2_10_10_10_REV:
-          switch (format) {
-              case GL_RGBA:
-              case GL_ABGR_EXT:
-              case GL_BGRA:
-                  break;
-              default:
-                  __glSetError(gc, GL_INVALID_OPERATION);
-                  return GL_FALSE;
-          }
-          break;
-    case GL_UNSIGNED_INT_5_9_9_9_REV_EXT:
-        if (!__glExtension[__GL_EXTID_EXT_texture_shared_exponent].bEnabled)
-        {
-            __glSetError(gc, GL_INVALID_ENUM);
-            return GL_FALSE;
-        }
-
-        if(format != GL_RGB)
-        {
-            __glSetError(gc, GL_INVALID_ENUM);
-            return GL_FALSE;
-        }
-        break;
-    case GL_HALF_FLOAT_ARB:
-        if (!__glExtension[__GL_EXTID_ARB_half_float_pixel].bEnabled)
-        {
-            __glSetError(gc, GL_INVALID_ENUM);
-            return GL_FALSE;
-        }
-        break;
-
-    case GL_UNSIGNED_INT_10F_11F_11F_REV_EXT:
-        if (!__glExtension[__GL_EXTID_EXT_packed_float].bEnabled)
-        {
-            __glSetError(gc, GL_INVALID_ENUM);
-            return GL_FALSE;
-        }
-
-        if(format != GL_RGB)
-        {
-            __glSetError(gc, GL_INVALID_ENUM);
-            return GL_FALSE;
-        }
-        break;
-
-    default:
-          __glSetError(gc, GL_INVALID_ENUM);
-          return GL_FALSE;
-    }
+    else  /* Running OES api */
 #endif
+    {
+        /* Implementation-chosen format information */
+        if ((formatInfo->dataType == type) && (formatInfo->dataFormat == format))
+        {
+            return GL_TRUE;
+        }
+
+        switch (formatInfo->category)
+        {
+        case GL_SIGNED_NORMALIZED:
+        case GL_UNSIGNED_NORMALIZED:
+            if (GL_RGBA != format && GL_BGRA_EXT != format)
+            {
+                __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+            }
+            if (__GL_FMT_RGB10_A2 == formatInfo->drvFormat)
+            {
+                if (GL_UNSIGNED_BYTE != type && GL_UNSIGNED_INT_2_10_10_10_REV != type)
+                {
+                    __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                }
+            }
+            else if (GL_BGRA_EXT == format)
+            {
+                if (GL_UNSIGNED_BYTE != type &&
+                    GL_UNSIGNED_SHORT_4_4_4_4_REV_EXT != type &&
+                    GL_UNSIGNED_SHORT_1_5_5_5_REV_EXT != type)
+                {
+                    __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                }
+            }
+            else
+            {
+                if (GL_UNSIGNED_BYTE != type)
+                {
+                    __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                }
+            }
+            break;
+
+        case GL_FLOAT:
+            if (GL_RGBA != format || GL_FLOAT != type)
+            {
+                __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+            }
+            break;
+
+        case GL_UNSIGNED_INT:
+            if (GL_RGBA_INTEGER != format || GL_UNSIGNED_INT != type)
+            {
+                __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+            }
+            break;
+
+        case GL_INT:
+            if (GL_RGBA_INTEGER != format || GL_INT != type)
+            {
+                __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+            }
+            break;
+
+        default:
+            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+        }
+    }
 
     return GL_TRUE;
 }
@@ -1023,7 +1022,7 @@ __GL_INLINE GLvoid __glReadPixelsEnd(__GLcontext *gc)
 
     retVal = (*gc->dp.readPixelsEnd)(gc);
 
-    if(!retVal)
+    if (!retVal)
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -1099,7 +1098,7 @@ GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei 
     }
 
 OnExit:
-    if((GL_TRUE == transferInfo.srcNeedFree) && (gcvNULL != transferInfo.srcImage)){
+    if ((GL_TRUE == transferInfo.srcNeedFree) && (gcvNULL != transferInfo.srcImage)){
         (*gc->imports.free)(gc, (void*)transferInfo.srcImage);
         transferInfo.srcImage = gcvNULL;
     }
@@ -1146,7 +1145,7 @@ GLvoid APIENTRY __glim_DrawBuffer(__GLcontext *gc, GLenum mode)
 
     /*
     ** Gc is binding to a FBO, set the state to fbo not gc. */
-    if(DRAW_FRAMEBUFFER_BINDING_NAME != 0){
+    if (DRAW_FRAMEBUFFER_BINDING_NAME != 0){
         __GLframebufferObject *drawFBO = gc->frameBuffer.drawFramebufObj;
 
         if (mode != GL_NONE && mode != GL_BACK &&
@@ -1254,7 +1253,7 @@ GLvoid APIENTRY __glim_DrawBuffer(__GLcontext *gc, GLenum mode)
         for(i = 1; i < gc->constants.maxDrawBuffers; i++)
             gc->state.raster.drawBuffers[i] = GL_NONE;
 
-        if(gc->state.raster.drawBuffers[0] != originalDrawBuffer)
+        if (gc->state.raster.drawBuffers[0] != originalDrawBuffer)
         {
             changed = GL_TRUE;
         }
@@ -1775,7 +1774,7 @@ GLboolean __glCheckDrawPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
             return GL_FALSE;
         }
     case GL_DEPTH_COMPONENT:
-        if( !gc->modes.haveDepthBuffer )
+        if ( !gc->modes.haveDepthBuffer )
         {
             __glSetError(gc, GL_INVALID_OPERATION);
             return GL_FALSE;
@@ -1791,7 +1790,7 @@ GLvoid APIENTRY __glim_DrawPixels(__GLcontext *gc, GLsizei width, GLsizei height
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-    if(gc->conditionalRenderDiscard){
+    if (gc->conditionalRenderDiscard){
         return;
     }
 
@@ -1836,20 +1835,20 @@ GLvoid APIENTRY __glim_CopyPixels(__GLcontext *gc, GLint x, GLint y, GLsizei wid
     GLenum format;
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
-    if(gc->conditionalRenderDiscard){
+    if (gc->conditionalRenderDiscard){
         return;
     }
 
-    if(READ_FRAMEBUFFER_BINDING_NAME != 0)
+    if (READ_FRAMEBUFFER_BINDING_NAME != 0)
     {
-        if(!gc->dp.isFramebufferComplete(gc, gc->frameBuffer.readFramebufObj))
+        if (!gc->dp.isFramebufferComplete(gc, gc->frameBuffer.readFramebufObj))
         {
             __glSetError(gc, GL_INVALID_FRAMEBUFFER_OPERATION_EXT);
             return;
         }
         else
         {
-            if(gc->frameBuffer.readFramebufObj->fbSamples > 0)
+            if (gc->frameBuffer.readFramebufObj->fbSamples > 0)
             {
                 __glSetError(gc, GL_INVALID_FRAMEBUFFER_OPERATION_EXT);
                 return;
@@ -1947,7 +1946,7 @@ GLvoid APIENTRY __glim_Bitmap(__GLcontext *gc, GLsizei w, GLsizei h, GLfloat xOr
         return;
     }
 
-    if(!gc->drawablePrivate->width || !gc->drawablePrivate->height)
+    if (!gc->drawablePrivate->width || !gc->drawablePrivate->height)
     {
         return;
     }

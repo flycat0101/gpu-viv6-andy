@@ -345,7 +345,7 @@ GLvoid __glDoLoadMatrix(__GLcontext *gc, const __GLmatrix *m)
     switch (gc->state.transform.matrixMode) {
       case GL_MODELVIEW:
           tr = gc->transform.modelView;
-          if(__GL_MEMCMP(&tr->matrix.matrix[0][0],&m->matrix[0][0],16*sizeof(GLfloat)))
+          if (__GL_MEMCMP(&tr->matrix.matrix[0][0],&m->matrix[0][0],16*sizeof(GLfloat)))
           {
               (*gc->transform.matrix.copy)(&tr->matrix, m);
               tr->updateInverse = GL_TRUE;
@@ -360,7 +360,7 @@ GLvoid __glDoLoadMatrix(__GLcontext *gc, const __GLmatrix *m)
 
       case GL_PROJECTION:
           tr = gc->transform.projection;
-          if(__GL_MEMCMP(&tr->matrix.matrix[0][0],&m->matrix[0][0],16*sizeof(GLfloat)))
+          if (__GL_MEMCMP(&tr->matrix.matrix[0][0],&m->matrix[0][0],16*sizeof(GLfloat)))
           {
               (*gc->transform.matrix.copy)(&tr->matrix, m);
               tr->updateInverse = GL_TRUE;

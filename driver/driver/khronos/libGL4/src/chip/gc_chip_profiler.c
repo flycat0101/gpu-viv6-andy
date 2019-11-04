@@ -346,7 +346,7 @@ gcChipProfilerWrite(
 
             /* write api time counters */
             gcmWRITE_CONST(VPG_ES30_TIME);
-            for (i = 0; i < GLES3_NUM_API_CALLS; ++i)
+            for (i = 0; i < GL4_NUM_API_CALLS; ++i)
             {
                 if (gc->profiler.apiCalls[i] > 0)
                 {
@@ -358,7 +358,7 @@ gcChipProfilerWrite(
             gcmWRITE_CONST(VPG_ES30);
 
 
-            for (i = 0; i < GLES3_NUM_API_CALLS; ++i)
+            for (i = 0; i < GL4_NUM_API_CALLS; ++i)
             {
                 if (gc->profiler.apiCalls[i] > 0)
                 {
@@ -366,121 +366,121 @@ gcChipProfilerWrite(
 
                     totalCalls += gc->profiler.apiCalls[i];
 
-                    switch (GLES3_APICALLBASE + i)
+                    switch (GL4_APICALLBASE + i)
                     {
-                    case GLES3_DRAWARRAYS:
-                    case GLES3_DRAWELEMENTS:
-                    case GLES3_DRAWRANGEELEMENTS:
-                    case GLES3_DRAWARRAYSINSTANCED:
-                    case GLES3_DRAWELEMENTSINSTANCED:
-                    case GLES3_MULTIDRAWARRAYS:
-                    case GLES3_MULTIDRAWELEMENTS:
-                    case GLES31_DRAWARRAYSINDIRECT:
-                    case GLES31_DRAWELEMENTSINDIRECT:
-                    case GLES31_MULTIDRAWARRAYSINDIRECT:
-                    case GLES31_MULTIDRAWELEMENTSINDIRECT:
-                    case GLES31_DRAWELEMENTSBASEVERTEX:
-                    case GLES31_DRAWRANGEELEMENTSBASEVERTEX:
-                    case GLES31_DRAWELEMENTSINSTANCEDBASEVERTEX:
-                    case GLES31_MULTIDRAWELEMENTSBASEVERTEX:
+                    case GL4_DRAWARRAYS:
+                    case GL4_DRAWELEMENTS:
+                    case GL4_DRAWRANGEELEMENTS:
+                    case GL4_DRAWARRAYSINSTANCED:
+                    case GL4_DRAWELEMENTSINSTANCED:
+                    case GL4_MULTIDRAWARRAYS:
+                    case GL4_MULTIDRAWELEMENTS:
+                    case GL4_DRAWARRAYSINDIRECT:
+                    case GL4_DRAWELEMENTSINDIRECT:
+                    case GL4_MULTIDRAWARRAYSINDIRECT:
+                    case GL4_MULTIDRAWELEMENTSINDIRECT:
+                    case GL4_DRAWELEMENTSBASEVERTEX:
+                    case GL4_DRAWRANGEELEMENTSBASEVERTEX:
+                    case GL4_DRAWELEMENTSINSTANCEDBASEVERTEX:
+                    case GL4_MULTIDRAWELEMENTSBASEVERTEX:
                         totalDrawCalls += gc->profiler.apiCalls[i];
                         break;
 
-                    case GLES3_ATTACHSHADER:
-                    case GLES3_BLENDCOLOR:
-                    case GLES3_BLENDEQUATION:
-                    case GLES3_BLENDEQUATIONSEPARATE:
-                    case GLES3_BLENDFUNC:
-                    case GLES3_BLENDFUNCSEPARATE:
-                    case GLES3_CLEARCOLOR:
-                    case GLES3_COLORMASK:
-                    case GLES3_DEPTHFUNC:
-                    case GLES3_DEPTHMASK:
-                    case GLES3_DEPTHRANGEF:
-                    case GLES3_STENCILFUNC:
-                    case GLES3_STENCILFUNCSEPARATE:
-                    case GLES3_STENCILMASK:
-                    case GLES3_STENCILMASKSEPARATE:
-                    case GLES3_STENCILOP:
-                    case GLES3_STENCILOPSEPARATE:
-                    case GLES3_UNIFORM1F:
-                    case GLES3_UNIFORM1FV:
-                    case GLES3_UNIFORM1I:
-                    case GLES3_UNIFORM1IV:
-                    case GLES3_UNIFORM2F:
-                    case GLES3_UNIFORM2FV:
-                    case GLES3_UNIFORM2I:
-                    case GLES3_UNIFORM2IV:
-                    case GLES3_UNIFORM3F:
-                    case GLES3_UNIFORM3FV:
-                    case GLES3_UNIFORM3I:
-                    case GLES3_UNIFORM3IV:
-                    case GLES3_UNIFORM4F:
-                    case GLES3_UNIFORM4FV:
-                    case GLES3_UNIFORM4I:
-                    case GLES3_UNIFORM4IV:
-                    case GLES3_UNIFORMMATRIX2FV:
-                    case GLES3_UNIFORMMATRIX3FV:
-                    case GLES3_UNIFORMMATRIX4FV:
-                    case GLES3_USEPROGRAM:
-                    case GLES3_CULLFACE:
-                    case GLES3_DISABLE:
-                    case GLES3_ENABLE:
-                    case GLES3_DISABLEVERTEXATTRIBARRAY:
-                    case GLES3_ENABLEVERTEXATTRIBARRAY:
-                    case GLES3_FRONTFACE:
-                    case GLES3_HINT:
-                    case GLES3_LINEWIDTH:
-                    case GLES3_PIXELSTOREI:
-                    case GLES3_POLYGONOFFSET:
-                    case GLES3_SAMPLECOVERAGE:
-                    case GLES3_SCISSOR:
-                    case GLES3_TEXIMAGE2D:
-                    case GLES3_TEXPARAMETERF:
-                    case GLES3_TEXPARAMETERFV:
-                    case GLES3_TEXPARAMETERI:
-                    case GLES3_TEXPARAMETERIV:
-                    case GLES3_TEXSUBIMAGE2D:
-                    case GLES3_VERTEXATTRIB1F:
-                    case GLES3_VERTEXATTRIB1FV:
-                    case GLES3_VERTEXATTRIB2F:
-                    case GLES3_VERTEXATTRIB2FV:
-                    case GLES3_VERTEXATTRIB3F:
-                    case GLES3_VERTEXATTRIB3FV:
-                    case GLES3_VERTEXATTRIB4F:
-                    case GLES3_VERTEXATTRIB4FV:
-                    case GLES3_VERTEXATTRIBPOINTER:
-                    case GLES3_VIEWPORT:
-                    case GLES3_BINDATTRIBLOCATION:
-                    case GLES3_BINDBUFFER:
-                    case GLES3_BINDFRAMEBUFFER:
-                    case GLES3_BINDRENDERBUFFER:
-                    case GLES3_BINDTEXTURE:
-                    case GLES3_COMPRESSEDTEXIMAGE2D:
-                    case GLES3_COMPRESSEDTEXSUBIMAGE2D:
-                    case GLES3_DETACHSHADER:
-                    case GLES3_SHADERBINARY:
-                    case GLES3_SHADERSOURCE:
-                    case GLES3_BUFFERDATA:
-                    case GLES3_BUFFERSUBDATA:
-                    case GLES3_CREATEPROGRAM:
-                    case GLES3_CREATESHADER:
-                    case GLES3_DELETEBUFFERS:
-                    case GLES3_DELETEFRAMEBUFFERS:
-                    case GLES3_DELETEPROGRAM:
-                    case GLES3_DELETERENDERBUFFERS:
-                    case GLES3_DELETESHADER:
-                    case GLES3_DELETETEXTURES:
-                    case GLES3_FRAMEBUFFERRENDERBUFFER:
-                    case GLES3_FRAMEBUFFERTEXTURE2D:
-                    case GLES3_GENBUFFERS:
-                    case GLES3_GENERATEMIPMAP:
-                    case GLES3_GENFRAMEBUFFERS:
-                    case GLES3_GENRENDERBUFFERS:
-                    case GLES3_GENTEXTURES:
-                    case GLES3_RELEASESHADERCOMPILER:
-                    case GLES3_RENDERBUFFERSTORAGE:
-                    case GLES3_PROGRAMBINARYOES:
+                    case GL4_ATTACHSHADER:
+                    case GL4_BLENDCOLOR:
+                    case GL4_BLENDEQUATION:
+                    case GL4_BLENDEQUATIONSEPARATE:
+                    case GL4_BLENDFUNC:
+                    case GL4_BLENDFUNCSEPARATE:
+                    case GL4_CLEARCOLOR:
+                    case GL4_COLORMASK:
+                    case GL4_DEPTHFUNC:
+                    case GL4_DEPTHMASK:
+                    case GL4_DEPTHRANGEF:
+                    case GL4_STENCILFUNC:
+                    case GL4_STENCILFUNCSEPARATE:
+                    case GL4_STENCILMASK:
+                    case GL4_STENCILMASKSEPARATE:
+                    case GL4_STENCILOP:
+                    case GL4_STENCILOPSEPARATE:
+                    case GL4_UNIFORM1F:
+                    case GL4_UNIFORM1FV:
+                    case GL4_UNIFORM1I:
+                    case GL4_UNIFORM1IV:
+                    case GL4_UNIFORM2F:
+                    case GL4_UNIFORM2FV:
+                    case GL4_UNIFORM2I:
+                    case GL4_UNIFORM2IV:
+                    case GL4_UNIFORM3F:
+                    case GL4_UNIFORM3FV:
+                    case GL4_UNIFORM3I:
+                    case GL4_UNIFORM3IV:
+                    case GL4_UNIFORM4F:
+                    case GL4_UNIFORM4FV:
+                    case GL4_UNIFORM4I:
+                    case GL4_UNIFORM4IV:
+                    case GL4_UNIFORMMATRIX2FV:
+                    case GL4_UNIFORMMATRIX3FV:
+                    case GL4_UNIFORMMATRIX4FV:
+                    case GL4_USEPROGRAM:
+                    case GL4_CULLFACE:
+                    case GL4_DISABLE:
+                    case GL4_ENABLE:
+                    case GL4_DISABLEVERTEXATTRIBARRAY:
+                    case GL4_ENABLEVERTEXATTRIBARRAY:
+                    case GL4_FRONTFACE:
+                    case GL4_HINT:
+                    case GL4_LINEWIDTH:
+                    case GL4_PIXELSTOREI:
+                    case GL4_POLYGONOFFSET:
+                    case GL4_SAMPLECOVERAGE:
+                    case GL4_SCISSOR:
+                    case GL4_TEXIMAGE2D:
+                    case GL4_TEXPARAMETERF:
+                    case GL4_TEXPARAMETERFV:
+                    case GL4_TEXPARAMETERI:
+                    case GL4_TEXPARAMETERIV:
+                    case GL4_TEXSUBIMAGE2D:
+                    case GL4_VERTEXATTRIB1F:
+                    case GL4_VERTEXATTRIB1FV:
+                    case GL4_VERTEXATTRIB2F:
+                    case GL4_VERTEXATTRIB2FV:
+                    case GL4_VERTEXATTRIB3F:
+                    case GL4_VERTEXATTRIB3FV:
+                    case GL4_VERTEXATTRIB4F:
+                    case GL4_VERTEXATTRIB4FV:
+                    case GL4_VERTEXATTRIBPOINTER:
+                    case GL4_VIEWPORT:
+                    case GL4_BINDATTRIBLOCATION:
+                    case GL4_BINDBUFFER:
+                    case GL4_BINDFRAMEBUFFER:
+                    case GL4_BINDRENDERBUFFER:
+                    case GL4_BINDTEXTURE:
+                    case GL4_COMPRESSEDTEXIMAGE2D:
+                    case GL4_COMPRESSEDTEXSUBIMAGE2D:
+                    case GL4_DETACHSHADER:
+                    case GL4_SHADERBINARY:
+                    case GL4_SHADERSOURCE:
+                    case GL4_BUFFERDATA:
+                    case GL4_BUFFERSUBDATA:
+                    case GL4_CREATEPROGRAM:
+                    case GL4_CREATESHADER:
+                    case GL4_DELETEBUFFERS:
+                    case GL4_DELETEFRAMEBUFFERS:
+                    case GL4_DELETEPROGRAM:
+                    case GL4_DELETERENDERBUFFERS:
+                    case GL4_DELETESHADER:
+                    case GL4_DELETETEXTURES:
+                    case GL4_FRAMEBUFFERRENDERBUFFER:
+                    case GL4_FRAMEBUFFERTEXTURE2D:
+                    case GL4_GENBUFFERS:
+                    case GL4_GENERATEMIPMAP:
+                    case GL4_GENFRAMEBUFFERS:
+                    case GL4_GENRENDERBUFFERS:
+                    case GL4_GENTEXTURES:
+                    case GL4_RELEASESHADERCOMPILER:
+                    case GL4_RENDERBUFFERSTORAGE:
+                    case GL4_PROGRAMBINARYOES:
                         totalStateChangeCalls += gc->profiler.apiCalls[i];
                         break;
 
@@ -504,7 +504,7 @@ gcChipProfilerWrite(
         break;
 
     case GL3_PROFILER_WRITE_FRAME_RESET:
-        for (i = 0; i < GLES3_NUM_API_CALLS; ++i)
+        for (i = 0; i < GL4_NUM_API_CALLS; ++i)
         {
             gc->profiler.apiCalls[i] = 0;
             gc->profiler.apiTimes[i] = 0;

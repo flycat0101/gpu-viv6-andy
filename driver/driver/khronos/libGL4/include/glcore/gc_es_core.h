@@ -101,8 +101,8 @@ typedef struct __GLcontextModesRec {
     GLenum  configCaveat;
     GLint   configId;
 
-    GLboolean  defaultConfig;
-    GLboolean  nativeRenderable;
+    GLuint     defaultConfig;
+    GLuint     nativeRenderable;
     GLint      nativeVisualType;
 
     /*multisample extend*/
@@ -111,8 +111,8 @@ typedef struct __GLcontextModesRec {
     GLuint sampleBuffers;
 
     GLenum                     surfaceType;
-    GLboolean                  bindToTetxureRGB;
-    GLboolean                  bindToTetxureRGBA;
+    GLuint                     bindToTetxureRGB;
+    GLuint                     bindToTetxureRGBA;
 
     GLint                      luminanceSize;
     GLint                      alphaMaskSize;
@@ -133,9 +133,9 @@ typedef struct __GLcontextModesRec {
     GLint                      transparentGreenValue;
     GLint                      transparentBlueValue;
     /* Special config on android to return BGRA visual. */
-    GLboolean                  swizzleRB;
+    GLuint                     swizzleRB;
     /* EGL_ANDROID_recordable extension. */
-    GLboolean                  recordableConfig;
+    GLuint                     recordableConfig;
 
     GLuint rgbMode;
     GLuint rgbFloatMode;
@@ -372,6 +372,8 @@ typedef enum
     __GL_FMT_R16,
     __GL_FMT_RG16,
     __GL_FMT_RGB16,
+    __GL_FMT_R16_SNORM,
+    __GL_FMT_RG16_SNORM,
 #endif
 
     __GL_FMT_MAX,

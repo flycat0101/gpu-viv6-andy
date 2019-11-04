@@ -461,9 +461,16 @@ typedef struct __GLpixelTransferInfoRec{
     /*
     ** Public info.
     */
-    GLint width, height, depth;
-    GLint numOfPixel;               /* Total number of pixels */
-    GLint numOfComponents;          /* Total number of components */
+    GLuint width, height, depth;
+    GLuint numOfPixel;               /* Total number of pixels */
+    GLuint numOfComponents;          /* Total number of components */
+    GLuint sizeOfAlignMemory;           /* size of alignment of memory */
+    GLuint widthAlign, dstWidthAlign;   /* alignment width */
+    GLuint sizeOfElement;           /* Element size */
+    GLuint compNumOfElement;        /* Element number */
+    GLuint numOfAlign;              /* number of alignment */
+    GLuint numOfAlignSrc;       /* number of alignment about source memory */
+    GLuint alignment;               /* alignment size */
 
     GLenum baseFormat;
     GLubyte compNumber;             /* Get component number from base format */
@@ -503,12 +510,21 @@ typedef enum __GLPixelTransferOperations {
     __GL_CopyPixels
 } __GLPixelTransferOperations;
 
+typedef enum __GLParameterTypeJudge{
+    __GL_InputFormat=0,
+    __GL_OutputFormat,
+    __GL_RemainFormat
+} ____GLParameterTypeJudge;
+
 extern GLboolean __glNeedScaleBias(__GLcontext *gc, __GLcolor *scale, __GLcolor *bias);
 extern GLvoid __glLoadUnpackModes(__GLcontext *gc, __GLpixelSpanInfo *spanInfo);
 extern GLvoid __glLoadPackModes(__GLcontext *gc, __GLpixelSpanInfo *spanInfo);
 extern GLvoid __glGenericPixelTransfer(__GLcontext *gc, GLsizei width, GLsizei height,  GLsizei depth, __GLformatInfo *formatInfo, GLenum format, GLenum *type, const GLvoid *buf, __GLpixelTransferInfo *transferInfo, GLenum pixelTransferOperations);
 extern __GLformatInfo* __glGetFormatInfo(GLenum internalFormat);
 extern GLuint __glPixelSize(__GLcontext *gc, GLenum format, GLenum type);
+extern GLvoid __glGetSizeAndNumOfElement(GLenum format, GLenum type, __GLpixelTransferInfo *transferInfo);
+extern GLvoid __glMemoryAlignment(GLenum baseFmt, GLenum srcType, GLenum dstType, __GLpixelTransferInfo *transferInfo, GLenum __GLPixelTransferOperations);
+extern GLvoid __glGetSizeOfBuffer(__GLtextureObject *tex, GLint face, GLint level , __GLmipMapLevel *mipmap, GLuint *width, GLuint *height, GLuint *depth);
 extern GLboolean __glCheckSpecialFormat(GLenum internalFormat, GLenum format, GLenum* type);
 
 /*data types which aren't defined by spec. but supported by Vivante internal*/

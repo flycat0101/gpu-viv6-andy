@@ -388,29 +388,33 @@ GLvoid __glInitDevPipeDefault(__GLdevicePipeline *dp)
 
 GLvoid __glInitCurrentState(__GLcontext *gc)
 {
-
-#ifdef OPENGL40
-    gc->state.current.color.r = 1.0;
-    gc->state.current.color.g = 1.0;
-    gc->state.current.color.b = 1.0;
-    gc->state.current.color.a = 1.0;
-    gc->state.current.colorIndex = 1.0;
-
-    gc->state.current.color2.r = 0.0;
-    gc->state.current.color2.g = 0.0;
-    gc->state.current.color2.b = 0.0;
-    gc->state.current.color2.a = 1.0;
-#else
     GLint i;
 
-    for (i=0; i<__GL_MAX_VERTEX_ATTRIBUTES; ++i)
+#ifdef OPENGL40
+    if (gc->imports.conformGLSpec)
     {
-        gc->state.current.attribute[i].f.x = 0.0;
-        gc->state.current.attribute[i].f.y = 0.0;
-        gc->state.current.attribute[i].f.z = 0.0;
-        gc->state.current.attribute[i].f.w = 1.0;
+        gc->state.current.color.r = 1.0;
+        gc->state.current.color.g = 1.0;
+        gc->state.current.color.b = 1.0;
+        gc->state.current.color.a = 1.0;
+        gc->state.current.colorIndex = 1.0;
+
+        gc->state.current.color2.r = 0.0;
+        gc->state.current.color2.g = 0.0;
+        gc->state.current.color2.b = 0.0;
+        gc->state.current.color2.a = 1.0;
     }
+    else  /* Running OES api */
 #endif
+    {
+        for (i=0; i<__GL_MAX_VERTEX_ATTRIBUTES; ++i)
+        {
+            gc->state.current.attribute[i].f.x = 0.0;
+            gc->state.current.attribute[i].f.y = 0.0;
+            gc->state.current.attribute[i].f.z = 0.0;
+            gc->state.current.attribute[i].f.w = 1.0;
+        }
+    }
 }
 
 GLvoid __glInitHintState(__GLcontext *gc)
@@ -451,13 +455,13 @@ GLvoid __glInitRasterState(__GLcontext *gc)
     }
 
 #ifdef OPENGL40
-    if (!gc->modes.doubleBufferMode)
+    if (gc->imports.conformGLSpec && !gc->modes.doubleBufferMode)
     {
         gc->flags |= __GL_CONTEXT_DRAW_TO_FRONT;
         fs->drawBuffers[0] = GL_FRONT;
         fs->readBuffer = GL_FRONT;
     }
-    else
+    else  /* Running OES api */
 #endif
     {
         gc->flags &= ~__GL_CONTEXT_DRAW_TO_FRONT;
@@ -466,49 +470,52 @@ GLvoid __glInitRasterState(__GLcontext *gc)
     }
 
 #ifdef OPENGL40
-    fs->alphaFunction = GL_ALWAYS;
-    fs->alphaReference = 0;
-
-    gc->state.rasterPos.rPos.winPos.f.x = 0.0;
-    gc->state.rasterPos.rPos.winPos.f.y = 0.0;
-    gc->state.rasterPos.rPos.winPos.f.z = 0.0;
-
-    /* Initialize primary color */
-    gc->state.rasterPos.rPos.color[__GL_PRIMARY_COLOR]
-            = &gc->state.rasterPos.rPos.colors[__GL_FRONTFACE];
-    gc->state.rasterPos.rPos.colors[__GL_FRONTFACE].r = 1.0;
-    gc->state.rasterPos.rPos.colors[__GL_FRONTFACE].g = 1.0;
-    gc->state.rasterPos.rPos.colors[__GL_FRONTFACE].b = 1.0;
-    gc->state.rasterPos.rPos.colors[__GL_FRONTFACE].a = 1.0;
-    gc->state.rasterPos.rPos.colors[__GL_BACKFACE].r = 1.0;
-    gc->state.rasterPos.rPos.colors[__GL_BACKFACE].g = 1.0;
-    gc->state.rasterPos.rPos.colors[__GL_BACKFACE].b = 1.0;
-    gc->state.rasterPos.rPos.colors[__GL_BACKFACE].a = 1.0;
-
-    /* Initialize secondary color */
-    gc->state.rasterPos.rPos.color[__GL_SECONDARY_COLOR]
-            = &gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE];
-    gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE].r = 0.0;
-    gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE].g = 0.0;
-    gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE].b = 0.0;
-    gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE].a = 1.0;
-    gc->state.rasterPos.rPos.colors2[__GL_BACKFACE].r = 0.0;
-    gc->state.rasterPos.rPos.colors2[__GL_BACKFACE].g = 0.0;
-    gc->state.rasterPos.rPos.colors2[__GL_BACKFACE].b = 0.0;
-    gc->state.rasterPos.rPos.colors2[__GL_BACKFACE].a = 1.0;
-
-    for (i = 0; i < __GL_MAX_TEXTURE_COORDS; i++)
+    if (gc->imports.conformGLSpec)
     {
-        gc->state.rasterPos.rPos.texture[i].fTex.s = 0.0;
-        gc->state.rasterPos.rPos.texture[i].fTex.t = 0.0;
-        gc->state.rasterPos.rPos.texture[i].fTex.r = 0.0;
-        gc->state.rasterPos.rPos.texture[i].fTex.q = 1.0;
+        fs->alphaFunction = GL_ALWAYS;
+        fs->alphaReference = 0;
+
+        gc->state.rasterPos.rPos.winPos.f.x = 0.0;
+        gc->state.rasterPos.rPos.winPos.f.y = 0.0;
+        gc->state.rasterPos.rPos.winPos.f.z = 0.0;
+
+        /* Initialize primary color */
+        gc->state.rasterPos.rPos.color[__GL_PRIMARY_COLOR]
+                = &gc->state.rasterPos.rPos.colors[__GL_FRONTFACE];
+        gc->state.rasterPos.rPos.colors[__GL_FRONTFACE].r = 1.0;
+        gc->state.rasterPos.rPos.colors[__GL_FRONTFACE].g = 1.0;
+        gc->state.rasterPos.rPos.colors[__GL_FRONTFACE].b = 1.0;
+        gc->state.rasterPos.rPos.colors[__GL_FRONTFACE].a = 1.0;
+        gc->state.rasterPos.rPos.colors[__GL_BACKFACE].r = 1.0;
+        gc->state.rasterPos.rPos.colors[__GL_BACKFACE].g = 1.0;
+        gc->state.rasterPos.rPos.colors[__GL_BACKFACE].b = 1.0;
+        gc->state.rasterPos.rPos.colors[__GL_BACKFACE].a = 1.0;
+
+        /* Initialize secondary color */
+        gc->state.rasterPos.rPos.color[__GL_SECONDARY_COLOR]
+                = &gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE];
+        gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE].r = 0.0;
+        gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE].g = 0.0;
+        gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE].b = 0.0;
+        gc->state.rasterPos.rPos.colors2[__GL_FRONTFACE].a = 1.0;
+        gc->state.rasterPos.rPos.colors2[__GL_BACKFACE].r = 0.0;
+        gc->state.rasterPos.rPos.colors2[__GL_BACKFACE].g = 0.0;
+        gc->state.rasterPos.rPos.colors2[__GL_BACKFACE].b = 0.0;
+        gc->state.rasterPos.rPos.colors2[__GL_BACKFACE].a = 1.0;
+
+        for (i = 0; i < __GL_MAX_TEXTURE_COORDS; i++)
+        {
+            gc->state.rasterPos.rPos.texture[i].fTex.s = 0.0;
+            gc->state.rasterPos.rPos.texture[i].fTex.t = 0.0;
+            gc->state.rasterPos.rPos.texture[i].fTex.r = 0.0;
+            gc->state.rasterPos.rPos.texture[i].fTex.q = 1.0;
+        }
+        gc->state.rasterPos.rPos.clipW = 1.0;
+        gc->state.rasterPos.validRasterPos = GL_TRUE;
+        gc->state.rasterPos.rPos.eyeDistance = 1.0;
+        fs->clampFragColor = GL_FIXED_ONLY;
+        fs->clampReadColor = GL_FIXED_ONLY;
     }
-    gc->state.rasterPos.rPos.clipW = 1.0;
-    gc->state.rasterPos.validRasterPos = GL_TRUE;
-    gc->state.rasterPos.rPos.eyeDistance = 1.0;
-    fs->clampFragColor = GL_FIXED_ONLY;
-    fs->clampReadColor = GL_FIXED_ONLY;
 #endif
 }
 
@@ -553,10 +560,13 @@ GLvoid __glInitLineState(__GLcontext *gc)
     ls->requestedWidth = 1.0;
     ls->aliasedWidth = 1;
 #ifdef OPENGL40
-    ls->smoothWidth = __glClampWidth(1.0, &gc->constants);
-    ls->stipple = 0xFFFF;
-    ls->stippleRepeat = 1;
-    gc->state.enables.line.stippleRequested = GL_FALSE;
+    if (gc->imports.conformGLSpec)
+    {
+        ls->smoothWidth = __glClampWidth(1.0, &gc->constants);
+        ls->stipple = 0xFFFF;
+        ls->stippleRepeat = 1;
+        gc->state.enables.line.stippleRequested = GL_FALSE;
+    }
 #endif
 }
 
@@ -569,10 +579,13 @@ GLvoid __glInitPolygonState(__GLcontext *gc)
     ps->factor    = 0.0;
     ps->units     = 0.0;
 #ifdef OPENGL40
-    ps->frontMode = GL_FILL;
-    ps->backMode = GL_FILL;
-    ps->bothFaceFill = GL_TRUE;
-    gc->state.current.edgeflag = GL_TRUE;
+    if (gc->imports.conformGLSpec)
+    {
+        ps->frontMode = GL_FILL;
+        ps->backMode = GL_FILL;
+        ps->bothFaceFill = GL_TRUE;
+        gc->state.current.edgeflag = GL_TRUE;
+    }
 #endif
 }
 
@@ -707,18 +720,13 @@ GLvoid __glDestroyDrawable(void* drawable)
     }
 }
 
-__GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
-#ifdef OPENGL40
-                                     ,__GLcontext  *gc)
-#else
-                                     )
-#endif
+__GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable)
 {
     __GLcontextModes *pmode = gcvNULL;
 
     GLuint i;
     __GLdrawablePrivate *glDrawable = gcvNULL;
-    gcoSURF accumSurf;
+//    gcoSURF accumSurf;
 
     if (!eglDrawable || !eglDrawable->config)
     {
@@ -752,10 +760,8 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
     pmode = (__GLcontextModes *)eglDrawable->config;
 
 #ifdef OPENGL40
-    if (gc->imports.fromEGL)
-    {
-        pmode->doubleBufferMode = GL_TRUE;
-    }
+        /* TODO: EGL not set doubleBufferMode for now, need to add in the future */
+        pmode->doubleBufferMode = GL_FALSE;
 #else
     pmode->doubleBufferMode = GL_TRUE;
 #endif
@@ -764,18 +770,14 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
     if (glDrawable->gc &&
         (glDrawable->rtHandles[0]  != eglDrawable->rtHandles[0] ||
          glDrawable->depthHandle   != eglDrawable->depthHandle ||
-         glDrawable->stencilHandle != eglDrawable->stencilHandle
-        )
+         glDrawable->stencilHandle != eglDrawable->stencilHandle)
        )
     {
         (*glDrawable->gc->dp.detachDrawable)(glDrawable->gc);
     }
 
     /* Always update glDrawable info when EGL set drawable */
-
-
     __glFormatGLModes(&glDrawable->modes, pmode);
-
 
     glDrawable->width= eglDrawable->width;
     glDrawable->height = eglDrawable->height;
@@ -801,13 +803,6 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable
         glDrawable->rtFormatInfo = gcvNULL;
     }
 
-#ifdef OPENGL40
-    if (eglDrawable->accumHandle)
-    {
-        accumSurf = (gcoSURF)eglDrawable->accumHandle;
-        (*gc->dp.createAccumBufferInfo)(gc, accumSurf,glDrawable);
-    }
-#endif
 
     for (i = 0 ; i < __GL_MAX_DRAW_BUFFERS; i++)
     {
@@ -924,6 +919,11 @@ GLvoid __glEvaluateSystemDrawableChange(__GLcontext *gc, GLbitfield flags)
 /* Mutex lock for drawable change */
 __GLlock drawableChangeLock;
 
+extern GLvoid __glShareDlists(__GLcontext *dst, __GLcontext *src);
+extern GLvoid __glFreeDlistVertexCache(__GLcontext *gc);
+extern GLvoid __glFreeConcatDlistCache(__GLcontext *gc);
+
+
 GLuint __glShareContext(__GLcontext *gc, __GLcontext *gcShare)
 {
     __glShareDlists(gc, gcShare);
@@ -968,7 +968,7 @@ GLvoid __glNotifyRTMakeResident(__GLcontext *gc)
 {
     __GLpipeline *ctx;
     ctx = &gc->dp.ctx;
-    if(ctx->notifyWinBuffersResident)
+    if (ctx->notifyWinBuffersResident)
     {
         ctx->notifyWinBuffersResident(gc, gc->drawablePrivate);
     }
@@ -978,7 +978,7 @@ GLvoid __glNotifySwapBuffers(__GLcontext *gc)
 {
     __GLpipeline *ctx;
     ctx = &gc->dp.ctx;
-    if(ctx->notifySwapBuffers)
+    if (ctx->notifySwapBuffers)
     {
         ctx->notifySwapBuffers(gc);
     }
@@ -991,10 +991,10 @@ GLvoid __glNotifyChangeBufferSize(__GLcontext *gc)
     GLint yInvert = (DRAW_FRAMEBUFFER_BINDING_NAME == 0)? draw->yInverted :GL_FALSE;
 
     ctx = &gc->dp.ctx;
-    if(ctx->notifyChangeBufferSize)
+    if (ctx->notifyChangeBufferSize)
     {
         /* Release exclusive mode first, then create new RTs */
-        if((draw->fullScreenMode) && (draw->type == __GL_WINDOW) && (__glDevice->IsEXCLUSIVE_MODE))
+        if ((draw->fullScreenMode) && (draw->type == __GL_WINDOW) && (__glDevice->IsEXCLUSIVE_MODE))
         {
             (*draw->dp.setExclusiveDisplay)(GL_FALSE);
             draw->flipOn = GL_FALSE;
@@ -1018,7 +1018,7 @@ GLvoid __glNotifyDestroyBuffers(__GLcontext *gc)
      __GLpipeline *ctx;
 
     ctx = &gc->dp.ctx;
-    if(ctx->notifyDestroyBuffers)
+    if (ctx->notifyDestroyBuffers)
     {
         ctx->notifyDestroyBuffers(gc);
     }
@@ -1030,7 +1030,7 @@ GLvoid __glNotifyDrawableSwitch(__GLcontext *gc)
     __GLpipeline *ctx;
 
     ctx = &gc->dp.ctx;
-    if(ctx->notifyDrawableSwitch)
+    if (ctx->notifyDrawableSwitch)
     {
         ctx->notifyDrawableSwitch(gc);
     }
@@ -1058,7 +1058,7 @@ GLvoid __glDispatchDrawableChange(__GLcontext *gc)
     ** This Lock is also necessary to make sure that at one time only one context is
     ** updating the drawable (We rely on a context to resize the drawable).
     */
-    (*gc->imports.lockMutex)(&drawableChangeLock);
+    (*gc->imports.lockMutex)((VEGLLock *)&drawableChangeLock);
 
     if ((gc->changeMask & (__GL_DRAWABLE_PENDING_RESIZE |
                       __GL_DRAWABLE_PENDING_MOVE |
@@ -1073,7 +1073,7 @@ GLvoid __glDispatchDrawableChange(__GLcontext *gc)
 
     /* make resident rt which have been swapped out
     ** Note: Handle this pending info before __GL_DRAWABLE_PENDING_RESIZE*/
-    if(gc->changeMask & __GL_DRAWABLE_PENDING_RT_RESIDENT)
+    if (gc->changeMask & __GL_DRAWABLE_PENDING_RT_RESIDENT)
     {
         __glNotifyRTMakeResident(gc);
         gc->changeMask &= ~ __GL_DRAWABLE_PENDING_RT_RESIDENT;
@@ -1123,7 +1123,7 @@ GLvoid __glDispatchDrawableChange(__GLcontext *gc)
 
 DispatchDrawableChange_Exit:
 
-    (*gc->imports.unlockMutex)(&drawableChangeLock);
+    (*gc->imports.unlockMutex)((VEGLLock *)&drawableChangeLock);
 }
 
 /*
@@ -1139,7 +1139,7 @@ GLvoid __glNotifyDrawableChange(__GLcontext *gc, GLuint mask)
     ** This Lock is also necessary to make sure that at one time only one context is
     ** updating the drawable (We rely on a context to resize the drawable).
     */
-    (*gc->imports.lockMutex)(&drawableChangeLock);
+    (*gc->imports.lockMutex)((VEGLLock *)&drawableChangeLock);
 
     gc->changeMask |= mask;
 
@@ -1192,7 +1192,7 @@ GLvoid __glNotifyDrawableChange(__GLcontext *gc, GLuint mask)
         __glResetImmedVertexBuffer(gc);
     }
 
-    (*gc->imports.unlockMutex)(&drawableChangeLock);
+    (*gc->imports.unlockMutex)((VEGLLock *)&drawableChangeLock);
 }
 #endif
 
@@ -1202,36 +1202,19 @@ GLvoid __glInitContextState(__GLcontext *gc)
     gc->invalidCommonCommit = gcvTRUE;
     gc->invalidDrawCommit = gcvTRUE;
     gc->conditionalRenderDiscard = gcvFALSE;
-/* some init functions should be isolated from ES3, TO DO */
+
+    /* Some init functions should be isolated from ES3, TO DO */
     __glInitCurrentState(gc);
-#ifdef OPENGL40
-    __glInitAttribStackState(gc);
-    gc->renderMode = GL_RENDER;
-#endif
     __glInitHintState(gc);
     __glInitRasterState(gc);
     __glInitStencilState(gc);
     __glInitDepthState(gc);
-#ifdef OPENGL40
-    __glInitTransformState(gc);
-    __glInitFogState(gc);
-    __glInitLightState(gc);
-    __glInitPointState(gc);
-#endif
     __glInitLineState(gc);
     __glInitPolygonState(gc);
-#ifdef OPENGL40
-    __glInitEvaluatorState(gc);
-#endif
     __glInitPixelState(gc);
     __glInitMultisampleState(gc);
-
     __glInitVertexArrayState(gc);
     __glInitFramebufferStates(gc);
-#ifdef OPENGL40
-    __glInitDlistState(gc);
-    __glInitFeedback(gc);
-#endif
     __glInitTextureState(gc);
     __glInitBufferObjectState(gc);
     __glInitShaderProgramState(gc);
@@ -1239,15 +1222,28 @@ GLvoid __glInitContextState(__GLcontext *gc)
     __glInitXfbState(gc);
     __glInitQueryState(gc);
     __glInitSyncState(gc);
-
     __glInitEnableState(gc);
     __glInitImageState(gc);
     __glInitDebugState(gc);
     __glInitPrimBoundingState(gc);
     __glInitPrimRestartState(gc);
 
-    __glBitmaskInitAllOne(&gc->texUnitAttrDirtyMask, gc->constants.shaderCaps.maxCombinedTextureImageUnits);
+#ifdef OPENGL40
+    if (gc->imports.conformGLSpec)
+    {
+        gc->renderMode = GL_RENDER;
+        __glInitAttribStackState(gc);
+        __glInitTransformState(gc);
+        __glInitFogState(gc);
+        __glInitLightState(gc);
+        __glInitPointState(gc);
+        __glInitEvaluatorState(gc);
+        __glInitDlistState(gc);
+        __glInitFeedback(gc);
+    }
+#endif
 
+    __glBitmaskInitAllOne(&gc->texUnitAttrDirtyMask, gc->constants.shaderCaps.maxCombinedTextureImageUnits);
     __glBitmaskInitAllOne(&gc->imageUnitDirtyMask, gc->constants.shaderCaps.maxImageUnit);
 
     __glSetAttributeStatesDirty(gc);
@@ -1413,9 +1409,12 @@ GLboolean __glLoseCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
     retVal = (*gc->dp.loseCurrent)(gc, GL_FALSE);
 
 #if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
-    /* Free all vertex data caches in video memory */
-    __glFreeDataCacheInVideoMemory(gc);
-    __glFreeVertexInputState(gc);
+    if (gc->imports.conformGLSpec)
+    {
+        /* Free all vertex data caches in video memory */
+        __glFreeDataCacheInVideoMemory(gc);
+        __glFreeVertexInputState(gc);
+    }
 #endif
 
     return retVal;
@@ -1429,7 +1428,10 @@ GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
 
     __glSetDrawable(gc, drawable, readable);
 #ifdef OPENGL40
-    __glInitVertexInputState(gc);
+    if (gc->imports.conformGLSpec)
+    {
+        __glInitVertexInputState(gc);
+    }
 #endif
     if (gc->flags & __GL_CONTEXT_UNINITIALIZED)
     {
@@ -1452,9 +1454,12 @@ GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
         __glUpdateScissor(gc, 0, 0, width, height);
 
 #ifdef OPENGL40
-        gc->input.inputMaskChanged = GL_TRUE;
-        /* Must reset drawables/RTs for newly created gc */
-        gc->changeMask |= __GL_DRAWABLE_PENDING_RESIZE;
+        if (gc->imports.conformGLSpec)
+        {
+            gc->input.inputMaskChanged = GL_TRUE;
+            /* Must reset drawables/RTs for newly created gc */
+            gc->changeMask |= __GL_DRAWABLE_PENDING_RESIZE;
+        }
 #endif
 
         gc->flags &= ~(__GL_CONTEXT_UNINITIALIZED);
@@ -1500,12 +1505,15 @@ GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
     retVal = (*gc->dp.makeCurrent)(gc);
 
 #if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
-    /* Get the latest drawable information */
-    LINUX_LOCK_FRAMEBUFFER(gc);
-    /* Make sure the drawable is allocated and updated */
-    __glDispatchDrawableChange(gc);
-    __glComputeClipBox(gc);
-    LINUX_UNLOCK_FRAMEBUFFER(gc);
+    if (gc->imports.conformGLSpec)
+    {
+        /* Get the latest drawable information */
+        LINUX_LOCK_FRAMEBUFFER(gc);
+        /* Make sure the drawable is allocated and updated */
+        __glDispatchDrawableChange(gc);
+        __glComputeClipBox(gc);
+        LINUX_UNLOCK_FRAMEBUFFER(gc);
+    }
 #endif
 
     return retVal;
@@ -1517,16 +1525,16 @@ GLboolean __glDestroyContext(GLvoid *context)
     GLboolean retVal = GL_TRUE;
 
 #ifdef OPENGL40
-    __glFreeAttribStackState(gc);
+    if (gc->imports.conformGLSpec)
+    {
+         __glFreeAttribStackState(gc);
+         __glFreeTransformState(gc);
+         __glFreeVertexInputState(gc);
+         __glFreeEvaluatorState(gc);
+         __glFreeDlistState(gc);
+    }
 #endif
-
     __glFreeFramebufferStates(gc);
-#ifdef OPENGL40
-     __glFreeTransformState(gc);
-     __glFreeVertexInputState(gc);
-     __glFreeEvaluatorState(gc);
-     __glFreeDlistState(gc);
-#endif
     __glFreeTextureState(gc);
     __glFreeVertexArrayState(gc);
     __glFreeBufferObjectState(gc);
@@ -1561,67 +1569,76 @@ GLvoid *__glCreateContext(GLint clientVersion,
 
     __GL_HEADER();
 
-    /* Record the context version: sometime es20 and es30 may have different rule
-    */
-    switch (clientVersion)
-    {
 #ifdef OPENGL40
-    case 0x10:
-        apiVersion = __GL_API_VERSION_OGL10;
-        break;
-    case 0x11:
-        apiVersion = __GL_API_VERSION_OGL11;
-        break;
-    case 0x12:
-        apiVersion = __GL_API_VERSION_OGL12;
-        break;
-    case 0x13:
-        apiVersion = __GL_API_VERSION_OGL13;
-        break;
-    case 0x14:
-        apiVersion = __GL_API_VERSION_OGL14;
-        break;
-    case 0x15:
-        apiVersion = __GL_API_VERSION_OGL15;
-        break;
-    case 0x20:
-        apiVersion = __GL_API_VERSION_OGL20;
-        break;
-    case 0x21:
-        apiVersion = __GL_API_VERSION_OGL21;
-        break;
-    case 0x30:
-        apiVersion = __GL_API_VERSION_OGL30;
-        break;
-    case 0x31:
-        apiVersion = __GL_API_VERSION_OGL31;
-        break;
-    case 0x32:
-        apiVersion = __GL_API_VERSION_OGL32;
-        break;
-    case 0x33:
-        apiVersion = __GL_API_VERSION_OGL33;
-        break;
-    case 0x40:
-        apiVersion = __GL_API_VERSION_OGL40;
-        break;
-#else
-    case 0x20:
-        apiVersion = __GL_API_VERSION_ES20;
-        break;
-    case 0x30:
-        apiVersion = __GL_API_VERSION_ES30;
-        break;
-    case 0x31:
-        apiVersion = __GL_API_VERSION_ES31;
-        break;
-    case 0x32:
-        apiVersion = __GL_API_VERSION_ES32;
-        break;
+    if (imports->conformGLSpec)
+    {
+        switch (clientVersion)
+        {
+        case 0x10:
+            apiVersion = __GL_API_VERSION_OGL10;
+            break;
+        case 0x11:
+            apiVersion = __GL_API_VERSION_OGL11;
+            break;
+        case 0x12:
+            apiVersion = __GL_API_VERSION_OGL12;
+            break;
+        case 0x13:
+            apiVersion = __GL_API_VERSION_OGL13;
+            break;
+        case 0x14:
+            apiVersion = __GL_API_VERSION_OGL14;
+            break;
+        case 0x15:
+            apiVersion = __GL_API_VERSION_OGL15;
+            break;
+        case 0x20:
+            apiVersion = __GL_API_VERSION_OGL20;
+            break;
+        case 0x21:
+            apiVersion = __GL_API_VERSION_OGL21;
+            break;
+        case 0x30:
+            apiVersion = __GL_API_VERSION_OGL30;
+            break;
+        case 0x31:
+            apiVersion = __GL_API_VERSION_OGL31;
+            break;
+        case 0x32:
+            apiVersion = __GL_API_VERSION_OGL32;
+            break;
+        case 0x33:
+            apiVersion = __GL_API_VERSION_OGL33;
+            break;
+        case 0x40:
+            apiVersion = __GL_API_VERSION_OGL40;
+            break;
+        default:
+            GL_ASSERT(0);
+            __GL_ERROR_EXIT2();
+        }
+    }
+    else  /* Runing OES api */
 #endif
-    default:
-        GL_ASSERT(0);
-        __GL_ERROR_EXIT2();
+    {
+        switch (clientVersion)
+        {
+        case 0x20:
+            apiVersion = __GL_API_VERSION_ES20;
+            break;
+        case 0x30:
+            apiVersion = __GL_API_VERSION_ES30;
+            break;
+        case 0x31:
+            apiVersion = __GL_API_VERSION_ES31;
+            break;
+        case 0x32:
+            apiVersion = __GL_API_VERSION_ES32;
+            break;
+        default:
+            GL_ASSERT(0);
+            __GL_ERROR_EXIT2();
+        }
     }
 
     if (!initialized)
@@ -1652,7 +1669,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
         break;
     }
 
-    if(imports->config)
+    if (imports->config)
     {
         __glFormatGLModes(&gc->modes, (__GLcontextModes *)imports->config);
     }
@@ -1688,7 +1705,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
     ** And initialize the device pipeline "gc->dp" function pointers.
     */
 
-    if((*__glDevice->devCreateContext)(gc) == GL_FALSE)
+    if ((*__glDevice->devCreateContext)(gc) == GL_FALSE)
     {
         (*imports->free)(gc, gc);
         gc = gcvNULL;
@@ -1716,7 +1733,10 @@ GLvoid *__glCreateContext(GLint clientVersion,
 
     /* Initialize API dispatch tables. */
 #ifdef OPENGL40
-    gc->dlCompileDispatch = __glListCompileFuncTable;
+    if (gc->imports.conformGLSpec)
+    {
+        gc->dlCompileDispatch = __glListCompileFuncTable;
+    }
 #endif
     gc->immedModeDispatch = __glImmediateFuncTable;
     gc->pModeDispatch = &gc->immedModeDispatch; /* immediate mode by default. */

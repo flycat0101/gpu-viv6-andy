@@ -641,7 +641,7 @@ GLvoid GLX_PREFIX(glXCopyContext)(Display *dpy, GLXContext source, GLXContext de
 #endif
 }
 
-
+#if defined(INDIRECT_SUPPORT)
 /*
 ** Return GL_TRUE if the context is direct rendering or not.
 */
@@ -668,6 +668,7 @@ static Bool __glXIsDirect(Display *dpy, GLXContextID contextID)
 
     return reply.isDirect;
 }
+#endif
 
 Bool GLX_PREFIX(glXIsDirect)(Display *dpy, GLXContext gc)
 {
@@ -2563,21 +2564,13 @@ GLvoid (*glXGetProcAddressARB(const GLubyte *procName))( GLvoid )
     {
         /* Skip the first two characters "gl" of procName */
         apiName = procName + 2;
-        __GLextFuncAlias *curAlias;
-        for (curAlias = __glExtFuncAlias; curAlias->index < __GL_EXTID_EXT_LAST;++curAlias)
-        {
-                if(strcmp(curAlias->procName, apiName) == 0)
-                {
-                        apiName = curAlias->aliasName;
-                        break;
-                }
-        }
+
 
         /* Find API function's offset in __glProcInfoTable[] table */
         for (i = 0; i < __glProcTabSize; ++i)
         {
             procInfo = &__glProcInfoTable[i];
-            if (strcmp(procInfo->name, apiName) == 0)
+            if (strcmp((const char *)procInfo->name, (const char *)apiName) == 0)
             {
             return procInfo->func;
             }

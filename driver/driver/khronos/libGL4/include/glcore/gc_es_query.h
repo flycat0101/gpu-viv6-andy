@@ -54,6 +54,9 @@ typedef struct __GLqueryObjectRec
     GLvoid  *privateData;
 
     GLchar *label;
+
+    /* Index of multiple vertex streams */
+    GLuint  index;
 } __GLqueryObject;
 
 
@@ -63,7 +66,7 @@ typedef struct __GLqueryMachineRec
     ** we just use the __GLsharedObjectMachine to manage the query objects.
     */
     __GLsharedObjectMachine *noShare;
-    __GLqueryObject *currQuery[__GL_QUERY_LAST];
+    __GLqueryObject *currQuery[__GL_QUERY_LAST][4]; // __GL_MAX_TRANSFORM_FEEDBACK_STREAMS = 4, for multiple vertex streams.
 
 } __GLqueryMachine;
 

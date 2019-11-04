@@ -126,8 +126,8 @@ __GL_INLINE GLvoid __glDuplicatePreviousAttrib(__GLcontext *gc)
         break;
 
     default:
-        if(missingMask & __GL_EDGEFLAG_BIT) {
-            if(gc->input.vertex.index == 0)
+        if (missingMask & __GL_EDGEFLAG_BIT) {
+            if (gc->input.vertex.index == 0)
                 gc->input.edgeflag.pointer[gc->input.vertex.index] = gc->state.current.edgeflag;
             else
                 gc->input.edgeflag.pointer[gc->input.vertex.index] = gc->input.edgeflag.pointer[gc->input.vertex.index - 1];

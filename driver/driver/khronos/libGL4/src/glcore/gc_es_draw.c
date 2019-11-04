@@ -43,10 +43,10 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
     gc->vertexStreams.edgeflagStream = NULL;
 
     arrayEnabled = vertexArrayState->attribEnabled;
-    if(arrayEnabled & (__GL_VARRAY_EDGEFLAG))
+    if (arrayEnabled & (__GL_VARRAY_EDGEFLAG))
     {
         array = &vertexArrayState->attribute[__GL_VARRAY_EDGEFLAG_INDEX];;
-        if( vertexArrayState->attributeBinding[array->attribBinding].boundArrayName == 0 )
+        if ( vertexArrayState->attributeBinding[array->attribBinding].boundArrayName == 0 )
         {
             gc->vertexStreams.edgeflagStream = (GLubyte *)array->pointer;
         }
@@ -58,11 +58,11 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
 
     arrayEnabled &= ~(__GL_VARRAY_EDGEFLAG);
     gc->vertexStreams.indexCount = gc->vertexArray.indexCount;
-    if(gc->vertexStreams.indexCount)
+    if (gc->vertexStreams.indexCount)
     {
         /*configure the index stream*/
         gc->vertexStreams.indexStream.type = gc->vertexArray.indexType;
-        if(indexBuffer == 0 )
+        if (indexBuffer == 0 )
         {
             gc->vertexStreams.indexStream.ppIndexBufPriv = NULL;
             gc->vertexStreams.indexStream.streamAddr = (GLvoid *)gc->vertexArray.indices;
@@ -137,13 +137,13 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
 
     while(mask)
     {
-        if(mask & 0x1)
+        if (mask & 0x1)
         {
             array = &vertexArrayState->attribute[arrayIdx];
             bufObj = vertexArrayState->attributeBinding[arrayIdx].boundArrayObj;
 
             /* Corner case: FarCry call SecondaryColorPointer with size 4. currentArrays will not updated.*/
-            if(array->stride == 0)
+            if (array->stride == 0)
             {
                 gc->vertexStreams.missingAttribs |= (__GL_ONE_64 << arrayIdx);
                 arrayIdx++;
@@ -151,7 +151,7 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
                 continue;
             }
 
-            if(array->stride < array->size * __glSizeOfType(array->type))
+            if (array->stride < array->size * __glSizeOfType(array->type))
             {
 //                gc->vertexArray.immedFallback = GL_TRUE;
                 return;
@@ -162,9 +162,9 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
             for(streamIdx = 0; streamIdx < numStreams; streamIdx++)
             {
                 stream = &gc->vertexStreams.streams[streamIdx];
-                if( bufObj == NULL || bufObj->size == 0 )/*normal vertex array*/
+                if ( bufObj == NULL || bufObj->size == 0 )/*normal vertex array*/
                 {
-                    if(stream->privPtrAddr == NULL)/*stream source from conventional vertex array*/
+                    if (stream->privPtrAddr == NULL)/*stream source from conventional vertex array*/
                     {
                         newStream = GL_FALSE;
                         break;
@@ -176,14 +176,14 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
                 }
                 else/*from buffer object*/
                 {
-                    if(stream->privPtrAddr == NULL)/*stream source from conventional vertex array*/
+                    if (stream->privPtrAddr == NULL)/*stream source from conventional vertex array*/
                     {
                         continue;
                     }
                     else/*stream source from buffer object*/
                     {
                         GL_ASSERT(bufObj);
-                        if(&bufObj->privateData == stream->privPtrAddr)
+                        if (&bufObj->privateData == stream->privPtrAddr)
                         {
                             newStream = GL_FALSE;
                             break;
@@ -197,7 +197,7 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
             }
 
             /*the second stage of checking whether we should configure another stream for this element*/
-            if(!newStream)
+            if (!newStream)
             {
                 __GLvertexElement *prevElement, tempElement;
                 __GLvertexAttrib *prevArray;
@@ -211,7 +211,7 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
 
                 /*array->offset may be an offset or a pointer. No matter what it is,
                 (array->offset - prevArray->offset) is always what we want here*/
-                if( (array->stride == (GLsizei)stream->stride) && ( (GLuint)abs((GLint)glALL_TO_UINT32(array->offset - prevArray->offset)) < stream->stride ))
+                if ( (array->stride == (GLsizei)stream->stride) && ( (GLuint)abs((GLint)glALL_TO_UINT32(array->offset - prevArray->offset)) < stream->stride ))
                 {
                     /*configure the next element in the stream*/
                     element = &stream->streamElement[stream->numElements];
@@ -248,7 +248,7 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
                 }
             }
 
-            if(newStream)
+            if (newStream)
             {
                 /*get a new stream*/
                 stream = &gc->vertexStreams.streams[numStreams];
@@ -288,7 +288,7 @@ GLvoid __glConfigArrayVertexStream(__GLcontext *gc, GLenum mode)
     {
         stream = &gc->vertexStreams.streams[streamIdx];
         /*for streams in buffer object, offset is already an offset*/
-        if(stream->privPtrAddr == NULL)
+        if (stream->privPtrAddr == NULL)
         {
             GL_ASSERT(stream->streamAddr == __GL_OFFSET_TO_POINTER(stream->streamElement[0].offset));
             for(i = 1; i < stream->numElements; i ++ )
@@ -388,7 +388,7 @@ GLint __glCalcTexMaxLevelUsed(__GLcontext *gc, __GLtextureObject *texObj, GLenum
     GLint base = texObj->params.baseLevel;
 
     /* Rectangular texture target has only one mipmap level, can't do mipmap */
-    if(texObj->targetIndex == __GL_TEXTURE_RECTANGLE_INDEX)
+    if (texObj->targetIndex == __GL_TEXTURE_RECTANGLE_INDEX)
     {
         return base;
     }
@@ -987,7 +987,7 @@ __GL_INLINE GLvoid __glEvaluateAttribGroup3(__GLcontext* gc, __GLattribute* cs, 
 __GL_INLINE GLuint __glGetTextureDIM(__GLattribute* cs, GLint i)
 {
 #ifdef OPENGL40
-    if ( cs->enables.texUnits[i].enabledDimension > 0 )
+    if (cs->enables.texUnits[i].enabledDimension > 0)
         return cs->enables.texUnits[i].enabledDimension - 1;
 #endif
     return cs->texture.texUnits[i].enableDim;
@@ -1012,7 +1012,15 @@ __GL_INLINE GLvoid __glEvaluateTextureAttrib(__GLcontext* gc, __GLattribute* cs,
         lastMaxLevelUsed = gc->texture.units[i].maxLevelUsed;
 
         /* Save the last enabled texture dimension and last texture object. */
-        enableDim = __glGetTextureDIM(cs, i);
+        if (gc->imports.conformGLSpec)
+        {
+            enableDim = __glGetTextureDIM(cs, i);
+        }
+        else
+        {
+            enableDim = cs->texture.texUnits[i].enableDim;
+        }
+
         lastRealEnableDim = ds->texture.texUnits[i].realEnableDim;
 
         /* Please do only use "currentTexture" after the evaluation and in this draw.
@@ -1130,7 +1138,11 @@ __GL_INLINE GLvoid __glEvaluateTextureAttrib(__GLcontext* gc, __GLattribute* cs,
                             if (__GL_MEMCMP(cs_params->borderColor.fv, texObj->borderColorUsed.fv, 4 * sizeof(GLfloat)))
                             {
                                 __GL_MEMCOPY(texObj->borderColorUsed.fv, cs_params->borderColor.fv, 4 * sizeof(GLfloat));
-                                texObj->uObjStateDirty.s.borderColorDirty = GL_TRUE;
+
+                                if(gc->imports.conformGLSpec)
+                                {
+                                    texObj->uObjStateDirty.s.borderColorDirty = GL_TRUE;
+                                }
                             }
                             __GL_CHECK_SAMPLER_PARAM_ARRAY(__GL_TEXPARAM_BORDER_COLOR_BIT, borderColor.fv, 4, sizeof(GLfloat));
 
@@ -1365,14 +1377,14 @@ __GL_INLINE GLuint64 GetCycleCount()
 }
 
 #define ENTERFUNC_TM() \
-    if(logTimeEnable) tTick = GetCycleCount();
+    if (logTimeEnable) tTick = GetCycleCount();
 
 #define LEAVEFUNC_TM()                                  \
     if (logTimeEnable) {                                \
         tTick = GetCycleCount() - tTick;                \
         curOutput += sprintf(curOutput, "%d\t", tTick); \
         if (curOutput > endSlot ) {                     \
-            if(timeingLogFile) {                        \
+            if (timeingLogFile) {                       \
                 sprintf(curOutput, "\0");               \
                 fprintf(timeingLogFile, printBuffer);   \
                 curOutput = printBuffer;                \
@@ -1439,12 +1451,12 @@ __GL_INLINE GLboolean __glDrawValidateState(__GLcontext *gc)
         }
 
 #ifdef OPENGL40
-        if(gc->globalDirtyState[__GL_LIGHTING_ATTRS])
+        if (gc->globalDirtyState[__GL_LIGHTING_ATTRS])
         {
             __glEvaluateLightingAttrib(gc,cs,ds);
         }
 
-        if(gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS])
+        if (gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS])
         {
             __glEvaluateLightSrcAttrib(gc,cs,ds);
         }
@@ -1711,9 +1723,19 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
     GLboolean ret = GL_TRUE;
     __GLvertexArrayMachine *vertexArray = &gc->vertexArray;
 
-    if (__glExtension[__GL_EXTID_KHR_robust_buffer_access_behavior].bEnabled)
+    if(!gc->imports.conformGLSpec)
     {
-        return GL_TRUE;
+        if (gc->imports.robustAccess && __glExtension[__GL_EXTID_KHR_robust_buffer_access_behavior].bEnabled)
+        {
+            return GL_TRUE;
+        }
+    }
+    else
+    {
+        if (__glExtension[__GL_EXTID_KHR_robust_buffer_access_behavior].bEnabled)
+        {
+            return GL_TRUE;
+        }
     }
 
     if (!(vertexArray->multidrawIndirect || vertexArray->drawIndirect))
@@ -1752,32 +1774,31 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
             __GLvertexArrayState *curVertexArray = &gc->vertexArray.boundVAO->vertexArray;
             GLuint64 attribEnabled = curVertexArray->attribEnabled;
             __GLprogramObject *vsProgObj = __glGetCurrentStageProgram(gc,__GLSL_STAGE_VS);
-            GLuint vsInputArrayMask = 0;
-#ifdef OPENGL40
-            GLuint64 vsInputMask = 0;
-#endif
-            if(vsProgObj)
+            GLuint64 inputMask = 0;
+
+            if (vsProgObj)
             {
-                vsInputArrayMask = vsProgObj->bindingInfo.vsInputArrayMask;
 #ifdef OPENGL40
-                vsInputMask = vsProgObj->bindingInfo.vsInputMask;
+                if (gc->imports.conformGLSpec)
+                {
+                    inputMask = vsProgObj->bindingInfo.vsInputMask;
+                }
+                else  /* Running OES api */
 #endif
+                {
+                    inputMask = vsProgObj->bindingInfo.vsInputArrayMask;
+                }
             }
 
-#ifdef OPENGL40
-            while (attribEnabled & vsInputMask)
+            while (attribEnabled & inputMask)
             {
-                if ((attribEnabled & vsInputMask) & 0x1)
-#else
-            while (attribEnabled & vsInputArrayMask)
-            {
-                if ((attribEnabled & vsInputArrayMask) & 0x1)
-#endif
+                if ((attribEnabled & inputMask) & 0x1)
                 {
                     GLuint remain;
                     __GLvertexAttrib *pAttrib = &curVertexArray->attribute[index];
                     __GLvertexAttribBinding *pAttribBinding = &curVertexArray->attributeBinding[pAttrib->attribBinding];
-                    __GLbufferObject *boundVBObj = pAttribBinding->boundArrayObj;
+                    __GLbufferObject *boundVBObj = (gc->imports.conformGLSpec) ? pAttribBinding->boundArrayObj:
+                        __glGetCurrentVertexArrayBufObj(gc, pAttrib->attribBinding);
 
                     if (boundVBObj)
                     {
@@ -1806,11 +1827,7 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
                 }
 
                 index++;
-#ifdef OPENGL40
-                vsInputMask >>= 1;
-#else
-                vsInputArrayMask >>= 1;
-#endif
+                inputMask >>= 1;
                 attribEnabled >>= 1;
             }
         }

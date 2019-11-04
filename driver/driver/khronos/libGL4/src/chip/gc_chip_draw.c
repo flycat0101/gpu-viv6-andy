@@ -279,7 +279,7 @@ gcChipComputeWlimitArg(
         return status;
     }
 
-    if(chipCtx->patchId == gcvPATCH_GMMY16MAPFB && instantDraw->count == 4)
+    if (chipCtx->patchId == gcvPATCH_GMMY16MAPFB && instantDraw->count == 4)
     {
         gcmONERROR(gco3D_SetWPlaneLimitF(chipCtx->engine, 1.0f));
         gcmONERROR(gco3D_SetWClipEnable(chipCtx->engine, gcvTRUE));
@@ -297,7 +297,7 @@ gcChipComputeWlimitArg(
         return status;
     }
 
-    if(chipCtx->patchId == gcvPATCH_ROCKSTAR_MAXPAYNE)
+    if (chipCtx->patchId == gcvPATCH_ROCKSTAR_MAXPAYNE)
     {
         gcmONERROR(gco3D_SetWClipEnable(chipCtx->engine, gcvFALSE));
         chipCtx->wLimitSettled = gcvTRUE;
@@ -337,7 +337,7 @@ gcChipComputeWlimitArg(
     {
         gcmONERROR(gco3D_SetWPlaneLimitF(chipCtx->engine, 0.0f));
         gcmONERROR(gco3D_SetWClipEnable(chipCtx->engine, gcvFALSE));
-        if(chipCtx->patchId == gcvPATCH_DEQP)
+        if (chipCtx->patchId == gcvPATCH_DEQP)
         {
             gcmONERROR(gco3D_SetWPlaneLimitF(chipCtx->engine, 0.1f));
             gcmONERROR(gco3D_SetWClipEnable(chipCtx->engine, gcvTRUE));
@@ -558,7 +558,7 @@ __GL_INLINE gctFLOAT computeSpecailWlimit(__GLcontext * gc, __GLchipInstantDraw 
                 v3 = v1 + 2;
                 break;
             }
-            if((v3 >= (gctINT)instantDraw->count) || (v2 < 0))
+            if ((v3 >= (gctINT)instantDraw->count) || (v2 < 0))
             {
                 return 0.0f;
             }
@@ -570,7 +570,7 @@ __GL_INLINE gctFLOAT computeSpecailWlimit(__GLcontext * gc, __GLchipInstantDraw 
             v2 = loopIndex - 1;
             v3 = loopIndex + 1;
 
-            if((v3 >= (gctINT)instantDraw->count) || (v2 < 0))
+            if ((v3 >= (gctINT)instantDraw->count) || (v2 < 0))
             {
                 return  0.0f;
             }
@@ -642,7 +642,7 @@ __GL_INLINE gctFLOAT computeSpecailWlimit(__GLcontext * gc, __GLchipInstantDraw 
     /* Get Value */
     for(i = 0; i< 3; i++)
     {
-        if((((gcmPTR2SIZE(vertexPtrs[i])) & 3) == 0))
+        if ((((gcmPTR2SIZE(vertexPtrs[i])) & 3) == 0))
         {
             for(j = 0; j < attrib->size; j++)
             {
@@ -692,7 +692,7 @@ __GL_INLINE gctFLOAT computeSpecailWlimit(__GLcontext * gc, __GLchipInstantDraw 
 
     /*Interpolate between v1 v2 and v1 v3 */
 
-    if(cullMask[0] & cullMask[1] & cullMask[2])  /* Triangle is been culled */
+    if (cullMask[0] & cullMask[1] & cullMask[2])  /* Triangle is been culled */
     {
         return 0.0f;
     }
@@ -700,7 +700,7 @@ __GL_INLINE gctFLOAT computeSpecailWlimit(__GLcontext * gc, __GLchipInstantDraw 
     for(i = 1;i <= 2; i++)
     {
 
-        if(cullMask[i] & 0x10)  /* Skip if z<0, interpolate should between v0 (z<0) and vi(z>0)*/
+        if (cullMask[i] & 0x10)  /* Skip if z<0, interpolate should between v0 (z<0) and vi(z>0)*/
         {
             limit = 0.0f;
             continue;
@@ -714,7 +714,7 @@ __GL_INLINE gctFLOAT computeSpecailWlimit(__GLcontext * gc, __GLchipInstantDraw 
         xMax = gcoMATH_Absolute(x ) * gc->state.viewport.width / 2.0f;
         yMax = gcoMATH_Absolute(y ) * gc->state.viewport.height / 2.0f;
 
-        if(xMax > fBound * gcoMATH_Absolute(w) || yMax > fBound * gcoMATH_Absolute(w))
+        if (xMax > fBound * gcoMATH_Absolute(w) || yMax > fBound * gcoMATH_Absolute(w))
         {
             /* If use wlimit value, the interpolate is
                  t = (w0 -wL)/(w0 -w1);
@@ -736,7 +736,7 @@ __GL_INLINE gctFLOAT computeSpecailWlimit(__GLcontext * gc, __GLchipInstantDraw 
             yMax = b / (fBound * 2.0f / gc->state.viewport.height + a);
             limit = xMax > yMax ? xMax : yMax;
 
-            if(limit > wlimit)
+            if (limit > wlimit)
                 wlimit = limit;
         }
     }
@@ -809,7 +809,7 @@ gcChipComputeWlimitByVertex(
         gco3D_SetWClipEnable(chipCtx->engine, gcvFALSE);
         chipCtx->wLimitSettled = gcvFALSE;
 
-        if(chipCtx->patchId == gcvPATCH_RIPTIDEGP2 || chipCtx->patchId == gcvPATCH_NAMESGAS)
+        if (chipCtx->patchId == gcvPATCH_RIPTIDEGP2 || chipCtx->patchId == gcvPATCH_NAMESGAS)
         {
             gco3D_SetWPlaneLimitF(chipCtx->engine, 0.01f);
             gco3D_SetWClipEnable(chipCtx->engine, gcvTRUE);
@@ -877,7 +877,7 @@ gcChipComputeWlimitByVertex(
 
 
         /* Get Value */
-        if((((gcmPTR2SIZE(vertexPtr)) & 3) == 0))
+        if ((((gcmPTR2SIZE(vertexPtr)) & 3) == 0))
         {
             for(j=0 ; j < attrib->size; j++)
             {
@@ -916,12 +916,12 @@ gcChipComputeWlimitByVertex(
           + mvp[11] * vector[2]
           + mvp[15] * vector[3];
 
-        if(i == 0)
+        if (i == 0)
         {
             refZ = z;
             refW = w;
         }
-        else if(!(refZ == z && refW == w))
+        else if (!(refZ == z && refW == w))
         {
             disableWlimit = gcvFALSE;
         }
@@ -939,7 +939,7 @@ gcChipComputeWlimitByVertex(
             gctFLOAT xmax = absX  * gc->state.viewport.width / 2.0f;
             gctFLOAT ymax = absY  * gc->state.viewport.height / 2.0f;
 
-            if(xmax > fBound * absW || ymax > fBound * absW)
+            if (xmax > fBound * absW || ymax > fBound * absW)
             {
                 gctFLOAT max = xmax > ymax ? xmax : ymax;
 
@@ -951,19 +951,19 @@ gcChipComputeWlimitByVertex(
             gctFLOAT xmax = absX / zNear * gc->state.viewport.width / 2.0f;
             gctFLOAT ymax = absY / zNear * gc->state.viewport.height / 2.0f;
 
-            if(xmax > fBound || ymax > fBound)
+            if (xmax > fBound || ymax > fBound)
             {
                 gctFLOAT max = xmax > ymax ? xmax : ymax;
 
                 limit = max * zNear / ((1 << 22) - 1);
             }
 
-            if(w < 0.0f)
+            if (w < 0.0f)
             {
                 float minWlimt = 0.0f;
                 minWlimt= computeSpecailWlimit(gc, instantDraw, (gctINT) i);
 
-                if(minWlimt > limit)
+                if (minWlimt > limit)
                 {
                     limit = minWlimt;
                 }
@@ -982,7 +982,7 @@ gcChipComputeWlimitByVertex(
             gcmTRACE(gcvLEVEL_ERROR,"wlimit can't handle this issue");
         }
 
-        if(limit > wlimit)
+        if (limit > wlimit)
         {
             wlimit = limit;
             ok = gcvTRUE;
@@ -1063,7 +1063,7 @@ gcChipSetVertexArrayBindBegin(
 #endif
 
     /* Need to convert to triangle list? */
-    if(instantDraw->primMode == gcvPRIMITIVE_LINE_LOOP)
+    if (instantDraw->primMode == gcvPRIMITIVE_LINE_LOOP)
     {
         /*for line loop the last line is automatic added in hw implementation*/
         instantDraw->primCount = instantDraw->primCount - 1;
@@ -1115,16 +1115,12 @@ gcChipSetVertexArrayBind(
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gcsVERTEXARRAY_STREAM_INFO streamInfo;
     gcsVERTEXARRAY_INDEX_INFO  indexInfo;
-    gctBOOL fixProgram = gcvFALSE;
 
     gcmHEADER_ARG("gc=0x%x instanced=%d", gc, instanced);
 
-#ifdef OPENGL40
-    fixProgram = chipCtx->fixProgramFlag;
-#endif
     gcmONERROR(gcChipSetVertexArrayBindBegin(gc, instantDraw, fixWLimit));
     /* Collect info for hal level.*/
-    gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, instanced, fixProgram);
+    gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, instanced, chipCtx->fixProgramFlag);
     gcmGL_COLLECT_INDEX_INFO(indexInfo, instantDraw);
 
     /* Bind the vertex array to the hardware. */
@@ -4897,85 +4893,87 @@ gcChipValidateDrawPath(
             }
 
 #ifdef OPENGL40
-            switch (gc->vertexArray.primMode)
+            if (gc->imports.conformGLSpec)
             {
-            case  GL_QUADS:
-                if (chipCtx->indexLoops)
+                switch (gc->vertexArray.primMode)
                 {
-                    gcChipPatchQuadListIndexed(gc, chipCtx, defaultInstant);
-                }
-                else
-                {
-                    gcChipPatchQuadList(gc, chipCtx, defaultInstant);
-                }
-                break;
-            case GL_QUAD_STRIP:
-                if (chipCtx->indexLoops)
-                {
-                    gcChipPatchQuadStripIndexed(gc, chipCtx, defaultInstant);
-                }
-                else
-                {
-                    gcChipPatchQuadStrip(gc, chipCtx, defaultInstant);
-                }
-                break;
-            case GL_POLYGON:
-                if (chipCtx->indexLoops)
-                {
-                    if (gc->state.light.shadingModel != GL_FLAT)
-                    {
-                        defaultInstant->primMode = gcvPRIMITIVE_TRIANGLE_FAN;
-                        defaultInstant->primCount = defaultInstant->count - 2;
-                    }
-                    else
-                    {
-                        gcChipPatchPolygonIndexed(gc, chipCtx, defaultInstant);
-                    }
-                }
-                else
-                {
-                    if (gc->state.light.shadingModel != GL_FLAT)
-                    {
-                        defaultInstant->primMode = gcvPRIMITIVE_TRIANGLE_FAN;
-                        defaultInstant->primCount = defaultInstant->count - 2;
-                    }
-                    else
-                    {
-                        gcChipPatchPolygon(gc, chipCtx, defaultInstant);
-                    }
-                }
-                break;
-            case GL_LINE_LOOP:
-                if (chipCtx->hashKey.hasLineStippleEnabled)
-                {
+                case  GL_QUADS:
                     if (chipCtx->indexLoops)
                     {
-                        gcChipPatchLineLoopIndexed(gc, chipCtx, defaultInstant, gcvTRUE);
+                        gcChipPatchQuadListIndexed(gc, chipCtx, defaultInstant);
                     }
                     else
                     {
-                        gcChipPatchLineLoop(gc, chipCtx, defaultInstant);
+                        gcChipPatchQuadList(gc, chipCtx, defaultInstant);
                     }
-                }
-                break;
-            case GL_TRIANGLE_FAN:
-                if (gc->state.polygon.frontMode == GL_LINE)
-                {
+                    break;
+                case GL_QUAD_STRIP:
                     if (chipCtx->indexLoops)
                     {
-                        gcChipPatchLineTriangleFanIndexed(gc, chipCtx, defaultInstant, gcvTRUE);
+                        gcChipPatchQuadStripIndexed(gc, chipCtx, defaultInstant);
                     }
                     else
                     {
-                        gcChipPatchLineTriangleFan(gc, chipCtx, defaultInstant);
+                        gcChipPatchQuadStrip(gc, chipCtx, defaultInstant);
                     }
+                    break;
+                case GL_POLYGON:
+                    if (chipCtx->indexLoops)
+                    {
+                        if (gc->state.light.shadingModel != GL_FLAT)
+                        {
+                            defaultInstant->primMode = gcvPRIMITIVE_TRIANGLE_FAN;
+                            defaultInstant->primCount = defaultInstant->count - 2;
+                        }
+                        else
+                        {
+                            gcChipPatchPolygonIndexed(gc, chipCtx, defaultInstant);
+                        }
+                    }
+                    else
+                    {
+                        if (gc->state.light.shadingModel != GL_FLAT)
+                        {
+                            defaultInstant->primMode = gcvPRIMITIVE_TRIANGLE_FAN;
+                            defaultInstant->primCount = defaultInstant->count - 2;
+                        }
+                        else
+                        {
+                            gcChipPatchPolygon(gc, chipCtx, defaultInstant);
+                        }
+                    }
+                    break;
+                case GL_LINE_LOOP:
+                    if (chipCtx->hashKey.hasLineStippleEnabled)
+                    {
+                        if (chipCtx->indexLoops)
+                        {
+                            gcChipPatchLineLoopIndexed(gc, chipCtx, defaultInstant, gcvTRUE);
+                        }
+                        else
+                        {
+                            gcChipPatchLineLoop(gc, chipCtx, defaultInstant);
+                        }
+                    }
+                    break;
+                case GL_TRIANGLE_FAN:
+                    if (gc->state.polygon.frontMode == GL_LINE)
+                    {
+                        if (chipCtx->indexLoops)
+                        {
+                            gcChipPatchLineTriangleFanIndexed(gc, chipCtx, defaultInstant, gcvTRUE);
+                        }
+                        else
+                        {
+                            gcChipPatchLineTriangleFan(gc, chipCtx, defaultInstant);
+                        }
+                    }
+                    break;
+                default:
+                    break;
                 }
-                break;
-            default:
-                break;
             }
 #endif
-
 
             if (chipCtx->chipFeature.haltiLevel >= __GL_CHIP_HALTI_LEVEL_3)
             {
@@ -5028,7 +5026,7 @@ gcChipValidateDrawPath(
                  * independent primitives.
                  */
                 if ((gc->state.enables.primitiveRestart)
-                    && (!chipCtx->chipFeature.primitiveRestart)
+                    && (!chipCtx->chipFeature.hwFeature.primitiveRestart)
                     && (chipCtx->indexLoops))
                 {
                     switch (defaultInstant->primMode)
@@ -5075,7 +5073,7 @@ gcChipValidateDrawPath(
                     /* Convert triangle strip to triangle list if HW cannot support */
                     if (chipCtx->indexLoops)
                     {
-                        if (forceInstancedDraw || chipCtx->chipFeature.patchTriangleStrip)
+                        if (forceInstancedDraw || chipCtx->chipFeature.hwFeature.patchTriangleStrip)
                         {
                             if (defaultInstant->indexBuffer)
                             {
@@ -5111,7 +5109,7 @@ gcChipValidateDrawPath(
                         }
                     }
                     else if (chipCtx->indexLoops &&
-                             chipCtx->chipFeature.patchTriangleStrip &&
+                             chipCtx->chipFeature.hwFeature.patchTriangleStrip &&
                              chipCtx->patchId == gcvPATCH_DEQP)
                     {
                         gcmONERROR(gcChipPatchTriangleFanIndexed(gc, chipCtx, defaultInstant, gcvFALSE));
@@ -5120,7 +5118,7 @@ gcChipValidateDrawPath(
 
                 case gcvPRIMITIVE_LINE_LOOP:
                     /* Convert line loop to line list if HW cannot support */
-                    if (forceInstancedDraw || !chipCtx->chipFeature.lineLoop)
+                    if (forceInstancedDraw || !chipCtx->chipFeature.hwFeature.lineLoop)
                     {
                         /* We can change it to line strip here for performance. But then
                         ** we would need to choose glChipDrawElements as the draw path
@@ -5341,11 +5339,9 @@ gcChipValidateStream(
     GLint attribIdx = 0;
     GLuint bitMask;
     gceSTATUS status = gcvSTATUS_OK;
-#ifdef OPENGL40
     GLuint arrayLoc[__GL_MAX_VERTEX_ATTRIBUTES];
     GLint index = 0;
     GLuint i;
-#endif
 
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
@@ -5370,35 +5366,43 @@ gcChipValidateStream(
     chipCtx->directPositionIndex = -1;
 
 #ifdef OPENGL40
-    memset((char *)arrayLoc, 0xFF, sizeof(arrayLoc));
-    if ( (index = chipCtx->builtinAttributeIndex[_GL_VERTEX_INDEX]) >= 0)
+    if (gc->imports.conformGLSpec)
     {
-        arrayLoc[index] = __GL_INPUT_VERTEX_INDEX;
-    }
-
-    if ( (index = chipCtx->builtinAttributeIndex[_GL_COLOR_INDEX]) >= 0)
-    {
-        arrayLoc[index] = __GL_INPUT_DIFFUSE_INDEX;
-    }
-
-    for(i = _GL_MULTITEX0_INDEX; i< _GL_BT_INDEX_MAX; i++)
-    {
-
-        if ( (index = chipCtx->builtinAttributeIndex[i]) >= 0)
+        memset((char *)arrayLoc, 0xFF, sizeof(arrayLoc));
+        if ( (index = chipCtx->builtinAttributeIndex[_GL_VERTEX_INDEX]) >= 0)
         {
-
-            arrayLoc[index] = __GL_INPUT_TEX0_INDEX + i - _GL_MULTITEX0_INDEX;
+            arrayLoc[index] = __GL_INPUT_VERTEX_INDEX;
         }
 
-    }
-    for(i = 0; i < __GL_MAX_VERTEX_ATTRIBUTES; i++)
-    {
-        if ( arrayLoc[i] == 0xFFFFFFFF)
+        if ( (index = chipCtx->builtinAttributeIndex[_GL_COLOR_INDEX]) >= 0)
         {
-            arrayLoc[i] = i + __GL_INPUT_ATT0_INDEX;
+            arrayLoc[index] = __GL_INPUT_DIFFUSE_INDEX;
+        }
+
+        for(i = _GL_MULTITEX0_INDEX; i< _GL_BT_INDEX_MAX; i++)
+        {
+            if ( (index = chipCtx->builtinAttributeIndex[i]) >= 0)
+            {
+                arrayLoc[index] = __GL_INPUT_TEX0_INDEX + i - _GL_MULTITEX0_INDEX;
+            }
+        }
+
+        for(i = 0; i < __GL_MAX_VERTEX_ATTRIBUTES; i++)
+        {
+            if ( arrayLoc[i] == 0xFFFFFFFF)
+            {
+                arrayLoc[i] = i + __GL_INPUT_ATT0_INDEX;
+            }
         }
     }
+    else /* Running OES api */
 #endif
+    {
+        for(i = 0; i < __GL_MAX_VERTEX_ATTRIBUTES; i++)
+        {
+            arrayLoc[i] = i;
+        }
+    }
 
     /* vsInputArrayMask means generic vertex attribute array index. */
     while (vsInputArrayMask)
@@ -5426,19 +5430,12 @@ gcChipValidateStream(
             attribPtr->tempStream = gcvNULL;
 
             /* Check whether VS required attribute was enabled by apps */
-#ifdef OPENGL40
-           if (vertexArrayState->attribEnabled & (__GL_ONE_64 << arrayLoc[arrayIdx]))
-#else
-            if (vertexArrayState->attribEnabled & (__GL_ONE_64 << arrayIdx))
-#endif
+            if (vertexArrayState->attribEnabled & (__GL_ONE_64 << arrayLoc[arrayIdx]))
             {
                 __GLbufferObject *bufObj;
                 gceVERTEX_FORMAT format = gcvVERTEX_BYTE;
-#ifdef OPENGL40
                 __GLvertexAttrib *attribute = &vertexArrayState->attribute[arrayLoc[arrayIdx]];
-#else
-                __GLvertexAttrib *attribute = &vertexArrayState->attribute[arrayIdx];
-#endif
+
                 __GLvertexAttribBinding *attribBinding = &vertexArrayState->attributeBinding[attribute->attribBinding];
                 GLboolean normalize = attribute->normalized;
                 gceATTRIB_SCHEME scheme = gcvATTRIB_SCHEME_KEEP;
@@ -5514,7 +5511,7 @@ gcChipValidateStream(
                     if (attribute->integer)
                     {
                         format = gcvVERTEX_INT16;
-                        if (hwIntAttrib && chipCtx->chipFeature.extendIntSign)
+                        if (hwIntAttrib && chipCtx->chipFeature.hwFeature.extendIntSign)
                         {
                             /* HW reuses normalize bit to extend sign to 32bit */
                             normalize = GL_TRUE;
@@ -5551,7 +5548,7 @@ gcChipValidateStream(
                     if (attribute->integer)
                     {
                         format = gcvVERTEX_INT8;
-                        if (hwIntAttrib && chipCtx->chipFeature.extendIntSign)
+                        if (hwIntAttrib && chipCtx->chipFeature.hwFeature.extendIntSign)
                         {
                             /* HW reuses normalize bit to extend sign to 32bit */
                             normalize = GL_TRUE;
@@ -5576,7 +5573,7 @@ gcChipValidateStream(
                     break;
                 case GL_UNSIGNED_INT_2_10_10_10_REV:
                     format = gcvVERTEX_UNSIGNED_INT_2_10_10_10_REV;
-                    if (!chipCtx->chipFeature.attrib2101010Rev)
+                    if (!chipCtx->chipFeature.hwFeature.attrib2101010Rev)
                     {
                         chipCtx->anyAttibConverted = gcvTRUE;
                         scheme = gcvATTRIB_SCHEME_2_10_10_10_REV_TO_FLOAT;
@@ -5585,7 +5582,7 @@ gcChipValidateStream(
 
                 case GL_INT_2_10_10_10_REV:
                     format = gcvVERTEX_INT_2_10_10_10_REV;
-                    if (!chipCtx->chipFeature.attrib2101010Rev)
+                    if (!chipCtx->chipFeature.hwFeature.attrib2101010Rev)
                     {
                         chipCtx->anyAttibConverted = gcvTRUE;
                         scheme = gcvATTRIB_SCHEME_2_10_10_10_REV_TO_FLOAT;
@@ -5650,17 +5647,11 @@ gcChipValidateStream(
                     {
                         attribPtr->stream = gcvNULL;
                         attribPtr->enable = gcvFALSE;
-#ifdef OPENGL40
+
                         attribPtr->genericValue[0] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.x;
                         attribPtr->genericValue[1] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.y;
                         attribPtr->genericValue[2] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.z;
                         attribPtr->genericValue[3] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.w;
-#else
-                        attribPtr->genericValue[0] = gc->state.current.attribute[arrayIdx].f.x;
-                        attribPtr->genericValue[1] = gc->state.current.attribute[arrayIdx].f.y;
-                        attribPtr->genericValue[2] = gc->state.current.attribute[arrayIdx].f.z;
-                        attribPtr->genericValue[3] = gc->state.current.attribute[arrayIdx].f.w;
-#endif
                     }
                 }
                 else
@@ -5680,17 +5671,12 @@ gcChipValidateStream(
             {
                 attribPtr->stream = gcvNULL;
                 attribPtr->enable = gcvFALSE;
-#ifdef OPENGL40
+
                 attribPtr->genericValue[0] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.x;
                 attribPtr->genericValue[1] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.y;
                 attribPtr->genericValue[2] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.z;
                 attribPtr->genericValue[3] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.w;
-#else
-                attribPtr->genericValue[0] = gc->state.current.attribute[arrayIdx].f.x;
-                attribPtr->genericValue[1] = gc->state.current.attribute[arrayIdx].f.y;
-                attribPtr->genericValue[2] = gc->state.current.attribute[arrayIdx].f.z;
-                attribPtr->genericValue[3] = gc->state.current.attribute[arrayIdx].f.w;
-#endif
+
                 chipCtx->anyAttibGeneric = GL_TRUE;
             }
 
@@ -5721,7 +5707,7 @@ gcChipValidateFixShaderStream(
         return gcvSTATUS_OK;
     }
 
-    if (chipCtx->fixProgramFlag != gcvTRUE)
+    if (chipCtx->fixProgramFlag == gcvFALSE)
     {
          gcmFOOTER();
         return gcChipValidateStream(gc, chipCtx);
@@ -5898,7 +5884,7 @@ GLvoid configStream(__GLcontext* gc)
             vertexPtr = &chipCtx->attributeArray[attrIndex];
 
             {
-                if(vertexStream) {
+                if (vertexStream) {
                     /* Mark stream dirty. */
                     vertexStream->dirty = GL_TRUE;
 
@@ -7442,19 +7428,14 @@ gcChipSplitDrawIndexFetch(
     __GLchipInstantDraw tmpInstantDraw;
     gcsVERTEXARRAY_STREAM_INFO streamInfo;
     gcsVERTEXARRAY_INDEX_INFO  indexInfo;
-    gctBOOL fixProgram = gcvFALSE;
 
     gcmHEADER();
-
-#ifdef OPENGL40
-    fixProgram = chipCtx->fixProgramFlag;
-#endif
 
     gcmONERROR(gcChipSetVertexArrayBindBegin(gc, instantDraw, gcvTRUE));
 
     /* Stream data not change, only need bind once.*/
     /* Collect info for hal level.*/
-    gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, gcvTRUE, fixProgram);
+    gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, gcvTRUE, chipCtx->fixProgramFlag);
     gcmGL_COLLECT_INDEX_INFO(indexInfo, instantDraw);
 
 #if gcdUSE_WCLIP_PATCH
@@ -7715,13 +7696,8 @@ gcChipSplitDrawTCS(
     gcsVERTEXARRAY_STREAM_INFO streamInfo;
     gcsVERTEXARRAY_INDEX_INFO  indexInfo;
     __GLchipInstantDraw tmpInstantDraw;
-    gctBOOL fixProgram = gcvFALSE;
 
     gcmHEADER();
-
-#ifdef OPENGL40
-    fixProgram = chipCtx->fixProgramFlag;
-#endif
 
     gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
 
@@ -7732,7 +7708,7 @@ gcChipSplitDrawTCS(
 
     /* Stream data not change, only need bind once.*/
     /* Collect info for hal level.*/
-    gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, gcvTRUE, fixProgram);
+    gcmGL_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, gcvTRUE, chipCtx->fixProgramFlag);
     gcmGL_COLLECT_INDEX_INFO(indexInfo, instantDraw);
     __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
 
@@ -7975,7 +7951,7 @@ gcChipCollectSplitDrawElementInfo(
         return gcvSTATUS_OK;
     }
 
-    if(chipCtx->hashKey.hasLineStippleEnabled && instantDraw->primMode == gcvPRIMITIVE_LINE_LIST)
+    if (chipCtx->hashKey.hasLineStippleEnabled && instantDraw->primMode == gcvPRIMITIVE_LINE_LIST)
     {
         splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_STIPPLE;
         splitDrawInfo->splitDrawFunc = gcChipSplitDrawStipple;
@@ -8526,21 +8502,22 @@ __glChipFlush(
     gcmONERROR(gcChipFboSyncFromShadowFreon(gc, gc->frameBuffer.drawFramebufObj));
 
 #ifdef OPENGL40
-    if (chipCtx->drawRtViews[0].surf) {
+    if (chipCtx->drawRtViews[0].surf)
+    {
         /* Flush the cache. */
         gcmONERROR(gcoSURF_Flush(chipCtx->drawRtViews[0].surf));
+    }
 #endif
 
     /* Commit command buffer. */
     gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvFALSE));
 
 #ifdef OPENGL40
-        if(!gc->imports.fromEGL)
+    if (!gc->imports.fromEGL)
+    {
+        if (gc->flags & __GL_CONTEXT_DRAW_TO_FRONT)
         {
-            if(gc->flags & __GL_CONTEXT_DRAW_TO_FRONT)
-            {
-                (*gc->imports.internalSwapBuffers)(gc, GL_TRUE, GL_TRUE);
-            }
+            (*gc->imports.internalSwapBuffers)(gc, GL_TRUE, GL_TRUE);
         }
     }
 #endif
@@ -8575,7 +8552,7 @@ __glChipFinish(
     gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
 
 #ifdef OPENGL40
-    if(gc->flags & __GL_CONTEXT_DRAW_TO_FRONT)
+    if (!gc->imports.fromEGL && (gc->flags & __GL_CONTEXT_DRAW_TO_FRONT))
     {
         (*gc->imports.internalSwapBuffers)(gc,GL_TRUE, GL_TRUE);
     }
@@ -8666,9 +8643,8 @@ gcChipTraverseProgramStages(
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x call=0x%x", gc, chipCtx, callback);
 
 #ifdef OPENGL40
-    if ( chipCtx->fixProgramFlag )
+    if (chipCtx->fixProgramFlag == gcvFALSE)
     {
-    } else {
 #endif
 
     while (stageBits)
@@ -8713,12 +8689,7 @@ __glChipDrawBegin(
 
     gcmHEADER_ARG("gc=0x%x mode=0x%04x", gc, mode);
 
-
-/* quick code for check fix path */
-
-#ifdef OPENGL40
     chipCtx->fixProgramFlag = gcvTRUE;
-#endif
 
     do
     {
@@ -8752,7 +8723,6 @@ __glChipDrawBegin(
                                 gcvFRAMEINFO_DRAW_NUM,
                                 gcvFRAMEINFO_OP_INC,
                                 gcvNULL);
-
         }
 #endif
 
@@ -8795,17 +8765,19 @@ __glChipDrawBegin(
                 if ((!ppObj->stageProgs[__GLSL_STAGE_VS] && !ppObj->stageProgs[__GLSL_STAGE_FS]) ||
                     !__glChipValidateProgramPipeline(gc, ppObj, GL_TRUE))
                 {
-#ifndef OPENGL40
-                    __GLES_PRINT("ES30:skip draw because of program pipeline validate failed");
-#endif
+                    if (!gc->imports.conformGLSpec)
+                    {
+                        __GLES_PRINT("ES30:skip draw because of program pipeline validate failed");
+                    }
                     break;
                 }
             }
             else
             {
-#ifndef OPENGL40
-                __GLES_PRINT("ES30:skip draw because of no program object nor program pipeline object was active");
-#endif
+                if (!gc->imports.conformGLSpec)
+                {
+                    __GLES_PRINT("ES30:skip draw because of no program object nor program pipeline object was active");
+                }
                 break;
             }
         }
@@ -8833,9 +8805,10 @@ __glChipDrawBegin(
         vsProgram = chipCtx->activePrograms[__GLSL_STAGE_VS];
         if (!vsProgram)
         {
-#ifndef OPENGL40
-            __GLES_PRINT("ES30:skip draw because of NULL VS program");
-#endif
+            if (!gc->imports.conformGLSpec)
+            {
+                __GLES_PRINT("ES30:skip draw because of NULL VS program");
+            }
             break;
         }
 
@@ -8906,8 +8879,6 @@ __glChipDrawBegin(
             __GLchipSLProgram *gsProgram = chipCtx->activePrograms[__GLSL_STAGE_GS];
             GLboolean legalPrimType = GL_FALSE;
             __GLxfbObject *xfbObj = gc->xfb.boundXfbObj;
-            GLuint numPrims = 0;
-            GLuint numVerts = 0;
 
             if (gsProgram)
             {
@@ -8986,23 +8957,8 @@ __glChipDrawBegin(
 
                 if (xfbObj->active && !xfbObj->paused)
                 {
-                    switch (gsInputType)
-                    {
-                    case GL_POINTS:
-                        numPrims = gsProgObj->bindingInfo.gsOutVertices;
-                        numVerts = numPrims;
-                        break;
-                    case GL_LINES:
-                        numPrims = (gsProgObj->bindingInfo.gsOutVertices / 2);
-                        numVerts = numPrims * 2;
-                        break;
-                    case GL_TRIANGLES:
-                        numPrims = (gsProgObj->bindingInfo.gsOutVertices / 3);
-                        numVerts = numPrims * 3;
-                        break;
-                    }
-
-                    xfbObj->vertices += numVerts;
+                    //TODO: This is max vertices, maybe need to capture GS output vertices after draw.
+                    xfbObj->vertices += gsProgObj->bindingInfo.gsOutVertices;
                 }
             }
             else
@@ -9194,14 +9150,23 @@ __glChipDrawBegin(
     } while (0);
 
 #ifdef OPENGL40
-    if ( gc->shaderProgram.currentProgram )
-        chipCtx->fixProgramFlag = gcvFALSE;
-    if (chipCtx->fixProgramFlag)
+    if (gc->imports.conformGLSpec)
     {
-        configStream(gc);
-        ret = GL_TRUE;
+        if (gc->shaderProgram.currentProgram)
+        {
+            chipCtx->fixProgramFlag = gcvFALSE;
+        }
+        if (chipCtx->fixProgramFlag)
+        {
+            configStream(gc);
+            ret = GL_TRUE;
+        }
     }
+    else
 #endif
+    {
+        chipCtx->fixProgramFlag = gcvFALSE;
+    }
 
 #if VIVANTE_PROFILER
     if (ret == GL_FALSE && gc->profiler.enable && gc->profiler.perDrawMode)
@@ -9223,7 +9188,7 @@ gcChipValidateFixProgram(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
-    if ( chipCtx->fixProgramFlag )
+    if (chipCtx->fixProgramFlag)
     {
         gcmONERROR(gcChipLoadFixFunctionShader(gc));
     }
@@ -9250,14 +9215,19 @@ __glChipDrawValidateState(
 
     /* Validate stream */
 #ifdef OPENGL40
-    gcmONERROR(gcChipValidateGL4FixState(gc, chipCtx));
-    gcmONERROR(gcChipValidateFixShaderStream(gc, chipCtx));
-    gcmONERROR(gcChipValidateGL4Texture(gc, chipCtx));
-    gcmONERROR(gcChipValidateFixProgram(gc,chipCtx));
-    gcmONERROR(gcChipBindFixSamplers(gc));
-#else
-    gcmONERROR(gcChipValidateStream(gc, chipCtx));
+    if (gc->imports.conformGLSpec)
+    {
+        gcmONERROR(gcChipValidateGL4FixState(gc, chipCtx));
+        gcmONERROR(gcChipValidateFixShaderStream(gc, chipCtx));
+        gcmONERROR(gcChipValidateGL4Texture(gc, chipCtx));
+        gcmONERROR(gcChipValidateFixProgram(gc,chipCtx));
+        gcmONERROR(gcChipBindFixSamplers(gc));
+    }
+    else
 #endif
+    {
+        gcmONERROR(gcChipValidateStream(gc, chipCtx));
+    }
 
     /* Validate render buffer state*/
     gcmONERROR(gcChipValidateRenderTargetState(gc, chipCtx));
@@ -9305,7 +9275,7 @@ __gl4ChipFlush(
         /* Commit command buffer. */
         gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvFALSE));
 
-        if (gc->flags & __GL_CONTEXT_DRAW_TO_FRONT)
+        if (!gc->imports.fromEGL && (gc->flags & __GL_CONTEXT_DRAW_TO_FRONT))
         {
             (*gc->imports.internalSwapBuffers)(gc,GL_TRUE, GL_FALSE);
         }
@@ -9340,7 +9310,7 @@ __glChipDrawEnd(
     gcmHEADER_ARG("gc=0x%x", gc);
 
 #ifdef OPENGL40
-    if (!gc->imports.fromEGL)
+    /* TODO check if this is needed */
     {
         gcmONERROR(__gl4ChipFlush(gc));
     }
@@ -9704,7 +9674,7 @@ __glChipDrawPattern(
 
     /* Fill into uniforms */
     pFastFlush->programValid = program ? gcvTRUE : gcvFALSE;
-    if(program == gcvNULL)
+    if (program == gcvNULL)
     {
         pFastFlush->userDefUniformCount = 0;
         vsInputArrayMask = 0;
@@ -9823,7 +9793,7 @@ __glChipDrawPattern(
     pFastFlush->trgFuncColor = func;
 
     /* Fill into depth compare */
-    if((gc->state.enables.depthTest && chipCtx->drawDepthView.surf) ||
+    if ((gc->state.enables.depthTest && chipCtx->drawDepthView.surf) ||
         (gc->state.enables.stencilTest && chipCtx->drawStencilView.surf))
     {
         pFastFlush->depthMode = gcvDEPTH_Z;
@@ -9923,10 +9893,8 @@ __glChipComputeBegin(
 #endif
 
 #ifdef OPENGL40
-    if (chipCtx && chipCtx->fixProgramFlag)
+    if (chipCtx->fixProgramFlag  == gcvFALSE)
     {
-    }
-    else
 #endif
     if (gc->globalDirtyState[__GL_PROGRAM_ATTRS] & (__GL_DIRTY_GLSL_PROGRAM_SWITCH |
                                                     __GL_DIRTY_GLSL_MODE_SWITCH))
@@ -9957,6 +9925,9 @@ __glChipComputeBegin(
             __GL_ERROR(GL_INVALID_OPERATION);
         }
     }
+#ifdef OPENGL40
+    }
+#endif
 
     /* update maxUnit / maxSampler.*/
     if (gc->globalDirtyState[__GL_PROGRAM_ATTRS] & (__GL_DIRTY_GLSL_PROGRAM_SWITCH |

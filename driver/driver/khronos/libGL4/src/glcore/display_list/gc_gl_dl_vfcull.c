@@ -176,14 +176,14 @@ __GL_INLINE GLvoid __glConcatListBatchEnd(__GLcontext *gc)
         /* Allocate and initialize a listConcatDraw structure */
         listConcatDraw = (__GLDlistConcatDraw *)(*gc->imports.malloc)(gc, sizeof(__GLDlistConcatDraw) );
 
-        if(listConcatDraw == NULL)
+        if (listConcatDraw == NULL)
         {
             goto cache_fail;
         }
 
         listConcatDraw->primBegin = (__GLPrimBegin *)(*gc->imports.malloc)(gc, dataSize );
 
-        if(listConcatDraw->primBegin == NULL)
+        if (listConcatDraw->primBegin == NULL)
         {
             goto cache_fail;
         }
@@ -196,7 +196,7 @@ __GL_INLINE GLvoid __glConcatListBatchEnd(__GLcontext *gc)
             dataSize = primBegin->indexCount * sizeof(GLushort);
             listConcatDraw->primBegin->indexBuffer = (GLushort *)(*gc->imports.malloc)(gc, dataSize );
 
-            if(listConcatDraw->primBegin->indexBuffer == NULL)
+            if (listConcatDraw->primBegin->indexBuffer == NULL)
             {
                 goto cache_fail;
             }
@@ -206,7 +206,7 @@ __GL_INLINE GLvoid __glConcatListBatchEnd(__GLcontext *gc)
             /* Allocate and copy concatIndexCount[] to listConcatDraw->concatIndexCount */
             dataSize = gc->dlist.concatListCount * sizeof(GLint);
             listConcatDraw->concatIndexCount = (GLint *)(*gc->imports.malloc)(gc, dataSize );
-            if(listConcatDraw->concatIndexCount == NULL)
+            if (listConcatDraw->concatIndexCount == NULL)
             {
                 goto cache_fail;
             }
@@ -224,7 +224,7 @@ __GL_INLINE GLvoid __glConcatListBatchEnd(__GLcontext *gc)
         /* Allocate and copy concatDlistPtrs[] to listConcatDraw->concatDlistPtrs */
         dataSize = gc->dlist.concatListCount * sizeof(__GLdlist *);
         listConcatDraw->concatDlistPtrs = (__GLdlist **)(*gc->imports.malloc)(gc, dataSize );
-        if(listConcatDraw->concatDlistPtrs == NULL)
+        if (listConcatDraw->concatDlistPtrs == NULL)
         {
             goto cache_fail;
         }
@@ -233,7 +233,7 @@ __GL_INLINE GLvoid __glConcatListBatchEnd(__GLcontext *gc)
         /* Allocate and copy concatVertexCount[] to listConcatDraw->concatVertexCount */
         dataSize = gc->dlist.concatListCount * sizeof(GLint);
         listConcatDraw->concatVertexCount = (GLint *)(*gc->imports.malloc)(gc, dataSize );
-        if(listConcatDraw->concatVertexCount == NULL)
+        if (listConcatDraw->concatVertexCount == NULL)
         {
             goto cache_fail;
         }
@@ -295,32 +295,32 @@ __GL_INLINE GLvoid __glConcatListBatchEnd(__GLcontext *gc)
 
 cache_fail:
 
-    if(listConcatDraw && listConcatDraw->concatVertexCount)
+    if (listConcatDraw && listConcatDraw->concatVertexCount)
     {
         (*gc->imports.free)(gc, listConcatDraw->concatVertexCount);
     }
 
-    if(listConcatDraw && listConcatDraw->concatDlistPtrs)
+    if (listConcatDraw && listConcatDraw->concatDlistPtrs)
     {
         (*gc->imports.free)(gc, listConcatDraw->concatDlistPtrs);
     }
 
-    if(listConcatDraw && listConcatDraw->concatIndexCount)
+    if (listConcatDraw && listConcatDraw->concatIndexCount)
     {
         (*gc->imports.free)(gc, listConcatDraw->concatIndexCount);
     }
 
-    if(listConcatDraw && listConcatDraw->primBegin && listConcatDraw->primBegin->indexBuffer)
+    if (listConcatDraw && listConcatDraw->primBegin && listConcatDraw->primBegin->indexBuffer)
     {
         (*gc->imports.free)(gc, listConcatDraw->primBegin->indexBuffer);
     }
 
-    if(listConcatDraw && listConcatDraw->primBegin)
+    if (listConcatDraw && listConcatDraw->primBegin)
     {
         (*gc->imports.free)(gc, listConcatDraw->primBegin);
     }
 
-    if(listConcatDraw)
+    if (listConcatDraw)
     {
         (*gc->imports.free)(gc, listConcatDraw);
     }

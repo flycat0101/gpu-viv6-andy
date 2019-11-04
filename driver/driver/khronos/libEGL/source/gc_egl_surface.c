@@ -3761,6 +3761,7 @@ eglLockSurfaceKHR(
                 Display, Surface, Attrib_list);
     gcmDUMP_API_ARRAY_TOKEN(Attrib_list, EGL_NONE);
     gcmDUMP_API("$}");
+    VEGL_TRACE_API(LockSurfaceKHR)(Display, Surface, Attrib_list);
 
     /* Get current thread. */
     thread = veglGetThreadData();
@@ -3893,6 +3894,7 @@ eglUnlockSurfaceKHR(
 
     gcmHEADER_ARG("Display=0x%x Surface=0x%x", Display, Surface);
     gcmDUMP_API("${EGL eglUnlockSurfaceKHR 0x%08X 0x%08X}", Display, Surface);
+    VEGL_TRACE_API(UnlockSurfaceKHR)(Display, Surface);
 
     /* Get current thread. */
     thread = veglGetThreadData();

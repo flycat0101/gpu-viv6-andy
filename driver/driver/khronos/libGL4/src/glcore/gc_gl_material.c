@@ -74,7 +74,7 @@ GLvoid __glImmedFlushPrim_Material(__GLcontext *gc, GLboolean bFlushPipe)
 
         /* Switch dispatch entry dispatchTable->End
         Current dispatch table should be info table */
-        if(vertexCount > 0 && (gc->immedModeDispatch.End != __glim_End_Material))
+        if (vertexCount > 0 && (gc->immedModeDispatch.End != __glim_End_Material))
         {
             gc->input.indexCount = 0;
             gc->tnlAccum.glimEnd = gc->immedModeDispatch.End;

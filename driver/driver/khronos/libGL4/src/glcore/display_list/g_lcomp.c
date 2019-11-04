@@ -50,7 +50,7 @@ extern GLboolean __glCheckTexImgArgs(__GLcontext *gc, __GLtextureObject *tex, GL
 extern GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex, GLint internalFormat, GLboolean compSizeMatch);
 extern GLboolean __glCheckTexImgTypeArg(__GLcontext *gc, __GLtextureObject *tex, GLenum type);
 extern GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc, __GLtextureObject *tex, GLenum internalFormat);
-extern GLboolean __glCheckTexImgFmt(__GLcontext *gc, __GLtextureObject *tex, GLenum target, GLint internalFormat, GLenum format, GLenum type);
+extern GLboolean __glCheckTexImgFmt(__GLcontext *gc, __GLtextureObject *tex, GLenum target, GLint internalFormat, GLenum format, GLenum type, GLenum InOrOutput);
 extern GLboolean __glCheckTexImgFmtArg(__GLcontext *gc, __GLtextureObject *tex, GLenum format);
 extern GLboolean __glCheckTexSubImgArgs(__GLcontext *gc, __GLtextureObject *tex, GLuint  face, GLint   lod, GLint   xoffset, GLint   yoffset, GLint   zoffset, GLsizei width, GLsizei height, GLsizei depth);
 /* OpenGL compiled display list APIs */
@@ -140,7 +140,7 @@ GLvoid APIENTRY __gllc_End(__GLcontext *gc)
 
 
     if (gc->dlist.mode == GL_COMPILE_AND_EXECUTE) {
-         if(gc->immedModeDispatch.End == __glim_End_Material)
+         if (gc->immedModeDispatch.End == __glim_End_Material)
             __glim_End_Material(gc);
         else
             __glim_End(gc);
@@ -1426,7 +1426,7 @@ GLvoid APIENTRY __gllc_Materialfv(__GLcontext *gc, GLenum face, GLenum pname, co
     }
 
     error = __glErrorCheckMaterial(face, pname, params[0]);
-    if(error != GL_NO_ERROR) {
+    if (error != GL_NO_ERROR) {
         __gllc_Error(gc, error);
         return;
     }
@@ -1474,7 +1474,7 @@ GLvoid APIENTRY __gllc_Materialiv(__GLcontext *gc, GLenum face, GLenum pname, co
     }
 
     error = __glErrorCheckMaterial(face, pname, (GLfloat)params[0]);
-    if(error != GL_NO_ERROR) {
+    if (error != GL_NO_ERROR) {
         __gllc_Error(gc, error);
         return;
     }
@@ -7500,7 +7500,7 @@ GLvoid APIENTRY __gllc_TexImage1D(__GLcontext *gc, GLenum target, GLint level,
             __glSetError(gc, oldError);
         }
 
-        if (!__glCheckTexImgFmt(gc, tex, target, components, format, type))
+        if (!__glCheckTexImgFmt(gc, tex, target, components, format, type, __GL_InputFormat))
         {
             __glSetError(gc, oldError);
         }
@@ -7570,7 +7570,7 @@ GLvoid APIENTRY __gllc_TexImage2D(__GLcontext *gc, GLenum target, GLint lod,
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
             case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
-                if(!__glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled && !__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
+                if (!__glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled && !__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
                 {
                     __gllc_InvalidEnum(gc);
                     return;
@@ -7604,7 +7604,7 @@ GLvoid APIENTRY __gllc_TexImage2D(__GLcontext *gc, GLenum target, GLint lod,
         __glSetError(gc, oldError);
         }
 
-        if (!__glCheckTexImgFmt(gc, tex, target, internalFormat, format, type))
+        if (!__glCheckTexImgFmt(gc, tex, target, internalFormat, format, type, __GL_InputFormat))
         {
         __glSetError(gc, oldError);
         }
@@ -7702,7 +7702,7 @@ GLvoid APIENTRY __gllc_TexImage3D(__GLcontext *gc, GLenum target,
             __glSetError(gc, oldError);
         }
 
-        if (!__glCheckTexImgFmt(gc, tex, target, components, format, type))
+        if (!__glCheckTexImgFmt(gc, tex, target, components, format, type, __GL_InputFormat))
         {
             __glSetError(gc, oldError);
         }
@@ -7710,7 +7710,7 @@ GLvoid APIENTRY __gllc_TexImage3D(__GLcontext *gc, GLenum target,
     }
 
 
-    if(!__glTexImagCopyInfo(gc, format, type, &adjust_format, &adjust_type))
+    if (!__glTexImagCopyInfo(gc, format, type, &adjust_format, &adjust_type))
     return;
 
     imageSize = __glImageSize3D(width, height, depth, format, type);
@@ -7773,7 +7773,7 @@ GLvoid APIENTRY __gllc_CopyTexImage1D(__GLcontext *gc, GLenum target, GLint leve
             case GL_DEPTH_COMPONENT16:
             case GL_DEPTH_COMPONENT24:
             case GL_DEPTH_COMPONENT32:
-                if(!gc->modes.haveDepthBuffer)
+                if (!gc->modes.haveDepthBuffer)
                 {
                     __gllc_InvalidOperation(gc);
                     return;
@@ -7829,7 +7829,7 @@ GLvoid APIENTRY __gllc_CopyTexImage2D(__GLcontext *gc, GLenum target, GLint leve
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
             case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
-                if(!__glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled && !__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
+                if (!__glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled && !__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
                 {
                     __gllc_InvalidEnum(gc);
                     return;
@@ -7848,7 +7848,7 @@ GLvoid APIENTRY __gllc_CopyTexImage2D(__GLcontext *gc, GLenum target, GLint leve
             case GL_DEPTH_COMPONENT16:
             case GL_DEPTH_COMPONENT24:
             case GL_DEPTH_COMPONENT32:
-                if(!gc->modes.haveDepthBuffer)
+                if (!gc->modes.haveDepthBuffer)
                 {
                     __gllc_InvalidOperation(gc);
                     return;
@@ -7917,7 +7917,7 @@ GLvoid APIENTRY __gllc_TexSubImage1D(__GLcontext *gc, GLenum target, GLint level
 
         __glCheckTexImgFmtArg(gc, tex, format);
 
-        __glCheckTexImgFmt(gc, tex, target, tex->faceMipmap[0][level].requestedFormat, format, type);
+        __glCheckTexImgFmt(gc, tex, target, tex->faceMipmap[0][level].requestedFormat, format, type, __GL_InputFormat);
 
         __glSetError(gc, oldError);
     }
@@ -7979,7 +7979,7 @@ GLvoid APIENTRY __gllc_TexSubImage2D(__GLcontext *gc, GLenum target, GLint level
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
             case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
-                if(!__glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled && !__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
+                if (!__glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled && !__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
                 {
                     __gllc_InvalidEnum(gc);
                     return;
@@ -7999,7 +7999,7 @@ GLvoid APIENTRY __gllc_TexSubImage2D(__GLcontext *gc, GLenum target, GLint level
 
         __glCheckTexImgFmtArg(gc, tex, format);
 
-        __glCheckTexImgFmt(gc, tex, target, tex->faceMipmap[0][level].requestedFormat, format, type);
+        __glCheckTexImgFmt(gc, tex, target, tex->faceMipmap[0][level].requestedFormat, format, type, __GL_InputFormat);
 
         __glSetError(gc, oldError);
     }
@@ -8073,7 +8073,7 @@ GLvoid APIENTRY __gllc_TexSubImage3D(__GLcontext *gc, GLenum target,
 
         __glCheckTexImgFmtArg(gc, tex, format);
 
-        __glCheckTexImgFmt(gc, tex, target, tex->faceMipmap[0][lod].requestedFormat, format, type);
+        __glCheckTexImgFmt(gc, tex, target, tex->faceMipmap[0][lod].requestedFormat, format, type, __GL_InputFormat);
 
         __glSetError(gc, oldError);
     }
@@ -8081,7 +8081,7 @@ GLvoid APIENTRY __gllc_TexSubImage3D(__GLcontext *gc, GLenum target,
     adjust_format = format;
     adjust_type = type;
 
-    if(!__glTexImagCopyInfo(gc, format, type, &adjust_format, &adjust_type))
+    if (!__glTexImagCopyInfo(gc, format, type, &adjust_format, &adjust_type))
     return;
 
     imageSize = __glImageSize3D(width, height, depth, format, type);
@@ -8158,7 +8158,7 @@ GLvoid APIENTRY __gllc_CopyTexSubImage1D(__GLcontext *gc, GLenum target, GLint l
             case GL_DEPTH_COMPONENT16:
             case GL_DEPTH_COMPONENT24:
             case GL_DEPTH_COMPONENT32:
-                if(!gc->modes.haveDepthBuffer)
+                if (!gc->modes.haveDepthBuffer)
                 {
                     __gllc_InvalidOperation(gc);
                     return;
@@ -8230,7 +8230,7 @@ GLvoid APIENTRY __gllc_CopyTexSubImage2D(__GLcontext *gc, GLenum target, GLint l
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
             case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
-                if(!__glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled && !__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
+                if (!__glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled && !__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
                 {
                     __gllc_InvalidEnum(gc);
                     return;
@@ -8250,7 +8250,7 @@ GLvoid APIENTRY __gllc_CopyTexSubImage2D(__GLcontext *gc, GLenum target, GLint l
             case GL_DEPTH_COMPONENT16:
             case GL_DEPTH_COMPONENT24:
             case GL_DEPTH_COMPONENT32:
-                if(!gc->modes.haveDepthBuffer)
+                if (!gc->modes.haveDepthBuffer)
                 {
                     __gllc_InvalidOperation(gc);
                     return;
@@ -8338,7 +8338,7 @@ GLvoid APIENTRY __gllc_CopyTexSubImage3D(__GLcontext *gc, GLenum target,
             case GL_DEPTH_COMPONENT16:
             case GL_DEPTH_COMPONENT24:
             case GL_DEPTH_COMPONENT32:
-                if(!gc->modes.haveDepthBuffer)
+                if (!gc->modes.haveDepthBuffer)
                 {
                     __gllc_InvalidOperation(gc);
                     return;
@@ -8425,7 +8425,7 @@ GLvoid APIENTRY __gllc_CompressedTexImage2D(__GLcontext *gc, GLenum target, GLin
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
             case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
-                if(!__glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled && !__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
+                if (!__glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled && !__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
                 {
                     __gllc_InvalidEnum(gc);
                     return;
@@ -8565,7 +8565,7 @@ GLvoid APIENTRY __gllc_CompressedTexSubImage2D(__GLcontext *gc, GLenum target, G
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
             case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
-                if(!__glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled && !__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
+                if (!__glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled && !__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
                 {
                     __gllc_InvalidEnum(gc);
                     return;

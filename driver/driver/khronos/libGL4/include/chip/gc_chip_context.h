@@ -125,46 +125,94 @@ typedef struct __GLchipFeatureRec
     ** Note: which path was chosen doesn't depend on only HW capability, but also some API parameters.
     **       E.g. FBO attaches multisampled texture implicitly requires indirect path by spec.
     */
-    GLboolean                   indirectRTT;
+    struct
+    {
+        GLuint                   indirectRTT                : 1;
+        GLuint                   hasCorrectStencil          : 1;
+        GLuint                   hasTileStatus              : 1;
+        GLuint                   wideLine                   : 1;
+        GLuint                   patchTriangleStrip         : 1;
+        GLuint                   lineLoop                   : 1;
+        GLuint                   primitiveRestart           : 1;
+        GLuint                   patchNP2Texture            : 1;
+        GLuint                   msaaFragmentOperation      : 1;
+        GLuint                   hasYuv420Tiler             : 1;
+        GLuint                   hasYuvAssembler            : 1;
+        GLuint                   hasLinearTx                : 1;
+        GLuint                   hasTxSwizzle               : 1;
+        GLuint                   hasSupertiledTx            : 1;
+        GLuint                   hasTxTileStatus            : 1;
+        GLuint                   hasTxDecompressor          : 1;
+        GLuint                   attrib2101010Rev           : 1;
+        GLuint                   extendIntSign              : 1;
+        GLuint                   hasTxDescriptor            : 1;
+        GLuint                   hasBlitEngine              : 1;
+        GLuint                   hasHwTFB                   : 1;
+        GLuint                   txDefaultValueFix          : 1;
+        GLuint                   hasCommandPrefetch         : 1;
+        GLuint                   hasYuvAssembler10bit       : 1;
+        GLuint                   supportMSAA2X              : 1;
+        GLuint                   hasSecurity                : 1;
+        GLuint                   hasRobustness              : 1;
+        GLuint                   txLerpLessBit              : 1;
 
-    GLboolean                   hasCorrectStencil;
-
-    GLboolean                   hasTileStatus;
-
-    GLboolean                   wideLine;
-
-    /* For GL_TRIANGLE_STRIP Patch. */
-    GLboolean                   patchTriangleStrip;
-
-    GLboolean                   lineLoop;
-
-    GLboolean                   primitiveRestart;
-
-    GLboolean                   patchNP2Texture;
-
-    GLboolean                   msaaFragmentOperation;
-
-    GLboolean                   hasYuv420Tiler;
-    GLboolean                   hasYuvAssembler;
-    GLboolean                   hasLinearTx;
-    GLboolean                   hasTxSwizzle;
-    GLboolean                   hasSupertiledTx;
-    GLboolean                   hasTxTileStatus;
-    GLboolean                   hasTxDecompressor;
-
-    GLboolean                   attrib2101010Rev;
-    GLboolean                   extendIntSign;
-    GLboolean                   hasTxDescriptor;
-    GLboolean                   hasBlitEngine;
-    GLboolean                   hasHwTFB;
-    GLboolean                   txDefaultValueFix;
-    GLboolean                   hasCommandPrefetch;
-    GLboolean                   hasYuvAssembler10bit;
-    GLboolean                   supportMSAA2X;
-    GLboolean                   hasSecurity;
-    GLboolean                   hasRobustness;
+        GLuint                   hasTxBorderClamp           : 1;
+        GLuint                   hasVertex1010102           : 1;
+        GLuint                   hasTxDXT                   : 1;
+        GLuint                   hasTxAnisFilter            : 1;
+        GLuint                   hasHalfFloatPipe           : 1;
+        GLuint                   hasPSIOInterlock           : 1;
+        GLuint                   hasMSAAshading             : 1;
+        GLuint                   hasStencilTexture          : 1;
+        GLuint                   hasSeparateRTCtrl          : 1;
+        GLuint                   hasASTC                    : 1;
+        GLuint                   hasASTCCodecFix            : 1;
+        GLuint                   hasGS                      : 1;
+        GLuint                   hasCubeArray               : 1;
+        GLuint                   hasAdvancedInstr           : 1;
+        GLuint                   hasMultiDrawIndirect       : 1;
+        GLuint                   hasTextureBuffer           : 1;
+        GLuint                   hasTS                      : 1;
+        GLuint                   hasDrawElementBaseVertex   : 1;
+        GLuint                   hasInteger32Fix            : 1;
+        GLuint                   hasDrawIndirect            : 1;
+        GLuint                   hasPatchListFetchFix       : 1;
+        GLuint                   hasFEstartVertex           : 1;
+        GLuint                   hasPEB2BPixelFix           : 1;
+        GLuint                   hasV2MSAACoherencyFix      : 1;
+        GLuint                   hasIndexFetchFix           : 1;
+        GLuint                   hasComputeIndirect         : 1;
+        GLuint                   hasBugFixes18              : 1;
+        GLuint                   hasCubeBorderLOD           : 1;
+        GLuint                   hasTxFrac6Bit              : 1;
+        GLuint                   hasTxFrac8Bit              : 1;
+        GLuint                   hasMSAAOQFix               : 1;
+        GLuint                   hasWideLineHelperFix       : 1;
+        GLuint                   needWideLineTriangleEMU    : 1;
+        GLuint                   hasPEEnhancement2          : 1;
+        GLuint                   hasBugFixes7               : 1;
+        GLuint                   hasPEDitherFix2            : 1;
+        GLuint                   hasCompressionV1           : 1;
+        GLuint                   hasRSBLTMsaaDecompression  : 1;
+        GLuint                   hasAdvanceBlendPart0       : 1;
+        GLuint                   hasTxBaseLOD               : 1;
+        GLuint                   hasRADepthWrite            : 1;
+        GLuint                   hasTxGather                : 1;
+        GLuint                   hasTxGatherOffsets         : 1;
+        GLuint                   hasUnifiedSamplers         : 1;
+        GLuint                   hasD24S8SampleStencil      : 1;
+        GLuint                   hasSinglePipeHalti1        : 1;
+        GLuint                   hasPSIODual16_32bpcFix     : 1;
+        GLuint                   hasDepthBiasFix            : 1;
+        GLuint                   hasSRGBRT                  : 1;
+        GLuint                   hasTileFiller              : 1;
+        GLuint                   hasTxASTCMultiSliceFix     : 1;
+        GLuint                   hasMultiPixelPipes         : 1;
+        GLuint                   hasSingleBuffer            : 1;
+        GLuint                   hasPaLineClipFix           : 1;
+        GLuint                   hasMSAA                    : 1;
+    }hwFeature;
 } __GLchipFeature;
-
 
 typedef struct __GLchipContextRec __GLchipContext;
 

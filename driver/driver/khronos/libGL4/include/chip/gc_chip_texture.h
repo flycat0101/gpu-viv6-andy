@@ -527,6 +527,7 @@ __glChipGetTexImage(
     __GLtextureObject *texObj,
     GLint face,
     GLint level,
+    GLenum format,
     GLenum type,
     GLvoid *buf
     );

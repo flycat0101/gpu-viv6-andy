@@ -66,7 +66,7 @@ GLvoid __glInitBufferObject(__GLcontext *gc, __GLbufferObject *bufObj, GLuint na
 {
     bufObj->bindCount           = 0;
     bufObj->accessFlags         = 0;
-    bufObj->access           = GL_READ_WRITE;
+    bufObj->access              = gc->imports.conformGLSpec? GL_READ_WRITE:GL_WRITE_ONLY_OES;
     bufObj->bufferMapped        = GL_FALSE;
     bufObj->mapPointer          = gcvNULL;
     bufObj->mapOffset           = 0;
@@ -481,15 +481,40 @@ GLboolean __glDeleteBufferObject(__GLcontext *gc, __GLbufferObject *bufObj)
     /* Check all the binding points in vertexArrayState. */
     for (bindingIndex = 0; bindingIndex < __GL_MAX_VERTEX_ATTRIBUTE_BINDINGS; bindingIndex++)
     {
-        if (vertexArrayState->attributeBinding[bindingIndex].boundArrayObj == bufObj)
+        if(gc->imports.conformGLSpec)
         {
+            if (vertexArrayState->attributeBinding[bindingIndex].boundArrayObj == bufObj)
+            {
+                if (gc->vertexArray.boundVertexArray)
+                {
+                    __glRemoveImageUser(gc, &bufObj->vaoList, gc->vertexArray.boundVAO);
+                }
+
+                vertexArrayState->attributeBinding[bindingIndex].boundArrayName = 0;
+                vertexArrayState->attributeBinding[bindingIndex].boundArrayObj = gcvNULL;
+            }
+        }
+        else
+        {
+            __GLvertexAttribBinding *pAttribBinding = &vertexArrayState->attributeBinding[bindingIndex];
+
             if (gc->vertexArray.boundVertexArray)
             {
-                __glRemoveImageUser(gc, &bufObj->vaoList, gc->vertexArray.boundVAO);
+                if (pAttribBinding->boundArrayObj == bufObj)
+                {
+                    __glRemoveImageUser(gc, &bufObj->vaoList, gc->vertexArray.boundVAO);
+                    pAttribBinding->boundArrayName = 0;
+                    pAttribBinding->boundArrayObj = gcvNULL;
+                }
             }
-
-            vertexArrayState->attributeBinding[bindingIndex].boundArrayName = 0;
-            vertexArrayState->attributeBinding[bindingIndex].boundArrayObj = gcvNULL;
+            else
+            {
+                if (pAttribBinding->boundArrayName == bufObj->name)
+                {
+                    pAttribBinding->boundArrayName = 0;
+                    pAttribBinding->boundArrayObj = gcvNULL;
+                }
+            }
         }
     }
 
@@ -653,7 +678,8 @@ GLvoid GL_APIENTRY __glim_BindBuffer(__GLcontext *gc, GLenum target, GLuint buff
     __GL_GET_BUFFER_TARGET_INDEX(target, targetIndex);
 
 #ifdef OPENGL40
-    if (gc->imports.coreProfile && buffer && !__glIsNameDefined(gc, gc->bufferObject.shared, buffer))
+    if (gc->imports.conformGLSpec &&
+        buffer && !__glIsNameDefined(gc, gc->bufferObject.shared, buffer))
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
@@ -678,7 +704,8 @@ GLvoid GL_APIENTRY __glim_BindBufferBase(__GLcontext *gc, GLenum target, GLuint 
     __GL_HEADER();
 
 #ifdef OPENGL40
-    if (gc->imports.coreProfile && buffer && !__glIsNameDefined(gc, gc->bufferObject.shared, buffer))
+    if (gc->imports.conformGLSpec &&
+        buffer && !__glIsNameDefined(gc, gc->bufferObject.shared, buffer))
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
@@ -748,7 +775,8 @@ GLvoid GL_APIENTRY __glim_BindBufferRange(__GLcontext *gc, GLenum target, GLuint
     }
 
 #ifdef OPENGL40
-    if (gc->imports.coreProfile && buffer && !__glIsNameDefined(gc, gc->bufferObject.shared, buffer))
+    if (gc->imports.conformGLSpec &&
+        buffer && !__glIsNameDefined(gc, gc->bufferObject.shared, buffer))
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
@@ -1139,15 +1167,17 @@ GLvoid* GL_APIENTRY __glim_MapBufferRange(__GLcontext *gc, GLenum target, GLintp
     }
     bufObj->accessFlags = access;
 
-    if((access & (GL_MAP_READ_BIT|GL_MAP_WRITE_BIT)) == GL_MAP_READ_BIT)
-        bufObj->access =  GL_READ_ONLY;
+    if(gc->imports.conformGLSpec)
+    {
+        if ((access & (GL_MAP_READ_BIT|GL_MAP_WRITE_BIT)) == GL_MAP_READ_BIT)
+            bufObj->access =  GL_READ_ONLY;
 
-    if((access & (GL_MAP_READ_BIT|GL_MAP_WRITE_BIT)) == GL_MAP_WRITE_BIT)
-        bufObj->access =  GL_WRITE_ONLY;
+        if ((access & (GL_MAP_READ_BIT|GL_MAP_WRITE_BIT)) == GL_MAP_WRITE_BIT)
+            bufObj->access =  GL_WRITE_ONLY;
 
-    if((access & (GL_MAP_READ_BIT|GL_MAP_WRITE_BIT)) == (GL_MAP_READ_BIT|GL_MAP_WRITE_BIT))
-        bufObj->access = GL_READ_WRITE;
-
+        if ((access & (GL_MAP_READ_BIT|GL_MAP_WRITE_BIT)) == (GL_MAP_READ_BIT|GL_MAP_WRITE_BIT))
+            bufObj->access = GL_READ_WRITE;
+    }
 OnError:
     __GL_FOOTER();
     return result;
@@ -1233,7 +1263,7 @@ GLvoid GL_APIENTRY __glim_FlushMappedBufferRange(__GLcontext *gc, GLenum target,
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    if(!(*gc->dp.flushMappedBufferRange)(gc, bufObj, targetIndex, offset, length))
+    if (!(*gc->dp.flushMappedBufferRange)(gc, bufObj, targetIndex, offset, length))
     {
         __GL_ERROR_EXIT((*gc->dp.getError)(gc));
     }

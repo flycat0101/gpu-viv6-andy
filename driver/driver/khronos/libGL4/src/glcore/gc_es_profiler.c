@@ -28,7 +28,7 @@ __glProfiler(
     __GLcontext *gc = __glGetGLcontext();
     GL_ASSERT(gc);
 
-    if(gcvNULL == gc)
+    if (gcvNULL == gc)
     {
         gcmFATAL("Get context failed");
         return GL_FALSE;

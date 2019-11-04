@@ -65,6 +65,7 @@ static struct eglExtension extensions[] =
     {"EGL_KHR_create_context",                  EGL_TRUE },
     {"EGL_KHR_no_config_context",               EGL_TRUE },
     {"EGL_KHR_surfaceless_context",             EGL_TRUE },
+    {"EGL_KHR_get_all_proc_addresses",          EGL_TRUE },
     {"EGL_EXT_create_context_robustness",       EGL_TRUE },
     {"EGL_EXT_protected_surface",               EGL_FALSE},
     {"EGL_EXT_protected_content",               EGL_FALSE},
@@ -427,19 +428,13 @@ _FillIn(
 
     config->renderableType = EGL_OPENGL_ES_BIT
                            | EGL_OPENGL_ES2_BIT
-                           | EGL_OPENGL_ES3_BIT_KHR;
+                           | EGL_OPENGL_ES3_BIT_KHR
+                           | EGL_OPENGL_BIT;
 
     config->conformant     = EGL_OPENGL_ES_BIT
                            | EGL_OPENGL_ES2_BIT
-                           | EGL_OPENGL_ES3_BIT_KHR;
-
-    if(thread->dispatchTables[vegl_OPENGL])
-    {
-        config->renderableType |= EGL_OPENGL_BIT;
-        config->conformant |= EGL_OPENGL_BIT;
-    }
-
-
+                           | EGL_OPENGL_ES3_BIT_KHR
+                           | EGL_OPENGL_BIT;
 
     if (Samples == 16)
     {
@@ -450,7 +445,7 @@ _FillIn(
 
 #if gcdENABLE_3D
     {
-        gcePATCH_ID patchId   = gcvPATCH_INVALID;
+        gcePATCH_ID patchId = gcvPATCH_INVALID;
         gcoHAL_GetPatchID(gcvNULL, &patchId);
         if (patchId == gcvPATCH_GTFES30)
         {
@@ -470,11 +465,12 @@ _FillIn(
                     printed = gcvTRUE;
                 }
                 /* Only enable RGBA8888/D24S8 and RGB565/D0S0 for ES2/ES3 context to reduce ES CTS running time */
+                /* Enable RGBA8888/D24S8 and RGB565/D0S0 for GL context to make GL and ES go the same path */
                 if (!((Color->formatFlags & VEGL_8888) == VEGL_8888 && config->depthSize == 24 && config->stencilSize == 8) &&
                     !((Color->formatFlags & VEGL_565) == VEGL_565 && config->depthSize == 0 && config->stencilSize == 0))
                 {
-                    config->renderableType &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR);
-                    config->conformant     &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR);
+                    config->renderableType &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR | EGL_OPENGL_BIT);
+                    config->conformant     &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR | EGL_OPENGL_BIT);
                 }
                 else if (!printed)
                 {
@@ -482,8 +478,6 @@ _FillIn(
                     printed = gcvTRUE;
                 }
             }
-            config->renderableType &= ~EGL_OPENGL_BIT;
-            config->conformant &= ~EGL_OPENGL_BIT;
         }
     }
 #endif
@@ -985,7 +979,7 @@ veglGetPlatformDisplay(
         /* Zero memory. */
         gcoOS_ZeroMemory(pointer, sizeof (struct eglDisplay));
 
-        display = pointer;
+        display = (VEGLDisplay)pointer;
 
         /* Initialize EGLDisplay. */
         display->platform      = eglPlatform;
@@ -1373,17 +1367,17 @@ veglInitilizeDisplay(
                 Display->enableClient = 0;
                 Display->enableServer = 0;
             }
-            else if(gcmIS_SUCCESS(gcoOS_StrCmp(env, "0")))
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "0")))
             {
                 Display->enableClient = 1;
                 Display->enableServer = 1;
             }
-            else if(gcmIS_SUCCESS(gcoOS_StrCmp(env, "server")))
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "server")))
             {
                 Display->enableClient = 1;
                 Display->enableServer = 0;
             }
-            else if(gcmIS_SUCCESS(gcoOS_StrCmp(env, "client")))
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "client")))
             {
                 Display->enableClient = 0;
                 Display->enableServer = 1;
@@ -1448,8 +1442,13 @@ veglInitilizeDisplay(
             (gctSIZE_T) Display->configCount * sizeof(struct eglConfig),
             &pointer
             ));
+        /* Clear buffer to avoid dirty content */
+        if (gcvNULL != pointer)
+        {
+            gcoOS_ZeroMemory(pointer, (gctSIZE_T) Display->configCount * sizeof(struct eglConfig));
+        }
 
-        Display->config = pointer;
+        Display->config = (VEGLConfig)pointer;
 
         /* Start at beginning of configuration buffer. */
         index = 0;
@@ -2094,8 +2093,7 @@ eglQueryString(
             if (thread->dispatchTables[vegl_OPENVG] &&
                 (thread->dispatchTables[vegl_OPENGL_ES11_CL] ||
                  thread->dispatchTables[vegl_OPENGL_ES11] ||
-                 thread->dispatchTables[vegl_OPENGL_ES20] ||
-                 thread->dispatchTables[vegl_OPENGL_ES30]) &&
+                 thread->dispatchTables[vegl_OPENGL_ES20]) &&
                  thread->dispatchTables[vegl_OPENGL])
             {
                 ptr = "OpenGL_ES OpenGL OpenVG";
@@ -2103,15 +2101,13 @@ eglQueryString(
             else if (thread->dispatchTables[vegl_OPENVG] &&
                 (thread->dispatchTables[vegl_OPENGL_ES11_CL] ||
                  thread->dispatchTables[vegl_OPENGL_ES11] ||
-                 thread->dispatchTables[vegl_OPENGL_ES20] ||
-                 thread->dispatchTables[vegl_OPENGL_ES30]))
+                 thread->dispatchTables[vegl_OPENGL_ES20]))
             {
                 ptr = "OpenGL_ES OpenVG";
             }
             else if ((thread->dispatchTables[vegl_OPENGL_ES11_CL] ||
                 thread->dispatchTables[vegl_OPENGL_ES11] ||
-                thread->dispatchTables[vegl_OPENGL_ES20] ||
-                thread->dispatchTables[vegl_OPENGL_ES30]) &&
+                thread->dispatchTables[vegl_OPENGL_ES20]) &&
                 thread->dispatchTables[vegl_OPENGL])
             {
                 ptr = "OpenGL_ES OpenGL";

@@ -29509,30 +29509,32 @@ gcChipPatchDraw(
         }
 
 #ifdef OPENGL40
-        /* Filter out no effect draw first */
-        if (gc->state.polygon.frontMode == GL_LINE && gc->state.polygon.backMode == GL_LINE &&
-            !gc->state.current.edgeflag && !gc->vertexStreams.edgeflagStream &&
-            (gc->vertexStreams.primMode == GL_TRIANGLES ||
-             gc->vertexStreams.primMode == GL_QUADS ||
-             gc->vertexStreams.primMode == GL_POLYGON))
+        if (gc->imports.conformGLSpec)
         {
-            ret = 1;
-            break;
-        }
-        else
-        if (gc->state.enables.polygon.cullFace && gc->state.polygon.cullFace == GL_FRONT_AND_BACK &&
-           ((gc->vertexStreams.primMode >= GL_TRIANGLES && gc->vertexStreams.primMode <= GL_POLYGON) ||
-            (gc->vertexStreams.primMode == GL_TRIANGLES_ADJACENCY_EXT) ||
-            (gc->vertexStreams.primMode == GL_TRIANGLE_STRIP_ADJACENCY_EXT)))
-        {
-            ret = 1;
-            break;
-        }
-
+            /* Filter out no effect draw first */
+            if (gc->state.polygon.frontMode == GL_LINE && gc->state.polygon.backMode == GL_LINE &&
+                !gc->state.current.edgeflag && !gc->vertexStreams.edgeflagStream &&
+                (gc->vertexStreams.primMode == GL_TRIANGLES ||
+                 gc->vertexStreams.primMode == GL_QUADS ||
+                 gc->vertexStreams.primMode == GL_POLYGON))
+            {
+                ret = 1;
+                break;
+            }
+            else
+            if (gc->state.enables.polygon.cullFace && gc->state.polygon.cullFace == GL_FRONT_AND_BACK &&
+               ((gc->vertexStreams.primMode >= GL_TRIANGLES && gc->vertexStreams.primMode <= GL_POLYGON) ||
+                (gc->vertexStreams.primMode == GL_TRIANGLES_ADJACENCY_EXT) ||
+                (gc->vertexStreams.primMode == GL_TRIANGLE_STRIP_ADJACENCY_EXT)))
+            {
+                ret = 1;
+                break;
+            }
 #if __GL_ENABLE_HW_NULL
-        ret = 1;
-        break;
+            ret = 1;
+            break;
 #endif
+        }
 #endif
 
         if (program &&

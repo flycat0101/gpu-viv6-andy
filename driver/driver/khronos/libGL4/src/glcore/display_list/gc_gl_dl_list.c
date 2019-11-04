@@ -379,7 +379,7 @@ GLvoid APIENTRY __glim_EndList(__GLcontext *gc)
     /* Compile the display list into a contiguous memory buffer.
     */
     dlist = __glCompileDisplayList(gc, compDlist);
-    if(dlist == NULL)
+    if (dlist == NULL)
     {
         __glSetError(gc, GL_OUT_OF_MEMORY);
         return;

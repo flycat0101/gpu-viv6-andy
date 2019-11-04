@@ -24,6 +24,51 @@ extern  const __GLprocInfo __glProcInfoTable[];
 
 __GLextension __glExtension[] =
 {
+#ifdef OPENGL40
+    {__GL_EXTID_ARB_ES2_compatibility, "GL_ARB_ES2_compatibility", GL_TRUE, GL_TRUE},
+    {__GL_EXTID_ARB_ES3_compatibility, "GL_ARB_ES3_compatibility", GL_TRUE, GL_TRUE},
+    {__GL_EXTID_ARB_ES3_1_compatibility, "GL_ARB_ES3_1_compatibility", GL_TRUE, GL_TRUE},
+    {__GL_EXTID_ARB_ES3_2_compatibility, "GL_ARB_ES3_2_compatibility", GL_TRUE, GL_TRUE},
+    {__GL_EXTID_ARB_color_buffer_float, "GL_ARB_color_buffer_float", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_ARB_depth_texture, "GL_ARB_depth_texture", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_framebuffer_object, "GL_ARB_framebuffer_object", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_half_float_pixel, "GL_ARB_half_float_pixel", GL_TRUE, GL_TRUE},
+    {__GL_EXTID_ARB_shader_objects, "GL_ARB_shader_objects", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_shading_language_100, "GL_ARB_shading_language_100", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_texture_array, "GL_EXT_texture_array", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_ARB_texture_float, "GL_ARB_texture_float", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_vertex_buffer_object, "GL_ARB_vertex_buffer_object", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_vertex_program, "GL_ARB_vertex_program", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_ARB_window_pos, "GL_ARB_window_pos", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_texture_compression, "GL_ARB_texture_compression", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_multitexture, "GL_ARB_multitexture", GL_TRUE, GL_FALSE},
+
+    /* Fix: KHR-GL**.gpu_shader5_gl.*(GL30/31/32/33/40), add glTexStorage2D */
+    {__GL_EXTID_ARB_texture_storage, "GL_ARB_texture_storage", GL_TRUE, GL_FALSE},
+
+    /* Fix: GTF-GL40.gtf40.GLCoverage.CoverageGL40, add glProgramParameteri support in OpenGL 4.0*/
+    {__GL_EXTID_ARB_get_program_binary, "GL_ARB_get_program_binary", GL_TRUE, GL_FALSE},
+
+    /* Fix: GTF-GL40.gtf30.GL3Tests.framebuffer_blit.framebuffer_blit_error_blitframebuffer_multisampled_framebuffers_different_sample_count, add glGetInternalformativ support in OpenGL 4.0*/
+    {__GL_EXTID_ARB_internalformat_query, "GL_ARB_internalformat_query", GL_TRUE, GL_FALSE},
+
+    /*Fix: GTF-GL30.gtf21.GL3Tests.proxy_textures.proxy_textures_valid, add glTexImage2DMultisample support in OpenGL 4.0*/
+    {__GL_EXTID_ARB_texture_multisample, "GL_ARB_texture_multisample", GL_TRUE, GL_FALSE},
+
+    /*Fix: GTF-GL40.gtf33.GL3Tests.explicit_attrib_location.explicit_attrib_location_* */
+    {__GL_EXTID_ARB_explicit_attrib_location, "GL_ARB_explicit_attrib_location", GL_FALSE, GL_FALSE},
+
+    {__GL_EXTID_EXT_framebuffer_blit, "GL_EXT_framebuffer_blit", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_EXT_framebuffer_object, "GL_EXT_framebuffer_object", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_EXT_packed_float, "GL_EXT_packed_float", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_EXT_texture_compression_latc, "GL_EXT_texture_compression_latc", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_EXT_texture_compression_rgtc, "GL_EXT_texture_compression_rgtc", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_EXT_texture_integer, "GL_EXT_texture_integer", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_EXT_texture_shared_exponent, "GL_EXT_texture_shared_exponent", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_EXT_texture_sRGB, "GL_EXT_texture_sRGB", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_EXT_timer_query, "GL_EXT_timer_query", GL_TRUE, GL_FALSE},
+#endif
+
     {__GL_EXTID_OES_vertex_type_10_10_10_2, "GL_OES_vertex_type_10_10_10_2", GL_FALSE, GL_FALSE},
     {__GL_EXTID_OES_vertex_half_float, "GL_OES_vertex_half_float", GL_FALSE, GL_FALSE},
     {__GL_EXTID_OES_element_index_uint, "GL_OES_element_index_uint", GL_FALSE, GL_FALSE},
@@ -114,48 +159,12 @@ __GLextension __glExtension[] =
     {__GL_EXTID_EXT_primitive_bounding_box, "GL_EXT_primitive_bounding_box", GL_FALSE, GL_TRUE},
     {__GL_EXTID_EXT_shader_framebuffer_fetch, "GL_EXT_shader_framebuffer_fetch", GL_FALSE, GL_TRUE },
     {__GL_EXTID_EXT_protected_textures, "GL_EXT_protected_textures", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_EXT_sRGB, "GL_EXT_sRGB", GL_FALSE, GL_FALSE},
+
     {__GL_EXTID_ANDROID_extension_pack_es31a, "GL_ANDROID_extension_pack_es31a", GL_FALSE, GL_TRUE },
 
     {__GL_EXTID_VIV_tex_direct, "GL_VIV_direct_texture", GL_FALSE, GL_FALSE},
 
-
-#ifdef OPENGL40
-    {__GL_EXTID_EXT_framebuffer_blit, "GL_EXT_framebuffer_blit", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_EXT_framebuffer_object, "GL_EXT_framebuffer_object", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_EXT_packed_float, "GL_EXT_packed_float", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_EXT_texture_compression_latc, "GL_EXT_texture_compression_latc", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_EXT_texture_compression_rgtc, "GL_EXT_texture_compression_rgtc", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_EXT_texture_integer, "GL_EXT_texture_integer", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_EXT_texture_shared_exponent, "GL_EXT_texture_shared_exponent", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_EXT_texture_sRGB, "GL_EXT_texture_sRGB", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_EXT_timer_query, "GL_EXT_timer_query", GL_TRUE, GL_FALSE},
-
-    {__GL_EXTID_ARB_color_buffer_float, "GL_ARB_color_buffer_float", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_ARB_depth_texture, "GL_ARB_depth_texture", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_framebuffer_object, "GL_ARB_framebuffer_object", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_half_float_pixel, "GL_ARB_half_float_pixel", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_ARB_shader_objects, "GL_ARB_shader_objects", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_shading_language_100, "GL_ARB_shading_language_100", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_texture_array, "GL_EXT_texture_array", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_ARB_texture_float, "GL_ARB_texture_float", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_vertex_buffer_object, "GL_ARB_vertex_buffer_object", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_vertex_program, "GL_ARB_vertex_program", GL_FALSE, GL_FALSE},
-    {__GL_EXTID_ARB_window_pos, "GL_ARB_window_pos", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_texture_compression, "GL_ARB_texture_compression", GL_TRUE, GL_FALSE},
-    {__GL_EXTID_ARB_multitexture, "GL_ARB_multitexture", GL_TRUE, GL_FALSE},
-
-    /* Fix: KHR-GL**.gpu_shader5_gl.*(GL30/31/32/33/40), add glTexStorage2D */
-    {__GL_EXTID_ARB_texture_storage, "GL_ARB_texture_storage", GL_TRUE, GL_FALSE},
-
-    /* Fix: GTF-GL40.gtf40.GLCoverage.CoverageGL40, add glProgramParameteri support in OpenGL 4.0*/
-    {__GL_EXTID_ARB_get_program_binary, "GL_ARB_get_program_binary", GL_TRUE, GL_FALSE},
-
-    /* Fix: GTF-GL40.gtf30.GL3Tests.framebuffer_blit.framebuffer_blit_error_blitframebuffer_multisampled_framebuffers_different_sample_count, add glGetInternalformativ support in OpenGL 4.0*/
-    {__GL_EXTID_ARB_internalformat_query, "GL_ARB_internalformat_query", GL_TRUE, GL_FALSE},
-
-    /*Fix: GTF-GL30.gtf21.GL3Tests.proxy_textures.proxy_textures_valid, add glTexImage2DMultisample support in OpenGL 4.0*/
-    {__GL_EXTID_ARB_texture_multisample, "GL_ARB_texture_multisample", GL_TRUE, GL_FALSE},
-#endif
 
     {__GL_EXTID_EXT_LAST, gcvNULL, GL_FALSE, GL_FALSE}
 };

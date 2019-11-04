@@ -157,7 +157,7 @@ GLvoid __glInitPacker(__GLcontext *gc, __GLpixelSpanInfo *spanInfo)
     alignment = spanInfo->dstAlignment;
     swap_bytes = spanInfo->dstSwapBytes;
 
-    if( type >= __GL_MIN_TC_TYPE && type <= __GL_MAX_TC_TYPE)
+    if ( type >= __GL_MIN_TC_TYPE && type <= __GL_MAX_TC_TYPE)
     {
         GL_ASSERT(!(spanInfo->dstSkipPixels % __GL_TCBLOCK_DIM));
         GL_ASSERT(!(spanInfo->dstSkipLines % __GL_TCBLOCK_DIM));
@@ -311,7 +311,7 @@ GLvoid __glInitUnpacker(__GLcontext *gc, __GLpixelSpanInfo *spanInfo)
 
     components = __glElementsPerGroup(format, type);
 
-    if( type >= __GL_MIN_TC_TYPE && type <= __GL_MAX_TC_TYPE)
+    if ( type >= __GL_MIN_TC_TYPE && type <= __GL_MAX_TC_TYPE)
     {
         groups_per_line = (spanInfo->srcLineLength + __GL_TCBLOCK_DIM - 1)
                                                                 /__GL_TCBLOCK_DIM;
@@ -759,6 +759,31 @@ GLboolean __glGetComponentAndMaskFromFormat(GLenum format, GLubyte* components, 
     return GL_FALSE;
 }
 
+GLvoid __glCalculateMemoryAndNumOfComponents(__GLpixelTransferInfo *transferInfo)
+{
+    if ((transferInfo->dstSizeOfPixel * transferInfo->width) % transferInfo->alignment)
+    {
+        transferInfo->numOfAlign =  transferInfo->alignment - ((transferInfo->dstSizeOfPixel * transferInfo->width) %  transferInfo->alignment);
+    }
+    else
+    {
+        transferInfo->numOfAlign = 0;
+    }
+    transferInfo->sizeOfAlignMemory = transferInfo->width * transferInfo->height * transferInfo->depth * transferInfo->dstSizeOfPixel + transferInfo->height * transferInfo->numOfAlign;
+
+    if ((transferInfo->srcSizeOfPixel * transferInfo->width) %  transferInfo->alignment)
+    {
+        transferInfo->numOfComponents = transferInfo->compNumber * transferInfo->numOfPixel;
+        transferInfo->numOfAlignSrc= transferInfo->alignment - ((transferInfo->srcSizeOfPixel * transferInfo->width) %  transferInfo->alignment);
+
+    }
+    else
+    {
+        transferInfo->numOfComponents = transferInfo->compNumber * transferInfo->numOfPixel * transferInfo->width / transferInfo->widthAlign;
+        transferInfo->numOfPixel =  transferInfo->width * transferInfo->height * transferInfo->depth;
+    }
+}
+
 GLboolean __glInitTransferInfo(__GLcontext *gc,
                                 GLsizei width,
                                 GLsizei height,
@@ -766,7 +791,8 @@ GLboolean __glInitTransferInfo(__GLcontext *gc,
                                 __GLpixelTransferInfo *transferInfo,
                                 GLenum baseFmt,
                                 GLenum srcType,
-                                GLenum dstType)
+                                GLenum dstType,
+                                GLenum pixelTransferOperations)
 {
     transferInfo->scale.r = gc->state.pixel.transferMode.r_scale;
     transferInfo->scale.g = gc->state.pixel.transferMode.g_scale;
@@ -780,17 +806,27 @@ GLboolean __glInitTransferInfo(__GLcontext *gc,
     transferInfo->width = width;
     transferInfo->height = height;
     transferInfo->depth = depth;
-    transferInfo->numOfPixel = width * height * depth;
-    if(0 == transferInfo->numOfPixel)
+
+    transferInfo->alignment = gc->clientState.pixel.packModes.alignment;
+    __glMemoryAlignment(baseFmt, srcType, dstType, transferInfo, pixelTransferOperations);
+    transferInfo->numOfPixel =  transferInfo->widthAlign * height * depth;
+    if (0 == transferInfo->numOfPixel)
     {
         __GL_EXIT();
     }
 
-    transferInfo->applyGenericScaleBias = __glNeedScaleBias(gc, &(transferInfo->scale), &(transferInfo->bias));
+    if (gc->imports.conformGLSpec)
+    {
+        transferInfo->applyGenericScaleBias = __glNeedScaleBias(gc, &(transferInfo->scale), &(transferInfo->bias));
+    }
+    else
+    {
+        transferInfo->applyGenericScaleBias = GL_FALSE;
+    }
 
     transferInfo->srcType = srcType;
     transferInfo->dstType = dstType;
-    if((GL_FALSE == transferInfo->applyGenericScaleBias) && (transferInfo->srcType == transferInfo->dstType))
+    if ((GL_FALSE == transferInfo->applyGenericScaleBias) && (transferInfo->srcType == transferInfo->dstType))
     {
         /* No need do pixel operation */
         transferInfo->applyPixelTransfer = GL_FALSE;
@@ -808,11 +844,13 @@ GLboolean __glInitTransferInfo(__GLcontext *gc,
     transferInfo->dstSizeOfPixel = __glPixelSize(gc, transferInfo->baseFormat, transferInfo->dstType);
     GL_ASSERT(0 != transferInfo->dstSizeOfPixel);
 
-    if(GL_TRUE == __glGetComponentAndMaskFromFormat(transferInfo->baseFormat, &(transferInfo->compNumber), &(transferInfo->compMask[0])))
+    if (GL_TRUE == __glGetComponentAndMaskFromFormat(transferInfo->baseFormat, &(transferInfo->compNumber), &(transferInfo->compMask[0])))
     {
         __GL_EXIT();
     }
-    transferInfo->numOfComponents = transferInfo->compNumber * transferInfo->numOfPixel;
+
+    /* calculate dst alignment memory size and src numofComponents */
+    __glCalculateMemoryAndNumOfComponents(transferInfo);
 
     return GL_TRUE;
 
@@ -823,6 +861,7 @@ OnExit:
 
 #define gcdUINT_MAX(n)                  ((gctUINT)(((gctUINT64)1 << (n)) - 1))
 #define gcdGET_FIELD(data, start, bits) (((data) >> (start)) & (~(~0U << bits)))
+#define gcdOFFSET_O_DOT_5(x)            (((x) < 0) ? ((x) - 0.5f) : ((x) + 0.5f))
 
 
 #define __GL_CONVERT_UNSIGNED_2_FLOAT_SPECIAL(offset, start, bits) \
@@ -832,7 +871,7 @@ OnExit:
 
 #define __GL_CONVERT_SIGNED_2_FLOAT(srcType, maxValue) \
     {\
-        *((GLfloat *)tmpBuf+i) = (GLfloat)(*((srcType *)buf+i) * 2 + 1) / (GLfloat)(maxValue);\
+        *((GLfloat *)tmpBuf+i) = (GLfloat)(*((srcType *)buf+i)) / (GLfloat)(maxValue);\
     }
 
 #define __GL_CONVERT_UNSIGNED_2_FLOAT(srcType, maxValue) \
@@ -849,7 +888,7 @@ OnExit:
 #define __GL_CONVERT_UNSIGNED_L_2_RGB(srcType, maxValue)\
     {\
         readOffset = (3 == components) ? i : 2*i;\
-        if(3 == j)\
+        if (3 == j)\
         {\
             *((GLfloat *)tmpBuf+components*i+j) =  (GLfloat)(*((srcType *)buf+readOffset+1)) / (GLfloat)(maxValue);\
         }\
@@ -862,7 +901,7 @@ OnExit:
 #define __GL_CONVERT_SIGNED_L_2_RGB(srcType, maxValue) \
     {\
         readOffset = (3 == components) ? i : 2*i;\
-        if(3 == j)\
+        if (3 == j)\
         {\
             *((GLfloat *)tmpBuf+components*i+j) = (GLfloat)(*((srcType *)buf+readOffset+1) * 2 + 1) / (GLfloat)(maxValue);\
         }\
@@ -875,7 +914,7 @@ OnExit:
 #define __GL_CONVERT_FLOAT_L_2_RGB()\
     {\
         readOffset = (3 == components) ? i : 2*i;\
-        if(3 == j)\
+        if (3 == j)\
         {\
             *((GLfloat *)tmpBuf+components*i+j) = *((GLfloat*)buf+readOffset+1);\
         }\
@@ -888,7 +927,7 @@ OnExit:
 #define __GL_CONVERT_HALF_FLOAT_L_2_RGB()\
     {\
         readOffset = (3 == components) ? i : 2*i;\
-        if(3 == j)\
+        if (3 == j)\
         {\
             *((GLfloat *)tmpBuf+components*i+j) = (GLfloat)gcoMATH_Float16ToFloat(*((GLushort *)buf+readOffset+1));\
         }\
@@ -920,17 +959,17 @@ OnExit:
 
 #define __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(offset, start, bits) \
     {\
-        tmpUint32 &= (GLuint)(((GLuint)(*((GLfloat *)tmpBuf+i+offset) * (GLfloat)(gcdUINT_MAX(bits))) & gcdUINT_MAX(bits)) << start);\
+        tmpUint32 |= (GLuint)(((GLuint)(*((GLfloat *)tmpBuf+i+offset) * (GLfloat)(gcdUINT_MAX(bits)) + 0.5f) & gcdUINT_MAX(bits)) << start);\
     }
 
 #define __GL_FINALCONVERSION_2_SIGNED(dstType, maxValue) \
     {\
-        *((dstType *)outBuf+i) = (dstType)(((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue) - 1) / 2);\
+        *((dstType *)outBuf+i) = (dstType)(gcdOFFSET_O_DOT_5(((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue) - 1.0f) / 2.0f));\
     }
 
 #define __GL_FINALCONVERSION_2_UNSIGNED(dstType, maxValue) \
     {\
-        *((dstType *)outBuf+i) = (dstType)((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue));\
+        *((dstType *)outBuf+i) = (dstType)((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue) + 0.5f);\
     }
 
 #define __GL_FINALCONVERSION_2_HALF_FLOAT() \
@@ -941,20 +980,20 @@ OnExit:
 #define __GL_L_FINALCONVERSION_2_UNSIGNED(dstType, maxValue) \
     {\
         writeOffset = (3 == components) ? (i/components) : ((i/components)*2);\
-        *((dstType *)outBuf+writeOffset) = (dstType)((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue));\
-        if(4 == components)\
+        *((dstType *)outBuf+writeOffset) = (dstType)((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue) + 0.5f);\
+        if (4 == components)\
         {\
-            *((dstType *)outBuf+writeOffset+1) = (dstType)((*((GLfloat *)tmpBuf+i+3)) * (GLfloat)(maxValue));\
+            *((dstType *)outBuf+writeOffset+1) = (dstType)((*((GLfloat *)tmpBuf+i+3)) * (GLfloat)(maxValue) + 0.5f);\
         }\
     }
 
 #define __GL_L_FINALCONVERSION_2_SIGNED(dstType, maxValue) \
     {\
         writeOffset = (3 == components) ? (i/components) : ((i/components)*2);\
-        *((dstType *)outBuf+writeOffset) = (dstType)(((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue)-1)/2);\
-        if(4 == components)\
+        *((dstType *)outBuf+writeOffset) = (dstType)(gcdOFFSET_O_DOT_5(((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue) - 1.0f) / 2.0f));\
+        if (4 == components)\
         {\
-            *((dstType *)outBuf+writeOffset+1) = (dstType)(((*((GLfloat *)tmpBuf+i+3)) * (GLfloat)(maxValue)-1)/2);\
+            *((dstType *)outBuf+writeOffset+1) = (dstType)(gcdOFFSET_O_DOT_5(((*((GLfloat *)tmpBuf+i+3)) * (GLfloat)(maxValue) - 1.0f) / 2.0f));\
         }\
     }
 
@@ -962,7 +1001,7 @@ OnExit:
     {\
         writeOffset = (3 == components) ? (i/components) : ((i/components)*2);\
         *((GLfloat *)outBuf+writeOffset) = *((GLfloat *)tmpBuf+i);\
-        if(4 == components)\
+        if (4 == components)\
         {\
             *((GLfloat *)outBuf+writeOffset+1) = *((GLfloat *)tmpBuf+i+3);\
         }\
@@ -972,7 +1011,7 @@ OnExit:
     {\
         writeOffset = (3 == components) ? (i/components) : ((i/components)*2);\
         *((GLushort *)outBuf+writeOffset) = (GLushort)gcoMATH_FloatToFloat16(*((GLuint *)tmpBuf+i));\
-        if(4 == components)\
+        if (4 == components)\
         {\
             *((GLushort *)outBuf+writeOffset+1) = (GLushort)gcoMATH_FloatToFloat16(*((GLuint *)tmpBuf+i+3));\
         }\
@@ -980,12 +1019,12 @@ OnExit:
 
 #define __GL_I_FINALCONVERSION_2_UNSIGNED(dstType, maxValue) \
     {\
-        *((dstType *)outBuf+i/components) = (dstType)((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue));\
+        *((dstType *)outBuf+i/components) = (dstType)((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue) + 0.5f);\
     }
 
 #define __GL_I_FINALCONVERSION_2_SIGNED(dstType, maxValue) \
     {\
-        *((dstType *)outBuf+i/components) = (dstType)(((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue)-1)/2);\
+        *((dstType *)outBuf+i/components) = (dstType)(gcdOFFSET_O_DOT_5(((*((GLfloat *)tmpBuf+i)) * (GLfloat)(maxValue) - 1.0f) / 2.0f));\
     }
 
 #define __GL_I_FINALCONVERSION_2_FLOAT() \
@@ -1008,7 +1047,7 @@ GLvoid __glCheckSpcecialType(GLenum baseFmt, GLenum *srcType, GLenum dstType)
         case GL_UNSIGNED_SHORT_5_6_5_REV:
         case GL_UNSIGNED_INT_10F_11F_11F_REV:
         case GL_UNSIGNED_INT_5_9_9_9_REV:
-            if((GL_RGB != baseFmt) && (GL_RGB_INTEGER != baseFmt) && (GL_BGR != baseFmt) && (GL_BGR_INTEGER != baseFmt))
+            if ((GL_RGB != baseFmt) && (GL_RGB_INTEGER != baseFmt) && (GL_BGR != baseFmt) && (GL_BGR_INTEGER != baseFmt))
             {
                 *srcType = dstType;
             }
@@ -1021,7 +1060,7 @@ GLvoid __glCheckSpcecialType(GLenum baseFmt, GLenum *srcType, GLenum dstType)
         case GL_UNSIGNED_INT_8_8_8_8_REV:
         case GL_UNSIGNED_INT_10_10_10_2:
         case GL_UNSIGNED_INT_2_10_10_10_REV:
-            if((GL_RGBA != baseFmt) && (GL_RGBA_INTEGER != baseFmt) && (GL_BGRA != baseFmt) && (GL_BGRA_INTEGER != baseFmt))
+            if ((GL_RGBA != baseFmt) && (GL_RGBA_INTEGER != baseFmt) && (GL_BGRA != baseFmt) && (GL_BGRA_INTEGER != baseFmt))
             {
                 *srcType = dstType;
             }
@@ -1073,10 +1112,10 @@ GLboolean __glCheckSpecialFormat(GLenum internalFormat, GLenum format, GLenum* t
                     if (*type == GL_INT){
                         *type = GL_UNSIGNED_INT;
                     }
-                    else if(*type == GL_SHORT){
+                    else if (*type == GL_SHORT){
                         *type = GL_UNSIGNED_SHORT;
                     }
-                    else if(*type == GL_BYTE){
+                    else if (*type == GL_BYTE){
                         *type = GL_UNSIGNED_BYTE;
                     }
                     break;
@@ -1105,10 +1144,10 @@ GLboolean __glCheckSpecialFormat(GLenum internalFormat, GLenum format, GLenum* t
                     if (*type == GL_UNSIGNED_INT){
                         *type = GL_INT;
                     }
-                    else if(*type == GL_UNSIGNED_SHORT){
+                    else if (*type == GL_UNSIGNED_SHORT){
                         *type = GL_SHORT;
                     }
-                    else if(*type == GL_UNSIGNED_BYTE){
+                    else if (*type == GL_UNSIGNED_BYTE){
                         *type = GL_BYTE;
                     }
                     break;
@@ -1305,19 +1344,19 @@ GLboolean __glConvert2Float(GLenum type,GLsizei numOfComponent, GLubyte componen
         case GL_BYTE:
             for(i=0; i<numOfComponent; i++)
             {
-                __GL_CONVERT_SIGNED_2_FLOAT(GLbyte, __glMaxUbyte);
+                __GL_CONVERT_SIGNED_2_FLOAT(GLbyte, __glMaxByte);
             }
             break;
         case GL_SHORT:
             for(i=0; i<numOfComponent; i++)
             {
-                __GL_CONVERT_SIGNED_2_FLOAT(GLshort, __glMaxUshort);
+                __GL_CONVERT_SIGNED_2_FLOAT(GLshort, __glMaxShort);
             }
             break;
         case GL_INT:
             for(i=0; i<numOfComponent; i++)
             {
-                __GL_CONVERT_SIGNED_2_FLOAT(GLint, __glMaxUint);
+                __GL_CONVERT_SIGNED_2_FLOAT(GLint, __glMaxInt);
             }
             break;
         case GL_UNSIGNED_BYTE:
@@ -1833,7 +1872,7 @@ GLvoid __glFinalConversion(GLenum interType, GLenum* type, GLsizei numOfComponen
                 __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 16, 8);
                 __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 8,  8);
                 __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(3, 0,  8);
-                *((GLuint *)outBuf + (i/components)) = (GLuint)(tmpUint32 & gcdUINT_MAX(16));
+                *((GLuint *)outBuf + (i/components)) = (GLuint)(tmpUint32 & gcdUINT_MAX(32));
             }
             break;
         case GL_UNSIGNED_INT_8_8_8_8_REV:
@@ -1845,7 +1884,7 @@ GLvoid __glFinalConversion(GLenum interType, GLenum* type, GLsizei numOfComponen
                 __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 8,  8);
                 __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 16, 8);
                 __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(3, 24, 8);
-                *((GLuint *)outBuf + (i/components)) = (GLuint)(tmpUint32 & gcdUINT_MAX(16));
+                *((GLuint *)outBuf + (i/components)) = (GLuint)(tmpUint32 & gcdUINT_MAX(32));
             }
             break;
         case GL_UNSIGNED_INT_10_10_10_2:
@@ -1857,7 +1896,7 @@ GLvoid __glFinalConversion(GLenum interType, GLenum* type, GLsizei numOfComponen
                 __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 12, 10);
                 __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 2,  10);
                 __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(3, 0,  2);
-                *((GLuint *)outBuf + (i/components)) = (GLuint)(tmpUint32 & gcdUINT_MAX(16));
+                *((GLuint *)outBuf + (i/components)) = (GLuint)(tmpUint32 & gcdUINT_MAX(32));
             }
             break;
         case GL_UNSIGNED_INT_2_10_10_10_REV:
@@ -1869,7 +1908,7 @@ GLvoid __glFinalConversion(GLenum interType, GLenum* type, GLsizei numOfComponen
                 __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(1, 10, 10);
                 __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(2, 20, 10);
                 __GL_FINALCONVERSION_2_UNSIGNED_SPECIAL(3, 30, 2);
-                *((GLuint *)outBuf + (i/components)) = (GLuint)(tmpUint32 & gcdUINT_MAX(16));
+                *((GLuint *)outBuf + (i/components)) = (GLuint)(tmpUint32 & gcdUINT_MAX(32));
             }
             break;
         case GL_UNSIGNED_INT_10F_11F_11F_REV:
@@ -1878,9 +1917,9 @@ GLvoid __glFinalConversion(GLenum interType, GLenum* type, GLsizei numOfComponen
             {
                 GLshort r=0,g=0,b=0;
 
-                r = (GLushort)gcoMATH_FloatToFloat11((GLuint)*((GLfloat*)tmpBuf+i));
-                g = (GLushort)gcoMATH_FloatToFloat11((GLuint)*((GLfloat*)tmpBuf+i+1));
-                b = (GLushort)gcoMATH_FloatToFloat10((GLuint)*((GLfloat*)tmpBuf+i+2));
+                r = (GLushort)gcoMATH_FloatToFloat11(*(GLuint*)((GLfloat*)tmpBuf+i));
+                g = (GLushort)gcoMATH_FloatToFloat11(*(GLuint*)((GLfloat*)tmpBuf+i+1));
+                b = (GLushort)gcoMATH_FloatToFloat10(*(GLuint*)((GLfloat*)tmpBuf+i+2));
 
                 *((GLuint *)outBuf + (i/components)) = (b << 22) | (g << 11) | r;
             }
@@ -1921,6 +1960,127 @@ GLvoid __glFinalConversion(GLenum interType, GLenum* type, GLsizei numOfComponen
     *type = interType;
 }
 
+GLvoid __glClearAlignmentPlaceOfBuffer(__GLcontext *gc, __GLpixelTransferInfo *transferInfo, GLvoid **srcBuf)
+{
+    GLuint i, j;
+
+    if ((transferInfo->srcSizeOfPixel * transferInfo->width) % transferInfo->alignment)
+    {
+        (*srcBuf) = (GLfloat *)(*gc->imports.malloc)(gc, transferInfo->numOfPixel * transferInfo->srcSizeOfPixel * sizeof(GLubyte));
+        gcoOS_MemCopy((GLubyte *)(*srcBuf), (GLubyte *)transferInfo->srcImage, transferInfo->numOfPixel * transferInfo->srcSizeOfPixel);
+
+        for (i=0, j=0; i < transferInfo->numOfPixel * transferInfo->srcSizeOfPixel; i++, j++)
+        {
+            while (j % (transferInfo->width * transferInfo->srcSizeOfPixel + transferInfo->numOfAlignSrc) == transferInfo->width * transferInfo->srcSizeOfPixel)
+            {
+                j = j + transferInfo->numOfAlignSrc;
+            }
+
+            if (j < transferInfo->numOfPixel * transferInfo->srcSizeOfPixel)
+            {
+                 *((GLubyte *)transferInfo->srcImage+i) = *((GLubyte *)transferInfo->srcImage + j);
+            }
+        }
+        transferInfo->numOfComponents = transferInfo->numOfComponents / transferInfo->widthAlign * transferInfo->width;
+    }
+}
+
+GLvoid __glAddAlignmentPlaceOfBuffer(__GLcontext *gc, __GLpixelTransferInfo *transferInfo, GLvoid *alignmentBuf)
+{
+    GLuint i, j;
+
+    if (transferInfo->numOfAlign)
+    {
+        alignmentBuf = (*gc->imports.malloc)(gc, transferInfo->sizeOfAlignMemory * sizeof(GLubyte));
+
+        for(i=0, j=0; j < transferInfo->sizeOfAlignMemory; i++, j++)
+        {
+            if (j % (transferInfo->dstWidthAlign * transferInfo->dstSizeOfPixel) == transferInfo->width * transferInfo->dstSizeOfPixel)
+            {
+                j = j + transferInfo->numOfAlign;
+            }
+
+            if (j < transferInfo->sizeOfAlignMemory)
+            {
+                *((GLubyte *)alignmentBuf + j) = *((GLubyte *)transferInfo->dstImage + i);
+            }
+        }
+
+        gcoOS_MemCopy((GLubyte *)transferInfo->dstImage, (GLubyte *)alignmentBuf, transferInfo->sizeOfAlignMemory);
+        if (alignmentBuf != gcvNULL)
+        {
+            (*gc->imports.free)(gc, (void*)alignmentBuf);
+            alignmentBuf = gcvNULL;
+        }
+    }
+}
+
+GLvoid __glConvertToFloatOfBufferType(__GLcontext *gc, GLenum format, GLenum *type, const GLvoid* buf, __GLpixelTransferInfo *transferInfo, GLsizei width, GLsizei height, GLsizei depth)
+{
+    if (buf != gcvNULL)
+    {
+        GLuint i;
+        GLfloat *tmpBuf = gcvNULL;
+        GLuint tmpUint32;
+
+        transferInfo->height = height;
+        transferInfo->depth = depth;
+        transferInfo->width = width;
+
+        transferInfo->alignment = gc->clientState.pixel.packModes.alignment;
+        __glMemoryAlignment(format, *type, *type, transferInfo, __GL_TexImage);
+        transferInfo->numOfPixel = height * depth * transferInfo->widthAlign;
+        transferInfo->numOfComponents = transferInfo->numOfPixel * transferInfo->compNumOfElement;
+        tmpBuf = (GLfloat *)(*gc->imports.malloc)(gc, transferInfo->numOfComponents * sizeof(GLfloat));
+
+        switch (*type)
+        {
+           case GL_UNSIGNED_BYTE:
+                for (i=0; i<transferInfo->numOfComponents; i++)
+                {
+                    __GL_CONVERT_UNSIGNED_2_FLOAT(GLubyte, __glMaxUbyte);
+                }
+                break;
+           case GL_BYTE:
+                for (i=0; i<transferInfo->numOfComponents; i++)
+                {
+                    __GL_CONVERT_SIGNED_2_FLOAT(GLbyte, __glMaxUbyte);
+                }
+                break;
+           case GL_SHORT:
+                for (i=0; i<transferInfo->numOfComponents; i++)
+                {
+                    __GL_CONVERT_SIGNED_2_FLOAT(GLshort, __glMaxUshort);
+                }
+                break;
+           case GL_INT:
+                for (i=0; i<transferInfo->numOfComponents; i++)
+                {
+                    __GL_CONVERT_SIGNED_2_FLOAT(GLint, __glMaxUint);
+                }
+                break;
+           case GL_HALF_FLOAT:
+                for (i=0; i<transferInfo->numOfComponents; i++)
+                {
+                    tmpUint32=0;
+                    __GL_CONVERT_HALF_FLOAT_2_FLOAT();
+                }
+                break;
+           default:
+                break;
+        }
+
+        (*type)=GL_FLOAT;
+        transferInfo->srcImage = buf;
+        transferInfo->dstImage = tmpBuf;
+        transferInfo->dstNeedFree = GL_TRUE;
+    }
+    else
+    {
+        transferInfo->srcImage = buf;
+        transferInfo->dstImage = buf;
+    }
+}
 
 /* A GenericPixelTransfer function template*/
 GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
@@ -1928,54 +2088,59 @@ GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
                                         GLenum *type)
 {
     GLfloat *tmpBuf = gcvNULL;
+    GLvoid  *srcBuf = gcvNULL;
+    GLvoid  *alignmentBuf = gcvNULL;
     GLenum baseFormat = transferInfo->baseFormat;
 
-    if((gcvNULL == transferInfo->srcImage) || (0 == transferInfo->numOfComponents))
+    if ((gcvNULL == transferInfo->srcImage) || (0 == transferInfo->numOfComponents))
     {
         __GL_EXIT();
     }
+
+    /* clear alignment place in the buffer before conversion*/
+    __glClearAlignmentPlaceOfBuffer(gc, transferInfo, &srcBuf);
 
     tmpBuf = (GLfloat *)(*gc->imports.malloc)(gc, transferInfo->numOfComponents * sizeof(GLfloat));
-    if(gcvNULL == tmpBuf)
+    if (gcvNULL == tmpBuf)
     {
         __GL_EXIT();
     }
 
-    if((baseFormat == GL_LUMINANCE) || (baseFormat == GL_LUMINANCE_ALPHA))
+    if ((baseFormat == GL_LUMINANCE) || (baseFormat == GL_LUMINANCE_ALPHA))
     {
-        if(__glConvertL2RGB(transferInfo->srcType, transferInfo->numOfPixel, transferInfo->compNumber, tmpBuf, transferInfo->srcImage))
+        if (__glConvertL2RGB(transferInfo->srcType, transferInfo->numOfPixel, transferInfo->compNumber, tmpBuf, transferInfo->srcImage))
         {
             __GL_EXIT();
         }
     }
-    else if(baseFormat == GL_INTENSITY)
+    else if (baseFormat == GL_INTENSITY)
     {
-        if(__glConvertI2RGBA(transferInfo->srcType, transferInfo->numOfPixel, transferInfo->compNumber, tmpBuf, transferInfo->srcImage))
+        if (__glConvertI2RGBA(transferInfo->srcType, transferInfo->numOfPixel, transferInfo->compNumber, tmpBuf, transferInfo->srcImage))
         {
             __GL_EXIT();
         }
     }
     else
     {
-        if(__glConvert2Float(transferInfo->srcType, transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, transferInfo->srcImage))
+        if (__glConvert2Float(transferInfo->srcType, transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, transferInfo->srcImage))
         {
             __GL_EXIT();
         }
     }
 
     /* Scale, Bias, Clamp */
-    if(transferInfo->applyGenericScaleBias)
+    if (transferInfo->applyGenericScaleBias)
     {
         __glScaleAndBias(transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, (GLfloat *)(&(transferInfo->scale)), (GLfloat *)(&(transferInfo->bias)), &(transferInfo->compMask[0]));
     }
     __glClamp2ZeroOne(transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf);
 
 
-    if((baseFormat == GL_LUMINANCE) || (baseFormat == GL_LUMINANCE_ALPHA))
+    if ((baseFormat == GL_LUMINANCE) || (baseFormat == GL_LUMINANCE_ALPHA))
     {
         __glFinalConversionForL(transferInfo->dstType, type, transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, (GLvoid *)(transferInfo->dstImage));
     }
-    else if(baseFormat == GL_INTENSITY)
+    else if (baseFormat == GL_INTENSITY)
     {
         __glFinalConversionForI(transferInfo->dstType, type, transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, (GLvoid *)(transferInfo->dstImage));
     }
@@ -1984,10 +2149,20 @@ GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
         __glFinalConversion(transferInfo->dstType, type, transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, (GLvoid *)(transferInfo->dstImage));
     }
 
+    /* add alignment place in the buffer after conversion */
+    __glAddAlignmentPlaceOfBuffer(gc, transferInfo, alignmentBuf);
+
 OnExit:
-    if(tmpBuf != gcvNULL){
+    if (tmpBuf != gcvNULL){
         (*gc->imports.free)(gc, (void*)tmpBuf);
         tmpBuf = gcvNULL;
+    }
+
+    if (srcBuf != gcvNULL)
+    {
+         gcoOS_MemCopy((GLubyte *)transferInfo->srcImage, (GLubyte *)srcBuf, transferInfo->numOfPixel * transferInfo->srcSizeOfPixel);
+        (*gc->imports.free)(gc, (void*)srcBuf);
+        srcBuf = gcvNULL;
     }
 }
 
@@ -2010,12 +2185,21 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
     GLenum inType = 0;
     GLenum outType = 0;
 
-    if((gcvNULL == buf) || (gcvNULL == formatInfo) || (gcvNULL == transferInfo))
+    if(!gc->imports.conformGLSpec)
     {
         __GL_EXIT();
     }
 
-    if(pixelTransferOperations == __GL_TexImage)// Tex
+    if ((gcvNULL == buf) || (gcvNULL == formatInfo) || (gcvNULL == transferInfo))
+    {
+        if ((gcvNULL != formatInfo) && (*type != formatInfo->dataType))
+        {
+            *type = formatInfo->dataType;
+        }
+        __GL_EXIT();
+    }
+
+    if (pixelTransferOperations == __GL_TexImage)// Tex
     {
         internalFormat = formatInfo->glFormat;
         baseFmt = format;
@@ -2023,18 +2207,18 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
         outType = formatInfo->dataType;
 
         /* When format is integer/index/depth/stencil */
-        if(__glCheckSpecialFormat(internalFormat, baseFmt, type))
+        if (__glCheckSpecialFormat(internalFormat, baseFmt, type))
         {
             __GL_EXIT();
         }
 
-        if(GL_FALSE == __glInitTransferInfo(gc, width, height, depth, transferInfo, baseFmt, inType, outType))
+        if (GL_FALSE == __glInitTransferInfo(gc, width, height, depth, transferInfo, baseFmt, inType, outType, __GL_TexImage))
         {
             __GL_EXIT();
         }
 
-        interBuf  = (gc->imports.malloc)(gc, transferInfo->numOfPixel * transferInfo->dstSizeOfPixel);
-        if(gcvNULL == interBuf)
+        interBuf  = (gc->imports.malloc)(gc, transferInfo->sizeOfAlignMemory);
+        if (gcvNULL == interBuf)
         {
             __GL_EXIT();
         }
@@ -2044,7 +2228,7 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
 
         __glGenericPixelTransferSub(gc, transferInfo, type);
     }
-    else if(pixelTransferOperations == __GL_ReadPixelsPre)// Read
+    else if (pixelTransferOperations == __GL_ReadPixelsPre)// Read
     {
         internalFormat = formatInfo->glFormat;
         baseFmt = format;
@@ -2052,20 +2236,20 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
         outType = *type;
 
         /* When format is integer/index/depth/stencil */
-        if(__glCheckSpecialFormat(internalFormat, baseFmt, type))
+        if (__glCheckSpecialFormat(internalFormat, baseFmt, type))
         {
             __GL_EXIT();
         }
 
         __glCheckSpcecialType(baseFmt, &inType, outType);
 
-        if(GL_FALSE == __glInitTransferInfo(gc, width, height, depth, transferInfo, baseFmt, inType, outType))
+        if (GL_FALSE == __glInitTransferInfo(gc, width, height, depth, transferInfo, baseFmt, inType, outType, __GL_ReadPixelsPre))
         {
             __GL_EXIT();
         }
 
         interBuf = (gc->imports.malloc)(gc, transferInfo->numOfPixel * transferInfo->srcSizeOfPixel);
-        if(gcvNULL == interBuf)
+        if (gcvNULL == interBuf)
         {
             __GL_EXIT();
         }
@@ -2075,9 +2259,9 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
         *type = transferInfo->srcType;
         return;
     }
-    else if(pixelTransferOperations == __GL_ReadPixels)
+    else if (pixelTransferOperations == __GL_ReadPixels)
     {
-        if(GL_FALSE == transferInfo->applyPixelTransfer)
+        if (GL_FALSE == transferInfo->applyPixelTransfer)
         {
             __GL_EXIT();
         }
@@ -2086,12 +2270,19 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
     }
 
 OnExit:
-    if(gcvNULL == interBuf)
+    if (gcvNULL == interBuf)
     {
-        if(pixelTransferOperations == __GL_TexImage)
+        if (pixelTransferOperations == __GL_TexImage)
         {
-            transferInfo->srcImage = buf;
-            transferInfo->dstImage = buf;
+            if ((format==GL_DEPTH_COMPONENT)&&((*type)==GL_UNSIGNED_BYTE||(*type)==GL_BYTE||(*type)==GL_SHORT||(*type)==GL_INT||(*type)==GL_HALF_FLOAT))
+            {
+                __glConvertToFloatOfBufferType(gc, format, type, buf, transferInfo, width, height, depth);
+            }
+            else
+            {
+                transferInfo->srcImage = buf;
+                transferInfo->dstImage = buf;
+            }
         }
         else if (pixelTransferOperations == __GL_ReadPixelsPre)
         {

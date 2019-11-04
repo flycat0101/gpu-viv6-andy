@@ -13,6 +13,8 @@
 
 #include "gc_egl_precomp.h"
 
+extern void _InitDispatchTables(VEGLThreadData Thread);
+
 #if defined(ANDROID) && !defined(GPU_VENDOR)
 #  define GPU_VENDOR "VIVANTE"
 #endif
@@ -28,38 +30,34 @@
 
 #if !gcdSTATIC_LINK
 
-static const char * _dlls[] =
+static const char * _driverDlls[] =
 {
 #if defined(ANDROID)
     "libEGL_" GPU_VENDOR ".so",         /* EGL */
     "libGLESv1_CL_" GPU_VENDOR ".so",   /* OpenGL ES 1.1 Common Lite */
     "libGLESv1_CM_" GPU_VENDOR ".so",   /* OpenGL ES 1.1 Common */
-    "libGLESv2_" GPU_VENDOR ".so",      /* OpenGL ES 2.0 */
-    "libGLESv2_" GPU_VENDOR ".so",      /* OpenGL ES 3.0 */
+    "libGLESv2_" GPU_VENDOR ".so",      /* OpenGL ES 2.0/3.x */
     "libGL.so",                         /* OpenGL */
     "libOpenVG.so",                     /* OpenVG 1.0 */
 #elif defined(__QNXNTO__)
-    "libEGL_viv",                       /* EGL */
+    "egl-dlls",                         /* EGL */
     "glesv1-dlls",                      /* OpenGL ES 1.1 Common Lite */
     "glesv1-dlls",                      /* OpenGL ES 1.1 Common */
-    "glesv2-dlls",                      /* OpenGL ES 2.0 */
-    "glesv2-dlls",                      /* OpenGL ES 3.0 */
+    "glesv2-dlls",                      /* OpenGL ES 2.0/3.x */
     gcvNULL,                            /* OpenGL */
     "vg-dlls",                          /* OpenVG 1.0 */
 #elif defined(__APPLE__)
     "libEGL.dylib",                     /* EGL */
     "libGLESv1_CL.dylib",               /* OpenGL ES 1.1 Common Lite */
     "libGLESv1_CM.dylib",               /* OpenGL ES 1.1 Common */
-    "libGLESv2.dylib",                  /* OpenGL ES 2.0 */
-    "libGLESv3.dylib",                  /* OpenGL ES 3.0 */
+    "libGLESv2.dylib",                  /* OpenGL ES 2.0/3.x */
     "libOpenGL.dylib",                  /* OpenGL */
     "libOpenVG.dylib",                  /* OpenVG 1.0 */
 #else
     "libEGL",                           /* EGL */
     "libGLESv1_CL",                     /* OpenGL ES 1.1 Common Lite */
     "libGLESv1_CM",                     /* OpenGL ES 1.1 Common */
-    "libGLESv2",                        /* OpenGL ES 2.0 */
-    "libGLESv2",                        /* OpenGL ES 3.0 */
+    "libGLESv2",                        /* OpenGL ES 2.0/3.x */
     "libGL",                            /* OpenGL */
     "libOpenVG",                        /* OpenVG 1.0 */
 #endif
@@ -72,8 +70,7 @@ static const char * _dispatchNames[] =
     "GLES_CL_DISPATCH_TABLE",           /* OpenGL ES 1.1 Common Lite */
     "GLES_CM_DISPATCH_TABLE",           /* OpenGL ES 1.1 Common */
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 2.0 */
-    "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 3.0 */
-    "GL_DISPATCH_TABLE",                /* OpenGL GL 3.0 */
+    "GL_DISPATCH_TABLE",                /* OpenGL 4.x */
     "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
 };
 #endif
@@ -82,13 +79,12 @@ gctHANDLE
 veglGetModule(
     IN gcoOS Os,
     IN veglAPIINDEX Index,
-#if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
     IN gctCONST_STRING Name,
-#endif
     IN veglDISPATCH **Dispatch
     )
 {
     gctHANDLE library = gcvNULL;
+    gctSTRING libEnvStr = gcvNULL;
 
     if (Index < vegl_API_LAST)
     {
@@ -112,7 +108,7 @@ veglGetModule(
 
         /* Try load library. */
         offset = 0;
-        gcoOS_PrintStrSafe(path, 64, &offset, "%s%s%s", LIBRARY_PATH1, subdir, _dlls[Index]);
+        gcoOS_PrintStrSafe(path, 64, &offset, "%s%s%s", LIBRARY_PATH1, subdir, _driverDlls[Index]);
         gcoOS_LoadLibrary(Os, path, &library);
 
         /* Try 2nd path for Android */
@@ -120,17 +116,33 @@ veglGetModule(
         {
             /* Try load library in 2d path. */
             offset = 0;
-            gcoOS_PrintStrSafe(path, 64, &offset, "%s%s%s", LIBRARY_PATH2, subdir, _dlls[Index]);
+            gcoOS_PrintStrSafe(path, 64, &offset, "%s%s%s", LIBRARY_PATH2, subdir, _driverDlls[Index]);
             gcoOS_LoadLibrary(Os, path, &library);
         }
 #else
-        gcoOS_LoadLibrary(Os, _dlls[Index], &library);
+        if (Index == vegl_OPENGL_ES20)
+        {
+            if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_GL_FOR_GLES", &libEnvStr)) &&
+                libEnvStr && gcmIS_SUCCESS(gcoOS_StrCmp(libEnvStr, "1")))
+            {
+                gcoOS_Print("Use OpenGL library libGL.so.x for GLES application!\n");
+                gcoOS_LoadLibrary(Os, _driverDlls[vegl_OPENGL], &library);
+            }
+            else
+            {
+                gcoOS_LoadLibrary(Os, _driverDlls[vegl_OPENGL_ES20], &library);
+            }
+        }
+        else
+        {
+            gcoOS_LoadLibrary(Os, _driverDlls[Index], &library);
+        }
 
         /* Query the CL handle if CM not available. */
         if (!library && Index == vegl_OPENGL_ES11)
         {
             Index = vegl_OPENGL_ES11_CL;
-            gcoOS_LoadLibrary(Os, _dlls[vegl_OPENGL_ES11_CL], &library);
+            gcoOS_LoadLibrary(Os, _driverDlls[vegl_OPENGL_ES11_CL], &library);
         }
 #endif
 
@@ -161,7 +173,7 @@ _GetAPIIndex(
         VEGLThreadData thread;
         VEGLContext context;
         EGLenum api;
-        EGLint client;
+        EGLint major;
 
         /* Get thread data. */
         thread = veglGetThreadData();
@@ -185,22 +197,22 @@ _GetAPIIndex(
         /* Is there a current context? */
         if (context == gcvNULL)
         {
-            /* No current context, use thread data. */
+            /* No current context, use thread data. API default is ES1 */
             api    = thread->api;
-            client = 1;
+            major = 1;
         }
         else
         {
             /* Have current context set. */
             api    = context->api;
-            client = context->client;
+            major = MAJOR_API_VER(context->client);
         }
 
         /* Dispatch base on the API. */
         switch (api)
         {
         case EGL_OPENGL_ES_API:
-            index = vegl_OPENGL_ES11 + MAJOR_API_VER(client) - 1;
+            index = (major == 1)? vegl_OPENGL_ES11 : vegl_OPENGL_ES20;
             break;
 
         case EGL_OPENVG_API:
@@ -350,10 +362,18 @@ _Malloc(
     )
 {
     gctPOINTER data = gcvNULL;
+
+    if (0x0 == size)
+    {
+        return gcvNULL;
+    }
+
     if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, size, &data)))
     {
         gcmFATAL("%s(%d): gcoOS_Allocate failed", __FUNCTION__, __LINE__);
     }
+
+    gcoOS_ZeroMemory(data, size);
     return data;
 }
 
@@ -523,8 +543,10 @@ _CreateApiContext(
     imports.resetNotification = Context->resetNotification;
     imports.contextFlags = Context->flags;
     imports.debuggable = (Context->flags & EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR) ? gcvTRUE : gcvFALSE;
-    imports.fromEGL = gcvTRUE;
+    imports.version = Context->client;
+    imports.conformGLSpec = (Context->api == EGL_OPENGL_API) ? gcvTRUE : gcvFALSE;
     imports.coreProfile = Context->coreProfile;
+    imports.fromEGL = gcvTRUE;
 
     /*
      * EGL_EXT_protected_context.
@@ -563,35 +585,6 @@ _DestroyApiContext(
     }
 
     return (*dispatch->destroyContext)(Thread, ApiContext);
-}
-
-EGLBoolean
-_FlushApiContext(
-    VEGLThreadData Thread,
-    VEGLContext Context,
-    void * ApiContext
-    )
-{
-    veglDISPATCH * dispatch = _GetDispatch(Thread, Context);
-
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_EGL_CONTEXT,
-                  "%s(%d): 0x%x,0x%x",
-                  __FUNCTION__, __LINE__,
-                  Thread, ApiContext);
-
-    if (ApiContext == gcvNULL)
-    {
-        return EGL_TRUE;
-    }
-
-    if ((dispatch == gcvNULL)
-    ||  (dispatch->flushContext == gcvNULL)
-    )
-    {
-        return EGL_FALSE;
-    }
-
-    return (*dispatch->flushContext)(Context);
 }
 
 static EGLBoolean
@@ -648,7 +641,7 @@ _SetDrawable(
     )
 {
     veglDISPATCH * dispatch = _GetDispatch(Thread, Context);
-    void * ApiContext = Context ? Context->context : gcvNULL;
+    void * ApiContext = Context->context;
 
     gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_EGL_CONTEXT,
                   "%s(%d): 0x%x,0x%x,0x%x,0x%x",
@@ -795,52 +788,58 @@ veglBindAPI(
     switch (api)
     {
     case EGL_OPENGL_ES_API:
-        /* OpenGL ES API. */
+        /* Bind OpenGL ES API. */
+        thread->api = api;
+        thread->context = thread->esContext;
+
+        if (!thread->dispatchTables[vegl_OPENGL_ES11] ||
+            !thread->dispatchTables[vegl_OPENGL_ES20])
+        {
+            /* Initialize client dispatch tables. */
+            _InitDispatchTables(thread);
+        }
         if (!thread->dispatchTables[vegl_OPENGL_ES11_CL] &&
             !thread->dispatchTables[vegl_OPENGL_ES11] &&
-            !thread->dispatchTables[vegl_OPENGL_ES20] &&
-            !thread->dispatchTables[vegl_OPENGL_ES30])
+            !thread->dispatchTables[vegl_OPENGL_ES20])
         {
             /* OpenGL ES API not supported. */
             veglSetEGLerror(thread,  EGL_BAD_PARAMETER);;
             gcmFOOTER_ARG("%d", EGL_FALSE);
             return EGL_FALSE;
-        }
-
-        if (thread->api != api)
-        {
-            thread->api = api;
-            thread->context = thread->esContext;
         }
         gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
         break;
 
     case EGL_OPENGL_API:
-        /*
-                veglSetEGLerror(thread,  EGL_BAD_PARAMETER);;
-                gcmFOOTER_ARG("%d", EGL_FALSE);
-                return EGL_FALSE;
-        */
-                /* OpenGL ES API. */
+        /* Bind OpenGL API. */
+        thread->api = api;
+        thread->context = thread->glContext;
+
         if (!thread->dispatchTables[vegl_OPENGL])
         {
-            /* OpenGL ES API not supported. */
+            /* Initialize client dispatch tables. */
+            _InitDispatchTables(thread);
+        }
+        if (!thread->dispatchTables[vegl_OPENGL])
+        {
+            /* OpenGL API not supported. */
             veglSetEGLerror(thread,  EGL_BAD_PARAMETER);;
             gcmFOOTER_ARG("%d", EGL_FALSE);
             return EGL_FALSE;
         }
-
-        if (thread->api != api)
-        {
-            thread->api = api;
-            thread->context = thread->glContext;
-        }
         gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
         break;
 
-
     case EGL_OPENVG_API:
-        /* OpenVG API. */
+        /* Bind OpenVG API. */
+        thread->api = api;
+        thread->context = thread->vgContext;
+
+        if (!thread->dispatchTables[vegl_OPENVG])
+        {
+            /* Initialize client dispatch tables. */
+            _InitDispatchTables(thread);
+        }
         if (!thread->dispatchTables[vegl_OPENVG])
         {
             /* OpenVG API not supported. */
@@ -848,13 +847,6 @@ veglBindAPI(
             gcmFOOTER_ARG("%d", EGL_FALSE);
             return EGL_FALSE;
         }
-
-        if (thread->api != api)
-        {
-            thread->context = thread->vgContext;
-            thread->api = api;
-        }
-
 #if gcdENABLE_VG
         if (thread->openVGpipe)
         {
@@ -960,13 +952,12 @@ eglCreateContext(
     EGLint major = 1;
     EGLint minor = 0;
     gctPOINTER pointer = gcvNULL;
-    VEGLConfig  eglConfig = gcvNULL;
+    VEGLConfig eglConfig = gcvNULL;
     EGLint flags = 0;
     gctBOOL robustAccess = EGL_FALSE;
     gctINT resetNotification = EGL_NO_RESET_NOTIFICATION_EXT;
     gctBOOL robustAttribSet = gcvFALSE;
     EGLBoolean protectedContent = gcvFALSE;
-    EGLenum    glProfileMask = EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT;
 
     gcmHEADER_ARG("Dpy=0x%x config=0x%x SharedContext=0x%x attrib_list=0x%x",
                   Dpy, config, SharedContext, attrib_list);
@@ -1142,10 +1133,6 @@ eglCreateContext(
                 {
                     veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-                }
-                else
-                {
-                    glProfileMask = attrib_list[i + 1];
                 }
                 break;
 
@@ -1358,14 +1345,6 @@ eglCreateContext(
         }
     }
 
-    /* Flush any existing context. */
-    if (thread->context != EGL_NO_CONTEXT)
-    {
-        gcmVERIFY(_FlushApiContext(thread,
-                                   thread->context,
-                                   thread->context->context));
-    }
-
     /* Create new context. */
     status = gcoOS_Allocate(gcvNULL,
                             gcmSIZEOF(struct eglContext),
@@ -1399,29 +1378,7 @@ eglCreateContext(
 
     if (thread->api == EGL_OPENGL_API)
     {
-        if ((major > 3) || (major == 3 && minor > 1) )
-        {
-            switch (glProfileMask) {
-            case EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT_KHR:
-                context->coreProfile = gcvTRUE;
-                break;
-            case EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT_KHR:
-                context->coreProfile = gcvFALSE;
-                break;
-            }
-
-        }
-        else
-        {
-            if (major == 3 && minor == 1)
-            {
-                context->coreProfile = gcvTRUE;
-            }
-            else
-            {
-                context->coreProfile = gcvFALSE;
-            }
-        }
+        context->coreProfile = gcvFALSE;
     }
 
 #if gcdGC355_PROFILER
@@ -1481,7 +1438,7 @@ eglCreateContext(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if(dpy->platform && dpy->platform->platform == EGL_PLATFORM_DRI_VIV)
+    if (dpy->platform && dpy->platform->platform == EGL_PLATFORM_DRI_VIV)
     {
         dpy->platform->createContext(dpy->localInfo, context);
     }
@@ -1589,10 +1546,18 @@ _DestroyContext(
                  "%s(%d): _DestroyContext: context is still in current of current thread.",
                  __FUNCTION__, __LINE__);
 
-        /* Flush current context of current client API */
-        gcmVERIFY(_FlushApiContext(Thread,
-                                 current,
-                                 current->context));
+        /*  Make sure all swap workers have been processed before detaching
+         *  window drawable from the current context.
+         */
+        if (current->draw && (current->draw->type & EGL_WINDOW_BIT))
+        {
+            if (Display->workerThread != gcvNULL)
+            {
+                gcmVERIFY_OK(gcoOS_WaitSignal(gcvNULL,
+                                current->draw->workerDoneSignal, gcvINFINITE));
+            }
+        }
+
         /* Remove context. */
         gcmVERIFY(_ApiLoseCurrent(Thread, current));
     }
@@ -1668,7 +1633,7 @@ _DestroyContext(
     Context->thread = gcvNULL;
     Context->api    = EGL_NONE;
 
-    if(Display->platform && Display->platform->platform == EGL_PLATFORM_DRI_VIV)
+    if (Display->platform && Display->platform->platform == EGL_PLATFORM_DRI_VIV)
     {
         Display->platform->destroyContext(Display->localInfo, Context);
     }
@@ -1890,6 +1855,15 @@ veglMakeCurrent(
 
     if (draw && (draw->type & EGL_WINDOW_BIT))
     {
+        /*  Make sure all swap workers have been processed before attaching
+         *  window drawable to a new context.
+         */
+        if (dpy->workerThread != gcvNULL)
+        {
+            gcmVERIFY_OK(gcoOS_WaitSignal(gcvNULL,
+                            draw->workerDoneSignal, gcvINFINITE));
+        }
+
         /* Validate native window. */
         result = platform->getWindowSize(dpy, draw, &width, &height);
 
@@ -1939,11 +1913,6 @@ veglMakeCurrent(
             }
 #endif
             current = thread->context;
-            /* Flush current context. */
-            gcmVERIFY(
-                _FlushApiContext(thread,
-                                 current,
-                                 current->context));
 
             /* Remove context. */
             gcmVERIFY(_ApiLoseCurrent(thread, current));
@@ -2334,13 +2303,9 @@ veglMakeCurrent(
         break;
     }
 
-    /* Step 2: flush and unlink current context from thread. */
+    /* Step 2: Unlink current context from thread. */
     if (current)
     {
-        /* Flush current context of current client API */
-        gcmVERIFY(_FlushApiContext(thread,
-                                 current,
-                                 current->context));
         /* Remove context. */
         gcmVERIFY(_ApiLoseCurrent(thread, current));
 
@@ -2571,7 +2536,7 @@ veglMakeCurrent(
     /* Set the new current thread. */
     ctx->thread = thread;
 
-    if(platform && platform->platform == EGL_PLATFORM_DRI_VIV)
+    if (platform && platform->platform == EGL_PLATFORM_DRI_VIV)
     {
         if (draw && (draw->type & EGL_WINDOW_BIT))
         {
@@ -3129,7 +3094,7 @@ _CreateImageTexture(
     )
 {
     veglDISPATCH * dispatch = _GetDispatch(Thread, Context);
-    void* ApiContext = Context->context;
+    void * ApiContext = Context->context;
 
     gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_EGL_CONTEXT,
                   "%s(%d): Thread=0x%08x,Target=0x%04x,Texture=0x%08x",
@@ -3161,7 +3126,7 @@ _CreateImageFromRenderBuffer(
     )
 {
     veglDISPATCH * dispatch = _GetDispatch(Thread, Context);
-    void* ApiContext = Context->context;
+    void * ApiContext = Context->context;
 
     gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_EGL_CONTEXT,
                   "%s(%d): Thread=0x%08x, RenderBuffer=%u,Image=0x%08x",

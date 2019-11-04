@@ -28,11 +28,7 @@ extern GLvoid* __glCreateContext(GLint, VEGLimports*, GLvoid*);
 
 
 extern GLuint __glDestroyContext(GLvoid *gc);
-#ifdef OPENGL40
-extern __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable, __GLcontext* gc);
-#else
 extern __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable);
-#endif
 extern GLvoid __glSetDrawable(__GLcontext* gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable);
 extern GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable, GLboolean flushDrawableChange);
 extern GLboolean __glLoseCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable);
@@ -82,7 +78,7 @@ GLvoid __eglFree(GLvoid *ptr)
 
 static void __eglDestroyThreadArea(void *thrArea)
 {
-    __GLthreadPriv *esThrArea = (__GLthreadPriv *)thrArea;
+    __GLthreadPriv *esThrArea = thrArea;
 
     /* Destroy 3d blit state */
     if (esThrArea->p3DBlitState)
@@ -155,7 +151,7 @@ void __eglDestruct(void)
 
 static void* veglCreateContext_es3(void *thrData, gctINT ClientVersion, VEGLimports *Imports, gctPOINTER SharedContext)
 {
-    __GLcontext *gc = (__GLcontext *)__glCreateContext((GLint)ClientVersion, Imports, SharedContext);
+    __GLcontext *gc = __glCreateContext((GLint)ClientVersion, Imports, SharedContext);
 
     return gc;
 }
@@ -188,13 +184,8 @@ static EGLBoolean veglDestroyContext_es3(void *thrData, GLvoid *pCtxPriv)
 static EGLBoolean veglSetDrawable_es3(void *thrData, void *pCtxPriv, VEGLDrawable drawable, VEGLDrawable readable)
 {
     __GLcontext* gc = (__GLcontext*)pCtxPriv;
-#ifdef OPENGL40
-    __GLdrawablePrivate* glDrawable = __glGetDrawable(drawable, gc);
-    __GLdrawablePrivate* glReadable = __glGetDrawable(readable, gc);
-#else
     __GLdrawablePrivate* glDrawable = __glGetDrawable(drawable);
     __GLdrawablePrivate* glReadable = __glGetDrawable(readable);
-#endif
 
     __glSetDrawable(gc, glDrawable, glReadable);
 
@@ -204,13 +195,9 @@ static EGLBoolean veglSetDrawable_es3(void *thrData, void *pCtxPriv, VEGLDrawabl
 static EGLBoolean veglMakeCurrent_es3(void *thrData, void *pCtxPriv, VEGLDrawable drawable, VEGLDrawable readable)
 {
     __GLcontext *gc = (__GLcontext*)pCtxPriv;
-#ifdef OPENGL40
-    __GLdrawablePrivate* glDrawable = __glGetDrawable(drawable, gc);
-    __GLdrawablePrivate* glReadable = __glGetDrawable(readable, gc);
-#else
     __GLdrawablePrivate* glDrawable = __glGetDrawable(drawable);
     __GLdrawablePrivate* glReadable = __glGetDrawable(readable);
-#endif
+
 
     /* MakeCurrent for the new GL context, null drawables/readables means GL_OES_surfaceless_context. */
     if (!__glMakeCurrent(gc, glDrawable, glReadable, GL_FALSE))
@@ -233,12 +220,6 @@ static EGLBoolean veglLoseCurrent_es3(void *thrData, void *pCtxPriv)
     }
 
     __glSetGLcontext(gcvNULL);
-    return EGL_TRUE;
-}
-
-
-static EGLBoolean veglFlushContext_es3(void * Context)
-{
     return EGL_TRUE;
 }
 
@@ -338,7 +319,7 @@ veglBindTexImage_es3(
         GLenum glFormat = GL_NONE;
         __GLcontext *gc = __glGetGLcontext();
 
-        if(gcvNULL == gc)
+        if (gcvNULL == gc)
         {
             error = EGL_BAD_CONTEXT;
             break;
@@ -382,7 +363,7 @@ static EGL_PROC veglGetProcAddr_es3(const char *procname)
     return (EGL_PROC)__glGetProcAddr(procname);
 }
 
-/* Dispatch table. */
+/* OpenGL Dispatch table. */
 veglDISPATCH GL_DISPATCH_TABLE =
 {
     /* createContext            */  veglCreateContext_es3,
@@ -390,7 +371,28 @@ veglDISPATCH GL_DISPATCH_TABLE =
     /* makeCurrent              */  veglMakeCurrent_es3,
     /* loseCurrent              */  veglLoseCurrent_es3,
     /* setDrawable              */  veglSetDrawable_es3,
-    /* flushContext             */  veglFlushContext_es3,
+    /* flush                    */  veglFlush_es3,
+    /* finish                   */  veglFinish_es3,
+    /* getClientBuffer          */  gcvNULL,
+    /* createImageTexture       */  veglCreateImageTexture_es3,
+    /* createImageRenderbuffer  */  veglCreateImageRenderbuffer_es3,
+    /* createImageParentImage   */  gcvNULL,
+    /* bindTexImage             */  veglBindTexImage_es3,
+    /* profiler                 */  veglProfiler_es3,
+    /* getProcAddr              */  veglGetProcAddr_es3,
+    /* swapBuffers              */  veglSwapBuffers_es3,
+    /* queryHWVG                */  gcvNULL,
+    /* resolveVG                */  gcvNULL,
+};
+
+/* OpenGL ES Dispatch table for ES Compatibility */
+veglDISPATCH GLESv2_DISPATCH_TABLE =
+{
+    /* createContext            */  veglCreateContext_es3,
+    /* destroyContext           */  veglDestroyContext_es3,
+    /* makeCurrent              */  veglMakeCurrent_es3,
+    /* loseCurrent              */  veglLoseCurrent_es3,
+    /* setDrawable              */  veglSetDrawable_es3,
     /* flush                    */  veglFlush_es3,
     /* finish                   */  veglFinish_es3,
     /* getClientBuffer          */  gcvNULL,

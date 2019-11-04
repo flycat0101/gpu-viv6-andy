@@ -278,20 +278,20 @@ GLsizei minVertexNumber[] =
 */
 GLuint edgeFlagInputMask[] =
 {
-    ~__GL_INPUT_EDGEFLAG,                     /* GL_POINTS             */
-    ~__GL_INPUT_EDGEFLAG,                     /* GL_LINES              */
-    ~__GL_INPUT_EDGEFLAG,                     /* GL_LINE_LOOP          */
-    ~__GL_INPUT_EDGEFLAG,                     /* GL_LINE_STRIP         */
-    (GLuint)~0,                                       /* GL_TRIANGLES          */
-    ~__GL_INPUT_EDGEFLAG,                     /* GL_TRIANGLE_STRIP     */
-    ~__GL_INPUT_EDGEFLAG,                     /* GL_TRIANGLE_FAN       */
-    (GLuint)~0,                                       /* GL_QUADS              */
-    ~__GL_INPUT_EDGEFLAG,                     /* GL_QUAD_STRIP         */
-    (GLuint)~0,                                       /* GL_POLYGON            */
-    ~__GL_INPUT_EDGEFLAG,                     /* GL_LINES_ADJACENCY_EXT */
-    ~__GL_INPUT_EDGEFLAG,                     /* GL_LINE_STRIP_ADJACENCY_EXT */
-    (GLuint)~0,                                       /* GL_TRIANGLES_ADJACENCY_EXT */
-    ~__GL_INPUT_EDGEFLAG,                     /* GL_TRIANGLE_STRIP_ADJACENCY_EXT */
+    ~((GLuint)__GL_INPUT_EDGEFLAG),                     /* GL_POINTS             */
+    ~((GLuint)__GL_INPUT_EDGEFLAG),                     /* GL_LINES              */
+    ~((GLuint)__GL_INPUT_EDGEFLAG),                     /* GL_LINE_LOOP          */
+    ~((GLuint)__GL_INPUT_EDGEFLAG),                     /* GL_LINE_STRIP         */
+    ~((GLuint)0),                                       /* GL_TRIANGLES          */
+    ~((GLuint)__GL_INPUT_EDGEFLAG),                     /* GL_TRIANGLE_STRIP     */
+    ~((GLuint)__GL_INPUT_EDGEFLAG),                     /* GL_TRIANGLE_FAN       */
+    ~((GLuint)0),                                       /* GL_QUADS              */
+    ~((GLuint)__GL_INPUT_EDGEFLAG),                     /* GL_QUAD_STRIP         */
+    ~((GLuint)0),                                       /* GL_POLYGON            */
+    ~((GLuint)__GL_INPUT_EDGEFLAG),                     /* GL_LINES_ADJACENCY_EXT */
+    ~((GLuint)__GL_INPUT_EDGEFLAG),                     /* GL_LINE_STRIP_ADJACENCY_EXT */
+    ~((GLuint)0),                                       /* GL_TRIANGLES_ADJACENCY_EXT */
+    ~((GLuint)__GL_INPUT_EDGEFLAG),                     /* GL_TRIANGLE_STRIP_ADJACENCY_EXT */
 };
 
 /*
@@ -443,7 +443,7 @@ GLvoid __glComputeRequiredInputMask(__GLcontext *gc)
 
     if (gc->shaderProgram.vertShaderEnable)
     {
-        if(gc->shaderProgram.currentProgram)
+        if (gc->shaderProgram.currentProgram)
         {
             vsInputMask = gc->shaderProgram.currentProgram->bindingInfo.vsInputMask;
         }
@@ -608,7 +608,7 @@ GLvoid __glComputeRequiredInputMaskInstancedEXT(__GLcontext *gc)
 
     if (gc->shaderProgram.vertShaderEnable)
     {
-        if(gc->shaderProgram.currentProgram)
+        if (gc->shaderProgram.currentProgram)
         {
             vsInputMask = gc->shaderProgram.currentProgram->bindingInfo.vsInputMask;
         }
@@ -924,7 +924,7 @@ GLvoid __glImmedUpdateVertexState(__GLcontext *gc)
         {
             GLfloat *src, *dst;
             input = &gc->input.currentInput[i];
-            if((GLubyte*)input->currentPtrDW < (GLubyte*)input->pointer)
+            if ((GLubyte*)input->currentPtrDW < (GLubyte*)input->pointer)
             {
                 /* This could happen in number of vertex is 0 case. skip vertex attribute update */
                 goto Skip_UpdateVertexState;
@@ -1186,7 +1186,7 @@ GLvoid __glSwitchToNewPrimtiveFormat_Material(__GLcontext *gc, GLuint attFmtIdx)
 
     /* Save data of last vertex */
     lastVertexBlock = (GLfloat*)(*gc->imports.malloc)(gc, origTotalStrideDW<<2 );
-    if(!lastVertexBlock)
+    if (!lastVertexBlock)
     {
         GL_ASSERT(0);
         return;
@@ -1400,7 +1400,7 @@ GLvoid __glImmediateFlushBuffer(__GLcontext *gc)
     GLuint startIndex, endIndex;
     GLint vertexCount, connectCount = 0, i;
 
-    if(gc->immedModeDispatch.End == __glim_End_Material)
+    if (gc->immedModeDispatch.End == __glim_End_Material)
     {
         __glImmedFlushBuffer_Material(gc);
         return;
@@ -1586,7 +1586,7 @@ GLvoid __glConsistentFormatChange(__GLcontext *gc)
     GLuint i, j, lastVertexIndex, dataSize;
     GLuint inputMask, formatMask, inputTag;
 
-    if(gc->immedModeDispatch.End == __glim_End_Material)
+    if (gc->immedModeDispatch.End == __glim_End_Material)
     {
         GL_ASSERT(0);
     }
@@ -1647,7 +1647,7 @@ GLvoid __glSwitchToNewPrimtiveFormat(__GLcontext *gc, GLuint attFmtIdx)
     GLuint64 inputMask;
     GLfloat *curPrimPtr, *src, *dst, *cur;
 
-    if(gc->immedModeDispatch.End == __glim_End_Material)
+    if (gc->immedModeDispatch.End == __glim_End_Material)
     {
         __glSwitchToNewPrimtiveFormat_Material(gc, attFmtIdx);
         return;
@@ -1815,7 +1815,7 @@ GLvoid __glSwitchToInconsistentFormat(__GLcontext *gc)
     GLuint inputOffsetDW[__GL_TOTAL_VERTEX_ATTRIBUTES] = {0};
     GLuint inputSize[__GL_TOTAL_VERTEX_ATTRIBUTES] = {0};
 
-    if(gc->immedModeDispatch.End == __glim_End_Material)
+    if (gc->immedModeDispatch.End == __glim_End_Material)
     {
          __glSwitchToInconsistentFormat_Material(gc);
          return;
@@ -2151,7 +2151,7 @@ GLuint __glInitVertexOutputState(__GLcontext *gc)
             (gc, 2 * __GL_MAX_VERTEX_NUMBER * sizeof(GLuint) );
     }
 
-    if(!gc->vsOutputContainer.clipCodeBuffer)
+    if (!gc->vsOutputContainer.clipCodeBuffer)
     {
         __glSetError(GL_OUT_OF_MEMORY);
         return GL_FALSE;
@@ -2168,7 +2168,7 @@ GLuint __glInitVertexOutputState(__GLcontext *gc)
             (gc, 2 * __GL_MAX_VERTEX_NUMBER * sizeof(__GLvertex4) );
     }
 
-    if(!gc->vsOutputContainer.vertexOutputBuffer)
+    if (!gc->vsOutputContainer.vertexOutputBuffer)
     {
         __glSetError(GL_OUT_OF_MEMORY);
         return GL_FALSE;
@@ -2185,17 +2185,17 @@ GLuint __glInitVertexOutputState(__GLcontext *gc)
 GLvoid __glFreeVertexOutputState(__GLcontext *gc)
 {
     /*
-    if(gc->vsOutputContainer.vertexOutputBuffer)
+    if (gc->vsOutputContainer.vertexOutputBuffer)
         (*gc->imports.free)(gc, gc->vsOutputContainer.vertexOutputBuffer);
     gc->vsOutputContainer.outVBSize = 0;
     gc->vsOutputContainer.vertexOutputBuffer = NULL;
 
-    if(gc->vsOutputContainer.clipCodeBuffer)
+    if (gc->vsOutputContainer.clipCodeBuffer)
         (*gc->imports.free)(gc, gc->vsOutputContainer.clipCodeBuffer);
     gc->vsOutputContainer.clipCodeBuffer = NULL;
     gc->vsOutputContainer.outClipSize = 0;
 
-    if(gc->vsOutputContainer.clipSpacePosBuffer)
+    if (gc->vsOutputContainer.clipSpacePosBuffer)
         (*gc->imports.free)(gc, gc->vsOutputContainer.clipSpacePosBuffer);
     gc->vsOutputContainer.clipSpacePosBuffer = NULL;
     gc->vsOutputContainer.outClipSpacePosSize = 0;

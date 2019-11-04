@@ -70,7 +70,7 @@ __glAddObject(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint id, GLvoi
     {
         /* Insert object to the hash table */
         __GLobjItem *item = __glFindObjItemNode(gc, shared, id);
-        if(item != gcvNULL)
+        if (item != gcvNULL)
             item->obj = obj;
     }
 

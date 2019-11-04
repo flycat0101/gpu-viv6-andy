@@ -1794,7 +1794,7 @@ static Bool MakeContextCurrent(Display *dpy,
                    GLXDrawable draw, GLXDrawable read,
                    GLXContext gc)
 {
-    xGLXMakeCurrentReply reply;
+    xGLXMakeCurrentReply reply = {0};
     GLXContext oldGC;
     CARD8 opcode, oldOpcode = 0;
     Bool sentRequestToOldDpy = False;

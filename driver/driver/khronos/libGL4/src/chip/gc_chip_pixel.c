@@ -771,7 +771,7 @@ GLvoid restoreAttributes(__GLcontext* gc, __GLchipContext *chipCtx)
     pDispatchTable->PopAttrib(gc);
 
     /* Restore previous MSAA enable or disable */
-    if(chipCtx->multiSampleOn)
+    if (chipCtx->multiSampleOn)
     {
         pDispatchTable->Enable(gc, GL_MULTISAMPLE);
     }
@@ -1383,7 +1383,7 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
 
     gc->error = 0;
     /*
-    if(gc->drawablePrivate->yInverted)
+    if (gc->drawablePrivate->yInverted)
     {
         vertex.f.y = gc->drawablePrivate->height - vertex.f.y;
     }
@@ -1465,13 +1465,13 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
         break;
 
     default:
-        if(gc->modes.rgbFloatMode)
+        if (gc->modes.rgbFloatMode)
         {
             internalFormat = GL_RGBA32F_ARB;
         }
         else
         {
-            if(gc->modes.alphaBits == 0)
+            if (gc->modes.alphaBits == 0)
             {
                 internalFormat = GL_RGB;
             }
@@ -1636,22 +1636,22 @@ calculateArea(
     dstsx = dx;
     dstex = dx + w;
 
-    if(srcsx < 0)
+    if (srcsx < 0)
     {
         dstsx -= srcsx;
         srcsx = 0;
     }
-    if(srcex > srcW)
+    if (srcex > srcW)
     {
         dstex -= srcex - srcW;
         srcex = srcW;
     }
-    if(dstsx < 0)
+    if (dstsx < 0)
     {
         srcsx -= dstsx;
         dstsx = 0;
     }
-    if(dstex > dstW)
+    if (dstex > dstW)
     {
         srcex -= dstex - dstW;
         dstex = dstW;
@@ -1661,7 +1661,7 @@ calculateArea(
     w = srcex - srcsx;
     gcmASSERT(w == dstex - dstsx);
 
-    if(w <= 0)
+    if (w <= 0)
     {
         gcmFOOTER_ARG("return=%s", "FALSE");
 
@@ -1673,22 +1673,22 @@ calculateArea(
     dstsy = dy;
     dstey = dy + h;
 
-    if(srcsy < 0)
+    if (srcsy < 0)
     {
         dstsy -= srcsy;
         srcsy = 0;
     }
-    if(srcey > srcH)
+    if (srcey > srcH)
     {
         dstey -= srcey - srcH;
         srcey = srcH;
     }
-    if(dstsy < 0)
+    if (dstsy < 0)
     {
         srcsy -= dstsy;
         dstsy = 0;
     }
-    if(dstey > dstH)
+    if (dstey > dstH)
     {
         srcey -= dstey - dstH;
         dstey = dstH;
@@ -1697,7 +1697,7 @@ calculateArea(
     h = srcey - srcsy;
     gcmASSERT(h == dstey - dstsy);
 
-    if(h <= 0)
+    if (h <= 0)
     {
         gcmFOOTER_ARG("return=%s", "FALSE");
 
@@ -2079,11 +2079,11 @@ __glChipReadPixels(
     GLuint imageHeight = ps->packModes.imageHeight ? ps->packModes.imageHeight : (GLuint)height;
     __GLformatInfo *formatInfo;
 #ifdef OPENGL40
-    GLboolean     RGBFloat = GL_FALSE;
-    gceSURF_FORMAT      floatFmt = gcvSURF_UNKNOWN;
-    float  *bit = gcvNULL;
-    float  *temp = gcvNULL;
-    GLint  i,j;
+    GLboolean RGBFloat = GL_FALSE;
+    gceSURF_FORMAT floatFmt = gcvSURF_UNKNOWN;
+    float *bit = gcvNULL;
+    float *temp = gcvNULL;
+    GLint i,j;
 #endif
     gceSTATUS status = gcvSTATUS_OK;
 
@@ -2101,18 +2101,20 @@ __glChipReadPixels(
     ** And all surface function should take offset into consideration
     */
 #ifdef OPENGL40
-    switch(format)
+    if (gc->imports.conformGLSpec)
     {
-    case GL_DEPTH_COMPONENT:
-    case GL_STENCIL_INDEX:
-    case GL_DEPTH_STENCIL_EXT:
-        status = __glChipReadDepthStencilPixels(gc, x, y,
-                                        width, height,
-                                        format, type, buf);
-        gcmFOOTER_ARG("return=%d", status);
-        return (status == gcvSTATUS_OK);
-    default:
-        break;
+        switch(format)
+        {
+        case GL_DEPTH_COMPONENT:
+        case GL_STENCIL_INDEX:
+        case GL_DEPTH_STENCIL_EXT:
+            status = __glChipReadDepthStencilPixels(gc,
+                            x, y, width, height, format, type, buf);
+            gcmFOOTER_ARG("return=%d", status);
+            return (status == gcvSTATUS_OK);
+        default:
+            break;
+        }
     }
 #endif
     srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
@@ -2126,163 +2128,7 @@ __glChipReadPixels(
         srcView.numSlices = 1;
     }
 
-    switch (type)
-    {
-    case GL_UNSIGNED_BYTE:
-        switch (format)
-        {
-        case GL_RGBA:
-            wrapformat = gcvSURF_A8B8G8R8;
-            break;
-        case GL_BGRA_EXT:
-            wrapformat = gcvSURF_A8R8G8B8;
-            break;
-#ifdef OPENGL40
-        case GL_RED:
-            wrapformat = gcvSURF_R8;
-            break;
-        case GL_ALPHA:
-            wrapformat = gcvSURF_A8;
-            break;
-        case GL_LUMINANCE:
-            wrapformat = gcvSURF_L8;
-            break;
-        case GL_LUMINANCE_ALPHA:
-            wrapformat = gcvSURF_A8L8;
-            break;
-#endif
-        default:
-            break;
-        }
-        break;
-
-    case GL_UNSIGNED_INT_2_10_10_10_REV:
-        if (format == GL_RGBA)
-        {
-            wrapformat = gcvSURF_A2B10G10R10;
-        }
-        break;
-
-    case GL_FLOAT:
-        if (format == GL_RGBA)
-        {
-            wrapformat = gcvSURF_A32B32G32R32F;
-        }
-#ifdef OPENGL40
-        else if (format == GL_RGB)
-        {
-            RGBFloat = GL_TRUE;
-            floatFmt = gcvSURF_A32B32G32R32F;
-        }
-#endif
-        break;
-
-#ifdef OPENGL40
-    case GL_UNSIGNED_SHORT:
-        switch (format)
-        {
-        case GL_RGBA:
-            wrapformat = gcvSURF_A16B16G16R16;
-            break;
-        case GL_RGBA_INTEGER:
-            wrapformat = gcvSURF_A16B16G16R16UI;
-            break;
-        case GL_RED_INTEGER:
-            wrapformat = gcvSURF_R16UI;
-            break;
-        case GL_RED:
-            wrapformat = gcvSURF_R16;
-            break;
-        case GL_ALPHA:
-            wrapformat = gcvSURF_A16;
-            break;
-        case GL_LUMINANCE:
-            wrapformat = gcvSURF_L16;
-            break;
-        case GL_LUMINANCE_ALPHA:
-            wrapformat = gcvSURF_A16L16;
-            break;
-        default:
-            break;
-        }
-        break;
-#endif
-
-    case GL_UNSIGNED_INT:
-        switch (format)
-        {
-        case GL_RGBA_INTEGER:
-            wrapformat = gcvSURF_A32B32G32R32UI;
-            break;
-#ifdef OPENGL40
-        case GL_RED_INTEGER:
-            wrapformat = gcvSURF_R32UI;
-            break;
-        case GL_RED:
-            wrapformat = gcvSURF_R32;
-            break;
-        case GL_ALPHA:
-            wrapformat = gcvSURF_A32;
-            break;
-        case GL_LUMINANCE:
-            wrapformat = gcvSURF_L32;
-            break;
-#endif
-        default:
-            break;
-        }
-        break;
-
-    case GL_INT:
-        if (format == GL_RGBA_INTEGER)
-        {
-            wrapformat = gcvSURF_A32B32G32R32I;
-        }
-        break;
-
-    case GL_UNSIGNED_SHORT_4_4_4_4_REV_EXT:
-        {
-            wrapformat = gcvSURF_A4R4G4B4;
-        }
-        break;
-
-    case GL_UNSIGNED_SHORT_1_5_5_5_REV_EXT:
-        {
-            wrapformat = gcvSURF_A1R5G5B5;
-        }
-        break;
-
-#ifdef OPENGL40
-    case GL_UNSIGNED_INT_8_8_8_8_REV:
-        if (format == GL_RGBA)
-        {
-            wrapformat = gcvSURF_A8B8G8R8;
-        }
-        else if (format == GL_BGRA)
-        {
-            wrapformat = gcvSURF_A8R8G8B8;
-        }
-        break;
-
-    case GL_UNSIGNED_INT_8_8_8_8:
-        if (format == GL_BGRA)
-        {
-            wrapformat = gcvSURF_B8G8R8A8;
-        }
-        else if (format == GL_RGBA)
-        {
-            wrapformat = gcvSURF_R8G8B8A8;
-        }
-        break;
-
-    case GL_UNSIGNED_SHORT_5_6_5:
-        gcmASSERT(format == GL_RGB);
-        wrapformat = gcvSURF_B5G6R5;
-        break;
-#endif
-    default:
-        break;
-    }
+    __glGetWrapFormat(format ,type, &wrapformat);
 
     /* Check if framebuffer is complete */
     if (READ_FRAMEBUFFER_BINDING_NAME == 0)
@@ -2324,7 +2170,7 @@ __glChipReadPixels(
     logicalAddress = (gctPOINTER)((gctINT8_PTR)logicalAddress + skipOffset);
 
 #ifdef OPENGL40
-    if (RGBFloat)
+    if (gc->imports.conformGLSpec && RGBFloat)
     {
         /* Allocate a new surface. */
         gcmONERROR(gcoSURF_Construct(
@@ -2340,7 +2186,7 @@ __glChipReadPixels(
             dstView.surf, gcvNULL, (gctPOINTER*)&bit
             ));
     }
-    else
+    else  /* Running OES api */
 #endif
     {
         /* Create the wrapper surface. */
@@ -2401,7 +2247,7 @@ __glChipReadPixels(
     while (gcvFALSE);
 
 #ifdef OPENGL40
-    if (RGBFloat)
+    if (gc->imports.conformGLSpec && RGBFloat)
     {
         temp = logicalAddress;
         for (i = 0; i < height; i++)

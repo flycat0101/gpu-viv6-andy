@@ -406,6 +406,7 @@ typedef struct __GLshaderProgramMachineRec
 #define __GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_COMPONENTS     64
 #define __GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS        4
 #define __GL_MAX_TRANSFORM_FEEDBACK_BUFFERS                 4
+#define __GL_MAX_TRANSFORM_FEEDBACK_STREAMS                 4
 
 #define __GL_MAX_XFBOBJ_LINEAR_TABLE_SIZE           1024
 #define __GL_DEFAULT_XFBOBJ_LINEAR_TABLE_SIZE       256

@@ -563,7 +563,7 @@ GLvoid __glOptimizeDisplaylist(__GLcontext *gc, __GLcompiledDlist *cdlist)
                 dlistop = dlistop->next;
             }
 
-            if(primFormat != 0){
+            if (primFormat != 0){
                 /* If there are attrib after last glvertex, skip opt. */
                 goto Next_dlistop;
             }
@@ -1451,7 +1451,7 @@ __GLdlist * __glCompileDisplayList(__GLcontext *gc, __GLcompiledDlist *compDlist
     freeCount = 0;
     for (dlistop = compDlist->dlist; dlistop; dlistop = dlistop->next)
     {
-        if(dlistop->opcode != __glop_Skip)
+        if (dlistop->opcode != __glop_Skip)
         {
             totalSize += dlistop->size + sizeof(__GLlistExecFunc *);
 
