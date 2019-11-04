@@ -2933,6 +2933,9 @@ vx_status vxoNN_LSTMNNLayer_DeInitializer(vxnne_layer_s* layer)
     if (((vxnne_lstm_layer)layer)->operations2)
         gcoOS_Free(VX_NULL, ((vxnne_lstm_layer)layer)->operations2);
 
+    if (((vxnne_lstm_layer)layer)->units)
+        gcoOS_Free(VX_NULL, ((vxnne_lstm_layer)layer)->units);
+
     return VX_SUCCESS;
 }
 
