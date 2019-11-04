@@ -4436,6 +4436,10 @@ OUT gctUINT *NumRegNeeded
                else
                {
                     tempRegIndex = cldPrivateMemoryAddressRegIndex;
+                    /* set sw location for variables (e.g. array) using private memory */
+                    if ((Name->type == clvVARIABLE_NAME) && (Name->die != VSC_DI_INVALIDE_DIE))
+                        cloCOMPILER_SetDIELogicalReg(Compiler, Name->die, tempRegIndex,
+                                                     1, (gctUINT)_ConvComponentSelectionToEnable(&LogicalRegs->componentSelection));
                }
                break;
            }

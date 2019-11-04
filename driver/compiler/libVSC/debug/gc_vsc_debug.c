@@ -576,25 +576,22 @@ void vscDISetHwLocToSWLoc(VSC_DIContext * context, VSC_DI_SW_LOC * swLoc, VSC_DI
                     }
                     else
                     {
-                        /* we need split the sw loc here */
-                        /* the split is not finished yet, we create a sw loc and add to next */
-                        if (sl->u.reg.end != swLoc->u.reg.end)
-                        {
-                            VSC_DI_SW_LOC * newSWLoc = gcvNULL;
-                            gctUINT16 newSWLocId = VSC_DI_INVALID_SW_LOC;
+                        /* split the sw loc here */
+                        /* create a sw loc and add to next */
+                        VSC_DI_SW_LOC * newSWLoc = gcvNULL;
+                        gctUINT16 newSWLocId = VSC_DI_INVALID_SW_LOC;
 
-                            newSWLocId = vscDIAddSWLoc(context);
+                        newSWLocId = vscDIAddSWLoc(context);
 
-                            /* re-get the sl in case we flush out the loc table in addSwLoc */
-                            sl = &context->swLocTable.loc[i];
-                            sl->next = newSWLocId;
+                        /* re-get the sl in case we flush out the loc table in addSwLoc */
+                        sl = &context->swLocTable.loc[i];
+                        sl->next = newSWLocId;
 
-                            /* copy the information of the base sw loc */
-                            newSWLoc = vscDIGetSWLoc(context, newSWLocId);
-                            *newSWLoc = *sl;
-                            newSWLoc->id = newSWLocId;
-                            newSWLoc->next = VSC_DI_INVALID_SW_LOC;
-                        }
+                        /* copy the information of the base sw loc */
+                        newSWLoc = vscDIGetSWLoc(context, newSWLocId);
+                        *newSWLoc = *sl;
+                        newSWLoc->id = newSWLocId;
+                        newSWLoc->next = VSC_DI_INVALID_SW_LOC;
 
                         /* set the reg to new start and new end */
                         sl->u.reg.start = swLoc->u.reg.start;
@@ -643,7 +640,17 @@ void vscDISetHwLocToSWLoc(VSC_DIContext * context, VSC_DI_SW_LOC * swLoc, VSC_DI
                                 hl->u.offset.offset, hl->u.offset.endOffset);
                         }
                     }
-                    break;
+                    if (hwLoc->u.reg.type == VSC_DIE_HW_REG_CONST)
+                    {
+                        /* when setting the hw location for uniforms,
+                        need to find all the uniforms used in multiple kernels */
+                        found = gcvFALSE;
+                        continue;
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
                 else
                 {

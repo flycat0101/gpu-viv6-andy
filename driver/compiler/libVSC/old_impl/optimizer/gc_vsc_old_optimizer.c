@@ -10570,7 +10570,7 @@ gcSHADER_PackRegister(
     gctINT8 * varUsageList = gcvNULL;
     struct regMap * regMapList = gcvNULL;
 
-    if (0 && gcSHADER_DumpOptimizerVerbose(Shader))
+    if (gcSHADER_DumpOptimizerVerbose(Shader))
     {
         gcDump_Shader(gcvNULL, "Before pack resgister shader IR.", gcvNULL, Shader, gcvTRUE);
     }
@@ -11202,6 +11202,23 @@ gcSHADER_PackRegister(
         }
     }
 
+    /* udpate the temp reg id of sw locations in debug info */
+    if (Shader->debugInfo)
+    {
+        VSC_DIContext * context = (VSC_DIContext *)(Shader->debugInfo);
+        gctUINT     i;
+        VSC_DI_SW_LOC * sl = gcvNULL;
+        for (i = 0 ; i < context->swLocTable.usedCount; i ++)
+        {
+            sl = &context->swLocTable.loc[i];
+            if (sl->reg && sl->u.reg.type == VSC_DIE_REG_TYPE_TMP)
+            {
+                sl->u.reg.start = (gctUINT16) regMapList[sl->u.reg.start].packedIndex;
+                sl->u.reg.end   = (gctUINT16) regMapList[sl->u.reg.end].packedIndex;
+            }
+        }
+    }
+
     /*Increase tempRegCount by 2 to hold unused variable.*/
     Shader->_tempRegCount =  regIndex + 2;
 
@@ -11225,7 +11242,10 @@ gcSHADER_PackRegister(
         gcoOS_Free(gcvNULL, (gctPOINTER)codeUsageList);
     }
 
-
+    if (gcSHADER_DumpOptimizerVerbose(Shader))
+    {
+        gcDump_Shader(gcvNULL, "After pack resgister shader IR.", gcvNULL, Shader, gcvTRUE);
+    }
     return gcvSTATUS_OK;
 
 }
