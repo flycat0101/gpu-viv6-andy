@@ -30,7 +30,19 @@
     vkApiMacro(EnumerateDeviceExtensionProperties) \
     vkApiMacro(EnumerateInstanceLayerProperties) \
     vkApiMacro(EnumerateDeviceLayerProperties) \
+    vkApiMacro(EnumerateDeviceLayerProperties) \
+    vkApiMacro(EnumeratePhysicalDeviceGroups) \
+    vkApiMacro(GetPhysicalDeviceFeatures2) \
+    vkApiMacro(GetPhysicalDeviceProperties2) \
+    vkApiMacro(GetPhysicalDeviceFormatProperties2) \
+    vkApiMacro(GetPhysicalDeviceImageFormatProperties2) \
+    vkApiMacro(GetPhysicalDeviceQueueFamilyProperties2) \
+    vkApiMacro(GetPhysicalDeviceMemoryProperties2) \
     vkApiMacro(GetPhysicalDeviceSparseImageFormatProperties) \
+    vkApiMacro(GetPhysicalDeviceSparseImageFormatProperties2) \
+    vkApiMacro(GetPhysicalDeviceExternalBufferProperties) \
+    vkApiMacro(GetPhysicalDeviceExternalFenceProperties) \
+    vkApiMacro(GetPhysicalDeviceExternalSemaphoreProperties) \
     vkApiMacro(DestroySurfaceKHR) \
     vkApiMacro(GetPhysicalDeviceSurfaceSupportKHR) \
     vkApiMacro(GetPhysicalDeviceSurfaceCapabilitiesKHR) \
