@@ -153,6 +153,12 @@ gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
         return NULL;
     }
 
+    if (bpp == 3)
+    {
+        bpp = 4;
+        gralloc_trace(2, "Be careful!!! format=%x bpp=%d", gralloc_handle_format(handle), bpp);
+    }
+
     stride = ALIGN(gralloc_handle_width(handle), align_w) * bpp;
     size = stride * ALIGN(gralloc_handle_height(handle), align_h);
 
