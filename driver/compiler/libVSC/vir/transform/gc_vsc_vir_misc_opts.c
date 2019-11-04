@@ -12651,6 +12651,7 @@ vscVIR_DetectSingleLoopInfo(
             VIR_Label*          pLabel = gcvNULL;
             VIR_Link*           pLink = gcvNULL;
             VIR_Label*          pNewLabel = gcvNULL;
+            gctBOOL             bMatched = gcvFALSE;
 
             errCode = VIR_BB_InsertBBAfter(VIR_Inst_GetBasicBlock(VIR_Inst_GetPrev(BB_GET_START_INST(pLoopHeadBB))),
                                            VIR_OP_NOP,
@@ -12680,6 +12681,13 @@ vscVIR_DetectSingleLoopInfo(
 
                 pJmpInst = BB_GET_END_INST(pWorkingBB);
 
+                if (!VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(pJmpInst)) &&
+                    pEdge->type == VIR_CFG_EDGE_TYPE_ALWAYS)
+                {
+                    vscHTBL_DirectSet(pSameJmpBBSet, (void *)pNewBB, gcvNULL);
+                    continue;
+                }
+
                 if (!VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(pJmpInst)))
                 {
                     continue;
@@ -12696,9 +12704,13 @@ vscVIR_DetectSingleLoopInfo(
                 VIR_Function_NewLink(pFunc, &pLink);
                 VIR_Link_SetReference(pLink, (gctUINTPTR_T)pJmpInst);
                 VIR_Link_AddLink(VIR_Label_GetReferenceAddr(pNewLabel), pLink);
+                bMatched = gcvTRUE;
             }
 
-            vscHTBL_DirectSet(pSameJmpBBSet, (void *)pLoopHeadBB, gcvNULL);
+            if (bMatched)
+            {
+                vscHTBL_DirectSet(pSameJmpBBSet, (void *)pLoopHeadBB, gcvNULL);
+            }
         }
     }
 
