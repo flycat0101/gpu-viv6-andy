@@ -5910,7 +5910,7 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
 
     if (enable_bias)
     {
-        if (TENSOR_QUANT_TYPE(bias) == VX_QUANT_DYNAMIC_FIXED_POINT)
+        if (TENSOR_QUANT_TYPE(bias) == VX_QUANT_DYNAMIC_FIXED_POINT && bias_format == VX_TYPE_INT16)
         {
             vx_int8   biasFixedPointPos  = TENSOR_POS(bias);
             vx_int32  postshift         = 0;
@@ -16766,7 +16766,7 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
         output_ZP        = TENSOR_TF_ZEROPOINT(output);
     }
 
-    if (TENSOR_QUANT_TYPE(bias) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    if (TENSOR_QUANT_TYPE(bias) == VX_QUANT_DYNAMIC_FIXED_POINT &&  biasFormat == VX_TYPE_INT16)
     {
         vx_int8   biasFixedPointPos  = TENSOR_POS(bias);
         vx_int32  postshift         = 0;
