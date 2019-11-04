@@ -758,6 +758,15 @@ vivCreateContext( const __GLcontextModes *modes,
 
     imports.config = (void *)modes;
 
+    /* imports.version = 40; */
+    imports.robustAccess = 0;
+    imports.resetNotification = 0;
+    imports.contextFlags = 0;
+    imports.debuggable = gcvFALSE;
+    imports.conformGLSpec = gcvTRUE;
+    imports.coreProfile = gcvFALSE;
+    imports.fromEGL = gcvFALSE;
+
     /* create the core rendering context */
     gc = GL_DISPATCH_TABLE.createContext(gcvNULL, 0x14, (VEGLimports *)&imports, (gctPOINTER)sharedContextPrivate);
 
