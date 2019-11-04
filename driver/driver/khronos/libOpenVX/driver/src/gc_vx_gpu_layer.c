@@ -2417,7 +2417,10 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D_4S", borderMode);
                 }
                 else if (enable_four_pixel)
+                {
+                    execution_parameters.globalWorkScale[0] = 4;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D_4X", borderMode);
+                }
                 else
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D", borderMode);
                 if (!shaderExecutable) goto OnError;
@@ -2426,7 +2429,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
             {
                 if (enable_four_pixel)
                 {
-                    execution_parameters.globalWorkScale[1] = 4;
+                    execution_parameters.globalWorkScale[0] = 4;
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_4X", borderMode);
                 }
                 else
