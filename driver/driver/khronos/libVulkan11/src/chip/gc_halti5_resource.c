@@ -11771,7 +11771,8 @@ VkResult halti5_updateDescriptorSet(
                         patchInfos[entryIdx].binding = binding->std.binding;
                         patchInfos[entryIdx].arrayIndex = j;
                         patchInfos[entryIdx].patchStages = binding->std.stageFlags;
-                        patchInfos[entryIdx].patchFormat = imgv->createInfo.format;
+                        patchInfos[entryIdx].patchFormat = chipImgv->patchFormat;
+                        patchInfos[entryIdx].originalFormat = imgv->createInfo.format;
                         patchInfos[entryIdx].viewType = imgv->createInfo.viewType;
                         patchIdx++;
                     }

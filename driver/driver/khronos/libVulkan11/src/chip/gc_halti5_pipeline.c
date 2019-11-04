@@ -7341,11 +7341,11 @@ VkResult halti5_patch_pipeline(
                                             VSC_IMAGE_FORMAT storeImgFormat = chipPipeline->patchStorageImgFormat[i][j];
                                             VSC_IMAGE_FORMAT mapedFormat = VSC_IMAGE_FORMAT_NONE;
 
-                                            if (mapTable[storeImgFormat].drvFormat != (VkFormat)patchInfo->patchFormat)
+                                            if (mapTable[storeImgFormat].drvFormat != (VkFormat)patchInfo->originalFormat)
                                             {
                                                 for (m = 0; m < __VK_VSC_DRV_FORMAT_MAP_NUM; m++)
                                                 {
-                                                    if ((VkFormat)patchInfo->patchFormat == mapTable[m].drvFormat)
+                                                    if ((VkFormat)patchInfo->originalFormat == mapTable[m].drvFormat)
                                                     {
                                                         mapedFormat = mapTable[m].vscFormat;
                                                         break;

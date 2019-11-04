@@ -651,6 +651,7 @@ typedef struct
 {
     VkShaderStageFlags patchStages;
     uint32_t patchFormat;
+    uint32_t originalFormat;
     uint32_t binding;
     uint32_t arrayIndex;
     SwizzleComponent swizzles[4];
