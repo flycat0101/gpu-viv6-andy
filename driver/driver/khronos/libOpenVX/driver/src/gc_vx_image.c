@@ -1163,7 +1163,7 @@ VX_INTERNAL_API vx_image VX_API_CALL vxoImage_CreateImageFromInternalHandle(
         void **ptrs, vx_uint32 *phys)
 {
     vx_image    image;
-    vx_uint32   planeIndex, dimIndex;
+    vx_uint32   planeIndex = 0, dimIndex;
 
     gcmHEADER_ARG("context=%p, format=%p, addrs=%p, ptrs=%p, phys=%p", context, format, addrs, ptrs, phys);
 
@@ -1201,7 +1201,6 @@ VX_INTERNAL_API vx_image VX_API_CALL vxoImage_CreateImageFromInternalHandle(
 
     if (image->planeCount > 1) goto OnError;
 
-    for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
     {
         vx_uint32 size = sizeof(vx_uint8);
 
@@ -1236,13 +1235,10 @@ VX_INTERNAL_API vx_image VX_API_CALL vxoImage_CreateImageFromInternalHandle(
     return image;
 
 OnError:
-    for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
+    if (image->memory.writeLocks[planeIndex] != VX_NULL)
     {
-        if (image->memory.writeLocks[planeIndex] != VX_NULL)
-        {
-            vxDestroyMutex(image->memory.writeLocks[planeIndex]);
-            image->memory.writeLocks[planeIndex]  = VX_NULL;
-        }
+        vxDestroyMutex(image->memory.writeLocks[planeIndex]);
+        image->memory.writeLocks[planeIndex]  = VX_NULL;
     }
 
     vxReleaseImage(&image);
