@@ -4366,12 +4366,6 @@ struct _VIR_UNIFORM
             /* The sampled image symbol ID. */
             VIR_SymId       sampledImageSymId;
 
-            /*
-            ** VIV:TODO:
-            ** If parent is an array, which array index in parent, we use this for link lib entry.
-            ** But since we create one only symbol for a sampler array, if there are more than one
-            ** element in this sampler array need to be transformed, then we can't handle it.
-            */
             gctUINT         arrayIdxInParent;
         } samplerOrImageAttr;
         struct

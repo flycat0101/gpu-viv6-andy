@@ -1389,14 +1389,6 @@ gckOS_AllocateNonPagedMemory(
         if (!strcmp(allocator->name, "dma") ||
             ((Flag & allocator->capability) == Flag && numPages == 1))
         {
-            /*!VIV:
-             * For historical issue, we force allocate all non-paged memory from
-             * dma coherent pool when it is not disabled.
-             *
-             * The code here changes the scheme a little: can try other
-             * allocators when page count is 1. This is to save memory usage of
-             * dma coherent pool.
-             */
             status = gcmALLOCATOR_Alloc(allocator, mdl, numPages, Flag);
 
             if (gcmIS_SUCCESS(status))

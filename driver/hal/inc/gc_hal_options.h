@@ -1223,11 +1223,6 @@ This define enables the use of VM for gckCommand and fence buffers.
 #endif
 #endif
 
-/*
-VIV:gcdUSE_MMU_EXCEPTION
-
-    When enabled, enable and check exception interrupt raised by MMU.
-*/
 #ifndef gcdUSE_MMU_EXCEPTION
 #   define gcdUSE_MMU_EXCEPTION                 1
 #endif

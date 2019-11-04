@@ -476,7 +476,7 @@ VX_PRIVATE_API void vxoGlobalData_FetchOptionsForTransferGraph(vx_global_data gl
         {
             ++pos;
             vxInfo("doing WAR%d\n", atoi(pos));
-            switch( atoi(pos) )
+            switch(atoi(pos) )
             {
             case 7:
                 globalData->options.enableGraphWAR7 = 1;
@@ -1468,6 +1468,7 @@ VX_PRIVATE_API vx_context vxoContext_Create()
 
         context->cnnAvailableEventID = 1;
 
+        gcoVX_QueryDeviceCount(&context->deviceCount);
         gcoVX_QueryHWChipInfo(&context->hwChipInfo);
 
         vxoGlobalData_AddRef(vxGlobalData);
@@ -1485,7 +1486,7 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         }
 
         gcoHAL_GetProductName(gcvNULL, &productName, &context->pid);
-        gcoOS_StrCopySafe(context->productName, 32 , productName);
+        gcoOS_StrCopySafe(context->productName, 32, productName);
         gcmOS_SAFE_FREE(gcvNULL, productName);
         vxInfo("#productname=%s, pid=0x%x\n", context->productName, context->pid);
         if (context->options.enableCNNPerf || context->options.enableNNArchPerfPrint)

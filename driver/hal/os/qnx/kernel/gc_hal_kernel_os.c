@@ -4426,10 +4426,6 @@ gckOS_Broadcast(
     case gcvBROADCAST_GPU_IDLE:
         gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_OS, "GPU idle.");
 
-        /*
-        * VIV: See bug #10104. Since atomic operation can be used in interrupt
-        * VIV: in QNX, so have to disable gcdPOWER_SUSPEND_WHEN_IDLE for QNX.
-        */
         /* Put GPU IDLE. */
         gcmkONERROR(
             gckHARDWARE_SetPowerState(Hardware,

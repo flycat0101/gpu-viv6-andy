@@ -25,11 +25,6 @@
    make sure change this accordingly*/
 #define SPV_MAX_OPCODE_NUM                          334
 
-/* switch could have a lot of cases. */
-/*
-** VIV:TODO: change this to dynamic
-** Now spv->operands is dynamic, we need to use spv->maxOperandSize as its array length.
-*/
 #define SPV_MAX_OPERAND_NUM                         20
 
 #define SPV_DEFAULT_OPERAND_NUM                     32

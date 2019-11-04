@@ -2808,12 +2808,6 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
         return errCode;
     }
 
-    /* check prerequisite and collect work set at the same time */
-    /*
-    ** VIV:TODO:
-    ** Now if any usage is invalid, we will make this instruction invalid and skip all usages.
-    ** We need to refine it so we can just skip the invalid usage.
-    */
     ON_ERROR(_VSC_PH_InitHashTable(ph, &VSC_PH_Peephole_WorkSet(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512),
              "Failed to initialize Hashtable");
     work_set = VSC_PH_Peephole_WorkSet(ph);

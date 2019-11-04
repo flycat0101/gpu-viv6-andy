@@ -11569,10 +11569,6 @@ static void __SpvSetClientVersion(
         }
     }
 
-    /*
-    ** Base on srcLanguageVersion/srcLanguage to decide client version.
-    ** VIV:TODO: Now we always treats it as a GLES, not desktop GL.
-    */
     if (spv->srcLanguage == SpvSourceLanguageESSL ||
         spv->srcLanguage == SpvSourceLanguageGLSL)
     {

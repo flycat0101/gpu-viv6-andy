@@ -4345,7 +4345,6 @@ VSC_CheckUniformUsage(
         }
     }
 
-    /* check usage in LTC: VIV:TODO: LTC is not in VIR yet */
 
     for(i = 0; i < VIR_IdList_Count(VIR_Shader_GetUniforms(pShader)); ++i)
     {

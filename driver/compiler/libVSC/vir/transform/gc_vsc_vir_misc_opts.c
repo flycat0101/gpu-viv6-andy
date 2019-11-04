@@ -6524,21 +6524,6 @@ VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker)
     errCode = _ConvertRetToJmpForFunctions(pShader, &bInvalidCfg);
     ON_ERROR(errCode, "Convert RET to JMP for functions");
 
-    /* Disable this opt, since it does not consider DU. For example,
-       add t0, t1, c
-       mova a0, t0
-       ldarr t2, t3, a0
-       ...
-       add t4, t0, t5
-       ==>
-       add t0, t1, 0 ==> also, we need constant folding to change this to MOV to further optimize
-       mova a0, t0
-       ldarr t2, (t3 + c), a0
-       ...
-       add t4, t0, t5 ==> t0 is changed !!!
-       VIV:TODO: since vulkan needs this, we enable it for vulkan only for now.
-       Need better solution.
-    */
     if (VIR_Shader_IsVulkan(pShader))
     {
         errCode = _MergeConstantOffset(pShader);
@@ -9352,10 +9337,6 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
                                                     &newInst);
             VIR_Inst_SetOpcode(newInst, VIR_OP_IMOD);
 
-            /*
-            ** Change the instType to UINT16.
-            ** VIV:TODO: is UINT16 enough for globalIndex?
-            */
             VIR_Inst_SetInstType(newInst, VIR_TYPE_UINT16);
 
             dstOpnd = VIR_Inst_GetDest(newInst);
@@ -9604,10 +9585,6 @@ static VSC_ErrCode _CalculateIndexForLocalMemory(
                                                     &newInst);
             VIR_Inst_SetOpcode(newInst, VIR_OP_IMOD);
 
-            /*
-            ** Change the instType to UINT16.
-            ** VIV:TODO: is UINT16 enough for globalIndex?
-            */
             VIR_Inst_SetInstType(newInst, VIR_TYPE_UINT16);
 
             dstOpnd = VIR_Inst_GetDest(newInst);
@@ -12671,11 +12648,6 @@ _vscVIR_DetectSingleLoopInfo(
         return errCode;
     }
 
-    /*
-    ** Find the initialize jmp and the back jmp of this loop.
-    ** Note that the initialize jmp may be not existed("do{}while{}" statement), but the back jmp is always existed.
-    ** VIV:TODO: we also need to add all break/continue.
-    */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, &pLoopHeadBB->dgNode.predList);
     for (pEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
          pEdge != gcvNULL;

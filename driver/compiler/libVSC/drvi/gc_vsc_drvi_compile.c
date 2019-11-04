@@ -758,11 +758,6 @@ static VSC_ErrCode _CompileShaderAtMedLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     if (!VIR_Shader_IsPatchLib(pShader))
     {
         gctBOOL linkImageIntrinsic = gcvFALSE;  /* image intrinsic needs combined sampler to work */
-        /*
-        ** VIV:TODO: actually in here we only need to inline the must-inline functions,
-        ** but there is a limitation that we can't do any CPP between two inline passes,
-        ** so now if we call inline pass, we need to inline all functions.
-        */
         ilPassData.bCheckAlwaysInlineOnly = gcvFALSE;
 
         /* Mark the must-inline functions. */

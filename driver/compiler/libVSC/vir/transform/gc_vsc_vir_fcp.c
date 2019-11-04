@@ -80,30 +80,6 @@ void _VIR_ReplaceLDARR(
 
     VIR_Operand_GetOperandInfo(pInst, pSrc1Opnd, &src1OpndInfo);
 
-    /* replace LDARR at its indexing use
-    case 1:
-    2: ldarr dst1, src0, t2.x
-    ...
-    4: texld dst, dst1, XXX   <== dst1 is only defined by ldarr
-    ==>
-    2: (removed)
-    ...
-    4: texld dst, src0[t2.x], XXX
-
-    case 2:
-    2: ldarr dst1, src0, t2.x
-    ...
-    4: texld dst, dst1, XXX
-    ==>
-    2: mov dst1, src0[t2.x]
-    ...
-    4: texld dst, dst1, XXX
-
-    For performance purpose, for dual16 shader, we always do as case2,
-    since indexing should always be single-t.
-    VIV:TODO: could be smarter to compute the benefits and costs.
-    */
-
     if (VIR_Shader_isDual16Mode(pShader))
     {
         VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
@@ -1942,10 +1918,6 @@ _changeConvDataType(IN VIR_Instruction    *Inst)
 
         if (VIR_Inst_GetOpcode(Inst) == VIR_OP_I2I)
         {
-            /*
-            ** I2I can't support that DEST and SRC use the same data type, so we just change it to MOV.
-            ** VIV:TODO: maybe we can move this check before RA so we may skip this MOV.
-            */
             if (newComponentTy == i2iSrc0Ty)
             {
                 bChangeToMov = gcvTRUE;

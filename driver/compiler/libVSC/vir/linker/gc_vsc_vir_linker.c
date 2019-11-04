@@ -2710,10 +2710,6 @@ _VIR_LinkIntrinsicLib_AddVregSymbol(
                                                 VIR_TypeId_isAtomicCounters(baseTyId),
                                                 gcvFALSE);
 
-        /*
-        ** VIV:TODO: we may use the index range to get the regCount for an array
-        ** because when convert gcSHADER to VIR, we create more than one parameter for a parameter array.
-        */
         if (VIR_Symbol_GetIndexRange(pLibVarSym) > (gctINT)libVarStartVirRegIndex)
         {
             regCount = vscMAX(regCount, VIR_Symbol_GetIndexRange(pLibVarSym) - libVarStartVirRegIndex);
@@ -5360,11 +5356,6 @@ _CheckTexldSymbolFmt(
             matched = _CheckTexldSymbolFmt(pLinkPoint, pShader, pInst, pSrcOpnd, separateImageSym, resOpBit);
         }
     }
-    /*
-    ** VIV:TODO: if this resource is an array, do we need to check the array index(static index or dynamic index)?
-    ** If the array elements have different link type, we can't handle it right now.
-    */
-
     return matched;
 }
 

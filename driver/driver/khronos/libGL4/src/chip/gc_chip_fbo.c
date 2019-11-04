@@ -693,9 +693,6 @@ __glChipFramebufferTexture(
 
         samples = gcmMAX((GLsizei)texObj->samplesUsed, samples);
 
-        /*
-        **VIV: [todo] remove cubemap check
-        */
         if (gcChipTexNeedShadow(gc, texObj, texInfo, formatMapInfo, samples, &attachPoint->samplesUsed))
         {
             __GLimageUser *fboList = texObj->fboList;
@@ -1407,10 +1404,6 @@ gcChipBlitFramebufferResolve(
             {
                 if (rtView.surf->isMsaa)
                 {
-                    /*
-                    ** Destination framebuffer is MSAA, using CPUBlit to solve it.
-                    ** VIV: TODO: 3DBlit do not support destMSAA.
-                    */
                     status = gcChipBlitFramebufferSoftware(gc,
                                                         srcX0, srcY0, srcX1, srcY1,
                                                         dstX0, dstY0, dstX1, dstY1,
@@ -1478,10 +1471,6 @@ gcChipBlitFramebufferResolve(
         {
             if (drawDsView->surf->isMsaa)
             {
-                /*
-                ** Destination framebuffer is MSAA, using CPUBlit to solve it.
-                ** VIV: TODO: 3DBlit do not support destMSAA.
-                */
                 status = gcChipBlitFramebufferSoftware(gc,
                                                     srcX0, srcY0, srcX1, srcY1,
                                                     dstX0, dstY0, dstX1, dstY1,

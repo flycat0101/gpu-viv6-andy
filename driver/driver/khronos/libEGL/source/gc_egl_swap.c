@@ -3165,10 +3165,6 @@ eglGetRenderBufferv0VIV(
 
         if (draw->backBuffer.context == gcvNULL)
         {
-            /*
-             *VIV: [TODO] Get window back buffer without bound.
-             * This case is when 'draw' is not made current.
-             */
             EGLBoolean result;
 
             result = dpy->platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer);
@@ -3282,10 +3278,6 @@ eglGetRenderBufferVIV(
 
         if (draw->backBuffer.context == gcvNULL)
         {
-            /*
-             *VIV: [TODO] Get window back buffer without bound.
-             * This case is when 'draw' is not made current.
-             */
             EGLBoolean result;
 
             result = dpy->platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer);

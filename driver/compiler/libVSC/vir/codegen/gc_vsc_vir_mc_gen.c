@@ -1346,40 +1346,6 @@ _VSC_MC_GEN_GenInstType(
         }
         else
         {
-            /* Since HW uses inst type to control comparison and to control implicit conversion, and also clamp src0 and src1.
-               we may choose data type from different source, and
-
-               For this case:
-               if we use F32, the value of src0's clamp is wrong.
-               if we use I32, the value of src1' clamp may be wrong.
-                013: JMPC.eq            dp 14, bvec4 mp  temp(1).mp.x, bool false
-                015: MOV                hp temp(6).hp.x, 0.900000[3f666666]
-                016: JMP                dp 15
-                018: LABEL              dp 14:
-                017: MOV                hp temp(6).hp.x, 0.100000[3dcccccd]
-                020: LABEL              dp 15:
-                019: NOP
-                -->
-                026: CSELECT.not        hp temp(6).hp.x, bvec4 mp  temp(1).mp.x, 0.100000[3dcccccd], 0.900000[3f666666]
-
-
-               For this case:
-               if we use U8, the value of src2 is wrong because it is overflow.
-                027: JMPC.eq            30, uchar_X4 temp(37).w, int 0
-                028: MOV                int temp(51).x, int 32768
-                029: JMP                31
-                031: LABEL              30:
-                030: MOV                int temp(51).x, int 0
-                033: LABEL              31:
-                -->
-                065: CSELECT.not        int temp(51).x, uchar_X4 temp(37).w, int 0, int 32768
-
-               A temporary solution:
-               If src0 and src1 have the same data type(float/int), use the data type which has the larger size;
-               otherwise use src0's data type.
-
-               VIV:TODO: insert a explicit type conversion for src0 before SELECT.
-            */
             VIR_TypeId src0TypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0)));
             VIR_TypeId src1TypeId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 1)));
 
@@ -2387,11 +2353,6 @@ _VSC_MC_GEN_GenTarget(
 
             Src->regType           = 0x7;
 
-            /*
-            ** If this LABEL instruction has been generated, just use the label,
-            ** else save all its users to the InstMark and update them in _VSC_MC_GEN_BackFill.
-            ** VIV:TODO: shall we just use the PC if the label has been generated?
-            */
             if (Gen->InstMark[labelID].Inst == gcvNULL
                 && Gen->InstMark[labelID].Label != -1)
             {

@@ -10856,10 +10856,6 @@ VkResult halti5_createImageView(
 
     if ((usage & VK_IMAGE_USAGE_STORAGE_BIT)
         ||
-        /*
-        ** Allocate a image for a sampled image because we may use it for opImageFetch.
-        ** VIV: [todo], we may need to move this allocation after program linkage.
-        */
         (usage & VK_IMAGE_USAGE_SAMPLED_BIT && !devCtx->pPhyDevice->vscCoreSysCtx.hwCfg.hwFeatureFlags.supportSeparatedTex))
     {
         result = halti5_helper_convertHwImgDesc(devCtx, imgv, VK_NULL_HANDLE, gcvNULL, chipImgv->imgDesc);

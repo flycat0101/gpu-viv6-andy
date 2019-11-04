@@ -1373,10 +1373,6 @@ static void _VIR_RA_LS_Init(
 
     if (pRA->bReservedMovaReg)
     {
-        /*
-        ** VIV:TODO: we need to add a pass to check if there is any MOVA within this shader.
-        ** And we also need to allocate the registers dynamically.
-        */
         pRA->movaRegCount = 2;
 
         pRA->movaHash = vscHTBL_Create(VIR_RA_LS_GetMM(pRA),
@@ -1910,8 +1906,6 @@ _VIR_RA_LS_isUniformIndex(
             *defInst = pDef->defKey.pDefInst;
             gcmASSERT(VIR_Inst_GetOpcode(*defInst) == VIR_OP_MOVA);
 
-            /* assume all uniform base is uniformly indexed.
-               VIV:TODO: have data flow analysis to detect uniform index */
             return gcvTRUE;
         }
     }
@@ -2629,8 +2623,6 @@ gctBOOL _VIR_RA_LS_removableLDARR(
         return gcvFALSE;
     }
 
-    /* B0 should not replace its use, since B0 is a scalar
-       VIV:TODO: could be optimized to replace the "last" one */
     if (pRA->pHwCfg->hwFeatureFlags.hasUniformB0 &&
         VIR_Symbol_isUniform(VIR_Operand_GetSymbol(pBaseOpnd)))
     {
@@ -3742,8 +3734,6 @@ void _VIR_RA_LS_AssignColorWeb(
     {
         VIR_RA_LR_SetFlag(pLR, VIR_RA_LRFLAG_SPILLED);
         _VIR_RA_SetLRSpillOffset(pLR, pRA->spillOffset);
-        /* every spill has 16 bytes, since regNoRange is coming from VIR_Type_GetVirRegCount
-           VIV:TODO: change to based on size */
         pRA->spillOffset += pLR->regNoRange * __DEFAULT_TEMP_REGISTER_SIZE_IN_BYTE__;
     }
     else
@@ -6331,14 +6321,6 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTableBB(
 
     _VIR_RA_LS_ClearChannelMask(pRA);
 
-    /* process the live out for this BB as following:
-       tempVec = xor(LRLiveVec, outFlow)
-       for each 1 in tempVec
-        if thisDefId in outFlow (i.e., LR live_out but not live yet)
-            make the LR live (update the LRLiveVec)
-        else (i.e., LR is live but not live_out any more)
-            make the LR dead (update the LRLiveVec)
-      VIV:TODO: need to reset the channel mask */
     pBlkFlow = (VIR_TS_BLOCK_FLOW*)vscSRARR_GetElement(
         &pFuncFlow->tsBlkFlowArray,
         pBB->dgNode.id);
@@ -8214,12 +8196,6 @@ _VIR_RA_LS_InsertFill(
 
     gcmASSERT(dataRegisterIdx < VIR_RA_LS_DATA_REG_NUM);
 
-    /*
-    ** Some optimizations here:
-    ** 1) If this DEST is used by the next instruction, we can store it in the data register so we can save one LOAD instruction.
-    ** 2) If this DEST is only used by the next instruction, we don't need to save it to the spill memory so we can save one more STORE instruction.
-    ** VIV:TODO: we can do more analysis to make this optimization work for more usages, not only the next-instruction-usage.
-    */
     if (!needToReloadDest &&
         VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetOPTS(pOption), VSC_OPTN_RAOptions_SPILL_DEST_OPT) &&
         !_VIR_RA_LS_NeedToSpillDest(pRA, pInst, pOpnd, pLR, &bSaveInSpillDataRegister, &dataRegisterEndPoint))
@@ -10889,11 +10865,6 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr(
                                 newInst,
                                 newInst->src[VIR_Operand_Src2]);
 
-    /* store_attr destionation.
-       in some cases (src2 is immediate/uniform/indirect), store_attr
-       needs a valid destination. We use the reserved register for destination.
-       since its live range is only this instruction.
-       VIV:TODO: guarentee that resRegister should not be used within st bubble */
     newInst->dest = pInst->dest;
     if (VIR_RA_LS_GetHwCfg(pRA)->hwFeatureFlags.hasHalti5 &&
         VIR_Inst_Store_Have_Dst(pInst))

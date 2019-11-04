@@ -4487,13 +4487,6 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveLoadingConfigData(
     return loadingDataTableIndex;
 }
 
-/*
-VIV: This function is remove the extra scale parameters from the network input table.
-Some layers are implemented with SH, and these layers have sclae parameters.
-such as tensor mul, tensor div.
-These sclae parameters are fixed a network.
-We don't need to put they in input table as network inputs.
-*/
 VX_PRIVATE_API vx_bool vxoBinaryGraph_ScaleIsNetworkInput(
     vx_graph graph,
     vx_node node,

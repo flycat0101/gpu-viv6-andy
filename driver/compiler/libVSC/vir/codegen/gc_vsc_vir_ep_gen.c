@@ -755,12 +755,6 @@ static gctBOOL _IsIoConstInterpolate(VIR_Shader* pShader,
         pSymType = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(pSymType));
     }
 
-    /*
-    ** Our HW can't handle FP16 varing correctly in PA, it divides smooth components(FP16) by W(FP32), which gets a incorrect value.
-    ** VIV:TODO: for a non-flat FP16 IO, we need to change it to FP32 and
-    ** 1) For a input, convert it to FP16 in the beginning of the main function.
-    ** 2) For a output, convert it to FP32 in the end of the main function.
-    */
     if (VIR_GetTypeComponentType(VIR_Type_GetIndex(pSymType)) == VIR_TYPE_FLOAT16)
     {
         WARNING_REPORT(VSC_ERR_NOT_SUPPORTED, "HW can't support smooth for FP16!!!");
