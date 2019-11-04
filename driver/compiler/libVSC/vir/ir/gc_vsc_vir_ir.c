@@ -1222,7 +1222,17 @@ VIR_Uniform_CheckImageFormatMismatch(
         ||
         (VIR_TypeId_isInteger(imageSampledTypeId) && !VIR_TypeId_isInteger(imageComponentTypeId)))
     {
+        /*
+        ** According vulkan spec:
+        ** 14.5.2. Descriptor Set Interface
+        ** ......
+        ** The Sampled Type of an OpTypeImage declaration must match the numeric format of the
+        ** corresponding resource in type and signedness, as shown in the SPIR-V Sampled Type column of the
+        ** Interpretation of Numeric Format table, or the values obtained by reading or sampling from this
+        ** image are undefined.
+        */
         VIR_Symbol_SetFlagExt(pUniformSym, VIR_SYMUNIFORMFLAGEXT_IMAGE_FORMAT_MISMATCH);
+        VIR_Shader_SetFlagExt1(Shader, VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH);
     }
 
     return errCode;

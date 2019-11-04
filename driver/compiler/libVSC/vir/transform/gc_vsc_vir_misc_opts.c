@@ -13877,3 +13877,204 @@ OnError:
     return errCode;
 }
 
+/*-------------------------------------------Process the image-format mismatch-------------------------------------------*/
+static gctBOOL
+_vscVIR_IsImageReadOrWrite(
+    IN VIR_Shader*      pShader,
+    IN VIR_Instruction* pInst,
+    INOUT gctBOOL*      pImageRead,
+    INOUT gctBOOL*      pImageWrite,
+    INOUT VIR_Operand** ppImageSrcOpnd
+    )
+{
+    gctBOOL             bImageRead = gcvFALSE, bImageWrite = gcvFALSE;
+    VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Operand*        pImageSrcOpnd = gcvNULL;
+
+    if (opCode == VIR_OP_INTRINSIC)
+    {
+        VIR_IntrinsicsKind  ik = VIR_Operand_GetIntrinsicKind(VIR_Inst_GetSource(pInst, 0));
+        VIR_ParmPassing*    pParmOpnd = VIR_Operand_GetParameters(VIR_Inst_GetSource(pInst, 1));
+
+        if (VIR_Intrinsics_isImageLoad(ik) || VIR_Intrinsics_isImageFetch(ik))
+        {
+            bImageRead = gcvTRUE;
+            pImageSrcOpnd = pParmOpnd->args[0];
+        }
+        else if (VIR_Intrinsics_isImageStore(ik))
+        {
+            bImageWrite = gcvTRUE;
+            pImageSrcOpnd = pParmOpnd->args[0];
+        }
+    }
+    else if (VIR_OPCODE_isImgLd(opCode))
+    {
+        bImageRead = gcvTRUE;
+        pImageSrcOpnd = VIR_Inst_GetSource(pInst, 0);
+    }
+    else if (VIR_OPCODE_isImgSt(opCode))
+    {
+        bImageWrite = gcvTRUE;
+        pImageSrcOpnd = VIR_Inst_GetSource(pInst, 0);
+    }
+
+    if (pImageRead)
+    {
+        *pImageRead = bImageRead;
+    }
+    if (pImageWrite)
+    {
+        *pImageWrite = bImageWrite;
+    }
+    if (ppImageSrcOpnd)
+    {
+        *ppImageSrcOpnd = pImageSrcOpnd;
+    }
+
+    return bImageRead | bImageWrite;
+}
+
+static VSC_ErrCode
+_vscVIR_ReplaceImageFormatMismatchInst(
+    IN VIR_Shader*      pShader,
+    IN VIR_Function*    pFunc,
+    IN VIR_Instruction* pInst,
+    IN gctBOOL          bImageRead,
+    IN gctBOOL          bImageWrite
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+
+    if (bImageRead)
+    {
+        VIR_Operand*    pSrc0Opnd = VIR_Inst_GetSource(pInst, 0);
+        VIR_TypeId      dataTypeId = VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst));
+        gctUINT         i;
+        VIR_ScalarConstVal constVal = { 0 };
+
+        /* Free the sources. */
+        for (i = 1; i < VIR_Inst_GetSrcNum(pInst); i++)
+        {
+            VIR_Inst_FreeSource(pInst, i);
+        }
+
+        /* Change to MOV. */
+        VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
+        VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
+        VIR_Inst_SetSrcNum(pInst, 1);
+
+        /* Set the data. */
+        VIR_Operand_SetImmediate(pSrc0Opnd, VIR_GetTypeComponentType(dataTypeId), constVal);
+        VIR_Operand_SetSwizzle(pSrc0Opnd, VIR_SWIZZLE_XXXX);
+    }
+    else if (bImageWrite)
+    {
+        VIR_Function_ChangeInstToNop(pFunc, pInst);
+    }
+
+    return errCode;
+}
+
+DEF_SH_NECESSITY_CHECK(vscVIR_ProcessImageFormatMismatch)
+{
+    VIR_Shader*         pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+
+    /* Check for Vulkan only. */
+    if (!VIR_Shader_IsVulkan(pShader))
+    {
+        return gcvFALSE;
+    }
+
+    if (!VIR_Shader_HasImageFormatMismatch(pShader))
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_ProcessImageFormatMismatch)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
+}
+
+VSC_ErrCode vscVIR_ProcessImageFormatMismatch(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Shader*         pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    /* Here we only need to process the main function because all image-related instructions should be inlined to the main function now. */
+    VIR_Function*       pCurrentFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_InstIterator    inst_iter;
+    VIR_Instruction*    pInst;
+    gctBOOL             bChanged = gcvFALSE;
+
+    /*
+    ** According to vulkan specs:
+    **  1) If the image format of the OpTypeImage is not compatible with the VkImageView’s format,
+    **     the write causes the contents of the image’s memory to become undefined.
+    **  2) The Sampled Type of an OpTypeImage declaration must match the numeric format of the corresponding resource in type and signedness,
+    **     as shown in the SPIR-V Sampled Type column of the Interpretation of Numeric Format table,
+    **     or the values obtained by reading or sampling from this image are undefined.
+    **
+    **  So for any instructions that operate on such an image, we do:
+    **  1) For a image read, use a "MOV 0" to replace it.
+    **  2) For a image write, just remove it.
+    */
+
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "Before process image format mismatch.", pShader, gcvTRUE);
+    }
+
+    VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pCurrentFunc));
+    for (pInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+         pInst != gcvNULL;
+         pInst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+    {
+        gctBOOL         bImageRead = gcvFALSE, bImageWrite = gcvFALSE;
+        VIR_Operand*    pImageSrcOpnd = gcvNULL;
+        VIR_Symbol*     pImageSrcSym = gcvNULL;
+
+        /* Check if this instruction is an image read or write. */
+        if (!_vscVIR_IsImageReadOrWrite(pShader, pInst, &bImageRead, &bImageWrite, &pImageSrcOpnd))
+        {
+            continue;
+        }
+
+        gcmASSERT(pImageSrcOpnd && VIR_Operand_isSymbol(pImageSrcOpnd));
+
+        /* Find the image uniform. */
+        pImageSrcSym = VIR_Operand_GetSymbol(pImageSrcOpnd);
+        if (!(VIR_Symbol_isImageT(pImageSrcSym) || VIR_Symbol_isImage(pImageSrcSym)))
+        {
+            VIR_Operand*    pParentSrc = gcvNULL;
+            pParentSrc = _vscVIR_FindParentImgOperandFromIndex(pInst,
+                                                               pImageSrcOpnd,
+                                                               VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(pImageSrcOpnd), 0));
+            pImageSrcSym = VIR_Operand_GetSymbol(pParentSrc);
+        }
+        gcmASSERT(pImageSrcSym && (VIR_Symbol_isImageT(pImageSrcSym)|| VIR_Symbol_isImage(pImageSrcSym)));
+
+        /* Check if this uniform is image format mismatch. */
+        if (!isSymUniformImageFormatMismatch(pImageSrcSym))
+        {
+            continue;
+        }
+
+        /* Replace this image read or write. */
+        errCode = _vscVIR_ReplaceImageFormatMismatchInst(pShader, pCurrentFunc, pInst, bImageRead, bImageWrite);
+        ON_ERROR(errCode, "Replace image format mistmatch instruction.");
+
+        bChanged = gcvTRUE;
+    }
+
+    if (bChanged &&
+        VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "After process image format mismatch.", pShader, gcvTRUE);
+    }
+
+OnError:
+    return errCode;
+}
+

@@ -127,6 +127,10 @@ VSC_ErrCode vscVIR_CutDownWorkGroupSize(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_SH_NECESSITY_CHECK(vscVIR_CutDownWorkGroupSize);
 DECLARE_QUERY_PASS_PROP(vscVIR_CutDownWorkGroupSize);
 
+VSC_ErrCode vscVIR_ProcessImageFormatMismatch(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_SH_NECESSITY_CHECK(vscVIR_ProcessImageFormatMismatch);
+DECLARE_QUERY_PASS_PROP(vscVIR_ProcessImageFormatMismatch);
+
 END_EXTERN_C()
 
 #endif /* __gc_vsc_vir_misc_opts_h_ */

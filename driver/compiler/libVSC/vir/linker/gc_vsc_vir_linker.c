@@ -6939,6 +6939,7 @@ VIR_Lib_UpdateImageFormat(
     VIR_Uniform*                    pVirUniform;
     VIR_UniformIdList*              pVirUniformLsts = VIR_Shader_GetUniforms(pShader);
     VIR_ImageFormat                 imageFormat = (VIR_ImageFormat)pImageFormatInfo->imageFormat;
+    VIR_ImageFormat                 originalImageFormat;
 
     for (virUniformIdx = 0; virUniformIdx < VIR_IdList_Count(pVirUniformLsts); virUniformIdx ++)
     {
@@ -6953,10 +6954,23 @@ VIR_Lib_UpdateImageFormat(
         if (VIR_Symbol_GetDescriptorSet(pVirUniformSym) == pImageFormatInfo->set &&
             VIR_Symbol_GetBinding(pVirUniformSym) == pImageFormatInfo->binding)
         {
-            gcmASSERT(VIR_Symbol_GetImageFormat(pVirUniformSym) == VIR_IMAGE_FORMAT_NONE ||
-                      VIR_Symbol_GetImageFormat(pVirUniformSym) == imageFormat);
-
+            originalImageFormat = VIR_Symbol_GetImageFormat(pVirUniformSym);
             VIR_Symbol_SetImageFormat(pVirUniformSym, imageFormat);
+
+            /*
+            ** According vulkan spec:
+            ** 15.4.1. Texel Output Validation Operations
+            ** ......
+            ** Texel Format Validation
+            ** If the image format of the OpTypeImage is not compatible with the VkImageView’s format, the write
+            ** causes the contents of the image’s memory to become undefined.
+            */
+            if (originalImageFormat != VIR_IMAGE_FORMAT_NONE && originalImageFormat != imageFormat)
+            {
+                VIR_Symbol_SetFlagExt(pVirUniformSym, VIR_SYMUNIFORMFLAGEXT_IMAGE_FORMAT_MISMATCH);
+                VIR_Shader_SetFlagExt1(pShader, VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH);
+            }
+
             break;
         }
     }

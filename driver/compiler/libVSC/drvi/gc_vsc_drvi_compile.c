@@ -790,6 +790,16 @@ static VSC_ErrCode _CompileShaderAtMedLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     */
     CALL_SH_PASS(vscVIR_GenCombinedSampler, 0, gcvNULL);
 
+    /* If there is any image format/sampled type mismatch, we need to process here before linking. */
+    if (VIR_Shader_HasImageFormatMismatch(pShader))
+    {
+        VSC_IL_PASS_DATA    ilPassData = { 2, gcvTRUE };
+
+        CALL_SH_PASS(vscVIR_CheckMustInlineFuncForML, 0, gcvNULL);
+        CALL_SH_PASS(VSC_IL_PerformOnShader, 0, &ilPassData);
+        CALL_SH_PASS(vscVIR_ProcessImageFormatMismatch, 0, gcvNULL);
+    }
+
     /* We are at end of ML of VIR, so set this correct level */
     VIR_Shader_SetLevel(pShader, VIR_SHLEVEL_Post_Medium);
 
