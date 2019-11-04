@@ -257,18 +257,22 @@ gckKERNEL_MapVideoMemory(
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Kernel, gcvOBJ_KERNEL);
+    gcmkVERIFY_ARGUMENT(Logical != NULL);
 
-    gckOS_GetProcessID(&pid);
-
-    *Logical = (gctPOINTER)mmap64_peer(pid, gcvNULL, Bytes,
-            PROT_READ | PROT_WRITE | PROT_NOCACHE, MAP_SHARED | MAP_NOINIT,
-            drv_mempool_get_fileDescriptor(), Offset);
-
-    if (*Logical == MAP_FAILED)
+    if (*Logical == NULL)
     {
-        *Logical = NULL;
-        gcmkFOOTER_NO();
-        return gcvSTATUS_INVALID_ADDRESS;
+        gckOS_GetProcessID(&pid);
+
+        *Logical = (gctPOINTER)mmap64_peer(pid, gcvNULL, Bytes,
+                PROT_READ | PROT_WRITE | PROT_NOCACHE, MAP_SHARED | MAP_NOINIT,
+                drv_mempool_get_fileDescriptor(), Offset);
+
+        if (*Logical == MAP_FAILED)
+        {
+            *Logical = NULL;
+            gcmkFOOTER_NO();
+            return gcvSTATUS_INVALID_ADDRESS;
+        }
     }
 
     gcmkFOOTER_NO();

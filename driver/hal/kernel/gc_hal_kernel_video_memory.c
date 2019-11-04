@@ -3557,17 +3557,14 @@ gckVIDMEM_NODE_LockCPU(
         if (FromUser)
         {
             /* Map video memory pool to user space. */
-            if (node->VidMem.logical == gcvNULL)
-            {
-                gcmkONERROR(
-                    gckKERNEL_MapVideoMemory(Kernel,
-                                             gcvTRUE,
-                                             node->VidMem.pool,
-                                             node->VidMem.physical,
-                                             (gctUINT32)node->VidMem.offset,
-                                             (gctUINT32)node->VidMem.bytes,
-                                             &node->VidMem.logical));
-            }
+            gcmkONERROR(
+                gckKERNEL_MapVideoMemory(Kernel,
+                                         gcvTRUE,
+                                         node->VidMem.pool,
+                                         node->VidMem.physical,
+                                         (gctUINT32)node->VidMem.offset,
+                                         (gctUINT32)node->VidMem.bytes,
+                                         &node->VidMem.logical));
 
             logical = node->VidMem.logical;
         }
