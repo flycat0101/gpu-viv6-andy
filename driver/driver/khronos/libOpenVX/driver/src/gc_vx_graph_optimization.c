@@ -3326,7 +3326,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_splitMaxpFromCRL2(vx_graph graph)
                 }
                 {
                     vx_nn_pooling_params_t p = { VX_NN_POOLING_MAX,
-                         pool_size[0], pool_size[1], 0,0,0, VX_NN_DS_SIZE_ROUNDING_FLOOR };
+                         pool_size[0], pool_size[1], 0, 0, 0, 0, VX_NN_DS_SIZE_ROUNDING_FLOOR };
 
                     vx_node maxpNode = vxPoolingLayer2(graph,
                                                convOutTensor,
