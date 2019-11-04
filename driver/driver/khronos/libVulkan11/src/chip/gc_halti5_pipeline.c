@@ -547,8 +547,10 @@ VkResult halti5_pip_emit_vsinput(
  31:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16))));
 
-            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5EA0 + attribIdx, VK_FALSE,
-                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if (0)
+            {
+                __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5EA0 + attribIdx, VK_FALSE,
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:0) - (0 ?
  8:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -558,7 +560,7 @@ VkResult halti5_pip_emit_vsinput(
  8:0) - (0 ?
  8:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 8:0) - (0 ? 8:0) + 1))))))) << (0 ? 8:0)))
-                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  11:11) - (0 ?
  11:11) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -568,6 +570,7 @@ VkResult halti5_pip_emit_vsinput(
  11:11) - (0 ?
  11:11) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 11:11) - (0 ? 11:11) + 1))))))) << (0 ? 11:11))));
+            }
 
             __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5E80 + attribIdx, VK_FALSE, hwVertexAttribDesc[attribIdx].integer ? 1 : 0x3F800000);
 
