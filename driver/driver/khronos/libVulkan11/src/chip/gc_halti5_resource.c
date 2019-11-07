@@ -10922,10 +10922,10 @@ VkResult halti5_createImageView(
         }
     }
 
-    /*if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
+    if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
     {
         chipImgv->patchKey = HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
-    }*/
+    }
 
     if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
     {
@@ -11032,7 +11032,7 @@ VkResult halti5_createBufferView(
     if (buf->createInfo.usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT)
     {
         chipBufv->patchFormat = bufv->createInfo.format;
-        /*chipBufv->patchKey |= HALTI5_PATCH_FORMAT_TO_COMPILER_BIT;*/
+        chipBufv->patchKey |= HALTI5_PATCH_FORMAT_TO_COMPILER_BIT;
 
         if (!(buf->createInfo.usage & VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT))
         {
