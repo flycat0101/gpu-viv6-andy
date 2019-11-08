@@ -4229,6 +4229,8 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsageInst(VIR_DEF_USAGE_INFO*     pDuInfo,
     VIR_GENERAL_UD_ITERATOR udIter;
     VIR_DEF*                pDef;
     gctBOOL                 bHasDef = gcvFALSE;
+    gctBOOL                 bCheckGivenDefInst = (pExpectedUniqueDefInst != gcvNULL);
+    VIR_Instruction*        pFirstDefInst = gcvNULL;
 
     /* We only consider normal instructions */
     gcmASSERT(pUsageInst < VIR_OUTPUT_USAGE_INST);
@@ -4237,17 +4239,38 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsageInst(VIR_DEF_USAGE_INFO*     pDuInfo,
     for (pDef = vscVIR_GeneralUdIterator_First(&udIter); pDef != gcvNULL;
          pDef = vscVIR_GeneralUdIterator_Next(&udIter))
     {
-        if (pDef->defKey.pDefInst != pExpectedUniqueDefInst)
+        /* Compare all defined instructions with the given defined instruction. */
+        if (bCheckGivenDefInst)
         {
-            if (ppFirstOtherDefInst)
+            if (pDef->defKey.pDefInst != pExpectedUniqueDefInst)
             {
-                *ppFirstOtherDefInst = pDef->defKey.pDefInst;
-            }
+                if (ppFirstOtherDefInst)
+                {
+                    *ppFirstOtherDefInst = pDef->defKey.pDefInst;
+                }
 
-            return gcvFALSE;
+                return gcvFALSE;
+            }
+        }
+        /* Compare all defined instructions. */
+        else
+        {
+            if (pFirstDefInst == gcvNULL)
+            {
+                pFirstDefInst = pDef->defKey.pDefInst;
+            }
+            else if (pFirstDefInst != pDef->defKey.pDefInst)
+            {
+                return gcvFALSE;
+            }
         }
 
         bHasDef = gcvTRUE;
+    }
+
+    if (!bCheckGivenDefInst && bHasDef && ppFirstOtherDefInst)
+    {
+        *ppFirstOtherDefInst = pFirstDefInst;
     }
 
     return (bHasDef ? gcvTRUE : gcvFALSE);
