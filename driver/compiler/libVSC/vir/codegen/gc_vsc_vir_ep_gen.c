@@ -2255,7 +2255,10 @@ static VSC_ErrCode _CollectUavMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper,
         }
     }
 
-    /* Share memory simulated by global memory for OCL */
+    /*
+    ** 1) Share memory simulated by global memory for OCL.
+    ** 2) The global memory to save the thread ID.
+    */
     for (virUniformIdx = 0; virUniformIdx < VIR_IdList_Count(pVirUniformLsts); virUniformIdx ++)
     {
         pVirUniformSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirUniformLsts, virUniformIdx));
@@ -2300,9 +2303,41 @@ static VSC_ErrCode _CollectUavMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper,
                 pThisUavSlotMapping->hwLoc.pHwDirectAddrBase = &pOutSEP->constantMapping.pConstantArrayMapping[llArraySlot].
                                                                 pSubConstantArrays[llSlot].hwFirstConstantLocation;
             }
-            break;
         }
+        else if (VIR_Symbol_GetUniformKind(pVirUniformSym) == VIR_UNIFORM_THREAD_ID_MEM_ADDR)
+        {
+            if (!bPostCollection)
+            {
+                pThisUavSlotMapping = _enlargeUavSlotMappingRoom(pUavMapping, 1, &startUavSlotIdx);
+                vscInitializeUavSlotMapping(pThisUavSlotMapping);
 
+                pUavMapping->uavSlotMask |= (1 << startUavSlotIdx);
+
+                pThisUavSlotMapping->uavSlotIndex = startUavSlotIdx;
+                pThisUavSlotMapping->accessMode = SHADER_UAV_ACCESS_MODE_TYPE;
+                pThisUavSlotMapping->u.s.uavDimension = SHADER_UAV_DIMENSION_BUFFER;
+                /* We only need 4 bytes to save the threadID. */
+                pThisUavSlotMapping->sizeInByte = 4;
+
+                if (VIR_Symbol_GetLlResSlot(pVirUniformSym) == NOT_ASSIGNED)
+                {
+                    VIR_Symbol_SetLlResSlot(pVirUniformSym, startUavSlotIdx);
+                }
+            }
+            else
+            {
+                pThisUavSlotMapping = &pOutSEP->uavMapping.pUAV[VIR_Symbol_GetLlResSlot(pVirUniformSym)];
+
+                llArraySlot = VIR_Symbol_GetArraySlot(pVirUniformSym);
+                llSlot = VIR_Symbol_GetFirstSlot(pVirUniformSym);
+
+                gcmASSERT(llArraySlot != NOT_ASSIGNED && llSlot != NOT_ASSIGNED);
+
+                pThisUavSlotMapping->hwMemAccessMode = SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR;
+                pThisUavSlotMapping->hwLoc.pHwDirectAddrBase = &pOutSEP->constantMapping.pConstantArrayMapping[llArraySlot].
+                                                                pSubConstantArrays[llSlot].hwFirstConstantLocation;
+            }
+        }
     }
 
     return errCode;
@@ -2641,6 +2676,7 @@ static void _CollectExeHints(VSC_SHADER_COMPILER_PARAM* pCompilerParam, VSC_SEP_
     {
         pOutSEP->exeHints.derivedHints.prvStates.gps.bThreadGroupSync = pShader->hasThreadGroupSync;
         pOutSEP->exeHints.derivedHints.prvStates.gps.bUseLocalMemory = VIR_Shader_UseLocalMem(pShader);
+        pOutSEP->exeHints.derivedHints.prvStates.gps.bUsePrivateMemory = VIR_Shader_UsePrivateMem(pShader);
 
         for (i = 0; i < 3; i++)
         {
@@ -3129,7 +3165,10 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
         }
     }
 
-    /* Share memory simulated by global memory for OCL */
+    /*
+    ** 1) Share memory simulated by global memory for OCL.
+    ** 2) The global memory to save the thread ID.
+    */
     for (virUniformIdx = 0; virUniformIdx < VIR_IdList_Count(pVirUniformLsts); virUniformIdx ++)
     {
         pVirUniformSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirUniformLsts, virUniformIdx));
@@ -3154,8 +3193,19 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
             pPrivUavEntry->commonPrivm.privmKindIndex = 0;
             pPrivUavEntry->commonPrivm.pPrivateData = gcvNULL;
             pPrivUavEntry->pBuffer = &pOutSEP->uavMapping.pUAV[llSlot];
+        }
+        else if (VIR_Symbol_GetUniformKind(pVirUniformSym) == VIR_UNIFORM_THREAD_ID_MEM_ADDR)
+        {
+            pPrivUavEntry = _enlargePrivUavMappingRoom(&pOutSEP->staticPrivMapping.privUavMapping, 1, gcvNULL);
+            memset(pPrivUavEntry, 0, sizeof(SHADER_PRIV_UAV_ENTRY));
 
-            break;
+            llSlot = VIR_Symbol_GetLlResSlot(pVirUniformSym);
+            gcmASSERT(llSlot != NOT_ASSIGNED);
+
+            pPrivUavEntry->commonPrivm.privmKind = SHS_PRIV_MEM_KIND_THREAD_ID_MEM_ADDR;
+            pPrivUavEntry->commonPrivm.privmKindIndex = 0;
+            pPrivUavEntry->commonPrivm.pPrivateData = gcvNULL;
+            pPrivUavEntry->pBuffer = &pOutSEP->uavMapping.pUAV[llSlot];
         }
     }
 

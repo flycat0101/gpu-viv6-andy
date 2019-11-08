@@ -67,7 +67,8 @@ typedef enum SHS_PRIV_MEM_KIND
     SHS_PRIV_MEM_KIND_CL_PRIVATE_MEMORY         = 3, /* For CL private mem */
     SHS_PRIV_MEM_KIND_SHARED_MEMORY             = 4, /* For CL local memory or DirectCompute shared mem */
     SHS_PRIV_MEM_KIND_EXTRA_UAV_LAYER           = 5,
-    SHS_PRIV_MEM_KIND_COUNT                     = 6,
+    SHS_PRIV_MEM_KIND_THREAD_ID_MEM_ADDR        = 6, /* The global memory to save the consecutive thread ID. */
+    SHS_PRIV_MEM_KIND_COUNT                     = 7,
 }SHS_PRIV_MEM_KIND;
 
 /* !!!!!NOTE: For dynamic (lib-link) patch, the priv-mapping flag will directly use VSC_LIB_LINK_TYPE!!!!! */

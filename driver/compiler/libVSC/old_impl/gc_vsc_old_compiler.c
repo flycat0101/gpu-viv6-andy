@@ -2031,27 +2031,6 @@ gcSHADER_GetHintSize(
     return gcmSIZEOF(struct _gcsHINT);
 }
 
-/* this function is to check the shader binary output is consistent in 32bit and 64bit platform */
-static gctBOOL _isStructChecked = gcvFALSE;
-
-static gctBOOL
-gcShader_CheckStructCompitibility(void)
-{
-    gctBOOL ret = gcvTRUE;
-
-    if (_isStructChecked)
-        return ret;
-
-    if ((sizeof(struct _gcsHINT) % 8) != 0)
-        ret = gcvFALSE;
-
-    if ((gcmOFFSETOF(_gcsHINT, shaderVidNodes) % 8) != 0)
-        ret = gcvFALSE;
-
-    _isStructChecked = gcvTRUE;
-    return ret;
-}
-
 /*******************************************************************************
 **  gcSHADER_Construct
 **
@@ -2089,14 +2068,6 @@ gcSHADER_Construct(
 
     /* Verify the arguments. */
     gcmDEBUG_VERIFY_ARGUMENT(Shader != gcvNULL);
-
-    /* check the shader binary output is consistent in 32bit and 64bit platform */
-    if (!gcShader_CheckStructCompitibility())
-    {
-        gcmFATAL("Invalid stuct size. Need to add padding bytes or adjust the struct layout.");
-        gcmFOOTER();
-        return gcvSTATUS_INVALID_DATA;
-    }
 
     if (ShaderType != gcSHADER_TYPE_CL)
     {
@@ -37984,6 +37955,12 @@ gcHINTS_Destroy(
             gcoSHADER_FreeVidMem(gcvNULL, gcvSURF_VERTEX, "share variable memory", (gctPOINTER)Hints->shaderVidNodes.sharedMemVidMemNode);
             Hints->shaderVidNodes.sharedMemVidMemNode = gcvNULL;
         }
+
+        if (Hints->shaderVidNodes.threadIdVidMemNode)
+        {
+            gcoSHADER_FreeVidMem(gcvNULL, gcvSURF_VERTEX, "thread id memory", (gctPOINTER)Hints->shaderVidNodes.threadIdVidMemNode);
+            Hints->shaderVidNodes.threadIdVidMemNode = gcvNULL;
+        }
     }
 
     gcmFOOTER();
@@ -38360,6 +38337,15 @@ _CaculateShaderVidNodesSize(
 
             sizeInByte += surfNode->size;
         }
+
+        /* thread id memory. */
+        sizeInByte += gcmSIZEOF(gctUINT32);
+        if (Hints->shaderVidNodes.threadIdVidMemNode)
+        {
+            gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.threadIdVidMemNode;
+
+            sizeInByte += surfNode->size;
+        }
     } while (gcvFALSE);
 
     return sizeInByte;
@@ -38473,6 +38459,34 @@ _SaveShaderVidNodes(
 
         /* shared memory. */
         memory = Hints->shaderVidNodes.sharedMemVidMemNode;
+        data = gcvNULL;
+        sizeInByte = 0;
+
+        /* Get the size. */
+        if (memory != gcvNULL)
+        {
+            sizeInByte += ((gcsSURF_NODE_PTR)memory)->size;
+            gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)memory,
+                                          gcvNULL,
+                                          &data));
+
+            gcmASSERT(sizeInByte != 0);
+        }
+
+        /* Copy the size. */
+        gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Copy the data. */
+        if (sizeInByte != 0)
+        {
+            gcoOS_MemCopy(buffer, data, sizeInByte);
+            buffer += sizeInByte;
+            gcoSURF_UnLockNode((gcsSURF_NODE_PTR)memory, gcvSURF_VERTEX);
+        }
+
+        /* thread id memory. */
+        memory = Hints->shaderVidNodes.threadIdVidMemNode;
         data = gcvNULL;
         sizeInByte = 0;
 
@@ -38654,6 +38668,37 @@ _LoadShaderVidNodesAndFixup(
             *pPatchPoint = physical;
             pPatchPoint = ProgramState->stateDelta
                         + ProgramState->patchOffsetsInDW.sharedMemVidMemInStateDelta;
+            *pPatchPoint = physical;
+        }
+
+        /* thread id memory. */
+        sizeInByte = *(gctUINT32*)buffer;
+        physical = (gctUINT32)~0;
+        pPatchPoint = gcvNULL;
+
+        buffer += gcmSIZEOF(gctUINT32);
+
+        if (sizeInByte > 0)
+        {
+            gcoSHADER_AllocateVidMem(gcvNULL,
+                                     gcvSURF_VERTEX,
+                                     "thread id memory",
+                                     sizeInByte,
+                                     256,
+                                     (gctPOINTER *)&Hints->shaderVidNodes.threadIdVidMemNode,
+                                     gcvNULL,
+                                     &physical,
+                                     buffer,
+                                     gcvFALSE);
+
+            gcmASSERT((gctUINT32)~0 != physical);
+            gcmASSERT(ProgramState->patchOffsetsInDW.threadIdVidMemInStateBuffer != 0);
+            gcmASSERT(ProgramState->patchOffsetsInDW.threadIdVidMemInStateDelta != 0);
+            pPatchPoint = (gctUINT32*)ProgramState->stateBuffer
+                        + ProgramState->patchOffsetsInDW.threadIdVidMemInStateBuffer;
+            *pPatchPoint = physical;
+            pPatchPoint = ProgramState->stateDelta
+                        + ProgramState->patchOffsetsInDW.threadIdVidMemInStateDelta;
             *pPatchPoint = physical;
         }
 

@@ -1287,7 +1287,10 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
             /* Whether use Local memory. */
             gctUINT               bUseLocalMemory                 : 1;
 
-            gctUINT               reserved                        : 30;
+            /* Whether use Private memory. */
+            gctUINT               bUsePrivateMemory               : 1;
+
+            gctUINT               reserved                        : 29;
 
             gctUINT16             workGroupSizeFactor[3];
         } gps;

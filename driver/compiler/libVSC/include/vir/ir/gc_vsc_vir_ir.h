@@ -2745,6 +2745,7 @@ typedef enum _VIR_UNIFORMKIND
     VIR_UNIFORM_TEXELBUFFER_TO_IMAGE,
     VIR_UNIFORM_GLOBAL_WORK_SCALE,
     VIR_UNIFORM_VIEW_INDEX,
+    VIR_UNIFORM_THREAD_ID_MEM_ADDR,
     /* should not larger than 2^6, since it is using storageClass,
      * in case it is >= 64, need to enlarge _storageClass */
 } VIR_UniformKind;

@@ -9245,13 +9245,14 @@ VSC_ErrCode vscVIR_FixTexldOffset(VSC_SH_PASS_WORKER* pPassWorker)
 static VSC_ErrCode _CalculateIndexForPrivateMemory(
     VIR_DEF_USAGE_INFO  *pDuInfo,
     VIR_Shader          *pShader,
+    gctBOOL             bNeedOOBCheck,
     VIR_Function        *pFunc,
     VIR_Instruction     *pInst
     )
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
-    VIR_Instruction     *newInst = gcvNULL;
+    VIR_Instruction     *pModInst = gcvNULL;
     VIR_Operand         *dstOpnd = gcvNULL;
     VIR_Operand         *srcOpnd = gcvNULL;
     VIR_OperandInfo     srcOpndInfo;
@@ -9261,6 +9262,10 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
     VIR_Symbol          *privateMemSym = gcvNULL;
     VIR_VirRegId        newVirRegIdx = VIR_INVALID_ID;
     VIR_SymId           newVirRegSymId = VIR_INVALID_ID;
+    VIR_Symbol*         pThreadIdMemAddrSym = gcvNULL;
+    VIR_Uniform*        pThreadIdMemAddrUniform = gcvNULL;
+    VIR_Instruction*    pAtomAddInst = gcvNULL;
+    VIR_Operand*        pNewOpnd = gcvNULL;
 
     if (opCode == VIR_OP_ADD && VIR_Operand_isSymbol(VIR_Inst_GetSource(pInst, VIR_Operand_Src1)))
     {
@@ -9277,7 +9282,7 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
     {
         /* Add a new uniform to save the workThreadCount. */
         errCode = VIR_Shader_AddString(pShader,
-                                       "#WorkThreadCount",
+                                       _sldWorkThreadCountName,
                                        &nameId);
 
         errCode = VIR_Shader_AddSymbol(pShader,
@@ -9299,11 +9304,11 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
 
         newVirRegIdx = VIR_Shader_NewVirRegId(pShader, 1);
         errCode = VIR_Shader_AddSymbol(pShader,
-                                        VIR_SYM_VIRREG,
-                                        newVirRegIdx,
-                                        VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT16),
-                                        VIR_STORAGE_UNKNOWN,
-                                        &newVirRegSymId);
+                                       VIR_SYM_VIRREG,
+                                       newVirRegIdx,
+                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT16),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &newVirRegSymId);
         ON_ERROR(errCode, "Add symbol");
 
         if (opCode == VIR_OP_ADD)
@@ -9335,26 +9340,26 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
                                                     shiftOrMulInst,
                                                     shiftOrMulInst,
                                                     gcvTRUE,
-                                                    &newInst);
-            VIR_Inst_SetOpcode(newInst, VIR_OP_IMOD);
+                                                    &pModInst);
+            VIR_Inst_SetOpcode(pModInst, VIR_OP_IMOD);
 
-            VIR_Inst_SetInstType(newInst, VIR_TYPE_UINT16);
+            VIR_Inst_SetInstType(pModInst, VIR_TYPE_UINT16);
 
-            dstOpnd = VIR_Inst_GetDest(newInst);
+            dstOpnd = VIR_Inst_GetDest(pModInst);
             VIR_Operand_SetSymbol(dstOpnd, pFunc, newVirRegSymId);
             VIR_Operand_SetEnable(dstOpnd, VIR_ENABLE_X);
 
-            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+            srcOpnd = VIR_Inst_GetSource(pModInst, VIR_Operand_Src0);
             VIR_Operand_SetTypeId(srcOpnd, VIR_TYPE_UINT16);
 
-            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+            srcOpnd = VIR_Inst_GetSource(pModInst, VIR_Operand_Src1);
             VIR_Operand_SetSymbol(srcOpnd, pFunc, workThreadCountSymId);
             VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XXXX);
 
             /* Update the DU for IMOD. */
-            VIR_Operand_GetOperandInfo(newInst, VIR_Inst_GetSource(newInst, VIR_Operand_Src0), &srcOpndInfo);
+            VIR_Operand_GetOperandInfo(pModInst, VIR_Inst_GetSource(pModInst, VIR_Operand_Src0), &srcOpndInfo);
             vscVIR_AddNewDef(pDuInfo,
-                             newInst,
+                             pModInst,
                              newVirRegIdx,
                              1,
                              VIR_Operand_GetEnable(dstOpnd),
@@ -9364,12 +9369,12 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
 
             vscVIR_AddNewUsageToDef(pDuInfo,
                                     VIR_ANY_DEF_INST,
-                                    newInst,
-                                    VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
+                                    pModInst,
+                                    VIR_Inst_GetSource(pModInst, VIR_Operand_Src0),
                                     gcvFALSE,
                                     srcOpndInfo.u1.virRegInfo.virReg,
                                     1,
-                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(newInst, VIR_Operand_Src0))),
+                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pModInst, VIR_Operand_Src0))),
                                     VIR_HALF_CHANNEL_MASK_FULL,
                                     gcvNULL);
 
@@ -9419,23 +9424,23 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
                                               VIR_TYPE_UINT16,
                                               pInst,
                                               gcvTRUE,
-                                              &newInst);
-            dstOpnd = VIR_Inst_GetDest(newInst);
+                                              &pModInst);
+            dstOpnd = VIR_Inst_GetDest(pModInst);
             VIR_Operand_SetSymbol(dstOpnd, pFunc, newVirRegSymId);
             VIR_Operand_SetEnable(dstOpnd, VIR_ENABLE_X);
 
-            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+            srcOpnd = VIR_Inst_GetSource(pModInst, VIR_Operand_Src0);
             VIR_Operand_Copy(srcOpnd, VIR_Inst_GetSource(pInst, VIR_Operand_Src0));
             VIR_Operand_SetTypeId(srcOpnd, VIR_TYPE_UINT16);
 
-            srcOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src1);
+            srcOpnd = VIR_Inst_GetSource(pModInst, VIR_Operand_Src1);
             VIR_Operand_SetSymbol(srcOpnd, pFunc, workThreadCountSymId);
             VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XXXX);
 
             /* Update the DU for IMOD. */
-            VIR_Operand_GetOperandInfo(newInst, VIR_Inst_GetSource(newInst, VIR_Operand_Src0), &srcOpndInfo);
+            VIR_Operand_GetOperandInfo(pModInst, VIR_Inst_GetSource(pModInst, VIR_Operand_Src0), &srcOpndInfo);
             vscVIR_AddNewDef(pDuInfo,
-                             newInst,
+                             pModInst,
                              newVirRegIdx,
                              1,
                              VIR_Operand_GetEnable(dstOpnd),
@@ -9445,12 +9450,12 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
 
             vscVIR_AddNewUsageToDef(pDuInfo,
                                     VIR_ANY_DEF_INST,
-                                    newInst,
-                                    VIR_Inst_GetSource(newInst, VIR_Operand_Src0),
+                                    pModInst,
+                                    VIR_Inst_GetSource(pModInst, VIR_Operand_Src0),
                                     gcvFALSE,
                                     srcOpndInfo.u1.virRegInfo.virReg,
                                     1,
-                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(newInst, VIR_Operand_Src0))),
+                                    VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(VIR_Inst_GetSource(pModInst, VIR_Operand_Src0))),
                                     VIR_HALF_CHANNEL_MASK_FULL,
                                     gcvNULL);
 
@@ -9486,6 +9491,99 @@ static VSC_ErrCode _CalculateIndexForPrivateMemory(
                                     VIR_HALF_CHANNEL_MASK_FULL,
                                     gcvNULL);
         }
+
+        /* Start to generate instructions to calculate the offset for the private memory. */
+        /* Find uniform #threadIdMemAddr, if not found, create one. */
+        pThreadIdMemAddrSym = VIR_Shader_FindSymbolByName(pShader, VIR_SYM_UNIFORM, _sldThreadIdMemoryAddressName);
+        if (pThreadIdMemAddrSym == gcvNULL)
+        {
+            errCode = VIR_Shader_AddNamedUniform(pShader,
+                                                 _sldThreadIdMemoryAddressName,
+                                                 VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UINT_X3),
+                                                 &pThreadIdMemAddrSym);
+
+            VIR_Symbol_SetUniformKind(pThreadIdMemAddrSym, VIR_UNIFORM_THREAD_ID_MEM_ADDR);
+            VIR_Symbol_SetFlag(pThreadIdMemAddrSym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+            VIR_Symbol_SetFlag(pThreadIdMemAddrSym, VIR_SYMFLAG_COMPILER_GEN);
+            VIR_Symbol_SetLocation(pThreadIdMemAddrSym, -1);
+            VIR_Symbol_SetPrecision(pThreadIdMemAddrSym, VIR_PRECISION_HIGH);
+
+            pThreadIdMemAddrUniform = VIR_Symbol_GetUniform(pThreadIdMemAddrSym);
+            pThreadIdMemAddrUniform->index = VIR_IdList_Count(VIR_Shader_GetUniforms(pShader)) - 1;
+        }
+
+        /* Create a ATOMIC_ADD to get the thread ID. */
+        errCode = VIR_Function_AddInstructionBefore(pFunc,
+                                                    VIR_OP_ATOMADD_S,
+                                                    VIR_TYPE_UINT32,
+                                                    pModInst,
+                                                    gcvTRUE,
+                                                    &pAtomAddInst);
+        ON_ERROR(errCode, "Insert a ATOMIC_ADD instruction.");
+
+        /* Set DEST. */
+        pNewOpnd = VIR_Inst_GetDest(pAtomAddInst);
+        VIR_Operand_SetSymbol(pNewOpnd, pFunc, newVirRegSymId);
+        VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT32);
+        VIR_Operand_SetEnable(pNewOpnd, VIR_ENABLE_X);
+
+        /* src0 - base */
+        pNewOpnd = VIR_Inst_GetSource(pAtomAddInst, 0);
+        VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pThreadIdMemAddrSym));
+        VIR_Operand_SetSwizzle(pNewOpnd, bNeedOOBCheck ? VIR_SWIZZLE_XYZZ : VIR_SWIZZLE_XXXX);
+
+        /* src1 - 0 */
+        pNewOpnd = VIR_Inst_GetSource(pAtomAddInst, 1);
+        VIR_Operand_SetImmediateUint(pNewOpnd, 0);
+
+        /* src2 - 1 */
+        pNewOpnd = VIR_Inst_GetSource(pAtomAddInst, 2);
+        VIR_Operand_SetImmediateUint(pNewOpnd, 1);
+
+        /* Update the DU. */
+        vscVIR_AddNewDef(pDuInfo,
+                         pAtomAddInst,
+                         newVirRegIdx,
+                         1,
+                         VIR_ENABLE_X,
+                         VIR_HALF_CHANNEL_MASK_FULL,
+                         gcvNULL,
+                         gcvNULL);
+
+        /* Change the SRC0 of MOD instruction. */
+        pNewOpnd = VIR_Inst_GetSource(pModInst, 0);
+        VIR_Operand_GetOperandInfo(pModInst, pNewOpnd, &srcOpndInfo);
+
+        /* Delete the usage first. */
+        if (srcOpndInfo.isVreg)
+        {
+            vscVIR_DeleteUsage(pDuInfo,
+                               VIR_ANY_DEF_INST,
+                               pModInst,
+                               pNewOpnd,
+                               gcvFALSE,
+                               srcOpndInfo.u1.virRegInfo.virReg,
+                               1,
+                               VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pNewOpnd)),
+                               VIR_HALF_CHANNEL_MASK_FULL,
+                               gcvNULL);
+        }
+
+        VIR_Operand_SetSymbol(pNewOpnd, pFunc, newVirRegSymId);
+        VIR_Operand_SetTypeId(pNewOpnd, VIR_TYPE_UINT16);
+        VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XXXX);
+
+        /* Update the DU for MAD. */
+        vscVIR_AddNewUsageToDef(pDuInfo,
+                                pAtomAddInst,
+                                pModInst,
+                                pNewOpnd,
+                                gcvFALSE,
+                                newVirRegIdx,
+                                1,
+                                VIR_ENABLE_X,
+                                VIR_HALF_CHANNEL_MASK_FULL,
+                                gcvNULL);
     }
 
 OnError:
@@ -9941,6 +10039,7 @@ _UpdateLocMemAndPrivMem(
     VIR_FunctionNode*   func_node;
     VSC_HW_CONFIG       *pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     VIR_DEF_USAGE_INFO  *pDuInfo = pPassWorker->pDuInfo;
+    gctBOOL             bNeedOOBCheck = (pPassWorker->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK) != 0;
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -9952,14 +10051,15 @@ _UpdateLocMemAndPrivMem(
 
         VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
-                inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+             inst != gcvNULL;
+             inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
             /* Only support OCL now. */
             if (VIR_Shader_IsCL(pShader) &&
                 !VIR_Shader_IsVulkan(pShader) &&
                 VIR_Shader_GetPrivateMemorySize(pShader) > 0)
             {
-                errCode = _CalculateIndexForPrivateMemory(pDuInfo, pShader, func, inst);
+                errCode = _CalculateIndexForPrivateMemory(pDuInfo, pShader, bNeedOOBCheck, func, inst);
                 ON_ERROR(errCode, "Create concurrent workThreadCount.");
             }
 
