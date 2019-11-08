@@ -3565,6 +3565,30 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                                                       &viewIndexUniform));
                     virUniform->gcslIndex = viewIndexIndex;
                 }
+                else if (VIR_Symbol_GetUniformKind(virUniformSym) == VIR_UNIFORM_THREAD_ID_MEM_ADDR)
+                {
+                    gctINT16 threadIdIndex;
+                    gcUNIFORM threadIdUniform;
+
+                    /* Create threadID. */
+                    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+                                                        VIR_Shader_GetSymNameString(VirShader, virUniformSym),
+                                                        gcSHADER_UINT_X3,
+                                                        gcSHADER_PRECISION_HIGH,
+                                                        -1,
+                                                        -1,
+                                                        -1,
+                                                        0,
+                                                        gcvNULL,
+                                                        gcSHADER_VAR_CATEGORY_THREAD_ID_MEM_ADDR,
+                                                        0,
+                                                        -1,
+                                                        -1,
+                                                        gcIMAGE_FORMAT_DEFAULT,
+                                                        &threadIdIndex,
+                                                        &threadIdUniform));
+                    virUniform->gcslIndex = threadIdIndex;
+                }
                 else if (VIR_Symbol_GetUniformKind(virUniformSym) == VIR_UNIFORM_TEMP_REG_SPILL_MEM_ADDRESS)
                 {
                     /* Convert the tempRegSpillMem only when multiGPU is enabled. */

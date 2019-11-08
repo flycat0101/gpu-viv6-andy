@@ -1203,6 +1203,10 @@ _ConvUniformKind2Vir(
         virUniformKind = VIR_UNIFORM_VIEW_INDEX;
         break;
 
+    case gcSHADER_VAR_CATEGORY_THREAD_ID_MEM_ADDR:
+        virUniformKind = VIR_UNIFORM_THREAD_ID_MEM_ADDR;
+        break;
+
     case gcSHADER_VAR_CATEGORY_NORMAL:
         switch(GetUniformKind(Uniform))
         {

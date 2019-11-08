@@ -107,6 +107,7 @@ enum
     _VSC_PATCH_OFFSET_GPRSPILL = 2,
     _VSC_PATCH_OFFSET_CRSPILL  = 3,
     _VSC_PATCH_OFFSET_SHAREMEM = 4,
+    _VSC_PATCH_OFFSET_THREADID = 5,
 };
 
 /*
@@ -134,6 +135,10 @@ static VSC_ErrCode _SetPatchOffsets(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer,
     case _VSC_PATCH_OFFSET_SHAREMEM:
         pStatesPgmer->patchOffsetsInDW.sharedMemVidMemInStateBuffer = pStatesPgmer->nextStateAddr + 1;
         pStatesPgmer->patchOffsetsInDW.sharedMemVidMemInStateDelta = pStatesPgmer->nextStateDeltaAddr + 2;
+        break;
+    case _VSC_PATCH_OFFSET_THREADID:
+        pStatesPgmer->patchOffsetsInDW.threadIdVidMemInStateBuffer = pStatesPgmer->nextStateAddr + 1;
+        pStatesPgmer->patchOffsetsInDW.threadIdVidMemInStateDelta = pStatesPgmer->nextStateDeltaAddr + 2;
         break;
     }
     return VSC_ERR_NONE;
@@ -7368,6 +7373,154 @@ OnError:
     return errCode;
 }
 
+/* Alloate the video memory to save the thread ID. */
+static VSC_ErrCode _AllocVidMemForThreadID(VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer,
+                                           SHADER_EXECUTABLE_PROFILE* pGpsSEP,
+                                           gcsSURF_NODE_PTR* pThreadIDVidmemNode,
+                                           gctUINT32* pVidMemAddrOfThreadID,
+                                           gctUINT* pThreadIDSize)
+
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    gctUINT                    ThreadIdVidMemSize = 0, i;
+    gctUINT32                  physical = NOT_ASSIGNED;
+
+    for (i = 0; i < pGpsSEP->staticPrivMapping.privUavMapping.countOfEntries; i ++)
+    {
+        if (pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].commonPrivm.privmKind == SHS_PRIV_MEM_KIND_THREAD_ID_MEM_ADDR)
+        {
+            gcmASSERT(pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCnstSubArray == gcvNULL);
+            gcmASSERT(pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCTC == gcvNULL);
+
+            ThreadIdVidMemSize = pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].pBuffer->sizeInByte;
+            gcmASSERT(ThreadIdVidMemSize == 4);
+
+            break;
+        }
+    }
+
+    if (ThreadIdVidMemSize == 0)
+    {
+        return errCode;
+    }
+
+    (*pStatesPgmer->pSysCtx->drvCBs.pfnAllocVidMemCb)(pStatesPgmer->pSysCtx->hDrv,
+                                                      gcvSURF_VERTEX,
+                                                      "shared memory",
+                                                      ThreadIdVidMemSize,
+                                                      64,
+                                                      (gctPOINTER *)pThreadIDVidmemNode,
+                                                      gcvNULL,
+                                                      &physical,
+                                                      gcvNULL,
+                                                      gcvTRUE);
+
+    if (NOT_ASSIGNED == physical)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        ON_ERROR(errCode, "Create shared-mem vid-mem");
+    }
+
+    *pVidMemAddrOfThreadID = physical;
+    *pThreadIDSize = ThreadIdVidMemSize;
+
+OnError:
+    return errCode;
+}
+
+/* Program the thread ID memory address. */
+static VSC_ErrCode _ProgramThreadIdMemAddr(SHADER_EXECUTABLE_PROFILE* pGpsSEP,
+                                           gctUINT startConstRegAddr,
+                                           gctUINT threadIdMemAddr,
+                                           gctUINT threadIdMemSize,
+                                           VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
+{
+    VSC_ErrCode                           errCode = VSC_ERR_NONE;
+    gctUINT                               channel, regAddr, i;
+    SHADER_CONSTANT_HW_LOCATION_MAPPING*  pConstHwLocMapping = gcvNULL;
+
+    for (i = 0; i < pGpsSEP->staticPrivMapping.privUavMapping.countOfEntries; i ++)
+    {
+        if (pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].commonPrivm.privmKind == SHS_PRIV_MEM_KIND_THREAD_ID_MEM_ADDR)
+        {
+            gcmASSERT(pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCnstSubArray == gcvNULL);
+            gcmASSERT(pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].memData.ppCTC == gcvNULL);
+
+            gcmASSERT(pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].pBuffer->hwMemAccessMode ==
+                      SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR);
+
+            pConstHwLocMapping = pGpsSEP->staticPrivMapping.privUavMapping.pPrivUavEntries[i].pBuffer->hwLoc.pHwDirectAddrBase;
+
+            break;
+        }
+    }
+
+    gcmASSERT(pConstHwLocMapping);
+    gcmASSERT(pConstHwLocMapping->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
+
+    if (pGpsSEP->exeHints.derivedHints.globalStates.bEnableRobustCheck)
+    {
+        gctUINT upperLimit;
+        /* must at start with x and at least .x.y.z channels are allocated */
+        gcmASSERT((pConstHwLocMapping->validHWChannelMask & 0x07) == 0x07);
+        regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.constReg.hwRegNo * CHANNEL_NUM);
+        VSC_LOAD_HW_STATE(regAddr, threadIdMemAddr);
+
+        regAddr += 1;  /* .y lower limit */
+        VSC_LOAD_HW_STATE(regAddr, threadIdMemAddr);
+
+        regAddr += 1;  /* .z upper limit */
+        upperLimit = threadIdMemAddr + threadIdMemSize - 1;
+        VSC_LOAD_HW_STATE(regAddr, upperLimit);
+    }
+    else
+    {
+        for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+        {
+            if (pConstHwLocMapping->validHWChannelMask & (1 << channel))
+            {
+                regAddr = startConstRegAddr + (pConstHwLocMapping->hwLoc.constReg.hwRegNo * CHANNEL_NUM) + channel;
+                VSC_LOAD_HW_STATE(regAddr, threadIdMemAddr);
+            }
+        }
+    }
+OnError:
+    return errCode;
+}
+
+/* Allocate the program the thread ID memory. */
+static VSC_ErrCode _ProgramGpsThreadIDMemory(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    SHADER_EXECUTABLE_PROFILE* pGpsSEP = pShHwInfo->pSEP;
+    gcsSURF_NODE_PTR           threadIdVidMemNode = gcvNULL;
+    gctUINT                    threadIdMemAddrOfSharedMem = NOT_ASSIGNED;
+    gctBOOL                    threadWalkInPs = pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasThreadWalkerInPS;
+    gctUINT                    threadIdMemSize = 0;
+
+    errCode = _AllocVidMemForThreadID(pStatesPgmer, pGpsSEP, &threadIdVidMemNode, &threadIdMemAddrOfSharedMem, &threadIdMemSize);
+    ON_ERROR(errCode, "Alloc vid-mem for thread ID");
+
+    if (threadIdMemSize == 0)
+    {
+        return errCode;
+    }
+
+    pStatesPgmer->pHints->shaderVidNodes.threadIdVidMemNode = threadIdVidMemNode;
+
+    _SetPatchOffsets(pStatesPgmer, _VSC_PATCH_OFFSET_THREADID, 0);
+
+    errCode = _ProgramThreadIdMemAddr(pGpsSEP,
+                                      threadWalkInPs ? _GetPsStartConstRegAddr(pShHwInfo, pStatesPgmer) : _GetVsStartConstRegAddr(pShHwInfo, pStatesPgmer),
+                                      threadIdMemAddrOfSharedMem,
+                                      threadIdMemSize,
+                                      pStatesPgmer);
+    ON_ERROR(errCode, "Program thread ID memory address ");
+
+OnError:
+    return errCode;
+}
+
 static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
@@ -7754,6 +7907,13 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
                 pStatesPgmer->pHints->sharedMemAllocByCompiler = gcvTRUE;
             }
         }
+    }
+
+    /* Allocate the global memory to save the thread ID. */
+    if (pGpsSEP->exeHints.derivedHints.prvStates.gps.bUsePrivateMemory)
+    {
+        errCode = _ProgramGpsThreadIDMemory(pShHwInfo, pStatesPgmer);
+        ON_ERROR(errCode, "Program thread ID memory");
     }
 
 OnError:
