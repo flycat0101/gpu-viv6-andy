@@ -4478,7 +4478,8 @@ gcoHARDWARE_InitializeFormatArrayTable(
        {
            /* change all closestTXFormat=gcvSURF_A8L8 to gcvSURF_A8L8_1_A8R8G8B8 */
            if (formatLuminanceAlpha[i].closestTXFormat == gcvSURF_A8L8 &&
-               formatLuminanceAlpha[i].format != gcvSURF_A8L8_RAW)
+               formatLuminanceAlpha[i].format != gcvSURF_A8L8_RAW &&
+               formatLuminanceAlpha[i].format != gcvSURF_A8L8)
            {
               formatLuminanceAlpha[i].closestTXFormat = gcvSURF_A8L8_1_A8R8G8B8;
               formatLuminanceAlpha[i].txFormat        = gcvINVALID_TEXTURE_FORMAT;
