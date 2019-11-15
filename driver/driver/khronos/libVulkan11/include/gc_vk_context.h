@@ -30,7 +30,6 @@ typedef struct __vkUtilsHashRec         __vkUtilsHash;
 #define __VK_MAX_PDGRO_COUNT            1
 #define __VK_MAX_GPU_CORE_COUNT         4
 #define __VK_MAX_FENCE_COUNT            32768
-#define __VK_MAX_QUERY_BUF_SIZE         4096
 #define __VK_MAX_NAME_LENGTH            256
 
 enum

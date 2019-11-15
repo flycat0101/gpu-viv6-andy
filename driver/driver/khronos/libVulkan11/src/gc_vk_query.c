@@ -30,6 +30,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateQueryPool(
     VkDeviceMemory memory;
     uint64_t *queryMemory;
     uint32_t iq;
+    VkDeviceSize memorySize = 0;
     VkResult result;
 
     /* Set the allocator to the parent allocator or API defined allocator if valid */
@@ -41,8 +42,8 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateQueryPool(
         return result;
     }
 
-    /* maybe overflow maximum size of query pool.*/
-    __VK_ASSERT(pCreateInfo->queryCount * MAX_UNIT_COUNT * sizeof(uint64_t)< __VK_MAX_QUERY_BUF_SIZE);
+    memorySize = pCreateInfo->queryCount * MAX_UNIT_COUNT * sizeof(uint64_t);
+    memorySize = __VK_ALIGN(memorySize, 4096);
 
     /* Initialize __vkQueryPool specific data fields here */
     qyp->queryCount = pCreateInfo->queryCount;
@@ -60,7 +61,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateQueryPool(
     buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buf_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    buf_info.size = __VK_MAX_QUERY_BUF_SIZE;
+    buf_info.size = memorySize;
 
     qyp->queryBuffer = VK_NULL_HANDLE;
     __VK_ONERROR(__vk_CreateBuffer(device, &buf_info, gcvNULL, &qyp->queryBuffer));
@@ -68,7 +69,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateQueryPool(
     /* Allocate device memory for fences */
     __VK_MEMZERO(&mem_alloc, sizeof(mem_alloc));
     mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    mem_alloc.allocationSize = __VK_MAX_QUERY_BUF_SIZE;
+    mem_alloc.allocationSize = memorySize;
     mem_alloc.memoryTypeIndex = 0;
     __VK_ONERROR(__vk_AllocateMemory(device, &mem_alloc, gcvNULL, &memory));
 
@@ -77,9 +78,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateQueryPool(
 
     /* Lock surface for memory */
     __VK_ONERROR(__vk_MapMemory(device, memory, 0,
-        __VK_MAX_QUERY_BUF_SIZE, 0, (void **)&queryMemory));
+        memorySize, 0, (void **)&queryMemory));
 
-    __VK_MEMZERO(queryMemory, __VK_MAX_QUERY_BUF_SIZE);
+    __VK_MEMZERO(queryMemory, memorySize);
 
     /* Unlock the memory */
     __vk_UnmapMemory(device, memory);
