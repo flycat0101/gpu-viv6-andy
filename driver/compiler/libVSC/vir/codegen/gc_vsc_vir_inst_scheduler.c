@@ -1223,16 +1223,16 @@ static void _VSC_IS_InstConflict(
     gctUINT32 i, j;
     VIR_Enable overlappingEnable;
 
-    if(VIR_Inst_GetOpcode(inst1) == VIR_OP_BARRIER)
+    if (VIR_Inst_IsHWBarrier(inst1))
     {
         VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_BARRIER);
-        if(VIR_Inst_GetOpcode(inst0) == VIR_OP_BARRIER)
+        if (VIR_Inst_IsHWBarrier(inst0))
         {
             VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_BARRIER);
         }
         return;
     }
-    if(VIR_Inst_GetOpcode(inst0) == VIR_OP_BARRIER)
+    if (VIR_Inst_IsHWBarrier(inst0))
     {
         VSC_IS_OtherConflictType_ExclusivelySet(*oct, *excludeOCT, VSC_IS_OtherConflictType_BARRIER);
         VSC_IS_OtherConflictType_Set(*excludeOCT, VSC_IS_OtherConflictType_BARRIER);

@@ -17356,13 +17356,16 @@ _GenBarrierOpCode(
 {
     gceSTATUS         status            = gcvSTATUS_OK;
     sleOPCODE         opcode            = slvOPCODE_INVALID;
-    slsROPERAND       constantZero[1];
+    slsROPERAND       memoryScopeConstant[1];
+    slsROPERAND       memorySemantic[1];
     gctBOOL           vertexShaderOK = gcvFALSE,
                       fragmentShaderOK = gcvFALSE,
                       computeShaderOK = gcvFALSE,
                       tesOK = gcvFALSE,
                       tcsOK = gcvFALSE;
-    gcSL_BARRIER_TYPE barrierType = gcSL_BARRIER_NORMAL;
+    gcSL_MEMORY_SCOPE memoryScope = gcSL_MEMORY_SCOPE_QUEUE_FAMILY;
+    gcSL_MEMORY_SEMANTIC_FLAG memorySemanticFlag = gcSL_MEMORY_SEMANTIC_ACQUIRERELEASE;
+
     gcmHEADER();
 
     /* Verify the arguments. */
@@ -17373,61 +17376,64 @@ _GenBarrierOpCode(
     if (gcmIS_SUCCESS(gcoOS_StrCmp(PolynaryExpr->funcSymbol, "barrier")))
     {
         opcode = slvOPCODE_BARRIER;
-        barrierType = gcSL_BARRIER_NORMAL;
         computeShaderOK = gcvTRUE;
         tcsOK = gcvTRUE;
+        memoryScope = gcSL_MEMORY_SCOPE_WORKGROUP;
     }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(PolynaryExpr->funcSymbol, "memoryBarrier")))
     {
         opcode = slvOPCODE_MEMORY_BARRIER;
-        barrierType = gcSL_BARRIER_MEM;
         vertexShaderOK = gcvTRUE;
         fragmentShaderOK = gcvTRUE;
         computeShaderOK = gcvTRUE;
         tcsOK = gcvTRUE;
         tesOK = gcvTRUE;
+        memorySemanticFlag |=
+            (gcSL_MEMORY_SEMANTIC_UNIFORMMEMORY | gcSL_MEMORY_SEMANTIC_WORKGROUPMEMORY | gcSL_MEMORY_SEMANTIC_ATOMICCOUNTERMEMORY | gcSL_MEMORY_SEMANTIC_IMAGEMEMORY);
     }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(PolynaryExpr->funcSymbol, "memoryBarrierAtomicCounter")))
     {
         opcode = slvOPCODE_MEMORY_BARRIER;
-        barrierType = gcSL_BARRIER_MEM_ATOMIC_COUNTER;
         vertexShaderOK = gcvTRUE;
         fragmentShaderOK = gcvTRUE;
         computeShaderOK = gcvTRUE;
         tcsOK = gcvTRUE;
         tesOK = gcvTRUE;
+        memorySemanticFlag |= gcSL_MEMORY_SEMANTIC_ATOMICCOUNTERMEMORY;
     }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(PolynaryExpr->funcSymbol, "memoryBarrierBuffer")))
     {
         opcode = slvOPCODE_MEMORY_BARRIER;
-        barrierType = gcSL_BARRIER_MEM_BUFFER;
         vertexShaderOK = gcvTRUE;
         fragmentShaderOK = gcvTRUE;
         computeShaderOK = gcvTRUE;
         tcsOK = gcvTRUE;
         tesOK = gcvTRUE;
+        memorySemanticFlag |= gcSL_MEMORY_SEMANTIC_UNIFORMMEMORY;
     }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(PolynaryExpr->funcSymbol, "memoryBarrierImage")))
     {
         opcode = slvOPCODE_MEMORY_BARRIER;
-        barrierType = gcSL_BARRIER_MEM_IMAGE;
         vertexShaderOK = gcvTRUE;
         fragmentShaderOK = gcvTRUE;
         computeShaderOK = gcvTRUE;
         tcsOK = gcvTRUE;
         tesOK = gcvTRUE;
+        memorySemanticFlag |= gcSL_MEMORY_SEMANTIC_IMAGEMEMORY;
     }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(PolynaryExpr->funcSymbol, "memoryBarrierShared")))
     {
         opcode = slvOPCODE_MEMORY_BARRIER;
-        barrierType = gcSL_BARRIER_MEM_SHARED;
         computeShaderOK = gcvTRUE;
+        memorySemanticFlag |= gcSL_MEMORY_SEMANTIC_WORKGROUPMEMORY;
     }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(PolynaryExpr->funcSymbol, "groupMemoryBarrier")))
     {
         opcode = slvOPCODE_MEMORY_BARRIER;
-        barrierType = gcSL_BARRIER_MEM_GROUP;
         computeShaderOK = gcvTRUE;
+        memoryScope = gcSL_MEMORY_SCOPE_WORKGROUP;
+        memorySemanticFlag |=
+            (gcSL_MEMORY_SEMANTIC_UNIFORMMEMORY | gcSL_MEMORY_SEMANTIC_WORKGROUPMEMORY | gcSL_MEMORY_SEMANTIC_ATOMICCOUNTERMEMORY | gcSL_MEMORY_SEMANTIC_IMAGEMEMORY);
     }
     else
     {
@@ -17451,17 +17457,22 @@ _GenBarrierOpCode(
         return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
     }
 
-    slsROPERAND_InitializeIntOrIVecConstant(constantZero,
+    slsROPERAND_InitializeIntOrIVecConstant(memoryScopeConstant,
                                             gcSHADER_UINT_X1,
                                             gcSHADER_PRECISION_MEDIUM,
-                                            (gctUINT) barrierType);
+                                            (gctUINT) memoryScope);
+
+    slsROPERAND_InitializeIntOrIVecConstant(memorySemantic,
+                                            gcSHADER_UINT_X1,
+                                            gcSHADER_PRECISION_MEDIUM,
+                                            (gctUINT) memorySemanticFlag);
 
     status = slGenGenericNullTargetCode(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
                                         opcode,
-                                        constantZero,
-                                        gcvNULL);
+                                        memoryScopeConstant,
+                                        memorySemantic);
 
     gcmFOOTER_NO();
     return status;

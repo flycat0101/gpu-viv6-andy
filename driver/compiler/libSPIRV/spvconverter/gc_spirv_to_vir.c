@@ -10438,11 +10438,6 @@ VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
         }
     }
 
-    if (virOpcode == VIR_OP_BARRIER)
-    {
-        VIR_Shader_SetFlag(virShader, VIR_SHFLAG_HAS_BARRIER);
-    }
-
     virEnableMask = __SpvGenEnable(spv, dstVirType, resultTypeId);
 
     VIR_Function_AddInstruction(spv->virFunction,
@@ -10961,6 +10956,79 @@ VSC_ErrCode __SpvEmitUnsupported(gcSPV spv, VIR_Shader * virShader)
 VSC_ErrCode __SpvEmitLoopMerge(gcSPV spv, VIR_Shader * virShader)
 {
     return VSC_ERR_NONE;
+}
+
+VSC_ErrCode __SpvEmitBarrier(gcSPV spv, VIR_Shader * virShader)
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Instruction*            pNewInst = gcvNULL;
+    VIR_Operand*                pNewOpnd = gcvNULL;
+    VIR_OpCode                  virOpCode = SPV_OPCODE_2_VIR_OPCODE(spv->opCode);
+    SpvId                       memoryScopeId;
+    VIR_Const*                  pMemoryScopeConst = gcvNULL;
+    VIR_Type*                   pMemoryScopeType = gcvNULL;
+    VIR_MEMORY_SCOPE_TYPE       memoryScope = VIR_MEMORY_SCOPE_TYPE_WORKGROUP;
+    SpvId                       memorySemanticId;
+    VIR_Const*                  pMemorySemanticConst = gcvNULL;
+    VIR_Type*                   pMemorySemanticType = gcvNULL;
+    gctBOOL                     bNeedHwBarrier = gcvFALSE;
+
+    gcmASSERT(virOpCode == VIR_OP_BARRIER || virOpCode == VIR_OP_MEM_BARRIER);
+    gcmASSERT(spv->operandSize == 2);
+
+    /* Add the BARRIER instruction. */
+    errCode = VIR_Function_AddInstruction(spv->virFunction,
+                                          virOpCode,
+                                          VIR_TYPE_VOID,
+                                          &pNewInst);
+    ON_ERROR(errCode, "Add a instruction.");
+
+    /* Src0 -- Memory scope. */
+    memoryScopeId = spv->operands[0];
+    gcmASSERT(SPV_ID_TYPE(memoryScopeId) == SPV_ID_TYPE_CONST);
+
+    pMemoryScopeConst = VIR_Shader_GetConstFromId(virShader, SPV_ID_VIR_CONST_ID(memoryScopeId));
+    pMemoryScopeType = VIR_Shader_GetTypeFromId(virShader, pMemoryScopeConst->type);
+    /* Scope must be an <id> of a 32-bit integer scalar. */
+    if (!VIR_Type_isInteger(pMemoryScopeType) || !VIR_Type_isScalar(pMemoryScopeType))
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+    VIR_Operand_SetImmediateInt(pNewOpnd, pMemoryScopeConst->value.scalarVal.iValue);
+
+    memoryScope = (VIR_MEMORY_SCOPE_TYPE)pMemoryScopeConst->value.scalarVal.iValue;
+    /* So far we can't support DEVICE barrier. */
+    if (memoryScope == VIR_MEMORY_SCOPE_TYPE_CROSS_DEVICE || memoryScope == VIR_MEMORY_SCOPE_TYPE_DEVICE)
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    /* Src1 -- Memory semantic. */
+    memorySemanticId = spv->operands[1];
+    gcmASSERT(SPV_ID_TYPE(memorySemanticId) == SPV_ID_TYPE_CONST);
+
+    pMemorySemanticConst = VIR_Shader_GetConstFromId(virShader, SPV_ID_VIR_CONST_ID(memorySemanticId));
+    pMemorySemanticType = VIR_Shader_GetTypeFromId(virShader, pMemorySemanticConst->type);
+    /* Semantic must be an <id> of a 32-bit integer scalar. */
+    if (!VIR_Type_isInteger(pMemorySemanticType) || !VIR_Type_isScalar(pMemorySemanticType))
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    pNewOpnd = VIR_Inst_GetSource(pNewInst, 1);
+    VIR_Operand_SetImmediateInt(pNewOpnd, pMemorySemanticConst->value.scalarVal.iValue);
+
+    /* Set the shader flag. */
+    bNeedHwBarrier = VIR_Inst_IsHWBarrier(pNewInst);
+    if (bNeedHwBarrier)
+    {
+        VIR_Shader_SetFlag(virShader, VIR_SHFLAG_HAS_BARRIER);
+    }
+
+OnError:
+    return errCode;
 }
 
 VSC_ErrCode __SpvEmitName(gcSPV spv, VIR_Shader * virShader)

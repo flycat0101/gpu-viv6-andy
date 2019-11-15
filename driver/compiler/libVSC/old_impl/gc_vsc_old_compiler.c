@@ -29767,6 +29767,53 @@ gcGetDualFP16Mode(
 
     return dual16Mode;
 }
+
+/* Same logical to VIR_Inst_IsHWBarrier. */
+gctBOOL
+gcIsInstHWBarrier(
+    IN gcSHADER             Shader,
+    IN gcSL_INSTRUCTION     Code
+    )
+{
+    gcSL_OPCODE                 opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(Code->opcode, Opcode);
+    gcSL_MEMORY_SCOPE           memoryScope = gcSL_MEMORY_SCOPE_WORKGROUP;
+    gcSL_MEMORY_SEMANTIC_FLAG   memorySemantic = gcSL_MEMORY_SEMANTIC_ACQUIRERELEASE;
+
+    if (opcode != gcSL_BARRIER && opcode != gcSL_MEM_BARRIER)
+    {
+        return gcvFALSE;
+    }
+
+    if (gcmSL_SOURCE_GET(Code->source0, Type) == gcSL_CONSTANT)
+    {
+        memoryScope = (gcSL_MEMORY_SCOPE)((Code->source1Index) | (Code->source1Indexed << 16));
+    }
+    if (gcmSL_SOURCE_GET(Code->source1, Type) == gcSL_CONSTANT)
+    {
+        memorySemantic = (gcSL_MEMORY_SEMANTIC_FLAG)((Code->source1Index) | (Code->source1Indexed << 16));
+    }
+
+    /* So far always generate for BARRIER. */
+    if (opcode == gcSL_BARRIER)
+    {
+        return gcvTRUE;
+    }
+    else if (opcode == gcSL_MEM_BARRIER)
+    {
+        if (memoryScope == gcSL_MEMORY_SCOPE_WORKGROUP
+            &&
+            ((memorySemantic & gcSL_MEMORY_SEMANTIC_ACQUIRE) || (memorySemantic & gcSL_MEMORY_SEMANTIC_ACQUIRERELEASE)))
+        {
+            return gcvTRUE;
+        }
+        else
+        {
+            return gcvFALSE;
+        }
+    }
+
+    return gcvFALSE;
+}
 #endif
 
 gcOPTIMIZER_OPTION *

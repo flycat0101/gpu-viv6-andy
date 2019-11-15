@@ -4696,8 +4696,7 @@ _VIR_LoopInfo_CanDoStaticllyUnroll(
     }
     while(gcvTRUE)
     {
-        VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
-        if (opcode == VIR_OP_BARRIER)
+        if (VIR_Inst_IsHWBarrier(instIter))
         {
             return gcvFALSE;
         }
@@ -4717,8 +4716,7 @@ _VIR_LoopInfo_CanDoStaticllyUnroll(
 
         while(gcvTRUE)
         {
-            VIR_OpCode opcode = VIR_Inst_GetOpcode(instIter);
-            if (opcode == VIR_OP_BARRIER)
+            if (VIR_Inst_IsHWBarrier(instIter))
             {
                 return gcvFALSE;
             }
