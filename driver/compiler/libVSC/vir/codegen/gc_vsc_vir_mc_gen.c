@@ -481,7 +481,14 @@ _VSC_MC_GEN_GenOpcode(
         }
         break;
     case VIR_OP_MEM_BARRIER:
-        *BaseOpcode = 0x00; /* HW has logic to naturally insure memory access is in-order */
+        if (VIR_Inst_IsHWBarrier(Inst))
+        {
+            *BaseOpcode = 0x2A;
+        }
+        else
+        {
+            *BaseOpcode = 0x00; /* HW has logic to naturally insure memory access is in-order */
+        }
         break;
     case VIR_OP_ATOMADD:
     case VIR_OP_ATOMADD_S:
@@ -2942,7 +2949,7 @@ _VSC_MC_GEN_GenInst(
     VSC_MC_CODEC_DST        mcDest;
     VSC_MC_CODEC_SRC        mcSrc[MAX_MC_SRC_COUNT];
     gctBOOL                 bNeedAppendNop = (Inst == Func->instList.pTail &&
-                                              (Gen->Shader->functions.info.count > 1 || virOpcode == VIR_OP_BARRIER) &&
+                                              (Gen->Shader->functions.info.count > 1 || VIR_Inst_IsHWBarrier(Inst)) &&
                                               Func == Gen->Shader->mainFunction);
 
     memset(&mcInstCtrl, 0, sizeof(mcInstCtrl));
@@ -3319,7 +3326,7 @@ _VSC_MC_GEN_GenInst(
             Gen->Shader->psHasDiscard = gcvTRUE;
         }
 
-        if (virOpcode == VIR_OP_BARRIER && Gen->Shader->shaderKind == VIR_SHADER_COMPUTE)
+        if (VIR_Inst_IsHWBarrier(Inst) && Gen->Shader->shaderKind == VIR_SHADER_COMPUTE)
         {
             Gen->Shader->hasThreadGroupSync = gcvTRUE;
         }

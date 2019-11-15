@@ -532,6 +532,7 @@
     VIR_IdList_Add;
     VIR_IdList_DeleteByValue;
     VIR_Inst_UpdateResOpType;
+    VIR_Inst_IsHWBarrier;
 
     local:
         *;

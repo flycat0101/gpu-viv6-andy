@@ -818,10 +818,12 @@
 
     /* synchronization and atomic operations */
     /*
-    ** Barrier instructions, source0 is a integer constant, save the barrier type(VIR_BARRIER_TYPE).
+    ** Barrier instructions:
+    ** source0 is a integer constant, save the memory scope(VIR_MEMORY_SCOPE_TYPE).
+    ** source1 is a integer constant, save the memory semantic(VIR_MEMORY_SEMANTIC_FLAG).
     */
-    VIR_OPINFO(BARRIER, 1, NoDest, 0, AL), /*   */
-    VIR_OPINFO(MEM_BARRIER, 1, NoDest, 0, AL), /*   */
+    VIR_OPINFO(BARRIER, 2, NoDest, 0, AL),
+    VIR_OPINFO(MEM_BARRIER, 2, NoDest, 0, AL),
     VIR_OPINFO(FENCE, 0, NoDest, 0, NU), /* memory fence */
     VIR_OPINFO(FLUSH, 1, NoDest, 0, AL), /* flush cache:
                                                    *   bit0: Flush L1 cache

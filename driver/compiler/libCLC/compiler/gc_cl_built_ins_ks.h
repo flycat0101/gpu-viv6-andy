@@ -1233,6 +1233,8 @@ _GenBarrierCode(
     )
 {
     gceSTATUS status;
+    clsROPERAND     memoryScope[1];
+    clsROPERAND     memorySemantic[1];
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -1241,13 +1243,21 @@ _GenBarrierCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand == gcvNULL);
 
-        status = clGenGenericNullTargetCode(Compiler,
-                                            PolynaryExpr->exprBase.base.lineNo,
-                                            PolynaryExpr->exprBase.base.stringNo,
-                                            clvOPCODE_BARRIER,
-                                            &OperandsParameters[0].rOperands[0],
-                                            gcvNULL);
-        if (gcmIS_ERROR(status)) return status;
+    clsROPERAND_InitializeIntOrIVecConstant(memoryScope,
+                                            clmGenCodeDataType(T_UINT),
+                                            (gctUINT) gcSL_MEMORY_SCOPE_WORKGROUP);
+
+    clsROPERAND_InitializeIntOrIVecConstant(memorySemantic,
+                                            clmGenCodeDataType(T_UINT),
+                                            (gctUINT) gcSL_MEMORY_SEMANTIC_ACQUIRERELEASE);
+
+    status = clGenGenericNullTargetCode(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
+                                        clvOPCODE_BARRIER,
+                                        memoryScope,
+                                        memorySemantic);
+    if (gcmIS_ERROR(status)) return status;
 
     return gcvSTATUS_OK;
 }

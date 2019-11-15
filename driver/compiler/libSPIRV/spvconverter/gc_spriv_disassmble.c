@@ -1217,37 +1217,6 @@ void __SpvDumpFunctionControlMask(
     }
 }
 
-void __SpvDumpMemorySemanticsMask(
-    gctCHAR*Line,
-    gctUINT*Offset,
-    gctUINT Mask)
-{
-    gctUINT i;
-    gctSTRING masks[12] = {"Bad", "Acquire", "Release", "AcquireRelease", "SequentiallyConsistent", "Bad",
-                           "UniformMemory", "SubgroupMemory", "WorkgroupMemory", "CrossWorkgroupMemory",
-                           "AtomicCounterMemory", "ImageMemory"};
-
-    if (Mask == 0)
-    {
-        gcoOS_PrintStrSafe(Line,
-                           SPV_DUMP_MAX_SIZE - 1,
-                           Offset,
-                           "None ");
-    }
-
-    for (i = 0; i < sizeof(masks) / sizeof(gctSTRING); i++)
-    {
-        if (Mask & (1 << i))
-        {
-            gcoOS_PrintStrSafe(Line,
-                               SPV_DUMP_MAX_SIZE - 1,
-                               Offset,
-                               "%s ",
-                               masks[i]);
-        }
-    }
-}
-
 void __SpvDumpMemoryAccessMask(
     gctCHAR*Line,
     gctUINT*Offset,
@@ -1399,7 +1368,9 @@ gceSTATUS __SpvDumpLine(
         switch (operandClass)
         {
         case OperandId:
+        /* Scope&MemorySemantics is an <id> of a 32-bit integer scalar, we can't get the constant value when dummping the binary.  */
         case OperandScope:
+        case OperandMemorySemantics:
             gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpId(stream[word++]));
             --numOperands;
             break;
@@ -1537,12 +1508,6 @@ gceSTATUS __SpvDumpLine(
 
         case OperandFunction:
             __SpvDumpFunctionControlMask(line, &offset, stream[word]);
-            word++;
-            --numOperands;
-            break;
-
-        case OperandMemorySemantics:
-            __SpvDumpMemorySemanticsMask(line, &offset, stream[word]);
             word++;
             --numOperands;
             break;
