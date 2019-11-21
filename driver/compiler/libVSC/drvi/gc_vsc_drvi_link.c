@@ -6359,6 +6359,8 @@ gceSTATUS vscInitializeHwPipelineShadersStates(VSC_SYS_CONTEXT* pSysCtx, VSC_HW_
     pHwShdsStates->hints.psOutCntl4to7 = -1;
     pHwShdsStates->hints.psOutCntl8to11 = -1;
     pHwShdsStates->hints.psOutCntl12to15 = -1;
+    pHwShdsStates->hints.rtArrayComponent = -1;
+    pHwShdsStates->hints.sampleMaskLoc = -1;
 
 #if TEMP_SHADER_PATCH
     pHwShdsStates->hints.pachedShaderIdentifier = gcvMACHINECODE_COUNT;
