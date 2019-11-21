@@ -4086,6 +4086,17 @@ vxnne_shader_executable vxnneGPUTensorCopyROIShaderExecutable(
     vx_scalar               outputYOffset,
     vx_tensor               input,
     vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPUTensorTRShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               inputs,
+    vx_float32              a_val,
+    vx_float32              b_val,
+    vx_enum                 funcType,
+    vx_tensor               outputs);
+
 #ifdef __cplusplus
 }
 #endif
