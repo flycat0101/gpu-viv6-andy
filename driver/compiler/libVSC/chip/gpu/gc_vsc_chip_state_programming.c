@@ -1393,6 +1393,9 @@ static VSC_ErrCode _ProgramVsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CH
     _ProgramConstCountInfo(pShHwInfo, pStatesPgmer, gcvTRUE);
 
     pStatesPgmer->pHints->hwConstRegBases[gcvPROGRAM_STAGE_VERTEX] = startConstRegAddr * 4;
+
+    pStatesPgmer->pHints->constRegNoBase[gcvPROGRAM_STAGE_COMPUTE] =
+    pStatesPgmer->pHints->constRegNoBase[gcvPROGRAM_STAGE_OPENCL] =
     pStatesPgmer->pHints->constRegNoBase[gcvPROGRAM_STAGE_VERTEX] = pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset;
 
     errCode = _ProgramRegedCTC(pShHwInfo,
@@ -4566,6 +4569,9 @@ static VSC_ErrCode _ProgramPsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CH
     pStatesPgmer->pHints->hwConstRegBases[gcvPROGRAM_STAGE_COMPUTE] =
     pStatesPgmer->pHints->hwConstRegBases[gcvPROGRAM_STAGE_OPENCL] =
     pStatesPgmer->pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] = startConstRegAddr * 4;
+
+    pStatesPgmer->pHints->constRegNoBase[gcvPROGRAM_STAGE_COMPUTE] =
+    pStatesPgmer->pHints->constRegNoBase[gcvPROGRAM_STAGE_OPENCL] =
     pStatesPgmer->pHints->constRegNoBase[gcvPROGRAM_STAGE_FRAGMENT] = pShHwInfo->hwProgrammingHints.hwConstantRegAddrOffset;
 
     errCode = _ProgramRegedCTC(pShHwInfo,

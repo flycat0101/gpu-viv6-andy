@@ -11545,7 +11545,20 @@ VSC_ErrCode _VIR_RA_LS_RewriteColors(
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
     VIR_Instruction     *pInst, *nextInst;
     VIR_InstIterator    instIter;
+    gctUINT             i;
+    VIR_RA_LS_Liverange *pLR;
 
+    /* We need to clear the temp color for a new function because so far we use instruction ID to check usage. */
+    for (i = 0; i < VIR_RA_LS_GetNumWeb(pRA); i++)
+    {
+        pLR = _VIR_RA_LS_Web2LR(pRA, i);
+        if (isLRSpilled(pLR))
+        {
+            _VIR_RA_InitLRTempColor(pLR);
+        }
+    }
+
+    /* Set the current function. */
     VIR_Shader_SetCurrentFunction(VIR_RA_LS_GetShader(pRA), pFunc);
 
     VIR_InstIterator_Init(&instIter, &pFunc->instList);
