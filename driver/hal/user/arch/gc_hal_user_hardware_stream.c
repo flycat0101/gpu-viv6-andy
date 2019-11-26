@@ -942,7 +942,7 @@ gcoHARDWARE_FlushVertex(
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
 
     if (Hardware->config->chipModel == gcv700
-        || Hardware->config->gpuCoreCount > 1
+        || Hardware->config->coreCount > 1
         )
     {
         /* Flush L2 cache for GC700. */

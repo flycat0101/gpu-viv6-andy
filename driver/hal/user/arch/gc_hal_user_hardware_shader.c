@@ -749,7 +749,7 @@ gcoHARDWARE_InvokeThreadWalkerCL(
 
     gcmGETHARDWARE(Hardware);
 
-    gpuCount = Hardware->config->gpuCoreCount;
+    gpuCount = Hardware->config->coreCount;
     usedGPUCount = gpuCount;
     if ((gpuCount > 1) && !(Info->memoryAccessFlag & gceMA_FLAG_ATOMIC))
     {
@@ -936,7 +936,7 @@ gcoHARDWARE_InvokeThreadWalkerCL(
 
             if (gpuCount > 1)
             {
-                { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1765,7 +1765,7 @@ gcoHARDWARE_InvokeThreadWalkerCL(
 
         if (gpuCount > 1)
         {
-             { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+             { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1789,7 +1789,7 @@ gcoHARDWARE_InvokeThreadWalkerCL(
 
             if (gpuCount > 1)
             {
-                { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2162,7 +2162,7 @@ gcoHARDWARE_InvokeThreadWalkerCL(
 
         if (gpuCount > 1)
         {
-            { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2303,7 +2303,7 @@ gcoHARDWARE_InvokeThreadWalkerCL(
         /* ICACHE need be invalidate when if the core is compute only and in combineMode */
         if(Hardware->features[gcvFEATURE_COMPUTE_ONLY] )
         {
-            if(Hardware->config->gpuCoreCount > 1)
+            if(Hardware->config->coreCount > 1)
             {
                 /* Invalidate Shader Icache. */
                 if (gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_HALTI5))
@@ -2495,7 +2495,7 @@ gcoHARDWARE_InvokeThreadWalkerGL(
         gcmONERROR(gcoHARDWARE_FlushDrawID(Hardware, gcvFALSE, (gctPOINTER*)&memory));
     }
 
-    if (Hardware->config->gpuCoreCount > 1)
+    if (Hardware->config->coreCount > 1)
     {
         /* TODO: select optimum rendering mode for different statemetn */
         gcmONERROR(gcoHARDWARE_FlushMultiGPURenderingMode(Hardware, (gctPOINTER*)&memory, gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_128x64));
@@ -3229,7 +3229,7 @@ gcoHARDWARE_InvokeThreadWalkerGL(
     }
 
     gcoHARDWARE_MultiGPUSync(Hardware, &memory);
-    { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -3496,7 +3496,7 @@ gcoHARDWARE_InvokeThreadWalkerGL(
                  Info->workGroupCountX, Info->workGroupCountY, Info->workGroupCountZ);
     }
 
-    { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -3994,9 +3994,9 @@ gcoHARDWARE_FlushUniform(
             }
             else if(uniformState->info.dirty == 0xf && uniformState->combinedDirty == 0xf)
             {
-                for(k = 0; k < Hardware->config->gpuCoreCount; k++)
+                for(k = 0; k < Hardware->config->coreCount; k++)
                 {
-                    { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4079,7 +4079,7 @@ gcoHARDWARE_FlushUniform(
 
 
                 }
-                { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4156,9 +4156,9 @@ gcoHARDWARE_FlushUniform(
                     }
                 }
 
-                for(k = 0; k < Hardware->config->gpuCoreCount; k++)  /*Flush Uniform data that is combined*/
+                for(k = 0; k < Hardware->config->coreCount; k++)  /*Flush Uniform data that is combined*/
                 {
-                    { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4232,7 +4232,7 @@ gcoHARDWARE_FlushUniform(
                         }
                     }
                 }
-                { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4336,7 +4336,7 @@ gcoHARDWARE_BindUniformEx(
 
     if(CombinedMode)
     {
-        for(k = 1; k < Hardware->config->gpuCoreCount; k++)
+        for(k = 1; k < Hardware->config->coreCount; k++)
         {
             pArray[k] = (gctUINT8_PTR) Values[k];
         }
@@ -4414,7 +4414,7 @@ gcoHARDWARE_BindUniformEx(
 
                 if(CombinedMode)
                 {
-                    for(k = 1; k < Hardware->config->gpuCoreCount; k++)
+                    for(k = 1; k < Hardware->config->coreCount; k++)
                     {
                          pData = IsRowMajor
                             ? pArray[k] + col * MatrixStride + (row << 2)
@@ -4446,7 +4446,7 @@ gcoHARDWARE_BindUniformEx(
                     pArray[0] += (col << 2);
                     if(CombinedMode)
                     {
-                        for(k = 1 ; k < Hardware->config->gpuCoreCount; k++)
+                        for(k = 1 ; k < Hardware->config->coreCount; k++)
                         {
                             pArray[k] += (col << 2);
                         }
@@ -4457,7 +4457,7 @@ gcoHARDWARE_BindUniformEx(
                 uniformState->data[0][shift + col] = dataPerGpu[0];
                  if(CombinedMode)
                     {
-                        for(k = 1 ; k < Hardware->config->gpuCoreCount; k++)
+                        for(k = 1 ; k < Hardware->config->coreCount; k++)
                         {
                            uniformState->data[k][shift + col]=  dataPerGpu[k];
                         }
@@ -4480,7 +4480,7 @@ gcoHARDWARE_BindUniformEx(
 
         if(CombinedMode)
         {
-            for(k = 1 ; k < Hardware->config->gpuCoreCount; k++)
+            for(k = 1 ; k < Hardware->config->coreCount; k++)
             {
                 pArray[k] +=  ArrayStride;
             }

@@ -813,6 +813,7 @@ EXPORTS
     gcoCL_MemBltCopy
     gcoCL_MemWaitAndGetFence
     gcoCL_ChooseBltEngine
+    gcoCL_SetHardwareType
 
     ; gcoPROFILER
     gcoPROFILER_Construct
@@ -1053,6 +1054,7 @@ EXPORTS
     gcoVX_QueryCoreCount
     gcoVX_QueryMultiCore
     gcoVX_CaptureInitState
+    gcoVX_SetHardwareType
 
 !IF "$(VSIMULATOR_DEBUG)" == "1"
     gcoOS_UpdateSimulatorCallback

@@ -809,10 +809,6 @@ _TLSDestructor(
 
     if (tls->defaultHardware != gcvNULL)
     {
-        gceHARDWARE_TYPE type = tls->currentType;
-
-        tls->currentType = gcvHARDWARE_3D;
-
         gcmTRACE_ZONE(
             gcvLEVEL_VERBOSE, gcvZONE_HARDWARE,
             "%s(%d): destroying default hardware object 0x%08X.",
@@ -823,7 +819,6 @@ _TLSDestructor(
 
         tls->defaultHardware = gcvNULL;
         tls->currentHardware = gcvNULL;
-        tls->currentType = type;
     }
 
     if (tls->hardware2D != gcvNULL)
@@ -1314,6 +1309,7 @@ _GetTLS(
 
         /* Determine default hardware type later. */
         tls->currentType = gcvHARDWARE_INVALID;
+        tls->targetType  = gcvHARDWARE_INVALID;
 
         res = pthread_setspecific(gcProcessKey, tls);
 
