@@ -232,7 +232,7 @@ clCreateContext(
         }
     }
 #if VIVANTE_PROFILER
-    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+    gcoCL_SetHardwareType(gcvHARDWARE_3D);
 #endif
     /* Allocate context. */
     clmONERROR(gcoOS_Allocate(gcvNULL,

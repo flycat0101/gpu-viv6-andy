@@ -118,7 +118,7 @@ clGetDeviceIDs(
     gcmHEADER_ARG("NumEntries=%u", NumEntries);
     gcmDUMP_API("${OCL clGetDeviceIDs %d}", NumEntries);
 
-    gcoHAL_SetHardwareType(gcvNULL,gcvHARDWARE_3D);
+    gcoCL_SetHardwareType(gcvHARDWARE_3D);
     if (Devices && NumEntries == 0)
     {
         gcmUSER_DEBUG_ERROR_MSG(

@@ -76,7 +76,7 @@ _MultiGPUSync(
 
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
 
-    if (Engine == gcvENGINE_RENDER && Hardware->config->gpuCoreCount > 1)
+    if (Engine == gcvENGINE_RENDER && Hardware->config->coreCount > 1)
     {
         if (BeforeBlt == gcvTRUE)
         {
@@ -86,7 +86,7 @@ _MultiGPUSync(
             if (forceSingle)
             {
                 /* Select GPU 3D_0. */
-                { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -108,7 +108,7 @@ _MultiGPUSync(
             if (forceSingle)
             {
                 /* Enable all 3D GPUs. */
-                { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1188,7 +1188,7 @@ gcoHARDWARE_3DBlitCopy(
     CurrentEngine = Engine;
     clusterMask = Hardware->config->clusterAliveMask;
     clusterCount = Hardware->config->clusterCount;
-    gpuCount = Hardware->config->gpuCoreCount;
+    gpuCount = Hardware->config->coreCount;
 
     if (clusterMask == 0)
     {
@@ -1233,7 +1233,7 @@ gcoHARDWARE_3DBlitCopy(
 
             if (gpuCount > 1)
             {
-                { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1667,7 +1667,7 @@ gcoHARDWARE_3DBlitCopy(
 
         if (gpuCount > 1)
         {
-            { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -1885,7 +1885,7 @@ gcoHARDWARE_3DBlitBlt(
     }
 
     CurrentEngine = Args->uArgs.v2.engine;
-    gpuCount = Hardware->config->gpuCoreCount;
+    gpuCount = Hardware->config->coreCount;
     clusterMask = Hardware->config->clusterAliveMask;
     clusterCount = Hardware->config->clusterCount;
 
@@ -3621,7 +3621,7 @@ gcoHARDWARE_3DBlitBlt(
 
             if (gpuCount > 1)
             {
-                { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4011,7 +4011,7 @@ gcoHARDWARE_3DBlitBlt(
 
         if (gpuCount > 1)
         {
-            { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4389,7 +4389,7 @@ gcoHARDWARE_3DBlitClear(
     gcmASSERT(DstView->numSlices == 1);
 
     CurrentEngine = Engine;
-    gpuCount = Hardware->config->gpuCoreCount;
+    gpuCount = Hardware->config->coreCount;
     clusterMask = Hardware->config->clusterAliveMask;
     clusterCount = Hardware->config->clusterCount;
 
@@ -5204,7 +5204,7 @@ gcoHARDWARE_3DBlitClear(
 
             if (gpuCount > 1)
             {
-                { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5519,7 +5519,7 @@ gcoHARDWARE_3DBlitClear(
 
         if (gpuCount > 1)
         {
-            { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -6396,7 +6396,7 @@ gcoHARDWARE_3DBlitTileFill(
     gcmGETHARDWARE(Hardware);
 
     CurrentEngine = Engine;
-    gpuCount = Hardware->config->gpuCoreCount;
+    gpuCount = Hardware->config->coreCount;
     clusterMask = Hardware->config->clusterAliveMask;
     clusterCount = Hardware->config->clusterCount;
 
@@ -6978,7 +6978,7 @@ gcoHARDWARE_3DBlitTileFill(
 
              if (gpuCount > 1)
             {
-                { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7303,7 +7303,7 @@ gcoHARDWARE_3DBlitTileFill(
 
         if (gpuCount > 1)
         {
-            { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?

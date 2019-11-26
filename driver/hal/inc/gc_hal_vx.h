@@ -165,6 +165,11 @@ gcoVX_KernelConstruct(
     IN OUT gcoVX_Hardware_Context   *Context
     );
 
+gceSTATUS
+gcoVX_SetHardwareType(
+    IN gceHARDWARE_TYPE Type
+    );
+
 
 gceSTATUS
 gcoVX_LockKernel(
@@ -356,8 +361,9 @@ gcoVX_ProgrammYUV2RGBScale(
 gceSTATUS
 gcoVX_CreateHW(
     IN gctUINT32  DeviceID,
-    IN gctUINT32  GpuCountPerDevice,
-    IN gctUINT32  GpuCoreIndexs[],
+    IN gctUINT32  CoreCountPerDevice,
+    IN gctUINT32  LocalCoreIndexs[],
+    IN gctUINT32  GlobalCoreIndexs[],
     OUT gcoHARDWARE * Hardware
     );
 

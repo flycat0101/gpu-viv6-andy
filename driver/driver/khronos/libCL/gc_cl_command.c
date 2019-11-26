@@ -2370,9 +2370,10 @@ clfFlushCommandQueue(
     /* Delete the used commit request */
     gcmVERIFY_OK(clfDeleteCommitRequest(commitRequest));
 
-     gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
-     /* we need a function to flush main thread event for multi-thread mode.*/
-     gcmONERROR(gcoCL_Flush(Stall));
+    gcoCL_SetHardwareType(gcvHARDWARE_3D);
+
+    /* we need a function to flush main thread event for multi-thread mode.*/
+    gcmONERROR(gcoCL_Flush(Stall));
 
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;

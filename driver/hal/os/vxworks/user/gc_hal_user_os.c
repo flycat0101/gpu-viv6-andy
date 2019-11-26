@@ -1201,6 +1201,7 @@ _GetTLS(
 
         /* Determine default hardware type later. */
         tls->currentType = gcvHARDWARE_INVALID;
+        tls->targetType  = gcvHARDWARE_INVALID;
 
         res = pthread_setspecific(gcProcessKey, tls);
 

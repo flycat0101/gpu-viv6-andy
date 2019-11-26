@@ -283,7 +283,6 @@ clfGetDefaultPlatformID(
         }
 
 
-        gcoHAL_SetHardwareType(gcvNULL,gcvHARDWARE_3D); /* cl used the 3d type!*/
         gcmSWITCH_TO_DEFAULT();
         gcoCL_InitializeHardware(); /*Init cl hardware for default hw */
         gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);

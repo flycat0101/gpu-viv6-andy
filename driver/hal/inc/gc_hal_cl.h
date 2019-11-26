@@ -97,6 +97,25 @@ typedef struct _gcoCL_DEVICE_INFO
 
 typedef gcoCL_DEVICE_INFO *  gcoCL_DEVICE_INFO_PTR;
 
+/*******************************************************************************
+**
+**  gcoCL_SetHardwareType
+**
+**  Set hardware type in CL. If the specific type is not available,
+**  it will query the first available type and set it.
+**
+**  INPUT:
+**
+**      The hardware type to be set.
+**
+**  OUTPUT:
+**
+**      Nothing
+*/
+gceSTATUS
+gcoCL_SetHardwareType(
+    IN gceHARDWARE_TYPE Type
+    );
 
 /*******************************************************************************
 **
