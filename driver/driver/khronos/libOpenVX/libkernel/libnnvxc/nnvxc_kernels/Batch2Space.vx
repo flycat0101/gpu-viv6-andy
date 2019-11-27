@@ -4,10 +4,7 @@
 
 _viv_uniform float tmpScale;
 _viv_uniform float tmpZP;
-_viv_uniform int output_width;
-_viv_uniform int output_height;
-_viv_uniform int input_width;
-_viv_uniform int input_height;
+_viv_uniform float output_ratio;
 
 __kernel void vxcBatch2Space_u8_u8_general
     (
@@ -41,7 +38,8 @@ __kernel void vxcBatch2Space_u8_u8_general
     int tmpBatch = in_batch;
     int tmpDepth = in_depth;
 
-    int out_batch = tmpBatch / (output_width * output_height);
+    //int out_batch = tmpBatch / (output_width * output_height);
+    int out_batch = floor(tmpBatch * output_ratio);
     int out_z = out_batch * input_depth + tmpDepth;
     int4 coord_out = (int4)(gidx * strides.x + tmpx , (gidy * strides.y + tmpy), out_z, 0);
 
@@ -84,10 +82,10 @@ __kernel void vxcBatch2Space_u8_u8_general_noFl
     int tmpBatch = in_batch;
     int tmpDepth = in_depth;
 
-    int out_batch = tmpBatch / (output_width * output_height);
+    //int out_batch = tmpBatch / (output_width * output_height);
+    int out_batch = floor(tmpBatch * output_ratio);
     int out_z = out_batch * input_depth + tmpDepth;
     int4 coord_out = (int4)(gidx * strides.x + tmpx , (gidy * strides.y + tmpy), out_z, 0);
-
     VXC_WriteImage2DArray(output, coord_out, imageData, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
 }
 
@@ -123,7 +121,8 @@ __kernel void vxcBatch2Space_fp16_fp16_general
     int tmpBatch = in_batch;
     int tmpDepth = in_depth;
 
-    int out_batch = tmpBatch / (output_width * output_height);
+    //int out_batch = tmpBatch / (output_width * output_height);
+    int out_batch = floor(tmpBatch * output_ratio);
     int out_z = out_batch * input_depth + tmpDepth;
     int4 coord_out = (int4)(gidx * strides.x + tmpx , (gidy * strides.y + tmpy), out_z, 0);
 
