@@ -19274,10 +19274,13 @@ VIR_Resouce_FindResUniform(
             thisArraySize = 1;
         }
 
-        if (VIR_Symbol_GetDescriptorSet(sym) == setNo &&
-            VIR_Symbol_GetBinding(sym) == binding &&
-            thisArraySize == arraySize)
+        if (VIR_Symbol_GetDescriptorSet(sym) == setNo && VIR_Symbol_GetBinding(sym) == binding)
         {
+            if (thisArraySize > arraySize)
+            {
+                gcmASSERT(gcvFALSE);
+            }
+
             gcmASSERT(uniformCount < 2);
             pRetUniform[uniformCount] = symUniform;
             uniformCount++;
