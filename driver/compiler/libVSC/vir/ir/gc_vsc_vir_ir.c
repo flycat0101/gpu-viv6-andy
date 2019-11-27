@@ -1020,7 +1020,8 @@ VIR_Inst_UpdateResOpType(
 /* Same logical to gcIsInstHWBarrier. */
 gctBOOL
 VIR_Inst_IsHWBarrier(
-    IN VIR_Instruction     *pInst
+    IN VIR_Instruction*         pInst,
+    IN gctBOOL                  bGenerateMC
     )
 {
     VIR_Shader*                 pShader = VIR_Inst_GetShader(pInst);
@@ -1056,7 +1057,9 @@ VIR_Inst_IsHWBarrier(
     else if (opCode == VIR_OP_MEM_BARRIER)
     {
         /* Only CS/CL and TCS can support BARRIER instruction. */
-        if (!(VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsTCS(pShader)))
+        if (bGenerateMC
+            &&
+            !(VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsTCS(pShader)))
         {
             return gcvFALSE;
         }
@@ -18405,7 +18408,7 @@ VIR_Shader_CalcMaxRegBasedOnWorkGroupSize(
     VIR_Shader      *pShader
     )
 {
-    if (VIR_Shader_HasBarrier(pShader))
+    if (VIR_Shader_HasHWBarrier(pShader))
     {
         /* if compute shader has barrier, the temp count must follow
             ceiling(work_group_size/(shader_core_count*4*threads_per_register)) <= floor(maxFreeReg/temp_register_count)

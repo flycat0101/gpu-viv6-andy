@@ -4696,7 +4696,7 @@ _VIR_LoopInfo_CanDoStaticllyUnroll(
     }
     while(gcvTRUE)
     {
-        if (VIR_Inst_IsHWBarrier(instIter))
+        if (VIR_Inst_IsHWBarrier(instIter, gcvFALSE))
         {
             return gcvFALSE;
         }
@@ -4716,7 +4716,7 @@ _VIR_LoopInfo_CanDoStaticllyUnroll(
 
         while(gcvTRUE)
         {
-            if (VIR_Inst_IsHWBarrier(instIter))
+            if (VIR_Inst_IsHWBarrier(instIter, gcvFALSE))
             {
                 return gcvFALSE;
             }
@@ -5675,7 +5675,7 @@ _VIR_MaxInvariantCodeMotionCount(
     gctUINT             maxInvariantCodeCount = 16;
 
     /* Almost the same implementation of _VIR_RA_LS_GetMaxReg in RA. */
-    if (VIR_Shader_HasBarrier(pShader))
+    if (VIR_Shader_HasHWBarrier(pShader))
     {
         gctUINT         maxFreeReg = 0;
         gctFLOAT        workGroupSize = 0, threadCount;

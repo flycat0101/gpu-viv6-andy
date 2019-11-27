@@ -4724,7 +4724,7 @@ typedef enum _VIR_SHADERFLAGS
     VIR_SHFLAG_HAS_PRIMITIVEID                  = 0x020, /* whether the shader has primitive id */
     VIR_SHFLAG_HAS_SAMPLER_INDEXING             = 0x040, /* whether the shader has sampler indexing */
     VIR_SHFLAG_HAS_OUTPUT_ARRAY_HIGHP           = 0x080, /* whether the shader has output array that is highp */
-    VIR_SHFLAG_HAS_BARRIER                      = 0x0100, /* whether the shader has barrier */
+    VIR_SHFLAG_HAS_HW_BARRIER                   = 0x0100, /* whether the shader has HW barrier */
     VIR_SHFLAG_HAS_INT64                        = 0x0200, /* whether the shader has int64 */
     VIR_SHFLAG_HAS_IMAGE_QUERY                  = 0x0400, /* whether the shader has image query which require img_desc to be vec8 */
     VIR_SHFLAG_BY_SSA_FORM                      = 0x0800, /* whether the shader is by ssa form */
@@ -4800,7 +4800,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
 #define VIR_Shader_HasPrimitiveId(Shader)           (((Shader)->flags & VIR_SHFLAG_HAS_PRIMITIVEID) != 0)
 #define VIR_Shader_HasSamplerIndexing(Shader)       (((Shader)->flags & VIR_SHFLAG_HAS_SAMPLER_INDEXING) != 0)
 #define VIR_Shader_HasOutputArrayHighp(Shader)      (((Shader)->flags & VIR_SHFLAG_HAS_OUTPUT_ARRAY_HIGHP) != 0)
-#define VIR_Shader_HasBarrier(Shader)               (((Shader)->flags & VIR_SHFLAG_HAS_BARRIER) != 0)
+#define VIR_Shader_HasHWBarrier(Shader)             (((Shader)->flags & VIR_SHFLAG_HAS_HW_BARRIER) != 0)
 #define VIR_Shader_HasInt64(Shader)                 (((Shader)->flags & VIR_SHFLAG_HAS_INT64) != 0)
 #define VIR_Shader_HasImageQuery(Shader)            (((Shader)->flags & VIR_SHFLAG_HAS_IMAGE_QUERY) != 0)
 #define VIR_Shader_BySSAForm(Shader)                (((Shader)->flags & VIR_SHFLAG_BY_SSA_FORM) != 0)
@@ -5385,7 +5385,8 @@ VIR_Inst_UpdateResOpType(
 
 gctBOOL
 VIR_Inst_IsHWBarrier(
-    IN VIR_Instruction     *pInst
+    IN VIR_Instruction     *pInst,
+    IN gctBOOL              bGenerateMC
     );
 
 /* VIR_ConditionOp */

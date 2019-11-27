@@ -12725,7 +12725,7 @@ _vscVIR_DetectSingleLoopInfo(
             pInst = BB_GET_START_INST(pWorkingBB);
             while (gcvTRUE)
             {
-                if (VIR_Inst_IsHWBarrier(pInst))
+                if (VIR_Inst_IsHWBarrier(pInst, gcvFALSE))
                 {
                     bHasBarrier = gcvTRUE;
                     break;
@@ -13085,7 +13085,7 @@ _vscVIR_MoveBarrierOutOfBB(
         VSC_ADJACENT_LIST_ITERATOR   succEdgeIter;
         VIR_CFG_EDGE*                pSuccEdge;
 
-        if (!VIR_Inst_IsHWBarrier(pInst))
+        if (!VIR_Inst_IsHWBarrier(pInst, gcvFALSE))
         {
             continue;
         }
@@ -13101,7 +13101,7 @@ _vscVIR_MoveBarrierOutOfBB(
                 continue;
             }
 
-            if (!VIR_Inst_IsHWBarrier(pInst))
+            if (!VIR_Inst_IsHWBarrier(pInst, gcvFALSE))
             {
                 break;
             }
@@ -13173,7 +13173,7 @@ _vscVIR_MoveBarrierOutOfBB(
                                                              &pNewInst);
             ON_ERROR(errCode, "Copy the BARRIER.");
 
-            if (VIR_Inst_IsHWBarrier(pNewInst))
+            if (VIR_Inst_IsHWBarrier(pNewInst, gcvFALSE))
             {
                 BB_FLAGS_SET_HAS_BARRIER(pLeftBB);
             }
