@@ -7266,9 +7266,9 @@ VkResult halti5_patch_pipeline(
     halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
     uint32_t patchMask = descSetInfo->patchMask;
     uint32_t i = 0, j = 0, stageIdx = 0;
-    void *stateKey[__VK_MAX_DESCRIPTOR_SETS];
-    void *stateKeyMask[__VK_MAX_DESCRIPTOR_SETS];
-    uint32_t stateKeySizeInBytes[__VK_MAX_DESCRIPTOR_SETS];
+    void *stateKey[__VK_MAX_DESCRIPTOR_SETS] = {0};
+    void *stateKeyMask[__VK_MAX_DESCRIPTOR_SETS] = {0};
+    uint32_t stateKeySizeInBytes[__VK_MAX_DESCRIPTOR_SETS] = {0};
     uint32_t keyCount = 0;
     uint32_t instanceKey;
     uint32_t totalEntries = 0;
