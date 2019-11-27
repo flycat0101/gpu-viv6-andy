@@ -3276,14 +3276,14 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_uint32 weights_dims      = TENSOR_DIM_NUM(weights);
     vx_int32  sizes[4]                       = {1, 1, 1, 1};
     vx_bool   is_write_2data = vx_false_e, is_write_4data = vx_false_e;
-    vx_bool   is_write_q32_8data = vx_false_e, is_write_q32_16data = vx_false_e;
-    vx_bool   is_write_q32_7data = vx_false_e, is_write_q32_14data = vx_false_e;
-    vx_bool   is_no_pad = vx_false_e;
+    vx_bool   is_no_pad      = vx_false_e;
+    vx_bool   is_MxN_process = vx_false_e;
     vx_bool   enable_in_cast_format   = vx_false_e;
     vx_tensor    inputs_rs            = NULL;
     vx_tensor    outputs_rs           = NULL;
     vx_scalar    outputHeight         = NULL;
     vx_scalar    heightDiff           = NULL;
+    vx_size      thread_scale0        = 1;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, inputs=%p, outputs=%p", context, kernelEnum, inputs, outputs);
 
@@ -3309,6 +3309,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             outputs_rs = vxoTensor_ReshapeTensor(outputs, sizes, dims);
         }
     }
+
     if (biases)
     {
         if (fabs(inputScale*weightScale - biasScale) > 0.000001f || biasZP !=0)
@@ -3339,8 +3340,6 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
         bias_dims = (bias_dims == 1) ? 2 : bias_dims;
         reBiases  = vxoTensor_ReshapeTensor(biases, reSize, bias_dims);
     }
-
-
 
     sizes[0] = kernel_width * kernel_height;
     if (weights_dims < 4)
@@ -3443,69 +3442,58 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             {
                 if (1 == channel_multiplier->value->n32)
                 {
-                    if ((output_width == 7) && is_no_pad && enable_2d_img && enable_in_cast_format && (1 == strideXvalue || 2 == strideXvalue))
+                    if (enable_2d_img && enable_in_cast_format && is_no_pad
+                       && ((1 == strideXvalue && 1 == strideYvalue) || (2 == strideXvalue && 2 == strideYvalue)))
                     {
-                        is_write_q32_7data = vx_true_e;
-                        inputs_rs = vxoTensor_ReformatTensor(inputs_rs, VX_TYPE_UINT32);
-                        if (1 == strideXvalue)
+                        inputs_rs        = vxoTensor_ReformatTensor(inputs_rs, VX_TYPE_UINT32);
+                        if (output_width % 4 == 0)
                         {
-                            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s1_NoPad_Q32toQ8_w7_2D", borderMode);
+                            if (2 == strideXvalue)
+                            {
+                                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_s2_Q32_x4_2D", borderMode);
+                            }
+                            else
+                            {
+                                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_s1_Q32_x4_2D", borderMode);
+                            }
+                            is_write_4data   = vx_true_e;
                         }
-                        else if (2 == strideXvalue)
+                        else if (output_width % 2 == 0)
                         {
-                            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s2_NoPad_Q32toQ8_w7_2D", borderMode);
+                            if (2 == strideXvalue)
+                            {
+                                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_s2_Q32_s4_r2_2D", borderMode);
+                            }
+                            else
+                            {
+                                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_s1_Q32_s4_r2_2D", borderMode);
+                            }
+                            is_write_2data   = vx_true_e;
                         }
-                        is_use_2d_fun   = vx_true_e;
-                    }
-                    else if ((output_width == 14) && is_no_pad && enable_2d_img && enable_in_cast_format && (1 == strideXvalue || 2 == strideXvalue))
-                    {
-                        is_write_q32_14data = vx_true_e;
-                        inputs_rs = vxoTensor_ReformatTensor(inputs_rs, VX_TYPE_UINT32);
-                        if (1 == strideXvalue)
+                        else
                         {
-                            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s1_NoPad_Q32toQ8_w14_2D", borderMode);
+                            if (2 == strideXvalue)
+                            {
+                                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_s2_Q32_s4_2D", borderMode);
+                            }
+                            else
+                            {
+                                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_s1_Q32_s4_2D", borderMode);
+                            }
                         }
-                        else if (2 == strideXvalue)
-                        {
-                            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s2_NoPad_Q32toQ8_w14_2D", borderMode);
-                        }
-                        is_use_2d_fun   = vx_true_e;
-                    }
-                    else if ((output_width % 16 == 0) && is_no_pad && enable_2d_img && enable_in_cast_format && (1 == strideXvalue))
-                    {
-                        is_write_q32_16data = vx_true_e;
-                        inputs_rs = vxoTensor_ReformatTensor(inputs_rs, VX_TYPE_UINT32);
-                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s1_NoPad_Q32_x16_2D", borderMode);
-                        is_use_2d_fun   = vx_true_e;
-                    }
-                    else if ((output_width % 8 == 0) && is_no_pad && enable_2d_img && enable_in_cast_format  && (1 == strideXvalue || 2 == strideXvalue))
-                    {
-                        is_write_q32_8data = vx_true_e;
-                        inputs_rs = vxoTensor_ReformatTensor(inputs_rs, VX_TYPE_UINT32);
-                        if (1 == strideXvalue)
-                        {
-                            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s1_NoPad_Q32_x8_2D", borderMode);
-                        }
-                        else if (2 == strideXvalue)
-                        {
-                            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s2_NoPad_Q32_x8_2D", borderMode);
-                        }
-                        is_use_2d_fun   = vx_true_e;
+                        is_use_2d_fun    = vx_true_e;
+                        is_MxN_process   = vx_true_e;
+                        thread_scale0    = 4;
                     }
                     else if ((output_width % 4 == 0) && (padRightv <= 1) && (padLeftv <= 1) && (1 == strideXvalue || 2 == strideXvalue))
                     {
                         is_write_4data = vx_true_e;
+                        thread_scale0  = 4;
                         if (1 == strideXvalue)
                         {
-                            if (is_no_pad)
+                            if (is_no_pad && 1 == strideYvalue)
                             {
-                                if (enable_in_cast_format && enable_2d_img)
-                                {
-                                    inputs_rs = vxoTensor_ReformatTensor(inputs_rs, VX_TYPE_UINT32);
-                                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s1_NoPad_Q32toQ8_x4_2D", borderMode);
-                                    is_use_2d_fun   = vx_true_e;
-                                }
-                                else if (enable_2d_img)
+                                if (enable_2d_img )
                                 {
                                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s1_NoPad_Quant8_x4_2D", borderMode);
                                     is_use_2d_fun   = vx_true_e;
@@ -3514,23 +3502,15 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                                 {
                                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s1_NoPad_Quant8_x4", borderMode);
                                 }
-
                             }
                             else
                             {
                                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s1_Quant8_x4", borderMode);
                             }
-
                         }
                         else if (2 == strideXvalue)
                         {
-                            if (enable_in_cast_format && enable_2d_img)
-                            {
-                                inputs_rs = vxoTensor_ReformatTensor(inputs_rs, VX_TYPE_UINT32);
-                                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s2_NoPad_Q32toQ8_x4_2D", borderMode);
-                                is_use_2d_fun   = vx_true_e;
-                            }
-                            else if (is_no_pad)
+                            if (is_no_pad)
                             {
                                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s2_NoPad_Quant8_x4", borderMode);
                             }
@@ -3552,11 +3532,13 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                         {
                             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s1_Quant8_x2", borderMode);
                         }
+                        thread_scale0 = 2;
                     }
                     else if ((output_width % 2 == 0) && (padRightv <= 1) && (padLeftv <= 1) && (2 == strideXvalue))
                     {
                         is_write_2data = vx_true_e;
                         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_c1_s2_Quant8_x2", borderMode);
+                        thread_scale0  = 2;
                     }
                     else
                     {
@@ -3572,28 +3554,11 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                     goto OnError;
                 }
 
-                if (is_write_q32_7data)
+                status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+
+                if (is_write_4data)
                 {
-                    status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                    status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                }
-                else if (is_write_q32_14data)
-                {
-                    status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                    status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                    if (is_use_2d_fun)
-                    {
-                        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 10, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_TWO_COMPONENTS);
-                    }
-                    else
-                    {
-                        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 15, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_TWO_COMPONENTS);
-                    }
-                }
-                else if (is_write_4data || is_write_q32_16data || is_write_q32_8data)
-                {
-                    status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                    status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     if (is_use_2d_fun)
                     {
                         status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 10, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -3605,8 +3570,6 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 }
                 else if (is_write_2data)
                 {
-                    status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                    status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                     if (is_use_2d_fun)
                     {
                         status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 10, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_TWO_COMPONENTS);
@@ -3616,11 +3579,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                         status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 15, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_TWO_COMPONENTS);
                     }
                 }
-                else
-                {
-                    status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
-                    status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
-                }
+
                 if (status != VX_SUCCESS) goto OnError;
             }
             else
@@ -3641,7 +3600,16 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 vx_float32  inputZP_f   = (vx_float32)inputZP;
                 vx_float32  weightZP_f  = (vx_float32)weightZP;
                 vx_float32  outputZP_f  = (vx_float32)outputZP + 0.5f;
-                vx_int32    height_diff = height - output_height;
+                vx_int32    height_diff = 0;
+
+                if (is_MxN_process)
+                {
+                    height_diff = output_height % 3;
+                }
+                else
+                {
+                    height_diff = height - output_height;
+                }
 
                 outputHeight = vxCreateScalar(context, VX_TYPE_INT32, &output_height);
                 heightDiff   = vxCreateScalar(context, VX_TYPE_INT32, &height_diff);
@@ -3650,7 +3618,14 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 zpIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &inputZP_f);
                 zpWeight = vxCreateScalar(context, VX_TYPE_FLOAT32, &weightZP_f);
                 zpOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &outputZP_f);
-                zpIn_int  = vxCreateScalar(context, VX_TYPE_INT32, &inputZP);
+                if (is_MxN_process)
+                {
+                    zpIn_int  = vxCreateScalar(context, VX_TYPE_INT32, &height);
+                }
+                else
+                {
+                    zpIn_int  = vxCreateScalar(context, VX_TYPE_INT32, &inputZP);
+                }
                 parameters[3] = (vx_reference)outputHeight;
                 parameters[4] = (vx_reference)heightDiff;
                 parameters[5] = (vx_reference)scaleOut;
@@ -3685,7 +3660,6 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 parameters[14] = (vx_reference)zpIn_int;
                 status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 16);
             }
-
 
             if (status != VX_SUCCESS) goto OnError;
         }
@@ -3745,45 +3719,51 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
         }
     }
 
-    if (is_write_q32_7data)
-    {
-        execution_parameters.globalWorkScale[0]  = 7;
-    }
-    else if (is_write_q32_14data)
-    {
-        execution_parameters.globalWorkScale[0]  = 14;
-    }
-    else if (is_write_q32_16data)
-    {
-        execution_parameters.globalWorkScale[0]  = 16;
-    }
-    else if (is_write_q32_8data)
-    {
-        execution_parameters.globalWorkScale[0]  = 8;
-    }
-    else if (is_write_4data)
-    {
-        execution_parameters.globalWorkScale[0]  = 4;
-    }
-    else if (is_write_2data)
-    {
-        execution_parameters.globalWorkScale[0]  = 2;
-    }
+    execution_parameters.globalWorkScale[0] = thread_scale0;
 
     if (is_use_2d_fun)
     {
+        vx_uint32 thread_height = output_depth;
         execution_parameters.workDim = 2;
-        execution_parameters.localWorkSize[0]  = 1;
-        execution_parameters.localWorkSize[1]  = 16;
+        if (is_MxN_process)
+        {
+            if (output_width > 32)
+            {
+                execution_parameters.localWorkSize[0]  = 16;
+                execution_parameters.localWorkSize[1]  = 1;
+            }
+            else if (output_width > 16)
+            {
+                execution_parameters.localWorkSize[0]  = 8;
+                execution_parameters.localWorkSize[1]  = 2;
+            }
+            else if (output_width > 8)
+            {
+                execution_parameters.localWorkSize[0]  = 4;
+                execution_parameters.localWorkSize[1]  = 4;
+            }
+            else
+            {
+                execution_parameters.localWorkSize[0]  = 2;
+                execution_parameters.localWorkSize[1]  = 8;
+            }
+            thread_height = output_depth;
+        }
+        else
+        {
+            execution_parameters.localWorkSize[0]  = 1;
+            execution_parameters.localWorkSize[1]  = 16;
+            thread_height = output_height * output_depth;
+        }
         if (execution_parameters.localWorkSize[0])
         {
             execution_parameters.globalWorkSize[0] = gcmALIGN((output_width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], execution_parameters.localWorkSize[0]);
-            execution_parameters.globalWorkSize[1] = gcmALIGN((output_height * output_depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1], execution_parameters.localWorkSize[1]);
+            execution_parameters.globalWorkSize[1] = gcmALIGN((thread_height + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1], execution_parameters.localWorkSize[1]);
         }
         else
         {
             execution_parameters.globalWorkSize[0] = (output_width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
-            execution_parameters.globalWorkSize[1] = (output_height * output_depth + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
+            execution_parameters.globalWorkSize[1] = (thread_height + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
         }
     }
     else
