@@ -7943,15 +7943,31 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
 
                                 if (hwMemAccessMode == SHADER_HW_MEM_ACCESS_MODE_DIRECT_SAMPLER)
                                 {
-                                    data[0] = chipBufv->txDesc[0].baseWidth;
-                                    data[1] = chipBufv->txDesc[0].baseHeight;
+                                    if (chipBufv->txDesc[0].isFakedSize)
+                                    {
+                                        data[0] = chipBufv->txDesc[0].originalWidth;
+                                        data[1] = chipBufv->txDesc[0].originalHeight;
+                                    }
+                                    else
+                                    {
+                                        data[0] = chipBufv->txDesc[0].baseWidth;
+                                        data[1] = chipBufv->txDesc[0].baseHeight;
+                                    }
                                     data[2] = chipBufv->txDesc[0].baseDepth;
                                     data[3] = chipBufv->txDesc[0].baseSlice;
                                 }
                                 else
                                 {
-                                    data[0] = chipBufv->imgDesc[0].baseWidth;
-                                    data[1] = chipBufv->imgDesc[0].baseHeight;
+                                    if (chipBufv->imgDesc[0].isFakedSize)
+                                    {
+                                        data[0] = chipBufv->imgDesc[0].originalWidth;
+                                        data[1] = chipBufv->imgDesc[0].originalHeight;
+                                    }
+                                    else
+                                    {
+                                        data[0] = chipBufv->imgDesc[0].baseWidth;
+                                        data[1] = chipBufv->imgDesc[0].baseHeight;
+                                    }
                                     data[2] = chipBufv->imgDesc[0].baseDepth;
                                     data[3] = chipBufv->imgDesc[0].baseSlice;
                                 }
@@ -7978,8 +7994,16 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
 
                             __VK_ASSERT(privEntry->commonPrivm.privmKind == SHS_PRIV_CONSTANT_KIND_IMAGE_SIZE);
 
-                            data[0] = chipBufv->imgDesc[0].baseWidth;
-                            data[1] = chipBufv->imgDesc[0].baseHeight;
+                            if (chipBufv->imgDesc[0].isFakedSize)
+                            {
+                                data[0] = chipBufv->imgDesc[0].originalWidth;
+                                data[1] = chipBufv->imgDesc[0].originalHeight;
+                            }
+                            else
+                            {
+                                data[0] = chipBufv->imgDesc[0].baseWidth;
+                                data[1] = chipBufv->imgDesc[0].baseHeight;
+                            }
                             data[2] = chipBufv->imgDesc[0].baseDepth;
                             data[3] = chipBufv->imgDesc[0].baseSlice;
 
