@@ -1372,10 +1372,8 @@ static VkResult deqp_vk_msaa_128bpp_04_copy(
     case VK_FORMAT_R32G32B32A32_SFLOAT:
         {
             uint32_t x, y, layer;
-            float clearColor[4] = {-1.0, -1.0, -1.0, -1.0};
-            float renderColor[4] = {1.0, 1.0, 1.0, 1.0};
-            float color[4] = {1.0, 1.0, 1.0, 1.0};
             float *dstPtr = (float *)dstAddress;
+            int32_t sample4Bits[] = { 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4 };
 
             for (layer = 0; layer < layerCount; layer++)
             {
@@ -1383,27 +1381,11 @@ static VkResult deqp_vk_msaa_128bpp_04_copy(
                 {
                     for (x = 0; x < 32; x++)
                     {
-                        if (sampleMask == 0x0u)
-                        {
-                            dstPtr[0] = clearColor[0];
-                            dstPtr[1] = clearColor[1];
-                            dstPtr[2] = clearColor[2];
-                            dstPtr[3] = clearColor[3];
-                        }
-                        else if(sampleMask == ((0x1u << sampleCount) - 1u))
-                        {
-                            dstPtr[0] = renderColor[0];
-                            dstPtr[1] = renderColor[1];
-                            dstPtr[2] = renderColor[2];
-                            dstPtr[3] = renderColor[3];
-                        }
-                        else
-                        {
-                            dstPtr[0] = color[0];
-                            dstPtr[1] = color[1];
-                            dstPtr[2] = color[2];
-                            dstPtr[3] = color[3];
-                        }
+                        float val = 0.5f * sample4Bits[sampleMask] - 1.0f;
+                        dstPtr[0] = val;
+                        dstPtr[1] = val;
+                        dstPtr[2] = val;
+                        dstPtr[3] = val;
 
                         dstPtr += 4;
                     }
