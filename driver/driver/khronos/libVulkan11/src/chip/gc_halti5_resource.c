@@ -6419,6 +6419,8 @@ VkResult halti5_helper_convertHwTxDesc(
     uint32_t hwDescriptorSize = TX_HW_DESCRIPTOR_MEM_SIZE;
     uint32_t partIdx, partCount = 1;
     uint32_t tmpResidentImgFormat = 0;
+    VkBool32 isFakedSize = VK_FALSE;
+    uint32_t originalWidth = 0, originalHeight = 0;
 
     __VK_ASSERT(hwTxDesc);
 
@@ -6490,8 +6492,11 @@ VkResult halti5_helper_convertHwTxDesc(
         sizeInByte = (bufv->createInfo.range == VK_WHOLE_SIZE)
                    ? (uint32_t)(buf->createInfo.size - bufv->createInfo.offset)
                    : (uint32_t)bufv->createInfo.range;
-
         texelSize = sizeInByte / (residentFormatInfo->bitsPerBlock >> 3);
+        isFakedSize = VK_TRUE;
+        originalWidth = texelSize;
+        originalHeight = 1;
+
         tiling = gcvLINEAR;
         if (texelSize <= __VK_FAKED_TEX_MAX_WIDTH)
         {
@@ -6642,6 +6647,10 @@ VkResult halti5_helper_convertHwTxDesc(
         hwTxDesc[partIdx].baseHeight = baseLevel->requestH;
         hwTxDesc[partIdx].baseDepth  = baseLevel->requestD;
         hwTxDesc[partIdx].baseSlice  = (uint32_t)(baseLevel->sliceSize) / (residentFormatInfo->bitsPerBlock >> 3);
+
+        hwTxDesc[partIdx].isFakedSize = isFakedSize;
+        hwTxDesc[partIdx].originalWidth = originalWidth;
+        hwTxDesc[partIdx].originalHeight = originalHeight;
 
         if (subResourceRange->levelCount == VK_REMAINING_MIP_LEVELS)
         {
@@ -7184,6 +7193,8 @@ VkResult halti5_helper_convertHwImgDesc(
     {
 #define __VK_FAKED_IMG_MAX_WIDTH 8192
         __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, bufv->createInfo.buffer);
+        VkBool32 isFakedSize = VK_FALSE;
+        uint32_t originalWidth = 0, originalHeight = 0;
 
         __VK_ASSERT(!imgv);
 
@@ -7205,6 +7216,9 @@ VkResult halti5_helper_convertHwImgDesc(
                                 : (uint32_t)bufv->createInfo.range;
 
             uint32_t texelSize = sizeInByte / (residentFormatInfo->bitsPerBlock >> 3);
+            isFakedSize = VK_TRUE;
+            originalWidth = texelSize;
+            originalHeight = 1;
 
             if (texelSize <= __VK_FAKED_IMG_MAX_WIDTH)
             {
@@ -7223,6 +7237,10 @@ VkResult halti5_helper_convertHwImgDesc(
         hwImgDesc[0].baseHeight = height;
         hwImgDesc[0].baseDepth = 1;
         hwImgDesc[0].baseSlice = stride * height;
+
+        hwImgDesc[0].isFakedSize = isFakedSize;
+        hwImgDesc[0].originalWidth = originalWidth;
+        hwImgDesc[0].originalHeight = originalHeight;
     }
     else
     {
