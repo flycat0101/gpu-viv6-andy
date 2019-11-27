@@ -1023,6 +1023,7 @@ VIR_Inst_IsHWBarrier(
     IN VIR_Instruction     *pInst
     )
 {
+    VIR_Shader*                 pShader = VIR_Inst_GetShader(pInst);
     VIR_OpCode                  opCode = VIR_Inst_GetOpcode(pInst);
     VIR_Operand*                pScopeOpnd = VIR_Inst_GetSource(pInst, 0);
     VIR_Operand*                pMemorySemanticOpnd = VIR_Inst_GetSource(pInst, 1);
@@ -1051,10 +1052,18 @@ VIR_Inst_IsHWBarrier(
     {
         return gcvTRUE;
     }
-    /* HW has logic to naturally insure memory access is in-order */
+    /* HW has logic to naturally insure memory access is in-order in queue scope. */
     else if (opCode == VIR_OP_MEM_BARRIER)
     {
-        if (memoryScope == VIR_MEMORY_SCOPE_TYPE_WORKGROUP
+        /* Only CS/CL and TCS can support BARRIER instruction. */
+        if (!(VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader) || VIR_Shader_IsTCS(pShader)))
+        {
+            return gcvFALSE;
+        }
+
+        if ((memoryScope == VIR_MEMORY_SCOPE_TYPE_WORKGROUP ||
+             memoryScope == VIR_MEMORY_SCOPE_TYPE_DEVICE    ||
+             memoryScope == VIR_MEMORY_SCOPE_TYPE_CROSS_DEVICE)
             &&
             ((memorySemantic & VIR_MEMORY_SEMANTIC_ACQUIRE) || (memorySemantic & VIR_MEMORY_SEMANTIC_ACQUIRERELEASE)))
         {
