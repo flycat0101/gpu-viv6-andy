@@ -1163,7 +1163,7 @@ VX_INTERNAL_API vx_image VX_API_CALL vxoImage_CreateImageFromInternalHandle(
         void **ptrs, vx_uint32 *phys)
 {
     vx_image    image;
-    vx_uint32   planeIndex = 0, dimIndex;
+    vx_uint32   dimIndex;
 
     gcmHEADER_ARG("context=%p, format=%p, addrs=%p, ptrs=%p, phys=%p", context, format, addrs, ptrs, phys);
 
@@ -1178,19 +1178,19 @@ VX_INTERNAL_API vx_image VX_API_CALL vxoImage_CreateImageFromInternalHandle(
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_FORMAT);
     }
 
-    if (addrs == VX_NULL || addrs[0].dim_x == 0 || addrs[0].dim_y == 0)
+    if (addrs == VX_NULL || addrs->dim_x == 0 || addrs->dim_y == 0)
     {
         gcmFOOTER_NO();
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
     }
 
-    if (addrs[0].dim_x > OVX_IMAGE_HW_MAX_WIDTH || addrs[0].dim_y > OVX_IMAGE_HW_MAX_HEIGHT)
+    if (addrs[0].dim_x > OVX_IMAGE_HW_MAX_WIDTH || addrs->dim_y > OVX_IMAGE_HW_MAX_HEIGHT)
     {
         vxError("Due to the HW limitation, the width or height of image can not exceed 65535.\n");
         return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
     }
 
-    image = vxoImage_Create(context, addrs[0].dim_x, addrs[0].dim_y, format, vx_false_e);
+    image = vxoImage_Create(context, addrs->dim_x, addrs->dim_y, format, vx_false_e);
 
     if (vxoReference_GetStatus((vx_reference)image) != VX_SUCCESS)
     {
@@ -1204,27 +1204,27 @@ VX_INTERNAL_API vx_image VX_API_CALL vxoImage_CreateImageFromInternalHandle(
     {
         vx_uint32 size = sizeof(vx_uint8);
 
-        image->memory.logicals[planeIndex]                  = (vx_uint8_ptr)ptrs[planeIndex];
-        image->memory.physicals[planeIndex]                 = phys[planeIndex];
-        image->memory.strides[planeIndex][VX_DIM_CHANNEL]   = (vx_uint32)vxImageFormat_GetChannelSize(format);
-        image->memory.strides[planeIndex][VX_DIM_X]         = addrs[planeIndex].stride_x;
-        image->memory.strides[planeIndex][VX_DIM_Y]         = addrs[planeIndex].stride_y;
-        image->memory.wrappedSize[planeIndex]               = (gctUINT32)size;
+        image->memory.logicals[0]                  = (vx_uint8_ptr)(*ptrs);
+        image->memory.physicals[0]                 = *phys;
+        image->memory.strides[0][VX_DIM_CHANNEL]   = (vx_uint32)vxImageFormat_GetChannelSize(format);
+        image->memory.strides[0][VX_DIM_X]         = addrs->stride_x;
+        image->memory.strides[0][VX_DIM_Y]         = addrs->stride_y;
+        image->memory.wrappedSize[0]               = (gctUINT32)size;
 
-        if (image->memory.strides[planeIndex][VX_DIM_CHANNEL] != 0)
+        if (image->memory.strides[0][VX_DIM_CHANNEL] != 0)
         {
-            size = (vx_uint32)abs(image->memory.strides[planeIndex][VX_DIM_CHANNEL]);
+            size = (vx_uint32)abs(image->memory.strides[0][VX_DIM_CHANNEL]);
         }
 
         for (dimIndex = 0; dimIndex < image->memory.dimCount; dimIndex++)
         {
-            image->memory.strides[planeIndex][dimIndex] = size;
-            size *= (vx_uint32)abs(image->memory.dims[planeIndex][dimIndex]);
+            image->memory.strides[0][dimIndex] = size;
+            size *= (vx_uint32)abs(image->memory.dims[0][dimIndex]);
         }
 
-        image->memory.wrappedSize[planeIndex] = (vx_uint32)size;
+        image->memory.wrappedSize[0] = (vx_uint32)size;
 
-        if (!vxCreateMutex(OUT &image->memory.writeLocks[planeIndex]))
+        if (!vxCreateMutex(OUT &image->memory.writeLocks[0]))
         {
             goto OnError;
         }
@@ -1235,10 +1235,10 @@ VX_INTERNAL_API vx_image VX_API_CALL vxoImage_CreateImageFromInternalHandle(
     return image;
 
 OnError:
-    if (image->memory.writeLocks[planeIndex] != VX_NULL)
+    if (image->memory.writeLocks[0] != VX_NULL)
     {
-        vxDestroyMutex(image->memory.writeLocks[planeIndex]);
-        image->memory.writeLocks[planeIndex]  = VX_NULL;
+        vxDestroyMutex(image->memory.writeLocks[0]);
+        image->memory.writeLocks[0]  = VX_NULL;
     }
 
     vxReleaseImage(&image);
