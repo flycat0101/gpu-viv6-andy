@@ -940,6 +940,10 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
 
     gctBOOL supportPasting = gcvTRUE;
 
+    gctBOOL meetOxPasting = gcvFALSE;
+
+    gctBOOL prevArgBeforePasting = gcvFALSE;
+
     gcmTRACE(gcvLEVEL_VERBOSE, "ME : begin to expand replacement-list.");
 
     ppoTOKEN_ColonTokenList(
@@ -963,6 +967,13 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
             gctINT whereisarg = -1;
 
             ppoTOKEN search_formal_arg = ms->argv;
+
+            if (gcmIS_SUCCESS(gcoOS_StrNCmp(replacement_list->poolString, "0x##", 4)))
+            {
+                status = cloCOMPILER_AllocatePoolString(PP->compiler, replacement_list->poolString + 4, &(replacement_list->poolString));
+                meetOxPasting = gcvTRUE;
+                replacement_list->type = ppvTokenType_INT;
+            }
 
             status = ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList_GetPositionOfNode(
                 PP,
@@ -1004,6 +1015,16 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
                     ID
                     );
 
+                /* replace 0x##Arg with 0x+realArg */
+                if (meetOxPasting)
+                {
+                    gctCHAR tmpString[1024];
+                    gctUINT   offset  = 0;
+                    gcoOS_PrintStrSafe(tmpString, 1023, &offset, "0x%s", tmphead->poolString);
+                    status = cloCOMPILER_AllocatePoolString(PP->compiler, tmpString, &(tmphead->poolString));
+                    meetOxPasting = gcvFALSE;
+                }
+
                 tmpend = tmphead;
 
                 gcmTRACE(gcvLEVEL_VERBOSE, "ME : add hs to output nodes.");
@@ -1025,6 +1046,7 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
                     tmpend = (ppoTOKEN)tmpend->inputStream.base.node.prev;
                 }
 
+                prevArgBeforePasting = gcvTRUE;
 
                 gcmTRACE(gcvLEVEL_VERBOSE,
                     "ME : replacementList : add the expanded node to output.",
@@ -1098,16 +1120,37 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
                     replacement_list = (ppoTOKEN)replacement_list->inputStream.base.node.prev;
                     pasting = gcvFALSE;
                     skip_ws_in_pasting = gcvFALSE;
+                    prevArgBeforePasting = gcvFALSE;
                     continue;
                 }
                 else if (pasting)
                 {
                     pasting = gcvFALSE;
+                    /* merge strings after ## with previous real argument */
+                    if (prevArgBeforePasting)
+                    {
+                        ppoTOKEN tmp = *End;
+                        while(tmp->poolString == PP->keyword->ws)
+                        {
+                            tmp = (ppoTOKEN)tmp->inputStream.base.node.next;
+                        }
+                        status = ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList_MergePastingTokenName(
+                             PP,
+                             tmp,
+                             replacement_list,
+                             &(tmp->poolString)
+                             );
+                        *End = tmp;
+                        replacement_list = (ppoTOKEN)replacement_list->inputStream.base.node.prev;
+                        prevArgBeforePasting = gcvFALSE;
+                        continue;
+                    }
                 }
                 gcmTRACE(
                     gcvLEVEL_VERBOSE,
                     "ME : replacementList node: %s,inputStream not a formal arg.",
                     replacement_list->poolString);
+                prevArgBeforePasting = gcvFALSE;
             }
         }/*if(replacementList->type == ppvTokenType_ID)*/
         else
