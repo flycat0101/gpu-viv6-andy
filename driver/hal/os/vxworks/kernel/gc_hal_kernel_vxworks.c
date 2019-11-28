@@ -258,6 +258,29 @@ gckKERNEL_UnmapMemory(
     return gckOS_UnmapMemoryEx(Kernel->os, physical, Bytes, Logical, ProcessID);
 }
 
+/****************************************************************************
+**
+**  gckKERNEL_DestroyProcessReservedUserMap
+**
+**  Destroy process reserved memory
+**
+**  INPUT:
+**
+**      gctPHYS_ADDR Physical
+**          Physical address of video memory to map.
+**
+**      gctUINT32 Pid
+**          Process ID.
+*/
+gceSTATUS
+gckKERNEL_DestroyProcessReservedUserMap(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 Pid
+    )
+{
+    return gcvSTATUS_OK;
+}
+
 /*******************************************************************************
 **
 **  gckKERNEL_MapVideoMemory

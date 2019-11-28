@@ -1330,6 +1330,8 @@ gckKERNEL_DestroyProcessDB(
         }
     }
 
+    gcmkONERROR(gckKERNEL_DestroyProcessReservedUserMap(Kernel, ProcessID));
+
     /* Acquire the database mutex. */
     gcmkONERROR(gckOS_AcquireMutex(Kernel->os, Kernel->db->dbMutex, gcvINFINITE));
     acquired = gcvTRUE;
