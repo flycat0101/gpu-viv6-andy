@@ -10980,9 +10980,11 @@ gcoHARDWARE_ProgramTextureDesc(
 
     }
 
-    if (samplerTSIndex < (gcdSAMPLER_TS - 1))
+    if (Hardware->MCDirty->hwTxSamplerTSDirty || samplerTSIndex < (gcdSAMPLER_TS - 1))
     {
-        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+        if (samplerTSIndex < (gcdSAMPLER_TS - 1))
+        {
+            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -11034,11 +11036,9 @@ gcoHARDWARE_ProgramTextureDesc(
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
-    }
+        }
 
-    if (Hardware->MCDirty->hwTxSamplerTSDirty)
-    {
-         {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -11112,8 +11112,8 @@ gcoHARDWARE_ProgramTextureDesc(
 
 
          /* Send FE-PE stall token. */
-         *memory++ =
-             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        *memory++ =
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -11124,8 +11124,8 @@ gcoHARDWARE_ProgramTextureDesc(
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));
 
-         *memory++ =
-             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        *memory++ =
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  4:0) - (0 ?
  4:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -11135,7 +11135,7 @@ gcoHARDWARE_ProgramTextureDesc(
  4:0) - (0 ?
  4:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
-                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:8) - (0 ?
  12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -11146,9 +11146,9 @@ gcoHARDWARE_ProgramTextureDesc(
  12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)));
 
-                /* Dump the stall. */
-          gcmDUMP(gcvNULL, "#[stall 0x%08X 0x%08X]",
-             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+               /* Dump the stall. */
+         gcmDUMP(gcvNULL, "#[stall 0x%08X 0x%08X]",
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  4:0) - (0 ?
  4:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -11158,7 +11158,7 @@ gcoHARDWARE_ProgramTextureDesc(
  4:0) - (0 ?
  4:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0))),
-             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:8) - (0 ?
  12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
