@@ -268,6 +268,92 @@ gckKERNEL_UnmapMemory(
     return gckOS_UnmapMemoryEx(Kernel->os, physical, Bytes, Logical, ProcessID);
 }
 
+/****************************************************************************
+**
+**  gckKERNEL_DestroyProcessReservedUserMap
+**
+**  Destroy process reserved memory
+**
+**  INPUT:
+**
+**      gctPHYS_ADDR Physical
+**          Physical address of video memory to map.
+**
+**      gctUINT32 Pid
+**          Process ID.
+*/
+gceSTATUS
+gckKERNEL_DestroyProcessReservedUserMap(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 Pid
+    )
+{
+    gceSTATUS status      = gcvSTATUS_OK;
+    gckGALDEVICE device   = gcvNULL;
+    gctSIZE_T bytes       = 0;
+    gctPHYS_ADDR physHandle = gcvNULL;
+    /* when unmap reserved memory, we don't need real logical*/
+    gctPOINTER Logical = (gctPOINTER)0xFFFFFFFF;
+    gctINT i;
+    gcmkHEADER_ARG("Logical=0x%08x pid=%u",
+                   Logical, Pid);
+    /* Verify the arguments. */
+    gcmkVERIFY_OBJECT(Kernel, gcvOBJ_KERNEL);
+    /* Extract the pointer to the gckGALDEVICE class. */
+    device = (gckGALDEVICE) Kernel->context;
+
+    physHandle = (PLINUX_MDL)device->internalPhysical;
+    bytes = device->internalSize;
+    if (bytes)
+    {
+        gckOS_UnmapMemoryEx(Kernel->os, physHandle, bytes, Logical, Pid);
+    }
+
+    physHandle = (PLINUX_MDL)device->externalPhysical;
+    bytes = device->externalSize;
+    if (bytes)
+    {
+        gckOS_UnmapMemoryEx(Kernel->os, physHandle, bytes, Logical, Pid);
+    }
+
+    /* System memory. */
+    physHandle = (PLINUX_MDL)device->contiguousPhysical;
+    bytes = device->contiguousSize;
+    if (bytes)
+    {
+        gckOS_UnmapMemoryEx(Kernel->os, physHandle, bytes, Logical, Pid);
+    }
+
+    /* External shared SRAM memory. */
+    for(i = 0; i < gcvSRAM_EXT_COUNT; i++)
+    {
+        physHandle = (PLINUX_MDL)device->extSRAMPhysical[i];
+        bytes = device->extSRAMSizes[i];
+        if (bytes)
+        {
+            gckOS_UnmapMemoryEx(Kernel->os, physHandle, bytes, Logical, Pid);
+        }
+    }
+
+    /* Per core SRAM reserved usage. */
+    for(i = 0; i < gcvSRAM_INTER_COUNT; i++)
+    {
+        if (!Kernel->sRAMPhysFaked[i])
+        {
+            physHandle = (PLINUX_MDL)Kernel->sRAMPhysical[i];
+            bytes = Kernel->sRAMSizes[i];
+            if (bytes)
+            {
+                gckOS_UnmapMemoryEx(Kernel->os, physHandle, bytes, Logical, Pid);
+            }
+        }
+    }
+
+    /* Retunn the status. */
+    gcmkFOOTER_NO();
+    return status;
+}
+
 /*******************************************************************************
 **
 **  gckKERNEL_MapVideoMemory
