@@ -11898,25 +11898,6 @@ IN cloIR_BASE SwitchBody
     return &switchSelect->exprBase.base;
 }
 
-static gctUINT _clStringBufferSize = 0;
-static gctSTRING _clStringBuffer = gcvNULL;
-
-static gctSTRING
-_clGetStringBuffer(
-IN gctUINT BufSize
-)
-{
-   if(BufSize > _clStringBufferSize) {
-      if(_clStringBuffer) {
-        clFree((gctPOINTER)_clStringBuffer);
-      }
-      _clStringBufferSize = BufSize << 1; /* initialize with double the size */
-      _clStringBuffer = (gctSTRING)clMalloc((gctSIZE_T)sizeof(gctCHAR) * _clStringBufferSize);
-   }
-   return _clStringBuffer;
-}
-
-
 static cltPOOL_STRING
 _clTransformLabel(
 IN cloCOMPILER Compiler,
@@ -11932,7 +11913,7 @@ IN gctSTRING Label
    names in the program **/
   if (Label == gcvNULL) return gcvNULL;
   labelLen = gcoOS_StrLen(Label, gcvNULL);
-  newLabel = _clGetStringBuffer(labelLen + 2);
+  status = cloCOMPILER_Allocate(Compiler, labelLen + 2, (gctPOINTER *)&newLabel);
   if (newLabel == gcvNULL) return gcvNULL;
   newLabel[0] = ' ';
 
@@ -11940,6 +11921,7 @@ IN gctSTRING Label
   status = cloCOMPILER_AllocatePoolString(Compiler,
                       newLabel,
                       &symbolInPool);
+  cloCOMPILER_Free(Compiler, newLabel);
   if (gcmIS_ERROR(status)) return gcvNULL;
   return symbolInPool;
 }
