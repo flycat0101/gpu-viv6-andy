@@ -686,10 +686,26 @@ static gceSTATUS clfUpdateCompileOption(clsPlatformId_PTR platform, gctSTRING *o
     gctSIZE_T totalLength;
     gceSTATUS status = gcvSTATUS_OK;
     gctPOINTER pointer = gcvNULL;
+    gctSTRING  pos = gcvNULL;
+    gctBOOL hasClKhrFp16 = gcvFALSE;
+    gctUINT32 i = 0;
 
     if (!platform->virShaderPath)
     {
         extraOptionLength = gcoOS_StrLen(" -cl-viv-gcsl-driver-image", gcvNULL);
+    }
+
+    for (i = 0; i < platform->numDevices; i++)
+    {
+        gcoOS_StrStr(platform->devices[i].extensions,
+                     "cl_khr_fp16",
+                     &pos);
+        if(pos)
+        {
+            hasClKhrFp16 = gcvTRUE;
+            extraOptionLength += gcoOS_StrLen(" -Dcl_khr_fp16", gcvNULL);
+            break;
+        }
     }
 
     if (!extraOptionLength)
@@ -711,7 +727,14 @@ static gceSTATUS clfUpdateCompileOption(clsPlatformId_PTR platform, gctSTRING *o
     }
 
     gcmASSERT(extraOptionLength);
-    gcmVERIFY_OK(gcoOS_StrCatSafe((gctSTRING)pointer, totalLength, " -cl-viv-gcsl-driver-image"));
+    if (!platform->virShaderPath)
+    {
+        gcmVERIFY_OK(gcoOS_StrCatSafe((gctSTRING)pointer, totalLength, " -cl-viv-gcsl-driver-image"));
+    }
+    if (hasClKhrFp16)
+    {
+        gcmVERIFY_OK(gcoOS_StrCatSafe((gctSTRING)pointer, totalLength, " -Dcl_khr_fp16"));
+    }
 
     *options = (gctSTRING)pointer;
 
