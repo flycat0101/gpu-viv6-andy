@@ -6803,24 +6803,27 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
     gctUINT                 i = 0;
     VIR_Symbol              *pSym = gcvNULL;
     gctBOOL                 isAppConformance = (compCfg->ctx.appNameId == gcvPATCH_GTFES30 || compCfg->ctx.appNameId == gcvPATCH_DEQP);
+    gctBOOL                 isPerfBench = gcvFALSE;
     VSC_HW_CONFIG*          pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     gctBOOL                 bHasOneConstFix = pHwCfg->hwFeatureFlags.noOneConstLimit;
+
+    if (compCfg->ctx.appNameId == gcvPATCH_GLBM21 ||
+        compCfg->ctx.appNameId == gcvPATCH_GLBM25 ||
+        compCfg->ctx.appNameId == gcvPATCH_GLBM27 ||
+        compCfg->ctx.appNameId == gcvPATCH_GFXBENCH ||
+        compCfg->ctx.appNameId == gcvPATCH_MM07 ||
+        compCfg->ctx.appNameId == gcvPATCH_NENAMARK2 ||
+        compCfg->ctx.appNameId == gcvPATCH_LEANBACK ||
+        compCfg->ctx.appNameId == gcvPATCH_ANGRYBIRDS)
+    {
+        isPerfBench = gcvTRUE;
+    }
 
     if (dual16Mode == DUAL16_AUTO_BENCH)
     {
         /* Enable dual16 auto-on mode for following games. */
-        switch (compCfg->ctx.appNameId)
+        if (!isPerfBench)
         {
-        case gcvPATCH_GLBM21:
-        case gcvPATCH_GLBM25:
-        case gcvPATCH_GLBM27:
-        case gcvPATCH_GFXBENCH:
-        case gcvPATCH_MM07:
-        case gcvPATCH_NENAMARK2:
-        case gcvPATCH_LEANBACK:
-        case gcvPATCH_ANGRYBIRDS:
-            break;
-        default:
             return errCode;
         }
     }
@@ -6907,7 +6910,9 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                 /* check dest */
                 if (VIR_Inst_Dual16NotSupported(pInst)  ||
                     /* A WAR to disable dual16 for some CTS cases because our HW can't support denormalize F16. */
-                    (isAppConformance && (VIR_Inst_GetOpcode(pInst) == VIR_OP_SINPI || VIR_Inst_GetOpcode(pInst) == VIR_OP_COSPI)))
+                    (isAppConformance && (VIR_Inst_GetOpcode(pInst) == VIR_OP_SINPI || VIR_Inst_GetOpcode(pInst) == VIR_OP_COSPI)) ||
+                    /* nxp benchmark render error caused by dual16, this is a workround to disable shader with pow API */
+                    ((!isPerfBench) && VIR_Inst_GetOpcode(pInst) == VIR_OP_EXP2))
                 {
                     if(VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
                     {
