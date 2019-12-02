@@ -26826,22 +26826,23 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
                         status = VX_FAILURE;
                         goto exit;
                     }
-                status = vxnneShaderOperation_Initialize(&tensor_mean_layer->tensor_mean_trans_sh_operation,
-                    &tensor_mean_layer->base,
-                    VXNNE_OPERATOR_TENSOR_TRANS,
-                    batchCount,
-                    shaderExecutable);
-
-                if (status != VX_SUCCESS)
-                    goto exit;
-
-                vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
-                vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_sh_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-
-                vxnneLayer_SetOperation(
+                    batchCount = new_sizes[3];
+                    status = vxnneShaderOperation_Initialize(&tensor_mean_layer->tensor_mean_trans_sh_operation,
                         &tensor_mean_layer->base,
-                        &tensor_mean_layer->tensor_mean_trans_sh_operation.base,
-                        operationIdx++);
+                        VXNNE_OPERATOR_TENSOR_TRANS,
+                        batchCount,
+                        shaderExecutable);
+
+                    if (status != VX_SUCCESS)
+                        goto exit;
+
+                    vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
+                    vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_sh_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+                    vxnneLayer_SetOperation(
+                            &tensor_mean_layer->base,
+                            &tensor_mean_layer->tensor_mean_trans_sh_operation.base,
+                            operationIdx++);
                 }
                 else
                 {
@@ -26861,7 +26862,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
                     }
 
                     pnum_s = vxCreateScalar(context, VX_TYPE_UINT32, &pnum);
-
+                    batchCount = new_sizes[3];
                     vxnneOperation_Initialize(&tensor_mean_layer->tensor_trans_sw_operation.base,
                                               &tensor_mean_layer->base,
                                               VXNNE_OPERATION_TARGET_SW,
@@ -27029,6 +27030,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
     }
     else
     {
+        vx_uint32 dims          = TENSOR_DIM_NUM(input);
+        vx_uint32 batch         = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+
+        batchCount = batch;
         vxnneOperation_Initialize(&tensor_mean_layer->tensor_mean_sw_operation.base,
             &tensor_mean_layer->base,
             VXNNE_OPERATION_TARGET_SW,
