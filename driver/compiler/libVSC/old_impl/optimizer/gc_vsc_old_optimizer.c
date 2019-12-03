@@ -1616,7 +1616,7 @@ gcOpt_OptimizeMOVInstructions(
 
             if (callDependent)
             {
-                for (iterCode = userCode; iterCode != code; iterCode = iterCode->prev)
+                for (iterCode = userCode; (iterCode != code) && (iterCode != gcvNULL) ; iterCode = iterCode->prev)
                 {
                     if (gcmSL_OPCODE_GET(iterCode->instruction.opcode, Opcode) == gcSL_JMP ||
                         gcmSL_OPCODE_GET(iterCode->instruction.opcode, Opcode) == gcSL_CALL)
