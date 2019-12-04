@@ -1238,6 +1238,7 @@ registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
     __vkWaylandSwapchainKHR *sc = data;
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
     char *p;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
 #endif
 
     if (strcmp(interface, "wl_viv") == 0)
@@ -1253,6 +1254,13 @@ registry_handle_global(void *data, struct wl_registry *registry, uint32_t name,
     }
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
     else if (strcmp(interface, "zwp_linux_explicit_synchronization_v1") == 0) {
+        gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+        if (patchId == gcvPATCH_DEQP_VK)
+        {
+            return;
+        }
+
         p = getenv("WL_EGL_CLIENT_FENCE");
         if((p == gcvNULL) || (p[0] != '0'))
         {
@@ -1384,6 +1392,7 @@ static VkResult waylandCreateSwapchain(
     if(sc->use_explicit_sync == 1)
     {
         struct __vkSurfaceSwapchain *tmp = __vkQuerySurface(surf->surface);
+        pthread_mutex_lock(&__vk_surface_swapchain_mutex);
         if(!tmp)
         {
             struct __vkSurfaceSwapchain *surface_swap = (struct __vkSurfaceSwapchain *)malloc(sizeof(struct __vkSurfaceSwapchain));
@@ -1393,12 +1402,11 @@ static VkResult waylandCreateSwapchain(
                 zwp_linux_explicit_synchronization_v1_get_synchronization(
                       sc->explicit_sync, surf->surface);
             surface_swap->surface_sync = sc->surface_sync;
-            pthread_mutex_lock(&__vk_surface_swapchain_mutex);
             wl_list_insert(&__vk_surface_list, &surface_swap->link);
-            pthread_mutex_unlock(&__vk_surface_swapchain_mutex);
             if (!sc->surface_sync)
             {
                 gcmPRINT("zwp_linux_explicit_synchronization_v1_get_synchronization failed");
+                pthread_mutex_unlock(&__vk_surface_swapchain_mutex);
                 goto OnError;
             }
         }
@@ -1407,6 +1415,8 @@ static VkResult waylandCreateSwapchain(
             tmp->ref_count++;
             sc->surface_sync = tmp->surface_sync;
         }
+
+        pthread_mutex_unlock(&__vk_surface_swapchain_mutex);
     }
 #endif
 
