@@ -1636,7 +1636,8 @@ VkResult halti3_fillBuffer(
     )
 {
     /* To do */
-     __vkBuffer *pDstBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, buffer);
+    __vkBuffer *pDstBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, buffer);
+    __vkCommandBuffer *pCmdBuf = (__vkCommandBuffer*)cmdBuf;
     __vkBlitRes tmpRes;
     const uint32_t maxTexSize = 8192;
     VkClearValue  clearValue;
@@ -1674,6 +1675,17 @@ VkResult halti3_fillBuffer(
              halti5_computeClear(cmdBuf,&clearValue,&tmpRes);
         }
     }
+
+    if (pCmdBuf->bindInfo.pipeline.graphics)
+    {
+        pCmdBuf->bindInfo.pipeline.dirty |= __VK_CMDBUF_BINDNIGINFO_PIPELINE_GRAPHICS_DIRTY;
+    }
+
+    if(pCmdBuf->bindInfo.pipeline.compute)
+    {
+        pCmdBuf->bindInfo.pipeline.dirty |= __VK_CMDBUF_BINDINGINFO_PIPELINE_COMPUTE_DIRTY;
+    }
+
     return VK_SUCCESS;
 }
 
