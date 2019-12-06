@@ -4341,6 +4341,12 @@ _DetectProcess(
             gcvFALSE
         },
 
+        {
+            gcvPATCH_KANZI,
+            "\x94\x8f\x9e",
+            gcvFALSE
+        },
+
 #if defined(ANDROID)
         {
             gcvPATCH_A8HP,
