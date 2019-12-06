@@ -152,6 +152,7 @@ typedef enum _gcePATCH_ID
     gcvPATCH_ANDROID_PHOTOS,
     gcvPATCH_OVX_CTS,
     gcvPATCH_DEQP_VK,
+    gcvPATCH_KANZI,
 
     gcvPATCH_COUNT
 } gcePATCH_ID;

@@ -6666,7 +6666,21 @@ VIR_Inst_Dual16NotSupported(
 
     if (VIR_OPCODE_isCall(opcode) || opcode == VIR_OP_RET ||
         opcode == VIR_OP_LOOP || opcode == VIR_OP_ENDLOOP ||
-        opcode == VIR_OP_REP || opcode == VIR_OP_ENDREP)
+        opcode == VIR_OP_REP || opcode == VIR_OP_ENDREP || opcode == VIR_OP_TEXLD_GATHER)
+    {
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+static gctBOOL
+VIR_Inst_Dual16NotSupportedShader(
+    IN VIR_Function *pFunc,
+    IN VIR_Instruction *  pInst
+)
+{
+    if (VIR_Function_GetInstCount(pFunc) > 512 &&
+        VIR_Inst_GetOpcode(pInst) == VIR_OP_EXP2)
     {
         return gcvTRUE;
     }
@@ -6912,7 +6926,7 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                     /* A WAR to disable dual16 for some CTS cases because our HW can't support denormalize F16. */
                     (isAppConformance && (VIR_Inst_GetOpcode(pInst) == VIR_OP_SINPI || VIR_Inst_GetOpcode(pInst) == VIR_OP_COSPI)) ||
                     /* nxp benchmark render error caused by dual16, this is a workround to disable shader with pow API */
-                    ((!isPerfBench) && VIR_Inst_GetOpcode(pInst) == VIR_OP_EXP2))
+                    ((!isPerfBench) && (compCfg->ctx.appNameId == gcvPATCH_KANZI) && (VIR_Inst_Dual16NotSupportedShader(pFunc, pInst))))
                 {
                     if(VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
                     {
