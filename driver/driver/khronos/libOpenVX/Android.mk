@@ -64,7 +64,39 @@ LOCAL_SRC_FILES += \
 
 # Layers
 LOCAL_SRC_FILES += \
-    driver/src/layers/gc_vx_layer_lstm.c
+    driver/src/layers/gc_vx_layer_lstm.c \
+    driver/src/layers/gc_vx_layer_activation.c \
+    driver/src/layers/gc_vx_layer_conv.c \
+    driver/src/layers/gc_vx_layer_fc.c \
+    driver/src/layers/gc_vx_layer_adapter.c \
+    driver/src/layers/gc_vx_layer_batch_norm.c \
+    driver/src/layers/gc_vx_layer_concat.c \
+    driver/src/layers/gc_vx_layer_deconv.c \
+    driver/src/layers/gc_vx_layer_depthwise_conv.c \
+    driver/src/layers/gc_vx_layer_div.c \
+    driver/src/layers/gc_vx_layer_eltwise.c \
+    driver/src/layers/gc_vx_layer_rnn.c \
+    driver/src/layers/gc_vx_layer_hash_lut.c \
+    driver/src/layers/gc_vx_layer_l2norm.c \
+    driver/src/layers/gc_vx_layer_lrn.c \
+    driver/src/layers/gc_vx_layer_lsh_project.c \
+    driver/src/layers/gc_vx_layer_lut.c \
+    driver/src/layers/gc_vx_layer_pool.c \
+    driver/src/layers/gc_vx_layer_reduce_sum.c \
+    driver/src/layers/gc_vx_layer_reorg.c \
+    driver/src/layers/gc_vx_layer_roi_pool.c \
+    driver/src/layers/gc_vx_layer_rpn.c \
+    driver/src/layers/gc_vx_layer_tensor_mean.c \
+    driver/src/layers/gc_vx_layer_tensor_reshape.c \
+    driver/src/layers/gc_vx_layer_tensor_round.c \
+    driver/src/layers/gc_vx_layer_tensor_scale.c \
+    driver/src/layers/gc_vx_layer_tensor_squeeze.c \
+    driver/src/layers/gc_vx_layer_tensor_stride_slice.c \
+    driver/src/layers/gc_vx_layer_tensor_transpose.c \
+    driver/src/layers/gc_vx_layer_tensor_pad.c \
+    driver/src/layers/gc_vx_layer_softmax.c \
+    driver/src/layers/gc_vx_layer_tensor_copy.c \
+    driver/src/layers/gc_vx_layer_tensor_reverse.c \
 
 # API
 LOCAL_SRC_FILES += \
@@ -72,9 +104,8 @@ LOCAL_SRC_FILES += \
     driver/src/gc_vx_nn_extension_interface.c \
     driver/src/gc_vx_internal_node_api.c \
     driver/src/gc_vx_nn_util.c \
-	driver/src/gc_vx_nn_encoder.c \
+    driver/src/gc_vx_nn_encoder.c \
     driver/src/gc_vx_nn_command.c \
-    driver/src/gc_vx_lstm.c \
 
 # Kernel
 LOCAL_SRC_FILES += \
