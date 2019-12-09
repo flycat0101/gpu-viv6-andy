@@ -10885,7 +10885,7 @@ VkResult halti5_createImageView(
         }
     }
 
-    if (usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
+    if ((usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT) || (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT))
     {
         if (img->createInfo.samples > VK_SAMPLE_COUNT_1_BIT)
         {
