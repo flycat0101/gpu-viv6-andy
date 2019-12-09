@@ -35,7 +35,8 @@ veglCreateSync(
     EGLDisplay Dpy,
     EGLenum type,
     const void *attrib_list,
-    EGLBoolean intAttrib
+    EGLBoolean intAttrib,
+    EGLBoolean isCreateSyncKHR
     )
 {
     VEGLThreadData thread;
@@ -88,7 +89,15 @@ veglCreateSync(
 #endif
         && type != EGL_SYNC_FENCE)
     {
-        thread->error = EGL_BAD_ATTRIBUTE;
+        if (isCreateSyncKHR)
+        {
+            thread->error = EGL_BAD_ATTRIBUTE;
+        }
+        else
+        {
+            thread->error = EGL_BAD_PARAMETER;
+        }
+
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
@@ -804,7 +813,7 @@ eglCreateSync(
     VEGL_TRACE_API_PRE(CreateSync)(dpy, type, attrib_list);
 
     /* Call internal function. */
-    sync = veglCreateSync(dpy, type, attrib_list, EGL_FALSE);
+    sync = veglCreateSync(dpy, type, attrib_list, EGL_FALSE, EGL_FALSE);
 
     VEGL_TRACE_API_POST(CreateSync)(dpy, type, attrib_list, sync);
     gcmDUMP_API("${EGL eglCreateSync 0x%08X 0x%08X (0x%08X) := 0x%08X",
@@ -920,7 +929,7 @@ eglCreateSyncKHR(
     VEGL_TRACE_API_PRE(CreateSyncKHR)(dpy, type, attrib_list);
 
     /* Alias to eglCreateSync. */
-    sync = (EGLSyncKHR) veglCreateSync(dpy, type, attrib_list, EGL_TRUE);
+    sync = (EGLSyncKHR) veglCreateSync(dpy, type, attrib_list, EGL_TRUE, EGL_TRUE);
 
     VEGL_TRACE_API_POST(CreateSyncKHR)(dpy, type, attrib_list, sync);
     gcmDUMP_API("${EGL eglCreateSyncKHR 0x%08X 0x%08X (0x%08X) := 0x%08X",
