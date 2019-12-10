@@ -738,6 +738,7 @@ typedef struct
 
     uint32_t instancedVertexBindingMask;
     uint32_t instancedVertexBindingStride[__VK_MAX_VERTEX_BUFFER_BINDINGS];
+    uint32_t instancedStrideDirty;
 
     VkBool32 subSampleZUsedInPS;
     VkBool32 sampleMaskInPos;

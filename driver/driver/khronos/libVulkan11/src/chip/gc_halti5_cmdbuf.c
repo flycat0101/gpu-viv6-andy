@@ -777,7 +777,8 @@ VkResult halti5_draw(
 
     __VK_ASSERT(cmdBuf->curScrachBufIndex == 0);
 
-    if (firstInstance != cmdBuf->bindInfo.vertexBuffers.firstInstance)
+    if (chipGfxPipeline->instancedStrideDirty ||
+        (firstInstance != cmdBuf->bindInfo.vertexBuffers.firstInstance))
     {
         cmdBuf->bindInfo.vertexBuffers.firstInstance = firstInstance;
         cmdBuf->bindInfo.vertexBuffers.dirtyBits |= chipGfxPipeline->instancedVertexBindingMask;
@@ -1280,7 +1281,8 @@ VkResult halti5_drawIndexed(
         cmdBuf->bindInfo.indexBuffer.dirty = VK_TRUE;
     }
 
-    if (firstInstance != cmdBuf->bindInfo.vertexBuffers.firstInstance)
+    if (chipGfxPipeline->instancedStrideDirty ||
+        (firstInstance != cmdBuf->bindInfo.vertexBuffers.firstInstance))
     {
         cmdBuf->bindInfo.vertexBuffers.firstInstance = firstInstance;
         cmdBuf->bindInfo.vertexBuffers.dirtyBits |= chipGfxPipeline->instancedVertexBindingMask;
