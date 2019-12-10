@@ -405,6 +405,7 @@ VkResult halti5_pip_emit_vsinput(
         {
             chipGfxPipeline->instancedVertexBindingMask |= 1 << vsInputBinding->binding;
             chipGfxPipeline->instancedVertexBindingStride[vsInputBinding->binding] = vsInputBinding->stride;
+            chipGfxPipeline->instancedStrideDirty = 1;
         }
     }
 
