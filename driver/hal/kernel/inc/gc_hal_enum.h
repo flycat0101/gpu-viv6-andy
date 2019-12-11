@@ -632,6 +632,13 @@ typedef enum _gceFEATURE
     gcvFEATURE_VIP_DEC400,
     gcvFEATURE_MAX_POINTSIZE_CLAMP,
     gcvFEATURE_2D_FAST_CLEAR, /* For tilestatus Fast Clear feature*/
+    gcvFEATURE_NEGATIVE_POST_SHIFT_FIX,
+    gcvFEATURE_NN_COMMAND_KERNEL_REQUEST_CONFICT_FIX,
+    gcvFEATURE_DDR_BURST_LEN_256B,
+    gcvFEATURE_NN_LEAKY_RELU,
+    gcvFEATURE_NN_NATIVE_STRIDE_TWO,
+    gcvFEATURE_NN_TENSOR_ADD,
+    gcvFEATURE_VIP_SCALER_4K,
 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
