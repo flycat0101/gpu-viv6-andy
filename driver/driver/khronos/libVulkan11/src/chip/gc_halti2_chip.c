@@ -737,6 +737,7 @@ VkResult halti2_clearImageWithRS(
     }
 
     rsConfigTiling(img, &dstTiling, &dstSuperTile);
+    __VK_ASSERT(hwFormat == 0x10 && dstTiling == 0x1);
 
     __VK_ASSERT(cmd->curScrachBufIndex == 0);
     pCmdBuffer = pCmdBufferBegin = &cmd->scratchCmdBuffer[cmd->curScrachBufIndex];
@@ -774,6 +775,16 @@ VkResult halti2_clearImageWithRS(
  12:8) - (0 ?
  12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
+                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) ((gctUINT32) (dstTiling) & ((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)))
                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  14:14) - (0 ?
  14:14) + 1) == 32) ?
