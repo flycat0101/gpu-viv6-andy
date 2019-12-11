@@ -3624,6 +3624,9 @@ VkResult halti5_computeClear(
     {
         __VK_ONERROR(halti5_addAllocationForCompute(&scatch, blitProg));
     }
+
+    __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, &scatch, VK_NULL_HANDLE, HW_CACHE_ALL));
+
     __VK_ONERROR(blitProg->program_dst(pCmdBuf, blitProg, &scatch, VK_NULL_HANDLE, dstRes, &params));
     __VK_ONERROR(blitProg->program_const(pCmdBuf, blitProg, &scatch, &params));
 
