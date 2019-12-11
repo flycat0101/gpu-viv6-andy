@@ -1299,7 +1299,7 @@ VkResult halti2_copyImageWithRS(
 
         if (!useComputeBlit)
         {
-            if (srcTiling == 0x0 &&
+            if ((srcTiling == 0x0 || dstTiling == 0x0) &&
                 __vk_GetVkFormatInfo((VkFormat) srcFormat)->bitsPerBlock == 8)
             {
                 useComputeBlit = VK_TRUE;
