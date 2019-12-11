@@ -208,6 +208,9 @@
 
 #define VX_TRANSPOSE_MAX_INTERLEAVE_CH      16
 #define VX_TRANSPOSE_MAX_INTERLEAVE_1MULTI1_CH      9
+
+#define IMG_MAX_WIDTH (65536)
+
 /* Function macros */
 #ifndef vxmLENGTH_OF
 #define vxmLENGTH_OF(array)                 (sizeof(array) / sizeof((array)[0]))
@@ -308,6 +311,17 @@
                     } \
                 } \
                 while (gcvFALSE)
+
+#define vxmOPERATION_COUNT(layer)       gcmCOUNTOF(layer->operations)
+
+#define VX_GET_DATA_FROM_TENSOR(tensor, index) \
+    vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(tensor), TENSOR_QUANT_TYPE(tensor), index, TENSOR_LOGICAL_ADDR(tensor), TENSOR_POS(tensor), TENSOR_TF_ZEROPOINT(tensor), TENSOR_TF_SCALE(tensor))
+
+#define VX_SAVE_DATA_TO_TENSOR(tensor, data, index) \
+    vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(tensor), TENSOR_QUANT_TYPE(tensor), index, data, TENSOR_LOGICAL_ADDR(tensor), TENSOR_POS(tensor), TENSOR_TF_ZEROPOINT(tensor), TENSOR_TF_SCALE(tensor), TENSOR_ROUNDING_MODE(tensor))
+
+#define CHECK_LIFETIME_IS_STATIC(tensor) \
+    (((tensor != VX_NULL) && TENSOR_DATA_LIFETIME(tensor) == VX_TENSOR_LIFE_TIME_STATIC) ? vx_true_e : vx_false_e)
 
 
 #define VX_INVALID_VALUE  0xDEADDEAD
@@ -2747,6 +2761,20 @@ typedef enum viv_nn_pooling_type_e
     VIV_NN_POOLING_AVG         = 2,
     VIV_NN_POOLING_FIRST_PIXEL = 3
 }viv_nn_pooling_type_e;
+
+vx_status vxnneOperation_TP_Deinitialize(vxnne_operation_s *operation);
+
+vx_status vxnneOperation_AddReference(
+    vxnne_operation_s*            operation,
+    vx_reference                  reference,
+    vxnne_operation_reference_e   refType
+    );
+
+vx_status vxnneGetTensorMemeory(vx_tensor tensor, vx_ptr_ptr ptr, vx_bool stage, vx_bool zero);
+
+vx_bool vxoElementOptimization_GetTensorShape(vx_tensor input, vx_uint32 sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION], vx_uint32 * num_of_dims);
+
+vx_status vxnneOperation_Deinitialize(vxnne_operation_s *operation);
 
 
 

@@ -4422,7 +4422,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_padConv(vx_graph graph)
 }
 
 /* Greatest Common Divisor*/
-VX_PRIVATE_API vx_bool vxoGetDataDivisors(vx_uint32 input_value, vx_uint32 *divisors, vx_uint32 gcd)
+vx_bool vxoGetDataDivisors(vx_uint32 input_value, vx_uint32 *divisors, vx_uint32 gcd)
 {
     vx_uint32 i                 = 0;
 

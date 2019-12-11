@@ -53,7 +53,6 @@ vx_status vxoFC_NN_Trans_Initialize(
     vx_uint32_ptr op_index
     );
 
-#define IMG_MAX_WIDTH 65536
 
 vx_status vxoFCOperation_TransposeTensor(vx_tensor weights, vx_tensor weight_conv, vx_uint32* perm, vx_uint32 pnum)
 {
