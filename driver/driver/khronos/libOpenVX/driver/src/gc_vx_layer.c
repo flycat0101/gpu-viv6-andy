@@ -20,7 +20,6 @@
 
 #define _GC_OBJ_ZONE            gcdZONE_VX_LAYER
 
-#define IMG_MAX_WIDTH 65536
 #define SHADER_THREAD_COUNT  (4)
 #define MAX_MULTIPLIER_NUM      (65535)
 #define MAX_POST_SHIFT_BITS     (31)

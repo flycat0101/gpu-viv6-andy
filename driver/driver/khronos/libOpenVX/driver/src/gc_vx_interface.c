@@ -11473,7 +11473,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_convert_depth_Validate(vx_node no
     return VX_SUCCESS;
 }
 
-#define IMG_MAX_WIDTH 65536
 VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_convert_depth_Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
                                                 /*workdim, globel offset, globel scale    local size, globel size,*/
