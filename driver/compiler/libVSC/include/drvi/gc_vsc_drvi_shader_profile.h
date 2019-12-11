@@ -1290,7 +1290,10 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
             /* Whether use Private memory. */
             gctUINT               bUsePrivateMemory               : 1;
 
-            gctUINT               reserved                        : 29;
+            /* Whether use Evis instruction. */
+            gctUINT               bUseEvisInst                    : 1;
+
+            gctUINT               reserved                        : 28;
 
             gctUINT16             workGroupSizeFactor[3];
         } gps;
