@@ -435,10 +435,598 @@ vx_status vxnneExecuteSWRNNReshuffleWeightsBiases(struct _vxnne_operation_s *ope
 
     return vxoRNNLayer_ReshuffleWeightBias(weight, recurrent_weight, new_weight, bias, new_bias);
 }
+#if REGISTER_FRAME
+
+VX_PRIVATE_API vx_status vxoRNNLayer_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_rnn_layer  rnnLayer = (vxnne_rnn_layer)ops_layer;
+
+    vx_tensor  inputs = (vx_tensor)parameters[0];
+    vx_tensor  weights = (vx_tensor)parameters[1];
+    vx_tensor  recurrent_weights = (vx_tensor)parameters[2];
+    vx_tensor  bias = (vx_tensor)parameters[3];
+    vx_tensor  state_in = (vx_tensor)parameters[4];
+    vx_tensor  activation = (vx_tensor)parameters[5];
+    vx_tensor  state_out = (vx_tensor)parameters[6];
+    vx_tensor  outputs = (vx_tensor)parameters[7];
+    vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxnneOperation_Initialize(&rnnLayer->rnn_sw_operation.base,
+        &rnnLayer->base,
+        VXNNE_OPERATION_TARGET_SW,
+        VXNNE_OPERATOR_RNN,
+        vxnneExecuteSWRNN,
+        VX_NULL,
+        batchCount,
+        0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &rnnLayer->base,
+        &rnnLayer->rnn_sw_operation.base,
+        0));
+
+    rnnLayer->rnn_sw_operation.inputs = inputs;
+    rnnLayer->rnn_sw_operation.weights = weights;
+    rnnLayer->rnn_sw_operation.recurrent_weights = recurrent_weights;
+    rnnLayer->rnn_sw_operation.bias = bias;
+    rnnLayer->rnn_sw_operation.state_in = state_in;
+    rnnLayer->rnn_sw_operation.activation = activation;
+    rnnLayer->rnn_sw_operation.state_out = state_out;
+    rnnLayer->rnn_sw_operation.outputs = outputs;
+
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_operation.base, (vx_reference)recurrent_weights, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_operation.base, (vx_reference)bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_operation.base, (vx_reference)state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_operation.base, (vx_reference)activation, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_operation.base, (vx_reference)state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoRNNLayer_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_tensor  inputs = (vx_tensor)parameters[0];
+    vx_tensor  bias = (vx_tensor)parameters[3];
+    vx_tensor  outputs = (vx_tensor)parameters[7];
+    vx_enum    inputFormat = TENSOR_DATA_TYPE(inputs);
+    vx_enum    outputFormat = TENSOR_DATA_TYPE(outputs);
+    vx_enum    biasFormat = TENSOR_DATA_TYPE(bias);
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && ((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && (biasFormat == VX_TYPE_FLOAT16 || biasFormat == VX_TYPE_FLOAT32))
+                        || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32 && biasFormat == VX_TYPE_FLOAT32 && !evis)
+                        || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_UINT8));
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoRNNLayer_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoRNNLayer_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoRNNLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxnne_rnn_layer  rnnLayer = (vxnne_rnn_layer)ops_layer;
+
+    vx_tensor  inputs = (vx_tensor)parameters[0];
+    vx_tensor  weights = (vx_tensor)parameters[1];
+    vx_tensor  recurrent_weights = (vx_tensor)parameters[2];
+    vx_tensor  bias = (vx_tensor)parameters[3];
+    vx_tensor  state_in = (vx_tensor)parameters[4];
+    vx_tensor  activation = (vx_tensor)parameters[5];
+    vx_tensor  state_out = (vx_tensor)parameters[6];
+    vx_tensor  outputs = (vx_tensor)parameters[7];
+    vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
+
+    vxnne_shader_executable shaderExecutable;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    if (evis)
+    {
+        shaderExecutable = vxnneGetRnnShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_RNN, &ops_layer->node->kernelAttributes.borderMode,
+            inputs, bias, weights, state_in, recurrent_weights, activation, state_out, outputs);
+    }
+    else
+    {
+        shaderExecutable = vxnneGetGPURnnShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_RNN, &ops_layer->node->kernelAttributes.borderMode,
+            inputs, bias, weights, state_in, recurrent_weights, activation, state_out, outputs);
+    }
+
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    vxmONERROR(vxnneShaderOperation_Initialize(&rnnLayer->rnn_sh_operation,
+        &rnnLayer->base,
+        VXNNE_OPERATOR_RNN,
+        batchCount,
+        shaderExecutable));
+
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sh_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sh_operation.base, (vx_reference)recurrent_weights, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sh_operation.base, (vx_reference)bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sh_operation.base, (vx_reference)state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sh_operation.base, (vx_reference)activation, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sh_operation.base, (vx_reference)state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &rnnLayer->base,
+        &rnnLayer->rnn_sh_operation.base,
+        0));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+VX_PRIVATE_API vx_status vxoRNNLayer_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoRNNLayer_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return VX_SUCCESS;
+}
+VX_PRIVATE_API vx_status vxoRNNLayer_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoRNNLayer_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_bool vxoRNNLayer_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    support = support && vxoRNNLayer_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoRNNLayer_NN_TP_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_tensor  inputs = (vx_tensor)parameters[0];
+    vx_tensor  weights = (vx_tensor)parameters[1];
+    vx_tensor  recurrent_weights = (vx_tensor)parameters[2];
+    vx_tensor  outputs = (vx_tensor)parameters[7];
+
+    vx_context context = vxGetContext((vx_reference)node);
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)
+        return support;
+
+    support = support && (CHECK_LIFETIME_IS_STATIC(weights) &&
+        CHECK_LIFETIME_IS_STATIC(recurrent_weights) &&
+        vxnneIsNNSupportFormat(context, inputs, VX_NULL, outputs));
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoRNNLayer_NN_TP_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_rnn_layer  rnnLayer = (vxnne_rnn_layer)ops_layer;
+
+    vx_tensor  inputs = (vx_tensor)parameters[0];
+    vx_tensor  weights = (vx_tensor)parameters[1];
+    vx_tensor  recurrent_weights = (vx_tensor)parameters[2];
+    vx_tensor  bias = (vx_tensor)parameters[3];
+    vx_tensor  state_in = (vx_tensor)parameters[4];
+    vx_tensor  activation = (vx_tensor)parameters[5];
+    vx_tensor  state_out = (vx_tensor)parameters[6];
+    vx_tensor  outputs = (vx_tensor)parameters[7];
+    vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
+
+    vx_context context = vxGetContext((vx_reference)ops_layer->node);
+
+    vx_int32 opt_index = 0;
+    vx_uint32 s = 0;
+    vx_int32 batch = TENSOR_SIZE_INDEX(inputs, 1), input_size = TENSOR_SIZE_INDEX(inputs, 0), output_size = TENSOR_SIZE_INDEX(state_in, 0), unit_num = TENSOR_SIZE_INDEX(state_in, 0);
+    vx_int32 sizes[][4] = {
+        { 1, 1, unit_num + input_size, batch }, /* input   : 1 * 1 * ((input_size + output size) * batch        */
+        { 1, 1, unit_num + input_size, unit_num }, /* weights : 1 * 1 * (unit_num + input_size)     * unit_num     */
+        { unit_num + input_size, 1, 1, 1 }, /* biases  : (unit_num + input_size) * 1 * 1 * 1                */
+        { 1, 1, output_size, batch }, /* outputs : 1 * 1 * output size                 * batch        */
+    };
+    vx_tensor_create_params_t tensor_create_params;
+    vx_tensor stages[4];
+    vx_int32 zero = 0;
+    vx_enum rounding = VX_NN_DS_SIZE_ROUNDING_FLOOR;
+    vx_bool nne_conv = vx_true_e;
+
+    vx_enum acts[] = {
+        VX_NN_ACTIVATION_NONE, /* kNone */
+        VX_NN_ACTIVATION_RELU, /* kRelu */
+        VX_NN_ACTIVATION_RELU1, /* kRelu1 */
+        VX_NN_ACTIVATION_RELU6, /* kRelu6 */
+    };
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    for (s = 0; s < (vx_uint32)sizeof(sizes) / sizeof(sizes[0]) - 1; s++)
+    {
+        /* Bias still create float32 tensor */
+
+        gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+        tensor_create_params.num_of_dims = sizeof(sizes[s]) / sizeof(sizes[s][0]);
+        tensor_create_params.sizes = (vx_uint32_ptr)sizes[s];
+        tensor_create_params.data_format = (s == 2) ? VX_TYPE_FLOAT32 : VX_TYPE_FLOAT16;
+        tensor_create_params.quant_format = 0;
+
+        stages[s] = vxoTensor_CreateTensor(context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+
+        vxmONERROR(vxoReference_GetStatus((vx_reference)stages[s]));
+
+
+        vxmONERROR(vxoTensor_AllocateMemory(stages[s]));
+
+        rnnLayer->base.temp_tensors[rnnLayer->base.num_temp_tensors++] = stages[s];
+    }
+
+    /* reshape output from (batch * output_size) to (1 * 1 * output_size * batch) */
+    stages[3] = vxoTensor_ReshapeTensor(outputs, sizes[3], 4);
+    rnnLayer->base.temp_tensors[rnnLayer->base.num_temp_tensors++] = stages[3];
+
+    /* SW implement of weight and bias reshuffle */
+    vxmONERROR(vxoRNNLayer_ReshuffleWeightBias(weights, recurrent_weights, stages[1], bias, stages[2]));
+
+    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP))
+    {
+        vx_op_param_s conv = { 0 };
+
+        conv.pad_x_left = 0;
+        conv.pad_y_top = 0;
+        conv.pool_size_x = 0;
+        conv.pool_size_y = 0;
+        conv.pool_stride = 1;
+        conv.enable_relu = vx_false_e;
+        conv.pad_mode = VX_PAD_CONSTANT;
+        conv.pad_const = 0;
+        /* interleave input to new input tensor */
+        vxmONERROR(vxnneOperation_Initialize(&rnnLayer->rnn_input_reshuffle_tp_operation.base,
+            &rnnLayer->base,
+            VXNNE_OPERATION_TARGET_TP,
+            VXNNE_OPERATOR_INTERLEAVE,
+            VX_NULL,
+            vxnneOperation_TP_Deinitialize,
+            1,
+            0));
+
+        conv.tpType = TP_RNN_INTERLEAVE;
+        conv.other_ref = gcvNULL;
+        conv.data_buff = gcvNULL;
+        memcpy(&rnnLayer->rnn_input_reshuffle_tp_operation.base.parameter, &conv, sizeof(vx_op_param_s));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &rnnLayer->base,
+            &rnnLayer->rnn_input_reshuffle_tp_operation.base,
+            opt_index++));
+
+        rnnLayer->rnn_input_reshuffle_tp_operation.input = inputs;
+        rnnLayer->rnn_input_reshuffle_tp_operation.output = stages[0];
+
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_input_reshuffle_tp_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_input_reshuffle_tp_operation.base, (vx_reference)stages[0], VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        /******************************************************************/
+        /* interleave state in to new input tensor */
+        vxmONERROR(vxnneOperation_Initialize(&rnnLayer->rnn_input_reshuffle_tp_operation2.base,
+            &rnnLayer->base,
+            VXNNE_OPERATION_TARGET_TP,
+            VXNNE_OPERATOR_INTERLEAVE,
+            VX_NULL,
+            vxnneOperation_TP_Deinitialize,
+            1,
+            0));
+
+        conv.tpType = TP_RNN_INTERLEAVE;
+        conv.other_ref = gcvNULL;
+        conv.data_buff = gcvNULL;
+
+        /* output start address offset */
+        conv.pad_x_left = TENSOR_SIZE_INDEX(inputs, 0) * TENSOR_DATA_SIZE(inputs);
+
+        memcpy(&rnnLayer->rnn_input_reshuffle_tp_operation2.base.parameter, &conv, sizeof(vx_op_param_s));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &rnnLayer->base,
+            &rnnLayer->rnn_input_reshuffle_tp_operation2.base,
+            opt_index++));
+
+        rnnLayer->rnn_input_reshuffle_tp_operation2.input = state_in;
+        rnnLayer->rnn_input_reshuffle_tp_operation2.output = stages[0];
+
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_input_reshuffle_tp_operation2.base, (vx_reference)state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_input_reshuffle_tp_operation2.base, (vx_reference)stages[0], VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    }
+    else
+    {
+        /* SW implement of input reshuffle */
+        vxmONERROR(vxnneOperation_Initialize(&rnnLayer->rnn_input_reshuffle_operation.base,
+            &rnnLayer->base,
+            VXNNE_OPERATION_TARGET_SW,
+            VXNNE_OPERATOR_INTERLEAVE,
+            vxnneExecuteSWRNNReshuffleInput,
+            VX_NULL,
+            batchCount,
+            0));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &rnnLayer->base,
+            &rnnLayer->rnn_input_reshuffle_operation.base,
+            opt_index++));
+
+        rnnLayer->rnn_input_reshuffle_operation.input0 = inputs;
+        rnnLayer->rnn_input_reshuffle_operation.input1 = state_in;
+        rnnLayer->rnn_input_reshuffle_operation.new_input = stages[0];
+
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_input_reshuffle_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_input_reshuffle_operation.base, (vx_reference)state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_input_reshuffle_operation.base, (vx_reference)stages[0], VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    }
+
+    if (nne_conv)
+    {
+        vx_nn_convolution_relu_pooling_params_ext2_t params = {
+            {
+                { 0, 0, 0, 0, 0, 0, 0,
+                VX_CONVERT_POLICY_WRAP, VX_ROUND_POLICY_TO_ZERO, VX_NN_DS_SIZE_ROUNDING_FLOOR,
+                vx_true_e, 0, 0, 0, VX_PAD_CONSTANT, 0 },
+                1, 1
+            },
+            0, VX_TENSOR_RANK_WHCN, VX_TYPE_FLOAT16
+        };
+
+        vx_weights_biases_parameter weights_biases = vxCreateWeightsBiasesParameterFromTensors2(
+            VX_NN_CONVOLUTION_LAYER,
+            4, (vx_uint32_ptr)sizes[0],
+            (vx_uint32_ptr)sizes[3], (vx_uint32_ptr)sizes[3],
+            VX_TYPE_FLOAT16,
+            (vx_nn_convolution_relu_pooling_params)&params, sizeof(vx_nn_convolution_relu_pooling_params_ext2_t),
+            NULL, stages[1], stages[2]);
+
+        vx_int32 batchCount = TENSOR_SIZE_INDEX(stages[0], 3);
+
+        vx_int32 activ = (activation != VX_NULL) ? *(vx_int32_ptr)TENSOR_LOGICAL_ADDR(activation) : -1;
+        vx_bool enable_relu = (activ == 1) ? vx_true_e : vx_false_e;
+
+        gcmASSERT(activ == 0 || activ == 1);
+
+        /* Initialize covolution operation */
+        vxmONERROR(vxnneOperation_Initialize(&rnnLayer->convolution_nn_convolution_operation0.base,
+            &rnnLayer->base,
+            VXNNE_OPERATION_TARGET_NN,
+            VXNNE_OPERATOR_CONVOLUTION,
+            VX_NULL,
+            NULL,
+            batchCount,
+            NNE_COMMAND_SIZE));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &rnnLayer->base,
+            &rnnLayer->convolution_nn_convolution_operation0.base,
+            opt_index++));
+
+        rnnLayer->convolution_nn_convolution_operation0.inputs = stages[0];
+        rnnLayer->convolution_nn_convolution_operation0.weights_biases = weights_biases;
+        rnnLayer->convolution_nn_convolution_operation0.enable_relu = enable_relu;
+        rnnLayer->convolution_nn_convolution_operation0.outputs = stages[3];
+
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->convolution_nn_convolution_operation0.base, (vx_reference)stages[0], VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->convolution_nn_convolution_operation0.base, (vx_reference)stages[3], VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        {
+            vx_op_param_s conv = { 0 };
+
+            conv.pad_x_left = 0;
+            conv.pad_x_right = 0;
+            conv.pad_y_top = 0;
+            conv.pad_y_bottom = 0;
+            conv.pad_mode = VX_PAD_CONSTANT;
+            conv.pad_const = 0;
+            conv.pool_type = 0;
+            conv.conv_rounding_type = VX_NN_DS_SIZE_ROUNDING_FLOOR;
+            conv.enable_relu = enable_relu;
+            conv.pool_size_x = 0;
+            conv.pool_size_y = 0;
+
+            memcpy(&rnnLayer->convolution_nn_convolution_operation0.base.parameter, &conv, sizeof(vx_op_param_s));
+        }
+    }
+    else
+    {
+
+        vx_enum relu_e = (activation != VX_NULL) ? acts[*(vx_int32_ptr)TENSOR_LOGICAL_ADDR(activation)] : VX_NN_ACTIVATION_NONE;
+
+        /* For SW convolution, must enable relue */
+        vxmONERROR(vxnneOperation_Initialize(&rnnLayer->rnn_sw_operation2.base,
+            &rnnLayer->base,
+            VXNNE_OPERATION_TARGET_SW,
+            VXNNE_OPERATOR_CONVOLUTION,
+            vxnneExecuteSWConvolution,
+            VX_NULL,
+            batchCount,
+            0));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &rnnLayer->base,
+            &rnnLayer->rnn_sw_operation2.base,
+            opt_index++));
+
+        rnnLayer->rnn_sw_operation2.inputs = stages[0];
+        rnnLayer->rnn_sw_operation2.weights = stages[1];
+        rnnLayer->rnn_sw_operation2.biases = stages[2];
+        rnnLayer->rnn_sw_operation2.outputs = stages[3];
+
+        rnnLayer->rnn_sw_operation2.padX = vxCreateScalar(context, VX_TYPE_INT32, &zero);
+        rnnLayer->rnn_sw_operation2.padXRight = vxCreateScalar(context, VX_TYPE_INT32, &zero);
+        rnnLayer->rnn_sw_operation2.padY = vxCreateScalar(context, VX_TYPE_INT32, &zero);
+        rnnLayer->rnn_sw_operation2.padYBottom = vxCreateScalar(context, VX_TYPE_INT32, &zero);
+        rnnLayer->rnn_sw_operation2.dilationX = vxCreateScalar(context, VX_TYPE_INT32, &zero);
+        rnnLayer->rnn_sw_operation2.dilationY = vxCreateScalar(context, VX_TYPE_INT32, &zero);
+        rnnLayer->rnn_sw_operation2.relu = vxCreateScalar(context, VX_TYPE_ENUM, &relu_e);
+        rnnLayer->rnn_sw_operation2.downScaleSizeRounding = vxCreateScalar(context, VX_TYPE_ENUM, &rounding);
+
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_operation2.base, (vx_reference)stages[0], VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_operation2.base, (vx_reference)stages[1], VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_operation2.base, (vx_reference)stages[2], VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_operation2.base, (vx_reference)stages[3], VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    }
+    /* Tensor Copy output to state out */
+    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP))
+    {
+        vx_op_param_s conv = { 0 };
+
+        conv.pad_x_left = 0;
+        conv.pad_y_top = 0;
+        conv.pool_size_x = 0;
+        conv.pool_size_y = 0;
+        conv.pool_stride = 1;
+        conv.enable_relu = vx_false_e;
+        conv.pad_mode = VX_PAD_CONSTANT;
+        conv.pad_const = 0;
+
+        vxmONERROR(vxnneOperation_Initialize(&rnnLayer->rnn_tensor_copy.base,
+            &rnnLayer->base,
+            VXNNE_OPERATION_TARGET_TP,
+            VXNNE_OPERATOR_TENSOR_COPY,
+            VX_NULL,
+            vxnneOperation_TP_Deinitialize,
+            batchCount,
+            0));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &rnnLayer->base,
+            &rnnLayer->rnn_tensor_copy.base,
+            opt_index++));
+
+        rnnLayer->rnn_tensor_copy.input = outputs;
+        rnnLayer->rnn_tensor_copy.output = state_out;
+
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_tensor_copy.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_tensor_copy.base, (vx_reference)state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        conv.tpType = TP_TENSOR_COPY;
+        conv.other_ref = gcvNULL;
+        conv.data_buff = gcvNULL;
+
+        memcpy(&rnnLayer->rnn_tensor_copy.base.parameter, &conv, sizeof(vx_op_param_s));
+    }
+    else
+    {
+        vxmONERROR(vxnneOperation_Initialize(&rnnLayer->rnn_sw_tensor_copy.base,
+            &rnnLayer->base,
+            VXNNE_OPERATION_TARGET_SW,
+            VXNNE_OPERATOR_TENSOR_COPY,
+            vxnneExecuteSWTensorCopy,
+            VX_NULL,
+            batchCount,
+            0));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &rnnLayer->base,
+            &rnnLayer->rnn_sw_tensor_copy.base,
+            opt_index++));
+
+        rnnLayer->rnn_sw_tensor_copy.src = outputs;
+        rnnLayer->rnn_sw_tensor_copy.dst = state_out;
+
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_tensor_copy.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&rnnLayer->rnn_sw_tensor_copy.base, (vx_reference)state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    }
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+    vxnne_rnn_layer  rnnLayer = (vxnne_rnn_layer)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(rnnLayer->operations);
+
+    *operations = rnnLayer->operations;
+
+    return status;
+}
+
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoRNNLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
+    vxnne_layer_imp_s registerRNNLayers[] = {/* Please DON'T adjust the order, it's importent */
+        { "RNNLayer NN/TP", vxoRNNLayer_NN_TP_Support, vxoRNNLayer_NN_TP_Initialize, VX_NULL },
+        { "RNNLayer TP", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer,VX_NULL },
+        { "RNNLayer SH EVIS", vxoRNNLayer_SH_EVIS_Support, vxoRNNLayer_SH_EVIS_Initialize, VX_NULL },
+        { "RNNLayer SH F32", vxoRNNLayer_SH_Support, vxoRNNLayer_SH_Initialize, VX_NULL },
+        { "RNNLayer SW ", vxoNNCommon_Support, vxoRNNLayer_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerRNNLayers, vxnne_rnn_layer_s, "RNN", vxoNNLayer_GetOperations);
+
+OnError:
+#else
     vx_tensor  inputs = (vx_tensor)parameters[0];
     vx_tensor  weights = (vx_tensor)parameters[1];
     vx_tensor  recurrent_weights = (vx_tensor)parameters[2];
@@ -893,6 +1481,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoRNNLayer_Initializer(vx_node node, const
 
 exit:
     if (rnnLayer) gcoOS_Free(gcvNULL, (gctPOINTER)rnnLayer);
+#endif
     return status;
 }
 
@@ -1164,10 +1753,729 @@ VX_PRIVATE_API vx_status vxnneExecuteSVDF_DepthWeightsTime(vx_tensor input, vx_t
 
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
+
+VX_PRIVATE_API vx_status vxoSVDFLayer_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_svdf_layer  svdfLayer = (vxnne_svdf_layer)ops_layer;
+
+    vx_tensor  inputs = (vx_tensor)parameters[0];
+    vx_tensor  weights_feature = (vx_tensor)parameters[1];
+    vx_tensor  recurrent_time = (vx_tensor)parameters[2];
+    vx_tensor  bias = (vx_tensor)parameters[3];
+    vx_tensor  state_in = (vx_tensor)parameters[4];
+    vx_tensor  ranks = (vx_tensor)parameters[5];
+    vx_tensor  activation = (vx_tensor)parameters[6];
+    vx_tensor  state_out = (vx_tensor)parameters[7];
+    vx_tensor  outputs = (vx_tensor)parameters[8];
+
+    vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxnneOperation_Initialize(&svdfLayer->svdf_sw_operation.base,
+        &svdfLayer->base,
+        VXNNE_OPERATION_TARGET_SW,
+        VXNNE_OPERATOR_SVDF,
+        vxnneExecuteSWSVDF,
+        VX_NULL,
+        batchCount,
+        0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &svdfLayer->base,
+        &svdfLayer->svdf_sw_operation.base,
+        0));
+
+    svdfLayer->svdf_sw_operation.inputs = inputs;
+    svdfLayer->svdf_sw_operation.weights_feature = weights_feature;
+    svdfLayer->svdf_sw_operation.recurrent_time = recurrent_time;
+    svdfLayer->svdf_sw_operation.bias = bias;
+    svdfLayer->svdf_sw_operation.state_in = state_in;
+    svdfLayer->svdf_sw_operation.rank = ranks;
+    svdfLayer->svdf_sw_operation.activation = activation;
+    svdfLayer->svdf_sw_operation.state_out = state_out;
+    svdfLayer->svdf_sw_operation.outputs = outputs;
+
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_operation.base, (vx_reference)weights_feature, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_operation.base, (vx_reference)recurrent_time, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_operation.base, (vx_reference)bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_operation.base, (vx_reference)state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_operation.base, (vx_reference)state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoSVDFLayer_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_tensor  inputs = (vx_tensor)parameters[0];
+    vx_tensor  bias = (vx_tensor)parameters[3];
+    vx_tensor  outputs = (vx_tensor)parameters[8];
+
+    vx_enum    inputFormat = TENSOR_DATA_TYPE(inputs);
+    vx_enum    outputFormat = TENSOR_DATA_TYPE(outputs);
+    vx_enum    biasFormat = TENSOR_DATA_TYPE(bias);
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    if(evis)
+    {
+         support = support && (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16
+                                && (biasFormat == VX_TYPE_FLOAT16 || biasFormat == VX_TYPE_FLOAT32));
+    }
+    else
+    {
+         support = support && ((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && (biasFormat == VX_TYPE_FLOAT16 || biasFormat == VX_TYPE_FLOAT32)) ||
+                                     (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32 && biasFormat == VX_TYPE_FLOAT32));
+    }
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoSVDFLayer_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+
+    support = support && vxoSVDFLayer_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoSVDFLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxnne_svdf_layer  svdfLayer = (vxnne_svdf_layer)ops_layer;
+
+    vx_tensor  inputs = (vx_tensor)parameters[0];
+    vx_tensor  weights_feature = (vx_tensor)parameters[1];
+    vx_tensor  recurrent_time = (vx_tensor)parameters[2];
+    vx_tensor  bias = (vx_tensor)parameters[3];
+    vx_tensor  state_in = (vx_tensor)parameters[4];
+    vx_tensor  ranks = (vx_tensor)parameters[5];
+    vx_tensor  activation = (vx_tensor)parameters[6];
+    vx_tensor  state_out = (vx_tensor)parameters[7];
+    vx_tensor  outputs = (vx_tensor)parameters[8];
+
+    vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
+    vx_enum actType = VX_NN_ACTIVATION_NONE;
+
+    vxnne_shader_executable shaderExecutable;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    if (evis)
+    {
+        shaderExecutable = vxnneGetSvdfShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_SVDF, &ops_layer->node->kernelAttributes.borderMode,
+            inputs, bias, weights_feature, recurrent_time, activation, ranks, state_in, state_out, outputs);
+    }
+    else
+    {
+        vx_int32 rankValue = (ranks != VX_NULL) ? (vx_int32)VX_GET_DATA_FROM_TENSOR(ranks, 0) : 1;
+
+        if (activation != VX_NULL)
+        {
+            switch (*(vx_int32_ptr)TENSOR_LOGICAL_ADDR(activation))
+            {
+            case 0:
+            default:
+                actType = VX_NN_ACTIVATION_NONE;
+                break;
+            case 1:
+                actType = VX_NN_ACTIVATION_RELU;
+                break;
+            case 2:
+                actType = VX_NN_ACTIVATION_RELU1;
+                break;
+            case 3:
+                actType = VX_NN_ACTIVATION_RELU6;
+                break;
+            }
+        }
+
+        shaderExecutable = vxnneGetGPUSvdfShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_SVDF, &ops_layer->node->kernelAttributes.borderMode,
+            inputs, bias, weights_feature, recurrent_time, actType, rankValue, state_in, state_out, outputs);
+    }
+
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    vxmONERROR(vxnneShaderOperation_Initialize(&svdfLayer->svdf_sh_operation,
+        &svdfLayer->base,
+        VXNNE_OPERATOR_SVDF,
+        batchCount,
+        shaderExecutable));
+
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sh_operation.base, (vx_reference)weights_feature, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sh_operation.base, (vx_reference)recurrent_time, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sh_operation.base, (vx_reference)bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sh_operation.base, (vx_reference)activation, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sh_operation.base, (vx_reference)ranks, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sh_operation.base, (vx_reference)state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sh_operation.base, (vx_reference)state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &svdfLayer->base,
+        &svdfLayer->svdf_sh_operation.base,
+        0));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+VX_PRIVATE_API vx_status vxoSVDFLayer_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoSVDFLayer_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return VX_SUCCESS;
+}
+VX_PRIVATE_API vx_status vxoSVDFLayer_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoSVDFLayer_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_bool vxoSVDFLayer_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+
+    support = support && vxoSVDFLayer_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoSVDFLayer_NN_TP_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_tensor  inputs = (vx_tensor)parameters[0];
+    vx_tensor  weights_feature = (vx_tensor)parameters[1];
+    vx_tensor  recurrent_time = (vx_tensor)parameters[2];
+
+    vx_tensor  outputs = (vx_tensor)parameters[8];
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)
+        return support;
+
+    support = support && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP) &&
+                            vxnneIsTPSupportFormat(node->base.context, inputs, VX_NULL, outputs)
+                            && weights_feature->tensorBuffer->data_lifetime == VX_TENSOR_LIFE_TIME_STATIC
+                            && recurrent_time->tensorBuffer->data_lifetime == VX_TENSOR_LIFE_TIME_STATIC
+                            );
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoSVDFLayer_NN_TP_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_svdf_layer  svdfLayer = (vxnne_svdf_layer)ops_layer;
+
+    vx_tensor  inputs = (vx_tensor)parameters[0];
+    vx_tensor  weights_feature = (vx_tensor)parameters[1];
+    vx_tensor  recurrent_time = (vx_tensor)parameters[2];
+    vx_tensor  bias = (vx_tensor)parameters[3];
+    vx_tensor  state_in = (vx_tensor)parameters[4];
+    vx_tensor  ranks = (vx_tensor)parameters[5];
+
+    vx_tensor  outputs = (vx_tensor)parameters[8];
+
+    vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
+
+
+    vx_int32 count = 0;
+    vx_op_param_s conv = { 0 };
+    vx_tensor output_feature = VX_NULL, depth_weight_time = VX_NULL, input_fc = VX_NULL, state_in_fc = VX_NULL;
+    vx_weights_biases_parameter weights_biases_feature = VX_NULL, weights_biases = VX_NULL;
+    vx_bool feature_sw = vxoNode_CheckF32Support(ops_layer->node), state_map_sw = vxoNode_CheckF32Support(ops_layer->node), time_sw = vxoNode_CheckF32Support(ops_layer->node);
+    /* step2, map result to state in */
+    vx_int32 batch_size = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+    vx_int32 input_size = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+    vx_int32 rank = (ranks != VX_NULL) ? (vx_int32)VX_GET_DATA_FROM_TENSOR(ranks, 0) : 1;
+    vx_int32 num_unit = TENSOR_VIEW_SIZE_INDEX(weights_feature, 1);
+    vx_int32 memory_size = TENSOR_VIEW_SIZE_INDEX(recurrent_time, 0);
+    vx_bool aligned64 = (batch_size == 1 || ((batch_size > 1) && (input_size * TENSOR_DATA_SIZE(inputs)) % 64 == 0)) ? vx_true_e : vx_false_e;
+
+    vx_tensor_create_params_t tensor_create_params;
+    vx_int32 sizes[][4] = {
+        { 1, 1, num_unit, batch_size }, /*output feature*/
+        { 1, 1, memory_size *  num_unit, num_unit / rank }, /*depth weight time*/
+        { 1, 1, input_size, batch_size }, /*input fc reshape*/
+        { 1, 1, memory_size *  num_unit, batch_size }, /*state in fc reshape*/
+        { 1, 1, input_size, num_unit }, /*output feature*/
+    };
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = 4;
+    tensor_create_params.sizes = (vx_uint32_ptr)sizes[0];
+    tensor_create_params.data_format = TENSOR_DATA_TYPE(inputs);
+    tensor_create_params.quant_format = TENSOR_QUANT_TYPE(inputs);
+    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(inputs);
+    }
+    else
+    {
+        tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(inputs);
+        tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
+    }
+
+    output_feature = vxoTensor_CreateVirtualTensor2(ops_layer->node->graph, &tensor_create_params, sizeof(vx_tensor_create_params_t));
+
+    tensor_create_params.sizes = (vx_uint32_ptr)sizes[1];
+    depth_weight_time = vxoTensor_CreateTensor2(ops_layer->node->base.context, &tensor_create_params, sizeof(vx_tensor_create_params_t));
+
+    input_fc = vxoTensor_ReshapeTensor(inputs, sizes[2], 4);
+
+    state_in_fc = vxoTensor_ReshapeTensor(state_in, sizes[3], 4);
+
+    svdfLayer->base.temp_tensors[svdfLayer->base.num_temp_tensors++] = output_feature;
+    svdfLayer->base.temp_tensors[svdfLayer->base.num_temp_tensors++] = depth_weight_time;
+    svdfLayer->base.temp_tensors[svdfLayer->base.num_temp_tensors++] = input_fc;
+    svdfLayer->base.temp_tensors[svdfLayer->base.num_temp_tensors++] = state_in_fc;
+
+    vxnneExecuteSVDF_DepthWeightsTime(recurrent_time, depth_weight_time, rank);
+
+    feature_sw = (vxnneIsNNSupportFormat(ops_layer->node->base.context, input_fc, VX_NULL, output_feature) || aligned64)?vx_false_e:vx_true_e;
+
+    if (feature_sw)
+    {
+
+        vxmONERROR(vxnneOperation_Initialize(&svdfLayer->svdf_sw_fc_operations[0].base,
+            &svdfLayer->base,
+            VXNNE_OPERATION_TARGET_SW,
+            VXNNE_OPERATOR_FULLYCONNECTED,
+            vxnneExecuteSWFullyConnected,
+            VX_NULL,
+            batchCount,
+            0));
+        vxmONERROR(vxnneLayer_SetOperation(
+            &svdfLayer->base,
+            &svdfLayer->svdf_sw_fc_operations[0].base,
+            count++));
+
+        svdfLayer->svdf_sw_fc_operations[0].inputs = input_fc;
+        svdfLayer->svdf_sw_fc_operations[0].weights = weights_feature;
+        svdfLayer->svdf_sw_fc_operations[0].biases = VX_NULL;
+        svdfLayer->svdf_sw_fc_operations[0].outputs = output_feature;
+
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_fc_operations[0].base, (vx_reference)input_fc, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_fc_operations[0].base, (vx_reference)weights_feature, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_fc_operations[0].base, (vx_reference)output_feature, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    }
+    else if (aligned64)
+    {
+        /* step1, input * weight_feature */
+        weights_biases_feature = _createWeightsBiasesParameterFromTensors(
+            ops_layer->node->base.context,
+            VX_NN_FULLYCONNECTED_LAYER,
+            input_fc->dims,/*inputs_dims,*/
+            input_fc->dimCount,
+            output_feature->dimCount,
+            0,
+            0,
+            0,
+            0,
+            0,/*pooling_size_x,*/
+            0,/*pooling_size_y,*/
+            0,
+            0,
+            VX_NN_DS_SIZE_ROUNDING_FLOOR,
+            output_feature->dims,/*convolution_outputs_dims,*/
+            output_feature->dims,/*pool_outputs_dims,*/
+            NULL, /*optimizations,*/
+            TENSOR_DATA_TYPE(weights_feature),
+            0,
+            VX_TENSOR_RANK_SN,
+            weights_feature,
+            VX_NULL,
+            VX_NULL,
+            vx_false_e,
+            vx_false_e
+        );
+
+        vxmONERROR(vxoNNFullyConnectedLayerInitializer(
+            ops_layer->node,
+            &svdfLayer->base,
+            &svdfLayer->svdf_tp_operation[count],
+            VX_NULL,
+            VX_NULL,
+            VX_NULL,
+            input_fc,
+            weights_biases_feature,
+            0,
+            0,
+            vx_false_e,
+            &count,
+            output_feature));
+    }
+    else
+    {
+        /* NN implement */
+        /*vx_op_param_s conv = { 0 };*/
+        vx_tensor weights_feature_fc = VX_NULL;
+
+        weights_feature_fc = vxoTensor_ReshapeTensor(weights_feature, sizes[4], 4);
+
+        svdfLayer->base.temp_tensors[svdfLayer->base.num_temp_tensors++] = weights_feature_fc;
+
+        weights_biases_feature = _createWeightsBiasesParameterFromTensors(
+            vxGetContext((vx_reference)ops_layer->node),
+            VX_NN_CONVOLUTION_LAYER,
+            input_fc->dims,/*inputs_dims,*/
+            input_fc->dimCount,
+            output_feature->dimCount,
+            0,
+            0,
+            0,
+            0,
+            0,/*pooling_size_x,*/
+            0,/*pooling_size_y,*/
+            0,
+            0,
+            VX_NN_DS_SIZE_ROUNDING_FLOOR,
+            output_feature->dims,/*convolution_outputs_dims,*/
+            output_feature->dims,/*pool_outputs_dims,*/
+            NULL, /*optimizations,*/
+            TENSOR_DATA_TYPE(weights_feature_fc),
+            0,
+            VX_TENSOR_RANK_WHCN,
+            weights_feature_fc,
+            VX_NULL,
+            VX_NULL,
+            vx_false_e,
+            vx_false_e
+        );
+
+        vxmONERROR(vxnneOperation_Initialize(&svdfLayer->svdf_nn_operation[0].base,
+            &svdfLayer->base,
+            VXNNE_OPERATION_TARGET_NN,
+            VXNNE_OPERATOR_CONVOLUTION,
+            VX_NULL,
+            VX_NULL,
+            batch_size,
+            NNE_COMMAND_SIZE));
+
+        conv.pad_x_left = conv.pad_x_right = conv.pad_y_top = conv.pad_y_bottom = 0;
+        conv.pad_mode = VX_PAD_CONSTANT;
+        conv.pad_const = 0;
+        conv.pool_type = 0;
+        conv.pool_size_x = conv.pool_size_y = 0;
+        conv.conv_rounding_type = 0;
+        conv.enable_relu = vx_false_e;
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &svdfLayer->base,
+            &svdfLayer->svdf_nn_operation[0].base,
+            count++));
+
+        svdfLayer->svdf_nn_operation[0].orig_inputs = inputs;
+        svdfLayer->svdf_nn_operation[0].inputs = input_fc;
+        svdfLayer->svdf_nn_operation[0].weights_biases = weights_biases_feature;
+        svdfLayer->svdf_nn_operation[0].outputs = output_feature;
+
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_nn_operation[0].base, (vx_reference)input_fc, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_nn_operation[0].base, (vx_reference)output_feature, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        memcpy(&svdfLayer->svdf_nn_operation[0].base.parameter, &conv, sizeof(vx_op_param_s));
+    }
+
+    state_map_sw = (vxnneIsTPSupportFormat(ops_layer->node->base.context, output_feature, VX_NULL, state_in_fc))?vx_false_e:vx_true_e;
+
+
+    /* step2, map result to state in */
+    if (state_map_sw)
+    {
+        vxmONERROR(vxnneOperation_Initialize(&svdfLayer->svdf_sw_operations[0].base,
+            &svdfLayer->base,
+            VXNNE_OPERATION_TARGET_SW,
+            VXNNE_OPERATOR_SVDF_MAP,
+            vxnneExecuteSWSVDF_MAP,
+            VX_NULL,
+            batchCount,
+            0));
+        vxmONERROR(vxnneLayer_SetOperation(
+            &svdfLayer->base,
+            &svdfLayer->svdf_sw_operations[0].base,
+            count++));
+
+        svdfLayer->svdf_sw_operations[0].inputs = output_feature;
+        svdfLayer->svdf_sw_operations[0].outputs = state_in_fc;
+
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_operations[0].base, (vx_reference)output_feature, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_operations[0].base, (vx_reference)state_in_fc, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    }
+    else
+    {
+        conv.pad_x_left = 0;
+        conv.pad_y_top = 0;
+        conv.pool_size_x = 0;
+        conv.pool_size_y = 0;
+        conv.pool_stride = 1;
+        conv.enable_relu = vx_false_e;
+        conv.pad_mode = VX_PAD_CONSTANT;
+        conv.pad_const = 0;
+
+        vxmONERROR(vxnneOperation_Initialize(&svdfLayer->svdf_tp_operation[count].base,
+            &svdfLayer->base,
+            VXNNE_OPERATION_TARGET_TP,
+            VXNNE_OPERATOR_SVDF_MAP,
+            VX_NULL,
+            vxnneOperation_TP_Deinitialize,
+            batch_size,
+            0));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &svdfLayer->base,
+            &svdfLayer->svdf_tp_operation[1].base,
+            count++));
+
+        svdfLayer->svdf_tp_operation[count - 1].input = output_feature;
+        svdfLayer->svdf_tp_operation[count - 1].output = state_in;
+
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_tp_operation[count - 1].base, (vx_reference)output_feature, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_tp_operation[count - 1].base, (vx_reference)state_in, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        conv.tpType = TP_TENSOR_SVDF_MAP;
+        conv.other_ref = (vx_reference)output_feature;
+
+        conv.data_buff = gcvNULL;
+
+        memcpy(&svdfLayer->svdf_tp_operation[count - 1].base.parameter, &conv, sizeof(vx_op_param_s));
+    }
+
+    time_sw = (!vxnneIsNNSupportFormat(ops_layer->node->base.context, state_in_fc, VX_NULL, outputs) && !aligned64)?vx_true_e:vx_false_e;
+
+    /* step3, state_in * weight_time */
+    if (time_sw)
+    {
+        vxmONERROR(vxnneOperation_Initialize(&svdfLayer->svdf_sw_fc_operations[1].base,
+            &svdfLayer->base,
+            VXNNE_OPERATION_TARGET_SW,
+            VXNNE_OPERATOR_FULLYCONNECTED,
+            vxnneExecuteSWFullyConnected,
+            VX_NULL,
+            batchCount,
+            0));
+        vxmONERROR(vxnneLayer_SetOperation(
+            &svdfLayer->base,
+            &svdfLayer->svdf_sw_fc_operations[1].base,
+            count++));
+
+        svdfLayer->svdf_sw_fc_operations[1].inputs = state_in_fc;
+        svdfLayer->svdf_sw_fc_operations[1].weights = depth_weight_time;
+        svdfLayer->svdf_sw_fc_operations[1].biases = bias;
+        svdfLayer->svdf_sw_fc_operations[1].outputs = outputs;
+
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_fc_operations[1].base, (vx_reference)state_in_fc, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_fc_operations[1].base, (vx_reference)depth_weight_time, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_fc_operations[1].base, (vx_reference)bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_sw_fc_operations[1].base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    }
+    else if (aligned64)
+    {
+        weights_biases = _createWeightsBiasesParameterFromTensors(
+            ops_layer->node->base.context,
+            VX_NN_FULLYCONNECTED_LAYER,
+            state_in->dims,/*inputs_dims,*/
+            state_in->dimCount,
+            outputs->dimCount,
+            0,
+            0,
+            0,
+            0,
+            0,/*pooling_size_x,*/
+            0,/*pooling_size_y,*/
+            0,
+            0,
+            VX_NN_DS_SIZE_ROUNDING_FLOOR,
+            outputs->dims,/*convolution_outputs_dims,*/
+            outputs->dims,/*pool_outputs_dims,*/
+            NULL, /*optimizations,*/
+            TENSOR_DATA_TYPE(depth_weight_time),
+            0,
+            VX_TENSOR_RANK_SN,
+            depth_weight_time,
+            bias,
+            VX_NULL,
+            vx_false_e,
+            vx_false_e
+        );
+
+        vxmONERROR(vxoNNFullyConnectedLayerInitializer(
+            ops_layer->node,
+            &svdfLayer->base,
+            &svdfLayer->svdf_tp_operation[count],
+            VX_NULL,
+            VX_NULL,
+            VX_NULL,
+            state_in,
+            weights_biases,
+            0,
+            0,
+            vx_false_e,
+            &count,
+            outputs));
+    }
+    else
+    {
+
+        /* NN implement */
+        /*vx_op_param_s conv = { 0 };*/
+        vx_tensor output_fc = VX_NULL;
+        vx_int32 nn_sizes[] = { 1, 1, TENSOR_SIZE_INDEX(outputs, 0), TENSOR_SIZE_INDEX(outputs, 1) };
+
+        output_fc = vxoTensor_ReshapeTensor(outputs, nn_sizes, 4);
+
+        svdfLayer->base.temp_tensors[svdfLayer->base.num_temp_tensors++] = output_fc;
+
+        weights_biases = _createWeightsBiasesParameterFromTensors(
+            vxGetContext((vx_reference)ops_layer->node),
+            VX_NN_CONVOLUTION_LAYER,
+            state_in_fc->dims,/*inputs_dims,*/
+            state_in_fc->dimCount,
+            output_fc->dimCount,
+            0,
+            0,
+            0,
+            0,
+            0,/*pooling_size_x,*/
+            0,/*pooling_size_y,*/
+            0,
+            0,
+            VX_NN_DS_SIZE_ROUNDING_FLOOR,
+            output_fc->dims,/*convolution_outputs_dims,*/
+            output_fc->dims,/*pool_outputs_dims,*/
+            NULL, /*optimizations,*/
+            TENSOR_DATA_TYPE(depth_weight_time),
+            0,
+            VX_TENSOR_RANK_WHCN,
+            depth_weight_time,
+            bias,
+            VX_NULL,
+            vx_false_e,
+            vx_false_e
+        );
+
+        vxmONERROR(vxnneOperation_Initialize(&svdfLayer->svdf_nn_operation[1].base,
+            &svdfLayer->base,
+            VXNNE_OPERATION_TARGET_NN,
+            VXNNE_OPERATOR_CONVOLUTION,
+            VX_NULL,
+            VX_NULL,
+            batch_size,
+            NNE_COMMAND_SIZE));
+
+        conv.pad_x_left = conv.pad_x_right = conv.pad_y_top = conv.pad_y_bottom = 0;
+        conv.pad_mode = VX_PAD_CONSTANT;
+        conv.pad_const = 0;
+        conv.pool_type = 0;
+        conv.pool_size_x = conv.pool_size_y = 0;
+        conv.conv_rounding_type = 0;
+        conv.enable_relu = vx_false_e;
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &svdfLayer->base,
+            &svdfLayer->svdf_nn_operation[1].base,
+            count++));
+
+        svdfLayer->svdf_nn_operation[1].orig_inputs = state_in;
+        svdfLayer->svdf_nn_operation[1].inputs = state_in_fc;
+        svdfLayer->svdf_nn_operation[1].weights_biases = weights_biases;
+        svdfLayer->svdf_nn_operation[1].outputs = output_fc;
+
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_nn_operation[1].base, (vx_reference)state_in_fc, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&svdfLayer->svdf_nn_operation[1].base, (vx_reference)output_fc, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        memcpy(&svdfLayer->svdf_nn_operation[1].base.parameter, &conv, sizeof(vx_op_param_s));
+    }
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetSVDFOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+    vxnne_svdf_layer  svdfLayer = (vxnne_svdf_layer)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(svdfLayer->operations);
+
+    *operations = svdfLayer->operations;
+
+    return status;
+}
+
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
+    vxnne_layer_imp_s registerSVDFLayers[] = {/* Please DON'T adjust the order, it's importent */
+        { "SVDF NN/TP", vxoSVDFLayer_NN_TP_Support, vxoSVDFLayer_NN_TP_Initialize, VX_NULL },
+        { "SVDF TP", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "SVDF SH EVIS", vxoSVDFLayer_SH_EVIS_Support, vxoSVDFLayer_SH_EVIS_Initialize, VX_NULL },
+        { "SVDF SH F32", vxoSVDFLayer_SH_Support, vxoSVDFLayer_SH_Initialize, VX_NULL },
+        { "SVDF SW ", vxoNNCommon_Support, vxoSVDFLayer_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerSVDFLayers, vxnne_svdf_layer_s, "SVDF", vxoNNLayer_GetSVDFOperations);
+
+OnError:
+#else
     vx_tensor  inputs = (vx_tensor)parameters[0];
     vx_tensor  weights_feature = (vx_tensor)parameters[1];
     vx_tensor  recurrent_time = (vx_tensor)parameters[2];
@@ -1742,6 +3050,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
     return status;
 exit:
     if (svdfLayer) gcoOS_Free(NULL, (gctPOINTER)svdfLayer);
+#endif
     return status;
 }
 
@@ -3584,10 +4893,975 @@ exit:
     return status;
 }
 
+#if REGISTER_FRAME
+
+VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_int32  index = 0;
+    vx_tensor input = (vx_tensor)parameters[index++];
+
+    vx_tensor input2input_weight = (vx_tensor)parameters[index++];
+    vx_tensor input2forget_weight = (vx_tensor)parameters[index++];
+    vx_tensor input2cell_weight = (vx_tensor)parameters[index++];
+    vx_tensor input2output_weight = (vx_tensor)parameters[index++];
+
+    vx_tensor recurrent2input_weight = (vx_tensor)parameters[index++];
+    vx_tensor recurrent2forget_weight = (vx_tensor)parameters[index++];
+    vx_tensor recurrent2cell_weight = (vx_tensor)parameters[index++];
+    vx_tensor recurrent2output_weight = (vx_tensor)parameters[index++];
+
+    vx_tensor cell2input_weight = (vx_tensor)parameters[index++];
+    vx_tensor cell2forget_weight = (vx_tensor)parameters[index++];
+    vx_tensor cell2output_weight = (vx_tensor)parameters[index++];
+
+    vx_tensor layernorm2input_weight = (vx_tensor)parameters[index++];
+    vx_tensor layernorm2forget_weight = (vx_tensor)parameters[index++];
+    vx_tensor layernorm2cell_weight = (vx_tensor)parameters[index++];
+    vx_tensor layernorm2output_weight = (vx_tensor)parameters[index++];
+
+    vx_tensor input_gate_bias = (vx_tensor)parameters[index++];
+    vx_tensor forget_gate_bias = (vx_tensor)parameters[index++];
+    vx_tensor cell_bias = (vx_tensor)parameters[index++];
+    vx_tensor output_gate_bias = (vx_tensor)parameters[index++];
+
+    vx_tensor projection_weight = (vx_tensor)parameters[index++];
+    vx_tensor projection_bias = (vx_tensor)parameters[index++];
+    vx_tensor output_state_in = (vx_tensor)parameters[index++];
+    vx_tensor cell_state_in = (vx_tensor)parameters[index++];
+
+    vx_tensor activation = (vx_tensor)parameters[index++];
+    vx_tensor forget_bias = (vx_tensor)parameters[index++];
+    vx_tensor cell_clip = (vx_tensor)parameters[index++];
+    vx_tensor proj_clip = (vx_tensor)parameters[index++];
+
+    vx_tensor scratch = (vx_tensor)parameters[index++];
+    vx_tensor output_state_out = (vx_tensor)parameters[index++];
+    vx_tensor cell_state_out = (vx_tensor)parameters[index++];
+    vx_tensor output = (vx_tensor)parameters[index++];
+    vx_uint32 batchCount = 1;//TENSOR_SIZE_INDEX(input, 1);
+    vx_status status = VX_SUCCESS;
+    vxnne_lstm_unit  lstmUnitNode = (vxnne_lstm_unit)ops_layer;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxnneOperation_Initialize(&lstmUnitNode->lstm_unit_operation.base,
+        &lstmUnitNode->base,
+        VXNNE_OPERATION_TARGET_SW,
+        VXNNE_OPERATOR_LSTM_UNIT,
+        vxnneExecuteSW_LSTMUnit,
+        VX_NULL,
+        batchCount,
+        0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &lstmUnitNode->base,
+        &lstmUnitNode->lstm_unit_operation.base,
+        0));
+
+    lstmUnitNode->lstm_unit_operation.input                     = input;
+
+    lstmUnitNode->lstm_unit_operation.input2input_weight        = input2input_weight;
+    lstmUnitNode->lstm_unit_operation.input2forget_weight       = input2forget_weight;
+    lstmUnitNode->lstm_unit_operation.input2cell_weight         = input2cell_weight;
+    lstmUnitNode->lstm_unit_operation.input2output_weight       = input2output_weight;
+
+    lstmUnitNode->lstm_unit_operation.recurrent2input_weight    = recurrent2input_weight;
+    lstmUnitNode->lstm_unit_operation.recurrent2forget_weight   = recurrent2forget_weight;
+    lstmUnitNode->lstm_unit_operation.recurrent2cell_weight     = recurrent2cell_weight;
+    lstmUnitNode->lstm_unit_operation.recurrent2output_weight   = recurrent2output_weight;
+
+    lstmUnitNode->lstm_unit_operation.cell2input_weight         = cell2input_weight;
+    lstmUnitNode->lstm_unit_operation.cell2forget_weight        = cell2forget_weight;
+    lstmUnitNode->lstm_unit_operation.cell2output_weight        = cell2output_weight;
+
+    lstmUnitNode->lstm_unit_operation.layernorm2input_weight    = layernorm2input_weight;
+    lstmUnitNode->lstm_unit_operation.layernorm2forget_weight   = layernorm2forget_weight;
+    lstmUnitNode->lstm_unit_operation.layernorm2cell_weight     = layernorm2cell_weight;
+    lstmUnitNode->lstm_unit_operation.layernorm2output_weight   = layernorm2output_weight;
+
+    lstmUnitNode->lstm_unit_operation.input_gate_bias           = input_gate_bias;
+    lstmUnitNode->lstm_unit_operation.forget_gate_bias          = forget_gate_bias;
+    lstmUnitNode->lstm_unit_operation.cell_bias                 = cell_bias;
+    lstmUnitNode->lstm_unit_operation.output_gate_bias          = output_gate_bias;
+
+    lstmUnitNode->lstm_unit_operation.projection_weight         = projection_weight;
+    lstmUnitNode->lstm_unit_operation.projection_bias           = projection_bias;
+    lstmUnitNode->lstm_unit_operation.output_state_in           = output_state_in;
+    lstmUnitNode->lstm_unit_operation.cell_state_in             = cell_state_in;
+
+    lstmUnitNode->lstm_unit_operation.activation                = activation;
+    lstmUnitNode->lstm_unit_operation.forget_bias               = forget_bias;
+    lstmUnitNode->lstm_unit_operation.cell_clip                 = cell_clip;
+    lstmUnitNode->lstm_unit_operation.proj_clip                 = proj_clip;
+
+    lstmUnitNode->lstm_unit_operation.scratch                   = scratch;
+    lstmUnitNode->lstm_unit_operation.output_state_out          = output_state_out;
+    lstmUnitNode->lstm_unit_operation.cell_state_out            = cell_state_out;
+    lstmUnitNode->lstm_unit_operation.output                    = output;
+
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2input_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2cell_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2output_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)recurrent2input_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)recurrent2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)recurrent2cell_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)recurrent2output_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)layernorm2input_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)layernorm2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)layernorm2cell_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)layernorm2output_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell2input_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell2output_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input_gate_bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)forget_gate_bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell_bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output_gate_bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output_state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell_state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+
+    if (projection_weight)vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)projection_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    if (projection_bias)vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)projection_bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)scratch, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output_state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell_state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNN_LSTMUnit_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_tensor input = (vx_tensor)parameters[0];
+    vx_tensor input2forget_weight = (vx_tensor)parameters[2];
+    vx_tensor activation = (vx_tensor)parameters[24];
+    vx_tensor output = (vx_tensor)parameters[31];
+
+    vx_bool   enable_activation = vx_false_e;
+    vx_enum   inputFormat = TENSOR_DATA_TYPE(input);
+    vx_enum   w_xFormat = TENSOR_DATA_TYPE(input2forget_weight);
+    vx_enum   outputFormat = TENSOR_DATA_TYPE(output);
+    vx_enum   actType = 0;
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    enable_activation = (vx_bool)((CHECK_LIFETIME_IS_STATIC(activation) && *((vx_enum*)TENSOR_LOGICAL_ADDR(activation)) == lstm_activation_tanh) || CHECK_LIFETIME_IS_STATIC(activation) == vx_false_e);
+
+    if (evis)
+    {
+        support = (vx_bool)(enable_activation &&
+                            inputFormat == VX_TYPE_FLOAT16 &&
+                            w_xFormat == VX_TYPE_FLOAT16 &&
+                            outputFormat == VX_TYPE_FLOAT16);
+    }
+    else
+    {
+        switch (*((vx_enum*)TENSOR_LOGICAL_ADDR(activation)))
+        {
+        case 0:
+            actType = VX_NN_ACTIVATION_NONE;
+            break;
+        default:
+        case 4:
+            actType = VX_NN_ACTIVATION_HYPERBOLIC_TAN;
+            break;
+        case 1:
+            actType = VX_NN_ACTIVATION_RELU;
+            break;
+        case 3:
+            actType = VX_NN_ACTIVATION_RELU6;
+            break;
+        case 6:
+            actType = VX_NN_ACTIVATION_LOGISTIC;
+            break;
+        }
+
+        support = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && w_xFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
+                            (inputFormat == VX_TYPE_FLOAT32 && w_xFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32));
+
+    }
+
+    if (support)
+    {
+        reg_param->flag = actType;
+    }
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoNN_LSTMUnit_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoNN_LSTMUnit_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxnne_lstm_unit  lstmUnitNode = (vxnne_lstm_unit)ops_layer;
+
+    vx_tensor input = (vx_tensor)parameters[0];
+
+    vx_tensor input2input_weight = (vx_tensor)parameters[1];
+    vx_tensor input2forget_weight = (vx_tensor)parameters[2];
+    vx_tensor input2cell_weight = (vx_tensor)parameters[3];
+    vx_tensor input2output_weight = (vx_tensor)parameters[4];
+
+    vx_tensor recurrent2input_weight = (vx_tensor)parameters[5];
+    vx_tensor recurrent2forget_weight = (vx_tensor)parameters[6];
+    vx_tensor recurrent2cell_weight = (vx_tensor)parameters[7];
+    vx_tensor recurrent2output_weight = (vx_tensor)parameters[8];
+
+    vx_tensor cell2input_weight = (vx_tensor)parameters[9];
+    vx_tensor cell2forget_weight = (vx_tensor)parameters[10];
+    vx_tensor cell2output_weight = (vx_tensor)parameters[11];
+
+    vx_tensor input_gate_bias = (vx_tensor)parameters[16];
+    vx_tensor forget_gate_bias = (vx_tensor)parameters[17];
+    vx_tensor cell_bias = (vx_tensor)parameters[18];
+    vx_tensor output_gate_bias = (vx_tensor)parameters[19];
+
+    vx_tensor projection_weight = (vx_tensor)parameters[20];
+    vx_tensor projection_bias = (vx_tensor)parameters[21];
+    vx_tensor output_state_in = (vx_tensor)parameters[22];
+    vx_tensor cell_state_in = (vx_tensor)parameters[23];
+
+    vx_tensor activation = (vx_tensor)parameters[24];
+
+    vx_tensor cell_clip = (vx_tensor)parameters[26];
+    vx_tensor proj_clip = (vx_tensor)parameters[27];
+
+    vx_tensor output_state_out = (vx_tensor)parameters[29];
+    vx_tensor cell_state_out = (vx_tensor)parameters[30];
+    vx_tensor output = (vx_tensor)parameters[31];
+
+    vx_uint32 batchCount = 1;//TENSOR_SIZE_INDEX(input, 1);
+
+    vx_bool   enable_cifg = (input2input_weight == VX_NULL) ? vx_true_e : vx_false_e;
+    vx_bool   enable_peephole = (cell2output_weight != VX_NULL) ? vx_true_e : vx_false_e;
+    vx_bool   enable_projection = (projection_weight != VX_NULL) ? vx_true_e : vx_false_e;
+    //     vx_bool   enable_proj_bias        = (projection_bias != VX_NULL)    ? vx_true_e : vx_false_e;
+
+    vx_enum   actType = reg_param->flag;
+    vx_float32 cellClipValue = (vx_float32)((cell_clip == NULL) ? 0.0f : *((vx_float32*)TENSOR_LOGICAL_ADDR(cell_clip)));
+    vx_float32 projClipValue = (vx_float32)((proj_clip == NULL) ? 0.0f : *((vx_float32*)TENSOR_LOGICAL_ADDR(proj_clip)));
+
+    vxnne_shader_executable shaderExecutable;
+    vx_uint32 tmpTensorIndex = 0;
+    vx_uint32 ts_cp_op_idx = 0;
+    vx_tensor w_x = NULL;
+    vx_tensor w_h = NULL;
+    vx_tensor bias = NULL;
+    vx_tensor fc_output = NULL;
+    vx_tensor project_out = NULL;
+    vx_tensor tensorArray[4] = { NULL };
+    vx_uint32 sizes[] = { 1,1,1,1 };
+    vx_uint32 dims = TENSOR_DIM_NUM(input2forget_weight);
+    vx_uint32 inputCount = 0;
+    vx_uint32 numofweights = enable_cifg ? 3 : 4;
+    vx_uint32 idx = 0;
+    vx_tensor_create_params_t tensor_create_params;
+    vx_bool   isDynamicInput = vx_false_e;
+    vx_uint32 opIdx = 0;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    /* Concat input weights. */
+    sizes[0] = TENSOR_VIEW_SIZE_INDEX(input2forget_weight, 0);
+    sizes[1] = TENSOR_VIEW_SIZE_INDEX(input2forget_weight, 1) * numofweights;
+    dims = 2;
+    idx = 0;
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = dims;
+    tensor_create_params.sizes = sizes;
+    tensor_create_params.data_format = TENSOR_DATA_TYPE(input2forget_weight);
+    tensor_create_params.quant_format = TENSOR_QUANT_TYPE(input2forget_weight);
+    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(input2forget_weight);
+    }
+    else
+    {
+        tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(input2forget_weight);
+        tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(input2forget_weight);
+    }
+
+    if (enable_cifg == vx_false_e)
+        tensorArray[idx++] = input2input_weight;
+    tensorArray[idx++] = input2forget_weight;
+    tensorArray[idx++] = input2cell_weight;
+    tensorArray[idx++] = input2output_weight;
+    w_x = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+    if (vxoTensor_AllocateMemory(w_x) != VX_SUCCESS)
+    {
+        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+        status = VX_ERROR_NO_MEMORY;
+        goto OnError;
+    }
+    lstmUnitNode->base.temp_tensors[tmpTensorIndex++] = w_x;
+
+    isDynamicInput = !CHECK_LIFETIME_IS_STATIC(input2forget_weight) ||
+        !CHECK_LIFETIME_IS_STATIC(input2cell_weight) ||
+        !CHECK_LIFETIME_IS_STATIC(input2output_weight);
+
+    if (isDynamicInput)
+    {
+        vxnne_shader_executable shaderExecutable;
+        vx_tensor       subtensor[4] = { NULL };
+        vx_tensor_view  tensor_view[4] = { NULL };
+        vx_uint32       start[4] = { 0, 0, 0, 0 };
+        vx_uint32       end[4] = { sizes[0], 0, 0, 0 };
+        vx_uint32       weight_height = TENSOR_VIEW_SIZE_INDEX(input2forget_weight, 1);
+        vx_uint32       i;
+
+        for (i = 0; i < idx; i++)
+        {
+            start[1] = end[1];
+            end[1] += weight_height;
+
+            tensor_view[i] = vxCreateTensorView(ops_layer->node->base.context, start, end, (vx_uint8)dims);
+            if (tensor_view[i] == NULL)
+            {
+                vxError("vxCreateTensorView failure! at line %d\n", __LINE__);
+                goto OnError;
+            }
+
+            subtensor[i] = vxoTensor_CreateTensorFromView(w_x, tensor_view[i]);
+            lstmUnitNode->base.temp_tensors[tmpTensorIndex++] = subtensor[i];
+
+            if (evis)
+            {
+                shaderExecutable = vxnneTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
+            }
+            else
+            {
+                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
+            }
+
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto OnError;
+            }
+
+            vxmONERROR(vxnneShaderOperation_Initialize(&lstmUnitNode->ts_cp_sh_operation[ts_cp_op_idx],
+                &lstmUnitNode->base,
+                VXNNE_OPERATOR_TENSOR_COPY,
+                batchCount,
+                shaderExecutable));
+
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->ts_cp_sh_operation[ts_cp_op_idx].base, (vx_reference)tensorArray[i], VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->ts_cp_sh_operation[ts_cp_op_idx].base, (vx_reference)subtensor[i], VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+            vxmONERROR(vxnneLayer_SetOperation(
+                &lstmUnitNode->base,
+                &lstmUnitNode->ts_cp_sh_operation[ts_cp_op_idx++].base,
+                opIdx++));
+
+            if (tensor_view[i]) vxReleaseTensorView(&tensor_view[i]);
+        }
+    }
+    else
+    {
+        vxmONERROR(vxnneExecuteSWLstmPreProcessConcat(tensorArray, numofweights, w_x));
+    }
+
+    /* Concat recurrent weights. */
+    sizes[0] = TENSOR_VIEW_SIZE_INDEX(recurrent2forget_weight, 0);
+    sizes[1] = TENSOR_VIEW_SIZE_INDEX(recurrent2forget_weight, 1) * numofweights;
+    dims = 2;
+    idx = 0;
+    if (enable_cifg == vx_false_e)
+        tensorArray[idx++] = recurrent2input_weight;
+    tensorArray[idx++] = recurrent2forget_weight;
+    tensorArray[idx++] = recurrent2cell_weight;
+    tensorArray[idx++] = recurrent2output_weight;
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = dims;
+    tensor_create_params.sizes = sizes;
+    tensor_create_params.data_format = TENSOR_DATA_TYPE(recurrent2forget_weight);
+    tensor_create_params.quant_format = TENSOR_QUANT_TYPE(recurrent2forget_weight);
+    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(recurrent2forget_weight);
+    }
+    else
+    {
+        tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(recurrent2forget_weight);
+        tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(recurrent2forget_weight);
+    }
+
+    w_h = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+    if (vxoTensor_AllocateMemory(w_h) != VX_SUCCESS)
+    {
+        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+        status = VX_ERROR_NO_MEMORY;
+        return status;
+    }
+    lstmUnitNode->base.temp_tensors[tmpTensorIndex++] = w_h;
+
+    isDynamicInput = !CHECK_LIFETIME_IS_STATIC(recurrent2forget_weight) ||
+        !CHECK_LIFETIME_IS_STATIC(recurrent2cell_weight) ||
+        !CHECK_LIFETIME_IS_STATIC(recurrent2output_weight);
+
+    if (isDynamicInput)
+    {
+        vxnne_shader_executable shaderExecutable;
+        vx_tensor       subtensor[4] = { NULL };
+        vx_tensor_view  tensor_view[4] = { NULL };
+        vx_uint32       start[4] = { 0, 0, 0, 0 };
+        vx_uint32       end[4] = { sizes[0], 0, 0, 0 };
+        vx_uint32       weight_height = TENSOR_VIEW_SIZE_INDEX(recurrent2forget_weight, 1);
+        vx_uint32       i;
+
+        for (i = 0; i < idx; i++)
+        {
+            start[1] = end[1];
+            end[1] += weight_height;
+
+            tensor_view[i] = vxCreateTensorView(ops_layer->node->base.context, start, end, (vx_uint8)dims);
+            if (tensor_view[i] == NULL)
+            {
+                vxError("vxCreateTensorView failure! at line %d\n", __LINE__);
+                goto OnError;
+            }
+
+            subtensor[i] = vxoTensor_CreateTensorFromView(w_h, tensor_view[i]);
+            lstmUnitNode->base.temp_tensors[tmpTensorIndex++] = subtensor[i];
+
+            if (evis)
+            {
+                shaderExecutable = vxnneTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
+            }
+            else
+            {
+                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
+            }
+
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto OnError;
+            }
+
+            vxmONERROR(vxnneShaderOperation_Initialize(&lstmUnitNode->ts_cp_sh_operation[ts_cp_op_idx],
+                &lstmUnitNode->base,
+                VXNNE_OPERATOR_TENSOR_COPY,
+                batchCount,
+                shaderExecutable));
+
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->ts_cp_sh_operation[ts_cp_op_idx].base, (vx_reference)tensorArray[i], VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->ts_cp_sh_operation[ts_cp_op_idx].base, (vx_reference)subtensor[i], VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+            vxmONERROR(vxnneLayer_SetOperation(
+                &lstmUnitNode->base,
+                &lstmUnitNode->ts_cp_sh_operation[ts_cp_op_idx++].base,
+                opIdx++));
+
+            if (tensor_view[i]) vxReleaseTensorView(&tensor_view[i]);
+        }
+    }
+    else
+    {
+        vxmONERROR(vxnneExecuteSWLstmPreProcessConcat(tensorArray, numofweights, w_h));
+    }
+
+    /* Concat biases. */
+    sizes[0] = TENSOR_VIEW_SIZE_INDEX(forget_gate_bias, 0) * numofweights;
+    sizes[1] = 1;
+    dims = 2;
+    idx = 0;
+    if (enable_cifg == vx_false_e)
+        tensorArray[idx++] = input_gate_bias;
+    tensorArray[idx++] = forget_gate_bias;
+    tensorArray[idx++] = cell_bias;
+    tensorArray[idx++] = output_gate_bias;
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = dims;
+    tensor_create_params.sizes = sizes;
+    tensor_create_params.data_format = TENSOR_DATA_TYPE(forget_gate_bias);
+    tensor_create_params.quant_format = TENSOR_QUANT_TYPE(forget_gate_bias);
+    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(forget_gate_bias);
+    }
+    else
+    {
+        tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(forget_gate_bias);
+        tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(forget_gate_bias);
+    }
+    bias = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+    if (vxoTensor_AllocateMemory(bias) != VX_SUCCESS)
+    {
+        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+        status = VX_ERROR_NO_MEMORY;
+        return status;
+    }
+    lstmUnitNode->base.temp_tensors[tmpTensorIndex++] = bias;
+
+    isDynamicInput = !CHECK_LIFETIME_IS_STATIC(forget_gate_bias) ||
+        !CHECK_LIFETIME_IS_STATIC(cell_bias) ||
+        !CHECK_LIFETIME_IS_STATIC(forget_gate_bias);
+
+    if (isDynamicInput)
+    {
+        vxnne_shader_executable shaderExecutable;
+        vx_tensor       subtensor[4] = { NULL };
+        vx_tensor_view  tensor_view[4] = { NULL };
+        vx_uint32       start[4] = { 0, 0, 0, 0 };
+        vx_uint32       end[4] = { 0, 1, 1, 1 };
+        vx_uint32       bias_width = TENSOR_VIEW_SIZE_INDEX(forget_gate_bias, 0);
+        vx_uint32       i;
+
+        for (i = 0; i < idx; i++)
+        {
+            start[0] = end[0];
+            end[0] += bias_width;
+
+            tensor_view[i] = vxCreateTensorView(ops_layer->node->base.context, start, end, (vx_uint8)dims);
+            if (tensor_view[i] == NULL)
+            {
+                vxError("vxCreateTensorView failure! at line %d\n", __LINE__);
+                goto OnError;
+            }
+
+            subtensor[i] = vxoTensor_CreateTensorFromView(bias, tensor_view[i]);
+            lstmUnitNode->base.temp_tensors[tmpTensorIndex++] = subtensor[i];
+
+            if (evis)
+            {
+                shaderExecutable = vxnneTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
+            }
+            else
+            {
+                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, tensorArray[i], subtensor[i]);
+            }
+
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto OnError;
+            }
+
+            vxmONERROR(vxnneShaderOperation_Initialize(&lstmUnitNode->ts_cp_sh_operation[ts_cp_op_idx],
+                &lstmUnitNode->base,
+                VXNNE_OPERATOR_TENSOR_COPY,
+                batchCount,
+                shaderExecutable));
+
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->ts_cp_sh_operation[ts_cp_op_idx].base, (vx_reference)tensorArray[i], VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->ts_cp_sh_operation[ts_cp_op_idx].base, (vx_reference)subtensor[i], VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+            vxmONERROR(vxnneLayer_SetOperation(
+                &lstmUnitNode->base,
+                &lstmUnitNode->ts_cp_sh_operation[ts_cp_op_idx++].base,
+                opIdx++));
+
+            if (tensor_view[i]) vxReleaseTensorView(&tensor_view[i]);
+        }
+    }
+    else
+    {
+        vxmONERROR(vxnneExecuteSWLstmPreProcessConcat(tensorArray, numofweights, bias));
+    }
+
+    vxmONERROR(vxoTensor_GetTensorElementCount(input, &inputCount));
+    sizes[0] = TENSOR_VIEW_SIZE_INDEX(input2forget_weight, 1) * numofweights;
+    sizes[1] = inputCount / TENSOR_VIEW_SIZE_INDEX(input2forget_weight, 0);
+    dims = 2;
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = dims;
+    tensor_create_params.sizes = sizes;
+    tensor_create_params.data_format = TENSOR_DATA_TYPE(input);
+    tensor_create_params.quant_format = TENSOR_QUANT_TYPE(input);
+    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(input);
+    }
+    else
+    {
+        tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(input);
+        tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(input);
+    }
+    fc_output = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_true_e);
+    lstmUnitNode->base.temp_tensors[tmpTensorIndex++] = fc_output;
+
+    /*op1 : fc*/
+    if (evis)
+    {
+        shaderExecutable = vxnneGetFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &ops_layer->node->kernelAttributes.borderMode, input, w_x, bias, VX_NN_ACTIVATION_NONE, fc_output);
+    }
+    else
+    {
+        shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_FULLYCONNECTED, &ops_layer->node->kernelAttributes.borderMode, vx_false_e, input, w_x, bias, VX_NN_ACTIVATION_NONE, fc_output);
+    }
+
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    vxmONERROR(vxnneShaderOperation_Initialize(&lstmUnitNode->lstm_fc_sh_operation,
+        &lstmUnitNode->base,
+        VXNNE_OPERATOR_FULLYCONNECTED,
+        batchCount,
+        shaderExecutable));
+
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_fc_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_fc_sh_operation.base, (vx_reference)w_x, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_fc_sh_operation.base, (vx_reference)bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_fc_sh_operation.base, (vx_reference)fc_output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    /*op2 : lstm unit*/
+    if (enable_projection)
+    {
+        sizes[0] = TENSOR_VIEW_SIZE_INDEX(projection_weight, 0);
+        sizes[1] = TENSOR_VIEW_SIZE_INDEX(output, 1);
+        dims = 2;
+
+        gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+        tensor_create_params.num_of_dims = dims;
+        tensor_create_params.sizes = sizes;
+        tensor_create_params.data_format = TENSOR_DATA_TYPE(output);
+        tensor_create_params.quant_format = TENSOR_QUANT_TYPE(output);
+        if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+        {
+            tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(output);
+        }
+        else
+        {
+            tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(output);
+            tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(output);
+        }
+
+        project_out = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_true_e);
+
+        lstmUnitNode->base.temp_tensors[tmpTensorIndex++] = project_out;
+
+        if (evis)
+        {
+            shaderExecutable = vxnneLSTMUnitShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_LSTMUNIT, &ops_layer->node->kernelAttributes.borderMode, fc_output, w_h, output_state_in, cell_state_in, cell_clip, enable_cifg, enable_peephole, enable_projection, cell2input_weight, cell2forget_weight, cell2output_weight, cell_state_out, output_state_out, activation, project_out);
+
+        }
+        else
+        {
+            shaderExecutable = vxnneGPULSTMUnitShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_LSTMUNIT, &ops_layer->node->kernelAttributes.borderMode, fc_output, w_h,
+                output_state_in, cell_state_in, cellClipValue, enable_cifg, enable_peephole, enable_projection, cell2input_weight,
+                cell2forget_weight, cell2output_weight, cell_state_out, output_state_out, actType, project_out);
+        }
+    }
+    else
+    {
+        if (evis)
+        {
+            shaderExecutable = vxnneLSTMUnitShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_LSTMUNIT, &ops_layer->node->kernelAttributes.borderMode, fc_output, w_h, output_state_in, cell_state_in, cell_clip, enable_cifg, enable_peephole, enable_projection, cell2input_weight, cell2forget_weight, cell2output_weight, cell_state_out, output_state_out, activation, output);
+
+        }
+        else
+        {
+            shaderExecutable = vxnneGPULSTMUnitShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_LSTMUNIT, &ops_layer->node->kernelAttributes.borderMode, fc_output, w_h,
+                output_state_in, cell_state_in, cellClipValue, enable_cifg, enable_peephole, enable_projection, cell2input_weight,
+                cell2forget_weight, cell2output_weight, cell_state_out, output_state_out, actType, output);
+        }
+    }
+
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    vxmONERROR(vxnneShaderOperation_Initialize(&lstmUnitNode->lstm_unit_sh_operation,
+        &lstmUnitNode->base,
+        VXNNE_OPERATOR_LSTM_UNIT,
+        batchCount,
+        shaderExecutable));
+
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)fc_output, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)w_h, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)output_state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)cell_state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)activation, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)cell_clip, VXNNE_OPERATION_REFENRENCE_INPUT));
+    if (enable_peephole)
+    {
+        if (cell2input_weight != NULL)
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)cell2input_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)cell2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)cell2output_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+    }
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)cell_state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)output_state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    if (enable_projection)
+    {
+        vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)project_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    }
+    else
+    {
+        vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    }
+
+
+    lstmUnitNode->base.num_temp_tensors = tmpTensorIndex;
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &lstmUnitNode->base,
+        &lstmUnitNode->lstm_fc_sh_operation.base,
+        opIdx++));
+    vxmONERROR(vxnneLayer_SetOperation(
+        &lstmUnitNode->base,
+        &lstmUnitNode->lstm_unit_sh_operation.base,
+        opIdx++));
+
+    if (enable_projection)
+    {
+        if (evis)
+        {
+            shaderExecutable = vxnneGetLSTMUnitProjectionShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_LSTMUNIT_PROJECTION, &ops_layer->node->kernelAttributes.borderMode, project_out, projection_weight, projection_bias, proj_clip, output_state_out, output);
+
+        }
+        else
+        {
+            shaderExecutable = vxnneGetGPULSTMUnitProjectionShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_LSTMUNIT_PROJECTION, &ops_layer->node->kernelAttributes.borderMode, project_out, projection_weight, projection_bias, projClipValue, output_state_out, output);
+
+        }
+
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            goto OnError;
+        }
+
+        vxmONERROR(vxnneShaderOperation_Initialize(&lstmUnitNode->lstm_unit_prj_sh_operation,
+            &lstmUnitNode->base,
+            VXNNE_OPERATOR_LSTM_UNIT,
+            batchCount,
+            shaderExecutable));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &lstmUnitNode->base,
+            &lstmUnitNode->lstm_unit_prj_sh_operation.base,
+            opIdx++));
+
+        vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_prj_sh_operation.base, (vx_reference)project_out, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_prj_sh_operation.base, (vx_reference)projection_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+        if (projection_bias)
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_prj_sh_operation.base, (vx_reference)projection_bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_prj_sh_operation.base, (vx_reference)proj_clip, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_prj_sh_operation.base, (vx_reference)output_state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+        vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_prj_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    }
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return VX_SUCCESS;
+}
+VX_PRIVATE_API vx_status vxoNN_LSTMUnit_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNN_LSTMUnit_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_bool vxoNN_LSTMUnit_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    support = support && vxoNN_LSTMUnit_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoNN_LSTMUnit_NN_TP_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_tensor input                     = (vx_tensor)parameters[0];
+
+    vx_tensor input2forget_weight       = (vx_tensor)parameters[2];
+    vx_tensor input2cell_weight         = (vx_tensor)parameters[3];
+    vx_tensor input2output_weight       = (vx_tensor)parameters[4];
+
+    vx_tensor recurrent2forget_weight   = (vx_tensor)parameters[6];
+    vx_tensor recurrent2cell_weight     = (vx_tensor)parameters[7];
+    vx_tensor recurrent2output_weight   = (vx_tensor)parameters[8];
+
+    vx_tensor forget_gate_bias          = (vx_tensor)parameters[17];
+    vx_tensor cell_bias                 = (vx_tensor)parameters[18];
+    vx_tensor output_gate_bias          = (vx_tensor)parameters[19];
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && (vxnneIsNNSupportFormat(node->base.context, input, VX_NULL, VX_NULL)
+        || vxnneIsTPSupportFormat(node->base.context, input, VX_NULL, VX_NULL));
+
+    if (!support)return support;
+
+    support = support && (CHECK_LIFETIME_IS_STATIC(input2forget_weight) &&
+                            CHECK_LIFETIME_IS_STATIC(input2cell_weight) &&
+                            CHECK_LIFETIME_IS_STATIC(input2output_weight) &&
+                            CHECK_LIFETIME_IS_STATIC(recurrent2forget_weight) &&
+                            CHECK_LIFETIME_IS_STATIC(recurrent2cell_weight) &&
+                            CHECK_LIFETIME_IS_STATIC(recurrent2output_weight) &&
+                            CHECK_LIFETIME_IS_STATIC(forget_gate_bias) &&
+                            CHECK_LIFETIME_IS_STATIC(cell_bias) &&
+                            CHECK_LIFETIME_IS_STATIC(output_gate_bias));
+
+    /*Need check why disable by default?*/
+    support = vx_false_e;
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNN_LSTMUnit_NN_TP_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_tensor input                     = (vx_tensor)parameters[0];
+
+    vx_tensor input2input_weight        = (vx_tensor)parameters[1];
+    vx_tensor input2forget_weight       = (vx_tensor)parameters[2];
+    vx_tensor input2cell_weight         = (vx_tensor)parameters[3];
+    vx_tensor input2output_weight       = (vx_tensor)parameters[4];
+
+    vx_tensor recurrent2input_weight    = (vx_tensor)parameters[5];
+    vx_tensor recurrent2forget_weight   = (vx_tensor)parameters[6];
+    vx_tensor recurrent2cell_weight     = (vx_tensor)parameters[7];
+    vx_tensor recurrent2output_weight   = (vx_tensor)parameters[8];
+
+    vx_tensor cell2input_weight         = (vx_tensor)parameters[9];
+    vx_tensor cell2forget_weight        = (vx_tensor)parameters[10];
+    vx_tensor cell2output_weight        = (vx_tensor)parameters[11];
+
+    vx_tensor input_gate_bias           = (vx_tensor)parameters[16];
+    vx_tensor forget_gate_bias          = (vx_tensor)parameters[17];
+    vx_tensor cell_bias                 = (vx_tensor)parameters[18];
+    vx_tensor output_gate_bias          = (vx_tensor)parameters[19];
+
+    vx_tensor projection_weight         = (vx_tensor)parameters[20];
+    vx_tensor projection_bias           = (vx_tensor)parameters[21];
+    vx_tensor output_state_in           = (vx_tensor)parameters[22];
+    vx_tensor cell_state_in             = (vx_tensor)parameters[23];
+
+    vx_tensor activation                = (vx_tensor)parameters[24];
+    vx_tensor forget_bias               = (vx_tensor)parameters[25];
+    vx_tensor cell_clip                 = (vx_tensor)parameters[26];
+    vx_tensor proj_clip                 = (vx_tensor)parameters[27];
+
+    vx_tensor output_state_out          = (vx_tensor)parameters[29];
+    vx_tensor cell_state_out            = (vx_tensor)parameters[30];
+    vx_tensor output                    = (vx_tensor)parameters[31];
+
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxnneExecuteLSTM_NN_TP_LAYER(ops_layer->node,
+        input,
+        input2input_weight, input2forget_weight, input2cell_weight, input2output_weight,
+        recurrent2input_weight, recurrent2forget_weight, recurrent2cell_weight, recurrent2output_weight,
+        cell2input_weight, cell2forget_weight, cell2output_weight,
+        input_gate_bias, forget_gate_bias, cell_bias, output_gate_bias,
+        projection_weight, projection_bias,
+        output_state_in, cell_state_in,
+        activation, forget_bias, cell_clip, proj_clip,
+        output_state_out, cell_state_out, output,
+        1));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetLSTMUnitOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+    vxnne_lstm_unit  lstmUnitNode = (vxnne_lstm_unit)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(lstmUnitNode->operations);
+
+    *operations = lstmUnitNode->operations;
+
+    return status;
+}
+
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMUnit_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status = VX_SUCCESS;
+#if REGISTER_FRAME
+    vxnne_layer_imp_s registerLSTMUnits[] = {/* Please DON'T adjust the order, it's importent */
+        { "LSTM Unit NN/TP", vxoNN_LSTMUnit_NN_TP_Support, vxoNN_LSTMUnit_NN_TP_Initialize, VX_NULL },
+        { "LSTM Unit TP", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "LSTM Unit SH EVIS", vxoNN_LSTMUnit_SH_EVIS_Support, vxoNN_LSTMUnit_SH_EVIS_Initialize, VX_NULL },
+        { "LSTM Unit SH F32", vxoNN_LSTMUnit_SH_Support, vxoNN_LSTMUnit_SH_Initialize, VX_NULL },
+        { "LSTM Unit SW ", vxoNNCommon_Support, vxoNN_LSTMUnit_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerLSTMUnits, vxnne_lstm_unit_s, "_LSTM_Unit", vxoNNLayer_GetLSTMUnitOperations);
+
+OnError:
+#else
 
     vx_int32  index = 0;
     vx_tensor input = (vx_tensor)parameters[index++];
@@ -4381,6 +6655,7 @@ exit:
     {
         gcoOS_Free(VX_NULL, lstmUnitNode);
     }
+#endif
 
     return status;
 

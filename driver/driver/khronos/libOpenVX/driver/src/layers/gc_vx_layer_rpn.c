@@ -2028,11 +2028,213 @@ exit:
 
     return status;
 }
+#if REGISTER_FRAME
+
+VX_PRIVATE_API vx_int32 vxoNNRPNLayer_GetRPNModeFromEnv()
+{
+    gctSTRING envctrl = gcvNULL;
+    vx_int32 rpn_type = -1;
+    /*USE_RPN_MODE-0: SHD+CPU 1: ALL CPU 2: ALL SHD*/
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "USE_RPN_MODE", &envctrl)) && envctrl)
+    {
+        rpn_type = atoi(envctrl);
+        if (rpn_type < 0)
+            rpn_type = -1;
+        else if (rpn_type >= 2)
+            rpn_type = 2;
+    }
+
+    return rpn_type;
+}
+
+VX_PRIVATE_API vx_bool vxoNNRPNLayer_SW_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vx_true_e;
+
+    vx_int32 rpn_type = vxoNNRPNLayer_GetRPNModeFromEnv();
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (rpn_type != -1)
+    {
+        /* the priority of env 'USE_RPN_MODE' is highest, the rpn mode of SW  is 1 */
+        support = (rpn_type == 1)?vx_true_e:vx_false_e;
+    }
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNRPNLayer_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNRPNLayer_Initializer_cpu(ops_layer->node, parameters, num));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+VX_PRIVATE_API vx_bool vxoNNRPNLayer_SH_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_tensor  score                      = (vx_tensor)parameters[0];
+    vx_tensor  bbox                       = (vx_tensor)parameters[1];
+    vx_tensor  anchors                    = (vx_tensor)parameters[2];
+    vx_bool enable_condition0, enable_condition1, enable_condition2, enable_condition3;
+    vx_enum score_format = TENSOR_DATA_TYPE(score);
+    vx_enum bbox_format  = TENSOR_DATA_TYPE(bbox);
+    vx_enum anchors_format = TENSOR_DATA_TYPE(anchors);
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    enable_condition0 = (vx_bool)((score_format   == VX_TYPE_FLOAT16)
+                                && (bbox_format    == VX_TYPE_FLOAT16)
+                                && (anchors_format == VX_TYPE_FLOAT32));
+
+    enable_condition1 = (vx_bool)((score_format   == VX_TYPE_INT16)
+                                && (bbox_format    == VX_TYPE_INT16)
+                                && (anchors_format == VX_TYPE_FLOAT32));
+
+    enable_condition2 = (vx_bool)((score_format   == VX_TYPE_INT8)
+                                && (bbox_format    == VX_TYPE_INT8)
+                                && (anchors_format == VX_TYPE_FLOAT32));
+
+    enable_condition3 = (vx_bool)((score_format   == VX_TYPE_UINT8)
+                                        && (bbox_format    == VX_TYPE_UINT8)
+                                        && (anchors_format == VX_TYPE_FLOAT32));
+
+    support = support && (enable_condition0 || enable_condition1 || enable_condition2 ||enable_condition3);
+
+    if (support)
+    {
+        SETBIT(reg_param->flag, enable_condition0, 0);
+        SETBIT(reg_param->flag, enable_condition1, 1);
+        SETBIT(reg_param->flag, enable_condition2, 2);
+        SETBIT(reg_param->flag, enable_condition3, 3);
+    }
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoNNRPNLayer_SH_SW_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_int32 rpn_type = vxoNNRPNLayer_GetRPNModeFromEnv();
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    if (rpn_type != -1)
+    {
+        /* the priority of env 'USE_RPN_MODE' is highest, the rpn mode of SH + SW  is 0 */
+        support = (rpn_type == 0)?vx_true_e:vx_false_e;
+    }
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoNNRPNLayer_SH_Support_Ext(node, parameters, num, reg_param);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNRPNLayer_SH_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNRPNLayer_Initializer_shd_cpu(ops_layer->node, parameters, num));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+VX_PRIVATE_API vx_bool vxoNNRPNLayer_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_int32 rpn_type = vxoNNRPNLayer_GetRPNModeFromEnv();
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    if (rpn_type != -1)
+    {
+        /* the priority of env 'USE_RPN_MODE' is highest, the rpn mode of SH  is 2 */
+        support = (rpn_type == 2)?vx_true_e:vx_false_e;
+    }
+
+    if (!support)return support;
+
+    support = support && vxoNNRPNLayer_SH_Support_Ext(node, parameters, num, reg_param);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNRPNLayer_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNRPNLayer_Initializer_shd(ops_layer->node, parameters, num));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+    vxnne_tensor_rpn_layer  rpnLayer = (vxnne_tensor_rpn_layer)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(rpnLayer->operations);
+
+    *operations = rpnLayer->operations;
+
+    return status;
+}
+#endif
 
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status;
+#if REGISTER_FRAME
+    vxnne_layer_imp_s registerRPNLayers[] = {/* Please DON'T adjust the order, it's importent */
+        { "RPNLAYER NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "RPNLAYER TP", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "RPNLAYER SH EVIS", vxoNNRPNLayer_SH_SW_Support, vxoNNRPNLayer_SH_SW_Initialize, VX_NULL },
+        { "RPNLAYER SW", vxoNNRPNLayer_SW_Support, vxoNNRPNLayer_SW_Initialize, VX_NULL },
+        { "RPNLAYER SH F32", vxoNNRPNLayer_SH_Support, vxoNNRPNLayer_SH_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerRPNLayers, vxnne_tensor_rpn_layer_s, "RpnLayer", vxoNNLayer_GetOperations);
+
+OnError:
+#else
     vx_int32 rpn_type = 0;
     gctSTRING envctrl = gcvNULL;
     vx_tensor  score                      = (vx_tensor)parameters[0];
@@ -2075,6 +2277,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Initializer(vx_node node, con
         status = vxoNNRPNLayer_Initializer_cpu(node,parameters,num);
     else
         status = vxoNNRPNLayer_Initializer_shd(node,parameters,num);
+#endif
     return status;
 }
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNRPNLayer_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)

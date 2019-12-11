@@ -3337,3 +3337,183 @@ OnError:
     return status;
 }
 
+#if REGISTER_FRAME
+vx_status vxnneLayer_Ops_Initialize(
+    vx_node                     node,
+    vxnne_layer_ops             ops,
+    vx_char*                    name,
+    const vx_uint32             size_of_layer,
+    const vx_reference          parameters[],
+    vx_uint32                   num
+    )
+{
+    vx_status status = VX_ERROR_NOT_SUPPORTED;
+    vx_uint32 i = 0, flag = 0;
+    vxnne_register_param_s reg_param = { 0 };
+
+    /* destroy the existing layer */
+    if (node->layer)
+    {
+        vxmONERROR(vxnneLayer_Free(node->layer));
+        node->layer = VX_NULL;
+    }
+
+    for (i = 0; i < ops->imp_count; i++)
+    {
+        vxnne_layer_imp imp = &ops->imps[i];
+
+        flag = 0;
+        gcoOS_ZeroMemory(&reg_param, sizeof(vxnne_register_param_s));
+
+        gcmASSERT((imp->verification != VX_NULL) && (imp->initialize != VX_NULL) && (size_of_layer > 0));
+
+        if (imp->verification(node, parameters, num, &reg_param))
+        {
+            vx_uint32 max_num_operations = 0;
+            vxnne_operation *operations = VX_NULL;
+
+            vxmONERROR(gcoOS_Allocate(gcvNULL, size_of_layer, (gctPOINTER*)&node->layer));
+            gcoOS_ZeroMemory(node->layer, size_of_layer);
+            node->layer->node = node;
+
+            if (ops->get_operations)ops->get_operations(node->layer, &max_num_operations, &operations);
+
+            vxmONERROR(vxnneLayer_Initialize(node->layer,
+                                  name,
+                                  node,
+                                  max_num_operations,
+                                  operations,
+                                  imp->deinitialize));
+
+            vxmONERROR(imp->initialize(node->layer, parameters, num, &reg_param));
+
+            break;
+        }
+
+    }
+
+    gcmASSERT("Not Support Node!" && (i < ops->imp_count) && (status == VX_SUCCESS));
+
+    return status;
+
+OnError:
+    if (node->layer)
+        gcoOS_Free(gcvNULL, node->layer);
+
+    return status;
+}
+
+vx_status vxoNNLayer_NotSupport_Initializer(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    return VX_ERROR_NOT_SUPPORTED;
+}
+
+vx_bool vxoNNCommon_NotSupport(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vx_false_e;
+
+    return support;
+}
+
+vx_bool vxoNNCommon_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vx_true_e;
+
+    return support;
+}
+
+vx_status vxoNNCommon_Deinitialize(vxnne_layer layer)
+{
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_bool vxoLayer_CheckNNFormatSupport(vx_context context, vx_enum type, vx_enum format, vx_uint32_ptr flag)
+{
+    vx_bool support = vx_true_e;
+    gcsNN_FIXED_FEATURE* feature = &context->nnConfig.fixedFeature;
+
+    if (type != VX_NN_QUERY_NN)
+        return support;
+
+    support = support && (feature->nnCoreCount > 0);
+
+    switch (format)
+    {
+    case VX_TYPE_INT8:
+        support = support && (feature->nnCoreCountInt8 > 0);
+        break;
+    case VX_TYPE_INT16:
+        support = support && (feature->nnCoreCountInt16 > 0);
+        break;
+    case VX_TYPE_FLOAT16:
+        support = support && (feature->nnCoreCountFloat16 > 0);
+        break;
+    case VX_TYPE_BFLOAT16:
+        support = support && (feature->nnCoreCountBFloat16 > 0);
+        break;
+    default:
+        support = vx_false_e;
+        vxError("Not support format: %d\n", format);
+        break;
+    }
+
+    return support;
+}
+
+vx_bool vxoLayer_CheckSupport(vx_context context, vx_enum type, vx_enum format, vx_uint32_ptr flag)
+{
+    vx_bool support = vx_true_e;
+
+    switch (type)
+    {
+    case VX_NN_QUERY_NN:
+        support = support && vxoLayer_CheckNNFormatSupport(context, type, format, flag);
+        break;
+    case VX_NN_QUERY_TP:
+        support = support && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP);
+        break;
+    case VX_NN_QUERY_SHADER:
+        support = support && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SHADER);
+        break;
+    default:
+        vxError("Cannot check support, Not support type: %d\n", type);
+        support = vx_false_e;
+        break;
+    }
+
+    return support;
+}
+
+vx_status vxoLayer_VerificationHead(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    return VX_SUCCESS;
+}
+
+vx_status vxoLayer_InitializeHead(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    return VX_SUCCESS;
+}
+vx_status vxoLayer_VerificationFoot(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool* support)
+{
+    gctSTRING envctrl = gcvNULL;
+    gctCHAR name[128] = { 0 };
+
+    sprintf(name, "VIV_VX_DEBUG_LAYER_%d_%d", node->kernel->enumeration, reg_param->index);
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, name, &envctrl)) && envctrl)
+    {
+        *support = (atoi(envctrl) == 0) ? vx_false_e : vx_true_e;
+    }
+
+
+    reg_param->support = *support;
+
+    return VX_SUCCESS;
+}
+
+vx_status vxoLayer_InitializeFoot(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+
+    return VX_SUCCESS;
+}
+#endif
+

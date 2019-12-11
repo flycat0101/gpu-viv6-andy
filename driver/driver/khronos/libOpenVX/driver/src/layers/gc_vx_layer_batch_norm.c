@@ -162,10 +162,326 @@ vx_status vxnneExecuteSWBatchNormalization(struct _vxnne_operation_s *operation)
     return status;
 }
 
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status vxoNNBatchNormalizationLayer_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vx_scalar  epss                       = (vx_scalar)parameters[0];
+    vx_tensor  means                      = (vx_tensor)parameters[1];
+    vx_tensor  variances                  = (vx_tensor)parameters[2];
+    vx_tensor  gamma                      = (vx_tensor)parameters[3];
+    vx_tensor  beta                       = (vx_tensor)parameters[4];
+    vx_tensor  input                      = (vx_tensor)parameters[5];
+    vx_tensor  output                     = (vx_tensor)parameters[6];
+
+    vxnne_batchnorm_layer  batchnormLayer = (vxnne_batchnorm_layer)ops_layer;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxnneOperation_Initialize(&batchnormLayer->batchnorm_operation.base,
+                                       &batchnormLayer->base,
+                                       VXNNE_OPERATION_TARGET_SW,
+                                       VXNNE_OPERATOR_BATCHNORM,
+                                       vxnneExecuteSWBatchNormalization,
+                                       VX_NULL,
+                                       1/*batchCount*/,
+                                       0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &batchnormLayer->base,
+        &batchnormLayer->batchnorm_operation.base,
+        0));
+
+    batchnormLayer->batchnorm_operation.eps              = epss;
+    batchnormLayer->batchnorm_operation.mean             = means;
+    batchnormLayer->batchnorm_operation.variance         = variances;
+    batchnormLayer->batchnorm_operation.gamma            = gamma;
+    batchnormLayer->batchnorm_operation.beta             = beta;
+    batchnormLayer->batchnorm_operation.input            = input;
+    batchnormLayer->batchnorm_operation.output           = output;
+
+    vxmONERROR(vxnneOperation_AddReference(&batchnormLayer->batchnorm_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&batchnormLayer->batchnorm_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNNBatchNormalizationLayer_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_tensor  input                      = (vx_tensor)parameters[5];
+    vx_tensor  output                     = (vx_tensor)parameters[6];
+    vx_enum    inputFormat                = TENSOR_DATA_TYPE(input);
+    vx_enum    outputFormat               = TENSOR_DATA_TYPE(output);
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    if(evis)
+    {
+        support = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
+                          || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
+                          || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+                          || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                          || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16));
+    }
+    else
+    {
+        support = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32)
+                          || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                          || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
+    }
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoNNBatchNormalizationLayer_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoNNBatchNormalizationLayer_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNBatchNormalizationLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_status status = VX_SUCCESS;
+
+    vx_scalar  epss                       = (vx_scalar)parameters[0];
+    vx_tensor  means                      = (vx_tensor)parameters[1];
+    vx_tensor  variances                  = (vx_tensor)parameters[2];
+    vx_tensor  gamma                      = (vx_tensor)parameters[3];
+    vx_tensor  beta                       = (vx_tensor)parameters[4];
+    vx_tensor  input                      = (vx_tensor)parameters[5];
+    vx_tensor  output                     = (vx_tensor)parameters[6];
+    vx_enum    inputFormat                = TENSOR_DATA_TYPE(input);
+    vx_enum    outputFormat               = TENSOR_DATA_TYPE(output);
+
+    vx_tensor weights                     = NULL;
+    vx_tensor biases                      = NULL;
+    vx_tensor_create_params_t tensor_create_params;
+    vx_uint32 batchCount                  = TENSOR_SIZE_INDEX(input, 3);
+
+    vxnne_batchnorm_layer  batchnormLayer = (vxnne_batchnorm_layer)ops_layer;
+
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vx_uint32  sizes[]          = {1, 1, 1, 1};
+    vx_uint32  dims             = 2;
+    vx_float32 inputScale       = 1.0f;
+    vx_int32   input_ZP         = 0;
+    vx_float32 outputScale      = 1.0f;
+    vx_float32 output_ZP        = 0.0f;
+    vx_int8    srcFixPointPos   = TENSOR_POS(input);
+    vx_int8    dstFixPointPos   = TENSOR_POS(output);
+    vx_uint32  axis             = 2;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    if (TENSOR_DIM_NUM(input) < 3)
+        axis = 0;
+
+    sizes[0] = evis ? TENSOR_VIEW_SIZE_INDEX(input, axis) * 2 : TENSOR_VIEW_SIZE_INDEX(input, axis);
+    sizes[1] = 1;
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = dims;
+    tensor_create_params.sizes = sizes;
+    tensor_create_params.data_format = evis ? VX_TYPE_INT16 : VX_TYPE_FLOAT32;
+    tensor_create_params.quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
+    tensor_create_params.quant_data.dfp.fixed_point_pos = 0;
+
+    weights = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+    if (vxoTensor_AllocateMemory(weights) != VX_SUCCESS)
+    {
+        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+        status = VX_ERROR_NO_MEMORY;
+        goto OnError;
+    }
+
+    biases = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+    if (vxoTensor_AllocateMemory(biases) != VX_SUCCESS)
+    {
+        vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+        status = VX_ERROR_NO_MEMORY;
+        goto OnError;
+    }
+
+    if ((inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_INT16) && TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        if (srcFixPointPos >= 0)
+        {
+            inputScale = 1.0f / (vx_float32) (1 << srcFixPointPos);
+        }
+        else if (srcFixPointPos < 0)
+        {
+            inputScale = (vx_float32) (1 << -srcFixPointPos);
+        }
+    }
+    else if (inputFormat == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
+    {
+        input_ZP   = evis ? 0 : TENSOR_TF_ZEROPOINT(input);
+        inputScale = TENSOR_TF_SCALE(input);
+    }
+
+    if ((outputFormat == VX_TYPE_INT8 || outputFormat == VX_TYPE_INT16) && TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        if (dstFixPointPos >= 0)
+        {
+            outputScale = (vx_float32) (1 << dstFixPointPos);
+        }
+        else if (dstFixPointPos < 0)
+        {
+            outputScale = 1.0f / (vx_float32) (1 << -dstFixPointPos);
+        }
+    }
+    else if (outputFormat == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
+    {
+        outputScale = 1.0f / TENSOR_TF_SCALE(output);
+        output_ZP   = (vx_float32)TENSOR_TF_ZEROPOINT(output);
+        if (evis == vx_false_e)
+            output_ZP += 0.5f;
+    }
+
+    vxmONERROR(vxnneExecuteSWBatchNormPreProcess(means, variances, gamma, beta, epss->value->f32, inputScale, input_ZP, outputScale, output_ZP, weights, biases));
+    if(evis)
+    {
+        shaderExecutable = vxnneGetBatchNormShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_BATCHNORM, &ops_layer->node->kernelAttributes.borderMode, axis, input, weights, biases, output);
+    }
+    else
+    {
+        shaderExecutable = vxnneGetGPUBatchNormShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_BATCHNORM, &ops_layer->node->kernelAttributes.borderMode, axis, input, weights, biases, output);
+    }
+
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    vxmONERROR(vxnneShaderOperation_Initialize(&batchnormLayer->batchnorm_sh_operation,
+                                    &batchnormLayer->base,
+                                    VXNNE_OPERATOR_BATCHNORM,
+                                    batchCount,
+                                    shaderExecutable));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &batchnormLayer->base,
+        &batchnormLayer->batchnorm_sh_operation.base,
+        0));
+
+    vxmONERROR(vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT));
+    vxmONERROR(vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT));
+
+    vxmONERROR(vxnneOperation_AddReference(&batchnormLayer->batchnorm_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&batchnormLayer->batchnorm_sh_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&batchnormLayer->batchnorm_sh_operation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&batchnormLayer->batchnorm_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    batchnormLayer->base.num_temp_tensors = 2;
+    batchnormLayer->base.temp_tensors[0] = weights;
+    batchnormLayer->base.temp_tensors[1] = biases;
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNBatchNormalizationLayer_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNBatchNormalizationLayer_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+VX_PRIVATE_API vx_bool vxoNNBatchNormalizationLayer_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && vxoNNBatchNormalizationLayer_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNBatchNormalizationLayer_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNBatchNormalizationLayer_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+    vxnne_batchnorm_layer  Pooling = (vxnne_batchnorm_layer)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(Pooling->operations);
+
+    *operations = Pooling->operations;
+
+    return status;
+}
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status                     = VX_SUCCESS;
+#if REGISTER_FRAME
+    vxnne_layer_imp_s registerBNLayers[] = {/* Please DON'T adjust the order, it's importent */
+        { "Concat2Layer NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "Concat2Layer TP", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "Concat2Layer SH EVIS", vxoNNBatchNormalizationLayer_SH_EVIS_Support, vxoNNBatchNormalizationLayer_SH_EVIS_Initialize, VX_NULL },
+        { "Concat2Layer SH F32", vxoNNBatchNormalizationLayer_SH_Support, vxoNNBatchNormalizationLayer_SH_Initialize, VX_NULL },
+        { "Concat2Layer SW", vxoNNCommon_Support, vxoNNBatchNormalizationLayer_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerBNLayers, vxnne_concat2_layer_s, "BatchNormalizationLayer", vxoNNLayer_GetOperations);
+
+OnError:
+#else
     vx_context context                    = vxGetContext((vx_reference)node);
 
     vx_scalar  epss                       = (vx_scalar)parameters[0];
@@ -385,6 +701,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
 
 exit:
     if (batchnormLayer) gcoOS_Free(gcvNULL, (gctPOINTER)batchnormLayer);
+#endif
     return status;
 
 }

@@ -90,10 +90,235 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHashLUT_ValidateOutput(vx_node node, vx_
 {
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status vxoHashLUT_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_tensor  keys                       = (vx_tensor)parameters[1];
+    vx_tensor  values                     = (vx_tensor)parameters[2];
+    vx_tensor  hits                       = (vx_tensor)parameters[3];
+    vx_tensor  outputs                    = (vx_tensor)parameters[4];
+
+    vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
+
+    vxnne_hashlut_layer  hashlutLayer = (vxnne_hashlut_layer)ops_layer;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+    vxmONERROR(vxnneOperation_Initialize(&hashlutLayer->hashlut_sw_operation.base,
+                                &hashlutLayer->base,
+                                VXNNE_OPERATION_TARGET_SW,
+                                VXNNE_OPERATOR_HASHLUT,
+                                vxnneExecuteSWHashLUT,
+                                VX_NULL,
+                                batchCount,
+                                0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &hashlutLayer->base,
+        &hashlutLayer->hashlut_sw_operation.base,
+        0));
+
+    hashlutLayer->hashlut_sw_operation.inputs           = inputs;
+    hashlutLayer->hashlut_sw_operation.keys             = keys;
+    hashlutLayer->hashlut_sw_operation.values           = values;
+    hashlutLayer->hashlut_sw_operation.hits             = hits;
+    hashlutLayer->hashlut_sw_operation.outputs          = outputs;
+
+    vxmONERROR(vxnneOperation_AddReference(&hashlutLayer->hashlut_sw_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&hashlutLayer->hashlut_sw_operation.base, (vx_reference)keys, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&hashlutLayer->hashlut_sw_operation.base, (vx_reference)values, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&hashlutLayer->hashlut_sw_operation.base, (vx_reference)hits, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&hashlutLayer->hashlut_sw_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoHashLUT_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_tensor  values                     = (vx_tensor)parameters[2];
+    vx_tensor  outputs                    = (vx_tensor)parameters[4];
+
+    vx_enum    outputFormat               = TENSOR_DATA_TYPE(outputs);
+    vx_enum    valueFormat                = TENSOR_DATA_TYPE(values);
+    vx_bool    dataFormat_flag            = vx_false_e;
+    vx_float32    input_scale             = TENSOR_TF_SCALE(values);
+    vx_float32    output_scale            = TENSOR_TF_SCALE(outputs);
+    vx_int32      inputZP                 = TENSOR_TF_ZEROPOINT(values);
+    vx_int32      outputZP                = TENSOR_TF_ZEROPOINT(outputs);
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, _num, reg_param);
+
+    if(evis)
+    {
+        if (((valueFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+            && (input_scale == output_scale && inputZP == outputZP))
+            || (valueFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16))
+            dataFormat_flag = vx_true_e;
+    }
+    else
+    {
+        if (((valueFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+            && (input_scale == output_scale && inputZP == outputZP))
+            || (valueFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
+            || (valueFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+            || (valueFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32))
+            dataFormat_flag = vx_true_e;
+    }
+
+    support = dataFormat_flag && support;
+
+    vxoLayer_VerificationFoot(node, parameters, _num, reg_param, &support);
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoHashLUT_SH_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_status status = VX_SUCCESS;
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_tensor  keys                       = (vx_tensor)parameters[1];
+    vx_tensor  values                     = (vx_tensor)parameters[2];
+    vx_tensor  hits                       = (vx_tensor)parameters[3];
+    vx_tensor  outputs                    = (vx_tensor)parameters[4];
+
+    vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
+
+    vxnne_hashlut_layer  hashlutLayer     = (vxnne_hashlut_layer)ops_layer;
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vxoLayer_InitializeHead(ops_layer, parameters, _num, reg_param);
+
+    if(evis)
+    {
+        shaderExecutable = vxnneGetHashLUTShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_HASHLUT,
+            &ops_layer->node->kernelAttributes.borderMode, inputs, keys, values, hits, outputs);
+    }
+    else
+    {
+        shaderExecutable = vxnneGetGPUHashLUTShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_HASHLUT,
+            &ops_layer->node->kernelAttributes.borderMode, inputs, keys, values, hits, outputs);
+    }
+
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    vxmONERROR(vxnneShaderOperation_Initialize(&hashlutLayer->hashlut_sh_operation,
+        &hashlutLayer->base,
+        VXNNE_OPERATOR_HASHLUT,
+        batchCount,
+        shaderExecutable));
+
+    vxmONERROR(vxnneOperation_AddReference(&hashlutLayer->hashlut_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&hashlutLayer->hashlut_sh_operation.base, (vx_reference)keys, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&hashlutLayer->hashlut_sh_operation.base, (vx_reference)values, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&hashlutLayer->hashlut_sh_operation.base, (vx_reference)hits, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&hashlutLayer->hashlut_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &hashlutLayer->base,
+        &hashlutLayer->hashlut_sh_operation.base,
+        0));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, _num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoHashLUT_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoHashLUT_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoHashLUT_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    status = vxoHashLUT_SH_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoHashLUT_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    support = support && vxoHashLUT_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoHashLUT_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    status = vxoHashLUT_SH_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+
+    vxnne_hashlut_layer  hashlutLayer = (vxnne_hashlut_layer)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(hashlutLayer->operations);
+
+    *operations = hashlutLayer->operations;
+
+    return status;
+}
+
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoHashLUT_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
+    vxnne_layer_imp_s registerHashLUT[] = {/* Please DON'T adjust the order, it's importent */
+        { "HashLUT NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "HashLUT TP", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "HashLUT SH EVIS", vxoHashLUT_SH_EVIS_Support, vxoHashLUT_SH_EVIS_Initialize, VX_NULL },
+        { "HashLUT SH F32", vxoHashLUT_SH_Support, vxoHashLUT_SH_Initialize, VX_NULL },
+        { "HashLUT SW ", vxoNNCommon_Support, vxoHashLUT_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerHashLUT, vxnne_hashlut_layer_s, "HashLUT", vxoNNLayer_GetOperations);
+
+OnError:
+#else
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_tensor  keys                       = (vx_tensor)parameters[1];
     vx_tensor  values                     = (vx_tensor)parameters[2];
@@ -229,6 +454,7 @@ OnError:
         gcoOS_Free(VX_NULL, (gctPOINTER)hashlutLayer);
         hashlutLayer = VX_NULL;
     }
+#endif
     return status;
 }
 

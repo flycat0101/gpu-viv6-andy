@@ -390,10 +390,518 @@ VX_PRIVATE_API vx_bool vxnneExecuteSWTSS_FullPositiveSeq(vx_tensor dims, vx_int3
         vxnneExecuteSWTSS_FullPositiveSeq(begin_dims, begin_mask->value->n32) && /* only support positive sequence currently*/ \
         vxnneExecuteSWTSS_FullPositiveSeq(end_dims, end_mask->value->n32) && \
         vxnneExecuteSWTSS_FullPositiveSeq(stride_dims, shrink_axis_mask->value->n32)
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_tensor_stride_slice_layer  tensor_stride_slice_layer = (vxnne_tensor_stride_slice_layer)ops_layer;
+
+    vx_tensor input                 = (vx_tensor)parameters[0];
+    vx_tensor begin_dims            = (vx_tensor)parameters[1];
+    vx_tensor end_dims              = (vx_tensor)parameters[2];
+    vx_tensor stride_dims           = (vx_tensor)parameters[3];
+    vx_scalar begin_mask            = (vx_scalar)parameters[4];
+    vx_scalar end_mask              = (vx_scalar)parameters[5];
+    vx_scalar shrink_axis_mask      = (vx_scalar)parameters[6];
+    vx_tensor output                = (vx_tensor)parameters[7];
+    vx_uint32 batchCount            = 1;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxnneOperation_Initialize(&tensor_stride_slice_layer->tensor_stride_slice_sw_operation.base,
+        &tensor_stride_slice_layer->base,
+        VXNNE_OPERATION_TARGET_SW,
+        VXNNE_OPERATOR_TENSOR_STRIDE_SLICE,
+        vxnneExecuteSWTensorStrideSlice,
+        VX_NULL,
+        batchCount,
+        0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &tensor_stride_slice_layer->base,
+        &tensor_stride_slice_layer->tensor_stride_slice_sw_operation.base,
+        0));
+
+    tensor_stride_slice_layer->tensor_stride_slice_sw_operation.input       = input;
+    tensor_stride_slice_layer->tensor_stride_slice_sw_operation.begin_dims  = begin_dims;
+    tensor_stride_slice_layer->tensor_stride_slice_sw_operation.end_dims    = end_dims;
+    tensor_stride_slice_layer->tensor_stride_slice_sw_operation.strides     = stride_dims;
+    tensor_stride_slice_layer->tensor_stride_slice_sw_operation.begin_mask  = begin_mask;
+    tensor_stride_slice_layer->tensor_stride_slice_sw_operation.end_mask    = end_mask;
+    tensor_stride_slice_layer->tensor_stride_slice_sw_operation.shrink_axis_mask = shrink_axis_mask;
+    tensor_stride_slice_layer->tensor_stride_slice_sw_operation.output      = output;
+
+    vxmONERROR(vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_stride_slice_sw_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_stride_slice_sw_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNNTensorStrideSlice_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_tensor input                 = (vx_tensor)parameters[0];
+    vx_tensor begin_dims            = (vx_tensor)parameters[1];
+    vx_tensor end_dims              = (vx_tensor)parameters[2];
+    vx_tensor stride_dims           = (vx_tensor)parameters[3];
+    vx_scalar begin_mask            = (vx_scalar)parameters[4];
+    vx_scalar end_mask              = (vx_scalar)parameters[5];
+    vx_scalar shrink_axis_mask      = (vx_scalar)parameters[6];
+    vx_tensor output                = (vx_tensor)parameters[7];
+
+    vx_int32  start[4]              = {0};
+    vx_int32  stop[4]               = {1};
+    vx_int32  stride[4]             = {1};
+
+    vx_enum   inputFormat           = TENSOR_DATA_TYPE(input);
+    vx_enum   outputFormat          = TENSOR_DATA_TYPE(output);
+    vx_uint32 batch                 = TENSOR_VIEW_DIM_NUM(input) > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+    vx_bool   enable_sh_crop        = vx_false_e;
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    vxoNNTensorStrideSlice_getStartStopStride(input, begin_dims, end_dims, stride_dims, begin_mask, end_mask, shrink_axis_mask, start, stop, stride);
+
+    enable_sh_crop = (vx_bool)((inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[1]) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[2]) && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && batch == 1);
+
+
+    support = support && (((_IsSameType(input, output) && batch == 1) || enable_sh_crop) && (TENSOR_VIEW_SIZE_INDEX(input, 0) < IMG_MAX_WIDTH && TENSOR_VIEW_SIZE_INDEX(input, 1) < IMG_MAX_WIDTH)) ;
+
+    if (evis && ((inputFormat == VX_TYPE_FLOAT32) || (outputFormat == VX_TYPE_FLOAT32)))
+        support = vx_false_e;
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoNNTensorStrideSlice_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoNNTensorStrideSlice_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_status status = VX_SUCCESS;
+
+    vx_tensor input                 = (vx_tensor)parameters[0];
+    vx_tensor begin_dims            = (vx_tensor)parameters[1];
+    vx_tensor end_dims              = (vx_tensor)parameters[2];
+    vx_tensor stride_dims           = (vx_tensor)parameters[3];
+    vx_scalar begin_mask            = (vx_scalar)parameters[4];
+    vx_scalar end_mask              = (vx_scalar)parameters[5];
+    vx_scalar shrink_axis_mask      = (vx_scalar)parameters[6];
+    vx_tensor output                = (vx_tensor)parameters[7];
+    vx_uint32 batchCount            = 1;
+    vx_int32  start[4]              = {0};
+    vx_int32  stop[4]               = {1};
+    vx_int32  stride[4]             = {1};
+    vx_uint32 reverseAxis[4]        = {0xcdcd};
+    vx_uint32 numOfAxis             = 0;
+    vx_uint32 opIdx                 = 0;
+    vx_uint32 input_size[4]         = {0};
+    vx_uint32 i                     = 0;
+    vx_enum   inputFormat           = TENSOR_DATA_TYPE(input);
+    vx_enum   outputFormat          = TENSOR_DATA_TYPE(output);
+    vx_uint32 batch                 = TENSOR_VIEW_DIM_NUM(input) > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+    vx_bool   enable_sh_crop        = vx_false_e;
+    vx_bool   enable_sh_reverse     = vx_false_e;
+
+    vxnne_tensor_stride_slice_layer  tensor_stride_slice_layer = (vxnne_tensor_stride_slice_layer)ops_layer;
+
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vx_tensor tmpTensor = NULL;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    for (i = 0; i < TENSOR_DIM_NUM(input); i++)
+    {
+        input_size[i] = TENSOR_VIEW_SIZE_INDEX(input, i);
+    }
+
+    vxmONERROR(vxoNNTensorStrideSlice_getStartStopStride(input, begin_dims, end_dims, stride_dims, begin_mask, end_mask, shrink_axis_mask, start, stop, stride));
+
+    enable_sh_crop = (vx_bool)((inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[1]) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[2]) && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && batch == 1);
+
+
+    vxmONERROR(vxoNNTensorStrideSlice_getReverseAxis(start, stop, stride, reverseAxis, &numOfAxis, input_size));
+
+    enable_sh_reverse    = (vx_bool)(numOfAxis > 0 && numOfAxis < 4);
+
+    if (enable_sh_reverse)
+    {
+        vx_uint32 sizes[4] = {1};
+        vx_uint32 dims     = TENSOR_DIM_NUM(output);
+        vx_uint32 idx      = 0;
+        vx_tensor_create_params_t tensor_create_params;
+        vx_context context = vxGetContext((vx_reference)ops_layer->node);
+
+        for (idx = 0; idx < dims; idx++)
+        {
+            sizes[idx] = TENSOR_VIEW_SIZE_INDEX(input, idx);
+        }
+
+        gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+        tensor_create_params.num_of_dims = dims;
+        tensor_create_params.sizes = sizes;
+        tensor_create_params.data_format = TENSOR_DATA_TYPE(input);
+        tensor_create_params.quant_format = TENSOR_QUANT_TYPE(input);
+        if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+        {
+            tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(input);
+        }
+        else
+        {
+            tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(input);
+            tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(input);
+        }
+
+        tmpTensor = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_true_e);
+
+        tensor_stride_slice_layer->base.temp_tensors[0]  = tmpTensor;
+        tensor_stride_slice_layer->base.num_temp_tensors = 1;
+
+
+        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REVERSE) &&
+            vxnneIsTPSupportFormat(context, input, VX_NULL, tmpTensor))
+        {
+            vx_op_param_s conv = {0};
+            vx_int32 axis[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+
+            for (i = 0; i < numOfAxis; i++)
+            {
+                axis[i] = reverseAxis[i];
+            }
+
+            vxmONERROR(vxnneOperation_Initialize(&tensor_stride_slice_layer->tensor_reverse_tp_operation.base,
+                &tensor_stride_slice_layer->base,
+                VXNNE_OPERATION_TARGET_TP,
+                VXNNE_OPERATOR_TENSOR_REVERSE,
+                VX_NULL,
+                vxnneOperation_TP_Deinitialize,
+                batchCount,
+                0));
+
+            vxmONERROR(vxnneLayer_SetOperation(&tensor_stride_slice_layer->base, &tensor_stride_slice_layer->tensor_reverse_tp_operation.base, opIdx++));
+            tensor_stride_slice_layer->tensor_reverse_tp_operation.input  = input;
+            tensor_stride_slice_layer->tensor_reverse_tp_operation.output = tmpTensor;
+
+            vxmONERROR(vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_reverse_tp_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_reverse_tp_operation.base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+            conv.pad_x_left = 0;
+            conv.pad_y_top = 0;
+            conv.pool_size_x = 0;
+            conv.pool_size_y = 0;
+            conv.pool_stride = 1;
+            conv.enable_relu = vx_false_e;
+            conv.conv_rounding_type = 0;
+            conv.pad_mode = VX_PAD_CONSTANT;
+            conv.pad_const = 0;
+            conv.tpType = TP_REVERSE;
+            conv.data_buff = gcvNULL;
+            conv.other_ref = (vx_reference)input;
+            conv.tp_value = (vx_tp_value_cmd)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+            conv.tp_value->u32[0] = numOfAxis;
+            conv.tp_value->p8[0] = (vx_uint8_ptr)vxAllocateAndZeroMemory(sizeof(axis));
+            vxMemCopy(conv.tp_value->p8[0], axis, sizeof(axis));
+
+            vxMemCopy(&tensor_stride_slice_layer->tensor_reverse_tp_operation.base.parameter, &conv, sizeof(vx_op_param_s));
+        }
+        else
+        {
+            if(evis)
+            {
+                shaderExecutable = vxnneGetReverseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_REVERSE, &ops_layer->node->kernelAttributes.borderMode,
+                    input, tmpTensor, numOfAxis, reverseAxis);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetGPUReverseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_REVERSE, &ops_layer->node->kernelAttributes.borderMode,
+                    input, tmpTensor, numOfAxis, reverseAxis);
+            }
+
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto OnError;
+            }
+            vxmONERROR(vxnneShaderOperation_Initialize(&tensor_stride_slice_layer->tensor_reverse_sh_operation,
+                &tensor_stride_slice_layer->base,
+                VXNNE_OPERATOR_TENSOR_STRIDE_SLICE,
+                batchCount,
+                shaderExecutable));
+
+            vxmONERROR(vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_reverse_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_reverse_sh_operation.base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+            vxmONERROR(vxnneLayer_SetOperation(
+                &tensor_stride_slice_layer->base,
+                &tensor_stride_slice_layer->tensor_reverse_sh_operation.base,
+                opIdx++));
+        }
+    }
+    else
+    {
+        tmpTensor = input;
+    }
+
+    if (enable_sh_crop)
+    {
+        if(evis)
+        {
+            shaderExecutable = vxnneGetTensorCropShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_CROP, &ops_layer->node->kernelAttributes.borderMode, start, stop, tmpTensor, output);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetGPUTensorCropShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_CROP, &ops_layer->node->kernelAttributes.borderMode, start, stop, tmpTensor, output);
+        }
+
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            goto OnError;
+        }
+        vxmONERROR(vxnneShaderOperation_Initialize(&tensor_stride_slice_layer->tensor_crop_sh_operation,
+            &tensor_stride_slice_layer->base,
+            VXNNE_OPERATOR_TENSOR_STRIDE_SLICE,
+            batchCount,
+            shaderExecutable));
+
+        vxmONERROR(vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_crop_sh_operation.base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_crop_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &tensor_stride_slice_layer->base,
+            &tensor_stride_slice_layer->tensor_crop_sh_operation.base,
+            opIdx++));
+    }
+    else
+    {
+        if(evis)
+        {
+            shaderExecutable = vxnneGetTensorStridedSliceShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_STRIDE_SLICE, &ops_layer->node->kernelAttributes.borderMode, start, stop, stride, tmpTensor, output);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetGPUTensorStridedSliceShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_STRIDE_SLICE, &ops_layer->node->kernelAttributes.borderMode, start, stop, stride, tmpTensor, output);
+        }
+
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            goto OnError;
+        }
+        vxmONERROR(vxnneShaderOperation_Initialize(&tensor_stride_slice_layer->tensor_stride_slice_sh_operation,
+            &tensor_stride_slice_layer->base,
+            VXNNE_OPERATOR_TENSOR_STRIDE_SLICE,
+            batchCount,
+            shaderExecutable));
+
+        vxmONERROR(vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_stride_slice_sh_operation.base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_stride_slice_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &tensor_stride_slice_layer->base,
+            &tensor_stride_slice_layer->tensor_stride_slice_sh_operation.base,
+            opIdx++));
+    }
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+VX_PRIVATE_API vx_bool vxoNNTensorStrideSlice_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && vxoNNTensorStrideSlice_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNNTensorStrideSlice_TP_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_tensor input                 = (vx_tensor)parameters[0];
+    vx_tensor begin_dims            = (vx_tensor)parameters[1];
+    vx_tensor end_dims              = (vx_tensor)parameters[2];
+    vx_tensor stride_dims           = (vx_tensor)parameters[3];
+    vx_scalar begin_mask            = (vx_scalar)parameters[4];
+    vx_scalar end_mask              = (vx_scalar)parameters[5];
+    vx_scalar shrink_axis_mask      = (vx_scalar)parameters[6];
+    vx_tensor output                = (vx_tensor)parameters[7];
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support  && (vxnneIsTPSupportFormat(node->base.context, input, VX_NULL, output) && STRIDED_SLICE_CHECK_TP_SUPPORT);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_TP_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_tensor_stride_slice_layer  tensor_stride_slice_layer = (vxnne_tensor_stride_slice_layer)ops_layer;
+
+    vx_tensor input                 = (vx_tensor)parameters[0];
+    vx_tensor begin_dims            = (vx_tensor)parameters[1];
+    vx_tensor end_dims              = (vx_tensor)parameters[2];
+    vx_tensor stride_dims           = (vx_tensor)parameters[3];
+
+    vx_tensor output                = (vx_tensor)parameters[7];
+
+    vx_uint32 batch                 = TENSOR_VIEW_DIM_NUM(input) > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+
+    vx_op_param_s conv = { 0 };
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    conv.pad_x_left = 0;
+    conv.pad_y_top = 0;
+    conv.pool_size_x = 0;
+    conv.pool_size_y = 0;
+    conv.pool_stride = 1;
+    conv.enable_relu = vx_false_e;
+    conv.pad_mode = VX_PAD_CONSTANT;
+    conv.pad_const = 0;
+
+    vxmONERROR(vxnneOperation_Initialize(&tensor_stride_slice_layer->tensor_stride_slice_tp_operation.base,
+        &tensor_stride_slice_layer->base,
+        VXNNE_OPERATION_TARGET_TP,
+        VXNNE_OPERATOR_TENSOR_STRIDE_SLICE,
+        VX_NULL,
+        vxnneOperation_TP_Deinitialize,
+        batch,
+        0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &tensor_stride_slice_layer->base,
+        &tensor_stride_slice_layer->tensor_stride_slice_tp_operation.base,
+        0));
+
+    tensor_stride_slice_layer->tensor_stride_slice_tp_operation.input = input;
+    tensor_stride_slice_layer->tensor_stride_slice_tp_operation.output = output;
+
+    vxmONERROR(vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_stride_slice_tp_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&tensor_stride_slice_layer->tensor_stride_slice_tp_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    conv.tpType = TP_TENSOR_STRIDED_SLICE;
+    conv.other_ref = (vx_reference)input;
+    conv.data_buff = gcvNULL;
+
+    conv.tp_value = (vx_tp_value_cmd)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+    /*
+     * u32[0]: begin_dims[0]
+     * u32[1]: begin_dims[1]
+     * u32[2]: end_dims[0]
+     * u32[3]: end_dims[1]
+     * u32[4]: stride_dims[0]
+     * u32[5]: stride_dims[1]
+     */
+    conv.tp_value->u32[0] = (vx_uint32)VX_GET_DATA_FROM_TENSOR(begin_dims, 0);
+    conv.tp_value->u32[1] = TENSOR_VIEW_SIZE_INDEX(begin_dims, 0) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(begin_dims, 1) : 0;
+    conv.tp_value->u32[2] = (vx_uint32)VX_GET_DATA_FROM_TENSOR(end_dims, 0);
+    conv.tp_value->u32[3] = TENSOR_VIEW_SIZE_INDEX(end_dims, 0) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(end_dims, 1) : 1;
+    conv.tp_value->u32[4] = (vx_uint32)VX_GET_DATA_FROM_TENSOR(stride_dims, 0); /* stride x*/
+    conv.tp_value->u32[5] = TENSOR_VIEW_SIZE_INDEX(stride_dims, 0) > 1 ? (vx_uint32)VX_GET_DATA_FROM_TENSOR(stride_dims, 1) : 1; /* stride y*/
+
+    memcpy(&tensor_stride_slice_layer->tensor_stride_slice_tp_operation.base.parameter, &conv, sizeof(vx_op_param_s));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+    vxnne_tensor_stride_slice_layer  tensor_stride_slice_layer = (vxnne_tensor_stride_slice_layer)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(tensor_stride_slice_layer->operations);
+
+    *operations = tensor_stride_slice_layer->operations;
+
+    return status;
+}
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorStrideSlice_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
+    vxnne_layer_imp_s registerTensorStrideSliceLayers[] = {/* Please DON'T adjust the order, it's importent */
+        { "RPNLAYER NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "RPNLAYER TP", vxoNNTensorStrideSlice_TP_Support, vxoNNTensorStrideSlice_TP_Initialize, VX_NULL },
+        { "RPNLAYER SH EVIS", vxoNNTensorStrideSlice_SH_EVIS_Support, vxoNNTensorStrideSlice_SH_EVIS_Initialize, VX_NULL },
+        { "RPNLAYER SH F32", vxoNNTensorStrideSlice_SH_Support, vxoNNTensorStrideSlice_SH_Initialize, VX_NULL },
+        { "RPNLAYER SW", vxoNNCommon_Support, vxoNNTensorStrideSlice_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerTensorStrideSliceLayers, vxnne_tensor_stride_slice_layer_s, "TensorStrideSlice", vxoNNLayer_GetOperations);
+
+OnError:
+#else
 
     vx_tensor input                 = (vx_tensor)parameters[0];
     vx_tensor begin_dims            = (vx_tensor)parameters[1];
@@ -757,6 +1265,7 @@ exit:
         }
         gcoOS_Free(NULL, (gctPOINTER)tensor_stride_slice_layer);
     }
+#endif
     return status;
 }
 

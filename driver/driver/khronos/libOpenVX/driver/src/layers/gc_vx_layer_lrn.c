@@ -375,7 +375,8 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     vx_float32 alpha,
     vx_float32 beta,
     vx_float32 bias,
-    vx_uint32 *op_index)
+    vx_uint32 *op_index,
+    vx_bool evis)
 {
     vx_status status = VX_SUCCESS;
 
@@ -411,7 +412,7 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     dataformat_flag[1] = (vx_bool)(inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16);
     dataformat_flag[2] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8);
     dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
-    dataformat_flag[4] = (vx_bool)(inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32 &&!context->evisNoInst.supportEVIS);
+    dataformat_flag[4] = (vx_bool)(inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32 &&!evis);
     dataformat_flag[5] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16);
     isuint8_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[5])
                                     || dataformat_flag[2]);
@@ -427,7 +428,7 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     {
         if (acrossmap_flag)
         {
-            if(context->evisNoInst.supportEVIS)
+            if(evis)
             {
                 alpha = alpha * (vx_float32)norm_size;
             }
@@ -445,7 +446,7 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     {
         if (acrossmap_flag)
         {
-            if(!context->evisNoInst.supportEVIS)
+            if(!evis)
             {
                 alpha = alpha / (vx_float32)div;
                 norm_size = norm_size / 2;
@@ -458,7 +459,7 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     alpha_s     = vxCreateScalar(context, VX_TYPE_FLOAT32, &alpha);
     beta_s      = vxCreateScalar(context, VX_TYPE_FLOAT32, &beta);
 
-    if(context->evisNoInst.supportEVIS)
+    if(evis)
     {
         if (isuint8_flag)
             shaderExecutable = vxnneGetNormalizationUint8ShaderExecutable(node->base.context, VXNNE_KERNEL_NORMALIZATION, &node->kernelAttributes.borderMode, inputs, type_s, norm_size_s, alpha_s, beta_s, bias, outputs);
@@ -551,6 +552,328 @@ VX_PRIVATE_API vx_status vxoLRNOperationSW_Initialize(
 OnError:
     return status;
 }
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status vxoNormalization_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_normalization_layer  lrn_layer = (vxnne_normalization_layer)ops_layer;
+
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_scalar  type_s                     = (vx_scalar)parameters[1];
+    vx_scalar  norm_size_s                = (vx_scalar)parameters[2];
+    vx_scalar  div_s                      = (vx_scalar)parameters[3];
+    vx_scalar  alpha_s                    = (vx_scalar)parameters[4];
+    vx_scalar  beta_s                     = (vx_scalar)parameters[5];
+    vx_scalar  bias_s                     = (vx_scalar)parameters[6];
+    vx_tensor  outputs                    = (vx_tensor)parameters[7];
+
+    vx_enum    norm_type                  = type_s->value->e;
+    vx_uint32  norm_size                  = norm_size_s->value->u32;
+    vx_uint32  div                        = (div_s == VX_NULL)?(norm_type == VX_NN_NORMALIZATION_SAME_MAP ? norm_size * norm_size : norm_size):div_s->value->u32;
+    vx_float32 alpha                      = alpha_s->value->f32;
+    vx_float32 beta                       = beta_s->value->f32;
+    vx_float32 bias                       = (bias_s == VX_NULL)?1:bias_s->value->f32;
+
+    vx_uint32  batch_count                = TENSOR_DIM_NUM(inputs) > 3 ? TENSOR_SIZE_INDEX(inputs, 3) : 1;
+
+    vx_uint32  op_index                   = 0;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoLRNOperationSW_Initialize(&lrn_layer->lrn_sw_operation,
+                                            &lrn_layer->base,
+                                            inputs,
+                                            outputs,
+                                            batch_count,
+                                            norm_type,
+                                            norm_size,
+                                            div,
+                                            alpha,
+                                            beta,
+                                            bias,
+                                            &op_index));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNormalization_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_scalar  type_s                     = (vx_scalar)parameters[1];
+    vx_scalar  norm_size_s                = (vx_scalar)parameters[2];
+
+    vx_scalar  beta_s                     = (vx_scalar)parameters[5];
+    vx_tensor  outputs                    = (vx_tensor)parameters[7];
+
+    vx_enum    norm_type                  = type_s->value->e;
+    vx_uint32  norm_size                  = norm_size_s->value->u32;
+
+    vx_float32 beta                       = beta_s->value->f32;
+    vx_enum    input_format               = TENSOR_DATA_TYPE(inputs);
+    vx_enum    output_format              = TENSOR_DATA_TYPE(outputs);
+    vx_bool    sammap_flag                = vx_false_e;
+    vx_bool    acrossmap_flag             = vx_false_e;
+    vx_bool    dataformat_flag[7]         = {vx_false_e};
+    vx_bool    norm_config[3]             = {vx_false_e};
+    vx_bool    generic_flag               = vx_false_e;
+    vx_bool    isuint8_flag               = vx_false_e;
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    sammap_flag        = (vx_bool)(norm_type == VX_NN_NORMALIZATION_SAME_MAP);
+    acrossmap_flag     = (vx_bool)(norm_type == VX_NN_NORMALIZATION_ACROSS_MAPS);
+    norm_config[0]     = (vx_bool)(norm_size == 3 && beta == 0.75);
+    norm_config[1]     = (vx_bool)(norm_size == 5 && beta == 0.75);
+    norm_config[2]     = (vx_bool)(norm_size == 11 && beta == 0.5);
+    dataformat_flag[0] = (vx_bool)((input_format == VX_TYPE_FLOAT16 || input_format == VX_TYPE_INT8) && (output_format == VX_TYPE_FLOAT16 || output_format == VX_TYPE_INT8));
+    dataformat_flag[1] = (vx_bool)(input_format == VX_TYPE_INT16 && output_format == VX_TYPE_INT16);
+    dataformat_flag[2] = (vx_bool)(input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_UINT8);
+    dataformat_flag[3] = (vx_bool)(input_format == VX_TYPE_FLOAT16 && output_format == VX_TYPE_FLOAT16);
+    dataformat_flag[4] = (vx_bool)(input_format == VX_TYPE_FLOAT32 && output_format == VX_TYPE_FLOAT32) && !evis;
+    dataformat_flag[5] = (vx_bool)(input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_FLOAT16);
+    dataformat_flag[6] = (vx_bool)(input_format == VX_TYPE_BFLOAT16 && output_format == VX_TYPE_BFLOAT16);
+
+    isuint8_flag       = (vx_bool)((acrossmap_flag && norm_config[0] && dataformat_flag[2])
+        || (acrossmap_flag && norm_config[1] && dataformat_flag[2])
+        || (acrossmap_flag && norm_config[2] && dataformat_flag[2])
+        || dataformat_flag[2]);
+
+    generic_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[0]) || (sammap_flag && dataformat_flag[3])
+                                    || (dataformat_flag[1])
+                                    || (acrossmap_flag && dataformat_flag[5])
+                                    || (dataformat_flag[6]));
+
+    support   = support && (((sammap_flag && norm_config[0] && dataformat_flag[0])
+                            || (acrossmap_flag && norm_config[0] && dataformat_flag[0])
+                            || (acrossmap_flag && norm_config[1] && dataformat_flag[0])
+                            || (acrossmap_flag && norm_config[2] && (dataformat_flag[0] || dataformat_flag[1]))
+                            || generic_flag || isuint8_flag));
+
+    if (!evis)
+    {
+        support   = support || dataformat_flag[4];
+    }
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoNormalization_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoNormalization_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNormalization_SH_EVIS_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxnne_normalization_layer  lrn_layer = (vxnne_normalization_layer)ops_layer;
+
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_scalar  type_s                     = (vx_scalar)parameters[1];
+    vx_scalar  norm_size_s                = (vx_scalar)parameters[2];
+    vx_scalar  div_s                      = (vx_scalar)parameters[3];
+    vx_scalar  alpha_s                    = (vx_scalar)parameters[4];
+    vx_scalar  beta_s                     = (vx_scalar)parameters[5];
+    vx_scalar  bias_s                     = (vx_scalar)parameters[6];
+    vx_tensor  outputs                    = (vx_tensor)parameters[7];
+
+    vx_enum    norm_type                  = type_s->value->e;
+    vx_uint32  norm_size                  = norm_size_s->value->u32;
+    vx_uint32  div                        = (div_s == VX_NULL)?(norm_type == VX_NN_NORMALIZATION_SAME_MAP ? norm_size * norm_size : norm_size):div_s->value->u32;
+    vx_float32 alpha                      = alpha_s->value->f32;
+    vx_float32 beta                       = beta_s->value->f32;
+    vx_float32 bias                       = (bias_s == VX_NULL)?1:bias_s->value->f32;
+
+    vx_uint32  batch_count                = TENSOR_DIM_NUM(inputs) > 3 ? TENSOR_SIZE_INDEX(inputs, 3) : 1;
+
+    vx_uint32  op_index                   = 0;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoLRNOperationSH_Initialize(&lrn_layer->lrn_sh_operation,
+                                            &lrn_layer->base,
+                                            inputs,
+                                            outputs,
+                                            batch_count,
+                                            norm_type,
+                                            norm_size,
+                                            div,
+                                            alpha,
+                                            beta,
+                                            bias,
+                                            &op_index,
+                                            evis));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNormalization_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNormalization_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+VX_PRIVATE_API vx_bool vxoNormalization_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    support = support && vxoNormalization_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNormalization_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNormalization_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNormalization_TP_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_scalar  type_s                     = (vx_scalar)parameters[1];
+    vx_scalar  norm_size_s                = (vx_scalar)parameters[2];
+    vx_tensor  outputs                    = (vx_tensor)parameters[6];
+
+    vx_enum    norm_type                  = type_s->value->e;
+    vx_uint32  norm_size                  = norm_size_s->value->u32;
+
+    vx_uint32  size_x = TENSOR_SIZE_INDEX(inputs, 0), size_y = TENSOR_SIZE_INDEX(inputs, 1);
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && (vxnneIsTPSupportFormat(node->base.context, inputs, VX_NULL, outputs) &&
+                            vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP_LRN) &&
+                            norm_size <= 5 &&
+                            (norm_type == VX_NN_NORMALIZATION_SAME_MAP || size_x * size_y < 65536));
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNormalization_TP_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_normalization_layer  lrn_layer = (vxnne_normalization_layer)ops_layer;
+
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_scalar  type_s                     = (vx_scalar)parameters[1];
+    vx_scalar  norm_size_s                = (vx_scalar)parameters[2];
+    vx_scalar  div_s                      = (vx_scalar)parameters[3];
+    vx_scalar  alpha_s                    = (vx_scalar)parameters[4];
+    vx_scalar  beta_s                     = (vx_scalar)parameters[5];
+    vx_scalar  bias_s                     = (vx_scalar)parameters[6];
+    vx_tensor  outputs                    = (vx_tensor)parameters[7];
+
+    vx_enum    norm_type                  = type_s->value->e;
+    vx_uint32  norm_size                  = norm_size_s->value->u32;
+    vx_uint32  div                        = (div_s == VX_NULL)?(norm_type == VX_NN_NORMALIZATION_SAME_MAP ? norm_size * norm_size : norm_size):div_s->value->u32;
+    vx_float32 alpha                      = alpha_s->value->f32;
+    vx_float32 beta                       = beta_s->value->f32;
+    vx_float32 bias                       = (bias_s == VX_NULL)?1:bias_s->value->f32;
+
+    vx_uint32  batch_count                = TENSOR_DIM_NUM(inputs) > 3 ? TENSOR_SIZE_INDEX(inputs, 3) : 1;
+
+    vx_uint32  op_index                   = 0;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoLRNOperationTP_Initialize(&lrn_layer->lrn_tp_operation,
+                                            &lrn_layer->base,
+                                            inputs,
+                                            outputs,
+                                            batch_count,
+                                            norm_type,
+                                            norm_size,
+                                            div,
+                                            alpha,
+                                            beta,
+                                            bias,
+                                            &op_index));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+    vxnne_normalization_layer  Pooling = (vxnne_normalization_layer)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(Pooling->operations);
+
+    *operations = Pooling->operations;
+
+    return status;
+}
+
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_Initializer_Ext(vx_node node, vx_char* name, const vx_reference parameters[], vx_uint32 num)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_layer_imp_s registerNormalizations[] = {/* Please DON'T adjust the order, it's importent */
+        { "Normalization NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "Normalization TP", vxoNormalization_TP_Support, vxoNormalization_TP_Initialize, VX_NULL },
+        { "Normalization SH EVIS", vxoNormalization_SH_EVIS_Support, vxoNormalization_SH_EVIS_Initialize, VX_NULL },
+        { "Normalization SH F32", vxoNormalization_SH_Support, vxoNormalization_SH_Initialize, VX_NULL },
+        { "Normalization SW", vxoNNCommon_Support, vxoNormalization_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerNormalizations, vxnne_normalization_layer_s, name, vxoNNLayer_GetOperations);
+
+OnError:
+    return status;
+}
+#else
 
 VX_PRIVATE_API vx_status _InitializeLRNOperation(
     vxnne_normalization_layer layer,
@@ -602,7 +925,7 @@ VX_PRIVATE_API vx_status _InitializeLRNOperation(
                                                 alpha,
                                                 beta,
                                                 bias,
-                                                op_index));
+                                                op_index, layer->base.node->base.context->evisNoInst.supportEVIS));
         break;
 
     case VXNNE_OPERATION_TARGET_SW:
@@ -628,6 +951,7 @@ VX_PRIVATE_API vx_status _InitializeLRNOperation(
 OnError:
     return status;
 }
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNNormalization(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
@@ -652,6 +976,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_ValidateOutput(vx_node nod
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalization_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
+    vx_float32 bias = 1.0f;
+    vx_scalar  bias_s = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &bias);
+    vx_reference params[] = {
+        parameters[0], parameters[1], parameters[2], VX_NULL, parameters[3], parameters[4], (vx_reference)bias_s, parameters[5],
+    };
+    vxmONERROR(vxoNormalization_Initializer_Ext(node, "NormalizationLayer", params, gcmCOUNTOF(params)));
+
+    vxReleaseScalar(&bias_s);
+OnError:
+#else
     vx_context context = vxGetContext((vx_reference)node);
 
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
@@ -771,6 +1106,7 @@ OnError:
     {
         vxFree(lrn_layer);
     }
+#endif
 
     return status;
 }
@@ -798,6 +1134,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_ValidateOutput(vx_no
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
+    vx_uint32 div = 1;
+    vx_scalar  div_s = vxCreateScalar(node->base.context, VX_TYPE_UINT32, &div);
+    vx_reference params[] = {
+        parameters[0], parameters[1], parameters[2], (vx_reference)div_s, parameters[3], parameters[4], parameters[5], parameters[6],
+    };
+    vxmONERROR(vxoNormalization_Initializer_Ext(node, "NormalizationLayer2", params, gcmCOUNTOF(params)));
+
+    vxReleaseScalar(&div_s);
+OnError:
+#else
 
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_scalar  type_s                     = (vx_scalar)parameters[1];
@@ -921,6 +1268,7 @@ OnError:
         }
         vxFree(lrn2_layer);
     }
+#endif
 
     return status;
 }
