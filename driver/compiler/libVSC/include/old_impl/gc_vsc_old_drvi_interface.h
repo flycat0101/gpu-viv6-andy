@@ -703,6 +703,7 @@ typedef struct _gcsHINT
     gctUINT32   colorKillInstruction[3];
 #endif
 
+    /* First word. */
     /* gctBOOL isdefined as signed int, 1 bit will have problem if the value
      * is not used to test zero or not, use 2 bits to avoid the potential error
      */
@@ -724,6 +725,8 @@ typedef struct _gcsHINT
     gctBOOL     useDSY                : 2;
     gctBOOL     yInvertAware          : 2;
     gctBOOL     hasCentroidInput      : 2; /* flag if PS uses any inputs defined as centroid. */
+
+    /* Second word. */
     gctBOOL     disableEarlyZ         : 2; /* Disable EarlyZ for this program. */
     gctBOOL     threadGroupSync       : 2;
     gctBOOL     usedSampleIdOrSamplePosition : 2; /* For sample shading. */
@@ -744,7 +747,12 @@ typedef struct _gcsHINT
 #endif
     gctBOOL     useGroupId            : 2;
     gctBOOL     useLocalId            : 2;
+    gctBOOL     useEvisInst           : 2;
+
+    /* Third word. */
     gctUINT     fragColorUsage        : 2;
+    gctUINT     reserved              : 30;
+
     /* flag if the shader uses gl_FragCoord, gl_FrontFacing, gl_PointCoord */
     gctCHAR     useFragCoord[4];
     gctCHAR     usePointCoord[4];
@@ -830,7 +838,7 @@ typedef struct _gcsHINT
     gctBOOL     useGPRSpill[gcvPROGRAM_STAGE_LAST];
 
     /* padding bytes to make the offset of shaderVidNodes field be consistent in 32bit and 64bit platforms */
-    gctCHAR     reservedByteForShaderVidNodeOffset[8];
+    gctCHAR     reservedByteForShaderVidNodeOffset[4];
 
     /* shaderVidNodes should always be the LAST filed in hits. */
     /* SURF Node for memory that is used in shader. */

@@ -7636,6 +7636,7 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
     pStatesPgmer->pHints->threadGroupSync = pGpsSEP->exeHints.derivedHints.prvStates.gps.bThreadGroupSync;
     pStatesPgmer->pHints->useGroupId = (pGpsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_THREADGROUPID].ioIndexMask != 0);
     pStatesPgmer->pHints->useLocalId = (pGpsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_THREADIDINGROUP].ioIndexMask != 0);
+    pStatesPgmer->pHints->useEvisInst = pGpsSEP->exeHints.derivedHints.prvStates.gps.bUseEvisInst;
     for (i = 0; i < 3; i++)
     {
         pStatesPgmer->pHints->workGroupSizeFactor[i] = pGpsSEP->exeHints.derivedHints.prvStates.gps.workGroupSizeFactor[i];
