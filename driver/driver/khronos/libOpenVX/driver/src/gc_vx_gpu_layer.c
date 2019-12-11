@@ -4731,7 +4731,12 @@ vxnne_shader_executable vxnneGetGPUFullyConnectedShaderExecutable(
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
             if (!shaderExecutable) goto OnError;
 
-            if(inputSize % 4 == 0)
+            if(inputSize % 4 == 0
+#if REGISTER_FRAME
+                || (shaderExecutable->kernelShader->states.programState.hints->useEvisInst == 0))
+#else
+               )
+#endif
             {
                 status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);

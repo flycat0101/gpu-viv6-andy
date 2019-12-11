@@ -265,10 +265,227 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReverse_ValidateOutput(vx_node n
 {
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status vxoNNTensorReverse_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_tensor_reverse  reverseNode = (vxnne_tensor_reverse)ops_layer;
+    vx_tensor  input      = (vx_tensor)parameters[0];
+    vx_tensor  output     = (vx_tensor)parameters[6];
+    vx_uint32  numOfAxis  = ((vx_scalar)parameters[1])->value->u32;
+    vx_uint32  batchCount = (TENSOR_SIZE_INDEX(input, TENSOR_VIEW_DIM_NUM(input)) == 0) ? 1 : TENSOR_SIZE_INDEX(input, TENSOR_VIEW_DIM_NUM(input));
+    vx_uint32 i;
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+    vxmONERROR(vxnneOperation_Initialize(&reverseNode->tensor_reverse_sw_operation.base,
+        &reverseNode->base,
+        VXNNE_OPERATION_TARGET_SW,
+        VXNNE_OPERATOR_TENSOR_REVERSE,
+        vxnneExecuteSWTensorReverse,
+        VX_NULL,
+        batchCount,
+        0));
+
+    vxmONERROR(vxnneLayer_SetOperation(&reverseNode->base, &reverseNode->tensor_reverse_sw_operation.base, 0));
+    reverseNode->tensor_reverse_sw_operation.input           = input;
+    reverseNode->tensor_reverse_sw_operation.output          = output;
+    reverseNode->tensor_reverse_sw_operation.numOfAxis       = numOfAxis;
+    for (i = 0; i <numOfAxis; i++)
+    {
+        reverseNode->tensor_reverse_sw_operation.axis[i] = (vx_scalar)parameters[i + 2];
+    }
+
+    vxmONERROR(vxnneOperation_AddReference(&reverseNode->tensor_reverse_sw_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&reverseNode->tensor_reverse_sw_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNNTensorReverse_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_tensor  input      = (vx_tensor)parameters[0];
+    vx_tensor  output     = (vx_tensor)parameters[6];
+    vx_uint32  numOfAxis  = ((vx_scalar)parameters[1])->value->u32;
+    vx_uint32 i;
+    vx_bool dataFormat_flag, axFlag;
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    axFlag = vx_true_e;
+
+    dataFormat_flag = (vx_bool)(!checkOutputTensorDoAlu(input, output));
+    for (i = 0; i <numOfAxis; i++)
+    {
+       if(((vx_scalar)parameters[i + 2])->value->n32 == 3)
+       {
+           axFlag = vx_false_e;
+           break;
+       }
+    }
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    support = dataFormat_flag && support;
+    support = support && (numOfAxis < 4);
+    support = support && axFlag;
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorReverse_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vx_tensor  input      = (vx_tensor)parameters[0];
+    vx_tensor  output     = (vx_tensor)parameters[6];
+    vx_uint32  numOfAxis  = ((vx_scalar)parameters[1])->value->u32;
+    vx_uint32  batchCount = (TENSOR_SIZE_INDEX(input, TENSOR_VIEW_DIM_NUM(input)) == 0) ? 1 : TENSOR_SIZE_INDEX(input, TENSOR_VIEW_DIM_NUM(input));
+    vxnne_tensor_reverse  reverseNode = (vxnne_tensor_reverse)ops_layer;
+    vx_uint32 i;
+
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vx_uint32 axis[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {8, 8, 8, 8, 8, 8};
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    for (i = 0; i <numOfAxis; i++)
+    {
+        axis[i] = ((vx_scalar)parameters[i + 2])->value->n32;
+    }
+
+    shaderExecutable = vxnneGetReverseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_REVERSE, &ops_layer->node->kernelAttributes.borderMode,
+        input, output, numOfAxis, axis);
+
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    vxmONERROR(vxnneShaderOperation_Initialize(&reverseNode->tensor_reverse_sh_operation,
+        &reverseNode->base,
+        VXNNE_OPERATOR_TENSOR_REVERSE,
+        batchCount,
+        shaderExecutable));
+
+    vxmONERROR(vxnneOperation_AddReference(&reverseNode->tensor_reverse_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&reverseNode->tensor_reverse_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneLayer_SetOperation(
+        &reverseNode->base,
+        &reverseNode->tensor_reverse_sh_operation.base,
+        0));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNNTensorReverse_TP_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_tensor  input      = (vx_tensor)parameters[0];
+    vx_tensor  output     = (vx_tensor)parameters[6];
+    vx_context context = vxGetContext((vx_reference)node);
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    support = support && vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REVERSE);
+    support = support && vxnneIsTPSupportFormat(context, input, VX_NULL, output);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorReverse_TP_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vx_tensor  input      = (vx_tensor)parameters[0];
+    vx_tensor  output     = (vx_tensor)parameters[6];
+    vx_uint32  numOfAxis  = ((vx_scalar)parameters[1])->value->u32;
+    vx_uint32  batchCount = (TENSOR_SIZE_INDEX(input, TENSOR_VIEW_DIM_NUM(input)) == 0) ? 1 : TENSOR_SIZE_INDEX(input, TENSOR_VIEW_DIM_NUM(input));
+    vxnne_tensor_reverse  reverseNode = (vxnne_tensor_reverse)ops_layer;
+    vx_uint32 i;
+    vx_op_param_s conv = {0};
+    vx_int32 axis[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    for (i = 0; i <numOfAxis; i++)
+    {
+        axis[i] = ((vx_scalar)parameters[i + 2])->value->n32;
+    }
+
+    vxmONERROR(vxnneOperation_Initialize(&reverseNode->tensor_reverse_tp_operation.base,
+                                        &reverseNode->base,
+                                        VXNNE_OPERATION_TARGET_TP,
+                                        VXNNE_OPERATOR_TENSOR_REVERSE,
+                                        VX_NULL,
+                                        vxnneOperation_TP_Deinitialize,
+                                        batchCount,
+                                        0));
+
+    vxmONERROR(vxnneLayer_SetOperation(&reverseNode->base, &reverseNode->tensor_reverse_tp_operation.base, 0));
+    reverseNode->tensor_reverse_tp_operation.input  = input;
+    reverseNode->tensor_reverse_tp_operation.output = output;
+
+    vxmONERROR(vxnneOperation_AddReference(&reverseNode->tensor_reverse_tp_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&reverseNode->tensor_reverse_tp_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    conv.pad_x_left = 0;
+    conv.pad_y_top = 0;
+    conv.pool_size_x = 0;
+    conv.pool_size_y = 0;
+    conv.pool_stride = 1;
+    conv.enable_relu = vx_false_e;
+    conv.conv_rounding_type = 0;
+    conv.pad_mode = VX_PAD_CONSTANT;
+    conv.pad_const = 0;
+    conv.tpType = TP_REVERSE;
+    conv.data_buff = gcvNULL;
+    conv.other_ref = (vx_reference)input;
+    conv.tp_value = (vx_tp_value_cmd)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+    conv.tp_value->u32[0] = numOfAxis;
+    conv.tp_value->p8[0] = (vx_uint8_ptr)vxAllocateAndZeroMemory(sizeof(axis));
+    vxMemCopy(conv.tp_value->p8[0], axis, sizeof(axis));
+
+    vxMemCopy(&reverseNode->tensor_reverse_tp_operation.base.parameter, &conv, sizeof(vx_op_param_s));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+    vxnne_tensor_reverse  reverseNode = (vxnne_tensor_reverse)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(reverseNode->operations);
+
+    *operations = reverseNode->operations;
+
+    return status;
+}
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReverse_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status     = VX_SUCCESS;
+#if REGISTER_FRAME
+    vxnne_layer_imp_s registerTensorReverse[] = {/* Please DON'T adjust the order, it's importent */
+        { "TensorReverse NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "TensorReverse TP", vxoNNTensorReverse_TP_Support, vxoNNTensorReverse_TP_Initialize, VX_NULL },
+        { "TensorReverse SH EVIS", vxoNNTensorReverse_SH_EVIS_Support, vxoNNTensorReverse_SH_EVIS_Initialize, VX_NULL },
+        { "TensorReverse SH F32", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "TensorReverse SW ", vxoNNCommon_Support, vxoNNTensorReverse_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerTensorReverse, vxnne_tensor_reverse_s, "TensorReverse", vxoNNLayer_GetOperations);
+
+OnError:
+#else
     vx_tensor  input      = (vx_tensor)parameters[0];
     vx_tensor  output     = (vx_tensor)parameters[6];
     vx_uint32  numOfAxis  = ((vx_scalar)parameters[1])->value->u32;
@@ -426,6 +643,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorReverse_Initializer(vx_node node
 
 exit:
     if(reverseNode) gcoOS_Free(gcvNULL, reverseNode);
+#endif
     return status;
 }
 

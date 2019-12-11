@@ -196,6 +196,599 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolLayer_ValidateOutput(vx_node no
 {
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status vxoROIPoolLayer_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_tensor_roipool_layer  roipoolLayer = (vxnne_tensor_roipool_layer)ops_layer;
+
+    vx_tensor  input_data                 = (vx_tensor)parameters[0];
+    vx_tensor  input_rois                 = (vx_tensor)parameters[1];
+    vx_scalar  pool_types                 = (vx_scalar)parameters[2];
+    vx_scalar  spatial_scales             = (vx_scalar)parameters[3];
+    vx_scalar  pooled_heights             = (vx_scalar)parameters[4];
+    vx_scalar  pooled_widths              = (vx_scalar)parameters[5];
+    vx_tensor  outputs                    = (vx_tensor)parameters[6];
+    vx_scalar  relu                       = (vx_scalar)parameters[7];
+
+    vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(input_data, 3);
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxnneOperation_Initialize(&roipoolLayer->tensorROIPoolSW.base,
+        &roipoolLayer->base,
+        VXNNE_OPERATION_TARGET_SW,
+        VXNNE_OPERATOR_ROIPOOL,
+        vxnneExecuteSWROIPooling,
+        VX_NULL,
+        batchCount,
+        0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+             &roipoolLayer->base,
+             &roipoolLayer->tensorROIPoolSW.base,
+             0));
+
+    roipoolLayer->tensorROIPoolSW.input_data      = input_data;
+    roipoolLayer->tensorROIPoolSW.input_rois      = input_rois;
+    roipoolLayer->tensorROIPoolSW.pool_type       = pool_types;
+    roipoolLayer->tensorROIPoolSW.pooled_height   = pooled_heights;
+    roipoolLayer->tensorROIPoolSW.pooled_width    = pooled_widths;
+    roipoolLayer->tensorROIPoolSW.spatial_scale   = spatial_scales;
+    roipoolLayer->tensorROIPoolSW.output          = outputs;
+    roipoolLayer->tensorROIPoolSW.relu            = relu;
+
+    vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->tensorROIPoolSW.base, (vx_reference)input_data, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->tensorROIPoolSW.base, (vx_reference)input_rois, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->tensorROIPoolSW.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoROIPoolLayer_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_tensor  input_data                 = (vx_tensor)parameters[0];
+    vx_tensor  input_rois                 = (vx_tensor)parameters[1];
+
+    vx_scalar  pooled_heights             = (vx_scalar)parameters[4];
+    vx_scalar  pooled_widths              = (vx_scalar)parameters[5];
+    vx_tensor  outputs                    = (vx_tensor)parameters[6];
+
+    vx_uint32  pool_width                 = pooled_widths->value->u32;
+    vx_uint32  pool_height                = pooled_heights->value->u32;
+
+    vx_uint32  width                      = TENSOR_VIEW_SIZE_INDEX(input_data, 0);
+    vx_uint32  height                     = TENSOR_VIEW_SIZE_INDEX(input_data, 1);
+    vx_uint32  roi_stride                 = TENSOR_VIEW_SIZE_INDEX(input_rois, 2);
+
+    vx_enum    inputFormat                = TENSOR_DATA_TYPE(input_data);
+    vx_enum    roisFormat                 = TENSOR_DATA_TYPE(input_rois);
+    vx_enum    outputFormat               = TENSOR_DATA_TYPE(outputs);
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vx_bool    shExe_flag0  = (vx_bool)(width == 20 && height == 16 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
+    vx_bool    shExe_flag1  = (vx_bool)(width == 51 && height == 39 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
+    vx_bool    shExe_flag2  = (vx_bool)(width == 51 && height == 39 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_INT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8);
+    vx_bool    shExe_flag3  = (vx_bool)(width == 20 && height == 16 && roi_stride == 5 && pool_width == 6 && pool_height == 6 && inputFormat == VX_TYPE_INT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8);
+    vx_bool    shExe_flag4  = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) /*||
+                                                (inputFormat == VX_TYPE_INT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)||
+                                                (inputFormat == VX_TYPE_UINT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)*/);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support =  support && (shExe_flag2 || shExe_flag3 || shExe_flag4);
+
+    if (support)
+    {
+        SETBIT(reg_param->flag, shExe_flag0, 0);
+        SETBIT(reg_param->flag, shExe_flag1, 1);
+        SETBIT(reg_param->flag, shExe_flag2, 2);
+        SETBIT(reg_param->flag, shExe_flag3, 3);
+        SETBIT(reg_param->flag, shExe_flag4, 4);
+    }
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoROIPoolLayer_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoROIPoolLayer_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoROIPoolLayer_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vx_tensor  input_data                 = (vx_tensor)parameters[0];
+    vx_tensor  input_rois                 = (vx_tensor)parameters[1];
+    vx_scalar  spatial_scales             = (vx_scalar)parameters[3];
+    vx_scalar  pooled_heights             = (vx_scalar)parameters[4];
+    vx_scalar  pooled_widths              = (vx_scalar)parameters[5];
+    vx_tensor  outputs                    = (vx_tensor)parameters[6];
+    vx_scalar  relu                       = (vx_scalar)parameters[7];
+
+    vx_float32 spatial_scale              = spatial_scales->value->f32;
+    vx_uint32  pool_width                 = pooled_widths->value->u32;
+    vx_uint32  pool_height                = pooled_heights->value->u32;
+
+    vx_uint32  width                      = TENSOR_VIEW_SIZE_INDEX(input_data, 0);
+    vx_uint32  height                     = TENSOR_VIEW_SIZE_INDEX(input_data, 1);
+    vx_uint32  depth                      = TENSOR_VIEW_SIZE_INDEX(input_data, 2);
+    vx_uint32  roi_stride                 = TENSOR_VIEW_SIZE_INDEX(input_rois, 2);
+    vx_uint32  rois_num                   = TENSOR_VIEW_SIZE_INDEX(input_rois, 3);
+
+    vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(input_data, 3);
+
+    vxnne_tensor_roipool_layer  roipoolLayer = (vxnne_tensor_roipool_layer)ops_layer;
+
+    vx_bool    shExe_flag0  = GETBIT(reg_param->flag, 0);
+    vx_bool    shExe_flag1  = GETBIT(reg_param->flag, 1);
+    vx_bool    shExe_flag2  = GETBIT(reg_param->flag, 2);
+    vx_bool    shExe_flag3  = GETBIT(reg_param->flag, 3);
+    vx_bool    shExe_flag4  = GETBIT(reg_param->flag, 4);
+
+    vx_tensor_create_params_t  tensor_create_params;
+
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vx_bool enable_relu = relu ? relu->value->b : vx_false_e;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    if (shExe_flag0 || shExe_flag1 || shExe_flag2 || shExe_flag3)
+    {
+        vx_uint32 imgNum                = width == 51 ? 7 : 4;
+        vx_uint32 dims                  = 3;
+        vx_uint32 tmp_sizes0[3]         = {width, height, depth * imgNum };
+        vx_uint32 tmp_sizes1[3]         = {84, rois_num, 1 };
+        vx_uint32 outputs_dims          = outputs->dimCount;
+        vx_tensor outputs_reshp         = NULL;
+        vx_tensor vertMaxPoolTensor, preTreatedRectTensor;
+
+        gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+        tensor_create_params.num_of_dims = dims;
+        tensor_create_params.sizes = tmp_sizes0;
+        tensor_create_params.data_format = TENSOR_DATA_TYPE(outputs);
+        tensor_create_params.quant_format = TENSOR_QUANT_TYPE(outputs);
+        if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+        {
+            tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(outputs);
+        }
+        else
+        {
+            tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(outputs);
+            tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(outputs);
+        }
+
+        vertMaxPoolTensor = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_true_e);
+        if (vertMaxPoolTensor == VX_NULL)
+        {
+            vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
+            status = VX_ERROR_NO_MEMORY;
+            goto OnError;
+        }
+
+        tensor_create_params.data_format = TENSOR_DATA_TYPE(input_rois);
+        tensor_create_params.quant_format = TENSOR_QUANT_TYPE(input_rois);
+        if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+        {
+            tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(input_rois);
+        }
+        else
+        {
+            tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(input_rois);
+            tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(input_rois);
+        }
+        tensor_create_params.sizes = tmp_sizes1;
+        preTreatedRectTensor = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_true_e);
+        if (preTreatedRectTensor == VX_NULL)
+        {
+            vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
+            status = VX_ERROR_NO_MEMORY;
+            goto OnError;
+        }
+
+        //operation1:vertMaxPool
+        shaderExecutable = vxnneVertMaxPoolShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_VERTMAXPOOL, &ops_layer->node->kernelAttributes.borderMode, input_data, pool_width, pool_height, enable_relu, vertMaxPoolTensor);
+
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            goto OnError;
+        }
+        vxmONERROR(vxnneShaderOperation_Initialize(&roipoolLayer->vertmaxpool_operation.vertmaxpool_SHoperation,
+            &roipoolLayer->base,
+            VXNNE_OPERATOR_VERTMAXPOOL,
+            batchCount,
+            shaderExecutable));
+
+        vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->vertmaxpool_operation.vertmaxpool_SHoperation.base, (vx_reference)input_data, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->vertmaxpool_operation.vertmaxpool_SHoperation.base, (vx_reference)vertMaxPoolTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        //operation2:preTreatedRect
+        shaderExecutable = vxnnePreTreatedRectShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_PRETREATEDRECT, &ops_layer->node->kernelAttributes.borderMode, input_rois, roi_stride, rois_num, width, height, spatial_scale, preTreatedRectTensor);
+
+
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            goto OnError;
+        }
+        vxmONERROR(vxnneShaderOperation_Initialize(&roipoolLayer->pretreatedrect_operation.pretreatedrect_SHoperation,
+            &roipoolLayer->base,
+            VXNNE_OPERATOR_PRETREATEDRECT,
+            batchCount,
+            shaderExecutable));
+
+        vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->pretreatedrect_operation.pretreatedrect_SHoperation.base, (vx_reference)input_rois, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->pretreatedrect_operation.pretreatedrect_SHoperation.base, (vx_reference)preTreatedRectTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        //operation3:horzMaxPool
+        if(outputs_dims == 4)
+        {
+            vx_int32 new_size[3] = {pool_width * pool_height, depth, rois_num};
+            outputs_dims = 3;
+            outputs_reshp = vxoTensor_ReshapeTensor(outputs, new_size, outputs_dims);
+            TENSOR_POS(outputs_reshp) = TENSOR_POS(outputs);
+        }
+
+        TENSOR_POS(vertMaxPoolTensor) = TENSOR_POS(input_data);
+        if(outputs_reshp)
+        {
+            shaderExecutable = vxnneHorzMaxPoolShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_HORZMAXPOOL, &ops_layer->node->kernelAttributes.borderMode, vertMaxPoolTensor, preTreatedRectTensor, outputs_reshp);
+            vxmONERROR(vxoTensor_ReleaseTensor(&outputs_reshp));
+        }
+        else
+        {
+            shaderExecutable = vxnneHorzMaxPoolShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_HORZMAXPOOL, &ops_layer->node->kernelAttributes.borderMode, vertMaxPoolTensor, preTreatedRectTensor, outputs);
+        }
+
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            goto OnError;
+        }
+        vxmONERROR(vxnneShaderOperation_Initialize(&roipoolLayer->horzmaxpool_operation.horzmaxpool_SHoperation,
+            &roipoolLayer->base,
+            VXNNE_OPERATOR_HORZMAXPOOL,
+            batchCount,
+            shaderExecutable));
+
+        vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->horzmaxpool_operation.horzmaxpool_SHoperation.base, (vx_reference)vertMaxPoolTensor, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->horzmaxpool_operation.horzmaxpool_SHoperation.base, (vx_reference)preTreatedRectTensor, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->horzmaxpool_operation.horzmaxpool_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &roipoolLayer->base,
+            &roipoolLayer->vertmaxpool_operation.vertmaxpool_SHoperation.base,
+            0));
+        vxmONERROR(vxnneLayer_SetOperation(
+            &roipoolLayer->base,
+            &roipoolLayer->pretreatedrect_operation.pretreatedrect_SHoperation.base,
+            1));
+        vxmONERROR(vxnneLayer_SetOperation(
+            &roipoolLayer->base,
+            &roipoolLayer->horzmaxpool_operation.horzmaxpool_SHoperation.base,
+            2));
+
+        roipoolLayer->base.num_temp_tensors                  = 2;
+        roipoolLayer->base.temp_tensors[0] = vertMaxPoolTensor;
+        roipoolLayer->base.temp_tensors[1] = preTreatedRectTensor;
+    }
+    else if (shExe_flag4)
+    {
+        shaderExecutable = vxnneROIPoolShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_ROIPOOL, &ops_layer->node->kernelAttributes.borderMode, input_data, input_rois, pool_width, pool_height, spatial_scale, enable_relu, outputs);
+
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            goto OnError;
+        }
+        vxmONERROR(vxnneShaderOperation_Initialize(&roipoolLayer->tensorROIPoolSH,
+            &roipoolLayer->base,
+            VXNNE_OPERATOR_ROIPOOL,
+            batchCount,
+            shaderExecutable));
+
+        vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->tensorROIPoolSH.base, (vx_reference)input_data, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->tensorROIPoolSH.base, (vx_reference)input_rois, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->tensorROIPoolSH.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+                 &roipoolLayer->base,
+                 &roipoolLayer->tensorROIPoolSH.base,
+                 0));
+    }
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoROIPoolLayer_TP_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_tensor  input_data                 = (vx_tensor)parameters[0];
+    vx_tensor  input_rois                 = (vx_tensor)parameters[1];
+    vx_tensor  outputs                    = (vx_tensor)parameters[6];
+
+    vx_enum    roisFormat                 = TENSOR_DATA_TYPE(input_rois);
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    support = support && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP_ROI_POOLING) &&
+                            vxnneIsTPSupportFormat(node->base.context, input_data, VX_NULL, outputs) &&
+                            (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_BFLOAT16));
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoROIPoolLayer_TP_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_tensor_roipool_layer  roipoolLayer = (vxnne_tensor_roipool_layer)ops_layer;
+
+    vx_tensor  input_data                 = (vx_tensor)parameters[0];
+    vx_tensor  input_rois                 = (vx_tensor)parameters[1];
+
+    vx_scalar  spatial_scales             = (vx_scalar)parameters[3];
+    vx_scalar  pooled_heights             = (vx_scalar)parameters[4];
+    vx_scalar  pooled_widths              = (vx_scalar)parameters[5];
+    vx_tensor  outputs                    = (vx_tensor)parameters[6];
+    vx_scalar  relu                       = (vx_scalar)parameters[7];
+
+    vx_context context                    = vxGetContext((vx_reference)ops_layer->node);
+
+    vx_float32 spatial_scale              = spatial_scales->value->f32;
+    vx_uint32  pool_width                 = pooled_widths->value->u32;
+    vx_uint32  pool_height                = pooled_heights->value->u32;
+    vx_uint32  roi_stride                 = TENSOR_VIEW_SIZE_INDEX(input_rois, 2);
+    vx_uint32  rois_num                   = TENSOR_VIEW_SIZE_INDEX(input_rois, 3);
+    vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(input_data, 3);
+
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vx_uint32 size, maxpool, poolx, pooly, poolz;
+    vx_op_param_s conv = {0};
+    vx_tensor tmpTensor = VX_NULL;
+    vx_tensor list = VX_NULL;
+    vx_tensor split_end = VX_NULL;
+    vx_tensor_create_params_t tensor_create_params;
+    vx_uint32 core = context->nnConfig.fixedFeature.tpCoreCount;
+    vx_bool mult = context->options.enableMultiTP && core > 1;
+    vx_uint32 slice = !mult ? 1 : gcmMIN(TENSOR_VIEW_SIZE_INDEX(outputs, 3), core);
+    vx_uint32 roi_size = TENSOR_VIEW_SIZE_INDEX(outputs, 3);
+    vx_uint32 split_size_array[TP_TENSOR_COUNT] = {0};
+    vx_uint32 split_offset_array[TP_TENSOR_COUNT] = {0};
+    vx_uint32 splitEnds[TP_TENSOR_COUNT] = {0};
+    vx_uint32 i = 0;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    calculateSplitSize(roi_size, slice, split_size_array, split_offset_array);
+
+    splitEnds[0] = split_size_array[0] - 1;
+    for (i = 1; i < slice; i++)
+    {
+        splitEnds[i] = splitEnds[i - 1] + split_size_array[i];
+    }
+
+    vxmONERROR(vxnneOperation_Initialize(&roipoolLayer->roipool_tp_operation[0].base,
+                                        &roipoolLayer->base,
+                                        VXNNE_OPERATION_TARGET_TP,
+                                        VXNNE_OPERATOR_ROIPOOL,
+                                        VX_NULL,
+                                        vxnneOperation_TP_Deinitialize,
+                                        batchCount,
+                                        0));
+
+    vxmONERROR(vxnneOperation_Initialize(&roipoolLayer->roipool_tp_operation[1].base,
+                                        &roipoolLayer->base,
+                                        VXNNE_OPERATION_TARGET_TP,
+                                        VXNNE_OPERATOR_ROIPOOL,
+                                        VX_NULL,
+                                        vxnneOperation_TP_Deinitialize,
+                                        batchCount,
+                                        0));
+
+    /* Prepare ROI intermediate output buffer. */
+    maxpool = (TENSOR_VIEW_SIZE_INDEX(input_data, 0) + pool_width - 1) / pool_width;
+    poolx = 1 << (vx_uint32) ceil(log(TENSOR_VIEW_SIZE_INDEX(input_data, 0)) / log(2));
+    pooly = 1 << (vx_uint32) ceil(log(TENSOR_VIEW_SIZE_INDEX(input_data, 1)) / log(2));
+    poolz = 1 << (vx_uint32) ceil(log(TENSOR_VIEW_SIZE_INDEX(input_data, 2)) / log(2));
+    size = poolx * pooly * poolz * maxpool * TENSOR_DATA_SIZE(input_data);
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = 1;
+    tensor_create_params.sizes = &size;
+    tensor_create_params.data_format = TENSOR_DATA_TYPE(input_data);
+    tensor_create_params.quant_format = TENSOR_QUANT_TYPE(input_data);
+    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(input_data);
+    }
+    else
+    {
+        tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(input_data);
+        tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(input_data);
+    }
+
+    tmpTensor = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_true_e);
+    if (tmpTensor == VX_NULL)
+    {
+        vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
+        status = VX_ERROR_NO_MEMORY;
+        goto OnError;
+    }
+
+    conv.pad_x_left = 0;
+    conv.pad_y_top = 0;
+    conv.pool_size_x = 0;
+    conv.pool_size_y = 0;
+    conv.pool_stride = 1;
+    conv.enable_relu = vx_false_e;
+    conv.conv_rounding_type = 0;
+    conv.pad_mode = VX_PAD_CONSTANT;
+    conv.pad_const = 0;
+    conv.tpType = TP_ROI_POOLING_STEP_1;
+    conv.other_ref = (vx_reference)input_rois;
+    conv.data_buff = gcvNULL;
+    conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+    conv.tp_value->u32[0] = pool_width;
+    conv.tp_value->u32[1] = pool_height;
+    conv.tp_value->f32[0] = spatial_scale;
+    conv.tp_value->u32[2] = maxpool;
+    conv.tp_value->u32[3] = poolx;
+    conv.tp_value->u32[4] = pooly;
+    conv.tp_value->u32[5] = poolz;
+    conv.tp_value->u32[6] = TENSOR_VIEW_SIZE_INDEX(outputs, 3);
+    conv.tp_value->e32[0] = 0;
+
+    vxMemCopy(&roipoolLayer->roipool_tp_operation[0].base.parameter, &conv, sizeof(vx_op_param_s));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &roipoolLayer->base,
+        &roipoolLayer->roipool_tp_operation[0].base,
+        0));
+
+    roipoolLayer->roipool_tp_operation[0].input  = input_data;
+    roipoolLayer->roipool_tp_operation[0].output = tmpTensor;
+    vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->roipool_tp_operation[0].base, (vx_reference)input_data, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->roipool_tp_operation[0].base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    /* Prepare ROI list. */
+    num = TENSOR_VIEW_SIZE_INDEX(outputs, 3) * sizeof(vx_tp_roi_pool) / sizeof(vx_uint32) * 2;
+    list = vxnneAllocateTPROIListBuffer(context, ops_layer->node, num, VX_TYPE_UINT16);
+    if (list == VX_NULL)
+    {
+        status = VX_ERROR_NO_MEMORY;
+        goto OnError;
+    }
+    /* Prepare Split end list. */
+    split_end = vxnneAllocateTPROIListBuffer(context, ops_layer->node, slice, VX_TYPE_UINT32);
+    if (split_end == VX_NULL)
+    {
+        status = VX_ERROR_NO_MEMORY;
+        goto OnError;
+    }
+
+    vxnneInitROITensorFromBuffer(split_end, splitEnds, slice * sizeof(vx_uint32));
+
+    shaderExecutable = vxnneROIRect2ROIListShaderExecutable(context, VXNNE_KERNEL_ROIRECT2ROILIST, &ops_layer->node->kernelAttributes.borderMode, input_rois, roi_stride, rois_num, pool_width, pool_height, spatial_scale, slice, split_end, list);
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    vxmONERROR(vxnneShaderOperation_Initialize(&roipoolLayer->tensorROIPoolSH,
+        &roipoolLayer->base,
+        VXNNE_OPERATOR_PRETREATEDRECT,
+        batchCount,
+        shaderExecutable));
+
+    vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->tensorROIPoolSH.base, (vx_reference)input_rois, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->tensorROIPoolSH.base, (vx_reference)split_end, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->tensorROIPoolSH.base, (vx_reference)list, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneLayer_SetOperation(
+        &roipoolLayer->base,
+        &roipoolLayer->tensorROIPoolSH.base,
+        1));
+    conv.tpType = TP_ROI_POOLING_STEP_2;
+    conv.other_ref = (vx_reference)input_data;
+    conv.data_buff = list;
+    if (relu != VX_NULL)
+        conv.enable_relu = relu->value->b;
+    else
+        conv.enable_relu = vx_false_e;
+    conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+    conv.tp_value->u32[0] = pool_width;
+    conv.tp_value->u32[1] = pool_height;
+    conv.tp_value->f32[0] = spatial_scale;
+    conv.tp_value->u32[2] = maxpool;
+    conv.tp_value->u32[3] = poolx;
+    conv.tp_value->u32[4] = pooly;
+    conv.tp_value->u32[5] = poolz;
+    conv.tp_value->u32[6] = TENSOR_VIEW_SIZE_INDEX(outputs, 3);
+    conv.tp_value->e32[0] = 1;
+
+    vxMemCopy(&roipoolLayer->roipool_tp_operation[1].base.parameter, &conv, sizeof(vx_op_param_s));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &roipoolLayer->base,
+        &roipoolLayer->roipool_tp_operation[1].base,
+        2));
+
+    roipoolLayer->roipool_tp_operation[1].input  = tmpTensor;
+    roipoolLayer->roipool_tp_operation[1].output = outputs;
+
+    vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->roipool_tp_operation[1].base, (vx_reference)tmpTensor, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->roipool_tp_operation[1].base, (vx_reference)list, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&roipoolLayer->roipool_tp_operation[1].base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    roipoolLayer->base.num_temp_tensors = 2;
+    roipoolLayer->base.temp_tensors[0] = tmpTensor;
+    roipoolLayer->base.temp_tensors[1] = split_end;
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+    vxnne_tensor_roipool_layer  roipoolLayer = (vxnne_tensor_roipool_layer)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(roipoolLayer->operations);
+
+    *operations = roipoolLayer->operations;
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(vx_node    node, char* name, const vx_reference parameters[], vx_uint32 num)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_layer_imp_s registerROIPoolLayers[] = {/* Please DON'T adjust the order, it's importent */
+        { "ROIPool NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "ROIPool TP", vxoROIPoolLayer_TP_Support, vxoROIPoolLayer_TP_Initialize, VX_NULL },
+        { "ROIPool SH EVIS", vxoROIPoolLayer_SH_EVIS_Support, vxoROIPoolLayer_SH_EVIS_Initialize, VX_NULL },
+        { "ROIPool SH F32", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "ROIPool SW", vxoNNCommon_Support, vxoROIPoolLayer_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerROIPoolLayers, vxnne_tensor_roipool_layer_s, name, vxoNNLayer_GetOperations);
+
+OnError:
+    return status;
+}
+#else
 
 VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
     vx_node    node,
@@ -677,9 +1270,18 @@ exit:
     if(roipoolLayer) gcoOS_Free(NULL, (gctPOINTER)roipoolLayer);
     return status;
 }
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
+#if REGISTER_FRAME
+    vx_reference params[] = {
+        parameters[0], parameters[1], parameters[2], parameters[3], parameters[4],
+        parameters[5], parameters[6], VX_NULL,
+    };
+
+    return vxnneROIPoolLayer_Initializer(node, "ROIPoolLayer", params, gcmCOUNTOF(params));
+#else
     vx_tensor  input_data                 = (vx_tensor)parameters[0];
     vx_tensor  input_rois                 = (vx_tensor)parameters[1];
     vx_scalar  pool_types                 = (vx_scalar)parameters[2];
@@ -700,6 +1302,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolLayer_Initializer(vx_node node,
         outputs,
         VX_NULL
         );
+#endif
 
 
 }
@@ -732,6 +1335,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolReluLayer_ValidateOutput(vx_nod
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolReluLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
+#if REGISTER_FRAME
+    return vxnneROIPoolLayer_Initializer(node, "ROIPoolLayer", parameters, num);
+#else
     vx_tensor  input_data                 = (vx_tensor)parameters[0];
     vx_tensor  input_rois                 = (vx_tensor)parameters[1];
     vx_scalar  pool_types                 = (vx_scalar)parameters[2];
@@ -753,6 +1359,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolReluLayer_Initializer(vx_node n
         outputs,
         relu
         );
+#endif
 }
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNROIPoolReluLayer_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
