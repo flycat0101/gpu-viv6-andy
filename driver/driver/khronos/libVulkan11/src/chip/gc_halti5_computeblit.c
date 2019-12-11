@@ -984,7 +984,7 @@ static VkResult halti5_program_blit_dst_img(
         params->dstOffset = dstRes->u.img.offset;
         params->dstExtent = dstRes->u.img.extent;
 
-        if (!imgView->formatInfo->compressed &&& srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed)
+        if (!imgView->formatInfo->compressed && srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed)
         {
             VkExtent2D rect = srcRes->u.img.pImage->formatInfo.blockSize;
 
