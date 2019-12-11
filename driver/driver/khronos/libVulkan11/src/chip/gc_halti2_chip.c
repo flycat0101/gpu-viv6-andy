@@ -606,7 +606,7 @@ __VK_INLINE void rsConfigTiling(
     switch (img->halTiling)
     {
     case gcvTILED:
-        *tiling    = 0x1;
+        *tiling    = img->formatInfo.compressed ? 0x0 : 0x1;
         *superTile = 0x0;
         break;
     case gcvSUPERTILED:
@@ -1261,12 +1261,10 @@ VkResult halti2_copyImageWithRS(
             fmtInfo = __vk_GetVkFormatInfo((VkFormat) dstFormat);
             rect = fmtInfo->blockSize;
 
-            dstTiling = 0x0;
-            dstSuperTile = 0x0;
-            srcOffset.x = gcmALIGN_NP2(srcOffset.x - rect.width  + 1, rect.width );
-            srcOffset.y = gcmALIGN_NP2(srcOffset.y - rect.height + 1, rect.height);
-            dstOffset.x = gcmALIGN_NP2(dstOffset.x - rect.width  + 1, rect.width );
-            dstOffset.y = gcmALIGN_NP2(dstOffset.y - rect.height + 1, rect.height);
+            srcOffset.x = gcmALIGN_NP2(srcOffset.x - rect.width  + 1, rect.width ) / rect.width;
+            srcOffset.y = gcmALIGN_NP2(srcOffset.y - rect.height + 1, rect.height) / rect.height;
+            dstOffset.x = gcmALIGN_NP2(dstOffset.x - rect.width  + 1, rect.width ) / rect.width;
+            dstOffset.y = gcmALIGN_NP2(dstOffset.y - rect.height + 1, rect.height) / rect.height;
             srcExtent.width  = gcmALIGN_NP2(srcExtent.width, rect.width ) / rect.width;
             srcExtent.height = gcmALIGN_NP2(srcExtent.height, rect.height) / rect.height;
             dstExtent.width  = gcmALIGN_NP2(dstExtent.width, rect.width ) / rect.width;

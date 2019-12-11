@@ -983,6 +983,14 @@ static VkResult halti5_program_blit_dst_img(
 
         params->dstOffset = dstRes->u.img.offset;
         params->dstExtent = dstRes->u.img.extent;
+
+        if (!imgView->formatInfo->compressed && srcRes->u.img.pImage->formatInfo.compressed)
+        {
+            VkExtent2D rect = srcRes->u.img.pImage->formatInfo.blockSize;
+
+            params->dstExtent.width  = gcmALIGN_NP2(params->dstExtent.width, rect.width ) / rect.width;
+            params->dstExtent.height = gcmALIGN_NP2(params->dstExtent.height, rect.height) / rect.height;
+        }
     }
     else
     {
@@ -1046,6 +1054,7 @@ static VkResult halti5_program_blit_dst_img(
 
     if (params->rawCopy && imgView && imgView->formatInfo->compressed)
     {
+        VkBool32 srcCompressed = srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed;
         VkExtent2D rect = imgView->formatInfo->blockSize;
         __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, imgView->createInfo.image);
         __vkImageLevel *baseLevel = &img->pImgLevels[imgView->createInfo.subresourceRange.baseMipLevel];
@@ -1053,10 +1062,10 @@ static VkResult halti5_program_blit_dst_img(
         uint32_t width  = gcmALIGN_NP2(baseLevel->requestW, rect.width ) / rect.width;
         uint32_t height = gcmALIGN_NP2(baseLevel->requestH, rect.height) / rect.height;
 
-        params->dstOffset.x = gcmALIGN_NP2(params->dstOffset.x - rect.width  + 1, rect.width );
-        params->dstOffset.y = gcmALIGN_NP2(params->dstOffset.y - rect.height + 1, rect.height);
-        params->dstExtent.width  = gcmALIGN_NP2(params->dstExtent.width, rect.width ) / rect.width;
-        params->dstExtent.height = gcmALIGN_NP2(params->dstExtent.height, rect.height) / rect.height;
+        params->dstOffset.x = gcmALIGN_NP2(params->dstOffset.x - rect.width  + 1, rect.width ) / rect.width;
+        params->dstOffset.y = gcmALIGN_NP2(params->dstOffset.y - rect.height + 1, rect.height) / rect.height;
+        params->dstExtent.width  = gcmALIGN_NP2(params->dstExtent.width, rect.width ) / (srcCompressed ? rect.width  : 1);
+        params->dstExtent.height = gcmALIGN_NP2(params->dstExtent.height, rect.height) / (srcCompressed ? rect.height : 1);
 
         if (imgView->formatInfo->bitsPerBlock == 128)
         {
@@ -1689,20 +1698,18 @@ static VkResult halti5_program_copy_dst_img(
         if (imgView && pDstImg->formatInfo.compressed)
         {
             VkExtent2D rect = pDstImg->formatInfo.blockSize;
-
+            VkBool32 srcCompressed = srcRes->isImage && srcRes->u.img.pImage->formatInfo.compressed;
             uint32_t width = gcmALIGN_NP2(pImgLevel->requestW, rect.width) / rect.width;
             uint32_t height = gcmALIGN_NP2(pImgLevel->requestH, rect.height) / rect.height;
 
             /*ditOffset dstExtent is the area to copy to, width/height is the image Size*/
             params->dstOffset.x = gcmALIGN_NP2(params->dstOffset.x - rect.width + 1, rect.width) / rect.width;
             params->dstOffset.y = gcmALIGN_NP2(params->dstOffset.y - rect.height + 1, rect.height) / rect.height;
-            params->dstExtent.width = gcmALIGN_NP2(params->dstExtent.width, rect.width) / rect.width;
-            params->dstExtent.height = gcmALIGN_NP2(params->dstExtent.height, rect.height) / rect.height;
+            params->dstExtent.width = gcmALIGN_NP2(params->dstExtent.width, rect.width)     / (srcCompressed ? rect.width  : 1);
+            params->dstExtent.height = gcmALIGN_NP2(params->dstExtent.height, rect.height) / (srcCompressed ? rect.height : 1);
 
             if (pDstImg->formatInfo.bitsPerBlock == 128)
             {
-                params->dstOffset.x *= 2;
-                params->dstExtent.width *= 2;
                 width *= 2;
             }
 
@@ -1723,7 +1730,13 @@ static VkResult halti5_program_copy_dst_img(
 
                 pUserSize = &userSize;
             }
+            if (srcRes->u.img.pImage->formatInfo.compressed)
+            {
+                VkExtent2D rect = srcRes->u.img.pImage->formatInfo.blockSize;
 
+                params->dstExtent.width  = gcmALIGN_NP2(params->dstExtent.width, rect.width ) / rect.width;
+                params->dstExtent.height = gcmALIGN_NP2(params->dstExtent.height, rect.height) / rect.height;
+            }
         }
     }
     else
