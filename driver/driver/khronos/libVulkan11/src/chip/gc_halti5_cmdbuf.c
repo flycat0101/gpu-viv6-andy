@@ -33,6 +33,22 @@ static VkBool32 g_dbgSkipDraw = VK_FALSE;
     }                                    \
 } while (0);
 
+/* 0x48 HW validation: add SnapToPage after draw avoid gemometry hang
+   case list:
+    dEQP-VK.tessellation.geometry_interaction.limits.output_required_max_tessellation
+    dEQP-VK.geometry.layered.3d.render_to_all
+    dEQP-VK.geometry.layered.3d.render_different_content
+*/
+#define LoadAllSnapToPage() do { \
+    *pCmdBuffer++ = gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, OPCODE, SNAP_TO_PAGE)       \
+                  | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, VS)                 \
+                  | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, TCS)                \
+                  | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, TES)                \
+                  | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, GS)                 \
+                  | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, PS);                \
+    *pCmdBuffer++ = 0;           \
+} while (0);
+
 
 /* Data size for each type in HW.*/
 static const uint32_t g_queryDataSizeTable[] = {
@@ -969,6 +985,7 @@ VkResult halti5_draw(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+            LoadAllSnapToPage();
 
             if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
             {
@@ -1181,6 +1198,7 @@ VkResult halti5_draw(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+        LoadAllSnapToPage();
 
         if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
         {
@@ -1469,6 +1487,7 @@ VkResult halti5_drawIndexed(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+            LoadAllSnapToPage();
 
             if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
             {
@@ -1679,6 +1698,7 @@ VkResult halti5_drawIndexed(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+        LoadAllSnapToPage();
 
         if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
         {
@@ -1924,6 +1944,7 @@ VkResult halti5_drawDirect(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+    LoadAllSnapToPage();
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
@@ -2171,6 +2192,7 @@ VkResult halti5_drawIndexedDirect(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+    LoadAllSnapToPage();
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
@@ -2697,6 +2719,7 @@ VkResult halti5_splitDrawIndexedPatchList(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+    LoadAllSnapToPage();
 
     if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
     {
@@ -3062,6 +3085,7 @@ static VkResult halti5_drawIndirect_common(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+            LoadAllSnapToPage();
 
 
             if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
@@ -3258,6 +3282,7 @@ static VkResult halti5_drawIndirect_common(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));}} while (0);
 
+        LoadAllSnapToPage();
 
 
         if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
