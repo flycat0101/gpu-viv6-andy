@@ -737,7 +737,11 @@ VkResult halti2_clearImageWithRS(
     }
 
     rsConfigTiling(img, &dstTiling, &dstSuperTile);
-    __VK_ASSERT(hwFormat == 0x10 && dstTiling == 0x1);
+
+    if (hwFormat == 0x10)
+    {
+        __VK_ASSERT(dstTiling == 0x1);
+    }
 
     __VK_ASSERT(cmd->curScrachBufIndex == 0);
     pCmdBuffer = pCmdBufferBegin = &cmd->scratchCmdBuffer[cmd->curScrachBufIndex];
