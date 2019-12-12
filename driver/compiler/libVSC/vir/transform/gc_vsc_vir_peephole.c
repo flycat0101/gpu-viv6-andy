@@ -5435,6 +5435,11 @@ static gctBOOL _VSC_PH_LocalVariable(
     VIR_DEF_USAGE_INFO* duInfo = VSC_PH_Peephole_GetDUInfo(ph);
     VIR_Symbol  *sym = VIR_Operand_GetSymbol(pOpnd);
 
+    if (!VIR_Operand_isSymbol(pOpnd))
+    {
+        return gcvFALSE;
+    }
+
     if (vscHTBL_DirectTestAndGet(visitSet, (void*) pOpnd, gcvNULL))
     {
         return gcvFALSE;
@@ -5466,8 +5471,7 @@ static gctBOOL _VSC_PH_LocalVariable(
             {
                 for (i = 0; i < VIR_Inst_GetSrcNum(defInst);i++)
                 {
-                    if (!VIR_Operand_isImm(VIR_Inst_GetSource(defInst, i)) &&
-                        _VSC_PH_LocalVariable(ph, defInst, VIR_Inst_GetSource(defInst, i), visitSet))
+                    if (_VSC_PH_LocalVariable(ph, defInst, VIR_Inst_GetSource(defInst, i), visitSet))
                     {
                         return gcvTRUE;
                     }
