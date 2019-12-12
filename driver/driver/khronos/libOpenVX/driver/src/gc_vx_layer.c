@@ -25658,7 +25658,7 @@ vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
         goto OnError;
     }
 
-    if(input_width < 8 && input_height < 4 && inputFormat == VX_TYPE_FLOAT16)
+    if(input_width < 8 && input_height < 4)
     {
         smallFlg = 1;
     }
@@ -25754,8 +25754,16 @@ vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
     {
         if (inputElementSize ==1)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Const8Bits", borderMode);
-            if (!shaderExecutable) goto OnError;
+            if(smallFlg)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Const8Bits_Small", borderMode);
+                if (!shaderExecutable) goto OnError;
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Const8Bits", borderMode);
+                if (!shaderExecutable) goto OnError;
+            }
         }
         else if (inputElementSize ==2)
         {
