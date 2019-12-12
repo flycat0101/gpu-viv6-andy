@@ -2462,6 +2462,41 @@ _VIR_FCP_ModifyFP16Instruction(
     return status;
 }
 
+static VSC_ErrCode
+_VIR_FCP_FixAtomTiming(
+    VIR_Shader*         pShader,
+    VIR_Function*       pFunc,
+    VIR_Instruction**   ppInst)
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Instruction*    pWorkingInst = *ppInst;
+    VIR_Instruction*    pLastInst = gcvNULL;
+    gctUINT             i, nopCount = 120;
+
+    for (i = 0; i < nopCount; i++)
+    {
+        errCode = VIR_Function_AddInstructionAfter(pFunc,
+                                                   VIR_OP_NOP,
+                                                   VIR_TYPE_UNKNOWN,
+                                                   pWorkingInst,
+                                                   gcvTRUE,
+                                                   &pLastInst);
+        ON_ERROR(errCode, "Add a NOP instruction.");
+
+        VIR_Inst_SetFlag(pLastInst, VIR_INSTFLAG_FORCE_GEN);
+
+        pWorkingInst = pLastInst;
+    }
+
+    if (ppInst)
+    {
+        *ppInst = pLastInst;
+    }
+
+OnError:
+    return errCode;
+}
+
 DEF_QUERY_PASS_PROP(vscVIR_PostCGCleanup)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
@@ -2494,6 +2529,7 @@ VSC_ErrCode vscVIR_PostCGCleanup(
     VSC_HW_CONFIG*      pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     VIR_DEF_USAGE_INFO* pDuInfo = pPassWorker->pDuInfo;
     gctBOOL             bSupportImgLdSt = VIR_Shader_SupportImgLdSt(pShader, pHwCfg, gcvFALSE);
+    gctBOOL             bHasAtomTimingFix = pHwCfg->hwFeatureFlags.hasAtomTimingFix;
     /* So far only vulkan driver needs to check the resource opcode type. */
     gctBOOL             bNeedToCheckResOp = VIR_Shader_IsVulkan(pShader);
 
@@ -2579,6 +2615,11 @@ VSC_ErrCode vscVIR_PostCGCleanup(
 
                     _SetResOpBitsForImage(pDuInfo, pShader, inst, VIR_Inst_GetSource(inst, 0), resOpType);
                 }
+            }
+
+            if (VIR_OPCODE_isAtom(opCode) && !bHasAtomTimingFix)
+            {
+                _VIR_FCP_FixAtomTiming(pShader, func, &inst);
             }
 
             if (bGenInst)

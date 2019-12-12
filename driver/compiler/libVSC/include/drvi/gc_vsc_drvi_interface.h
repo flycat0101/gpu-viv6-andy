@@ -732,7 +732,8 @@ typedef struct _VSC_HW_CONFIG
         /* word 3 */
         gctUINT          hasPointSizeFix        : 1;
         gctUINT          supportVectorB0        : 1;
-        gctUINT          reserved1              : 30;
+        gctUINT          hasAtomTimingFix       : 1;
+        gctUINT          reserved1              : 29;
 
         /* Last word */
         /* Followings will be removed after shader programming is removed out of VSC */
