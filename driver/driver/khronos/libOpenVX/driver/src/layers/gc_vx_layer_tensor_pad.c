@@ -1024,10 +1024,21 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
     vx_int32 inWidth = 0, inHeight = 0, inDepth = 0, inBatch = 0;
     vx_int32 outWidth = 0, outHeight = 0, outDepth = 0, outBatch = 0;
     vx_bool shader_flag = vx_false_e;
+    vx_bool dataFormatFlag = vx_false_e;
     vx_bool pad_flag = vx_false_e;
     vx_bool whc_flag = vx_false_e;
     vx_int32_ptr pad_base = VX_NULL;
     vx_enum pad_mode = padMode->value->e;
+
+    vx_enum    inputFormat             = TENSOR_DATA_TYPE(src);
+    vx_int8    inputFixPointPos        = TENSOR_POS(src);
+    vx_int32   inputZeroPoint          = TENSOR_TF_ZEROPOINT(src);
+    vx_float32 inputScale              = TENSOR_TF_SCALE(src);
+    vx_uint32  inputElementSize        = TENSOR_DATA_SIZE(src);
+    vx_enum    outputFormat            = TENSOR_DATA_TYPE(dst);
+    vx_int8    outputFixPointPos       = TENSOR_POS(dst);
+    vx_int32   outputZeroPoint         = TENSOR_TF_ZEROPOINT(dst);
+    vx_float32 outputScale             = TENSOR_TF_SCALE(dst);
 
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
 
@@ -1042,6 +1053,9 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
     inDepth = TENSOR_VIEW_SIZE_INDEX(src, 2);
     inBatch = TENSOR_VIEW_SIZE_INDEX(src, 3);
     vxoTensor_GetTensorViewMemory(pad_dims, (gctPOINTER*)&pad_base, VX_NULL);
+
+    dataFormatFlag = (vx_bool)((inputFormat == outputFormat) && (inputElementSize & 3) && (inputFixPointPos == outputFixPointPos)
+            && (inputZeroPoint == outputZeroPoint) && (inputScale == outputScale));
 
     if(outDepth == inDepth && outBatch == inBatch)
     {
@@ -1080,7 +1094,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
         whc_flag = vx_true_e;
     }
 
-    support = support && shader_flag;
+    support = support && shader_flag && dataFormatFlag;
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -1297,7 +1311,6 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_SH_EVIS_Initialize(vxnne_layer ops_laye
         shaderExecutable));
 
     vxmONERROR(vxnneOperation_AddReference(&padNode->tensor_pad_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&padNode->tensor_pad_sh_operation.base, (vx_reference)padConst, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&padNode->tensor_pad_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
     vxmONERROR(vxnneLayer_SetOperation(
@@ -1500,11 +1513,25 @@ OnError:
     {
         vx_int32 inWidth = 0, inHeight = 0, inDepth = 0, inBatch = 0;
         vx_int32 outWidth = 0, outHeight = 0, outDepth = 0, outBatch = 0;
+        vx_bool dataFormatFlag = vx_false_e;
         vx_bool shader_flag = vx_false_e;
         vx_bool pad_flag = vx_false_e;
         vx_bool whc_flag = vx_false_e;
         vx_int32_ptr pad_base = VX_NULL;
         vx_enum pad_mode = padMode->value->e;
+
+        vx_enum    inputFormat             = TENSOR_DATA_TYPE(src);
+        vx_int8    inputFixPointPos        = TENSOR_POS(src);
+        vx_int32   inputZeroPoint          = TENSOR_TF_ZEROPOINT(src);
+        vx_float32 inputScale              = TENSOR_TF_SCALE(src);
+        vx_uint32  inputElementSize        = TENSOR_DATA_SIZE(src);
+        vx_enum    outputFormat            = TENSOR_DATA_TYPE(dst);
+        vx_int8    outputFixPointPos       = TENSOR_POS(dst);
+        vx_int32   outputZeroPoint         = TENSOR_TF_ZEROPOINT(dst);
+        vx_float32 outputScale             = TENSOR_TF_SCALE(dst);
+
+        dataFormatFlag = (vx_bool)((inputFormat == outputFormat) && (inputElementSize & 3) && (inputFixPointPos == outputFixPointPos)
+            && (inputZeroPoint == outputZeroPoint) && (inputScale == outputScale));
 
         outWidth  = TENSOR_VIEW_SIZE_INDEX(dst, 0);
         outHeight = TENSOR_VIEW_SIZE_INDEX(dst, 1);
@@ -1551,6 +1578,11 @@ OnError:
         {
             shader_flag = vx_true_e;
             whc_flag = vx_true_e;
+        }
+
+        if(!dataFormatFlag)
+        {
+            shader_flag = vx_false_e;
         }
 
         if (shader_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
@@ -1701,7 +1733,6 @@ OnError:
                 goto exit;
 
             vxnneOperation_AddReference(&padNode->tensor_pad_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&padNode->tensor_pad_sh_operation.base, (vx_reference)padConst, VXNNE_OPERATION_REFENRENCE_INPUT);
             vxnneOperation_AddReference(&padNode->tensor_pad_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
             vxnneLayer_SetOperation(
