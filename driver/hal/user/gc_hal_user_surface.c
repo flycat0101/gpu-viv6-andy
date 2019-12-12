@@ -477,7 +477,7 @@ gcoSURF_AllocateTileStatus(
     &&  !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MC_FCCACHE_BYTEMASK)) || (chipModel == gcv7000 && chipRevision == 0x6203))
     {
         bytes += 128;
-        allocFlags |= gcvALLOC_FLAG_CONTIGUOUS;
+        allocFlags |= gcvALLOC_FLAG_CMA_LIMIT;
     }
 
     if (Surface->hints & gcvSURF_PROTECTED_CONTENT)
@@ -488,6 +488,11 @@ gcoSURF_AllocateTileStatus(
     if (Surface->hints & gcvSURF_DMABUF_EXPORTABLE)
     {
         allocFlags |= gcvALLOC_FLAG_DMABUF_EXPORTABLE;
+    }
+
+    if (Surface->hints & gcvSURF_CMA_LIMIT)
+    {
+        allocFlags |= gcvALLOC_FLAG_CMA_LIMIT;
     }
 
     /* Copy filler. */
