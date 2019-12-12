@@ -6586,7 +6586,10 @@ vxnne_shader_executable vxnneGetGPUTensorScaleShaderExecutable(
     {
         vx_reference parameters[4] = {(vx_reference)input, (vx_reference)scaleX_s, (vx_reference)scaleY_s, (vx_reference)output};
 
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BilinearFP32", borderMode);
+        if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BilinearFP16", borderMode);
+        else
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BilinearFP32", borderMode);
         if (!shaderExecutable) goto OnError;
 
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
