@@ -10913,7 +10913,10 @@ VkResult halti5_createImageView(
                 }
                 break;
             default:
-                __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgv, VK_NULL_HANDLE, gcvNULL, chipImgv->imgDesc));
+                if (usage & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
+                {
+                    __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgv, VK_NULL_HANDLE, gcvNULL, chipImgv->imgDesc));
+                }
                 break;
             }
         }
