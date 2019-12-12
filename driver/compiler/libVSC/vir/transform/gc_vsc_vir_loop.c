@@ -593,6 +593,11 @@ _VIR_LoopInfo_AddBB(
             errCode = _VIR_LoopInfo_AddBB(VIR_LoopInfo_GetParentLoop(loopInfo), bb, gcvNULL);
         }
 
+        if (BB_FLAGS_HAS_BARRIER(bb))
+        {
+            VIR_LoopInfo_AddFlag(loopInfo, VIR_LoopInfo_Flags_HasBarrier);
+        }
+
         if(newlyAdded)
         {
             *newlyAdded = gcvTRUE;
@@ -4838,9 +4843,18 @@ _VIR_LoopInfo_CanDoDynamicallyUnroll(
     VIR_LoopInfo* loopInfo
     )
 {
+    VIR_Shader* pShader = VIR_LoopInfo_GetShader(loopInfo);
+    VSC_HW_CONFIG* pHwCfg = VIR_LoopOpts_GetHwCfg(VIR_LoopInfoMgr_GetLoopOpts(VIR_LoopInfo_GetLoopInfoMgr(loopInfo)));
     VIR_BB* loopHead = VIR_LoopInfo_GetLoopHead(loopInfo);
     VIR_BB* loopEnd = VIR_LoopInfo_GetLoopEnd(loopInfo);
     VSC_OPTN_LoopOptsOptions* options = VIR_LoopInfo_GetOptions(loopInfo);
+
+    if (VIR_LoopInfo_HasFlag(loopInfo, VIR_LoopInfo_Flags_HasBarrier)
+        &&
+        VIR_Shader_NeedToCutDownWorkGroupSize(pShader, pHwCfg))
+    {
+        return gcvFALSE;
+    }
 
     {
         gctUINT loopLength = _VIR_LoopInfo_GetInstCount(loopInfo);
