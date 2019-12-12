@@ -3142,6 +3142,11 @@ gcChipRecompileShader(
         recompileOptions |= __GL_CHIP_RO_OUTPUT_HIGHP_CONVERSION;
     }
 
+    if (pgStateKeyMask->s.hasFrontFacingClockwice)
+    {
+        gcmONERROR(gcCreateFrontFacingDirective(&recompileInfo->recompilePatchDirectivePtr));
+    }
+
     if (recompileInfo->recompilePatchDirectivePtr || recompileNoDirective)
     {
         /* Do first kind of recompile */
@@ -3300,6 +3305,12 @@ gcChipNeedRecompile(
             pgStateKey->staticKey->highpConversion = GL_TRUE;
             pgStateKeyMask->s.hasPSOutHighpConversion = 1;
         }
+
+        if (pgKeyState->staticKey->frontFacingClockwice)
+        {
+            pgStateKey->staticKey->frontFacingClockwice = GL_TRUE;
+            pgStateKeyMask->s.hasFrontFacingClockwice = 1;
+        }
     }
 
     if (program->stageBits & gcvPROGRAM_STAGE_TCS_BIT)
@@ -3342,6 +3353,16 @@ gcChipRecompileEvaluateKeyStates(
     gceSTATUS status = gcvSTATUS_OK;
     gctBOOL needTxRecompile = gcvFALSE;
     gctBOOL needRtRecompile = gcvFALSE;
+    gctBOOL hasGlFrontFacing = gcvFALSE;
+    gcSHADER shaderBinary;
+    GLuint i;
+
+    gctBOOL bTriangle = (gc->vertexArray.primMode == GL_TRIANGLES ||
+                         gc->vertexArray.primMode == GL_TRIANGLE_FAN ||
+                         gc->vertexArray.primMode == GL_TRIANGLE_STRIP ||
+                         gc->vertexArray.primMode == GL_TRIANGLES_ADJACENCY ||
+                         gc->vertexArray.primMode == GL_TRIANGLE_STRIP_ADJACENCY) ?
+                         gcvTRUE : gcvFALSE;
 
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
@@ -3965,6 +3986,37 @@ gcChipRecompileEvaluateKeyStates(
                     pgKeyState->staticKey->alpha2Coverage = alphaCov;
                     pgKeyDirty = GL_TRUE;
                 }
+            }
+        }
+
+        if (bTriangle && (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_FRONTFACE_BIT))
+        {
+            if (gc->state.polygon.frontFace == GL_CW)
+            {
+                shaderBinary = program->curPgInstance->binaries[__GLSL_STAGE_FS];
+                for (i = 0; i < (GLuint)shaderBinary->attributeCount; i++)
+                {
+                    if (shaderBinary->attributes[i] == gcvNULL)
+                    {
+                        continue;
+                    }
+                    if (shaderBinary->attributes[i]->nameLength == gcSL_FRONT_FACING)
+                    {
+                        hasGlFrontFacing = GL_TRUE;
+                        break;
+                    }
+                }
+
+                if (hasGlFrontFacing)
+                {
+                    pgKeyState->staticKey->frontFacingClockwice = GL_TRUE;
+                    pgKeyDirty = GL_TRUE;
+                }
+            }
+            else if (pgKeyState->staticKey->frontFacingClockwice)
+            {
+                pgKeyState->staticKey->frontFacingClockwice = GL_FALSE;
+                pgKeyDirty = GL_TRUE;
             }
         }
     }
