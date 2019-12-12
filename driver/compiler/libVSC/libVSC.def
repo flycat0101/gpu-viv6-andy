@@ -267,6 +267,8 @@ EXPORTS
     gcCreateCLLongULongDirective
     gcCreateRemoveAssignmentForAlphaChannel
     gcCreateYFlippedShaderDirective
+    gcCreateFrontFacingDirective
+    gcCreateAlphaTestDirective
     gcCreateSampleMaskDirective
     gcCreateTcsInputMismatch
     gcCreateColorKillDirective

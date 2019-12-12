@@ -114,6 +114,8 @@ enum gceRecompileKind
     gceRK_PATCH_Y_FLIPPED_TEXTURE,
     gceRK_PATCH_REMOVE_ASSIGNMENT_FOR_ALPHA,
     gceRK_PATCH_Y_FLIPPED_SHADER,
+    gceRK_PATCH_INVERT_FRONT_FACING,
+    gceRK_PATCH_ALPHA_TEST,
     gceRK_PATCH_SAMPLE_MASK,
     gceRK_PATCH_SIGNEXTENT,
     gceRK_PATCH_TCS_INPUT_COUNT_MISMATCH,
@@ -361,6 +363,12 @@ typedef struct _gcsPatchYFlippedShader
 }
 gcsPatchYFlippedShader;
 
+typedef struct _gcsPatchAlphaTestShader
+{
+    gcUNIFORM alphaTestData; /* uniform contains refValue and func. */
+}
+gcsPatchAlphaTestShader;
+
 typedef struct _gcsPatchFlippedSamplePosition
 {
     gctFLOAT  value;  /* change gl_SamplePosition to (value - gl_SamplePosition); */
@@ -444,6 +452,7 @@ typedef struct _gcRecompileDirective
         gcsPatchYFlippedTexture * yFlippedTexture;
         gcsPatchRemoveAssignmentForAlphaChannel * removeOutputAlpha;
         gcsPatchYFlippedShader *  yFlippedShader;
+        gcsPatchAlphaTestShader * alphaTestShader;
         gcsPatchSampleMask *      sampleMask;
         gcsPatchSignExtent *      signExtent;
         gcsPatchTCSInputCountMismatch *  inputMismatch;
@@ -7892,6 +7901,16 @@ gcCreateRemoveAssignmentForAlphaChannel(
 
 gceSTATUS
 gcCreateYFlippedShaderDirective(
+    OUT gcPatchDirective  **   PatchDirectivePtr
+    );
+
+gceSTATUS
+gcCreateFrontFacingDirective(
+    OUT gcPatchDirective  **   PatchDirectivePtr
+    );
+
+gceSTATUS
+gcCreateAlphaTestDirective(
     OUT gcPatchDirective  **   PatchDirectivePtr
     );
 
