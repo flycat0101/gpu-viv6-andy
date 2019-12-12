@@ -12800,7 +12800,9 @@ _vscVIR_DetectSingleLoopInfo(
         }
 
         /* Move the other instructions to another BB. */
-        if (VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(BB_GET_END_INST(pWorkingBB))))
+        if (VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(BB_GET_END_INST(pWorkingBB)))
+            &&
+            BB_GET_END_INST(pWorkingBB) != BB_GET_START_INST(pWorkingBB))
         {
             errCode = _vscVIR_MoveJmpOutOfBB(VIR_Shader_GetMainFunction(pContext->pShader),
                                              pWorkingBB);
@@ -13079,6 +13081,167 @@ OnError:
         vscHTBL_Destroy(pBBWorkingSet);
     }
 
+    return errCode;
+}
+
+static VSC_ErrCode
+_vscVIR_DetectBarrierWithinForwardJmp(
+    IN VSC_CutDownWGS*  pContext
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Shader*         pShader = pContext->pShader;
+    VIR_Function*       pFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_CONTROL_FLOW_GRAPH* pCfg = VIR_Function_GetCFG(pFunc);
+    VIR_Instruction*    pJmpInst = gcvNULL;
+    VIR_Instruction*    pLabelInst = gcvNULL;
+    VIR_Instruction*    pInstIter = gcvNULL;
+    VIR_Instruction*    pEndInst = gcvNULL;
+    VIR_BB*             pJmpBB = gcvNULL;
+    VIR_BB*             pLabelBB = gcvNULL;
+    VIR_BB*             pBBIter = gcvNULL;
+    VIR_BB*             pNewBB = gcvNULL;
+    VSC_ADJACENT_LIST_ITERATOR  succEdgeIter;
+    VIR_CFG_EDGE*       pSuccEdge;
+    gctBOOL             bHasBarrierBetweenJmp = gcvFALSE;
+
+    for (pJmpInst = VIR_Function_GetInstStart(pFunc); pJmpInst != gcvNULL; pJmpInst = VIR_Inst_GetNext(pJmpInst))
+    {
+        bHasBarrierBetweenJmp = gcvFALSE;
+
+        if (!VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(pJmpInst)))
+        {
+            continue;
+        }
+
+        pLabelInst = VIR_Label_GetDefInst(VIR_Operand_GetLabel(VIR_Inst_GetDest(pJmpInst)));
+
+        /* So far skip the backward JMP.*/
+        if (VIR_Inst_GetId(pJmpInst) > VIR_Inst_GetId(pLabelInst))
+        {
+            continue;
+        }
+
+        pJmpBB = VIR_Inst_GetBasicBlock(pJmpInst);
+        pLabelBB = VIR_Inst_GetBasicBlock(pLabelInst);
+        pBBIter = pJmpBB;
+
+        /* Go through all instructions between the JMP instruction and the LABEL instruction and find if there is any BARRIER instruction. */
+        while (pBBIter)
+        {
+            /* Get the start instruction. */
+            if (pBBIter == pJmpBB)
+            {
+                pInstIter = pJmpInst;
+            }
+            else
+            {
+                pInstIter = BB_GET_START_INST(pBBIter);
+            }
+
+            /* Get the end instruction. */
+            if (pBBIter == pLabelBB)
+            {
+                pEndInst = pLabelInst;
+            }
+            else
+            {
+                pEndInst = BB_GET_END_INST(pBBIter);
+            }
+
+            /* Check if there is any BARRIER between the start instruction and the end instruction. */
+            while (pInstIter)
+            {
+                if (VIR_Inst_IsHWBarrier(pInstIter, gcvFALSE))
+                {
+                    bHasBarrierBetweenJmp = gcvTRUE;
+                    break;
+                }
+
+                if (pInstIter == pEndInst)
+                {
+                    break;
+                }
+                pInstIter = VIR_Inst_GetNext(pInstIter);
+            }
+
+            if (bHasBarrierBetweenJmp || pBBIter == pLabelBB)
+            {
+                break;
+            }
+
+            pBBIter = VIR_Inst_GetBasicBlock(VIR_Inst_GetNext(pEndInst));
+        };
+
+        /* No BARRIER, check the next JMP instruction. */
+        if (!bHasBarrierBetweenJmp)
+        {
+            continue;
+        }
+
+        gcmASSERT(BB_GET_END_INST(pJmpBB) == pJmpInst);
+
+        /* Create a new BB to hold this JMP instruction. */
+        errCode = VIR_BB_InsertBBAfter(pJmpBB,
+                                       VIR_OP_NOP,
+                                       &pNewBB);
+        ON_ERROR(errCode, "Insert a new BB.");
+
+        /* Move this JMP to this new BB. */
+        errCode = VIR_Function_MoveInstructionBefore(pFunc,
+                                                     BB_GET_START_INST(pNewBB),
+                                                     pJmpInst);
+        ON_ERROR(errCode, "Move a instruction");
+
+        /* Delete the NOP instruction. */
+        errCode = VIR_Function_DeleteInstruction(pFunc,
+                                                 BB_GET_END_INST(pNewBB));
+        ON_ERROR(errCode, "Delete a instruction");
+
+        /* Update the edges. */
+        VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &pJmpBB->dgNode.succList);
+        pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succEdgeIter);
+        for (; pSuccEdge != gcvNULL; pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succEdgeIter))
+        {
+            errCode = vscVIR_AddEdgeToCFG(pCfg, pNewBB, CFG_EDGE_GET_TO_BB(pSuccEdge), CFG_EDGE_GET_TYPE(pSuccEdge));
+            ON_ERROR(errCode, "Add a new edge.");
+        }
+
+        VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &pNewBB->dgNode.succList);
+        pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succEdgeIter);
+        for (; pSuccEdge != gcvNULL; pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succEdgeIter))
+        {
+            errCode = vscVIR_RemoveEdgeFromCFG(pCfg, pJmpBB, CFG_EDGE_GET_TO_BB(pSuccEdge));
+            ON_ERROR(errCode, "Remove a old edge.");
+        }
+
+        errCode = vscVIR_AddEdgeToCFG(pCfg, pJmpBB, pNewBB, VIR_CFG_EDGE_TYPE_ALWAYS);
+        ON_ERROR(errCode, "Add a new edge.");
+
+        /* Mark this JMP BB. */
+        vscHTBL_DirectSet(pContext->pSameJmpBBSet, (void *)pNewBB, gcvNULL);
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_vscVIR_DetectBarrierWithinJmp(
+    IN VSC_CutDownWGS*  pContext
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+
+    /* I: Detect Barrier within a forward JMP. */
+    errCode = _vscVIR_DetectBarrierWithinForwardJmp(pContext);
+    ON_ERROR(errCode, "Detect BARRIER within the loop.");
+
+    /* II: Detect Barrier within a loop. */
+    errCode = _vscVIR_DetectBarrierWithinLoop(pContext);
+    ON_ERROR(errCode, "Detect BARRIER within the loop.");
+
+OnError:
     return errCode;
 }
 
@@ -13945,8 +14108,8 @@ VSC_ErrCode vscVIR_CutDownWorkGroupSize(VSC_SH_PASS_WORKER* pPassWorker)
     errCode = _vscVIR_AnalyzeMultiPathWithBarrier(&context);
     ON_ERROR(errCode, "Analyze multi-path with BARRIER.");
 
-    /* V: Detect any BARRIERs within a loop. */
-    errCode = _vscVIR_DetectBarrierWithinLoop(&context);
+    /* V: Detect any BARRIERs within a JMP, including a forward JMP and a backward JMP(a loop). */
+    errCode = _vscVIR_DetectBarrierWithinJmp(&context);
     ON_ERROR(errCode, "Detect BARRIER within the loop.");
 
     /* VI: Re-caculate the builtin attributes. */
