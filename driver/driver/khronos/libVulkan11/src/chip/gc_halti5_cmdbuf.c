@@ -33,20 +33,18 @@ static VkBool32 g_dbgSkipDraw = VK_FALSE;
     }                                    \
 } while (0);
 
-/* 0x48 HW validation: add SnapToPage after draw avoid gemometry hang
-   case list:
-    dEQP-VK.tessellation.geometry_interaction.limits.output_required_max_tessellation
-    dEQP-VK.geometry.layered.3d.render_to_all
-    dEQP-VK.geometry.layered.3d.render_different_content
-*/
 #define LoadAllSnapToPage() do { \
-    *pCmdBuffer++ = gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, OPCODE, SNAP_TO_PAGE)       \
-                  | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, VS)                 \
-                  | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, TCS)                \
-                  | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, TES)                \
-                  | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, GS)                 \
-                  | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, PS);                \
-    *pCmdBuffer++ = 0;           \
+    if (!(devCtx->database->chipID == 0x7000 && \
+          (devCtx->database->chipVersion == 0x6008 || devCtx->database->chipVersion == 0x6009)) )   \
+    { \
+        *pCmdBuffer++ = gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, OPCODE, SNAP_TO_PAGE)       \
+                      | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, VS)                 \
+                      | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, TCS)                \
+                      | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, TES)                \
+                      | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, GS)                 \
+                      | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, PS);                \
+        *pCmdBuffer++ = 0;           \
+    } \
 } while (0);
 
 
