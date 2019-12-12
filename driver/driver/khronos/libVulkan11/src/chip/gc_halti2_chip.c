@@ -1346,6 +1346,24 @@ VkResult halti2_copyImageWithRS(
         }
     }
 
+    /* resolve not support srgb downsample */
+    if ((srcMsaa != dstMsaa && srcRes->isImage && dstRes->isImage) &&
+        (dstFormat == VK_FORMAT_A8B8G8R8_SRGB_PACK32 || dstFormat == VK_FORMAT_R8G8B8A8_SRGB ||
+         dstFormat == VK_FORMAT_B8G8R8A8_SRGB || dstFormat == VK_FORMAT_R8_SRGB ||
+         dstFormat == VK_FORMAT_R8G8_SRGB || dstFormat == VK_FORMAT_R8G8B8_SRGB ||
+         dstFormat == VK_FORMAT_B8G8R8_SRGB))
+    {
+        useComputeBlit = VK_TRUE;
+    }
+
+    if ((srcMsaa != dstMsaa && srcRes->isImage && dstRes->isImage) &&
+        (dstFormat == VK_FORMAT_R8G8_UNORM || dstFormat == VK_FORMAT_R8G8_SNORM ||
+         dstFormat == VK_FORMAT_R16_UNORM || dstFormat == VK_FORMAT_R16_SNORM))
+    {
+        __VK_ASSERT(srcRsDesc.hwFormat == 0x01);
+        useComputeBlit = VK_TRUE;
+    }
+
     if (useComputeBlit)
     {
         return (halti5_computeBlit(commandBuffer, srcRes, dstRes, rawCopy, gcvNULL, filter));
