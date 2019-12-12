@@ -3465,7 +3465,10 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             }
             else
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
+                if (inputFormat == VX_TYPE_FLOAT16)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP16", borderMode);
+                else
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
                 if (!shaderExecutable) goto OnError;
             }
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 11);
@@ -5602,7 +5605,10 @@ vxnne_shader_executable vxnneGetGPUL2PoolingShaderExecutable(
             vx_reference parameters[6] = {(vx_reference)input, (vx_reference)poolSizeX, (vx_reference)poolSizeY,
                                           (vx_reference)stride_x, (vx_reference)stride_y, (vx_reference)output};
 
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoPadFP32", borderMode);
+            if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoPadFP16", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_NoPadFP32", borderMode);
             if (!shaderExecutable) goto OnError;
 
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 6);
