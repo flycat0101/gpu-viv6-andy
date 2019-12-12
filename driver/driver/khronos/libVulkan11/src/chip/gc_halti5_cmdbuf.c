@@ -10700,6 +10700,7 @@ VkResult halti5_setMultiGPURenderingMode(
     halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     VkResult result = VK_SUCCESS;
+    uint32_t setMappingGPU4to7 = 0;
 
     pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
 
@@ -10718,7 +10719,7 @@ VkResult halti5_setMultiGPURenderingMode(
     }
     else
     {
-        mode = gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_128x64;
+        mode = devCtx->database->MULTI_CLUSTER ? gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED : gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_128x64;
     }
 
     if (mode == cmdBuf->gpuRenderingMode)
@@ -10746,6 +10747,11 @@ VkResult halti5_setMultiGPURenderingMode(
     case gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_128x128:
         control = 0x6;
         break;
+
+    case gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED:
+        control = 0x7;
+        break;
+
     case gcvMULTI_GPU_RENDERING_MODE_SPLIT_WIDTH:
     case gcvMULTI_GPU_RENDERING_MODE_SPLIT_HEIGHT:
     default:
@@ -10811,7 +10817,114 @@ VkResult halti5_setMultiGPURenderingMode(
  23:23) - (0 ?
  23:23) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1))))))) << (0 ? 23:23)))
+                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:28) - (0 ?
+ 31:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:28) - (0 ?
+ 31:28) + 1))))))) << (0 ?
+ 31:28))) | (((gctUINT32) ((gctUINT32) (3) & ((gctUINT32) ((((1 ?
+ 31:28) - (0 ?
+ 31:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:28) - (0 ? 31:28) + 1))))))) << (0 ? 31:28)))
                      ;
+        }
+        else if (gpuCoreCount == 8)
+        {
+            __VK_ASSERT(devCtx->database->MULTI_CORE_BLOCK_SET_CONFIG2);
+            /* Flat map set[i] to core[i]. */
+            control |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:4) - (0 ?
+ 6:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 6:4) - (0 ?
+ 6:4) + 1))))))) << (0 ?
+ 6:4))) | (((gctUINT32) (0x7 & ((gctUINT32) ((((1 ?
+ 6:4) - (0 ?
+ 6:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 6:4) - (0 ? 6:4) + 1))))))) << (0 ? 6:4)))
+                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 8:8) - (0 ?
+ 8:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 8:8) - (0 ?
+ 8:8) + 1))))))) << (0 ?
+ 8:8))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 8:8) - (0 ?
+ 8:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ? 8:8)))
+                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:13) - (0 ?
+ 13:13) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 13:13) - (0 ?
+ 13:13) + 1))))))) << (0 ?
+ 13:13))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 13:13) - (0 ?
+ 13:13) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 13:13) - (0 ? 13:13) + 1))))))) << (0 ? 13:13)))
+                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:18) - (0 ?
+ 18:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 18:18) - (0 ?
+ 18:18) + 1))))))) << (0 ?
+ 18:18))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 18:18) - (0 ?
+ 18:18) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 18:18) - (0 ? 18:18) + 1))))))) << (0 ? 18:18)))
+                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:23) - (0 ?
+ 23:23) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:23) - (0 ?
+ 23:23) + 1))))))) << (0 ?
+ 23:23))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 23:23) - (0 ?
+ 23:23) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 23:23) - (0 ? 23:23) + 1))))))) << (0 ? 23:23)))
+                     ;
+            setMappingGPU4to7 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) (1 << 4) & ((gctUINT32) ((((1 ?
+ 7:0) - (0 ?
+ 7:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ? 7:0)))
+                              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:8) - (0 ?
+ 15:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:8) - (0 ?
+ 15:8) + 1))))))) << (0 ?
+ 15:8))) | (((gctUINT32) ((gctUINT32) (1 << 5) & ((gctUINT32) ((((1 ?
+ 15:8) - (0 ?
+ 15:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:8) - (0 ? 15:8) + 1))))))) << (0 ? 15:8)))
+                              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:16) - (0 ?
+ 23:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:16) - (0 ?
+ 23:16) + 1))))))) << (0 ?
+ 23:16))) | (((gctUINT32) ((gctUINT32) (1 << 6) & ((gctUINT32) ((((1 ?
+ 23:16) - (0 ?
+ 23:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 23:16) - (0 ? 23:16) + 1))))))) << (0 ? 23:16)))
+                              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1))))))) << (0 ?
+ 31:24))) | (((gctUINT32) ((gctUINT32) (1 << 7) & ((gctUINT32) ((((1 ?
+ 31:24) - (0 ?
+ 31:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:24) - (0 ? 31:24) + 1))))))) << (0 ? 31:24)));
+
         }
         else if (gpuCoreCount == 2)
         {
@@ -11003,7 +11116,7 @@ VkResult halti5_setMultiGPURenderingMode(
                 }
             };
 
-            gcmASSERT(gpuCoreCount == 2);
+            __VK_ASSERT(gpuCoreCount == 2);
 
             control |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  6:4) - (0 ?
@@ -11216,6 +11329,16 @@ VkResult halti5_setMultiGPURenderingMode(
  6:4) - (0 ?
  6:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 6:4) - (0 ? 6:4) + 1))))))) << (0 ? 6:4)));
+            control |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:28) - (0 ?
+ 31:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:28) - (0 ?
+ 31:28) + 1))))))) << (0 ?
+ 31:28))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 31:28) - (0 ?
+ 31:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:28) - (0 ? 31:28) + 1))))))) << (0 ? 31:28)));
 
             chipID = 0;
 
@@ -11228,11 +11351,16 @@ VkResult halti5_setMultiGPURenderingMode(
                 control |= mappingForNextTwoCores[chipID][i - 1];
             }
 
-            gcmASSERT(gpuCoreCount == 3);
+            __VK_ASSERT(gpuCoreCount == 3);
         }
     }
 
     __vkCmdLoadSingleHWState(&pCmdBuffer,0x0E80, VK_FALSE, control);
+
+    if (setMappingGPU4to7)
+    {
+        __vkCmdLoadSingleHWState(&pCmdBuffer,0x0E84, VK_FALSE, setMappingGPU4to7);
+    }
 
     cmdBuf->gpuRenderingMode = mode;
 
