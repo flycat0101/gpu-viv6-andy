@@ -9281,6 +9281,8 @@ vxnne_shader_executable vxnneGetGPUTensorPadShaderExecutable(
     vx_uint32     padRightv                  = padRight->value->u32;
     vx_uint32     padTopv                    = padTop->value->u32;
     vx_uint32     padBottomv                 = padBottom->value->u32;
+    vx_tensor     src                        = NULL;
+    vx_tensor     dst                        = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, inputs=%p, outputs=%p",
          context, kernelEnum, borderMode, inputs, outputs);
@@ -9290,6 +9292,24 @@ vxnne_shader_executable vxnneGetGPUTensorPadShaderExecutable(
     {
         vxError("The input size not match with the output size! failed at function %s line %d", __FUNCTION__, __LINE__);
         goto OnError;
+    }
+
+    if (TENSOR_DIM_NUM(inputs) == 1)
+    {
+        vx_uint32 sizes[4] = {1, 1, 1, 1};
+
+        sizes[0]    = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+        src         = vxoTensor_ReshapeTensor(inputs, (vx_int32*)sizes, 2);
+        parameters[0] = (vx_reference)src;
+    }
+
+    if (TENSOR_DIM_NUM(outputs) == 1)
+    {
+        vx_uint32 sizes[4] = {1, 1, 1, 1};
+
+        sizes[0]    = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
+        dst         = vxoTensor_ReshapeTensor(outputs, (vx_int32*)sizes, 2);
+        parameters[3] = (vx_reference)dst;
     }
 
     if (padModev == VX_PAD_CONSTANT)
@@ -9377,10 +9397,14 @@ vxnne_shader_executable vxnneGetGPUTensorPadShaderExecutable(
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
     if (status != VX_SUCCESS) goto OnError;
 
+    if (src) vxoTensor_ReleaseTensor(&src);
+    if (dst) vxoTensor_ReleaseTensor(&dst);
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
 
 OnError:
+    if (src) vxoTensor_ReleaseTensor(&src);
+    if (dst) vxoTensor_ReleaseTensor(&dst);
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
