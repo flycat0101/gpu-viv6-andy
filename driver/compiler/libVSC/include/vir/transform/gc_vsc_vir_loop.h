@@ -212,9 +212,10 @@ For the loops we are talking about here, they have the following attributes:
 
 typedef enum
 {
-    VIR_LoopInfo_Flags_None             = 0,
-    VIR_LoopInfo_Flags_HasEmit          = 1,
-    VIR_LoopInfo_Flags_HasStore         = 2,
+    VIR_LoopInfo_Flags_None             = 0x0000,
+    VIR_LoopInfo_Flags_HasEmit          = 0x0001,
+    VIR_LoopInfo_Flags_HasStore         = 0x0002,
+    VIR_LoopInfo_Flags_HasBarrier       = 0x0004,
 } VIR_LoopInfo_Flags;
 
 typedef struct VIR_LOOPINFO
