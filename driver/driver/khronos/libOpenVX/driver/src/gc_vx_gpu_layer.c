@@ -584,7 +584,43 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         vxReleaseProgram(&program);
     }
 
-    if((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32) &&
+    if(inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
+    {
+        vx_reference parameters[2] = {(vx_reference)input_rs, (vx_reference)output_rs};
+        if (new_width % 4 == 0)
+        {
+            if (enable_2d_img)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32toFP16_4X_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32toFP16_4X", borderMode);
+            }
+            is_write_4x      = vx_true_e;
+        }
+        else
+        {
+            if (enable_2d_img)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32toFP16_4S_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32toFP16_4S", borderMode);
+            }
+        }
+        if (!shaderExecutable) goto OnError;
+
+        status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        if (is_write_4x)
+        {
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        }
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32) &&
         (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32))
     {
         vx_reference parameters[2] = {(vx_reference)input_rs, (vx_reference)output_rs};
