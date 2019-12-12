@@ -1444,9 +1444,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdResolveImage(
     VkResult result = VK_SUCCESS;
     VkBool32 rawCopy = VK_FALSE;
 
-    /*if the HW can't support 256byte per cacheline, it can't support 128bpp MSAA*/
     if (pSrcImage->formatInfo.bitsPerBlock == 128 &&
-        !devCtx->database->CACHE128B256BPERLINE)
+        (!devCtx->database->CACHE128B256BPERLINE || !devCtx->msaa_64bpp))
     {
         if (__vkDoImageFill(commandBuffer, dstImage))
             return;
