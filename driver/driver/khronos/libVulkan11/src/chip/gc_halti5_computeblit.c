@@ -3578,6 +3578,8 @@ VkResult halti5_computeClear(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&scatch)++ = 0;
 ;
 
+
+        __vkCmdLoadSingleHWState(&scatch, 0x0E80, VK_FALSE, 1);
     }
 
      __VK_MEMZERO(&params, sizeof(params));
@@ -3723,6 +3725,8 @@ VkResult halti5_computeCopyOQQueryPool(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&scatch)++ = 0;
 ;
 
+
+        __vkCmdLoadSingleHWState(&scatch, 0x0E80, VK_FALSE, 1);
     }
 
     __VK_MEMZERO(&params, sizeof(params));
