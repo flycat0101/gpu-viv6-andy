@@ -400,7 +400,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSets(
     )
 {
     uint32_t i;
-    __vkDevContext *devCtx = (__vkDevContext *)device;
 
     /* Write descriptor */
     for (i = 0; i < writeCount; i++)
@@ -480,9 +479,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSets(
         }
         __VK_ASSERT((uint8_t *)dstResource <= ((uint8_t *)dstDescPool->resourceInfo + dstEnd.resource));
         __VK_ASSERT((uint8_t *)dstSampler <= ((uint8_t *)dstDescPool->sampler + dstEnd.sampler));
-
-        __VK_VERIFY_OK((*devCtx->chipFuncs->UpdateDescriptorSet)(device, (VkDescriptorSet)(uintptr_t)dstDesc));
-
     }
 
     /* Copy descriptor */
@@ -568,11 +564,9 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSets(
         default:
             break;
         }
-
-        __VK_VERIFY_OK((*devCtx->chipFuncs->UpdateDescriptorSet)(device, (VkDescriptorSet)(uintptr_t)dstDesc));
-
     }
 
+    /* update halti5 descriptor in __vk_CmdBindDescriptorSets to ensure all be updated */
     return;
 }
 
@@ -624,7 +618,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSetWithTemplate(
     VkDescriptorImageInfo* pImageInfo = VK_NULL_HANDLE;
     VkBufferView* pTexelBufferView = VK_NULL_HANDLE;
     VkDescriptorBufferInfo* pBufferInfo = VK_NULL_HANDLE;
-    __vkDevContext *devCtx = (__vkDevContext *)device;
     __vkDescriptorUpdateTemplate * desUpdateTemplate = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorUpdateTemplate *, descriptorUpdateTemplate);
     __vkDescriptorSetEntry *pDescSets = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetEntry *, descriptorSet);
     __vkDescriptorSet *dstDesc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescSets->descSet);
@@ -717,10 +710,9 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSetWithTemplate(
 
         __VK_ASSERT((uint8_t *)dstResource <= ((uint8_t *)dstDescPool->resourceInfo + dstEnd.resource));
         __VK_ASSERT((uint8_t *)dstSampler <= ((uint8_t *)dstDescPool->sampler + dstEnd.sampler));
-
-        __VK_VERIFY_OK((*devCtx->chipFuncs->UpdateDescriptorSet)(device, (VkDescriptorSet)(uintptr_t)dstDesc));
     }
 
+    /* update halti5 descriptor in __vk_CmdBindDescriptorSets to ensure all be updated */
 }
 
 VKAPI_ATTR void VKAPI_CALL __vk_DestroyDescriptorUpdateTemplate(
