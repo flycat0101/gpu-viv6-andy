@@ -1032,7 +1032,7 @@ GLboolean __glDestroyContext(GLvoid *context)
     return retVal;
 }
 
-GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sharedCtx)
+GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sharedCtx, GLint SharedContextClient)
 {
     __GLcontext *gc = gcvNULL;
     __GLApiVersion apiVersion;
@@ -1094,7 +1094,15 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
 
 
     gc->apiVersion   = apiVersion;
-    gc->shareCtx     = (__GLcontext*)sharedCtx;
+
+    /*
+        VIV: We don't support shared context between ES11 and ES20 above.
+    */
+    if (sharedCtx != gcvNULL && SharedContextClient != 0x10)
+    {
+        gc->shareCtx = (__GLcontext*)sharedCtx;
+    }
+
     gc->contextFlags = 0;
 
     if (imports->contextFlags & EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR)

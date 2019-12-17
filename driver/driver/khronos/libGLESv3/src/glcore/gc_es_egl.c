@@ -23,7 +23,7 @@ extern __GLesDispatchTable __glesApiFuncDispatchTable;
 extern GLint __glGetDispatchOffset(const char *procName);
 extern __GLprocAddr __glGetProcAddr(const GLchar *procName);
 
-extern GLvoid* __glCreateContext(GLint, VEGLimports*, GLvoid*);
+extern GLvoid* __glCreateContext(GLint, VEGLimports*, GLvoid*, GLint);
 extern GLuint __glDestroyContext(GLvoid *gc);
 extern __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable);
 extern GLvoid __glSetDrawable(__GLcontext* gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable);
@@ -152,9 +152,9 @@ void __eglDestruct(void)
 #error "Unsupported compiler version for TLS"
 #endif
 
-static void* veglCreateContext_es3(void *thrData, gctINT ClientVersion, VEGLimports *Imports, gctPOINTER SharedContext)
+static void* veglCreateContext_es3(void *thrData, gctINT ClientVersion, VEGLimports *Imports, gctPOINTER SharedContext, gctINT SharedContextClient)
 {
-    __GLcontext *gc = __glCreateContext((GLint)ClientVersion, Imports, SharedContext);
+    __GLcontext *gc = (__GLcontext*)__glCreateContext((GLint)ClientVersion, Imports, SharedContext, SharedContextClient);
 
     return gc;
 }

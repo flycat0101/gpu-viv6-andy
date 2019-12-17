@@ -994,7 +994,8 @@ _CreateApiContext(
     VEGLThreadData Thread,
     VEGLContext    Context,
     VEGLConfig     Config,
-    void         * SharedContext
+    void         * SharedContext,
+    EGLint         SharedContextClient
     );
 
 EGLBoolean
