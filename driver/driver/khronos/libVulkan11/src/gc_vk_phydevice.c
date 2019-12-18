@@ -37,9 +37,11 @@ const VkExtensionProperties g_DeviceExtensions[] =
     {VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME, VK_EXT_QUEUE_FAMILY_FOREIGN_SPEC_VERSION},
 #if defined(LINUX) || defined(ANDROID)
     {VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME, VK_KHR_EXTERNAL_SEMAPHORE_FD_SPEC_VERSION},
+    {VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME, VK_KHR_EXTERNAL_FENCE_FD_SPEC_VERSION},
 #endif
 #if defined(_WIN32)
     {VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME, VK_KHR_EXTERNAL_SEMAPHORE_WIN32_SPEC_VERSION},
+    {VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME, VK_KHR_EXTERNAL_FENCE_WIN32_SPEC_VERSION},
 #endif
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 #if (ANDROID_SDK_VERSION >= 24)
@@ -2197,10 +2199,12 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceExternalFenceProperties(
     switch (handleType)
     {
     case VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_FD_BIT:
+        pExternalFenceProperties->externalFenceFeatures = 0;
+        break;
     case VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_BIT:
     case VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT:
     case VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT:
-        pExternalFenceProperties->externalFenceFeatures = 0;
+        pExternalFenceProperties->externalFenceFeatures = 0xF;
         break;
     default:
         __VK_ASSERT(!"invalid external fence handle types");

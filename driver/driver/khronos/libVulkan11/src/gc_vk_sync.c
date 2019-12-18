@@ -158,6 +158,29 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateFence(
         __VK_ONERROR(gcoOS_Signal(gcvNULL, fce->signal, VK_TRUE));
     }
 
+    if (pCreateInfo->pNext != VK_NULL_HANDLE)
+    {
+         VkExportFenceCreateInfo *exportInfo = (VkExportFenceCreateInfo *)pCreateInfo->pNext;
+         __VK_ASSERT(exportInfo->sType == VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO);
+
+         fce->handleType = (VkExternalFenceHandleTypeFlagBits)exportInfo->handleTypes;
+
+        if (fce->handleType == VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_BIT ||
+            fce->handleType == VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT)
+        {
+            /* Fence's winHandle is Fence's created signal*/
+            fce->winHandle = fce->signal;
+        }
+#if defined(LINUX) || defined(ANDROID)
+        if (fce->handleType == VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_FD_BIT ||
+            fce->handleType == VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT)
+        {
+            /*create the fence's fenceFd*/
+            __VK_ONERROR(gcoOS_CreateNativeFence(gcvNULL, fce->signal, &fce->fenceFd));
+        }
+#endif
+    }
+
     /* Return the object pointer as a 64-bit handle */
     *pFence = (VkFence)(uintptr_t)fce;
 
@@ -186,8 +209,23 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyFence(
     {
         __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
 
-        if (fce->signal)
+        if ((fce->signal && !fce->winHandle) ||
+            (fce->signal && !fce->exported && !fce->imported))
+        {
             gcoOS_DestroySignal(gcvNULL, fce->signal);
+        }
+
+        if (fce->permanent)
+        {
+            gcoOS_DestroySignal(gcvNULL, fce->permanent);
+        }
+
+#if defined(LINUX) || defined(ANDROID)
+        if (fce->fenceFd && fce->handleType != VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_FD_BIT)
+        {
+            close(fce->fenceFd);
+        }
+#endif
 
         __vk_DestroyObject(devCtx, __VK_OBJECT_FENCE, (__vkObject *)fce);
     }
@@ -205,7 +243,27 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ResetFences(
     for (i = 0; i < fenceCount; i++)
     {
         __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, pFences[i]);
-        __VK_ONERROR(gcoOS_Signal(gcvNULL, fce->signal, VK_FALSE));
+
+        if (fce->permanent)
+        {
+#if defined(LINUX) || defined(ANDROID)
+            if (fce->handleType == VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT)
+            {
+                if (fce->fenceFd)
+                {
+                    close(fce->fenceFd);
+                }
+
+                gcoOS_DestroySignal(gcvNULL, fce->signal);
+            }
+#endif
+            fce->signal = fce->permanent;
+            fce->permanent = VK_NULL_HANDLE;
+        }
+        else
+        {
+            __VK_ONERROR(gcoOS_Signal(gcvNULL, fce->signal, VK_FALSE));
+        }
     }
 
 OnError:
@@ -548,6 +606,75 @@ VkResult VKAPI_CALL __vk_ImportSemaphoreFdKHR(
     return result;
 }
 
+VkResult VKAPI_CALL __vk_GetFenceFdKHR(
+    VkDevice device,
+    const VkFenceGetFdInfoKHR* pGetFdInfo,
+    int* pFd
+    )
+{
+    __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, pGetFdInfo->fence);
+    VkResult result = VK_SUCCESS;
+
+    __VK_ASSERT(fce->handleType == pGetFdInfo->handleType);
+    __VK_ASSERT(fce->handleType == VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT);
+
+    if (fce->fenceFd != VK_NULL_HANDLE)
+    {
+        *pFd = fce->fenceFd;
+        fce->exported = VK_TRUE;
+        return result;
+    }
+    else
+    {
+        result = VK_INCOMPLETE;
+    }
+
+   return result;
+
+}
+
+VkResult VKAPI_CALL __vk_ImportFenceFdKHR(
+    VkDevice device,
+    const VkImportFenceFdInfoKHR* pImportFenceFdInfo
+    )
+{
+    __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, pImportFenceFdInfo->fence);
+    VkResult result = VK_SUCCESS;
+
+    fce->handleType = pImportFenceFdInfo->handleType;
+
+#if defined(LINUX) || defined(ANDROID)
+    if (fce->handleType == VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT)
+    {
+        fce->permanent = fce->signal;
+
+        if(fce->fenceFd)
+        {
+            close(fce->fenceFd);
+        }
+        __VK_ONERROR(gcoOS_CreateSignal(gcvNULL, VK_TRUE, &fce->signal));
+        __VK_ONERROR(gcoOS_CreateNativeFence(gcvNULL, fce->signal, &fce->fenceFd));
+
+        if (!gcoOS_WaitNativeFence(gcvNULL, pImportFenceFdInfo->fd, 0))
+        {
+            gcoOS_Signal(gcvNULL, fce->signal, VK_TRUE);
+        }
+
+        close(pImportFenceFdInfo->fd);
+    }
+#endif
+
+    fce->imported = VK_TRUE;
+
+
+    return result;
+
+#if defined(LINUX) || defined(ANDROID)
+OnError:
+    return VK_INCOMPLETE;
+#endif
+}
+
 #if defined(_WIN32)
 VkResult VKAPI_CALL __vk_GetSemaphoreWin32HandleKHR(
     VkDevice device,
@@ -581,6 +708,61 @@ VkResult VKAPI_CALL __vk_ImportSemaphoreWin32HandleKHR(
 
     sph->winHandle = pImportSemaphoreWin32HandleInfo->handle;
     sph->handleType = pImportSemaphoreWin32HandleInfo->handleType;
+
+    return result;
+}
+
+VkResult VKAPI_CALL __vk_GetFenceWin32HandleKHR(
+    VkDevice device,
+    const VkFenceGetWin32HandleInfoKHR* pGetWin32HandleInfo,
+    HANDLE* pHandle
+    )
+{
+    __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, pGetWin32HandleInfo->fence);
+    VkResult result = VK_SUCCESS;
+
+    __VK_ASSERT(fce->handleType == pGetWin32HandleInfo->handleType);
+
+    if (fce->winHandle != VK_NULL_HANDLE)
+    {
+        *pHandle = fce->winHandle;
+        fce->exported = VK_TRUE;
+        return result;
+    }
+    else
+    {
+        result = VK_INCOMPLETE;
+    }
+
+    return result;
+}
+
+VkResult VKAPI_CALL __vk_ImportFenceWin32HandleKHR(
+    VkDevice device,
+    const VkImportFenceWin32HandleInfoKHR* pImportFenceWin32HandleInfo
+    )
+{
+    __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, pImportFenceWin32HandleInfo->fence);
+    VkResult result = VK_SUCCESS;
+
+    fce->winHandle = pImportFenceWin32HandleInfo->handle;
+    fce->handleType = pImportFenceWin32HandleInfo->handleType;
+
+    if (pImportFenceWin32HandleInfo->flags == VK_FENCE_IMPORT_TEMPORARY_BIT)
+    {
+        fce->permanent = fce->signal;
+    }
+    else
+    {
+        if (!fce->imported && !fce->exported)
+        {
+            gcoOS_DestroySignal(gcvNULL, fce->signal);
+        }
+        fce->permanent = VK_NULL_HANDLE;
+    }
+
+    fce->signal = fce->winHandle;
+    fce->imported = VK_TRUE;
 
     return result;
 }
