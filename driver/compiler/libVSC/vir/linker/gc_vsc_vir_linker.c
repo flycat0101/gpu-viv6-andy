@@ -5334,22 +5334,46 @@ _CheckTexldSymbolFmt(
     return matched;
 }
 
+static gctBOOL
+_CheckTextureResource(
+    VSC_LINK_POINT_RESOURCE_SUBTYPE linkPointSubType
+    )
+{
+    if (linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
+        ||
+        linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGRAD_EXTRA_LATYER
+        ||
+        linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXFETCH_REPLACE_WITH_IMGLD
+        ||
+        linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER
+        ||
+        linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHERPCF_D32F
+        ||
+        linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_NORMALIZE_TEXCOORD)
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
 static void
-_GetTranspointTexldFmt(
+_GetTranspointResourcePatch(
     IN VIR_LinkLibContext         *Context,
     OUT VIR_TRANS_WORKLIST        *Worklist
     )
 {
-    VIR_Shader              *pShader = Context->shader;
-    VSC_LIB_LINK_POINT      *pLinkPoint = Context->linkPoint;
-
-    VIR_FuncIterator    func_iter;
-    VIR_FunctionNode    *func_node;
-    VIR_Function        *func;
+    VIR_Shader*                     pShader = Context->shader;
+    VSC_LIB_LINK_POINT*             pLinkPoint = Context->linkPoint;
+    VSC_LINK_POINT_RESOURCE_SUBTYPE linkPointSubType = pLinkPoint->u.resource.subType;
+    VIR_FuncIterator                func_iter;
+    VIR_FunctionNode*               func_node;
+    VIR_Function*                   func;
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
-         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+         func_node != gcvNULL;
+         func_node = VIR_FuncIterator_Next(&func_iter))
     {
         VIR_InstIterator    inst_iter;
         VIR_Instruction     *inst;
@@ -5360,31 +5384,36 @@ _GetTranspointTexldFmt(
         func = func_node->function;
 
         /* we don't need to go through the library functions */
-        if ((func->flags & VIR_FUNCFLAG_LINKED_LIB) == 0)
+        if ((func->flags & VIR_FUNCFLAG_LINKED_LIB) != 0)
         {
-            VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
-            for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
-                 inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+            continue;
+        }
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             inst != gcvNULL;
+             inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            /* Find the texld for the texture resource. */
+            if (_CheckTextureResource(linkPointSubType) && VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(inst)))
             {
-                /* find the texld to patch */
-                if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(inst)))
+                srcOpnd = VIR_Inst_GetSource(inst, 0);
+
+                if (VIR_Operand_isSymbol(srcOpnd))
                 {
-                    srcOpnd = VIR_Inst_GetSource(inst, 0);
+                    srcSym = VIR_Operand_GetSymbol(srcOpnd);
+                    resOpBit = _VirResOpType2DrviResOpBit(VIR_Inst_GetResOpType(inst));
 
-                    if (VIR_Operand_isSymbol(srcOpnd))
+                    if (_CheckTexldSymbolFmt(pLinkPoint, pShader, inst, srcOpnd, srcSym, resOpBit))
                     {
-                        srcSym = VIR_Operand_GetSymbol(srcOpnd);
-                        resOpBit = _VirResOpType2DrviResOpBit(VIR_Inst_GetResOpType(inst));
-
-                        if (_CheckTexldSymbolFmt(pLinkPoint, pShader, inst, srcOpnd, srcSym, resOpBit))
-                        {
-                            _TranspointsQueue(Context->pMM, Worklist, (void *) inst);
-                        }
+                        _TranspointsQueue(Context->pMM, Worklist, (void *) inst);
                     }
                 }
             }
         }
     }
+
+    return;
 }
 
 static VSC_ErrCode
@@ -6506,7 +6535,7 @@ OnError:
 };
 
 static VSC_ErrCode
-_InsertCallTexldFmt(
+_InsertCallResourcePatch(
     IN VIR_LinkLibContext     *Context,
     IN void                   *Transpoint,
     IN VIR_Function           *LibFunc
@@ -7117,9 +7146,9 @@ VIR_LinkLibLibrary(
                         linkPoint,
                         libEntry->libSpecializationConstantCount,
                         libEntry->pLibSpecializationConsts,
-                        _GetTranspointTexldFmt,
+                        _GetTranspointResourcePatch,
                         gcvNULL,
-                        _InsertCallTexldFmt);
+                        _InsertCallResourcePatch);
                 break;
 
             /* Below LIB_LINK_TYPE don't need to link the lib functions. */
