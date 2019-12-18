@@ -8976,8 +8976,10 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
     vx_uint32     width                 = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32     height                = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
     vx_uint32     depth                 = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
+    vx_uint32     batch                 = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
     vx_enum       input_format          = TENSOR_DATA_TYPE(input);
     vx_enum       output_format         = TENSOR_DATA_TYPE(output);
+    vx_tensor     dst                   = VX_NULL;
     vx_scalar     axisScale             = vxCreateScalar(context, VX_TYPE_FLOAT32, &axis_coef);
     vx_reference  parameters[8]         = {(vx_reference)input, (vx_reference)axisScale, (vx_reference)output, (vx_reference)VX_NULL, (vx_reference)VX_NULL, (vx_reference)VX_NULL, (vx_reference)VX_NULL, (vx_reference)VX_NULL};
     vx_uint32     paramnum              = 3;
@@ -8986,6 +8988,7 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
     vx_scalar     scaleIn  = NULL;
     vx_scalar     scaleOut = NULL;
     vx_scalar     sCount   = NULL;
+    vx_uint32     sizes[4] = {1, 1, 1, 1};
     char          subKernelName[32];
     vx_uint32     offset = 0;
 
@@ -9028,6 +9031,49 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
         if (!kernel) goto OnError;
 
         vxReleaseProgram(&program);
+    }
+
+    if (0 == axis)
+    {
+       if ((TENSOR_DIM_NUM(output) != dims) || (TENSOR_VIEW_SIZE_INDEX(output, 0) != 1))
+       {
+            sizes[0]      = 1;
+            sizes[1]      = height;
+            sizes[2]      = depth;
+            sizes[3]      = batch;
+            dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4);
+            parameters[2] = (vx_reference)dst;
+        }
+    }
+    else if (1 == axis)
+    {
+       if ((TENSOR_DIM_NUM(output) != dims) || (TENSOR_VIEW_SIZE_INDEX(output, 1) != 1))
+       {
+            sizes[0]      = width;
+            sizes[1]      = 1;
+            sizes[2]      = depth;
+            sizes[3]      = batch;
+            dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4);
+            parameters[2] = (vx_reference)dst;
+        }
+    }
+    else if (2 == axis)
+    {
+       if ((TENSOR_DIM_NUM(output) != dims) || (TENSOR_VIEW_SIZE_INDEX(output, 2) != 1))
+       {
+            sizes[0]      = width;
+            sizes[1]      = height;
+            sizes[2]      = 1;
+            sizes[3]      = batch;
+            dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4);
+            parameters[2] = (vx_reference)dst;
+        }
+    }
+    else
+    {
+        status = VX_ERROR_INVALID_PARAMETERS;
+        vxError("Invalid input dimention %d function %s line %d", axis, __FUNCTION__, __LINE__);
+        goto OnError;
     }
 
     if (0 == axis)
@@ -9111,6 +9157,7 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
     if(scaleIn) vxReleaseScalar(&scaleIn);
     if(scaleOut) vxReleaseScalar(&scaleOut);
     if(sCount)   vxReleaseScalar(&sCount);
+    if (dst) vxoTensor_ReleaseTensor(&dst);
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
 
@@ -9122,6 +9169,7 @@ OnError:
     if(scaleOut) vxReleaseScalar(&scaleOut);
     if(sCount)   vxReleaseScalar(&sCount);
     if (program) vxReleaseProgram(&program);
+    if (dst) vxoTensor_ReleaseTensor(&dst);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
 #if !gcdUSE_VXC_BINARY
