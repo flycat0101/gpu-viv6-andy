@@ -191,7 +191,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
             }
             attribBufSizeInKbyte -= fragmentSizeInKbyte;
 
-            if (!(IS_HW_SUPPORT(gcvFEATURE_PSCS_THROTTLE) && IS_HW_SUPPORT(gcvFEATURE_HWMANAGED_LS)))
+            if ((attribBufSizeInKbyte > 0) && !(IS_HW_SUPPORT(gcvFEATURE_PSCS_THROTTLE) && IS_HW_SUPPORT(gcvFEATURE_HWMANAGED_LS)))
             {
                 attribBufSizeInKbyte -= 1;
             }
