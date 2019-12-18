@@ -23415,6 +23415,8 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_scalar               poolingX,
     vx_scalar               poolingY,
     vx_scalar               downScaleSizeRounding,
+    vx_int32                strideXvalue,
+    vx_int32                strideYvalue,
     vx_tensor               outputs)
 {
 #if !gcdUSE_VXC_BINARY
@@ -23442,8 +23444,6 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_int32      kernel_height              = TENSOR_VIEW_SIZE_INDEX(weights, 1);
     vx_int32      padLeftv                   = padXLeft->value->n32;
     vx_int32      padRightv                  = padXRight->value->n32;
-    vx_int32      padTop                     = padYTop->value->n32;
-    vx_int32      padBottom                  = padYBottom->value->n32;
     vx_uint32     inputZP                    = TENSOR_TF_ZEROPOINT(inputs);
     vx_float32    inputScale                 = TENSOR_TF_SCALE(inputs);
     vx_uint32     weightZP                   = TENSOR_TF_ZEROPOINT(weights);
@@ -23463,8 +23463,6 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_scalar     kernel_heights             = vxCreateScalar(context, VX_TYPE_INT32, &kernel_height);
     vx_scalar     strides                    = VX_NULL;
     vx_int32      stride                     = 0;
-    vx_int32      strideXvalue               = 0;
-    vx_int32      strideYvalue               = 0;
     vx_tensor     reBiases                   = VX_NULL;
     vx_tensor     reWeights                  = VX_NULL;
     vx_int32      sizes[4]                   = {1, 1, 1, 1};
@@ -23481,23 +23479,6 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         goto OnError;
     }
 
-    if ((input_width == 1) || (output_width == 1))
-    {
-        strideXvalue = 1;
-    }
-    else
-    {
-        strideXvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_width + padLeftv + padRightv - kernel_width) / (output_width - 1), downScaleSizeRounding->value->e);
-    }
-
-    if ((input_height == 1) || (output_height == 1))
-    {
-        strideYvalue = 1;
-    }
-    else
-    {
-        strideYvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_height + padTop + padBottom - kernel_height) / (output_height - 1), downScaleSizeRounding->value->e);
-    }
     stride  = strideXvalue;
     strides = vxCreateScalar(context, VX_TYPE_INT32, &stride);
 
