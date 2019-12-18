@@ -2553,6 +2553,7 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
             enable_packed_weights = vx_true_e;
         }
         else if (!enable_conv2d_1x1 && biases != NULL
+            && CHECK_LIFETIME_IS_STATIC(weights)
             && ((outputWidth * outputHeight < IMG_MAX_WIDTH) && outputDepth < IMG_MAX_WIDTH && input_size < IMG_MAX_WIDTH)
             && (outputDepth % CONV2D_ALIGN_SIZE4 == 0)
             && ((TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE && TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8)
@@ -3537,6 +3538,13 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
     vx_int32 dilation_y = dilationY->value->n32 + 1;
 
     gcoOS_Allocate(gcvNULL, sizeof(vxnne_operation_s) * (dilation_x * dilation_y + vxmOPERATION_COUNT(convolutionLayer)), (gctPOINTER*)&convolutionLayer->dynamic_operations);
+    if (!convolutionLayer->dynamic_operations)
+    {
+        status = VX_ERROR_NO_MEMORY;
+        vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+        return status;
+    }
+    gcoOS_ZeroMemory(convolutionLayer->dynamic_operations, sizeof(vxnne_operation_s) * (dilation_x * dilation_y + vxmOPERATION_COUNT(convolutionLayer)));
 
     *max_num_operations = dilation_x * dilation_y + vxmOPERATION_COUNT(convolutionLayer);
 
