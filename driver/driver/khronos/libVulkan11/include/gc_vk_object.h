@@ -87,6 +87,20 @@ typedef struct __vkFenceRec
 
     /* Fence specific fields */
     gctSIGNAL signal;
+
+    /*support fence_win32 extention */
+    void *winHandle;
+
+    VkExternalFenceHandleTypeFlagBits handleType;
+
+    /*support fence_fd extension*/
+    int fenceFd;
+
+    VkBool32 exported;
+    VkBool32 imported;
+
+    gctSIGNAL permanent;
+
 } __vkFence;
 
 typedef struct __vkSemaphoreRec

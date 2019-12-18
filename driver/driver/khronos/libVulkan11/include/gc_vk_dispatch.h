@@ -215,7 +215,9 @@
     vkApiMacro(DestroyDebugReportCallbackEXT) \
     vkApiMacro(DebugReportMessageEXT)\
     vkApiMacro(GetSemaphoreFdKHR)\
-    vkApiMacro(ImportSemaphoreFdKHR)
+    vkApiMacro(ImportSemaphoreFdKHR)\
+    vkApiMacro(GetFenceFdKHR)\
+    vkApiMacro(ImportFenceFdKHR)
 
 #define __VK_WSI_XLIB_ENTRIES(vkApiMacro) \
     vkApiMacro(CreateXlibSurfaceKHR) \
@@ -251,7 +253,9 @@
     vkApiMacro(CreateWin32SurfaceKHR) \
     vkApiMacro(GetPhysicalDeviceWin32PresentationSupportKHR)\
     vkApiMacro(GetSemaphoreWin32HandleKHR)\
-    vkApiMacro(ImportSemaphoreWin32HandleKHR)
+    vkApiMacro(ImportSemaphoreWin32HandleKHR)\
+    vkApiMacro(GetFenceWin32HandleKHR)\
+    vkApiMacro(ImportFenceWin32HandleKHR)
 
 #define __VK_ICD_API_ENTRIES(vkApiMacro) \
     vkApiMacro(GetInstanceProcAddr) \
@@ -524,6 +528,10 @@ extern VKAPI_ATTR void     VKAPI_CALL __vk_DebugReportMessageEXT(VkInstance inst
 extern VKAPI_ATTR VkResult VKAPI_CALL __vk_GetSemaphoreFdKHR(VkDevice device, const VkSemaphoreGetFdInfoKHR* pGetFdInfo, int* pFd);
 extern VKAPI_ATTR VkResult VKAPI_CALL __vk_ImportSemaphoreFdKHR(VkDevice device, const VkImportSemaphoreFdInfoKHR* pImportSemaphoreFdInfo);
 
+/*VK_KHR_external_fence_fd*/
+extern VKAPI_ATTR VkResult VKAPI_CALL __vk_GetFenceFdKHR(VkDevice device, const VkFenceGetFdInfoKHR* pGetFdInfo, int* pFd);
+extern VKAPI_ATTR VkResult VKAPI_CALL __vk_ImportFenceFdKHR(VkDevice device, const VkImportFenceFdInfoKHR* pImportFenceFdInfo);
+
 #ifdef VK_USE_PLATFORM_XLIB_KHR
 extern VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateXlibSurfaceKHR(VkInstance instance, Display* dpy, Window window, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface);
 extern VKAPI_ATTR VkBool32 VKAPI_CALL __vk_GetPhysicalDeviceXlibPresentationSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, Display* dpy, VisualID visualID);
@@ -557,6 +565,9 @@ extern VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateWin32SurfaceKHR(VkInstance inst
 extern VKAPI_ATTR VkBool32 VKAPI_CALL __vk_GetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex);
 extern VKAPI_ATTR VkResult VKAPI_CALL __vk_GetSemaphoreWin32HandleKHR(VkDevice device, const VkSemaphoreGetWin32HandleInfoKHR* pGetWin32HandleInfo, HANDLE* pHandle);
 extern VKAPI_ATTR VkResult VKAPI_CALL __vk_ImportSemaphoreWin32HandleKHR(VkDevice device, const VkImportSemaphoreWin32HandleInfoKHR* pImportSemaphoreWin32HandleInfo);
+/*VK_KHR_external_fence_win32*/
+extern VKAPI_ATTR VkResult VKAPI_CALL __vk_GetFenceWin32HandleKHR(VkDevice device, const VkFenceGetWin32HandleInfoKHR* pGetWin32HandleInfo, HANDLE* pHandle);
+extern VKAPI_ATTR VkResult VKAPI_CALL __vk_ImportFenceWin32HandleKHR(VkDevice device, const VkImportFenceWin32HandleInfoKHR* pImportFenceWin32HandleInfo);
 #endif
 
 extern VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_icdGetInstanceProcAddr(VkInstance instance, const char* pName);
