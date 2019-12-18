@@ -1281,14 +1281,6 @@ __kernel void gpuDepthwiseConvNoBias_Quant8(
 
 typedef _viv_uchar16_packed   vxc_uchar16;
 typedef _viv_uchar8_packed    vxc_uchar8;
-inline uchar* get_image2D_array_ptr(image2d_array_t  input)
-{
-    int8 desc;
-    _viv_asm(COPY, desc, input, sizeof(desc));
-    uchar *src_ptr = (uchar*)desc.s0;
-
-    return src_ptr;
-}
 
 #define DEPTHWISE_U8_NOPAD_S1_PROCESS_PART1() \
     int x = get_global_id(0); \
