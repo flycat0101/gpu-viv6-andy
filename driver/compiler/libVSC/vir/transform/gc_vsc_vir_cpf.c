@@ -380,6 +380,7 @@ _VSC_CPF_Init(
     VSC_CPF_SetHwCfg(pCPF, pHwCfg);
     VSC_CPF_SetOptions(pCPF, pOptions);
     VSC_CPF_SetDumper(pCPF, pDumper);
+    VSC_CPF_SetCodeChange(pCPF, gcvFALSE);
     pCPF->pMM = pMM;
 }
 
@@ -1373,6 +1374,10 @@ _VSC_CPF_FoldConst(
         VIR_LOG_FLUSH(pDumper);
     }
 
+    if (folded)
+    {
+        VSC_CPF_SetCodeChange(pCPF, gcvTRUE);
+    }
     return gcvTRUE;
 }
 
@@ -1519,7 +1524,8 @@ _VSC_CPF_FoldConst_LDARR(
         VIR_LOG(pDumper, "\n");
         VIR_LOG_FLUSH(pDumper);
     }
-
+    /* code change */
+    VSC_CPF_SetCodeChange(pCPF, gcvTRUE);
     return gcvTRUE;
 }
 
@@ -1616,7 +1622,7 @@ gctBOOL                 allConst
         VIR_LOG(pDumper, "\n");
         VIR_LOG_FLUSH(pDumper);
     }
-
+    VSC_CPF_SetCodeChange(pCPF, gcvTRUE);
     return gcvTRUE;
 }
 
@@ -1719,6 +1725,8 @@ _VSC_CPF_PropagateConst(
     {
         /* const vec case */
     }
+    /* code change */
+    VSC_CPF_SetCodeChange(pCPF, gcvTRUE);
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
         VSC_OPTN_CPFOptions_TRACE_ALGORITHM) && VSC_CPF_GetDumper(pCPF))
@@ -2679,6 +2687,8 @@ _VSC_CPF_PerformOnInst(
                 else if(nopChannelCount == channelCount)
                 {
                     VIR_Function_ChangeInstToNop(VIR_Inst_GetFunction(pInst), pInst);
+                    /* code change */
+                    VSC_CPF_SetCodeChange(pCPF, gcvTRUE);
                 }
             }
         }
@@ -3374,6 +3384,11 @@ VSC_CPF_PerformOnShader(
                   dumper,
                   pPassWorker->basePassWorker.pMM);
     errCode = _VSC_CPF_PerformOnShader(&cpf);
+    /* invalid du information if code changed */
+    if (VSC_CPF_CodeChanged(&cpf))
+    {
+        pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
+    }
     _VSC_CPF_Final(&cpf);
 
     return errCode;
