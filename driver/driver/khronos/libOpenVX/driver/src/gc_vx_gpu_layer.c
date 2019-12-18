@@ -8591,6 +8591,8 @@ vxnne_shader_executable vxnneGetGPUBatch2SpaceShaderExecutable(
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
+    vx_uint32               crop_left,
+    vx_uint32               crop_top,
     vx_tensor               stride,
     vx_tensor               output)
 {
@@ -8604,7 +8606,9 @@ vxnne_shader_executable vxnneGetGPUBatch2SpaceShaderExecutable(
     vxnne_kernel_shaders        kernel;
 
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    vx_reference  parameters[5]              = {(vx_reference)input, (vx_reference)VX_NULL, (vx_reference)VX_NULL, (vx_reference) VX_NULL, (vx_reference)output};
+    vx_reference  parameters[8]              = {(vx_reference)input, (vx_reference)VX_NULL, (vx_reference)VX_NULL,
+                                                     (vx_reference)VX_NULL, (vx_reference) VX_NULL,
+                                                     (vx_reference)VX_NULL, (vx_reference) VX_NULL, (vx_reference)output};
     vx_enum       inputFormat                = TENSOR_DATA_TYPE(input);
     vx_enum       outputFormat               = TENSOR_DATA_TYPE(output);
     vx_uint32     input_width                = TENSOR_VIEW_SIZE_INDEX(input, 0);
@@ -8622,6 +8626,9 @@ vxnne_shader_executable vxnneGetGPUBatch2SpaceShaderExecutable(
     vx_tensor     input_rs                   = NULL;
     vx_tensor     output_rs                  = NULL;
     vx_scalar     inputDepth                 = vxCreateScalar(context, VX_TYPE_UINT32, &input_depth);
+    vx_scalar     outBatch                   = vxCreateScalar(context, VX_TYPE_UINT32, &output_batch);
+    vx_scalar     cropLeft                   = vxCreateScalar(context, VX_TYPE_UINT32, &crop_left);
+    vx_scalar     cropTop                    = vxCreateScalar(context, VX_TYPE_UINT32, &crop_top);
     vx_int32_ptr  block_size                 = VX_NULL;
     vx_int32      block_w                    = 0;
     vx_int32      block_h                    = 0;
@@ -8659,11 +8666,14 @@ vxnne_shader_executable vxnneGetGPUBatch2SpaceShaderExecutable(
     input_batch = (input_batch == 0) ? 1 : input_batch;
     input_dimz = input_batch * input_depth;
     parameters[3] = (vx_reference)inputDepth;
+    parameters[4] = (vx_reference)outBatch;
+    parameters[5] = (vx_reference)cropLeft;
+    parameters[6] = (vx_reference)cropTop;
 
     if (output_dim == 4)
     {
         output_rs        = vxoTensor_ReshapeTensor(output, sizes, 3);
-        parameters[4]    = (vx_reference)output_rs;
+        parameters[7]    = (vx_reference)output_rs;
     }
 
     if (input_dim == 4)
@@ -8729,7 +8739,7 @@ vxnne_shader_executable vxnneGetGPUBatch2SpaceShaderExecutable(
         if (!shaderExecutable) goto OnError;
     }
 
-    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 5);
+    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
     if (status != VX_SUCCESS) goto OnError;
 
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
@@ -8738,8 +8748,11 @@ vxnne_shader_executable vxnneGetGPUBatch2SpaceShaderExecutable(
     if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
     if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
     if (inputDepth) vxReleaseScalar(&inputDepth);
+    if (outBatch) vxReleaseScalar(&outBatch);
     if (blockw) vxReleaseScalar(&blockw);
     if (blockh) vxReleaseScalar(&blockh);
+    if (cropLeft) vxReleaseScalar(&cropLeft);
+    if (cropTop) vxReleaseScalar(&cropTop);
 
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
@@ -8750,8 +8763,11 @@ OnError:
     if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
     if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
     if (inputDepth) vxReleaseScalar(&inputDepth);
+    if (outBatch) vxReleaseScalar(&outBatch);
     if (blockw) vxReleaseScalar(&blockw);
     if (blockh) vxReleaseScalar(&blockh);
+    if (cropLeft) vxReleaseScalar(&cropLeft);
+    if (cropTop) vxReleaseScalar(&cropTop);
 
 #if !gcdUSE_VXC_BINARY
     if (programSources)
