@@ -366,6 +366,7 @@ __registry_handle_global(void *data, struct wl_registry *registry, uint32_t name
     __WLEGLDisplay display = data;
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
     char *p;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
 #endif
 
     if (strcmp(interface, "wl_viv") == 0 && display)
@@ -375,6 +376,13 @@ __registry_handle_global(void *data, struct wl_registry *registry, uint32_t name
     }
 #ifdef gcdUSE_ZWP_SYNCHRONIZATION
     else if (strcmp(interface, "zwp_linux_explicit_synchronization_v1") == 0 && !gbm_query_enable_overlay_view()) {
+        gcoHAL_GetPatchID(gcvNULL. &patchId);
+        if (patchId == gcvPATCH_GTFES30)
+        {
+            /* Workaound for the Random es30 cts crash on 8MN board */
+            return;
+        }
+
         p = getenv("WL_EGL_CLIENT_FENCE");
         if((p == gcvNULL) || (p[0] != '0'))
         {
