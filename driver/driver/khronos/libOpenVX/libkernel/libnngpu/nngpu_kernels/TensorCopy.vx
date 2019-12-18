@@ -176,7 +176,7 @@ __kernel void gpuTensorCopy_Quant8_4S_2D (__read_only image2d_t  input,
     uint4 tmpIn = {0}; \
     float4 tmp = {0.0}; \
     tmpIn = read_imageui(input, coord); \
-    tmp = convert_float4(tmpIn) * scale + offset; \
+    tmp = (convert_float4(tmpIn) - zp) * scale; \
     write_imagef(output, coord, tmp);
 
 
@@ -184,7 +184,7 @@ __kernel void gpuTensorCopy_Quant8_4S_2D (__read_only image2d_t  input,
     uint4 tmpIn = {0}; \
     float4 tmp = {0.0}; \
     tmpIn = read_imageui(input, coord); \
-    tmp = convert_float4(tmpIn) * scale + offset; \
+    tmp = (convert_float4(tmpIn) - zp )* scale; \
     write_imagef(output, coord, tmp.xxxx); \
     coord.x++; \
     write_imagef(output, coord, tmp.yyyy); \
@@ -195,7 +195,7 @@ __kernel void gpuTensorCopy_Quant8_4S_2D (__read_only image2d_t  input,
 
 __kernel void gpuTensorCopy_Q8toFP32_4X (__read_only image2d_array_t  input,
                                                           float       scale,
-                                                          float       offset,
+                                                          float       zp,
                                         __write_only image2d_array_t  output)
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
@@ -204,7 +204,7 @@ __kernel void gpuTensorCopy_Q8toFP32_4X (__read_only image2d_array_t  input,
 
 __kernel void gpuTensorCopy_Q8toFP32_4X_2D (__read_only image2d_t  input,
                                                           float    scale,
-                                                          float    offset,
+                                                          float    zp,
                                            __write_only image2d_t  output)
 {
     int2 coord = (int2)(get_global_id(0), get_global_id(1));
@@ -213,7 +213,7 @@ __kernel void gpuTensorCopy_Q8toFP32_4X_2D (__read_only image2d_t  input,
 
 __kernel void gpuTensorCopy_Q8toFP32_4S (__read_only image2d_array_t  input,
                                                           float       scale,
-                                                          float       offset,
+                                                          float       zp,
                                         __write_only image2d_array_t  output)
 {
     int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
@@ -222,7 +222,7 @@ __kernel void gpuTensorCopy_Q8toFP32_4S (__read_only image2d_array_t  input,
 
 __kernel void gpuTensorCopy_Q8toFP32_4S_2D (__read_only image2d_t  input,
                                                           float    scale,
-                                                          float    offset,
+                                                          float    zp,
                                            __write_only image2d_t  output)
 {
     int2 coord = (int2)(get_global_id(0), get_global_id(1));
