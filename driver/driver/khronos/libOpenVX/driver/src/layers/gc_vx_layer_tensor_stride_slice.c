@@ -159,7 +159,7 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_getReverseAxis(vx_int32 start[4]
     {
         reverseAxis[idx] = 0xcdcdcdcd;
 
-        if (stride[i] < 0)
+        if (stride[i] < 0 && gcmABS(stop[i] - start[i]) > 1)
         {
             vx_uint32 start_axis    = tensor_size[i] - start[i] - 1;
             vx_uint32 stop_axis     = tensor_size[i] - stop[i] - 2;
