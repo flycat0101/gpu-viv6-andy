@@ -351,8 +351,16 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->hwFeatureFlags.supportMultiGPU        = gcvTRUE;
     pVscHwCfg->hwFeatureFlags.hasPointSizeFix        = IS_HW_SUPPORT(gcvFEATURE_MAX_POINTSIZE_CLAMP);
     pVscHwCfg->hwFeatureFlags.supportVectorB0        = gcvFALSE;
-    pVscHwCfg->hwFeatureFlags.hasAtomTimingFix       = !(pVscHwCfg->chipModel == 0x3000 && pVscHwCfg->chipRevision == 0x5450);
-
+    if ((pVscHwCfg->chipModel == gcv7000 && pVscHwCfg->chipRevision == 0x6009)
+        ||
+        (pVscHwCfg->chipModel == gcv3000 && pVscHwCfg->chipRevision == 0x5450))
+    {
+        pVscHwCfg->hwFeatureFlags.hasAtomTimingFix   = gcvFALSE;
+    }
+    else
+    {
+        pVscHwCfg->hwFeatureFlags.hasAtomTimingFix   = gcvTRUE;
+    }
     pVscHwCfg->hwFeatureFlags.FEDrawDirect           = IS_HW_SUPPORT(gcvFEATURE_FE_DRAW_DIRECT);
     pVscHwCfg->hwFeatureFlags.hasUSCAtomicFix2       = IS_HW_SUPPORT(gcvFEATURE_USC_ATOMIC_FIX2);
 
@@ -372,6 +380,7 @@ _StallHw(
     gcsPROGRAM_UNIFIED_STATUS *prevProgUnifiedStatus = &Hardware->prevProgramUnfiedStatus;
     gctBOOL reconfigUSC = gcvFALSE;
     gctBOOL smallBatch = Hardware->features[gcvFEATURE_SMALL_BATCH] && Hardware->options.smallBatch;
+    gctBOOL needSnapToPage = gcvFALSE;
     gceSTATUS status = gcvSTATUS_OK;
 
     do
