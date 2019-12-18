@@ -8979,6 +8979,7 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
     vx_uint32     batch                 = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
     vx_enum       input_format          = TENSOR_DATA_TYPE(input);
     vx_enum       output_format         = TENSOR_DATA_TYPE(output);
+    vx_tensor     src                   = VX_NULL;
     vx_tensor     dst                   = VX_NULL;
     vx_scalar     axisScale             = vxCreateScalar(context, VX_TYPE_FLOAT32, &axis_coef);
     vx_reference  parameters[8]         = {(vx_reference)input, (vx_reference)axisScale, (vx_reference)output, (vx_reference)VX_NULL, (vx_reference)VX_NULL, (vx_reference)VX_NULL, (vx_reference)VX_NULL, (vx_reference)VX_NULL};
@@ -9031,6 +9032,17 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
         if (!kernel) goto OnError;
 
         vxReleaseProgram(&program);
+    }
+
+    if (dims == 1)
+    {
+        dims          = 2;
+        sizes[0]      = width;
+        sizes[1]      = height;
+        sizes[2]      = depth;
+        sizes[3]      = batch;
+        src           = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
+        parameters[0] = (vx_reference)src;
     }
 
     if (0 == axis)
@@ -9158,6 +9170,7 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
     if(scaleOut) vxReleaseScalar(&scaleOut);
     if(sCount)   vxReleaseScalar(&sCount);
     if (dst) vxoTensor_ReleaseTensor(&dst);
+    if (src) vxoTensor_ReleaseTensor(&src);
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
 
@@ -9170,6 +9183,7 @@ OnError:
     if(sCount)   vxReleaseScalar(&sCount);
     if (program) vxReleaseProgram(&program);
     if (dst) vxoTensor_ReleaseTensor(&dst);
+    if (src) vxoTensor_ReleaseTensor(&src);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
 #if !gcdUSE_VXC_BINARY
