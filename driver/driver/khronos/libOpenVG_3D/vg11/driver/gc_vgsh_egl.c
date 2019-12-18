@@ -130,7 +130,8 @@ veglCreateContext(
     void * Thread,
     gctINT ClientVersion,
     VEGLimports *Imports,
-    void * SharedContext
+    void * SharedContext,
+    gctINT SharedContextClient
     )
 {
     _VGContext *context = gcvNULL;
