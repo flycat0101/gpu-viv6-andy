@@ -3505,6 +3505,7 @@ vx_status vxoLayer_InitializeHead(vxnne_layer ops_layer, const vx_reference para
 }
 vx_status vxoLayer_VerificationFoot(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool* support)
 {
+#if REGISTER_FRAME_LAYER_DEBUG
     gctSTRING envctrl = gcvNULL;
     gctCHAR name[128] = { 0 };
 
@@ -3513,6 +3514,7 @@ vx_status vxoLayer_VerificationFoot(vx_node node, const vx_reference parameters[
     {
         *support = (atoi(envctrl) == 0) ? vx_false_e : vx_true_e;
     }
+#endif
 
 
     reg_param->support = *support;
