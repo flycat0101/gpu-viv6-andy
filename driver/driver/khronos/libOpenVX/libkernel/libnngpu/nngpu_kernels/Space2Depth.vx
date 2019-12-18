@@ -56,7 +56,6 @@ __kernel void gpuReorg2_Space2DepthQuant8Block2
     uint4 tmp = {0};
 
     tmp = read_imageui(input, coord);
-    tmp.x = floor((tmp.x - zpIn)*scale + zpOut + 0.5);
     coord_out.z = ((x & 1) + (y & 1) * 2 ) * inDepth + z;
     write_imageui(output, coord_out, tmp);
 }
@@ -81,7 +80,6 @@ __kernel void gpuReorg2_Space2DepthQuant8
     uint4 tmp = {0};
 
     tmp = read_imageui(input, coord);
-    tmp.x = floor((tmp.x - zpIn)*scale + zpOut + 0.5);
     coord_out.z = ((x - coord_out.x * block_size) + (y - coord_out.y * block_size) * block_size) * inDepth + z;
     write_imageui(output, coord_out, tmp);
 }
@@ -102,7 +100,6 @@ __kernel void gpuReorg2_Space2DepthQuant16Block2
     int4 tmp = {0};
 
     tmp = read_imagei(input, coord);
-    tmp.x = floor(tmp.x*scale + 0.5);
     coord_out.z = ((x & 1) + (y & 1) * 2 ) * inDepth + z;
     write_imagei(output, coord_out, tmp);
 }
