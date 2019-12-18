@@ -191,6 +191,11 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
             }
             attribBufSizeInKbyte -= fragmentSizeInKbyte;
 
+            if (!(IS_HW_SUPPORT(gcvFEATURE_PSCS_THROTTLE) && IS_HW_SUPPORT(gcvFEATURE_HWMANAGED_LS)))
+            {
+                attribBufSizeInKbyte -= 1;
+            }
+
             localStorageSizeInKbyte = attribBufSizeInKbyte;
         }
     }
@@ -373,6 +378,20 @@ _StallHw(
     {
         if (Hardware->features[gcvFEATURE_USC])
         {
+            if (!(Hardware->features[gcvFEATURE_PSCS_THROTTLE] && Hardware->features[gcvFEATURE_HWMANAGED_LS]))
+            {
+                if (((Hardware->prevProgramStageBits & gcvPROGRAM_STAGE_VERTEX_BIT) ||
+                    (Hardware->prevProgramStageBits & gcvPROGRAM_STAGE_TCS_BIT) ||
+                    (Hardware->prevProgramStageBits & gcvPROGRAM_STAGE_TES_BIT) ||
+                    (Hardware->prevProgramStageBits & gcvPROGRAM_STAGE_GEOMETRY_BIT)) &&
+                    ((hints->stageBits & gcvPROGRAM_STAGE_FRAGMENT_BIT) ||
+                    (hints->stageBits & gcvPROGRAM_STAGE_COMPUTE_BIT) ||
+                    (hints->stageBits & gcvPROGRAM_STAGE_OPENCL_BIT)))
+                {
+                    needSnapToPage = gcvTRUE;
+                }
+            }
+
             if ((Hardware->prevProgramStageBits & gcvPROGRAM_STAGE_COMPUTE_BIT) !=
                 (hints->stageBits & gcvPROGRAM_STAGE_COMPUTE_BIT))
             {
@@ -615,6 +634,13 @@ _StallHw(
                                                 0x03884,
                                                 uscConfig,
                                                 gcvNULL));
+    }
+    else if (needSnapToPage)
+    {
+        gcmONERROR(gcoHARDWARE_SnapPages(
+                    Hardware,
+                    0xF,
+                    gcvNULL));
     }
 
     /* overwrite to previous one */
