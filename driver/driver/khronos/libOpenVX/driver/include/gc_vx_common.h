@@ -213,6 +213,7 @@
 
 #define REGISTER_FRAME 1
 #define REGISTER_FRAME_CL_RELAX 0
+#define REGISTER_FRAME_LAYER_DEBUG 0
 
 /* Function macros */
 #ifndef vxmLENGTH_OF
