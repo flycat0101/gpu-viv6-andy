@@ -2700,6 +2700,7 @@ vxnne_shader_executable vxnneGetSpace2BatchShaderExecutable(
     vx_uint32     input_height               = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32     input_depth                = TENSOR_VIEW_SIZE_INDEX(input, 2);
     vx_uint32     input_batch                = TENSOR_VIEW_SIZE_INDEX(input, 3);
+    vx_uint32     input_dim                  = TENSOR_DIM_NUM(input);
     vx_uint32     output_dim                 = TENSOR_DIM_NUM(output);
     vx_uint32     stride_dim                 = TENSOR_DIM_NUM(stride);
     vx_uint32     pad_dim                    = TENSOR_DIM_NUM(pad);
@@ -2719,6 +2720,7 @@ vxnne_shader_executable vxnneGetSpace2BatchShaderExecutable(
     vx_int32      in_zeros_point             = TENSOR_TF_ZEROPOINT(input);
     vx_int32      out_zeros_point            = TENSOR_TF_ZEROPOINT(output);
     vx_bool       sameFlg                    = vx_true_e;
+    vx_tensor     input_rs                   = NULL;
     vx_tensor     output_rs                  = NULL;
     vx_tensor     stride_rs                  = NULL;
     vx_tensor     pad_rs                     = NULL;
@@ -2750,6 +2752,16 @@ vxnne_shader_executable vxnneGetSpace2BatchShaderExecutable(
     {
         output_rs        = vxoTensor_ReshapeTensor(output, sizes, 3);
         parameters[3]    = (vx_reference)output_rs;
+    }
+
+    if (input_dim == 4)
+    {
+        sizes[0] = input_width;
+        sizes[1] = input_height;
+        sizes[2] = input_depth * input_batch;
+        sizes[3] = 1;
+        input_rs        = vxoTensor_ReshapeTensor(input, sizes, 3);
+        parameters[0]    = (vx_reference)input_rs;
     }
 
     if (stride_dim == 1)
@@ -2853,12 +2865,16 @@ vxnne_shader_executable vxnneGetSpace2BatchShaderExecutable(
         if (!shaderExecutable) goto OnError;
     }
 
+    status = vxnneShaderExecutable_SetUniform(shaderExecutable, "input_batch", 1, &input_batch);
+    if (status != VX_SUCCESS) goto OnError;
+
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 5);
     if (status != VX_SUCCESS) goto OnError;
 
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
     if (status != VX_SUCCESS) goto OnError;
 
+    if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
     if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
     if (stride_rs) vxoTensor_ReleaseTensor(&stride_rs);
     if (pad_rs) vxoTensor_ReleaseTensor(&pad_rs);
@@ -2869,6 +2885,7 @@ vxnne_shader_executable vxnneGetSpace2BatchShaderExecutable(
 OnError:
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
+    if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
     if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
     if (stride_rs) vxoTensor_ReleaseTensor(&stride_rs);
     if (pad_rs) vxoTensor_ReleaseTensor(&pad_rs);

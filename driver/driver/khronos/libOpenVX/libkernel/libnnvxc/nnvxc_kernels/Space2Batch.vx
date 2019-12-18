@@ -6,6 +6,7 @@ _viv_uniform float tmpScale;
 _viv_uniform float tmpZP;
 _viv_uniform int input_width;
 _viv_uniform int input_height;
+_viv_uniform int input_batch;
 _viv_uniform int out_zeros_point;
 
 __kernel void vxcSpace2Batch_uint8_uint8_general
@@ -35,7 +36,7 @@ __kernel void vxcSpace2Batch_uint8_uint8_general
     short blockX = (short)strides.x;
     short blockY = (short)strides.y;
     int out_batch = (int)(sidx % blockX + (sidy % blockY) * blockX);
-    int out_z = out_batch * input_depth + gidz;
+    int out_z = out_batch * input_depth * input_batch + gidz;
     int4 coord_out = (int4)((int)(sidx / blockX), (int)(sidy / blockY), out_z, 0);
 
     float tmpVal0 = imageData * tmpScale + tmpZP;
@@ -76,7 +77,7 @@ __kernel void vxcSpace2Batch_uint8_uint8_general_noFl
     short blockX = (short)strides.x;
     short blockY = (short)strides.y;
     int out_batch = (int)(sidx % blockX + (sidy % blockY) * blockX);
-    int out_z = out_batch * input_depth + gidz;
+    int out_z = out_batch * input_depth * input_batch + gidz;
     int4 coord_out = (int4)((int)(sidx / blockX), (int)(sidy / blockY), out_z, 0);
 
     VXC_WriteImage2DArray(output, coord_out, imageData, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
@@ -109,7 +110,8 @@ __kernel void vxcSpace2Batch_fp16_fp16_general
     short blockX = (short)strides.x;
     short blockY = (short)strides.y;
     int out_batch = (int)(sidx % blockX + (sidy % blockY) * blockX);
-    int out_z = out_batch * input_depth + gidz;
+    //int out_z = out_batch * input_depth + gidz;
+    int out_z = out_batch * input_depth * input_batch + gidz;
     int4 coord_out = (int4)((int)(sidx / blockX), (int)(sidy / blockY), out_z, 0);
 
     VXC_WriteImage2DArray(output, coord_out, imageData, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
