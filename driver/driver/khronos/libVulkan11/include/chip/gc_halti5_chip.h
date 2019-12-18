@@ -707,6 +707,7 @@ typedef struct
     VSC_IMAGE_FORMAT *patchStorageImgFormat[__VK_MAX_DESCRIPTOR_SETS];
     VSC_IMAGE_FORMAT *patchSampledImgFormat[__VK_MAX_DESCRIPTOR_SETS];
     VSC_IMAGE_FORMAT *patchCombinedImgFormat[__VK_MAX_DESCRIPTOR_SETS];
+    VSC_RES_OP_BIT *patchResOpBit[__VK_MAX_DESCRIPTOR_SETS];
     /* number of valid key array */
     uint32_t keyCount;
 
