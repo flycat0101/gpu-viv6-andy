@@ -2384,7 +2384,7 @@ vxCopyTensorPatch(
     }
 
     /* determine if virtual before checking for memory */
-    if (tensor->base.isVirtual == vx_true_e)
+    if (tensor->base.isVirtual == vx_true_e && tensor->base.accessible == vx_false_e)
     {
         /* User tried to access a "virtual" tensor. */
         vxError("Can not access a virtual tensor\n");
@@ -2392,7 +2392,7 @@ vxCopyTensorPatch(
         return VX_ERROR_OPTIMIZED_AWAY;
     }
 
-    if (!vxoTensor_MemoryIsAllocated(tensor))
+    if (!vxoTensor_MemoryIsAllocated(tensor) && !(tensor->base.isVirtual && tensor->alloced))
     {
         if (usage != VX_WRITE_ONLY || vxoTensor_AllocateMemory(tensor) != VX_SUCCESS)
         {
@@ -2493,7 +2493,7 @@ vxoCopyTensorPatch(
         if (!vxoTensor_CheckValidTensorAddressing(tensor, user_addr)) return VX_ERROR_INVALID_REFERENCE;
     }
 
-    if (tensor->base.isVirtual) return VX_ERROR_OPTIMIZED_AWAY;
+    if (tensor->base.isVirtual && tensor->base.accessible == vx_false_e) return VX_ERROR_OPTIMIZED_AWAY;
 
     if (user_ptr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
 

@@ -6557,6 +6557,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyVirtualBuffer(vx_graph graph)
                         vxoMemory_ResetOffset(inmem);
                         vxoMemory_SetSize(inmem, gcmALIGN(size, 64));
                         vxoMemory_SetType(inmem, VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR);
+                        input->alloced = vx_true_e;
                     }
 
                     if (enablePool)
@@ -6590,6 +6591,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyVirtualBuffer(vx_graph graph)
                         vxoMemory_ResetOffset(outmem);
                         vxoMemory_SetSize(outmem, gcmALIGN(size, 64));
                         vxoMemory_SetType(outmem, VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR);
+                        output->alloced = vx_true_e;
                     }
 
                     if (enablePool)
@@ -6609,6 +6611,41 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyVirtualBuffer(vx_graph graph)
     {
         status = vxoMemoryPool_RequestList(graph, rlist, count, 0, count, VX_NULL);
         gcmASSERT(status == VX_SUCCESS);
+        if (status != VX_SUCCESS)
+        {
+            for (i = 0; i < graph->layer->opIndicesNum; i++)
+            {
+                vxnne_operation op = graph->layer->operations[graph->layer->opIndices[i].operationID];
+
+                for (j = 0; j < op->inputsNum; j++)
+                {
+                    if (op->inputs[j] != VX_NULL && op->inputs[j]->type == VX_TYPE_TENSOR)
+                    {
+                        vx_tensor input = (vx_tensor)op->inputs[j];
+                        vx_memory inmem = &input->tensorBuffer->memory;
+
+                        if (!(inmem->allocType & VXNNE_MEM_POOL_TYPE_SRAM) && vxoTensor_IsVirtualTensor(input))
+                        {
+                            input->alloced = vx_false_e;
+                        }
+                    }
+                }
+
+                for (j = 0; j < op->outputsNum; j++)
+                {
+                    if (op->outputs[j] != VX_NULL && op->outputs[j]->type == VX_TYPE_TENSOR)
+                    {
+                        vx_tensor output = (vx_tensor)op->outputs[j];
+                        vx_memory outmem = &output->tensorBuffer->memory;
+
+                        if (!(outmem->allocType & VXNNE_MEM_POOL_TYPE_SRAM) && vxoTensor_IsVirtualTensor(output))
+                        {
+                            output->alloced = vx_false_e;
+                        }
+                    }
+                }
+            }
+        }
     }
 
 OnError:
@@ -10335,9 +10372,7 @@ VX_PRIVATE_API vx_status vxoGraph_ProcessInternal(vx_graph graph)
         vx_node node = graph->nodeTable[graph->allNodeIndexTable[0]];
         vx_target target = &graph->base.context->targetTable[node->targetIndex];
 
-        vxoNode_EnableVirtualAccessible(node);
         action = target->funcs.processLayer(target, &graph->layer->base);
-        vxoNode_DisableVirtualAccessible(node);
     }
     else
     {
