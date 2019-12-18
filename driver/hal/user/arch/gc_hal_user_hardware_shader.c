@@ -644,12 +644,19 @@ _StallHw(
                                                 uscConfig,
                                                 gcvNULL));
     }
-    else if (needSnapToPage)
+    else if (needSnapToPage && (Hardware->features[gcvFEATURE_SNAPPAGE_CMD] &&
+        Hardware->features[gcvFEATURE_SNAPPAGE_CMD_FIX]))
     {
-        gcmONERROR(gcoHARDWARE_SnapPages(
+        gcePROGRAM_STAGE_BIT snapStags = Hardware->prevProgramStageBits & gcvPORGRAM_STAGE_GPIPE;
+
+        if (snapStags)
+        {
+            gcmVERIFY_OK(
+                gcoHARDWARE_SnapPages(
                     Hardware,
-                    0xF,
+                    snapStags,
                     gcvNULL));
+        }
     }
 
     /* overwrite to previous one */
