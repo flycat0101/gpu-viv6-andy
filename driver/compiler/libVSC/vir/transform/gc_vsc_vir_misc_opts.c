@@ -12671,7 +12671,8 @@ _vscVIR_DetectSingleLoopInfo(
     IN VIR_LoopInfo*    pLoopInfo,
     IN VSC_HASH_TABLE*  pSameJmpBBSet,
     IN VSC_HASH_TABLE*  pLoopInfoWorkingSet,
-    IN VSC_HASH_TABLE*  pBBWorkingSet
+    IN VSC_HASH_TABLE*  pBBWorkingSet,
+    OUT gctBOOL*        pHasBarrier
     )
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
@@ -12689,8 +12690,12 @@ _vscVIR_DetectSingleLoopInfo(
     gctBOOL             bHasInitJmp = gcvFALSE;
 
     /* Skip the processed loop info. */
-    if (vscHTBL_DirectTestAndGet(pLoopInfoWorkingSet, (void *)pLoopInfo, gcvNULL))
+    if (vscHTBL_DirectTestAndGet(pLoopInfoWorkingSet, (void *)pLoopInfo, (void **)&bHasBarrier))
     {
+        if (pHasBarrier)
+        {
+            *pHasBarrier = bHasBarrier;
+        }
         return errCode;
     }
 
@@ -12706,8 +12711,11 @@ _vscVIR_DetectSingleLoopInfo(
              pNode = CAST_ULN_2_ULEN(vscULIterator_Next(&iter)))
         {
             VIR_LoopInfo* pChildLoopInfo = (VIR_LoopInfo*)vscULNDEXT_GetContainedUserData(pNode);
+            gctBOOL bChildLoopHasBarrier = gcvFALSE;
 
-            _vscVIR_DetectSingleLoopInfo(pContext, pChildLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet);
+            _vscVIR_DetectSingleLoopInfo(pContext, pChildLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet, &bChildLoopHasBarrier);
+
+            bHasBarrier |= bChildLoopHasBarrier;
         }
     }
 
@@ -12727,44 +12735,51 @@ _vscVIR_DetectSingleLoopInfo(
     gcmASSERT(pSuccBBOfLoopEnd);
 
     /* Check the left BB. */
-    VIR_LoopInfo_BBIterator_Init(&bbIter, pLoopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
-    for (pWorkingBB = VIR_LoopInfo_BBIterator_First(&bbIter);
-         pWorkingBB != gcvNULL;
-         pWorkingBB = VIR_LoopInfo_BBIterator_Next(&bbIter))
+    if (!bHasBarrier)
     {
-        /* Skip the processed BB, they are handled in the child loop. */
-        if (vscHTBL_DirectTestAndGet(pBBWorkingSet, (void *)pWorkingBB, gcvNULL))
+        VIR_LoopInfo_BBIterator_Init(&bbIter, pLoopInfo, VIR_LoopInfo_BBIterator_Type_Arbitrary);
+        for (pWorkingBB = VIR_LoopInfo_BBIterator_First(&bbIter);
+                pWorkingBB != gcvNULL;
+                pWorkingBB = VIR_LoopInfo_BBIterator_Next(&bbIter))
         {
-            continue;
-        }
-
-        /* We need to go through all BBs. */
-        if (!bHasBarrier)
-        {
-            pInst = BB_GET_START_INST(pWorkingBB);
-            while (gcvTRUE)
+            /* Skip the processed BB, they are handled in the child loop. */
+            if (vscHTBL_DirectTestAndGet(pBBWorkingSet, (void *)pWorkingBB, gcvNULL))
             {
-                if (VIR_Inst_IsHWBarrier(pInst, gcvFALSE))
-                {
-                    bHasBarrier = gcvTRUE;
-                    break;
-                }
+                continue;
+            }
 
-                if (pInst == BB_GET_END_INST(pWorkingBB))
+            /* We need to go through all BBs. */
+            if (!bHasBarrier)
+            {
+                pInst = BB_GET_START_INST(pWorkingBB);
+                while (gcvTRUE)
                 {
-                    break;
-                }
-                pInst = VIR_Inst_GetNext(pInst);
-            };
+                    if (VIR_Inst_IsHWBarrier(pInst, gcvFALSE))
+                    {
+                        bHasBarrier = gcvTRUE;
+                        break;
+                    }
+
+                    if (pInst == BB_GET_END_INST(pWorkingBB))
+                    {
+                        break;
+                    }
+                    pInst = VIR_Inst_GetNext(pInst);
+                };
+            }
+
+            vscHTBL_DirectSet(pBBWorkingSet, (void *)pWorkingBB, gcvNULL);
         }
-
-        vscHTBL_DirectSet(pBBWorkingSet, (void *)pWorkingBB, gcvNULL);
     }
 
-    vscHTBL_DirectSet(pLoopInfoWorkingSet, (void *)pLoopInfo, gcvNULL);
+    vscHTBL_DirectSet(pLoopInfoWorkingSet, (void *)pLoopInfo, ((void*)(gctSIZE_T)bHasBarrier));
 
     if (!bHasBarrier)
     {
+        if (pHasBarrier)
+        {
+            *pHasBarrier = bHasBarrier;
+        }
         return errCode;
     }
 
@@ -12885,6 +12900,10 @@ _vscVIR_DetectSingleLoopInfo(
     }
 
 OnError:
+    if (pHasBarrier)
+    {
+        *pHasBarrier = bHasBarrier;
+    }
     return errCode;
 }
 
@@ -13065,7 +13084,7 @@ _vscVIR_DetectBarrierWithinLoop(
              pLoopInfo != gcvNULL;
              pLoopInfo = (VIR_LoopInfo*)vscULIterator_Next(&iter))
         {
-            errCode = _vscVIR_DetectSingleLoopInfo(pContext, pLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet);
+            errCode = _vscVIR_DetectSingleLoopInfo(pContext, pLoopInfo, pSameJmpBBSet, pLoopInfoWorkingSet, pBBWorkingSet, gcvNULL);
             ON_ERROR(errCode, "Detect single loop info.");
         }
     }
