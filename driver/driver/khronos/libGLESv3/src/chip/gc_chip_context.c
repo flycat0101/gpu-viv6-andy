@@ -667,6 +667,13 @@ gcChipInitExtension(
         }
     }
 
+#if defined(ANDROID)
+    if (gcdPROC_IS_WEBGL(chipCtx->patchId))
+    {
+        __glFormatInfoTable[__GL_FMT_SRGB8].renderable = GL_TRUE;
+    }
+#endif
+
     /*Generate compressed texture format table base on extension status*/
     if (constants->majorVersion >= 3)
     {
