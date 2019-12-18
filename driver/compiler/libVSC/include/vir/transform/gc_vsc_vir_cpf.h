@@ -67,6 +67,7 @@ typedef struct _VSC_CPF
                                                   value: VSC_CPF_Const */
     /* We need a loop to check that in/out flow. */
     VIR_LoopOpts                loopOpts;
+    gctBOOL                     codeChanged;
 } VSC_CPF;
 
 #define VSC_CPF_GetAppNameId(cpf)               ((cpf)->appNameId)
@@ -88,6 +89,9 @@ typedef struct _VSC_CPF
 #define VSC_CPF_GetConstTable(cpf)              (&(cpf)->constTable)
 #define VSC_CPF_GetLoopOpts(cpf)                ((cpf)->loopOpts)
 #define VSC_CPF_SetLoopOpts(cpf, l)             ((cpf)->loopOpts = (l))
+
+#define VSC_CPF_CodeChanged(cpf)                ((cpf)->codeChanged)
+#define VSC_CPF_SetCodeChange(cpf, cc)          ((cpf)->codeChanged = cc)
 
 extern VSC_ErrCode VSC_CPF_PerformOnShader(
     IN VSC_SH_PASS_WORKER* pPassWorker

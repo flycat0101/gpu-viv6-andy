@@ -5511,8 +5511,8 @@ _VIR_LoopOpts_PerformSpecOptOnLoops(
 
 VSC_ErrCode
 VIR_LoopOpts_PerformOnFunction(
-    VIR_LoopOpts* loopOpts
-    )
+    VIR_LoopOpts* loopOpts,
+    OUT gctBOOL* optchanged)
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VIR_Function* func = VIR_LoopOpts_GetFunc(loopOpts);
@@ -5561,7 +5561,10 @@ VIR_LoopOpts_PerformOnFunction(
                 return errCode;
             }
             _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop, gcvTRUE, &localChanged);
-
+            if (optchanged)
+            {
+                *optchanged |= localChanged;
+            }
             errCode = vscVIR_DestroyDOMTreePerCFG(VIR_Function_GetCFG(func));
             if (errCode)
             {
@@ -5589,6 +5592,10 @@ VIR_LoopOpts_PerformOnFunction(
                 VIR_Function_Dump(dumper, func);
             }
             _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopInversionOnLoop, gcvTRUE, &localChanged);
+            if (optchanged)
+            {
+                *optchanged |= localChanged;
+            }
             if(VSC_UTILS_MASK(VSC_OPTN_LoopOptsOptions_GetTrace(options), VSC_OPTN_LoopOptsOptions_TRACE_INVERSION_FUNC_OUTPUT))
             {
                 VIR_Dumper* dumper = VIR_LoopOpts_GetDumper(loopOpts);
@@ -5620,7 +5627,10 @@ VIR_LoopOpts_PerformOnFunction(
             }
 
             _VIR_LoopOpts_PerformSpecOptOnLoops(loopOpts, _VIR_LoopInfo_PerformLoopUnrollingOnLoop, gcvTRUE, &localChanged);
-
+            if (optchanged)
+            {
+                *optchanged |= localChanged;
+            }
             errCode = vscVIR_DestroyDOMTreePerCFG(VIR_Function_GetCFG(func));
             if (errCode)
             {
@@ -5731,7 +5741,7 @@ DEF_QUERY_PASS_PROP(VIR_LoopOpts_PerformOnShader)
 
     pPassProp->passFlag.resCreationReq.s.bNeedCfg = gcvTRUE;
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
-    pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
+
 }
 
 
@@ -5750,6 +5760,7 @@ VIR_LoopOpts_PerformOnShader(
     VIR_FuncIterator func_iter;
     VIR_FunctionNode* func_node;
     VSC_OPTN_LoopOptsOptions* options = (VSC_OPTN_LoopOptsOptions*)pPassWorker->basePassWorker.pBaseOption;
+    gctBOOL              codeChanged = gcvFALSE;
     /* set the max instrunction numbers after unroll */
     gctUINT allowedInstNumsAfterUnroll =  _VIR_AllowedInstNumAfterUnroll(pPassWorker);
     gctUINT maxInvariantCodeMotionCount = _VIR_MaxInvariantCodeMotionCount(pPassWorker);
@@ -5787,7 +5798,7 @@ VIR_LoopOpts_PerformOnShader(
     {
         VIR_LoopOpts loopOpts;
         VIR_Function* func = func_node->function;
-
+        gctBOOL       funcChanged = gcvFALSE;
         VIR_LoopOpts_Init(&loopOpts,
                           pPassWorker->pDuInfo,
                           shader,
@@ -5799,9 +5810,13 @@ VIR_LoopOpts_PerformOnShader(
         VIR_LoopOpts_SetAllowedInstNumAfterUnroll(&loopOpts, allowedInstNumsAfterUnroll);
         VIR_LoopOpts_SetMaxInvariantCodeMotionCount(&loopOpts, maxInvariantCodeMotionCount);
 
-        errcode = VIR_LoopOpts_PerformOnFunction(&loopOpts);
+        errcode = VIR_LoopOpts_PerformOnFunction(&loopOpts, &funcChanged);
         VIR_LoopOpts_Final(&loopOpts);
 
+        if (funcChanged)
+        {
+            codeChanged = gcvTRUE;
+        }
         if(errcode)
         {
             break;
@@ -5819,7 +5834,10 @@ VIR_LoopOpts_PerformOnShader(
     {
         VIR_Shader_Dump(gcvNULL, "After Loop optimizations.", shader, gcvTRUE);
     }
-
+    if (codeChanged)
+    {
+        pPassWorker->pResDestroyReq->s.bInvalidateCg = gcvTRUE;
+    }
     return errcode;
 }
 

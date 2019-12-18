@@ -878,7 +878,7 @@ VSC_ErrCode VSC_IL_SelectInlineFunctions(
     gctINT              instCount = VIR_Function_GetInstCount(pFunc);
     gctINT              leftBudget;
     gctINT              callSites = 0;
-
+    gctBOOL             smallfuncBody = gcvFALSE;
     VSC_ADJACENT_LIST_ITERATOR   edgeIter;
     VIR_CG_EDGE*                 pEdge;
 
@@ -899,10 +899,17 @@ VSC_ErrCode VSC_IL_SelectInlineFunctions(
             pEdge = CG_PRED_EDGE_TO_SUCC_EDGE(pEdge);
             callSites += vscSRARR_GetElementCount(&pEdge->callSiteArray);
         }
+        /* real uesful instruction counts of current function need to substract MOV instruction used for paraments and extra 2 (nop and ret) */
+        smallfuncBody = (gctINT)(instCount - 2 - pFunc->paramters.count) < (gctINT)(2 + pFunc->paramters.count);
         instCount  = (instCount - 1) * (callSites - 1);
         leftBudget = VSC_IL_GetInlineBudget(pInliner) - instCount + pFunc->paramters.count ;
 
         if (AlwayInline || callSites == 1)
+        {
+            vscHTBL_DirectSet(pCandidates, (void*) pFunc, gcvNULL);
+            VSC_IL_SetInlineBudget(pInliner, leftBudget);
+        }
+        else if (smallfuncBody)
         {
             vscHTBL_DirectSet(pCandidates, (void*) pFunc, gcvNULL);
             VSC_IL_SetInlineBudget(pInliner, leftBudget);
@@ -924,7 +931,8 @@ VSC_ErrCode VSC_IL_SelectInlineFunctions(
    ===========================================================================
 */
 VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
-    VIR_Inliner       *pInliner)
+    VIR_Inliner       *pInliner,
+    gctBOOL           *changed)
 {
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
     VIR_CALL_GRAPH      *pCG = VSC_IL_GetCallGraph(pInliner);
@@ -938,6 +946,7 @@ VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
     VIR_FUNC_BLOCK      *pFuncBlk;
 
     gctUINT             countOfFuncBlk = vscDG_GetNodeCount(&pCG->dgGraph);
+    gctBOOL             codeChanged = gcvFALSE;
 
     ppFuncBlkRPO = (VIR_FUNC_BLOCK**)vscMM_Alloc(VSC_IL_GetMM(pInliner),
         sizeof(VIR_FUNC_BLOCK*)*countOfFuncBlk);
@@ -980,6 +989,7 @@ VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
                 if (callerBlk->maxCallDepth == pFuncBlk->maxCallDepth - 1)
                 {
                     retValue = VSC_IL_InlineSingleFunction(pInliner, callerBlk->pVIRFunc, pFunc);
+                    codeChanged = gcvTRUE;
                 }
             }
 
@@ -993,7 +1003,10 @@ VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
             }
         }
     }
-
+    if (changed)
+    {
+        *changed = codeChanged;
+    }
     vscMM_Free(VSC_IL_GetMM(pInliner), ppFuncBlkRPO);
 
     return retValue;
@@ -1309,7 +1322,6 @@ DEF_QUERY_PASS_PROP(VSC_IL_PerformOnShader)
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
 
     pPassProp->passFlag.resCreationReq.s.bNeedCg = gcvTRUE;
-    pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
 }
 
 DEF_SH_NECESSITY_CHECK(VSC_IL_PerformOnShader)
@@ -1334,7 +1346,7 @@ VSC_ErrCode VSC_IL_PerformOnShader(
     VSC_OPTN_ILOptions  *pOption = (VSC_OPTN_ILOptions*)pPassWorker->basePassWorker.pBaseOption;
     gctUINT             countOfFuncBlk = vscDG_GetNodeCount(&pCG->dgGraph);
     VSC_IL_PASS_DATA    ILPassData = { 0, gcvFALSE };
-
+    gctBOOL             codeChanged = gcvFALSE;
     if (pPassWorker->basePassWorker.pPassSpecificData != gcvNULL)
     {
         ILPassData = *(VSC_IL_PASS_DATA *)pPassWorker->basePassWorker.pPassSpecificData;
@@ -1353,12 +1365,14 @@ VSC_ErrCode VSC_IL_PerformOnShader(
 
     if (countOfFuncBlk != 0)
     {
+        gctBOOL     changed = gcvFALSE;
         /* inline functons that are exceed the max call stack depth*/
         if (!VSC_IL_GetCheckAlwaysInlineOnly(&inliner) &&
             VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetHeuristics(pOption),
             VSC_OPTN_ILOptions_CALL_DEPTH))
         {
-            retValue = VSC_IL_OptimizeCallStackDepth(&inliner);
+            retValue = VSC_IL_OptimizeCallStackDepth(&inliner, &changed);
+            codeChanged |= changed;
         }
 
         /* top down traverse the call graph */
@@ -1366,6 +1380,7 @@ VSC_ErrCode VSC_IL_PerformOnShader(
             VSC_OPTN_ILOptions_TOP_DOWN))
         {
             retValue = VSC_IL_TopDownInline(&inliner);
+            codeChanged |= (HTBL_GET_ITEM_COUNT(VSC_IL_GetCandidates(&inliner)) > 0);
         }
     }
 
@@ -1383,7 +1398,10 @@ VSC_ErrCode VSC_IL_PerformOnShader(
         VIR_LOG_FLUSH(pDumper);
         pShader->dumper->invalidCFG = oldCFGFlag;
     }
-
+    if (codeChanged)
+    {
+        pPassWorker->pResDestroyReq->s.bInvalidateCg = gcvTRUE;
+    }
     _VSC_IL_Final(&inliner);
 
     return retValue;
