@@ -8823,6 +8823,7 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
     vx_int32      block_h                    = 0;
     vx_scalar     blockw                     = NULL;
     vx_scalar     blockh                     = NULL;
+    vx_scalar     input_depth_batch          = NULL;
     vx_scalar     padX                       = NULL;
     vx_scalar     padY                       = NULL;
     vx_int32      in_zeros_point             = TENSOR_TF_ZEROPOINT(input);
@@ -8862,6 +8863,9 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
 
     input_batch = (input_batch == 0) ? 1 : input_batch;
     input_dimz = input_batch * input_depth;
+
+    input_depth_batch = vxCreateScalar(context, VX_TYPE_INT32, &input_dimz);
+    parameters[4] = (vx_reference)input_depth_batch;
 
     if (output_dim == 4)
     {
@@ -8941,6 +8945,7 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
     if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
     if (blockw) vxReleaseScalar(&blockw);
     if (blockh) vxReleaseScalar(&blockh);
+    if (input_depth_batch) vxReleaseScalar(&input_depth_batch);
     if (padX) vxReleaseScalar(&padX);
     if (padY) vxReleaseScalar(&padY);
 
@@ -8954,6 +8959,7 @@ OnError:
     if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
     if (blockw) vxReleaseScalar(&blockw);
     if (blockh) vxReleaseScalar(&blockh);
+    if (input_depth_batch) vxReleaseScalar(&input_depth_batch);
     if (padX) vxReleaseScalar(&padX);
     if (padY) vxReleaseScalar(&padY);
 
