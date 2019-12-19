@@ -449,6 +449,16 @@ VX_PRIVATE_API vx_status vxoNNTensorMean_SH_EVIS_Initialize_Ext(vxnne_layer ops_
 
             input = vxoTensor_ReshapeTensor((vx_tensor)parameters[0], (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
 
+            for (i = 0; i < reshpTensor_Dims; i++)
+            {
+                new_sizes[i] = reshpTensor_Sizes[i];
+            }
+
+            for (; i < 4; i++)
+            {
+                new_sizes[i] = 1;
+            }
+
             tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = input;
             tensor_mean_layer->base.num_temp_tensors = tmpTensorIndex;
         }
