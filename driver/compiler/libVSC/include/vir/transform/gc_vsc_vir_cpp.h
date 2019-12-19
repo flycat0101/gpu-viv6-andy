@@ -17,7 +17,7 @@
 #include "gc_vsc.h"
 
 #define VSC_CPP_MAX_INST_COUNT_GENERAL      3400
-#define VSC_CPP_MAX_INST_COUNT_DEQP         2048
+#define VSC_CPP_MAX_INST_COUNT_DEQP         2000
 
 BEGIN_EXTERN_C()
 
