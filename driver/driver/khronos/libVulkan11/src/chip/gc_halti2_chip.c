@@ -1089,6 +1089,7 @@ VkResult halti2_copyImageWithRS(
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
     __vkDevContext *devCtx = cmd->devCtx;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
+    VkBool32 flushSHL1 = VK_FALSE;
 
     if (!srcRes->isImage && !dstRes->isImage)
     {
@@ -1346,6 +1347,16 @@ VkResult halti2_copyImageWithRS(
         }
     }
 
+
+    if ((srcMsaa != dstMsaa && srcRes->isImage && dstRes->isImage) &&
+        (srcFormat == VK_FORMAT_R16_SFLOAT || srcFormat == VK_FORMAT_R16G16_SFLOAT ||
+         srcFormat == VK_FORMAT_R32_SFLOAT || dstFormat == VK_FORMAT_R16_SFLOAT ||
+         dstFormat == VK_FORMAT_R16G16_SFLOAT || dstFormat == VK_FORMAT_R32_SFLOAT))
+    {
+        useComputeBlit = VK_TRUE;
+        flushSHL1 = VK_TRUE;
+    }
+
     /* resolve not support srgb downsample */
     if ((srcMsaa != dstMsaa && srcRes->isImage && dstRes->isImage) &&
         (dstFormat == VK_FORMAT_A8B8G8R8_SRGB_PACK32 || dstFormat == VK_FORMAT_R8G8B8A8_SRGB ||
@@ -1354,6 +1365,7 @@ VkResult halti2_copyImageWithRS(
          dstFormat == VK_FORMAT_B8G8R8_SRGB))
     {
         useComputeBlit = VK_TRUE;
+        flushSHL1 = VK_TRUE;
     }
 
     if ((srcMsaa != dstMsaa && srcRes->isImage && dstRes->isImage) &&
@@ -1362,19 +1374,45 @@ VkResult halti2_copyImageWithRS(
     {
         __VK_ASSERT(srcRsDesc.hwFormat == 0x01);
         useComputeBlit = VK_TRUE;
-    }
-
-    if ((srcMsaa != dstMsaa && srcRes->isImage && dstRes->isImage) &&
-        (srcFormat == VK_FORMAT_R16_SFLOAT || srcFormat == VK_FORMAT_R16G16_SFLOAT ||
-         srcFormat == VK_FORMAT_R32_SFLOAT || dstFormat == VK_FORMAT_R16_SFLOAT ||
-         dstFormat == VK_FORMAT_R16G16_SFLOAT || dstFormat == VK_FORMAT_R32_SFLOAT))
-    {
-        useComputeBlit = VK_TRUE;
+        flushSHL1 = VK_TRUE;
     }
 
     if (useComputeBlit)
     {
-        return (halti5_computeBlit(commandBuffer, srcRes, dstRes, rawCopy, gcvNULL, filter));
+        result = halti5_computeBlit(commandBuffer, srcRes, dstRes, rawCopy, gcvNULL, filter);
+
+        if (flushSHL1)
+        {
+            __VK_ASSERT(cmd->curScrachBufIndex == 0);
+            pCmdBuffer = pCmdBufferBegin = &cmd->scratchCmdBuffer[cmd->curScrachBufIndex];
+
+            __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E03, VK_FALSE, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1))))))) << (0 ?
+ 5:5))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 5:5) - (0 ?
+ 5:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5))));
+
+             cmd->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+            __VK_ASSERT(cmd->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+
+            if (cmd->curScrachBufIndex > 0)
+            {
+                uint32_t *states = gcvNULL;
+
+                __vk_CmdAquireBuffer(commandBuffer, cmd->curScrachBufIndex, &states);
+                __VK_MEMCOPY(states, cmd->scratchCmdBuffer, cmd->curScrachBufIndex * sizeof(uint32_t));
+                __vk_CmdReleaseBuffer(commandBuffer, cmd->curScrachBufIndex);
+                cmd->curScrachBufIndex = 0;
+            }
+
+        }
+
+        return result;
     }
 
     __VK_ASSERT(srcSampleInfo.product >= dstSampleInfo.product);
