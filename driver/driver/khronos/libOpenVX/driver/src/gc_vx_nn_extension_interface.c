@@ -3407,8 +3407,10 @@ vx_status vxnneLayer_Ops_Initialize(
     return status;
 
 OnError:
-    if (node->layer)
+    if (node->layer) {
         gcoOS_Free(gcvNULL, node->layer);
+        node->layer = VX_NULL;
+    }
 
     return status;
 }
