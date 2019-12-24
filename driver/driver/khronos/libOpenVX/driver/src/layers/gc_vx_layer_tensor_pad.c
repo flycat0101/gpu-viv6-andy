@@ -977,7 +977,7 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_SW_Initialize(vxnne_layer ops_layer, co
     vx_tensor  pad_dims = (vx_tensor)parameters[2];
     vx_scalar  padMode = (vx_scalar)parameters[3];
     vx_scalar  padConst = (vx_scalar)parameters[4];
-    vx_uint32  batchCount = TENSOR_SIZE_INDEX(src, 3);
+    vx_uint32  batchCount = 1;
     vx_int32_ptr pad_base = VX_NULL;
 
     vxnne_tensor_pad  padNode = (vxnne_tensor_pad)ops_layer;
@@ -1006,8 +1006,6 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_SW_Initialize(vxnne_layer ops_layer, co
     vxmONERROR(vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT));
     vxmONERROR(vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)pad_dims, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)padMode, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&padNode->tensor_pad_operation.base, (vx_reference)padConst, VXNNE_OPERATION_REFENRENCE_INPUT));
 
 OnError:
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
