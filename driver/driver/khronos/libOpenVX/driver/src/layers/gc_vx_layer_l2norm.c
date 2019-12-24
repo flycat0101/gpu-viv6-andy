@@ -372,7 +372,7 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
                                     batch,
                                     shaderExecutable));
 
-    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_SumSqrt_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_SumSqrt_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_SumSqrt_sh_operation.base, (vx_reference)sumTmp, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
     //node 2
@@ -396,9 +396,9 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
                                     batch,
                                     shaderExecutable));
 
-    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sumScale_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sumScale_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sumScale_sh_operation.base, (vx_reference)sumTmp, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sumScale_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+    vxmONERROR(vxnneOperation_AddReference(&l2normalizeLayer->l2normalize_sumScale_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
     vxmONERROR(vxnneLayer_SetOperation(
         &l2normalizeLayer->base,
@@ -409,12 +409,11 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
         &l2normalizeLayer->l2normalize_sumScale_sh_operation.base,
         1));
 
-    l2normalizeLayer->base.temp_tensors[0] = sumTmp;
-    l2normalizeLayer->base.temp_tensors[1] = src;
-    l2normalizeLayer->base.temp_tensors[2] = dst;
-    l2normalizeLayer->base.num_temp_tensors = 3;
-
 OnError:
+    if (src) vxoTensor_ReleaseTensor(&src);
+    if (dst) vxoTensor_ReleaseTensor(&dst);
+    if (sumTmp) vxoTensor_ReleaseTensor(&sumTmp);
+
     vxoLayer_InitializeFoot(ops_layer, parameters, _num, reg_param);
 
     return status;
