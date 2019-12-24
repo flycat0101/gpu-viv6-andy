@@ -5257,6 +5257,33 @@ clfGetScaleHint(
     }
 }
 
+static gctBOOL clfThreadRemapNeedRecompile(cl_kernel Kernel, cl_uint WorkDim, const size_t * LocalWorkSize)
+ {
+    gctUINT16    *factor;
+    gctBOOL      doRecompile = gcvFALSE;
+
+    if (Kernel->context->platform->virShaderPath)
+    {
+        factor = Kernel->virCurrentInstance ? Kernel->virCurrentInstance->hwStates.hints.workGroupSizeFactor : gcvNULL;
+    }
+    else
+    {
+        factor = Kernel->masterInstance.programState.hints ? Kernel->masterInstance.programState.hints->workGroupSizeFactor : gcvNULL;
+    }
+
+    if (factor && LocalWorkSize)
+    {
+        doRecompile = ((LocalWorkSize[0] % 2 != 0) && factor[0] != 0)
+                        || ((WorkDim > 1) ? (LocalWorkSize[1] % 2 != 0) && factor[1] != 0 : gcvFALSE)
+                        || ((WorkDim > 2) ? (LocalWorkSize[2] % 2 != 0) && factor[2] != 0 : gcvFALSE);
+    }
+
+    if (doRecompile == gcvTRUE)
+        Kernel->recompileThreadRemap = gcvTRUE;
+
+    return doRecompile;
+}
+
 static gctBOOL clfVIRNeedRecompile(clsCommandNDRangeVIRKernel_PTR NDRangeKernel,
                                          gctUINT                  * kernelKeyData,
                                          gctUINT                  * kernelKeySize,
@@ -5475,7 +5502,8 @@ clfEnqueueNDRangeVIRKernel(
                CL_OUT_OF_HOST_MEMORY);
     NDRangeKernel->numArgs = Kernel->kernelNumArgs;
 
-    if(Kernel->virMasterInstance->hashKey != 0 && clfVIRNeedRecompile(NDRangeKernel, keyStateData, &keyStateSize, &currentKey))
+    if((Kernel->virMasterInstance->hashKey != 0 && clfVIRNeedRecompile(NDRangeKernel, keyStateData, &keyStateSize, &currentKey))
+        || Kernel->recompileThreadRemap == gcvTRUE)
     {
         clsVIRInstanceKey_PTR instance = gcvNULL;
 
@@ -5485,7 +5513,7 @@ clfEnqueueNDRangeVIRKernel(
         if(instance == gcvNULL)
         {
             /* if not find in the cache table, recompile the kernel then store the instance into the cache table */
-            clmONERROR(clfRecompileVIRKernel(Kernel), CL_LINK_PROGRAM_FAILURE);
+            clmONERROR(clfRecompileVIRKernel(Kernel, (gctUINT)workGroupSize), CL_LINK_PROGRAM_FAILURE);
             Kernel->virCurrentInstance->hashKey = currentKey;
 
             clmONERROR(gcoOS_AcquireMutex(gcvNULL, Kernel->cacheMutex, gcvINFINITE), CL_LINK_PROGRAM_FAILURE);
@@ -5613,19 +5641,22 @@ clEnqueueNDRangeKernel(
 
     if (factor)
     {
-        for (i = 0; i < WorkDim; i++)
+        if (clfThreadRemapNeedRecompile(Kernel, WorkDim, LocalWorkSize) == gcvFALSE)
         {
+            for (i = 0; i < WorkDim; i++)
+            {
+                if (LocalWorkSize)
+                {
+                    shadowLocalWorkSize[i] = LocalWorkSize[i] / (factor[i] ? factor[i] : 1);
+                }
+                shadowGlobalWorkSize[i] = GlobalWorkSize[i] / (factor[i] ? factor[i] : 1);
+            }
+
+            GlobalWorkSize = shadowGlobalWorkSize;
             if (LocalWorkSize)
             {
-                shadowLocalWorkSize[i] = LocalWorkSize[i] / (factor[i] ? factor[i] : 1);
+                LocalWorkSize = shadowLocalWorkSize;
             }
-            shadowGlobalWorkSize[i] = GlobalWorkSize[i] / (factor[i] ? factor[i] : 1);
-        }
-
-        GlobalWorkSize = shadowGlobalWorkSize;
-        if (LocalWorkSize)
-        {
-            LocalWorkSize = shadowLocalWorkSize;
         }
     }
 

@@ -75,7 +75,8 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libdl \
 	libVSC \
-	libGAL
+	libGAL \
+	libCLC
 
 ifeq ($(ENABLE_CL_GL), 1)
 LOCAL_SHARED_LIBRARIES += \
