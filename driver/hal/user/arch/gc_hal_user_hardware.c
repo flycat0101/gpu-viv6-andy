@@ -6974,6 +6974,7 @@ gcoHARDWARE_Construct(
     else  /*gcvHARDWARE_2D */
     {
         attachCoreCount = 1;
+        coreIndexs[0] = 0;
     }
 
     gcmONERROR(gcoHARDWARE_ConstructEx(Hal, ThreadDefault, Robust, type, attachCoreCount, localCoreIndexs, coreIndexs, Hardware));
