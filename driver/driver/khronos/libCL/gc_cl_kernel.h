@@ -179,6 +179,9 @@ typedef struct _cl_kernel
     SHADER_HANDLE           shaderHandle;
 
     gctPOINTER              linkedDebugInfo;
+
+    /* indicate if the kernel need re-compile when thread remapping */
+    gctBOOL                 recompileThreadRemap;
 }
 clsKernel;
 
@@ -328,7 +331,8 @@ clfRetainKernel(
 
 gceSTATUS
 clfRecompileVIRKernel(
-    cl_kernel Kernel
+    cl_kernel Kernel,
+    gctUINT workGroupSize
     );
 
 clsVIRInstanceKey *
