@@ -1893,7 +1893,13 @@ __glChipBindDrawFramebuffer(
     ** known tests. In fact, there is still hole when other client uses EGLimage w/o unbinding from ES3 client.
     ** For later chips support direct RTT, no need to sync any more.
     */
-    gcmONERROR(gcChipFboSyncFromShadow(gc, preFBO));
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 29)
+    if(!(gcvPATCH_ANDROID_COMPOSITOR == chipCtx->patchId &&
+        gc->frameBuffer.drawFramebufObj == &gc->frameBuffer.defaultDrawFBO &&
+        chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653
+        ))
+#endif
+        gcmONERROR(gcChipFboSyncFromShadow(gc, preFBO));
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
