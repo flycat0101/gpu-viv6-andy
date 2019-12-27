@@ -592,7 +592,7 @@ gcoHAL_ConstructEx(
                                        &iface, gcmSIZEOF(iface),
                                        &iface, gcmSIZEOF(iface)));
 
-#if gcdIGNORE_DRIVER_VERSIONS_MISMATCH
+#if !gcdIGNORE_DRIVER_VERSIONS_MISMATCH
         /* Test if versions match. */
         if ((iface.u.Version.major != gcvVERSION_MAJOR)
         ||  (iface.u.Version.minor != gcvVERSION_MINOR)
