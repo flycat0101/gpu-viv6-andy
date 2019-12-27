@@ -4754,6 +4754,12 @@ vx_status vxnneOperation_NodeDump(
         }
     }
 
+    if (fpLayer)
+    {
+        fclose(fpLayer);
+        fpLayer = VX_NULL;
+    }
+
     return VX_SUCCESS;
 }
 
