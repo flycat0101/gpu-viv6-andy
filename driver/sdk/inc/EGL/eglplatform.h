@@ -118,22 +118,17 @@ typedef screen_pixmap_t EGLNativePixmapType;
 
 #elif defined(__unix__) || defined(USE_X11)
 
-#if defined(EGL_API_DFB)
+#if defined(EGL_API_X)
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
 
-/* Vivante DFB */
-typedef void * EGLNativeDisplayType;
-typedef void * EGLNativeWindowType;
-typedef void * EGLNativePixmapType;
+typedef Display *EGLNativeDisplayType;
+typedef Pixmap   EGLNativePixmapType;
+typedef Window   EGLNativeWindowType;
 
-#elif defined(EGL_API_FB)
+#elif defined(EGL_API_FB) || defined(EGL_API_DFB) || defined(EGL_API_NULLWS)
 
-/* Vivante FBDEV */
-typedef void * EGLNativeDisplayType;
-typedef void * EGLNativeWindowType;
-typedef void * EGLNativePixmapType;
-
-#elif defined(EGL_API_NULLWS)
-
+/* Vivante FB */
 typedef void * EGLNativeDisplayType;
 typedef void * EGLNativeWindowType;
 typedef void * EGLNativePixmapType;
