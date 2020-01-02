@@ -1793,7 +1793,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeFullyConnectedNodes(vx_node 
         nodes[0]->merged = vx_true_e;
         nodes[0] = newNode;
         newNodeflag = vx_true_e;
-        if(newNode) vxReleaseNode(&newNode);
     }
 
     /*replace fc's output with relu's output, but reshape it as fc's output*/
