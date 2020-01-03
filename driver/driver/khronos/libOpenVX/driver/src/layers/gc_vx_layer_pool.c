@@ -36,7 +36,8 @@ vx_status vxnneExecuteSWPooling(struct _vxnne_operation_s *operation)
     gctPOINTER outputsBaseLogicalAddr = VX_NULL;
 
     vx_int32 inputs_width, inputs_height, depth, outputs_width, outputs_height, out_w, out_h, batch;
-    vx_uint32 stride_x, stride_y;
+    vx_uint32 stride_x = poolingOperation->stride_x;
+    vx_uint32 stride_y = poolingOperation->stride_y;
     vx_int32 type;
 
     vxoTensor_GetTensorViewMemory(inputs, &inputsBaseLogicalAddr, VX_NULL);
@@ -62,27 +63,29 @@ vx_status vxnneExecuteSWPooling(struct _vxnne_operation_s *operation)
         vxError("not support this pool type");
         return VX_ERROR_INVALID_PARAMETERS;
     }
-
-    if (outputs_width == 1 && outputs_height == 1)
+    if (stride_x == 0 || stride_y == 0)
     {
-        stride_x = 1;
-        stride_y = 1;
-    }
-    else if (outputs_width == 1)
-    {
-        stride_x = 1;
-        stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputs_height + poolPadYTop_v + poolPadYBottom_v - poolSizeY_v) / (outputs_height - 1), rounding_v);
-    }
-    else if(outputs_height == 1)
-    {
-        stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputs_width + poolPadXLeft_v + poolPadXRight_v - poolSizeX_v) / (outputs_width - 1), rounding_v);
-        stride_y = 1;
-    }
-    else
-    {
+        if (outputs_width == 1 && outputs_height == 1)
+        {
+            stride_x = 1;
+            stride_y = 1;
+        }
+        else if (outputs_width == 1)
+        {
+            stride_x = 1;
+            stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputs_height + poolPadYTop_v + poolPadYBottom_v - poolSizeY_v) / (outputs_height - 1), rounding_v);
+        }
+        else if(outputs_height == 1)
+        {
+            stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputs_width + poolPadXLeft_v + poolPadXRight_v - poolSizeX_v) / (outputs_width - 1), rounding_v);
+            stride_y = 1;
+        }
+        else
+        {
         /* Calculate stride = (w + 2*pad - weight)/(output_w - 1) */
-        stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputs_width + poolPadXLeft_v + poolPadXRight_v - poolSizeX_v) / (outputs_width - 1), rounding_v);
-        stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputs_height + poolPadYTop_v + poolPadYBottom_v - poolSizeY_v) / (outputs_height - 1), rounding_v);
+            stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputs_width + poolPadXLeft_v + poolPadXRight_v - poolSizeX_v) / (outputs_width - 1), rounding_v);
+            stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputs_height + poolPadYTop_v + poolPadYBottom_v - poolSizeY_v) / (outputs_height - 1), rounding_v);
+        }
     }
 
     status = vxnnePoolingCpu((vx_uint8_ptr)inputsBaseLogicalAddr,
@@ -170,7 +173,9 @@ VX_PRIVATE_API vx_status vxoNNPooling_SW_Initialize(vxnne_layer ops_layer, const
     vx_scalar  poolPadYTopScalar          = (vx_scalar)parameters[6];
     vx_scalar  poolPadYBottomScalar       = (vx_scalar)parameters[7];
     vx_scalar  rounding_s             = (vx_scalar)parameters[8];
-    vx_tensor  outputs                    = (vx_tensor)parameters[9];
+    vx_scalar  stride_x_s                = (vx_scalar)parameters[9];
+    vx_scalar  stride_y_s                = (vx_scalar)parameters[10];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num-1];
 
     vx_uint32  batchCount    = TENSOR_SIZE_INDEX(inputs, 3);
 
@@ -205,6 +210,22 @@ VX_PRIVATE_API vx_status vxoNNPooling_SW_Initialize(vxnne_layer ops_layer, const
     poolingLayer->pooling_sw_operation.pool_pad_y_bottom = pool_pad_y_bottom;
     poolingLayer->pooling_sw_operation.rounding          = rounding_s->value->e;
     poolingLayer->pooling_sw_operation.outputs           = outputs;
+    if (stride_x_s != NULL)
+    {
+        poolingLayer->pooling_sw_operation.stride_x          = stride_x_s->value->u32;
+    }
+    else
+    {
+        poolingLayer->pooling_sw_operation.stride_x          = 0;
+    }
+    if (stride_y_s != NULL)
+    {
+        poolingLayer->pooling_sw_operation.stride_y          = stride_y_s->value->u32;
+    }
+    else
+    {
+        poolingLayer->pooling_sw_operation.stride_y          = 0;
+    }
 
     vxmONERROR(vxnneOperation_AddReference(&poolingLayer->pooling_sw_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&poolingLayer->pooling_sw_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
@@ -224,10 +245,12 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
     vx_scalar  pool_size_y_s            = (vx_scalar)parameters[3];
     vx_scalar  poolPadXLeftScalar       = (vx_scalar)parameters[4];
     vx_scalar  poolPadXRightScalar      = (vx_scalar)parameters[5];
-    vx_scalar  poolPadYTopScalar        = (vx_scalar)parameters[4];
-    vx_scalar  poolPadYBottomScalar     = (vx_scalar)parameters[5];
+    vx_scalar  poolPadYTopScalar        = (vx_scalar)parameters[6];
+    vx_scalar  poolPadYBottomScalar     = (vx_scalar)parameters[7];
     vx_scalar  rounding_s               = (vx_scalar)parameters[8];
-    vx_tensor  outputs                  = (vx_tensor)parameters[9];
+    vx_scalar  stride_x_s               = (vx_scalar)parameters[9];
+    vx_scalar  stride_y_s               = (vx_scalar)parameters[10];
+    vx_tensor  outputs                  = (vx_tensor)parameters[num-1];
 
     vx_enum poolTypeValue                    = pool_type_s->value->e;
     vx_uint32 poolSizeXValue                 = pool_size_x_s->value->u32;
@@ -243,7 +266,7 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
 
     vx_uint32 inputsWidth, inputsHeight, outputsWidth, outputsHeight;
     vx_int32  inputsDepth, outputsDepth;
-    vx_uint32  stride = 0;
+    vx_uint32  stride_x = 0, stride_y = 0;
 
     vx_uint32 pool_pad_x_left   = poolPadXLeftScalar->value->u32;
     vx_uint32 pool_pad_x_right  = poolPadXRightScalar->value->u32;
@@ -259,13 +282,36 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
-    if (outputsWidth == 1)
+    if (stride_x_s != NULL)
     {
-        stride = 1;
+        stride_x = stride_x_s->value->u32;
     }
     else
     {
-        stride = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        if (outputsWidth == 1)
+        {
+            stride_x = 1;
+        }
+        else
+        {
+            stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        }
+    }
+
+    if (stride_y_s != NULL)
+    {
+        stride_y = stride_y_s->value->u32;
+    }
+    else
+    {
+        if (outputsHeight == 1)
+        {
+            stride_y = 1;
+        }
+        else
+        {
+            stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputsHeight + pool_pad_y_top + pool_pad_y_bottom - poolSizeYValue) / (outputsHeight - 1), roundingValue);
+        }
     }
 
 
@@ -311,14 +357,14 @@ VX_PRIVATE_API vx_bool vxoNNPooling_SH_EVIS_Support_Ext(vx_node node, const vx_r
         vx_bool generic_flag               = vx_false_e;
         vx_bool maxPool_BF_flag            = vx_false_e;
         vx_bool enable_outputALU           = checkOutputTensorDoAlu(inputs, outputs);
-        vx_bool enable_downSampleSH        = (vx_bool)(stride == 2 && poolSizeXValue == 1 && poolSizeYValue == 1 && (!enable_outputALU));
+        vx_bool enable_downSampleSH        = (vx_bool)(stride_x == 2 && (stride_x == stride_y) && poolSizeXValue == 1 && poolSizeYValue == 1 && (!enable_outputALU));
         vx_bool enable_tf_avgPool          = (vx_bool)(pool_pad_x_left || pool_pad_x_right ||pool_pad_y_top || pool_pad_y_bottom);
 
-        kernel_MaxPool_flag[0]             = (vx_bool)(stride == 2 && poolSizeXValue == 3 && pool_pad_x_left == 1);
-        kernel_MaxPool_flag[1]             = (vx_bool)(stride == 2 && poolSizeXValue == 2 && pool_pad_x_left == 0);
-        kernel_MaxPool_flag[2]             = (vx_bool)(stride == 2 && poolSizeXValue == 3 && pool_pad_x_left == 0);
-        kernel_MaxPool_flag[3]             = (vx_bool)(stride == 1 && poolSizeXValue == 3 && pool_pad_x_left == 1);
-        kernel_MaxPool_flag[4]             = (vx_bool)(stride == 1 && poolSizeXValue == 2 && poolSizeYValue == 2 && pool_pad_x_left == 0 && pool_pad_y_top == 0);
+        kernel_MaxPool_flag[0]             = (vx_bool)(stride_x == 2 && (stride_x == stride_y) && poolSizeXValue == 3 && pool_pad_x_left == 1);
+        kernel_MaxPool_flag[1]             = (vx_bool)(stride_x == 2 && (stride_x == stride_y) && poolSizeXValue == 2 && pool_pad_x_left == 0);
+        kernel_MaxPool_flag[2]             = (vx_bool)(stride_x == 2 && (stride_x == stride_y) && poolSizeXValue == 3 && pool_pad_x_left == 0);
+        kernel_MaxPool_flag[3]             = (vx_bool)(stride_x == 1 && (stride_x == stride_y) && poolSizeXValue == 3 && pool_pad_x_left == 1);
+        kernel_MaxPool_flag[4]             = (vx_bool)(stride_x == 1 && (stride_x == stride_y) && poolSizeXValue == 2 && poolSizeYValue == 2 && pool_pad_x_left == 0 && pool_pad_y_top == 0);
 
         if(evis)
         {
@@ -417,7 +463,9 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
     vx_scalar  poolPadYTopScalar          = (vx_scalar)parameters[6];
     vx_scalar  poolPadYBottomScalar       = (vx_scalar)parameters[7];
     vx_scalar  rounding_s             = (vx_scalar)parameters[8];
-    vx_tensor  outputs                    = (vx_tensor)parameters[9];
+    vx_scalar  strideXScalar                = (vx_scalar)parameters[9];
+    vx_scalar  strideYScalar                = (vx_scalar)parameters[10];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num-1];
 
     vx_uint32 poolSizeXValue                 = pool_size_x_s->value->u32;
     vx_uint32 poolSizeYValue                 = pool_size_y_s->value->u32;
@@ -462,23 +510,36 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
     outputsDepth  = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
-
-    if (outputsWidth == 1)
+    if (strideXScalar != NULL)
     {
-        stride_x = 1;
+        stride_x = strideXScalar->value->u32;
     }
     else
     {
-        stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        if (outputsWidth == 1)
+        {
+            stride_x = 1;
+        }
+        else
+        {
+            stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        }
     }
 
-    if (outputsHeight == 1)
+    if (strideYScalar != NULL)
     {
-        stride_y = 1;
+        stride_y = strideYScalar->value->u32;
     }
     else
     {
-        stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputsHeight + pool_pad_y_top + pool_pad_y_bottom - poolSizeYValue) / (outputsHeight - 1), roundingValue);
+        if (outputsHeight == 1)
+        {
+            stride_y = 1;
+        }
+        else
+        {
+            stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputsHeight + pool_pad_y_top + pool_pad_y_bottom - poolSizeYValue) / (outputsHeight - 1), roundingValue);
+        }
     }
 
 
@@ -778,9 +839,12 @@ VX_PRIVATE_API vx_bool vxoNNPooling_NN_AVG_Support(vx_node node, const vx_refere
     vx_scalar  pool_size_y_s            = (vx_scalar)parameters[3];
     vx_scalar  poolPadXLeftScalar         = (vx_scalar)parameters[4];
     vx_scalar  poolPadXRightScalar        = (vx_scalar)parameters[5];
-
+    vx_scalar  poolPadYTopScalar        = (vx_scalar)parameters[6];
+    vx_scalar  poolPadYBottomScalar        = (vx_scalar)parameters[7];
     vx_scalar  rounding_s             = (vx_scalar)parameters[8];
-    vx_tensor  outputs                    = (vx_tensor)parameters[9];
+    vx_scalar  stride_x_s                = (vx_scalar)parameters[9];
+    vx_scalar  stride_y_s                = (vx_scalar)parameters[10];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num-1];
 
     vx_enum poolTypeValue                    = pool_type_s->value->e;
     vx_uint32 poolSizeXValue                 = pool_size_x_s->value->u32;
@@ -788,41 +852,67 @@ VX_PRIVATE_API vx_bool vxoNNPooling_NN_AVG_Support(vx_node node, const vx_refere
     vx_enum roundingValue                    = rounding_s->value->e;
 
 
-    vx_uint32 inputsWidth, outputsWidth;
+    vx_uint32 inputsWidth, outputsWidth, inputsHeight, outputsHeight;
     vx_int32  inputsDepth, outputsDepth;
-    vx_uint32  stride = 0;
+    vx_uint32  stride_x = 0, stride_y = 0;
     vx_uint32 totalSize = 0;
     vx_uint32 maxAllocateSize = 256 * 1024 * 1024; /* set max allocate size because fpga out of memory when using nn do avg pooling, max value is 256M */
 
 
     vx_uint32 pool_pad_x_left = poolPadXLeftScalar->value->u32;
     vx_uint32 pool_pad_x_right = poolPadXRightScalar->value->u32;
-
+    vx_uint32 pool_pad_y_top = poolPadYTopScalar->value->u32;
+    vx_uint32 pool_pad_y_bottom = poolPadYBottomScalar->value->u32;
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
 
     inputsWidth   = TENSOR_SIZE_INDEX(inputs, 0);
+    inputsHeight  = TENSOR_SIZE_INDEX(inputs, 1);
     inputsDepth   = TENSOR_SIZE_INDEX(inputs, 2);
     outputsWidth  = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
+    outputsHeight = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
     outputsDepth  = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
 
     if (!support)return support;
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
-    if (outputsWidth == 1)
+    if (stride_x_s != NULL)
     {
-        stride = 1;
+        stride_x = stride_x_s->value->u32;
     }
     else
     {
-        stride = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        if (outputsWidth == 1)
+        {
+            stride_x = 1;
+        }
+        else
+        {
+            stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        }
+    }
+
+    if (stride_y_s != NULL)
+    {
+        stride_y = stride_y_s->value->u32;
+    }
+    else
+    {
+        if (outputsHeight == 1)
+        {
+            stride_y = 1;
+        }
+        else
+        {
+            stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputsHeight + pool_pad_y_top + pool_pad_y_bottom - poolSizeYValue) / (outputsHeight - 1), roundingValue);
+        }
     }
 
     totalSize = poolSizeXValue * poolSizeYValue * inputsDepth * outputsDepth * (vx_uint32)vxDataType_GetSize((vx_type_e)TENSOR_DATA_TYPE(inputs)) + outputsDepth * sizeof(vx_float32);
 
     support = support && (vxnneIsNNSupportFormat(node->base.context, inputs, VX_NULL, outputs) &&
             (poolTypeValue == VX_NN_POOLING_AVG) &&
-            (stride == 1) &&
+            (stride_x == 1) && (stride_x == stride_y) &&
             (totalSize <= maxAllocateSize));
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
@@ -841,7 +931,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
     vx_scalar  poolPadYTopScalar          = (vx_scalar)parameters[6];
     vx_scalar  poolPadYBottomScalar       = (vx_scalar)parameters[7];
     vx_scalar  rounding_s             = (vx_scalar)parameters[8];
-    vx_tensor  outputs                    = (vx_tensor)parameters[9];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num-1];
 
     vx_enum poolTypeValue                    = pool_type_s->value->e;
     vx_uint32 poolSizeXValue                 = pool_size_x_s->value->u32;
@@ -1225,9 +1315,11 @@ VX_PRIVATE_API vx_bool vxoNNPooling_TP_MAX_Support(vx_node node, const vx_refere
     vx_scalar  poolPadXLeftScalar         = (vx_scalar)parameters[4];
     vx_scalar  poolPadXRightScalar        = (vx_scalar)parameters[5];
     vx_scalar  poolPadYTopScalar        = (vx_scalar)parameters[6];
-
+    vx_scalar  poolPadYBottomScalar     = (vx_scalar)parameters[7];
     vx_scalar  rounding_s             = (vx_scalar)parameters[8];
-    vx_tensor  outputs                    = (vx_tensor)parameters[9];
+    vx_scalar  stride_x_s                = (vx_scalar)parameters[9];
+    vx_scalar  stride_y_s                = (vx_scalar)parameters[10];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num-1];
 
     vx_enum poolTypeValue                    = pool_type_s->value->e;
     vx_uint32 poolSizeXValue                 = pool_size_x_s->value->u32;
@@ -1236,34 +1328,59 @@ VX_PRIVATE_API vx_bool vxoNNPooling_TP_MAX_Support(vx_node node, const vx_refere
     vx_enum inputdata_format                 = TENSOR_DATA_TYPE(inputs);
     vx_enum outputdata_format                = TENSOR_DATA_TYPE(outputs);
 
-    vx_uint32 inputsWidth, outputsWidth;
+    vx_uint32 inputsWidth, outputsWidth, outputsHeight, inputsHeight;
     vx_int32  inputsDepth, outputsDepth;
-    vx_uint32  stride = 0;
+    vx_uint32  stride_x = 0, stride_y = 0;
 
     vx_uint32 pool_pad_x_left  = poolPadXLeftScalar->value->u32;
     vx_uint32 pool_pad_x_right = poolPadXRightScalar->value->u32;
     vx_uint32 pool_pad_y_top   = poolPadYTopScalar->value->u32;
-
+    vx_uint32 pool_pad_y_bottom  = poolPadYBottomScalar->value->u32;
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
 
     vx_bool avgPool_BF_flag                  = vx_false_e;
 
     inputsWidth   = TENSOR_SIZE_INDEX(inputs, 0);
+    inputsHeight  = TENSOR_SIZE_INDEX(inputs, 1);
     inputsDepth   = TENSOR_SIZE_INDEX(inputs, 2);
     outputsWidth  = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
+    outputsHeight = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
     outputsDepth  = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
 
     if (!support)return support;
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
-    if (outputsWidth == 1)
+    if (stride_x_s != NULL)
     {
-        stride = 1;
+        stride_x = stride_x_s->value->u32;
     }
     else
     {
-        stride = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        if (outputsWidth == 1)
+        {
+            stride_x = 1;
+        }
+        else
+        {
+            stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        }
+    }
+
+    if (stride_y_s != NULL)
+    {
+        stride_y = stride_y_s->value->u32;
+    }
+    else
+    {
+        if (outputsHeight == 1)
+        {
+            stride_y = 1;
+        }
+        else
+        {
+            stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputsHeight + pool_pad_y_top + pool_pad_y_bottom - poolSizeYValue) / (outputsHeight - 1), roundingValue);
+        }
     }
 
     if(node->base.context->evisNoInst.supportEVIS)
@@ -1271,13 +1388,12 @@ VX_PRIVATE_API vx_bool vxoNNPooling_TP_MAX_Support(vx_node node, const vx_refere
         avgPool_BF_flag = (vx_bool)(inputdata_format == VX_TYPE_BFLOAT16 && outputdata_format == VX_TYPE_BFLOAT16);
     }
 
-    if (stride > 0)
+    if (stride_x > 0)
     {
         vx_bool isTpSupportFormat = vxnneIsTPSupportFormat(node->base.context, inputs, VX_NULL, outputs);
-        vx_bool isStride1Support = ((stride == 1) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_MAX_POOLING_STRIDE1) && poolSizeXValue <= 3) ? vx_true_e : vx_false_e;
-        vx_bool isStride2Support = ((stride == 2) && (stride == poolSizeXValue || stride == poolSizeXValue-1)) ? vx_true_e : vx_false_e;
-        vx_bool isPoolSizeSupport = (poolSizeXValue == 1 && !pool_pad_x_left && !pool_pad_y_top && TENSOR_VIEW_SIZE_INDEX(inputs, 0) % stride == 0 && TENSOR_VIEW_SIZE_INDEX(inputs, 1) % stride == 0) ? vx_true_e : vx_false_e;
-
+        vx_bool isStride1Support = ((stride_x == 1) && (stride_x == stride_y) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_MAX_POOLING_STRIDE1) && poolSizeXValue <= 3) ? vx_true_e : vx_false_e;
+        vx_bool isStride2Support = ((stride_x == 2) && (stride_x == stride_y) && (stride_x == poolSizeXValue || stride_x == poolSizeXValue-1)) ? vx_true_e : vx_false_e;
+        vx_bool isPoolSizeSupport = ((stride_x == stride_y) && poolSizeXValue == 1 && !pool_pad_x_left && !pool_pad_y_top && TENSOR_VIEW_SIZE_INDEX(inputs, 0) % stride_x == 0 && TENSOR_VIEW_SIZE_INDEX(inputs, 1) % stride_x == 0) ? vx_true_e : vx_false_e;
 
         /* stride!=2 is not supported yet */
         support = support && ((poolTypeValue == VX_NN_POOLING_MAX) &&
@@ -1309,7 +1425,8 @@ VX_PRIVATE_API vx_status vxoNNPooling_TP_MAX_Initialize(vxnne_layer ops_layer, c
     vx_scalar  poolPadYTopScalar          = (vx_scalar)parameters[6];
     vx_scalar  poolPadYBottomScalar       = (vx_scalar)parameters[7];
     vx_scalar  rounding_s             = (vx_scalar)parameters[8];
-    vx_tensor  outputs                    = (vx_tensor)parameters[9];
+    vx_scalar  stride_x_s                = (vx_scalar)parameters[9];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num-1];
 
     vx_uint32 poolSizeXValue                 = pool_size_x_s->value->u32;
     vx_uint32 poolSizeYValue                 = pool_size_y_s->value->u32;
@@ -1328,13 +1445,20 @@ VX_PRIVATE_API vx_status vxoNNPooling_TP_MAX_Initialize(vxnne_layer ops_layer, c
     vx_op_param_s conv = {0};
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
-    if (outputsWidth == 1)
+    if (stride_x_s != NULL)
     {
-        stride = 1;
+        stride = stride_x_s->value->u32;
     }
     else
     {
-        stride = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        if (outputsWidth == 1)
+        {
+            stride = 1;
+        }
+        else
+        {
+            stride = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        }
     }
 
     vxmONERROR(vxnneOperation_Initialize(&poolingLayer->pooling_tp_operation.base,
@@ -1425,6 +1549,8 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
     vx_scalar rounding_s,
     vx_enum padMode,
     vx_scalar padConst,
+    vx_scalar stride_x_s,
+    vx_scalar stride_y_s,
     vx_tensor outputs
     )
 {
@@ -1484,23 +1610,36 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                           poolingLayer->operations,
                           vxnneLayer_Deinitialize);
 
-
-    if (outputsWidth == 1)
+    if (stride_x_s != NULL)
     {
-        stride_x = 1;
+        stride_x = stride_x_s->value->u32;
     }
     else
     {
-        stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        if (outputsWidth == 1)
+        {
+            stride_x = 1;
+        }
+        else
+        {
+            stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        }
     }
 
-    if (outputsHeight == 1)
+    if (stride_y_s != NULL)
     {
-        stride_y = 1;
+        stride_y = stride_y_s->value->u32;
     }
     else
     {
-        stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputsHeight + pool_pad_y_top + pool_pad_y_bottom - poolSizeYValue) / (outputsHeight - 1), roundingValue);
+        if (outputsHeight == 1)
+        {
+            stride_y = 1;
+        }
+        else
+        {
+            stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputsHeight + pool_pad_y_top + pool_pad_y_bottom - poolSizeYValue) / (outputsHeight - 1), roundingValue);
+        }
     }
 
     totalSize = poolSizeXValue * poolSizeYValue * inputsDepth * outputsDepth * (vx_uint32)vxDataType_GetSize((vx_type_e)TENSOR_DATA_TYPE(inputs)) + outputsDepth * sizeof(vx_float32);
@@ -2308,11 +2447,40 @@ exit:
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPoolingLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
 #if REGISTER_FRAME
+    vx_reference params[12] =
+        { parameters[0], /*input*/
+            parameters[1], /*pool_type*/
+            parameters[2], /*size_x*/
+            parameters[3], /*size_y*/
+            parameters[4], /*pad_x_left*/
+            VX_NULL, /*pad_x_right*/
+            VX_NULL, /*pad_y_top*/
+            VX_NULL, /*pad_y_bottom*/
+            VX_NULL, /*rounding*/
+            VX_NULL, /*stride_x*/
+            VX_NULL, /*stride_y*/
+            VX_NULL /*output*/
+        };
+    if (num == 8)
+    {
+        params[5] = parameters[4]; /*pad_x_right*/
+        params[6] = parameters[5]; /*pad_y_top*/
+        params[7] = parameters[5]; /*pad_y_bottom*/
+        params[8] = parameters[6]; /*rounding*/
+        params[11] = parameters[7]; /*output*/
+    }
+    else
+    {
 
-    vx_reference params[] = {
-        parameters[0], parameters[1], parameters[2], parameters[3], parameters[4], parameters[4],
-        parameters[5], parameters[5], parameters[6], parameters[7], parameters[8], parameters[9],
-    };
+        params[5] = parameters[5]; /*pad_x_right*/
+        params[6] = parameters[6]; /*pad_y_top*/
+        params[7] = parameters[7]; /*pad_y_bottom*/
+        params[8] = parameters[8]; /*rounding*/
+        params[9] = parameters[9]; /*stride_x*/
+        params[10] = parameters[10]; /*stride_y*/
+        params[11] = parameters[11]; /*output*/
+    }
+
     return vxnnePoolingInitializer(node,
                                    "PoolingLayer",
                                    params,
@@ -2325,7 +2493,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPoolingLayer_Initializer(vx_node node,
     vx_scalar  poolPadXScalar             = (vx_scalar)parameters[4];
     vx_scalar  poolPadYScalar             = (vx_scalar)parameters[5];
     vx_scalar  roundingScalar             = (vx_scalar)parameters[6];
-    vx_tensor  outputs                    = (vx_tensor)parameters[7];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num-1];
 
     vx_uint32 pad_x_left;
     vx_uint32 pad_x_right;
@@ -2356,6 +2524,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPoolingLayer_Initializer(vx_node node,
                                             pad_y_bottom,
                                             roundingScalar,
                                             VX_PAD_CONSTANT,
+                                            VX_NULL,
+                                            VX_NULL,
                                             VX_NULL,
                                             outputs);
 #endif
@@ -2412,7 +2582,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPoolingLayer2_Initializer(vx_node node
     vx_scalar  poolPadYTopScalar          = (vx_scalar)parameters[6];
     vx_scalar  poolPadYBottomScalar       = (vx_scalar)parameters[7];
     vx_scalar  roundingScalar             = (vx_scalar)parameters[8];
-    vx_tensor  outputs                    = (vx_tensor)parameters[9];
+    vx_scalar  strideXScalar              = (vx_scalar)parameters[9];
+    vx_scalar  strideYScalar              = (vx_scalar)parameters[10];
+    vx_tensor  outputs                    = (vx_tensor)parameters[num-1];
 
     vx_uint32 poolPadXLeft                = poolPadXLeftScalar->value->u32;
     vx_uint32 poolPadXRight               = poolPadXRightScalar->value->u32;
@@ -2439,6 +2611,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPoolingLayer2_Initializer(vx_node node
                                             roundingScalar,
                                             VX_PAD_CONSTANT,
                                             VX_NULL,
+                                            strideXScalar,
+                                            strideYScalar,
                                             outputs);
 #endif
 }
