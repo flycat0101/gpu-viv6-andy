@@ -1,4 +1,0 @@
-/*
-    custom op data struct def
-*/
-DEF_NODE_TYPE(custom_softmax)
