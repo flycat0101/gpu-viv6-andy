@@ -2029,8 +2029,9 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SW_Initialize(vxnne_layer
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
-    gcmASSERT(relu == vx_false_e);
-    gcmASSERT((pooling != VX_NN_POOLING_MAX) && (pooling != VX_NN_POOLING_AVG));
+    if(relu != vx_false_e)gcmASSERT("SW Conv Not support relu!");
+    if((pooling == VX_NN_POOLING_MAX) || (pooling == VX_NN_POOLING_AVG))
+        gcmASSERT("SW Conv Not support Pooling!");
 
     vxmONERROR(vxnneOperation_Initialize(&convolutionLayer->convolutionSW.base,
                             &convolutionLayer->base,
