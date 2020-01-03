@@ -2138,9 +2138,15 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
     vx_scalar pool_pad_y_top_s   = VX_NULL;
     vx_scalar pool_pad_y_bottom_s   = VX_NULL;
     vx_scalar rounding_s      = VX_NULL;
+    vx_enum   type, rounding_policy;
+    vx_uint32 size_x, size_y;
+    vx_uint32 pad_x_left, pad_x_right, pad_y_top, pad_y_bottom;
+    vx_uint32 stride_x, stride_y;
 
     vx_reference    parameters[] = {
     (vx_reference)inputs,
+    VX_NULL,
+    VX_NULL,
     VX_NULL,
     VX_NULL,
     VX_NULL,
@@ -2159,15 +2165,41 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
     gcmDUMP_API("$VX vxPoolingLayer2: graph=%p, inputs=%p, pooling_params=%p, size_of_pooling_params=0x%lx, outputs=%p",
         graph, inputs, pooling_params, size_of_pooling_params, outputs);
 
-    if (size_of_pooling_params != sizeof(vx_nn_pooling_params_t))
+    if (size_of_pooling_params == sizeof(vx_nn_pooling_params_t))
     {
+        type = pooling_params->pool_type;
+        size_x = pooling_params->pool_size_x;
+        size_y = pooling_params->pool_size_y;
+        pad_x_left = pooling_params->pool_pad_x_left;
+        pad_x_right = pooling_params->pool_pad_x_right;
+        pad_y_top = pooling_params->pool_pad_y_top;
+        pad_y_bottom = pooling_params->pool_pad_y_bottom;
+        rounding_policy = pooling_params->rounding;
+    }
+    else if (size_of_pooling_params == sizeof(vx_nn_pooling_params_ext_t))
+    {
+        vx_nn_pooling_params_ext_t *pooling_params_ext = (vx_nn_pooling_params_ext_t *)pooling_params;
+        type = pooling_params_ext->base.pool_type;
+        size_x = pooling_params_ext->base.pool_size_x;
+        size_y = pooling_params_ext->base.pool_size_y;
+        pad_x_left = pooling_params_ext->base.pool_pad_x_left;
+        pad_x_right = pooling_params_ext->base.pool_pad_x_right;
+        pad_y_top = pooling_params_ext->base.pool_pad_y_top;
+        pad_y_bottom = pooling_params_ext->base.pool_pad_y_bottom;
+        rounding_policy = pooling_params_ext->base.rounding;
+        stride_x = pooling_params_ext->stride_x;
+        stride_y = pooling_params_ext->stride_y;
+    }
+    else
+    {
+        vxError("Invalid parameter poolinglayer_params\n");
         gcmFOOTER_NO();
         return NULL;
     }
 
     context = vxGetContext((vx_reference)graph);
 
-    pool_type_s = vxCreateScalar(context, VX_TYPE_ENUM, &pooling_params->pool_type);
+    pool_type_s = vxCreateScalar(context, VX_TYPE_ENUM, &type);
     if (vxoReference_GetStatus((vx_reference)pool_type_s) != VX_SUCCESS)
     {
         vxError("%s[%d]: Get pool_type_s reference failed!\n", __FUNCTION__, __LINE__);
@@ -2176,7 +2208,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
         return (vx_node)pool_type_s;
     }
 
-    pool_size_x_s = vxCreateScalar(context, VX_TYPE_UINT32, &pooling_params->pool_size_x);
+    pool_size_x_s = vxCreateScalar(context, VX_TYPE_UINT32, &size_x);
     if (vxoReference_GetStatus((vx_reference)pool_size_x_s) != VX_SUCCESS)
     {
         vxError("%s[%d]: Get pool_size_x_s reference failed!\n", __FUNCTION__, __LINE__);
@@ -2185,7 +2217,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
         return (vx_node)pool_size_x_s;
     }
 
-    pool_size_y_s = vxCreateScalar(context, VX_TYPE_UINT32, &pooling_params->pool_size_y);
+    pool_size_y_s = vxCreateScalar(context, VX_TYPE_UINT32, &size_y);
     if (vxoReference_GetStatus((vx_reference)pool_size_y_s) != VX_SUCCESS)
     {
         vxError("%s[%d]: Get pool_size_y_s reference failed!\n", __FUNCTION__, __LINE__);
@@ -2194,7 +2226,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
         return (vx_node)pool_size_y_s;
     }
 
-    pool_pad_x_left_s = vxCreateScalar(context, VX_TYPE_UINT32, &pooling_params->pool_pad_x_left);
+    pool_pad_x_left_s = vxCreateScalar(context, VX_TYPE_UINT32, &pad_x_left);
     if (vxoReference_GetStatus((vx_reference)pool_pad_x_left_s) != VX_SUCCESS)
     {
         vxError("%s[%d]: Get pool_pad_x_left_s reference failed!\n", __FUNCTION__, __LINE__);
@@ -2203,7 +2235,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
         return (vx_node)pool_pad_x_left_s;
     }
 
-    pool_pad_x_right_s = vxCreateScalar(context, VX_TYPE_UINT32, &pooling_params->pool_pad_x_right);
+    pool_pad_x_right_s = vxCreateScalar(context, VX_TYPE_UINT32, &pad_x_right);
     if (vxoReference_GetStatus((vx_reference)pool_pad_x_right_s) != VX_SUCCESS)
     {
         vxError("%s[%d]: Get pool_pad_x_right_s reference failed!\n", __FUNCTION__, __LINE__);
@@ -2212,7 +2244,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
         return (vx_node)pool_pad_x_right_s;
     }
 
-    pool_pad_y_top_s = vxCreateScalar(context, VX_TYPE_UINT32, &pooling_params->pool_pad_y_top);
+    pool_pad_y_top_s = vxCreateScalar(context, VX_TYPE_UINT32, &pad_y_top);
     if (vxoReference_GetStatus((vx_reference)pool_pad_y_top_s) != VX_SUCCESS)
     {
         vxError("%s[%d]: Get pool_pad_y_top_s reference failed!\n", __FUNCTION__, __LINE__);
@@ -2221,7 +2253,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
         return (vx_node)pool_pad_y_top_s;
     }
 
-    pool_pad_y_bottom_s = vxCreateScalar(context, VX_TYPE_UINT32, &pooling_params->pool_pad_y_bottom);
+    pool_pad_y_bottom_s = vxCreateScalar(context, VX_TYPE_UINT32, &pad_y_bottom);
     if (vxoReference_GetStatus((vx_reference)pool_pad_y_bottom_s) != VX_SUCCESS)
     {
         vxError("%s[%d]: Get pool_pad_y_bottom_s reference failed!\n", __FUNCTION__, __LINE__);
@@ -2230,7 +2262,7 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
         return (vx_node)pool_pad_y_bottom_s;
     }
 
-    rounding_s = vxCreateScalar(context, VX_TYPE_ENUM, &pooling_params->rounding);
+    rounding_s = vxCreateScalar(context, VX_TYPE_ENUM, &rounding_policy);
     if (vxoReference_GetStatus((vx_reference)rounding_s) != VX_SUCCESS)
     {
         vxError("%s[%d]: Get rounding_s reference failed!\n", __FUNCTION__, __LINE__);
@@ -2247,6 +2279,12 @@ VX_API_ENTRY vx_node VX_API_CALL vxPoolingLayer2(vx_graph graph,
     parameters[6]  = (vx_reference)pool_pad_y_top_s;
     parameters[7]  = (vx_reference)pool_pad_y_bottom_s;
     parameters[8]  = (vx_reference)rounding_s;
+
+    if (size_of_pooling_params == sizeof(vx_nn_pooling_params_ext_t))
+    {
+        parameters[9] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, &stride_x);
+        parameters[10] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_UINT32, &stride_y);
+    }
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_POOLING_LAYER2, parameters, vxmLENGTH_OF(parameters));
 
