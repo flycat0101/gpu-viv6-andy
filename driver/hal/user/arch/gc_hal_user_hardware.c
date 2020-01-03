@@ -1755,6 +1755,10 @@ Fill2DFeaturesByDatabase(
         Features[gcvFEATURE_2D_SUPER_TILE_V3] = gcvFALSE;
     }
 
+    /*supertileMode 2 means supertileVersion V3*/
+    if(Features[gcvFEATURE_2D_SUPER_TILE_V3])
+        Hardware->config->superTileMode = 2;
+
     Features[gcvFEATURE_2D_POST_FLIP] =
     Features[gcvFEATURE_2D_MULTI_SOURCE_BLT_EX2] = database->REG_MultiSrcV2;
 
