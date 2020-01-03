@@ -11031,6 +11031,12 @@ add2mad(
     gctINT32 srcAddress[3];
     gctINT32 srcType[3];
 
+    gcOPTIMIZER_OPTION * opt = gcGetOptimizerOption();
+
+    /* do not generate MAD if split mad is on */
+    if (opt->splitMAD)
+        return gcvTRUE;
+
     /* Get previous instruction. */
     if (!_GetPreviousCode(CodeGen, &code))
     {
@@ -11185,6 +11191,27 @@ add2mad(
  5:0) - (0 ?
  5:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)));
+            if (!((((gctUINT32) (States[0])) >> (0 ?
+ 11:11) & ((gctUINT32) ((((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1)))))) == (0x0 & ((gctUINT32) ((((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:11) - (0 ? 11:11) + 1))))))))
+            {
+                code[0] = ((((gctUINT32) (code[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1))))))) << (0 ?
+ 11:11))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:11) - (0 ? 11:11) + 1))))))) << (0 ? 11:11)));
+            }
             code[3] = ((((gctUINT32) (States[3])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
