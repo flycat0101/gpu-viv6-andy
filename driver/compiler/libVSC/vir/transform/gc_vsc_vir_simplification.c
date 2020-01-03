@@ -152,26 +152,66 @@ gctBOOL _VSC_SIMP_ConstantConditionAllFalse(
 }
 
 static
-gctBOOL _VSC_SIMP_NextMulOfPreDiv(
+gctBOOL _VSC_SIMP_NextMulOfPreDivAndMatchEnable(
     IN VIR_Instruction* inst
     )
 {
     VIR_Instruction*    pMulInst = VIR_Inst_GetNext(inst);
     VIR_Operand*        pDivDest = VIR_Inst_GetDest(inst);
+    VIR_Enable          divEnable = VIR_Operand_GetEnable(pDivDest);
     VIR_Operand*        pMulSrc0;
     VIR_Operand*        pMulSrc1;
+    gctUINT8            channel, firstEnableChannel = 0xFF, secondEnableChannel = 0xFF;
 
+    /* Skip non-MUL instruction. */
     if (pMulInst == gcvNULL || VIR_Inst_GetOpcode(pMulInst) != VIR_OP_MUL)
     {
         return gcvFALSE;
     }
 
+    /* I: check symbol. */
     pMulSrc0 = VIR_Inst_GetSource(pMulInst, 0);
     pMulSrc1 = VIR_Inst_GetSource(pMulInst, 1);
 
     if ((!VIR_Operand_isSymbol(pMulSrc0) || (VIR_Operand_GetSymbol(pMulSrc0) != VIR_Operand_GetSymbol(pDivDest)))
         ||
         (!VIR_Operand_isSymbol(pMulSrc1) || (VIR_Operand_GetSymbol(pMulSrc1) != VIR_Operand_GetSymbol(pDivDest))))
+    {
+        return gcvFALSE;
+    }
+
+    /* II: check the enable/swizzle, after vectorization, multiple instructions may be combined, so we need to check this. */
+    /* Skip mismatch enables. */
+    if (VIR_Enable_Channel_Count(divEnable) != 2)
+    {
+        return gcvFALSE;
+    }
+
+    /* Get the two enabled channels. */
+    for (channel = 0; channel < VIR_CHANNEL_COUNT; ++channel)
+    {
+        if (divEnable & (1 << channel))
+        {
+            if (firstEnableChannel == 0xFF)
+            {
+                firstEnableChannel = channel;
+            }
+            else if (secondEnableChannel == 0xFF)
+            {
+                secondEnableChannel = channel;
+                break;
+            }
+        }
+    }
+    gcmASSERT(firstEnableChannel != 0xFF && secondEnableChannel != 0xFF);
+
+    if ((VIR_Operand_GetSwizzle(pMulSrc0) != VIR_Enable_2_Swizzle_WShift((VIR_Enable)(1 << firstEnableChannel))
+         &&
+         VIR_Operand_GetSwizzle(pMulSrc0) != firstEnableChannel)
+        ||
+        (VIR_Operand_GetSwizzle(pMulSrc1) != VIR_Enable_2_Swizzle_WShift((VIR_Enable)(1 << secondEnableChannel))
+         &&
+         VIR_Operand_GetSwizzle(pMulSrc1) != secondEnableChannel))
     {
         return gcvFALSE;
     }
@@ -925,12 +965,12 @@ _VSC_SIMP_Steps DIV_Steps[] = {
 _VSC_SIMP_Steps PRE_DIV_Steps[] = {
     /* Change x/1 to x. */
     {_VSC_SIMP_STEPS_COUNT, {3}},
-    {_VSC_SIMP_STEPS_INST_CHECK, {(gctUINTPTR_T)_VSC_SIMP_NextMulOfPreDiv}},
+    {_VSC_SIMP_STEPS_INST_CHECK, {(gctUINTPTR_T)_VSC_SIMP_NextMulOfPreDivAndMatchEnable}},
     {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ImmOne}},
     {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_ChangeMulToMovAndDeleteDiv}},
     /* Change x/-1 to -x. */
     {_VSC_SIMP_STEPS_COUNT, {3}},
-    {_VSC_SIMP_STEPS_INST_CHECK, {(gctUINTPTR_T)_VSC_SIMP_NextMulOfPreDiv}},
+    {_VSC_SIMP_STEPS_INST_CHECK, {(gctUINTPTR_T)_VSC_SIMP_NextMulOfPreDivAndMatchEnable}},
     {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_VSC_SIMP_ImmNegOne}},
     {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_VSC_SIMP_ChangeMulToMovNegAndDeleteDiv}},
     {_VSC_SIMP_STEPS_END, {0}}
