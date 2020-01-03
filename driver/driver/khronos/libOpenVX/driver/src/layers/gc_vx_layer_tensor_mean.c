@@ -768,14 +768,14 @@ VX_PRIVATE_API vx_status vxoNNTensorMean_SH_EVIS_Initialize_Ext(vxnne_layer ops_
         if(evis)
         {
             if(enable_tf_quantize)
-                shaderExecutable = vxnneGetAvgPooling_UInt8ShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING_UINT8, &ops_layer->node->kernelAttributes.borderMode, transTensor, NULL, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, VX_NN_ACTIVATION_NONE, dst);
-
+                shaderExecutable = vxnneGetAvgPooling_UInt8ShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING_UINT8, &ops_layer->node->kernelAttributes.borderMode,
+                transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, VX_NN_ACTIVATION_NONE, dst);
             else if(enable_int16_sh)
                 shaderExecutable = vxnneGetAvgPooling_Int16ShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING_INT16, &ops_layer->node->kernelAttributes.borderMode,
-                transTensor, NULL, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, VX_NN_ACTIVATION_NONE, dst);
+                transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, VX_NN_ACTIVATION_NONE, dst);
             else
                 shaderExecutable = vxnneGetAvgPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
-                transTensor, NULL, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, dst);
+                transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, dst);
         }
         else
         {
@@ -1410,14 +1410,14 @@ OnError:
             if(node->base.context->evisNoInst.supportEVIS)
             {
                 if(enable_tf_quantize)
-                    shaderExecutable = vxnneGetAvgPooling_UInt8ShaderExecutable(node->base.context, VXNNE_KERNEL_AVGPOOLING_UINT8, &node->kernelAttributes.borderMode, transTensor, NULL, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, VX_NN_ACTIVATION_NONE, dst);
-
+                    shaderExecutable = vxnneGetAvgPooling_UInt8ShaderExecutable(node->base.context, VXNNE_KERNEL_AVGPOOLING_UINT8, &node->kernelAttributes.borderMode,
+                    transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, VX_NN_ACTIVATION_NONE, dst);
                 else if(enable_int16_sh)
                     shaderExecutable = vxnneGetAvgPooling_Int16ShaderExecutable(node->base.context, VXNNE_KERNEL_AVGPOOLING_INT16, &node->kernelAttributes.borderMode,
-                    transTensor, NULL, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, VX_NN_ACTIVATION_NONE, dst);
+                    transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, VX_NN_ACTIVATION_NONE, dst);
                 else
                     shaderExecutable = vxnneGetAvgPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_AVGPOOLING, &node->kernelAttributes.borderMode,
-                    transTensor, NULL, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, dst);
+                    transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, dst);
             }
             else
             {
