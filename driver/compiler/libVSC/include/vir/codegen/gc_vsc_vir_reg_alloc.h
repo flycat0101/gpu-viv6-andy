@@ -283,8 +283,13 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
        registers to save the data, since in some instruction, maybe more than
        one src is spilled, and even the dest may need a extra register(for some undefinite-write instructions, e.g. CMOV). */
     gctUINT                     resDataRegisterCount;
+
+    /* So far:
+    ** 1) all spilled source LR will be marked as invalid immediately after processing the current instruction
+    ** 2) all spilled dest LR, except for whose dataRegisterEndPoint are not VIR_INVALID_ID, will also be marked as invalid as the SOURCE LR.
+    */
     VIR_HwRegId                 dataRegister[VIR_RA_LS_DATA_REG_NUM];
-    gctBOOL                     dataRegisterUsed[VIR_RA_LS_DATA_REG_NUM];
+    gctUINT                     dataRegisterUsedMaskBit;
     gctUINT                     dataRegisterEndPoint[VIR_RA_LS_DATA_REG_NUM];
 
     /* save and use the correct symbolId to make IR valid */

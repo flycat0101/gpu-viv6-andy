@@ -1392,10 +1392,11 @@ static void _VIR_RA_LS_Init(
        registers to save the data, since in some instruction, maybe more than
        one src is spilled */
     pRA->resDataRegisterCount = 0;
+    pRA->dataRegisterUsedMaskBit = 0;
     for (i = 0; i < VIR_RA_LS_DATA_REG_NUM; i++)
     {
         pRA->dataRegister[i] = VIR_INVALID_ID;
-        pRA->dataRegisterUsed[i] = gcvFALSE;
+
         pRA->dataRegisterEndPoint[i] = VIR_INVALID_ID;
         pRA->dataSymId[i] = VIR_INVALID_ID;
     }
@@ -1411,6 +1412,30 @@ static void _VIR_RA_LS_Init(
     VIR_RA_LS_SetExtendLSEndPoint(pRA, gcvFALSE);
     VIR_RA_LS_SetInstIdChanged(pRA, gcvFALSE);
     VIR_RA_LS_SetEnableDebug(pRA, gcvFALSE);
+}
+
+static VSC_ErrCode
+_VIR_RA_LS_InvalidDataRegisterUsedMask(
+    VIR_RA_LS           *pRA,
+    VIR_Instruction     *pInst
+    )
+{
+    gctUINT             i;
+
+    for (i = 0; i < VIR_RA_LS_DATA_REG_NUM; i++)
+    {
+        if (pRA->dataRegisterEndPoint[i] == VIR_INVALID_ID || (gctUINT)VIR_Inst_GetId(pInst) > pRA->dataRegisterEndPoint[i])
+        {
+            pRA->dataRegisterUsedMaskBit &= (~(1 << i));
+
+            if ((gctUINT)VIR_Inst_GetId(pInst) > pRA->dataRegisterEndPoint[i])
+            {
+                pRA->dataRegisterEndPoint[i] = VIR_INVALID_ID;
+            }
+        }
+    }
+
+    return VSC_ERR_NONE;
 }
 
 /* ===========================================================================
@@ -7877,7 +7902,7 @@ _VIR_RA_LS_InsertSpill(
 
     for (i = 0 ; i < VIR_RA_LS_DATA_REG_NUM; i++)
     {
-        if (!pRA->dataRegisterUsed[i])
+        if ((pRA->dataRegisterUsedMaskBit & (1 << i)) == 0)
         {
             gcmASSERT(pRA->dataRegister[i] != VIR_INVALID_ID);
 
@@ -7897,7 +7922,7 @@ _VIR_RA_LS_InsertSpill(
             }
 
             _VIR_RA_MakeColor(pRA->dataRegister[i], 0, &curColor);
-            pRA->dataRegisterUsed[i] = gcvTRUE;
+            pRA->dataRegisterUsedMaskBit |= (1 << i);
             break;
         }
     }
@@ -7996,7 +8021,7 @@ _VIR_RA_LS_InsertSpillForDest(
 
     for (i = 0 ; i < VIR_RA_LS_DATA_REG_NUM; i++)
     {
-        if (!pRA->dataRegisterUsed[i])
+        if ((pRA->dataRegisterUsedMaskBit & (1 << i)) == 0)
         {
             gcmASSERT(pRA->dataRegister[i] != VIR_INVALID_ID);
 
@@ -8016,7 +8041,7 @@ _VIR_RA_LS_InsertSpillForDest(
             }
 
             _VIR_RA_MakeColor(pRA->dataRegister[i], 0, &curColor);
-            pRA->dataRegisterUsed[i] = gcvTRUE;
+            pRA->dataRegisterUsedMaskBit |= (1 << i);
             dataRegisterIdx = i;
             dataRegister= pRA->dataRegister[i];
             break;
@@ -8190,7 +8215,7 @@ _VIR_RA_LS_InsertFill(
     else
     {
         destHwRegId = pRA->dataRegister[0];
-        pRA->dataRegisterUsed[0] = gcvTRUE;
+        pRA->dataRegisterUsedMaskBit |= (1 << 0);
         dataRegisterIdx = 0;
     }
 
@@ -8623,6 +8648,10 @@ _VIR_RA_LS_InsertSpillOffset(
              _VSC_RA_MOVA_RemoveConstValAllChannel(pRA->movaHash, pMovaInst);
         }
     }
+
+    /* All data registers that used in MAD instruction are valid now. */
+    retErrCode = _VIR_RA_LS_InvalidDataRegisterUsedMask(pRA, pInst);
+    if(retErrCode != VSC_ERR_NONE) return retErrCode;
 
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
         VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
@@ -11139,21 +11168,10 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
     VIR_RA_LS_Liverange     *pBaseLR;
 
     gctUINT             defIdx, webIdx = 0;
-    gctUINT             i;
     VIR_OpCode          opcode    = VIR_OP_NOP;
 
-    for (i = 0; i < VIR_RA_LS_DATA_REG_NUM; i++)
-    {
-        if (pRA->dataRegisterEndPoint[i] == VIR_INVALID_ID || (gctUINT)VIR_Inst_GetId(pInst) > pRA->dataRegisterEndPoint[i])
-        {
-            pRA->dataRegisterUsed[i] = gcvFALSE;
-
-            if ((gctUINT)VIR_Inst_GetId(pInst) > pRA->dataRegisterEndPoint[i])
-            {
-                pRA->dataRegisterEndPoint[i] = VIR_INVALID_ID;
-            }
-        }
-    }
+    retValue = _VIR_RA_LS_InvalidDataRegisterUsedMask(pRA, pInst);
+    if(retValue != VSC_ERR_NONE) return retValue;
 
     opcode = VIR_Inst_GetOpcode(pInst);
     switch(opcode)
