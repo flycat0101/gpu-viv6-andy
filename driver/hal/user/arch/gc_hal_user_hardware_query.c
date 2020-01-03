@@ -7260,9 +7260,7 @@ gcoHARDWARE_QuerySuperTileMode(
 
     gcmGETHARDWARE(Hardware);
 
-#if gcdENABLE_3D
     *SuperTileMode = Hardware->config->superTileMode;
-#endif
 
 OnError:
     gcmFOOTER();
