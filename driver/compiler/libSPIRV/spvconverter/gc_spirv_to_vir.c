@@ -2872,10 +2872,12 @@ static VIR_SymId __SpvAddIdSymbol(
             if (attachmentDesc != gcvNULL)
             {
                 VIR_Symbol_SetImageFormat(sym, __SpvVkFormat2VirImageFormat(attachmentDesc->format));
+                VIR_Symbol_SetOriginalImageFormat(sym, __SpvVkFormat2VirImageFormat(attachmentDesc->format));
             }
             else
             {
                 VIR_Symbol_SetImageFormat(sym, __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(imageTypeId)));
+                VIR_Symbol_SetOriginalImageFormat(sym, __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(imageTypeId)));
             }
         }
     }
@@ -5893,6 +5895,7 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
     if (SPV_ID_TYPE_IS_IMAGE(type))
     {
         VIR_Symbol_SetImageFormat(sym, __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(type)));
+        VIR_Symbol_SetOriginalImageFormat(sym, __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(type)));
     }
 
     SPV_SET_IDDESCRIPTOR_NAME(spv, id, nameId);

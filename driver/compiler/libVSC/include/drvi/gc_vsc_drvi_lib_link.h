@@ -170,12 +170,21 @@ typedef struct _VSC_LIB_LINK_IMAGE_READ_WRITE
     VSC_SAMPLER_INFO *              samplerInfo;
 } VSC_LIB_LINK_IMAGE_READ_WRITE;
 
+/* Same value with VIR_IMAGE_ACCESS_STRATEGY. */
+typedef enum _VSC_LIB_LINK_IMAGE_ACCESS_STRATEGY
+{
+    VSC_LIB_LINK_IMAGE_ACCESS_STRATEGY_USE_FORMAT                = 0,
+    VSC_LIB_LINK_IMAGE_ACCESS_STRATEGY_LOAD_ZERO_STORE_NOP       = 1,
+    VSC_LIB_LINK_IMAGE_ACCESS_STRATEGY_LOAD_ZERO_STORE_ZERO      = 2,
+} VSC_LIB_LINK_IMAGE_ACCESS_STRATEGY;
+
 typedef struct _VSC_LIB_LINK_IMAGE_FORMAT
 {
-    gctUINT                         set;
-    gctUINT                         binding;
-    gctUINT                         arrayIndex;
-    VSC_IMAGE_FORMAT                imageFormat;
+    gctUINT                             set;
+    gctUINT                             binding;
+    gctUINT                             arrayIndex;
+    VSC_IMAGE_FORMAT                    imageFormat;
+    VSC_LIB_LINK_IMAGE_ACCESS_STRATEGY  replaceStrategy;
 } VSC_LIB_LINK_IMAGE_FORMAT;
 
 typedef struct _VSC_LIB_LINK_POINT
