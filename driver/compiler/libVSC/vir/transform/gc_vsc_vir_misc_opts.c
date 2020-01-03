@@ -14158,12 +14158,14 @@ _vscVIR_IsImageReadOrWrite(
     IN VIR_Instruction* pInst,
     INOUT gctBOOL*      pImageRead,
     INOUT gctBOOL*      pImageWrite,
-    INOUT VIR_Operand** ppImageSrcOpnd
+    INOUT VIR_Operand** ppImageSrcOpnd,
+    INOUT VIR_Operand** ppImageWriteDataOpnd
     )
 {
     gctBOOL             bImageRead = gcvFALSE, bImageWrite = gcvFALSE;
     VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
     VIR_Operand*        pImageSrcOpnd = gcvNULL;
+    VIR_Operand*        pImageWriteDataOpnd = gcvNULL;
 
     if (opCode == VIR_OP_INTRINSIC)
     {
@@ -14179,6 +14181,7 @@ _vscVIR_IsImageReadOrWrite(
         {
             bImageWrite = gcvTRUE;
             pImageSrcOpnd = pParmOpnd->args[0];
+            pImageWriteDataOpnd = pParmOpnd->args[2];
         }
     }
     else if (VIR_OPCODE_isImgLd(opCode))
@@ -14190,6 +14193,7 @@ _vscVIR_IsImageReadOrWrite(
     {
         bImageWrite = gcvTRUE;
         pImageSrcOpnd = VIR_Inst_GetSource(pInst, 0);
+        pImageWriteDataOpnd = VIR_Inst_GetSource(pInst, 2);
     }
 
     if (pImageRead)
@@ -14204,6 +14208,10 @@ _vscVIR_IsImageReadOrWrite(
     {
         *ppImageSrcOpnd = pImageSrcOpnd;
     }
+    if (ppImageWriteDataOpnd)
+    {
+        *ppImageWriteDataOpnd = pImageWriteDataOpnd;
+    }
 
     return bImageRead | bImageWrite;
 }
@@ -14214,10 +14222,15 @@ _vscVIR_ReplaceImageFormatMismatchInst(
     IN VIR_Function*    pFunc,
     IN VIR_Instruction* pInst,
     IN gctBOOL          bImageRead,
-    IN gctBOOL          bImageWrite
+    IN gctBOOL          bImageWrite,
+    IN VIR_Operand*     pImageWriteDataOpnd,
+    IN VIR_IMAGE_ACCESS_STRATEGY imageAccessStrategy
     )
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
+
+    gcmASSERT(imageAccessStrategy == VIR_IMAGE_ACCESS_STRATEGY_LOAD_ZERO_STORE_NOP ||
+              imageAccessStrategy == VIR_IMAGE_ACCESS_STRATEGY_LOAD_ZERO_STORE_ZERO);
 
     if (bImageRead)
     {
@@ -14243,7 +14256,18 @@ _vscVIR_ReplaceImageFormatMismatchInst(
     }
     else if (bImageWrite)
     {
-        VIR_Function_ChangeInstToNop(pFunc, pInst);
+        if (imageAccessStrategy == VIR_IMAGE_ACCESS_STRATEGY_LOAD_ZERO_STORE_NOP)
+        {
+            VIR_Function_ChangeInstToNop(pFunc, pInst);
+        }
+        else
+        {
+            VIR_TypeId          dataTypeId = VIR_Operand_GetTypeId(pImageWriteDataOpnd);
+            VIR_ScalarConstVal  constVal = { 0 };
+
+            VIR_Operand_SetImmediate(pImageWriteDataOpnd, VIR_GetTypeComponentType(dataTypeId), constVal);
+            VIR_Operand_SetSwizzle(pImageWriteDataOpnd, VIR_SWIZZLE_XXXX);
+        }
     }
 
     return errCode;
@@ -14307,10 +14331,12 @@ VSC_ErrCode vscVIR_ProcessImageFormatMismatch(VSC_SH_PASS_WORKER* pPassWorker)
     {
         gctBOOL         bImageRead = gcvFALSE, bImageWrite = gcvFALSE;
         VIR_Operand*    pImageSrcOpnd = gcvNULL;
+        VIR_Operand*    pImageWriteDataOpnd = gcvNULL;
         VIR_Symbol*     pImageSrcSym = gcvNULL;
+        VIR_IMAGE_ACCESS_STRATEGY accessStrategy;
 
         /* Check if this instruction is an image read or write. */
-        if (!_vscVIR_IsImageReadOrWrite(pShader, pInst, &bImageRead, &bImageWrite, &pImageSrcOpnd))
+        if (!_vscVIR_IsImageReadOrWrite(pShader, pInst, &bImageRead, &bImageWrite, &pImageSrcOpnd, &pImageWriteDataOpnd))
         {
             continue;
         }
@@ -14335,8 +14361,20 @@ VSC_ErrCode vscVIR_ProcessImageFormatMismatch(VSC_SH_PASS_WORKER* pPassWorker)
             continue;
         }
 
+        accessStrategy = VIR_Symbol_GetImageAccessStrategy(pImageSrcSym);
+        if (accessStrategy == VIR_IMAGE_ACCESS_STRATEGY_USE_FORMAT)
+        {
+            continue;
+        }
+
         /* Replace this image read or write. */
-        errCode = _vscVIR_ReplaceImageFormatMismatchInst(pShader, pCurrentFunc, pInst, bImageRead, bImageWrite);
+        errCode = _vscVIR_ReplaceImageFormatMismatchInst(pShader,
+                                                         pCurrentFunc,
+                                                         pInst,
+                                                         bImageRead,
+                                                         bImageWrite,
+                                                         pImageWriteDataOpnd,
+                                                         accessStrategy);
         ON_ERROR(errCode, "Replace image format mistmatch instruction.");
 
         bChanged = gcvTRUE;

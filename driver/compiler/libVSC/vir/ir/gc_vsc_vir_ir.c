@@ -1260,6 +1260,11 @@ VIR_Uniform_CheckImageFormatMismatch(
         return errCode;
     }
 
+    if (isSymUniformImageFormatMismatch(pUniformSym))
+    {
+        return errCode;
+    }
+
     imageComponentTypeId = VIR_ImageFormat_GetComponentTypeId(imageFormat);
 
     if ((VIR_TypeId_isFloat(imageSampledTypeId) && !VIR_TypeId_isFloat(imageComponentTypeId))
@@ -1276,6 +1281,7 @@ VIR_Uniform_CheckImageFormatMismatch(
         ** image are undefined.
         */
         VIR_Symbol_SetFlagExt(pUniformSym, VIR_SYMUNIFORMFLAGEXT_IMAGE_FORMAT_MISMATCH);
+        VIR_Symbol_SetImageAccessStrategy(pUniformSym, VIR_IMAGE_ACCESS_STRATEGY_LOAD_ZERO_STORE_NOP);
         VIR_Shader_SetFlagExt1(Shader, VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH);
     }
 
