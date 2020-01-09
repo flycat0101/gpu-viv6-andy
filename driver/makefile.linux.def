@@ -337,8 +337,6 @@ ifeq ($(EGL_API_WL),1)
   CFLAGS            += -DEGL_API_WL -DWL_EGL_PLATFORM -Wno-deprecated-declarations
   ifeq ($(GL4_LINUX_ENABLE),1)
     CFLAGS            += -DOPENGL40
-    CFLAGS            += -DDRI_PIXMAPRENDER_ASYNC
-    CFLAGS            += -DDRI_PIXMAPRENDER_GL
   endif
 endif
 

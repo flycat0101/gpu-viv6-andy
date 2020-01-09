@@ -85,7 +85,6 @@ endif
 # Specific soc platform in <vendor>-<board> format, or 'default'.
 SOC_PLATFORM                 ?= freescale-imx
 
-
 ################################################################################
 # Variables.
 
