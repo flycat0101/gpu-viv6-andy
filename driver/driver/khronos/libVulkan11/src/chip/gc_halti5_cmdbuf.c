@@ -7868,6 +7868,8 @@ static VkResult halti5_syncShadowImage(
     __vkImage* shadowImage ;
     __vkImageLevel  pSrcLevel;
 
+    __VK_MEMZERO(&pSrcRes, sizeof(pSrcRes));
+    __VK_MEMZERO(&pDstRes, sizeof(pDstRes));
     __VK_MEMCOPY(&fakedIamge, image, sizeof(__vkImage));
     image = &fakedIamge;
     image->createInfo.format = image->formatInfo.residentImgFormat;
@@ -7879,6 +7881,7 @@ static VkResult halti5_syncShadowImage(
     pSrcRes.u.img.pImage = image;
     pSrcRes.u.img.subRes.mipLevel = subresourceRange.baseMipLevel;
     pSrcRes.u.img.subRes.arrayLayer = subresourceRange.baseArrayLayer;
+    pSrcRes.u.img.subRes.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     pSrcRes.u.img.offset.x = 0;
     pSrcRes.u.img.offset.y = 0;
     pSrcRes.u.img.offset.z = 0;

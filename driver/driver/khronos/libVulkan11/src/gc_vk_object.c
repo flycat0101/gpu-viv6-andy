@@ -212,6 +212,13 @@ VkResult __vk_SurfaceKHRStatFunc(__vkDevContext *devCtx, __vkObject *obj, int32_
     return VK_SUCCESS;
 }
 
+VkResult __vk_YCbCrConversionStatFunc(__vkDevContext *devCtx, __vkObject *obj, int32_t flag)
+{
+//    __vkSamplerYcbcrConversion *conversion = (__vkSamplerYcbcrConversion *)obj;
+
+    return VK_SUCCESS;
+}
+
 /* __vkObjectStatFuncTable[] must have the same order as __vkObjectIndex */
 
 PFN_ObjectStatFunc __vkObjectStatFuncTable[] = {
@@ -239,6 +246,7 @@ PFN_ObjectStatFunc __vkObjectStatFuncTable[] = {
     __vk_DeviceMemoryStatFunc, /* __VK_OBJECT_DEVICE_MEMORY */
     __vk_SwapchainKHRStatFunc, /* __VK_OBJECT_SWAPCHAIN_KHR */
     __vk_SurfaceKHRStatFunc, /* __VK_OBJECT_SURFACE_KHR */
+    __vk_YCbCrConversionStatFunc, /* __VK_OBJECT_YCBCR_CONVERSION */
 };
 
 char *__vkObjectNames[] = {
@@ -266,6 +274,7 @@ char *__vkObjectNames[] = {
     "VK_OBJECT_DEVICE_MEMORY", /* __VK_OBJECT_DEVICE_MEMORY */
     "VK_OBJECT_SWAPCHAIN_KHR"               /* __VK_OBJECT_SWAPCHAIN_KHR */
     "VK_OBJECT_SURFACE_KHR"                 /* __VK_OBJECT_SURFACE_KHR */
+    "VK_OBJECT_YCBCR_CONVERSION", /* __VK_OBJECT_YCBCR_CONVERSION */
 };
 
 VkResult __vk_CreateObject(

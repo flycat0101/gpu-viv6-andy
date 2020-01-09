@@ -1107,7 +1107,10 @@ __vkYCbCrFormatInfo __vk_GetYCbCrFormatInfo(
     case VK_FORMAT_G16_B16R16_2PLANE_422_UNORM:
     case VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM:
     default:
-        __VK_ASSERT(0 && "not implement");
+        if (info.bYUVFormat)
+        {
+            __VK_ASSERT(0 && "not implement");
+        }
         break;
     }
 
@@ -3341,6 +3344,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateImageView(
             }
             break;
         default:
+            baseIn = (VkBaseInStructure *)baseIn->pNext;
             break;
         }
     }
