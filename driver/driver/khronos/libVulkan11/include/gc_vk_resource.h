@@ -81,6 +81,17 @@ typedef struct __vkFormatInfoRec
     VkFormatProperties  formatProperties;
 } __vkFormatInfo;
 
+#define __VK_MAX_PLANE    3
+typedef struct __vkYCbCrFormatInfoRec
+{
+    int32_t         bYUVFormat;
+    int32_t         planeCount;
+    int32_t         uvHorzSample;
+    int32_t         uvVertSample;
+    int32_t         bitsPerChannel;
+    VkFormat        planeFormat[__VK_MAX_PLANE];
+} __vkYCbCrFormatInfo;
+
 typedef struct __vkTileStatusRec
 {
     gcsSURF_NODE tsNode;
@@ -180,6 +191,17 @@ typedef struct __vkImageLevelRec
     VkDeviceSize            size;
 
     VkDeviceSize            offset;
+
+    uint32_t                planeRequestW[__VK_MAX_PLANE];
+    uint32_t                planeRequestH[__VK_MAX_PLANE];
+    uint32_t                planeAllocedW[__VK_MAX_PLANE];
+    uint32_t                planeAllocedH[__VK_MAX_PLANE];
+    uint32_t                planeAlignedW[__VK_MAX_PLANE];
+    uint32_t                planeAlignedH[__VK_MAX_PLANE];
+
+    VkDeviceSize            planeOffset[__VK_MAX_PLANE];
+    VkDeviceSize            planeStride[__VK_MAX_PLANE];
+    VkDeviceSize            planeSize[__VK_MAX_PLANE];
 } __vkImageLevel;
 
 typedef struct __vkImageRec
@@ -192,6 +214,7 @@ typedef struct __vkImageRec
     VkImageCreateInfo createInfo;
     VkMemoryRequirements memReq;
     __vkFormatInfo formatInfo;
+    __vkYCbCrFormatInfo  ycbcrFormatInfo;
     gceTILING halTiling;
     gctUINT32 hAlignment;
     gcsSAMPLES sampleInfo;
@@ -233,7 +256,8 @@ typedef struct __vkImageViewRec
 
     /* ImageView specific fields */
     VkImageViewCreateInfo createInfo;
-    __vkSamplerYcbcrConversion conversion;
+    __vkSamplerYcbcrConversion *ycbcrConversion;
+    VkBool32    ycbcrPlaneView;
     VkAllocationCallbacks memCb;
 
     const __vkFormatInfo *formatInfo;
@@ -249,6 +273,7 @@ typedef struct __vkSamplerRec
 
     /* Sampler specific fields */
     VkSamplerCreateInfo createInfo;
+    __vkSamplerYcbcrConversion *ycbcrConversion;
 
     VkAllocationCallbacks memCb;
 
@@ -298,6 +323,8 @@ enum
 
     __VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM,
     __VK_FORMAT_B8G8R8G8_422_RGB_IDENTITY_UNORM,
+    __VK_FORMAT_G8B8G8R8_422_NARROW_RANGE_UNORM,
+    __VK_FORMAT_B8G8R8G8_422_NARROW_RANGE_UNORM,
 };
 
 enum
@@ -310,6 +337,25 @@ enum
 
 __vkFormatInfo * __vk_GetVkFormatInfo(
     VkFormat vkFormat
+    );
+
+int32_t __vk_GetPlaneIndex(
+    VkImageAspectFlags flags
+    );
+
+__vkFormatInfo *__vk_GetPlaneFormatInfo(
+    __vkImage *pImage,
+    VkImageAspectFlags flags
+    );
+
+VkDeviceSize __vk_GetPlaneOffset(
+    __vkImage *pImage,
+    VkImageAspectFlags flags,
+    int32_t level
+    );
+
+__vkYCbCrFormatInfo __vk_GetYCbCrFormatInfo(
+    VkFormat format
     );
 
 typedef enum __VkMemoryImportType
