@@ -32,28 +32,24 @@ static const char * _driverDlls[] =
 {
 #if defined(ANDROID)
     "libEGL_" GPU_VENDOR ".so",         /* EGL */
-    "libGLESv1_CL_" GPU_VENDOR ".so",   /* OpenGL ES 1.1 Common Lite */
     "libGLESv1_CM_" GPU_VENDOR ".so",   /* OpenGL ES 1.1 Common */
     "libGLESv2_" GPU_VENDOR ".so",      /* OpenGL ES 2.0/3.x */
     "libGL.so",                         /* OpenGL */
     "libOpenVG.so",                     /* OpenVG 1.0 */
 #elif defined(__QNXNTO__)
     "egl-dlls",                         /* EGL */
-    "glesv1-dlls",                      /* OpenGL ES 1.1 Common Lite */
     "glesv1-dlls",                      /* OpenGL ES 1.1 Common */
     "glesv2-dlls",                      /* OpenGL ES 2.0/3.x */
     gcvNULL,                            /* OpenGL */
     "vg-dlls",                          /* OpenVG 1.0 */
 #elif defined(__APPLE__)
     "libEGL.dylib",                     /* EGL */
-    "libGLESv1_CL.dylib",               /* OpenGL ES 1.1 Common Lite */
     "libGLESv1_CM.dylib",               /* OpenGL ES 1.1 Common */
     "libGLESv2.dylib",                  /* OpenGL ES 2.0/3.x */
     "libOpenGL.dylib",                  /* OpenGL */
     "libOpenVG.dylib",                  /* OpenVG 1.0 */
 #else
     "libEGL",                           /* EGL */
-    "libGLESv1_CL",                     /* OpenGL ES 1.1 Common Lite */
     "libGLESv1_CM",                     /* OpenGL ES 1.1 Common */
     "libGLESv2",                        /* OpenGL ES 2.0/3.x */
     "libGL",                            /* OpenGL */
@@ -65,7 +61,6 @@ static const char * _driverDlls[] =
 static const char * _dispatchNames[] =
 {
     "",                                 /* EGL */
-    "GLES_CL_DISPATCH_TABLE",           /* OpenGL ES 1.1 Common Lite */
     "GLES_CM_DISPATCH_TABLE",           /* OpenGL ES 1.1 Common */
     "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 2.0 */
     "GL_DISPATCH_TABLE",                /* OpenGL 4.x */
@@ -134,13 +129,6 @@ veglGetModule(
         else
         {
             gcoOS_LoadLibrary(Os, _driverDlls[Index], &library);
-        }
-
-        /* Query the CL handle if CM not available. */
-        if (!library && Index == vegl_OPENGL_ES11)
-        {
-            Index = vegl_OPENGL_ES11_CL;
-            gcoOS_LoadLibrary(Os, _driverDlls[vegl_OPENGL_ES11_CL], &library);
         }
 #endif
 
@@ -787,8 +775,7 @@ veglBindAPI(
     switch (api)
     {
     case EGL_OPENGL_ES_API:
-        if (!thread->dispatchTables[vegl_OPENGL_ES11_CL] &&
-            !thread->dispatchTables[vegl_OPENGL_ES11] &&
+        if (!thread->dispatchTables[vegl_OPENGL_ES11] &&
             !thread->dispatchTables[vegl_OPENGL_ES20])
         {
             /* OpenGL ES API not supported. */

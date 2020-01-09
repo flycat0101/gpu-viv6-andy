@@ -2097,22 +2097,19 @@ eglQueryString(
         {
         case EGL_CLIENT_APIS:
             if (thread->dispatchTables[vegl_OPENVG] &&
-                (thread->dispatchTables[vegl_OPENGL_ES11_CL] ||
-                 thread->dispatchTables[vegl_OPENGL_ES11] ||
+                (thread->dispatchTables[vegl_OPENGL_ES11] ||
                  thread->dispatchTables[vegl_OPENGL_ES20]) &&
                  thread->dispatchTables[vegl_OPENGL])
             {
                 ptr = "OpenGL_ES OpenGL OpenVG";
             }
             else if (thread->dispatchTables[vegl_OPENVG] &&
-                (thread->dispatchTables[vegl_OPENGL_ES11_CL] ||
-                 thread->dispatchTables[vegl_OPENGL_ES11] ||
+                (thread->dispatchTables[vegl_OPENGL_ES11] ||
                  thread->dispatchTables[vegl_OPENGL_ES20]))
             {
                 ptr = "OpenGL_ES OpenVG";
             }
-            else if ((thread->dispatchTables[vegl_OPENGL_ES11_CL] ||
-                thread->dispatchTables[vegl_OPENGL_ES11] ||
+            else if ((thread->dispatchTables[vegl_OPENGL_ES11] ||
                 thread->dispatchTables[vegl_OPENGL_ES20]) &&
                 thread->dispatchTables[vegl_OPENGL])
             {
