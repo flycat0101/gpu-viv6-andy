@@ -11,11 +11,6 @@
 *****************************************************************************/
 
 
-#ifndef _GNU_SOURCE
-#  define _GNU_SOURCE
-#endif
-
-
 #include "gc_egl_precomp.h"
 
 /* Zone used for header/footer. */
@@ -2936,16 +2931,6 @@ _Lookup(
     return gcvNULL;
 }
 
-static int isInApiTraceMode()
-{
-#ifndef UNDER_CE
-    void *fptr = dlsym(RTLD_DEFAULT, "ApiTraceEnabled");
-    return (fptr != NULL);
-#else
-    return 0;
-#endif
-}
-
 #define gcmDEF2STRING(def) #def
 
 EGLAPI __eglMustCastToProperFunctionPointerType EGLAPIENTRY
@@ -3013,12 +2998,6 @@ eglGetProcAddress(const char *procname)
             break;
         }
 
-        /* If apitrace is enabled, do not return function name */
-        if (isInApiTraceMode())
-        {
-            func = gcvNULL;
-        }
-
         thread = veglGetThreadData();
         if (thread == gcvNULL)
         {
@@ -3047,12 +3026,6 @@ eglGetProcAddress(const char *procname)
 
             library  = thread->clientHandles[index];
             dispatch = thread->dispatchTables[index];
-
-            /* If apitrace is enabled, do not use dispatch to get proc address */
-            if (isInApiTraceMode())
-            {
-                dispatch = gcvNULL;
-            }
 
             if (dispatch && dispatch->getProcAddr)
             {
