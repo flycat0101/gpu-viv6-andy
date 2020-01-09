@@ -2759,7 +2759,7 @@ typedef enum _VIR_UNIFORMKIND
     VIR_UNIFORM_GLOBAL_WORK_SCALE,
     VIR_UNIFORM_VIEW_INDEX,
     VIR_UNIFORM_THREAD_ID_MEM_ADDR,
-    VIR_UNIFORM_YCBCR_PLANES,
+    VIR_UNIFORM_YCBCR_PLANE,
     /* should not larger than 2^6, since it is using storageClass,
      * in case it is >= 64, need to enlarge _storageClass */
 } VIR_UniformKind;
@@ -4408,7 +4408,7 @@ struct _VIR_UNIFORM
             /*
             ** The plane image uniform for a ycbcr sampler.
             */
-            VIR_SymId       ycbcrPlaneSymId;
+            VIR_SymId       ycbcrPlaneSymId[__YCBCR_PLANE_COUNT__];
 
             /* The sampled image symbol ID. */
             VIR_SymId       sampledImageSymId;

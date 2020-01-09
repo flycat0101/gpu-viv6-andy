@@ -146,6 +146,7 @@ typedef struct _VSC_LIB_LINK_POINT_RESOURCE
     gctUINT                           arrayIndex;
     VSC_RES_OP_BIT                    opTypeBits;
     VSC_RES_ACT_BIT                   actBits;
+    void*                             pPrivData;
     VSC_LINK_POINT_RESOURCE_SUBTYPE   subType;
 } VSC_LIB_LINK_POINT_RESOURCE;
 

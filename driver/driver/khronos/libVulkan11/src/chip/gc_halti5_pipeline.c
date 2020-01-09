@@ -7828,6 +7828,7 @@ VkResult halti5_patch_pipeline(
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.opTypeBits = opTypeBits;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.actBits = actBits;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.subType = subType;
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.pPrivData = gcvNULL;
                                         switch (k)
                                         {
                                         case HALTI5_PATCH_TX_GATHER_PCF:
