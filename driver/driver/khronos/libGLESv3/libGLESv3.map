@@ -364,23 +364,28 @@
         glDrawElementsInstancedBaseVertex;
         glPrimitiveBoundingBox;
 
-        glBlendBarrierKHR;
         glEGLImageTargetTexture2DOES;
         glEGLImageTargetRenderbufferStorageOES;
         glMultiDrawArraysEXT;
         glMultiDrawElementsEXT;
+        glMultiDrawElementsBaseVertexEXT;
+        glGetBufferPointervOES;
         glMapBufferOES;
         glUnmapBufferOES;
-        glGetBufferPointervOES;
         glDiscardFramebufferEXT;
-        glFramebufferTexture2DMultisampleEXT;
         glRenderbufferStorageMultisampleEXT;
-        glGetProgramBinaryOES;
-        glProgramBinaryOES;
+        glFramebufferTexture2DMultisampleEXT;
         glTexDirectVIV;
         glTexDirectInvalidateVIV;
         glTexDirectVIVMap;
         glTexDirectTiledMapVIV;
+        glMultiDrawArraysIndirectEXT;
+        glMultiDrawElementsIndirectEXT;
+        glGetTexImage;
+
+        glBlendBarrierKHR;
+        glGetProgramBinaryOES;
+        glProgramBinaryOES;
         glBindVertexArrayOES;
         glDeleteVertexArraysOES;
         glGenVertexArraysOES;

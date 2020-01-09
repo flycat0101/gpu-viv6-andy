@@ -345,16 +345,16 @@ static __GLextProcAlias __glExtProcAlias[] =
 
 #ifdef OPENGL40
     /* Extension API alias for GL_ARB_vertex_buffer_object */
-    {__GL_EXTID_ARB_vertex_buffer_object, "GenBuffers", (__GLprocAddr)glGenBuffers},
-    {__GL_EXTID_ARB_vertex_buffer_object, "BindBuffer", (__GLprocAddr)glBindBuffer},
-    {__GL_EXTID_ARB_vertex_buffer_object, "BufferData", (__GLprocAddr)glBufferData},
-    {__GL_EXTID_ARB_vertex_buffer_object, "BufferSubData", (__GLprocAddr)glBufferSubData},
-    {__GL_EXTID_ARB_vertex_buffer_object, "DeleteBuffers", (__GLprocAddr)glDeleteBuffers},
-    {__GL_EXTID_ARB_vertex_buffer_object, "IsBuffer", (__GLprocAddr)glIsBuffer},
+    {__GL_EXTID_ARB_vertex_buffer_object, "GenBuffersARB", (__GLprocAddr)glGenBuffers},
+    {__GL_EXTID_ARB_vertex_buffer_object, "BindBufferARB", (__GLprocAddr)glBindBuffer},
+    {__GL_EXTID_ARB_vertex_buffer_object, "BufferDataARB", (__GLprocAddr)glBufferData},
+    {__GL_EXTID_ARB_vertex_buffer_object, "BufferSubDataARB", (__GLprocAddr)glBufferSubData},
+    {__GL_EXTID_ARB_vertex_buffer_object, "DeleteBuffersARB", (__GLprocAddr)glDeleteBuffers},
+    {__GL_EXTID_ARB_vertex_buffer_object, "IsBufferARB", (__GLprocAddr)glIsBuffer},
 
     /* Extension API alias for GL_ARB_vertex_program */
-    {__GL_EXTID_ARB_vertex_program, "EnableVertexAttribArray", (__GLprocAddr)glEnableVertexAttribArray},
-    {__GL_EXTID_ARB_vertex_program, "VertexAttribPointer", (__GLprocAddr)glVertexAttribPointer},
+    {__GL_EXTID_ARB_vertex_program, "EnableVertexAttribArrayARB", (__GLprocAddr)glEnableVertexAttribArray},
+    {__GL_EXTID_ARB_vertex_program, "VertexAttribPointerARB", (__GLprocAddr)glVertexAttribPointer},
 
     /* Extension API alias for GL_ARB_shader_objects */
     {__GL_EXTID_ARB_shader_objects, "CreateProgramObjectARB", (__GLprocAddr)glCreateProgram},
@@ -454,7 +454,7 @@ __GLprocAddr __glGetProcAddr(const GLchar *procName)
     /* Find in __glExtFuncAlias[] table first */
     for (curAlias = __glExtProcAlias; curAlias->index < __GL_EXTID_EXT_LAST; ++curAlias)
     {
-        if (strcmp(curAlias->procName, apiName) == 0)
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(curAlias->procName, apiName)))
         {
             return curAlias->func;
         }
@@ -464,7 +464,7 @@ __GLprocAddr __glGetProcAddr(const GLchar *procName)
     for (i = 0; i < __glProcTabSize; ++i)
     {
         procInfo = &__glProcInfoTable[i];
-        if (strcmp(procInfo->name, apiName) == 0)
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(procInfo->name, apiName)))
         {
             return procInfo->func;
         }

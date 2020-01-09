@@ -17,7 +17,6 @@ ROOTDIR=$(AQROOT)/driver/khronos/libGL4
 LIBS += -L$(AQROOT)/build/sdk/drivers -L$(ROOTFS_USR)/lib -L$(ROOTDIR)/lib
 LIBS += -L$(AQROOT)/hal/user/$(OBJ_DIR)
 LIBS += -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR)
-#LFLAGS += -lm -lpthread -lGAL -lVSC -lGL -lXext -lX11 -ldl -lXfixes -lXdamage -ldrm
 
 INSTALL = install
 INSTDATFLAGS = -m 0444
@@ -48,6 +47,8 @@ INCLUDE += \
 	-I$(ROOTDIR)/include/dri -I$(ROOTDIR)/include/glcore \
 	-I$(ROOTDIR)/include/chip \
 	-I$(ROOTDIR)/include/dri \
+	-I$(AQROOT)/driver/X/libdrm-2.4.91/include/drm \
+	-I$(AQROOT)/driver/X/libdrm-2.4.91 \
 	-I$(ROOTFS_USR)/include/pixman-1 \
 	-I$(ROOTFS_USR)/include/libdrm \
 	-I$(ROOTFS_USR)/include \

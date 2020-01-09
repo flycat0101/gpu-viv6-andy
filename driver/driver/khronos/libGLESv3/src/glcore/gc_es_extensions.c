@@ -265,21 +265,12 @@ static __GLextProcAlias __glExtProcAlias[] =
     {__GL_EXTID_KHR_debug, "ObjectPtrLabelKHR", (__GLprocAddr)glObjectPtrLabel},
     {__GL_EXTID_KHR_debug, "GetObjectPtrLabelKHR", (__GLprocAddr)glGetObjectPtrLabel},
 
-    /* Extension API alias for GL_KHR_blend_equation_advanced */
-    {__GL_EXTID_KHR_blend_equation_advanced, "BlendBarrierKHR", (__GLprocAddr)glBlendBarrierKHR},
-
     /* Extension API alias for GL_KHR_robustness */
     {__GL_EXTID_KHR_robustness, "GetGraphicsResetStatusKHR", (__GLprocAddr)glGetGraphicsResetStatus},
     {__GL_EXTID_KHR_robustness, "ReadnPixelsKHR", (__GLprocAddr)glReadnPixels},
     {__GL_EXTID_KHR_robustness, "GetnUniformfvKHR", (__GLprocAddr)glGetnUniformfv},
     {__GL_EXTID_KHR_robustness, "GetnUniformivKHR", (__GLprocAddr)glGetnUniformiv},
     {__GL_EXTID_KHR_robustness, "GetnUniformuivKHR", (__GLprocAddr)glGetnUniformuiv},
-
-    /* Extension API alias for GL_EXT_robustness */
-    {__GL_EXTID_KHR_robustness, "GetGraphicsResetStatusEXT", (__GLprocAddr)glGetGraphicsResetStatusEXT},
-    {__GL_EXTID_KHR_robustness, "ReadnPixelsEXT", (__GLprocAddr)glReadnPixelsEXT},
-    {__GL_EXTID_KHR_robustness, "GetnUniformfvEXT", (__GLprocAddr)glGetnUniformfvEXT},
-    {__GL_EXTID_KHR_robustness, "GetnUniformivEXT", (__GLprocAddr)glGetnUniformivEXT},
 
     {__GL_EXTID_EXT_LAST, gcvNULL, gcvNULL}
 };
