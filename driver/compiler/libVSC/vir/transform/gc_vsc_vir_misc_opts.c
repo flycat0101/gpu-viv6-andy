@@ -4937,6 +4937,7 @@ vscVIR_ConvertVirtualInstructions(
                         VIR_SymId llmSymID = VIR_INVALID_ID;
                         VIR_Symbol * sym;
                         gctCHAR name[128] = "#";
+                        gctUINT i;
 
                         gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, samplerSym));
                         gcoOS_StrCatSafe(name, gcmSIZEOF(name), "$LodMinMax");
@@ -4969,7 +4970,10 @@ vscVIR_ConvertVirtualInstructions(
                         lodMinMaxUniform->u.samplerOrImageAttr.parentSamplerSymId = VIR_Uniform_GetSymID(samplerUniform);
                         lodMinMaxUniform->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
                         lodMinMaxUniform->u.samplerOrImageAttr.texelBufferToImageSymId = VIR_INVALID_ID;
-                        lodMinMaxUniform->u.samplerOrImageAttr.ycbcrPlaneSymId = VIR_INVALID_ID;
+                        for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+                        {
+                            lodMinMaxUniform->u.samplerOrImageAttr.ycbcrPlaneSymId[i] = VIR_INVALID_ID;
+                        }
                     }
                     VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                     VIR_Inst_SetSrcNum(inst, 1);
@@ -5028,6 +5032,7 @@ vscVIR_ConvertVirtualInstructions(
                         VIR_SymId lbsSymID = VIR_INVALID_ID;
                         VIR_Symbol * sym;
                         gctCHAR name[128] = "#";
+                        gctUINT i;
 
                         gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, samplerOrImageSym));
                         gcoOS_StrCatSafe(name, gcmSIZEOF(name), "$LevelBaseSize");
@@ -5061,7 +5066,10 @@ vscVIR_ConvertVirtualInstructions(
                         levelBaseSizeUniform->u.samplerOrImageAttr.parentSamplerSymId = VIR_Uniform_GetSymID(samplerOrImageUniform);
                         levelBaseSizeUniform->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
                         levelBaseSizeUniform->u.samplerOrImageAttr.texelBufferToImageSymId = VIR_INVALID_ID;
-                        levelBaseSizeUniform->u.samplerOrImageAttr.ycbcrPlaneSymId = VIR_INVALID_ID;
+                        for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+                        {
+                            levelBaseSizeUniform->u.samplerOrImageAttr.ycbcrPlaneSymId[i] = VIR_INVALID_ID;
+                        }
                     }
                     VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                     VIR_Inst_SetSrcNum(inst, 1);
@@ -5120,6 +5128,7 @@ vscVIR_ConvertVirtualInstructions(
                         VIR_SymId lbsSymID = VIR_INVALID_ID;
                         VIR_Symbol * sym;
                         gctCHAR name[128] = "#";
+                        gctUINT i;
 
                         gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, samplerOrImageSym));
                         gcoOS_StrCatSafe(name, gcmSIZEOF(name), "LevelsSamples");
@@ -5153,7 +5162,10 @@ vscVIR_ConvertVirtualInstructions(
                         levelsSamplesUniform->u.samplerOrImageAttr.parentSamplerSymId = VIR_Uniform_GetSymID(samplerOrImageUniform);
                         levelsSamplesUniform->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
                         levelsSamplesUniform->u.samplerOrImageAttr.texelBufferToImageSymId = VIR_INVALID_ID;
-                        levelsSamplesUniform->u.samplerOrImageAttr.ycbcrPlaneSymId = VIR_INVALID_ID;
+                        for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+                        {
+                            levelsSamplesUniform->u.samplerOrImageAttr.ycbcrPlaneSymId[i] = VIR_INVALID_ID;
+                        }
                     }
                     VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                     VIR_Inst_SetSrcNum(inst, 1);

@@ -3857,7 +3857,10 @@ _UpdateOperandParameterForIntrinsicCall(
                 extraLayer->u.samplerOrImageAttr.parentSamplerSymId = image->sym;
                 extraLayer->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
                 extraLayer->u.samplerOrImageAttr.texelBufferToImageSymId = VIR_INVALID_ID;
-                extraLayer->u.samplerOrImageAttr.ycbcrPlaneSymId = VIR_INVALID_ID;
+                for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+                {
+                    extraLayer->u.samplerOrImageAttr.ycbcrPlaneSymId[i] = VIR_INVALID_ID;
+                }
             }
 
             /* New a operand with this extra image layer.  */
@@ -5521,6 +5524,7 @@ _AddExtraSampler(
     VIR_Symbol          *extraLayerSym;
     VIR_Uniform         *extraLayer;
     VIR_SymId           extraLayerSymId = sampler->u.samplerOrImageAttr.extraImageLayer;
+    gctUINT             i;
 
     gcmASSERT(sampler);
 
@@ -5558,7 +5562,10 @@ _AddExtraSampler(
         extraLayer->u.samplerOrImageAttr.parentSamplerSymId = sampler->sym;
         extraLayer->u.samplerOrImageAttr.arrayIdxInParent = arrayIndex;
         extraLayer->u.samplerOrImageAttr.texelBufferToImageSymId = VIR_INVALID_ID;
-        extraLayer->u.samplerOrImageAttr.ycbcrPlaneSymId = VIR_INVALID_ID;
+        for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+        {
+            extraLayer->u.samplerOrImageAttr.ycbcrPlaneSymId[i] = VIR_INVALID_ID;
+        }
     }
 
     /* New a operand with this extra image layer.  */
@@ -6581,63 +6588,73 @@ _AddYcbcrPlanesToSampler(
     IN VIR_Function*    pFunc,
     IN VIR_Symbol*      pSamplerSym,
     IN VIR_Uniform*     pSamplerUniform,
+    IN VIR_ImageFormat* pImageFormat,
     IN gctUINT          arrayIndex,
-    OUT VIR_Symbol**    ppPlanesImageSym
+    OUT VIR_SymId*      pYcbcrPlaneSymIds
     )
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
-    VIR_SymId           ycbcrPlaneSymId = pSamplerUniform->u.samplerOrImageAttr.ycbcrPlaneSymId;
-    VIR_Symbol*         pPlanesImageSym = gcvNULL;
-    VIR_Uniform*        pPlanesImage = gcvNULL;
+    VIR_SymId           ycbcrPlaneSymId = pSamplerUniform->u.samplerOrImageAttr.ycbcrPlaneSymId[0];
+    gctUINT             i;
 
     if (ycbcrPlaneSymId == VIR_INVALID_ID)
     {
+        VIR_Symbol*     pPlanesImageSym = gcvNULL;
+        VIR_Uniform*    pPlanesImage = gcvNULL;
         VIR_NameId      nameId;
-        gctCHAR         name[128] = "#";
-        VIR_TypeId      planesTypeId = VIR_TYPE_VOID;
+        gctCHAR         name[128];
+        gctUINT         offset;
 
-        /* Add an array type uimage[3]. */
-        errCode = VIR_Shader_AddArrayType(pShader,
-                                          VIR_TYPE_UIMAGE_2D,
-                                          3,
-                                          1,
-                                          &planesTypeId);
-        ON_ERROR(errCode, "Add an array type.");
+        for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+        {
+            offset = 0;
 
-        /* Add a name string. */
-        gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, pSamplerSym));
-        gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_YcbcrPlanes");
-        errCode = VIR_Shader_AddString(pShader,
-                                       name,
-                                       &nameId);
-        ON_ERROR(errCode, "Add a string");
+            /* Add a name string. */
+            gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#%s_YcbcrPlanes_%d", VIR_Shader_GetSymNameString(pShader, pSamplerSym), i);
+            errCode = VIR_Shader_AddString(pShader,
+                                           name,
+                                           &nameId);
+            ON_ERROR(errCode, "Add a string");
 
-        /* Add the array image. */
-        errCode = VIR_Shader_AddSymbol(pShader,
-                                       VIR_SYM_IMAGE,
-                                       nameId,
-                                       VIR_Shader_GetTypeFromId(pShader, planesTypeId),
-                                       VIR_STORAGE_UNKNOWN,
-                                       &ycbcrPlaneSymId);
-        ON_ERROR(errCode, "VIR_Shader_AddSymbol");
+            /* Add the array image. */
+            errCode = VIR_Shader_AddSymbol(pShader,
+                                           VIR_SYM_IMAGE,
+                                           nameId,
+                                           VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_UIMAGE_2D),
+                                           VIR_STORAGE_UNKNOWN,
+                                           &ycbcrPlaneSymId);
+            ON_ERROR(errCode, "VIR_Shader_AddSymbol");
 
-        pPlanesImageSym = VIR_Shader_GetSymFromId(pShader, ycbcrPlaneSymId);
-        pSamplerUniform->u.samplerOrImageAttr.ycbcrPlaneSymId = ycbcrPlaneSymId;
-        VIR_Symbol_SetFlag(pPlanesImageSym, VIR_SYMFLAG_COMPILER_GEN);
-        VIR_Symbol_SetPrecision(pPlanesImageSym, VIR_Symbol_GetPrecision(pSamplerSym));
-        VIR_Symbol_SetUniformKind(pPlanesImageSym, VIR_UNIFORM_YCBCR_PLANES);
-        VIR_Symbol_SetAddrSpace(pPlanesImageSym, VIR_AS_CONSTANT);
-        VIR_Symbol_SetTyQualifier(pPlanesImageSym, VIR_Symbol_GetTyQualifier(pSamplerSym));
-        pPlanesImageSym->layout = pSamplerSym->layout;
+            pPlanesImageSym = VIR_Shader_GetSymFromId(pShader, ycbcrPlaneSymId);
+            pSamplerUniform->u.samplerOrImageAttr.ycbcrPlaneSymId[i] = ycbcrPlaneSymId;
+            VIR_Symbol_SetFlag(pPlanesImageSym, VIR_SYMFLAG_COMPILER_GEN);
+            VIR_Symbol_SetPrecision(pPlanesImageSym, VIR_Symbol_GetPrecision(pSamplerSym));
+            VIR_Symbol_SetUniformKind(pPlanesImageSym, VIR_UNIFORM_YCBCR_PLANE);
+            VIR_Symbol_SetAddrSpace(pPlanesImageSym, VIR_AS_CONSTANT);
+            VIR_Symbol_SetTyQualifier(pPlanesImageSym, VIR_Symbol_GetTyQualifier(pSamplerSym));
 
-        pPlanesImage = VIR_Symbol_GetImage(pPlanesImageSym);
-        pPlanesImage->u.samplerOrImageAttr.parentSamplerSymId = VIR_Symbol_GetIndex(pSamplerSym);
-        pPlanesImage->u.samplerOrImageAttr.arrayIdxInParent = arrayIndex;
+            /* Copy the layout from the sampler symbol. */
+            pPlanesImageSym->layout = pSamplerSym->layout;
+
+            /* Set the specified image format. */
+            if (pImageFormat != gcvNULL && pImageFormat[i] != VIR_IMAGE_FORMAT_NONE)
+            {
+                VIR_Symbol_SetImageFormat(pPlanesImageSym, pImageFormat[i]);
+            }
+
+            pPlanesImage = VIR_Symbol_GetImage(pPlanesImageSym);
+            pPlanesImage->u.samplerOrImageAttr.parentSamplerSymId = VIR_Symbol_GetIndex(pSamplerSym);
+            pPlanesImage->u.samplerOrImageAttr.arrayIdxInParent = arrayIndex;
+        }
     }
 
-    if (ppPlanesImageSym)
+    if (pYcbcrPlaneSymIds)
     {
-        *ppPlanesImageSym = VIR_Shader_GetSymFromId(pShader, ycbcrPlaneSymId);
+        for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+        {
+            pYcbcrPlaneSymIds[i] = pSamplerUniform->u.samplerOrImageAttr.ycbcrPlaneSymId[i];
+            gcmASSERT(pYcbcrPlaneSymIds[i] != VIR_INVALID_ID);
+        }
     }
 
 OnError:
@@ -6663,8 +6680,8 @@ _InsertCallYcbcrTexture(
     gctUINT                     argIdx = 0, i;
     VIR_Instruction*            pNewInst = gcvNULL;
     VIR_Operand*                pNewOpnd = gcvNULL;
+    VIR_SymId                   planeImageSymIds[__YCBCR_PLANE_COUNT__] = { VIR_INVALID_ID, VIR_INVALID_ID, VIR_INVALID_ID };
     VIR_Symbol*                 pPlanesImageSym = gcvNULL;
-    VIR_Type*                   pPlanesImageSymType = gcvNULL;
     gctSTRING                   paramName = gcvNULL;
     gctBOOL                     notFoundParam = gcvFALSE;
 
@@ -6682,12 +6699,10 @@ _InsertCallYcbcrTexture(
                                        pFunc,
                                        pSamplerSym,
                                        pSamplerUniform,
+                                       (VIR_ImageFormat*)(pContext->linkPoint->u.resource.pPrivData),
                                        pContext->linkPoint->u.resource.arrayIndex,
-                                       &pPlanesImageSym);
+                                       planeImageSymIds);
     ON_ERROR(errCode, "Add ycbcr planes uniform.");
-
-    pPlanesImageSymType = VIR_Symbol_GetType(pPlanesImageSym);
-    gcmASSERT(VIR_Type_isArray(pPlanesImageSymType));
 
     /* insert the MOV to pass arguement */
     /* MOV arg1, sampler */
@@ -6701,17 +6716,16 @@ _InsertCallYcbcrTexture(
     VIR_Operand_Copy(VIR_Inst_GetSource(pNewInst, 0), VIR_Inst_GetSource(pTexldInst, 1));
 
     /* MOV plane images. */
-    for (i = 0; i < VIR_Type_GetArrayLength(pPlanesImageSymType); i++)
+    for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
     {
         errCode = _InsertMovToArgs(pShader, pFunc, pLibFunc, argIdx++, pTexldInst, &pNewInst);
         ON_ERROR(errCode, "Insert a MOV for a argument.");
 
+        pPlanesImageSym = VIR_Shader_GetSymFromId(pShader, planeImageSymIds[i]);
+
         pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
         VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pPlanesImageSym));
-        VIR_Operand_SetTypeId(pNewOpnd, VIR_Type_GetBaseTypeId(pPlanesImageSymType));
         VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZW);
-        VIR_Operand_SetIsConstIndexing(pNewOpnd, gcvTRUE);
-        VIR_Operand_SetRelIndex(pNewOpnd, i);
     }
 
     /* MOV the specialized parameters. */

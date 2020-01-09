@@ -3214,6 +3214,8 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
             SHS_PRIV_MEM_KIND   privMemKind = SHS_PRIV_MEM_KIND_NONE;
             VIR_UniformKind     uniformKind;
             gctBOOL             bAddLlResSlot = gcvTRUE;
+            gctBOOL             bSpecifiedPrivmKindIndex = gcvFALSE;
+            gctUINT             specifiedPrivmKindIndex = 0;
 
             pVirUniform = VIR_Symbol_GetUniformPointer(pShader, pVirUniformSym);
             if (pVirUniform && pVirUniform->physical == -1)
@@ -3228,9 +3230,27 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
                 privMemKind = SHS_PRIV_MEM_KIND_EXTRA_UAV_LAYER;
                 break;
 
-            case VIR_UNIFORM_YCBCR_PLANES:
-                privMemKind = SHS_PRIV_MEM_KIND_YCBCR_PLANES;
-                bAddLlResSlot = gcvFALSE;
+            case VIR_UNIFORM_YCBCR_PLANE:
+                {
+                    VIR_Symbol* pParentSym = VIR_Shader_GetSymFromId(pShader, pVirUniform->u.samplerOrImageAttr.parentSamplerSymId);
+                    VIR_Uniform*pParentUniform = VIR_Symbol_GetUniformPointer(pShader, pParentSym);
+                    gctUINT     i;
+
+                    privMemKind = SHS_PRIV_MEM_KIND_YCBCR_PLANE;
+                    bAddLlResSlot = gcvFALSE;
+                    bSpecifiedPrivmKindIndex = gcvTRUE;
+
+                    for (i = 0; i < __YCBCR_PLANE_COUNT__; i++)
+                    {
+                        if (pParentUniform->u.samplerOrImageAttr.ycbcrPlaneSymId[i] == VIR_Symbol_GetIndex(pVirUniformSym))
+                        {
+                            break;
+                        }
+                    }
+
+                    gcmASSERT(i != __YCBCR_PLANE_COUNT__);
+                    specifiedPrivmKindIndex = i;
+                }
                 break;
 
             default:
@@ -3248,7 +3268,15 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
                 pPrivUavEntry = _enlargePrivUavMappingRoom(&pOutSEP->staticPrivMapping.privUavMapping, 1);
 
                 pPrivUavEntry->commonPrivm.privmKind = privMemKind;
-                pPrivUavEntry->commonPrivm.privmKindIndex = i;
+
+                if (bSpecifiedPrivmKindIndex)
+                {
+                    pPrivUavEntry->commonPrivm.privmKindIndex = specifiedPrivmKindIndex;
+                }
+                else
+                {
+                    pPrivUavEntry->commonPrivm.privmKindIndex = i;
+                }
 
                 if (bAddLlResSlot)
                 {
@@ -5196,7 +5224,7 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepG
             _AddPrivateImageUniform(&pCombTsEntry->hwMappings[stageIdx].pYcbcrPlanes[j],
                                     &pCombTsEntry->combTsBinding,
                                     pSep,
-                                    SHS_PRIV_MEM_KIND_YCBCR_PLANES,
+                                    SHS_PRIV_MEM_KIND_YCBCR_PLANE,
                                     gcvTRUE,
                                     j);
         }
