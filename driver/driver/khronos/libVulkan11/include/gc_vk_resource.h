@@ -50,6 +50,11 @@
 #define __VK_FORMAT_DEPTH_FEATURES \
     VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
 
+#define __VK_FORMAT_YCBCR_CONVERSION_FEATURES \
+    VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT               | \
+    VK_FORMAT_FEATURE_TRANSFER_SRC_BIT_KHR            | \
+    VK_FORMAT_FEATURE_TRANSFER_DST_BIT_KHR
+
 enum
 {
     __VK_FMT_CATEGORY_UNORM = 0,
@@ -214,6 +219,13 @@ enum
     __VK_IMAGE_VIEW_TYPE_CUBE_ARRAY_BIT = 1 << VK_IMAGE_VIEW_TYPE_CUBE_ARRAY,
 };
 
+typedef struct __vkSamplerYcbcrConversionRec
+{
+    __vkObject obj; /* Must be the first field */
+    VkSamplerYcbcrConversionCreateInfo  createInfo;
+    VkAllocationCallbacks memCb;
+}__vkSamplerYcbcrConversion;
+
 typedef struct __vkImageViewRec
 {
     __vkObject obj; /* Must be the first field */
@@ -221,6 +233,7 @@ typedef struct __vkImageViewRec
 
     /* ImageView specific fields */
     VkImageViewCreateInfo createInfo;
+    __vkSamplerYcbcrConversion conversion;
     VkAllocationCallbacks memCb;
 
     const __vkFormatInfo *formatInfo;
@@ -282,6 +295,9 @@ enum
     __VK_FORMAT_R8_1_X8R8G8B8,
     __VK_FORMAT_D24_UNORM_S8_UINT_PACKED32,
     __VK_FORMAT_D24_UNORM_X8_PACKED32,
+
+    __VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM,
+    __VK_FORMAT_B8G8R8G8_422_RGB_IDENTITY_UNORM,
 };
 
 enum

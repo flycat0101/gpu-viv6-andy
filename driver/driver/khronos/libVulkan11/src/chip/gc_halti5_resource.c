@@ -265,6 +265,16 @@ const __vkFormatToHwTxFmtInfo* halti5_helper_convertHwTxInfo(
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
         {VK_FORMAT_ASTC_12x12_SRGB_BLOCK, TX_FORMAT(0, 0x14, VK_FALSE, VK_TRUE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+
+        /* YCbCr format */
+        {VK_FORMAT_G8B8G8R8_422_UNORM, TX_FORMAT(0x0E, 0, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        {__VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM, TX_FORMAT(0, 0x1E, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_BLUE, SWZL_USE_GREEN, SWZL_USE_RED, SWZL_USE_ALPHA)},
+        {VK_FORMAT_B8G8R8G8_422_UNORM, TX_FORMAT(0x0F, 0, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        {__VK_FORMAT_B8G8R8G8_422_RGB_IDENTITY_UNORM, TX_FORMAT(0, 0x1D, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_BLUE, SWZL_USE_GREEN, SWZL_USE_RED, SWZL_USE_ALPHA)},
     };
 
     static const __vkFormatToHwTxFmtInfo s_vkR8HwTxInfo_halti2 =
@@ -2235,6 +2245,99 @@ VkResult halti5_helper_convertHwBltDesc(
  8:6) - (0 ?
  8:6) + 1))))))) << (0 ?
  8:6))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 8:6) - (0 ?
+ 8:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 8:6) - (0 ?
+ 8:6) + 1))))))) << (0 ?
+ 8:6))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:9) - (0 ?
+ 11:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:9) - (0 ?
+ 11:9) + 1))))))) << (0 ?
+ 11:9))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
+ 11:9) - (0 ?
+ 11:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:9) - (0 ? 11:9) + 1))))))) << (0 ? 11:9))), VK_FALSE},
+
+        {VK_FORMAT_G8B8G8R8_422_UNORM, 0x07, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1))))))) << (0 ?
+ 2:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:3) - (0 ?
+ 5:3) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:3) - (0 ?
+ 5:3) + 1))))))) << (0 ?
+ 5:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 5:3) - (0 ?
+ 5:3) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:3) - (0 ?
+ 5:3) + 1))))))) << (0 ?
+ 5:3))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 8:6) - (0 ?
+ 8:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 8:6) - (0 ?
+ 8:6) + 1))))))) << (0 ?
+ 8:6))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 8:6) - (0 ?
+ 8:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 8:6) - (0 ?
+ 8:6) + 1))))))) << (0 ?
+ 8:6))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:9) - (0 ?
+ 11:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:9) - (0 ?
+ 11:9) + 1))))))) << (0 ?
+ 11:9))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
+ 11:9) - (0 ?
+ 11:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:9) - (0 ? 11:9) + 1))))))) << (0 ? 11:9))), VK_FALSE},
+        {VK_FORMAT_B8G8R8G8_422_UNORM, 0x07, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 2:0) - (0 ?
+ 2:0) + 1))))))) << (0 ?
+ 2:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:3) - (0 ?
+ 5:3) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:3) - (0 ?
+ 5:3) + 1))))))) << (0 ?
+ 5:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 5:3) - (0 ?
+ 5:3) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:3) - (0 ?
+ 5:3) + 1))))))) << (0 ?
+ 5:3))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 8:6) - (0 ?
+ 8:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 8:6) - (0 ?
+ 8:6) + 1))))))) << (0 ?
+ 8:6))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
  8:6) - (0 ?
  8:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -6383,6 +6486,7 @@ VkResult halti5_helper_convertHwTxDesc(
     uint32_t addressing;
     uint32_t txConfig2;
     VkBool32 astcImage;
+    VkBool32 yuvImage;
     uint32_t swizzle_r, swizzle_g, swizzle_b, swizzle_a;
     __vkFormatInfo *residentFormatInfo = VK_NULL_HANDLE;
     __vkDeviceMemory *resourceMemory = VK_NULL_HANDLE;
@@ -6526,7 +6630,12 @@ VkResult halti5_helper_convertHwTxDesc(
     logDepth  = __vk_UtilLog2inXdot8(baseLevel->requestD);
     addressing = (tiling == gcvLINEAR) ? 0x3 : 0x0;
     astcImage = ((((((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_NEW_SHIFT))) >> (0 ? 5:0)) & ((gctUINT32) ((((1 ? 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1)))))) ) == 0x14) ?
-        VK_TRUE : VK_FALSE;
+    VK_TRUE : VK_FALSE;
+    yuvImage = ((((((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_NEW_SHIFT))) >> (0 ? 5:0)) & ((gctUINT32) ((((1 ? 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1)))))) ) == 0x1E) ||
+        ((((((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_NEW_SHIFT))) >> (0 ? 5:0)) & ((gctUINT32) ((((1 ? 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1)))))) ) == 0x1D) ||
+        ((((((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_OLD_SHIFT))) >> (0 ? 5:0)) & ((gctUINT32) ((((1 ? 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1)))))) ) == 0x0E) ||
+        ((((((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_OLD_SHIFT))) >> (0 ? 5:0)) & ((gctUINT32) ((((1 ? 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1)))))) ) == 0x0F)
+        ? VK_TRUE : VK_FALSE;
 
     switch (createFormat)
     {
@@ -6603,6 +6712,8 @@ VkResult halti5_helper_convertHwTxDesc(
         gcsTEXTUREDESCRIPTORREGS *hwDescriptor;
         uint32_t levelCount = subResourceRange->levelCount;
         uint32_t layerCount = subResourceRange->layerCount;
+        uint32_t yuvStandard = 0x0;
+        uint32_t swapUV = 0;
 
         /* Allocate device memory for texture descriptor */
         __VK_MEMZERO(&mem_alloc, sizeof(mem_alloc));
@@ -6668,6 +6779,198 @@ VkResult halti5_helper_convertHwTxDesc(
             physical = resourceMemory->devAddr;
             physical += (uint32_t)(offsetInResourceMemory + baseLevel->offset);
             hwDescriptor->gcregTXAddress[0] = physical;
+        }
+
+        if (yuvImage)
+        {
+            VkSamplerYcbcrConversionInfo* ycbcrConversionInfo = (VkSamplerYcbcrConversionInfo*)imgv->createInfo.pNext;
+            if (ycbcrConversionInfo)
+            {
+                /* */
+                __vkSamplerYcbcrConversion *ycbcrConversion = (__vkSamplerYcbcrConversion*)ycbcrConversionInfo->conversion;
+                __vkFormatInfo *formatInfo = __vk_GetVkFormatInfo(ycbcrConversion->createInfo.format);
+                uint32_t xFormat = 0, yFormat = 0;
+
+                switch (formatInfo->residentImgFormat)
+                {
+                case VK_FORMAT_G8B8G8R8_422_UNORM:
+                case VK_FORMAT_B8G8R8G8_422_UNORM:
+                case __VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM:
+                case __VK_FORMAT_B8G8R8G8_422_RGB_IDENTITY_UNORM:
+                    xFormat = 0x2;
+                    yFormat = 0x1;
+                    break;
+                case VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM:
+                    xFormat = 0x2;
+                    yFormat = 0x2;
+                    break;
+                case VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM:
+                    xFormat = 0x1;
+                    yFormat = 0x1;
+                    break;
+                default:
+                    __VK_ASSERT(0 && "yuv format is not support");
+                }
+
+                hwDescriptor->gcregTXControlYUVEx =
+                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1))))))) << (0 ?
+ 1:0))) | (((gctUINT32) ((gctUINT32) (xFormat) & ((gctUINT32) ((((1 ?
+ 1:0) - (0 ?
+ 1:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1))))))) << (0 ?
+ 5:4))) | (((gctUINT32) ((gctUINT32) (yFormat) & ((gctUINT32) ((((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1))))))) << (0 ?
+ 6:6))) | (((gctUINT32) ((gctUINT32) (0x0) & ((gctUINT32) ((((1 ?
+ 6:6) - (0 ?
+ 6:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1))))))) << (0 ?
+ 10:8))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 10:8) - (0 ?
+ 10:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 10:8) - (0 ? 10:8) + 1))))))) << (0 ? 10:8)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1))))))) << (0 ?
+ 14:12))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 14:12) - (0 ?
+ 14:12) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 14:12) - (0 ? 14:12) + 1))))))) << (0 ? 14:12)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ?
+ 18:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1))))))) << (0 ?
+ 11:11))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 11:11) - (0 ?
+ 11:11) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 11:11) - (0 ? 11:11) + 1))))))) << (0 ? 11:11)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1))))))) << (0 ?
+ 20:20))) | (((gctUINT32) ((gctUINT32) (0x1) & ((gctUINT32) ((((1 ?
+ 20:20) - (0 ?
+ 20:20) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ? 20:20)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:22) - (0 ?
+ 23:22) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 23:22) - (0 ?
+ 23:22) + 1))))))) << (0 ?
+ 23:22))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 23:22) - (0 ?
+ 23:22) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 23:22) - (0 ? 23:22) + 1))))))) << (0 ? 23:22)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:24) - (0 ?
+ 25:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:24) - (0 ?
+ 25:24) + 1))))))) << (0 ?
+ 25:24))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:24) - (0 ?
+ 25:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 25:24) - (0 ? 25:24) + 1))))))) << (0 ? 25:24)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 27:26) - (0 ?
+ 27:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 27:26) - (0 ?
+ 27:26) + 1))))))) << (0 ?
+ 27:26))) | (((gctUINT32) ((gctUINT32) (2) & ((gctUINT32) ((((1 ?
+ 27:26) - (0 ?
+ 27:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 27:26) - (0 ? 27:26) + 1))))))) << (0 ? 27:26)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 21:21) - (0 ?
+ 21:21) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 21:21) - (0 ?
+ 21:21) + 1))))))) << (0 ?
+ 21:21))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 21:21) - (0 ?
+ 21:21) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 21:21) - (0 ? 21:21) + 1))))))) << (0 ? 21:21)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1))))))) << (0 ?
+ 29:28))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 29:28) - (0 ?
+ 29:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 29:28) - (0 ? 29:28) + 1))))))) << (0 ? 29:28)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:30) - (0 ?
+ 31:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:30) - (0 ?
+ 31:30) + 1))))))) << (0 ?
+ 31:30))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 31:30) - (0 ?
+ 31:30) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:30) - (0 ? 31:30) + 1))))))) << (0 ? 31:30)))
+                    ;
+                hwDescriptor->gcregTXStrideYUVEx = 0;
+                hwDescriptor->gcregTXLogSize = 0x2;
+                yuvStandard = ycbcrConversion->createInfo.ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_709
+                            ? 0x1 : yuvStandard;
+
+                swapUV = ycbcrConversion->createInfo.components.r == VK_COMPONENT_SWIZZLE_B &&
+                         ycbcrConversion->createInfo.components.b == VK_COMPONENT_SWIZZLE_R;
+                if ((ycbcrConversion->createInfo.ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY ||
+                    ycbcrConversion->createInfo.ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_IDENTITY) && swapUV == 1)
+                {
+                    uint32_t swizzle = swizzle_r;
+                    swizzle_r = swizzle_b;
+                    swizzle_b = swizzle;
+                    swapUV = 0;
+
+                }
+            }
         }
 
         hwDescriptor->gcregTXConfig =
@@ -6829,7 +7132,7 @@ VkResult halti5_helper_convertHwTxDesc(
  ~0U : (~(~0U << ((1 ?
  15:15) - (0 ?
  15:15) + 1))))))) << (0 ?
- 15:15))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 15:15))) | (((gctUINT32) ((gctUINT32) (swapUV) & ((gctUINT32) ((((1 ?
  15:15) - (0 ?
  15:15) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:15) - (0 ? 15:15) + 1))))))) << (0 ? 15:15)))
@@ -6869,7 +7172,7 @@ VkResult halti5_helper_convertHwTxDesc(
  ~0U : (~(~0U << ((1 ?
  29:29) - (0 ?
  29:29) + 1))))))) << (0 ?
- 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 29:29))) | (((gctUINT32) ((gctUINT32) (yuvStandard) & ((gctUINT32) ((((1 ?
  29:29) - (0 ?
  29:29) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)))
@@ -6965,7 +7268,7 @@ VkResult halti5_helper_convertHwTxDesc(
 
         hwDescriptor->gcregTXSlice = (uint32_t)baseLevel->sliceSize;
 
-        hwDescriptor->gcregTXLogSize = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        hwDescriptor->gcregTXLogSize |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:27) - (0 ?
  28:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10763,7 +11066,6 @@ OnError:
     return result;
 }
 
-
 VkResult halti5_createImageView(
     VkDevice device,
     VkImageView imageView
@@ -10779,7 +11081,7 @@ VkResult halti5_createImageView(
     VkFormatFeatureFlags formatFeatureFlags = (img->createInfo.tiling == VK_IMAGE_TILING_LINEAR) ?
         formatProps->linearTilingFeatures : formatProps->optimalTilingFeatures;
     uint32_t residentImgFormat = imgv->formatInfo->residentImgFormat;
-    uint32_t *ext = (uint32_t *)imgv->createInfo.pNext;
+    VkBaseInStructure *ext = (VkBaseInStructure *)imgv->createInfo.pNext;
     VkImageUsageFlags usage = img->createInfo.usage;
 
     __VK_SET_ALLOCATIONCB(&imgv->memCb);
@@ -10806,14 +11108,18 @@ VkResult halti5_createImageView(
 
     while (ext)
     {
-        switch (*ext)
+        switch (ext->sType)
         {
         case VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO:
             {
                 VkImageViewUsageCreateInfo * imgvUsage = (VkImageViewUsageCreateInfo *)ext;
                 usage = imgvUsage->usage;
-                ext = (uint32_t *)imgvUsage->pNext;
+                ext = (VkBaseInStructure *)imgvUsage->pNext;
             }
+            break;
+        case VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO:
+            imgv->conversion = *(__vkSamplerYcbcrConversion*)ext;
+            ext = (VkBaseInStructure *)ext->pNext;
             break;
         default:
             {

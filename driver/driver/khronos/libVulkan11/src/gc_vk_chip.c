@@ -48,12 +48,54 @@ VkResult __vkInitilizeChipModule(
 VKAPI_ATTR void VKAPI_CALL __vk_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, VkQueue* pQueue)
 {
 }
+
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateSamplerYcbcrConversion(VkDevice device, const VkSamplerYcbcrConversionCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSamplerYcbcrConversion* pYcbcrConversion)
 {
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    __vkSamplerYcbcrConversion* pConversion = VK_NULL_HANDLE;
+    VkResult result = VK_SUCCESS;
+
+    /* Set the allocator to the parent allocator or API defined allocator if valid */
+    __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
+    if (pCreateInfo->ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_2020 ||
+        pCreateInfo->ycbcrModel == VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_IDENTITY ||
+        (pCreateInfo->ycbcrRange == VK_SAMPLER_YCBCR_RANGE_ITU_FULL &&
+         pCreateInfo->ycbcrModel != VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY))
+    {
+        result = VK_ERROR_FEATURE_NOT_PRESENT;
+        goto OnError;
+    }
+
+    __VK_ONERROR(__vk_CreateObject(devCtx, __VK_OBJECT_YCBCR_CONVERSION, sizeof(__vkSampler), (__vkObject**)&pConversion));
+
+    /* Initialize __vkSamplerYcbcrConversion specific data fields here */
+    __VK_MEMCOPY(&pConversion->createInfo, pCreateInfo, sizeof(VkSamplerYcbcrConversionCreateInfo));
+
+    *pYcbcrConversion = (VkSamplerYcbcrConversion)(uintptr_t)pConversion;
+
     return VK_SUCCESS;
+OnError:
+    if (pConversion)
+    {
+        __vk_DestroyObject(devCtx, __VK_OBJECT_YCBCR_CONVERSION, (__vkObject *)pConversion);
+    }
+    return result;
 }
+
 VKAPI_ATTR void VKAPI_CALL __vk_DestroySamplerYcbcrConversion(VkDevice device, VkSamplerYcbcrConversion ycbcrConversion, const VkAllocationCallbacks* pAllocator)
 {
+    __vkDevContext *devCtx = (__vkDevContext *)device;
+    if (ycbcrConversion)
+    {
+        __vkSamplerYcbcrConversion *pConversion = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSamplerYcbcrConversion *, ycbcrConversion);
+
+        /* Set the allocator to the parent allocator or API defined allocator if valid */
+        __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
+
+        __vk_DestroyObject(devCtx, __VK_OBJECT_YCBCR_CONVERSION, (__vkObject *)pConversion);
+    }
 }
 
 
