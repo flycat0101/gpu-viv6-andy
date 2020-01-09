@@ -478,6 +478,8 @@ _GetUniformKindString(
         return "viewIndex";
     case VIR_UNIFORM_THREAD_ID_MEM_ADDR:
         return "threadIdMemAddr";
+    case VIR_UNIFORM_YCBCR_PLANES:
+        return "ycbcrPlanes";
     default:
         gcmASSERT(0);
         return "";

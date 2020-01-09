@@ -3857,6 +3857,7 @@ _UpdateOperandParameterForIntrinsicCall(
                 extraLayer->u.samplerOrImageAttr.parentSamplerSymId = image->sym;
                 extraLayer->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
                 extraLayer->u.samplerOrImageAttr.texelBufferToImageSymId = VIR_INVALID_ID;
+                extraLayer->u.samplerOrImageAttr.ycbcrPlaneSymId = VIR_INVALID_ID;
             }
 
             /* New a operand with this extra image layer.  */
@@ -5351,7 +5352,9 @@ _CheckTextureResource(
         ||
         linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHERPCF_D32F
         ||
-        linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_NORMALIZE_TEXCOORD)
+        linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_NORMALIZE_TEXCOORD
+        ||
+        linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_YCBCR_TEXTURE)
     {
         return gcvTRUE;
     }
@@ -5555,6 +5558,7 @@ _AddExtraSampler(
         extraLayer->u.samplerOrImageAttr.parentSamplerSymId = sampler->sym;
         extraLayer->u.samplerOrImageAttr.arrayIdxInParent = arrayIndex;
         extraLayer->u.samplerOrImageAttr.texelBufferToImageSymId = VIR_INVALID_ID;
+        extraLayer->u.samplerOrImageAttr.ycbcrPlaneSymId = VIR_INVALID_ID;
     }
 
     /* New a operand with this extra image layer.  */
@@ -6572,6 +6576,203 @@ OnError:
 };
 
 static VSC_ErrCode
+_AddYcbcrPlanesToSampler(
+    IN VIR_Shader*      pShader,
+    IN VIR_Function*    pFunc,
+    IN VIR_Symbol*      pSamplerSym,
+    IN VIR_Uniform*     pSamplerUniform,
+    IN gctUINT          arrayIndex,
+    OUT VIR_Symbol**    ppPlanesImageSym
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_SymId           ycbcrPlaneSymId = pSamplerUniform->u.samplerOrImageAttr.ycbcrPlaneSymId;
+    VIR_Symbol*         pPlanesImageSym = gcvNULL;
+    VIR_Uniform*        pPlanesImage = gcvNULL;
+
+    if (ycbcrPlaneSymId == VIR_INVALID_ID)
+    {
+        VIR_NameId      nameId;
+        gctCHAR         name[128] = "#";
+        VIR_TypeId      planesTypeId = VIR_TYPE_VOID;
+
+        /* Add an array type uimage[3]. */
+        errCode = VIR_Shader_AddArrayType(pShader,
+                                          VIR_TYPE_UIMAGE_2D,
+                                          3,
+                                          1,
+                                          &planesTypeId);
+        ON_ERROR(errCode, "Add an array type.");
+
+        /* Add a name string. */
+        gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, pSamplerSym));
+        gcoOS_StrCatSafe(name, gcmSIZEOF(name), "_YcbcrPlanes");
+        errCode = VIR_Shader_AddString(pShader,
+                                       name,
+                                       &nameId);
+        ON_ERROR(errCode, "Add a string");
+
+        /* Add the array image. */
+        errCode = VIR_Shader_AddSymbol(pShader,
+                                       VIR_SYM_IMAGE,
+                                       nameId,
+                                       VIR_Shader_GetTypeFromId(pShader, planesTypeId),
+                                       VIR_STORAGE_UNKNOWN,
+                                       &ycbcrPlaneSymId);
+        ON_ERROR(errCode, "VIR_Shader_AddSymbol");
+
+        pPlanesImageSym = VIR_Shader_GetSymFromId(pShader, ycbcrPlaneSymId);
+        pSamplerUniform->u.samplerOrImageAttr.ycbcrPlaneSymId = ycbcrPlaneSymId;
+        VIR_Symbol_SetFlag(pPlanesImageSym, VIR_SYMFLAG_COMPILER_GEN);
+        VIR_Symbol_SetPrecision(pPlanesImageSym, VIR_Symbol_GetPrecision(pSamplerSym));
+        VIR_Symbol_SetUniformKind(pPlanesImageSym, VIR_UNIFORM_YCBCR_PLANES);
+        VIR_Symbol_SetAddrSpace(pPlanesImageSym, VIR_AS_CONSTANT);
+        VIR_Symbol_SetTyQualifier(pPlanesImageSym, VIR_Symbol_GetTyQualifier(pSamplerSym));
+        pPlanesImageSym->layout = pSamplerSym->layout;
+
+        pPlanesImage = VIR_Symbol_GetImage(pPlanesImageSym);
+        pPlanesImage->u.samplerOrImageAttr.parentSamplerSymId = VIR_Symbol_GetIndex(pSamplerSym);
+        pPlanesImage->u.samplerOrImageAttr.arrayIdxInParent = arrayIndex;
+    }
+
+    if (ppPlanesImageSym)
+    {
+        *ppPlanesImageSym = VIR_Shader_GetSymFromId(pShader, ycbcrPlaneSymId);
+    }
+
+OnError:
+    return errCode;
+}
+
+/*
+vec4 _viv_ycbcr_texture(sampler2D tex, vec2 fcoord, uimage2D plane0, uimage2D plane1, uimage2D plane2, ivec4 param0, ivec4 param1)
+*/
+static VSC_ErrCode
+_InsertCallYcbcrTexture(
+    IN VIR_LinkLibContext*      pContext,
+    IN void*                    pTranspoint,
+    IN VIR_Function*            pLibFunc
+    )
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Shader*                 pShader = pContext->shader;
+    VIR_Instruction*            pTexldInst = (VIR_Instruction *)pTranspoint;
+    VIR_Function*               pFunc = VIR_Inst_GetFunction(pTexldInst);
+    VIR_Symbol*                 pSamplerSym = gcvNULL;
+    VIR_Uniform*                pSamplerUniform = gcvNULL;
+    gctUINT                     argIdx = 0, i;
+    VIR_Instruction*            pNewInst = gcvNULL;
+    VIR_Operand*                pNewOpnd = gcvNULL;
+    VIR_Symbol*                 pPlanesImageSym = gcvNULL;
+    VIR_Type*                   pPlanesImageSymType = gcvNULL;
+    gctSTRING                   paramName = gcvNULL;
+    gctBOOL                     notFoundParam = gcvFALSE;
+
+    gcmASSERT(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(pTexldInst)));
+
+    /* Get the sampler uniform. */
+    gcmASSERT(VIR_Operand_isSymbol(VIR_Inst_GetSource(pTexldInst, 0)));
+    pSamplerSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(pTexldInst, 0));
+
+    gcmASSERT(VIR_Symbol_isSampler(pSamplerSym));
+    pSamplerUniform = VIR_Symbol_GetSampler(pSamplerSym);
+
+    /* Add the texelBuffer to image uniform. */
+    errCode = _AddYcbcrPlanesToSampler(pShader,
+                                       pFunc,
+                                       pSamplerSym,
+                                       pSamplerUniform,
+                                       pContext->linkPoint->u.resource.arrayIndex,
+                                       &pPlanesImageSym);
+    ON_ERROR(errCode, "Add ycbcr planes uniform.");
+
+    pPlanesImageSymType = VIR_Symbol_GetType(pPlanesImageSym);
+    gcmASSERT(VIR_Type_isArray(pPlanesImageSymType));
+
+    /* insert the MOV to pass arguement */
+    /* MOV arg1, sampler */
+    errCode = _InsertMovToArgs(pShader, pFunc, pLibFunc, argIdx++, pTexldInst, &pNewInst);
+    ON_ERROR(errCode, "Insert a MOV for a argument.");
+    VIR_Operand_Copy(VIR_Inst_GetSource(pNewInst, 0), VIR_Inst_GetSource(pTexldInst, 0));
+
+    /* MOV arg2, coord */
+    errCode = _InsertMovToArgs(pShader, pFunc, pLibFunc, argIdx++, pTexldInst, &pNewInst);
+    ON_ERROR(errCode, "Insert a MOV for a argument.");
+    VIR_Operand_Copy(VIR_Inst_GetSource(pNewInst, 0), VIR_Inst_GetSource(pTexldInst, 1));
+
+    /* MOV plane images. */
+    for (i = 0; i < VIR_Type_GetArrayLength(pPlanesImageSymType); i++)
+    {
+        errCode = _InsertMovToArgs(pShader, pFunc, pLibFunc, argIdx++, pTexldInst, &pNewInst);
+        ON_ERROR(errCode, "Insert a MOV for a argument.");
+
+        pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+        VIR_Operand_SetSymbol(pNewOpnd, pFunc, VIR_Symbol_GetIndex(pPlanesImageSym));
+        VIR_Operand_SetTypeId(pNewOpnd, VIR_Type_GetBaseTypeId(pPlanesImageSymType));
+        VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZW);
+        VIR_Operand_SetIsConstIndexing(pNewOpnd, gcvTRUE);
+        VIR_Operand_SetRelIndex(pNewOpnd, i);
+    }
+
+    /* MOV the specialized parameters. */
+    for (i = 0; i < pContext->libSpecializationConstantCount; i ++)
+    {
+        VSC_LIB_SPECIALIZATION_CONSTANT* pSpecializationConst = &pContext->libSpecializationConsts[i];
+
+        paramName = _GetLibFuncParam(pLibFunc, argIdx);
+
+        if (gcmIS_SUCCESS(gcoOS_StrNCmp(pSpecializationConst->varName, paramName, gcoOS_StrLen(pSpecializationConst->varName, gcvNULL)))
+            &&
+            pSpecializationConst->type == VSC_SHADER_DATA_TYPE_INTEGER_X4)
+        {
+            VIR_ConstVal    new_const_val;
+            VIR_ConstId     new_const_id;
+            VIR_Const       *new_const;
+
+            errCode = _InsertMovToArgs(pShader, pFunc, pLibFunc, argIdx++, pTexldInst, &pNewInst);
+            ON_ERROR(errCode, "Insert a parameter.");
+
+            new_const_val.vecVal.i32Value[0] = pSpecializationConst->value.iValue[0];
+            new_const_val.vecVal.i32Value[1] = pSpecializationConst->value.iValue[1];
+            new_const_val.vecVal.i32Value[2] = pSpecializationConst->value.iValue[2];
+            new_const_val.vecVal.i32Value[3] = pSpecializationConst->value.iValue[3];
+
+            VIR_Shader_AddConstant(pShader,
+                                   VIR_TYPE_INTEGER_X4,
+                                   &new_const_val,
+                                   &new_const_id);
+            new_const = VIR_Shader_GetConstFromId(pShader, new_const_id);
+            new_const->type = VIR_TYPE_INTEGER_X4;
+
+            pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
+            VIR_Operand_SetConst(pNewOpnd, VIR_TYPE_INTEGER_X4, new_const_id);
+            VIR_Operand_SetSwizzle(pNewOpnd, VIR_SWIZZLE_XYZW);
+        }
+        else
+        {
+            notFoundParam = gcvTRUE;
+            break;
+        }
+    }
+
+    if (notFoundParam)
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    /* insert the MOV to get the return value
+       MOV destination, arg[7] */
+    errCode = _InsertMovFromArgs(pShader, pFunc, pLibFunc, argIdx++, pTexldInst, &pNewInst);
+    VIR_Operand_Copy(VIR_Inst_GetDest(pNewInst), pTexldInst->dest);
+
+    /* change texldInst to the call instruction */
+    _ChangeTexldToCall(pTexldInst, pLibFunc);
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
 _InsertCallResourcePatch(
     IN VIR_LinkLibContext     *Context,
     IN void                   *Transpoint,
@@ -6602,6 +6803,9 @@ _InsertCallResourcePatch(
             break;
         case VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXFETCH_REPLACE_WITH_IMGLD:
             errCode = _InsertCallTexldImg(Context, Transpoint, LibFunc);
+            break;
+        case VSC_LINK_POINT_RESOURCE_SUBTYPE_YCBCR_TEXTURE:
+            errCode = _InsertCallYcbcrTexture(Context, Transpoint, LibFunc);
             break;
         default:
             gcmASSERT(gcvFALSE);
