@@ -7866,7 +7866,7 @@ static VkResult halti5_syncShadowImage(
     __vkBlitRes pSrcRes, pDstRes;
     __vkImage fakedIamge;
     __vkImage* shadowImage ;
-    __vkImageLevel  pSrcLevel, pDstLevel ;
+    __vkImageLevel  pSrcLevel;
 
     __VK_MEMCOPY(&fakedIamge, image, sizeof(__vkImage));
     image = &fakedIamge;
@@ -7885,15 +7885,8 @@ static VkResult halti5_syncShadowImage(
     pSrcRes.u.img.extent.width = pSrcLevel.requestW;
     pSrcRes.u.img.extent.height = pSrcLevel.requestH;
     pSrcRes.u.img.extent.depth = pSrcLevel.requestD;
-    __VK_MEMCOPY(&pDstRes, &pSrcRes, sizeof(__vkBlitRes));
-    pDstLevel = shadowImage->pImgLevels[subresourceRange.baseMipLevel];
-    pDstRes.u.img.offset.x = 0;
-    pDstRes.u.img.offset.y = 0;
-    pDstRes.u.img.offset.z = 0;
 
-    pDstRes.u.img.extent.width = pSrcLevel.requestW;
-    pDstRes.u.img.extent.height = pSrcLevel.requestH;
-    pDstRes.u.img.extent.depth = pSrcLevel.requestD;
+    __VK_MEMCOPY(&pDstRes, &pSrcRes, sizeof(__vkBlitRes));
 
     pDstRes.u.img.pImage = shadowImage;
 
@@ -8843,6 +8836,41 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
                                                                       sampler->createInfo.borderColor,
                                                                       extraSamplerNo,
                                                                       hints->shaderConfigData);
+                }
+
+                /* program YCbCr reompile plane img desc */
+                {
+                    uint32_t planeIdx = 0;
+
+                    for (planeIdx = 0; planeIdx < 3; planeIdx++)
+                    {
+                        uint32_t imageInfo[4];
+                        SHADER_PRIV_UAV_ENTRY *privEntry = samplerEntry->hwMappings[stageIdx].pYcbcrPlanes[planeIdx];
+                        if (privEntry)
+                        {
+                            uint32_t hwConstRegNo = privEntry->pBuffer->hwLoc.pHwDirectAddrBase->hwLoc.constReg.hwRegNo;
+                            uint32_t hwConstRegAddr = (hints->hwConstRegBases[stageIdx] >> 2) + (hwConstRegNo * 4)
+                                                    + privEntry->pBuffer->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
+
+                            __VK_MEMCOPY(imageInfo, chipImgv->imgDesc[planeIdx * __VK_MAX_PARTS].imageInfo, sizeof(imageInfo));
+
+                            __VK_ASSERT(planeIdx == privEntry->uavEntryIndex);
+
+                            /* for ycbcr conversion, always is clamp to edge */
+                            imageInfo[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1))))))) << (0 ?
+ 5:4))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
+ 5:4) - (0 ?
+ 5:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
+
+                            __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr, VK_FALSE, 4, imageInfo);
+                        }
+                    }
                 }
 
                 for (layerIdx = 0; layerIdx < 2; layerIdx++)

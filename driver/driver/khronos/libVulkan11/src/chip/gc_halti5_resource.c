@@ -267,14 +267,31 @@ const __vkFormatToHwTxFmtInfo* halti5_helper_convertHwTxInfo(
             TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
 
         /* YCbCr format */
-        {VK_FORMAT_G8B8G8R8_422_UNORM, TX_FORMAT(0x0E, 0, VK_FALSE, VK_FALSE, VK_FALSE),
-            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        /* texture native support */
         {__VK_FORMAT_G8B8G8R8_422_RGB_IDENTITY_UNORM, TX_FORMAT(0, 0x1E, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_BLUE, SWZL_USE_GREEN, SWZL_USE_RED, SWZL_USE_ALPHA)},
-        {VK_FORMAT_B8G8R8G8_422_UNORM, TX_FORMAT(0x0F, 0, VK_FALSE, VK_FALSE, VK_FALSE),
-            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
         {__VK_FORMAT_B8G8R8G8_422_RGB_IDENTITY_UNORM, TX_FORMAT(0, 0x1D, VK_FALSE, VK_FALSE, VK_FALSE),
             TX_COMP_SWIZZLE(SWZL_USE_BLUE, SWZL_USE_GREEN, SWZL_USE_RED, SWZL_USE_ALPHA)},
+        {__VK_FORMAT_G8B8G8R8_422_NARROW_RANGE_UNORM, TX_FORMAT(0x0E, 0, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        {__VK_FORMAT_B8G8R8G8_422_NARROW_RANGE_UNORM, TX_FORMAT(0x0F, 0, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+
+        /* texture not support, implement by shader recompile, value is incorrect, but not care */
+        {VK_FORMAT_G8B8G8R8_422_UNORM, TX_FORMAT(0, 0, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        {VK_FORMAT_B8G8R8G8_422_UNORM, TX_FORMAT(0, 0, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        {VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM, TX_FORMAT(0, 0, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        {VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, TX_FORMAT(0, 0, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        {VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM, TX_FORMAT(0, 0, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        {VK_FORMAT_G8_B8R8_2PLANE_422_UNORM, TX_FORMAT(0, 0, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
+        {VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM, TX_FORMAT(0, 0, VK_FALSE, VK_FALSE, VK_FALSE),
+            TX_COMP_SWIZZLE(SWZL_USE_RED, SWZL_USE_GREEN, SWZL_USE_BLUE, SWZL_USE_ALPHA)},
     };
 
     static const __vkFormatToHwTxFmtInfo s_vkR8HwTxInfo_halti2 =
@@ -2260,99 +2277,6 @@ VkResult halti5_helper_convertHwBltDesc(
  11:9) - (0 ?
  11:9) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 11:9) - (0 ? 11:9) + 1))))))) << (0 ? 11:9))), VK_FALSE},
-
-        {VK_FORMAT_G8B8G8R8_422_UNORM, 0x07, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ?
- 2:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 2:0) - (0 ?
- 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 2:0) - (0 ?
- 2:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 2:0) - (0 ?
- 2:0) + 1))))))) << (0 ?
- 2:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 5:3) - (0 ?
- 5:3) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 5:3) - (0 ?
- 5:3) + 1))))))) << (0 ?
- 5:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 5:3) - (0 ?
- 5:3) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 5:3) - (0 ?
- 5:3) + 1))))))) << (0 ?
- 5:3))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 8:6) - (0 ?
- 8:6) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 8:6) - (0 ?
- 8:6) + 1))))))) << (0 ?
- 8:6))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
- 8:6) - (0 ?
- 8:6) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 8:6) - (0 ?
- 8:6) + 1))))))) << (0 ?
- 8:6))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 11:9) - (0 ?
- 11:9) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 11:9) - (0 ?
- 11:9) + 1))))))) << (0 ?
- 11:9))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
- 11:9) - (0 ?
- 11:9) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 11:9) - (0 ? 11:9) + 1))))))) << (0 ? 11:9))), VK_FALSE},
-        {VK_FORMAT_B8G8R8G8_422_UNORM, 0x07, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ?
- 2:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 2:0) - (0 ?
- 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 2:0) - (0 ?
- 2:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 2:0) - (0 ?
- 2:0) + 1))))))) << (0 ?
- 2:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 5:3) - (0 ?
- 5:3) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 5:3) - (0 ?
- 5:3) + 1))))))) << (0 ?
- 5:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 5:3) - (0 ?
- 5:3) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 5:3) - (0 ?
- 5:3) + 1))))))) << (0 ?
- 5:3))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 8:6) - (0 ?
- 8:6) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 8:6) - (0 ?
- 8:6) + 1))))))) << (0 ?
- 8:6))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
- 8:6) - (0 ?
- 8:6) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 8:6) - (0 ?
- 8:6) + 1))))))) << (0 ?
- 8:6))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 11:9) - (0 ?
- 11:9) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 11:9) - (0 ?
- 11:9) + 1))))))) << (0 ?
- 11:9))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
- 11:9) - (0 ?
- 11:9) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 11:9) - (0 ? 11:9) + 1))))))) << (0 ? 11:9))), VK_FALSE},
     };
     bitsPerPixel = __vk_GetVkFormatInfo((VkFormat) vkFormat)->bitsPerBlock / __vk_GetVkFormatInfo((VkFormat) vkFormat)->partCount;
     hwBltDesc->pixelSize = bitsPerPixel;
@@ -3438,6 +3362,8 @@ VkResult halti5_copyImage(
 
     if (srcRes->isImage)
     {
+        int32_t planeIdx = -1;
+        const __vkFormatInfo *fmtInfo = VK_NULL_HANDLE;
         __vkImageLevel *pSrcLevel;
         srcImg = srcRes->u.img.pImage;
 #if __VK_ENABLETS
@@ -3450,7 +3376,8 @@ VkResult halti5_copyImage(
 
         srcStride = (uint32_t)pSrcLevel->stride;
         srcSampleInfo = srcImg->sampleInfo;
-        srcFormat = srcImg->formatInfo.residentImgFormat;
+        fmtInfo   = __vk_GetPlaneFormatInfo(srcImg, srcRes->u.img.subRes.aspectMask);
+        srcFormat = fmtInfo ? fmtInfo->residentImgFormat : srcImg->formatInfo.residentImgFormat;
 
         if (srcImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT &&
            (srcImg->createInfo.format == VK_FORMAT_B4G4R4A4_UNORM_PACK16 ||
@@ -3463,11 +3390,17 @@ VkResult halti5_copyImage(
             srcFormat = srcImg->createInfo.format;
         }
 
-        srcParts = pSrcLevel->partCount;
+        planeIdx    = __vk_GetPlaneIndex(srcRes->u.img.subRes.aspectMask);
+        planeIdx    = planeIdx < 0 ? 0 : planeIdx;
+        srcStride   = (uint32_t)pSrcLevel->planeStride[planeIdx];
+        srcParts    = pSrcLevel->partCount;
         srcPartSize = (uint32_t)pSrcLevel->partSize;
-        srcAddress = srcImg->memory->devAddr;
+        srcAddress  = srcImg->memory->devAddr;
         offset = (uint32_t)(srcImg->memOffset + pSrcLevel->offset + srcRes->u.img.subRes.arrayLayer * pSrcLevel->sliceSize);
         srcAddress += offset;
+        /* for ycbcr format */
+        srcAddress += (uint32_t)__vk_GetPlaneOffset(srcImg, srcRes->u.img.subRes.aspectMask, srcRes->u.img.subRes.mipLevel);
+
         halti5_helper_configMSAA(srcImg, &srcMsaa, &srcCacheMode);
         halti5_helper_configTiling(srcImg, &srcTiling, &srcSuperTile);
 #if __VK_ENABLETS
@@ -3543,7 +3476,8 @@ VkResult halti5_copyImage(
         srcMsaa      = 0x0;
         srcCacheMode = 0x0;
 
-        srcFormat = dstImg->createInfo.format;
+        fmtInfo   = __vk_GetPlaneFormatInfo(dstImg, dstRes->u.img.subRes.aspectMask);
+        srcFormat = fmtInfo ? fmtInfo->residentImgFormat : dstImg->createInfo.format;
         fmtInfo = __vk_GetVkFormatInfo((VkFormat) srcFormat);
         srcParts = fmtInfo->partCount;
         srcPartSize = (uint32_t)(srcBuf->memReq.size);
@@ -3555,6 +3489,8 @@ VkResult halti5_copyImage(
 
     if (dstRes->isImage)
     {
+        int32_t planeIdx = -1;
+        const __vkFormatInfo *fmtInfo = VK_NULL_HANDLE;
         __vkImage *dstImg = dstRes->u.img.pImage;
         __vkImageLevel *pDstLevel = &dstImg->pImgLevels[dstRes->u.img.subRes.mipLevel];
 #if __VK_ENABLETS
@@ -3575,7 +3511,8 @@ VkResult halti5_copyImage(
         __VK_DEBUG_ONLY(dstAspect = dstRes->u.img.subRes.aspectMask);
 
         dstSampleInfo = dstImg->sampleInfo;
-        dstFormat = dstImg->formatInfo.residentImgFormat;
+        fmtInfo   = __vk_GetPlaneFormatInfo(dstImg, dstRes->u.img.subRes.aspectMask);
+        dstFormat = fmtInfo ? fmtInfo->residentImgFormat : dstImg->formatInfo.residentImgFormat;
 
         if (dstImg->createInfo.flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT &&
            (dstImg->createInfo.format == VK_FORMAT_B4G4R4A4_UNORM_PACK16 ||
@@ -3588,12 +3525,17 @@ VkResult halti5_copyImage(
             dstFormat = dstImg->createInfo.format;
         }
 
-        dstStride = (uint32_t)pDstLevel->stride;
-        dstParts = pDstLevel->partCount;
+        planeIdx    = __vk_GetPlaneIndex(dstRes->u.img.subRes.aspectMask);
+        planeIdx    = planeIdx < 0 ? 0 : planeIdx;
+        dstStride   = (uint32_t)pDstLevel->planeStride[planeIdx];
         dstPartSize = (uint32_t)pDstLevel->partSize;
-        dstAddress = dstImg->memory->devAddr;
+        dstParts    = pDstLevel->partCount;
+        dstAddress  = dstImg->memory->devAddr;
         dstAddress += (uint32_t)(dstImg->memOffset + pDstLevel->offset +
                                  dstRes->u.img.subRes.arrayLayer * pDstLevel->sliceSize);
+        /* for ycbcr format */
+        dstAddress += (uint32_t)__vk_GetPlaneOffset(dstImg, dstRes->u.img.subRes.aspectMask, dstRes->u.img.subRes.mipLevel);
+
         halti5_helper_configMSAA(dstImg, &dstMsaa, &dstCacheMode);
         halti5_helper_configTiling(dstImg, &dstTiling, &dstSuperTile);
 #if __VK_ENABLETS
@@ -6625,9 +6567,6 @@ VkResult halti5_helper_convertHwTxDesc(
     swizzle_b = halti5_helper_convertHwTxSwizzle(residentFormatInfo, componentMapping->b, hwTxFmtInfo->hwSwizzles[2], hwTxFmtInfo->hwSwizzles);
     swizzle_a = halti5_helper_convertHwTxSwizzle(residentFormatInfo, componentMapping->a, hwTxFmtInfo->hwSwizzles[3], hwTxFmtInfo->hwSwizzles);
 
-    logWidth  = __vk_UtilLog2inXdot8(baseLevel->allocedW);
-    logHeight = __vk_UtilLog2inXdot8(baseLevel->allocedH);
-    logDepth  = __vk_UtilLog2inXdot8(baseLevel->requestD);
     addressing = (tiling == gcvLINEAR) ? 0x3 : 0x0;
     astcImage = ((((((gctUINT32) ((hwTxFmtInfo->hwFormat >> TX_FORMAT_NEW_SHIFT))) >> (0 ? 5:0)) & ((gctUINT32) ((((1 ? 5:0) - (0 ? 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1)))))) ) == 0x14) ?
     VK_TRUE : VK_FALSE;
@@ -6714,6 +6653,11 @@ VkResult halti5_helper_convertHwTxDesc(
         uint32_t layerCount = subResourceRange->layerCount;
         uint32_t yuvStandard = 0x0;
         uint32_t swapUV = 0;
+        uint32_t requestW = 0;
+        uint32_t allocedW = 0;
+        uint32_t requestH = 0;
+        uint32_t allocedH = 0;
+        uint32_t stride = 0;
 
         /* Allocate device memory for texture descriptor */
         __VK_MEMZERO(&mem_alloc, sizeof(mem_alloc));
@@ -6724,6 +6668,24 @@ VkResult halti5_helper_convertHwTxDesc(
         __VK_ONERROR(__vk_MapMemory((VkDevice)devCtx, hwTxDesc[partIdx].descriptor, 0, hwDescriptorSize, 0, (void **)&texDesc));
         __VK_MEMZERO(texDesc, hwDescriptorSize);
 
+        if (imgv && imgv->ycbcrPlaneView)
+        {
+            int32_t plane = __vk_GetPlaneIndex(subResourceRange->aspectMask);
+            requestW  = baseLevel->planeRequestW[plane];
+            allocedW  = baseLevel->planeAllocedW[plane];
+            requestH  = baseLevel->planeRequestH[plane];
+            allocedH  = baseLevel->planeAllocedH[plane];
+            stride    = (uint32_t)baseLevel->planeStride[plane];
+        }
+        else
+        {
+            requestW  = baseLevel->requestW;
+            allocedW  = baseLevel->allocedW;
+            requestH  = baseLevel->requestH;
+            allocedH  = baseLevel->allocedH;
+            stride    = (uint32_t)baseLevel->stride;
+        }
+
         hwDescriptor = (gcsTEXTUREDESCRIPTORREGS *)texDesc;
 
         hwTxDesc[partIdx].sRGB = (hwTxFmtInfo->hwFormat >> TX_FORMAT_SRGB_SHIFT) & 0x1;
@@ -6733,8 +6695,8 @@ VkResult halti5_helper_convertHwTxDesc(
         hwTxDesc[partIdx].msaaImage =  msaaImage;
         hwTxDesc[partIdx].isCubmap = (viewType == VK_IMAGE_VIEW_TYPE_CUBE) || (viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY);
 
-        hwTxDesc[partIdx].baseWidth  = baseLevel->requestW;
-        hwTxDesc[partIdx].baseHeight = baseLevel->requestH;
+        hwTxDesc[partIdx].baseWidth  = requestW;
+        hwTxDesc[partIdx].baseHeight = requestH;
         hwTxDesc[partIdx].baseDepth  = baseLevel->requestD;
         hwTxDesc[partIdx].baseSlice  = (uint32_t)(baseLevel->sliceSize) / (residentFormatInfo->bitsPerBlock >> 3);
 
@@ -6760,12 +6722,14 @@ VkResult halti5_helper_convertHwTxDesc(
             {
                 __vkImageLevel *level = &img->pImgLevels[subResourceRange->baseMipLevel + levelIdx];
                 uint32_t physical = 0;
+                int32_t plane = __vk_GetPlaneIndex(subResourceRange->aspectMask);
 
                 physical = img->memory->devAddr;
                 physical += (uint32_t)(img->memOffset
                                      + partIdx * level->partSize
                                      + level->offset
                                      + subResourceRange->baseArrayLayer * level->sliceSize);
+                physical += plane > -1 ? (uint32_t)level->planeOffset[plane] : 0;
                 hwDescriptor->gcregTXAddress[levelIdx] = physical;
             }
         }
@@ -7022,7 +6986,7 @@ VkResult halti5_helper_convertHwTxDesc(
  ~0U : (~(~0U << ((1 ?
  14:0) - (0 ?
  14:0) + 1))))))) << (0 ?
- 14:0))) | (((gctUINT32) ((gctUINT32) (baseLevel->allocedW) & ((gctUINT32) ((((1 ?
+ 14:0))) | (((gctUINT32) ((gctUINT32) (allocedW) & ((gctUINT32) ((((1 ?
  14:0) - (0 ?
  14:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 14:0) - (0 ? 14:0) + 1))))))) << (0 ? 14:0)))
@@ -7032,7 +6996,7 @@ VkResult halti5_helper_convertHwTxDesc(
  ~0U : (~(~0U << ((1 ?
  30:16) - (0 ?
  30:16) + 1))))))) << (0 ?
- 30:16))) | (((gctUINT32) ((gctUINT32) (baseLevel->allocedH) & ((gctUINT32) ((((1 ?
+ 30:16))) | (((gctUINT32) ((gctUINT32) (allocedH) & ((gctUINT32) ((((1 ?
  30:16) - (0 ?
  30:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:16) - (0 ? 30:16) + 1))))))) << (0 ? 30:16)));
@@ -7071,7 +7035,7 @@ VkResult halti5_helper_convertHwTxDesc(
  ~0U : (~(~0U << ((1 ?
  17:0) - (0 ?
  17:0) + 1))))))) << (0 ?
- 17:0))) | (((gctUINT32) ((gctUINT32) (baseLevel->stride) & ((gctUINT32) ((((1 ?
+ 17:0))) | (((gctUINT32) ((gctUINT32) (stride) & ((gctUINT32) ((((1 ?
  17:0) - (0 ?
  17:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 17:0) - (0 ? 17:0) + 1))))))) << (0 ? 17:0)));
@@ -7231,6 +7195,10 @@ VkResult halti5_helper_convertHwTxDesc(
  3:3) - (0 ?
  3:3) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ? 3:3)));
+
+        logWidth  = __vk_UtilLog2inXdot8(allocedW);
+        logHeight = __vk_UtilLog2inXdot8(allocedH);
+        logDepth  = __vk_UtilLog2inXdot8(baseLevel->requestD);
 
         hwDescriptor->gcregTXSizeExt =
               ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -7427,6 +7395,10 @@ VkResult halti5_helper_convertHwImgDesc(
     VkBool32 extraPart = VK_FALSE;
     uint32_t partSize = 0;
     uint32_t tmpResidentImgFormat = 0;
+    int32_t plane = 0;
+    int32_t planeCount = 1;
+    int32_t planeIdx = -1;
+    __vkYCbCrFormatInfo *ycbcrFormatInfo = VK_NULL_HANDLE;
 
     __VK_ASSERT(hwImgDesc);
 
@@ -7436,6 +7408,14 @@ VkResult halti5_helper_convertHwImgDesc(
         VkImageSubresourceRange *subResourceRange = &imgv->createInfo.subresourceRange;
         __vkImageLevel *baseLevel = &img->pImgLevels[subResourceRange->baseMipLevel];
 
+        planeIdx        = __vk_GetPlaneIndex(subResourceRange->aspectMask);
+        ycbcrFormatInfo = &img->ycbcrFormatInfo;
+        planeCount      = ycbcrFormatInfo->bYUVFormat ? ycbcrFormatInfo->planeCount : 1;
+        if (ycbcrFormatInfo->bYUVFormat)
+        {
+            __VK_ASSERT(userSize == VK_NULL_HANDLE);
+        }
+
         __VK_ASSERT(!bufv);
         physical = img->memory->devAddr;
         physical += (uint32_t)(img->memOffset + baseLevel->offset +
@@ -7444,7 +7424,9 @@ VkResult halti5_helper_convertHwImgDesc(
         residentFormatInfo = (__vkFormatInfo*)imgv->formatInfo;
         tmpResidentImgFormat = residentFormatInfo->residentImgFormat;
 
-        if (imgv->formatInfo->compressed || img->formatInfo.compressed)
+        if ((imgv->formatInfo->compressed || img->formatInfo.compressed) &&
+            !ycbcrFormatInfo->bYUVFormat
+            )
         {
             tiling = gcvLINEAR;
         }
@@ -7529,10 +7511,31 @@ VkResult halti5_helper_convertHwImgDesc(
         __VK_ASSERT(!"Must have one view to generate image descriptor");
     }
 
-    switch (tmpResidentImgFormat)
+    for (plane = 0; plane < planeCount; plane++)
     {
-    case VK_FORMAT_R8_UNORM:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        VkDeviceSize planeOffset = 0;
+        uint32_t format = tmpResidentImgFormat;
+        if (ycbcrFormatInfo && ycbcrFormatInfo->bYUVFormat)
+        {
+            __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imgv->createInfo.image);
+            VkImageSubresourceRange *subResourceRange = &imgv->createInfo.subresourceRange;
+            __vkImageLevel *baseLevel = &img->pImgLevels[subResourceRange->baseMipLevel];
+
+            format = ycbcrFormatInfo->planeFormat[plane];
+
+            /* when do computeblit, sometime use fake format */
+            format = planeIdx != plane && img->formatInfo.residentImgFormat == tmpResidentImgFormat ? format : tmpResidentImgFormat;
+            width  = baseLevel->planeAllocedW[plane];
+            height = baseLevel->planeAllocedH[plane];
+            stride = (uint32_t)baseLevel->planeStride[plane];
+            planeOffset = baseLevel->planeOffset[plane];
+
+        }
+
+        switch (format)
+        {
+        case VK_FORMAT_R8_UNORM:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7542,7 +7545,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7552,7 +7555,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7562,7 +7565,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7572,7 +7575,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7582,7 +7585,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7592,7 +7595,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7602,7 +7605,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7612,9 +7615,9 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
-    case VK_FORMAT_R8_SNORM:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            break;
+        case VK_FORMAT_R8_SNORM:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7624,7 +7627,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7634,7 +7637,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7644,7 +7647,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7654,7 +7657,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7664,7 +7667,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7674,7 +7677,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7684,7 +7687,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7694,9 +7697,9 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
-    case VK_FORMAT_R8_UINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            break;
+        case VK_FORMAT_R8_UINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7706,7 +7709,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7716,7 +7719,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7726,7 +7729,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7736,7 +7739,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7746,7 +7749,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7756,7 +7759,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7766,7 +7769,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7776,10 +7779,10 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R8_SINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R8_SINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7789,7 +7792,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7799,7 +7802,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7809,7 +7812,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7819,7 +7822,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7829,7 +7832,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7839,7 +7842,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7849,7 +7852,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7859,9 +7862,9 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
-    case VK_FORMAT_R8G8_UNORM:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            break;
+        case VK_FORMAT_R8G8_UNORM:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7871,7 +7874,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7881,7 +7884,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7891,7 +7894,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7901,7 +7904,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7911,7 +7914,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7921,7 +7924,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7931,7 +7934,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7941,9 +7944,9 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
-    case VK_FORMAT_R8G8_SNORM:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            break;
+        case VK_FORMAT_R8G8_SNORM:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7953,7 +7956,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7963,7 +7966,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7973,7 +7976,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7983,7 +7986,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -7993,7 +7996,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8003,7 +8006,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8013,7 +8016,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8023,9 +8026,9 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
-    case VK_FORMAT_R8G8_UINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            break;
+        case VK_FORMAT_R8G8_UINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8035,7 +8038,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8045,7 +8048,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8055,7 +8058,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8065,7 +8068,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8075,7 +8078,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8085,7 +8088,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8095,7 +8098,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8105,10 +8108,10 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R8G8_SINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R8G8_SINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8118,7 +8121,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8128,7 +8131,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8138,7 +8141,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8148,7 +8151,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8158,7 +8161,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8168,7 +8171,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8178,7 +8181,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8188,11 +8191,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_B8G8R8A8_UNORM:
-    case VK_FORMAT_B8G8R8A8_SRGB:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_B8G8R8A8_UNORM:
+        case VK_FORMAT_B8G8R8A8_SRGB:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8202,7 +8205,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8212,7 +8215,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8222,7 +8225,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8232,7 +8235,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8242,7 +8245,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8252,7 +8255,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8262,7 +8265,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8272,9 +8275,9 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
-    case VK_FORMAT_R8G8B8A8_SRGB:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            break;
+        case VK_FORMAT_R8G8B8A8_SRGB:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8284,7 +8287,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8294,7 +8297,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8304,7 +8307,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8314,7 +8317,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8324,7 +8327,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8334,7 +8337,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8344,7 +8347,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8354,11 +8357,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-         break;
+             break;
 
-    case VK_FORMAT_R8G8B8A8_UNORM:
-    case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R8G8B8A8_UNORM:
+        case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8368,7 +8371,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8378,7 +8381,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8388,7 +8391,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8398,7 +8401,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8408,7 +8411,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8418,7 +8421,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8428,7 +8431,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8438,10 +8441,10 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case __VK_FORMAT_R8_1_X8R8G8B8:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case __VK_FORMAT_R8_1_X8R8G8B8:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8451,7 +8454,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8461,7 +8464,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8471,7 +8474,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8481,7 +8484,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8491,7 +8494,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8501,7 +8504,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8511,7 +8514,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8521,11 +8524,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R8G8B8A8_SNORM:
-    case VK_FORMAT_A8B8G8R8_SNORM_PACK32:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R8G8B8A8_SNORM:
+        case VK_FORMAT_A8B8G8R8_SNORM_PACK32:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8535,7 +8538,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8545,7 +8548,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8555,7 +8558,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8565,7 +8568,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8575,7 +8578,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8585,7 +8588,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8595,7 +8598,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8605,11 +8608,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R8G8B8A8_UINT:
-    case VK_FORMAT_A8B8G8R8_UINT_PACK32:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R8G8B8A8_UINT:
+        case VK_FORMAT_A8B8G8R8_UINT_PACK32:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8619,7 +8622,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8629,7 +8632,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8639,7 +8642,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8649,7 +8652,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8659,7 +8662,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8669,7 +8672,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8679,7 +8682,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8689,11 +8692,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R8G8B8A8_SINT:
-    case VK_FORMAT_A8B8G8R8_SINT_PACK32:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R8G8B8A8_SINT:
+        case VK_FORMAT_A8B8G8R8_SINT_PACK32:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8703,7 +8706,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8713,7 +8716,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8723,7 +8726,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8733,7 +8736,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8743,7 +8746,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8753,7 +8756,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8763,7 +8766,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8773,9 +8776,9 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
-   case VK_FORMAT_R16_UINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            break;
+       case VK_FORMAT_R16_UINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8785,7 +8788,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8795,7 +8798,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8805,7 +8808,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8815,7 +8818,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8825,7 +8828,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8835,7 +8838,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8845,7 +8848,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8855,10 +8858,10 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R16_SINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R16_SINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8868,7 +8871,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8878,7 +8881,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8888,7 +8891,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8898,7 +8901,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8908,7 +8911,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8918,7 +8921,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8928,7 +8931,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8938,10 +8941,10 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R16_SFLOAT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R16_SFLOAT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8951,7 +8954,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8961,7 +8964,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8971,7 +8974,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8981,7 +8984,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -8991,7 +8994,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9001,7 +9004,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9011,7 +9014,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9021,10 +9024,10 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R16_UNORM:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R16_UNORM:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9034,7 +9037,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9044,7 +9047,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9054,7 +9057,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9064,7 +9067,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9074,7 +9077,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9084,7 +9087,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9094,7 +9097,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9104,11 +9107,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R16G16_UINT:
-    case __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R16G16_UINT:
+        case __VK_FORMAT_R16G16B16A16_UINT_2_R16G16_UINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9118,7 +9121,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9128,7 +9131,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9138,7 +9141,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9148,7 +9151,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9158,7 +9161,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9168,7 +9171,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9178,7 +9181,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9188,11 +9191,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R16G16_SINT:
-    case __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R16G16_SINT:
+        case __VK_FORMAT_R16G16B16A16_SINT_2_R16G16_SINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9202,7 +9205,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9212,7 +9215,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9222,7 +9225,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9232,7 +9235,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9242,7 +9245,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9252,7 +9255,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9262,7 +9265,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9272,11 +9275,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R16G16_SFLOAT:
-    case __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R16G16_SFLOAT:
+        case __VK_FORMAT_R16G16B16A16_SFLOAT_2_R16G16_SFLOAT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9286,7 +9289,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9296,7 +9299,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9306,7 +9309,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9316,7 +9319,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9326,7 +9329,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9336,7 +9339,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9346,7 +9349,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9356,10 +9359,10 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R16G16B16A16_UINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R16G16B16A16_UINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9369,7 +9372,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9379,7 +9382,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9389,7 +9392,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9399,7 +9402,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9409,7 +9412,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9419,7 +9422,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9429,7 +9432,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9439,10 +9442,10 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R16G16B16A16_SINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R16G16B16A16_SINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9452,7 +9455,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9462,7 +9465,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9472,7 +9475,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9482,7 +9485,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9492,7 +9495,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9502,7 +9505,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9512,7 +9515,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9522,10 +9525,10 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R16G16B16A16_SFLOAT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R16G16B16A16_SFLOAT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9535,7 +9538,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9545,7 +9548,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9555,7 +9558,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9565,7 +9568,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9575,7 +9578,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9585,7 +9588,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9595,7 +9598,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9605,11 +9608,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R32_UINT:
-    case __VK_FORMAT_R32G32_UINT_2_R32_UINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R32_UINT:
+        case __VK_FORMAT_R32G32_UINT_2_R32_UINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9619,7 +9622,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9629,7 +9632,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9639,7 +9642,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9649,7 +9652,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9659,7 +9662,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9669,7 +9672,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9679,7 +9682,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9689,11 +9692,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R32_SINT:
-    case __VK_FORMAT_R32G32_SINT_2_R32_SINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R32_SINT:
+        case __VK_FORMAT_R32G32_SINT_2_R32_SINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9703,7 +9706,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9713,7 +9716,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9723,7 +9726,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9733,7 +9736,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9743,7 +9746,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9753,7 +9756,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9763,7 +9766,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9773,11 +9776,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R32_SFLOAT:
-    case __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R32_SFLOAT:
+        case __VK_FORMAT_R32G32_SFLOAT_2_R32_SFLOAT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9787,7 +9790,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9797,7 +9800,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9807,7 +9810,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9817,7 +9820,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9827,7 +9830,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9837,7 +9840,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9847,7 +9850,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9857,11 +9860,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R32G32_UINT:
-    case __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R32G32_UINT:
+        case __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9871,7 +9874,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9881,7 +9884,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9891,7 +9894,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9901,7 +9904,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9911,7 +9914,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9921,7 +9924,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9931,7 +9934,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9941,11 +9944,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R32G32_SINT:
-    case __VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R32G32_SINT:
+        case __VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9955,7 +9958,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9965,7 +9968,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9975,7 +9978,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9985,7 +9988,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -9995,7 +9998,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10005,7 +10008,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10015,7 +10018,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10025,11 +10028,11 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R32G32_SFLOAT:
-    case __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R32G32_SFLOAT:
+        case __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10039,7 +10042,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10049,7 +10052,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10059,7 +10062,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10069,7 +10072,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10079,7 +10082,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10089,7 +10092,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10099,7 +10102,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10109,10 +10112,10 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R32G32B32A32_UINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R32G32B32A32_UINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10122,7 +10125,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10132,7 +10135,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10142,7 +10145,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10152,7 +10155,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10162,7 +10165,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10172,7 +10175,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10182,7 +10185,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10192,10 +10195,10 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R32G32B32A32_SINT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R32G32B32A32_SINT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10205,7 +10208,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10215,7 +10218,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10225,7 +10228,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10235,7 +10238,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10245,7 +10248,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10255,7 +10258,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10265,7 +10268,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10275,10 +10278,10 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    case VK_FORMAT_R32G32B32A32_SFLOAT:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        case VK_FORMAT_R32G32B32A32_SFLOAT:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10288,7 +10291,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10298,7 +10301,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10308,7 +10311,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10318,7 +10321,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10328,7 +10331,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10338,7 +10341,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10348,7 +10351,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10358,9 +10361,9 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
-    case VK_FORMAT_R5G6B5_UNORM_PACK16:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            break;
+        case VK_FORMAT_R5G6B5_UNORM_PACK16:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10370,7 +10373,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10380,7 +10383,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10390,7 +10393,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10400,7 +10403,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10410,7 +10413,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10420,7 +10423,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10430,7 +10433,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10440,9 +10443,9 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
-    case VK_FORMAT_A1R5G5B5_UNORM_PACK16:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            break;
+        case VK_FORMAT_A1R5G5B5_UNORM_PACK16:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10452,7 +10455,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10462,7 +10465,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10472,7 +10475,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10482,7 +10485,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10492,7 +10495,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10502,7 +10505,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10512,7 +10515,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10522,9 +10525,9 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
-    case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            break;
+        case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10534,7 +10537,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10544,7 +10547,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10554,7 +10557,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10564,7 +10567,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10574,7 +10577,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10584,7 +10587,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10594,7 +10597,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10604,9 +10607,9 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
-    case __VK_FORMAT_D24_UNORM_X8_PACKED32:
-        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            break;
+        case __VK_FORMAT_D24_UNORM_X8_PACKED32:
+            imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10616,7 +10619,7 @@ VkResult halti5_helper_convertHwImgDesc(
  9:6) - (0 ?
  9:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10626,7 +10629,7 @@ VkResult halti5_helper_convertHwImgDesc(
  2:0) - (0 ?
  2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10636,7 +10639,7 @@ VkResult halti5_helper_convertHwImgDesc(
  15:14) - (0 ?
  15:14) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10646,7 +10649,7 @@ VkResult halti5_helper_convertHwImgDesc(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10656,7 +10659,7 @@ VkResult halti5_helper_convertHwImgDesc(
  22:20) - (0 ?
  22:20) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ? 22:20)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10666,7 +10669,7 @@ VkResult halti5_helper_convertHwImgDesc(
  26:24) - (0 ?
  26:24) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ? 26:24)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10676,7 +10679,7 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ?
  30:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ? 30:28)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10686,16 +10689,16 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4) - (0 ?
  5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
-        break;
+            break;
 
-    default:
-        return VK_ERROR_FORMAT_NOT_SUPPORTED;
-    }
+        default:
+            return VK_ERROR_FORMAT_NOT_SUPPORTED;
+        }
 
-    switch (tiling)
-    {
-    case gcvLINEAR:
-        imageDesc |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        switch (tiling)
+        {
+        case gcvLINEAR:
+            imageDesc |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  11:10) - (0 ?
  11:10) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10705,9 +10708,9 @@ VkResult halti5_helper_convertHwImgDesc(
  11:10) - (0 ?
  11:10) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 11:10) - (0 ? 11:10) + 1))))))) << (0 ? 11:10)));
-        break;
-    case gcvSUPERTILED:
-        imageDesc |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            break;
+        case gcvSUPERTILED:
+            imageDesc |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  11:10) - (0 ?
  11:10) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10717,12 +10720,12 @@ VkResult halti5_helper_convertHwImgDesc(
  11:10) - (0 ?
  11:10) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 11:10) - (0 ? 11:10) + 1))))))) << (0 ? 11:10)));
-        break;
-    default:
-        __VK_ASSERT(!"Wrong tiling");
-    }
+            break;
+        default:
+            __VK_ASSERT(!"Wrong tiling");
+        }
 
-    imageDesc |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        imageDesc |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:12) - (0 ?
  12:12) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -10733,17 +10736,18 @@ VkResult halti5_helper_convertHwImgDesc(
  12:12) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:12) - (0 ? 12:12) + 1))))))) << (0 ? 12:12)));
 
-    hwImgDesc[0].imageInfo[0] = physical;
-    hwImgDesc[0].imageInfo[1] = stride;
-    hwImgDesc[0].imageInfo[2] = width | (height << 16);
-    hwImgDesc[0].imageInfo[3] = imageDesc;
+        hwImgDesc[plane * __VK_MAX_PARTS].imageInfo[0] = physical + (uint32_t)planeOffset;
+        hwImgDesc[plane * __VK_MAX_PARTS].imageInfo[1] = stride;
+        hwImgDesc[plane * __VK_MAX_PARTS].imageInfo[2] = width | (height << 16);
+        hwImgDesc[plane * __VK_MAX_PARTS].imageInfo[3] = imageDesc;
 
-    if (extraPart)
-    {
-        hwImgDesc[1].imageInfo[0] = physical + partSize;
-        hwImgDesc[1].imageInfo[1] = stride;
-        hwImgDesc[1].imageInfo[2] = width | (height << 16);
-        hwImgDesc[1].imageInfo[3] = imageDesc;
+        if (extraPart)
+        {
+            hwImgDesc[plane * __VK_MAX_PARTS + 1].imageInfo[0] = physical + partSize + (uint32_t)planeOffset;
+            hwImgDesc[plane * __VK_MAX_PARTS + 1].imageInfo[1] = stride;
+            hwImgDesc[plane * __VK_MAX_PARTS + 1].imageInfo[2] = width | (height << 16);
+            hwImgDesc[plane * __VK_MAX_PARTS + 1].imageInfo[3] = imageDesc;
+        }
     }
 
     return VK_SUCCESS;
@@ -11118,12 +11122,17 @@ VkResult halti5_createImageView(
             }
             break;
         case VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO:
-            imgv->conversion = *(__vkSamplerYcbcrConversion*)ext;
-            ext = (VkBaseInStructure *)ext->pNext;
+            {
+                if (imgv->createInfo.format == (VkFormat)imgv->formatInfo->residentImgFormat && !imgv->ycbcrPlaneView)
+                {
+                    chipImgv->patchKey |= HALTI5_PATCH_YCBCR_SAMPLER_BIT;
+                }
+
+                ext = (VkBaseInStructure *)ext->pNext;
+            }
             break;
         default:
             {
-                ext = VK_NULL_HANDLE;
                 __VK_ASSERT(!"unknown pNext in imageView createInfo ");
             }
             break;
@@ -11230,7 +11239,7 @@ VkResult halti5_createImageView(
 
     if (usage & VK_IMAGE_USAGE_STORAGE_BIT)
     {
-        chipImgv->patchKey = HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
+        chipImgv->patchKey |= HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
     }
 
     if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
@@ -11912,6 +11921,15 @@ const char * halti5_helper_patchFuc(
             VSC_RES_ACT_BIT_EXTRA_SAMPLER,
             VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGRAD_EXTRA_LAYER
         },
+        {
+            VK_FORMAT_UNDEFINED,
+            HALTI5_PATCH_YCBCR_SAMPLER,
+            0,
+            "_viv_ycbcr_texture_nearest",
+            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_LOD,
+            0,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_YCBCR_TEXTURE
+        },
     };
 
     uint32_t i;
@@ -12003,10 +12021,13 @@ VkResult halti5_updateDescriptorSet(
                                                        SWIZZLE_BLUE,
                                                        SWIZZLE_ALPHA};
                     VkCompareOp compareOp = VK_COMPARE_OP_MAX_ENUM;
+                    __vkSamplerYcbcrConversion *ycbcrConversion = VK_NULL_HANDLE;
+
                     if (samplers[0])
                     {
                         __vkSampler *sampler = samplers[0];
                         halti5_sampler *chipSampler = (halti5_sampler *)sampler->chipPriv;
+                        ycbcrConversion = sampler->ycbcrConversion;
                         patchKey |= chipSampler->patchKey;
                         compareOp = sampler->createInfo.compareOp;
                     }
@@ -12015,6 +12036,9 @@ VkResult halti5_updateDescriptorSet(
                     {
                         __vkImageView *imgv = resInfo->u.imageInfo.imageView;
                         halti5_imageView *chipImgv = (halti5_imageView *)imgv->chipPriv;
+                        __vkImage     *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, imgv->createInfo.image);
+                        __vkYCbCrFormatInfo ycbcrFormatInfo;
+
                         __VK_ASSERT(resInfo->type == __VK_DESC_RESOURCE_IMAGEVIEW_INFO);
                         patchKey |= chipImgv->patchKey;
                         patchFormat = chipImgv->patchFormat;
@@ -12023,6 +12047,37 @@ VkResult halti5_updateDescriptorSet(
                         {
                             patchInfos[entryIdx].originalFormat = imgv->createInfo.format;
                         }
+                        if ((patchKey & HALTI5_PATCH_YCBCR_SAMPLER_BIT) && ycbcrConversion != VK_NULL_HANDLE)
+                        {
+                            ycbcrFormatInfo = __vk_GetYCbCrFormatInfo(imgv->createInfo.format);
+
+#define                    MAKE_YUV_CHANNEL(count, hSample, vSample)  ((count << 8) | (hSample << 4) | vSample)
+
+                            patchInfos[entryIdx].standard   = (int32_t)ycbcrConversion->createInfo.ycbcrModel;
+                            patchInfos[entryIdx].bits       = img->ycbcrFormatInfo.bitsPerChannel;
+                            patchInfos[entryIdx].imgDesc    = chipImgv->imgDesc;
+                            patchInfos[entryIdx].mode       = (imgv->createInfo.format == VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16 ||
+                                                                imgv->createInfo.format == VK_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16 ||
+                                                                imgv->createInfo.format == VK_FORMAT_B16G16R16G16_422_UNORM ||
+                                                                imgv->createInfo.format == VK_FORMAT_B8G8R8G8_422_UNORM);
+                            patchInfos[entryIdx].channel       = MAKE_YUV_CHANNEL(ycbcrFormatInfo.planeCount, ycbcrFormatInfo.uvHorzSample, ycbcrFormatInfo.uvVertSample);
+                            patchInfos[entryIdx].range         = (int32_t)ycbcrConversion->createInfo.ycbcrRange;
+                            patchInfos[entryIdx].xChromaOffset = (int32_t)ycbcrConversion->createInfo.xChromaOffset;
+                            patchInfos[entryIdx].yChromaOffset = (int32_t)ycbcrConversion->createInfo.yChromaOffset;
+                            patchInfos[entryIdx].chromaFilter  = (int32_t)ycbcrConversion->createInfo.chromaFilter;
+                            patchInfos[entryIdx].swapUV        = ycbcrConversion->createInfo.components.r == VK_COMPONENT_SWIZZLE_B &&
+                                                                 ycbcrConversion->createInfo.components.b == VK_COMPONENT_SWIZZLE_R;
+
+                            __VK_ASSERT(patchInfos[entryIdx].standard >= VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY &&
+                                        patchInfos[entryIdx].standard <= VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_2020);
+                            __VK_ASSERT(patchInfos[entryIdx].range >= VK_SAMPLER_YCBCR_RANGE_ITU_FULL &&
+                                        patchInfos[entryIdx].range <= VK_SAMPLER_YCBCR_RANGE_ITU_NARROW);
+                        }
+                        else
+                        {
+                            patchKey &= ~HALTI5_PATCH_YCBCR_SAMPLER_BIT;
+                        }
+
                         viewType = imgv->createInfo.viewType;
                         swizzles[0] = __vkConvertSwizzle(imgv->createInfo.components.r, SWIZZLE_RED);
                         swizzles[1] = __vkConvertSwizzle(imgv->createInfo.components.g, SWIZZLE_GREEN);
