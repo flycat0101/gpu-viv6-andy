@@ -1489,8 +1489,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceFormatProperties(
     VkFormatProperties* pFormatProperties
     )
 {
-    if ((format <= VK_FORMAT_END_RANGE)
-        )
+    if ((format <= VK_FORMAT_END_RANGE) ||
+         (format >= VK_FORMAT_G8B8G8R8_422_UNORM && format <= VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM) )
     {
         *pFormatProperties = __vk_GetVkFormatInfo((VkFormat) format)->formatProperties;
     }
@@ -1750,7 +1750,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceFeatures2(
             {
                 VkPhysicalDeviceSamplerYcbcrConversionFeatures * phyDevSamplerYcbcrFeatures =
                     (VkPhysicalDeviceSamplerYcbcrConversionFeatures *)extFeature;
-                phyDevSamplerYcbcrFeatures->samplerYcbcrConversion = VK_FALSE;
+                phyDevSamplerYcbcrFeatures->samplerYcbcrConversion = VK_TRUE;
                 extFeature = (uint32_t *)phyDevSamplerYcbcrFeatures->pNext;
             }
             break;
