@@ -1152,7 +1152,9 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 
     galcore_device->dma_mask = &dma_mask;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
     galcore_device->coherent_dma_mask = dma_mask;
+#endif
 
     if (platform->ops->getPower)
     {

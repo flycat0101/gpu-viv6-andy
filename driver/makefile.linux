@@ -372,7 +372,7 @@ $(warning "-------------------------------------------------")
 
 else
 $(GAL_CORE):
-	@test ! -d $@ || $(MAKE) -f Kbuild -C $@ $(V_TARGET)
+	@test ! -d $@ || $(MAKE) -f Kbuild M=$(AQROOT) -C $@ $(V_TARGET)
 
 drivers:            $(GAL_CORE)
 endif
