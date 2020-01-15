@@ -3034,7 +3034,7 @@ GL_API void GL_APIENTRY glDrawElements(
         if (status == gcvSTATUS_INVALID_REQUEST)
         {
             GLint       first = 0;
-            glsSTREAM   stream;
+            glsSTREAM   stream = {0, 0};
 
             do
             {
