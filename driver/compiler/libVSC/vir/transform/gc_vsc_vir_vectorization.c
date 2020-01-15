@@ -162,7 +162,7 @@ static gctBOOL _CheckSymsVectorizability(VIR_Shader* pShader, VIR_Symbol** ppSym
 static gctSTRING _GetVectorizedSymStrName(VIR_Shader* pShader, VIR_Symbol** ppSymArray, gctUINT symCount, VSC_MM* pMM)
 {
     gctUINT        i, newNameLength = 0;
-    gctSTRING      strOrgName[16];
+    gctSTRING      strOrgName[16] = {0};
     gctSTRING      strNewName, strNameAfterDot;
     gctSTRING      strConnect = "+";
 
