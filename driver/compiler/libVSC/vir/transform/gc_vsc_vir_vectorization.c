@@ -3864,12 +3864,6 @@ static VSC_ErrCode _DoVectorizationOnBasicBlock(VIR_VECTORIZER_INFO* pVectorizer
         VIR_Operand * dest = VIR_Inst_GetDest(pInst);
         opCode = VIR_Inst_GetOpcode(pInst);
 
-        /* Skip some opcodes. */
-        if (opCode == VIR_OP_NOP)
-        {
-            continue;
-        }
-
         if ((VIR_Inst_isComponentwise(pInst) || opCode == VIR_OP_LDARR)&& /* LDARR can be vectorized too. */
             !VIR_OPCODE_isVX(opCode) &&       /* EVIS instruction cannot be vectorized */
             (opCode != VIR_OP_MOD) &&         /* MOD may be expanded to use SW implementation which only workds for scalar */
