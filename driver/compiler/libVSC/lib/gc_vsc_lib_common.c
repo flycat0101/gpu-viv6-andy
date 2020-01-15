@@ -3190,8 +3190,9 @@ static gceSTATUS gcSHADER_GetTempFileName(IN gctBOOL     isPatch,
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctCHAR gcTmpFileName[_cldFILENAME_MAX+1];
-
+    gcePATCH_ID patchId = gcPatchId;
     gctSTRING env = gcvNULL;
+
     gcoOS_GetEnv(gcvNULL, "VIV_LIB_SHADER_DIR", &env);
     if (env)
     {
@@ -3210,6 +3211,10 @@ static gceSTATUS gcSHADER_GetTempFileName(IN gctBOOL     isPatch,
         _cldFILENAME_MAX,
         "/"));
 #endif
+    if (isAppConformance(patchId))
+    {
+        gcmONERROR(gcoOS_StrCatSafe(gcTmpFileName, _cldFILENAME_MAX, "cts_"));
+    }
 
     if (isPatch)
     {
