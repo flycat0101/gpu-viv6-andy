@@ -1083,6 +1083,9 @@ enum vx_reorg_type_e
 
     /*! \brief  Reorgnization from space to batch. */
     VX_REORG_SPACE_TO_BATCH_ND,
+
+    /*! \brief Reorgnzation channel. */
+    VX_REORG_SHUFFLE_CHANNEL,
 };
 
 /*! \brief Input parameter for reorg layer
@@ -1104,6 +1107,13 @@ typedef struct _vx_nn_reorg_params_ext_t
     vx_nn_reorg_params_t base;      /*!< \brief vx_nn_reorg_params <tt>\ref vx_nn_reorg_params_t</tt> */
     vx_tensor pad;                  /*!< \brief  [Optional] Only for SPACE2BATCH, 2D tensor for paddings for each spatial dim of the input tensor(rank(input), 2), all values must be >=0. */
 } vx_nn_reorg_params_ext_t;
+
+typedef struct _vx_nn_reorg_params_ext2_t
+{
+    vx_nn_reorg_params_t base;      /*!< \brief vx_nn_reorg_params <tt>\ref vx_nn_reorg_params_t</tt> */
+    vx_int32 *num_group;
+    vx_int32 *axis;
+} vx_nn_reorg_params_ext2_t;
 
 /*! \brief [Graph] Creates a Reorgnization Layer Node, Enhancement of vxReorgLayer, Support both DEPTH to SPACE and SPACE to DEPTH.
  * \param [in] graph The reference to the parent graph.

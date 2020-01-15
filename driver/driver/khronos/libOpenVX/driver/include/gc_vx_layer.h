@@ -1920,6 +1920,8 @@ typedef struct _vxnne_reorg_operation_s
     vx_scalar                        type;
     vx_tensor                        pad;
     vx_tensor                        outputs;
+    vx_scalar                        num_group;
+    vx_scalar                        axis;
 }
 vxnne_reorg_operation_s, * vxnne_reorg_operation;
 

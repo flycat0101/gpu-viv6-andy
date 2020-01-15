@@ -4059,11 +4059,14 @@ VX_API_ENTRY vx_node VX_API_CALL vxReorgLayer2(
         VX_NULL,
         VX_NULL,
         VX_NULL,
-        (vx_reference)output
+        (vx_reference)output,
+        VX_NULL,
+        VX_NULL
     };
 
     vx_node node = VX_NULL;
     vx_scalar block_size = NULL, type = NULL;
+    vx_scalar num_group = NULL, axis = NULL;
 
     gcmHEADER_ARG("graph=%p, input=%p, reorg_params=%p, size_of_reorg_params=0x%lx, output=%p",
         graph, input, reorg_params, size_of_reorg_params, output);
@@ -4088,8 +4091,23 @@ VX_API_ENTRY vx_node VX_API_CALL vxReorgLayer2(
     {
         parameters[1] = (vx_reference)reorg_params->block_size;
     }
+    else if (sizeof(vx_nn_reorg_params_ext2_t) == size_of_reorg_params)
+    {
+        vx_nn_reorg_params_ext2_t * params = (vx_nn_reorg_params_ext2_t *)reorg_params;
+        num_group = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, params->num_group);
+        axis = vxCreateScalar(vxGetContext((vx_reference)graph), VX_TYPE_INT32, params->axis);
+        parameters[1] = (vx_reference)reorg_params->block_size;
+        parameters[5] = (vx_reference)num_group;
+        parameters[6] = (vx_reference)axis;
+    }
 
     node = vxoNode_CreateSpecific(graph, VX_KERNEL_NN_REORG2_LAYER, parameters, vxmLENGTH_OF(parameters));
+
+    if (sizeof(vx_nn_reorg_params_ext2_t) == size_of_reorg_params)
+    {
+        vxReleaseScalar(&num_group);
+        vxReleaseScalar(&axis);
+    }
 
     vxReleaseScalar(&block_size);
     vxReleaseScalar(&type);
