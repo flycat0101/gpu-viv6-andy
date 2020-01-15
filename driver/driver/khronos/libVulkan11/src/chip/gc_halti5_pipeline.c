@@ -4848,6 +4848,8 @@ static VkResult halti5_helper_createVscResLayout(
     if (!chipPipeline->vscResLayout)
     {
         VSC_PROGRAM_RESOURCE_LAYOUT *pVscResLayout = gcvNULL;
+        VkBool32 gsAccess= VK_FALSE;
+        VkBool32 onlyGsAccess = VK_TRUE;
         __VK_SET_ALLOCATIONCB(&pip->memCb);
 
         pVscResLayout = (VSC_PROGRAM_RESOURCE_LAYOUT*)__VK_ALLOC(sizeof(VSC_PROGRAM_RESOURCE_LAYOUT), 8,
@@ -4913,8 +4915,24 @@ static VkResult halti5_helper_createVscResLayout(
                         pVscResourceBinding->shResBinding.type = (VSC_SHADER_RESOURCE_TYPE)pVkDescSetLayout->binding[j].std.descriptorType;
                         pVscResourceBinding->shResBinding.set = i;
                         pVscResourceBinding->stageBits = (VSC_SHADER_STAGE_BIT)pVkDescSetLayout->binding[j].std.stageFlags;
+                        if (pVscResourceBinding->shResBinding.type == VSC_SHADER_RESOURCE_TYPE_UNIFORM_TEXEL_BUFFER)
+                        {
+                            if (pVscResourceBinding->stageBits == VSC_SHADER_STAGE_BIT_GS)
+                            {
+                                gsAccess = VK_TRUE;
+                            }
+                            else
+                            {
+                                onlyGsAccess = VK_FALSE;
+                            }
+                        }
                     }
                 }
+            }
+
+            if (gsAccess && onlyGsAccess)
+            {
+                chipPipeline->changeDefFormat = VK_TRUE;
             }
         }
     }
@@ -6064,6 +6082,14 @@ static VkResult halti5_pip_build_gfxshaders(
                 {
                     __VK_MEMCOPY(&decodeInfo->renderpassInfo->subPassInfo[j].input_attachment_index, &rdp->subPassInfo[j].input_attachment_index,
                         __VK_MAX_RENDER_TARGETS * sizeof(uint32_t));
+                }
+            }
+
+            if (shaderType == VSC_SHADER_STAGE_GS)
+            {
+                if (chipPipeline->changeDefFormat && devCtx->pPhyDevice->pInst->patchID == gcvPATCH_DEQP)
+                {
+                    decodeInfo->defaultImageFormat = VSC_IMAGE_FORMAT_RGBA8;
                 }
             }
 
@@ -7499,7 +7525,7 @@ VkResult halti5_patch_pipeline(
                     shaderLinkTable->pShLibLinkEntries = (VSC_SHADER_LIB_LINK_ENTRY *)__VK_ALLOC(sizeof(VSC_SHADER_LIB_LINK_ENTRY) * defaultEntriesCnt, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                     __VK_ONERROR(shaderLinkTable->pShLibLinkEntries ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
 
-                    __VK_MEMZERO(shaderLinkTable->pShLibLinkEntries, sizeof(VSC_SHADER_LIB_LINK_ENTRY) * 4);
+                    __VK_MEMZERO(shaderLinkTable->pShLibLinkEntries, sizeof(VSC_SHADER_LIB_LINK_ENTRY) * defaultEntriesCnt);
 
                     patchMask = descSetInfo->patchMask;
                     i = 0;

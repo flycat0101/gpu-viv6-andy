@@ -720,6 +720,7 @@ typedef struct
     uint32_t countOfseparateBinding;
 
     VkBool32 fastFilterDisable;
+    VkBool32 changeDefFormat;
 
     VkBool32 vanilla; /* plain pipeline and we don't need patch it */
     /* patch key for each descriptor set */
