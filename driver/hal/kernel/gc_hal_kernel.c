@@ -1490,7 +1490,6 @@ _ReleaseVideoMemory(
     gceSTATUS status;
     gckVIDMEM_NODE nodeObject;
     gceDATABASE_TYPE type;
-    gctBOOL isContiguous;
 
     gcmkHEADER_ARG("Kernel=%p ProcessID=%d Handle=%d",
                    Kernel, ProcessID, Handle);
@@ -1508,23 +1507,15 @@ _ReleaseVideoMemory(
             type,
             gcmINT2PTR(Handle)));
 
-    gcmkONERROR(gckVIDMEM_NODE_IsContiguous(Kernel, nodeObject, &isContiguous));
+    gckKERNEL_RemoveProcessDB(Kernel,
+        ProcessID,
+        gcvDB_CONTIGUOUS,
+        gcmINT2PTR(Handle));
 
-    if (isContiguous)
-    {
-        gcmkONERROR(gckKERNEL_RemoveProcessDB(Kernel,
-            ProcessID,
-            gcvDB_CONTIGUOUS,
-            gcmINT2PTR(Handle)));
-    }
-
-    if (nodeObject->type & gcvVIDMEM_TYPE_COMMAND)
-    {
-        gcmkONERROR(gckKERNEL_RemoveProcessDB(Kernel,
-            ProcessID,
-            gcvDB_COMMAND_BUFFER,
-            gcmINT2PTR(Handle)));
-    }
+    gckKERNEL_RemoveProcessDB(Kernel,
+        ProcessID,
+        gcvDB_COMMAND_BUFFER,
+        gcmINT2PTR(Handle));
 
     gckVIDMEM_HANDLE_Dereference(Kernel, ProcessID, Handle);
 
