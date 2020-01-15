@@ -163,7 +163,11 @@ _DmaAlloc(
 #if defined CONFIG_MIPS || defined CONFIG_CPU_CSKYV2 || defined CONFIG_PPC || defined CONFIG_ARM64
         = dma_alloc_coherent(galcore_device, NumPages * PAGE_SIZE, &mdlPriv->dmaHandle, gfp);
 #else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
+        = dma_alloc_wc(galcore_device, NumPages * PAGE_SIZE,  &mdlPriv->dmaHandle, gfp);
+#else
         = dma_alloc_writecombine(galcore_device, NumPages * PAGE_SIZE,  &mdlPriv->dmaHandle, gfp);
+#endif
 #endif
 
 #ifdef CONFLICT_BETWEEN_BASE_AND_PHYS
@@ -284,7 +288,11 @@ _DmaFree(
 #if defined CONFIG_MIPS || defined CONFIG_CPU_CSKYV2 || defined CONFIG_PPC || defined CONFIG_ARM64
     dma_free_coherent(galcore_device, Mdl->numPages * PAGE_SIZE, mdlPriv->kvaddr, mdlPriv->dmaHandle);
 #else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
+    dma_free_wc(galcore_device, Mdl->numPages * PAGE_SIZE, mdlPriv->kvaddr, mdlPriv->dmaHandle);
+#else
     dma_free_writecombine(galcore_device, Mdl->numPages * PAGE_SIZE, mdlPriv->kvaddr, mdlPriv->dmaHandle);
+#endif
 #endif
 
     gckOS_Free(os, mdlPriv);
@@ -320,11 +328,21 @@ _DmaMmap(
             pgprot_writecombine(vma->vm_page_prot)) < 0)
 #else
     /* map kernel memory to user space.. */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,6,0)
+    /* map kernel memory to user space.. */
+    if (dma_mmap_wc(galcore_device,
+            vma,
+            (gctINT8_PTR)mdlPriv->kvaddr + (skipPages << PAGE_SHIFT),
+            mdlPriv->dmaHandle + (skipPages << PAGE_SHIFT),
+            numPages << PAGE_SHIFT) < 0)
+#else
+    /* map kernel memory to user space.. */
     if (dma_mmap_writecombine(galcore_device,
             vma,
             (gctINT8_PTR)mdlPriv->kvaddr + (skipPages << PAGE_SHIFT),
             mdlPriv->dmaHandle + (skipPages << PAGE_SHIFT),
             numPages << PAGE_SHIFT) < 0)
+#endif
 #endif
     {
         gcmkTRACE_ZONE(
