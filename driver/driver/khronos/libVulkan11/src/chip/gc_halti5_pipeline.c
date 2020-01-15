@@ -5994,6 +5994,7 @@ static VkResult halti5_pip_build_gfxshaders(
             decodeInfo->tcsInputVertices = info->pTessellationState ? info->pTessellationState->patchControlPoints : 0;
             decodeInfo->funcCtx = shaderModule->funcTable;
             decodeInfo->subPass = pip->subPass;
+            decodeInfo->defaultImageFormat = VSC_IMAGE_FORMAT_NONE;
 
             if (shaderType == VSC_SHADER_STAGE_HS || shaderType == VSC_SHADER_STAGE_DS)
             {
@@ -6642,6 +6643,7 @@ static VkResult halti5_pip_build_computeshader(
         decodeInfo.funcCtx = gcvNULL;
         decodeInfo.renderpassInfo = gcvNULL;
         decodeInfo.subPass = ~0U;
+        decodeInfo.defaultImageFormat = VSC_IMAGE_FORMAT_NONE;
 
         __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &vscShader))
                                     ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
