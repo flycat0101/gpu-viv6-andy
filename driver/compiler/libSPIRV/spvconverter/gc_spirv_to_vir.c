@@ -2665,6 +2665,22 @@ VSC_ErrCode __SpvAddRedefinedSymbol(
     return errCode;
 }
 
+static void __SpvSetImageFormatForSym(
+    gcSPV spv,
+    VIR_Symbol* sym,
+    VIR_ImageFormat imageFormat,
+    gctBOOL bUseDefaultImageFormat
+    )
+{
+    if (bUseDefaultImageFormat && imageFormat == VIR_IMAGE_FORMAT_NONE)
+    {
+        imageFormat = spv->defaultVIRImageFormat;
+    }
+
+    VIR_Symbol_SetImageFormat(sym, imageFormat);
+    VIR_Symbol_SetOriginalImageFormat(sym, imageFormat);
+}
+
 static VIR_SymId __SpvAddIdSymbol(
     gcSPV spv,
     VIR_Shader * virShader,
@@ -2869,16 +2885,18 @@ static VIR_SymId __SpvAddIdSymbol(
         /* The image format is saved in the base type id. */
         if (!treatSubPassAsSampler)
         {
+            VIR_ImageFormat imageFormat;
+
             if (attachmentDesc != gcvNULL)
             {
-                VIR_Symbol_SetImageFormat(sym, __SpvVkFormat2VirImageFormat(attachmentDesc->format));
-                VIR_Symbol_SetOriginalImageFormat(sym, __SpvVkFormat2VirImageFormat(attachmentDesc->format));
+                imageFormat = __SpvVkFormat2VirImageFormat(attachmentDesc->format);
             }
             else
             {
-                VIR_Symbol_SetImageFormat(sym, __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(imageTypeId)));
-                VIR_Symbol_SetOriginalImageFormat(sym, __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(imageTypeId)));
+                imageFormat = __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(imageTypeId));
             }
+
+            __SpvSetImageFormatForSym(spv, sym, imageFormat, gcvTRUE);
         }
     }
 
@@ -4625,7 +4643,10 @@ VSC_ErrCode __SpvEmitType(gcSPV spv, VIR_Shader * virShader)
                     ON_ERROR(virErrCode, "Invalid OpTypeImage operand");
                 }
 
-                /* set a default format for subpass data */
+                /*
+                ** VIV:TODO: why we need this ????
+                ** set a default format for subpass data.
+                */
                 SPV_ID_TYPE_IMAGE_FORMAT(spv->resultId) = SpvImageFormatRgba8;
             }
 
@@ -5894,8 +5915,7 @@ VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader)
     /* If the parameter is an image, we need to copy the image format. */
     if (SPV_ID_TYPE_IS_IMAGE(type))
     {
-        VIR_Symbol_SetImageFormat(sym, __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(type)));
-        VIR_Symbol_SetOriginalImageFormat(sym, __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(type)));
+        __SpvSetImageFormatForSym(spv, sym, __SpvImageFormatToVirImageFormat(SPV_ID_TYPE_IMAGE_FORMAT(type)), gcvTRUE);
     }
 
     SPV_SET_IDDESCRIPTOR_NAME(spv, id, nameId);
@@ -13344,6 +13364,7 @@ gcSPV_Decode(
     __SpvDumpValidator(Spv->src, Spv->size * 4);
 #endif
     Spv->isLibraryShader = info->isLibraryShader;
+    Spv->defaultVIRImageFormat = (VIR_ImageFormat)info->defaultImageFormat;
 
     /*  Porcess Instructions */
     gcmONERROR(__SpvProcessInstruction(Spv, VirShader));

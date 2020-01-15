@@ -879,6 +879,7 @@ VkResult halti5_initializeChipModule(
     decodeInfo.specFlag = SPV_SPECFLAG_NONE | SPV_SPECFLAG_INTERNAL_LIBRARY;
     decodeInfo.tcsInputVertices = 0;
     decodeInfo.isLibraryShader = gcvTRUE;
+    decodeInfo.defaultImageFormat = VSC_IMAGE_FORMAT_NONE;
 
     __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &vscpatchLib)) ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
     chipModule->patchLib = halti5_CreateVkShader(vscpatchLib);

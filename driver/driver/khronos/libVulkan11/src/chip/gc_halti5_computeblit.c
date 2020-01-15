@@ -2027,6 +2027,8 @@ static halti5_vscprogram_blit* halti5_GetComputeBlitProg(
         decodeInfo.funcCtx = gcvNULL;
         decodeInfo.renderpassInfo = gcvNULL;
         decodeInfo.subPass = ~0U;
+        decodeInfo.defaultImageFormat = VSC_IMAGE_FORMAT_NONE;
+
         __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &blitVIR)) ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
 
         __VK_MEMZERO(&vscLinkParams, sizeof(vscLinkParams));
