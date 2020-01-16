@@ -5248,7 +5248,6 @@ exit:
 
 vx_status vxo_insertHandel(vxnne_execution_layer   executionLayer)
 {
-
 #define TP_INPUT_PHYSICAL_OFFSET    10
 #define TP_OUTPUT_PHYSICAL_OFFSET   13
 #define NN_INPUT_PHYSICAL_OFFSET    6
@@ -5268,86 +5267,75 @@ vx_status vxo_insertHandel(vxnne_execution_layer   executionLayer)
     for (i = 0; i < executionLayer->opIndicesNum; i++)
     {
         vx_uint32 j, k;
-        vx_uint32 tileOffset = 0;
         vxnne_operation op = executionLayer->operations[executionLayer->opIndices[i].operationID];
 
-        if (!executionLayer->opIndices[i].inputTile.sRAM)
+        if (!executionLayer->opIndices[i].inputTile.sRAM || op->target == VXNNE_OPERATION_TARGET_SH)
         {
             for (j = 0, n = executionLayer->swapcount; j < op->inputsNum; j++)
             {
-                if ((op->inputs[j] != VX_NULL)  && (op->inputs[j]->type == VX_TYPE_TENSOR || op->inputs[j]->type == VX_TYPE_IMAGE))
+                if ((op->inputs[j] != VX_NULL) && (op->inputs[j]->type == VX_TYPE_TENSOR || op->inputs[j]->type == VX_TYPE_IMAGE))
                 {
                     if(op->inputs[j]->type == VX_TYPE_TENSOR)
                     {
-                        if((!vxoTensor_IsVirtualTensor((vx_tensor)op->inputs[j])) && ((vx_tensor)op->inputs[j])->tensorBuffer->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
+                        vx_tensor tensor = (vx_tensor)op->inputs[j];
+
+                        if((!vxoTensor_IsVirtualTensor(tensor)) && tensor->tensorBuffer->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
                         {
                             if(executionLayer->swapHandle[n] == VX_NULL)
                             {
                                 executionLayer->swapHandle[n] = (vx_swapHandel *) vxAllocate(sizeof(vx_swapHandel));
                             }
                             executionLayer->swapHandle[n]->ref = (vx_reference)op->inputs[j];
-                            tileOffset = executionLayer->opIndices[i].inputTile.physical - ((vx_tensor)op->inputs[j])->tensorBuffer->memory.physicals[0];
                         }
                         else
                             continue;
                     }
                     else if(op->inputs[j]->type == VX_TYPE_IMAGE)
                     {
-                        if(!vxoImage_IsVirtualImage((vx_image)op->inputs[j]) && ((vx_image)op->inputs[j])->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
+                        vx_image image = (vx_image)op->inputs[j];
+                        if(!vxoImage_IsVirtualImage(image) && image->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
                         {
                             if(executionLayer->swapHandle[n] == VX_NULL)
                             {
                                 executionLayer->swapHandle[n] = (vx_swapHandel *) vxAllocate(sizeof(vx_swapHandel));
                             }
-
                             executionLayer->swapHandle[n]->ref = (vx_reference)op->inputs[j];
-                            tileOffset = executionLayer->opIndices[i].inputTile.physical - ((vx_image)op->inputs[j])->memory.physicals[0];
                         }
                         else
                             continue;
                     }
 
-                    if(op->target == VXNNE_OPERATION_TARGET_NN)
+                    if(op->target == VXNNE_OPERATION_TARGET_NN || op->target == VXNNE_OPERATION_TARGET_TP)
                     {
+                        vx_uint32 cmdSize = op->target == VXNNE_OPERATION_TARGET_NN ? NNE_COMMAND_SIZE : TP_COMMAND_SIZE;
+                        vx_uint32 inputCmdOffset = op->target == VXNNE_OPERATION_TARGET_NN ? NN_INPUT_PHYSICAL_OFFSET : TP_INPUT_PHYSICAL_OFFSET;
                         for(k = 0; k < (((&executionLayer->opIndices[i])->commandBuffer)).commandCount; ++k)
                         {
-                            executionLayer->swapHandle[n]->cmdAddr[k] = ((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + NNE_COMMAND_SIZE * k)) + NN_INPUT_PHYSICAL_OFFSET;
+                            executionLayer->swapHandle[n]->cmdAddr[k] = ((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + cmdSize * k)) + inputCmdOffset;
                             if(executionLayer->swapHandle[n]->ref->type == VX_TYPE_TENSOR)
-                                executionLayer->swapHandle[n]->u.offset[k] = (*(executionLayer->swapHandle[n]->cmdAddr[k]) - ((vx_tensor)(executionLayer->swapHandle[n]->ref))->tensorBuffer->memory.physicals[0]) + tileOffset;
+                                executionLayer->swapHandle[n]->u.offset[k] = *(executionLayer->swapHandle[n]->cmdAddr[k]) - ((vx_tensor)(executionLayer->swapHandle[n]->ref))->tensorBuffer->memory.physicals[0];
                             if(executionLayer->swapHandle[n]->ref->type == VX_TYPE_IMAGE)
-                                executionLayer->swapHandle[n]->u.offset[k] = (*(executionLayer->swapHandle[n]->cmdAddr[k]) - ((vx_image)(executionLayer->swapHandle[n]->ref))->memory.physicals[0]) + tileOffset; /*tensor or image input address offset*/
+                                executionLayer->swapHandle[n]->u.offset[k] = *(executionLayer->swapHandle[n]->cmdAddr[k]) - ((vx_image)(executionLayer->swapHandle[n]->ref))->memory.physicals[0];
                         }
                         executionLayer->swapHandle[n]->cmdCount = (((&executionLayer->opIndices[i])->commandBuffer)).commandCount;
-                        tileOffset = 0;
                         executionLayer->swapHandle[n]->isSH = vx_false_e;
+                        executionLayer->swapHandle[n]->orgAddress = ((executionLayer->opIndices[i]).inputTile).physical;
                     }
-                    if(op->target == VXNNE_OPERATION_TARGET_TP)
-                    {
-                        for(k = 0; k < (((&executionLayer->opIndices[i])->commandBuffer)).commandCount; ++k)
-                        {
-                            executionLayer->swapHandle[n]->cmdAddr[k]= ((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + TP_COMMAND_SIZE * k)) + TP_INPUT_PHYSICAL_OFFSET;
-                            if(executionLayer->swapHandle[n]->ref->type == VX_TYPE_TENSOR)
-                                executionLayer->swapHandle[n]->u.offset[k] = (*(executionLayer->swapHandle[n]->cmdAddr[k]) - ((vx_tensor)(executionLayer->swapHandle[n]->ref))->tensorBuffer->memory.physicals[0]) + tileOffset;
-                            if(executionLayer->swapHandle[n]->ref->type == VX_TYPE_IMAGE)
-                                executionLayer->swapHandle[n]->u.offset[k] = (*(executionLayer->swapHandle[n]->cmdAddr[k]) - ((vx_image)(executionLayer->swapHandle[n]->ref))->memory.physicals[0]) + tileOffset;
-                        }
-                        executionLayer->swapHandle[n]->cmdCount = (((&executionLayer->opIndices[i])->commandBuffer)).commandCount;
-                        tileOffset = 0;
-                        executionLayer->swapHandle[n]->isSH = vx_false_e;
-                    }
-
-                    if(op->target == VXNNE_OPERATION_TARGET_SH)
+                    else if(op->target == VXNNE_OPERATION_TARGET_SH)
                     {
                         executionLayer->swapHandle[n]->u.nodeTable[0] = op->layer->node->id;
                         executionLayer->swapHandle[n]->isSH = vx_true_e;
+                        if(op->inputs[j]->type == VX_TYPE_IMAGE)
+                            executionLayer->swapHandle[n]->orgAddress = ((vx_image)op->inputs[j])->memory.physicals[0];
+                        else if(op->inputs[j]->type == VX_TYPE_TENSOR)
+                            executionLayer->swapHandle[n]->orgAddress = ((vx_tensor)op->inputs[j])->tensorBuffer->memory.physicals[0];
                     }
-
-                    executionLayer->swapHandle[n]->orgAddress = ((executionLayer->opIndices[i]).inputTile).physical;
                     ++n;
                     executionLayer->swapcount = n;
                 }
             }
         }
+
         if (!executionLayer->opIndices[i].outputTile.sRAM)
         {
             for (j = 0; j < op->outputsNum; j++)
@@ -5357,77 +5345,66 @@ vx_status vxo_insertHandel(vxnne_execution_layer   executionLayer)
 
                     if(op->outputs[j]->type == VX_TYPE_TENSOR)
                     {
-                        if((!vxoTensor_IsVirtualTensor((vx_tensor)op->outputs[j])) && ((vx_tensor)op->outputs[j])->tensorBuffer->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
+                        vx_tensor tensor = (vx_tensor)op->outputs[j];
+
+                        if((!vxoTensor_IsVirtualTensor(tensor)) && tensor->tensorBuffer->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
                         {
                             if(executionLayer->swapHandle[n] == VX_NULL)
                             {
                                 executionLayer->swapHandle[n] = (vx_swapHandel *) vxAllocate(sizeof(vx_swapHandel));
                             }
                             executionLayer->swapHandle[n]->ref = (vx_reference)op->outputs[j];
-                            tileOffset = executionLayer->opIndices[i].outputTile.physical - ((vx_tensor)op->outputs[j])->tensorBuffer->memory.physicals[0];
                         }
                         else
                             continue;
                     }
                     else if(op->outputs[j]->type == VX_TYPE_IMAGE)
                     {
-                        if(!vxoImage_IsVirtualImage((vx_image)op->outputs[j]) && ((vx_image)op->outputs[j])->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
+                        vx_image image = (vx_image)op->outputs[j];
+
+                        if(!vxoImage_IsVirtualImage(image) && image->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
                         {
                              if(executionLayer->swapHandle[n] == VX_NULL)
                             {
                                 executionLayer->swapHandle[n] = (vx_swapHandel *) vxAllocate(sizeof(vx_swapHandel));
                             }
-
                             executionLayer->swapHandle[n]->ref = (vx_reference)op->outputs[j];
-                            tileOffset = executionLayer->opIndices[i].outputTile.physical - ((vx_image)op->outputs[j])->memory.physicals[0];
                         }
                         else
                             continue;
                     }
 
-
-                    if(op->target == VXNNE_OPERATION_TARGET_NN)
+                    if(op->target == VXNNE_OPERATION_TARGET_NN || op->target == VXNNE_OPERATION_TARGET_TP)
                     {
+                        vx_uint32 cmdSize = op->target == VXNNE_OPERATION_TARGET_NN ? NNE_COMMAND_SIZE : TP_COMMAND_SIZE;
+                        vx_uint32 outputCmdOffset = op->target == VXNNE_OPERATION_TARGET_NN ? NN_OUTPUT_PHYSICAL_OFFSET : TP_OUTPUT_PHYSICAL_OFFSET;
                         for(k = 0;k < (((&executionLayer->opIndices[i])->commandBuffer)).commandCount; ++k)
                         {
-                            executionLayer->swapHandle[n]->cmdAddr[k] = ((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + NNE_COMMAND_SIZE * k)) + NN_OUTPUT_PHYSICAL_OFFSET;
+                            executionLayer->swapHandle[n]->cmdAddr[k] = ((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + cmdSize * k)) + outputCmdOffset;
                             if(executionLayer->swapHandle[n]->ref->type == VX_TYPE_TENSOR)
-                                executionLayer->swapHandle[n]->u.offset[k] = (*(executionLayer->swapHandle[n]->cmdAddr[k]) - ((vx_tensor)(executionLayer->swapHandle[n]->ref))->tensorBuffer->memory.physicals[0]) + tileOffset;
+                                executionLayer->swapHandle[n]->u.offset[k] = *(executionLayer->swapHandle[n]->cmdAddr[k]) - ((vx_tensor)(executionLayer->swapHandle[n]->ref))->tensorBuffer->memory.physicals[0];
                             if(executionLayer->swapHandle[n]->ref->type == VX_TYPE_IMAGE)
-                                executionLayer->swapHandle[n]->u.offset[k] = (*(executionLayer->swapHandle[n]->cmdAddr[k]) - ((vx_image)(executionLayer->swapHandle[n]->ref))->memory.physicals[0]) + tileOffset;
+                                executionLayer->swapHandle[n]->u.offset[k] = *(executionLayer->swapHandle[n]->cmdAddr[k]) - ((vx_image)(executionLayer->swapHandle[n]->ref))->memory.physicals[0];
                         }
                         executionLayer->swapHandle[n]->cmdCount = (((&executionLayer->opIndices[i])->commandBuffer)).commandCount;
-                        tileOffset = 0;
                         executionLayer->swapHandle[n]->isSH = vx_false_e;
+                        executionLayer->swapHandle[n]->orgAddress = ((executionLayer->opIndices[i]).outputTile).physical;
                     }
-                    if(op->target == VXNNE_OPERATION_TARGET_TP)
-                    {
-                        for(k = 0; k < (((&executionLayer->opIndices[i])->commandBuffer)).commandCount; ++k)
-                        {
-                            executionLayer->swapHandle[n]->cmdAddr[k] = ((vx_uint32_ptr)(((vx_uint8_ptr)(&executionLayer->opIndices[i])->commandBuffer.logical) + TP_COMMAND_SIZE * k)) + TP_OUTPUT_PHYSICAL_OFFSET;
-                            if(executionLayer->swapHandle[n]->ref->type == VX_TYPE_TENSOR)
-                                executionLayer->swapHandle[n]->u.offset[k] =  (*(executionLayer->swapHandle[n]->cmdAddr[k]) - ((vx_tensor)(executionLayer->swapHandle[n]->ref))->tensorBuffer->memory.physicals[0]) + tileOffset;
-                            if(executionLayer->swapHandle[n]->ref->type == VX_TYPE_IMAGE)
-                                executionLayer->swapHandle[n]->u.offset[k] =  (*(executionLayer->swapHandle[n]->cmdAddr[k]) - ((vx_image)(executionLayer->swapHandle[n]->ref))->memory.physicals[0]) + tileOffset;
-                        }
-                        executionLayer->swapHandle[n]->cmdCount = (((&executionLayer->opIndices[i])->commandBuffer)).commandCount;
-                        tileOffset = 0;
-                        executionLayer->swapHandle[n]->isSH = vx_false_e;
-                    }
-
-                    if(op->target == VXNNE_OPERATION_TARGET_SH)
+                    else if(op->target == VXNNE_OPERATION_TARGET_SH)
                     {
                         executionLayer->swapHandle[n]->u.nodeTable[0] = op->layer->node->id;
                         executionLayer->swapHandle[n]->isSH = vx_true_e;
+                        if(op->outputs[j]->type == VX_TYPE_IMAGE)
+                            executionLayer->swapHandle[n]->orgAddress = ((vx_image)op->outputs[j])->memory.physicals[0];
+                        else if(op->outputs[j]->type == VX_TYPE_TENSOR)
+                            executionLayer->swapHandle[n]->orgAddress = ((vx_tensor)op->outputs[j])->tensorBuffer->memory.physicals[0];
                     }
 
-                    executionLayer->swapHandle[n]->orgAddress = ((executionLayer->opIndices[i]).outputTile).physical;
                     ++n;
                     executionLayer->swapcount = n;
                 }
             }
         }
-
     }
     return  vx_true_e;
 }
@@ -5699,7 +5676,7 @@ vx_status patchNodeParamLocation(vx_node node)
 
     for (j = 0; j < node->kernel->signature.paramCount; j++)
     {
-        if (node->kernel->signature.stateTable[j] == VX_PARAMETER_STATE_OPTIONAL)
+        if (node->kernel->signature.stateTable[j] == VX_PARAMETER_STATE_OPTIONAL && node->paramTable[j] == VX_NULL)
         continue;
 
         switch (node->paramTable[j]->type)
