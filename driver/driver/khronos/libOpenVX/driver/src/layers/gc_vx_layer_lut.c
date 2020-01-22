@@ -180,7 +180,7 @@ VX_PRIVATE_API vx_status vxoLUT2_SH_EVIS_Initialize_Ext(vxnne_layer ops_layer, c
     }
     else
     {
-        shaderExecutable = vxnneGetGPUEmbeddingLUTShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_EMBEDDINGLUT,
+        shaderExecutable = vxnneGetGPUEmbeddingLUTShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_EMBEDDINGLUT,
             &ops_layer->node->kernelAttributes.borderMode, inputs, lut, outputs);
     }
 
@@ -338,7 +338,7 @@ OnError:
         }
         else
         {
-            shaderExecutable = vxnneGetGPUEmbeddingLUTShaderExecutable(node->base.context, VXNNE_KERNEL_EMBEDDINGLUT,
+            shaderExecutable = vxnneGetGPUEmbeddingLUTShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_EMBEDDINGLUT,
                 &node->kernelAttributes.borderMode, inputs, lut, outputs);
         }
 

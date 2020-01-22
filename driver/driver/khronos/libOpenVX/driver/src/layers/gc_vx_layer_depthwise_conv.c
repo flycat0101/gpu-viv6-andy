@@ -670,7 +670,7 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
             padTop = vxCreateScalar(context, VX_TYPE_INT32, &padTopv);
             padBottom = vxCreateScalar(context, VX_TYPE_INT32, &padBottomv);
 
-            shaderExecutable = vxnneGPUTensorCopyROIShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPYROI, &ops_layer->node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGPUTensorCopyROIShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPYROI, &ops_layer->node->kernelAttributes.borderMode,
                 padLeft, padTop, padXLeft, padYTop, inputs, tensorCopy);
             if (!shaderExecutable)
             {
@@ -808,7 +808,7 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
             newBiases = biases;
         }
         shaderExecutable = vxnneGetGPUDepthwiseConvShaderExecutable(ops_layer->node->base.context,
-            VXNNE_KERNEL_DEPTHWISE_CONV,
+            VXNNE_KERNEL_GPU_DEPTHWISE_CONV,
             &ops_layer->node->kernelAttributes.borderMode,
             tensorCopy,
             weights,
@@ -1531,7 +1531,7 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
                     padTop    = vxCreateScalar(context, VX_TYPE_INT32, &padTopv);
                     padBottom = vxCreateScalar(context, VX_TYPE_INT32, &padBottomv);
 
-                    shaderExecutable = vxnneGPUTensorCopyROIShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPYROI, &node->kernelAttributes.borderMode,
+                    shaderExecutable = vxnneGPUTensorCopyROIShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPYROI, &node->kernelAttributes.borderMode,
                                                          padLeft, padTop, padXLeft, padYTop, inputs, tensorCopy);
                     if (!shaderExecutable)
                     {
@@ -1671,7 +1671,7 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
                     newBiases = biases;
                 }
                 shaderExecutable = vxnneGetGPUDepthwiseConvShaderExecutable(node->base.context,
-                                                                             VXNNE_KERNEL_DEPTHWISE_CONV,
+                                                                             VXNNE_KERNEL_GPU_DEPTHWISE_CONV,
                                                                              &node->kernelAttributes.borderMode,
                                                                              tensorCopy,
                                                                              weights,

@@ -417,11 +417,11 @@ VX_PRIVATE_API vx_status vxoNNActivationLayer_SH_EVIS_Initialize_Ext(vxnne_layer
     else
     {
         if (enable_tensorTR_SHExe)
-            shaderExecutable = vxnneGetGPUTensorTRShaderExecutable(context, VXNNE_KERNEL_TENSOR_TRANSCENDENTAL, &ops_layer->node->kernelAttributes.borderMode, input, minVal, maxVal, func_v, output);
+            shaderExecutable = vxnneGetGPUTensorTRShaderExecutable(context, VXNNE_KERNEL_GPU_TENSOR_TRANSCENDENTAL, &ops_layer->node->kernelAttributes.borderMode, input, minVal, maxVal, func_v, output);
         else if (enable_Leaky_SHExe)
-            shaderExecutable = vxnneGetGPULeakyReluShaderExecutable(context, VXNNE_KERNEL_NN_LEAKY, &ops_layer->node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
+            shaderExecutable = vxnneGetGPULeakyReluShaderExecutable(context, VXNNE_KERNEL_GPU_NN_LEAKY, &ops_layer->node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
         else
-            shaderExecutable = vxnneGetGPUActivationShaderExecutable(context, VXNNE_KERNEL_ACTIVATION, &ops_layer->node->kernelAttributes.borderMode, func_v, input, minVal, maxVal, output);
+            shaderExecutable = vxnneGetGPUActivationShaderExecutable(context, VXNNE_KERNEL_GPU_ACTIVATION, &ops_layer->node->kernelAttributes.borderMode, func_v, input, minVal, maxVal, output);
     }
 
     if (!shaderExecutable)
@@ -841,9 +841,9 @@ OnError:
         else
         {
             if (enable_tensorTR_SHExe)
-                shaderExecutable = vxnneGetGPUTensorTRShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSCENDENTAL, &node->kernelAttributes.borderMode, input, minVal, maxVal, func_v, output);
+                shaderExecutable = vxnneGetGPUTensorTRShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_TRANSCENDENTAL, &node->kernelAttributes.borderMode, input, minVal, maxVal, func_v, output);
             else
-                shaderExecutable = vxnneGetGPUActivationShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION, &node->kernelAttributes.borderMode, func_v, input, minVal, maxVal, output);
+                shaderExecutable = vxnneGetGPUActivationShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_ACTIVATION, &node->kernelAttributes.borderMode, func_v, input, minVal, maxVal, output);
         }
 
         if (!shaderExecutable)
@@ -882,7 +882,7 @@ OnError:
             }
             else
             {
-                shaderExecutable = vxnneGetGPULeakyReluShaderExecutable(node->base.context, VXNNE_KERNEL_NN_LEAKY, &node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
+                shaderExecutable = vxnneGetGPULeakyReluShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_NN_LEAKY, &node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
             }
         }
         if (!shaderExecutable)
@@ -1132,7 +1132,7 @@ VX_PRIVATE_API vx_status vxoNNLeakyReluLayer_SH_EVIS_Initialize_Ext(vxnne_layer 
     if(evis)
         shaderExecutable = vxnneGetLeakyReluShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_NN_LEAKY, &ops_layer->node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
     else
-        shaderExecutable = vxnneGetGPULeakyReluShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_NN_LEAKY, &ops_layer->node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
+        shaderExecutable = vxnneGetGPULeakyReluShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_NN_LEAKY, &ops_layer->node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
 
     if (!shaderExecutable)
     {
@@ -1431,7 +1431,7 @@ OnError:
         }
         else
         {
-            shaderExecutable = vxnneGetGPULeakyReluShaderExecutable(node->base.context, VXNNE_KERNEL_NN_LEAKY, &node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
+            shaderExecutable = vxnneGetGPULeakyReluShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_NN_LEAKY, &node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
         }
 
         if (!shaderExecutable)
@@ -1684,7 +1684,7 @@ VX_PRIVATE_API vx_status vxoNNPReluLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_
     if(evis)
         shaderExecutable = vxnneGetPReluShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_PRELU, &ops_layer->node->kernelAttributes.borderMode, inputs, alpha, outputs);
     else
-        shaderExecutable = vxnneGetGPUPReluShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_PRELU, &ops_layer->node->kernelAttributes.borderMode, inputs, alpha, outputs);
+        shaderExecutable = vxnneGetGPUPReluShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_PRELU, &ops_layer->node->kernelAttributes.borderMode, inputs, alpha, outputs);
 
     if (!shaderExecutable)
     {
@@ -1877,7 +1877,7 @@ OnError:
         if(node->base.context->evisNoInst.supportEVIS)
             shaderExecutable = vxnneGetPReluShaderExecutable(node->base.context, VXNNE_KERNEL_PRELU, &node->kernelAttributes.borderMode, inputs, alpha, outputs);
         else
-            shaderExecutable = vxnneGetGPUPReluShaderExecutable(node->base.context, VXNNE_KERNEL_PRELU, &node->kernelAttributes.borderMode, inputs, alpha, outputs);
+            shaderExecutable = vxnneGetGPUPReluShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_PRELU, &node->kernelAttributes.borderMode, inputs, alpha, outputs);
 
         if (!shaderExecutable)
         {

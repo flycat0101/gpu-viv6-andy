@@ -648,7 +648,7 @@ VX_PRIVATE_API vx_status vxoNNadapterLayer_SH_Initialize_Ext(vxnne_layer ops_lay
             else
             {
                 if (src && dst)
-                    shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &ops_layer->node->kernelAttributes.borderMode, src, pPerm, num, dst);
+                    shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_TRANSPOSE, &ops_layer->node->kernelAttributes.borderMode, src, pPerm, num, dst);
             }
 
             if (!shaderExecutable)
@@ -1264,7 +1264,7 @@ OnError:
                 else
                 {
                     if (src && dst)
-                        shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src, pPerm, num, dst);
+                        shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_TRANSPOSE, &node->kernelAttributes.borderMode, src, pPerm, num, dst);
                 }
 
                 if (!shaderExecutable)

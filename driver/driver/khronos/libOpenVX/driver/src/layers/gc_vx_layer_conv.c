@@ -2372,7 +2372,7 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
     {
         if (enable_conv2d_1x1 == vx_false_e)
         {
-            shaderExecutable = vxnneGPUTensor2RowShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR2ROW, &ops_layer->node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGPUTensor2RowShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR2ROW, &ops_layer->node->kernelAttributes.borderMode,
                            inputs, k_w, k_h, dilation_x, dilation_y, strideX, strideY, paddingLeft, paddingTop, outputWidth, outputHeight, tensor2Row);
         }
     }
@@ -2736,20 +2736,20 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
                     outputs_rs = outputs;
                 }
 
-                shaderExecutable = vxnneGPUConv2D_1x1ShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_CONVOLUTION_1X1,
+                shaderExecutable = vxnneGPUConv2D_1x1ShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_CONVOLUTION_1X1,
                     &ops_layer->node->kernelAttributes.borderMode, enable_tensor_cast || enable_ofm_gt_xy, enable_packed_weights, input_rs, weights_new_rs, newBiases, outputs_rs);
             }
             else
             {
                 outputs_rs = outputs;
-                shaderExecutable = vxnneGPUGemmShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GEMM,
+                shaderExecutable = vxnneGPUGemmShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_GEMM,
                     &ops_layer->node->kernelAttributes.borderMode, enable_packed_weights, input_rs, weights_new_rs, newBiases, outputs_rs);
             }
         }
         else
         {
             outputs_rs = outputs;
-            shaderExecutable = vxnneGPUGemm_noBiasShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GEMM_NOBIAS, &ops_layer->node->kernelAttributes.borderMode, input_rs, weights_new_rs, outputs_rs);
+            shaderExecutable = vxnneGPUGemm_noBiasShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_GEMM_NOBIAS, &ops_layer->node->kernelAttributes.borderMode, input_rs, weights_new_rs, outputs_rs);
         }
     }
 
@@ -4582,7 +4582,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                 {
                     if (enable_conv2d_1x1 == vx_false_e)
                     {
-                        shaderExecutable = vxnneGPUTensor2RowShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR2ROW, &node->kernelAttributes.borderMode,
+                        shaderExecutable = vxnneGPUTensor2RowShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR2ROW, &node->kernelAttributes.borderMode,
                                        inputs, k_w, k_h, dilation_x, dilation_y, strideX, strideY, paddingLeft, paddingTop, outputWidth, outputHeight, tensor2Row);
                     }
                 }
@@ -4948,20 +4948,20 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                                 outputs_rs = outputs;
                             }
 
-                            shaderExecutable = vxnneGPUConv2D_1x1ShaderExecutable(node->base.context, VXNNE_KERNEL_CONVOLUTION_1X1,
+                            shaderExecutable = vxnneGPUConv2D_1x1ShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_CONVOLUTION_1X1,
                                 &node->kernelAttributes.borderMode, enable_tensor_cast || enable_ofm_gt_xy, enable_packed_weights, input_rs, weights_new_rs, newBiases, outputs_rs);
                         }
                         else
                         {
                             outputs_rs = outputs;
-                            shaderExecutable = vxnneGPUGemmShaderExecutable(node->base.context, VXNNE_KERNEL_GEMM,
+                            shaderExecutable = vxnneGPUGemmShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_GEMM,
                                 &node->kernelAttributes.borderMode, enable_packed_weights, input_rs, weights_new_rs, newBiases, outputs_rs);
                         }
                     }
                     else
                     {
                         outputs_rs = outputs;
-                        shaderExecutable = vxnneGPUGemm_noBiasShaderExecutable(node->base.context, VXNNE_KERNEL_GEMM_NOBIAS, &node->kernelAttributes.borderMode, input_rs, weights_new_rs, outputs_rs);
+                        shaderExecutable = vxnneGPUGemm_noBiasShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_GEMM_NOBIAS, &node->kernelAttributes.borderMode, input_rs, weights_new_rs, outputs_rs);
                     }
                 }
 

@@ -374,7 +374,7 @@ VX_PRIVATE_API vx_status vxoNNBatchNormalizationLayer_SH_EVIS_Initialize_Ext(vxn
     }
     else
     {
-        shaderExecutable = vxnneGetGPUBatchNormShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_BATCHNORM, &ops_layer->node->kernelAttributes.borderMode, axis, input, weights, biases, output);
+        shaderExecutable = vxnneGetGPUBatchNormShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_BATCHNORM, &ops_layer->node->kernelAttributes.borderMode, axis, input, weights, biases, output);
     }
 
     if (!shaderExecutable)
@@ -633,7 +633,7 @@ OnError:
         }
         else
         {
-            shaderExecutable = vxnneGetGPUBatchNormShaderExecutable(node->base.context, VXNNE_KERNEL_BATCHNORM, &node->kernelAttributes.borderMode, axis, input, weights, biases, output);
+            shaderExecutable = vxnneGetGPUBatchNormShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_BATCHNORM, &node->kernelAttributes.borderMode, axis, input, weights, biases, output);
         }
 
         if (!shaderExecutable)

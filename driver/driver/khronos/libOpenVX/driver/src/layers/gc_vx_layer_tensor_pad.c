@@ -561,7 +561,7 @@ VX_PRIVATE_API vx_status vxoNNTensorPad_SH_Initialize_Ext(vxnne_layer ops_layer,
     else
     {
         shaderExecutable = vxnneGetGPUTensorPadShaderExecutable(ops_layer->node->base.context,
-                                                                VXNNE_KERNEL_TENSOR_PAD,
+                                                                VXNNE_KERNEL_GPU_TENSOR_PAD,
                                                                 &ops_layer->node->kernelAttributes.borderMode,
                                                                 src,
                                                                 padLeft,
@@ -891,7 +891,7 @@ OnError:
         else
         {
             shaderExecutable = vxnneGetGPUTensorPadShaderExecutable(node->base.context,
-                                                                 VXNNE_KERNEL_TENSOR_PAD,
+                                                                 VXNNE_KERNEL_GPU_TENSOR_PAD,
                                                                  &node->kernelAttributes.borderMode,
                                                                  src,
                                                                  padLeft,
@@ -1318,7 +1318,7 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_SH_EVIS_Initialize(vxnne_layer ops_laye
     else
     {
         shaderExecutable = vxnneGetTensorPad2ShaderExecutable(ops_layer->node->base.context,
-            VXNNE_KERNEL_TENSOR_PAD,
+            VXNNE_KERNEL_TENSOR_PAD2,
             &ops_layer->node->kernelAttributes.borderMode,
             src,
             padConst,
@@ -1370,7 +1370,7 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_GPU_Initialize(vxnne_layer ops_layer, c
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
     shaderExecutable = vxnneGetGPUTensorPad2ShaderExecutable(ops_layer->node->base.context,
-            VXNNE_KERNEL_TENSOR_PAD,
+            VXNNE_KERNEL_GPU_TENSOR_PAD2,
             &ops_layer->node->kernelAttributes.borderMode,
             src,
             padConst,
@@ -1673,7 +1673,7 @@ OnError:
             if(isFp32Flag)
             {
                 shaderExecutable = vxnneGetGPUTensorPad2ShaderExecutable(node->base.context,
-                    VXNNE_KERNEL_TENSOR_PAD,
+                    VXNNE_KERNEL_GPU_TENSOR_PAD2,
                     &node->kernelAttributes.borderMode,
                     src,
                     padConst,
@@ -1801,7 +1801,7 @@ OnError:
             else
             {
                 shaderExecutable = vxnneGetTensorPad2ShaderExecutable(node->base.context,
-                    VXNNE_KERNEL_TENSOR_PAD,
+                    VXNNE_KERNEL_TENSOR_PAD2,
                     &node->kernelAttributes.borderMode,
                     src,
                     padConst,

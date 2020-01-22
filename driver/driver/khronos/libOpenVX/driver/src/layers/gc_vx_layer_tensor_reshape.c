@@ -211,7 +211,7 @@ VX_PRIVATE_API vx_status vxoNNReshape_SH_Initialize_Ext(vxnne_layer ops_layer, c
     else
     {
         if (input && output)
-            shaderExecutable = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, input, output);
+            shaderExecutable = vxnneGPUTensorCopyShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPY, &ops_layer->node->kernelAttributes.borderMode, input, output);
     }
 
     if (!shaderExecutable)
@@ -600,7 +600,7 @@ OnError:
         else
         {
             if (input && output)
-                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
+                shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
         }
 
         if (!shaderExecutable)

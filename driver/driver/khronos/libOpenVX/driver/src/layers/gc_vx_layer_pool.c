@@ -705,7 +705,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
                 padXLeft    = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_INT32, &pool_pad_x_left);
                 padYTop = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_INT32, &pool_pad_y_top);
 
-                shaderExecutable = vxnneGPUTensorCopyROIShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_COPYROI,
+                shaderExecutable = vxnneGPUTensorCopyROIShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPYROI,
                     &ops_layer->node->kernelAttributes.borderMode,
                     padLeft, padTop, padXLeft, padYTop, inputs, tensorCopy);
                 if (!shaderExecutable)
@@ -742,20 +742,20 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
             }
 
             shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(
-            ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
+            ops_layer->node->base.context, VXNNE_KERNEL_GPU_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
             tensorCopy, pool_type_s, stride_x_s, stride_y_s,  pool_size_x_s, pool_size_y_s, pool_pad_x_left,
             pool_pad_y_top, pool_pad_x_right, pool_pad_y_bottom, rounding_s, is_copy_tensor,
             TENSOR_VIEW_SIZE_INDEX(inputs, 0), TENSOR_VIEW_SIZE_INDEX(inputs, 1), outputs);
         }
         else if (enable_L2Pool_SH)
         {
-            shaderExecutable = vxnneGetGPUL2PoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_L2POOLING, &ops_layer->node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGetGPUL2PoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_L2POOLING, &ops_layer->node->kernelAttributes.borderMode,
                             inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
                             pool_pad_y_bottom, rounding_s, outputs);
         }
         else if (maxPool_flag)
         {
-            shaderExecutable = vxnneGetGPUMaxPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_MAXPOOLING, &ops_layer->node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGetGPUMaxPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_MAXPOOLING, &ops_layer->node->kernelAttributes.borderMode,
                             inputs, pool_type_s, stride_x_s, stride_y, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
                             pool_pad_y_bottom,rounding_s, outputs);
         }
@@ -2311,7 +2311,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                             padXLeft    = vxCreateScalar(context, VX_TYPE_INT32, &pool_pad_x_left);
                             padYTop = vxCreateScalar(context, VX_TYPE_INT32, &pool_pad_y_top);
 
-                            shaderExecutable = vxnneGPUTensorCopyROIShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPYROI,
+                            shaderExecutable = vxnneGPUTensorCopyROIShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_COPYROI,
                                 &node->kernelAttributes.borderMode,
                                 padLeft, padTop, padXLeft, padYTop, inputs, tensorCopy);
                             if (!shaderExecutable)
@@ -2350,20 +2350,20 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                         }
 
                         shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(
-                        node->base.context, VXNNE_KERNEL_AVGPOOLING, &node->kernelAttributes.borderMode,
+                        node->base.context, VXNNE_KERNEL_GPU_AVGPOOLING, &node->kernelAttributes.borderMode,
                         tensorCopy, pool_type_s, stride_x_s, stride_y_s,  pool_size_x_s, pool_size_y_s, pool_pad_x_left,
                         pool_pad_y_top, pool_pad_x_right, pool_pad_y_bottom, rounding_s, is_copy_tensor,
                         TENSOR_VIEW_SIZE_INDEX(inputs, 0), TENSOR_VIEW_SIZE_INDEX(inputs, 1), outputs);
                     }
                     else if (enable_L2Pool_SH)
                     {
-                        shaderExecutable = vxnneGetGPUL2PoolingShaderExecutable(node->base.context, VXNNE_KERNEL_L2POOLING, &node->kernelAttributes.borderMode,
+                        shaderExecutable = vxnneGetGPUL2PoolingShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_L2POOLING, &node->kernelAttributes.borderMode,
                                         inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
                                         pool_pad_y_bottom, rounding_s, outputs);
                     }
                     else if (maxPool_flag)
                     {
-                        shaderExecutable = vxnneGetGPUMaxPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_MAXPOOLING, &node->kernelAttributes.borderMode,
+                        shaderExecutable = vxnneGetGPUMaxPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_MAXPOOLING, &node->kernelAttributes.borderMode,
                                        inputs, pool_type_s, stride_x_s, stride_y, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
                                        pool_pad_y_bottom,rounding_s, outputs);
                     }

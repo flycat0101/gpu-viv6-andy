@@ -165,7 +165,7 @@ VX_PRIVATE_API vx_status vxoTensorRounding_SH_Initialize_Ext(vxnne_layer ops_lay
     }
     else
     {
-        shaderExecutable = vxnneGetGPUFloorShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_FLOOR, &ops_layer->node->kernelAttributes.borderMode,
+        shaderExecutable = vxnneGetGPUFloorShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_FLOOR, &ops_layer->node->kernelAttributes.borderMode,
             inputs, mode_s, outputs);
     }
 
@@ -349,7 +349,7 @@ OnError:
         }
         else
         {
-            shaderExecutable = vxnneGetGPUFloorShaderExecutable(node->base.context, VXNNE_KERNEL_FLOOR, &node->kernelAttributes.borderMode,
+            shaderExecutable = vxnneGetGPUFloorShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_FLOOR, &node->kernelAttributes.borderMode,
                 inputs, mode_s, outputs);
         }
 
