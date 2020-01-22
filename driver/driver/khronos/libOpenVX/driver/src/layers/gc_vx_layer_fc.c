@@ -794,7 +794,7 @@ VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SH_EVIS_Initialize_Ext(vxnne_l
     }
     else
     {
-        shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_FULLYCONNECTED,
+        shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_FULLYCONNECTED,
             &ops_layer->node->kernelAttributes.borderMode, enable_cast_format, input_rs, weights_rs, biases, VX_NN_ACTIVATION_NONE, outputs);
     }
 
@@ -1003,7 +1003,7 @@ OnError:
         }
         else
         {
-            shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED,
+            shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_FULLYCONNECTED,
                 &node->kernelAttributes.borderMode, enable_cast_format, input_rs, weights_rs, biases, VX_NN_ACTIVATION_NONE, outputs);
         }
 

@@ -361,7 +361,7 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
     }
     else
     {
-        shaderExecutable = vxnneGPUL2NormSumSqrtShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_L2NORM_SUMSQRT, &ops_layer->node->kernelAttributes.borderMode, src, sumTmp);
+        shaderExecutable = vxnneGPUL2NormSumSqrtShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_L2NORM_SUMSQRT, &ops_layer->node->kernelAttributes.borderMode, src, sumTmp);
     }
 
     if (!shaderExecutable)
@@ -385,7 +385,7 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
     }
     else
     {
-        shaderExecutable = vxnneGPUL2NormSumScaleShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_L2NORM_SUMSCALE, &ops_layer->node->kernelAttributes.borderMode, src, sumTmp, dst);
+        shaderExecutable = vxnneGPUL2NormSumScaleShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_L2NORM_SUMSCALE, &ops_layer->node->kernelAttributes.borderMode, src, sumTmp, dst);
     }
 
     if (!shaderExecutable)
@@ -648,7 +648,7 @@ OnError:
         }
         else
         {
-            shaderExecutable = vxnneGPUL2NormSumSqrtShaderExecutable(node->base.context, VXNNE_KERNEL_L2NORM_SUMSQRT, &node->kernelAttributes.borderMode, src, sumTmp);
+            shaderExecutable = vxnneGPUL2NormSumSqrtShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_L2NORM_SUMSQRT, &node->kernelAttributes.borderMode, src, sumTmp);
         }
 
         if (!shaderExecutable)
@@ -674,7 +674,7 @@ OnError:
         }
         else
         {
-            shaderExecutable = vxnneGPUL2NormSumScaleShaderExecutable(node->base.context, VXNNE_KERNEL_L2NORM_SUMSCALE, &node->kernelAttributes.borderMode, src, sumTmp, dst);
+            shaderExecutable = vxnneGPUL2NormSumScaleShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_L2NORM_SUMSCALE, &node->kernelAttributes.borderMode, src, sumTmp, dst);
         }
 
         if (!shaderExecutable)

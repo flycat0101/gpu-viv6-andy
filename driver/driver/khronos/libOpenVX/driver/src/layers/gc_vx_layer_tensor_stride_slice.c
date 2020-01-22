@@ -637,7 +637,7 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(vxnne_lay
             }
             else
             {
-                shaderExecutable = vxnneGetGPUReverseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_REVERSE, &ops_layer->node->kernelAttributes.borderMode,
+                shaderExecutable = vxnneGetGPUReverseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_REVERSE, &ops_layer->node->kernelAttributes.borderMode,
                     input, tmpTensor, numOfAxis, reverseAxis);
             }
 
@@ -674,7 +674,7 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(vxnne_lay
         }
         else
         {
-            shaderExecutable = vxnneGetGPUTensorCropShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_CROP, &ops_layer->node->kernelAttributes.borderMode, start, stop, tmpTensor, output);
+            shaderExecutable = vxnneGetGPUTensorCropShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_CROP, &ops_layer->node->kernelAttributes.borderMode, start, stop, tmpTensor, output);
         }
 
         if (!shaderExecutable)
@@ -704,7 +704,7 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(vxnne_lay
         }
         else
         {
-            shaderExecutable = vxnneGetGPUTensorStridedSliceShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_STRIDE_SLICE, &ops_layer->node->kernelAttributes.borderMode, start, stop, stride, tmpTensor, output);
+            shaderExecutable = vxnneGetGPUTensorStridedSliceShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_STRIDE_SLICE, &ops_layer->node->kernelAttributes.borderMode, start, stop, stride, tmpTensor, output);
         }
 
         if (!shaderExecutable)
@@ -1120,7 +1120,7 @@ OnError:
                 }
                 else
                 {
-                    shaderExecutable = vxnneGetGPUReverseShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_REVERSE, &node->kernelAttributes.borderMode,
+                    shaderExecutable = vxnneGetGPUReverseShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_REVERSE, &node->kernelAttributes.borderMode,
                         input, tmpTensor, numOfAxis, reverseAxis);
                 }
 
@@ -1160,7 +1160,7 @@ OnError:
             }
             else
             {
-                shaderExecutable = vxnneGetGPUTensorCropShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_CROP, &node->kernelAttributes.borderMode, start, stop, tmpTensor, output);
+                shaderExecutable = vxnneGetGPUTensorCropShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_CROP, &node->kernelAttributes.borderMode, start, stop, tmpTensor, output);
             }
 
             if (!shaderExecutable)
@@ -1193,7 +1193,7 @@ OnError:
             }
             else
             {
-                shaderExecutable = vxnneGetGPUTensorStridedSliceShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_STRIDE_SLICE, &node->kernelAttributes.borderMode, start, stop, stride, tmpTensor, output);
+                shaderExecutable = vxnneGetGPUTensorStridedSliceShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_STRIDE_SLICE, &node->kernelAttributes.borderMode, start, stop, stride, tmpTensor, output);
             }
 
             if (!shaderExecutable)

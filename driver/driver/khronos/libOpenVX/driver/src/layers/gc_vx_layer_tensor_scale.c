@@ -329,7 +329,7 @@ VX_PRIVATE_API vx_status vxoTensorScale_SH_Initialize_Ext(vxnne_layer ops_layer,
         }
         else
         {
-            shaderExecutable = vxnneGetGPUTensorScaleShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_SCALE, &ops_layer->node->kernelAttributes.borderMode, inputs, type, outputs);
+            shaderExecutable = vxnneGetGPUTensorScaleShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_TENSOR_SCALE, &ops_layer->node->kernelAttributes.borderMode, inputs, type, outputs);
         }
     }
     else
@@ -340,7 +340,7 @@ VX_PRIVATE_API vx_status vxoTensorScale_SH_Initialize_Ext(vxnne_layer ops_layer,
         }
         else
         {
-            shaderExecutable = vxnneGetGPUResizeNearestNeighborShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_RESIZE_NEAREST_NEIGHBOR, &ops_layer->node->kernelAttributes.borderMode, inputs, type, outputs);
+            shaderExecutable = vxnneGetGPUResizeNearestNeighborShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_RESIZE_NEAREST_NEIGHBOR, &ops_layer->node->kernelAttributes.borderMode, inputs, type, outputs);
         }
 
     }
@@ -562,7 +562,7 @@ OnError:
             }
             else
             {
-                shaderExecutable = vxnneGetGPUTensorScaleShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_SCALE, &node->kernelAttributes.borderMode, inputs, type, outputs);
+                shaderExecutable = vxnneGetGPUTensorScaleShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_TENSOR_SCALE, &node->kernelAttributes.borderMode, inputs, type, outputs);
             }
         }
         else
@@ -573,7 +573,7 @@ OnError:
             }
             else
             {
-                shaderExecutable = vxnneGetGPUResizeNearestNeighborShaderExecutable(node->base.context, VXNNE_KERNEL_RESIZE_NEAREST_NEIGHBOR, &node->kernelAttributes.borderMode, inputs, type, outputs);
+                shaderExecutable = vxnneGetGPUResizeNearestNeighborShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_RESIZE_NEAREST_NEIGHBOR, &node->kernelAttributes.borderMode, inputs, type, outputs);
             }
 
         }
