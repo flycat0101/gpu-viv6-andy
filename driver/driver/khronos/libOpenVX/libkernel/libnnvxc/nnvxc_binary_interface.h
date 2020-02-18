@@ -1,81 +1,21 @@
+/****************************************************************************
+*
+*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+*
+*    The material in this file is confidential and contains trade secrets
+*    of Vivante Corporation. This is proprietary information owned by
+*    Vivante Corporation. No part of this work may be disclosed,
+*    reproduced, copied, transmitted, or used in any way for any purpose,
+*    without the express written permission of Vivante Corporation.
+*
+*****************************************************************************/
+
+
 #ifndef __NN_VXC_BINARY_INTERFACE_H__
 #define __NN_VXC_BINARY_INTERFACE_H__
 
 typedef enum _nnvxc_kernel_enum
 {
-    TensorPad,
-    LSTMUnitHiddenOut,
-    TensorStridedSlice,
-    NormalizationUint8,
-    EmbeddingLUT,
-    Tensor2Row,
-    MeanStddevNorm,
-    RPNSoftMax,
-    DeConvolution,
-    MaxPooling,
-    AvgPooling_Int16,
-    TensorTranspose,
-    ActivationSoftRelu,
-    Tensor2DAdd,
-    TensorDiv,
-    TensorPad2,
-    Space2Batch,
-    Space2Depth,
-    AvgPooling_UInt8,
-    DepthwiseConv,
-    TensorMeanAxis,
-    TFAvgPooling,
-    TensorAddMeanStddevNorm,
-    LSTMUnitStateOutExt,
-    LeakyRelu,
-    L2NormSumSqrt,
-    Reshuffle,
-    RPNSort,
-    Depth2Space,
-    TensorScale,
-    Activation,
-    TensorMul,
-    Reverse,
-    TensorMulSatRTE,
-    PRelu,
-    TensorTR,
-    Activation_UInt8,
-    RPNNms,
-    LSTMUnitLayerNormStateOut,
-    RPNRetrieve,
-    LSTMUnitHiddenOutExt,
-    L2NormSumScale,
-    HorzMaxPool,
-    VertMaxPool,
-    LSTMUnitHiddenOut_Packed,
-    LayerNorm,
-    LSTMUnit,
-    RPNRegression,
-    Svdf,
-    TensorCrop,
-    Gemm_noBias,
-    ResizeNearestNeighbor,
-    Rnn,
-    Reorg,
-    AvgPooling,
-    TensorAdd,
-    TensorConvFormat,
-    BatchNorm,
-    LSTMUnitProjection,
-    Softmax,
-    TensorCopy,
-    TensorAbs,
-    L2Pooling,
-    ROIPool,
-    ROIRect2ROIList,
-    LSTMLayer,
-    FullyConnected,
-    PreTreatedRect,
-    HashLUT,
-    Normalization,
-    Gemm,
-    Batch2Space,
-    Floor,
     NNVXC_KERNEL_NUM /*NNVXC_KERNEL_NUM should be the last item in the enum*/
 }
 nnvxc_kernel_enum;
