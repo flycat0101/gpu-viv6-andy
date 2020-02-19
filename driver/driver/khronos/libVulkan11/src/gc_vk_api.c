@@ -42,6 +42,7 @@ static VkResult __vk_InitializeGlobals(void)
         iface.command = gcvHAL_VERSION;
         __VK_ONERROR(__vk_DeviceControl(&iface, 0));
 
+#if !gcdIGNORE_DRIVER_VERSIONS_MISMATCH
         if ((iface.u.Version.major != gcvVERSION_MAJOR)
         ||  (iface.u.Version.minor != gcvVERSION_MINOR)
         ||  (iface.u.Version.patch != gcvVERSION_PATCH)
@@ -56,6 +57,7 @@ static VkResult __vk_InitializeGlobals(void)
 
             __VK_ONERROR(VK_ERROR_INCOMPATIBLE_DRIVER);
         }
+#endif
 
         if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_TRACE", &tracemode)) && tracemode)
         {
