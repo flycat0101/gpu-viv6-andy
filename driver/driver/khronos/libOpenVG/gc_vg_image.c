@@ -5433,3 +5433,11 @@ VG_API_CALL void VG_API_ENTRY vgResolveImageVIV(
     vgmLEAVEAPI(vgResolveImageVIV);
 }
 #endif
+
+VG_API_CALL VGImage VG_API_ENTRY vgCreateEGLImageTargetKHR(VGeglImageKHR image)
+{
+    VGImage vgimg = (VGImage)NULL;
+
+    return vgimg;
+}
+
