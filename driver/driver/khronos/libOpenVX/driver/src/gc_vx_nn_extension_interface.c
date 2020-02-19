@@ -3463,6 +3463,8 @@ VX_PRIVATE_API vx_bool vxoLayer_CheckNNFormatSupport(vx_context context, vx_enum
     case VX_TYPE_BFLOAT16:
         support = support && (feature->nnCoreCountBFloat16 > 0);
         break;
+    case VX_TYPE_INVALID:
+        break;
     default:
         support = vx_false_e;
         vxError("Not support format: %d\n", format);
