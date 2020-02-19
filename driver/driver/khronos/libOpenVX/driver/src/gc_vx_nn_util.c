@@ -5508,7 +5508,7 @@ vx_status vxoFlushTensorImage(vx_graph graph)
             if(executionLayer->swapHandle[j]->ref->type == VX_TYPE_TENSOR)
             {
                 vx_tensor tensor  = (vx_tensor)executionLayer->swapHandle[j]->ref;
-                if(tensor->tensorBuffer->memory.isDirty)
+                /*if(tensor->tensorBuffer->memory.isDirty)*/
                 {
                     gcoOS_CacheFlush(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
                     gcoOS_CacheInvalidate(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
