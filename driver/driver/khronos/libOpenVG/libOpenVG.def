@@ -104,3 +104,4 @@ EXPORTS
     vgPathNativeVIV                         @88
     vgImageGetDirectVIV                     @89
     vgImageFlushDirectVIV                   @90
+    vgCreateEGLImageTargetKHR               @91
