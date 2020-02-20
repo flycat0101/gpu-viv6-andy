@@ -36,6 +36,13 @@ struct wl_viv_buffer
     gctUINT32 gpuBaseAddr;
     gceTILING tiling;
     gctINT32 fd;
+
+    gctUINT32 ts_addr;
+    gctUINT32 fc_enabled;
+    gctUINT32 fcValue;
+    gctUINT32 fcValueUpper;
+    gctUINT32 compressed;
+    gctUINT32 tileStatus_enabled;
 };
 
 /* Legacy naming. */

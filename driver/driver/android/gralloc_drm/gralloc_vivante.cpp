@@ -137,15 +137,13 @@ static void baseaddr_quirk(buffer_handle_t handle,
     }
 }
 
-static struct gralloc_vivante_bo_t *
-gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
+int gralloc_vivante_validate_buffer_size(buffer_handle_t handle,uint32_t *v_size,
+                    uint32_t *v_tiling,int *v_create_ts,int *v_stride)
 {
-    struct gralloc_vivante_bo_t *bo;
-    int align_w, align_h, bpp, stride;
     uint32_t size;
+    int align_w, align_h, bpp, stride;
     uint32_t flags = 0;
     uint32_t tiling = 0;
-    uint32_t gem_handle;
     int create_ts = 0;
     int err;
 
@@ -165,27 +163,13 @@ gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
         align_h = 4;
     }
 
-    /* flags. */
-    if ((gralloc_handle_usage(handle) & GRALLOC_USAGE_SW_WRITE_OFTEN) ||
-            (gralloc_handle_usage(handle) & GRALLOC_USAGE_SW_READ_OFTEN))
-        flags |= DRM_VIV_GEM_CACHED;
-
-    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_PROTECTED)
-        flags |= DRM_VIV_GEM_SECURE;
-
-    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_FB)
-        flags |= DRM_VIV_GEM_CONTIGUOUS;
-
-    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_COMPOSER)
-        flags |= DRM_VIV_GEM_CMA_LIMIT;
-
     /* format & bpp. */
     bpp = gralloc_vivante_get_bpp(gralloc_handle_format(handle));
     if (!bpp) {
         /* not supported. */
         gralloc_trace_error(1, "unknown format=%x",
             gralloc_handle_format(handle));
-        return NULL;
+        return -1;
     }
 
     if (bpp == 3)
@@ -236,6 +220,61 @@ gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
             size += 64;
 
         break;
+    }
+
+    gralloc_handle_set_stride(handle, stride / bpp);
+
+    if (v_size != NULL) {
+        *v_size = size;
+    }
+    if (v_tiling != NULL) {
+        *v_tiling = tiling;
+    }
+    if (v_create_ts != NULL) {
+        *v_create_ts = create_ts;
+    }
+    if (v_stride != NULL) {
+        *v_stride = stride;
+    }
+
+    return 0;
+}
+
+static struct gralloc_vivante_bo_t *
+gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
+{
+    struct gralloc_vivante_bo_t *bo;
+    int stride;
+    uint32_t size;
+    uint32_t flags = 0;
+    uint32_t tiling = 0;
+    uint32_t gem_handle;
+    int create_ts = 0;
+    int err;
+
+    gralloc_trace(0, "handle=%p usage=0x%x", handle, gralloc_handle_usage(handle));
+
+    err = gralloc_vivante_validate_buffer_size(handle,&size,&tiling,&create_ts,&stride);
+    if (err) {
+        gralloc_trace_error(1, "err=%d", err);
+        return NULL;
+    }
+
+    /* flags. */
+    if ((gralloc_handle_usage(handle) & GRALLOC_USAGE_SW_WRITE_OFTEN) ||
+            (gralloc_handle_usage(handle) & GRALLOC_USAGE_SW_READ_OFTEN))
+        flags |= DRM_VIV_GEM_CACHED;
+
+    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_PROTECTED)
+        flags |= DRM_VIV_GEM_SECURE;
+
+    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_FB)
+        flags |= DRM_VIV_GEM_CONTIGUOUS;
+
+    if (gralloc_handle_usage(handle) & GRALLOC_USAGE_HW_COMPOSER) {
+        /* Ignore cache for layer buffer */
+        flags &= ~DRM_VIV_GEM_CACHED;
+        flags |= DRM_VIV_GEM_CMA_LIMIT;
     }
 
     bo = (struct gralloc_vivante_bo_t *)calloc(1, sizeof(*bo));
@@ -306,8 +345,6 @@ gralloc_vivante_alloc_bo(struct gralloc_vivante_t *drv, buffer_handle_t handle)
 
     gralloc_trace(2, "fd=%d drm-bo=%p gem_handle=%d",
         gralloc_handle_fd(handle), bo->bo, gem_handle);
-
-    gralloc_handle_set_stride(handle, stride / bpp);
 
     buffer_size_quirk(handle, size);
 

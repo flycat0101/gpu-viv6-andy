@@ -53,6 +53,8 @@ int gralloc_vivante_lock_ycbcr(struct gralloc_vivante_t *drv,
 int gralloc_vivante_perform(struct gralloc_vivante_t *drv,
             int operation, va_list args);
 
+int gralloc_vivante_validate_buffer_size(buffer_handle_t handle,uint32_t *v_size,
+                    uint32_t *v_tiling,int *v_create_ts,int *v_stride);
 #ifdef __cplusplus
 }
 #endif
