@@ -2017,6 +2017,19 @@ static gcePATCH_ID indirectList[] =
 
 #endif
 
+static EGLBoolean _CanSupport2DTilestatus()
+{
+    gceCHIPMODEL chipModel;
+    gctUINT32 chipRevision;
+
+    gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
+
+    if (chipModel == gcv7000 && chipRevision == 0x6204)
+    {
+        return EGL_TRUE;
+    }
+    return EGL_FALSE;
+}
 
 static EGLBoolean
 _BindWindow(
@@ -2316,6 +2329,12 @@ _BindWindow(
                 if(gbm_query_enable_overlay_view())
                 {
                     renderMode = VEGL_INDIRECT_RENDERING;
+                }
+
+                if (_CanSupport2DTilestatus())
+                {
+                    renderMode = VEGL_DIRECT_RENDERING_FC_NOCC;
+                    egl_surface->enable_tile_status = 1;
                 }
             }
         }

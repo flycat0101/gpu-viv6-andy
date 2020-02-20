@@ -154,6 +154,12 @@ static inline void * gralloc_handle_data(buffer_handle_t handle)
     return (void *)(uintptr_t)((gralloc_handle_t *)handle)->data;
 }
 
+/* get buffer size. */
+static inline int gralloc_handle_size(buffer_handle_t handle)
+{
+    return ((gralloc_handle_t *)handle)->size;
+}
+
 /* set data along with owner. */
 static inline void gralloc_handle_set_data(buffer_handle_t handle,
                         void *data, int data_owner)
