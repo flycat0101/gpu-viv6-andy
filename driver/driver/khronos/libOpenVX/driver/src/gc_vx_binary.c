@@ -10898,7 +10898,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSHParamSize(
     {
         vx_reference ref = shParams[i];
 
-        /* is network input */
+        /* is network's input */
         for (j = 0; j < graph->inputCount; j++)
         {
             if (ref == graph->inputs[j])
@@ -10908,7 +10908,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSHParamSize(
         }
         if (j != graph->inputCount) continue;
 
-        /* is network output */
+        /* is network's output */
         for (j = 0; j < graph->outputCount; j++)
         {
             if (ref == graph->outputs[j])
@@ -11025,7 +11025,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetShaderStatesSize(
 
     gcmONERROR(gcoVX_QueryCoreCount(graph->deviceID, &gpuCount));
 
-    statesSize += gpuCount * 112; /* for gcoHARDWARE_InvokeThreadWalkerCL() for(i = 0; i < usedGPUCount; i++) */
+    statesSize += gpuCount * 120; /* for gcoHARDWARE_InvokeThreadWalkerCL() for(i = 0; i < usedGPUCount; i++) */
 
     statesSize += 4 * 25;
 
@@ -11266,10 +11266,25 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
                     ksDataSize = (vx_uint32)WB_MEM_SIZE_INDEX(weights_biases, j);
                     temp = (vx_float32)ksDataSize * 1.004f; /* compress */
                     ksDataSize = (vx_uint32)temp;
+                    ksDataPhysical = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(weights_biases, j);
 
                     ksDataSize = gcmALIGN_NP2_SAFE(ksDataSize, 64);
-                    /*vxInfo("get NBG size TP FC KS size: 0x%08x \n", ksDataSize);*/
-                    KernelStreamSize += ksDataSize;
+
+                    for (cnt = 0; cnt < lcdKernelDataPhyIndex; cnt++)
+                    {
+                        if (lcdKernelDataPhysical[cnt] == ksDataPhysical)
+                        {
+                            break;
+                        }
+                    }
+
+                    if (cnt == lcdKernelDataPhyIndex)
+                    {
+                        /*vxInfo("get NBG size TP KS physcial: 0x%08xm size: 0x%08x \n", ksDataPhysical, ksDataSize);*/
+                        KernelStreamSize += ksDataSize;
+                        lcdKernelDataPhysical[lcdKernelDataPhyIndex] = ksDataPhysical;
+                        lcdKernelDataPhyIndex++;
+                    }
                 }
 
                 if (ksDataSize == 0)
@@ -11367,8 +11382,18 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
             vx_size tensorSize = 0;
             vx_uint32 physical = TENSOR_PHYSICAL_ADDR(input);
             vx_uint32 i = 0;
+            vx_uint32 num = 0;
+            vx_uint32 flag = 0;
 
-            if (vxoMemory_GetType(&input->tensorBuffer->memory) == VXNNE_MEM_POOL_TYPE_ORIG_DDR)
+            for (num = 0; num < graph->inputCount; num++)
+            {
+                if ((vx_reference)input == graph->inputs[num])
+                {
+                    flag = 1;/* is graph's input*/
+                }
+            }
+
+            if ((vxoMemory_GetType(&input->tensorBuffer->memory) == VXNNE_MEM_POOL_TYPE_ORIG_DDR) && (0 == flag))
             {
                 for (i = 0; i < lcdTensorsPhyIndex; i++)
                 {
@@ -11395,8 +11420,18 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
             vx_size tensorSize = 0;
             vx_uint32 physical = TENSOR_PHYSICAL_ADDR(output);
             vx_uint32 i = 0;
+            vx_uint32 num = 0;
+            vx_uint32 flag = 0;
 
-            if (vxoMemory_GetType(&output->tensorBuffer->memory) == VXNNE_MEM_POOL_TYPE_ORIG_DDR)
+            for (num = 0; num < graph->outputCount; num++)
+            {
+                if ((vx_reference)output == graph->outputs[num])
+                {
+                    flag = 1;/* is graph's input*/
+                }
+            }
+
+            if ((vxoMemory_GetType(&output->tensorBuffer->memory) == VXNNE_MEM_POOL_TYPE_ORIG_DDR) && (0 == flag))
             {
                 for (i = 0; i < lcdTensorsPhyIndex; i++)
                 {
@@ -11747,11 +11782,11 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
         inputOutputSize = 0;
     }
 
-    lcdSize = lcdSize - inputOutputSize;
     headerSize = nbEntranceSize + layeSize + sectionsSize + nbIOSize;
 
-    vxInfo("NBG: entranceSize: 0x%x, nbIOSize: 0x%x, layeSize: 0x%x, sectionsSize : 0x%x\n", nbEntranceSize, nbIOSize, layeSize, sectionsSize);
-    vxInfo("NBG: inputoutput size: 0x%x, lcdSize: 0x%x, headerSize : 0x%x\n", inputOutputSize, lcdSize, headerSize);
+    vxInfo("NBG: entranceSize: 0x%x, nbIOSize: 0x%x, layeSize: 0x%x, sectionsSize: 0x%x, inputoutput size: 0x%x\n",
+            nbEntranceSize, nbIOSize, layeSize, sectionsSize, inputOutputSize);
+    vxInfo("NBG: lcdSize: 0x%x, headerSize : 0x%x\n", lcdSize, headerSize);
 
     totalSize = headerSize + lcdSize;
 
