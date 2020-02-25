@@ -518,7 +518,7 @@ vxoTensor_Create(
 
     tensor->tensorBuffer->bufRefCount++;
 
-    tensor->tensorBuffer->roundingMode = ((tensor->dataFormat == VX_TYPE_INT8) || (tensor->dataFormat == VX_TYPE_INT16)|| (tensor->dataFormat == VX_TYPE_BFLOAT16))
+    tensor->tensorBuffer->roundingMode = ((tensor->dataFormat == VX_TYPE_UINT8)||(tensor->dataFormat == VX_TYPE_INT8) || (tensor->dataFormat == VX_TYPE_INT16)|| (tensor->dataFormat == VX_TYPE_BFLOAT16))
                                          ? VX_NN_ROUNDING_MODE_RTNE : VX_NN_ROUNDING_MODE_SIMPLE_ROUNDING;
 
     if (tensor->base.context->options.nnRoundingMode)
