@@ -4357,7 +4357,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     vx_uint32 *                  sinfo_num_ptr
     )
 {
-#define TP_SPLIT_COUNT     64
+#define TP_SPLIT_COUNT     128
     vx_nn_cmd_split_info_u * sinfoArray;
     vx_enum tpType, splitTypes[TP_TENSOR_COUNT] = {TP_SPLIT_Z_DIRECTION};
 
