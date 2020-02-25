@@ -11058,6 +11058,11 @@ vxnne_shader_executable vxnneGetGPULeakyReluShaderExecutable(
             }
 
             status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 7);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (is_write_4x)
+            {
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            }
             if (status != VX_SUCCESS)
             {
                 goto OnError;
