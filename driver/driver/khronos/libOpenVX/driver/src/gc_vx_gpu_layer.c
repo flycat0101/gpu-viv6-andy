@@ -1212,12 +1212,14 @@ vxnne_shader_executable vxnneGetGPUEmbeddingLUTShaderExecutable(
     vx_scalar zeroPointIn =NULL;
     vx_scalar zeroPointOut = NULL;
     vx_scalar scale = NULL;
+    vx_scalar inOutScale_scl = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
     if (!((valueFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
         || (valueFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
         || (valueFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+        || (valueFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
         ))
     {
         vxError("input or output's format is not support");
@@ -1309,6 +1311,45 @@ vxnne_shader_executable vxnneGetGPUEmbeddingLUTShaderExecutable(
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 6);
         if (status != VX_SUCCESS) goto OnError;
     }
+    if(valueFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
+    {
+        vx_int8 input_fixPointPos = TENSOR_POS(value);
+        vx_int8 output_fixPointPos = TENSOR_POS(output);
+        vx_float32 inScale =1.0;
+        vx_float32 outScale =1.0;
+        vx_float32 inOutScale = 1.0;
+        vx_reference  parameters[4] = {(vx_reference)input_rs, (vx_reference)value, (vx_reference)NULL, (vx_reference)output};
+
+        if (input_fixPointPos >= 0)
+        {
+            inScale = 1.0f / (vx_float32) (1 << input_fixPointPos);
+        }
+        else if (input_fixPointPos < 0)
+        {
+            inScale = (vx_float32) (1 << -input_fixPointPos);
+        }
+        if (output_fixPointPos >= 0)
+        {
+            outScale = (vx_float32) (1 << output_fixPointPos);
+        }
+        else if (output_fixPointPos < 0)
+        {
+            outScale = 1.0f / (vx_float32) (1 << -output_fixPointPos);
+        }
+        inOutScale = inScale * outScale;
+
+        inOutScale_scl = vxCreateScalar(context, VX_TYPE_FLOAT32, &inOutScale);
+        parameters[2] = (vx_reference)inOutScale_scl;
+
+        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_int32", borderMode);
+        if (!shaderExecutable)
+        {
+            goto OnError;
+        }
+
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+        if (status != VX_SUCCESS) goto OnError;
+    }
     else if((valueFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
             (valueFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32))
     {
@@ -1328,6 +1369,7 @@ vxnne_shader_executable vxnneGetGPUEmbeddingLUTShaderExecutable(
     if(scale) vxReleaseScalar(&scale);
     if(zeroPointIn) vxReleaseScalar(&zeroPointIn);
     if(zeroPointOut) vxReleaseScalar(&zeroPointOut);
+    if(inOutScale_scl) vxReleaseScalar(&inOutScale_scl);
 
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
@@ -1337,6 +1379,7 @@ OnError:
     if(scale) vxReleaseScalar(&scale);
     if(zeroPointIn) vxReleaseScalar(&zeroPointIn);
     if(zeroPointOut) vxReleaseScalar(&zeroPointOut);
+    if(inOutScale_scl) vxReleaseScalar(&inOutScale_scl);
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
@@ -4535,11 +4578,13 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
     vx_tensor     hit_rs                     = NULL;
     vx_tensor     output_rs                  = NULL;
     vx_int32      rs_sizes[4]                = {1, 1, 1, 1};
+    vx_scalar     inOutScale_scl             = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
     if (!((valueFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
         || (valueFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+        || (valueFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
         || (valueFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)))
     {
         gcmPRINT("input or output's format is not support");
@@ -4601,6 +4646,7 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
         parameters[2] = (vx_reference)value_rs;
     }
 
+    rs_sizes[1] = 1;
     if (tDims == 1)
     {
         rs_sizes[0] = tw;
@@ -4667,7 +4713,7 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
         status = vxBuildProgram(program, VX_NULL);
         if (status != VX_SUCCESS) goto OnError;
 
-        kernel = vxnneAddKernelShadersInProgram(context, "gpuHashLUT", program, 5, kernelEnum);
+        kernel = vxnneAddKernelShadersInProgram(context, "gpuHashLUT", program, 0, kernelEnum);
         if (!kernel) goto OnError;
 
         vxReleaseProgram(&program);
@@ -4684,9 +4730,72 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
         if (!shaderExecutable) goto OnError;
     }
+    else if (valueFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
+    {
+        vx_int8 input_fixPointPos = TENSOR_POS(value);
+        vx_int8 output_fixPointPos = TENSOR_POS(output);
+        vx_float32 inScale =1.0;
+        vx_float32 outScale =1.0;
+        vx_float32 inOutScale = 1.0;
+        vx_reference  parameters2[6] = {(vx_reference)input, (vx_reference)key, (vx_reference)value, (vx_reference)hit, (vx_reference)output, (vx_reference)NULL};
 
-    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 5);
-    if (status != VX_SUCCESS) goto OnError;
+        if(input_rs)
+        {
+            parameters2[0] = (vx_reference)input_rs;
+        }
+        if(key_rs)
+        {
+            parameters2[1] = (vx_reference)key_rs;
+        }
+        if(value_rs)
+        {
+            parameters2[2] = (vx_reference)value_rs;
+        }
+        if(hit_rs)
+        {
+            parameters2[3] = (vx_reference)hit_rs;
+        }
+        if(output_rs)
+        {
+            parameters2[4] = (vx_reference)output_rs;
+        }
+
+        if (input_fixPointPos >= 0)
+        {
+            inScale = 1.0f / (vx_float32) (1 << input_fixPointPos);
+        }
+        else if (input_fixPointPos < 0)
+        {
+            inScale = (vx_float32) (1 << -input_fixPointPos);
+        }
+        if (output_fixPointPos >= 0)
+        {
+            outScale = (vx_float32) (1 << output_fixPointPos);
+        }
+        else if (output_fixPointPos < 0)
+        {
+            outScale = 1.0f / (vx_float32) (1 << -output_fixPointPos);
+        }
+        inOutScale = inScale * outScale;
+
+        inOutScale_scl = vxCreateScalar(context, VX_TYPE_FLOAT32, &inOutScale);
+        parameters2[5] = (vx_reference)inOutScale_scl;
+
+        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Int32", borderMode);
+        if (!shaderExecutable)
+        {
+            goto OnError;
+        }
+
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters2, 6);
+        if (status != VX_SUCCESS) goto OnError;
+    }
+
+    if (!(valueFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32))
+    {
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 5);
+        if (status != VX_SUCCESS) goto OnError;
+    }
 
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
     if (status != VX_SUCCESS) goto OnError;
@@ -4696,6 +4805,7 @@ vxnne_shader_executable vxnneGetGPUHashLUTShaderExecutable(
     if (value_rs) vxoTensor_ReleaseTensor(&value_rs);
     if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
     if (hit_rs) vxoTensor_ReleaseTensor(&hit_rs);
+    if(inOutScale_scl) vxReleaseScalar(&inOutScale_scl);
 
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
@@ -4706,6 +4816,7 @@ OnError:
     if (value_rs) vxoTensor_ReleaseTensor(&value_rs);
     if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
     if (hit_rs) vxoTensor_ReleaseTensor(&hit_rs);
+    if(inOutScale_scl) vxReleaseScalar(&inOutScale_scl);
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 

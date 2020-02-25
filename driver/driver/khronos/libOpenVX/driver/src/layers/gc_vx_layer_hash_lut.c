@@ -138,6 +138,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHashLUT_Initializer(vx_node node, const 
     {
         if (((valueFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
             && (input_scale == output_scale && inputZP == outputZP))
+            || (valueFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
             || (valueFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
             || (valueFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32))
             dataFormat_flag = vx_true_e;
