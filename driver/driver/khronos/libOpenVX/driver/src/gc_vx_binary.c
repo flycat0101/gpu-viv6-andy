@@ -3454,7 +3454,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_GenerateStatesBuffer(
     {
         gctUINT32 gpuCount = 1;
         gcmONERROR(gcoVX_QueryCoreCount(graph->deviceID, &gpuCount));
-        if (binLoad->fixed.header.featureDB.core_count != (vx_uint8)gpuCount)
+        if ((binLoad->fixed.header.featureDB.core_count !=0 ) &&
+            (binLoad->fixed.header.featureDB.core_count != (vx_uint8)gpuCount))
         {
             vxError("%s[%d]: binary core count: %d, context core count: %d\n",
                     __FUNCTION__, __LINE__, binLoad->fixed.header.featureDB.core_count, gpuCount);
