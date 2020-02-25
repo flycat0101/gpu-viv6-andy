@@ -7454,7 +7454,7 @@ clPackROperand(
                                                                 regDataType,
                                                                 regDataType,
                                                                 fromROperand->u.reg.regIndex + j,
-                                                                clGetDefaultComponentSelection(Compiler, dataType));
+                                                                clGetDefaultComponentSelection(Compiler, regDataType));
             clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
                                                     clmGenCodeDataType(T_UINT),
                                                     packedSwizzleValue[j & 1]);
