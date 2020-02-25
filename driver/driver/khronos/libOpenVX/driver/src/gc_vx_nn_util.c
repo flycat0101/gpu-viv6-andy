@@ -4355,7 +4355,7 @@ vx_status vxnneOperation_InitializeCommand(
 
                     alignTensorChannelToTransposeChannel(output, operation->transposeOutChannel);
 
-                    transposeSize = caculateOutTransposeBufferSize(context, outImageTileX, outImageTileY, convOperation->enable_pooling, output->tensorBuffer->dataFormat);
+                    transposeSize = caculateOutTransposeBufferSize(context, outImageTileX, outImageTileY, convOperation, output->tensorBuffer->dataFormat);
                     gcoOS_ZeroMemory(&requestList->transposeOut, sizeof(vx_memory_s));
                     requestList->transposeOut.lastUseId = requestList->transposeOut.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
                     requestList->transposeOut.sizes[0] = transposeSize;
@@ -5613,7 +5613,7 @@ vx_uint32 caculateOutTransposeBufferSize(
     vx_context context,
     vx_uint32 outputTileXSize,
     vx_uint32 outputTileYSize,
-    vx_bool enablePooling,
+    vxnne_convolution_relu_pooling_operation convOperation,
     vx_enum format
     )
 {
@@ -5623,7 +5623,7 @@ vx_uint32 caculateOutTransposeBufferSize(
     vx_uint32 vipSramWidthInByte = context->nnConfig.fixedFeature.physicalVipSramWidthInByte;
     vx_uint32 dataSize        = (vx_uint32)vxDataType_GetSize((vx_type_e)format);
 
-    if(enablePooling)
+    if(convOperation->enable_pooling && (convOperation->pool_type != VIV_NN_POOLING_NON) && ((convOperation->pool_size_x == 2 && convOperation->pool_size_y == 2) || (convOperation->pool_size_x == 3 && convOperation->pool_size_y == 3)))
     {
         poolStride = NN_CONV_POOLED_STRIDE_HW;
     }
@@ -5843,7 +5843,7 @@ vx_bool estimateNNTransposeSize(vx_context context, vx_graph graph)
                                             operation->transposeInChannel,
                                             input->tensorBuffer->dataFormat);
 
-            operation->transposeOutSize = caculateOutTransposeBufferSize(context, outImageTileX, outImageTileY, convOperation->enable_pooling, output->tensorBuffer->dataFormat);
+            operation->transposeOutSize = caculateOutTransposeBufferSize(context, outImageTileX, outImageTileY, convOperation, output->tensorBuffer->dataFormat);
             operation->transposeKernelSize = GetEsitimateWBSize(opInfo.weightsBiases);
             operation->esitimateImageCacheSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
         }

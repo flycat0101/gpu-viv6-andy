@@ -457,7 +457,7 @@ vx_uint32 caculateOutTransposeBufferSize(
     vx_context context,
     vx_uint32 outputTileXSize,
     vx_uint32 outputTileYSize,
-    vx_bool enablePooling,
+    vxnne_convolution_relu_pooling_operation convOperation,
     vx_enum format
     );
 
