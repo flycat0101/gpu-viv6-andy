@@ -2649,7 +2649,7 @@ static VkResult halti5_pip_emit_rt(
 
     depthOnly = (subPass->colorCount == 0);
     /* ps shader is not necessary to be excuted */
-    depthOnly &= (!(hints->hasKill
+    depthOnly |= (!(hints->hasKill
         || hints->psHasFragDepthOut
         || psHasMemoryAccess
         || (hints->rtArrayComponent != -1)
