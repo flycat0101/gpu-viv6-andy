@@ -1750,11 +1750,6 @@ VX_PRIVATE_API vx_bool SupportSWTiling(
                 *failedID = i;
                 goto exit;
             }
-            else if (graph->layer->operations[i]->childOpNum > 1 && i != start + count - 1)
-            {
-                *failedID = i + 1;
-                goto exit;
-            }
             else
             {
                 vxnne_operation_info_s opInfo1, opInfo2;
@@ -1769,6 +1764,16 @@ VX_PRIVATE_API vx_bool SupportSWTiling(
                         *failedID = i;
                         goto exit;
                     }
+                    else if (graph->layer->operations[i]->childOpNum > 1 && i != start + count - 1)
+                    {
+                        *failedID = i + 1;
+                        goto exit;
+                    }
+                }
+                else if (graph->layer->operations[i]->childOpNum > 1 && i != start + count - 1)
+                {
+                    *failedID = i;
+                    goto exit;
                 }
             }
         }
