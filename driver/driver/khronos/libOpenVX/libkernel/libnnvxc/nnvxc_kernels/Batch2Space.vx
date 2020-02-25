@@ -4,10 +4,6 @@
 
 _viv_uniform float tmpScale;
 _viv_uniform float tmpZP;
-_viv_uniform int output_width;
-_viv_uniform int output_height;
-_viv_uniform int input_width;
-_viv_uniform int input_height;
 _viv_uniform float output_ratio;
 
 __kernel void vxcBatch2Space_u8_u8_general

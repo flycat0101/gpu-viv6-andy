@@ -3061,9 +3061,7 @@ vxnne_shader_executable vxnneGetBatch2SpaceShaderExecutable(
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_fp16_fp16_general", borderMode);
         if (!shaderExecutable) goto OnError;
     }
-    status = vxnneShaderExecutable_SetUniform(shaderExecutable, "output_width", 1, &output_width);
-    status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "output_height", 1, &output_height);
-    status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "output_ratio", 1, &output_ratio);
+    status = vxnneShaderExecutable_SetUniform(shaderExecutable, "output_ratio", 1, &output_ratio);
     if (status != VX_SUCCESS) goto OnError;
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
