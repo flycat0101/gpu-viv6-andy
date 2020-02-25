@@ -8975,7 +8975,7 @@ gcSHADER_Load(
 
             if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_SAVING_STREAM_NUMBER_FOR_OUTPUT)
             {
-                output->streamNumber = gcSHADER_PRECISION_DEFAULT;
+                output->streamNumber = 0;
             }
             else
             {
