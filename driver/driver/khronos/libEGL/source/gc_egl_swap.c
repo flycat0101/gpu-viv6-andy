@@ -45,6 +45,7 @@
 #define CONF_MAX_LEN 256
 #define STRING_LEN   1024
 
+#if !gcdDUMP
 static void
 _SaveFrameTGA(
     VEGLThreadData thread,
@@ -368,6 +369,7 @@ _SaveFrameTGA(
     }
     while(gcvFALSE);
 }
+#endif
 
 static void
 _DumpTGA(
