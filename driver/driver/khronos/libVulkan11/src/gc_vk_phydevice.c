@@ -294,6 +294,11 @@ if ((database->SMALLBATCH && phyDev->phyDevConfig.options.smallBatch)){    vsCon
             }
             attribBufSizeInKbyte -= fragmentSizeInKbyte;
 
+            if (!(database->PSCS_THROTTLE && database->HWMANAGED_LS))
+            {
+                attribBufSizeInKbyte -= 1;
+            }
+
             localStorageSizeInKbyte = attribBufSizeInKbyte;
         }
     }
