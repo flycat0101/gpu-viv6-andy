@@ -6985,7 +6985,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
 
             command_buffer->eventID[i] = i != command_buffer->commandCount - 1 ? 1 : 0;
 
-            if (operation_command->operation->operatorType == VXNNE_OPERATOR_FULLYCONNECTED)
+            if (operation_command->operation->operatorType == VXNNE_OPERATOR_FULLYCONNECTED && (parameter->tp_value->u32[0] == 1 || (parameter->tp_value->u32[0] != 1 && parameter->tp_value->e32[0] == 0)))
             {
                 command_buffer->eventID[i] |= 0x80000000;
             }
