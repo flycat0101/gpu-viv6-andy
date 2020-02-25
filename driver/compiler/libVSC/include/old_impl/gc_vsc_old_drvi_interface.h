@@ -60,6 +60,8 @@ BEGIN_EXTERN_C()
 
 /* Shared use. */
 #define _sldLocalMemoryAddressName          "#sh_localMemoryAddress"
+#define _sldThreadIdMemoryAddressName       "#sh_threadIdMemAddr"
+#define _sldWorkThreadCountName             "#sh_workThreadCount"
 
 #define FULL_PROGRAM_BINARY_SIG_1           gcmCC('F', 'U', 'L', 'L')
 #define FULL_PROGRAM_BINARY_SIG_2           gcmCC('P', 'R', 'G', 'M')
@@ -478,11 +480,13 @@ typedef struct _gcsPROGRAM_VidMemPatchOffset
     gctUINT32 gprSpillVidMemInStateBuffer[gcMAX_SHADERS_IN_LINK_GOURP];
     gctUINT32 crSpillVidMemInStateBuffer[gcMAX_SHADERS_IN_LINK_GOURP];
     gctUINT32 sharedMemVidMemInStateBuffer;
+    gctUINT32 threadIdVidMemInStateBuffer;
 
     gctUINT32 instVidMemInStateDelta[gcMAX_SHADERS_IN_LINK_GOURP];
     gctUINT32 gprSpillVidMemInStateDelta[gcMAX_SHADERS_IN_LINK_GOURP];
     gctUINT32 crSpillVidMemInStateDelta[gcMAX_SHADERS_IN_LINK_GOURP];
     gctUINT32 sharedMemVidMemInStateDelta;
+    gctUINT32 threadIdVidMemInStateDelta;
 }
 gcsPROGRAM_VidMemPatchOffset;
 
@@ -575,6 +579,7 @@ typedef struct _gcSHADER_VID_NODES
     gctPOINTER  gprSpillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for gpr spill memory. */
     gctPOINTER  crSpillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for cr spill memory. */
     gctPOINTER  sharedMemVidMemNode;
+    gctPOINTER  threadIdVidMemNode;
 }gcSHADER_VID_NODES;
 
 typedef enum _gceMEMORY_ACCESS_FLAG
@@ -825,15 +830,20 @@ typedef struct _gcsHINT
     gctBOOL     useGPRSpill[gcvPROGRAM_STAGE_LAST];
 
     /* padding bytes to make the offset of shaderVidNodes field be consistent in 32bit and 64bit platforms */
-    gctCHAR     reserved[8];
+    gctCHAR     reservedByteForShaderVidNodeOffset[8];
 
     /* shaderVidNodes should always be the LAST filed in hits. */
     /* SURF Node for memory that is used in shader. */
     gcSHADER_VID_NODES shaderVidNodes;
 
     /* padding bytes to make the struct size be consistent in 32bit and 64bit platforms */
-    gctCHAR     reserved1[4];
+    gctCHAR     reservedByteForHitSize[8];
 }gcsHINT;
+
+#if defined(_WINDOWS)
+char _check_shader_vid_nodes_offset[(gcmOFFSETOF(_gcsHINT, shaderVidNodes) % 8) == 0];
+char _check_hint_size[(sizeof(struct _gcsHINT) % 8) == 0];
+#endif
 
 #define gcsHINT_isCLShader(Hint)            ((Hint)->clShader)
 #define gcsHINT_GetShaderMode(Hint)         ((Hint)->shaderMode)

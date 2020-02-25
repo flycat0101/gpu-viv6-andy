@@ -6426,6 +6426,16 @@ gceSTATUS vscFinalizeHwPipelineShadersStates(VSC_SYS_CONTEXT* pSysCtx, VSC_HW_PI
 
             pHwShdsStates->hints.shaderVidNodes.sharedMemVidMemNode = gcvNULL;
         }
+
+        if (pHwShdsStates->hints.shaderVidNodes.threadIdVidMemNode)
+        {
+            (*pSysCtx->drvCBs.pfnFreeVidMemCb)(pSysCtx->hDrv,
+                                               gcvSURF_VERTEX,
+                                               "thread id memory",
+                                               pHwShdsStates->hints.shaderVidNodes.threadIdVidMemNode);
+
+            pHwShdsStates->hints.shaderVidNodes.threadIdVidMemNode = gcvNULL;
+        }
     }
 
     return status;
