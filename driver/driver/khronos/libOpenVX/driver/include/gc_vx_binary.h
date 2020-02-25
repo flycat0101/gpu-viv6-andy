@@ -771,6 +771,11 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
     vx_graph graph
     );
 
+VX_INTERNAL_API vx_status vxoBinaryGraph_UpdateInputOutputPhysicalTable(
+    vx_context context,
+    vx_uint32 oldPhysical,
+    vx_uint32 newPhysical
+    );
 
 VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     vx_graph graph

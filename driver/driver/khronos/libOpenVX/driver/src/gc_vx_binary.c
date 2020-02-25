@@ -4912,12 +4912,12 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
     vxInfo(" input table address: ");
     for (i = 0; i < graph->inputCount; i++)
     {
-        vxInfo("0x8%x ", binarySave->inputPhysicalEntry[i]);
+        vxInfo("0x%x ", binarySave->inputPhysicalEntry[i]);
     }
     vxInfo("\n output table address: ");
     for (i = 0; i < graph->outputCount; i++)
     {
-        vxInfo("0x8%x ", binarySave->outputPhysicalEntry[i]);
+        vxInfo("0x%x ", binarySave->outputPhysicalEntry[i]);
     }
     vxInfo("\n");
 
@@ -7802,6 +7802,77 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_GetGraphInputOutput(
                                             binarySave->outputTableRef, &binarySave->outputTableRefCount));
 
 OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+VX_INTERNAL_API vx_status vxoBinaryGraph_UpdateInputOutputPhysicalTable(
+    vx_context context,
+    vx_uint32 oldPhysical,
+    vx_uint32 newPhysical
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_graph graph = VX_NULL;
+    vx_binary_save_s *binarySave = VX_NULL;
+    vx_reference_item current;
+    vx_uint32 i = 0, j = 0;
+    vx_uint32 updated = 0;
+
+    gcmHEADER_ARG("context=%p, oldPhysical=0x%x, newPhysical=0x%x", context, oldPhysical, newPhysical);
+
+    current = context->refListHead;
+    while (current != VX_NULL)
+    {
+        vx_reference ref = current->ref;
+
+        if (ref != VX_NULL)
+        {
+            if (ref->type == VX_TYPE_GRAPH)
+            {
+                graph = (vx_graph)ref;
+                binarySave = graph->binarySave;
+                if (binarySave != VX_NULL)
+                {
+                    for (i = 0 ; i < graph->inputCount; i++)
+                    {
+                        if (binarySave->inputPhysicalEntry[i] == oldPhysical)
+                        {
+                            binarySave->inputPhysicalEntry[i] = newPhysical;
+                            for (j = 0; j < graph->outputCount; j++)
+                            {
+                                if (binarySave->outputPhysicalEntry[j] == newPhysical)
+                                {   /* is swap input/output */
+                                    binarySave->outputPhysicalEntry[j] = oldPhysical;
+                                }
+                            }
+                            updated = 1;
+                        }
+                    }
+
+                    if (updated == 0)
+                    {
+                        for (i = 0; i < graph->outputCount; i++)
+                        {
+                            if (binarySave->outputPhysicalEntry[i] == oldPhysical)
+                            {
+                                for (j = 0; j < graph->inputCount; j++)
+                                {
+                                    if (binarySave->inputPhysicalEntry[j] == newPhysical)
+                                    {   /* is swap input/output */
+                                        binarySave->inputPhysicalEntry[j] = oldPhysical;
+                                    }
+                                }
+                                binarySave->outputPhysicalEntry[i] = newPhysical;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        current = current->next;
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }

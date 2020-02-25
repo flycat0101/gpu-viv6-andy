@@ -3695,9 +3695,16 @@ OnError:
 VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* const new_ptrs, void** prev_ptrs)
 {
     vx_status status = VX_SUCCESS;
+    vx_uint32 oldPhysical = 0;
+    vx_uint32 newPhysical = 0;
 
     gcmHEADER_ARG("tensor=%p, new_ptrs=%p, prev_ptrs=%p", tensor, new_ptrs, prev_ptrs);
     gcmDUMP_API("$VX vxSwapTensorHandle: tensor=%p, new_ptrs=%p, prev_ptrs=%p", tensor, new_ptrs, prev_ptrs);
+
+    if (tensor->base.context->options.enableSaveBinary)
+    {
+        oldPhysical = TENSOR_PHYSICAL_ADDR(tensor);
+    }
 
     if (vxoTensor_IsValidTensor(tensor) == vx_true_e)
     {
@@ -3760,6 +3767,16 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* co
         status = VX_ERROR_INVALID_REFERENCE;
     }
 
+    if (tensor->base.context->options.enableSaveBinary)
+    {
+        newPhysical = TENSOR_PHYSICAL_ADDR(tensor);
+        if (oldPhysical != newPhysical)
+        {
+            vxInfo("generate NBG, try to update input or output table, oldPhysical: 0x%08X, newPhysical: 0x%08X\n", oldPhysical, newPhysical);
+            vxoBinaryGraph_UpdateInputOutputPhysicalTable(tensor->base.context, oldPhysical, newPhysical);
+        }
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -3795,6 +3812,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensor(vx_tensor tensor0, vx_tensor ten
     tensor0->tensorBuffer->memory.physicals[0] = tensor1->tensorBuffer->memory.physicals[0];
     tensor1->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)ptr;
     tensor1->tensorBuffer->memory.physicals[0] = physical;
+
+    if (tensor0->base.context->options.enableSaveBinary)
+    {
+        vxoBinaryGraph_UpdateInputOutputPhysicalTable(tensor0->base.context, TENSOR_PHYSICAL_ADDR(tensor0), TENSOR_PHYSICAL_ADDR(tensor1));
+    }
 
     gcmFOOTER_ARG("%d", status);
     return status;
