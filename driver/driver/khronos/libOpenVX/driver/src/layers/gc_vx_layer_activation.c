@@ -897,7 +897,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPReluLayer_Initializer(vx_node node, c
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_ACTIVATION) &&
             vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs) &&
-            (TENSOR_VIEW_SIZE_INDEX(outputs, 0) * TENSOR_VIEW_SIZE_INDEX(outputs, 1) * TENSOR_VIEW_SIZE_INDEX(outputs, 2) > 1) &&
+            (TENSOR_VIEW_SIZE_INDEX(outputs, 0) * TENSOR_VIEW_SIZE_INDEX(outputs, 1) /** TENSOR_VIEW_SIZE_INDEX(outputs, 2) */> 1) &&
             TENSOR_VIEW_SIZE_INDEX(inputs, 2) < PRELU_CHANNEL_MAX)
         {
 
