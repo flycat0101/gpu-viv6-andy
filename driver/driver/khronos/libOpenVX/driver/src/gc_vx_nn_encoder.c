@@ -6331,7 +6331,7 @@ vx_uint32 calcKernelSizeV8Huffman(
     vx_uint32 runSet2Bits = 1;
     CodeSymbol codeSymbol[THROUGHPUT * 3];
 
-    vx_bool hasNoBias = vx_false_e;
+    vx_bool hasNoBias = ((weight_format == VX_TYPE_BFLOAT16) || (weight_format == VX_TYPE_FLOAT16)) ? vx_true_e : vx_false_e;
     vx_bool hasNoZOffset = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_NO_Z_LOCATION_OFFSET);
     vx_bool hasNNPerFilterPostMultiply = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT);
     vx_bool hasNNPreLU = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU);
@@ -6357,7 +6357,8 @@ vx_uint32 calcKernelSizeV8Huffman(
         goto exit;
     }
 
-    if (weight_format == VX_TYPE_BFLOAT16)
+    if (weight_format == VX_TYPE_BFLOAT16 ||
+        weight_format == VX_TYPE_FLOAT16)
     {
         numOfInImageBuffer = (vx_uint32)gcoMATH_Ceiling((vx_float32)(weightCount * slice_count + BF16_BIAS_SIZE) / (vx_float32)linesInImageBuffer);
     }
@@ -6386,7 +6387,8 @@ vx_uint32 calcKernelSizeV8Huffman(
     nonCoefCount = usedCoreCount * (16 / weightBitSize);
     if (hasNNPerFilterPostMultiply)
         nonCoefCount += filterTotalCount;
-    if (weight_format == VX_TYPE_BFLOAT16)
+    if (weight_format == VX_TYPE_BFLOAT16 ||
+        weight_format == VX_TYPE_FLOAT16)
         nonCoefCount += (filterTotalCount * BF16_BIAS_SIZE); /*BFLOAT16 fp32 bias will be splitted to 3 BF16 to coef stream*/
 
 
@@ -6507,7 +6509,7 @@ vx_uint32 calcKernelSizeV8Huffman(
             {
                 if (huffmanConfig->fp16_flag)
                 {
-                    coef16 = (coef16 & 0x7FFF) * 2 + coef16 / (1<<15);
+                    coef16 = (coef16 & 0x7FFF) * 2 + ((coef16 & (1<<15)) >> 15);
                 }
                 coef16 -= huffmanConfig->avg_bias;
                 if (huffmanConfig->run_len_table_size == 0x0)
@@ -6948,7 +6950,7 @@ void calcTPKernelBufferSizeHuffman(
 
                 if (huffmanConfig->fp16_flag)
                 {
-                    coef16 = (coef16 & 0x7FFF) * 2 + coef16 / (1<<15);
+                    coef16 = (coef16 & 0x7FFF) * 2 + ((coef16 & (1<<15)) >> 15);
                 }
                 coef16 -= huffmanConfig->avg_bias;
                 if (huffmanConfig->run_len_table_size == 0x0)
@@ -9993,7 +9995,7 @@ vx_uint32 fillinTPKernelBufferHuffman(
             {
                 if (huffmanConfig->fp16_flag)
                 {
-                    coef16 = (coef16 & 0x7FFF) * 2 + coef16 / (1<<15);
+                    coef16 = (coef16 & 0x7FFF) * 2 + ((coef16 & (1<<15)) >> 15);
                 }
                 coef16 -= huffmanConfig->avg_bias;
                 if (huffmanConfig->run_len_table_size == 0x0)
@@ -11019,7 +11021,7 @@ vx_uint32 fillinKernelBufferV8Huffman(
     vx_uint32 runSet2Bits = 1;
     CodeSymbol codeSymbol[THROUGHPUT * 3];
 
-    vx_bool hasNoBias = vx_false_e;
+    vx_bool hasNoBias = ((weight_format == VX_TYPE_BFLOAT16) || (weight_format == VX_TYPE_FLOAT16)) ? vx_true_e : vx_false_e;
     vx_bool hasNoZOffset = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_NO_Z_LOCATION_OFFSET);
     vx_bool hasNNPerFilterPostMultiply = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_QUANT);
     vx_bool hasNNPreLU = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU);
@@ -11128,7 +11130,8 @@ vx_uint32 fillinKernelBufferV8Huffman(
         }
     }
 
-    if (weight_format == VX_TYPE_BFLOAT16)
+    if (weight_format == VX_TYPE_BFLOAT16 ||
+        weight_format == VX_TYPE_FLOAT16)
     {
         numOfInImageBuffer = (vx_uint32)gcoMATH_Ceiling((vx_float32)(weightCount * slice_count + BF16_BIAS_SIZE) / (vx_float32)linesInImageBuffer);
     }
@@ -11158,7 +11161,8 @@ vx_uint32 fillinKernelBufferV8Huffman(
     nonCoefCount = usedCoreCount * (16 / weightBitSize);
     if (hasNNPerFilterPostMultiply)
         nonCoefCount += filterTotalCount;
-    if (weight_format == VX_TYPE_BFLOAT16)
+    if (weight_format == VX_TYPE_BFLOAT16 ||
+        weight_format == VX_TYPE_FLOAT16)
         nonCoefCount += (filterTotalCount * BF16_BIAS_SIZE); /*BFLOAT16 fp32 bias will be splitted to 3 BF16 to coef stream*/
 
     nonCoefIndex = (vx_uint32 *)vxAllocateAndZeroMemory(nonCoefCount * sizeof(vx_uint32));
@@ -11316,7 +11320,7 @@ vx_uint32 fillinKernelBufferV8Huffman(
 
                 if (huffmanConfig->fp16_flag)
                 {
-                    coef16 = (coef16 & 0x7FFF) * 2 + coef16 / (1<<15);
+                    coef16 = (coef16 & 0x7FFF) * 2 + ((coef16 & (1<<15)) >> 15);
                 }
                 coef16 -= huffmanConfig->avg_bias;
                 if (huffmanConfig->run_len_table_size == 0x0)
