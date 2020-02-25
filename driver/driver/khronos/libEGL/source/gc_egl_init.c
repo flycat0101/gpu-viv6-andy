@@ -478,10 +478,6 @@ _FillIn(
                     printed = gcvTRUE;
                 }
             }
-#ifndef _WINDOWS
-            config->renderableType &= ~EGL_OPENGL_BIT;
-            config->conformant     &= ~EGL_OPENGL_BIT;
-#endif
         }
     }
 #endif
