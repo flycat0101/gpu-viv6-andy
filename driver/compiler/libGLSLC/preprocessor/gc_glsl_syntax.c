@@ -85,6 +85,8 @@ static slsEXTENSION_INFO _DefinedExtensions2[] =
     {"GL_ARB_explicit_attrib_location", slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_HALTI_VERSION, gcvNULL},
     /*GL desktop GL_ARB_tessellation_shader extension */
     {"GL_ARB_tessellation_shader", slvEXTENSION2_GL_ARB_TESSELLATION_SHADER, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_GL32_VERSION, gcvNULL},
+        /*GL desktop GL_ARB_uniform_buffer_object extension */
+    {"GL_ARB_uniform_buffer_object", slvEXTENSION2_GL_ARB_UNIFORM_BUFFER_OBJECT, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_GL31_VERSION, gcvNULL},
 };
 
 #define __sldDefinedExtensions2Count (gcmSIZEOF(_DefinedExtensions2) / gcmSIZEOF(slsEXTENSION_INFO))
@@ -194,6 +196,10 @@ gceSTATUS ppoPREPROCESSOR_InitExtensionTable(ppoPREPROCESSOR PP)
             break;
 
         case slvEXTENSION2_GL_ARB_TESSELLATION_SHADER:
+            _AddExtensionMacro(PP, &_DefinedExtensions2[i]);
+            break;
+
+        case slvEXTENSION2_GL_ARB_UNIFORM_BUFFER_OBJECT:
             _AddExtensionMacro(PP, &_DefinedExtensions2[i]);
             break;
 

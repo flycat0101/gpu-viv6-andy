@@ -1406,6 +1406,13 @@ sloCOMPILER_Compile(
         extension.extension2 = slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION;
         sloCOMPILER_EnableExtension(Compiler, &extension, gcvTRUE);
     }
+    /* Check if "GL_ARB_uniform_buffer_object" extention is enable. */
+    if (gcoOS_StrStr(GetGLExtensionString(), "GL_ARB_uniform_buffer_object", gcvNULL))
+    {
+        sloEXTENSION extension = {0};
+        extension.extension2 = slvEXTENSION2_GL_ARB_UNIFORM_BUFFER_OBJECT;
+        sloCOMPILER_EnableExtension(Compiler, &extension, gcvTRUE);
+    }
 
     /* Check if HW has HALTI5 and FMA support */
     if(GetHWHasHalti5() && GetHWHasFmaSupport())
