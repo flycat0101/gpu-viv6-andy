@@ -2931,8 +2931,8 @@ VX_INTERNAL_API vx_status vxoGraph_PredictPerf(vx_graph graph)
                     opInfo[count]->origoutx = TENSOR_VIEW_SIZE_INDEX(fcOp->outputs, 0);
                     opInfo[count]->origouty = TENSOR_VIEW_SIZE_INDEX(fcOp->outputs, 1);
                     opInfo[count]->oz = WB_OUTPUT_Z(wb);
-                    opInfo[count]->psize   = gcmMAX(WB_POOLING_SIZE_X(wb), 1);
-                    opInfo[count]->pstride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
+                    opInfo[count]->psize   = gcmMAX(operation->parameter.pool_size_x, 1);
+                    opInfo[count]->pstride = operation->parameter.pool_size_x ? operation->parameter.pool_stride : 1;
                 }
                 else
                 {
