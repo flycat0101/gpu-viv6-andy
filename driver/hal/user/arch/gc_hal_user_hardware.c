@@ -3219,6 +3219,7 @@ if (smallBatch){    Config->vsConstBase  = 0xD000;
     Config->nnConfig.fixedFeature.uscBanks                       = featureDatabase->USC_BANKS;
     Config->nnConfig.fixedFeature.nnLanesPerOutCycle             = featureDatabase->NN_LANES_PER_OUT_CYCLE;
     Config->nnConfig.fixedFeature.maxOTNumber                    = featureDatabase->MAX_OT_NUMBER;
+    Config->nnConfig.fixedFeature.physicalVipSramWidthInByte     = featureDatabase->PHYSICAL_VIP_SRAM_WIDTH_IN_BYTE;
     Config->nnConfig.fixedFeature.equivalentVipsramWidthInByte   = featureDatabase->EQUIVALENT_VIP_SRAM_WIDTH_INBYTE;
     Config->nnConfig.fixedFeature.latencyHidingAtFullAxiBw       = featureDatabase->LATENCY_HIDING_AT_FULL_AXI_BW;
     Config->nnConfig.fixedFeature.axiBusWidth                    = featureDatabase->AXI_BUS_WIDTH;
