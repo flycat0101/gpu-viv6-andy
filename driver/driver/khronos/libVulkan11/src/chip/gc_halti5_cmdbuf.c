@@ -34,7 +34,8 @@ static VkBool32 g_dbgSkipDraw = VK_FALSE;
 } while (0);
 
 #define LoadAllSnapToPage() do { \
-    if (devCtx->chipInfo->gpuCoreCount == 1) \
+    if (!(devCtx->database->chipID == 0x7000 && \
+          (devCtx->database->chipVersion == 0x6008 || devCtx->database->chipVersion == 0x6009)) )   \
     { \
         *pCmdBuffer++ = gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, OPCODE, SNAP_TO_PAGE)       \
                       | gcmSETFIELDVALUE(0, GCCMD_SNAP_TO_PAGE_COMMAND, CLIENT, VS)                 \
