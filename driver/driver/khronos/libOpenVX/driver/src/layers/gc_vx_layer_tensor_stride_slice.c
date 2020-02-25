@@ -739,7 +739,7 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SH_EVIS_Initialize(vxnne_layer o
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
-    vxmONERROR(vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e));
+    vxmONERROR(vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e));
 
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
 
@@ -767,7 +767,7 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SH_Initialize(vxnne_layer ops_la
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
-    vxmONERROR(vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e));
+    vxmONERROR(vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e));
 
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
 OnError:
