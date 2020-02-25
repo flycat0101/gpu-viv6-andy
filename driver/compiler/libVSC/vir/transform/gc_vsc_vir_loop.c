@@ -3524,8 +3524,8 @@ _VIR_LoopInfo_PerformLoopInvariantCodeMotionOnLoop(
                 repeat = gcvFALSE;
                 break;
             }
-
-            if(!_VIR_LoopInfo_BBIsBackBone(loopInfo, bb))
+            /* if current bb is new added in loop pass which has no data flow information, skip it since no du is updated */
+            if(!_VIR_LoopInfo_BBIsBackBone(loopInfo, bb) || !(bb)->pTsWorkDataFlow)
             {
                 continue;
             }
