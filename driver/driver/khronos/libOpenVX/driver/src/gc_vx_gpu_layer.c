@@ -11059,6 +11059,7 @@ vxnne_shader_executable vxnneGetGPULeakyReluShaderExecutable(
     vx_int32       zpOutValue       = TENSOR_TF_ZEROPOINT(output);
     vx_bool        paramChanged     = vx_false_e;
     vx_bool        enable_2d_img    = vx_false_e;
+    vx_bool        is_write_4x      = vx_false_e;
     vx_scalar      scaleIn          = VX_NULL;
     vx_scalar      zpIn             = VX_NULL;
     vx_scalar      scaleOut         = VX_NULL;
@@ -11186,11 +11187,27 @@ vxnne_shader_executable vxnneGetGPULeakyReluShaderExecutable(
         {
             if (enable_2d_img)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D", borderMode);
+                if (new_width % 4 == 0)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4X_2D", borderMode);
+                    is_write_4x = vx_true_e;
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4s_2D", borderMode);
+                }
             }
             else
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+                if (width % 4 == 0)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4X", borderMode);
+                    is_write_4x = vx_true_e;
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4s", borderMode);
+                }
             }
 
             if (!shaderExecutable)
@@ -11209,11 +11226,27 @@ vxnne_shader_executable vxnneGetGPULeakyReluShaderExecutable(
         {
             if (enable_2d_img)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D", borderMode);
+                if (new_width % 4 == 0)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_4X_2D", borderMode);
+                    is_write_4x = vx_true_e;
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_4s_2D", borderMode);
+                }
             }
             else
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
+                if (width % 4 == 0)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_4X", borderMode);
+                    is_write_4x = vx_true_e;
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_4s", borderMode);
+                }
             }
 
             if (!shaderExecutable)
@@ -11221,7 +11254,12 @@ vxnne_shader_executable vxnneGetGPULeakyReluShaderExecutable(
                 goto OnError;
             }
 
-            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
+            status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (is_write_4x)
+            {
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            }
             if (status != VX_SUCCESS)
             {
                 goto OnError;
@@ -11234,13 +11272,18 @@ vxnne_shader_executable vxnneGetGPULeakyReluShaderExecutable(
     if (enable_2d_img)
     {
         execution_parameters.workDim = 2;
-        execution_parameters.globalWorkSize[0]   = new_width;
+        execution_parameters.globalWorkScale[0]  = 4;
+        execution_parameters.globalWorkScale[1]  = 1;
+        execution_parameters.globalWorkSize[0]   = (new_width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
         execution_parameters.globalWorkSize[1]   = new_height;
     }
     else
     {
         execution_parameters.workDim = 3;
-        execution_parameters.globalWorkSize[0]   = width;
+        execution_parameters.globalWorkScale[0]  = 4;
+        execution_parameters.globalWorkScale[1]  = 1;
+        execution_parameters.globalWorkScale[2]  = 1;
+        execution_parameters.globalWorkSize[0]   = (width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
         execution_parameters.globalWorkSize[1]   = height;
         execution_parameters.globalWorkSize[2]   = depth;
     }
