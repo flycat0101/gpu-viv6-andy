@@ -1700,7 +1700,6 @@ VX_PRIVATE_API vx_bool SupportTiling(
            vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE2) &&
           (operation->operatorType == VXNNE_OPERATOR_RESHUFFLE ||
            operation->operatorType == VXNNE_OPERATOR_POOLING   ||
-           operation->operatorType == VXNNE_OPERATOR_NORMALIZATION ||
            operation->operatorType == VXNNE_OPERATOR_ACTIVATION ||
            operation->operatorType == VXNNE_OPERATOR_TENSOR_ADD
           )))
