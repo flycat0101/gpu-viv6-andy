@@ -830,7 +830,7 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     }
 
     envctrl = gcvNULL;
-    globalData->options.enableNNTranspose = 1;
+    globalData->options.enableNNTranspose = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NN_TRANSPOSE", &envctrl)) && envctrl)
     {
         globalData->options.enableNNTranspose = atoi(envctrl);
@@ -864,7 +864,7 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     }
 
     envctrl = gcvNULL;
-    globalData->options.enableSwtilingPhase1 = VX_SWTILING_OPTION_ALL;
+    globalData->options.enableSwtilingPhase1 = 0;//VX_SWTILING_OPTION_ALL;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SWTILING_PHASE1", &envctrl)) && envctrl)
     {
         globalData->options.enableSwtilingPhase1 = atoi(envctrl);
