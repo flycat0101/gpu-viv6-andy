@@ -732,8 +732,14 @@ vx_status vxnneReorg2_Batch2SpaceND(struct _vxnne_operation_s *operation)
     block_w = block_size[0];
     block_h = block_size[1];
 
-    gcmASSERT(output_width + crops_left + crops_right == input_width * block_w);
-    gcmASSERT(output_height + crops_bottom + crops_top == input_height * block_h);
+    if(output_width + crops_left + crops_right != input_width * block_w)
+    {
+        gcmASSERT(0);
+    }
+    if(output_height + crops_bottom + crops_top != input_height * block_h)
+    {
+        gcmASSERT(0);
+    }
     /*gcmASSERT(input_batch == output_batch * block_w * block_h);*/
     if (output_depth != input_depth)
     {
