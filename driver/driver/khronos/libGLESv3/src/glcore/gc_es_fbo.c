@@ -1655,7 +1655,7 @@ GLvoid GL_APIENTRY __gles_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
         }
         else
         {
-            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
         }
         /*
         ** Just pick the first one as they are all same;
