@@ -459,7 +459,7 @@ __GLprocAddr __glGetProcAddr(const GLchar *procName)
     /* Find in __glExtFuncAlias[] table first */
     for (curAlias = __glExtProcAlias; curAlias->index < __GL_EXTID_EXT_LAST; ++curAlias)
     {
-        if (strcmp(curAlias->procName, apiName) == 0)
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(curAlias->procName, apiName)))
         {
             return curAlias->func;
         }
@@ -469,7 +469,7 @@ __GLprocAddr __glGetProcAddr(const GLchar *procName)
     for (i = 0; i < __glProcTabSize; ++i)
     {
         procInfo = &__glProcInfoTable[i];
-        if (strcmp(procInfo->name, apiName) == 0)
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(procInfo->name, apiName)))
         {
             return procInfo->func;
         }
