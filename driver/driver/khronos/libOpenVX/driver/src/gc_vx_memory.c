@@ -1816,13 +1816,6 @@ again:
                             i = fid;
                             goto again;
                         }
-                        else if (mem->allocPartial && mem->sizes[1] > dsize)
-                        {
-                            vxoMemoryPool_SetStackItemSizeByPos(&stacks[ntype], mem->sizes[1]-dsize, pos);
-                            mem->allocated = vx_true_e;
-                            msize[ntype] = maxs[ntype];
-                            continue;
-                        }
                         else if (VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(mem->allocType) == VXNNE_MEM_POOL_TYPE_SRAM &&
                                  mem->allocTypeTmp == VXNNE_MEM_POOL_TYPE_VIP_SRAM &&
                                  maxs[VXNNE_MEM_POOL_TYPE_AXI_SRAM] != 0)
@@ -1830,6 +1823,13 @@ again:
                             mem->allocTypeTmp = VXNNE_MEM_POOL_TYPE_AXI_SRAM;
                             vxoMemoryPool_ResetStackItemByPos(&stacks[ntype], pos);
                             goto again;
+                        }
+                        else if (mem->allocPartial && mem->sizes[1] > dsize)
+                        {
+                            vxoMemoryPool_SetStackItemSizeByPos(&stacks[ntype], mem->sizes[1]-dsize, pos);
+                            mem->allocated = vx_true_e;
+                            msize[ntype] = maxs[ntype];
+                            continue;
                         }
                         else if (!mustHave)
                         {
