@@ -2769,7 +2769,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
             /* Set render windows for each 3D core. */
             for (i = 0; i < coreCount; i++)
             {
-                { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2935,7 +2935,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
             }
 
             /* Enable all 3D cores. */
-            { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -18529,7 +18529,7 @@ gcoHARDWARE_SetQuery(
                     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
                     for (i = 0; i < Hardware->config->coreCount; ++i)
                     {
-                        { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                        { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -18563,7 +18563,7 @@ gcoHARDWARE_SetQuery(
                             Hardware->QUERYStates->queryHeaderIndex[Type][Index]++;
                         }
                     }
-                    { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -18747,7 +18747,7 @@ gcoHARDWARE_SetQuery(
 
                     for (i = 0; i < gpuCount; ++i)
                     {
-                        { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                        { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -18781,7 +18781,7 @@ gcoHARDWARE_SetQuery(
                             Hardware->QUERYStates->queryHeaderIndex[Type][Index]++;
                         }
                     }
-                    { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -23196,7 +23196,7 @@ gcoHARDWARE_FlushXfb(
         if (Hardware->config->coreCount > 1)
         {
             gcoHARDWARE_MultiGPUSync(Hardware, &memory);
-            { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -23422,7 +23422,7 @@ gcoHARDWARE_FlushXfb(
         /* Resume to multiple GPU mode */
         if (Hardware->config->coreCount > 1)
         {
-            { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -23780,7 +23780,7 @@ gcoHARDWARE_SetProbeCmd(
     {
         if (Hardware->config->coreCount > 1)
         {
-            { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -24864,7 +24864,7 @@ gcoHARDWARE_SetProbeCmd(
 
     if (Hardware->config->coreCount > 1)
     {
-        { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        { if (Hardware->config->coreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?

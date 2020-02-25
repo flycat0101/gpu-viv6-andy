@@ -3153,6 +3153,8 @@ gckMMU_SetupSRAM(
                 reservedBase = Device->sRAMBases[i][j];
                 reservedSize = Device->sRAMSizes[i][j];
 
+                Device->sRAMBaseAddresses[i][j] = 0;
+
                 needMapInternalSRAM = reservedSize && (reservedBase != gcvINVALID_PHYSICAL_ADDRESS);
 
                 /* Map the internal SRAM. */
@@ -3171,9 +3173,6 @@ gckMMU_SetupSRAM(
                      * Default gpu virtual base = 0.
                      * It can be specified if not conflict with existing mapping.
                      */
-
-                    Device->sRAMBaseAddresses[i][j] = 0;
-
                     gcmkONERROR(gckOS_CPUPhysicalToGPUPhysical(
                         Mmu->os,
                         reservedBase,
@@ -3249,7 +3248,7 @@ gckMMU_SetupSRAM(
     for (i = gcvSRAM_INTERNAL0; i < gcvSRAM_INTER_COUNT; i++)
     {
         if (Device->sRAMSizes[Hardware->core][i] &&
-           (Device->sRAMBases[Hardware->core][i] != gcvINVALID_PHYSICAL_ADDRESS))
+           (Device->sRAMBaseAddresses[Hardware->core][i]))
         {
             kernel->sRAMBaseAddresses[i] = Device->sRAMBaseAddresses[Hardware->core][i];
             kernel->sRAMSizes[i] = Hardware->options.sRAMSizes[i]
