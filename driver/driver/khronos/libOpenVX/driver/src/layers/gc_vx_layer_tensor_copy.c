@@ -184,6 +184,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
                                  || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32)
                                  || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_UINT8)
                                  || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
+                                 || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT32)
                                  || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16))

@@ -484,23 +484,68 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
     vx_uint32    dimCount          = TENSOR_VIEW_DIM_NUM(input);
     vx_uint32    width             = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32    height            = (dimCount > 1) ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
-    vx_uint32    depth             = (dimCount > 1) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
-    vx_uint32    batch             = (dimCount > 1) ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+    vx_uint32    depth             = (dimCount > 2) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
+    vx_uint32    batch             = (dimCount > 3) ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+    vx_uint32    new_width         = width;
+    vx_uint32    new_height        = height;
     vx_uint32    input_dims        = TENSOR_DIM_NUM(input) == 1 ? 2 : TENSOR_DIM_NUM(input);
     vx_tensor    input_rs          = NULL;
     vx_tensor    output_rs         = NULL;
     vx_int32     sizes[4]          = {1, 1, 1, batch};
+    vx_bool      is_write_4x       = vx_false_e;
+    vx_bool      enable_2d_img     = vx_false_e;
     vx_scalar scale = NULL;
     vx_scalar zp = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
     borderMode->mode = VX_BORDER_REPLICATE;
-    sizes[0]  = width;
-    sizes[1]  = height;
-    sizes[2]  = depth;
-    input_rs  = vxoTensor_ReshapeTensor(input, sizes, input_dims);
-    output_rs = vxoTensor_ReshapeTensor(output, sizes, input_dims);
+
+    if (input_dims <= 2)
+    {
+        enable_2d_img = vx_true_e;
+    }
+
+    if(TENSOR_DIM_NUM(input) == 1)
+    {
+        sizes[0]      = width;
+        sizes[1]      = 1;
+        input_rs      = vxoTensor_ReshapeTensor(input, sizes, 2);
+        output_rs     = vxoTensor_ReshapeTensor(output, sizes, 2);
+        enable_2d_img = vx_true_e;
+        new_width     = width;
+        new_height    = 1;
+    }
+    else if (width * height < IMG_MAX_WIDTH && depth < IMG_MAX_WIDTH)
+    {
+        sizes[0]      = width * height;
+        sizes[1]      = depth;
+        sizes[2]      = 1;
+        input_rs      = vxoTensor_ReshapeTensor(input, sizes, 4);
+        output_rs     = vxoTensor_ReshapeTensor(output, sizes, 4);
+        enable_2d_img = vx_true_e;
+        new_width     = width * height;
+        new_height    = depth;
+    }
+    else if (width < IMG_MAX_WIDTH && height * depth < IMG_MAX_WIDTH)
+    {
+        sizes[0]      = width;
+        sizes[1]      = height * depth;
+        sizes[2]      = 1;
+        input_rs      = vxoTensor_ReshapeTensor(input, sizes, 4);
+        output_rs     = vxoTensor_ReshapeTensor(output, sizes, 4);
+        enable_2d_img = vx_true_e;
+        new_width     = width;
+        new_height    = height * depth;
+    }
+    else
+    {
+        sizes[0]  = width;
+        sizes[1]  = height;
+        sizes[2]  = depth;
+        input_rs  = vxoTensor_ReshapeTensor(input, sizes, input_dims);
+        output_rs = vxoTensor_ReshapeTensor(output, sizes, input_dims);
+    }
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
 
@@ -542,11 +587,74 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32))
     {
         vx_reference parameters[2] = {(vx_reference)input_rs, (vx_reference)output_rs};
-
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32", borderMode);
+        if (new_width % 4 == 0)
+        {
+            if (enable_2d_img)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32_4X_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32_4X", borderMode);
+            }
+            is_write_4x      = vx_true_e;
+        }
+        else
+        {
+            if (enable_2d_img)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32_4S_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32_4S", borderMode);
+            }
+        }
         if (!shaderExecutable) goto OnError;
 
-        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
+        status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        if (is_write_4x)
+        {
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        }
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
+    {
+        vx_reference parameters[2] = {(vx_reference)input_rs, (vx_reference)output_rs};
+
+        if (new_width % 4 == 0)
+        {
+            if (enable_2d_img)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_INT32_4X_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_INT32_4X", borderMode);
+            }
+            is_write_4x      = vx_true_e;
+        }
+        else
+        {
+            if (enable_2d_img)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_INT32_4S_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_INT32_4S", borderMode);
+            }
+        }
+        if (!shaderExecutable) goto OnError;
+
+        status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        if (is_write_4x)
+        {
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        }
         if (status != VX_SUCCESS) goto OnError;
     }
     else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
@@ -554,11 +662,37 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         if (_IsSameType(input, output))
         {
             vx_reference parameters[2] = {(vx_reference)input_rs, (vx_reference)output_rs};
-
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_8Bto8B", borderMode);
+            if (new_width % 4 == 0)
+            {
+                if (enable_2d_img)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_8Bto8B_4X_2D", borderMode);
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_8Bto8B_4X", borderMode);
+                }
+                is_write_4x      = vx_true_e;
+            }
+            else
+            {
+                if (enable_2d_img)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_8Bto8B_4S_2D", borderMode);
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_8Bto8B_4S", borderMode);
+                }
+            }
             if (!shaderExecutable) goto OnError;
 
-            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
+            status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (is_write_4x)
+            {
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            }
             if (status != VX_SUCCESS) goto OnError;
         }
         else
@@ -572,11 +706,37 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
             vx_scalar scale_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &uint8_scale);
             vx_scalar tail_s  = vxCreateScalar(context, VX_TYPE_FLOAT32, &tail);
             vx_reference parameters[4] = {(vx_reference)input_rs, (vx_reference)output_rs, (vx_reference)scale_s, (vx_reference)tail_s};
-
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+            if (new_width % 4 == 0)
+            {
+                if (enable_2d_img)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4X_2D", borderMode);
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4X", borderMode);
+                }
+                is_write_4x      = vx_true_e;
+            }
+            else
+            {
+                if (enable_2d_img)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4S_2D", borderMode);
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4S", borderMode);
+                }
+            }
             if (!shaderExecutable) goto OnError;
 
-            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+            status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (is_write_4x)
+            {
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            }
             if (status != VX_SUCCESS) goto OnError;
         }
     }
@@ -590,14 +750,40 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         zp = vxCreateScalar(context, VX_TYPE_FLOAT32, &offset);
         parameters[1] = (vx_reference)scale;
         parameters[2] = (vx_reference)zp;
-
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Q8toFP32", borderMode);
+        if (new_width % 4 == 0)
+        {
+            if (enable_2d_img)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Q8toFP32_4X_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Q8toFP32_4X", borderMode);
+            }
+            is_write_4x      = vx_true_e;
+        }
+        else
+        {
+            if (enable_2d_img)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Q8toFP32_4S_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Q8toFP32_4S", borderMode);
+            }
+        }
         if (!shaderExecutable)
         {
             goto OnError;
         }
 
-        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+        status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        if (is_write_4x)
+        {
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        }
         if (status != VX_SUCCESS) goto OnError;
     }
     else if ((inputFormat == VX_TYPE_FLOAT32 || inputFormat == VX_TYPE_FLOAT16) && outputFormat == VX_TYPE_UINT8)
@@ -611,13 +797,40 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         parameters[1] = (vx_reference)scale;
         parameters[2] = (vx_reference)zp;
 
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32toQ8", borderMode);
+        if (new_width % 4 == 0)
+        {
+            if (enable_2d_img)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32toQ8_4X_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32toQ8_4X", borderMode);
+            }
+            is_write_4x      = vx_true_e;
+        }
+        else
+        {
+            if (enable_2d_img)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32toQ8_4S_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32toQ8_4S", borderMode);
+            }
+        }
         if (!shaderExecutable)
         {
             goto OnError;
         }
 
-        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+        status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        if (is_write_4x)
+        {
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        }
         if (status != VX_SUCCESS) goto OnError;
     }
     else
@@ -626,9 +839,24 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         goto OnError;
     }
 
-    execution_parameters.globalWorkSize[0]   = width;
-    execution_parameters.globalWorkSize[1]   = height;
-    execution_parameters.globalWorkSize[2]   = depth;
+    if (enable_2d_img)
+    {
+        execution_parameters.workDim = 2;
+        execution_parameters.globalWorkScale[0]  = 4;
+        execution_parameters.globalWorkScale[1]  = 1;
+        execution_parameters.globalWorkSize[0]   = (new_width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
+        execution_parameters.globalWorkSize[1]   = new_height;
+    }
+    else
+    {
+        execution_parameters.workDim = 3;
+        execution_parameters.globalWorkScale[0]  = 4;
+        execution_parameters.globalWorkScale[1]  = 1;
+        execution_parameters.globalWorkScale[2]  = 1;
+        execution_parameters.globalWorkSize[0]   = (width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0];
+        execution_parameters.globalWorkSize[1]   = height;
+        execution_parameters.globalWorkSize[2]   = depth;
+    }
 
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
     if (status != VX_SUCCESS) goto OnError;
