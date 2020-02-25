@@ -6447,6 +6447,16 @@ VIR_Shader_SupportIoCommponentMapping(
     IN VIR_Shader*      pShader
     );
 
+/* Bubble sort the symbol ID list, by default using the location to compare. */
+typedef gctBOOL (*SortCompartFunc)(VIR_Symbol *, VIR_Symbol *);
+void
+VIR_Shader_BubbleSortSymIdList(
+    IN VIR_Shader*      pShader,
+    IN VIR_IdList*      pIdList,
+    IN SortCompartFunc  pFunc,
+    IN gctUINT          length
+    );
+
 /* setters */
 void
 VIR_Symbol_SetName(

@@ -9797,6 +9797,48 @@ VIR_Shader_SupportIoCommponentMapping(
     return gcvFALSE;
 }
 
+/* Bubble sort the symbol ID list, by default using the location to compare. */
+void
+VIR_Shader_BubbleSortSymIdList(
+    IN VIR_Shader*      pShader,
+    IN VIR_IdList*      pIdList,
+    IN SortCompartFunc  pFunc,
+    IN gctUINT          length
+    )
+{
+    gctUINT             i, j;
+    VIR_Id              temp;
+    VIR_Symbol*         pSym1;
+    VIR_Symbol*         pSym2;
+
+    for (j = 0; j < length - 1; j++)
+    {
+        for (i = 0; i < length - 1 - j; i++)
+        {
+            gctBOOL bSwap = gcvFALSE;
+
+            pSym1 = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pIdList, i));
+            pSym2 = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pIdList, i + 1));
+
+            if (pFunc != gcvNULL)
+            {
+                bSwap = (pFunc)(pSym1, pSym2);
+            }
+            else
+            {
+                bSwap = VIR_Symbol_GetLocation(pSym1) > VIR_Symbol_GetLocation(pSym2);
+            }
+
+            if (bSwap)
+            {
+                temp = VIR_IdList_GetId(pIdList, i);
+                VIR_IdList_SetId(pIdList, (gctUINT)i, VIR_IdList_GetId(pIdList, i + 1));
+                VIR_IdList_SetId(pIdList, (gctUINT)(i + 1), temp);
+            }
+        }
+    }
+}
+
 /* setters */
 void
 VIR_Symbol_SetName(

@@ -1273,30 +1273,10 @@ _CheckIOIdentical(
     return gcvTRUE;
 }
 
-static void _BubbleSortIoByComponent(VIR_Shader* pShader,
-                                     VIR_IdList* pList,
-                                     gctINT length)
+static gctBOOL _CompareIoByComponent(VIR_Symbol* pSym1,
+                                     VIR_Symbol* pSym2)
 {
-    gctINT          i, j;
-    VIR_Id          temp;
-    VIR_Symbol*     pSym1;
-    VIR_Symbol*     pSym2;
-
-    for (j = 0; j < length - 1; j++)
-    {
-        for (i = 0; i < length - 1 - j; i++)
-        {
-            pSym1 = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pList, i));
-            pSym2 = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pList, i + 1));
-
-            if (VIR_Layout_GetComponent(VIR_Symbol_GetLayout(pSym1)) > VIR_Layout_GetComponent(VIR_Symbol_GetLayout(pSym2)))
-            {
-                temp = VIR_IdList_GetId(pList, i);
-                VIR_IdList_SetId(pList, (gctUINT)i, VIR_IdList_GetId(pList, i + 1));
-                VIR_IdList_SetId(pList, (gctUINT)(i + 1), temp);
-            }
-        }
-    }
+    return VIR_Layout_GetComponent(VIR_Symbol_GetLayout(pSym1)) > VIR_Layout_GetComponent(VIR_Symbol_GetLayout(pSym2));
 }
 
 static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
@@ -1451,14 +1431,14 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
                 pList = &pOutputCompArrayList[i];
                 if (VIR_IdList_Count(pList) > 1)
                 {
-                    _BubbleSortIoByComponent(pUpperShader, pList, VIR_IdList_Count(pList));
+                    VIR_Shader_BubbleSortSymIdList(pUpperShader, pList, _CompareIoByComponent, VIR_IdList_Count(pList));
                     VIR_Shader_SetFlagExt1(pUpperShader, VIR_SHFLAG_EXT1_HAS_OUTPUT_COMP_MAP);
                 }
 
                 pList = &pInputCompArrayList[i];
                 if (VIR_IdList_Count(pList) > 1)
                 {
-                    _BubbleSortIoByComponent(pLowerShader, pList, VIR_IdList_Count(pList));
+                    VIR_Shader_BubbleSortSymIdList(pLowerShader, pList, _CompareIoByComponent, VIR_IdList_Count(pList));
                     VIR_Shader_SetFlagExt1(pLowerShader, VIR_SHFLAG_EXT1_HAS_INPUT_COMP_MAP);
                 }
             }
@@ -2238,7 +2218,7 @@ static VSC_ErrCode _CheckInputAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLinkH
             pList = &pComponentArrayList[i];
             if (VIR_IdList_Count(pList) > 1)
             {
-                _BubbleSortIoByComponent(pShader, pList, VIR_IdList_Count(pList));
+                VIR_Shader_BubbleSortSymIdList(pShader, pList, _CompareIoByComponent, VIR_IdList_Count(pList));
                 VIR_Shader_SetFlagExt1(pShader, VIR_SHFLAG_EXT1_HAS_INPUT_COMP_MAP);
             }
         }
@@ -2284,7 +2264,7 @@ static VSC_ErrCode _CheckOutputAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLink
             pList = &pComponentArrayList[i];
             if (VIR_IdList_Count(pList) > 1)
             {
-                _BubbleSortIoByComponent(pShader, pList, VIR_IdList_Count(pList));
+                VIR_Shader_BubbleSortSymIdList(pShader, pList, _CompareIoByComponent, VIR_IdList_Count(pList));
                 VIR_Shader_SetFlagExt1(pShader, VIR_SHFLAG_EXT1_HAS_OUTPUT_COMP_MAP);
             }
         }
