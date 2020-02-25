@@ -588,6 +588,7 @@ gcoHAL_ConstructEx(
                                        &iface, gcmSIZEOF(iface),
                                        &iface, gcmSIZEOF(iface)));
 
+#if gcdIGNORE_DRIVER_VERSIONS_MISMATCH
         /* Test if versions match. */
         if ((iface.u.Version.major != gcvVERSION_MAJOR)
         ||  (iface.u.Version.minor != gcvVERSION_MINOR)
@@ -600,6 +601,7 @@ gcoHAL_ConstructEx(
 
             gcmONERROR(gcvSTATUS_VERSION_MISMATCH);
         }
+#endif
 
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
         gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
