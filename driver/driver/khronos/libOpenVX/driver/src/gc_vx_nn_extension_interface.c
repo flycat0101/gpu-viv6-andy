@@ -6428,6 +6428,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
                 input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
                 output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
 
+                copyNode->base.temp_tensors[0] = input;
+                copyNode->base.temp_tensors[1] = output;
+                copyNode->base.num_temp_tensors = 2;
+
                 if(node->base.context->evisNoInst.supportEVIS)
                 {
                     if (input && output)
@@ -6438,9 +6442,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
                     if (input && output)
                         shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
                 }
-
-                if (input) vxoTensor_ReleaseTensor(&input);
-                if (output) vxoTensor_ReleaseTensor(&output);
 
                 if (!shaderExecutable)
                 {
@@ -6456,8 +6457,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
                 if (status != VX_SUCCESS)
                     goto exit;
 
-                vxnneOperation_AddReference(&copyNode->tensor_copy_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
-                vxnneOperation_AddReference(&copyNode->tensor_copy_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                vxnneOperation_AddReference(&copyNode->tensor_copy_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&copyNode->tensor_copy_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
                 vxnneLayer_SetOperation(&copyNode->base, &copyNode->tensor_copy_sh_operation.base, 0);
             }
             else
@@ -10090,6 +10091,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
         input     = vxoTensor_ReshapeTensor(inputs, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
         output     = vxoTensor_ReshapeTensor(outputs, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
 
+        activationLayer->base.temp_tensors[0] = input;
+        activationLayer->base.temp_tensors[1] = output;
+        activationLayer->base.num_temp_tensors = 2;
+
         if (func_v == VX_NN_ACTIVATION_RELU1)
         {
             minVal = -1;
@@ -10129,9 +10134,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
             shaderExecutable = vxnneGetGPUActivationShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION, &node->kernelAttributes.borderMode, func_v, input, minVal, maxVal, output);
         }
 
-        vxoTensor_ReleaseTensor(&input);
-        vxoTensor_ReleaseTensor(&output);
-
         if (!shaderExecutable)
         {
             status = VX_FAILURE;
@@ -10146,8 +10148,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
 
         if (status != VX_SUCCESS) goto exit;
 
-        vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+        vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
         vxnneLayer_SetOperation(
             &activationLayer->base,
@@ -12281,6 +12283,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
             src     = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
             dst     = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
 
+            tensor_trans_layer->base.temp_tensors[0] = src;
+            tensor_trans_layer->base.temp_tensors[1] = dst;
+            tensor_trans_layer->base.num_temp_tensors = 2;
+
             if(node->base.context->evisNoInst.supportEVIS)
             {
                 if (src && dst)
@@ -12291,9 +12297,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
                 if (src && dst)
                     shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, src, dst);
             }
-
-            if (src) vxoTensor_ReleaseTensor(&src);
-            if (dst) vxoTensor_ReleaseTensor(&dst);
 
             if (!shaderExecutable)
             {
@@ -12309,8 +12312,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorTrans_Initializer(vx_node node, 
             if (status != VX_SUCCESS)
                 goto exit;
 
-            vxnneOperation_AddReference(&tensor_trans_layer->tensor_copy_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&tensor_trans_layer->tensor_copy_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxnneOperation_AddReference(&tensor_trans_layer->tensor_copy_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&tensor_trans_layer->tensor_copy_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
             vxnneLayer_SetOperation(
                 &tensor_trans_layer->base,
@@ -23126,6 +23129,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReshape_Initializer(vx_node node, const 
         input     = vxoTensor_ReshapeTensor(inputs, (vx_int32*)sizes, dims);
         output     = vxoTensor_ReshapeTensor(outputs, (vx_int32*)sizes, dims);
 
+        reshapeLayer->base.temp_tensors[0] = input;
+        reshapeLayer->base.temp_tensors[1] = output;
+        reshapeLayer->base.num_temp_tensors = 2;
+
         if(node->base.context->evisNoInst.supportEVIS)
         {
             if (input && output)
@@ -23136,9 +23143,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReshape_Initializer(vx_node node, const 
             if (input && output)
                 shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
         }
-
-        if (input) vxoTensor_ReleaseTensor(&input);
-        if (output) vxoTensor_ReleaseTensor(&output);
 
         if (!shaderExecutable)
         {
@@ -23154,8 +23158,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReshape_Initializer(vx_node node, const 
         if (status != VX_SUCCESS)
             goto exit;
 
-        vxnneOperation_AddReference(&reshapeLayer->tensor_copy_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&reshapeLayer->tensor_copy_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+        vxnneOperation_AddReference(&reshapeLayer->tensor_copy_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&reshapeLayer->tensor_copy_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
         vxnneLayer_SetOperation(
             &reshapeLayer->base,
