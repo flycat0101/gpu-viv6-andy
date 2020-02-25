@@ -228,6 +228,11 @@ typedef struct
     uint32_t baseHeight;
     uint32_t baseDepth;
     uint32_t baseSlice;
+
+    VkBool32 isFakedSize;
+    uint32_t originalWidth;
+    uint32_t originalHeight;
+
     struct
     {
         uint32_t hwSamplerMode_p1;
@@ -261,6 +266,10 @@ typedef struct
     uint32_t baseHeight;
     uint32_t baseDepth;
     uint32_t baseSlice;
+
+    VkBool32 isFakedSize;
+    uint32_t originalWidth;
+    uint32_t originalHeight;
 } HwImgDesc;
 
 
