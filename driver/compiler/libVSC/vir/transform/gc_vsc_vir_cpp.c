@@ -204,17 +204,19 @@ static VSC_ErrCode _VSC_CPP_RemoveDefInst(
         VIR_HALF_CHANNEL_MASK_FULL,
         gcvNULL);
 
-    vscVIR_DeleteUsage(VSC_CPP_GetDUInfo(cpp),
-        VIR_ANY_DEF_INST,
-        defInst,
-        movSrc,
-        gcvFALSE,
-        movSrcInfo.u1.virRegInfo.virReg,
-        1,
-        VIR_Swizzle_2_Enable(movSrcSwizzle),
-        VIR_HALF_CHANNEL_MASK_FULL,
-        gcvNULL);
-
+    if (movSrcInfo.isVreg)
+    {
+        vscVIR_DeleteUsage(VSC_CPP_GetDUInfo(cpp),
+            VIR_ANY_DEF_INST,
+            defInst,
+            movSrc,
+            gcvFALSE,
+            movSrcInfo.u1.virRegInfo.virReg,
+            1,
+            VIR_Swizzle_2_Enable(movSrcSwizzle),
+            VIR_HALF_CHANNEL_MASK_FULL,
+            gcvNULL);
+    }
     if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
         VSC_OPTN_CPPOptions_TRACE_BACKWARD_OPT))
     {
