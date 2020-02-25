@@ -73,7 +73,7 @@
 #   include <linux/platform_device.h>
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,9,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,9,0) || defined(IMX8_SCU_CONTROL)
 #  define IMX_GPU_SUBSYSTEM   1
 #  include <linux/component.h>
 #endif
