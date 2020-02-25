@@ -13,6 +13,7 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
 #include "gc_nn_arch_model.h"
 #ifdef USE_LIB_NN_ARCH_PERF
 #include "nnArchPerfOri.h"
@@ -2624,7 +2625,6 @@ vx_status calculateArchPerf(
         {
             if (wb != VX_NULL)
             {
-                perf->maxPerCoreCompressionRatio = wb->max_per_core_compression_ratio;
                 perf->coefNonZeroRatio  = WB_NON_ZERO_RATIO(wb);
                 perf->coefCompressRatio = WB_COMPRESS_RATIO(wb);
                 perf->imageCompressRatio = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_VIP_DEC400) ? 0.700000000000000f : 1.0f;
@@ -3338,9 +3338,9 @@ vx_status calculateArchPerf(
 
         perf->calculated = vx_true_e;
 
-        if ((wb != NULL) && (wb->weights_sizes[0] == 1 && wb->weights_sizes[1] == 1
+        if ((wb != NULL) && (WB_KERNEL_X(wb) == 1 && WB_KERNEL_Y(wb) == 1
             && (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) || vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6))
-            && (wb->wb_base->weights_data_format == VX_TYPE_INT8 || wb->wb_base->weights_data_format == VX_TYPE_UINT8)) && !isV8)
+            && (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT8 || WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_UINT8)) && !isV8)
         {
             /*Per HW, there's a limition for HW now, arch perf's kernel per core should less equre than (accuBuffDepth / zdpNum) when zdp3 & zdp6*/
             vx_uint32 zdpNum = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6) ? 6 : 3;
@@ -3388,7 +3388,7 @@ VX_INTERNAL_API void calculateArchPerfFromTiling(
 
     kernelXSize = wb != VX_NULL && op_type != VXNNE_OPERATOR_RESHUFFLE ? WB_KERNEL_X(wb) : 1;
     kernelYSize = wb != VX_NULL && op_type != VXNNE_OPERATOR_RESHUFFLE ? WB_KERNEL_Y(wb) : 1;
-    kernelZSize = wb != VX_NULL ? ((op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV && wb->wb_base->hw_depth_wise) ? wb->weights_sizes[3] : WB_KERNEL_Z(wb))
+    kernelZSize = wb != VX_NULL ? ((op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV && WB_IS_DEPTH_WISE(wb)) ? WB_OUTPUT_Z(wb) : WB_KERNEL_Z(wb))
                                 : input_tiling->depth;
 
     xOffSet = (-1) * conv_cmd->pad_x_left;
@@ -3476,8 +3476,8 @@ VX_INTERNAL_API void calculateArchPerfFromTiling(
             perf->info.piy = 1;
             perf->swTilingInfo.origOutX = 1;
             perf->swTilingInfo.origOutY = 1;
-            perf->swTilingInfo.origOutZ = wb->weights_sizes[3];
-            perf->info.outz = wb->weights_sizes[3];
+            perf->swTilingInfo.origOutZ = WB_OUTPUT_Z(wb);
+            perf->info.outz = WB_OUTPUT_Z(wb);
             perf->swTilingInfo.origInX = perf->info.oinx;
             perf->swTilingInfo.origInY = perf->info.oiny;
         }
@@ -3501,6 +3501,12 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
     vx_uint32 orig_input_dims[],
     vx_uint32 output_dims[],
     vx_enum output_format,
+    vx_uint32 pad_x_left,
+    vx_uint32 pad_x_right,
+    vx_uint32 pad_y_top,
+    vx_uint32 pad_y_bottom,
+    vx_uint32 pool_size,
+    vx_uint32 pool_stride,
     vx_int32* offsets,
     vx_int32 flush,
     vx_uint8 src_buf,
@@ -3517,30 +3523,28 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
     ComputeInputSize(
         output_dims[0],
         WB_KERNEL_X(wb),
-        WB_PAD_LEFT(wb),
-        WB_PAD_RIGHT(wb),
-        WB_POOLING_SIZE_X(wb),
-        WB_POOLING_STRIDE(wb),
+        pad_x_left,
+        pad_x_right,
+        poolingSize,
+        poolingStride,
         &outXSize,
         1);
 
     ComputeInputSize(
         output_dims[1],
         WB_KERNEL_Y(wb),
-        WB_PAD_TOP(wb),
-        WB_PAD_BOTTOM(wb),
-        WB_POOLING_SIZE_Y(wb),
-        WB_POOLING_STRIDE(wb),
+        pad_y_top,
+        pad_y_bottom,
+        poolingSize,
+        poolingStride,
         &outYSize,
         1);
 
     kernelXSize = WB_KERNEL_X(wb);
     kernelYSize = WB_KERNEL_Y(wb);
-    kernelZSize = (op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV && wb->wb_base->hw_depth_wise) ? wb->weights_sizes[3] : WB_KERNEL_Z(wb);
-    poolingSize = gcmMAX(1, WB_POOLING_SIZE_X(wb));
-    poolingStride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
-    xOffSet = offsets == VX_NULL ? WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * WB_PAD_LEFT(wb)) : offsets[0];
-    yOffSet = offsets == VX_NULL ? WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) *  WB_PAD_TOP(wb)) : offsets[1];
+    kernelZSize = (op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV && WB_IS_DEPTH_WISE(wb)) ? WB_OUTPUT_Z(wb) : WB_KERNEL_Z(wb);
+    xOffSet = offsets == VX_NULL ? WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * pad_x_left) : offsets[0];
+    yOffSet = offsets == VX_NULL ? WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) * pad_y_top) : offsets[1];
     inputDataSize = 8 * (vx_uint32)vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb));
     outputDataSize = 8 * (vx_uint32)vxDataType_GetSize((vx_type_e)output_format);
 

@@ -12,7 +12,9 @@
 
 
 #include <gc_vx_common.h>
+#include <gc_vx_nn_wb.h>
 #include <layers/gc_vx_layer_pool.h>
+
 
 vx_status vxnneExecuteSWPooling(struct _vxnne_operation_s *operation)
 {
@@ -450,7 +452,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
 
                 vxoCopyTensorPatch(biases, VX_NULL, biasUserAddr, biasData, VX_WRITE_ONLY,0);
 
-                weights_biases = _createWeightsBiasesParameterFromTensors(context,
+                weights_biases = vxoCreateWeightsBiasesParameterFromTensors(context,
                                                                        VX_NN_CONVOLUTION_LAYER,
                                                                        (vx_uint32*)(TENSOR_SIZES(inputs)),
                                                                        inputs->dimCount,
@@ -544,7 +546,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
 
                 vxoCopyTensorPatch(biases, VX_NULL, biasUserAddr, biasData, VX_WRITE_ONLY,0);
 
-                weights_biases = _createWeightsBiasesParameterFromTensors(context,
+                weights_biases = vxoCreateWeightsBiasesParameterFromTensors(context,
                                                                        VX_NN_CONVOLUTION_LAYER,
                                                                        (vx_uint32*)(TENSOR_SIZES(inputs)),
                                                                        inputs->dimCount,
@@ -599,6 +601,8 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                 /* fill in cmd buffer */
                 memcpy(&poolingLayer->pooling_nne_operation.base.parameter, &conv, sizeof(vx_op_param_s));
             }
+
+            vxoCompressNNFirstTime(context, weights_biases, outputs);
 
             poolingLayer->pooling_nne_operation.weights_biases = weights_biases;
 

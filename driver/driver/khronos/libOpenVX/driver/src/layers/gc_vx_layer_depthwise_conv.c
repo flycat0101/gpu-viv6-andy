@@ -12,6 +12,7 @@
 
 
 #include <gc_vx_common.h>
+#include <gc_vx_nn_wb.h>
 #include <layers/gc_vx_layer_depthwise_conv.h>
 
 extern vx_status vxnneExecuteSWConvolution(vxnne_operation operation);
@@ -369,7 +370,7 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
             else
             {
                 vx_weights_biases_parameter_optimizations_t opt = { -1, TENSOR_DATA_TYPE(outputs), TENSOR_TF_ZEROPOINT(inputs)};
-                vx_weights_biases_parameter weights_biases = _createWeightsBiasesParameterFromTensors(
+                vx_weights_biases_parameter weights_biases = vxoCreateWeightsBiasesParameterFromTensors(
                                     vxGetContext((vx_reference)node),
                                     VX_NN_CONVOLUTION_LAYER,
                                     inputs->dims,/*inputs_dims,*/

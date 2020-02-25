@@ -13,6 +13,8 @@
 
 
 #include <gc_vx_common.h>
+#include <gc_vx_nn_wb.h>
+#include <gc_vx_nn_encoder.h>
 #include <layers/gc_vx_layer_conv.h>
 
 #define QUANT8_SUPPORT 0
@@ -99,6 +101,7 @@ vx_status vxnneExecuteSWConvertFormat(struct _vxnne_operation_s *operation)
 
     return VX_SUCCESS;
 }
+
 
 vx_status vxnneOperation_ConvolutionReluPooling_Deinitialize(vxnne_operation_s *operation)
 {
@@ -308,6 +311,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
     vx_uint32 tmpTensorIndex = 0;
     vx_bool enableBrickMode = vx_false_e;
     vx_bool needExtraBrickOp = vx_true_e;
+    vx_bool do_zdp_opt = vx_false_e, do_1xN = vx_false_e, do_fisrt_pixel_pool = vx_false_e;
 
     vx_weights_biases_parameter reshapeWb = VX_NULL;
 
@@ -339,7 +343,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
                             convolutionReluPoolingLayer->operations,
                             VX_NULL);
 
-    if (weights_biases->wb_base->hw_depth_wise)
+    if (WB_IS_DEPTH_WISE(weights_biases))
     {
         status = vxnneOperation_Initialize(&convolutionReluPoolingLayer->convolution_operation.base,
                                            &convolutionReluPoolingLayer->base,
@@ -364,10 +368,79 @@ vx_status vxnneConvolutionReluPoolingInitializer(
     if (status != VX_SUCCESS) goto exit;
 
 
+    /* TODO: merge similiar code in this function. fix bugs. */
+    {
+        vx_uint32 fitN = 0;
+
+        if ((vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) ||
+             vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6)) &&
+            WB_ORG_KERNEL_X(weights_biases) == 1 &&
+            WB_ORG_KERNEL_Y(weights_biases) == 1 &&
+            (pad_x_left == 0 && pad_x_right == 0 && pad_y_top == 0 && pad_y_bottom == 0) &&
+            (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8 ||
+             WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8) &&
+            context->options.enableZdpOpt &&
+            WB_DO_1XN_CONFIG(weights_biases))
+        {
+            do_zdp_opt = calcFitZdp3N(context,
+                                      TENSOR_VIEW_SIZE_INDEX(inputs, 0),
+                                      TENSOR_VIEW_SIZE_INDEX(inputs, 1),
+                                      &fitN,
+                                      WB_ORG_STRIDE_X(weights_biases),
+                                      pool_size_x);
+        }
+        else if (!(vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3) ||
+                 vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6)) &&
+                 !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_CONV1x1_PERF_FIX) &&
+                 !vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0) &&
+                 WB_ORG_KERNEL_X(weights_biases) == 1 &&
+                 WB_ORG_KERNEL_Y(weights_biases) == 1 &&
+                 pool_size_x <= 1 &&
+                 (pad_x_left == 0 && pad_x_right == 0 && pad_y_top == 0 && pad_y_bottom == 0) &&
+                 context->options.nn1x1To1xN &&
+                 WB_DO_1XN_CONFIG(weights_biases))
+        {
+            fitN = calcFit1xN(context,
+                              WB_ORG_KERNEL_Z(weights_biases),
+                              TENSOR_VIEW_SIZE_INDEX(inputs, 0),
+                              TENSOR_VIEW_SIZE_INDEX(inputs, 1));
+            if (fitN > 1 && WB_ORG_STRIDE_X(weights_biases) == 1)
+            {
+                do_1xN = vx_true_e;
+            }
+        }
+        if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_FIRST_PIXEL_POOLING) &&
+            WB_ORG_STRIDE_X(weights_biases) == 2 && WB_ORG_STRIDE_Y(weights_biases) == 2 &&
+            !do_zdp_opt &&
+            (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8 ||
+             WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8) &&
+            pool_size_x == 0 &&
+            ((TENSOR_VIEW_SIZE_INDEX(inputs, 0) % 2 == 0) ||
+             WB_IS_DEPTH_WISE(weights_biases)))
+        {
+            /* Per Arch, only support INT8 3x3 conv right now*/
+            /* First pixel pooling is 2x2 poooling stride is 2, so convolution output should be even*/
+            vx_float32 nonZeroRatio = calculateWeightNonZeroRatio(context,
+                                                                  WB_SKIP_VALUE(weights_biases),
+                                                                  WB_WEIGHT_TENSOR(weights_biases));
+
+            /*V8 has limitation for 1x2 & 2x1, those shape with 2x2 stride can't do FFP*/
+            if ((nonZeroRatio * WB_ORG_KERNEL_X(weights_biases) * WB_ORG_KERNEL_Y(weights_biases) < 6.3 ||
+                 WB_IS_DEPTH_WISE(weights_biases)) &&
+                !(vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0) &&
+                  ((WB_ORG_KERNEL_X(weights_biases) == 1 && WB_ORG_KERNEL_Y(weights_biases) == 2) ||
+                   (WB_ORG_KERNEL_X(weights_biases) == 2 && WB_ORG_KERNEL_Y(weights_biases) == 1))) &&
+                WB_ORG_KERNEL_X(weights_biases) <= 15 && WB_ORG_KERNEL_Y(weights_biases) <= 15)
+            {
+                do_fisrt_pixel_pool = vx_true_e;
+            }
+        }
+    }
+
     if ((WB_STRIDE_X(weights_biases) > 1) || (WB_STRIDE_Y(weights_biases) > 1))
     {
         vx_uint32 sizes[4];
-        vx_tensor reshuffleTensor = VX_NULL;
+        vx_tensor reshuffleTensor = VX_NULL, reshuffleWeightTensor = VX_NULL;
         vx_tensor specialTensorFor1x1 = VX_NULL;
         vx_tensor_create_params_t tensor_create_params;
 
@@ -534,7 +607,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
 
         convolutionReluPoolingLayer->base.temp_tensors[tmpTensorIndex++] = reshuffleTensor;
 
-        if (weights_biases->wb_base->org_weights_sizes[0] == 1 && weights_biases->wb_base->org_weights_sizes[1] == 1)
+        if (WB_ORG_KERNEL_X(weights_biases) == 1 && WB_ORG_KERNEL_Y(weights_biases) == 1)
         {
             /*Since in kx=1, ky=1 situation, weight won't do reshuffle,
             TP has special opt for input, only first num of kz input channels are valid*/
@@ -544,7 +617,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
 
             smallSizeEnd[0] = reshuffleTensor->dims[0];
             smallSizeEnd[1] = reshuffleTensor->dims[1];
-            smallSizeEnd[2] = weights_biases->weights_sizes[2];
+            smallSizeEnd[2] = WB_KERNEL_Z(weights_biases);
             smallSizeEnd[3] = reshuffleTensor->dims[3];
 
             smallView = vxCreateTensorView(node->base.context, smallSizeStart, smallSizeEnd, (vx_uint8)reshuffleTensor->dimCount);
@@ -561,6 +634,24 @@ vx_status vxnneConvolutionReluPoolingInitializer(
         pad_x_right  = 0;
         pad_y_top    = 0;
         pad_y_bottom = 0;
+
+        /* reshuffle weight here */
+        reshuffleWeightTensor = reshuffleKernelTensor(context,
+                                                      WB_WEIGHT_TENSOR(weights_biases),
+                                                      WB_WEIGHT_DIMS_SIZES(weights_biases),
+                                                      WB_STRIDE_X(weights_biases),
+                                                      WB_STRIDE_Y(weights_biases));
+        if (reshuffleWeightTensor == VX_NULL)
+        {
+            vxError("reshuffleKernelTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
+            status = VX_ERROR_NO_MEMORY;
+            goto exit;
+        }
+        else if (reshuffleWeightTensor != WB_WEIGHT_TENSOR(weights_biases))
+        {
+            weights_biases->set_weight_bias_tensor(weights_biases, reshuffleWeightTensor, VX_NULL);
+            convolutionReluPoolingLayer->base.temp_tensors[tmpTensorIndex++] = reshuffleWeightTensor;
+        }
     }
     else if (TENSOR_DATA_TYPE(interTensor) != WB_WEIGHT_DATA_FORMAT(weights_biases))
     {
@@ -657,12 +748,15 @@ vx_status vxnneConvolutionReluPoolingInitializer(
         interTensor = convertTensor;
     }
 
+    /* pre-compress for original ddr nn wb */
+    vxoCompressNNFirstTime(context, weights_biases, outputs);
+
+
     /* TODO. */
     needExtraBrickOp = vx_false_e;
 
 
-    if (weights_biases->wb_base->do_zdp_opt &&
-        !context->options.do1xnAfterSwtiling)
+    if (do_zdp_opt && !context->options.do1xnAfterSwtiling)
     {
         vx_uint32 fitN = 0;
         vx_uint32 fitOutN = 0;
@@ -697,8 +791,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
 
         vxmASSERT(convolutionReluPoolingLayer->convolution_operation.reshape_inputs != VX_NULL && convolutionReluPoolingLayer->convolution_operation.reshape_outputs != VX_NULL);
     }
-    else if (weights_biases->wb_base->do_1xN &&
-        !context->options.do1xnAfterSwtiling)
+    else if (do_1xN && !context->options.do1xnAfterSwtiling)
     {
         vx_uint32 fitN = calcFit1xN(context, TENSOR_VIEW_SIZE_INDEX(interTensor, 2), TENSOR_VIEW_SIZE_INDEX(interTensor, 0), TENSOR_VIEW_SIZE_INDEX(interTensor, 1));
 
@@ -729,7 +822,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
     }
 
     /* Convolution operation. */
-    if ((weights_biases->wb_base->do_zdp_opt || weights_biases->wb_base->do_1xN) &&
+    if ((do_zdp_opt || do_1xN) &&
         convolutionReluPoolingLayer->convolution_operation.reshape_inputs != VX_NULL &&
         convolutionReluPoolingLayer->convolution_operation.reshape_outputs != VX_NULL &&
         !context->options.do1xnAfterSwtiling)
@@ -746,7 +839,6 @@ vx_status vxnneConvolutionReluPoolingInitializer(
     convolutionReluPoolingLayer->convolution_operation.weights_biases = weights_biases;
     convolutionReluPoolingLayer->convolution_operation.reshape_weights_biases = reshapeWb;
 
-
     vxnneLayer_SetOperation(
         &convolutionReluPoolingLayer->base,
         &convolutionReluPoolingLayer->convolution_operation.base,
@@ -756,7 +848,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
 
     inputs->brickMode = interTensor->brickMode;
 
-    if (weights_biases->wb_base->do_fisrt_pixel_pool)
+    if (do_fisrt_pixel_pool)
     {
         vxnneConvolutionReluPoolingOperation_Initialize(
                 &convolutionReluPoolingLayer->convolution_operation,
@@ -821,7 +913,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
         conv.conv_rounding_type = conv_rounding_type;
         conv.enable_relu = enable_relu;
 
-        if (weights_biases->wb_base->do_fisrt_pixel_pool)
+        if (do_fisrt_pixel_pool)
         {
             conv.pool_type = VX_NN_POOLING_FFP;
             conv.pool_size_x = 2;
@@ -838,6 +930,10 @@ vx_status vxnneConvolutionReluPoolingInitializer(
         }
         memcpy(&convolutionReluPoolingLayer->convolution_operation.base.parameter, &conv, sizeof(vx_op_param_s));
     }
+
+    convolutionReluPoolingLayer->convolution_operation.do_zdp_opt = do_zdp_opt;
+    convolutionReluPoolingLayer->convolution_operation.do_1xN = do_1xN;
+    convolutionReluPoolingLayer->convolution_operation.do_fisrt_pixel_pool = do_fisrt_pixel_pool;
 
     node->layer = &convolutionReluPoolingLayer->base;
     return status;
@@ -1683,7 +1779,7 @@ VX_PRIVATE_API vx_status vxnneExecuteSWConv_Reshuffle(struct _vxnne_operation_s 
 
     if (weights && convOperation->create_wbp && (convOperation->weights_biaes == VX_NULL))
     {
-        convOperation->weights_biaes = _createWeightsBiasesParameterFromTensors(
+        convOperation->weights_biaes = vxoCreateWeightsBiasesParameterFromTensors(
                             vxGetContext((vx_reference)convOperation->weights),
                             VX_NN_CONVOLUTION_LAYER,
                             convOperation->reshuffled_inputs->dims,/*inputs_dims,*/
@@ -2544,6 +2640,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     gcoOS_Allocate(gcvNULL, sizeof(vxnne_convolution_relu_pooling_operation_s) * (dilation_x * dilation_y), (gctPOINTER*)&convolutionLayer->convolution_nn_convolution_dynamic_operation);
                     gcoOS_ZeroMemory(convolutionLayer->convolution_nn_convolution_dynamic_operation, sizeof(vxnne_convolution_relu_pooling_operation_s) * (dilation_x * dilation_y));
 
+                    vxoCompressNNFirstTime(context, convolutionLayer->convolution_sw1_reshuffle_operation2.weights_biaes, reshuffled_output);
+
                     for (i = 0; i < loop; i++)
                     {
                         /* Initialize covolution operation */
@@ -2639,6 +2737,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                         &convolutionLayer->base,
                         &convolutionLayer->convolution_nn_convolution_operation.base,
                         idx++);
+
+                    vxoCompressNNFirstTime(context, convolutionLayer->convolution_sw1_reshuffle_operation.weights_biaes, reshuffled_output);
 
                     convolutionLayer->convolution_nn_convolution_operation.inputs           = reshuffled_input;
                     convolutionLayer->convolution_nn_convolution_operation.orig_inputs      = inputs;

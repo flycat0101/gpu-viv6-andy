@@ -12,6 +12,7 @@
 
 
 #include <gc_vx_common.h>
+#include <gc_vx_nn_wb.h>
 #include <layers/gc_vx_layer_deconv.h>
 
 extern vx_status vxnneExecuteSWConvolution(vxnne_operation operation);
@@ -603,7 +604,7 @@ VX_PRIVATE_API vx_status vxnneExecuteSWDeConv_ReshuffleWeights(struct _vxnne_ope
             opt.zrl = -1;
             opt.outputFormat = VX_TYPE_UINT8;
 
-            deconvOperation->weights_biaes = _createWeightsBiasesParameterFromTensors(
+            deconvOperation->weights_biaes = vxoCreateWeightsBiasesParameterFromTensors(
                                 vxGetContext((vx_reference)deconvOperation->weights),
                                 VX_NN_CONVOLUTION_LAYER,
                                 deconvOperation->inputs->dims,/*inputs_dims,*/
@@ -633,7 +634,7 @@ VX_PRIVATE_API vx_status vxnneExecuteSWDeConv_ReshuffleWeights(struct _vxnne_ope
         }
         else
         {
-            deconvOperation->weights_biaes = _createWeightsBiasesParameterFromTensors(
+            deconvOperation->weights_biaes = vxoCreateWeightsBiasesParameterFromTensors(
                                 vxGetContext((vx_reference)deconvOperation->weights),
                                 VX_NN_CONVOLUTION_LAYER,
                                 deconvOperation->inputs->dims,/*inputs_dims,*/
@@ -1477,6 +1478,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
                 if (deconvolutionLayer->deconvolution_sw1_reshuffle_operation.weights_biaes)
                 {
                     vx_weights_biases_parameter weights_biases = deconvolutionLayer->deconvolution_sw1_reshuffle_operation.weights_biaes;
+
+                    vxoCompressNNFirstTime(context, weights_biases, need_upsample ? sample_output : outputs);
 
                     /* Initialize covolution operation */
                     status = vxnneOperation_Initialize(&deconvolutionLayer->convolution_operation.base,

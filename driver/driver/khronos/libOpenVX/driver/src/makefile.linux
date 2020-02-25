@@ -132,6 +132,7 @@ OBJECTS         +=    \
                     $(OBJ_DIR)/gc_vx_internal_node_api.o \
                     $(OBJ_DIR)/gc_vx_nn_util.o \
                     $(OBJ_DIR)/gc_vx_nn_encoder.o \
+                    $(OBJ_DIR)/gc_vx_nn_wb.o \
                     $(OBJ_DIR)/gc_vx_nn_command.o   \
 
 # Kernels

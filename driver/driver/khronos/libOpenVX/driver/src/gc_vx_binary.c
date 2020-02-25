@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
+#include <gc_vx_nn_encoder.h>
 #if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__) || defined(__APPLE__) || defined(__CYGWIN__)
 #include <utime.h>
 #include <sys/stat.h>
@@ -4755,7 +4757,6 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_CalculateNNSliceCount(
     vx_uint32 commandCount = 1;
     vx_uint32 fitN = 0;
     vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)operationCommand->operation;
-    vx_weights_biases_parameter wb = convOperation->weights_biases;
     vxnne_tiling_rect input = &operationCommand->inputTile;
     vx_uint32 inputDepth = WB_KERNEL_Z(convOperation->weights_biases);
     vx_uint32 inputWidth = input->width;
@@ -4763,10 +4764,10 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_CalculateNNSliceCount(
     vx_uint32 xcount = 1;
     vx_uint32 ycount = 1;
 
-    if (convOperation->weights_biases->wb_base->do_zdp_opt &&
+    if (convOperation->do_zdp_opt &&
         context->options.do1xnAfterSwtiling)
     {
-        calcFitZdp3N(context, input->width, input->height, &fitN, 1, wb->wb_base->pooling_size_x);
+        calcFitZdp3N(context, input->width, input->height, &fitN, 1, operationCommand->operation->parameter.pool_size_x);
         if (fitN == 0)
         {
             vxError("%s[%d]: fixN is zero\n", __FUNCTION__, __LINE__);
@@ -4775,8 +4776,8 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_CalculateNNSliceCount(
         inputWidth = input->width * input->height / fitN;
         inputHeight = fitN;
     }
-    else if (convOperation->weights_biases->wb_base->do_1xN &&
-        context->options.do1xnAfterSwtiling)
+    else if (convOperation->do_1xN &&
+             context->options.do1xnAfterSwtiling)
     {
         fitN = calcFit1xN(context, inputDepth, input->width, input->height);
         inputWidth = input->width * input->height;
@@ -8429,7 +8430,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                     if (!value->e32[0])
                     {
                         vxmASSERT(otherRef != VX_NULL);
-                        opNum = ((vx_weights_biases_parameter)otherRef)->slice_num;
+                        opNum = WB_TOTAL_SLICE_NUM((vx_weights_biases_parameter)otherRef);
                     }
                     else
                     {
@@ -9617,7 +9618,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_FindNodeIndexForWeight(
             }
             if (wb != VX_NULL)
             {
-                weight = wb->wb_base->origWeight;
+                weight = WB_WEIGHT_TENSOR(wb);
             }
             break;
         }
@@ -10851,7 +10852,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
                 if (!value->e32[0])
                 {
                     vxmASSERT(otherRef != VX_NULL);
-                    tempCount = ((vx_weights_biases_parameter)otherRef)->slice_num;
+                    tempCount = WB_TOTAL_SLICE_NUM((vx_weights_biases_parameter)otherRef);
                 }
                 else
                 {
@@ -10923,15 +10924,15 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
                 vx_uint32 j = 0;
                 vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter)parameter->other_ref;
 
-                if (weights_biases->slice_num == 0)
+                if (WB_TOTAL_SLICE_NUM(weights_biases) == 0)
                 {
                     vxError("fail to get NBG size, tp weights_biases sclice num is 0\n");
                     vxmONERROR(VX_ERROR_INVALID_VALUE);
                 }
 
-                for (j = 0; j < weights_biases->slice_num; j++)
+                for (j = 0; j < WB_TOTAL_SLICE_NUM(weights_biases); j++)
                 {
-                    ksDataSize = (vx_uint32)WB_STREAM_SIZE_INDEX(weights_biases, j);
+                    ksDataSize = (vx_uint32)WB_MEM_SIZE_INDEX(weights_biases, j);
                     temp = (vx_float32)ksDataSize * 1.004f; /* compress */
                     ksDataSize = (vx_uint32)temp;
 

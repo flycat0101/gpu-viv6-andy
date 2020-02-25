@@ -20,6 +20,7 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
 #ifdef ORI_NNARCHPERF
 #include "gc_nn_arch_model.h"
 #else
@@ -1042,7 +1043,7 @@ VX_PRIVATE_API void _checkSramOverflow(
         break;
     }
 
-    maxSizeOfCore = (vx_uint32)wb->slice_array[0].kernel_max_stream_size_percore;
+    maxSizeOfCore = (vx_uint32)WB_STREAM_MAX_SIZE_PERCORE_INDEX(wb, 0);
 
     for (i = 0; i != (info->vx_nn_general_cmd_info.kernelPatternMsb+1); i++)
     {
@@ -1114,19 +1115,19 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNSplitCommandInfo(
     if(wb)
     {
 
-        zcount = wb->slice_z_num != 0 ? wb->slice_z_num : 1;
+        zcount = WB_OUTPUT_Z_SLICE_NUM(wb) != 0 ? WB_OUTPUT_Z_SLICE_NUM(wb) : 1;
         z_offsets[0]=0;
-        for(k = 0; k < wb->slice_z_num; ++k)
+        for(k = 0; k < WB_OUTPUT_Z_SLICE_NUM(wb); ++k)
         {
-            z_size[k] = wb->slice_array[k].z_count;
-            z_offsets[k+1] = z_offsets[k] + wb->slice_array[k].z_count;
+            z_size[k] = WB_OUTPUT_Z_INDEX(wb, k);
+            z_offsets[k+1] = z_offsets[k] + WB_OUTPUT_Z_INDEX(wb, k);
         }
     }
     else
         z_size[0] = output->depth;
 
 
-    vxmASSERT(z_offsets[wb->slice_z_num] == output->depth);
+    vxmASSERT(z_offsets[WB_OUTPUT_Z_SLICE_NUM(wb)] == output->depth);
 
     count = xcount * ycount * zcount;
     sinfoArray = vxAllocateAndZeroMemory(sizeof(vx_nn_cmd_split_info_u) * count);
@@ -1321,7 +1322,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
     info->vx_nn_general_cmd_info.relu              = conv_cmd_ptr->enable_relu;
     info->vx_nn_general_cmd_info.outImageZSize     = outZSize;
 
-    info->vx_nn_general_cmd_info.hwDepthWise       = weights_biases->wb_base->hw_depth_wise ? 1 : 0;
+    info->vx_nn_general_cmd_info.hwDepthWise       = WB_IS_DEPTH_WISE(weights_biases) ? 1 : 0;
     info->vx_nn_general_cmd_info.noZOffset         = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_NO_Z_LOCATION_OFFSET);
     info->vx_nn_general_cmd_info.pRelu             = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU);
     info->vx_nn_general_cmd_info.perChannelPostMul = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PER_CHANNEL_POST_MULTIPLY);
@@ -1389,7 +1390,6 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
     info->vx_nn_general_cmd_info.postMultiplier = 0;
     info->vx_nn_general_cmd_info.roundingMode   = getHWRoundingMode((vx_nn_round_mode_e)outRMode, outDataFormat, vx_false_e);
 
-
     info->vx_nn_general_cmd_info.bFloat16Mode = (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_BFLOAT16) ? 1 : 0 ;
 
     if(info->vx_nn_general_cmd_info.bFloat16Mode)
@@ -1438,7 +1438,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
         exp = (uintScale & 0x7F800000) >> 23; /* postShift is Scale's exp*/
 
         /* HW design follow the paper, biasScale = inputScale * coefScale*/
-        if (!weights_biases->wb_base->no_bias)
+        if (WB_BIAS_TENSOR(weights_biases) != VX_NULL)
         {
             if (!(gcmABS(bScale - inScale * wScale) < 0.000001))
             {
@@ -2005,7 +2005,7 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
             {
                 vxmASSERT(otherRef != VX_NULL);
                 size = input->width * input->height * input->depth;
-                slice = ((vx_weights_biases_parameter)otherRef)->slice_num;
+                slice = WB_TOTAL_SLICE_NUM((vx_weights_biases_parameter)otherRef);
             }
             else
             {
@@ -2466,7 +2466,7 @@ void _fill_TP_SINGLE_FC_Command(
         kzGroup = value_cmd_ptr[i].u32[0];
         if (kzGroup == 1)
         {
-            vxmASSERT(WB_IS_USE_TP_FC(weights_biases));
+            vxmASSERT(WB_IS_TP_COMPRESS(weights_biases));
 
             zOffset = value_cmd_ptr[i].u32[1];
             outZSize = WB_OUTPUT_Z_INDEX(weights_biases, i);
@@ -2511,7 +2511,7 @@ void _fill_TP_SINGLE_FC_Command(
         {
             if (value_cmd_ptr[i].e32[0] == 0)
             {
-                vxmASSERT(WB_IS_USE_TP_FC(weights_biases));
+                vxmASSERT(WB_IS_TP_COMPRESS(weights_biases));
 
                 zOffset = value_cmd_ptr[i].u32[1];
                 kzOffset = value_cmd_ptr[i].u32[2];
@@ -6879,7 +6879,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
                            (gctPOINTER)cmdBufPtr,
                            0,
                            NNE_COMMAND_SIZE);
-            dumpNNCommandInfo(i, weights_biases->slice_num, &info, NULL);
+            dumpNNCommandInfo(i, WB_TOTAL_SLICE_NUM(weights_biases), &info, NULL);
 #endif
 
             if (node->graph->binarySave)

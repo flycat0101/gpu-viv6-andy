@@ -24,6 +24,7 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
 #include "archModelInterface.h"
 
 
@@ -253,7 +254,7 @@ static void updateSingleAllSilbling1X1(vxnne_operation operation,archModelOpInfo
                         vx_weights_biases_parameter wb;
                         vxnne_convolution_relu_pooling_operation convOp = (vxnne_convolution_relu_pooling_operation)tmpOperation;
                         wb = convOp->weights_biases;
-                        if(wb->weights_sizes[0] != 1 || wb->weights_sizes[1] != 1 || isValidTP(operation))
+                        if(WB_KERNEL_X(wb) != 1 || WB_KERNEL_Y(wb) != 1 || isValidTP(operation))
                         {
                             OpInfo[index]->perf.allSibling1x1 = 0;
                         }
@@ -584,28 +585,28 @@ archModelGraphInfo ** archTransferGraphInfo(vx_graph graph, vx_uint32 *totalCoun
                 wb = convOp->weights_biases;
                 ComputeInputSize(
                      TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 0),
-                     wb->weights_sizes[0],
-                     WB_PAD_LEFT(wb),
-                     WB_PAD_RIGHT(wb),
-                     WB_POOLING_SIZE_X(wb),
-                     WB_POOLING_STRIDE(wb),
+                     WB_KERNEL_X(wb),
+                     operation->parameter.pad_x_left,
+                     operation->parameter.pad_x_right,
+                     operation->parameter.pool_size_x,
+                     operation->parameter.pool_stride,
                      &outXSize,
                      1);
 
                 ComputeInputSize(
                      TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 1),
-                     wb->weights_sizes[1],
-                     WB_PAD_TOP(wb),
-                     WB_PAD_BOTTOM(wb),
-                     WB_POOLING_SIZE_Y(wb),
-                     WB_POOLING_STRIDE(wb),
+                     WB_KERNEL_Y(wb),
+                     operation->parameter.pad_y_top,
+                     operation->parameter.pad_y_bottom,
+                     operation->parameter.pool_size_y,
+                     operation->parameter.pool_stride,
                      &outYSize,
                      1);
 
                 /* set graph info for target NN */
                 /* Pooling info */
-                graphInfo[count]->pollingSize = gcmMAX(WB_POOLING_SIZE_X(wb), 1);
-                graphInfo[count]->pollingStride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
+                graphInfo[count]->pollingSize = gcmMAX(operation->parameter.pool_size_x, 1);
+                graphInfo[count]->pollingStride = operation->parameter.pool_size_x ? operation->parameter.pool_stride : 1;
 
                 /* other */
                 graphInfo[count]->xOffset = (-1) * convOp->pad_x_left;            /* for calculate xOffset*/
@@ -618,9 +619,9 @@ archModelGraphInfo ** archTransferGraphInfo(vx_graph graph, vx_uint32 *totalCoun
                 graphInfo[count]->isFp16 = (TENSOR_DATA_TYPE(convOp->inputs) == VX_TYPE_FLOAT16) ? 1:0;            /* is float 16 or not */
 
                 /* kernel information */
-                graphInfo[count]->kx = wb->weights_sizes[0];
-                graphInfo[count]->ky = wb->weights_sizes[1];
-                graphInfo[count]->kz = (operation->operatorType == VXNNE_OPERATOR_DEPTH_WISE_CONV && wb->wb_base->hw_depth_wise) ? wb->weights_sizes[3] : wb->weights_sizes[2];;
+                graphInfo[count]->kx = WB_KERNEL_X(wb);
+                graphInfo[count]->ky = WB_KERNEL_Y(wb);
+                graphInfo[count]->kz = (operation->operatorType == VXNNE_OPERATOR_DEPTH_WISE_CONV && WB_IS_DEPTH_WISE(wb)) ? WB_OUTPUT_Z(wb) : WB_KERNEL_Z(wb);
 
                 /* input */
                 graphInfo[count]->origInX = TENSOR_VIEW_SIZE_INDEX(convOp->orig_inputs, 0);
@@ -673,7 +674,7 @@ archModelGraphInfo ** archTransferGraphInfo(vx_graph graph, vx_uint32 *totalCoun
                     wb = tpOp->weights_biases;
                     gcmASSERT(wb != NULL);
                     gcmASSERT(tpOp->weights_biases != NULL);
-                    graphInfo[count]->kz = tpOp->weights_biases->weights_sizes[2];
+                    graphInfo[count]->kz = WB_KERNEL_Z(tpOp->weights_biases);
                 }
                 else
                 {
@@ -745,7 +746,7 @@ archModelGraphInfo ** archTransferGraphInfo(vx_graph graph, vx_uint32 *totalCoun
                         {
                             graphInfo[count]->finalOutX = 1;
                             graphInfo[count]->finalOutY = 1;
-                            graphInfo[count]->finalOutZ = wb->weights_sizes[3];
+                            graphInfo[count]->finalOutZ = WB_OUTPUT_Z(wb);
                         }
                     }
                 }
@@ -756,8 +757,8 @@ archModelGraphInfo ** archTransferGraphInfo(vx_graph graph, vx_uint32 *totalCoun
 
 
                     /* Pooling info */
-                    graphInfo[count]->pollingSize = gcmMAX(WB_POOLING_SIZE_X(wb), 1);
-                    graphInfo[count]->pollingStride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
+                    graphInfo[count]->pollingSize = gcmMAX(operation->parameter.pool_size_x, 1);
+                    graphInfo[count]->pollingStride = operation->parameter.pool_size_x ? operation->parameter.pool_stride : 1;
 
                     /* data size */
                     graphInfo[count]->inputDataSize   = TENSOR_DATA_SIZE(fcOp->inputs) * 8;
@@ -783,13 +784,13 @@ archModelGraphInfo ** archTransferGraphInfo(vx_graph graph, vx_uint32 *totalCoun
                 }
 
                 /* other */
-                graphInfo[count]->xOffset = (-1) * WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * WB_PAD_LEFT(wb));            /* for calculate xOffset*/
-                graphInfo[count]->yOffset = (-1) * WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) *  WB_PAD_TOP(wb));            /* for calculate yOffset */
+                graphInfo[count]->xOffset = (-1) * WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * operation->parameter.pad_x_left);            /* for calculate xOffset*/
+                graphInfo[count]->yOffset = (-1) * WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) * operation->parameter.pad_y_top);            /* for calculate yOffset */
 
                 /* kernel information */
                 graphInfo[count]->kx = 1;
                 graphInfo[count]->ky = 1;
-                graphInfo[count]->kz = wb->weights_sizes[2];
+                graphInfo[count]->kz = WB_KERNEL_Z(wb);
 
                 /* Compress */
                 graphInfo[count]->coefNonZeroRatio = WB_NON_ZERO_RATIO(wb);;
@@ -888,37 +889,37 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
 
                 ComputeInputSize(
                      TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 0),
-                     wb->weights_sizes[0],
-                     WB_PAD_LEFT(wb),
-                     WB_PAD_RIGHT(wb),
-                     WB_POOLING_SIZE_X(wb),
-                     WB_POOLING_STRIDE(wb),
+                     WB_KERNEL_X(wb),
+                     operation->parameter.pad_x_left,
+                     operation->parameter.pad_x_right,
+                     operation->parameter.pool_size_x,
+                     operation->parameter.pool_stride,
                      &outXSize,
                      1);
 
                 ComputeInputSize(
                      TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 1),
-                     wb->weights_sizes[1],
-                     WB_PAD_TOP(wb),
-                     WB_PAD_BOTTOM(wb),
-                     WB_POOLING_SIZE_Y(wb),
-                     WB_POOLING_STRIDE(wb),
+                     WB_KERNEL_Y(wb),
+                     operation->parameter.pad_y_top,
+                     operation->parameter.pad_y_bottom,
+                     operation->parameter.pool_size_y,
+                     operation->parameter.pool_stride,
                      &outYSize,
                      1);
 
                 opInfo[count]->op      = (archnne_operator_e)operation->operatorType;
                 opInfo[count]->target  = (archnne_operation_target_e)operation->target;
-                opInfo[count]->psize   = gcmMAX(WB_POOLING_SIZE_X(wb), 1);
-                opInfo[count]->pstride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
+                opInfo[count]->psize   = gcmMAX(operation->parameter.pool_size_x, 1);
+                opInfo[count]->pstride = operation->parameter.pool_size_x ? operation->parameter.pool_stride : 1;
                 opInfo[count]->xpad    = convOp->pad_x_left;
                 opInfo[count]->ypad    = convOp->pad_y_top;
                 opInfo[count]->inputDataFormat = TENSOR_DATA_TYPE(convOp->inputs);
                 opInfo[count]->inputDataSize   = TENSOR_DATA_SIZE(convOp->inputs) * 8;
                 opInfo[count]->outputDataFormat = TENSOR_DATA_TYPE(convOp->outputs);
                 opInfo[count]->outputDataSize   = TENSOR_DATA_SIZE(convOp->outputs) * 8;
-                opInfo[count]->kx = wb->weights_sizes[0];
-                opInfo[count]->ky = wb->weights_sizes[1];
-                opInfo[count]->kz = (operation->operatorType == VXNNE_OPERATOR_DEPTH_WISE_CONV && wb->wb_base->hw_depth_wise) ? wb->weights_sizes[3] : wb->weights_sizes[2];
+                opInfo[count]->kx = WB_KERNEL_X(wb);
+                opInfo[count]->ky = WB_KERNEL_Y(wb);
+                opInfo[count]->kz = (operation->operatorType == VXNNE_OPERATOR_DEPTH_WISE_CONV && WB_IS_DEPTH_WISE(wb)) ? WB_OUTPUT_Z(wb) : WB_KERNEL_Z(wb);
                 opInfo[count]->oz = TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 2);
                 opInfo[count]->siz = opInfo[count]->oz;
                 opInfo[count]->inx = TENSOR_VIEW_SIZE_INDEX(convOp->orig_inputs, 0);
@@ -928,7 +929,7 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                 opInfo[count]->origy = outYSize;
                 opInfo[count]->origoutx = TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 0);
                 opInfo[count]->origouty = TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 1);
-                opInfo[count]->p3 = convOp->pool_size_x == 3 ? 1 : 0;
+                opInfo[count]->p3 = operation->parameter.pool_size_x == 3 ? 1 : 0;
                 opInfo[count]->xsize = opInfo[count]->origx;
                 opInfo[count]->ysize = opInfo[count]->origy;
                 opInfo[count]->pix = (vx_uint32)ceilf((vx_float32)(opInfo[count]->xsize - opInfo[count]->p3) / opInfo[count]->pstride);
@@ -962,7 +963,6 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                     opInfo[count]->nnCores = pArchNnConfig->fixedFeature.nnCoreCount;
 
                 /* update compress ratio */
-                opInfo[count]->perf.maxPerCoreCompressionRatio = wb->max_per_core_compression_ratio;
                 opInfo[count]->perf.coefNonZeroRatio  = WB_NON_ZERO_RATIO(wb);
                 opInfo[count]->perf.coefCompressRatio = WB_COMPRESS_RATIO(wb);
                 opInfo[count]->perf.imageCompressRatio = archIsFeatureAvailable(pArchNnConfig,pArchOptions,pArchDataFeature, ARCH_NN_FEATURE_VIP_DEC400) ? 0.700000000000000f : 1.0f;
@@ -985,7 +985,7 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                     wb = tpOp->weights_biases;
                     gcmASSERT(wb != NULL);
                     gcmASSERT(tpOp->weights_biases != NULL);
-                    opInfo[count]->kz = tpOp->weights_biases->weights_sizes[2];
+                    opInfo[count]->kz = WB_KERNEL_Z(tpOp->weights_biases);
                     opInfo[count]->oz = TENSOR_VIEW_SIZE_INDEX(tpOp->output, 2);
                     opInfo[count]->stridex = WB_STRIDE_X(wb);
                     opInfo[count]->stridey = WB_STRIDE_Y(wb);
@@ -1108,7 +1108,7 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                         {
                             opInfo[count]->origoutx = 1;
                             opInfo[count]->origouty = 1;
-                            opInfo[count]->oz = wb->weights_sizes[3];
+                            opInfo[count]->oz = WB_OUTPUT_Z(wb);
                         }
                     }
                     opInfo[count]->p3 = 0;
@@ -1132,9 +1132,9 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                     opInfo[count]->origy = TENSOR_VIEW_SIZE_INDEX(fcOp->inputs, 1);
                     opInfo[count]->origoutx = TENSOR_VIEW_SIZE_INDEX(fcOp->outputs, 0);
                     opInfo[count]->origouty = TENSOR_VIEW_SIZE_INDEX(fcOp->outputs, 1);
-                    opInfo[count]->oz = wb->weights_sizes[3];
-                    opInfo[count]->psize   = gcmMAX(WB_POOLING_SIZE_X(wb), 1);
-                    opInfo[count]->pstride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
+                    opInfo[count]->oz = WB_OUTPUT_Z(wb);
+                    opInfo[count]->psize   = gcmMAX(operation->parameter.pool_size_x, 1);
+                    opInfo[count]->pstride = operation->parameter.pool_size_x ? operation->parameter.pool_stride : 1;
                     opInfo[count]->p3 = 0;
                     opInfo[count]->xsize = opInfo[count]->origx;
                     opInfo[count]->ysize = opInfo[count]->origy;
@@ -1148,12 +1148,12 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
 
                 opInfo[count]->op      = (archnne_operator_e)operation->operatorType;
                 opInfo[count]->target  = (archnne_operation_target_e)operation->target;
-                opInfo[count]->xpad    = WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * WB_PAD_LEFT(wb));
-                opInfo[count]->ypad    = WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) *  WB_PAD_TOP(wb));
+                opInfo[count]->xpad    = WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * operation->parameter.pad_x_left);
+                opInfo[count]->ypad    = WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) *  operation->parameter.pad_y_top);
                 /*opInfo[count]->dsize = vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb)) * 8;*/
                 opInfo[count]->kx = 1;
                 opInfo[count]->ky = 1;
-                opInfo[count]->kz = wb->weights_sizes[2];
+                opInfo[count]->kz = WB_KERNEL_Z(wb);
 
 
                 opInfo[count]->siz = opInfo[count]->oz;
@@ -1200,7 +1200,6 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                     opInfo[count]->nnCores = pArchNnConfig->fixedFeature.nnCoreCount;
 
                 /* update compress ratio */
-                opInfo[count]->perf.maxPerCoreCompressionRatio = wb->max_per_core_compression_ratio;
                 opInfo[count]->perf.coefNonZeroRatio  = WB_NON_ZERO_RATIO(wb);
                 opInfo[count]->perf.coefCompressRatio = WB_COMPRESS_RATIO(wb);
                 opInfo[count]->perf.imageCompressRatio = archIsFeatureAvailable(pArchNnConfig,pArchOptions,pArchDataFeature, ARCH_NN_FEATURE_VIP_DEC400) ? 0.700000000000000f : 1.0f;
@@ -2061,7 +2060,7 @@ VX_INTERNAL_API void archCalculateArchPerfFromTiling(
 
     kernelXSize = wb != ARCH_NULL && op_type != VXNNE_OPERATOR_RESHUFFLE ? WB_KERNEL_X(wb) : 1;
     kernelYSize = wb != ARCH_NULL && op_type != VXNNE_OPERATOR_RESHUFFLE ? WB_KERNEL_Y(wb) : 1;
-    kernelZSize = wb != ARCH_NULL ? ((op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV && wb->wb_base->hw_depth_wise) ? wb->weights_sizes[3] : WB_KERNEL_Z(wb))
+    kernelZSize = wb != ARCH_NULL ? ((op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV && WB_IS_DEPTH_WISE(wb)) ? WB_OUTPUT_Z(wb) : WB_KERNEL_Z(wb))
                                 : input_tiling->depth;
 
     xOffSet = (-1) * conv_cmd->pad_x_left;
@@ -2149,8 +2148,8 @@ VX_INTERNAL_API void archCalculateArchPerfFromTiling(
             perf->info.piy = 1;
             perf->swTilingInfo.origOutX = 1;
             perf->swTilingInfo.origOutY = 1;
-            perf->swTilingInfo.origOutZ = wb->weights_sizes[3];
-            perf->info.outz = wb->weights_sizes[3];
+            perf->swTilingInfo.origOutZ = WB_OUTPUT_Z(wb);
+            perf->info.outz = WB_OUTPUT_Z(wb);
             perf->swTilingInfo.origInX = perf->info.oinx;
             perf->swTilingInfo.origInY = perf->info.oiny;
         }
@@ -2176,10 +2175,8 @@ VX_INTERNAL_API void archCalculateArchPerfFromTiling(
         numCores  = pArchNnConfig->fixedFeature.nnCoreCount;
     }
 
-
     if(wb != NULL)
     {
-        perf->maxPerCoreCompressionRatio = wb->max_per_core_compression_ratio;
         perf->coefNonZeroRatio  = WB_NON_ZERO_RATIO(wb);
         perf->coefCompressRatio = WB_COMPRESS_RATIO(wb);
         perf->imageCompressRatio = archIsFeatureAvailable(pArchNnConfig,pArchOptions,&archDataFeature, ARCH_NN_FEATURE_VIP_DEC400) ? 0.700000000000000f : 1.0f;
@@ -2187,7 +2184,6 @@ VX_INTERNAL_API void archCalculateArchPerfFromTiling(
     }
     else
     {
-        perf->maxPerCoreCompressionRatio = 0;
         perf->coefNonZeroRatio  = 0;
         perf->coefCompressRatio = 0;
         perf->imageCompressRatio = 0;
@@ -2217,6 +2213,12 @@ ARCH_INTERNAL_API void archCalculateArchPerfFromWB(
     vx_uint32 orig_input_dims[],
     vx_uint32 output_dims[],
     vx_enum output_format,
+    arch_uint32 pad_x_left,
+    arch_uint32 pad_x_right,
+    arch_uint32 pad_y_top,
+    arch_uint32 pad_y_bottom,
+    arch_uint32 pool_size,
+    arch_uint32 pool_stride,
     vx_int32* offsets,
     vx_int32 flush,
     arch_uint8 src_buf,
@@ -2246,33 +2248,34 @@ ARCH_INTERNAL_API void archCalculateArchPerfFromWB(
     /* Init data feature */
     updateConfigration(&archDataFeature,pArchNnConfig);
 
+    poolingSize = gcmMAX(1, pool_size);
+    poolingStride = pool_size ? pool_stride : 1;
+
     ComputeInputSize(
         output_dims[0],
         WB_KERNEL_X(wb),
-        WB_PAD_LEFT(wb),
-        WB_PAD_RIGHT(wb),
-        WB_POOLING_SIZE_X(wb),
-        WB_POOLING_STRIDE(wb),
+        pad_x_left,
+        pad_x_right,
+        poolingSize,
+        poolingStride,
         &outXSize,
         1);
 
     ComputeInputSize(
         output_dims[1],
         WB_KERNEL_Y(wb),
-        WB_PAD_TOP(wb),
-        WB_PAD_BOTTOM(wb),
-        WB_POOLING_SIZE_Y(wb),
-        WB_POOLING_STRIDE(wb),
+        pad_y_top,
+        pad_y_bottom,
+        poolingSize,
+        poolingStride,
         &outYSize,
         1);
 
     kernelXSize = WB_KERNEL_X(wb);
     kernelYSize = WB_KERNEL_Y(wb);
-    kernelZSize = (op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV && wb->wb_base->hw_depth_wise) ? wb->weights_sizes[3] : WB_KERNEL_Z(wb);
-    poolingSize = gcmMAX(1, WB_POOLING_SIZE_X(wb));
-    poolingStride = WB_POOLING_SIZE_X(wb) ? 2 : 1;
-    xOffSet = offsets == VX_NULL ? WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * WB_PAD_LEFT(wb)) : offsets[0];
-    yOffSet = offsets == VX_NULL ? WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) *  WB_PAD_TOP(wb)) : offsets[1];
+    kernelZSize = (op_type == VXNNE_OPERATOR_DEPTH_WISE_CONV && WB_IS_DEPTH_WISE(wb)) ? WB_OUTPUT_Z(wb) : WB_KERNEL_Z(wb);
+    xOffSet = offsets == VX_NULL ? WB_STRIDE_X(wb) > 1 ? 0 : ((-1) * pad_x_left) : offsets[0];
+    yOffSet = offsets == VX_NULL ? WB_STRIDE_Y(wb) > 1 ? 0 : ((-1) * pad_y_top) : offsets[1];
     inputDataSize = 8 * (vx_uint32)vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb));
     outputDataSize = 8 * (vx_uint32)vxDataType_GetSize((vx_type_e)output_format);
 
@@ -2341,10 +2344,8 @@ ARCH_INTERNAL_API void archCalculateArchPerfFromWB(
         numCores       = pArchNnConfig->fixedFeature.nnCoreCount;
     */
 
-
     if(wb != NULL)
     {
-        perf->maxPerCoreCompressionRatio = wb->max_per_core_compression_ratio;
         perf->coefNonZeroRatio  = WB_NON_ZERO_RATIO(wb);
         perf->coefCompressRatio = WB_COMPRESS_RATIO(wb);
         perf->imageCompressRatio = archIsFeatureAvailable(pArchNnConfig, pArchOptions, &archDataFeature,ARCH_NN_FEATURE_VIP_DEC400) ? 0.700000000000000f : 1.0f;
@@ -2352,7 +2353,6 @@ ARCH_INTERNAL_API void archCalculateArchPerfFromWB(
     }
     else
     {
-        perf->maxPerCoreCompressionRatio = 0;
         perf->coefNonZeroRatio  = 0;
         perf->coefCompressRatio = 0;
         perf->imageCompressRatio = 0;

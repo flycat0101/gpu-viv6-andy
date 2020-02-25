@@ -33,8 +33,9 @@ ARCH_INTERNAL_API arch_status archGraphPredictPerf(vx_graph graph);
 //arch_status calculateArchPerf(APMHandle apm, arch_nn_config *pArchNnConfig,arch_drv_option *pArchOptions, arch_perf perf, archnne_operation_target_e op_target, archnne_operator_e op_type);
 vx_status showDriverPerformance(vx_context context,vxnne_layer layer,vxnne_operation op,arch_perf perf);
 ARCH_INTERNAL_API void archCalculateArchPerfFromWB(vx_context context,vxnne_operation operation, arch_perf perf,vx_weights_biases_parameter wb,arch_uint32 orig_input_dims[],
-                                    arch_uint32 output_dims[],vx_enum output_format,arch_int32* offsets,arch_int32 flush,arch_uint8 src_buf,arch_uint8 dst_buf,
-                                    arch_uint8 kernel_buf,arch_int32 cached_space,vxnne_operation_target_e op_target, vxnne_operator_e op_type);
+                                    arch_uint32 output_dims[],vx_enum output_format, arch_uint32 pad_x_left, arch_uint32 pad_x_right, arch_uint32 pad_y_top,
+                                    arch_uint32 pad_y_bottom, arch_uint32 pool_size, arch_uint32 pool_stride, arch_int32* offsets, arch_int32 flush,
+                                    arch_uint8 src_buf,arch_uint8 dst_buf, arch_uint8 kernel_buf,arch_int32 cached_space,vxnne_operation_target_e op_target, vxnne_operator_e op_type);
 
 ARCH_INTERNAL_API void archCalculateArchPerfFromTiling(vx_context context,vxnne_layer layer,arch_perf perf,vxnne_tensor_info input_tiling,
                                     vxnne_tensor_info output_tiling,vx_tensor input,vx_tensor output,vx_weights_biases_parameter wb,vxnne_operation_command  op_command,

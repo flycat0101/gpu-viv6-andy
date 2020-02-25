@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
+#include <gc_vx_nn_encoder.h>
 
 #define _GC_OBJ_ZONE            gcdZONE_VX_GRAPH
 #define QUANT_BIT_WIDTH         (8)
@@ -691,7 +693,7 @@ VX_INTERNAL_API vx_uint32* vxoGraphOptimization_kernelSize(vx_node convNode)
         convType == VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER2 )
     {
         vx_weights_biases_parameter weight_bias = (vx_weights_biases_parameter )convNode->paramTable[1];
-        kernelSize = weight_bias->weights_sizes;
+        kernelSize = WB_WEIGHT_DIMS_SIZES(weight_bias);
     }
 
     gcmFOOTER_ARG("%p", kernelSize);
@@ -769,8 +771,8 @@ VX_INTERNAL_API void vxoGraphOptimization_stroeNodeDims2paramter(vxcJSON *paramt
     case VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER2:
     case VX_KERNEL_NN_FULLY_CONNECTED_RELU_LAYER:
         {
-            dims = TENSOR_SIZES(((vx_weights_biases_parameter)node->paramTable[1])->wb_base->origWeight);
-            dimNum = TENSOR_DIM_NUM(((vx_weights_biases_parameter)node->paramTable[1])->wb_base->origWeight);
+            dims = TENSOR_SIZES(WB_WEIGHT_TENSOR((vx_weights_biases_parameter)node->paramTable[1]));
+            dimNum = TENSOR_DIM_NUM(WB_WEIGHT_TENSOR((vx_weights_biases_parameter)node->paramTable[1]));
         }
         break;
     default:
@@ -1249,7 +1251,10 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_WAR7_singleCascadedNodes(vx_graph
                     {
                         vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter)parentNode->paramTable[1];
                         vx_uint32 z_offset = alignedTensor->dims[0] * alignedTensor->dims[1] * TENSOR_DATA_SIZE(alignedTensor);
-                        replaceKernelBufferZOffset(weights_biases, weights_biases->memory.logicals[0], z_offset);
+                        replaceKernelBufferZOffset(WB_ZOFFSET_HANDLE_INDEX(weights_biases, 0),
+                                                   WB_NUM_OF_VZ_INDEX(weights_biases, 0),
+                                                   WB_MEM_LOGICAL_BASE_ADDR(weights_biases),
+                                                   z_offset);
                     }
                 }
 
@@ -1327,13 +1332,13 @@ VX_PRIVATE_API  void vxoGraphOptimization_MergeConvolutionNodes_GetParmFromConvR
 {
     vx_weights_biases_parameter wb = (vx_weights_biases_parameter)convNode->paramTable[PARAM_CONV_RELU_POOLING_1_WEIGHTED_BIAS_INDEX];
     if(weight)
-        *weight                      = wb->wb_base->origWeight;
+        *weight                      = WB_WEIGHT_TENSOR(wb);
     if(bias)
-        *bias                        = wb->wb_base->origBias;
+        *bias                        = WB_BIAS_TENSOR(wb);
     if(stride)
     {
-        stride[0]                   = wb->wb_base->strideX;
-        stride[1]                   = wb->wb_base->strideY;
+        stride[0]                   = WB_STRIDE_X(wb);
+        stride[1]                   = WB_STRIDE_Y(wb);
     }
 
     if(pad)
@@ -1377,15 +1382,15 @@ VX_PRIVATE_API  void vxoGraphOptimization_MergeConvolutionNodes_GetParmFromConvR
 {
     vx_weights_biases_parameter wb = (vx_weights_biases_parameter)convNode->paramTable[PARAM_CONV_RELU_POOLING_1_WEIGHTED_BIAS_INDEX];
     if(weight)
-        *weight                      = wb->wb_base->origWeight;
+        *weight                      = WB_WEIGHT_TENSOR(wb);
 
     if(bias)
-        *bias                        = wb->wb_base->origBias;
+        *bias                        = WB_BIAS_TENSOR(wb);
 
     if(stride)
     {
-        stride[0]                   = wb->wb_base->strideX;
-        stride[1]                   = wb->wb_base->strideY;
+        stride[0]                   = WB_STRIDE_X(wb);
+        stride[1]                   = WB_STRIDE_Y(wb);
     }
 
     if(dilation)
@@ -1433,19 +1438,6 @@ VX_PRIVATE_API  void vxoGraphOptimization_MergeConvolutionNodes_GetParmFromConvR
         *pad_const                  = SCALAR_VALUE(convNode->paramTable[PARAM_CONV_RELU_POOLING_2_PAD_CONST_INDEX], u32) - \
                                         TENSOR_TF_ZEROPOINT((vx_tensor)convNode->paramTable[0]);
 }
-
-extern VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromTensorsPRelu(
-    vx_enum     layer_type,
-    vx_uint32 * inputs_dims,
-    vx_uint32 * convolution_outputs_dims,
-    vx_uint32 * pool_outputs_dims,
-    const vx_nn_convolution_relu_pooling_params convolution_relu_pooling_params,
-    vx_size size_of_convolution_relu_pooling_params,
-    vx_weights_biases_parameter_optimizations_t *optimizations,
-    vx_size size_of_optimizations,
-    vx_tensor   weights,
-    vx_tensor   biases,
-    vx_tensor   alpha);
 
 VX_INTERNAL_API  vx_weights_biases_parameter vxoGraphOptimization_CreateWBParameter(vx_enum  layer_type,
                                                                                      vx_nn_convolution_relu_pooling_params_t *wb_params,
@@ -2344,8 +2336,8 @@ VX_PRIVATE_API void vxoGraphOptimization_getOrignalWB(vx_node node, vx_tensor *o
     case VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER2:
         {
             vx_weights_biases_parameter weight_biases = (vx_weights_biases_parameter)node->paramTable[1];
-            *orgWeight  = weight_biases->wb_base->origWeight;
-            *orgBias    = weight_biases->wb_base->origBias;
+            *orgWeight  = WB_WEIGHT_TENSOR(weight_biases);
+            *orgBias    = WB_BIAS_TENSOR(weight_biases);
             break;
         }
     case VX_KERNEL_FULLY_CONNECTED_LAYER:
@@ -4799,11 +4791,11 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_deleteRelu(vx_graph graph)
                 {
                     vx_weights_biases_parameter wb = (vx_weights_biases_parameter)child->paramTable[1];
 
-                    weight  = wb->wb_base->origWeight;
-                    bias    = wb->wb_base->origBias;
+                    weight  = WB_WEIGHT_TENSOR(wb);
+                    bias    = WB_BIAS_TENSOR(wb);
 
-                    wb->wb_base->biasScale = scale * TENSOR_TF_SCALE(weight);
-                    wb->wb_base->inputZP = TENSOR_TF_ZEROPOINT(reluOut);
+                    WB_BIAS_SCALE(wb) = scale * TENSOR_TF_SCALE(weight);
+                    WB_INPUT_ZP(wb) = TENSOR_TF_ZEROPOINT(reluOut);
                 }
 
                 if(bias)

@@ -105,6 +105,7 @@ LOCAL_SRC_FILES += \
     driver/src/gc_vx_internal_node_api.c \
     driver/src/gc_vx_nn_util.c \
     driver/src/gc_vx_nn_encoder.c \
+    driver/src/gc_vx_nn_wb.c \
     driver/src/gc_vx_nn_command.c \
 
 # Kernel

@@ -1032,6 +1032,10 @@ typedef struct _vxnne_convolution_relu_pooling_operation_s
     vx_weights_biases_parameter     swtWeightBiases;
 
     vx_performance_info_s           resultInfo;
+
+    vx_bool                         do_zdp_opt;
+    vx_bool                         do_1xN;
+    vx_bool                         do_fisrt_pixel_pool;
 }
 vxnne_convolution_relu_pooling_operation_s, *vxnne_convolution_relu_pooling_operation;
 
@@ -2687,40 +2691,6 @@ vx_bool checkImageCacheMode(
     vx_uint32 outImageZSize,
     vx_uint32 kernelsPerCore,
     vx_uint32 nnCoreCount
-    );
-
-vx_status vxnneOperation_CaculateSRAMCache(
-    vx_context      context,
-    vxnne_operation operation,
-    vx_bool         enableImageCache,
-    vx_uint32*      kernelCacheSize,
-    vx_uint32*      kernelCacheStart,
-    vx_enum*        kernelCacheMode,
-    vx_uint32*      imageCacheSize,
-    vx_uint32*      imageCacheStart,
-    vx_enum*        imageCacheMode
-    );
-
-vx_weights_biases_parameter vxoWeightsBiases_Create(
-    vx_context                       context,
-    vx_weights_biases_parameter_base wb_base,
-    vx_uint32 *                      weight_dims,
-    vx_enum                          layer_type,
-    vx_bool                          first_time
-    );
-
-vx_status vxoWeightsBiases_Compress(
-    vx_context                       context,
-    vx_weights_biases_parameter      wb,
-    vx_uint32                        kernel_per_core,
-    vx_uint32 *                      pooling_output_dims,
-    vx_enum                          output_format,
-    vx_int32                         z_offset
-    );
-
-vx_status vxoWeightsBiases_Decompress(
-    vx_context                       context,
-    vx_weights_biases_parameter      wb
     );
 
 vx_status vxnneOperation_Initialize(

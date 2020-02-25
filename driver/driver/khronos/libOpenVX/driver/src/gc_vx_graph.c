@@ -13,6 +13,7 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
 #ifdef ORI_NNARCHPERF
 #include "gc_nn_arch_model.h"
 #else
@@ -1082,6 +1083,18 @@ VX_INTERNAL_API vx_bool ComputeMNEx(
                                         inputDims,
                                         outputDims,
                                         TENSOR_DATA_TYPE(opInfo.output),
+                                        opInfo.pad.left,
+                                        opInfo.pad.right,
+                                        opInfo.pad.top,
+                                        opInfo.pad.bottom,
+                                        opInfo.poolSizeX,
+                                        opInfo.poolStrideX,
+                                        opInfo.pad.left,
+                                        opInfo.pad.right,
+                                        opInfo.pad.top,
+                                        opInfo.pad.bottom,
+                                        opInfo.poolSizeX,
+                                        opInfo.poolStrideX,
                                         VX_NULL,
                                         vx_true_e,
                                         SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
@@ -1094,8 +1107,8 @@ VX_INTERNAL_API vx_bool ComputeMNEx(
                 outImageTileX   = archPerfHandle.resultInfo.outImageTileXSize;
                 outImageTileY   = archPerfHandle.resultInfo.outImageTileYSize;
                 interleaveMode  = archPerfHandle.resultInfo.interleaveMode;
-                kernelX         = opInfo.weightsBiases->weights_sizes[0];
-                kernelY         = opInfo.weightsBiases->weights_sizes[1];
+                kernelX         = WB_KERNEL_X(opInfo.weightsBiases);
+                kernelY         = WB_KERNEL_Y(opInfo.weightsBiases);
                 inImageZ        = TENSOR_SIZE_INDEX(opInfo.input, 2);
                 inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
 
@@ -2046,9 +2059,6 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
             vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)operation;
             vxnne_mem_request requestList = graph->layer->memRequestList + segment->start + i;
             vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat, imageTileSize, kernelbufferSize;
-            vx_uint32 outputDims[3] = {TENSOR_VIEW_SIZE_INDEX(opInfo.output, 0),
-                                        TENSOR_VIEW_SIZE_INDEX(opInfo.output, 1),
-                                        TENSOR_VIEW_SIZE_INDEX(opInfo.output, 2)};
             vx_uint32 transposeSize = 0;
 
             /*if (convOperation->resultInfo.kernelsPerCore == 0)*/
@@ -2098,25 +2108,25 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
             }
             vxmASSERT(convOperation->resultInfo.kernelsPerCore != 0);
 
-            vxmONERROR(vxoWeightsBiases_Compress(
-                graph->base.context,
-                convOperation->weights_biases,
-                convOperation->resultInfo.kernelsPerCore,
-                outputDims,
-                TENSOR_DATA_TYPE(opInfo.output),
-                TENSOR_STRIDE_INDEX(opInfo.output, 2)));
+            vxmONERROR(
+                convOperation->weights_biases->compress(
+                    convOperation->weights_biases,
+                    opInfo.target,
+                    convOperation->resultInfo.kernelsPerCore,
+                    TENSOR_STRIDE_INDEX(opInfo.output, 2))
+                );
 
             outImageTileX  = convOperation->resultInfo.outImageTileXSize;
             outImageTileY  = convOperation->resultInfo.outImageTileYSize;
             interleaveMode = convOperation->resultInfo.interleaveMode;
-            kernelX = opInfo.weightsBiases->weights_sizes[0];
-            kernelY = opInfo.weightsBiases->weights_sizes[1];
+            kernelX = WB_KERNEL_X(opInfo.weightsBiases);
+            kernelY = WB_KERNEL_Y(opInfo.weightsBiases);
             inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
             inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
 
             imageTileSize = caculate3DTileSize(graph->base.context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
 
-            kernelbufferSize = (vx_uint32)gcmALIGN_NP2(opInfo.weightsBiases->slice_array[0].kernel_align_stream_size, CACHE_ALIGNMENT_SIZE);
+            kernelbufferSize = (vx_uint32)gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(opInfo.weightsBiases, 0), CACHE_ALIGNMENT_SIZE);
 
             requestList->kernelCache.lastUseId = requestList->kernelCache.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
             requestList->kernelCache.sizes[0] = kernelbufferSize;
@@ -2308,8 +2318,8 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
                         transposeSize = caculateInputTransposeBufferSize(VXNNE_SRAM_CACHE_MODE_FULL_CACHE,
                                                                         tilingInfo[j].tilingParam.outImageTileXSize,
                                                                         tilingInfo[j].tilingParam.outImageTileYSize,
-                                                                        opInfo.weightsBiases->weights_sizes[0],
-                                                                        opInfo.weightsBiases->weights_sizes[1],
+                                                                        WB_KERNEL_X(opInfo.weightsBiases),
+                                                                        WB_KERNEL_Y(opInfo.weightsBiases),
                                                                         inputZ,
                                                                         tilingInfo[j].tilingParam.interleaveMode,
                                                                         graph->base.context->nnConfig.customizedFeature.ddrLatency,
@@ -2322,8 +2332,8 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
                         outImageTileX = tilingInfo[j].tilingParam.outImageTileXSize;
                         outImageTileY = tilingInfo[j].tilingParam.outImageTileYSize;
                         interleaveMode = tilingInfo[j].tilingParam.interleaveMode;
-                        kernelX = opInfo.weightsBiases->weights_sizes[0];
-                        kernelY = opInfo.weightsBiases->weights_sizes[1];
+                        kernelX = WB_KERNEL_X(opInfo.weightsBiases);
+                        kernelY = WB_KERNEL_Y(opInfo.weightsBiases);
                         inImageZ = TENSOR_SIZE_INDEX(opInfo.input, 2);
                         inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
 
@@ -2350,16 +2360,13 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
 
             vxnneOperation_GetInfo(operation, &opInfo);
 
-            /* reshuffle weight data and save in wb_base->reshuffleWeightPtr if kernel stride > 1 */
-            vxoWeightsBiases_Reshuffle(WB_BASE(opInfo.weightsBiases));
-
             vxmASSERT(convOperation->swtWeightBiases == VX_NULL);
-            convOperation->swtWeightBiases = vxoWeightsBiases_Create(
-                                                             graph->base.context,
-                                                             WB_BASE(opInfo.weightsBiases),
-                                                             WB_BASE_WEIGHT_DIMS(opInfo.weightsBiases),
-                                                             VX_NN_CONVOLUTION_LAYER,
-                                                             vx_false_e);
+
+            convOperation->swtWeightBiases = vxoCreateWeightsBiasesFromWeightBias(
+                                                 graph->base.context,
+                                                 opInfo.weightsBiases,
+                                                 WB_WEIGHT_DIMS_SIZES(opInfo.weightsBiases),
+                                                 WB_WEIGHT_DIMS_NUM(opInfo.weightsBiases));
 
             if (convOperation->swtWeightBiases == VX_NULL)
             {
@@ -2369,12 +2376,13 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
 
             vxmASSERT(tilingInfo[0].tilingParam.kernelsPerCore != 0);
 
-            status = vxoWeightsBiases_Compress(graph->base.context,
+            vxmONERROR(
+                convOperation->swtWeightBiases->compress(
                     convOperation->swtWeightBiases,
+                    opInfo.target,
                     tilingInfo[0].tilingParam.kernelsPerCore,
-                    VX_NULL,
-                    TENSOR_DATA_TYPE(opInfo.output),
-                    requestList->outputMemory[0]->strides[0][2]);
+                    requestList->outputMemory[0]->strides[0][2])
+                );
 
             if (status != VX_SUCCESS) goto OnError;
 
@@ -2588,23 +2596,8 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
                         if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
                         {
                             vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i]->start];
-
-                            vxoReference_Release((vx_reference_ptr)&convOperation->swtWeightBiases, VX_TYPE_WEIGHTS_BIASES_PARAMETER, VX_REF_INTERNAL);
-
+                            vxoReleaseWeightsBiases(&convOperation->swtWeightBiases);
                             convOperation->swtWeightBiases = VX_NULL;
-
-                        }
-                    }
-                }
-                else
-                {
-                    vxmASSERT(block->segments[i]->type == VXNNE_SEGMENT_TYPE_AB);
-                    for (j = 0; j < block->segments[i]->count; j++)
-                    {
-                        if (graph->layer->operations[j + block->segments[i]->start]->target == VXNNE_OPERATION_TARGET_NN)
-                        {
-                            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i]->start];
-                            vxoWeightsBiases_Decompress(graph->base.context, convOperation->weights_biases);
                         }
                     }
                 }
@@ -2722,37 +2715,6 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
 #endif
 
         graph->peakAxiSramUsedSize = gcmMAX(peakMemSize[VXNNE_MEM_POOL_TYPE_AXI_SRAM], graph->peakAxiSramUsedSize);
-
-        /* temp solution for wb's reshuffleWeightPtr free, need remove it when solve reference count issue */
-        {
-            vx_uint32 j = 0;
-
-            for (i = 0; i < block->segmentNum; i++)
-            {
-                if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_TILING)
-                {
-                    for (j = 0; j < block->segments[i]->count; j++)
-                    {
-                        if (graph->layer->operations[j + block->segments[i]->start]->target == VXNNE_OPERATION_TARGET_NN)
-                        {
-                            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i]->start];
-                            vxoWeightsBiases_Clear(convOperation->swtWeightBiases);
-                        }
-                    }
-                }
-                else if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_AB)
-                {
-                    for (j = 0; j < block->segments[i]->count; j++)
-                    {
-                        if (graph->layer->operations[j + block->segments[i]->start]->target == VXNNE_OPERATION_TARGET_NN)
-                        {
-                            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i]->start];
-                            vxoWeightsBiases_Clear(convOperation->weights_biases);
-                        }
-                    }
-                }
-            }
-        }
 
         for (i = 0; i < block->segmentNum; i++)
         {
@@ -3906,6 +3868,12 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                                     inputDims,
                                     outputDims,
                                     TENSOR_DATA_TYPE(opInfo.output),
+                                    opInfo.pad.left,
+                                    opInfo.pad.right,
+                                    opInfo.pad.top,
+                                    opInfo.pad.bottom,
+                                    opInfo.poolSizeX,
+                                    opInfo.poolStrideX,
                                     VX_NULL,
                                     vx_true_e,
                                     SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
@@ -3920,6 +3888,12 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                                 inputDims,
                                 outputDims,
                                 TENSOR_DATA_TYPE(opInfo.output),
+                                opInfo.pad.left,
+                                opInfo.pad.right,
+                                opInfo.pad.top,
+                                opInfo.pad.bottom,
+                                opInfo.poolSizeX,
+                                opInfo.poolStrideX,
                                 VX_NULL,
                                 vx_true_e,
                                 SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
@@ -3931,8 +3905,8 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                 outImageTileX   = archPerfHandle.resultInfo.outImageTileXSize;
                 outImageTileY   = archPerfHandle.resultInfo.outImageTileYSize;
                 interleaveMode  = archPerfHandle.resultInfo.interleaveMode;
-                kernelX         = opInfo.weightsBiases->weights_sizes[0];
-                kernelY         = opInfo.weightsBiases->weights_sizes[1];
+                kernelX         = WB_KERNEL_X(opInfo.weightsBiases);
+                kernelY         = WB_KERNEL_Y(opInfo.weightsBiases);
                 inImageZ        = TENSOR_SIZE_INDEX(opInfo.input, 2);
                 inputDataFormat = TENSOR_DATA_TYPE(opInfo.input);
                 outputDataFormat = TENSOR_DATA_TYPE(opInfo.output);
@@ -4042,9 +4016,6 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
             if (operation->target == VXNNE_OPERATION_TARGET_NN)
             {
                 vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)operation;
-                vx_uint32 outputDims[3] = {TENSOR_VIEW_SIZE_INDEX(convOperation->outputs, 0),
-                                           TENSOR_VIEW_SIZE_INDEX(convOperation->outputs, 1),
-                                           TENSOR_VIEW_SIZE_INDEX(convOperation->outputs, 2)};
 
                 if (convOperation->resultInfo.kernelsPerCore == 0)
                 {
@@ -4093,15 +4064,13 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                 }
                 vxmASSERT(convOperation->resultInfo.kernelsPerCore != 0);
 
-                vxmONERROR(vxoWeightsBiases_Compress(
-                    graph->base.context,
-                    convOperation->weights_biases,
-                    convOperation->resultInfo.kernelsPerCore,
-                    outputDims,
-                    TENSOR_DATA_TYPE(convOperation->outputs),
-                    TENSOR_STRIDE_INDEX(convOperation->outputs, 2)));
-
-                vxoWeightsBiases_Clear(convOperation->weights_biases);
+                vxmONERROR(
+                    convOperation->weights_biases->compress(
+                        convOperation->weights_biases,
+                        operation->target,
+                        convOperation->resultInfo.kernelsPerCore,
+                        TENSOR_STRIDE_INDEX(convOperation->outputs, 2))
+                    );
             }
 
             for (k = 0; k < layer->operations[i]->batchCount; k++)
@@ -4166,7 +4135,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                 wb ? layer->opIndices[i].cmdInfo.kernelCacheSize : 0,
                 wb ? (vx_float32)layer->opIndices[i].cmdInfo.kernelCacheSize/gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(wb, 0), CACHE_ALIGNMENT_SIZE) *100  : 0,
                 wb ? ((vx_float32)gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(wb, 0), CACHE_ALIGNMENT_SIZE) / GetEsitimateWBSize(wb) *100) : 0,
-                wb ? IS_SRAM(wb->memory.physicals[0], axi) ? "AS" : "DD" : "NONE"
+                wb ? IS_SRAM(WB_MEM_PHYSICAL_BASE_ADDR(wb), axi) ? "AS" : "DD" : "NONE"
                 );
         }
 
@@ -4335,7 +4304,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_ComputeInputSize(
     vxnne_operation operation,
     vx_uint32 gpuCount
     )
- {
+{
     vx_uint32 inputY = 0, outputY = 0;
     vx_int32 diff = 0, sum = 1;
     vx_uint32 count = gpuCount;
@@ -4390,7 +4359,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_ComputeInputSize(
 OnError:
     gcmFOOTER_ARG("splitCount=0x%x", splitCount);
     return splitCount;
- }
+}
 
 VX_PRIVATE_API vx_bool vxoMultiGPU_IsSupport(
     vxnne_operation operation,
@@ -4449,36 +4418,22 @@ VX_PRIVATE_API vx_bool vxoMultiGPU_IsSupport(
     /*3. operation can be splited to multi core? */
     if (VXNNE_OPERATOR_FULLYCONNECTED == operation->operatorType)
     {
-        vxnne_tp_operation srcTpOp = (vxnne_tp_operation)operation;
-        vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter)srcTpOp->base.parameter.other_ref;
-        vx_uint32 outputDim = 0;
         vx_uint32 count = gpuCount;
-        vxmONERROR(vxQueryTensor(output, VX_TENSOR_NUMBER_OF_DIMS, &outputDim, sizeof(outputDim)));
         outputHeight = TENSOR_STRIDE_INDEX(output, 3) / TENSOR_DATA_SIZE(output);
 
-        /* weight/bias tensor is NULL for vData. create weight/bias parameter form stream, the origWeight tensor is NULL */
-        if (((weights_biases->wb_base->origWeight == VX_NULL) ||
-            ((TENSOR_LOGICAL_ADDR(weights_biases->wb_base->origWeight)) == VX_NULL)) &&
-            (weights_biases->mGpuWBCount <= 1))
+        while (count >= 2)
         {
-            splitFlag = vx_false_e;
-        }
-        else
-        {
-            while (count >= 2)
+            /* TP can't support 1x1x1 output */
+            if ((outputHeight / count) <= 1)
             {
-                /* TP can't support 1x1x1 output */
-                if ((outputHeight / count) <= 1)
-                {
-                    splitFlag = vx_false_e;
-                    count--;
-                }
-                else
-                {
-                    splitFlag = vx_true_e;
-                    *splitCount = count;
-                    break;
-                }
+                splitFlag = vx_false_e;
+                count--;
+            }
+            else
+            {
+                splitFlag = vx_true_e;
+                *splitCount = count;
+                break;
             }
         }
     }
@@ -5165,108 +5120,86 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForFC(
     if (outputView != VX_NULL) vxReleaseTensorView(&outputView);
     dstOperation->base.references[VX_MULTIVIP_OUTPUT_TENSOR_REFERENCE] = (vx_reference)outputTensor;
 
-    if (weights_biases->mGpuWBCount > 0)
+    weight = WB_WEIGHT_TENSOR(weights_biases);
+    bias   = WB_BIAS_TENSOR(weights_biases);
+    vxmONERROR(vxQueryTensor(weight, VX_TENSOR_DIMS, weightSizeEnd, sizeof(weightSizeEnd)));
+    vxmONERROR(vxQueryTensor(weight, VX_TENSOR_NUMBER_OF_DIMS, &weightDim, sizeof(weightDim)));
+    weightSplitAxis = outputSplitAxis + 1;
+    if (TENSOR_VIEW_SIZE_INDEX(weight, weightSplitAxis) != TENSOR_VIEW_SIZE_INDEX(output, outputSplitAxis))
     {
-        /*2. for vData weight/bias */
-        newWeightBias = weights_biases->mGpuWBTable[gpuIndex];
-        vxmASSERT(newWeightBias != VX_NULL);
+        for (i = 0 ; i < weightDim; i++)
+        {
+            if (TENSOR_VIEW_SIZE_INDEX(weight, weightSplitAxis) == TENSOR_VIEW_SIZE_INDEX(output, outputSplitAxis))
+            {
+                weightSplitAxis = i;
+            }
+        }
+    }
+    vxmASSERT(TENSOR_VIEW_SIZE_INDEX(weight, weightSplitAxis) == TENSOR_VIEW_SIZE_INDEX(output, outputSplitAxis));
+    weightSizeStart[weightSplitAxis] = outputStart;
+    weightSizeEnd[weightSplitAxis] = outputEnd;
+    weightView = vxCreateTensorView(node->base.context, weightSizeStart, weightSizeEnd, (vx_uint8)weightDim);
+    weightTensor  = vxoTensor_CreateTensorFromView(weight, weightView);
+    if (weightView != VX_NULL) vxReleaseTensorView(&weightView);
+    dstOperation->base.references[VX_MULTIVIP_WEIGHT_TENSOR_REFERENCE] = (vx_reference)weightTensor;
+
+    /*3. split bias tensor*/
+    if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 0))
+    {
+        biasSplitAxis = 0;
+    }
+    else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 1))
+    {
+        biasSplitAxis = 1;
+    }
+    else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 2))
+    {
+        biasSplitAxis = 2;
+    }
+    else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 3))
+    {
+        biasSplitAxis = 3;
     }
     else
     {
-        /*2. split weight tensor*/
-        if (weights_biases->mGpuWBTable == VX_NULL)
-        {
-            /* first allocate mGpuWBTable memory for multiVIP vData */
-            vx_uint32 size = sizeof(vx_weights_biases_parameter) * splitCount;
-            weights_biases->mGpuWBTable = (vx_weights_biases_parameter*)vxAllocateAndZeroMemory((vx_size)size);
-        }
-
-        weight = weights_biases->wb_base->origWeight;
-        bias   = weights_biases->wb_base->origBias;
-        vxmONERROR(vxQueryTensor(weight, VX_TENSOR_DIMS, weightSizeEnd, sizeof(weightSizeEnd)));
-        vxmONERROR(vxQueryTensor(weight, VX_TENSOR_NUMBER_OF_DIMS, &weightDim, sizeof(weightDim)));
-        weightSplitAxis = outputSplitAxis + 1;
-        if (TENSOR_VIEW_SIZE_INDEX(weight, weightSplitAxis) != TENSOR_VIEW_SIZE_INDEX(output, outputSplitAxis))
-        {
-            for (i = 0 ; i < weightDim; i++)
-            {
-                if (TENSOR_VIEW_SIZE_INDEX(weight, weightSplitAxis) == TENSOR_VIEW_SIZE_INDEX(output, outputSplitAxis))
-                {
-                    weightSplitAxis = i;
-                }
-            }
-        }
-        vxmASSERT(TENSOR_VIEW_SIZE_INDEX(weight, weightSplitAxis) == TENSOR_VIEW_SIZE_INDEX(output, outputSplitAxis));
-        weightSizeStart[weightSplitAxis] = outputStart;
-        weightSizeEnd[weightSplitAxis] = outputEnd;
-        weightView = vxCreateTensorView(node->base.context, weightSizeStart, weightSizeEnd, (vx_uint8)weightDim);
-        weightTensor  = vxoTensor_CreateTensorFromView(weight, weightView);
-        if (weightView != VX_NULL) vxReleaseTensorView(&weightView);
-        dstOperation->base.references[VX_MULTIVIP_WEIGHT_TENSOR_REFERENCE] = (vx_reference)weightTensor;
-
-        /*3. split bias tensor*/
-        if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 0))
-        {
-            biasSplitAxis = 0;
-        }
-        else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 1))
-        {
-            biasSplitAxis = 1;
-        }
-        else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 2))
-        {
-            biasSplitAxis = 2;
-        }
-        else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 3))
-        {
-            biasSplitAxis = 3;
-        }
-        else
-        {
-            vxmASSERT(0);
-        }
-        vxmASSERT(TENSOR_VIEW_SIZE_INDEX(bias, biasSplitAxis) == TENSOR_VIEW_SIZE_INDEX(output, outputSplitAxis));
-        vxmONERROR(vxQueryTensor(bias, VX_TENSOR_DIMS, biasSizeEnd, sizeof(biasSizeEnd)));
-        vxmONERROR(vxQueryTensor(bias, VX_TENSOR_NUMBER_OF_DIMS, &biasDim, sizeof(biasDim)));
-        biasSizeStart[biasSplitAxis] = outputStart;
-        biasSizeEnd[biasSplitAxis] = outputEnd;
-        biasView = vxCreateTensorView(node->base.context, biasSizeStart, biasSizeEnd, (vx_uint8)biasDim);
-        biasTensor  = vxoTensor_CreateTensorFromView(bias, biasView);
-        if (biasView != VX_NULL) vxReleaseTensorView(&biasView);
-        dstOperation->base.references[VX_MULTIVIP_BIAS_TENSOR_REFERENCE] = (vx_reference)biasTensor;
-
-        /*4. create new vx weights biases parameter */
-        params.ext.base.pad_x_left = weights_biases->wb_base->pad_x_left;
-        params.ext.base.pad_x_right = weights_biases->wb_base->pad_x_right;
-        params.ext.base.pad_y_top = weights_biases->wb_base->pad_y_top;
-        params.ext.base.pad_y_bottom = weights_biases->wb_base->pad_y_bottom;
-        params.ext.base.down_scale_size_rounding = weights_biases->wb_base->down_scale_size_rounding;
-        params.ext.stride_x = weights_biases->wb_base->strideX;
-        params.ext.stride_y = weights_biases->wb_base->strideY;
-        params.convert_dst_format = TENSOR_DATA_TYPE(outputTensor);
-        optimizations.inputZeroPoint = weights_biases->wb_base->inputZP;
-        optimizations.zrl = weights_biases->wb_base->setZeroLength;
-        optimizations.outputFormat = TENSOR_DATA_TYPE(outputTensor);
-
-        vxmONERROR(vxQueryTensor(outputTensor, VX_TENSOR_DIMS, outputDims, sizeof(outputDims)));
-        newWeightBias = vxCreateWeightsBiasesParameterFromTensors2(VX_NN_FULLYCONNECTED_LAYER,
-                                                                    weightDim,
-                                                                    inputSize,
-                                                                    outputDims,
-                                                                    outputDims,
-                                                                    TENSOR_DATA_TYPE(outputTensor),
-                                                                    (vx_nn_convolution_relu_pooling_params)&params,
-                                                                    sizeof(vx_nn_convolution_relu_pooling_params_ext2_t),
-                                                                    (vx_weights_biases_parameter_optimizations_t*)&optimizations,
-                                                                    weightTensor,
-                                                                    biasTensor);
-        /* save newWeightBias to mGpuWBTable[] for supporting vData */
-        if (gpuIndex == (splitCount - 1))
-        {
-            weights_biases->mGpuWBCount = splitCount;
-        }
-        weights_biases->mGpuWBTable[gpuIndex] = newWeightBias;
+        vxmASSERT(0);
     }
+    vxmASSERT(TENSOR_VIEW_SIZE_INDEX(bias, biasSplitAxis) == TENSOR_VIEW_SIZE_INDEX(output, outputSplitAxis));
+    vxmONERROR(vxQueryTensor(bias, VX_TENSOR_DIMS, biasSizeEnd, sizeof(biasSizeEnd)));
+    vxmONERROR(vxQueryTensor(bias, VX_TENSOR_NUMBER_OF_DIMS, &biasDim, sizeof(biasDim)));
+    biasSizeStart[biasSplitAxis] = outputStart;
+    biasSizeEnd[biasSplitAxis] = outputEnd;
+    biasView = vxCreateTensorView(node->base.context, biasSizeStart, biasSizeEnd, (vx_uint8)biasDim);
+    biasTensor  = vxoTensor_CreateTensorFromView(bias, biasView);
+    if (biasView != VX_NULL) vxReleaseTensorView(&biasView);
+    dstOperation->base.references[VX_MULTIVIP_BIAS_TENSOR_REFERENCE] = (vx_reference)biasTensor;
+
+    /*4. create new vx weights biases parameter */
+    params.ext.base.pad_x_left = srcOperation->parameter.pad_x_left;
+    params.ext.base.pad_x_right = srcOperation->parameter.pad_x_right;
+    params.ext.base.pad_y_top = srcOperation->parameter.pad_y_top;
+    params.ext.base.pad_y_bottom = srcOperation->parameter.pad_y_bottom;
+    params.ext.base.down_scale_size_rounding = srcOperation->parameter.conv_rounding_type;
+    params.ext.stride_x = WB_STRIDE_X(weights_biases);
+    params.ext.stride_y = WB_STRIDE_Y(weights_biases);
+    params.convert_dst_format = TENSOR_DATA_TYPE(outputTensor);
+    optimizations.inputZeroPoint = WB_INPUT_ZP(weights_biases);
+    optimizations.zrl = WB_SET_ZERO_LENGTH(weights_biases);
+    optimizations.outputFormat = TENSOR_DATA_TYPE(outputTensor);
+
+    vxmONERROR(vxQueryTensor(outputTensor, VX_TENSOR_DIMS, outputDims, sizeof(outputDims)));
+    newWeightBias = vxCreateWeightsBiasesParameterFromTensors2(VX_NN_FULLYCONNECTED_LAYER,
+                                                                weightDim,
+                                                                inputSize,
+                                                                outputDims,
+                                                                outputDims,
+                                                                TENSOR_DATA_TYPE(outputTensor),
+                                                                (vx_nn_convolution_relu_pooling_params)&params,
+                                                                sizeof(vx_nn_convolution_relu_pooling_params_ext2_t),
+                                                                (vx_weights_biases_parameter_optimizations_t*)&optimizations,
+                                                                weightTensor,
+                                                                biasTensor);
+
     dstOperation->base.references[VX_MULTIVIP_WEIGHT_BIAS_PARAM_REFERENCE] = (vx_reference)newWeightBias;
 
     /*5. construction new TP FullyConnect operation */
@@ -5280,19 +5213,19 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForFC(
     if (1 == kzGroup)
     {
         vx_tp_value_cmd_s values ;
-        vx_uint32 kzgroup = newWeightBias->weights_sizes[2] / newWeightBias->slice_array[0].kz_count;
+        vx_uint32 kzgroup = WB_KERNEL_Z(newWeightBias) / WB_KERNEL_Z_INDEX(newWeightBias, 0);
         vx_uint32 zoffset = 0;
         vxmASSERT(1 == kzGroup);
         memset(&values,0,sizeof(vx_tp_value_cmd_s));
-        dstOperation->base.parameter.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(newWeightBias->slice_num * sizeof(vx_tp_value_cmd_s));
+        dstOperation->base.parameter.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(WB_TOTAL_SLICE_NUM(newWeightBias) * sizeof(vx_tp_value_cmd_s));
         if (dstOperation->base.parameter.tp_value != VX_NULL)
         {
-            for (i = 0; i < newWeightBias->slice_num; i++)
+            for (i = 0; i < WB_TOTAL_SLICE_NUM(newWeightBias); i++)
             {
                 values.u32[0] = kzgroup;
                 values.u32[1] = zoffset;
                 vxMemCopy(&dstOperation->base.parameter.tp_value[i], &values, sizeof(vx_tp_value_cmd_s));
-                zoffset += newWeightBias->slice_array[i].z_count;
+                zoffset += WB_OUTPUT_Z_INDEX(newWeightBias, i);
             }
         }
     }
@@ -5303,11 +5236,11 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForFC(
         memset(&values,0,sizeof(vx_tp_value_cmd_s));
         if (0 == srcTpOp->base.parameter.tp_value->e32[0])
         {
-            dstOperation->base.parameter.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(newWeightBias->slice_num * sizeof(vx_tp_value_cmd_s));
+            dstOperation->base.parameter.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(WB_TOTAL_SLICE_NUM(newWeightBias) * sizeof(vx_tp_value_cmd_s));
             if (dstOperation->base.parameter.tp_value != VX_NULL)
             {
-                vx_uint32 kzgroup = newWeightBias->weights_sizes[2] / newWeightBias->slice_array[0].kz_count;
-                for (i = 0; i < newWeightBias->slice_num; i++)
+                vx_uint32 kzgroup = WB_KERNEL_Z(newWeightBias) / WB_KERNEL_Z_INDEX(newWeightBias, 0);
+                for (i = 0; i < WB_TOTAL_SLICE_NUM(newWeightBias); i++)
                 {
                     values.e32[0] = 0;
                     values.u32[0] = kzgroup;
@@ -5319,12 +5252,12 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForFC(
                     if (i % kzgroup == kzgroup - 1)
                     {
                         kzoffset = kzoffset2 = 0;
-                        zoffset += newWeightBias->slice_array[i].z_count;
+                        zoffset += WB_OUTPUT_Z_INDEX(newWeightBias, i);
                     }
                     else
                     {
-                        kzoffset += newWeightBias->slice_array[i].kz_count;
-                        kzoffset2 += newWeightBias->weights_sizes[3];
+                        kzoffset += WB_KERNEL_Z_INDEX(newWeightBias, i);
+                        kzoffset2 += WB_OUTPUT_Z(newWeightBias);
                     }
                 }
             }
@@ -5335,7 +5268,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForFC(
              if (dstOperation->base.parameter.tp_value != VX_NULL)
              {
                 values.e32[0] = 1;
-                values.u32[1] = newWeightBias->weights_sizes[3];
+                values.u32[1] = WB_OUTPUT_Z(newWeightBias);
                 vxMemCopy(dstOperation->base.parameter.tp_value, &values, sizeof(vx_tp_value_cmd_s));
              }
         }

@@ -13,6 +13,7 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
 /*
 ** Misc
 */
@@ -149,7 +150,6 @@ static vx_datatype_size_record_s vxDataTypeSizeRecords[] = {
     {VX_TYPE_TENSOR_ADDRESS, sizeof(vx_tensor_addressing_s)},
 
     {VX_TYPE_WEIGHTS_BIASES_PARAMETER, sizeof(vx_weights_biases_parameter_s)},
-    {VX_TYPE_WEIGHTS_BIASES_PARAMETER_BASE, sizeof(vx_weights_biases_parameter_base_s)}
 };
 
 VX_INTERNAL_API vx_uint32 vxDataType_GetSize(vx_type_e type)
@@ -217,8 +217,7 @@ static vx_object_destructor_record_s vxDestructorRecords[] = {
     {VX_TYPE_TENSOR_VIEW, VX_NULL},
     {VX_TYPE_TENSOR_ADDRESS,VX_NULL},
 
-    {VX_TYPE_WEIGHTS_BIASES_PARAMETER, &vxoWeightsBiases_Destructor},
-    {VX_TYPE_WEIGHTS_BIASES_PARAMETER_BASE, &vxoWeightsBiasesBase_Destructor},
+    {VX_TYPE_WEIGHTS_BIASES_PARAMETER, &vxoWeightBias_Destructor},
 
     {VX_TYPE_PROGRAM, &vxoProgram_Destructor}
 };
@@ -2806,12 +2805,7 @@ VX_INTERNAL_API vx_bool vxoContext_MemoryMap(
                 //buf = (vx_uint8*)malloc(size);
                 if (size > 0)
                 {
-                    if (VX_TYPE_WEIGHTS_BIASES_PARAMETER == ref->type)
-                    {
-                        vx_weights_biases_parameter wb = (vx_weights_biases_parameter)ref;
-                        buf = (vx_uint8_ptr)wb->memory.logicals[0] - WB_MEM_HEAD_OFFSET(wb);
-                    }
-                    else if (VX_TYPE_ARRAY == ref->type || VX_TYPE_LUT == ref->type)
+                    if (VX_TYPE_ARRAY == ref->type || VX_TYPE_LUT == ref->type)
                     {
                         vx_memory_map_extra_s* extra = (vx_memory_map_extra_s*)extra_data;
                         vx_size offset = extra->array_data.start * ((vx_array)ref)->itemSize;

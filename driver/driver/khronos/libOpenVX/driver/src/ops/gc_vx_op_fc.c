@@ -14,6 +14,7 @@
 #include <ops/gc_vx_op_fc.h>
 #include <ops/gc_vx_op_tensor_copy.h>
 #include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
 
 extern vx_tensor _createTensor(vx_graph graph, vx_bool is_virtual,
     vx_uint32 num_of_dims, vx_uint32 * sizes, vx_enum data_format, vx_enum quant_format,
@@ -476,8 +477,8 @@ vx_status vxoFCOperation_Initialize(
             {
                 wb = *weights_biases;
 
-                weights = wb->wb_base->origWeight;
-                biases = wb->wb_base->origBias;
+                weights = WB_WEIGHT_TENSOR(wb);
+                biases = WB_BIAS_TENSOR(wb);
             }
             else if (!weights_biases || !*weights_biases)
             {
@@ -491,7 +492,7 @@ vx_status vxoFCOperation_Initialize(
                     opt = &wb_opt;
                 }
 
-                wb = _createWeightsBiasesParameterFromTensors(context,
+                wb = vxoCreateWeightsBiasesParameterFromTensors(context,
                                                               VX_NN_FULLYCONNECTED_LAYER,
                                                               inputs->dims, /* inputs_dims */
                                                               inputs->dimCount,
@@ -521,6 +522,8 @@ vx_status vxoFCOperation_Initialize(
                 {
                     vxmONERROR(VX_ERROR_NO_RESOURCES);
                 }
+
+                wb->compress(wb, VXNNE_OPERATION_TARGET_TP, 0, TENSOR_STRIDE_INDEX(outputs, 2));
 
                 operation->weights_biases = wb;
 
@@ -750,8 +753,8 @@ zdp_size:
             {
                 wb = *weights_biases;
 
-                weights = wb->wb_base->origWeight;
-                biases = wb->wb_base->origBias;
+                weights = WB_WEIGHT_TENSOR(wb);
+                biases = WB_BIAS_TENSOR(wb);
             }
             else if (!weights_biases || !*weights_biases)
             {
@@ -765,7 +768,7 @@ zdp_size:
                     opt = &wb_opt;
                 }
 
-                wb = _createWeightsBiasesParameterFromTensors(context,
+                wb = vxoCreateWeightsBiasesParameterFromTensors(context,
                                                               VX_NN_CONVOLUTION_LAYER,
                                                               (mode == bfc2conv_mode_1xn)?input_trans->dims:input_conv->dims, /* inputs_dims */
                                                               (mode == bfc2conv_mode_1xn)?input_trans->dimCount:input_conv->dimCount,
@@ -795,6 +798,8 @@ zdp_size:
                 {
                     vxmONERROR(VX_ERROR_NO_RESOURCES);
                 }
+
+                wb->compress(wb, VXNNE_OPERATION_TARGET_NN, WB_OUTPUT_Z(wb), TENSOR_STRIDE_INDEX(output_trans, 2));
 
                 operation->weights_biases = wb;
 
@@ -925,7 +930,7 @@ vx_status vxoFCOperationTP_Initialize(
 {
     vx_status status = VX_SUCCESS;
 
-    vx_uint32 kzgroup = weights_biases->slice_kz_num;
+    vx_uint32 kzgroup = WB_KERNEL_Z_SLICE_NUM(weights_biases);
     vx_op_param op_param = VX_NULL;
     vx_tp_value_cmd tp_value = VX_NULL;
     vx_tensor_create_params_t tensor_create_params;
@@ -1004,10 +1009,10 @@ vx_status vxoFCOperationTP_Initialize(
     op_param->data_buff = VX_NULL;
     op_param->conv_rounding_type = rounding_policy;
 
-    tp_value = (vx_tp_value_cmd)vxAllocateAndZeroMemory(gcmSIZEOF(vx_tp_value_cmd_s) * weights_biases->slice_num);
+    tp_value = (vx_tp_value_cmd)vxAllocateAndZeroMemory(gcmSIZEOF(vx_tp_value_cmd_s) * WB_TOTAL_SLICE_NUM(weights_biases));
     vxmONERROR_NULLPTR(tp_value);
 
-    for (i = 0; i < weights_biases->slice_num; i++)
+    for (i = 0; i < WB_TOTAL_SLICE_NUM(weights_biases); i++)
     {
         tp_value[i].e32[0] = 0; /* 0: FC, 1: Sum filter. */
         tp_value[i].u32[0] = kzgroup;
@@ -1018,13 +1023,13 @@ vx_status vxoFCOperationTP_Initialize(
         /* Advance to the next. */
         if ((i + 1) % kzgroup)
         {
-            kzoffset += weights_biases->slice_array[i].kz_count;
-            kzoffset2 += weights_biases->weights_sizes[3];
+            kzoffset += WB_KERNEL_Z_INDEX(weights_biases, i);
+            kzoffset2 += WB_OUTPUT_Z(weights_biases);
         }
         else
         {
             kzoffset = kzoffset2 = 0;
-            zoffset += weights_biases->slice_array[i].z_count;
+            zoffset += WB_OUTPUT_Z_INDEX(weights_biases, i);
         }
     }
 
@@ -1060,7 +1065,7 @@ vx_status vxoFCOperationTP_Initialize(
 
         tp_value->e32[0] = 1; /* 0: FC, 1: Sum filter. */
         tp_value->u32[0] = kzgroup;
-        tp_value->u32[1] = weights_biases->weights_sizes[3];
+        tp_value->u32[1] = WB_OUTPUT_Z(weights_biases);
 
         aux_operation->base.parameter.tp_value = tp_value;
         aux_operation->input = fc_outputs;
@@ -1295,8 +1300,8 @@ vx_status vxoFCOperationNN_Initialize(
             (*op_index)++);
 
         operation_sw->inputs = fc_inputs;
-        operation_sw->weights = weights_biases->wb_base->origWeight;
-        operation_sw->biases = weights_biases->wb_base->origBias;
+        operation_sw->weights = WB_WEIGHT_TENSOR(weights_biases);
+        operation_sw->biases = WB_BIAS_TENSOR(weights_biases);
         operation_sw->padX = padXLeft;
         operation_sw->padXRight = padXRight;
         operation_sw->padY = padYTop;
@@ -1309,8 +1314,8 @@ vx_status vxoFCOperationNN_Initialize(
         operation_sw->outputs = fc_outputs;
 
         vxnneOperation_AddReference(&operation_sw->base, (vx_reference)fc_inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&operation_sw->base, (vx_reference)weights_biases->wb_base->origWeight, VXNNE_OPERATION_REFENRENCE_INPUT);
-        vxnneOperation_AddReference(&operation_sw->base, (vx_reference)weights_biases->wb_base->origBias, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&operation_sw->base, (vx_reference)WB_WEIGHT_TENSOR(weights_biases), VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&operation_sw->base, (vx_reference)WB_BIAS_TENSOR(weights_biases), VXNNE_OPERATION_REFENRENCE_INPUT);
         vxnneOperation_AddReference(&operation_sw->base, (vx_reference)fc_outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
     }
     else
@@ -1323,7 +1328,7 @@ vx_status vxoFCOperationNN_Initialize(
                                              VX_NULL,
                                              VX_NULL,
                                              batch_count,
-                                             NNE_COMMAND_SIZE * weights_biases->slice_num));
+                                             NNE_COMMAND_SIZE * WB_TOTAL_SLICE_NUM(weights_biases)));
 
         op_param = &operation->base.parameter;
 

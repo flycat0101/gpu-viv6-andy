@@ -14,6 +14,8 @@
 #include <layers/gc_vx_layer_rnn.h>
 #include <ops/gc_vx_ops.h>
 #include <layers/gc_vx_layer_lstm.h>
+#include <gc_vx_nn_util.h>
+#include <gc_vx_nn_wb.h>
 
 #define NEW_LSTM_LAYER_PATH
 
@@ -683,6 +685,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoRNNLayer_Initializer(vx_node node, const
                 &rnnLayer->convolution_nn_convolution_operation0.base,
                 opt_index++);
 
+            vxoCompressNNFirstTime(context, weights_biases, stages[3]);
+
             rnnLayer->convolution_nn_convolution_operation0.inputs = stages[0];
             rnnLayer->convolution_nn_convolution_operation0.weights_biases = weights_biases;
             rnnLayer->convolution_nn_convolution_operation0.enable_relu = enable_relu;
@@ -1178,6 +1182,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
     vx_tensor  state_out = (vx_tensor)parameters[7];
     vx_tensor  outputs = (vx_tensor)parameters[8];
 
+    vx_context context = node->base.context;
     vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
     vx_enum    inputFormat = TENSOR_DATA_TYPE(inputs);
     vx_enum    outputFormat = TENSOR_DATA_TYPE(outputs);
@@ -1310,7 +1315,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
         else if (aligned64)
         {
             /* step1, input * weight_feature */
-            weights_biases_feature = _createWeightsBiasesParameterFromTensors(
+            weights_biases_feature = vxoCreateWeightsBiasesParameterFromTensors(
                 node->base.context,
                 VX_NN_FULLYCONNECTED_LAYER,
                 input_fc->dims,/*inputs_dims,*/
@@ -1363,7 +1368,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
 
             svdfLayer->base.temp_tensors[svdfLayer->base.num_temp_tensors++] = weights_feature_fc;
 
-            weights_biases_feature = _createWeightsBiasesParameterFromTensors(
+            weights_biases_feature = vxoCreateWeightsBiasesParameterFromTensors(
                 vxGetContext((vx_reference)node),
                 VX_NN_CONVOLUTION_LAYER,
                 input_fc->dims,/*inputs_dims,*/
@@ -1414,6 +1419,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
                 &svdfLayer->base,
                 &svdfLayer->svdf_nn_operation[0].base,
                 count++);
+
+            vxoCompressNNFirstTime(context, weights_biases_feature, output_feature);
 
             svdfLayer->svdf_nn_operation[0].orig_inputs = inputs;
             svdfLayer->svdf_nn_operation[0].inputs = input_fc;
@@ -1520,7 +1527,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
         }
         else if (aligned64)
         {
-            weights_biases = _createWeightsBiasesParameterFromTensors(
+            weights_biases = vxoCreateWeightsBiasesParameterFromTensors(
                 node->base.context,
                 VX_NN_FULLYCONNECTED_LAYER,
                 state_in->dims,/*inputs_dims,*/
@@ -1575,7 +1582,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
 
             svdfLayer->base.temp_tensors[svdfLayer->base.num_temp_tensors++] = output_fc;
 
-            weights_biases = _createWeightsBiasesParameterFromTensors(
+            weights_biases = vxoCreateWeightsBiasesParameterFromTensors(
                 vxGetContext((vx_reference)node),
                 VX_NN_CONVOLUTION_LAYER,
                 state_in_fc->dims,/*inputs_dims,*/
@@ -1626,6 +1633,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
                 &svdfLayer->base,
                 &svdfLayer->svdf_nn_operation[1].base,
                 count++);
+
+            vxoCompressNNFirstTime(context, weights_biases, output_fc);
 
             svdfLayer->svdf_nn_operation[1].orig_inputs = state_in;
             svdfLayer->svdf_nn_operation[1].inputs = state_in_fc;
@@ -3298,7 +3307,7 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
 
             if (weights_biases == VX_NULL)
             {
-                weights_biases = _createWeightsBiasesParameterFromTensors(
+                weights_biases = vxoCreateWeightsBiasesParameterFromTensors(
                     context,
                     VX_NN_FULLYCONNECTED_LAYER,
                     input_conv[i]->dims,/*inputs_dims,*/
@@ -3328,8 +3337,11 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
 
                 vxoTensor_ReleaseTensor(&weights_conv);
                 vxoTensor_ReleaseTensor(&biases_conv);
+
+                weights_biases->compress(weights_biases, VXNNE_OPERATION_TARGET_TP, 0, TENSOR_STRIDE_INDEX(output_conv[i], 2));
             }
-            kzgroup = weights_biases->weights_sizes[2] / weights_biases->slice_array[0].kz_count;
+
+            kzgroup = WB_KERNEL_Z(weights_biases) / WB_KERNEL_Z_INDEX(weights_biases, 0);
 
             status = vxnneOperation_Initialize(&lstmUnitNode->lstm_tp_fc_operation.base,
                 &lstmlayer->base,
@@ -3355,23 +3367,22 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
             conv.pad_mode = VX_PAD_CONSTANT;
             conv.pad_const = 0;
 
-            conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(weights_biases->slice_num * sizeof(vx_tp_value_cmd_s));
+            conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(WB_TOTAL_SLICE_NUM(weights_biases) * sizeof(vx_tp_value_cmd_s));
 
             if (kzgroup == 1)
             {
-
                 conv.tpType = TP_SINGLE_FC;
                 conv.other_ref = (vx_reference)weights_biases;
                 conv.data_buff = gcvNULL;
 
                 if (conv.tp_value != VX_NULL)
                 {
-                    for (s = 0; s < weights_biases->slice_num; s++)
+                    for (s = 0; s < WB_TOTAL_SLICE_NUM(weights_biases); s++)
                     {
                         values.u32[0] = kzgroup;
                         values.u32[1] = zoffset;
                         memcpy(&conv.tp_value[s], &values, sizeof(vx_tp_value_cmd_s));
-                        zoffset += weights_biases->slice_array[s].z_count;
+                        zoffset += WB_OUTPUT_Z_INDEX(weights_biases, s);
                     }
                 }
 
@@ -3400,7 +3411,7 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
             /* NN implement */
             if (weights_biases == VX_NULL)
             {
-                weights_biases = _createWeightsBiasesParameterFromTensors(
+                weights_biases = vxoCreateWeightsBiasesParameterFromTensors(
                     context,
                     VX_NN_CONVOLUTION_LAYER,
                     input_conv[i]->dims,/*inputs_dims,*/
@@ -3430,7 +3441,10 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
 
                 vxoTensor_ReleaseTensor(&weights_conv);
                 vxoTensor_ReleaseTensor(&biases_conv);
+
+                vxoCompressNNFirstTime(context, weights_biases, output_conv[i]);
             }
+
             status = vxnneOperation_Initialize(&lstmUnitNode->lstm_nn_operation.base,
                 &lstmlayer->base,
                 VXNNE_OPERATION_TARGET_NN,
@@ -6186,7 +6200,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMLayer_Initializer(vx_node node, c
                     else
                     {
                         vx_op_param_s conv = { 0 };
-                        weights_biases = _createWeightsBiasesParameterFromTensors(node->base.context, VX_NN_CONVOLUTION_LAYER, input_conv->dims, input_conv->dimCount, output_conv->dimCount,
+                        weights_biases = vxoCreateWeightsBiasesParameterFromTensors(node->base.context, VX_NN_CONVOLUTION_LAYER, input_conv->dims, input_conv->dimCount, output_conv->dimCount,
                             0, 0, 0, 0, 0, 0, 0, 0, VX_NN_DS_SIZE_ROUNDING_FLOOR, output_conv->dims, output_conv->dims, VX_NULL, TENSOR_DATA_TYPE(output_conv), 0, VX_TENSOR_RANK_WHCN,
                             weights_conv, bias, vx_false_e);
 
@@ -6197,7 +6211,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMLayer_Initializer(vx_node node, c
                             VX_NULL,
                             vxnneLSTMLayerNNOperation_Deinitialize,
                             batch,
-                            NNE_COMMAND_SIZE * weights_biases->slice_num);
+                            NNE_COMMAND_SIZE * WB_TOTAL_SLICE_NUM(weights_biases));
 
                         if (status != VX_SUCCESS) goto exit;
 
@@ -6207,6 +6221,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMLayer_Initializer(vx_node node, c
                             &lstmLayer->base,
                             &lstmLayer->lstm_nn_operation.base,
                             operationIndex++);
+
+                        vxoCompressNNFirstTime(context, weights_biases, output_conv);
 
                         lstmLayer->lstm_nn_operation.inputs = input_conv;
                         lstmLayer->lstm_nn_operation.orig_inputs = input_conv;
