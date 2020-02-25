@@ -449,6 +449,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSets(
                 dstResource->u.imageInfo.imageView = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImageView *, pWrite->pImageInfo[writeIndex].imageView);
                 dstResource->u.imageInfo.layout = pWrite->pImageInfo[writeIndex].imageLayout;
                 dstResource->type = __VK_DESC_RESOURCE_IMAGEVIEW_INFO;
+                dstResource->bUpdate = VK_TRUE;
                 break;
             case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
             case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
@@ -456,11 +457,13 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSets(
                 dstResource->u.imageInfo.imageView = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImageView *, pWrite->pImageInfo[writeIndex].imageView);
                 dstResource->u.imageInfo.layout = pWrite->pImageInfo[writeIndex].imageLayout;
                 dstResource->type = __VK_DESC_RESOURCE_IMAGEVIEW_INFO;
+                dstResource->bUpdate = VK_TRUE;
                 break;
             case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
             case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
                 dstResource->u.bufferView = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBufferView*, pWrite->pTexelBufferView[writeIndex]);
                 dstResource->type = __VK_DESC_RESOURCE_BUFFERVIEW_INFO;
+                dstResource->bUpdate = VK_TRUE;
                 break;
             case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
             case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
@@ -470,6 +473,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSets(
                 dstResource->u.bufferInfo.offset = pWrite->pBufferInfo[writeIndex].offset;
                 dstResource->u.bufferInfo.range = pWrite->pBufferInfo[writeIndex].range;
                 dstResource->type = __VK_DESC_RESOURCE_BUFFER_INFO;
+                dstResource->bUpdate = VK_TRUE;
                 break;
             default:
                 break;
@@ -553,6 +557,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSets(
                 __VK_MEMCOPY(dstSampler, srcSampler, sizeof(__vkSampler *) * pCopy->descriptorCount);
             }
             __VK_MEMCOPY(dstResource, srcResource, sizeof(__vkDescriptorResourceInfo) * pCopy->descriptorCount);
+            dstResource->bUpdate = VK_TRUE;
             break;
         case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
         case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
@@ -564,6 +569,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_UpdateDescriptorSets(
         case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
         case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
             __VK_MEMCOPY(dstResource, srcResource, sizeof(__vkDescriptorResourceInfo) * pCopy->descriptorCount);
+            dstResource->bUpdate = VK_TRUE;
             break;
         default:
             break;
