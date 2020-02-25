@@ -18,7 +18,6 @@
 #include <gc_vx_layer.h>
 #include <gc_vx_nn_util.h>
 
-#define IMG_MAX_WIDTH (65536)
 #define SHADER_THREAD_COUNT  (4)
 #define _vxcFILENAME_MAX 1024
 #define ALIGN_SIZE4 (4)

@@ -90,13 +90,44 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/ops/gc_vx_o
 
 # Layers
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_lstm.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_activation.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_conv.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_fc.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_adapter.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_batch_norm.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_concat.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_deconv.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_depthwise_conv.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_div.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_eltwise.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_rnn.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_hash_lut.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_l2norm.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_lrn.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_lsh_project.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_lut.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_pool.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_reduce_sum.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_reorg.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_roi_pool.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_rpn.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_tensor_mean.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_tensor_reshape.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_tensor_round.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_tensor_scale.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_tensor_squeeze.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_tensor_stride_slice.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_tensor_transpose.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_tensor_pad.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_softmax.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_tensor_copy.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/layers/gc_vx_layer_tensor_reverse.o
 
 # API
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_interface.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_extension_interface.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_internal_node_api.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_layer.o
-SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_lstm.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_gpu_layer.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_util.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_encoder.o

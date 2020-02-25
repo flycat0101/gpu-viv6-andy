@@ -91,7 +91,39 @@ OBJECTS         +=    \
 
 # Layers
 OBJECTS         +=    \
-                    $(OBJ_DIR)/gc_vx_layer_lstm.o
+                    $(OBJ_DIR)/gc_vx_layer_lstm.o \
+		    $(OBJ_DIR)/gc_vx_layer_activation.o \
+		    $(OBJ_DIR)/gc_vx_layer_conv.o \
+		    $(OBJ_DIR)/gc_vx_layer_fc.o \
+		   $(OBJ_DIR)/gc_vx_layer_adapter.o \
+					$(OBJ_DIR)/gc_vx_layer_batch_norm.o \
+					$(OBJ_DIR)/gc_vx_layer_concat.o \
+					$(OBJ_DIR)/gc_vx_layer_deconv.o \
+					$(OBJ_DIR)/gc_vx_layer_depthwise_conv.o \
+					$(OBJ_DIR)/gc_vx_layer_div.o \
+					$(OBJ_DIR)/gc_vx_layer_eltwise.o \
+					$(OBJ_DIR)/gc_vx_layer_rnn.o \
+					$(OBJ_DIR)/gc_vx_layer_hash_lut.o \
+					$(OBJ_DIR)/gc_vx_layer_l2norm.o \
+					$(OBJ_DIR)/gc_vx_layer_lrn.o \
+					$(OBJ_DIR)/gc_vx_layer_lsh_project.o \
+					$(OBJ_DIR)/gc_vx_layer_lut.o \
+					$(OBJ_DIR)/gc_vx_layer_pool.o \
+					$(OBJ_DIR)/gc_vx_layer_reduce_sum.o \
+					$(OBJ_DIR)/gc_vx_layer_reorg.o \
+					$(OBJ_DIR)/gc_vx_layer_roi_pool.o \
+					$(OBJ_DIR)/gc_vx_layer_rpn.o \
+					$(OBJ_DIR)/gc_vx_layer_tensor_mean.o \
+					$(OBJ_DIR)/gc_vx_layer_tensor_reshape.o \
+					$(OBJ_DIR)/gc_vx_layer_tensor_round.o \
+					$(OBJ_DIR)/gc_vx_layer_tensor_scale.o \
+					$(OBJ_DIR)/gc_vx_layer_tensor_squeeze.o \
+					$(OBJ_DIR)/gc_vx_layer_tensor_stride_slice.o \
+					$(OBJ_DIR)/gc_vx_layer_tensor_transpose.o \
+					$(OBJ_DIR)/gc_vx_layer_tensor_pad.o \
+					$(OBJ_DIR)/gc_vx_layer_softmax.o \
+					$(OBJ_DIR)/gc_vx_layer_tensor_copy.o \
+					$(OBJ_DIR)/gc_vx_layer_tensor_reverse.o \
 
 # API
 OBJECTS         +=    \
@@ -100,7 +132,6 @@ OBJECTS         +=    \
                     $(OBJ_DIR)/gc_vx_internal_node_api.o \
                     $(OBJ_DIR)/gc_vx_nn_util.o \
                     $(OBJ_DIR)/gc_vx_nn_encoder.o \
-                    $(OBJ_DIR)/gc_vx_lstm.o \
                     $(OBJ_DIR)/gc_vx_nn_command.o   \
 
 # Kernels
