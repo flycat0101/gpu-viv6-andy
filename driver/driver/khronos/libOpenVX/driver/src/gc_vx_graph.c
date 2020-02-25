@@ -1700,7 +1700,8 @@ VX_PRIVATE_API vx_bool SupportAB(
        && ((operation->target == VXNNE_OPERATION_TARGET_SH && operation->inputsNum <= VX_MAX_MEM_PARAM_INPUT && operation->outputsNum <= VX_MAX_MEM_PARAM_OUTPUT)
            || (operation->inputsNum == 1 && operation->outputsNum == 1))
        && operation->batchCount == 1
-       && TENSOR_SIZE_INDEX(opInfo.input, 3) == 1 && TENSOR_SIZE_INDEX(opInfo.output, 3) == 1
+       && (opInfo.input && opInfo.output)
+       && (TENSOR_SIZE_INDEX(opInfo.input, 3) == 1) && (TENSOR_SIZE_INDEX(opInfo.output, 3) == 1)
        )
     {
         /* AB buffer didn't support those TP 4d oprerations like dilation reshuffle & upsample*/

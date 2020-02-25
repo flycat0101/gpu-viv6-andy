@@ -2471,8 +2471,8 @@ vx_status vxnneOperation_GetInfo(vxnne_operation operation, vxnne_operation_info
     }
     else if (operation->target == VXNNE_OPERATION_TARGET_SH)
     {
-        info->input = operation->inputsNum > 0 ? (vx_tensor)operation->inputs[0] : (vx_tensor)VX_NULL;
-        info->output = operation->outputsNum > 0 ? (vx_tensor)operation->outputs[0] : (vx_tensor)VX_NULL;
+        info->input = operation->inputsNum > 0 ? ((operation->inputs[0]->type == VX_TYPE_TENSOR) ? (vx_tensor)operation->inputs[0] : (vx_tensor)VX_NULL) : (vx_tensor)VX_NULL;
+        info->output = operation->outputsNum > 0 ? ((operation->outputs[0]->type == VX_TYPE_TENSOR) ? (vx_tensor)operation->outputs[0] : (vx_tensor)VX_NULL) : (vx_tensor)VX_NULL;
 
         info->reshuffStrideX = 1;
         info->reshuffStrideY = 1;
