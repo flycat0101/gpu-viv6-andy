@@ -12,6 +12,21 @@ inline uchar* get_image2D_array_ptr(image2d_array_t  input)
     return src_ptr;
 }
 
+__kernel void gpuTensorCopyROI_FP32 (__read_only image2d_array_t  input,
+                                       __write_only image2d_array_t output,
+                                       int inputXOffset,
+                                       int inputYOffset,
+                                       int outputXOffset,
+                                       int outputYOffset
+                                       )
+{
+    int4 coord_in = (int4)(get_global_id(0) + inputXOffset, get_global_id(1) + inputYOffset, get_global_id(2), 0);
+    int4 coord_out = (int4)(get_global_id(0) + outputXOffset, get_global_id(1) + outputYOffset, get_global_id(2), 0);
+    float4 tmp = {0};
+    tmp = read_imagef(input, coord_in);
+    write_imagef(output, coord_out, tmp);
+}
+
 __kernel void gpuTensorCopyROI_Quant8 (__read_only image2d_array_t  input,
                                        __write_only image2d_array_t output,
                                        int inputXOffset,
@@ -94,8 +109,8 @@ __kernel void gpuTensorCopyROI_Quant8_Pad1_2D_x16
 }
 
 __kernel void gpuTensorCopyROI_Quant8_Pad1_x7 (__read_only image2d_array_t  input,
-                                       __write_only image2d_array_t output
-                                       )
+                                               __write_only image2d_array_t output
+                                              )
 {
     int4 coord_in   = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
     int4 coord_out  = (int4)(get_global_id(0) + 1, get_global_id(1) + 1, get_global_id(2), 0);
