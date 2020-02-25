@@ -1305,7 +1305,7 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
     vx_weight_bias_general_param_s weight_param, bias_param;
 
     vx_bool doDepthWise         = vx_false_e;
-    vx_bool reallyDo1xN         = do1xN;
+    vx_bool reallyDo1xN         = vx_false_e;
     vx_bool doZdpOpt            = vx_false_e;
 
     vx_bool nnSupportFormat = vxnneIsNNSupportFormat(context, weights, VX_NULL, VX_NULL);
@@ -1700,7 +1700,7 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
                                      -1,
                                      skipValue,
                                      doDepthWise,
-                                     reallyDo1xN,
+                                     do1xN,
                                      layer_type);
     if (status != VX_SUCCESS) goto exit;
 
