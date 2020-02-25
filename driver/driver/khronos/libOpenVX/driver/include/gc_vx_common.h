@@ -842,6 +842,15 @@ typedef enum
 }
 vx_multiVIP_reference_type_t;
 
+typedef enum
+{
+    VX_MULTIVIP_CONV_SPLIT_NONE = 0,
+    VX_MULTIVIP_CONV_SPLIT_Y_AXIS,
+    VX_MULTIVIP_CONV_SPLIT_Z_AXIS,
+    VX_MULTIVIP_CONV_SPLIT_END,
+}
+vx_multiVIP_conv_split_axis_t;
+
 typedef struct _vx_tp_coomandInfo_s
 {
     vx_uint32 inImageXSize;

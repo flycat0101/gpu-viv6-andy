@@ -4342,7 +4342,8 @@ VX_PRIVATE_API vx_status vxoMultiGPU_ComputeInputSize(
 
  VX_PRIVATE_API vx_uint32 vxoMultiGPU_ConvSplitCount(
     vxnne_operation operation,
-    vx_uint32 gpuCount
+    vx_uint32 gpuCount,
+    vx_uint32 *axis
     )
 {
     vx_uint32 inputY = 0, outputY = 0;
@@ -4352,6 +4353,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_ComputeInputSize(
     vxnne_convolution_relu_pooling_operation convOp = (vxnne_convolution_relu_pooling_operation)operation;
     vxnne_operation_info_s opInfo;
     vx_status status = VX_SUCCESS;
+    vx_uint32 splitAxis = VX_MULTIVIP_CONV_SPLIT_NONE;
 
     gcmHEADER_ARG("operation=%p, gpuCount=0x%x", operation, gpuCount);
     vxmASSERT(VXNNE_OPERATOR_CONVOLUTION == operation->operatorType);
@@ -4396,6 +4398,43 @@ VX_PRIVATE_API vx_status vxoMultiGPU_ComputeInputSize(
         }
     }
 
+    /* try split CONV on Z axis */
+    if (splitCount <= (gpuCount / 2))
+    {
+        vx_uint32 outputDim = 0;
+        vx_uint32 zSize = 0;
+
+        vxQueryTensor(convOp->outputs, VX_TENSOR_NUMBER_OF_DIMS, &outputDim, sizeof(outputDim));
+        if (outputDim >= 3)
+        {
+            zSize = TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 2); /* Z axis*/
+            if ((zSize / gpuCount) <= 1)
+            {
+                splitAxis = VX_MULTIVIP_CONV_SPLIT_NONE;
+                splitCount = 0;
+            }
+            else
+            {
+                splitAxis = VX_MULTIVIP_CONV_SPLIT_Z_AXIS;
+                splitCount = gpuCount;
+            }
+        }
+        else
+        {
+            splitAxis = VX_MULTIVIP_CONV_SPLIT_NONE;
+            splitCount = 0;
+        }
+    }
+    else
+    {
+        splitAxis = VX_MULTIVIP_CONV_SPLIT_Y_AXIS;
+    }
+
+    if (axis != VX_NULL)
+    {
+        *axis = splitAxis;
+    }
+
 OnError:
     gcmFOOTER_ARG("splitCount=0x%x", splitCount);
     return splitCount;
@@ -4404,7 +4443,8 @@ OnError:
 VX_PRIVATE_API vx_bool vxoMultiGPU_IsSupport(
     vxnne_operation operation,
     vx_uint32 gpuCount,
-    vx_uint32 *splitCount
+    vx_uint32 *splitCount,
+    vx_uint32 *splitAxis
 )
 {
     vx_status status = VX_SUCCESS;
@@ -4492,11 +4532,16 @@ VX_PRIVATE_API vx_bool vxoMultiGPU_IsSupport(
     }
     else if (VXNNE_OPERATOR_CONVOLUTION == operation->operatorType)
     {
-        vx_uint32 count = vxoMultiGPU_ConvSplitCount(operation, gpuCount);
+        vx_uint32 count = vxoMultiGPU_ConvSplitCount(operation, gpuCount, splitAxis);
         if (count > 1)
         {
             splitFlag = vx_true_e;
             *splitCount = count;
+        }
+        else
+        {
+            splitFlag = vx_false_e;
+            *splitCount = 0;
         }
     }
     else if (VXNNE_OPERATOR_YUV2RGB_SCALE == operation->operatorType)
@@ -4582,7 +4627,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_AllocateMemoryForOperations(
     for (i = 0; i < node->layer->num_operations; i++)
     {
         operation = node->layer->operations[i];
-        if (vxoMultiGPU_IsSupport(operation, gpuCount, &splitCount))
+        if (vxoMultiGPU_IsSupport(operation, gpuCount, &splitCount, VX_NULL))
         {
             if (VXNNE_OPERATION_TARGET_TP == operation->target)
             {
@@ -5075,6 +5120,211 @@ OnError:
     return status;
 }
 
+VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForCONV(
+    vx_node node,
+    vxnne_operation dstOperation,
+    vxnne_operation srcOperation,
+    vx_uint32 splitCount,
+    vx_uint32 gpuIndex
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_convolution_relu_pooling_operation srcConvOp = (vxnne_convolution_relu_pooling_operation)srcOperation;
+    vxnne_convolution_relu_pooling_operation dstConvOp = (vxnne_convolution_relu_pooling_operation)dstOperation;
+    vx_weights_biases_parameter weights_biases = srcConvOp->weights_biases;
+    vx_weights_biases_parameter newWeightBias = VX_NULL;
+    vx_weights_biases_parameter_optimizations_t optimizations;
+    vx_tensor_view outputView = VX_NULL, weightView = VX_NULL, biasView = VX_NULL;
+    vx_tensor outputTensor = VX_NULL, weightTensor = VX_NULL, biasTensor = VX_NULL;
+    vx_tensor origInputTensor = srcConvOp->inputs;
+    vx_tensor origOutputTensor = srcConvOp->outputs;
+    vx_uint32 outputDim = 0, inputDim = 0, weightDim = 0, biasDim = 0;
+    vx_uint32 outputSize = 0, newOutputSize = 0, outputResidue = 0;
+    vx_uint32 outputPreOp = 0, outputStart = 0, outputEnd = 0;
+    vx_uint32 outputSizeStart[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 outputSizeEnd[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 inputDims[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 outputDims[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 weightSizeStart[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 weightSizeEnd[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 biasSizeStart[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 biasSizeEnd[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 convOutputDims[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_tensor weight = VX_NULL, bias = VX_NULL;
+    vx_uint32 weightSplitAxis = 0, biasSplitAxis = 0;
+    vx_uint32 i = 0;
+    vx_uint32 splitAxisZ = 2; /* z-axis*/
+    vx_nn_convolution_relu_pooling_params_ext2_t params = {
+            {
+                    { 0, 0, 0, 0, 0, 0, 0,
+                      VX_CONVERT_POLICY_SATURATE,
+                      VX_ROUND_POLICY_TO_ZERO,
+                      VX_NN_DS_SIZE_ROUNDING_FLOOR,
+                      vx_false_e,
+                      0, 0, 0, VX_PAD_CONSTANT, 0
+                    },
+                    1, 1
+            },
+            0,
+            VX_TENSOR_RANK_WHCN,
+            0
+    };
+
+    vxmONERROR(vxQueryTensor(origOutputTensor, VX_TENSOR_DIMS, outputSizeEnd, sizeof(outputSizeEnd)));
+    vxmONERROR(vxQueryTensor(origOutputTensor, VX_TENSOR_NUMBER_OF_DIMS, &outputDim, sizeof(outputDim)));
+
+    if (outputDim < 3)
+    {
+        vxError("%s[%d]: not support split convolution\n", __FUNCTION__, __LINE__);
+        vxmASSERT(0);
+        vxmONERROR(VX_FAILURE);
+    }
+
+    outputSize = TENSOR_VIEW_SIZE_INDEX(origOutputTensor, splitAxisZ);
+    vxmASSERT(outputSize > splitCount);
+
+    outputPreOp = outputSize / splitCount;
+    outputResidue = outputSize % splitCount;
+    if (outputResidue > gpuIndex)
+    {
+        newOutputSize = outputPreOp + 1;
+        outputStart = gpuIndex * newOutputSize;
+    }
+    else
+    {
+        newOutputSize = outputPreOp;
+        outputStart = gpuIndex * outputPreOp + outputResidue;
+    }
+
+    outputEnd =  ((outputStart + newOutputSize) > outputSize) ? outputSize : (outputStart + newOutputSize);
+    outputSizeStart[splitAxisZ] = outputStart;
+    outputSizeEnd[splitAxisZ] = outputEnd;
+    vxmASSERT((outputEnd - outputStart) != 0);
+    outputView = vxCreateTensorView(node->base.context, outputSizeStart, outputSizeEnd, (vx_uint8)outputDim);
+    outputTensor  = vxoTensor_CreateTensorFromView(origOutputTensor, outputView);
+    if (outputView != VX_NULL) vxReleaseTensorView(&outputView);
+    dstOperation->references[VX_MULTIVIP_OUTPUT_TENSOR_REFERENCE] = (vx_reference)outputTensor;
+
+    /*2. split weight tensor*/
+    weightSplitAxis = splitAxisZ + 1;
+
+    weight = WB_WEIGHT_TENSOR(weights_biases);
+    bias   = WB_BIAS_TENSOR(weights_biases);
+
+    vxmONERROR(vxQueryTensor(weight, VX_TENSOR_NUMBER_OF_DIMS, &weightDim, sizeof(weightDim)));
+    vxmONERROR(vxQueryTensor(weight, VX_TENSOR_DIMS, weightSizeEnd, sizeof(weightSizeEnd)));
+
+    if (TENSOR_VIEW_SIZE_INDEX(weight, weightSplitAxis) != TENSOR_VIEW_SIZE_INDEX(origOutputTensor, splitAxisZ))
+    {
+        vxError("%s[%d]: not support split convolution\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_FAILURE);
+    }
+
+    weightSizeStart[weightSplitAxis] = outputStart;
+    weightSizeEnd[weightSplitAxis] = outputEnd;
+
+    weightView = vxCreateTensorView(node->base.context, weightSizeStart, weightSizeEnd, (vx_uint8)weightDim);
+    weightTensor  = vxoTensor_CreateTensorFromView(weight, weightView);
+    if (weightView != VX_NULL) vxReleaseTensorView(&weightView);
+    dstOperation->references[VX_MULTIVIP_WEIGHT_TENSOR_REFERENCE] = (vx_reference)weightTensor;
+
+    /*3. split bias tensor*/
+    if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 0))
+    {
+        biasSplitAxis = 0;
+    }
+    else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 1))
+    {
+        biasSplitAxis = 1;
+    }
+    else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 2))
+    {
+        biasSplitAxis = 2;
+    }
+    else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 3))
+    {
+        biasSplitAxis = 3;
+    }
+    else
+    {
+        vxmASSERT(0);
+    }
+    vxmASSERT(TENSOR_VIEW_SIZE_INDEX(bias, biasSplitAxis) == TENSOR_VIEW_SIZE_INDEX(origOutputTensor, splitAxisZ));
+    vxmONERROR(vxQueryTensor(bias, VX_TENSOR_DIMS, biasSizeEnd, sizeof(biasSizeEnd)));
+    vxmONERROR(vxQueryTensor(bias, VX_TENSOR_NUMBER_OF_DIMS, &biasDim, sizeof(biasDim)));
+    biasSizeStart[biasSplitAxis] = outputStart;
+    biasSizeEnd[biasSplitAxis] = outputEnd;
+    biasView = vxCreateTensorView(node->base.context, biasSizeStart, biasSizeEnd, (vx_uint8)biasDim);
+    biasTensor  = vxoTensor_CreateTensorFromView(bias, biasView);
+    if (biasView != VX_NULL) vxReleaseTensorView(&biasView);
+    dstOperation->references[VX_MULTIVIP_BIAS_TENSOR_REFERENCE] = (vx_reference)biasTensor;
+
+    /*4. create new vx weights biases parameter */
+    params.ext.base.pad_x_left = srcOperation->parameter.pad_x_left;
+    params.ext.base.pad_x_right = srcOperation->parameter.pad_x_right;
+    params.ext.base.pad_y_top = srcOperation->parameter.pad_y_top;
+    params.ext.base.pad_y_bottom = srcOperation->parameter.pad_y_bottom;
+    params.ext.base.down_scale_size_rounding = srcOperation->parameter.conv_rounding_type;
+    params.ext.base.pool_size_x = srcOperation->parameter.pool_size_x;
+    params.ext.base.pool_size_y = srcOperation->parameter.pool_size_y;
+    params.ext.base.pool_type = srcOperation->parameter.pool_type;
+    params.ext.stride_x = WB_STRIDE_X(weights_biases);
+    params.ext.stride_y = WB_STRIDE_Y(weights_biases);
+    params.convert_dst_format = TENSOR_DATA_TYPE(outputTensor);
+
+    optimizations.inputZeroPoint = WB_INPUT_ZP(weights_biases);
+    optimizations.zrl = WB_SET_ZERO_LENGTH(weights_biases);
+    optimizations.outputFormat = TENSOR_DATA_TYPE(outputTensor);
+
+    vxmONERROR(vxQueryTensor(origInputTensor, VX_TENSOR_DIMS, inputDims, sizeof(inputDims)));
+    vxmONERROR(vxQueryTensor(origInputTensor, VX_TENSOR_NUMBER_OF_DIMS, &inputDim, sizeof(inputDim)));
+    vxmONERROR(vxQueryTensor(outputTensor, VX_TENSOR_DIMS, outputDims, sizeof(outputDims)));
+    for (i = 0; i < 2; i++)
+    {
+        /* compute the value of convout x/y */
+        ComputeInputSize(outputDims[i],
+                         WB_KERNEL_Y(weights_biases),
+                         srcOperation->parameter.pad_y_top,
+                         srcOperation->parameter.pad_y_bottom,
+                         srcOperation->parameter.pool_size_y,
+                         srcOperation->parameter.pool_stride,
+                         &convOutputDims[i],
+                         1);
+    }
+    convOutputDims[2] = outputDims[2];
+    convOutputDims[3] = outputDims[3];
+
+    newWeightBias = vxCreateWeightsBiasesParameterFromTensors2(WB_ORG_LAYER_TYPE(weights_biases),
+                                                                inputDim,
+                                                                inputDims,
+                                                                convOutputDims,
+                                                                outputDims,
+                                                                TENSOR_DATA_TYPE(outputTensor),
+                                                                (vx_nn_convolution_relu_pooling_params)&params,
+                                                                sizeof(vx_nn_convolution_relu_pooling_params_ext2_t),
+                                                                (vx_weights_biases_parameter_optimizations_t*)&optimizations,
+                                                                weightTensor,
+                                                                biasTensor);
+    {
+        vx_uint32 zOffset = 0;
+        vx_uint32 dims[2] =  {TENSOR_VIEW_SIZE_INDEX(outputTensor, 0), TENSOR_VIEW_SIZE_INDEX(outputTensor, 1)};
+        calculateZOffset(dims, TENSOR_DATA_TYPE(outputTensor), 0, &zOffset);
+        newWeightBias->compress(newWeightBias, VXNNE_OPERATION_TARGET_TP, 0, zOffset);
+    }
+
+    vxmASSERT(newWeightBias != VX_NULL);
+    dstConvOp->weights_biases =  newWeightBias;
+    dstOperation->references[VX_MULTIVIP_WEIGHT_BIAS_PARAM_REFERENCE] = (vx_reference)newWeightBias;
+
+    dstOperation->inputs[0] = (vx_reference)origInputTensor;
+    dstOperation->outputs[0] = (vx_reference)outputTensor;
+    dstConvOp->inputs = origInputTensor;
+    dstConvOp->outputs = outputTensor;
+
+OnError:
+    return status;
+}
+
 VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForFC(
     vx_node node,
     vxnne_tp_operation dstOperation,
@@ -5146,7 +5396,8 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForFC(
     }
     else
     {
-        vxmASSERT(0);
+        vxError("%s[%d]: not support split FC\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_FAILURE);
     }
     outputSize = TENSOR_VIEW_SIZE_INDEX(output, outputSplitAxis);
     vxmASSERT(outputSize > splitCount);
@@ -5215,7 +5466,8 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForFC(
     }
     else
     {
-        vxmASSERT(0);
+        vxError("%s[%d]: not support split FC bias\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_FAILURE);
     }
     vxmASSERT(TENSOR_VIEW_SIZE_INDEX(bias, biasSplitAxis) == TENSOR_VIEW_SIZE_INDEX(output, outputSplitAxis));
     vxmONERROR(vxQueryTensor(bias, VX_TENSOR_DIMS, biasSizeEnd, sizeof(biasSizeEnd)));
@@ -5295,7 +5547,8 @@ VX_PRIVATE_API vx_status vxoMultiGPU_Handle(
     vxnne_execution_layer layer,
     vx_node node,
     vxnne_operation operation,
-    vx_uint32 splitCount
+    vx_uint32 splitCount,
+    vx_uint32 splitAxis
     )
 {
     vx_status status = VX_SUCCESS;
@@ -5353,11 +5606,27 @@ VX_PRIVATE_API vx_status vxoMultiGPU_Handle(
             {
                 vxnne_convolution_relu_pooling_operation nnOperation =  &node->mGpuNNOperation[node->mGpuNNOpCnt];
 
-                vxmONERROR(vxoMultiGPU_SplitInputOutput(node, &nnOperation->base,
-                                                     operation,
-                                                     &nnOperation->inputs,
-                                                     &nnOperation->outputs,
-                                                     splitCount, gpuIndex));
+                if (splitAxis == VX_MULTIVIP_CONV_SPLIT_Y_AXIS)
+                {
+                    vxmONERROR(vxoMultiGPU_SplitInputOutput(node, &nnOperation->base,
+                                                         operation,
+                                                         &nnOperation->inputs,
+                                                         &nnOperation->outputs,
+                                                         splitCount, gpuIndex));
+                }
+                else if (splitAxis == VX_MULTIVIP_CONV_SPLIT_Z_AXIS)
+                {
+                    vxmONERROR(vxoMultiGPU_SplitResourceForCONV(node, &nnOperation->base,
+                                                                operation,
+                                                                splitCount,
+                                                                gpuIndex));
+                }
+                else
+                {
+                    vxError("%s[%d]: not support split convolution\n", __FUNCTION__, __LINE__);
+                    vxmONERROR(VX_FAILURE);
+                }
+
                 layer->operations[layer->base.num_operations] = &nnOperation->base;
                 layer->operations[layer->base.num_operations]->gpuId = gpuIndex;
                 if (gpuIndex == 0)
@@ -5384,7 +5653,8 @@ VX_PRIVATE_API vx_status vxoMultiGPU_Handle(
             }
             else
             {
-                vxmASSERT(0);
+                vxError("%s[%d]: not support operation target %d\n", __FUNCTION__, __LINE__, operation->operatorType);
+                vxmONERROR(VX_FAILURE);
             }
             layer->operations[layer->base.num_operations-1]->mGpuNext = VX_NULL;
         }
@@ -6348,7 +6618,7 @@ VX_INTERNAL_API void vxoGraph_GenerateOperationTable(vx_graph graph)
         for (j = 0; j < node->layer->num_operations; j++)
         {
             if ((gpuCount > 1) && enableMultiVIPCombined &&
-                (vxoMultiGPU_IsSupport(node->layer->operations[j], gpuCount, &splitCount)))
+                (vxoMultiGPU_IsSupport(node->layer->operations[j], gpuCount, &splitCount, VX_NULL)))
             {
                 operationCount += splitCount;
             }
@@ -6373,6 +6643,7 @@ VX_INTERNAL_API void vxoGraph_GenerateOperationTable(vx_graph graph)
     {
         vx_node node = graph->nodeTable[graph->allNodeIndexTable[i]];
         vx_uint32 splitCount = 0;
+        vx_uint32 splitAxis = VX_MULTIVIP_CONV_SPLIT_NONE;
 
         if ((gpuCount > 1) && enableMultiVIPCombined)
         {
@@ -6382,9 +6653,9 @@ VX_INTERNAL_API void vxoGraph_GenerateOperationTable(vx_graph graph)
         for (j = 0; j < node->layer->num_operations; j++)
         {
             if ((gpuCount > 1) && enableMultiVIPCombined &&
-                (vxoMultiGPU_IsSupport(node->layer->operations[j], gpuCount, &splitCount)))
+                (vxoMultiGPU_IsSupport(node->layer->operations[j], gpuCount, &splitCount, &splitAxis)))
             {
-                vxoMultiGPU_Handle(layer, node, node->layer->operations[j], splitCount);
+                vxoMultiGPU_Handle(layer, node, node->layer->operations[j], splitCount, splitAxis);
             }
             else
             {
