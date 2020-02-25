@@ -4932,8 +4932,6 @@ _GetIntrinsicOrExtFunc(
             if (VIR_Inst_GetOpcode(inst) == VIR_OP_INTRINSIC)
             {
                 VIR_Operand *   src0 = VIR_Inst_GetSource(inst, 0);
-                VIR_Operand *   src1 = VIR_Inst_GetSource(inst, 1);
-                VIR_ParmPassing * parmOpnd = VIR_Operand_GetParameters(src1);
                 VIR_IntrinsicsKind ik = VIR_Operand_GetIntrinsicKind(src0);
 
                 /* For some cases, we need to update the intrinsic kind. */
@@ -4945,32 +4943,9 @@ _GetIntrinsicOrExtFunc(
                     }
                     else
                     {
-                        VIR_TypeId opndTypeId = VIR_Operand_GetTypeId(parmOpnd->args[0]);
-                        VIR_TypeId symTypeId = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(VIR_Operand_GetSymbol(parmOpnd->args[0])));
-                        /*
-                        ** The source of image_fetch can be a image or a sampler:
-                        ** 1) If it is a image, we convert it to a image_load.
-                        ** 2) If it is a sampler, we convert it to a image_fetch_for_sampler.
-                        */
-                        if (VIR_Intrinsics_isImageFetch(ik))
-                        {
-                            if (VIR_TypeId_isSampler(opndTypeId) || VIR_TypeId_isSampler(symTypeId))
-                            {
-                                ik = VIR_IK_image_fetch_for_sampler;
-                            }
-                            else
-                            {
-                                ik = VIR_IK_image_load;
-                            }
-                            VIR_Operand_SetIntrinsicKind(src0, ik);
-                        }
-                        /* if the source of image_query_size is samplerMS */
-                        if (VIR_Intrinsics_isImageQuerySize(ik)
-                            && VIR_TypeId_isSamplerMS(opndTypeId))
-                        {
-                            ik = VIR_IK_image_query_size_for_sampler;
-                            VIR_Operand_SetIntrinsicKind(src0, ik);
-                        }
+                        /* We need to modify the intrinsic kind based on the parameter operands. */
+                        ik = VIR_Intrinsic_GetFinalIntrinsicKind(inst);
+                        VIR_Operand_SetIntrinsicKind(src0, ik);
                     }
                 }
 

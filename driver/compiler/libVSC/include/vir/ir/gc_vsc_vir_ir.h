@@ -8120,6 +8120,12 @@ VIR_ImageFormat_GetComponentTypeId(
     IN VIR_ImageFormat              imageFormat
     );
 
+/* Intrinsic instruction related. */
+VIR_IntrinsicsKind
+VIR_Intrinsic_GetFinalIntrinsicKind(
+    IN VIR_Instruction*             pIntrinsicInst
+    );
+
 END_EXTERN_C()
 
 #endif /* __gc_vsc_vir_ir_h_ */

@@ -19422,3 +19422,39 @@ VIR_ImageFormat_GetComponentTypeId(
     return componentTypeId;
 }
 
+/* Intrinsic instruction related. */
+VIR_IntrinsicsKind
+VIR_Intrinsic_GetFinalIntrinsicKind(
+    IN VIR_Instruction*             pIntrinsicInst
+    )
+{
+    VIR_IntrinsicsKind              intrinsicKind = VIR_Operand_GetIntrinsicKind(VIR_Inst_GetSource(pIntrinsicInst, 0));
+    VIR_ParmPassing*                pParmOpnd = VIR_Operand_GetParameters(VIR_Inst_GetSource(pIntrinsicInst, 1));
+    VIR_TypeId                      opndTypeId = VIR_Operand_GetTypeId(pParmOpnd->args[0]);
+    VIR_TypeId                      symTypeId = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(VIR_Operand_GetSymbol(pParmOpnd->args[0])));
+
+    /*
+    ** The source of image_fetch can be a image or a sampler:
+    ** 1) If it is a image, we convert it to a image_load.
+    ** 2) If it is a sampler, we convert it to a image_fetch_for_sampler.
+    */
+    if (VIR_Intrinsics_isImageFetch(intrinsicKind))
+    {
+        if (VIR_TypeId_isSampler(opndTypeId) || VIR_TypeId_isSampler(symTypeId))
+        {
+            intrinsicKind = VIR_IK_image_fetch_for_sampler;
+        }
+        else
+        {
+            intrinsicKind = VIR_IK_image_load;
+        }
+    }
+    /* if the source of image_query_size is samplerMS */
+    else if (VIR_Intrinsics_isImageQuerySize(intrinsicKind) && VIR_TypeId_isSamplerMS(opndTypeId))
+    {
+        intrinsicKind = VIR_IK_image_query_size_for_sampler;
+    }
+
+    return intrinsicKind;
+}
+
