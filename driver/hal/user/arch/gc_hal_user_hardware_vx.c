@@ -2938,6 +2938,114 @@ gcoHARDWAREVX_SetInstructionType(
 }
 
 gceSTATUS
+gcoHARDWAREVX_IsEndOfBB(
+    IN gctUINT32                            Opcode,
+    OUT gcoVX_Instruction                   *Instruction
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Opcode=0x%x", Opcode);
+
+    if (Instruction != NULL)
+    {
+        gcoHARDWARE Hardware = NULL;
+        gcmGETHARDWARE(Hardware);
+
+
+
+        if (Hardware->features[gcvFEATURE_SH_END_OF_BB])
+        {
+            switch (Opcode)
+            {
+            case 0x09:
+            case 0x56:
+            case 0x0A:
+            case 0x0B:
+            case 0x0F:
+            case 0x31:
+            case 0x10:
+                Instruction->binary[1] = (((gctUINT32)(Instruction->binary[1]) & ~((gctUINT32)(((((1 ?
+ 10:3) - (0 ?
+ 10:3) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:3) - (0 ?
+ 10:3) + 1))))) << (0 ?
+ 10:3))) | ((gctUINT32)((gctUINT32)(SETBITS(Instruction->binary[1], 3, 3, 1)) & ((((1 ?
+ 10:3) - (0 ?
+ 10:3) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:3) - (0 ? 10:3) + 1))))) << (0 ? 10:3)));
+                break;
+            case 0x65:
+            case 0x66:
+            case 0x67:
+            case 0x68:
+            case 0x69:
+            case 0x6A:
+            case 0x6B:
+            case 0x6C:
+            case 0x46:
+                Instruction->binary[0] = (((gctUINT32)(Instruction->binary[0]) & ~((gctUINT32)(((((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1))))) << (0 ?
+ 10:6))) | ((gctUINT32)((gctUINT32)(SETBITS(Instruction->binary[0], 2, 2, 1)) & ((((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:6) - (0 ? 10:6) + 1))))) << (0 ? 10:6)));
+                break;
+            case 0x32:
+            case 0x39:
+            case 0x33:
+            case 0x3A:
+            case 0x79:
+            case 0x34:
+            case 0x7A:
+            case 0x35:
+                Instruction->binary[0] = (((gctUINT32)(Instruction->binary[0]) & ~((gctUINT32)(((((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1))))) << (0 ?
+ 10:6))) | ((gctUINT32)((gctUINT32)(SETBITS(Instruction->binary[0], 2, 2, 1)) & ((((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:6) - (0 ? 10:6) + 1))))) << (0 ? 10:6)));
+                break;
+            default:
+                if (Opcode != 0x16 &&
+                    Opcode != 0x24 &&
+                    Opcode != 0x14 &&
+                    Opcode != 0x15 &&
+                    Opcode != 0x17)
+                    Instruction->binary[0] = (((gctUINT32)(Instruction->binary[0]) & ~((gctUINT32)(((((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1))))) << (0 ?
+ 10:6))) | ((gctUINT32)((gctUINT32)(SETBITS(Instruction->binary[0], 2, 2, 1)) & ((((1 ?
+ 10:6) - (0 ?
+ 10:6) + 1) == 32) ?
+ ~0 : (gctUINT32)(~((gctUINT64)(~0) << ((1 ?
+ 10:6) - (0 ? 10:6) + 1))))) << (0 ? 10:6)));
+                break;
+            }
+        }
+    }
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcoHARDWAREVX_AddOpcode(
     IN gctUINT32                            Opcode,
     IN gctUINT32                            Extended,
@@ -3008,6 +3116,8 @@ gcoHARDWAREVX_AddOpcode(
 
     if((gctUINT32)Type != GCREG_SH_INSTRUCTION_TYPE_INVALID)
         gcmONERROR(gcoHARDWAREVX_SetInstructionType(Type, Instruction));
+
+    gcmONERROR(gcoHARDWAREVX_IsEndOfBB(Opcode, Instruction));
 
 OnError:
     /* Return the status. */
