@@ -1147,7 +1147,6 @@ VX_PRIVATE_API vx_status vxoNNLeakyReluLayer_SH_EVIS_Initialize_Ext(vxnne_layer 
         shaderExecutable));
 
     vxmONERROR(vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)negative_slopes, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&activationLayer->activation_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
     vxmONERROR(vxnneLayer_SetOperation(
