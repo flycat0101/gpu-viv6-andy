@@ -61,7 +61,7 @@ vx_status vxChannelCombine(vx_node node, vx_image inputs[4], vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
             kernelContext->uniforms[0].index = 4;
-            kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData);
             kernelContext->uniform_num = 1;
             kernelContext->params.outputFormat = gcvSURF_R8G8B8;
             kernelContext->params.xstep = 4;
@@ -84,7 +84,7 @@ vx_status vxChannelCombine(vx_node node, vx_image inputs[4], vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
             kernelContext->uniforms[0].index = 5;
-            kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData);
             kernelContext->uniform_num = 1;
             kernelContext->params.outputFormat = gcvSURF_X8R8G8B8;
             kernelContext->params.xstep = 4;
@@ -104,7 +104,7 @@ vx_status vxChannelCombine(vx_node node, vx_image inputs[4], vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
             kernelContext->uniforms[0].index = 4;
-            kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData);
             kernelContext->uniform_num = 1;
             kernelContext->params.outputFormat = gcvSURF_UYVY;
             kernelContext->params.xstep = 8;
@@ -124,7 +124,7 @@ vx_status vxChannelCombine(vx_node node, vx_image inputs[4], vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
             kernelContext->uniforms[0].index = 4;
-            kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData);
             kernelContext->uniform_num = 1;
 
             kernelContext->params.outputFormat = gcvSURF_YUY2;
@@ -145,7 +145,7 @@ vx_status vxChannelCombine(vx_node node, vx_image inputs[4], vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
             kernelContext->uniforms[0].index = 5;
-            kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData);
             kernelContext->uniform_num = 1;
             kernelContext->params.outputFormat = gcvSURF_NV12;
             kernelContext->params.xstep = 16;
@@ -165,7 +165,7 @@ vx_status vxChannelCombine(vx_node node, vx_image inputs[4], vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
             kernelContext->uniforms[0].index = 5;
-            kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData);
             kernelContext->uniform_num = 1;
             kernelContext->params.outputFormat = gcvSURF_NV21;
             kernelContext->params.xstep = 16;
@@ -539,7 +539,7 @@ vx_status vxChannelExtract(vx_node node, vx_image src, vx_scalar channel, vx_ima
 
     gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
     kernelContext->uniforms[0].index = 4;
-    kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint8);
+    kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData);
     kernelContext->uniform_num = 1;
 
 #if gcdVX_OPTIMIZER

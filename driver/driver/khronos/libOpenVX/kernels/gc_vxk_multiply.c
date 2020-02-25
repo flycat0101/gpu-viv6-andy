@@ -120,14 +120,14 @@ vx_status vxMultiply(vx_node node, vx_image in0, vx_image in1, vx_scalar scale_p
         {
             vx_uint8 constantData[16] = {0, 32, 64, 96, 0, 0, 0, 0, 16, 16, 16, 16, 0, 0, 0, 0};
             gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, constantData, sizeof(constantData));
-            kernelContext->uniforms[kernelContext->uniform_num].num = sizeof(constantData) / sizeof(vx_uint8);
+            kernelContext->uniforms[kernelContext->uniform_num].num = vxmLENGTH_OF(constantData);
             kernelContext->uniforms[kernelContext->uniform_num++].index = 4;
         }
         else
         {
             vx_uint8 constantData[16] = {0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0};
             gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, constantData, sizeof(constantData));
-            kernelContext->uniforms[kernelContext->uniform_num].num = sizeof(constantData) / sizeof(vx_uint8);
+            kernelContext->uniforms[kernelContext->uniform_num].num = vxmLENGTH_OF(constantData);
             kernelContext->uniforms[kernelContext->uniform_num++].index = 4;
         }
 

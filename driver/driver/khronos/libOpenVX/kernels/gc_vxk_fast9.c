@@ -154,13 +154,13 @@ vx_status vxViv_Fast9Corners_Strength(vx_node node, vx_image src, vx_scalar t, v
 
     if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noIAdd || node->base.context->evisNoInst.noFilter || node->base.context->evisNoInst.noAbsDiff)
     {
-        indexNum = sizeof(indexs_halfevis)/sizeof(indexs_halfevis[0]);
+        indexNum = vxmLENGTH_OF(indexs_halfevis);
         indexData = (gcoVX_Index *)vxAllocate(sizeof(gcoVX_Index) * indexNum);
         vxMemCopy(indexData, indexs_halfevis, sizeof(gcoVX_Index) * indexNum);
     }
     else
     {
-        indexNum = sizeof(indexs)/sizeof(indexs[0]);
+        indexNum = vxmLENGTH_OF(indexs);
         indexData = (gcoVX_Index *)vxAllocate(sizeof(gcoVX_Index) * indexNum);
         vxMemCopy(indexData, indexs, sizeof(gcoVX_Index) * indexNum);
     }
@@ -314,7 +314,7 @@ vx_status vxViv_Fast9Corners_NonMax(vx_node node, vx_image src, vx_scalar t, vx_
     kernelContext->params.row      = (vx_uint8)toleranceValue;;
     kernelContext->params.col      = isDoNonmax;;
     kernelContext->params.xstep    = 1;
-    kernelContext->uniform_num     = sizeof(indexs)/sizeof(indexs[0]);
+    kernelContext->uniform_num     = vxmLENGTH_OF(indexs);
 
     for(i = 0; i < kernelContext->uniform_num; i++)
     {

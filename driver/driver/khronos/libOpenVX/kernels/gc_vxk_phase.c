@@ -58,7 +58,7 @@ vx_status vxPhase(vx_node node, vx_image grad_x, vx_image grad_y, vx_image outpu
 
         gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
         kernelContext->uniforms[0].index = 3;
-        kernelContext->uniforms[0].num = sizeof(bin) / sizeof(vx_uint8);
+        kernelContext->uniforms[0].num = vxmLENGTH_OF(bin);
         kernelContext->uniform_num = 1;
 
         kernelContext->params.evisNoInst = node->base.context->evisNoInst;
@@ -152,7 +152,7 @@ vx_status vxPhase_F16(vx_node node, vx_image grad_x, vx_image grad_y, vx_image o
 
         gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
         kernelContext->uniforms[0].index = 3;
-        kernelContext->uniforms[0].num = sizeof(bin) / sizeof(vx_uint8);
+        kernelContext->uniforms[0].num = vxmLENGTH_OF(bin);
         kernelContext->uniform_num = 1;
 
         gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, dp_fp16tofp32, sizeof(dp_fp16tofp32));

@@ -70,11 +70,11 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData1, sizeof(constantData1));
             kernelContext->uniforms[0].index = 4;
-            kernelContext->uniforms[0].num = sizeof(constantData1) / sizeof(vx_uint32);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData1);
 
             gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData2, sizeof(constantData2));
             kernelContext->uniforms[1].index = 5;
-            kernelContext->uniforms[1].num = sizeof(constantData2) / sizeof(vx_uint8);
+            kernelContext->uniforms[1].num = vxmLENGTH_OF(constantData2);
 
             kernelContext->uniform_num = 2;
         }
@@ -117,35 +117,35 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
             kernelContext->uniforms[0].index = 4;
-            kernelContext->uniforms[0].num = sizeof(constantData) / sizeof(vx_uint8);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData);
 
             gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData1, sizeof(constantData1));
             kernelContext->uniforms[1].index = 5;
-            kernelContext->uniforms[1].num = sizeof(constantData1) / sizeof(vx_float32);
+            kernelContext->uniforms[1].num = vxmLENGTH_OF(constantData1);
 
             gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, constantData2, sizeof(constantData2));
             kernelContext->uniforms[2].index = 6;
-            kernelContext->uniforms[2].num = sizeof(constantData2) / sizeof(vx_float32);
+            kernelContext->uniforms[2].num = vxmLENGTH_OF(constantData2);
 
             gcoOS_MemCopy(&kernelContext->uniforms[3].uniform, constantData3, sizeof(constantData3));
             kernelContext->uniforms[3].index = 7;
-            kernelContext->uniforms[3].num = sizeof(constantData3) / sizeof(vx_float32);
+            kernelContext->uniforms[3].num = vxmLENGTH_OF(constantData3);
 
             gcoOS_MemCopy(&kernelContext->uniforms[4].uniform, constantData4, sizeof(constantData4));
             kernelContext->uniforms[4].index = 8;
-            kernelContext->uniforms[4].num = sizeof(constantData4) / sizeof(vx_uint8);
+            kernelContext->uniforms[4].num = vxmLENGTH_OF(constantData4);
 
             gcoOS_MemCopy(&kernelContext->uniforms[5].uniform, constantData5, sizeof(constantData5));
             kernelContext->uniforms[5].index = 9;
-            kernelContext->uniforms[5].num = sizeof(constantData5) / sizeof(vx_uint8);
+            kernelContext->uniforms[5].num = vxmLENGTH_OF(constantData5);
 
             gcoOS_MemCopy(&kernelContext->uniforms[6].uniform, constantData6, sizeof(constantData6));
             kernelContext->uniforms[6].index = 10;
-            kernelContext->uniforms[6].num = sizeof(constantData6) / sizeof(vx_uint8);
+            kernelContext->uniforms[6].num = vxmLENGTH_OF(constantData6);
 
             gcoOS_MemCopy(&kernelContext->uniforms[7].uniform, constantData7, sizeof(constantData7));
             kernelContext->uniforms[7].index = 11;
-            kernelContext->uniforms[7].num = sizeof(constantData7) / sizeof(vx_uint8);
+            kernelContext->uniforms[7].num = vxmLENGTH_OF(constantData7);
 
             kernelContext->uniform_num = 8;
         }
@@ -172,11 +172,11 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData0, sizeof(constantData0));
             kernelContext->uniforms[0].index = 4;
-            kernelContext->uniforms[0].num = sizeof(constantData0) / sizeof(vx_uint8);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData0);
 
             gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData1, sizeof(constantData1));
             kernelContext->uniforms[1].index = 5;
-            kernelContext->uniforms[1].num = sizeof(constantData1) / sizeof(vx_uint8);
+            kernelContext->uniforms[1].num = vxmLENGTH_OF(constantData1);
 
             kernelContext->uniform_num = 2;
         }
@@ -214,19 +214,19 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData0, sizeof(constantData0));
             kernelContext->uniforms[0].index = 4;
-            kernelContext->uniforms[0].num = sizeof(constantData0) / sizeof(vx_uint32);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData0);
 
             gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData1, sizeof(constantData1));
             kernelContext->uniforms[1].index = 5;
-            kernelContext->uniforms[1].num = sizeof(constantData1) / sizeof(vx_float32);
+            kernelContext->uniforms[1].num = vxmLENGTH_OF(constantData1);
 
             gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, constantData2, sizeof(constantData2));
             kernelContext->uniforms[2].index = 6;
-            kernelContext->uniforms[2].num = sizeof(constantData2) / sizeof(vx_float32);
+            kernelContext->uniforms[2].num = vxmLENGTH_OF(constantData2);
 
             gcoOS_MemCopy(&kernelContext->uniforms[3].uniform, constantData3, sizeof(constantData3));
             kernelContext->uniforms[3].index = 7;
-            kernelContext->uniforms[3].num = sizeof(constantData3) / sizeof(vx_float32);
+            kernelContext->uniforms[3].num = vxmLENGTH_OF(constantData3);
 
             kernelContext->uniform_num = 4;
         }
@@ -290,31 +290,31 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData0, sizeof(constantData0));
             kernelContext->uniforms[0].index = 4;
-            kernelContext->uniforms[0].num = sizeof(constantData0) / sizeof(vx_uint8);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData0);
 
             gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData1, sizeof(constantData1));
             kernelContext->uniforms[1].index = 5;
-            kernelContext->uniforms[1].num = sizeof(constantData1) / sizeof(vx_float32);
+            kernelContext->uniforms[1].num = vxmLENGTH_OF(constantData1);
 
             gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, constantData2, sizeof(constantData2));
             kernelContext->uniforms[2].index = 6;
-            kernelContext->uniforms[2].num = sizeof(constantData2) / sizeof(vx_float32);
+            kernelContext->uniforms[2].num = vxmLENGTH_OF(constantData2);
 
             gcoOS_MemCopy(&kernelContext->uniforms[3].uniform, constantData3, sizeof(constantData3));
             kernelContext->uniforms[3].index = 7;
-            kernelContext->uniforms[3].num = sizeof(constantData3) / sizeof(vx_float32);
+            kernelContext->uniforms[3].num = vxmLENGTH_OF(constantData3);
 
             gcoOS_MemCopy(&kernelContext->uniforms[4].uniform, constantData4, sizeof(constantData4));
             kernelContext->uniforms[4].index = 8;
-            kernelContext->uniforms[4].num = sizeof(constantData4) / sizeof(vx_uint8);
+            kernelContext->uniforms[4].num = vxmLENGTH_OF(constantData4);
 
             gcoOS_MemCopy(&kernelContext->uniforms[5].uniform, constantData5, sizeof(constantData5));
             kernelContext->uniforms[5].index = 9;
-            kernelContext->uniforms[5].num = sizeof(constantData5) / sizeof(vx_uint8);
+            kernelContext->uniforms[5].num = vxmLENGTH_OF(constantData5);
 
             gcoOS_MemCopy(&kernelContext->uniforms[6].uniform, constantData6, sizeof(constantData6));
             kernelContext->uniforms[6].index = 10;
-            kernelContext->uniforms[6].num = sizeof(constantData6) / sizeof(vx_uint8);
+            kernelContext->uniforms[6].num = vxmLENGTH_OF(constantData6);
 
             if (outputFormat == VX_DF_IMAGE_RGBX)
             {
@@ -325,11 +325,11 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
             {
                 gcoOS_MemCopy(&kernelContext->uniforms[7].uniform, constantData7, sizeof(constantData7));
                 kernelContext->uniforms[7].index = 11;
-                kernelContext->uniforms[7].num = sizeof(constantData7) / sizeof(vx_uint8);
+                kernelContext->uniforms[7].num = vxmLENGTH_OF(constantData7);
 
                 gcoOS_MemCopy(&kernelContext->uniforms[8].uniform, constantData8, sizeof(constantData8));
                 kernelContext->uniforms[8].index = 12;
-                kernelContext->uniforms[8].num = sizeof(constantData8) / sizeof(vx_uint8);
+                kernelContext->uniforms[8].num = vxmLENGTH_OF(constantData8);
 
                 kernelContext->uniform_num = 9;
 
@@ -393,19 +393,19 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData0, sizeof(constantData0));
             kernelContext->uniforms[0].index = 4;
-            kernelContext->uniforms[0].num = sizeof(constantData0) / sizeof(vx_uint8);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData0);
 
             gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData1, sizeof(constantData1));
             kernelContext->uniforms[1].index = 5;
-            kernelContext->uniforms[1].num = sizeof(constantData1) / sizeof(vx_uint8);
+            kernelContext->uniforms[1].num = vxmLENGTH_OF(constantData1);
 
             gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, constantData2, sizeof(constantData2));
             kernelContext->uniforms[2].index = 6;
-            kernelContext->uniforms[2].num = sizeof(constantData2) / sizeof(vx_uint8);
+            kernelContext->uniforms[2].num = vxmLENGTH_OF(constantData2);
 
             gcoOS_MemCopy(&kernelContext->uniforms[3].uniform, constantData3, sizeof(constantData3));
             kernelContext->uniforms[3].index = 7;
-            kernelContext->uniforms[3].num = sizeof(constantData3) / sizeof(vx_uint8);
+            kernelContext->uniforms[3].num = vxmLENGTH_OF(constantData3);
 
             if (outputFormat == VX_DF_IMAGE_NV12)
             {
@@ -415,7 +415,7 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
             {
                 gcoOS_MemCopy(&kernelContext->uniforms[4].uniform, constantData4, sizeof(constantData4));
                 kernelContext->uniforms[4].index = 8;
-                kernelContext->uniforms[4].num = sizeof(constantData4) / sizeof(vx_uint8);
+                kernelContext->uniforms[4].num = vxmLENGTH_OF(constantData4);
 
                 kernelContext->uniform_num = 5;
             }
@@ -467,11 +467,11 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData0, sizeof(constantData0));
             kernelContext->uniforms[0].index = 6;
-            kernelContext->uniforms[0].num = sizeof(constantData0) / sizeof(vx_uint8);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData0);
 
             gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData1, sizeof(constantData1));
             kernelContext->uniforms[1].index = 7;
-            kernelContext->uniforms[1].num = sizeof(constantData1) / sizeof(vx_uint8);
+            kernelContext->uniforms[1].num = vxmLENGTH_OF(constantData1);
 
             kernelContext->uniform_num = 2;
         }
@@ -499,23 +499,23 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData0, sizeof(constantData0));
             kernelContext->uniforms[0].index = 4;
-            kernelContext->uniforms[0].num = sizeof(constantData0) / sizeof(vx_uint32);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData0);
 
             gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData1, sizeof(constantData1));
             kernelContext->uniforms[1].index = 5;
-            kernelContext->uniforms[1].num = sizeof(constantData1) / sizeof(vx_float32);
+            kernelContext->uniforms[1].num = vxmLENGTH_OF(constantData1);
 
             gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, constantData2, sizeof(constantData2));
             kernelContext->uniforms[2].index = 6;
-            kernelContext->uniforms[2].num = sizeof(constantData2) / sizeof(vx_float32);
+            kernelContext->uniforms[2].num = vxmLENGTH_OF(constantData2);
 
             gcoOS_MemCopy(&kernelContext->uniforms[3].uniform, constantData3, sizeof(constantData3));
             kernelContext->uniforms[3].index = 7;
-            kernelContext->uniforms[3].num = sizeof(constantData3) / sizeof(vx_float32);
+            kernelContext->uniforms[3].num = vxmLENGTH_OF(constantData3);
 
             gcoOS_MemCopy(&kernelContext->uniforms[4].uniform, constantData4, sizeof(constantData4));
             kernelContext->uniforms[4].index = 8;
-            kernelContext->uniforms[4].num = sizeof(constantData4) / sizeof(vx_uint8);
+            kernelContext->uniforms[4].num = vxmLENGTH_OF(constantData4);
 
             if (outputFormat == VX_DF_IMAGE_RGBX)
             {
@@ -526,11 +526,11 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
             {
                 gcoOS_MemCopy(&kernelContext->uniforms[5].uniform, constantData5, sizeof(constantData5));
                 kernelContext->uniforms[5].index = 9;
-                kernelContext->uniforms[5].num = sizeof(constantData5) / sizeof(vx_uint8);
+                kernelContext->uniforms[5].num = vxmLENGTH_OF(constantData5);
 
                 gcoOS_MemCopy(&kernelContext->uniforms[6].uniform, constantData6, sizeof(constantData6));
                 kernelContext->uniforms[6].index = 10;
-                kernelContext->uniforms[6].num = sizeof(constantData6) / sizeof(vx_uint8);
+                kernelContext->uniforms[6].num = vxmLENGTH_OF(constantData6);
 
                 kernelContext->uniform_num = 7;
                 kernelContext->params.outputMultipleWidth = 3;
@@ -571,23 +571,23 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData0, sizeof(constantData0));
             kernelContext->uniforms[0].index = 4;
-            kernelContext->uniforms[0].num = sizeof(constantData0) / sizeof(vx_uint32);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData0);
 
             gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData1, sizeof(constantData1));
             kernelContext->uniforms[1].index = 5;
-            kernelContext->uniforms[1].num = sizeof(constantData1) / sizeof(vx_float32);
+            kernelContext->uniforms[1].num = vxmLENGTH_OF(constantData1);
 
             gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, constantData2, sizeof(constantData2));
             kernelContext->uniforms[2].index = 6;
-            kernelContext->uniforms[2].num = sizeof(constantData2) / sizeof(vx_float32);
+            kernelContext->uniforms[2].num = vxmLENGTH_OF(constantData2);
 
             gcoOS_MemCopy(&kernelContext->uniforms[3].uniform, constantData3, sizeof(constantData3));
             kernelContext->uniforms[3].index = 7;
-            kernelContext->uniforms[3].num = sizeof(constantData3) / sizeof(vx_float32);
+            kernelContext->uniforms[3].num = vxmLENGTH_OF(constantData3);
 
             gcoOS_MemCopy(&kernelContext->uniforms[4].uniform, constantData4, sizeof(constantData4));
             kernelContext->uniforms[4].index = 8;
-            kernelContext->uniforms[4].num = sizeof(constantData4) / sizeof(vx_uint8);
+            kernelContext->uniforms[4].num = vxmLENGTH_OF(constantData4);
 
             if (outputFormat == VX_DF_IMAGE_RGBX)
             {
@@ -598,11 +598,11 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
             {
                 gcoOS_MemCopy(&kernelContext->uniforms[5].uniform, constantData5, sizeof(constantData5));
                 kernelContext->uniforms[5].index = 9;
-                kernelContext->uniforms[5].num = sizeof(constantData5) / sizeof(vx_uint8);
+                kernelContext->uniforms[5].num = vxmLENGTH_OF(constantData5);
 
                 gcoOS_MemCopy(&kernelContext->uniforms[6].uniform, constantData6, sizeof(constantData6));
                 kernelContext->uniforms[6].index = 10;
-                kernelContext->uniforms[6].num = sizeof(constantData6) / sizeof(vx_uint8);
+                kernelContext->uniforms[6].num = vxmLENGTH_OF(constantData6);
 
                 kernelContext->uniform_num = 7;
                 kernelContext->params.outputMultipleWidth = 3;
@@ -692,21 +692,21 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
 
             gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData0, sizeof(constantData0));
             kernelContext->uniforms[0].index = 6;
-            kernelContext->uniforms[0].num = sizeof(constantData0) / sizeof(vx_uint8);
+            kernelContext->uniforms[0].num = vxmLENGTH_OF(constantData0);
 
             gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData1, sizeof(constantData1));
             kernelContext->uniforms[1].index = 7;
-            kernelContext->uniforms[1].num = sizeof(constantData1) / sizeof(vx_uint8);
+            kernelContext->uniforms[1].num = vxmLENGTH_OF(constantData1);
 
             if (outputFormat == VX_DF_IMAGE_YUV4)
             {
                 gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, constantData2, sizeof(constantData2));
                 kernelContext->uniforms[2].index = 8;
-                kernelContext->uniforms[2].num = sizeof(constantData2) / sizeof(vx_uint8);
+                kernelContext->uniforms[2].num = vxmLENGTH_OF(constantData2);
 
                 gcoOS_MemCopy(&kernelContext->uniforms[3].uniform, constantData3, sizeof(constantData3));
                 kernelContext->uniforms[3].index = 9;
-                kernelContext->uniforms[3].num = sizeof(constantData3) / sizeof(vx_uint8);
+                kernelContext->uniforms[3].num = vxmLENGTH_OF(constantData3);
 
                 kernelContext->uniform_num = 4;
             }

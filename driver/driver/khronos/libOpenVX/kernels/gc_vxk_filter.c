@@ -95,7 +95,7 @@ vx_status _gcfVX_Filter_Halfevis(vx_node node, gceVX_KERNEL kernel, vx_image src
     {
         gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, constantData, sizeof(constantData));
         kernelContext->uniforms[2].index = 4;
-        kernelContext->uniforms[2].num = sizeof(constantData) / sizeof(vx_uint32);
+        kernelContext->uniforms[2].num = vxmLENGTH_OF(constantData);
         kernelContext->uniform_num = 3;
     }
 
@@ -939,7 +939,7 @@ vx_status vxCensus3x3(vx_node node, vx_image src, vx_image dst)
 
     gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData, sizeof(constantData));
     kernelContext->uniforms[1].index       = 3;
-    kernelContext->uniforms[1].num         = sizeof(constantData) / sizeof(vx_uint32);
+    kernelContext->uniforms[1].num         = vxmLENGTH_OF(constantData);
     kernelContext->uniform_num             = 2;
 
 
