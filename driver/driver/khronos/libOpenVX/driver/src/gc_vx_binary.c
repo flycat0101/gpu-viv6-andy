@@ -4853,7 +4853,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
         else
         {
             vxError("%s[%d]: bypass use user set inputs. useUserSet: %d\n", __FUNCTION__, __LINE__, useUserSet);
-
         }
     }
 
@@ -4908,6 +4907,18 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
 
         }
     }
+
+    vxInfo(" input table address: ");
+    for (i = 0; i < graph->inputCount; i++)
+    {
+        vxInfo("0x8%x ", binarySave->inputPhysicalEntry[i]);
+    }
+    vxInfo("\n output table address: ");
+    for (i = 0; i < graph->outputCount; i++)
+    {
+        vxInfo("0x8%x ", binarySave->outputPhysicalEntry[i]);
+    }
+    vxInfo("\n");
 
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -6848,22 +6859,27 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
             if (-1 != entryIndexIn)
             {
                 inputSourceType = VX_BINARY_SOURCE_INPUT;
+                if (cmdType == VX_BINARY_OPERATION_TYPE_NN)
+                {
+                    vxInfo("target nn, layer %s is input of the binary graph, address: 0x%x\n", node->layer->name, input->memoryPhysicalBase);
+                }
+                else if (cmdType == VX_BINARY_OPERATION_TYPE_TP)
+                {
+                    vxInfo("target tp, layer %s is input of the binary graph, address: 0x%x\n", node->layer->name, input->memoryPhysicalBase);
+                }
             }
             else
             {
                 /* this is for the output of network as a operation input */
                 inputSourceType = VX_BINARY_SOURCE_OUTPUT;
-            }
-
-            if (cmdType == VX_BINARY_OPERATION_TYPE_NN)
-            {
-                vxInfo("target nn, layer %s is input of the binary graph, address: 0x%x\n",
-                        node->layer->name, output->memoryPhysicalBase);
-            }
-            else if (cmdType == VX_BINARY_OPERATION_TYPE_TP)
-            {
-                vxInfo("target tp, layer %s is input of the binary graph, address: 0x%x\n",
-                        node->layer->name, output->memoryPhysicalBase);
+                if (cmdType == VX_BINARY_OPERATION_TYPE_NN)
+                {
+                    vxInfo("target nn, layer %s is input -> grpah output of the binary graph, address: 0x%x\n", node->layer->name, input->memoryPhysicalBase);
+                }
+                else if (cmdType == VX_BINARY_OPERATION_TYPE_TP)
+                {
+                    vxInfo("target tp, layer %s is input -> grpah output of the binary graph, address: 0x%x\n", node->layer->name, input->memoryPhysicalBase);
+                }
             }
         }
         else
@@ -7056,21 +7072,26 @@ VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
             if (-1 != entryIndexOut)
             {
                 outputSourceType = VX_BINARY_SOURCE_OUTPUT;
+                if (cmdType == VX_BINARY_OPERATION_TYPE_NN)
+                {
+                    vxInfo("target nn, layer %s is ouput of the binary graph, address: 0x%x\n", node->layer->name, output->memoryPhysicalBase);
+                }
+                else if (cmdType == VX_BINARY_OPERATION_TYPE_TP)
+                {
+                    vxInfo("target tp, layer %s is ouput of the binary graph, address: 0x%x\n", node->layer->name, output->memoryPhysicalBase);
+                }
             }
             else
             {   /* maybe, no such special case in network */
                 outputSourceType = VX_BINARY_SOURCE_INPUT;
-            }
-
-            if (cmdType == VX_BINARY_OPERATION_TYPE_NN)
-            {
-                vxInfo("target nn, layer %s is ouput of the binary graph, address: 0x%x\n",
-                            node->layer->name, output->memoryPhysicalBase);
-            }
-            else if (cmdType == VX_BINARY_OPERATION_TYPE_TP)
-            {
-                vxInfo("target tp, layer %s is ouput of the binary graph, address: 0x%x\n",
-                            node->layer->name, output->memoryPhysicalBase);
+                if (cmdType == VX_BINARY_OPERATION_TYPE_NN)
+                {
+                    vxInfo("target nn, layer %s is ouput -> graph input of the binary graph, address: 0x%x\n", node->layer->name, output->memoryPhysicalBase);
+                }
+                else if (cmdType == VX_BINARY_OPERATION_TYPE_TP)
+                {
+                    vxInfo("target tp, layer %s is ouput -> graph input of the binary graph, address: 0x%x\n", node->layer->name, output->memoryPhysicalBase);
+                }
             }
         }
         else
@@ -8040,11 +8061,6 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                                 break;
                             }
                         }
-                    }
-
-                    if (i >= binarySave->inputTableRefCount)
-                    {
-                        vxError("generate binary graph input not match....\n");
                     }
                 }
                 else
