@@ -3950,7 +3950,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseNBG(
         binLoad->outputPatch = VX_NULL;
     }
 
-    if ((binLoad->context->options.enableNNLayerDump) && (binLoad->nOperations > 0))
+    if ((binLoad->segmentsCount > 0) && (binLoad->segments != VX_NULL))
     {
         vxFree((vx_ptr)binLoad->segments);
         binLoad->segments = VX_NULL;
