@@ -33,7 +33,7 @@ static void * getVXCKernelInfo(vx_context context, nnvxc_kernel_enum type, vx_ui
     return GetVIPNNVXCBinaryPtr(type, len);
 #else
     GetVIPNNVXCBinaryPtr_FUNC funcHandle = VX_NULL;
-    if (gcvSTATUS_OK != gcoOS_GetProcAddress(gcvNULL, context->globalData->libNNVXCKernelHandle, "GetBinaryPtr", (gctPOINTER *)&funcHandle))
+    if (gcvSTATUS_OK != gcoOS_GetProcAddress(gcvNULL, context->globalData->libNNVXCKernelHandle, "GetVIPNNVXCBinaryPtr", (gctPOINTER *)&funcHandle))
     {
         vxError("Can't get binary pointer!\n");
         return VX_NULL;
