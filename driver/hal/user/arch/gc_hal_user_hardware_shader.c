@@ -871,6 +871,9 @@ gcoHARDWARE_InvokeThreadWalkerCL(
         gcmONERROR(gcoHARDWARE_FlushUniform(Hardware, cmdBuffer));
     }
 
+    /* Initialize some video memories that allocated by compiler. */
+    gcmONERROR(gcoHARDWARE_InitVidMemAllocatedByCompiler(Hardware));
+
     if (Hardware->SHDirty->shaderDirty)
     {
         /* Flush shader states. */
@@ -2465,6 +2468,9 @@ gcoHARDWARE_InvokeThreadWalkerGL(
     {
         gcmONERROR((*Hardware->funcPtr->programTexture)(Hardware, (gctPOINTER*)&memory));
     }
+
+    /* Initialize some video memories that allocated by compiler. */
+    gcmONERROR(gcoHARDWARE_InitVidMemAllocatedByCompiler(Hardware));
 
     if (Hardware->SHDirty->shaderDirty)
     {

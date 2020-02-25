@@ -2993,6 +2993,9 @@ static gceSTATUS gcoHARDWARE_FlushStates(
         gcmONERROR(gcoHARDWARE_FlushUniform(Hardware, Memory));
     }
 
+    /* Initialize some video memories that allocated by compiler. */
+    gcmONERROR(gcoHARDWARE_InitVidMemAllocatedByCompiler(Hardware));
+
     if (Hardware->SHDirty->shaderDirty)
     {
         /* Flush shader states. */
