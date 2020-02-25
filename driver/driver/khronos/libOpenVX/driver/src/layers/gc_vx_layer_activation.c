@@ -210,7 +210,7 @@ VX_PRIVATE_API vx_bool vxoNNActivationLayer_SH_EVIS_Support_Ext(vx_node node, co
 
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_scalar  func_s                     = (vx_scalar)parameters[1];
-    vx_tensor  outputs                    = (vx_tensor)parameters[4];
+    vx_tensor  outputs                    = (vx_tensor)parameters[2];
     vx_enum   inputFormat                 = TENSOR_DATA_TYPE(inputs);
     vx_enum   outputFormat                = TENSOR_DATA_TYPE(outputs);
     vx_enum   func_v                      = func_s->value->e;
