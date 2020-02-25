@@ -768,7 +768,7 @@ vivCreateContext( const __GLcontextModes *modes,
     imports.fromEGL = gcvFALSE;
 
     /* create the core rendering context */
-    gc = GL_DISPATCH_TABLE.createContext(gcvNULL, 0x14, (VEGLimports *)&imports, (gctPOINTER)sharedContextPrivate);
+    gc = GL_DISPATCH_TABLE.createContext(gcvNULL, 0x14, (VEGLimports *)&imports, (gctPOINTER)sharedContextPrivate, 0);
 
     _glthread_UNLOCK_MUTEX(__vivCrtMutex);
 

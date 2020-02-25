@@ -669,7 +669,8 @@ veglCreateContextEx(
     void * Thread,
     gctINT ClientVersion,
     VEGLimports *Imports,
-    void * SharedContext
+    void * SharedContext,
+    gctINT SharedContextClient
     )
 {
     return veglCreateContext(gcvNULL, gcvNULL,
