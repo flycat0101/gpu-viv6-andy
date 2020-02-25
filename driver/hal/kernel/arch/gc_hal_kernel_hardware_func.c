@@ -29927,7 +29927,7 @@ _FuncInit_PPU(IN gcsFUNCTION_EXECUTION_PTR Execution)
 #endif
 
 #if PPU_FOR_AD
-    Execution->funcVidMemBytes = 8 * 1024;
+    Execution->funcVidMemBytes = 32 * 1024;
 #else
     Execution->funcVidMemBytes = 1024;
 #endif
