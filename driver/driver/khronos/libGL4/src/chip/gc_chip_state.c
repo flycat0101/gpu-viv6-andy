@@ -55,7 +55,7 @@ GLenum setLogicOp(__GLchipContext* chipCtx, GLenum opCode, GLboolean enable)
 
     /* Determine whether the operation should be performed. */
     /* Set ROP code in the hardware if supported. */
-    if (chipCtx->hwLogicOp)
+    if (chipCtx->hwLogicOp && opCode)
     {
         gctUINT8 rop = ropTable[opCode - GL_CLEAR];
         /* Determine the proper ROP2. */
