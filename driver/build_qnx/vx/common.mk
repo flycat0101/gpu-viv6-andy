@@ -47,8 +47,8 @@ EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libkernel/libnnvxc
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libkernel/libovx12
 endif
 ifneq ($(ORI_NNARCHPERF),1)
-EXTRA_INCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/vipArchPerf
-EXTRA_INCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/libarchmodelSw/include
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/include
 endif
 # from libCL (trunk/driver/khronos/libCL/makefile.linux)
 # Core
@@ -213,7 +213,7 @@ LIBS += $(STATIC_LIBS)
 ifeq ($(ORI_NNARCHPERF),1)
 LIBS += CLC VSC GAL
 else
-LIBS += CLC VSC GAL ArchModelSw
+LIBS += CLC VSC GAL ArchModelSw NNArchPerf
 endif
 #CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS
 #CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_1_APIS

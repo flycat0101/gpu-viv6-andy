@@ -12,37 +12,39 @@
 
 
 LOCAL_PATH := $(call my-dir)
-include $(LOCAL_PATH)/../../../../Android.mk.def
+include $(LOCAL_PATH)/../../../../../Android.mk.def
 
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-    archModelInterface.c \
+    archSwCommon.cpp \
+    archSwPerf.cpp \
 
 LOCAL_CFLAGS := \
     $(CFLAGS) \
-    -Wno-unused-parameter
+	-fPIC	\
+	-Wall	\
+    -Wno-unused-parameter	\
+	-DLOG_TAG=\"ArchModelSw\"	\
 
 LOCAL_C_INCLUDES := \
-    $(AQROOT)/hal/inc \
-    $(AQROOT)/hal/user \
-    $(AQROOT)/hal/os/linux/user \
     $(AQROOT)/compiler/libVSC/include \
     $(AQROOT)/sdk/inc \
-    $(AQROOT)/driver/khronos/libOpenVX/driver/include \
-    $(AQROOT)/driver/khronos/libOpenVX/kernels \
-    $(AQROOT)/driver/khronos/libOpenVX/libarchmodelInterface/include \
     $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/include \
-    $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf
+    $(AQROOT)/driver/khronos/libOpenVX/libarchmodelInterface/include \
+    $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf \
 
-ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 20),1)
-LOCAL_C_INCLUDES += \
-	system/core/libsync/include
-endif
+LOCAL_SHARED_LIBRARIES := \
+    libNNArchPerf
 
-LOCAL_MODULE         := libarchmodelInterface
+LOCAL_LDFLAGS := \
+	-Wl,-z,defs	\
+	-Wl,--version-script=$(LOCAL_PATH)/libarchmodelSw.map
+
+LOCAL_MODULE         := libarchmodelSw
 LOCAL_MODULE_TAGS    := optional
+LOCAL_PRELINK_MODULE := false
 ifeq ($(PLATFORM_VENDOR),1)
 LOCAL_VENDOR_MODULE  := true
 endif
-include $(BUILD_STATIC_LIBRARY)
+include $(BUILD_SHARED_LIBRARY)

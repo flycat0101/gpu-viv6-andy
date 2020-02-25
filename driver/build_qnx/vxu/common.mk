@@ -36,7 +36,7 @@ EXTRA_INCVPATH += $(driver_root)/hal/user
 EXTRA_INCVPATH += $(driver_root)/hal/os/linux/user
 EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
 ifneq ($(ORI_NNARCHPERF),1)
-EXTRA_INCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/vipArchPerf
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf
 endif
 # from libCL (trunk/driver/khronos/libCL/makefile.linux)
 # Core

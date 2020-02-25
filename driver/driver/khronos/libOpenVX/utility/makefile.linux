@@ -31,7 +31,7 @@ INCLUDE += -I$(AQROOT)/compiler/libVSC/include
 ifeq ($(ORI_NNARCHPERF),1)
 INCLUDE += -I$(AQARCH)/../libNNArchPerf/libNNArchPerf
 else
-INCLUDE += -I$(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf
+INCLUDE += -I$(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf
 endif
 CFLAGS += $(INCLUDE)
 

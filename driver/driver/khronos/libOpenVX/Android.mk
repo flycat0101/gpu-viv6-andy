@@ -152,6 +152,8 @@ LOCAL_CFLAGS += \
     -DOPENVX_USE_TARGET
 
 #For original nnarchperf
+LOCAL_CFLAGS += \
+    -DUSE_LIB_NN_ARCH_PERF
 
 ifeq ($(ORI_NNARCHPERF),1)
 LOCAL_C_INCLUDES := \
@@ -163,7 +165,8 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/user \
     $(AQROOT)/hal/os/linux/user \
     $(AQROOT)/compiler/libVSC/include \
-    $(AQARCH)/cmodel/inc
+    $(AQARCH)/cmodel/inc \
+    $(AQARCH)/../libNNArchPerf/libNNArchPerf
 else
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/driver/include \
@@ -174,9 +177,9 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/user \
     $(AQROOT)/hal/os/linux/user \
     $(AQROOT)/compiler/libVSC/include \
-    $(AQARCH)/cmodel/inc
-    $(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf \
-    $(AQARCH)/../vipArchPerfMdl_dev/libarchmodelSw/include
+    $(AQARCH)/cmodel/inc \
+    $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf \
+    $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/include
 endif
 
 ifeq ($(USE_VXC_BINARY),1)
@@ -207,6 +210,7 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libVSC \
     libGAL \
+    libNNArchPerf
 else
 LOCAL_SHARED_LIBRARIES := \
     liblog \
@@ -249,6 +253,7 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/user \
     $(AQROOT)/hal/os/linux/user \
     $(AQROOT)/compiler/libVSC/include \
+    $(AQARCH)/../libNNArchPerf/libNNArchPerf
 else
 LOCAL_C_INCLUDES := \
     $(AQROOT)/sdk/inc \
@@ -258,7 +263,7 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/user \
     $(AQROOT)/hal/os/linux/user \
     $(AQROOT)/compiler/libVSC/include \
-    $(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf
+    $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf
 endif
 
 LOCAL_LDFLAGS := \
@@ -370,6 +375,13 @@ include $(BUILD_SHARED_LIBRARY)
 include $(AQROOT)/copy_installed_module.mk
 endif
 
+# libNNArchPerf
+ifeq ($(ORI_NNARCHPERF),1)
+include $(AQARCH)/../libNNArchPerf/libNNArchPerf/Android.mk
+else
+include $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf/Android.mk
+include $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/Android.mk
+endif
 # libarchmodel
 ifeq ($(ORI_NNARCHPERF),1)
 include $(AQROOT)/driver/khronos/libOpenVX/libarchmodel/Android.mk

@@ -44,6 +44,7 @@ INCLUDE := -I$(AQROOT)/hal/inc \
            -I$(AQROOT)/driver/khronos/libOpenVX/driver/include \
            -I$(AQROOT)/driver/khronos/libOpenVX/kernels \
            -I$(AQROOT)/driver/khronos/libOpenVX/libarchmodel/include \
+           -I$(AQARCH)/../libNNArchPerf/libNNArchPerf \
 
 CFLAGS += $(INCLUDE)
 

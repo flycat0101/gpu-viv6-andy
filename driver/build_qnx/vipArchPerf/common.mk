@@ -29,8 +29,9 @@ NAME=libNNArchPerf
 include $(qnx_build_dir)/common.mk
 
 # Core
-SOURCE_OBJECTS += $(driver_root)/arch/vipArchPerfMdl_dev/vipArchPerf/nnArchPerf.o
-EXTRA_SRCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/vipArchPerf
+EXTRA_INCVPATH += $(driver_root)/hal/inc
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf/nnArchPerf.o
+EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf
 
 EXTRA_LIBVPATH += $(LOCAL_INSTALL)
 
@@ -52,11 +53,6 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 include $(MKFILES_ROOT)/qmacros.mk
 
 include $(qnx_build_dir)/math.mk
-
-PRE_TARGET:= prebuild
-
-prebuild:
-	@cp -f $(driver_root)/tools/bin/gc_feature_database.h $(driver_root)/arch/vipArchPerfMdl_dev/vipArchPerf
 
 ifeq ($(filter so dll, $(VARIANT_LIST)),)
 INSTALLDIR=/dev/null

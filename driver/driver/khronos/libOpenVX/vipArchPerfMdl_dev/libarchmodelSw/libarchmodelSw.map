@@ -1,0 +1,20 @@
+{
+    global:
+        archSwLibDeInit;
+        archSwLibInit;
+        archPredictPerfFillLayer;
+        archPredictPerfAnalysing;
+        archGetPerfResult;
+        archPredictPerf;
+        archIsFeatureAvailable;
+        archCalculateArchPerf;
+        archFillOpInfo;
+        archSetManualFeatures;
+        deInitArchOpInfo;
+        initArchOpInfo;
+        initArchGraphInfo;
+        deInitArchGraphInfo;
+    local:
+        *;
+};
+

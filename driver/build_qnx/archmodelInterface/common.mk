@@ -34,8 +34,8 @@ EXTRA_INCVPATH += $(driver_root)/hal/inc
 EXTRA_INCVPATH += $(driver_root)/hal/user
 EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
 EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
-EXTRA_INCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/vipArchPerf
-EXTRA_INCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/libarchmodelSw/include
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/include
 
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/libarchmodelInterface/archModelInterface.o
 EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/libarchmodelInterface

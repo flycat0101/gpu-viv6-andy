@@ -19,17 +19,21 @@
 # Include common definitions.
 
 include $(AQROOT)/makefile.linux.def
-include ../makefile.linux.def
 
 ################################################################################
 # Define target module name.
 
-STATIC              := 1
-TARGET_NAME         := libarchmodelInterface.a
-TARGET_MODULE       := $(OBJ_DIR)/$(TARGET_NAME)
+ifeq ($(gcdSTATIC_LINK), 1)
+  STATIC            := 1
+  TARGET_MODULE     := $(OBJ_DIR)/libNNArchPerf.a
+else
+  DYNAMIC           := 1
+  TARGET_MODULE     := $(OBJ_DIR)/libNNArchPerf.so
+  TARGET_SONAME     := libNNArchPerf.so
+endif
 
 ################################################################################
-# Installation directory.
+# Installation directory
 
 INSTALL_DIR         := $(SDK_DIR)/drivers
 
@@ -37,29 +41,44 @@ INSTALL_DIR         := $(SDK_DIR)/drivers
 # Supply additional include directories.
 
 INCLUDE := -I$(AQROOT)/hal/inc \
-           -I$(AQROOT)/hal/user \
-           -I$(AQROOT)/hal/optimizer \
-           -I$(AQROOT)/hal/os/linux/user \
-           -I$(AQROOT)/compiler/libVSC/include \
-           -I$(AQROOT)/sdk/inc \
-           -I$(AQROOT)/driver/khronos/libOpenVX/driver/include \
-           -I$(AQROOT)/driver/khronos/libOpenVX/kernels \
-           -I$(AQROOT)/driver/khronos/libOpenVX/libarchmodelInterface/include \
-           -I$(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/include \
-           -I$(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf
 
 CFLAGS += $(INCLUDE)
 
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC), 1)
+  CFLAGS += -fPIC -Wall -fno-builtin
+endif
+
+################################################################################
+# Define flags for the linker.
+
+ifneq ($(USE_ARMCC), 1)
+  LFLAGS += -Wl,--version-script=libNNArchPerf.map
+endif
+
+ifeq ($(USE_ARMCC),1)
+  LFLAGS += --shared -L--soname=,$(TARGET_SONAME)
+else
+  LFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
+endif
+
+
+# Supply necessary libraries.
+LIBS += -lm -lpthread -ldl -lrt
+LIBS += -lstdc++
 
 ################################################################################
 # Describe object files.
 
-OBJECTS := $(OBJ_DIR)/archModelInterface.o \
+OBJECTS := $(OBJ_DIR)/nnArchPerf.o \
+
 
 ################################################################################
 # Define targets.
 
-.PHONY: all clean install
+.PHONY: all clean install extra_install prebuild
 
 all: $(TARGET_MODULE)
 
@@ -67,27 +86,34 @@ clean:
 	@rm -rf $(OBJ_DIR)
 
 install: all
-
-ifeq ($(gcdSTATIC_LINK), 1)
-install:
 	@mkdir -p $(INSTALL_DIR)
 	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
-endif
+
+prebuild:
+	@cp -f $(AQROOT)/tools/bin/gc_feature_database.h ./
 
 ################################################################################
 # Module rules.
 
+ifeq ($(STATIC),1)
 $(TARGET_MODULE): $(OBJECTS)
 	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
 	@$(AR) -r -c $@ $(OBJECTS)
-ifneq ($(USE_ARMCC), 1)
+ifneq ($(USE_ARMCC),1)
 	@$(RANLIB) $@
+endif
+endif
+
+ifeq ($(DYNAMIC),1)
+$(TARGET_MODULE): $(OBJECTS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
 endif
 
 ################################################################################
 # Object rules.
 
-$(OBJ_DIR)/%.o: %.c
+$(OBJ_DIR)/%.o: %.cpp
 	@echo "  COMPILE $(abspath $<)"
 	@mkdir -p $(OBJ_DIR)
 	@$(CC) -c $(CFLAGS) -MMD -o $@ $<

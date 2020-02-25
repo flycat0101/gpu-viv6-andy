@@ -32,8 +32,8 @@ ifeq ($(ORI_NNARCHPERF),1)
 INCLUDE += -I../../libarchmodel/include
 else
 INCLUDE += -I../../libarchmodelInterface/include
-INCLUDE += -I$(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf
-INCLUDE += -I$(AQARCH)/../vipArchPerfMdl_dev/libarchmodelSw/include
+INCLUDE += -I$(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf
+INCLUDE += -I$(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/include
 endif
 
 ifeq ($(gcdSTATIC_LINK), 1)
@@ -175,7 +175,7 @@ LIBS += -L $(SDK_DIR)/drivers
 LIBS += -L $(AQROOT)/hal/user/$(OBJ_DIR)
 ifeq ($(ORI_NNARCHPERF),1)
 else
-LIBS += -L $(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf/$(OBJ_DIR)
+LIBS += -L $(AQROOT)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf/$(OBJ_DIR)
 endif
 ifeq ($(USE_VXC_BINARY)$(USE_VSC_LITE),11)
 CFLAGS += -DVSC_LITE_BUILD=1
@@ -199,6 +199,7 @@ else
 LIBS += $(AQROOT)/driver/khronos/libOpenVX/libarchmodelInterface/$(OBJ_DIR)/libarchmodelInterface.a
 LIBS += -l ArchModelSw
 endif
+LIBS += -l NNArchPerf
 LIBS += -l dl -l pthread -lm
 
 ################################################################################

@@ -28,14 +28,14 @@ NAME=libArchModelSw
 
 include $(qnx_build_dir)/common.mk
 
-EXTRA_INCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/vipArchPerf
-EXTRA_INCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/libarchmodelSw/include
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/vipArchPerf
+EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/include
 
 # from libCL (trunk/driver/khronos/libCL/makefile.linux)
 # Core
-SOURCE_OBJECTS += $(driver_root)/arch/vipArchPerfMdl_dev/libarchmodelSw/archSwPerf.o
-SOURCE_OBJECTS += $(driver_root)/arch/vipArchPerfMdl_dev/libarchmodelSw/archSwCommon.o
-EXTRA_SRCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/libarchmodelSw
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/archSwPerf.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw/archSwCommon.o
+EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/vipArchPerfMdl_dev/libarchmodelSw
 
 EXTRA_LIBVPATH += $(LOCAL_INSTALL)
 
