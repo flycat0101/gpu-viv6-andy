@@ -1245,6 +1245,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
 
             vx_int32 kernel_channel = TENSOR_SIZE_INDEX(weights, 2);
             vx_int32 kernel_batch = TENSOR_SIZE_INDEX(weights, 3);
+            vx_int32 channel_multiplier = (group != VX_NULL && group->value->u32 > 0)?group->value->u32:1;
 
             vx_bool tp_upsample = (deconvolution_mode == gcoNNE_DECONV_MODE_NNE_TP)? vx_true_e : vx_false_e;
             vx_int32 upsample_pad_x = 0, upsample_pad_y = 0;
@@ -1262,7 +1263,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
 
                  {kernel_reshuffle_width, kernel_reshuffle_height, kernel_batch, stride_w * stride_h * kernel_channel}, /* reshuffled_weights */
                  {decov_output_w, decov_output_h, stride_w * stride_h * kernel_channel, batchCount}, /* sample_output */
-                 {1, 1, 1, kernel_channel * stride_w * stride_h}, /* reshuffled_bias */
+                 {1, 1, 1, channel_multiplier * kernel_channel * stride_w * stride_h}, /* reshuffled_bias */
                  { decov_output_w * stride_w, decov_output_h * stride_h, kernel_channel, batchCount}, /* upsampled_output */
             };
             vx_tensor_create_params_t tensor_create_params;
