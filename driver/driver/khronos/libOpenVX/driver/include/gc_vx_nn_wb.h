@@ -155,7 +155,7 @@ typedef struct _vx_weights_biases_parameter_s
     vx_weight_bias_set_1_tensor_f            set_alpha_tensor;
     vx_weight_bias_set_struct_ptr_f          set_optimization; /* vx_weights_biases_parameter_optimizations_ext2_t */
 }
-vx_weights_biases_parameter_s, *vx_weights_biases_parameter;
+vx_weights_biases_parameter_s;
 
 
 #define WB_EXTERNAL_PARAM(wb)                  (wb)->external_param
