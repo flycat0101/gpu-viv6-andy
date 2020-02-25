@@ -1008,7 +1008,7 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
     vx_uint32                      z_offset
     )
 {
-    vx_status status;
+    vx_status status = VX_SUCCESS;
     vx_context context;
     vx_size minTotalKernelBufferSize = 0;
     vx_size minKernelBufferSizes[MAX_ZGROUP_COUNT*MAX_KZGROUP_COUNT];
