@@ -1261,7 +1261,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
 
                  {kernel_reshuffle_width, kernel_reshuffle_height, kernel_batch, stride_w * stride_h * kernel_channel}, /* reshuffled_weights */
                  {decov_output_w, decov_output_h, stride_w * stride_h * kernel_channel, batchCount}, /* sample_output */
-                 {1, 1, 1, kernel_batch * stride_w * stride_h}, /* reshuffled_bias */
+                 {1, 1, 1, kernel_channel * stride_w * stride_h}, /* reshuffled_bias */
                  { decov_output_w * stride_w, decov_output_h * stride_h, kernel_channel, batchCount}, /* upsampled_output */
             };
             vx_tensor_create_params_t tensor_create_params;
