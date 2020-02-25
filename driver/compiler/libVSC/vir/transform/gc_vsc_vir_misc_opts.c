@@ -6824,7 +6824,18 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
             return errCode;
         }
     }
-
+    /* support triangle test for dual16 */
+    if(!VSC_OPTN_InRange(VIR_Shader_GetId(Shader), VSC_OPTN_DUAL16Options_BeforeShader(options), VSC_OPTN_DUAL16Options_AfterShader(options)))
+    {
+        if(VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
+        {
+            VIR_Dumper* dumper = pPassWorker->basePassWorker.pDumper;
+            VIR_LOG(dumper, "dual16 skip shader(%d) NOT in option (as %d bs %d)\n", VIR_Shader_GetId(Shader),
+                    VSC_OPTN_DUAL16Options_AfterShader(options), VSC_OPTN_DUAL16Options_BeforeShader(options));
+            VIR_LOG_FLUSH(dumper);
+        }
+        return errCode;
+    }
     /* dual16 does not support attribute components larger than 60 */
     {
         gctUINT attrCount = 0, highpAttrCount = 0, totalAttrCount = 0;
