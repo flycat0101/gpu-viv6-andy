@@ -25789,6 +25789,8 @@ vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
     vx_uint32     padTopv                    = padTop->value->u32;
     vx_uint32     padBottomv                 = padBottom->value->u32;
     vx_uint32     maxWorkGroupSize           = 8;
+    vx_tensor     rsInput                    = NULL;
+    vx_tensor     rsOutput                   = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, inputs=%p, outputs=%p",
          context, kernelEnum, borderMode, inputs, outputs);
@@ -25798,6 +25800,26 @@ vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
     {
         vxError("The input size not match with the output size! failed at function %s line %d", __FUNCTION__, __LINE__);
         goto OnError;
+    }
+
+    if (TENSOR_DIM_NUM(inputs) == 1)
+    {
+        vx_uint32 w         = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+        vx_int32  sizes[4]  = {w, 1, 1, 1};
+        vx_int32 dims = 2;
+
+        rsInput = vxoTensor_ReshapeTensor(inputs, sizes, dims);
+        parameters[0] = (vx_reference)rsInput;
+    }
+
+    if (TENSOR_DIM_NUM(outputs) == 1)
+    {
+        vx_uint32 w         = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
+        vx_int32  sizes[4]  = {w, 1, 1, 1};
+        vx_int32 dims = 2;
+
+        rsOutput = vxoTensor_ReshapeTensor(inputs, sizes, dims);
+        parameters[5] = (vx_reference)rsOutput;
     }
 
     if (padModev == VX_PAD_CONSTANT)
@@ -25910,10 +25932,15 @@ vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
     if (status != VX_SUCCESS) goto OnError;
 
+    if (rsInput) vxoTensor_ReleaseTensor(&rsInput);
+    if (rsOutput) vxoTensor_ReleaseTensor(&rsOutput);
+
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
 
 OnError:
+    if (rsInput) vxoTensor_ReleaseTensor(&rsInput);
+    if (rsOutput) vxoTensor_ReleaseTensor(&rsOutput);
     if (program)  vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
