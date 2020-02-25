@@ -2831,15 +2831,15 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_TensorAdd2Conv_createBias_asymmeti
     vx_uint32 bDims[1] = {coreNum};
     float biasScale = TENSOR_TF_SCALE(*weight) * TENSOR_TF_SCALE(tensorIn[0]);
 
-    vx_tensor_create_params_t bias_p = vxoGraphOptimization_createParamsForTensor(1, bDims, VX_TYPE_INT32, VX_QUANT_AFFINE_SCALE,
-        0, 0, biasScale);
-
-    *bias = vxCreateTensor2(context, &bias_p, sizeof(bias_p));
-
+    if(!bias)
+    {
+        vx_tensor_create_params_t bias_p = vxoGraphOptimization_createParamsForTensor(1, bDims, VX_TYPE_INT32, VX_QUANT_AFFINE_SCALE,
+            0, 0, biasScale);
+        *bias = vxCreateTensor2(context, &bias_p, sizeof(bias_p));
+    }
     {
         vx_uint32 i = 0;
         float biasValue         = (TENSOR_TF_ZEROPOINT(tensorIn[0]) - TENSOR_TF_ZEROPOINT(tensorIn[1])) * TENSOR_TF_SCALE(tensorIn[1]);
-        float biasScale         = TENSOR_TF_SCALE(*weight) * TENSOR_TF_SCALE(tensorIn[0]);
         vx_int32 quantedDias    = (vx_int32)roundRTNE(biasValue / biasScale);
         vx_int32 *biasData      = (vx_int32 *)vxAllocateAndZeroMemory(coreNum* sizeof(vx_int32));
 
