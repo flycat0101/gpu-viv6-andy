@@ -753,16 +753,6 @@ VX_PRIVATE_API vx_status vxoWeightBias_Initializer(
 
     strideX = stride_x;
     strideY = stride_y;
-    if ((strideX == 1 && strideY == 1) || weight_param->dims_sizes[0] != 1 || weight_param->dims_sizes[1] != 1)
-    {
-        /* Calculate weight_bias' weight width & height */
-        vx_uint32_ptr weights_dims = weight_param->dims_sizes;
-        vx_uint32 alignedWidth = ((weights_dims[0] % strideX == 0) ? weights_dims[0] : (weights_dims[0] + (strideX - weights_dims[0] % strideX)));
-        vx_uint32 alignedHeight = ((weights_dims[1] % strideY == 0) ? weights_dims[1] : (weights_dims[1] + (strideY - weights_dims[1] % strideY)));
-        WB_KERNEL_X(wb) = alignedWidth / strideX;
-        WB_KERNEL_Y(wb) = alignedHeight / strideY;
-        WB_KERNEL_Z(wb) = weights_dims[2] * strideX * strideY;
-    }
 
     vxMemCopy(&WB_BIAS_PARAM(wb), bias_param, sizeof(vx_weight_bias_general_param_s));
 
@@ -1381,15 +1371,6 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
         }
     }
 
-    if (!isV8 && layer_type == VX_NN_CONVOLUTION_LAYER &&
-        weightDimsChanged[0] != weightDimsChanged[1] && weightDimsChanged[0] != 1)
-    {
-        /*V7 didn't support MxN, only supoort 1xN*/
-        status = VX_ERROR_INVALID_VALUE;
-        vxError("vxoCreateWeightsBiasesParameterFromTensors: current NN didn't support this kernel size %d x %d", weightDimsChanged[0], weightDimsChanged[0]);
-        goto exit;
-    }
-
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT) && weightDataType == VX_TYPE_UINT8)
     {
         skipValue = TENSOR_TF_ZEROPOINT(weights);
@@ -1410,6 +1391,24 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
 
     strideXChanged = strideX;
     strideYChanged = strideY;
+
+    if ((strideX == 1 && strideY == 1) || weightDimsChanged[0] != 1 || weightDimsChanged[1] != 1)
+    {
+        vx_uint32 alignedWidth = ((weightDimsChanged[0] % strideX == 0) ? weightDimsChanged[0] : (weightDimsChanged[0] + (strideX - weightDimsChanged[0] % strideX)));
+        vx_uint32 alignedHeight = ((weightDimsChanged[1] % strideY == 0) ? weightDimsChanged[1] : (weightDimsChanged[1] + (strideY - weightDimsChanged[1] % strideY)));
+        weightDimsChanged[0] = alignedWidth / strideX;
+        weightDimsChanged[1] = alignedHeight / strideY;
+        weightDimsChanged[2] = weightDimsChanged[2] * strideX * strideY;
+    }
+
+    if (!isV8 && layer_type == VX_NN_CONVOLUTION_LAYER &&
+        weightDimsChanged[0] != weightDimsChanged[1] && weightDimsChanged[0] != 1)
+    {
+        /*V7 didn't support MxN, only supoort 1xN*/
+        status = VX_ERROR_INVALID_VALUE;
+        vxError("vxoCreateWeightsBiasesParameterFromTensors: current NN didn't support this kernel size %d x %d", weightDimsChanged[0], weightDimsChanged[1]);
+        goto exit;
+    }
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_FIRST_PIXEL_POOLING) &&
         strideX == 2 && strideY == 2 &&
