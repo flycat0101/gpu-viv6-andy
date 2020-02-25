@@ -10322,13 +10322,25 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNLeakyReluLayer_Initializer(vx_node nod
                           activationLayer->operations,
                           vxnneLayer_Deinitialize);
 
-    shExe_flag  = (vx_bool)((srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
-                          || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT16)
-                          || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_INT8)
-                          || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT16)
-                          || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
-                          || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT16)
-                          || (srcFormat == VX_TYPE_FLOAT16 && dstFormat != VX_TYPE_FLOAT32));
+    if(context->evisNoInst.supportEVIS)
+    {
+        shExe_flag  = (vx_bool)((srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+                              || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT16)
+                              || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_INT8)
+                              || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT16)
+                              || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
+                              || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT16)
+                              || (srcFormat == VX_TYPE_FLOAT16 && dstFormat != VX_TYPE_FLOAT32));
+    }
+    else
+    {
+        shExe_flag  = (vx_bool)(((srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+                              || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+                              || (srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_FLOAT32)
+                              || (srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_FLOAT16)
+                              || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT32))
+                              && negative_slopes->value->f32 == -1.0f);
+    }
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_ACTIVATION) &&
         vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs) &&
@@ -10385,7 +10397,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNLeakyReluLayer_Initializer(vx_node nod
     {
         vxnne_shader_executable shaderExecutable = VX_NULL;
 
-        shaderExecutable = vxnneGetLeakyReluShaderExecutable(node->base.context, VXNNE_KERNEL_NN_LEAKY, &node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
+        if(context->evisNoInst.supportEVIS)
+        {
+            shaderExecutable = vxnneGetLeakyReluShaderExecutable(node->base.context, VXNNE_KERNEL_NN_LEAKY, &node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetGPUActivationShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION, &node->kernelAttributes.borderMode, VX_NN_ACTIVATION_ABS, inputs, 0, 0, outputs);
+        }
 
         if (!shaderExecutable)
         {
