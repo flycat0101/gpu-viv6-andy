@@ -3080,6 +3080,13 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
                 TENSOR_DATA_TYPE(tensorIn[0]) != TENSOR_DATA_TYPE(output) )
                 continue;
 
+            if(VX_QUANT_DYNAMIC_FIXED_POINT == TENSOR_QUANT_TYPE(tensorIn[0]) )
+            {
+                vx_int32 weight_fl = gcmMAX(TENSOR_POS(tensorIn[1]) - TENSOR_POS(tensorIn[0]), 0);
+                if(TENSOR_POS(tensorIn[0]) + weight_fl < TENSOR_POS(output) )
+                    continue;
+            }
+
             if(node->kernel->enumeration == VX_KERNEL_TENSOR_SUBTRACT)
                 factor = -1;
             {
