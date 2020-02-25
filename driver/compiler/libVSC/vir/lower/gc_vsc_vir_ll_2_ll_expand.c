@@ -18641,7 +18641,8 @@ _InsertLDARR(
     VIR_Enable       ldArrEnable= VIR_ENABLE_NONE;
     VIR_Symbol      *sym        = VIR_Operand_GetSymbol(Opnd);
 
-    VIR_VirRegId     regId      = VIR_Shader_NewVirRegId(Shader, 1);
+    gctUINT  RegCount = VIR_Symbol_GetVirIoRegCount(Shader, sym);
+    VIR_VirRegId     regId      = VIR_Shader_NewVirRegId(Shader, RegCount);
     VIR_SymId        symId;
 
     VIR_SymId        relSymId   = VIR_Operand_GetRelIndexing(Opnd);
