@@ -732,6 +732,13 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     }
 
     envctrl = gcvNULL;
+    globalData->options.enableNNLayerDump_Int = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "NN_LAYER_DUMP_QTENSOR", &envctrl)) && envctrl)
+    {
+        globalData->options.enableNNLayerDump_Int = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
     globalData->options.enableBrickMode = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_BRICK_MODE", &envctrl)) && envctrl)
     {

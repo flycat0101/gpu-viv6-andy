@@ -3002,6 +3002,7 @@ typedef struct _vx_drv_option
     gctINT  tpZeroRunLen;
     gctUINT enableNNArchPerfPrint;
     gctUINT enableNNLayerDump;
+    gctUINT enableNNLayerDump_Int;
     gctUINT enableInterleave8;
     gctSTRING nnRoundingMode;
     gctSTRING vxcShaderSourcePath;
