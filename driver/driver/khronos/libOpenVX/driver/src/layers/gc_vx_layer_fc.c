@@ -264,7 +264,7 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     if (WB_IS_TP_COMPRESS(weights_biases))
     {
         vx_op_param conv = VX_NULL;
-        vx_uint32 kzgroup = WB_KERNEL_Z(weights_biases) / WB_KERNEL_Z_INDEX(weights_biases, 0);
+        vx_uint32 kzgroup = WB_KERNEL_Z(weights_biases) % MAX_TP_FC_KZ_SIZE == 0 ? WB_KERNEL_Z(weights_biases) / MAX_TP_FC_KZ_SIZE : WB_KERNEL_Z(weights_biases) / MAX_TP_FC_KZ_SIZE + 1;
         vx_uint32 zoffset = 0;
 
        vxmONERROR(vxnneOperation_Initialize(&tp_operation0->base,
