@@ -25791,6 +25791,7 @@ vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
     vx_uint32     maxWorkGroupSize           = 8;
     vx_tensor     rsInput                    = NULL;
     vx_tensor     rsOutput                   = NULL;
+    vx_uint32     smallFlg                   = 0;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, inputs=%p, outputs=%p",
          context, kernelEnum, borderMode, inputs, outputs);
@@ -25800,6 +25801,11 @@ vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
     {
         vxError("The input size not match with the output size! failed at function %s line %d", __FUNCTION__, __LINE__);
         goto OnError;
+    }
+
+    if(input_width < 8 && input_height < 4 && inputFormat == VX_TYPE_FLOAT16)
+    {
+        smallFlg = 1;
     }
 
     if (TENSOR_DIM_NUM(inputs) == 1)
@@ -25898,8 +25904,16 @@ vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
         }
         else if (inputElementSize ==2)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Const16Bits", borderMode);
-            if (!shaderExecutable) goto OnError;
+            if(smallFlg)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Const16Bits_Small", borderMode);
+                if (!shaderExecutable) goto OnError;
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Const16Bits", borderMode);
+                if (!shaderExecutable) goto OnError;
+            }
         }
     }
 
@@ -25918,6 +25932,10 @@ vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
     {
         execution_parameters.globalWorkScale[0]  = 8;
         execution_parameters.globalWorkScale[1]  = 4;
+    }
+    if(smallFlg)
+    {
+        execution_parameters.globalWorkScale[0]  = 1;
     }
     execution_parameters.globalWorkScale[2]  = 1;
     execution_parameters.globalWorkSize[0]   = gcmALIGN((output_width  + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
