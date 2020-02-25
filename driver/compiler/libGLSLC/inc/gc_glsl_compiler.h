@@ -253,6 +253,26 @@ sloCOMPILER_IsOGL20Version(
     IN sloCOMPILER Compiler
 );
 
+gctBOOL
+sloCOMPILER_IsOGL13Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL14Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL15Version(
+    IN sloCOMPILER Compiler
+);
+
+gctBOOL
+sloCOMPILER_IsOGL11Version(
+    IN sloCOMPILER Compiler
+);
+
 gceSTATUS
 sloCOMPILER_SetDebug(
     IN sloCOMPILER Compiler,

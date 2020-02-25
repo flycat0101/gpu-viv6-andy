@@ -4435,6 +4435,38 @@ sloCOMPILER_IsOGL20Version(
     return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL20_VERSION;
 }
 
+gctBOOL
+sloCOMPILER_IsOGL13Version(
+    IN sloCOMPILER Compiler
+    )
+{
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL13_VERSION;
+}
+
+gctBOOL
+sloCOMPILER_IsOGL14Version(
+    IN sloCOMPILER Compiler
+    )
+{
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL14_VERSION;
+}
+
+gctBOOL
+sloCOMPILER_IsOGL15Version(
+    IN sloCOMPILER Compiler
+    )
+{
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL15_VERSION;
+}
+
+gctBOOL
+sloCOMPILER_IsOGL11Version(
+    IN sloCOMPILER Compiler
+    )
+{
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL11_VERSION;
+}
+
 gctLABEL
 slNewLabel(
     IN sloCOMPILER Compiler
