@@ -353,6 +353,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_PaserSWLayerParameter(
     vx_status status = VX_SUCCESS;
     vx_uint32 i = 0;
     vx_reference *parameters = node->paramTable;
+    vx_graph graph = node->graph;
 
     switch (layerParam->sourceType)
     {
@@ -360,8 +361,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_PaserSWLayerParameter(
         {
             gctPOINTER tensorLogical  = gcvNULL;
             vx_uint32 tensorPhysical  = 0;
+            vx_reference ref = VX_NULL;
             vx_int32 inIndex = layerParam->index;
-            vx_reference ref = parameters[inIndex];
+            if (graph->inputCount && graph->inputs)
+            {
+                ref = graph->inputs[layerParam->index];
+            }
+            else
+                ref = parameters[inIndex];
             if (ref->type == VX_TYPE_TENSOR)
             {
                 vx_tensor tensor = (vx_tensor)ref;
@@ -379,8 +386,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_PaserSWLayerParameter(
         {
             gctPOINTER tensorLogical  = gcvNULL;
             vx_uint32 tensorPhysical  = 0;
+            vx_reference ref = VX_NULL;
             vx_uint32 outIndex = layerParam->index + binLoad->fixed.header.inputCount;
-            vx_reference ref = parameters[outIndex];
+            if (graph->outputCount && graph->outputs)
+            {
+                ref = graph->outputs[layerParam->index];
+             }
+            else
+                ref = parameters[outIndex];
             if (ref->type == VX_TYPE_TENSOR)
             {
                 vx_tensor tensor = (vx_tensor)ref;
