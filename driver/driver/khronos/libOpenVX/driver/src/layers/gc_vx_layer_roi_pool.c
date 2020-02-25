@@ -483,7 +483,7 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_
         if(outputs_reshp)
         {
             shaderExecutable = vxnneHorzMaxPoolShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_HORZMAXPOOL, &ops_layer->node->kernelAttributes.borderMode, vertMaxPoolTensor, preTreatedRectTensor, outputs_reshp);
-            vxmONERROR(vxoTensor_ReleaseTensor(&outputs_reshp));
+            vxoTensor_ReleaseTensor(&outputs_reshp);
         }
         else
         {

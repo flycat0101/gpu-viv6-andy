@@ -3404,6 +3404,14 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_NN_TP_Initialize(vxnne_la
                     &convolutionLayer->convolution_nn_convolution_dynamic_operation[i].base,
                     idx++);
             }
+            if (real_inputs)
+            {
+                gcoOS_Free(gcvNULL, real_inputs);
+            }
+            if (real_outputs)
+            {
+                gcoOS_Free(gcvNULL, real_outputs);
+            }
         }
     }
     else if (gcoNNE_CONV_MODE_NNE_TP == mode)

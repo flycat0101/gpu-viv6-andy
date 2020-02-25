@@ -1044,7 +1044,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
 
             weightUserAddr = vxCreateTensorAddressing(context, weightSize, weightStrideSize, (vx_uint8)numWeightDims);
 
-           vxmONERROR(vxoCopyTensorPatch(weights, VX_NULL, weightUserAddr, weightData, VX_WRITE_ONLY,0));
+            vxoCopyTensorPatch(weights, VX_NULL, weightUserAddr, weightData, VX_WRITE_ONLY,0);
 
             biasStrideSize[0] = biasItemSize;
 
