@@ -1441,7 +1441,7 @@ vxoMemoryPool_RequestList(
     vx_uint32           *fail_id
     )
 {
-    vx_uint32 i, j, ii, s, tcount = 0, mcounts[VXNNE_MEM_POOL_TYPE_END] = {0}, failId = 0;
+    vx_uint32 i, j, ii, s, tcount = 0, mcounts[VXNNE_MEM_POOL_TYPE_END] = {0}, failId = 0xDEAD;
     vx_size size, msize[VXNNE_MEM_POOL_TYPE_END] = {0};
     vx_size maxs[VXNNE_MEM_POOL_TYPE_ALL] = {0};
     vx_memory * plists[VXNNE_MEM_POOL_TYPE_END] = {VX_NULL};
@@ -1477,6 +1477,17 @@ vxoMemoryPool_RequestList(
                 list[i].outputMemory[j]->firstUseId = i;
             }
             list[i].outputMemory[j]->lastUseId = i;
+
+            if (i >= start + count &&
+                list[i].outputMemory[j]->firstUseId >= start &&
+                list[i].outputMemory[j]->firstUseId < start + count &&
+                list[i].outputMemory[j]->allocType != VXNNE_MEM_POOL_TYPE_ORIG_DDR &&
+                list[i].outputMemory[j]->allocated == vx_false_e)
+            {
+                failId = list[i].outputMemory[j]->firstUseId;
+                status = VX_ERROR_INVALID_SCOPE;
+                goto exit;
+            }
 
             if (i >= start && i < start + count)
             {
@@ -1522,6 +1533,17 @@ vxoMemoryPool_RequestList(
                 list[i].inputMemory[j]->firstUseId = i;
             }
             list[i].inputMemory[j]->lastUseId = i;
+
+            if (i >= start + count &&
+                list[i].inputMemory[j]->firstUseId >= start &&
+                list[i].inputMemory[j]->firstUseId < start + count &&
+                list[i].inputMemory[j]->allocType != VXNNE_MEM_POOL_TYPE_ORIG_DDR &&
+                list[i].inputMemory[j]->allocated == vx_false_e)
+            {
+                failId = list[i].inputMemory[j]->firstUseId;
+                status = VX_ERROR_INVALID_SCOPE;
+                goto exit;
+            }
 
             if (i >= start && i < start + count)
             {
@@ -1603,7 +1625,13 @@ again:
                 gcmASSERT(ntype < VXNNE_MEM_POOL_TYPE_END);
                 gcmASSERT(mcounts[ntype] > 0);
 
-                if (mem->allocated == vx_false_e && i > mem->firstUseId && mustHave)
+                if (mem->allocated == vx_false_e && mem->firstUseId < start)
+                {
+                    failId = i;
+                    status = VX_ERROR_INVALID_SCOPE;
+                    goto exit;
+                }
+                else if (mem->allocated == vx_false_e && i > mem->firstUseId && mustHave)
                 {
                     failId = i;
                     status = VX_FAILURE;
@@ -1875,7 +1903,8 @@ again:
         sstate = vxoMemoryPool_GetStackStatus(&stacks[i]);
         if (sstate != VX_MEMPOOL_STACK_EMPTY)
         {
-            status = VX_FAILURE;
+            vxmASSERT(0);
+            status = VX_ERROR_INVALID_SCOPE;
             goto exit;
         }
 
@@ -1946,7 +1975,7 @@ exit:
         }
     }
 
-    if (status == VX_FAILURE && fail_id != VX_NULL)
+    if (status != VX_SUCCESS && fail_id != VX_NULL)
     {
         *fail_id = failId;
     }
