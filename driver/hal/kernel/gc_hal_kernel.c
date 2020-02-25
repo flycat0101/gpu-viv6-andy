@@ -740,7 +740,6 @@ gckKERNEL_Construct(
     return gcvSTATUS_OK;
 
 OnError:
-    gckOS_SetGPUPower(Os, kernel->core, gcvFALSE, gcvFALSE);
     *Kernel = gcvNULL;
 
     if (kernel != gcvNULL)
