@@ -11805,7 +11805,7 @@ _CheckErrorForJump(
     {
         shaderType = Compiler->shaderType;
 
-        if (shaderType != slvSHADER_TYPE_FRAGMENT)
+        if (shaderType != slvSHADER_TYPE_FRAGMENT && shaderType != slvSHADER_TYPE_LIBRARY)
         {
             gcmVERIFY_OK(sloCOMPILER_Report(
                                             Compiler,
