@@ -5612,6 +5612,11 @@ VIR_Shader_IsGL40(
     IN VIR_Shader * Shader
     );
 
+gctBOOL
+VIR_Shader_IsGL40OrAbove(
+    IN VIR_Shader * Shader
+    );
+
 VSC_ErrCode
 VIR_Shader_AddFunction(
     IN  VIR_Shader *    Shader,
