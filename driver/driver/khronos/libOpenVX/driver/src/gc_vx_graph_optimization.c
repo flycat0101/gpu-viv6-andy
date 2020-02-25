@@ -4459,196 +4459,256 @@ vx_bool vxoGetDataDivisors(vx_uint32 input_value, vx_uint32 *divisors, vx_uint32
     return vx_false_e;
 }
 
-VX_PRIVATE_API vx_bool vxoGraphOptimization_GetElementTensorShape(vx_tensor input, vx_uint32 sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION], vx_uint32 * num_of_dims)
+VX_PRIVATE_API vx_uint32 vxoEltwise_fill_dim
+    (
+    vx_uint32* shape_x, vx_uint32* shape_y,
+    vx_uint32* shape_output, vx_uint32 rank,
+    vx_uint32 max_rank, vx_uint32 size_x, vx_uint32 size_y,
+    vx_uint32 size_output
+    )
 {
-    vx_status status            = VX_SUCCESS;
-    vx_uint32 element_count     = 0;
-    vx_uint32 i                 = 0;
-
-    status = vxoTensor_GetTensorElementCount(input, &element_count);
-    if (status != VX_SUCCESS) return vx_false_e;
-
-    for (i = 0; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
+    vx_uint32 cost_size = 1;
+    gcmASSERT(rank >= max_rank );
+    if(size_output < VIV_TENSOR_MAX_WIDTH )
     {
-        sizes[i] = 1;
-    }
-
-    if (element_count < VIV_TENSOR_MAX_WIDTH)
-    {
-        sizes[0] = element_count;
-
-        *num_of_dims = 2;
+        shape_x[rank] = size_x;
+        shape_y[rank] = size_y;
+        shape_output[rank] = size_output;
     }
     else
     {
-        vx_uint32 divisors = 1;
-        for (i = 0; i < 2; i++)
+        vx_uint32 divisor = 0;
+        vx_uint32 remainder = 0;
+
+        vxoGetDataDivisors(size_output, &divisor, 1 );
+        remainder = size_output / divisor;
+        if(remainder > VIV_TENSOR_MAX_WIDTH || rank >= max_rank )
         {
-            divisors = 1;
-            vxoGetDataDivisors(element_count, &divisors, 1);
-
-            sizes[i] = divisors;
-            element_count = element_count / divisors;
-        }
-
-        sizes[2] = element_count;
-        *num_of_dims = 3;
-    }
-
-    return vx_true_e;
-}
-
-VX_PRIVATE_API vx_status vxoGraphOptimization_EltwiseTensorShapeOpt(vx_tensor input0, vx_tensor input1, vx_tensor output, vx_uint32 sizes0[VX_CONTEXT_TENSOR_MAX_DIMENSION], vx_uint32 sizes1[VX_CONTEXT_TENSOR_MAX_DIMENSION], vx_uint32 sizes2[VX_CONTEXT_TENSOR_MAX_DIMENSION], vx_uint32 *dim_num)
-{
-    vx_status status            = VX_SUCCESS;
-
-    vx_uint32 i                 = 0;
-    vx_uint32 cnt               = 0;
-    vx_uint32 element_count0    = 0;
-    vx_uint32 element_count1    = 0;
-    vx_uint32 dims              = 0;
-    vx_bool   enable_broadcast  = vx_false_e;
-    vx_bool   enable_broadcast1 = vx_false_e;
-    vx_uint32 broadcast_Bits    = 0;
-
-    vxoTensor_GetTensorElementCount(input0, &element_count0);
-    vxoTensor_GetTensorElementCount(input1, &element_count1);
-
-    if (element_count0 == 1 || element_count1 == 1)
-    {
-        enable_broadcast1 = vx_true_e;
-    }
-
-    /*************step 1:init tensor shape*****************/
-    for (i = 0; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
-    {
-        sizes0[i] = 1;
-        sizes1[i] = 1;
-        sizes2[i] = 1;
-    }
-
-    /*************step 2:squeeze tensor shape*****************/
-    for (i = 0; i < TENSOR_DIM_NUM(output); i++)
-    {
-        vx_uint32 sz0 = TENSOR_DIM_NUM(input0) > i ? TENSOR_VIEW_SIZE_INDEX(input0, i) : 1;
-        vx_uint32 sz1 = TENSOR_DIM_NUM(input1) > i ? TENSOR_VIEW_SIZE_INDEX(input1, i) : 1;
-        vx_uint32 sz2 = TENSOR_DIM_NUM(output) > i ? TENSOR_VIEW_SIZE_INDEX(output, i) : 1;
-
-        if (sz0 == sz1 && sz0 == 1)
-        {
-            continue;
+            // Cannot optimize.
+            shape_x[rank] = size_x;
+            shape_y[rank] = size_y;
+            shape_output[rank] = size_output;
         }
         else
         {
-            sizes0[cnt] = sz0;
-            sizes1[cnt] = sz1;
-            sizes2[cnt] = sz2;
-
-            cnt ++;
-            dims ++;
+            /*
+             * We've limit the max size to 2^32 -1(Almost 4G * sizeof(data type)),
+             * so it should be always 2.
+             */
+            cost_size = 2;
+            if(size_x > 1 )
+            {
+                shape_x[rank]  = divisor;
+                shape_x[rank + 1] = remainder;
+            }
+            else
+            {
+                shape_x[rank] = 1;
+                shape_x[rank + 1] = 1;
+            }
+            if(size_y > 1 )
+            {
+                shape_y[rank]  = divisor;
+                shape_y[rank + 1] = remainder;
+            }
+            else
+            {
+                shape_y[rank] = 1;
+                shape_y[rank + 1] = 1;
+            }
+            shape_output[rank] = divisor;
+            shape_output[rank + 1] = remainder;
         }
     }
+    return cost_size;
+}
 
-    for (i = 0; i < dims; i++)
+VX_PRIVATE_API vx_bool vxoGraphOptimization_EltwiseTensorShapeOpt
+    (
+    vx_tensor input0,
+    vx_tensor input1,
+    vx_tensor output,
+    vx_uint32 *out_shape_x,
+    vx_uint32 *out_shape_y,
+    vx_uint32 *out_shape_output,
+    vx_uint32 *out_rank_output
+    )
+{
+    vx_bool   ret                           = vx_true_e;
+    vx_bool   append_dim                    = vx_false_e;
+    vx_uint32 i                             = 0;
+    vx_uint32 dims                          = 0;
+    vx_uint32 effective_size_x              = 1;
+    vx_uint32 effective_size_y              = 1;
+    vx_uint32 tmp_sz                        = 0;
+    vx_uint32 sx                            = 0;
+    vx_uint32 sy                            = 0;
+    vx_uint32 rank_x                        = TENSOR_DIM_NUM(input0);
+    vx_uint32 rank_y                        = TENSOR_DIM_NUM(input1);
+    vx_uint32 rank_output                   = TENSOR_DIM_NUM(output);
+    vx_uint32 shape_x[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 shape_y[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_uint32 shape_output[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+    vx_eltwise_broadcast_state_e state      = VX_ELTWISE_BROADCAST_STATE_EMPTY;
+    vx_eltwise_broadcast_state_e prv_state  = VX_ELTWISE_BROADCAST_STATE_EMPTY;
+
+
+    for (i = 0; i < rank_x; i++)
     {
-        vx_uint32 sz0 = sizes0[i];
-        vx_uint32 sz1 = sizes1[i];
+        shape_x[i] = TENSOR_VIEW_SIZE_INDEX(input0, i);
+    }
 
-        if (sz0 != sz1)
+    for (i = 0; i < rank_y; i++)
+    {
+        shape_y[i] = TENSOR_VIEW_SIZE_INDEX(input1, i);
+    }
+
+    for (i = 0; i < rank_output; i++)
+    {
+        shape_output[i] = TENSOR_VIEW_SIZE_INDEX(output, i);
+    }
+#define _swap_size(a, b, tmp)  \
+    do { \
+        tmp = a; \
+        a = b; \
+        b = tmp; \
+    } while(0)
+    for(i = 0; i < rank_output; i++ )
+    {
+        sx = i < rank_x ? shape_x[i] : 1;
+        sy = i < rank_y ? shape_y[i] : 1;
+
+        /*
+         * Skip dim if the size is equal to 1
+         * Also skip if(sx == 1 && sy == 1 )
+         */
+        if(shape_output[i] == 1 )
         {
-            enable_broadcast = vx_true_e;
-            broadcast_Bits |= (1 << i);
+            continue;
         }
-    }
-
-    /*************step 3:reshape tensor shape*****************/
-    if (enable_broadcast == vx_false_e || enable_broadcast1)
-    {
-        vxoGraphOptimization_GetElementTensorShape(input0, sizes0, &dims);
-        vxoGraphOptimization_GetElementTensorShape(input1, sizes1, &dims);
-        vxoGraphOptimization_GetElementTensorShape(output, sizes2, &dims);
-    }
-    else
-    {
-        switch (broadcast_Bits)
+        // Invalid shape for broadcasting
+        if(sx != sy && sx > 1 && sy > 1 )
         {
-        case ELTWISE_BROAD_CAST_BITS_0:
-            {
-                vx_uint32 element_count = 1;
-                vx_uint32 divisors = 1;
-
-                for (i = 1; i < dims; i++)
-                {
-                    element_count *= sizes0[i];
-                }
-
-                divisors = 1;
-                vxoGetDataDivisors(element_count, &divisors, 1);
-
-                sizes0[1] = divisors;
-                sizes1[1] = divisors;
-                sizes2[1] = divisors;
-                sizes0[2] = element_count / divisors;
-                sizes1[2] = element_count / divisors;
-                sizes2[2] = element_count / divisors;
-                dims = 3;
-
-                break;
-            }
-        case ELTWISE_BROAD_CAST_BITS_0 | ELTWISE_BROAD_CAST_BITS_1:
-        case ELTWISE_BROAD_CAST_BITS_0 | ELTWISE_BROAD_CAST_BITS_1 | ELTWISE_BROAD_CAST_BITS_2:
-            {
-                vx_uint32 w0 = sizes0[0] * sizes0[1];
-                vx_uint32 w1 = sizes1[0] * sizes1[1];
-                vx_uint32 w  = sizes2[0] * sizes2[1];
-                vx_uint32 h = sizes0[2];
-
-                if (h < VIV_TENSOR_MAX_WIDTH && (w0 == 1 || w1 == 1)
-                    && w < VIV_TENSOR_MAX_WIDTH)
-                {
-                    sizes0[0] = w0;
-                    sizes1[0] = w1;
-                    sizes2[0] = w;
-                    sizes0[1] = sizes0[2];
-                    sizes1[1] = sizes1[2];
-                    sizes2[1] = sizes2[2];
-                    sizes0[2] = 1;
-                    sizes1[2] = 1;
-                    sizes2[2] = 1;
-                }
-
-                break;
-            }
-        case ELTWISE_BROAD_CAST_BITS_2:
-            {
-                vx_uint32 w = sizes0[0] * sizes0[1];
-
-                if (w < VIV_TENSOR_MAX_WIDTH)
-                {
-                    sizes0[0] = w;
-                    sizes1[0] = w;
-                    sizes2[0] = w;
-                    sizes0[1] = sizes0[2];
-                    sizes1[1] = sizes1[2];
-                    sizes2[1] = sizes2[2];
-                    sizes0[2] = 1;
-                    sizes1[2] = 1;
-                    sizes2[2] = 1;
-                }
-
-                break;
-            }
-        default:
-            if (dims == TENSOR_DIM_NUM(output))
-                status = VX_FAILURE;
+            ret = FALSE;
             break;
         }
+        // Update state
+        state = VX_ELTWISE_BROADCAST_STATE_EMPTY;
+        if(sx == sy )
+        {
+            state = VX_ELTWISE_BROADCAST_STATE_NO_BROADCAST;
+        }
+        else if(sx == 1 )
+        {
+            state = VX_ELTWISE_BROADCAST_STATE_BROADCAST_X;
+        }
+        else if(sy == 1 )
+        {
+            state = VX_ELTWISE_BROADCAST_STATE_BROADCAST_Y;
+        }
+        else
+        {
+            gcmASSERT(FALSE );
+        }
+        if(prv_state == VX_ELTWISE_BROADCAST_STATE_EMPTY )
+        {
+            effective_size_x *= sx;
+            effective_size_y *= sy;
+            prv_state = state;
+            continue;
+        }
+        append_dim = FALSE;
+#define _pack_state(prev_state, cur_state )    (prev_state << 16 | cur_state)
+        switch(_pack_state(prv_state, state ) )
+        {
+            /*
+             * ...,x1,x2,...
+             * ...,y1,y2,...
+             */
+            case _pack_state(VX_ELTWISE_BROADCAST_STATE_NO_BROADCAST, VX_ELTWISE_BROADCAST_STATE_NO_BROADCAST ):
+                effective_size_x *= sx;
+                effective_size_y *= sy;
+                break;
+            /*
+             * ..., 1, 1,...
+             * ...,y1,y2,...
+             */
+            case _pack_state(VX_ELTWISE_BROADCAST_STATE_BROADCAST_X, VX_ELTWISE_BROADCAST_STATE_BROADCAST_X ):
+                effective_size_y *= sy;
+                break;
+            /*
+             * ...,x1,x2,...
+             * ..., 1, 1,...
+             */
+            case _pack_state(VX_ELTWISE_BROADCAST_STATE_BROADCAST_Y, VX_ELTWISE_BROADCAST_STATE_BROADCAST_Y ):
+                effective_size_x *= sx;
+                break;
+
+            /*
+             * ...,x1, 1,...
+             * ...,y1,y2,...
+             *
+             * ...,x1,x2,...
+             * ...,y1, 1,...
+             *
+             * ..., 1,x2,...
+             * ...,y1, 1,...
+             *
+             * ..., 1,x2,...
+             * ...,y1,y2,...
+             *
+             * ...,x1, 1,...
+             * ..., 1,y2,...
+             *
+             * ...,x1,x2,...
+             * ..., 1,y2,...
+             */
+            case _pack_state(VX_ELTWISE_BROADCAST_STATE_NO_BROADCAST, VX_ELTWISE_BROADCAST_STATE_BROADCAST_X ):
+            case _pack_state(VX_ELTWISE_BROADCAST_STATE_NO_BROADCAST, VX_ELTWISE_BROADCAST_STATE_BROADCAST_Y ):
+            case _pack_state(VX_ELTWISE_BROADCAST_STATE_BROADCAST_X, VX_ELTWISE_BROADCAST_STATE_BROADCAST_Y ):
+            case _pack_state(VX_ELTWISE_BROADCAST_STATE_BROADCAST_X, VX_ELTWISE_BROADCAST_STATE_NO_BROADCAST ):
+            case _pack_state(VX_ELTWISE_BROADCAST_STATE_BROADCAST_Y, VX_ELTWISE_BROADCAST_STATE_BROADCAST_X ):
+            case _pack_state(VX_ELTWISE_BROADCAST_STATE_BROADCAST_Y, VX_ELTWISE_BROADCAST_STATE_NO_BROADCAST ):
+                _swap_size(sx, effective_size_x, tmp_sz);
+                _swap_size(sy, effective_size_y, tmp_sz);
+                append_dim = TRUE;
+                break;
+            default:
+                vxError("Get error state (%d -> %d) while computing broadcast shape.",
+                        prv_state, state);
+                break;
+        }
+#undef _pack_state
+        prv_state = state;
+        if(append_dim )
+        {
+            dims += vxoEltwise_fill_dim(out_shape_x, out_shape_y, out_shape_output,
+                    dims, VX_CONTEXT_TENSOR_MAX_DIMENSION, sx, sy, gcmMAX(sx, sy ) );
+        }
     }
+    if(ret )
+    {
+        /* Append the last dim */
+        if(i == rank_output )
+        {
+            sx = effective_size_x;
+            sy = effective_size_y;
+            dims += vxoEltwise_fill_dim(out_shape_x, out_shape_y, out_shape_output,
+                    dims, VX_CONTEXT_TENSOR_MAX_DIMENSION, sx, sy, gcmMAX(sx, sy ) );
+        }
+        /* Avoid 1D shape*/
+        if(1 == dims )
+        {
+            out_shape_x[1] = 1;
+            out_shape_y[1] = 1;
+            out_shape_output[1] = 1;
+            dims = 2;
+        }
 
-    if (status == VX_SUCCESS)
-        *dim_num = gcmMAX(dims, 2);
-
-    return status;
+        *out_rank_output = dims;
+    }
+#undef _swap_size
+    return ret;
 }
 
 /*optimization for element-wise op*/
@@ -4666,7 +4726,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_eltwiseOp(vx_graph graph)
 
         if(vxoGraphOptimization_getKernelType(node) == OP_ELTWISE_ASMD || vxoGraphOptimization_getKernelType(node) == OP_ADD_SUB)
         {
-            vx_status status = VX_SUCCESS;
+            vx_bool ret = vx_true_e;
             vx_tensor tensorIn[2]   = {(vx_tensor)node->paramTable[0], (vx_tensor)node->paramTable[1]};
             vx_tensor output        = (vx_tensor)node->paramTable[node->numParameters - 1];
             vx_uint32 inDims0[VX_CONTEXT_TENSOR_MAX_DIMENSION];
@@ -4674,9 +4734,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_eltwiseOp(vx_graph graph)
             vx_uint32 outDims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
             vx_uint32 dimcnt = 0;
 
-            status = vxoGraphOptimization_EltwiseTensorShapeOpt(tensorIn[0], tensorIn[1], output, inDims0, inDims1, outDims, &dimcnt);
+            ret = vxoGraphOptimization_EltwiseTensorShapeOpt(tensorIn[0], tensorIn[1], output, inDims0, inDims1, outDims, &dimcnt);
 
-            if (status == VX_SUCCESS)
+            if (ret)
             {
                 vx_tensor newinput0 = vxoTensor_ReshapeTensor(tensorIn[0], (vx_int32*)inDims0, dimcnt);
                 vx_tensor newinput1 = vxoTensor_ReshapeTensor(tensorIn[1], (vx_int32*)inDims1, dimcnt);

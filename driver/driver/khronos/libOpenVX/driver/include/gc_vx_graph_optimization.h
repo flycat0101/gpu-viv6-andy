@@ -222,13 +222,14 @@ typedef enum _param_concat2_index_e
     PARAM_CONCAT2_INDEX_MAX
 } param_concat2_index_e;
 
-typedef enum _eltwise_broad_cast_bits_e
+typedef enum _vx_eltwise_broadcast_state_e
 {
-    ELTWISE_BROAD_CAST_BITS_0 = 0x01,
-    ELTWISE_BROAD_CAST_BITS_1 = 0x02,
-    ELTWISE_BROAD_CAST_BITS_2 = 0x04,
-    ELTWISE_BROAD_CAST_BITS_4 = 0x08,
-} eltwise_broad_cast_bits_e;
+    VX_ELTWISE_BROADCAST_STATE_BROADCAST_X  = 0,
+    VX_ELTWISE_BROADCAST_STATE_BROADCAST_Y  = 1,
+    VX_ELTWISE_BROADCAST_STATE_BROADCAST_XY = 2,
+    VX_ELTWISE_BROADCAST_STATE_NO_BROADCAST = 4,
+    VX_ELTWISE_BROADCAST_STATE_EMPTY        = 8,
+} vx_eltwise_broadcast_state_e;
 
 typedef vx_status (*perpareQuantizedWeightAndBiasFunc) (vx_tensor *weight, vx_tensor *bias, vx_tensor tensorIn[2], vx_uint32 coreNum, vx_int32 factor);
 
