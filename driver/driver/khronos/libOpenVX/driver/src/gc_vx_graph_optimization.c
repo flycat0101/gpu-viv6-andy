@@ -2831,7 +2831,7 @@ VX_PRIVATE_API vx_status vxoGraphOptimization_TensorAdd2Conv_createBias_asymmeti
     vx_uint32 bDims[1] = {coreNum};
     float biasScale = TENSOR_TF_SCALE(*weight) * TENSOR_TF_SCALE(tensorIn[0]);
 
-    if(!bias)
+    if(!(*bias))
     {
         vx_tensor_create_params_t bias_p = vxoGraphOptimization_createParamsForTensor(1, bDims, VX_TYPE_INT32, VX_QUANT_AFFINE_SCALE,
             0, 0, biasScale);
