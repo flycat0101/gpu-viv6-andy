@@ -7367,6 +7367,7 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
     vx_uint32     paramNum              = 3;
     vx_uint32     i                     = 0;
     vx_bool       useImage2DFlag        = vx_false_e;
+    vx_bool       enable_broadcast      = vx_false_e;
     vx_bool       enable_broadcast_Z    = vx_false_e;
 
     vx_scalar scaleIn0 = NULL;
@@ -7386,6 +7387,7 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
 
         if (size0 != size1)
         {
+            enable_broadcast = vx_true_e;
             if((size0 != 1) && (size1 != 1))
             {
                 goto OnError;
@@ -7430,7 +7432,7 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
         parameters[2] = (vx_reference)dst;
     }
 
-    if (depth == 1 && operation == VX_TENSOR_OP_ADD)
+    if (depth == 1 && operation == VX_TENSOR_OP_ADD && enable_broadcast == vx_false_e)
     {
         useImage2DFlag = vx_true_e;
     }
