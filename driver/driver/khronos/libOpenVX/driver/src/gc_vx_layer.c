@@ -17285,6 +17285,7 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
                     if (!shaderExecutable) goto OnError;
 
                     execution_parameters.globalWorkScale[0]  = 4;
+                    execution_parameters.globalWorkScale[1]  = 4;
                 }
                 else
                 {
