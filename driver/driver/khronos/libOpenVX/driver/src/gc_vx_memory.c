@@ -1713,9 +1713,6 @@ again:
                                 {
                                     for (k = 0; k < pcounts[p]; k++)
                                     {
-                                        if (VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(cplist[k]->allocPriority))
-                                            continue;
-
                                         asize += cplist[k]->sizes[1];
                                         acount++;
 
@@ -1765,7 +1762,11 @@ again:
                                     }
                                     else
                                     {
-                                        vxmASSERT(!VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(plist[k]->allocPriority));
+                                        if (VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(plist[k]->allocPriority))
+                                        {
+                                            status = VX_FAILURE;
+                                            goto exit;
+                                        }
                                         plist[k]->sizes[1] = 0;
                                     }
 
