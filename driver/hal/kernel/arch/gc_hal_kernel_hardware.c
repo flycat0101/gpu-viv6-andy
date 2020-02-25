@@ -1313,7 +1313,12 @@ _QueryFeatureDatabase(
         break;
 
     case gcvFEATURE_MMU:
+#if gcdCAPTURE_ONLY_MODE
+        available = gcvTRUE;
+#else
         available = database->REG_MMU;
+#endif
+
         break;
 
     case gcvFEATURE_FENCE_64BIT:
@@ -2875,9 +2880,11 @@ gckHARDWARE_InitializeHardware(
                                   data));
     }
 
+#if !gcdCAPTURE_ONLY_MODE
     gcmkONERROR(
         gckHARDWARE_SetMMU(Hardware,
                            Hardware->kernel->mmu));
+#endif
 
     if (Hardware->mcFE)
     {
@@ -9069,6 +9076,13 @@ gckHARDWARE_QueryIdle(
 
     gcmkHEADER_ARG("Hardware=0x%x", Hardware);
 
+#if gcdCAPTURE_ONLY_MODE
+    *IsIdle = gcvTRUE;
+
+    gcmkFOOTER_NO();
+    return gcvSTATUS_OK;
+#endif
+
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
     gcmkVERIFY_ARGUMENT(IsIdle != gcvNULL);
@@ -13366,6 +13380,10 @@ gckHARDWARE_ExecuteFunctions(
     gctUINT32 timer = 0, delay = 1;
     gctUINT32 address;
     gckHARDWARE hardware = (gckHARDWARE)Execution->hardware;
+
+#if gcdCAPTURE_ONLY_MODE
+    return gcvSTATUS_OK;
+#endif
 
     address = Execution->address;
 

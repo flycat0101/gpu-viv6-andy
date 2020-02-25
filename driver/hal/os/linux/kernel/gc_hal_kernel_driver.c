@@ -1165,6 +1165,16 @@ static int __devinit gpu_probe(struct platform_device *pdev)
     static u64 dma_mask = DMA_40BIT_MASK;
 #endif
 
+#if gcdCAPTURE_ONLY_MODE
+    gctPHYS_ADDR_T contiguousBaseCap = 0;
+    gctSIZE_T contiguousSizeCap = 0;
+    gctPHYS_ADDR_T sRAMBaseCap[gcvCORE_COUNT][gcvSRAM_INTER_COUNT];
+    gctUINT32 sRAMSizeCap[gcvCORE_COUNT][gcvSRAM_INTER_COUNT];
+    gctPHYS_ADDR_T extSRAMBaseCap[gcvSRAM_EXT_COUNT];
+    gctUINT32 extSRAMSizeCap[gcvSRAM_EXT_COUNT];
+    gctUINT i = 0, j = 0;
+#endif
+
     gcmkHEADER();
 
     platform->device = pdev;
@@ -1187,12 +1197,51 @@ static int __devinit gpu_probe(struct platform_device *pdev)
     /* Gather module parameters. */
     _InitModuleParam(&moduleParam);
 
+#if gcdCAPTURE_ONLY_MODE
+    contiguousBaseCap = moduleParam.contiguousBase;
+    contiguousSizeCap = moduleParam.contiguousSize;
+
+    for (i = 0; i < gcvCORE_COUNT; i++)
+    {
+        for (j = 0; j < gcvSRAM_INTER_COUNT; j++)
+        {
+            sRAMBaseCap[i][j] = moduleParam.sRAMBases[i][j];
+            sRAMSizeCap[i][j] = moduleParam.sRAMSizes[i][j];
+        }
+    }
+
+    for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
+    {
+        extSRAMBaseCap[i] = moduleParam.extSRAMBases[i];
+        extSRAMSizeCap[i] = moduleParam.extSRAMSizes[i];
+    }
+#endif
+
     if (platform->ops->adjustParam)
     {
         /* Override default module param. */
         platform->ops->adjustParam(platform, &moduleParam);
     }
 
+#if gcdCAPTURE_ONLY_MODE
+    moduleParam.contiguousBase = contiguousBaseCap;
+    moduleParam.contiguousSize = contiguousSizeCap;
+
+    for (i = 0; i < gcvCORE_COUNT; i++)
+    {
+        for (j = 0; j < gcvSRAM_INTER_COUNT; j++)
+        {
+            moduleParam.sRAMBases[i][j] = sRAMBaseCap[i][j];
+            moduleParam.sRAMSizes[i][j] = sRAMSizeCap[i][j];
+        }
+    }
+
+    for (i = 0; i < gcvSRAM_EXT_COUNT; i++)
+    {
+        moduleParam.extSRAMBases[i] = extSRAMBaseCap[i];
+        moduleParam.extSRAMSizes[i] = extSRAMSizeCap[i];
+    }
+#endif
     /* Update module param because drv_init() uses them directly. */
     _SyncModuleParam(&moduleParam);
 

@@ -1212,11 +1212,16 @@ _SetupContiguousVidMem(
         else
         {
             gckALLOCATOR allocator;
+            gctBOOL contiguousRequested = Args->contiguousRequested;
+
+#if gcdCAPTURE_ONLY_MODE
+            contiguousRequested = gcvTRUE;
+#endif
 
             gcmkONERROR(gckOS_RequestReservedMemory(
                 device->os, Args->contiguousBase, Args->contiguousSize,
                 "galcore contiguous memory",
-                Args->contiguousRequested,
+                contiguousRequested,
                 &device->contiguousPhysical
                 ));
 
@@ -1831,6 +1836,9 @@ gckGALDEVICE_Construct(
                 char sRAMName[20];
                 snprintf(sRAMName, gcmSIZEOF(sRAMName) - 1, "Galcore external sram%d", i);
 
+#if gcdCAPTURE_ONLY_MODE
+                device->args.sRAMRequested = gcvTRUE;
+#endif
                 /* Map external SRAM memory. */
                 gcmkONERROR(gckOS_RequestReservedMemory(
                         device->os,

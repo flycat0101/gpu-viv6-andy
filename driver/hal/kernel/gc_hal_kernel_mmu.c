@@ -3206,6 +3206,10 @@ gckMMU_SetupSRAM(
 
                     Device->sRAMPhysFaked[i][j] = gcvTRUE;
                 }
+
+#if gcdCAPTURE_ONLY_MODE
+                Device->sRAMPhysFaked[i][j] = gcvTRUE;
+#endif
             }
         }
 

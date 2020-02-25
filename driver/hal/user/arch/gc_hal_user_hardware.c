@@ -5326,6 +5326,26 @@ _Attach(
     iface.u.Attach.map = gcvFALSE;
 #endif
 
+#if gcdCAPTURE_ONLY_MODE
+    iface.u.Attach.queryCapSize = gcvTRUE;
+
+    gcmONERROR(gcoOS_DeviceControl(
+        gcvNULL,
+        IOCTL_GCHAL_INTERFACE,
+        &iface, gcmSIZEOF(iface),
+        &iface, gcmSIZEOF(iface)
+        ));
+
+    gcmONERROR(iface.status);
+
+    for (i = 0; i < gcdCONTEXT_BUFFER_NUM; i++)
+    {
+        gcmONERROR(gcoOS_Allocate(gcvNULL, iface.u.Attach.captureSize, &iface.u.Attach.contextLogical[i]));
+    }
+
+    iface.u.Attach.queryCapSize = gcvFALSE;
+#endif
+
     gcmONERROR(gcoOS_DeviceControl(
         gcvNULL,
         IOCTL_GCHAL_INTERFACE,
@@ -5347,7 +5367,7 @@ _Attach(
 
     hardware->numStates  = iface.u.Attach.numStates;
 
-#if gcdDUMP
+#if gcdDUMP || gcdCAPTURE_ONLY_MODE
     hardware->currentContext = 0;
     hardware->contextBytes = iface.u.Attach.bytes;
 
@@ -7354,6 +7374,11 @@ gceSTATUS gcoHARDWARE_Destroy(
             if (Hardware->contexts[i] != 0)
             {
                 gcsHAL_INTERFACE iface;
+
+#if gcdCAPTURE_ONLY_MODE
+                gctUINT count = 0;
+#endif
+
                 iface.ignoreTLS = gcvFALSE;
                 iface.command = gcvHAL_DETACH;
                 iface.u.Detach.context = Hardware->contexts[i];
@@ -7371,6 +7396,13 @@ gceSTATUS gcoHARDWARE_Destroy(
                     ));
 
                 Hardware->contexts[i] = 0;
+
+#if gcdCAPTURE_ONLY_MODE
+                for (count = 0; count < gcdCONTEXT_BUFFER_COUNT; ++count)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, Hardware->contextLogical[count]);
+                }
+#endif
             }
         }
         gcoHAL_SetCoreIndex(gcvNULL, coreIndex);
@@ -10586,6 +10618,13 @@ gcoHARDWARE_Commit(
         }
 #endif
     }
+
+#if gcdCAPTURE_ONLY_MODE
+     gcoBUFFER_SetContextLogical(
+        Hardware->contextLogical,
+        Hardware->engine[gcvENGINE_RENDER].buffer
+        );
+#endif
 
     status = gcoBUFFER_Commit(
         Hardware->engine[gcvENGINE_RENDER].buffer,
@@ -16970,7 +17009,18 @@ gcoHARDWARE_LockExAddCpuPhysicalAddr(
             iface.u.LockVideoMemory.node = handle;
             iface.u.LockVideoMemory.cacheable = cacheable;
 
+#if gcdCAPTURE_ONLY_MODE
+            iface.u.LockVideoMemory.queryCapSize = gcvTRUE;
+
             gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+
+            gcmONERROR(gcoOS_Allocate(gcvNULL, iface.u.LockVideoMemory.captureSize, &iface.u.LockVideoMemory.captureLogical));
+
+            iface.u.LockVideoMemory.queryCapSize = gcvFALSE;
+#endif
+
+            gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+
             if (CpuPhysicalAddress != gcvNULL)
             {
                 gcmASSERT(iface.u.LockVideoMemory.physicalAddress < 0x100000000);
@@ -17105,6 +17155,16 @@ gcoHARDWARE_LockEx(
             iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
             iface.u.LockVideoMemory.node = handle;
             iface.u.LockVideoMemory.cacheable = cacheable;
+
+#if gcdCAPTURE_ONLY_MODE
+            iface.u.LockVideoMemory.queryCapSize = gcvTRUE;
+
+            gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+
+            gcmONERROR(gcoOS_Allocate(gcvNULL, iface.u.LockVideoMemory.captureSize, &iface.u.LockVideoMemory.captureLogical));
+
+            iface.u.LockVideoMemory.queryCapSize = gcvFALSE;
+#endif
 
             gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
 

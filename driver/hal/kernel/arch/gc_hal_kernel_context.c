@@ -4240,6 +4240,10 @@ _AllocateContextBuffer(
         &Buffer->videoMem
         ));
 
+#if gcdCAPTURE_ONLY_MODE
+    gcmkONERROR(gckVIDMEM_HANDLE_Allocate(kernel, Buffer->videoMem, &Context->buffer->handle));
+#endif
+
     /* Lock for GPU access. */
     gcmkONERROR(gckVIDMEM_NODE_Lock(
         kernel,
