@@ -13493,13 +13493,20 @@ _ParseSearchLayoutId(
     sleLAYOUT_ID_EXT    layoutId2 = slvLAYOUT_EXT_NONE;
     sleSHADER_TYPE      shaderType;
     sleCOMPILER_FLAGS   flag;
+    sloEXTENSION extension = {{0}};
 
     shaderType = Compiler->shaderType;
     flag = Compiler->context.compilerFlags;
 
     /* Match layoutId1. */
+    extension.extension2 = slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION;
     if (gcmIS_SUCCESS(gcoOS_StrCmp(LayoutId->u.identifier, "location"))) {
-        layoutId1 = slvLAYOUT_LOCATION;
+        if (sloCOMPILER_GetLanguageVersion(Compiler) > _SHADER_GL32_VERSION ||
+            (sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_GL32_VERSION &&
+             sloCOMPILER_ExtensionEnabled(Compiler, &extension)))
+        {
+            layoutId1 = slvLAYOUT_LOCATION;
+        }
     }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(LayoutId->u.identifier, "shared"))) {
         layoutId1 = slvLAYOUT_SHARED;

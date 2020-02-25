@@ -1244,6 +1244,13 @@ sloCOMPILER_Compile(
     {
         sloCOMPILER_SetLanguageVersion(Compiler, 110, gcvTRUE);
     }
+    /* Check if "GL_ARB_explicit_attrib_location" extention is enable. */
+    if (gcoOS_StrStr(GetGLExtensionString(), "GL_ARB_explicit_attrib_location", gcvNULL))
+    {
+        sloEXTENSION extension = {{0}};
+        extension.extension2 = slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION;
+        sloCOMPILER_EnableExtension(Compiler, &extension, gcvTRUE);
+    }
 
     /* Check if HW has HALTI5 and FMA support */
     if(GetHWHasHalti5() && GetHWHasFmaSupport())

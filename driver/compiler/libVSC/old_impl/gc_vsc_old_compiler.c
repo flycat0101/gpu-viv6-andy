@@ -7360,13 +7360,14 @@ gcSHADER_MergeShader(
     OUT gcSHADER *    MergedShader
     )
 {
-    gceSTATUS   status = gcvSTATUS_OK;
-    gcSHADER    mainShader = gcvNULL;
-    gctINT      i;
-    gctUINT     j, functionCount;
+    gceSTATUS     status = gcvSTATUS_OK;
+    gcSHADER      mainShader = gcvNULL;
+    gctINT        i;
+    gctUINT       j, functionCount, s, k;
     gcSHADER_KIND type = gcSHADER_TYPE_UNKNOWN;
     gctUINT       offset = 0;
     gctCHAR       headsup[256];
+    gcLibraryList *libList;
 
     gcmHEADER_ARG("ShaderCount=%d ShaderArray=0x%x", ShaderCount, ShaderArray);
 
@@ -7501,7 +7502,8 @@ gcSHADER_MergeShader(
     {
         gcFUNCTION function = mainShader->functions[j];
         gcFUNCTION externFunction = gcvNULL;
-        gctBOOL funcDefined = gcvFALSE;
+        gctBOOL    funcDefined = gcvFALSE;
+        gctINT     tempIndex[32];
 
         if (function == gcvNULL || !IsFunctionExtern(function)) {
             continue;
@@ -7534,6 +7536,95 @@ gcSHADER_MergeShader(
                 gcmONERROR(_linkExternShader(ShaderCount,
                                              ShaderArray,
                                              ShaderArray[i]));
+            }
+
+            /* initialize tempRegister Index. */
+            for (k = 0; k < 32; k++)
+            {
+                tempIndex[k] = -1;
+            }
+            /* Allocate and add output to shader. */
+            if (ShaderArray[i]->outputCount)
+            {
+                for (s = 0; s < ShaderArray[i]->outputCount; s++)
+                {
+                    gctINT location = ShaderArray[i]->outputs[s]->location;
+                    gctSTRING outputAddName = ShaderArray[i]->outputs[s]->name;
+                    gctBOOL addOutput = gcvTRUE;
+
+                    for (k = 0; k < mainShader->outputCount; k++)
+                    {
+                        if ((location != -1) && (location == mainShader->outputs[k]->location))
+                        {
+                            ERR_REPORT(VSC_ERR_LOCATION_OVERLAP, "multiple bindings to output semantic : %s", outputAddName);
+                            return gcvSTATUS_LOCATION_OVERLAP;
+                        }
+                        else if ((location > 0) && (location != mainShader->outputs[k]->location) &&
+                                gcmIS_SUCCESS(gcoOS_StrCmp(outputAddName, mainShader->outputs[k]->name)))
+                        {
+                            ERR_REPORT(VSC_ERR_LOCATION_NOTCONSISTENT, "Same output name : %s has different location.", outputAddName);
+                            return gcvSTATUS_LOCATION_NOTCONSISTENT;
+                        }
+                        else
+                        {
+                            if (gcmIS_SUCCESS(gcoOS_StrCmp(outputAddName, mainShader->outputs[k]->name)))
+                            {
+                                addOutput = gcvFALSE;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (addOutput)
+                    {
+                        gcOUTPUT           newOutput;
+                        gctINT             rows;
+                        gctUINT32 outputFlag = ShaderArray[i]->outputs[s]->flags_;
+                        gcSHADER_TYPE outputType = ShaderArray[i]->outputs[s]->type;
+                        gcSHADER_PRECISION precision = ShaderArray[i]->outputs[s]->precision;
+                        gcSHADER_SHADERMODE shadingMode = ShaderArray[i]->outputs[s]->shaderMode;
+
+                        /* allocate temp register for the new output */
+                        rows = gcmType_Rows(outputType);
+                        tempIndex[s] = gcSHADER_NewTempRegs(mainShader, rows, outputType);
+
+                        /* newly added output is the last one in shader->outputs array */
+                        gcmONERROR(gcSHADER_AddOutputWithLocation(mainShader,
+                                                                  outputAddName,
+                                                                  outputType,
+                                                                  precision,
+                                                                  gcvFALSE,
+                                                                  1,
+                                                                  (gctUINT32)tempIndex[s],
+                                                                  shadingMode,
+                                                                  location,
+                                                                  -1,
+                                                                  gcvFALSE,
+                                                                  gcvFALSE,
+                                                                  &newOutput));
+                        /* Set added output Flag. */
+                        (mainShader)->outputs[mainShader->outputCount - 1]->flags_ = outputFlag;
+                    }
+                }
+            }
+
+            /* initialize Library's temp register mapping for the Shader */
+            libList = gcSHADER_InitMappingTable(ShaderArray[i], mainShader);
+            if(libList == gcvNULL)
+            {
+                status = gcvSTATUS_INVALID_ARGUMENT;
+                gcmONERROR(status);
+            }
+
+            for (j = 0; j < ShaderArray[i]->outputCount; j++)
+            {
+                gctINT mappedTempRegIndex;
+
+                mappedTempRegIndex = (gctINT)ShaderArray[i]->outputs[j]->tempIndex;
+
+                _MapTempRegister(libList,
+                                 mappedTempRegIndex,
+                                 tempIndex[j]);
             }
 
             gcmONERROR(gcSHADER_LinkExternFunction(mainShader,

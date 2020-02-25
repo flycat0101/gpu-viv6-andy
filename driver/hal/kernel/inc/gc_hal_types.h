@@ -529,6 +529,8 @@ typedef enum _gceSTATUS
     gcvSTATUS_INPUT_ARRAY_SIZE_MISMATCH         =   -1026,
     gcvSTATUS_OUTPUT_ARRAY_SIZE_MISMATCH        =   -1027,
     gcvSTATUS_LOCATION_ALIASED                  =   -1028,
+    gcvSTATUS_LOCATION_OVERLAP                  =   -1029,
+    gcvSTATUS_LOCATION_NOTCONSISTENT            =   -1030,
 
     /* Compiler errors. */
     gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR    =   -2000,
