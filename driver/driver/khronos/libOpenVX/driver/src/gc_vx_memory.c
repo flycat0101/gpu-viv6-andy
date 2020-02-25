@@ -257,7 +257,7 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
 
         /*page size alignment for CPU*/
         if(desc.logical & 0x3f || desc.size & 0xfff ) goto ErrorExit;
-        memory->sizes[planeIndex] = desc.size;
+
         memory->wrappedSize[planeIndex] = desc.size;
 
         /* Map the host ptr to a vidmem node. */
@@ -296,10 +296,10 @@ ErrorExit:
     {
         if (memory->wrappedNode[planeIndex] != 0)
         {
-            gcmVERIFY_OK(gcoHAL_UnlockVideoMemoryEX(
+            gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
                             memory->wrappedNode[planeIndex],
                             gcvVIDMEM_TYPE_BITMAP,
-                            gcvENGINE_RENDER, gcvTRUE));
+                            gcvENGINE_RENDER));
 
             gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(
                             memory->wrappedNode[planeIndex]));
@@ -341,10 +341,10 @@ VX_INTERNAL_API vx_bool vxoMemory_FreeWrappedMemory(vx_context context, vx_memor
     {
         if (memory->wrappedNode[planeIndex] != 0)
         {
-            gcmVERIFY_OK(gcoHAL_UnlockVideoMemoryEX(
+            gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
                             memory->wrappedNode[planeIndex],
                             gcvVIDMEM_TYPE_BITMAP,
-                            gcvENGINE_RENDER, gcvTRUE));
+                            gcvENGINE_RENDER));
 
             gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(
                             memory->wrappedNode[planeIndex]));

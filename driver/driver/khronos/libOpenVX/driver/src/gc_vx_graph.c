@@ -86,7 +86,6 @@ VX_INTERNAL_CALLBACK_API void vxoGraph_Destructor(vx_reference ref)
 
     gcmHEADER_ARG("ref=%p", ref);
     vxmASSERT(vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH));
-    gcoVX_Flush(gcvTRUE);
 
     if(graph->parentGraph == VX_NULL)
     {
