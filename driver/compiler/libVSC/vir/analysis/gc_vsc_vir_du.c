@@ -1053,14 +1053,19 @@ static VSC_ErrCode _BuildDefTable(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuIn
     return errCode;
 }
 
-static void _Update_ReachDef_Local_Kill_All_Output_Defs(VIR_DEF_USAGE_INFO* pDuInfo,
-                                                        VSC_BLOCK_TABLE* pDefTable,
-                                                        VSC_BIT_VECTOR* pGenFlow,
-                                                        VSC_BIT_VECTOR* pKillFlow)
+static void _Update_ReachDef_Local_Kill_Output_Defs_By_Emit(VIR_Shader* pShader,
+                                                            VIR_DEF_USAGE_INFO* pDuInfo,
+                                                            VSC_BLOCK_TABLE* pDefTable,
+                                                            VSC_BIT_VECTOR* pGenFlow,
+                                                            VSC_BIT_VECTOR* pKillFlow,
+                                                            gctBOOL bCheckAllOutput,
+                                                            gctINT streamNumber)
 {
     gctUINT                  defCount = pDuInfo->baseTsDFA.baseDFA.flowSize;
     VIR_DEF*                 pDef;
     VIR_DEF*                 pThisDef;
+    VIR_Symbol*              pTempSym;
+    VIR_Symbol*              pOutputSym;
     gctUINT                  thisDefIdx, defIdx;
     VSC_BIT_VECTOR           tmpMask;
 
@@ -1076,31 +1081,49 @@ static void _Update_ReachDef_Local_Kill_All_Output_Defs(VIR_DEF_USAGE_INFO* pDuI
 
         pThisDef = GET_DEF_BY_IDX(pDefTable, thisDefIdx);
 
-        if (pThisDef->flags.nativeDefFlags.bIsOutput)
+        /* Skip non-output def. */
+        if (!pThisDef->flags.nativeDefFlags.bIsOutput)
         {
-            defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pThisDef->defKey.regNo);
+            continue;
+        }
 
-            while (VIR_INVALID_DEF_INDEX != defIdx)
+        /* Find the specified output. */
+        if (!bCheckAllOutput)
+        {
+            pTempSym = VIR_Shader_FindSymbolByTempIndex(pShader, pThisDef->defKey.regNo);
+            gcmASSERT(pTempSym);
+
+            pOutputSym = VIR_Symbol_GetVregVariable(pTempSym);
+            gcmASSERT(pOutputSym);
+
+            if (VIR_Symbol_GetStreamNumber(pOutputSym) != streamNumber)
             {
-                pDef = GET_DEF_BY_IDX(pDefTable, defIdx);
-                gcmASSERT(pDef);
+                continue;
+            }
+        }
 
-                /* If this def is a real output, kill it */
-                if (pDef->flags.nativeDefFlags.bIsOutput)
+        defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pThisDef->defKey.regNo);
+
+        while (VIR_INVALID_DEF_INDEX != defIdx)
+        {
+            pDef = GET_DEF_BY_IDX(pDefTable, defIdx);
+            gcmASSERT(pDef);
+
+            /* If this def is a real output, kill it */
+            if (pDef->flags.nativeDefFlags.bIsOutput)
+            {
+                if (pKillFlow)
                 {
-                    if (pKillFlow)
-                    {
-                        vscBV_SetBit(pKillFlow, defIdx);
-                    }
-
-                    vscBV_ClearBit(pGenFlow, defIdx);
+                    vscBV_SetBit(pKillFlow, defIdx);
                 }
 
-                vscBV_SetBit(&tmpMask, defIdx);
-
-                /* Get next def with same regNo */
-                defIdx = pDef->nextDefIdxOfSameRegNo;
+                vscBV_ClearBit(pGenFlow, defIdx);
             }
+
+            vscBV_SetBit(&tmpMask, defIdx);
+
+            /* Get next def with same regNo */
+            defIdx = pDef->nextDefIdxOfSameRegNo;
         }
     }
 
@@ -1242,13 +1265,27 @@ static void _ReachDef_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
         }
 
         /* Emit will implicitly kill all output's defs */
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT)
+        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0   ||
+            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT    ||
+            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
         {
-            _Update_ReachDef_Local_Kill_All_Output_Defs((VIR_DEF_USAGE_INFO*)pBaseTsDFA,
-                                                        pDefTable,
-                                                        pGenFlow,
-                                                        pKillFlow);
+            gctBOOL     bCheckAllOutput = gcvTRUE;
+            gctINT      streamNumber = 0;
+
+            if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
+            {
+                bCheckAllOutput = gcvFALSE;
+                gcmASSERT(VIR_Operand_isImm(VIR_Inst_GetSource(pInst, 0)));
+                streamNumber = VIR_Operand_GetImmediateInt(VIR_Inst_GetSource(pInst, 0));
+            }
+
+            _Update_ReachDef_Local_Kill_Output_Defs_By_Emit(pShader,
+                                                            (VIR_DEF_USAGE_INFO*)pBaseTsDFA,
+                                                            pDefTable,
+                                                            pGenFlow,
+                                                            pKillFlow,
+                                                            bCheckAllOutput,
+                                                            streamNumber);
         }
 
         /* If current inst is the last inst of block, just bail out */
@@ -2076,7 +2113,7 @@ static void _CheckFalseOutput(VIR_DEF_USAGE_INFO* pDuInfo, VIR_DEF* pOutputDef)
         pUsage = GET_USAGE_BY_IDX(pUsageTable, pUsageNode->usageIdx);
         gcmASSERT(pUsage);
 
-        if (IS_OUTPUT_USAGE(pUsage))
+        if (VIR_IS_OUTPUT_USAGE_INST(pUsage->usageKey.pUsageInst))
         {
             bTrueOutput = gcvTRUE;
             break;
@@ -2125,8 +2162,9 @@ static gctBOOL _CanAddUsageToOutputDef(VIR_DEF_USAGE_INFO* pDuInfo,
     {
         /* Calling here is because we need determine implicits output usages for EMIT */
 
-        gcmASSERT(VIR_Inst_GetOpcode(pOutputUsageInst) == VIR_OP_EMIT0 ||
-                  VIR_Inst_GetOpcode(pOutputUsageInst) == VIR_OP_EMIT);
+        gcmASSERT(VIR_Inst_GetOpcode(pOutputUsageInst) == VIR_OP_EMIT0  ||
+                  VIR_Inst_GetOpcode(pOutputUsageInst) == VIR_OP_EMIT   ||
+                  VIR_Inst_GetOpcode(pOutputUsageInst) == VIR_OP_EMIT_STREAM);
 
         if (vscBV_TestBit(pWorkingDefFlow, outputDefIdx))
         {
@@ -2137,15 +2175,20 @@ static gctBOOL _CanAddUsageToOutputDef(VIR_DEF_USAGE_INFO* pDuInfo,
     return gcvFALSE;
 }
 
-static void _AddOutputUsages(VIR_DEF_USAGE_INFO* pDuInfo,
+static void _AddOutputUsages(VIR_Shader* pShader,
+                             VIR_DEF_USAGE_INFO* pDuInfo,
                              VSC_BIT_VECTOR* pWorkingDefFlow,
-                             VIR_Instruction* pOutputUsageInst)
+                             VIR_Instruction* pOutputUsageInst,
+                             gctBOOL bCheckAllOutput,
+                             gctINT streamNumber)
 {
     VSC_BLOCK_TABLE*         pDefTable = &pDuInfo->defTable;
     VSC_BLOCK_TABLE*         pUsageTable = &pDuInfo->usageTable;
     gctUINT                  defCount = pDuInfo->baseTsDFA.baseDFA.flowSize;
     VIR_DEF*                 pDef;
     VIR_DEF*                 pThisDef;
+    VIR_Symbol*              pTempSym;
+    VIR_Symbol*              pOutputSym;
     gctUINT                  newUsageIdx, thisDefIdx, defIdx;
     VIR_USAGE*               pNewUsage;
     VIR_DU_CHAIN_USAGE_NODE* pUsageNode;
@@ -2163,62 +2206,78 @@ static void _AddOutputUsages(VIR_DEF_USAGE_INFO* pDuInfo,
 
         pThisDef = GET_DEF_BY_IDX(pDefTable, thisDefIdx);
 
-        /* If this def is an output */
-        if (pThisDef->flags.nativeDefFlags.bIsOutput)
+        /* Skip non-output def. */
+        if (!pThisDef->flags.nativeDefFlags.bIsOutput)
         {
-            if (!_CanAddUsageToOutputDef(pDuInfo, pWorkingDefFlow, thisDefIdx, pOutputUsageInst))
+            continue;
+        }
+
+        /* Find the specified output. */
+        if (!bCheckAllOutput)
+        {
+            pTempSym = VIR_Shader_FindSymbolByTempIndex(pShader, pThisDef->defKey.regNo);
+            gcmASSERT(pTempSym);
+
+            pOutputSym = VIR_Symbol_GetVregVariable(pTempSym);
+            gcmASSERT(pOutputSym);
+
+            if (VIR_Symbol_GetStreamNumber(pOutputSym) != streamNumber)
             {
                 continue;
             }
+        }
 
-            /* Just get an empty usage entry to fill */
-            newUsageIdx = vscBT_NewEntry(pUsageTable);
-            pNewUsage = GET_USAGE_BY_IDX(pUsageTable, newUsageIdx);
-            gcmASSERT(pNewUsage);
+        if (!_CanAddUsageToOutputDef(pDuInfo, pWorkingDefFlow, thisDefIdx, pOutputUsageInst))
+        {
+            continue;
+        }
 
-            /* Initialize usage */
-            _InitializeUsage(pNewUsage, &pDuInfo->pmp.mmWrapper,
-                             pOutputUsageInst,
-                             (VIR_Operand*)(gctUINTPTR_T)pThisDef->defKey.regNo,
-                             gcvFALSE,
-                             0x0,
-                             pThisDef->halfChannelMask);
+        /* Just get an empty usage entry to fill */
+        newUsageIdx = vscBT_NewEntry(pUsageTable);
+        pNewUsage = GET_USAGE_BY_IDX(pUsageTable, newUsageIdx);
+        gcmASSERT(pNewUsage);
 
-            /* Add usageIdx to hash */
-            vscBT_AddToHash(pUsageTable, newUsageIdx, &pNewUsage->usageKey);
+        /* Initialize usage */
+        _InitializeUsage(pNewUsage, &pDuInfo->pmp.mmWrapper,
+                         pOutputUsageInst,
+                         (VIR_Operand*)(gctUINTPTR_T)pThisDef->defKey.regNo,
+                         gcvFALSE,
+                         0x0,
+                         pThisDef->halfChannelMask);
 
+        /* Add usageIdx to hash */
+        vscBT_AddToHash(pUsageTable, newUsageIdx, &pNewUsage->usageKey);
 
-            defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pThisDef->defKey.regNo);
+        defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pThisDef->defKey.regNo);
 
-            while (VIR_INVALID_DEF_INDEX != defIdx)
+        while (VIR_INVALID_DEF_INDEX != defIdx)
+        {
+            pDef = GET_DEF_BY_IDX(pDefTable, defIdx);
+            gcmASSERT(pDef);
+
+            /* If this def is an output */
+            if (pDef->flags.nativeDefFlags.bIsOutput)
             {
-                pDef = GET_DEF_BY_IDX(pDefTable, defIdx);
-                gcmASSERT(pDef);
-
-                /* If this def is an output */
-                if (pDef->flags.nativeDefFlags.bIsOutput)
+                if (_CanAddUsageToOutputDef(pDuInfo, pWorkingDefFlow, defIdx, pOutputUsageInst))
                 {
-                    if (_CanAddUsageToOutputDef(pDuInfo, pWorkingDefFlow, defIdx, pOutputUsageInst))
-                    {
-                        /* DU chain */
-                        pUsageNode = (VIR_DU_CHAIN_USAGE_NODE*)vscMM_Alloc(&pDuInfo->pmp.mmWrapper,
-                                                                           sizeof(VIR_DU_CHAIN_USAGE_NODE));
-                        vscUSGN_Initialize(pUsageNode, newUsageIdx);
-                        DU_CHAIN_ADD_USAGE(&pDef->duChain, pUsageNode);
+                    /* DU chain */
+                    pUsageNode = (VIR_DU_CHAIN_USAGE_NODE*)vscMM_Alloc(&pDuInfo->pmp.mmWrapper,
+                                                                        sizeof(VIR_DU_CHAIN_USAGE_NODE));
+                    vscUSGN_Initialize(pUsageNode, newUsageIdx);
+                    DU_CHAIN_ADD_USAGE(&pDef->duChain, pUsageNode);
 
-                        /* UD-chain */
-                        UD_CHAIN_ADD_DEF(&pNewUsage->udChain, defIdx);
+                    /* UD-chain */
+                    UD_CHAIN_ADD_DEF(&pNewUsage->udChain, defIdx);
 
-                        /* Mark real used channel mask */
-                        pNewUsage->realChannelMask |= (1 << pDef->defKey.channel);
-                    }
+                    /* Mark real used channel mask */
+                    pNewUsage->realChannelMask |= (1 << pDef->defKey.channel);
                 }
-
-                vscBV_SetBit(&tmpMask, defIdx);
-
-                /* Get next def with same regNo */
-                defIdx = pDef->nextDefIdxOfSameRegNo;
             }
+
+            vscBV_SetBit(&tmpMask, defIdx);
+
+            /* Get next def with same regNo */
+            defIdx = pDef->nextDefIdxOfSameRegNo;
         }
     }
 
@@ -2380,10 +2439,21 @@ static void _AddUsages(VIR_Shader* pShader,
     }
 
     /* Emit will implicitly use all outputs */
-    if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
-        VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT)
+    if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0   ||
+        VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT    ||
+        VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
     {
-        _AddOutputUsages(pDuInfo, pWorkingDefFlow, pInst);
+        gctBOOL     bCheckAllOutput = gcvTRUE;
+        gctINT      streamNumber = 0;
+
+        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
+        {
+            bCheckAllOutput = gcvFALSE;
+            gcmASSERT(VIR_Operand_isImm(VIR_Inst_GetSource(pInst, 0)));
+            streamNumber = VIR_Operand_GetImmediateInt(VIR_Inst_GetSource(pInst, 0));
+        }
+
+        _AddOutputUsages(pShader, pDuInfo, pWorkingDefFlow, pInst, bCheckAllOutput, streamNumber);
     }
 }
 
@@ -2447,13 +2517,27 @@ static void _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAGE_INFO*
         }
 
         /* Emit will implicitly kill all output's defs */
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT)
+        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0   ||
+            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT    ||
+            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
         {
-            _Update_ReachDef_Local_Kill_All_Output_Defs(pDuInfo,
-                                                        pDefTable,
-                                                        &workingDefFlow,
-                                                        gcvNULL);
+            gctBOOL     bCheckAllOutput = gcvTRUE;
+            gctINT      streamNumber = 0;
+
+            if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
+            {
+                bCheckAllOutput = gcvFALSE;
+                gcmASSERT(VIR_Operand_isImm(VIR_Inst_GetSource(pInst, 0)));
+                streamNumber = VIR_Operand_GetImmediateInt(VIR_Inst_GetSource(pInst, 0));
+            }
+
+            _Update_ReachDef_Local_Kill_Output_Defs_By_Emit(pShader,
+                                                            pDuInfo,
+                                                            pDefTable,
+                                                            &workingDefFlow,
+                                                            gcvNULL,
+                                                            bCheckAllOutput,
+                                                            streamNumber);
         }
 
         /* If current inst is the last inst of block, just bail out */
@@ -2521,7 +2605,7 @@ static VSC_ErrCode _BuildDUUDChain(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuI
 
     /* Outputs have special implicit usages from next stage. All false outputs will be
        also corrected by setting bIsOutput as FALSE */
-    _AddOutputUsages(pDuInfo, pMainFlowOut, VIR_OUTPUT_USAGE_INST);
+    _AddOutputUsages(pCg->pOwnerShader, pDuInfo, pMainFlowOut, VIR_OUTPUT_USAGE_INST, gcvTRUE, 0);
 
     pDuInfo->bDUUDChainBuilt = gcvTRUE;
 

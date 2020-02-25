@@ -3549,7 +3549,9 @@ void _VIR_RA_LS_GetSym_Enable_Swizzle(
 /* mark the use of outputs in EMIT instruction */
 void _VIR_RA_LS_Mark_Outputs(
     VIR_RA_LS       *pRA,
-    VIR_Instruction *pInst)
+    VIR_Instruction *pInst,
+    gctBOOL         bCheckAllOutput,
+    gctINT          streamNumber)
 {
     VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
     VIR_LIVENESS_INFO   *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
@@ -3559,14 +3561,22 @@ void _VIR_RA_LS_Mark_Outputs(
     gctUINT             i, j, defIdx;
     VIR_Enable          outEnable;
 
-    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0);
+    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
+              VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT  ||
+              VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM);
 
     for (outputIdx = 0;
-        outputIdx < VIR_IdList_Count(VIR_Shader_GetOutputs(pShader));
-        outputIdx ++)
+         outputIdx < VIR_IdList_Count(VIR_Shader_GetOutputs(pShader));
+         outputIdx ++)
     {
         VIR_Symbol* pOutputSym = VIR_Shader_GetSymFromId(pShader,
                             VIR_IdList_GetId(VIR_Shader_GetOutputs(pShader), outputIdx));
+
+        /* Check for the specified output only. */
+        if (!bCheckAllOutput && VIR_Symbol_GetStreamNumber(pOutputSym) != streamNumber)
+        {
+            continue;
+        }
 
         for (i = 0; i <VIR_Type_GetVirRegCount(pShader, VIR_Symbol_GetType(pOutputSym), -1); i++)
         {
@@ -6405,10 +6415,21 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTableBB(
         }
 
         /* Emit has implicit usage for all outputs, so we also gen these */
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT)
+        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0   ||
+            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT    ||
+            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
         {
-            _VIR_RA_LS_Mark_Outputs(pRA, pInst);
+            gctBOOL     bCheckAllOutput = gcvTRUE;
+            gctINT      streamNumber = 0;
+
+            if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
+            {
+                bCheckAllOutput = gcvFALSE;
+                gcmASSERT(VIR_Operand_isImm(VIR_Inst_GetSource(pInst, 0)));
+                streamNumber = VIR_Operand_GetImmediateInt(VIR_Inst_GetSource(pInst, 0));
+            }
+
+            _VIR_RA_LS_Mark_Outputs(pRA, pInst, bCheckAllOutput, streamNumber);
         }
 
         curPos = VIR_RA_LS_GetCurrPos(pRA);

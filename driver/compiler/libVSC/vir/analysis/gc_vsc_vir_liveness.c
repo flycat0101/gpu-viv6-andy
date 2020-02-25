@@ -141,16 +141,21 @@ static void _Update_Liveness_Local_Kill(VIR_DEF_USAGE_INFO* pDuInfo,
     }
 }
 
-static void _Update_Liveness_Local_Gen_All_Outputs(VIR_DEF_USAGE_INFO* pDuInfo,
-                                                   VSC_BIT_VECTOR* pGenFlow,
-                                                   VSC_BIT_VECTOR* pKillFlow,
-                                                   VIR_Instruction* pInst)
+static void _Update_Liveness_Local_Gen_Outputs_By_Emit(VIR_Shader* pShader,
+                                                       VIR_DEF_USAGE_INFO* pDuInfo,
+                                                       VSC_BIT_VECTOR* pGenFlow,
+                                                       VSC_BIT_VECTOR* pKillFlow,
+                                                       VIR_Instruction* pInst,
+                                                       gctBOOL bCheckAllOutput,
+                                                       gctINT streamNumber)
 {
     VSC_BLOCK_TABLE*       pDefTable = &pDuInfo->defTable;
     VSC_BLOCK_TABLE*       pUsageTable = &pDuInfo->usageTable;
     gctUINT                usageCount, usageIdx, i, defIdx;
     VIR_USAGE*             pUsage = gcvNULL;
     VIR_DEF*               pDef;
+    VIR_Symbol*            pTempSym;
+    VIR_Symbol*            pOutputSym;
 
     usageCount = BT_GET_MAX_VALID_ID(&pDuInfo->usageTable);
     for (usageIdx = 0; usageIdx < usageCount; usageIdx ++)
@@ -171,6 +176,21 @@ static void _Update_Liveness_Local_Gen_All_Outputs(VIR_DEF_USAGE_INFO* pDuInfo,
                     if (!pDef->flags.nativeDefFlags.bIsOutput)
                     {
                         gcmASSERT(gcvFALSE);
+                    }
+
+                    /* Find the specified output. */
+                    if (!bCheckAllOutput)
+                    {
+                        pTempSym = VIR_Shader_FindSymbolByTempIndex(pShader, pDef->defKey.regNo);
+                        gcmASSERT(pTempSym);
+
+                        pOutputSym = VIR_Symbol_GetVregVariable(pTempSym);
+                        gcmASSERT(pOutputSym);
+
+                        if (VIR_Symbol_GetStreamNumber(pOutputSym) != streamNumber)
+                        {
+                            continue;
+                        }
                     }
 
                     vscBV_SetBit(pGenFlow, defIdx);
@@ -499,13 +519,27 @@ static void _Liveness_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
                                     pInst);
 
          /* Emit has implicit usage for all outputs, so we also gen these */
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT)
+        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0   ||
+            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT    ||
+            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
         {
-            _Update_Liveness_Local_Gen_All_Outputs(pDuInfo,
-                                                   pGenFlow,
-                                                   pKillFlow,
-                                                   pInst);
+            gctBOOL     bCheckAllOutput = gcvTRUE;
+            gctINT      streamNumber = 0;
+
+            if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
+            {
+                bCheckAllOutput = gcvFALSE;
+                gcmASSERT(VIR_Operand_isImm(VIR_Inst_GetSource(pInst, 0)));
+                streamNumber = VIR_Operand_GetImmediateInt(VIR_Inst_GetSource(pInst, 0));
+            }
+
+            _Update_Liveness_Local_Gen_Outputs_By_Emit(pShader,
+                                                       pDuInfo,
+                                                       pGenFlow,
+                                                       pKillFlow,
+                                                       pInst,
+                                                       bCheckAllOutput,
+                                                       streamNumber);
         }
 
         /* If current inst is the start inst of block, just bail out */
