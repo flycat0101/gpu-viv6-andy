@@ -2901,7 +2901,7 @@ static gceSTATUS gcoHARDWARE_FlushStates(
     /* switch to 3D pipe */
     gcmONERROR(gcoHARDWARE_SelectPipe(Hardware, gcvPIPE_3D, Memory));
 
-    if (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION] == gcvQUERY_Enabled &&
+    if (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION][0] == gcvQUERY_Enabled &&
         !Hardware->features[gcvFEATURE_BUG_FIXES18] &&
         (Hardware->PEStates->depthStates.mode != gcvDEPTH_NONE))
     {
@@ -4903,11 +4903,21 @@ _InternalTFBSwitch(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    gctUINT i;
+    gctBOOL bHasPrimGenerated = gcvFALSE;
 
     gcmASSERT(Hardware->features[gcvFEATURE_HW_TFB]);
 
-    if ((Hardware->XFBStates->status != gcvXFB_Enabled) &&
-        (Hardware->QUERYStates->queryStatus[gcvQUERY_PRIM_GENERATED] == gcvQUERY_Enabled))
+    for (i = 0; i < gcvMAX_QUERY_SIZE; i++)
+    {
+        if (Hardware->QUERYStates->queryStatus[gcvQUERY_PRIM_GENERATED][i] == gcvQUERY_Enabled)
+        {
+            bHasPrimGenerated = gcvTRUE;
+            break;
+        }
+    }
+
+    if ((Hardware->XFBStates->status != gcvXFB_Enabled) && bHasPrimGenerated)
     {
         gctUINT32 tfbCmd = Enable
                          ?

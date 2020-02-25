@@ -2506,6 +2506,7 @@ gceSTATUS
 gcoHARDWARE_GetQueryIndex(
     IN gcoHARDWARE Hardware,
     IN gceQueryType Type,
+    IN gctUINT32    IndexedId,
     IN gctINT32 * Index
     );
 

@@ -300,6 +300,7 @@ __glChipGetQueryObject(
                                   &queryHeader->headerNode,
                                   queryHeader->headerSize,
                                   queryHeader->headerLocked,
+                                  0,
                                   &queryHeader->headerIndex));
 
         for (i = 0; i < queryHeader->headerIndex; i++)
