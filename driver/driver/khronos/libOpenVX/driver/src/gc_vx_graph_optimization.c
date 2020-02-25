@@ -1887,7 +1887,12 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeWithChildNodes(vx_node node)
             {
                 if((currNodeType & (allFeatures ^ features[i][0])) != 0)
                     goto merge;
-                if((currNodeType & features[i][1]) != 0 )
+
+                /*if some node has been picked, just check the relative feature that include the node type*/
+                if((opType ^ features[i][0]) && (opType & features[i][1]) == 0 )
+                    continue;
+
+                if((currNodeType & features[i][1]) != 0)
                     break;
             }
         }
