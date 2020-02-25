@@ -2391,3 +2391,228 @@ __kernel void vxcSoftmax_Int16to16Bits(
         while(coord.z < depth);
     }
 }
+
+__kernel void vxcSoftmax_Fp16toU8_2D(
+    __read_only image2d_array_t   input,
+    __write_only image2d_array_t  output)
+{
+    int4 coord = (int4)(get_global_id(0), 0, 0, 0);
+    vxc_short8 in0;
+    vxc_half8 vec0, max;
+    vxc_float4 data0;
+    vxc_float4 sum0, sum1;
+
+    VXC_ReadImage(in0, input, coord.xy, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, max, in0, 16);
+    coord.y ++;
+    do
+    {
+        VXC_ReadImage(in0, input, coord.xy, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, vec0, in0, 16);
+        VXC_VertMax3_Half(max, max, max, vec0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        coord.y ++;
+    }
+    while(coord.y < depth);
+
+    coord.y = 0;
+    sum0 = 0;
+    sum1 = 0;
+    do
+    {
+        VXC_ReadImage(in0, input, coord.xy, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, vec0, in0, 16);
+        VXC_DP4x4(data0, vec0, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubLoData_4x4);
+        sum0 += exponential(data0, scaleLogE);
+        VXC_DP4x4(data0, vec0, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubHiData_4x4);
+        sum1 += exponential(data0, scaleLogE);
+        coord.y ++;
+    }
+    while(coord.y < depth);
+
+    sum0 = 1 / sum0;
+    sum1 = 1 / sum1;
+    coord.y = 0;
+    vxc_int4 dst0, dst1;
+    do
+    {
+        vxc_uchar16 vect;
+        VXC_ReadImage(in0, input, coord.xy, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, vec0, in0, 16);
+        VXC_DP4x4(data0, vec0, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubLoData_4x4);
+        data0 = exponential(data0, scaleLogE) * sum0;
+        data0 = data0 * qScaleOut_UInt8 + uint8_out_ZP;
+        dst0  = convert_int4_rte(data0);
+        VXC_DP4x4(data0, vec0, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubHiData_4x4);
+        data0 = exponential(data0, scaleLogE) * sum1;
+        data0 = data0 * qScaleOut_UInt8 + uint8_out_ZP;
+        dst1  = convert_int4_rte(data0);
+        VXC_DP2x8(vect, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtact8Bit_2x8);
+        VXC_WriteImage(output, coord.xy, vect, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        coord.y ++;
+    }
+    while(coord.y < depth);
+}
+
+
+__kernel void vxcSoftmax_Fp16toU8(
+    __read_only image2d_array_t   input,
+    __write_only image2d_array_t  output)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), 0, 0);
+    vxc_short8 in0;
+    vxc_half8 vec0, max;
+    vxc_float4 data0;
+    vxc_float4 sum0, sum1;
+
+    VXC_ReadImage2DArray(in0, input, coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, max, in0, 16);
+    coord.z ++;
+    do
+    {
+        VXC_ReadImage2DArray(in0, input, coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, vec0, in0, 16);
+        VXC_VertMax3_Half(max, max, max, vec0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        coord.z ++;
+    }
+    while(coord.z < depth);
+
+    coord.z = 0;
+    sum0 = 0;
+    sum1 = 0;
+    do
+    {
+        VXC_ReadImage2DArray(in0, input, coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, vec0, in0, 16);
+        VXC_DP4x4(data0, vec0, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubLoData_4x4);
+        sum0 += exponential(data0, scaleLogE);
+        VXC_DP4x4(data0, vec0, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubHiData_4x4);
+        sum1 += exponential(data0, scaleLogE);
+        coord.z ++;
+    }
+    while(coord.z < depth);
+
+    sum0 = 1 / sum0;
+    sum1 = 1 / sum1;
+    coord.z = 0;
+    vxc_int4 dst0, dst1;
+    do
+    {
+        vxc_uchar16 vect;
+        VXC_ReadImage2DArray(in0, input, coord, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, vec0, in0, 16);
+        VXC_DP4x4(data0, vec0, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubLoData_4x4);
+        data0 = exponential(data0, scaleLogE) * sum0;
+        data0 = data0 * qScaleOut_UInt8 + uint8_out_ZP;
+        dst0  = convert_int4_rte(data0);
+        VXC_DP4x4(data0, vec0, max, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubHiData_4x4);
+        data0 = exponential(data0, scaleLogE) * sum1;
+        data0 = data0 * qScaleOut_UInt8 + uint8_out_ZP;
+        dst1  = convert_int4_rte(data0);
+        VXC_DP2x8(vect, dst0, dst1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), uniExtact8Bit_2x8);
+        VXC_WriteImage2DArray(output, coord, vect, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        coord.z ++;
+    }
+    while(coord.z < depth);
+}
+
+__kernel void vxcSoftmax_Fp16toU8_1x1xN(
+    __read_only image2d_array_t   input,
+    __write_only image2d_array_t  output)
+{
+    int4 coord = (int4)(16, get_global_id(0), 0, 0);
+
+    vxc_half8 img_val0, img_val1, img_val2, img_val3;
+    vxc_short8 val0, val1, val2, val3;
+    vxc_half8 val;
+    _viv_asm(COPY, val, vsi_min_fl16, 16);
+    do
+    {
+        VXC_ReadImage(val0, input,  coord.xy, VXC_5BITOFFSET_XY(-16, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, img_val0, val0, 16);
+        VXC_ReadImage(val1, input,  coord.xy, VXC_5BITOFFSET_XY(-8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, img_val1, val1, 16);
+        VXC_ReadImage(val2, input,  coord.xy, 0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, img_val2, val2, 16);
+        VXC_ReadImage(val3, input,  coord.xy, VXC_5BITOFFSET_XY(8, 0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, img_val3, val3, 16);
+        coord.x += 32;
+
+        VXC_VertMax3_Half(val, img_val0, img_val1, val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_VertMax3_Half(val, img_val2, img_val3, val, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_HorzMax3_Half(val, val, VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
+        VXC_DP2x8(val, val, val, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0), uniPackMaxData_2x8);
+        VXC_HorzMax3_Half(val, val, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+    }
+    while(coord.x < (inputSize + 16));
+
+    vxc_float4 prob;
+    float fProbSum = 0;
+    const float4 one4 = (float4)(1.0, 1.0, 1.0, 1.0);
+
+    int idx = 0;
+    for (coord.x = 0; coord.x < inputWidth; idx ++)
+    {
+        VXC_ReadImage(val0, input,  coord.xy, 0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, img_val0, val0, 16);
+        VXC_DP4x4(prob, img_val0, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubData0to3_4x4);
+        prob *= scaleLogE;
+        prob.x = exp2(prob.x);
+        prob.y = exp2(prob.y);
+        prob.z = exp2(prob.z);
+        prob.w = exp2(prob.w);
+        fProbSum += dot(prob, one4);
+
+        coord.x += 4;
+    }
+    VXC_ReadImage(val0, input,  coord.xy, 0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+    _viv_asm(COPY, img_val0, val0, 16);
+    VXC_DP4x4(prob, img_val0, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubData0to3_4x4);
+    prob *= scaleLogE;
+    if(inputWidthRemain4 == 1)
+    {
+        prob.x = exp2(prob.x);
+        prob.yzw = 0;
+        fProbSum += dot(prob, one4);
+    }
+    else if(inputWidthRemain4 == 2)
+    {
+        prob.x = exp2(prob.x);
+        prob.y = exp2(prob.y);
+        prob.zw = 0;
+        fProbSum += dot(prob, one4);
+    }
+    else if(inputWidthRemain4 == 3)
+    {
+        prob.x = exp2(prob.x);
+        prob.y = exp2(prob.y);
+        prob.z = exp2(prob.z);
+        prob.w = 0;
+        fProbSum += dot(prob, one4);
+    }
+
+    vxc_float4 probSum_rcp;
+    probSum_rcp.x = 1 / fProbSum;
+    idx = 0;
+
+    for (coord.x = 0; coord.x < inputSize; idx ++)
+    {
+        vxc_int4 dst0;
+        vxc_uchar16 dst_val0;
+        VXC_ReadImage(val0, input,  coord.xy, 0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+        _viv_asm(COPY, img_val0, val0, 16);
+        VXC_DP4x4(prob, img_val0, val, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniGetSubData0to3_4x4);
+        prob *= scaleLogE;
+        prob.x = exp2(prob.x);
+        prob.y = exp2(prob.y);
+        prob.z = exp2(prob.z);
+        prob.w = exp2(prob.w);
+
+        prob = prob.xyzw * probSum_rcp.xxxx;
+        prob = prob * qScaleOut_UInt8 + uint8_out_ZP;
+        dst0 = convert_int4_rte(prob);
+        VXC_DP2x8(dst_val0, dst0, dst0, VXC_MODIFIER(0, 3, 0, VXC_RM_ToNearestEven, 1), uniExtact8Bit_2x8);
+        VXC_WriteImage(output, coord.xy, dst_val0, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+        coord.x += 4;
+    }
+
+}

@@ -270,7 +270,8 @@ VX_PRIVATE_API vx_bool vxoNNSoftmax_SH_EVIS_Support_Ext(vx_node node, const vx_r
         enable_format = (((srcFormat == VX_TYPE_INT8 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32))
                          || ((srcFormat == VX_TYPE_BFLOAT16) && (dstFormat == VX_TYPE_BFLOAT16 || dstFormat == VX_TYPE_FLOAT16 || enable_float32))
                          || (srcFormat == VX_TYPE_INT16 && (dstFormat == VX_TYPE_INT16 || dstFormat == VX_TYPE_FLOAT16))
-                         || (srcFormat == VX_TYPE_INT8 &&  dstFormat == VX_TYPE_INT8));
+                         || (srcFormat == VX_TYPE_INT8 &&  dstFormat == VX_TYPE_INT8)
+                         || (srcFormat == VX_TYPE_FLOAT16 &&  dstFormat == VX_TYPE_UINT8));
         enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32 || dstFormat == VX_TYPE_UINT8));
     }
     else
