@@ -1284,7 +1284,8 @@ typedef enum _gceSURF_FORMAT
     /* GL4 formats */
     gcvSURF_G8                  = 1800,
     gcvSURF_B8,
-    gcvSURF_G32F
+    gcvSURF_G32F,
+    gcvSURF_B32F,
 }
 gceSURF_FORMAT;
 

@@ -4620,20 +4620,32 @@ gcChipProgramBuildBindingInfo(
                 for (j = 0; j < input->size; ++j)
                 {
                     __GLchipSLLinkage* attribLinkage = gcvNULL;
+                    __GLchipSLLinkage** programAttribLinkage = &program->attribLinkage[input->location + j];
+
                     /* Make sure the binding is not yet taken. */
-                    if (program->attribLinkage[input->location + j])
+                    if (gcvNULL != *programAttribLinkage)
                     {
-                        gcmONERROR(gcoOS_PrintStrSafe(logBuffer, __GLSL_LOG_INFO_SIZE, &logOffset, "Binding for %s occupied\n", input->name));
-                        gcmTRACE(gcvLEVEL_ERROR, "Binding for %s occupied.", input->name);
-                        gcmONERROR(gcvSTATUS_TOO_MANY_ATTRIBUTES);
+                        if (!(input->isLocationSetByDriver))
+                        {
+                            do
+                            {
+                                programAttribLinkage = &((*programAttribLinkage)->next);
+                            }
+                            while (gcvNULL != *programAttribLinkage);
+                        }
+                        else
+                        {
+                            gcmONERROR(gcoOS_PrintStrSafe(logBuffer, __GLSL_LOG_INFO_SIZE, &logOffset, "Binding for %s occupied\n", input->name));
+                            gcmTRACE(gcvLEVEL_ERROR, "Binding for %s occupied.", input->name);
+                            gcmONERROR(gcvSTATUS_TOO_MANY_ATTRIBUTES);
+                        }
                     }
 
                     /* Assign the binding. */
-
                     gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(__GLchipSLLinkage), (gctPOINTER *)&attribLinkage));
                     attribLinkage->attribLocation = (GLuint)(i + j);
                     attribLinkage->next = gcvNULL;
-                    program->attribLinkage[input->location + j] = attribLinkage;
+                    *programAttribLinkage = attribLinkage;
                     program->attribLocation[i + j].assigned = GL_TRUE;
                 }
             }

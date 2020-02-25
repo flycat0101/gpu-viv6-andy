@@ -4338,34 +4338,20 @@ GLvoid __glGetSizeAndNumOfElement(GLenum format, GLenum type, __GLpixelTransferI
     }
 }
 
-GLvoid __glMemoryAlignment(GLenum baseFmt, GLenum srcType, GLenum dstType, __GLpixelTransferInfo *transferInfo, GLenum __GLPixelTransferOperations)
+GLvoid __glMemoryAlignment(__GLpixelTransferInfo *transferInfo)
 {
-     __glGetSizeAndNumOfElement(baseFmt, dstType, transferInfo);
+    transferInfo->srcRowSizeBeforeAlign = transferInfo->width * transferInfo->srcSizeOfPixel;
+    transferInfo->srcRowSizeAfterAlign = (GLuint)(transferInfo->alignment * ceilf(transferInfo->srcRowSizeBeforeAlign / (float)transferInfo->alignment));
+    transferInfo->srcRowByteNeedAlign = transferInfo->srcRowSizeAfterAlign - transferInfo->srcRowSizeBeforeAlign;
 
-     if (transferInfo->sizeOfElement >= transferInfo->alignment)
-     {
-         transferInfo->widthAlign = transferInfo->width;
-     }
-     else
-     {
-         transferInfo->widthAlign = (GLuint)(transferInfo->alignment * ceilf(transferInfo->sizeOfElement * transferInfo->width / (float)transferInfo->alignment)) / transferInfo->sizeOfElement;
-     }
+    transferInfo->dstRowSizeBeforeAlign = transferInfo->width * transferInfo->dstSizeOfPixel;
+    transferInfo->dstRowSizeAfterAlign = (GLuint)(transferInfo->alignment * ceilf(transferInfo->dstRowSizeBeforeAlign / (float)transferInfo->alignment));
+    transferInfo->dstRowByteNeedAlign = transferInfo->dstRowSizeAfterAlign - transferInfo->dstRowSizeBeforeAlign;
 
-     transferInfo->dstWidthAlign=transferInfo->widthAlign;
+    transferInfo->applyAlign = (1 != transferInfo->alignment);
 
-     if (__GLPixelTransferOperations == __GL_ReadPixelsPre)
-     {
-        __glGetSizeAndNumOfElement(baseFmt, srcType, transferInfo);
-
-        if (transferInfo->sizeOfElement >= transferInfo->alignment)
-        {
-            transferInfo->widthAlign = transferInfo->width;
-        }
-        else
-        {
-            transferInfo->widthAlign = (GLuint)(transferInfo->alignment * ceilf(transferInfo->sizeOfElement * transferInfo->width / (float)transferInfo->alignment)) / transferInfo->sizeOfElement;
-        }
-     }
+    GL_ASSERT((0 != transferInfo->srcRowSizeBeforeAlign) && (0 != transferInfo->srcRowSizeAfterAlign)
+            && (0 != transferInfo->dstRowSizeBeforeAlign) && (0 != transferInfo->dstRowSizeAfterAlign));
 }
 
 /*

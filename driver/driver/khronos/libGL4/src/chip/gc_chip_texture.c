@@ -858,6 +858,11 @@ gcChipUtilGetImageFormat(
             bpp = 32;
             imageFormat = gcvSURF_A2B10G10R10UI;
             break;
+
+        case GL_UNSIGNED_INT_10_10_10_2:
+            bpp = 32;
+            imageFormat = gcvSURF_B10G10R10A2;
+            break;
 #ifdef OPENGL40
         case GL_UNSIGNED_INT_8_8_8_8:
             bpp = 32;
@@ -921,6 +926,10 @@ gcChipUtilGetImageFormat(
         case GL_UNSIGNED_BYTE:
             bpp = 8;
             imageFormat = gcvSURF_B8;
+            break;
+        case GL_FLOAT:
+            bpp = 32;
+            imageFormat = gcvSURF_B32F;
             break;
         default:
             break;

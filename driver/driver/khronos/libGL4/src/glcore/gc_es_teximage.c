@@ -1283,6 +1283,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
             case GL_BLUE_INTEGER_EXT:
             case GL_GREEN_INTEGER_EXT:
             case GL_ALPHA_INTEGER_EXT:
+            case GL_RG_INTEGER:
             case GL_RGB_INTEGER_EXT:
             case GL_RGBA_INTEGER_EXT:
             case GL_BGR_INTEGER_EXT:

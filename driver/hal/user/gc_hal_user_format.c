@@ -200,6 +200,30 @@ void _ReadPixelFrom_L32F(gctPOINTER inAddr[4], gcsPIXEL* outPixel)
     outPixel->s = 0;
 }
 
+void _ReadPixelFrom_B8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT8 ub = *(gctUINT8*)inAddr[0];
+
+    outPixel->color.f.b = gcdUNORM_TO_FLOAT(ub, 8);
+    outPixel->color.f.r = 0.0f;
+    outPixel->color.f.g = 0.0f;
+    outPixel->color.f.a = 1.0f;
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_G8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT8 ub = *(gctUINT8*)inAddr[0];
+
+    outPixel->color.f.g = gcdUNORM_TO_FLOAT(ub, 8);
+    outPixel->color.f.r = 0.0f;
+    outPixel->color.f.b = 0.0f;
+    outPixel->color.f.a = 1.0f;
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
 void _ReadPixelFrom_R8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
 {
     gctUINT8 ub = *(gctUINT8*)inAddr[0];
@@ -249,6 +273,29 @@ void _ReadPixelFrom_R16F(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPix
     outPixel->s = 0;
 }
 
+void _ReadPixelFrom_G32F(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctFLOAT f = *(gctFLOAT*)inAddr[0];
+
+    outPixel->color.f.g = f;
+    outPixel->color.f.r = 0.0f;
+    outPixel->color.f.b = 0.0f;
+    outPixel->color.f.a = 1.0f;
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_B32F(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctFLOAT f = *(gctFLOAT*)inAddr[0];
+
+    outPixel->color.f.b = f;
+    outPixel->color.f.r = 0.0f;
+    outPixel->color.f.g = 0.0f;
+    outPixel->color.f.a = 1.0f;
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
 
 void _ReadPixelFrom_R32F(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
 {
@@ -1498,6 +1545,18 @@ void _ReadPixelFrom_A2B10G10R10UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXE
     outPixel->s = 0;
 }
 
+void _ReadPixelFrom_B10G10R10A2(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT32 ui = *(gctUINT32*)inAddr[0];
+
+    outPixel->color.ui.r = gcdGET_FIELD(ui, 22, 10);
+    outPixel->color.ui.g = gcdGET_FIELD(ui, 12, 10);
+    outPixel->color.ui.b = gcdGET_FIELD(ui, 2,  10);
+    outPixel->color.ui.a = gcdGET_FIELD(ui, 0,   2);
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
 void _ReadPixelFrom_E5B9G9R9(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
 {
     const gctUINT32 mBits = 9;      /* mantissa bits */
@@ -1589,6 +1648,15 @@ _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
     case gcvSURF_A32L32F_1_G32R32F:
         return _ReadPixelFrom_A32L32F;
 
+    case gcvSURF_G8:
+        return _ReadPixelFrom_G8;
+    case gcvSURF_G32F:
+        return _ReadPixelFrom_G32F;
+
+    case gcvSURF_B8:
+        return _ReadPixelFrom_B8;
+    case gcvSURF_B32F:
+        return _ReadPixelFrom_B32F;
 
     case gcvSURF_R8:
         return _ReadPixelFrom_R8;
@@ -1901,6 +1969,9 @@ _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
 
     case gcvSURF_X8_SRGB8:
         return _ReadPixelFrom_X8R8G8B8;
+
+    case gcvSURF_B10G10R10A2:
+        return _ReadPixelFrom_B10G10R10A2;
 
     default:
         gcmASSERT(0);
@@ -2901,6 +2972,16 @@ void _WritePixelTo_A2B10G10R10UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SU
     *(gctUINT32*)outAddr[0] = (gctUINT32)((a << 30) | (b << 20) | (g << 10) | r);
 }
 
+void _WritePixelTo_B10G10R10A2(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 r = gcmMIN(inPixel->color.ui.r, gcdUINT_MAX(10));
+    gctUINT32 g = gcmMIN(inPixel->color.ui.g, gcdUINT_MAX(10));
+    gctUINT32 b = gcmMIN(inPixel->color.ui.b, gcdUINT_MAX(10));
+    gctUINT32 a = gcmMIN(inPixel->color.ui.a, gcdUINT_MAX(2));
+
+    *(gctUINT32*)outAddr[0] = (gctUINT32)((r << 22) | (g << 12) | (b << 2) | a);
+}
+
 void _WritePixelTo_B10G11R11F(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
 {
     gctUINT32* pI = (gctUINT32*)outAddr[0];
@@ -3310,6 +3391,8 @@ _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf)
     case gcvSURF_L32F_1_R32F:
         return _WritePixelTo_L32F;
 
+    case gcvSURF_B10G10R10A2:
+        return _WritePixelTo_B10G10R10A2;
 
     default:
         gcmASSERT(0);
