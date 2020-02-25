@@ -18388,7 +18388,8 @@ VIR_Shader_CalcMaxRegBasedOnWorkGroupSize(
 gctUINT
 VIR_Shader_ComputeWorkThreadNum(
     VIR_Shader      *pShader,
-    VSC_HW_CONFIG   *pHwCfg
+    VSC_HW_CONFIG   *pHwCfg,
+    IN gctBOOL      bUse16BitMod
     )
 {
     gctUINT maxFreeReg = pHwCfg->maxGPRCountPerCore / 4;
@@ -18406,14 +18407,25 @@ VIR_Shader_ComputeWorkThreadNum(
         numWorkThread = 1;
     }
 
-    return numWorkThread * 2;
+    if (bUse16BitMod)
+    {
+        numWorkThread = vscAlignToPow2(numWorkThread, 16);
+    }
+
+    if (!bUse16BitMod || numWorkThread * 2 < 0x10000)
+    {
+        numWorkThread *= 2;
+    }
+
+    return numWorkThread;
 }
 
 /* return the number of workgroups launched at the same time */
 gctUINT
 VIR_Shader_ComputeWorkGroupNum(
     IN VIR_Shader      *pShader,
-    IN VSC_HW_CONFIG   *pHwCfg
+    IN VSC_HW_CONFIG   *pHwCfg,
+    IN gctBOOL          bUse16BitMod
     )
 {
     gctUINT numWorkGroup;
@@ -18442,7 +18454,17 @@ VIR_Shader_ComputeWorkGroupNum(
         numWorkGroup = 1;
     }
 
-    return numWorkGroup * 2;
+    if (bUse16BitMod)
+    {
+        numWorkGroup = vscAlignToPow2(numWorkGroup, 16);
+    }
+
+    if (!bUse16BitMod || numWorkGroup * 2 < 0x10000)
+    {
+        numWorkGroup *= 2;
+    }
+
+    return numWorkGroup;
 }
 
 /* return the workGroupCount per shader group. */

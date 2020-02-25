@@ -7636,14 +7636,16 @@ VIR_Shader_CalcMaxRegBasedOnWorkGroupSize(
 gctUINT
 VIR_Shader_ComputeWorkThreadNum(
     IN VIR_Shader      *pShader,
-    IN VSC_HW_CONFIG   *pHwCfg
+    IN VSC_HW_CONFIG   *pHwCfg,
+    IN gctBOOL          bUse16BitMod
     );
 
 /* return the number of workgroups launched at the same time */
 gctUINT
 VIR_Shader_ComputeWorkGroupNum(
     IN VIR_Shader      *pShader,
-    IN VSC_HW_CONFIG   *pHwCfg
+    IN VSC_HW_CONFIG   *pHwCfg,
+    IN gctBOOL          bUse16BitMod
     );
 
 /* return the workGroupCount per shader group. */

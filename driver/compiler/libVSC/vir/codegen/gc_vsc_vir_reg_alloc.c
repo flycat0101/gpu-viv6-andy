@@ -8893,7 +8893,6 @@ _VIR_RA_LS_GetSpillSize(
 
     gctUINT     spillSize = 4, threadCount, groupCount, groupSize;
     gctUINT     maxGPRPerWorkgroup = hwConfig->maxGPRCountPerCore / 4;
-    gctFLOAT    index = 0.0;
 
     threadCount = hwConfig->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1);
     groupCount =  maxGPRPerWorkgroup / VIR_Shader_GetRegWatermark(pShader);
@@ -8901,17 +8900,12 @@ _VIR_RA_LS_GetSpillSize(
 
     /*
     ** Since we use the globalId as the index to MOD the groupSize, if we still use 16bit MOD,
-    ** we need to make sure that the groupSize can be divided by 0x10000.
+    ** we need to make sure that the groupSize is exactly divisible by 2.
     ** So there is no overlapping problem when the globalId is greater than 0xFFFF.
     */
     if (bUse16BitMod)
     {
-        while ((groupSize > (gctUINT)gcoMATH_Exp2(index)) && ((gctUINT)gcoMATH_Exp2(index) < 0x10000))
-        {
-            index++;
-        }
-        groupSize = (gctUINT)gcoMATH_Exp2(index);
-        gcmASSERT(groupSize < 0x10000);
+        groupSize = vscAlignToPow2(groupSize, 16);
     }
 
     if (!bUse16BitMod || groupSize * 2 < 0x10000)
@@ -12517,11 +12511,11 @@ void _VIR_RA_LS_SetRegWatermark(
     if (VIR_Shader_IsCL(pShader) || VIR_Shader_IsGlCompute(pShader))
     {
         /* Set the work group number. */
-        numWorkGroup = VIR_Shader_ComputeWorkGroupNum(pShader, pHwCfg);
+        numWorkGroup = VIR_Shader_ComputeWorkGroupNum(pShader, pHwCfg, gcvTRUE);
         VIR_Shader_SetCurrWorkGrpNum(pShader, numWorkGroup);
 
         /* Set the work thread number. */
-        numWorkThread = VIR_Shader_ComputeWorkThreadNum(pShader, pHwCfg);
+        numWorkThread = VIR_Shader_ComputeWorkThreadNum(pShader, pHwCfg, gcvTRUE);
         VIR_Shader_SetCurrWorkThreadNum(pShader, numWorkThread);
 
         /* Set the workGroupCount per shader group. */
