@@ -2587,6 +2587,7 @@ static VkResult halti5_pip_emit_rt(
     VkBool32 hasDsSurface = (subPass->dsAttachIndex != VK_ATTACHMENT_UNUSED) ? VK_TRUE : VK_FALSE;
     uint32_t i;
     VkBool32 rtEnabled = gcvFALSE;
+    VkBool32 noShader = VK_FALSE;
 
     static const gctINT32 s_xlateDepthCompare[] =
     {
@@ -2650,12 +2651,16 @@ static VkResult halti5_pip_emit_rt(
 
     depthOnly = (subPass->colorCount == 0) || (!(hints->stageBits & gcvPROGRAM_STAGE_FRAGMENT_BIT));
     /* ps shader is not necessary to be excuted */
-    depthOnly &= !(hints->hasKill
+    noShader = !(hints->hasKill
         || hints->psHasFragDepthOut
         || psHasMemoryAccess
         || (hints->rtArrayComponent != -1)
         || (hints->sampleMaskLoc != -1)
         || msaaFragmentOp);
+    if (depthOnly && (noShader == VK_FALSE))
+    {
+        depthOnly = VK_FALSE;
+    }
 
     chipGfxPipeline->depthOnly = depthOnly;
 
