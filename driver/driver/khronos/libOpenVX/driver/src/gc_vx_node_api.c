@@ -2368,8 +2368,6 @@ VX_API_ENTRY vx_node VX_API_CALL vxActivationLayer(
     vx_scalar func_s      = VX_NULL;
     vx_scalar a_s         = VX_NULL;
     vx_scalar b_s         = VX_NULL;
-    vx_int32 a_int;
-    vx_int32 b_int;
 
     vx_reference    parameters[] = {
     (vx_reference)inputs,
@@ -2389,26 +2387,14 @@ VX_API_ENTRY vx_node VX_API_CALL vxActivationLayer(
         gcmFOOTER_NO();
         return (vx_node)func_s;
     }
-    if(a > gcvMAXINT32)
-        a_int = gcvMAXINT32;
-    else if(a < (vx_int32)gcvMININT32)
-        a_int = (vx_int32)gcvMININT32;
-    else
-        a_int = (vx_int32)a;
 
-    if(b > gcvMAXINT32)
-        b_int = gcvMAXINT32;
-    else if(b < (vx_int32)gcvMININT32)
-        b_int = (vx_int32)gcvMININT32;
-    else
-        b_int = (vx_int32)b;
-    a_s = vxCreateScalar(context, VX_TYPE_INT32, &a_int);
+    a_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &a);
     if (vxoReference_GetStatus((vx_reference)a_s) != VX_SUCCESS)
     {
         gcmFOOTER_NO();
         return (vx_node)a_s;
     }
-    b_s = vxCreateScalar(context, VX_TYPE_INT32, &b_int);
+    b_s = vxCreateScalar(context, VX_TYPE_FLOAT32, &b);
     if (vxoReference_GetStatus((vx_reference)b_s) != VX_SUCCESS)
     {
         gcmFOOTER_NO();
