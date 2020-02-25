@@ -273,6 +273,18 @@ VKAPI_ATTR VkResult VKAPI_CALL __nop_ImportSemaphoreFdKHR(VkDevice device, const
     return VK_SUCCESS;
 }
 
+VKAPI_ATTR VkResult VKAPI_CALL __nop_GetFenceFdKHR(VkDevice device, const VkFenceGetFdInfoKHR* pGetFdInfo, int* pFd)
+{
+    __VK_NOP_MESSAGE();
+    return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __nop_ImportFenceFdKHR(VkDevice device, const VkImportFenceFdInfoKHR* pImportFenceFdInfo)
+{
+    __VK_NOP_MESSAGE();
+    return VK_SUCCESS;
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL __nop_CreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool)
 {
     __VK_NOP_MESSAGE();
@@ -1152,6 +1164,18 @@ VKAPI_ATTR VkResult VKAPI_CALL __nop_GetSemaphoreWin32HandleKHR(VkDevice device,
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __nop_ImportSemaphoreWin32HandleKHR(VkDevice device, const VkImportSemaphoreWin32HandleInfoKHR* pImportSemaphoreWin32HandleInfo)
+{
+    __VK_NOP_MESSAGE();
+    return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __nop_GetFenceWin32HandleKHR(VkDevice device, const VkFenceGetWin32HandleInfoKHR* pGetWin32HandleInfo, HANDLE* pHandle)
+{
+    __VK_NOP_MESSAGE();
+    return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL __nop_ImportFenceWin32HandleKHR(VkDevice device, const VkImportFenceWin32HandleInfoKHR* pImportFenceWin32HandleInfo)
 {
     __VK_NOP_MESSAGE();
     return VK_SUCCESS;

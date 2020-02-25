@@ -368,6 +368,16 @@ VKAPI_ATTR VkResult VKAPI_CALL vkImportSemaphoreFdKHR(VkDevice device, const VkI
     return __vkApiDispatchTable.ImportSemaphoreFdKHR(device, pImportSemaphoreFdInfo);
 }
 
+VKAPI_ATTR VkResult VKAPI_CALL vkGetFenceFdKHR(VkDevice device, const VkFenceGetFdInfoKHR* pGetFdInfo, int* pFd)
+{
+    return __vkApiDispatchTable.GetFenceFdKHR(device, pGetFdInfo, pFd);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL vkImportFenceFdKHR(VkDevice device, const VkImportFenceFdInfoKHR* pImportFenceFdInfo)
+{
+    return __vkApiDispatchTable.ImportFenceFdKHR(device, pImportFenceFdInfo);
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool)
 {
     return __vkApiDispatchTable.CreateQueryPool(device, pCreateInfo, pAllocator, pQueryPool);
