@@ -20431,13 +20431,17 @@ vxnne_shader_executable vxnneROIPoolShaderExecutable(
     vx_uint32    output_batch      = TENSOR_VIEW_SIZE_INDEX(output, 3);
     vx_uint32    dst_dims          = TENSOR_DIM_NUM(output) == 1 ? 2 : TENSOR_DIM_NUM(output);
     vx_int8      srcFixPointPos    = TENSOR_POS(input);
+    vx_int8      roiFixPointPos    = TENSOR_POS(input_rois);
     vx_int8      dstFixPointPos    = TENSOR_POS(output);
     vx_tensor    input_rois_rs     = NULL;
     vx_tensor    output_rs         = NULL;
     vx_float32   scaleIn           = 1.0;
     vx_float32   scaleOut          = 1.0;
+    vx_float32   scaleROI          = 1.0;
+    vx_float32   roi_tail          = 0.0;
     vx_int32     inputZP           = 0;
     vx_int32     outputZP          = 0;
+    vx_int32     roiZP             = 0;
     vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
     vx_enum      roisFormat        = TENSOR_DATA_TYPE(input_rois);
     vx_enum      outputFormat      = TENSOR_DATA_TYPE(output);
@@ -20448,7 +20452,7 @@ vxnne_shader_executable vxnneROIPoolShaderExecutable(
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
 
-    if (inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_INT16)
+    if (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         if (srcFixPointPos >= 0)
         {
@@ -20459,13 +20463,32 @@ vxnne_shader_executable vxnneROIPoolShaderExecutable(
             scaleIn    = (vx_float32)(1 << -srcFixPointPos);
         }
     }
-    else if (inputFormat == VX_TYPE_UINT8)
+    else if (TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
     {
         scaleIn = TENSOR_TF_SCALE(input);
         inputZP = TENSOR_TF_ZEROPOINT(input);
     }
 
-    if (outputFormat == VX_TYPE_INT8 || outputFormat == VX_TYPE_INT16)
+    if (TENSOR_QUANT_TYPE(input_rois) == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        if (roiFixPointPos >= 0)
+        {
+            scaleROI    = 1.0f / (vx_float32) (1 << roiFixPointPos);
+        }
+        else if (roiFixPointPos < 0)
+        {
+            scaleROI    = (vx_float32)(1 << -roiFixPointPos);
+        }
+    }
+    else if (TENSOR_QUANT_TYPE(input_rois) == VX_QUANT_AFFINE_SCALE)
+    {
+        scaleROI = TENSOR_TF_SCALE(input_rois);
+        roiZP    = TENSOR_TF_ZEROPOINT(input_rois);
+    }
+
+    roi_tail = -1 * scaleROI * roiZP;
+
+    if (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         if (dstFixPointPos >= 0)
         {
@@ -20476,13 +20499,22 @@ vxnne_shader_executable vxnneROIPoolShaderExecutable(
             scaleOut = 1.0f / (vx_float32) (1 << -dstFixPointPos);
         }
     }
-    else if (outputFormat == VX_TYPE_UINT8)
+    else if (TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
     {
-        scaleOut = TENSOR_TF_SCALE(output);
+        scaleOut = 1.0f / TENSOR_TF_SCALE(output);
         outputZP = TENSOR_TF_ZEROPOINT(output);
     }
 
     borderMode->mode   = VX_BORDER_CONSTANT;
+    if (rois_dims <= 2)
+    {
+        rois_dims     = 4;
+        rois_depth    = TENSOR_VIEW_SIZE_INDEX(input_rois, 0);
+        rois_batch    = TENSOR_VIEW_SIZE_INDEX(input_rois, 1);
+        rois_sizes[0] = rois_depth;
+        rois_sizes[1] = rois_batch;
+    }
+
     input_rois_rs      = vxoTensor_ReshapeTensor(input_rois, rois_sizes, rois_dims);
     output_rs          = vxoTensor_ReshapeTensor(output, dst_sizes, dst_dims);
     pool_width_s       = vxCreateScalar(context, VX_TYPE_INT32, &pool_width);
@@ -20567,7 +20599,7 @@ vxnne_shader_executable vxnneROIPoolShaderExecutable(
     }
 
     if ((inputFormat == VX_TYPE_FLOAT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
-        (inputFormat == VX_TYPE_INT16 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16))
+        (inputFormat == VX_TYPE_INT16 && (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_INT16) && outputFormat == VX_TYPE_INT16))
     {
         vx_float32 q_PoolWH[2] = {1 / (vx_float32)pool_width, 1 / (vx_float32)pool_height};
         vx_int32   inputSize[2] = {width, height};
@@ -20590,8 +20622,18 @@ vxnne_shader_executable vxnneROIPoolShaderExecutable(
         }
         else
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_generic_int16", borderMode);
-            if (!shaderExecutable) goto OnError;
+            if (roisFormat == VX_TYPE_INT16)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_generic_int16_int16", borderMode);
+                if (!shaderExecutable) goto OnError;
+                status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleROI", 1, &scaleROI);
+                if (status != VX_SUCCESS) goto OnError;
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_generic_int16", borderMode);
+                if (!shaderExecutable) goto OnError;
+            }
         }
 
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniFp16toFp32_4x4", 1, uniFp16toFp32_4x4);
@@ -20602,12 +20644,12 @@ vxnne_shader_executable vxnneROIPoolShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "minVal", 1, &minVal);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_UINT8 && roisFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
+    else if (inputFormat == VX_TYPE_UINT8 && (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_UINT8) && outputFormat == VX_TYPE_UINT8)
     {
         vx_float32 q_PoolWH[2] = {1 / (vx_float32)pool_width, 1 / (vx_float32)pool_height};
         vx_int32   inputSize[2] = {width, height};
         vx_int32   offset = rois_depth == 5? 1 : 0;
-        vx_float32 uint8Scale   = scaleIn / scaleOut;
+        vx_float32 uint8Scale   = scaleIn * scaleOut;
         vx_float32 input_ZP     = (vx_float32)inputZP;
         vx_float32 output_ZP    = (vx_float32)outputZP;
         vx_uint32 uniFp16toFp32_4x4[16] = {
@@ -20620,8 +20662,19 @@ vxnne_shader_executable vxnneROIPoolShaderExecutable(
             0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000 // Constant
         };
 
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_generic_uint8", borderMode);
-        if (!shaderExecutable) goto OnError;
+        if (roisFormat == VX_TYPE_UINT8)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_generic_uint8_uint8", borderMode);
+            if (!shaderExecutable) goto OnError;
+            status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleROI", 1, &scaleROI);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "roi_tail", 1, &roi_tail);
+            if (status != VX_SUCCESS) goto OnError;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_generic_uint8", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
 
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniFp16toFp32_4x4", 1, uniFp16toFp32_4x4);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputSize", 1, inputSize);
@@ -20630,6 +20683,43 @@ vxnne_shader_executable vxnneROIPoolShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uint8Scale", 1, &uint8Scale);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_ZP", 1, &input_ZP);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "output_ZP", 1, &output_ZP);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "minVal", 1, &minVal);
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if (inputFormat == VX_TYPE_INT8 && (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_INT8) && outputFormat == VX_TYPE_INT8)
+    {
+        vx_float32 q_PoolWH[2] = {1 / (vx_float32)pool_width, 1 / (vx_float32)pool_height};
+        vx_int32   inputSize[2] = {width, height};
+        vx_int32   offset = rois_depth == 5? 1 : 0;
+        vx_float32 scaleInt16toInt16   = scaleIn * scaleOut;
+        vx_uint32 uniFp16toFp32_4x4[16] = {
+            0x01010101, // TCfg
+            0x00000000, // ASelt
+            0x00010000, 0x00030002, // ABin
+            0x02020202, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000100, // AccumType, ConstantType, and PostShift
+            0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000, 0x00003c00, 0x00000000 // Constant
+        };
+
+        if (roisFormat == VX_TYPE_INT8)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_generic_int8_int8", borderMode);
+            if (!shaderExecutable) goto OnError;
+            status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleROI", 1, &scaleROI);
+            if (status != VX_SUCCESS) goto OnError;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_generic_int8", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+
+        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniFp16toFp32_4x4", 1, uniFp16toFp32_4x4);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputSize", 1, inputSize);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "q_PoolWH", 1, q_PoolWH);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "offset", 1, &offset);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleInt16toInt16", 1, &scaleInt16toInt16);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "minVal", 1, &minVal);
         if (status != VX_SUCCESS) goto OnError;
     }
