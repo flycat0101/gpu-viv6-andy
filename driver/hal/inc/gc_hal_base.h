@@ -5959,8 +5959,8 @@ gcoHAL_GetUserDebugOption(
                 } \
                 else \
                 { \
-                    attribBufSizeInKB -= 4; \
-                    L1cacheSize = 4; \
+                    attribBufSizeInKB -= 2; \
+                    L1cacheSize = 2; \
                 } \
             } \
             prefix##ASSERT(L1cacheSize); \
