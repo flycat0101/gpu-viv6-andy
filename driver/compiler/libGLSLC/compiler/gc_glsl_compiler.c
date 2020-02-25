@@ -167,6 +167,7 @@ static slsREDECLARED_VARIABLE FSRedeclaredVariables[] =
 {
     { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_Color",                 _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
     { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_SecondaryColor",        _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_ClipDistance",          _CheckRedeclaredForClipDistance,         _UpdateRedeclaredForClipDistance },
 };
 static gctUINT FSRedeclaredVariableCount = sizeof(FSRedeclaredVariables) / sizeof(slsREDECLARED_VARIABLE);
 
@@ -3188,7 +3189,7 @@ sloCOMPILER_CreateName(
             slsREDECLARED_VARIABLE      redeclaredVariable = { 0 };
             slsNAME*                    pBuiltinName = gcvNULL;
             gctUINT                     redeclaredVariableCount = 0, i = 0;
-            gctBOOL                     bMatch = gcvTRUE;
+            gctBOOL                     bMatch = gcvFALSE;
 
             if (shaderType == slvSHADER_TYPE_VERTEX)
             {
@@ -3225,6 +3226,11 @@ sloCOMPILER_CreateName(
                                                                Symbol,
                                                                Extension,
                                                                &pBuiltinName));
+
+                if (pBuiltinName == gcvNULL)
+                {
+                    break;
+                }
 
                 if (redeclaredVariable.checkFunc == gcvNULL)
                 {
