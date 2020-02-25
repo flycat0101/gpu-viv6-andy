@@ -1337,6 +1337,14 @@ VkResult halti2_copyImageWithRS(
         }
     }
 
+    if ((srcMsaa != dstMsaa && srcRes->isImage && dstRes->isImage) &&
+        (srcFormat == VK_FORMAT_R16_SFLOAT || srcFormat == VK_FORMAT_R16G16_SFLOAT ||
+         srcFormat == VK_FORMAT_R32_SFLOAT || dstFormat == VK_FORMAT_R16_SFLOAT ||
+         dstFormat == VK_FORMAT_R16G16_SFLOAT || dstFormat == VK_FORMAT_R32_SFLOAT))
+    {
+        useComputeBlit = VK_TRUE;
+    }
+
     if (useComputeBlit)
     {
         return (halti5_computeBlit(commandBuffer, srcRes, dstRes, rawCopy, gcvNULL, filter));
