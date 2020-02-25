@@ -7876,7 +7876,7 @@ _PmInitializeGPU(
 {
     gceSTATUS status;
 
-    bool hwMmuDisabled =  gcvTRUE;
+    gctBOOL hwMmuDisabled =  gcvTRUE;
 
     /* VIV for 8MM_EVK, maybe power off is failed, the GPU still has been power on,
     so we need to check the mmu enable flag to see if we need to dummy draw */
