@@ -3157,8 +3157,11 @@ _clGetOrConstructElement(
            }
         }
         if(typeInfo != gcvNULL) {
-           dataType = typeInfo->typePtr[CompoundDecl->dataType->accessQualifier]
+            dataType = typeInfo->typePtr[CompoundDecl->dataType->accessQualifier]
                               [CompoundDecl->dataType->addrSpaceQualifier];
+            if(dataType->accessQualifier == clvQUALIFIER_CONST && CompoundDecl->ptrDscr != gcvNULL) {
+                dataType->accessQualifier = clvQUALIFIER_NONE;
+            }
         }
         else dataType = gcvNULL;
 
