@@ -1874,13 +1874,11 @@ static void _GetTypeStr(
             gcoOS_PrintStrSafe(typeStr, strLength, &offset, "%s", _GetNameStr(context, typeDie->name));
         else
             gcoOS_StrCopySafe(typeStr, strLength, "struct or uninon"); /* Some struct or union may not have name. TODO: can provide more info if requied. */
-
-        if (die->u.variable.type.isPointer)
-            gcoOS_StrCatSafe(typeStr, strLength, " *");
-        return;
     }
-
-    gcoOS_StrCopySafe(typeStr, strLength, VIR_GetOCLTypeName(die->u.variable.type.type));
+    else
+        {
+            gcoOS_StrCopySafe(typeStr, strLength, VIR_GetOCLTypeName(die->u.variable.type.type));
+            }
 
     if (die->u.variable.type.isPointer)
         gcoOS_StrCatSafe(typeStr, strLength, " *");
@@ -1897,6 +1895,7 @@ static void _GetTypeStr(
         gcoOS_StrCatSafe(typeStr, strLength, " ");
         gcoOS_StrCatSafe(typeStr, strLength, tempStr);
     }
+    return;
 }
 
 gctBOOL vscDIGetDieisPrimitiveType(
@@ -2140,6 +2139,7 @@ void vscDIGetArrayTempReg(
     gctINT arrayLength = 1;
     gctINT elemCount = 4;
     gctUINT useRegNum = 1;
+    gctINT rows = 1;
     if(sl && dimDepth + 1 >= (gctUINT)die->u.variable.type.array.numDim)
     {
         /* calculate the array width*/
@@ -2156,10 +2156,16 @@ void vscDIGetArrayTempReg(
         /*calculate vector element count*/
         if(VSC_DI_DIETYPE_IS_VECTOR(die))
         {
-            elemCount = VIR_GetTypeLogicalComponents(die->u.variable.type.type);
+            /*  old:elemCount = VIR_GetTypeLogicalComponents(die->u.variable.type.type);*/
+            rows = VIR_GetTypeRows(die->u.variable.type.type);
         }
-        useRegNum = ((VIR_GetTypeSize(VIR_GetTypeComponentType(die->u.variable.type.type)))/4);
-        elemCount = elemCount * useRegNum;
+        else
+        {
+            useRegNum = ((VIR_GetTypeSize(VIR_GetTypeComponentType(die->u.variable.type.type)))/4);
+            elemCount = elemCount * useRegNum;
+            rows = (elemCount / 4) == 0? 1 : (elemCount / 4);
+        }
+
         /*find the array start position in sw reg*/
         regStart = sl->u.reg.start;
 
@@ -2170,7 +2176,7 @@ void vscDIGetArrayTempReg(
         }
         /*the absolute sw location*/
         /*if  elementCount < 4, occupy one reg*/
-        tempReg = regStart + (tempReg + idx) * ((elemCount / 4) == 0? 1 : (elemCount / 4));
+        tempReg = regStart + (tempReg + idx) * rows;
     }
     *PtempReg = tempReg;
 }
@@ -2232,7 +2238,8 @@ void vscDIGetVariableInfo(
 
     isArrayChild = (Vdie->tag == VSC_DI_TAG_TYPE || Vdie->tag == VSC_DI_TAG_VARIABE || Vdie->tag == VSC_DI_TAG_PARAMETER)
                    && Vdie->u.variable.type.array.numDim > 0
-                   && (gctINT)dimDepth < Vdie->u.variable.type.array.numDim;
+                   && (gctINT)dimDepth < Vdie->u.variable.type.array.numDim
+                   && die->child ==  VSC_DI_INVALIDE_DIE;
 
     isVectorChild = VSC_DI_DIETYPE_IS_VECTOR(Vdie);
 
@@ -2358,9 +2365,9 @@ void vscDIGetVariableInfo(
                 curChild = VSC_DI_DIE_PTR(curChild->sib);
             }
             /*first judge the array, then the vector*/
-            if((child->tag == VSC_DI_TAG_VARIABE || child->tag == VSC_DI_TAG_PARAMETER) && child->u.variable.type.array.numDim > 0)
+            if((*childrenCount == 0) && (child->tag == VSC_DI_TAG_VARIABE || child->tag == VSC_DI_TAG_PARAMETER) && child->u.variable.type.array.numDim > 0)
                 *childrenCount = child->u.variable.type.array.length[0];
-            else if((child->tag == VSC_DI_TAG_VARIABE || child->tag == VSC_DI_TAG_PARAMETER) && child->u.variable.type.isPointer)
+            else if((*childrenCount == 0) && (child->tag == VSC_DI_TAG_VARIABE || child->tag == VSC_DI_TAG_PARAMETER) && child->u.variable.type.isPointer)
             {
                 *childrenCount = 1;
             }

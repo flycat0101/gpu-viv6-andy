@@ -4853,6 +4853,11 @@ IN clsNAME * Variable
                 {
                     type.isPrimitiveType = gcvFALSE;
                     type.type = (gctINT)_GetStructUnionType(Compiler,Variable);
+                    type.array.numDim = Variable->decl.array.numDim;
+                    for (i = 0 ; i < type.array.numDim; i++)
+                    {
+                        type.array.length[i] = Variable->decl.array.length[i];
+                    }
                 }
                 else
                 {
