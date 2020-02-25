@@ -4357,6 +4357,8 @@ VX_PRIVATE_API vx_status vxoMultiGPU_ComputeInputSize(
     vxnne_operation_info_s opInfo;
     vx_status status = VX_SUCCESS;
     vx_uint32 splitAxis = VX_MULTIVIP_CONV_SPLIT_NONE;
+    vx_uint32 outputDim = 0;
+    vx_uint32 zSize = 0;
 
     gcmHEADER_ARG("operation=%p, gpuCount=0x%x", operation, gpuCount);
     vxmASSERT(VXNNE_OPERATOR_CONVOLUTION == operation->operatorType);
@@ -4401,36 +4403,31 @@ VX_PRIVATE_API vx_status vxoMultiGPU_ComputeInputSize(
         }
     }
 
-    /* try split CONV on Z axis */
-    if (splitCount <= (gpuCount / 2))
-    {
-        vx_uint32 outputDim = 0;
-        vx_uint32 zSize = 0;
+    vxQueryTensor(convOp->outputs, VX_TENSOR_NUMBER_OF_DIMS, &outputDim, sizeof(outputDim));
+    zSize = TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 2); /* Z axis*/
 
-        vxQueryTensor(convOp->outputs, VX_TENSOR_NUMBER_OF_DIMS, &outputDim, sizeof(outputDim));
-        if (outputDim >= 3)
-        {
-            zSize = TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 2); /* Z axis*/
-            if ((zSize / gpuCount) <= 1)
-            {
-                splitAxis = VX_MULTIVIP_CONV_SPLIT_NONE;
-                splitCount = 0;
-            }
-            else
-            {
-                splitAxis = VX_MULTIVIP_CONV_SPLIT_Z_AXIS;
-                splitCount = gpuCount;
-            }
-        }
-        else
-        {
-            splitAxis = VX_MULTIVIP_CONV_SPLIT_NONE;
-            splitCount = 0;
-        }
+    /* try split CONV on Z axis */
+    if (splitCount == gpuCount)
+    {
+        splitAxis = VX_MULTIVIP_CONV_SPLIT_Y_AXIS;
+    }
+    else if ((splitCount < gpuCount) && (outputDim >= 3) && ((zSize / gpuCount) >= 1))
+    {
+        splitAxis = VX_MULTIVIP_CONV_SPLIT_Z_AXIS;
+        splitCount = gpuCount;
+    }
+    else if (splitCount >= (gpuCount / 2))
+    {
+        splitAxis = VX_MULTIVIP_CONV_SPLIT_Y_AXIS;
+    }
+    else if (outputDim >= 3)
+    {
+        splitAxis = VX_MULTIVIP_CONV_SPLIT_Z_AXIS;
+        splitCount = zSize;
     }
     else
     {
-        splitAxis = VX_MULTIVIP_CONV_SPLIT_Y_AXIS;
+        splitAxis = VX_MULTIVIP_CONV_SPLIT_NONE;
     }
 
     if (axis != VX_NULL)
