@@ -7703,14 +7703,106 @@ static VSC_ErrCode _LinkOutputOfLastHwShaderStage(VSC_HW_PIPELINE_SHADERS_PARAM*
     SHADER_IO_REG_MAPPING*              pThisOutputRegMapping = gcvNULL;
     SHADER_IO_REG_LINKAGE*              pThisOutputRegLinkage;
     gctUINT                             outputIdx, channel, linkNo = 0;
+    gctUINT                             ptSzIdx = NOT_ASSIGNED;
 
     pOutputLinkageInfo->linkedShaderStage = SHADER_TYPE_FFU;
 
-    /* Link stream-out (only consider per-vertex IOs) */
     if (DECODE_SHADER_TYPE(pHwShader->pSEP->shVersionType) == SHADER_TYPE_VERTEX   ||
         DECODE_SHADER_TYPE(pHwShader->pSEP->shVersionType) == SHADER_TYPE_GEOMETRY ||
         DECODE_SHADER_TYPE(pHwShader->pSEP->shVersionType) == SHADER_TYPE_DOMAIN)
     {
+        /* Before check the stream-out output, we need to check position and pointSize if present. */
+
+        /* Get position output index */
+        if (pVtxPxlOutputMapping->usage2IO[SHADER_IO_USAGE_POSITION].ioIndexMask)
+        {
+            outputIdx = pVtxPxlOutputMapping->usage2IO[SHADER_IO_USAGE_POSITION].mainIoIndex;
+
+            /* No need to check if it is stream outed. */
+            if (!(pVtxPxlOutputMapping->soIoIndexMask & (1LL << outputIdx)))
+            {
+                pThisOutputRegMapping = &pVtxPxlOutputMapping->pIoRegMapping[outputIdx];
+                pThisOutputRegLinkage = &pVtxPxlOutputLinkageInfo->ioRegLinkage[outputIdx];
+
+                /* Need assure there is no other usages packed with position */
+                for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+                {
+                    if (pThisOutputRegMapping->ioChannelMapping[channel].flag.bActiveWithinShader)
+                    {
+                        if (pThisOutputRegMapping->ioChannelMapping[channel].ioUsage != SHADER_IO_USAGE_POSITION ||
+                            pThisOutputRegMapping->ioChannelMapping[channel].usageIndex != 0)
+                        {
+                            return VSC_ERR_INVALID_ARGUMENT;
+                        }
+
+                        switch (channel) {
+                        case CHANNEL_X:
+                            pThisOutputRegLinkage->bLinkedByOtherStageX = gcvTRUE;
+                            break;
+                        case CHANNEL_Y:
+                            pThisOutputRegLinkage->bLinkedByOtherStageY = gcvTRUE;
+                            break;
+                        case CHANNEL_Z:
+                            pThisOutputRegLinkage->bLinkedByOtherStageZ = gcvTRUE;
+                            break;
+                        default:
+                            pThisOutputRegLinkage->bLinkedByOtherStageW = gcvTRUE;
+                            break;
+                        }
+                    }
+                }
+
+                pThisOutputRegLinkage->linkNo = 0;
+
+                /* Always start from 1 since 0 is reserved for position */
+                linkNo = 1;
+            }
+        }
+
+        /* Get pointsize output index */
+        if (pVtxPxlOutputMapping->usage2IO[SHADER_IO_USAGE_POINTSIZE].ioIndexMask)
+        {
+            outputIdx = pVtxPxlOutputMapping->usage2IO[SHADER_IO_USAGE_POINTSIZE].mainIoIndex;
+
+            /* No need to check if it is stream outed. */
+            if (!(pVtxPxlOutputMapping->soIoIndexMask & (1LL << outputIdx)))
+            {
+                pThisOutputRegMapping = &pVtxPxlOutputMapping->pIoRegMapping[outputIdx];
+                pThisOutputRegLinkage = &pVtxPxlOutputLinkageInfo->ioRegLinkage[outputIdx];
+
+                /* Need assure there is no other usages packed with pointsize */
+                for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+                {
+                    if (pThisOutputRegMapping->ioChannelMapping[channel].flag.bActiveWithinShader)
+                    {
+                        if (pThisOutputRegMapping->ioChannelMapping[channel].ioUsage != SHADER_IO_USAGE_POINTSIZE ||
+                            pThisOutputRegMapping->ioChannelMapping[channel].usageIndex != 0)
+                        {
+                            return VSC_ERR_INVALID_ARGUMENT;
+                        }
+
+                        switch (channel) {
+                        case CHANNEL_X:
+                            pThisOutputRegLinkage->bLinkedByOtherStageX = gcvTRUE;
+                            break;
+                        case CHANNEL_Y:
+                            pThisOutputRegLinkage->bLinkedByOtherStageY = gcvTRUE;
+                            break;
+                        case CHANNEL_Z:
+                            pThisOutputRegLinkage->bLinkedByOtherStageZ = gcvTRUE;
+                            break;
+                        default:
+                            pThisOutputRegLinkage->bLinkedByOtherStageW = gcvTRUE;
+                            break;
+                        }
+                    }
+                }
+
+                ptSzIdx = outputIdx;
+            }
+        }
+
+        /* Link stream-out (only consider per-vertex IOs) */
         if (pVtxPxlOutputMapping->soIoIndexMask != 0 && pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportStreamOut)
         {
             for (outputIdx = 0; outputIdx < pVtxPxlOutputMapping->countOfIoRegMapping; outputIdx ++)
@@ -7766,6 +7858,11 @@ static VSC_ErrCode _LinkOutputOfLastHwShaderStage(VSC_HW_PIPELINE_SHADERS_PARAM*
 
                 pThisOutputRegLinkage->bOnlyLinkToSO = gcvTRUE;
             }
+        }
+
+        if (ptSzIdx != NOT_ASSIGNED)
+        {
+            pVtxPxlOutputLinkageInfo->ioRegLinkage[ptSzIdx].linkNo = linkNo ++;
         }
     }
 
