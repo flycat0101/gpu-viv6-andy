@@ -447,6 +447,7 @@ typedef struct __GLchipProgramStateStaticKeyRec
     gctBOOL                             alphaBlend;                               /* has blend code */
     gctBOOL                             ShaderPolygonOffset;                      /* has shader polygon offset */
     gctBOOL                             highpConversion;
+    gctBOOL                             frontFacingClockwice;                     /* has front face clockwice */
 }__GLchipProgramStateStaticKey;
 
 typedef struct __GLchipProgramStateKeyRec
@@ -481,7 +482,8 @@ typedef union __GLchipProgramStateKeyMaskRec
         GLuint                          hasAlphaBlend           : 1;
         GLuint                          hasPolygonOffset        : 1;
         GLuint                          hasPSOutHighpConversion : 1; /*  */
-        GLuint                          reserved                : 16;
+        GLuint                          hasFrontFacingClockwice : 1;
+        GLuint                          reserved                : 15;
     } s;
 
     GLuint                              value;
