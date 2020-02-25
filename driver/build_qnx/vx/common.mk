@@ -131,6 +131,7 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_layer
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_gpu_layer.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_util.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_encoder.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_wb.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_nn_command.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/driver/src/gc_vx_binary.o
 
