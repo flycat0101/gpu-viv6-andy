@@ -2854,6 +2854,7 @@ _FillInFeatureTable(
     Features[gcvFEATURE_NN_SMALLBATCH_PHASE1] = database->NN_SMALLBATCH_PHASE1;
     Features[gcvFEATURE_TP_SMALLBATCH_PHASE1] = database->TP_SMALLBATCH_PHASE1;
     Features[gcvFEATURE_VIP_SCALER] = database->SCALER;
+    Features[gcvFEATURE_VIP_SCALER_4K] = database->SCALER_4K;
     Features[gcvFEATURE_TX_8bit_UVFrac_ROUNDING_FIX] = database->TX_8bit_UVFrac_ROUNDING_FIX;
     Features[gcvFEATURE_NN_REQ_SLOWARBITRATION_FIX] =  database->NN_REQ_SLOWARBITRATION_FIX;
     Features[gcvFEATUER_IMAGE_PARTIAL_CACHE] = database->IMAGE_PARTIAL_CACHE;
