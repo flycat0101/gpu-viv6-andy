@@ -8755,6 +8755,19 @@ END_FIND:
                         if(clmIsElementTypeFloating(elementType) &&
                            _CheckVectorLength(arg->decl.dataType, vectorSize, length)) {
                             matched = gcvTRUE;
+                            if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))
+                            {
+                                clsIOPERAND iOperand[1];
+
+                                clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_FLOAT));
+                                gcmONERROR(clGenGenericCode1(Compiler,
+                                                             PolynaryExpr->exprBase.base.lineNo,
+                                                             PolynaryExpr->exprBase.base.stringNo,
+                                                             clvOPCODE_HALF_TO_FLOAT,
+                                                             iOperand,
+                                                             &OperandsParameters[operandsNeeded].rOperands[0]));
+                                clsROPERAND_InitializeUsingIOperand(&OperandsParameters[operandsNeeded].rOperands[0], iOperand);
+                            }
                         }
                         break;
 

@@ -4376,6 +4376,8 @@ _ConvOpcode(
     case clvOPCODE_FLOAT_TO_INT:     return gcSL_F2I;
     case clvOPCODE_FLOAT_TO_UINT:    return gcSL_F2I;
     case clvOPCODE_FLOAT_TO_BOOL:    gcmASSERT(0); return gcSL_NOP;
+    case clvOPCODE_FLOAT_TO_HALF:    gcmASSERT(0); return gcSL_NOP;
+    case clvOPCODE_HALF_TO_FLOAT:    gcmASSERT(0); return gcSL_NOP;
     case clvOPCODE_INT_TO_BOOL:      gcmASSERT(0); return gcSL_NOP;
     case clvOPCODE_UINT_TO_BOOL:     gcmASSERT(0); return gcSL_NOP;
     case clvOPCODE_INT_TO_INT:       return gcSL_CONV;
@@ -5606,6 +5608,92 @@ _EmitFloatToIntCode(
 }
 
 static gceSTATUS
+_EmitFloatToHalfCode(
+    IN cloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN gcsTARGET * Target,
+    IN gcsSOURCE * Source
+    )
+{
+    gctUINT32 format[1];
+    gceSTATUS status;
+    gcSHADER binary;
+
+    gcmHEADER();
+
+    gcmASSERT(Target);
+    gcmASSERT(Source);
+
+    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+    status = _EmitOpcodeAndTarget(Compiler,
+                                  LineNo,
+                                  StringNo,
+                                  gcSL_CONV,
+                                  Target);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    status = _EmitSource(Compiler,
+                         LineNo,
+                         StringNo,
+                         Source);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    format[0] = gcSL_FLOAT;
+    status = gcSHADER_AddSourceConstantFormatted(binary, format, gcSL_UINT32);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_EmitHalfToFloatCode(
+    IN cloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN gcsTARGET * Target,
+    IN gcsSOURCE * Source
+    )
+{
+    gctUINT32 format[1];
+    gceSTATUS status;
+    gcSHADER binary;
+
+    gcmHEADER();
+
+    gcmASSERT(Target);
+    gcmASSERT(Source);
+
+    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+    status = _EmitOpcodeAndTarget(Compiler,
+                                  LineNo,
+                                  StringNo,
+                                  gcSL_CONV,
+                                  Target);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    status = _EmitSource(Compiler,
+                         LineNo,
+                         StringNo,
+                         Source);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    format[0] = gcSL_FLOAT16;
+    status = gcSHADER_AddSourceConstantFormatted(binary, format, gcSL_UINT32);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
 _EmitScalarFloatOrIntToBoolCode(
     IN cloCOMPILER Compiler,
     IN gctUINT LineNo,
@@ -6437,6 +6525,8 @@ static clsSPECIAL_CODE_EMITTER1 SpecialCodeEmitterTable1[] =
     {clvOPCODE_FLOAT_TO_INT,    _EmitFloatToIntCode},
     {clvOPCODE_FLOAT_TO_UINT,    _EmitFloatToIntCode},
     {clvOPCODE_FLOAT_TO_BOOL,    _EmitFloatOrIntToBoolCode},
+    {clvOPCODE_FLOAT_TO_HALF,    _EmitFloatToHalfCode},
+    {clvOPCODE_HALF_TO_FLOAT,    _EmitHalfToFloatCode},
     {clvOPCODE_INT_TO_BOOL,        _EmitFloatOrIntToBoolCode},
     {clvOPCODE_UINT_TO_BOOL,    _EmitFloatOrIntToBoolCode},
     {clvOPCODE_IMPL_I2F,        _EmitIntToFloatCode},
