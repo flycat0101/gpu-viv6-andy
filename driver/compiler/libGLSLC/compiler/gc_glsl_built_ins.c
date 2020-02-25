@@ -3124,6 +3124,26 @@ _GenTexture3DProjLodCode(
 }
 
 gceSTATUS
+_GenTexture1DCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    )
+{
+    return _GenTexture1DArrayCode(
+                                  Compiler,
+                                  CodeGenerator,
+                                  PolynaryExpr,
+                                  OperandCount,
+                                  OperandsParameters,
+                                  IOperand
+                                  );
+}
+
+gceSTATUS
 _GenTexture1DArrayCode(
     IN sloCOMPILER Compiler,
     IN sloCODE_GENERATOR CodeGenerator,
