@@ -1733,7 +1733,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBindDescriptorSets(
         __vkDescriptorSet *descSet = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescSets->descSet);
 
         /* ensure all descriptor set be updated before call devCtx->chipFuncs->UpdateDescriptorSet */
-        result = (*devCtx->chipFuncs->UpdateDescriptorSet)((VkDevice)devCtx, (VkDescriptorSet)descSet);
+        result = (*devCtx->chipFuncs->UpdateDescriptorSet)((VkDevice)devCtx, (VkDescriptorSet)(uintptr_t)descSet);
         __VK_ASSERT(result == VK_SUCCESS);
 
         __VK_ASSERT(setIdx < __VK_MAX_DESCRIPTOR_SETS);
