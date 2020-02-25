@@ -1264,7 +1264,6 @@ _CheckErrorForSubscriptExpr(
     )
 {
     gctINT32        index;
-
     gceSTATUS       status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Compiler=0x%x LeftOperand=0x%x RightOperand=0x%x",
@@ -1492,9 +1491,11 @@ _CheckErrorForSubscriptExpr(
     {
         if (sloCOMPILER_IsHaltiVersion(Compiler))
         {
+            sloEXTENSION extension = {{0}};
+            extension.extension1 = slvEXTENSION1_GPU_SHADER5;
             if(slsDATA_TYPE_IsUnderlyingInterfaceBlock(LeftOperand->dataType) &&
                !slsDATA_TYPE_IsUnderlyingIOBlock(LeftOperand->dataType) &&
-               !sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_GPU_SHADER5))
+               !sloCOMPILER_ExtensionEnabled(Compiler, &extension))
             {
                 gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                 RightOperand->base.lineNo,
@@ -1525,8 +1526,10 @@ _CheckErrorForSubscriptExpr(
         if (slsDATA_TYPE_IsSampler(LeftOperand->dataType) ||
             slsDATA_TYPE_IsImage(LeftOperand->dataType))
         {
+            sloEXTENSION extension = {{0}};
+            extension.extension1 = slvEXTENSION1_GPU_SHADER5;
             if (sloIR_OBJECT_GetType(&RightOperand->base) != slvIR_CONSTANT &&
-                !sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_GPU_SHADER5) )
+                !sloCOMPILER_ExtensionEnabled(Compiler, &extension) )
             {
                 gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                 RightOperand->base.lineNo,
@@ -1704,6 +1707,7 @@ _CheckErrorAsArrayConstructor(
     gctUINT    operandCount;
     sloIR_EXPR operand;
     slsDATA_TYPE refDataType[1];
+    sloEXTENSION extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x PolynaryExpr=0x%x",
                   Compiler, PolynaryExpr);
@@ -1758,6 +1762,7 @@ _CheckErrorAsArrayConstructor(
     refDataType->arrayLength =
     refDataType->arrayLengthList[0] = 0;
 
+    extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
     FOR_EACH_DLINK_NODE(&PolynaryExpr->operands->members, struct _sloIR_EXPR, operand)
     {
         gcmASSERT(operand);
@@ -1777,7 +1782,7 @@ _CheckErrorAsArrayConstructor(
             return status;
         }
 
-        if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
+        if(sloCOMPILER_ExtensionEnabled(Compiler, &extension))
         {
             status = slMakeImplicitConversionForOperand(Compiler,
                                               operand,
@@ -2383,6 +2388,7 @@ _CreateUnnamedConstantExpr(
                                         &unnamedConstant);
     if (status == gcvSTATUS_NOT_FOUND)
     { /* not found */
+       sloEXTENSION extension = {{0}};
        status = sloCOMPILER_PushUnnamedSpace(Compiler, &nameSpace);
        if (gcmIS_ERROR(status)) return status;
 
@@ -2392,13 +2398,14 @@ _CreateUnnamedConstantExpr(
                                             DataType,
                                             &dataType));
 
+       extension.extension1 = slvEXTENSION1_NONE;
        gcmONERROR(sloCOMPILER_CreateName(Compiler,
                                          Constant->exprBase.base.lineNo,
                                          Constant->exprBase.base.stringNo,
                                          slvVARIABLE_NAME,
                                          dataType,
                                          "",
-                                         slvEXTENSION_NONE,
+                                         extension,
                                          gcvFALSE,
                                          &unnamedConstant));
 
@@ -2479,6 +2486,7 @@ slParseFuncCallExprAsExpr(
     gceSTATUS       status;
     sloIR_CONSTANT  constant;
     sloIR_EXPR      firstOperand;
+    sloEXTENSION    extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x FuncCall=0x%x",
                   Compiler, FuncCall);
@@ -2653,9 +2661,10 @@ slParseFuncCallExprAsExpr(
         gcmASSERT(0);
     }
 
+    extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
     if (FuncCall->operands != gcvNULL &&
         FuncCall->type == slvPOLYNARY_FUNC_CALL &&
-        sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
+        sloCOMPILER_ExtensionEnabled(Compiler, &extension))
     {
         sloIR_EXPR operand;
         FOR_EACH_DLINK_NODE(&FuncCall->operands->members, struct _sloIR_EXPR, operand)
@@ -3898,6 +3907,7 @@ _GetUniformBlockInfo(
     sloIR_VARIABLE variable;
     sloIR_BINARY_EXPR binaryExpr;
     sloIR_CONSTANT constant;
+    sloEXTENSION extension = {{0}};
 
     gcmHEADER_ARG("UniformBlockExpr=0x%x BlockName=0x%x ArrayIndex=0x%x",
                   UniformBlockExpr, BlockName, ArrayIndex);
@@ -3920,11 +3930,13 @@ _GetUniformBlockInfo(
             gcmFOOTER();
             return status;
         }
+
+        extension.extension1 = slvEXTENSION1_GPU_SHADER5;
         variable = (sloIR_VARIABLE) &binaryExpr->leftOperand->base;
         blockName = variable->name->u.variableInfo.interfaceBlock;
         gcmASSERT(sloIR_OBJECT_GetType(&binaryExpr->rightOperand->base) == slvIR_CONSTANT ||
-                  sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_GPU_SHADER5));
-        if(!sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_GPU_SHADER5))
+                  sloCOMPILER_ExtensionEnabled(Compiler, &extension));
+        if(!sloCOMPILER_ExtensionEnabled(Compiler, &extension))
         {
             constant = (sloIR_CONSTANT)&binaryExpr->rightOperand->base;
             gcmASSERT(constant->valueCount == 1);
@@ -4010,14 +4022,21 @@ slParseFieldSelectionExpr(
         {
             slsNAME *blockName;
             gctINT arrayIndex;
+            sloEXTENSION extension = {{0}};
+
             status = _GetUniformBlockInfo(Compiler, Operand, &blockName, &arrayIndex);
             if (gcmIS_ERROR(status))
             {
                 gcmFOOTER_ARG("<return>=%s", "<nil>");
                 return gcvNULL;
             }
+
+            extension.extension1 = slvEXTENSION1_GPU_SHADER5;
             gcmASSERT(fieldName->dataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM_BLOCK_MEMBER);
-            gcmASSERT(arrayIndex >= 0 || (arrayIndex == -1 && sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_GPU_SHADER5)));
+            if(!(arrayIndex >= 0 || (arrayIndex == -1 && sloCOMPILER_ExtensionEnabled(Compiler, &extension))))
+            {
+                gcmASSERT(gcvFALSE);
+            }
             status = _SetUniformBlockMemberActive(blockName, arrayIndex, fieldName);
             if (gcmIS_ERROR(status))
             {
@@ -4859,6 +4878,8 @@ _CheckErrorForArithmeticExpr(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    sloEXTENSION extension = {{0}};
+
     gcmHEADER_ARG("Compiler=0x%x IsMul=%d LeftOperand=0x%x RightOperand=0x%x",
                   Compiler, IsMul, LeftOperand, RightOperand);
 
@@ -4898,7 +4919,8 @@ _CheckErrorForArithmeticExpr(
         return status;
     }
 
-    if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
+    extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
+    if(sloCOMPILER_ExtensionEnabled(Compiler, &extension))
     {
         status = slMakeImplicitConversionForOperandPair(Compiler,
                                                       LeftOperand,
@@ -5096,6 +5118,7 @@ _CheckErrorForRelationalExpr(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    sloEXTENSION extension = {{0}};
     gcmHEADER_ARG("Compiler=0x%x LeftOperand=0x%x RightOperand=0x%x",
                   Compiler, LeftOperand, RightOperand);
 
@@ -5120,7 +5143,8 @@ _CheckErrorForRelationalExpr(
         return status;
     }
 
-    if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
+    extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
+    if(sloCOMPILER_ExtensionEnabled(Compiler, &extension))
     {
         status = slMakeImplicitConversionForOperandPair(Compiler,
                                                       LeftOperand,
@@ -5177,6 +5201,8 @@ _CheckErrorForEqualityExpr(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    sloEXTENSION extension = {{0}};
+
     gcmHEADER_ARG("Compiler=0x%x LeftOperand=0x%x RightOperand=0x%x",
                   Compiler, LeftOperand, RightOperand);
 
@@ -5211,7 +5237,8 @@ _CheckErrorForEqualityExpr(
         return status;
     }
 
-    if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
+    extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
+    if(sloCOMPILER_ExtensionEnabled(Compiler, &extension))
     {
         status = slMakeImplicitConversionForOperandPair(Compiler,
                                                       LeftOperand,
@@ -6147,6 +6174,7 @@ _CheckErrorForAssignmentExpr(
     )
 {
     gceSTATUS status;
+    sloEXTENSION extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x LeftOperand=0x%x RightOperand=0x%x",
                   Compiler, LeftOperand, RightOperand);
@@ -6224,7 +6252,8 @@ _CheckErrorForAssignmentExpr(
         return status;
     }
 
-    if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
+    extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
+    if(sloCOMPILER_ExtensionEnabled(Compiler, &extension))
     {
         status = slMakeImplicitConversionForOperandPair(Compiler,
                                                       LeftOperand,
@@ -6260,6 +6289,7 @@ _CheckErrorForArithmeticAssignmentExpr(
     )
 {
     gceSTATUS status;
+    sloEXTENSION extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x IsMul=%d LeftOperand=0x%x RightOperand=0x%x",
                   Compiler, IsMul, LeftOperand, RightOperand);
@@ -6308,7 +6338,8 @@ _CheckErrorForArithmeticAssignmentExpr(
         return status;
     }
 
-    if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
+    extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
+    if(sloCOMPILER_ExtensionEnabled(Compiler, &extension))
     {
         status = slMakeImplicitConversionForOperandPair(Compiler,
                                                         LeftOperand,
@@ -7607,6 +7638,8 @@ _ParseVariableDecl(
     gceSTATUS    status;
     slsNAME *variableName;
     slsDATA_TYPE * dataType;
+    sloEXTENSION  extension = {{0}};
+
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x",
                   Compiler, DataType, Identifier);
 
@@ -7656,13 +7689,14 @@ _ParseVariableDecl(
         return status;
     }
 
+    extension.extension1 = slvEXTENSION1_NONE;
     status = sloCOMPILER_CreateName(Compiler,
                                     Identifier->lineNo,
                                     Identifier->stringNo,
                                     slvVARIABLE_NAME,
                                     dataType,
                                     Identifier->u.identifier,
-                                    slvEXTENSION_NONE,
+                                    extension,
                                     gcvTRUE,
                                     &variableName);
 
@@ -7776,6 +7810,7 @@ _ParseVariableDeclWithInitializer(
     slsNAME *           name;
     sloIR_VARIABLE      variable;
     sloIR_BINARY_EXPR   binaryExpr;
+    sloEXTENSION        extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x Initializer=0x%x InitExpr=0x%x",
                   Compiler, DataType, Identifier, Initializer, InitExpr);
@@ -7791,13 +7826,14 @@ _ParseVariableDeclWithInitializer(
     }
 
     /* Create the name */
+    extension.extension1 = slvEXTENSION1_NONE;
     status = sloCOMPILER_CreateName(Compiler,
                                     Identifier->lineNo,
                                     Identifier->stringNo,
                                     slvVARIABLE_NAME,
                                     DataType,
                                     Identifier->u.identifier,
-                                    slvEXTENSION_NONE,
+                                    extension,
                                     gcvTRUE,
                                     &name);
 
@@ -9629,6 +9665,8 @@ slParseFuncHeader(
     gceSTATUS       status;
     slsNAME *       name  = gcvNULL;
     slsNAME *       field = gcvNULL;
+    sloEXTENSION    extension = {{0}};
+
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x",
                   Compiler, DataType, Identifier);
 
@@ -9694,13 +9732,14 @@ slParseFuncHeader(
         }
     }
 
+    extension.extension1 = slvEXTENSION1_NONE;
     status = sloCOMPILER_CreateName(Compiler,
                                     Identifier->lineNo,
                                     Identifier->stringNo,
                                     slvFUNC_NAME,
                                     DataType,
                                     Identifier->u.identifier,
-                                    slvEXTENSION_NONE,
+                                    extension,
                                     gcvTRUE,
                                     &name);
 
@@ -11092,6 +11131,8 @@ IN sloIR_BASE SwitchBody
         {
             sloIR_LABEL caseLabel = cases;
             gceSTATUS status = gcvSTATUS_OK;
+            sloEXTENSION extension = {{0}};
+            extension.extension1 = slvEXTENSION1_EXT_SHADER_IMPLICIT_CONVERSIONS;
             while(caseLabel)
             {
                 if (caseLabel->type == slvDEFAULT)
@@ -11099,7 +11140,7 @@ IN sloIR_BASE SwitchBody
                     caseLabel = caseLabel->nextCase;
                     continue;
                 }
-                if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
+                if(sloCOMPILER_ExtensionEnabled(Compiler, &extension))
                 {
                     status = slMakeImplicitConversionForOperand(Compiler,
                                               &(caseLabel->caseValue->exprBase),
@@ -12132,6 +12173,7 @@ slParseNonArrayParameterDecl(
 {
     gceSTATUS       status;
     slsNAME *       name;
+    sloEXTENSION    extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x",
                   Compiler, DataType, Identifier);
@@ -12169,13 +12211,14 @@ slParseNonArrayParameterDecl(
                                         "type qualifier other than precision qualifier is specified for parameter."));
     }
 
+    extension.extension1 = slvEXTENSION1_NONE;
     status = sloCOMPILER_CreateName(Compiler,
                                     (Identifier != gcvNULL)? Identifier->lineNo : 0,
                                     (Identifier != gcvNULL)? Identifier->stringNo : 0,
                                     slvPARAMETER_NAME,
                                     DataType,
                                     (Identifier != gcvNULL)? Identifier->u.identifier : "",
-                                    slvEXTENSION_NONE,
+                                    extension,
                                     gcvTRUE,
                                     &name);
 
@@ -12208,6 +12251,7 @@ slParseArrayParameterDecl(
     gctINT         arrayLength;
     slsDATA_TYPE * arrayDataType;
     slsNAME *      name;
+    sloEXTENSION   extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x ArrayLengthExpr=0x%x",
                   Compiler, DataType, Identifier, ArrayLengthExpr);
@@ -12260,13 +12304,14 @@ slParseArrayParameterDecl(
         return gcvNULL;
     }
 
+    extension.extension1 = slvEXTENSION1_NONE;
     status = sloCOMPILER_CreateName(Compiler,
                                     (Identifier != gcvNULL)? Identifier->lineNo : 0,
                                     (Identifier != gcvNULL)? Identifier->stringNo : 0,
                                     slvPARAMETER_NAME,
                                     arrayDataType,
                                     (Identifier != gcvNULL)? Identifier->u.identifier : "",
-                                    slvEXTENSION_NONE,
+                                    extension,
                                     gcvTRUE,
                                     &name);
 
@@ -13703,6 +13748,7 @@ slParseLayoutId(
     slvTES_ORDERING                 tesOrdering = slvTES_ORDERING_NONE;
     slvTES_POINT_MODE               tesPointMode = slvTES_POINT_MODE_NONE;
     slvGS_PRIMITIVE                 gsPrimitive = slvGS_PRIMITIVE_NONE;
+    sloEXTENSION                    extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x Layout Id=0x%x Value=0x%x",
                   Compiler, LayoutId, Value);
@@ -13725,6 +13771,7 @@ slParseLayoutId(
                          &layoutId,
                          &layoutIdExt);
 
+    extension.extension1 = slvEXTENSION1_BLEND_EQUATION_ADVANCED;
     do {
         if(layoutId == slvLAYOUT_NONE && layoutIdExt == slvLAYOUT_EXT_NONE) {
           gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
@@ -13737,7 +13784,7 @@ slParseLayoutId(
        }
 
        if((layoutId & sldLAYOUT_BLEND_SUPPORT_BIT_FIELDS) &&
-          !sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_BLEND_EQUATION_ADVANCED))
+           !sloCOMPILER_ExtensionEnabled(Compiler, &extension))
        {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                           LayoutId->lineNo,
@@ -14273,13 +14320,15 @@ slParseStructDeclEnd(
 
     if (Identifier != gcvNULL)
     {
+        sloEXTENSION extension = {{0}};
+        extension.extension1 = slvEXTENSION1_NONE;
         status = sloCOMPILER_CreateName(Compiler,
                                         Identifier->lineNo,
                                         Identifier->stringNo,
                                         slvSTRUCT_NAME,
                                         dataType,
                                         Identifier->u.identifier,
-                                        slvEXTENSION_NONE,
+                                        extension,
                                         gcvTRUE,
                                         gcvNULL);
 
@@ -14349,6 +14398,7 @@ slParseStructReDeclEnd(
     slsNAME *       field;
     slsNAME_SPACE * prevNameSpace = gcvNULL;
     sltPOOL_STRING  typeName = TypeName->u.typeName->symbol;
+    sloEXTENSION    extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x TypeName=0x%x", Compiler, TypeName);
 
@@ -14388,13 +14438,14 @@ slParseStructReDeclEnd(
         return gcvNULL;
     }
 
+    extension.extension1 = slvEXTENSION1_NONE;
     status = sloCOMPILER_CreateName(Compiler,
                                     sloCOMPILER_GetCurrentLineNo(Compiler),
                                     sloCOMPILER_GetCurrentStringNo(Compiler),
                                     slvSTRUCT_NAME,
                                     dataType,
                                     typeName,
-                                    slvEXTENSION_NONE,
+                                    extension,
                                     gcvTRUE,
                                     gcvNULL);
 
@@ -14956,7 +15007,8 @@ slParseInterfaceBlockDeclBegin(
 {
     gceSTATUS       status;
     slsNAME_SPACE * nameSpace = gcvNULL;
-    sleSHADER_TYPE shaderType;
+    sleSHADER_TYPE  shaderType;
+    sloEXTENSION    extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x", Compiler);
 
@@ -14994,11 +15046,12 @@ slParseInterfaceBlockDeclBegin(
         return;
     }
 
+    extension.extension1 = slvEXTENSION1_IO_BLOCKS;
     if (BlockType->u.qualifiers.storage != slvSTORAGE_QUALIFIER_BUFFER &&
         BlockType->u.qualifiers.storage != slvSTORAGE_QUALIFIER_UNIFORM &&
         ((BlockType->u.qualifiers.storage == slvSTORAGE_QUALIFIER_IN ||
           BlockType->u.qualifiers.storage == slvSTORAGE_QUALIFIER_OUT) &&
-         !sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_IO_BLOCKS)))
+          !sloCOMPILER_ExtensionEnabled(Compiler, &extension)))
     {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                         BlockType->lineNo,
@@ -15228,6 +15281,7 @@ slParseInterfaceBlockDeclEnd(
     if (BlockName != gcvNULL)
     {
         gctBOOL atGlobalNameSpace;
+        sloEXTENSION extension = {{0}};
 
         gcmVERIFY_OK(sloCOMPILER_AtGlobalNameSpace(Compiler, &atGlobalNameSpace));
         if (!atGlobalNameSpace)
@@ -15336,13 +15390,14 @@ slParseInterfaceBlockDeclEnd(
             return name;
         }
 
+        extension.extension1 = slvEXTENSION1_NONE;
         status = sloCOMPILER_CreateName(Compiler,
                                         BlockName->lineNo,
                                         BlockName->stringNo,
                                         slvINTERFACE_BLOCK_NAME,
                                         dataType,
                                         BlockName->u.identifier,
-                                        slvEXTENSION_NONE,
+                                        extension,
                                         gcvFALSE,
                                         &name);
 
@@ -15855,6 +15910,7 @@ slParseArrayListParameterDecl(
     gceSTATUS status;
     slsDATA_TYPE * arrayDataType;
     slsNAME * name = gcvNULL;
+    sloEXTENSION extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x ArrayLengthExpr=0x%x",
                   Compiler, DataType, Identifier, LengthList);
@@ -15919,13 +15975,14 @@ slParseArrayListParameterDecl(
                                        gcvTRUE,
                                        &arrayDataType));
 
+    extension.extension1 = slvEXTENSION1_NONE;
     gcmONERROR(sloCOMPILER_CreateName(Compiler,
                                      (Identifier != gcvNULL)? Identifier->lineNo : 0,
                                      (Identifier != gcvNULL)? Identifier->stringNo : 0,
                                      slvPARAMETER_NAME,
                                      arrayDataType,
                                      (Identifier != gcvNULL)? Identifier->u.identifier : "",
-                                     slvEXTENSION_NONE,
+                                     extension,
                                      gcvTRUE,
                                      &name));
 
@@ -16200,6 +16257,7 @@ slParseFieldListDecl(
     gctINT arrayLengthCount = 0, i = 0;
     gctINT * arrayLengthList = gcvNULL;
     slsDLINK_LIST * list;
+    sloEXTENSION extension = {{0}};
 
     gcmHEADER_ARG("Compiler=0x%x Identifier=0x%x ArrayLengthExpr=0x%x",
                   Compiler, Identifier, LengthList);
@@ -16245,13 +16303,14 @@ slParseFieldListDecl(
         gcmONERROR(status);
     }
 
+    extension.extension1 = slvEXTENSION1_NONE;
     status = sloCOMPILER_CreateName(Compiler,
                                     Identifier->lineNo,
                                     Identifier->stringNo,
                                     slvFIELD_NAME,
                                     gcvNULL,
                                     Identifier->u.identifier,
-                                    slvEXTENSION_NONE,
+                                    extension,
                                     gcvTRUE,
                                     &field);
 
@@ -16628,18 +16687,21 @@ slParseFieldDecl(
     slsNAME *       field;
     slsFieldDecl *  fieldDecl;
     gctPOINTER pointer = gcvNULL;
+    sloEXTENSION    extension = {{0}};
+
     gcmHEADER_ARG("Compiler=0x%x Identifier=0x%x ArrayLengthExpr=0x%x",
                   Compiler, Identifier, ArrayLengthExpr);
 
     gcmASSERT(Identifier);
 
+    extension.extension1 = slvEXTENSION1_NONE;
     status = sloCOMPILER_CreateName(Compiler,
                                     Identifier->lineNo,
                                     Identifier->stringNo,
                                     slvFIELD_NAME,
                                     gcvNULL,
                                     Identifier->u.identifier,
-                                    slvEXTENSION_NONE,
+                                    extension,
                                     gcvTRUE,
                                     &field);
 
@@ -16708,19 +16770,22 @@ slParseImplicitArraySizeFieldDecl(
     gceSTATUS       status;
     slsNAME *       field;
     slsFieldDecl *  fieldDecl;
-    gctPOINTER pointer = gcvNULL;
+    gctPOINTER      pointer = gcvNULL;
+    sloEXTENSION    extension = {{0}};
+
     gcmHEADER_ARG("Compiler=0x%x Identifier=0x%x",
                   Compiler, Identifier);
 
     gcmASSERT(Identifier);
 
+    extension.extension1 = slvEXTENSION1_NONE;
     status = sloCOMPILER_CreateName(Compiler,
                                     Identifier->lineNo,
                                     Identifier->stringNo,
                                     slvFIELD_NAME,
                                     gcvNULL,
                                     Identifier->u.identifier,
-                                    slvEXTENSION_NONE,
+                                    extension,
                                     gcvTRUE,
                                     &field);
 
