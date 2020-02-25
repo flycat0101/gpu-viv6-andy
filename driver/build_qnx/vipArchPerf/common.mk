@@ -20,25 +20,17 @@ endif
 include $(QCONFIG)
 
 define PINFO
-PINFO DESCRIPTION="NN arch model"
+PINFO DESCRIPTION="ArchModel Utilities"
 endef
+
+NAME=libNNArchPerf
 
 
 include $(qnx_build_dir)/common.mk
 
-EXTRA_INCVPATH += $(driver_root)/sdk/inc
-EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/driver/include
-EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/libarchmodelInterface/include
-EXTRA_INCVPATH += $(driver_root)/driver/khronos/libOpenVX/kernels
-EXTRA_INCVPATH += $(driver_root)/hal/inc
-EXTRA_INCVPATH += $(driver_root)/hal/user
-EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
-EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
-EXTRA_INCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/vipArchPerf
-EXTRA_INCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/libarchmodelSw/include
-
-SOURCE_OBJECTS += $(driver_root)/driver/khronos/libOpenVX/libarchmodelInterface/archModelInterface.o
-EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libOpenVX/libarchmodelInterface
+# Core
+SOURCE_OBJECTS += $(driver_root)/arch/vipArchPerfMdl_dev/vipArchPerf/nnArchPerf.o
+EXTRA_SRCVPATH += $(driver_root)/arch/vipArchPerfMdl_dev/vipArchPerf
 
 EXTRA_LIBVPATH += $(LOCAL_INSTALL)
 
@@ -48,11 +40,20 @@ ifneq ($(MISSING_OBJECTS), )
 $(error ***** Missing source objects:  $(MISSING_OBJECTS))
 endif
 
+CCFLAGS += -Wno-error=switch -Wno-error=missing-braces -Wno-unused-function -Wno-unused-variable -Wno-sign-compare -Wno-narrowing
+CCFLAGS += -Wno-unused-local-typedefs
+CCFLAGS += -D_LITTLE_ENDIAN_ \
+           -D__linux__ \
+           -fPIC \
+
+EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECTS)), $(OBJECTS_FROM_SRCVPATH))))
+#$(warning ***** Excluded objects: $(EXCLUDE_OBJS))
+
 include $(MKFILES_ROOT)/qmacros.mk
 
 include $(qnx_build_dir)/math.mk
 
-ifneq ($(filter so, $(VARIANT_LIST)), so)
+ifeq ($(filter so dll, $(VARIANT_LIST)),)
 INSTALLDIR=/dev/null
 endif
 

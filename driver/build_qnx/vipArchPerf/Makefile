@@ -11,11 +11,11 @@
 ##############################################################################
 
 
-LIST=COMPONENTS
-ENABLE_VG ?= 0
-ifeq ($(ORI_NNARCHPERF),1)
-EARLY_DIRS=halkernel halarchkernel halarchkernel_vg galcore halosuser halarchuser halarchuser_vg gal vsc egl vdk gles11 gles20sc gles30 clc cl vg11 vg11_vg archmodel vx
-else
-EARLY_DIRS=halkernel halarchkernel halarchkernel_vg galcore halosuser halarchuser halarchuser_vg gal vsc egl vdk gles11 gles20sc gles30 clc cl vg11 vg11_vg vipArchPerf archmodelSw archmodelInterface vx
+LIST=BOARD
+ifndef QRECURSE
+QRECURSE=recurse.mk
+ifdef QCONFIG
+QRDIR=$(dir $(QCONFIG))
 endif
-include recurse.mk
+endif
+include $(QRDIR)$(QRECURSE)
