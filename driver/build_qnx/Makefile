@@ -15,7 +15,7 @@ LIST=COMPONENTS
 ENABLE_VG ?= 0
 ifeq ($(ORI_NNARCHPERF),1)
 EARLY_DIRS=halkernel halarchkernel halarchkernel_vg galcore halosuser halarchuser halarchuser_vg gal vsc egl vdk gles11 gles20sc gles30 clc cl vg11 vg11_vg archmodel vx
-#else
+else
 EARLY_DIRS=halkernel halarchkernel halarchkernel_vg galcore halosuser halarchuser halarchuser_vg gal vsc egl vdk gles11 gles20sc gles30 clc cl vg11 vg11_vg archmodelSw archmodelInterface vx
-#endif
+endif
 include recurse.mk
