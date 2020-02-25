@@ -1809,7 +1809,7 @@ void _fill_TP_TRANSPOSE_Command(
         }
         vxmASSERT((vx_int32)i >=0);
         pnum = i + 1;
-        totalSize = pnum == 1 ? TENSOR_DATA_SIZE(other_tensor) : 1;
+        totalSize = 1;
         for (i = 0; i < pnum - 1; i++)
         {
             totalSize *= dims[i];
