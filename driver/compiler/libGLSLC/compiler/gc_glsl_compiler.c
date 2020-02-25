@@ -3195,7 +3195,7 @@ sloCOMPILER_CreateName(
         {
             sleSHADER_TYPE              shaderType = Compiler->shaderType;
             slsREDECLARED_VARIABLE*     pRedeclaredVariableList = gcvNULL;
-            slsREDECLARED_VARIABLE      redeclaredVariable = { 0 };
+            slsREDECLARED_VARIABLE      redeclaredVariable = { {slvEXTENSION1_NONE, slvEXTENSION2_NONE}, gcvNULL, gcvNULL, gcvNULL };
             slsNAME*                    pBuiltinName = gcvNULL;
             gctUINT                     redeclaredVariableCount = 0, i = 0;
             gctBOOL                     bMatch = gcvFALSE;
