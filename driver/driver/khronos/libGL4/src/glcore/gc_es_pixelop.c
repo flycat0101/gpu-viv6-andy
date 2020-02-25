@@ -450,7 +450,7 @@ OnError:
 
 GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
 {
-    __GL_HEADER();
+//    __GL_HEADER();
 
     /* Fullfill ES Spec requirements */
     if (!gc->imports.conformGLSpec)
@@ -609,7 +609,7 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
         }
     }
 OnError:
-    __GL_FOOTER();
+//    __GL_FOOTER();
 }
 
 
