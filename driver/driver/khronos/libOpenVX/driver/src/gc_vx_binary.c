@@ -1287,10 +1287,10 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SubmitCommand(
     )
 {
     vx_status status = VX_SUCCESS;
-    vx_uint32 maxSize = gcmALIGN_BASE(gcdCMD_BUFFER_SIZE, 64);
+    vx_uint32 maxSize = gcmALIGN_BASE(VX_GRAPH_COMMAND_BUFFER_SIZE, 64);
 
     gcmHEADER_ARG("statesBuff=%p, binLoad=%p, statesSize=%d", statesBuff, binLoad, statesSize);
-    if (maxSize == gcdCMD_BUFFER_SIZE)
+    if (maxSize == VX_GRAPH_COMMAND_BUFFER_SIZE)
     {
         maxSize = maxSize - 0x800;
     }
@@ -3523,9 +3523,9 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_GenerateStatesBuffer(
 
     /* 4. free binaryBuffer which allocate on system.
           This buffer will be used in vxoImportKernelFromFile() when nn layer dump mode or
-          stateSize > (gcmALIGN_BASE(gcdCMD_BUFFER_SIZE, 64) - 0x800)*/
+          stateSize > (gcmALIGN_BASE(VX_GRAPH_COMMAND_BUFFER_SIZE, 64) - 0x800)*/
     if ((0 == binLoad->context->options.enableNNLayerDump) && (binLoad->binaryBuffer != VX_NULL) &&
-        (stateSize <= (gcmALIGN_BASE(gcdCMD_BUFFER_SIZE, 64) - 0x800)))
+        (stateSize <= (gcmALIGN_BASE(VX_GRAPH_COMMAND_BUFFER_SIZE, 64) - 0x800)))
     {
         gcoOS_Free(gcvNULL, (gctPOINTER)binLoad->binaryBuffer);
         binLoad->binaryBuffer = VX_NULL;

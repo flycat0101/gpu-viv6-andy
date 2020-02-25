@@ -9455,12 +9455,12 @@ VX_PRIVATE_API void vxoGraph_GenerateCommandBuffer(vx_graph graph)
         vxmONERROR(VX_ERROR_NOT_SUPPORTED);
     }
 
-    commandBuffer = (vx_uint8 *)vxAllocateAndZeroMemory(gcdCMD_BUFFER_SIZE);
+    commandBuffer = (vx_uint8 *)vxAllocateAndZeroMemory(VX_GRAPH_COMMAND_BUFFER_SIZE);
 
     vxmONERROR((commandBuffer != VX_NULL ? VX_SUCCESS : VX_ERROR_NO_MEMORY));
 
     vxmONERROR(gcfVX_CaptureState(commandBuffer,
-        gcdCMD_BUFFER_SIZE, gcvNULL, gcvTRUE, gcvTRUE));
+        VX_GRAPH_COMMAND_BUFFER_SIZE, gcvNULL, gcvTRUE, gcvTRUE));
 
     bCaptureOn = vx_true_e;
 #if VIVANTE_PROFILER

@@ -210,6 +210,8 @@
 
 #define VX_TRANSPOSE_MAX_INTERLEAVE_CH      16
 #define VX_TRANSPOSE_MAX_INTERLEAVE_1MULTI1_CH      9
+
+#define VX_GRAPH_COMMAND_BUFFER_SIZE        gcdCMD_BUFFER_SIZE * 2
 /* Function macros */
 #ifndef vxmLENGTH_OF
 #define vxmLENGTH_OF(array)                 (sizeof(array) / sizeof((array)[0]))
