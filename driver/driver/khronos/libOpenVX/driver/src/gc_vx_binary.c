@@ -7449,7 +7449,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
             binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].LCDTIndex = (vx_uint32)ksLCDTIndex;
             binarySave->tempTensorsPhysical[binarySave->numberOfTempTensorInfo].size = ksDataSize;
             binarySave->numberOfTempTensorInfo++;
-            if (ksLCDTIndex == 0xFFFFFFFF)
+            if (ksLCDTIndex > 0xFFFE)
             {
                 vxmONERROR(VX_ERROR_NO_MEMORY);
             }
