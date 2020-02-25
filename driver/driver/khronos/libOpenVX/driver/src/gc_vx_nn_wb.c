@@ -188,7 +188,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
 {
     vx_status status;
     vx_uint32 i = 0, j = 0, index = 0, kzOffset = 0, oneFilterSize, weightSize, kzNum = 1, zNum = 1;
-    vx_uint32 nonZeroCount = 0, nonZeroTotalCount = 0, totalCount = 0, allTotalCount = 0, sliceCount = 0, filterCount, kernelPerCore;
+    vx_uint32 nonZeroCount = 0, nonZeroTotalCount = 0, totalCount = 0, allTotalCount = 0, sliceCount = 0, filterCount, kernelPerCore = 0;
     vx_uint32 zArray[MAX_ZGROUP_COUNT], kzArray[MAX_KZGROUP_COUNT];
     vx_size minTotalKernelBufferSize = 0, origKernelBufferSize = 0, origTotalKernelBufferSize = 0, weightDataBytesOffset = 0;
     vx_uint8_ptr weightPtr = VX_NULL, biasPtr = VX_NULL;
