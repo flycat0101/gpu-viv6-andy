@@ -504,7 +504,7 @@ static void updateStreamLayer(vx_graph graph,
 
                 /* Merge from CL213817 */
                 updateSingleAllSilbling1X1(operation,OpInfo,count);
-                vxInfo("index %d: allSibling1x1 is %d,  SiblingHas1x1 is %d.\n",count,OpInfo[count]->perf.allSibling1x1, OpInfo[count]->perf.SiblingHas1x1);
+                /*vxInfo("index %d: allSibling1x1 is %d,  SiblingHas1x1 is %d.\n",count,OpInfo[count]->perf.allSibling1x1, OpInfo[count]->perf.SiblingHas1x1);*/
                 count++;
             }
         }
@@ -878,7 +878,8 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
 
             if (isValidNN(operation))
             {
-                vx_uint32 outXSize, outYSize;
+                /*vx_uint32 outXSize, outYSize;*/
+                vx_uint32 calcInputXSize, calcoutputYSize;
                 vxnne_convolution_relu_pooling_operation convOp = (vxnne_convolution_relu_pooling_operation)operation;
 
                 wb = convOp->weights_biases;
@@ -894,7 +895,7 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                      operation->parameter.pad_x_right,
                      operation->parameter.pool_size_x,
                      operation->parameter.pool_stride,
-                     &outXSize,
+                     &calcInputXSize,
                      1);
 
                 ComputeInputSize(
@@ -904,7 +905,7 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                      operation->parameter.pad_y_bottom,
                      operation->parameter.pool_size_y,
                      operation->parameter.pool_stride,
-                     &outYSize,
+                     &calcoutputYSize,
                      1);
 
                 opInfo[count]->op      = (archnne_operator_e)operation->operatorType;
@@ -925,13 +926,13 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                 opInfo[count]->inx = TENSOR_VIEW_SIZE_INDEX(convOp->orig_inputs, 0);
                 opInfo[count]->iny = TENSOR_VIEW_SIZE_INDEX(convOp->orig_inputs, 1);
                 opInfo[count]->inz = TENSOR_VIEW_SIZE_INDEX(convOp->orig_inputs, 2);
-                opInfo[count]->origx = outXSize;
-                opInfo[count]->origy = outYSize;
+                opInfo[count]->calcinx = calcInputXSize;
+                opInfo[count]->calciny = calcoutputYSize;
                 opInfo[count]->origoutx = TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 0);
                 opInfo[count]->origouty = TENSOR_VIEW_SIZE_INDEX(convOp->outputs, 1);
                 opInfo[count]->p3 = operation->parameter.pool_size_x == 3 ? 1 : 0;
-                opInfo[count]->xsize = opInfo[count]->origx;
-                opInfo[count]->ysize = opInfo[count]->origy;
+                opInfo[count]->xsize = opInfo[count]->calcinx;
+                opInfo[count]->ysize = opInfo[count]->calciny;
                 opInfo[count]->pix = (vx_uint32)ceilf((vx_float32)(opInfo[count]->xsize - opInfo[count]->p3) / opInfo[count]->pstride);
                 opInfo[count]->piy = (vx_uint32)ceilf((vx_float32)(opInfo[count]->ysize - opInfo[count]->p3) / opInfo[count]->pstride);
 
@@ -996,8 +997,8 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                     opInfo[count]->oz = TENSOR_VIEW_SIZE_INDEX(tpOp->output, 2);
                 }
 
-                opInfo[count]->origx = TENSOR_VIEW_SIZE_INDEX(tpOp->input, 0);
-                opInfo[count]->origy = TENSOR_VIEW_SIZE_INDEX(tpOp->input, 1);
+                opInfo[count]->calcinx = TENSOR_VIEW_SIZE_INDEX(tpOp->input, 0);
+                opInfo[count]->calciny = TENSOR_VIEW_SIZE_INDEX(tpOp->input, 1);
                 opInfo[count]->origoutx = TENSOR_VIEW_SIZE_INDEX(tpOp->output, 0);
                 opInfo[count]->origouty = TENSOR_VIEW_SIZE_INDEX(tpOp->output, 1);
                 opInfo[count]->inx = TENSOR_VIEW_SIZE_INDEX(tpOp->input, 0);
@@ -1080,8 +1081,8 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                     opInfo[count]->inx = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 0);
                     opInfo[count]->iny = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 1);
                     opInfo[count]->inz = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 2);
-                    opInfo[count]->origx = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 0);
-                    opInfo[count]->origy = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 1);
+                    opInfo[count]->calcinx = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 0);
+                    opInfo[count]->calciny = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 1);
 
                     opInfo[count]->outputDataSize = TENSOR_DATA_SIZE(fcOp->output) * 8;
                     opInfo[count]->outputDataFormat = TENSOR_DATA_TYPE(fcOp->output);
@@ -1099,8 +1100,8 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                         {
                             opInfo[count]->inx = 1;
                             opInfo[count]->iny = 1;
-                            opInfo[count]->origx = 1;
-                            opInfo[count]->origy = 1;
+                            opInfo[count]->calcinx = 1;
+                            opInfo[count]->calciny = 1;
                             opInfo[count]->inz = TENSOR_VIEW_SIZE_INDEX(fcOp->input, 0) * TENSOR_VIEW_SIZE_INDEX(fcOp->input, 1) * TENSOR_VIEW_SIZE_INDEX(fcOp->input, 2);
                         }
 
@@ -1128,16 +1129,16 @@ static archModelOpInfo ** archTransferParam(vx_graph graph, archNN_DATABASE_FEAT
                     opInfo[count]->inx = TENSOR_VIEW_SIZE_INDEX(fcOp->inputs, 0);
                     opInfo[count]->iny = TENSOR_VIEW_SIZE_INDEX(fcOp->inputs, 1);
                     opInfo[count]->inz = TENSOR_VIEW_SIZE_INDEX(fcOp->inputs, 2);
-                    opInfo[count]->origx = TENSOR_VIEW_SIZE_INDEX(fcOp->inputs, 0);
-                    opInfo[count]->origy = TENSOR_VIEW_SIZE_INDEX(fcOp->inputs, 1);
+                    opInfo[count]->calcinx = TENSOR_VIEW_SIZE_INDEX(fcOp->inputs, 0);
+                    opInfo[count]->calciny = TENSOR_VIEW_SIZE_INDEX(fcOp->inputs, 1);
                     opInfo[count]->origoutx = TENSOR_VIEW_SIZE_INDEX(fcOp->outputs, 0);
                     opInfo[count]->origouty = TENSOR_VIEW_SIZE_INDEX(fcOp->outputs, 1);
                     opInfo[count]->oz = WB_OUTPUT_Z(wb);
                     opInfo[count]->psize   = gcmMAX(operation->parameter.pool_size_x, 1);
                     opInfo[count]->pstride = operation->parameter.pool_size_x ? operation->parameter.pool_stride : 1;
                     opInfo[count]->p3 = 0;
-                    opInfo[count]->xsize = opInfo[count]->origx;
-                    opInfo[count]->ysize = opInfo[count]->origy;
+                    opInfo[count]->xsize = opInfo[count]->calcinx;
+                    opInfo[count]->ysize = opInfo[count]->calciny;
                     opInfo[count]->pix = (vx_uint32)ceilf((vx_float32)(opInfo[count]->xsize - opInfo[count]->p3) / opInfo[count]->pstride);
                     opInfo[count]->piy = (vx_uint32)ceilf((vx_float32)(opInfo[count]->ysize - opInfo[count]->p3) / opInfo[count]->pstride);
                 }
@@ -1831,8 +1832,8 @@ void printOpInfo(archModelOpInfo ** archOp, vx_uint32 totalCount)
         vxInfo("inx is %d\n",archOp[i]->inx);
         vxInfo("iny is %d\n",archOp[i]->iny);
         vxInfo("inz is %d\n",archOp[i]->inz);
-        vxInfo("origx is %d\n",archOp[i]->origx);
-        vxInfo("origy is %d\n",archOp[i]->origy);
+        vxInfo("calcinx is %d\n",archOp[i]->calcinx);
+        vxInfo("calciny is %d\n",archOp[i]->calciny);
         vxInfo("origoutx is %d\n",archOp[i]->origoutx);
         vxInfo("origouty is %d\n",archOp[i]->origouty);
         vxInfo("stridex is %d\n",archOp[i]->stridex);
