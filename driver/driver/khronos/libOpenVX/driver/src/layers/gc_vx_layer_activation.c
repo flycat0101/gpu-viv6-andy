@@ -1783,14 +1783,14 @@ VX_PRIVATE_API vx_bool vxoNNPReluLayer_TP_Support(vx_node node, const vx_referen
 {
     vx_tensor inputs = (vx_tensor)parameters[0];
     vx_tensor outputs = (vx_tensor)parameters[2];
-
+    vx_uint32 channel = inputs->dims[2];
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
     support = support && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP_ACTIVATION);
     support = support && vxnneIsTPSupportFormat(node->base.context, inputs, VX_NULL, outputs);
-    support = support && (TENSOR_VIEW_SIZE_INDEX(outputs, 0) * TENSOR_VIEW_SIZE_INDEX(outputs, 1) /** TENSOR_VIEW_SIZE_INDEX(outputs, 2) */> 1);
+    support = support && (TENSOR_VIEW_SIZE_INDEX(outputs, 0) * TENSOR_VIEW_SIZE_INDEX(outputs, 1) /** TENSOR_VIEW_SIZE_INDEX(outputs, 2) */> 1) && channel < PRELU_CHANNEL_MAX;
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
