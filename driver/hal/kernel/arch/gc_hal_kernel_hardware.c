@@ -357,7 +357,7 @@ _IdentifyHardwareByDatabase(
     }
 
     /* If module parameter doesn't set per-core SRAM sizes. */
-    if (Core == gcvCORE_MAJOR)
+    if (i == gcvSRAM_INTER_COUNT)
     {
         gctUINT j = 0;
         for (i = Core; i < gcvCORE_COUNT; i++)
