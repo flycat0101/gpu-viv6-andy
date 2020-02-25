@@ -546,6 +546,24 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_OPCODE_isNonUniform(Opcode)         \
     ((Opcode) == VIR_OP_NONUNIFORM_ELECT)
 
+/* opcode with SkipHelper flag by default
+ * load need extra check instructionflag hasSkHp and use VIR_Inst_HasSkHp() */
+#define VIR_OPCODE_NeedSkHpFlag(Opcode) \
+     ((VIR_OPCODE_isAtom(Opcode))         ||  \
+        (Opcode == VIR_OP_IMG_LOAD)       || \
+        (Opcode == VIR_OP_VX_IMG_LOAD)    || \
+        (Opcode == VIR_OP_IMG_LOAD_3D)    || \
+        (Opcode == VIR_OP_VX_IMG_LOAD_3D) || \
+        (Opcode == VIR_OP_IMG_ADDR)       || \
+        (Opcode == VIR_OP_IMG_ADDR_3D)    || \
+        /* store_s should not skip helper */ \
+        (VIR_OPCODE_isLocalMemSt(Opcode))   || \
+        (VIR_OPCODE_isGlobalMemSt(Opcode))  || \
+        (Opcode == VIR_OP_IMG_STORE)      || \
+        (Opcode == VIR_OP_VX_IMG_STORE)   || \
+        (Opcode == VIR_OP_IMG_STORE_3D)   || \
+        (Opcode == VIR_OP_VX_IMG_STORE_3D))
+
 #define VIR_SymTable_MaxValidId(SymTable)   BT_GET_MAX_VALID_ID(SymTable)
 
 #define VIR_Function_GetLastInstId(Func)    ((Func)->_lastInstId)

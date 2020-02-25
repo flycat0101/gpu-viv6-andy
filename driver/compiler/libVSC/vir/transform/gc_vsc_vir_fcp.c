@@ -2521,9 +2521,10 @@ static gctBOOL _VIR_CheckDestIsUsedByTexld(
                     /* if usage is texld instruction, return true */
                     return gcvTRUE;
                 }
-                else if (_VIR_CheckMemOp(op) || VIR_Inst_GetDest(pUsageInst) == gcvNULL || pUsageInst == pInst)
+                else if (_VIR_CheckMemOp(op) || VIR_Inst_GetDest(pUsageInst) == gcvNULL || pUsageInst == pInst ||
+                         (op == VIR_OP_MOVA))
                 {
-                    /* if usage is used in memory instruction, continue checking other usages */
+                    /* if usage is used in special instruction like memory/mova, continue checking other usages */
                     continue;
                 }
                 else
@@ -2540,6 +2541,78 @@ static gctBOOL _VIR_CheckDestIsUsedByTexld(
     return gcvFALSE;
 }
 
+static gctBOOL _VIR_CheckSourceDefinedBySkHp(
+    VIR_Instruction *pInst,
+    VIR_Operand     *pSrc,
+    VIR_DEF_USAGE_INFO  *pDuInfo,
+    VSC_HASH_TABLE*     visitedInstSet)
+{
+    VIR_OperandInfo     opndInfo;
+    /* If the operand is a temp register, find its DEF. */
+    VIR_Operand_GetOperandInfo(pInst, pSrc, &opndInfo);
+    if (opndInfo.isVreg)
+    {
+        VIR_GENERAL_UD_ITERATOR     udIter;
+        VIR_DEF*                    pDef = gcvNULL;
+        VIR_Instruction*            pDefInst = gcvNULL;
+
+        vscVIR_InitGeneralUdIterator(&udIter, pDuInfo, pInst, pSrc, gcvFALSE, gcvFALSE);
+        for (pDef = vscVIR_GeneralUdIterator_First(&udIter);
+             pDef != gcvNULL;
+             pDef = vscVIR_GeneralUdIterator_Next(&udIter))
+        {
+            pDefInst = pDef->defKey.pDefInst;
+            if (pDefInst && (!VIR_IS_IMPLICIT_DEF_INST(pDefInst)) &&
+                (!vscHTBL_DirectTestAndGet(visitedInstSet, ((void *)pDefInst), gcvNULL)))
+            {
+                VIR_OpCode op = VIR_Inst_GetOpcode(pDefInst);
+                vscHTBL_DirectSet(visitedInstSet, (void *)(pDefInst), gcvNULL);
+                if (VIR_Inst_HasSkHp(pDefInst) || VIR_OPCODE_NeedSkHpFlag(op))
+                {
+                    return gcvTRUE;
+                }
+                else if (_VIR_CheckMemOp(op))
+                {
+                    /* if defInst is memory, skip its src and continue checking other defInst */
+                    continue;
+                }
+                else
+                {
+                    gctUINT srcNum = VIR_Inst_GetSrcNum(pDefInst);
+                    gctUINT i;
+                    for (i = 0; i < srcNum; i++)
+                    {
+                        VIR_Operand* src = VIR_Inst_GetSource(pDefInst, i);
+                        if (_VIR_CheckSourceDefinedBySkHp(pDefInst, src, pDuInfo, visitedInstSet))
+                        {
+                             return gcvTRUE;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return gcvFALSE;
+}
+
+static gctBOOL _VIR_CheckSrcDefinedBySkHp(
+    VIR_Instruction *pInst,
+    VIR_DEF_USAGE_INFO  *pDuInfo,
+    VSC_HASH_TABLE*     visitedInstSet)
+{
+    gctUINT i;
+    gctUINT srcNum = VIR_Inst_GetSrcNum(pInst);
+    for (i = 0; i < srcNum; i++)
+    {
+        VIR_Operand* src = VIR_Inst_GetSource(pInst, i);
+        if (_VIR_CheckSourceDefinedBySkHp(pInst, src, pDuInfo, visitedInstSet))
+        {
+            return gcvTRUE;
+        }
+    }
+    return gcvFALSE;
+}
+
 static VSC_ErrCode _VIR_CheckAndSetSkHpForLdInst(
     IN VIR_Shader*      pShader,
     VIR_DEF_USAGE_INFO  *pDuInfo,
@@ -2550,7 +2623,7 @@ static VSC_ErrCode _VIR_CheckAndSetSkHpForLdInst(
     VIR_FuncIterator    func_iter;
     VIR_FunctionNode*   func_node;
     VSC_HASH_TABLE*     visitedInstSet = (VSC_HASH_TABLE*)vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 128);
-
+    VSC_HASH_TABLE*     srcvisitedInstSet = (VSC_HASH_TABLE*)vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 128);
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
          func_node != gcvNULL;
@@ -2567,18 +2640,22 @@ static VSC_ErrCode _VIR_CheckAndSetSkHpForLdInst(
         {
             if (VIR_Inst_GetOpcode(inst) == VIR_OP_LOAD)
             {
-                /* if the dest is not used by texld, set skhp flag to load instruction */
+                /* if the dest is not used by texld and any source is defined by a .skhp instruction,
+                 * set skhp flag to load instruction */
                 VIR_Operand *dest = VIR_Inst_GetDest(inst);
-                if (!_VIR_CheckDestIsUsedByTexld(inst, dest, pDuInfo, visitedInstSet))
+                if ((!_VIR_CheckDestIsUsedByTexld(inst, dest, pDuInfo, visitedInstSet)) &&
+                    (_VIR_CheckSrcDefinedBySkHp(inst, pDuInfo, srcvisitedInstSet)))
                 {
                     VIR_INST_SetSkHp(inst, gcvTRUE);
                 }
                 vscHTBL_Reset(visitedInstSet);
+                vscHTBL_Reset(srcvisitedInstSet);
             }
         }
     }
 
     vscHTBL_Destroy(visitedInstSet);
+    vscHTBL_Destroy(srcvisitedInstSet);
 
     return status;
 }
