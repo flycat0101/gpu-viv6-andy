@@ -7320,6 +7320,7 @@ VkResult halti5_patch_pipeline(
             halti5_module *chipModule = (halti5_module*)devCtx->chipPriv;
             struct _gcsHINT *hints = VK_NULL_HANDLE;
             VkBool32 recompiled = VK_FALSE;
+            VkBool32 preHighPatch = VK_TRUE;
 
             for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
             {
@@ -7408,10 +7409,12 @@ VkResult halti5_patch_pipeline(
             }
 
             if (totalEntries == 0)
-                return result;
+            {
+                preHighPatch = VK_FALSE;
+            }
 
             /*handle all the Pre_High level patch per shader stage*/
-            for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx++)
+            for (stageIdx = 0; (stageIdx < VSC_MAX_SHADER_STAGE_COUNT) && preHighPatch; stageIdx++)
             {
                 if (chipPipeline->vkShaderDecoded[stageIdx])
                 {
