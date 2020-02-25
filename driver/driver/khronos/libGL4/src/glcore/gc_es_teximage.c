@@ -1998,48 +1998,7 @@ GLboolean __glCheckPBO(__GLcontext *gc,
                        GLenum type,
                        const GLvoid *buf)
 {
-    GLuint alignment = packMode->alignment;
-    GLuint lineLength = packMode->lineLength ? packMode->lineLength : (GLuint)width;
-    GLuint imageHeight = packMode->imageHeight ? packMode->imageHeight : (GLuint)height;
-    GLuint skipPixels = packMode->skipPixels;
-    GLuint skipLines = packMode->skipLines;
-    GLuint skipImages = packMode->skipImages;
-
-    GLuint numElement = __glGetNumberOfElement(format);
-    GLboolean packed;
-    GLuint sizeType = __glGetSizeOfType(type, &packed);
-    GLuint bytePerPixel = packed ? sizeType : numElement * sizeType;
-
-    GLuint rowStride = __GL_ALIGN(bytePerPixel * lineLength, alignment);
-    GLuint imageStride = depth > 0 ? rowStride * imageHeight : 0;
-    GLuint requireSize = 0;
-
-    /* If a pixel unpack buffer object is bound and data is not evenly divisible by the number
-     * of basic machine units needed to store in memory the corresponding GL data type
-     */
-    if (!sizeType || (__GL_PTR2UINT(buf) % sizeType) != 0)
-    {
-        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
-    }
-
-    if (!bufObj || bufObj->bufferMapped)
-    {
-        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
-    }
-
-    /* If a pixel unpack buffer object is bound and storing texture data would access
-     * memory beyond the end of the pixel unpack buffer, an INVALID_OPERATION error results.
-     */
-    requireSize = __GL_PTR2UINT(buf)
-                + (skipImages + depth - 1) * imageStride
-                + (skipLines + height - 1) * rowStride
-                + (skipPixels + width) * bytePerPixel;
-    if (requireSize > (GLuint)bufObj->size)
-    {
-        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
-    }
-
-    return GL_TRUE;
+    return GL_FALSE;
 }
 
 GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex, GLint internalFormat, GLboolean compSizeMatch)
