@@ -7752,7 +7752,7 @@ VkResult halti5_patch_pipeline(
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.applyLevel = VSC_SHLEVEL_Post_Medium;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
-                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_RESOURCE;
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_TEXTURE_REPLACE;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc =
                                             halti5_helper_patchFuc(patchInfo->patchFormat, k, patchInfo->viewType, &opTypeBits, &actBits, &subType);
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.set = i;

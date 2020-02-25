@@ -3460,7 +3460,7 @@ static VSC_ErrCode _CollectDynamicPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGe
         }
     }
 
-    /* Private samplers for VSC_LIB_LINK_TYPE_RESOURCE */
+    /* Private samplers for VSC_LIB_LINK_TYPE_TEXTURE_REPLACE */
     for (virUniformIdx = 0; virUniformIdx < VIR_IdList_Count(pVirUniformLsts); virUniformIdx ++)
     {
         pVirUniformSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirUniformLsts, virUniformIdx));
@@ -3478,7 +3478,7 @@ static VSC_ErrCode _CollectDynamicPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGe
             {
                 pPrivSamplerEntry = _enlargePrivSamplerMappingRoom(&pOutSEP->dynamicPrivMapping.privSamplerMapping, 1, gcvNULL);
 
-                pPrivSamplerEntry->commonPrivm.privmKind = VSC_LIB_LINK_TYPE_RESOURCE;
+                pPrivSamplerEntry->commonPrivm.privmKind = VSC_LIB_LINK_TYPE_TEXTURE_REPLACE;
                 pPrivSamplerEntry->commonPrivm.privmKindIndex = VIR_Symbol_GetFirstSlot(VIR_Shader_GetSymFromId(pShader,
                                                                                 pVirUniform->u.samplerOrImageAttr.parentSamplerSymId)) + subUniformIdx;
                 pPrivSamplerEntry->commonPrivm.pPrivateData = gcvNULL;
@@ -4065,7 +4065,7 @@ static VSC_ErrCode _AddExtraSamplerArray(SHADER_PRIV_SAMPLER_ENTRY*** pppExtraSa
         matched = gcvFALSE;
         pPrivSamplerEntry = &pSep->dynamicPrivMapping.privSamplerMapping.pPrivSamplerEntries[i];
 
-        if (pPrivSamplerEntry->commonPrivm.privmKind == VSC_LIB_LINK_TYPE_RESOURCE)
+        if (pPrivSamplerEntry->commonPrivm.privmKind == VSC_LIB_LINK_TYPE_TEXTURE_REPLACE)
         {
             pVirUniformSym = (VIR_Symbol*)pPrivSamplerEntry->commonPrivm.pPrivateData;
 
@@ -5148,7 +5148,7 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(VSC_PEP_GEN_HELPER* pPepG
 
     _SetResOpBits(pShader, &pCombTsEntry->combTsBinding, &pCombTsEntry->pResOpBits);
 
-    /* Extra samplers for VSC_LIB_LINK_TYPE_RESOURCE */
+    /* Extra samplers for VSC_LIB_LINK_TYPE_TEXTURE_REPLACE */
     if (pResAllocEntry->hwRegNo != NOT_ASSIGNED)
     {
         _AddExtraSamplerArray(&pCombTsEntry->hwMappings[stageIdx].ppExtraSamplerArray,
@@ -5563,7 +5563,7 @@ static VSC_ErrCode _PostProcessVkCombStTable(VSC_PEP_GEN_HELPER* pPepGenHelper, 
     {
         pComTsEntry = &pCombinedSampTexTable->pCombTsEntries[i];
 
-        /* Extra samplers for VSC_LIB_LINK_TYPE_RESOURCE */
+        /* Extra samplers for VSC_LIB_LINK_TYPE_TEXTURE_REPLACE */
         if (pComTsEntry->hwMappings[stageIdx].ppExtraSamplerArray)
         {
             for (j = 0; j < pComTsEntry->combTsBinding.arraySize; j ++)
@@ -5750,7 +5750,7 @@ static VSC_ErrCode _PostProcessVkInputAttachmentTable(VSC_PEP_GEN_HELPER* pPepGe
 
         if (bIsSampler)
         {
-            /* Extra samplers for VSC_LIB_LINK_TYPE_RESOURCE */
+            /* Extra samplers for VSC_LIB_LINK_TYPE_TEXTURE_REPLACE */
             if (pIaEntries->hwMappings[stageIdx].ppExtraSamplerArray)
             {
                 for (j = 0; j < pIaEntries->iaBinding.arraySize; j ++)

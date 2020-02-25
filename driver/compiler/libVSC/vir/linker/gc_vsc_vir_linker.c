@@ -7105,7 +7105,7 @@ VIR_LinkLibLibrary(
                         _InsertCallOutputFmt);
                 break;
 
-            case VSC_LIB_LINK_TYPE_RESOURCE:
+            case VSC_LIB_LINK_TYPE_TEXTURE_REPLACE:
                 _LinkLibContext_Initialize(
                         &vContext,
                         pHwCfg,
