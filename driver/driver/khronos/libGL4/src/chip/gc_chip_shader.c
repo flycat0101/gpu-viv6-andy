@@ -5319,7 +5319,7 @@ gcChipProgramBuildBindingInfo(
         {
             bytes = program->maxOutLoc * sizeof(__GLchipSLOutput*);
             gcmONERROR(gcoOS_Allocate(chipCtx->os, bytes, (gctPOINTER*)&program->loc2Out));
-            gcoOS_ZeroMemory(program->outputs, bytes);
+            gcoOS_ZeroMemory(program->loc2Out, bytes);
         }
 
         for (i = 0; i < resCount; ++i)
