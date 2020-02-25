@@ -28041,7 +28041,7 @@ _PatchPPUBuffer(
 
     return status;
 OnError:
-    if (pointer)
+    if (Execution->data)
     {
         for (i = 0; i < 8; i++)
         {
@@ -28076,7 +28076,7 @@ OnError:
             }
         }
 
-        gcmkVERIFY_OK(gckOS_Free(hardware->os, pointer));
+        gcmkVERIFY_OK(gckOS_Free(hardware->os, Execution->data));
         Execution->data = gcvNULL;
     }
 
@@ -31160,7 +31160,7 @@ _InitializeUSC(
     return status;
 
 OnError:
-    if (pointer)
+    if (Execution->data)
     {
         for (i = 0; i < 4; i++)
         {
@@ -31195,7 +31195,7 @@ OnError:
             }
         }
 
-        gcmkVERIFY_OK(gckOS_Free(hardware->os, pointer));
+        gcmkVERIFY_OK(gckOS_Free(hardware->os, Execution->data));
         Execution->data = gcvNULL;
     }
 
@@ -32228,7 +32228,7 @@ _InitializeUSC2(
 
     return status;
 OnError:
-   if (pointer)
+   if (Execution->data)
     {
         for (i = 0; i < 2; i++)
         {
@@ -32263,7 +32263,7 @@ OnError:
             }
         }
 
-        gcmkVERIFY_OK(gckOS_Free(hardware->os, pointer));
+        gcmkVERIFY_OK(gckOS_Free(hardware->os, Execution->data));
         Execution->data = gcvNULL;
     }
 
