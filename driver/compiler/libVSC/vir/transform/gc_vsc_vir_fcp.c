@@ -2462,10 +2462,131 @@ _VIR_FCP_ModifyFP16Instruction(
     return status;
 }
 
+static gctBOOL _VIR_CheckMemOp(
+    VIR_OpCode op)
+{
+    if (VIR_OPCODE_isMemLd(op) ||
+        VIR_OPCODE_isImgLd(op) ||
+        VIR_OPCODE_isAttrLd(op) ||
+        VIR_OPCODE_isMemSt(op) ||
+        VIR_OPCODE_isImgSt(op) ||
+        VIR_OPCODE_isAtom(op) ||
+        VIR_OPCODE_isAttrSt(op))
+    {
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+/* check the dest of Load instruction is used by a texld */
+static gctBOOL _VIR_CheckDestIsUsedByTexld(
+    VIR_Instruction *pInst,
+    VIR_Operand     *pDestOpnd,
+    VIR_DEF_USAGE_INFO  *pDuInfo,
+    VSC_HASH_TABLE*     visitedInstSet)
+{
+    gctUINT8                channel;
+    VIR_Enable              enable;
+    VIR_OperandInfo         destOpndInfo;
+    VIR_GENERAL_DU_ITERATOR du_iter;
+    VIR_USAGE*              pUsage = gcvNULL;
+
+    enable = VIR_Operand_GetEnable(pDestOpnd);
+    VIR_Operand_GetOperandInfo(pInst, pDestOpnd, &destOpndInfo);
+
+    for (channel = 0; channel < VIR_CHANNEL_COUNT; ++channel)
+    {
+        if (!(enable & (1 << channel)))
+        {
+            continue;
+        }
+        vscVIR_InitGeneralDuIterator(&du_iter,
+                                     pDuInfo,
+                                     pInst,
+                                     destOpndInfo.u1.virRegInfo.virReg,
+                                     channel,
+                                     gcvFALSE);
+        for (pUsage = vscVIR_GeneralDuIterator_First(&du_iter);
+             pUsage != gcvNULL;
+             pUsage = vscVIR_GeneralDuIterator_Next(&du_iter))
+        {
+             VIR_Instruction* pUsageInst = pUsage->usageKey.pUsageInst;
+             if (pUsageInst && !VIR_IS_OUTPUT_USAGE_INST(pUsageInst) &&
+                 (!vscHTBL_DirectTestAndGet(visitedInstSet, ((void *)pUsageInst), gcvNULL)))
+             {
+                VIR_OpCode op = VIR_Inst_GetOpcode(pUsageInst);
+                vscHTBL_DirectSet(visitedInstSet, (void *)(pUsageInst), gcvNULL);
+                if (VIR_OPCODE_isTexLd(op))
+                {
+                    /* if usage is texld instruction, return true */
+                    return gcvTRUE;
+                }
+                else if (_VIR_CheckMemOp(op) || VIR_Inst_GetDest(pUsageInst) == gcvNULL || pUsageInst == pInst)
+                {
+                    /* if usage is used in memory instruction, continue checking other usages */
+                    continue;
+                }
+                else
+                {
+                    /* usage is used in ALU instruction, recursively check the usage of dest */
+                    if (_VIR_CheckDestIsUsedByTexld(pUsageInst, VIR_Inst_GetDest(pUsageInst), pDuInfo, visitedInstSet))
+                    {
+                        return gcvTRUE;
+                    }
+                }
+            }
+        }
+    }
+    return gcvFALSE;
+}
+
+static VSC_ErrCode _VIR_CheckAndSetSkHpForLdInst(
+    IN VIR_Shader*      pShader,
+    VIR_DEF_USAGE_INFO  *pDuInfo,
+    VSC_MM*             pMM)
+{
+    VSC_ErrCode         status = VSC_ERR_NONE;
+
+    VIR_FuncIterator    func_iter;
+    VIR_FunctionNode*   func_node;
+    VSC_HASH_TABLE*     visitedInstSet = (VSC_HASH_TABLE*)vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 128);
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+         func_node != gcvNULL;
+         func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function*    func = func_node->function;
+        VIR_InstIterator inst_iter;
+        VIR_Instruction* inst;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             inst != gcvNULL;
+             inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            if (VIR_Inst_GetOpcode(inst) == VIR_OP_LOAD)
+            {
+                /* if the dest is not used by texld, set skhp flag to load instruction */
+                VIR_Operand *dest = VIR_Inst_GetDest(inst);
+                if (!_VIR_CheckDestIsUsedByTexld(inst, dest, pDuInfo, visitedInstSet))
+                {
+                    VIR_INST_SetSkHp(inst, gcvTRUE);
+                }
+                vscHTBL_Reset(visitedInstSet);
+            }
+        }
+    }
+
+    vscHTBL_Destroy(visitedInstSet);
+
+    return status;
+}
+
 DEF_QUERY_PASS_PROP(vscVIR_PostCGCleanup)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
-
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
 
@@ -2496,6 +2617,13 @@ VSC_ErrCode vscVIR_PostCGCleanup(
     gctBOOL             bSupportImgLdSt = VIR_Shader_SupportImgLdSt(pShader, pHwCfg, gcvFALSE);
     /* So far only vulkan driver needs to check the resource opcode type. */
     gctBOOL             bNeedToCheckResOp = VIR_Shader_IsVulkan(pShader);
+    VSC_MM*             pMM = pPassWorker->basePassWorker.pMM;
+
+    /* add skHp flag to load instruction if dest of load is not used in any texld instructions */
+    if (VIR_Shader_IsFS(pShader))
+    {
+        status = _VIR_CheckAndSetSkHpForLdInst(pShader, pDuInfo, pMM);
+    }
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);

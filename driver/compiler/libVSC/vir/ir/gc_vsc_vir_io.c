@@ -740,7 +740,8 @@ VIR_IO_writeInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
           VIR_Inst_IsPatternRep(pInst) << 10    |
           VIR_Inst_IsLoopInvariant(pInst) << 9 |
           VIR_Inst_IsEndOfBB(pInst) << 8        |
-          VIR_Inst_IsUSCUnallocate(pInst) << 7;
+          VIR_Inst_IsUSCUnallocate(pInst) << 7  |
+          VIR_Inst_HasSkHp(pInst)         << 6;
     ON_ERROR0(VIR_IO_writeUint(Buf, val));
 
     ON_ERROR0(VIR_IO_writeUint(Buf, *(gctUINT *)&pInst->sourceLoc));
@@ -2404,6 +2405,7 @@ VIR_IO_readInst(VIR_Shader_IOBuffer *Buf, VIR_Instruction* pInst)
     VIR_Inst_SetLoopInvariant(pInst, (uVal >> 9) & 0x1);
     VIR_Inst_SetEndOfBB(pInst, (uVal >> 8) & 0x1);
     VIR_Inst_SetUSCUnallocate(pInst, (uVal >> 7) & 0x1);
+    VIR_INST_SetSkHp(pInst, (uVal >> 6) & 0x1);
 
     ON_ERROR0(VIR_IO_readUint(Buf, (gctUINT *)&pInst->sourceLoc));
 

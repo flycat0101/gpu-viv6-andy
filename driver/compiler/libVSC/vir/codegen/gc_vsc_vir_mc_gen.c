@@ -1460,6 +1460,7 @@ _VSC_MC_GEN_GenSkipHelperFlag(
         ** LOAD instruction may be used for coordinate computation,
         ** which should not be skipped for helper.
         */
+        (opcode == VIR_OP_LOAD && VIR_Inst_HasSkHp(Inst))   ||
         (opcode == VIR_OP_IMG_LOAD)       ||
         (opcode == VIR_OP_VX_IMG_LOAD)    ||
         (opcode == VIR_OP_IMG_LOAD_3D)    ||

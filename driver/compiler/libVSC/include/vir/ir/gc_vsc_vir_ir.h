@@ -620,6 +620,7 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_Inst_IsLoopInvariant(Inst)  ((Inst)->_isLoopInvariant)
 #define VIR_Inst_IsEndOfBB(Inst)        ((Inst)->_endOfBB != 0)
 #define VIR_Inst_IsUSCUnallocate(Inst)  ((Inst)->_USCUnallocate != 0)
+#define VIR_Inst_HasSkHp(Inst)          ((Inst)->_skHp != 0)
 
 #define VIR_Inst_GetSrcLocLine(Inst)    ((Inst)->sourceLoc.lineNo)
 #define VIR_Inst_GetSrcLocCol(Inst)     ((Inst)->sourceLoc.colNo)
@@ -670,6 +671,7 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_Inst_SetPatched(Inst, Val)      do { (Inst)->_patched = (Val); } while (0)
 #define VIR_Inst_SetDual16ExpandSeq(Inst, Val)  do { (Inst)->_dual16ExpandSeq = (Val); } while (0)
 #define VIR_Inst_SetResOpType(Inst, Val)  do { (Inst)->_resOpType = (Val); } while (0)
+#define VIR_INST_SetSkHp(Inst, Val)       do { (Inst)->_skHp = (Val); } while (0)
 
 /* Inst iterator */
 typedef VSC_BL_ITERATOR VIR_InstIterator;
@@ -4142,7 +4144,8 @@ struct _VIR_INSTRUCTION
     gctUINT                 _isLoopInvariant: 1;
     gctUINT                 _endOfBB    : 1;  /* End Of Basic Block Bit for non-control-flow inst */
     gctUINT                 _USCUnallocate: 1; /* USC Unallocate Bit for global memory load/store  */
-    gctUINT                 _reserved1  : 7;
+    gctUINT                 _skHp       : 1;   /* load instruction need to set skip_for_helpers flag */
+    gctUINT                 _reserved1  : 6;
 
     gctUINT                 _dual16ExpandSeq;
 
