@@ -15928,7 +15928,7 @@ VX_PRIVATE_API vx_tensor vxoNNTensor_ReorgWeights(vx_tensor weights, vx_graph gr
     vx_uint8_ptr outaddr        = NULL;
     vx_uint32    dims           = 0;
     vx_uint32 _dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION], tstrides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
-    vx_uint32 elementCount = 0;
+    vx_uint32  tensorSz = 0;
     vx_context context = vxGetContext((vx_reference)weights);
 
 
@@ -15974,8 +15974,8 @@ VX_PRIVATE_API vx_tensor vxoNNTensor_ReorgWeights(vx_tensor weights, vx_graph gr
     vxoTensor_GetTensorDimStride(weight_in, &pnum, _dims, strides);
     vxoTensor_GetTensorDimStride(weight_out, &pnum, VX_NULL, tstrides);
 
-    vxoTensor_GetTensorElementCount(weight_in, &elementCount);
-    memcpy(inaddr, outaddr, elementCount);
+    vxoTensor_GetTensorSize(weight_in, &tensorSz);
+    memcpy(inaddr, outaddr, tensorSz);
 
     _TransposeTensor(inaddr, outaddr, TENSOR_DATA_SIZE(weight_in), _dims, strides, tstrides, perm, pnum - 1);
 
@@ -17373,7 +17373,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     else if (!enable_conv2d_1x1 && biases != NULL
                         && ((outputWidth * outputHeight < IMG_MAX_WIDTH) && outputDepth < IMG_MAX_WIDTH && input_size < IMG_MAX_WIDTH)
                         && (outputDepth % CONV2D_ALIGN_SIZE4 == 0)
-                        && (CHECK_LIFETIME_IS_STATIC(weights) && TENSOR_QUANT_TYPE(inputs) == VX_QUANT_AFFINE_SCALE))
+                        && CHECK_LIFETIME_IS_STATIC(weights)
+                        && (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE || TENSOR_QUANT_TYPE(weights) == VX_QUANT_NONE))
                     {
                         enable_packed_weights = vx_true_e;
                     }
@@ -17451,9 +17452,18 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                         if (enable_packed_weights)
                         {
                             vx_tensor t = NULL;
+
                             t = vxoNNTensor_ReorgWeights(weights_new, node->graph, ifm_rs, ofm);
+
+                            if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE)
+                            {
+                                weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
+                                convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
+                            }
+                            else
+                                weights_new_rs = t;
+
                             convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
-                            weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
                         }
                         else
                         {
@@ -17463,8 +17473,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                             sizes[3] = ofm;
                             dims     = 4;
                              weights_new_rs = vxoTensor_ReshapeTensor(weights_new, (vx_int32*)sizes, dims);
+                             convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
                         }
-                        convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
                     }
                     else
                     {
@@ -17564,7 +17574,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                             vx_uint32 ofm = TENSOR_VIEW_SIZE_INDEX(weights, 3);
                             t = vxoNNTensor_ReorgWeights(weights, node->graph, ifm, ofm);
                             convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
-                            weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
+                            if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE)
+                            {
+                                weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
+                                convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
+                            }
+                            else
+                                weights_new_rs = t;
                         }
                         else if (!enable_ofm_gt_xy)
                         {

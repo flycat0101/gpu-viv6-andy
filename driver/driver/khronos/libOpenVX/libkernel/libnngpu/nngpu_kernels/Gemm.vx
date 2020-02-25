@@ -1222,3 +1222,378 @@ __kernel void gpuGemm_Quant8_2D_8x_Wpacked
     }
 }
 
+__kernel void gpuGemm_FP32_2D_8s_Wpacked
+    (
+    __read_only  image2d_t input,
+    __read_only  image2d_t weights,
+    __read_only  image2d_t bias,
+    __write_only image2d_t output,
+    int          inputSize
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+
+    int4 coord = (int4)(0, y >> 2, x, y);
+
+    float4 inPixel_Array[8];
+    float4 wPixel_Array[8];
+    float4 sum, sumData, sumArray[16];
+
+    sum = read_imagef(bias, coord.wx);
+    coord.w += 4;
+    sumArray[0] = sum.xxxx;
+    sumArray[1] = sum.xxxx;
+    sumArray[2] = sum.yyyy;
+    sumArray[3] = sum.yyyy;
+
+    sumArray[4] = sum.zzzz;
+    sumArray[5] = sum.zzzz;
+    sumArray[6] = sum.wwww;
+    sumArray[7] = sum.wwww;
+
+    sum = read_imagef(bias, coord.wx);
+    sumArray[8] = sum.xxxx;
+    sumArray[9] = sum.xxxx;
+    sumArray[10] = sum.yyyy;
+    sumArray[11] = sum.yyyy;
+
+    sumArray[12] = sum.zzzz;
+    sumArray[13] = sum.zzzz;
+    sumArray[14] = sum.wwww;
+    sumArray[15] = sum.wwww;
+
+    coord.w = coord.z + 1;
+    do
+    {
+        inPixel_Array[0] = read_imagef(input, coord.xz);
+        inPixel_Array[1] = read_imagef(input, coord.xw);
+        coord.zw += (int2)(2, 2);
+        inPixel_Array[2] = read_imagef(input, coord.xz);
+        inPixel_Array[3] = read_imagef(input, coord.xw);
+        coord.zw += (int2)(2, 2);
+        inPixel_Array[4] = read_imagef(input, coord.xz);
+        inPixel_Array[5] = read_imagef(input, coord.xw);
+        coord.zw += (int2)(2, 2);
+        inPixel_Array[6] = read_imagef(input, coord.xz);
+        inPixel_Array[7] = read_imagef(input, coord.xw);
+        coord.xw = coord.xx * 4 + (int2)(0, 4);
+        wPixel_Array[0] = read_imagef(weights, coord.xy);
+        wPixel_Array[1] = read_imagef(weights, coord.wy);
+        coord.xw += (int2)(8, 8);
+        wPixel_Array[2] = read_imagef(weights, coord.xy);
+        wPixel_Array[3] = read_imagef(weights, coord.wy);
+        coord = coord.xyzx + (int4)(-8, 1, -6, -4);
+        wPixel_Array[4] = read_imagef(weights, coord.xy);
+        wPixel_Array[5] = read_imagef(weights, coord.wy);
+        coord.xw += (int2)(8, 8);
+        wPixel_Array[6] = read_imagef(weights, coord.xy);
+        wPixel_Array[7] = read_imagef(weights, coord.wy);
+        coord.x >>= 2;
+        coord = coord.xyzz + (int4)(2, -1, 0, 1);
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[0]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[0]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[0]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[0]);
+        sumArray[0] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[0]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[0]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[0]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[0]);
+        sumArray[1] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[1]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[1]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[1]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[1]);
+        sumArray[2] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[1]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[1]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[1]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[1]);
+        sumArray[3] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[2]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[2]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[2]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[2]);
+        sumArray[4] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[2]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[2]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[2]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[2]);
+        sumArray[5] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[3]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[3]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[3]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[3]);
+        sumArray[6] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[3]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[3]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[3]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[3]);
+        sumArray[7] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[4]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[4]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[4]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[4]);
+        sumArray[8] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[4]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[4]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[4]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[4]);
+        sumArray[9] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[5]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[5]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[5]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[5]);
+        sumArray[10] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[5]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[5]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[5]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[5]);
+        sumArray[11] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[6]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[6]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[6]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[6]);
+        sumArray[12] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[6]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[6]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[6]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[6]);
+        sumArray[13] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[7]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[7]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[7]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[7]);
+        sumArray[14] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[7]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[7]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[7]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[7]);
+        sumArray[15] += sumData;
+
+    } while (coord.x < inputSize);
+
+    coord.y <<= 2;
+    coord.xw = coord.zz + (int2)(1, 2);
+    for (int i = 0; i < 8; i++)
+    {
+        float4 dst0, dst1;
+        dst0 = sumArray[i*2];
+        dst1 = sumArray[i*2 + 1];
+
+        write_imagef(output, coord.zy, dst0.xxxx);
+        write_imagef(output, coord.xy, dst0.yyyy);
+        write_imagef(output, coord.wy, dst0.zzzz);
+        coord.xw += (int2)(2, 2);
+        write_imagef(output, coord.xy, dst0.wwww);
+        write_imagef(output, coord.wy, dst1.xxxx);
+        coord.xw += (int2)(2, 2);
+        write_imagef(output, coord.xy, dst1.yyyy);
+        write_imagef(output, coord.wy, dst1.zzzz);
+        coord.xw += (int2)(2, 2);
+        write_imagef(output, coord.xy, dst1.wwww);
+
+        coord.xw = coord.zz + (int2)(1, 2);
+        coord.y ++;
+    }
+}
+
+
+__kernel void gpuGemm_FP32_2D_8x_Wpacked
+    (
+    __read_only  image2d_t input,
+    __read_only  image2d_t weights,
+    __read_only  image2d_t bias,
+    __write_only image2d_t output,
+    int          inputSize
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+
+    int4 coord = (int4)(0, y >> 2, x, y);
+
+    float4 inPixel_Array[8];
+    float4 wPixel_Array[8];
+    float4 sum, sumData, sumArray[16];
+
+    sum = read_imagef(bias, coord.wx);
+    coord.w += 4;
+    sumArray[0] = sum.xxxx;
+    sumArray[1] = sum.xxxx;
+    sumArray[2] = sum.yyyy;
+    sumArray[3] = sum.yyyy;
+
+    sumArray[4] = sum.zzzz;
+    sumArray[5] = sum.zzzz;
+    sumArray[6] = sum.wwww;
+    sumArray[7] = sum.wwww;
+
+    sum = read_imagef(bias, coord.wx);
+    sumArray[8] = sum.xxxx;
+    sumArray[9] = sum.xxxx;
+    sumArray[10] = sum.yyyy;
+    sumArray[11] = sum.yyyy;
+
+    sumArray[12] = sum.zzzz;
+    sumArray[13] = sum.zzzz;
+    sumArray[14] = sum.wwww;
+    sumArray[15] = sum.wwww;
+
+    coord.w = coord.z + 1;
+    do
+    {
+        inPixel_Array[0] = read_imagef(input, coord.xz);
+        inPixel_Array[1] = read_imagef(input, coord.xw);
+        coord.zw += (int2)(2, 2);
+        inPixel_Array[2] = read_imagef(input, coord.xz);
+        inPixel_Array[3] = read_imagef(input, coord.xw);
+        coord.zw += (int2)(2, 2);
+        inPixel_Array[4] = read_imagef(input, coord.xz);
+        inPixel_Array[5] = read_imagef(input, coord.xw);
+        coord.zw += (int2)(2, 2);
+        inPixel_Array[6] = read_imagef(input, coord.xz);
+        inPixel_Array[7] = read_imagef(input, coord.xw);
+        coord.xw = coord.xx * 4 + (int2)(0, 4);
+        wPixel_Array[0] = read_imagef(weights, coord.xy);
+        wPixel_Array[1] = read_imagef(weights, coord.wy);
+        coord.xw += (int2)(8, 8);
+        wPixel_Array[2] = read_imagef(weights, coord.xy);
+        wPixel_Array[3] = read_imagef(weights, coord.wy);
+        coord = coord.xyzx + (int4)(-8, 1, -6, -4);
+        wPixel_Array[4] = read_imagef(weights, coord.xy);
+        wPixel_Array[5] = read_imagef(weights, coord.wy);
+        coord.xw += (int2)(8, 8);
+        wPixel_Array[6] = read_imagef(weights, coord.xy);
+        wPixel_Array[7] = read_imagef(weights, coord.wy);
+        coord.x >>= 2;
+        coord = coord.xyzz + (int4)(2, -1, 0, 1);
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[0]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[0]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[0]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[0]);
+        sumArray[0] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[0]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[0]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[0]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[0]);
+        sumArray[1] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[1]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[1]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[1]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[1]);
+        sumArray[2] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[1]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[1]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[1]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[1]);
+        sumArray[3] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[2]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[2]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[2]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[2]);
+        sumArray[4] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[2]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[2]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[2]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[2]);
+        sumArray[5] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[3]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[3]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[3]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[3]);
+        sumArray[6] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[3]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[3]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[3]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[3]);
+        sumArray[7] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[4]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[4]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[4]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[4]);
+        sumArray[8] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[4]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[4]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[4]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[4]);
+        sumArray[9] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[5]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[5]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[5]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[5]);
+        sumArray[10] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[5]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[5]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[5]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[5]);
+        sumArray[11] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[6]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[6]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[6]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[6]);
+        sumArray[12] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[6]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[6]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[6]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[6]);
+        sumArray[13] += sumData;
+
+        sumData.x = dot(inPixel_Array[0], wPixel_Array[7]);
+        sumData.y = dot(inPixel_Array[1], wPixel_Array[7]);
+        sumData.z = dot(inPixel_Array[2], wPixel_Array[7]);
+        sumData.w = dot(inPixel_Array[3], wPixel_Array[7]);
+        sumArray[14] += sumData;
+
+        sumData.x = dot(inPixel_Array[4], wPixel_Array[7]);
+        sumData.y = dot(inPixel_Array[5], wPixel_Array[7]);
+        sumData.z = dot(inPixel_Array[6], wPixel_Array[7]);
+        sumData.w = dot(inPixel_Array[7], wPixel_Array[7]);
+        sumArray[15] += sumData;
+
+    } while (coord.x < inputSize);
+
+    coord.y <<= 2;
+    coord.x = coord.z + 4;
+    for (int i = 0; i < 8; i++)
+    {
+        float4 dst0, dst1;
+        dst0 = sumArray[i*2];
+        dst1 = sumArray[i*2 + 1];
+
+        write_imagef(output, coord.zy, dst0);
+        write_imagef(output, coord.xy, dst1);
+        coord.y ++;
+    }
+}

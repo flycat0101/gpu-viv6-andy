@@ -2503,46 +2503,80 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
 
     if (enable_reorgWeights)
     {
-        vx_reference parameters[8] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)output};
-        vx_float32 uint8Scale  = input_scale * weight_scale * output_scale;
-        vx_float32 outputZP = (vx_float32)output_ZP + 0.5f;
-        vx_float32 weightZP = (vx_float32)weight_ZP;
-
-        scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &uint8Scale);
-        zpWeight = vxCreateScalar(context, VX_TYPE_FLOAT32, &weightZP);
-        zpOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &outputZP);
-
-        parameters[4] = (vx_reference)cycle;
-        parameters[5] = (vx_reference)scaleIn;
-        parameters[6] = (vx_reference)zpWeight;
-        parameters[7] = (vx_reference)zpOut;
-
-        if (enable_2d_img)
+        if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
         {
-            parameters[0]  = (vx_reference)inputs;
-            parameters[3]  = (vx_reference)outputs;
-        }
+            vx_reference parameters[5] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)output, (vx_reference)cycle};
 
-        if (enable_2d_img)
-        {
-            execution_parameters.globalWorkScale[0] = 8;
-            execution_parameters.globalWorkScale[1] = 8;
+            if (enable_2d_img)
+            {
+                parameters[0]  = (vx_reference)inputs;
+                parameters[3]  = (vx_reference)outputs;
+            }
+
+            if (enable_2d_img)
+            {
+                execution_parameters.globalWorkScale[0] = 8;
+                execution_parameters.globalWorkScale[1] = 8;
+                if (output_width % 4 == 0)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D_8x_Wpacked", borderMode);
+                else
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D_8s_Wpacked", borderMode);
+            }
+
+            if (!shaderExecutable) goto OnError;
+
+            status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             if (output_width % 4 == 0)
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8x_Wpacked", borderMode);
-            else
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8s_Wpacked", borderMode);
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+
+            status |= vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 5);
+            if (status != VX_SUCCESS) goto OnError;
         }
+        else
+        {
+            vx_reference parameters[8] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)output};
+            vx_float32 uint8Scale  = input_scale * weight_scale * output_scale;
+            vx_float32 outputZP = (vx_float32)output_ZP + 0.5f;
+            vx_float32 weightZP = (vx_float32)weight_ZP;
 
-        if (!shaderExecutable) goto OnError;
+            scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &uint8Scale);
+            zpWeight = vxCreateScalar(context, VX_TYPE_FLOAT32, &weightZP);
+            zpOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &outputZP);
 
-        status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-        if (output_width % 4 == 0)
-            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            parameters[4] = (vx_reference)cycle;
+            parameters[5] = (vx_reference)scaleIn;
+            parameters[6] = (vx_reference)zpWeight;
+            parameters[7] = (vx_reference)zpOut;
 
-        status |= vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
-        if (status != VX_SUCCESS) goto OnError;
+            if (enable_2d_img)
+            {
+                parameters[0]  = (vx_reference)inputs;
+                parameters[3]  = (vx_reference)outputs;
+            }
+
+            if (enable_2d_img)
+            {
+                execution_parameters.globalWorkScale[0] = 8;
+                execution_parameters.globalWorkScale[1] = 8;
+                if (output_width % 4 == 0)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8x_Wpacked", borderMode);
+                else
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8s_Wpacked", borderMode);
+            }
+
+            if (!shaderExecutable) goto OnError;
+
+            status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (output_width % 4 == 0)
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+
+            status |= vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
+            if (status != VX_SUCCESS) goto OnError;
+        }
     }
     else if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
     {
