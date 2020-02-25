@@ -4062,13 +4062,18 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Write(
     if (1 == binarySave->generateNBGToMemory)
     {   /* write NBG to memory */
         vx_uint8_ptr buffer = (vx_uint8_ptr)binarySave->NBGBuffer + offset;
-        if ((offset + size) > *(binarySave->NBGSize))
+        if ((offset + size) > binarySave->NBGInMemorySize)
         {
             vxError("%s[%d]:generate NBG in memory, out of buffer boundary\n", __FUNCTION__, __LINE__);
+            vxmASSERT(0);
             vxmONERROR(VX_ERROR_NO_MEMORY);
         }
 
         vxMemCopy((vx_ptr)buffer, data, size);
+        if ((offset + size) > *(binarySave->NBGSize))
+        {
+            *(binarySave->NBGSize) = offset + size;
+        }
     }
     else
     {   /* write NBG file */
@@ -11795,7 +11800,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
         *size = (vx_size)totalSize;
     }
 
-    graph->binarySave->NBGFileSize = totalSize;
+    graph->binarySave->NBGInMemorySize = totalSize;
 
     vxInfo("Calculate NBG size : %d bytes\n", (vx_uint32)(totalSize));
 OnError:
@@ -11814,12 +11819,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GenerateNBG(
     vx_uint32 enableDumpNBG = 0;
     gctSTRING envctrl = gcvNULL;
 
-    if (((vx_int8_ptr)buffer + graph->binarySave->NBGFileSize) == VX_NULL)
-    {
-        vxError("%s[%d]: buffer is not enough\n", __FUNCTION__, __LINE__);
-        vxmONERROR(VX_FAILURE);
-    }
-
     /* enable save binary */
     context->options.enableSaveBinary = 1;
     graph->binarySave->generateNBGToMemory = 1;
@@ -11829,11 +11828,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GenerateNBG(
     vxmONERROR(vxoBinaryGraph_GeneratNBG(graph));
 
     vxmONERROR(vxProcessGraph(graph));
-
-    if (size != VX_NULL)
-    {
-        *size = (vx_size)nbgSize;
-    }
 
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_DUMP_NBG", &envctrl)) && envctrl)
     {
@@ -11850,7 +11844,12 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GenerateNBG(
         gcmVERIFY_OK(gcoOS_Close(gcvNULL, binarySaveFile));
     }
 
-    vxInfo("Actual NBG size : %d bytes\n", nbgSize);
+    vxInfo("Generate NBG in memory Actual NBG size : %d bytes\n", nbgSize);
+
+    if (size != VX_NULL)
+    {
+        *size = (vx_size)nbgSize;
+    }
 
 OnError:
     context->options.enableSaveBinary = 0;
