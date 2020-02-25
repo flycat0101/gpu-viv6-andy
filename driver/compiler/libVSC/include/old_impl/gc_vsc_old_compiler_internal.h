@@ -1336,10 +1336,15 @@ gcGetVIRCGKind(
     IN gctBOOL              HasHalti2
     );
 
-
 gctUINT
 gcGetDualFP16Mode(
     IN gctBOOL              HasHalti2
+    );
+
+gctBOOL
+gcIsInstHWBarrier(
+    IN gcSHADER             Shader,
+    IN gcSL_INSTRUCTION     Code
     );
 
 #define _MASSAGE_MAX_UNIFORM_FOR_OES30(vsUniform, psUniform)   \

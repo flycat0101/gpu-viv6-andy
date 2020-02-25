@@ -262,7 +262,7 @@ conv2VirsVirOpcodeMap _virOpcodeMap[] =
     {VIR_OP_UCARRY, /* gcSL_UCARRY, 0x72 */ VIR_MOD_NONE, 0, 2},
     {OPCODE_TEXU, /* gcSL_TEXU, 0x73 */ VIR_MOD_NONE, EXTERN_TEXU, -1},
     {OPCODE_TEXU_LOD, /* gcSL_TEXU_LOD, 0x74 */ VIR_MOD_NONE, EXTERN_TEXU_LOD, -1},
-    {VIR_OP_MEM_BARRIER, /* gcS_BARRIER, 0x75 */ VIR_MOD_NONE, 0, 0},
+    {VIR_OP_MEM_BARRIER, /* gcSL_BARRIER, 0x75 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_NOP, /* gcSL_SAMPLER_ASSIGN, 0x76 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_GET_SAMPLER_IDX,/* gcSL_GET_SAMPLER_IDX, 0x77 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_IMG_LOAD_3D, /* gcSL_IMAGE_RD_3D, 0x78 */ VIR_MOD_NONE, 0, 0},
@@ -6304,7 +6304,7 @@ _ConvCode2VirInstruction(
         virErrCode = _ConvTexLdForShadow(Shader, Code, &opcode);
     }
 
-    if (opcode == gcSL_BARRIER)
+    if (gcIsInstHWBarrier(Shader, Code))
     {
         VIR_Shader_SetFlag(VirShader, VIR_SHFLAG_HAS_BARRIER);
     }

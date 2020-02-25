@@ -2326,9 +2326,9 @@
     /* SpvOpControlBarrier = 224 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassBarrier,
-        __SpvEmitInstructions,
+        __SpvEmitBarrier,
         3,
-        { OperandScope, OperandScope, OperandMemorySemantics, },
+        { OperandScope, OperandId, OperandId, },
         { "'Execution'", "'Memory'", "'Semantics'", },
         { gcvNULL },
         VIR_OP_BARRIER, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
@@ -2337,9 +2337,9 @@
     /* SpvOpMemoryBarrier = 225 */
     {
         gcvFALSE, gcvFALSE, gcvFALSE, OpClassBarrier,
-        __SpvEmitInstructions,
+        __SpvEmitBarrier,
         2,
-        { OperandScope, OperandMemorySemantics, },
+        { OperandId, OperandId, },
         { "'Memory'", "'Semantics'", },
         { gcvNULL },
         VIR_OP_MEM_BARRIER, VIR_TYPE_UNKNOWN, VIR_MOD_NONE

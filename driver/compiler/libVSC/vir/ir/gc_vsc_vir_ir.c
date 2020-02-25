@@ -1017,13 +1017,36 @@ VIR_Inst_UpdateResOpType(
     return errCode;
 }
 
+/* Same logical to gcIsInstHWBarrier. */
 gctBOOL
 VIR_Inst_IsHWBarrier(
     IN VIR_Instruction     *pInst
     )
 {
-    VIR_OpCode              opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_OpCode                  opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Operand*                pScopeOpnd = VIR_Inst_GetSource(pInst, 0);
+    VIR_Operand*                pMemorySemanticOpnd = VIR_Inst_GetSource(pInst, 1);
+    VIR_MEMORY_SCOPE_TYPE       memoryScope = VIR_MEMORY_SCOPE_TYPE_WORKGROUP;
+    VIR_MEMORY_SEMANTIC_FLAG    memorySemantic = VIR_MEMORY_SEMANTIC_ACQUIRERELEASE;
 
+    if (!VIR_OPCODE_isBarrier(opCode))
+    {
+        return gcvFALSE;
+    }
+
+    /* Get the memory scope from source0. */
+    if (pScopeOpnd && VIR_Operand_isImm(pScopeOpnd))
+    {
+        memoryScope = (VIR_MEMORY_SCOPE_TYPE)VIR_Operand_GetImmediateInt(pScopeOpnd);
+    }
+
+    /* Get the memory semantic from source1. */
+    if (pMemorySemanticOpnd && VIR_Operand_isImm(pMemorySemanticOpnd))
+    {
+        memorySemantic = (VIR_MEMORY_SEMANTIC_FLAG)VIR_Operand_GetImmediateInt(pMemorySemanticOpnd);
+    }
+
+    /* So far always generate for BARRIER. */
     if (opCode == VIR_OP_BARRIER)
     {
         return gcvTRUE;
@@ -1031,7 +1054,16 @@ VIR_Inst_IsHWBarrier(
     /* HW has logic to naturally insure memory access is in-order */
     else if (opCode == VIR_OP_MEM_BARRIER)
     {
-        return gcvFALSE;
+        if (memoryScope == VIR_MEMORY_SCOPE_TYPE_WORKGROUP
+            &&
+            ((memorySemantic & VIR_MEMORY_SEMANTIC_ACQUIRE) || (memorySemantic & VIR_MEMORY_SEMANTIC_ACQUIRERELEASE)))
+        {
+            return gcvTRUE;
+        }
+        else
+        {
+            return gcvFALSE;
+        }
     }
 
     return gcvFALSE;
