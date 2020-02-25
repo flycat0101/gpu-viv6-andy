@@ -1957,14 +1957,6 @@ fbdev_SynchronousFlip(
     IN PlatformDisplayType Display
     )
 {
-    struct _FBDisplay * display;
-    display = (struct _FBDisplay*) Display;
-
-    if (display)
-    {
-        if (display->serverSide)
-            return gcvTRUE;
-    }
     return gcvFALSE;
 }
 gceSTATUS
@@ -4229,35 +4221,6 @@ fbdev_GetFbdevPlatform(
 {
     return &fbdevPlatform;
 }
-
-void fbdev_SetServerTag(VEGLDisplay Display)
-{
-    struct _FBDisplay *fbdisplay = gcvNULL;
-
-    if (Display == gcvNULL) return;
-
-    if (Display->platform->platform != EGL_PLATFORM_FB_VIV) return;
-
-    if (Display->hdc == gcvNULL) return;
-
-    fbdisplay=(struct _FBDisplay *)Display->hdc;
-    fbdisplay->serverSide = gcvTRUE;
-}
-
-void fbdev_UnSetServerTag(VEGLDisplay Display)
-{
-    struct _FBDisplay *fbdisplay = gcvNULL;
-
-    if (Display == gcvNULL) return;
-
-    if (Display->platform->platform != EGL_PLATFORM_FB_VIV) return;
-
-    if (Display->hdc == gcvNULL) return;
-
-    fbdisplay=(struct _FBDisplay *)Display->hdc;
-    fbdisplay->serverSide = gcvFALSE;
-}
-
 
 static struct eglFbPlatform fbdevBackend =
 {
