@@ -767,7 +767,7 @@ VX_PRIVATE_API vx_float64 maxErrorLUT(vx_uint32 * pwlLUTBaseEx, vx_uint32 expBit
             vx_float64 inputDelta = 0;
             vx_uint32 absF24LUTInput = 0;
 
-            vx_uint32 nextBase = (base + 1) & ((!aluPwlSignSupport) << 9 | 0x1FF) | ((aluPwlSignSupport & (base >> 9)) << 9);
+            vx_uint32 nextBase = ((base + 1) & ((!aluPwlSignSupport) << 9 | 0x1FF)) | ((aluPwlSignSupport & (base >> 9)) << 9);
 
             while(mantStepDelta >= 2)
             {
