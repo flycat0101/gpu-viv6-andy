@@ -3,6 +3,8 @@
 #include "cl_viv_vx_ext.h"
 
 _viv_uniform int input_height;
+_viv_uniform int strideXvalue;
+_viv_uniform int strideYvalue;
 _viv_uniform VXC_512Bits uniConv_k3x3_s1_1_4x4;
 _viv_uniform VXC_512Bits uniConv_k3x3_s1_2_4x4;
 _viv_uniform VXC_512Bits uniSumOrderShort4_2x8;
@@ -24,8 +26,8 @@ __kernel void vxcDepthwiseConv_Fp16kernel_3x3_S1(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
-    int inxStart = gidx * stride - padLeft;
+    int inyStart = gidy * strideYvalue - padTop;
+    int inxStart = gidx * strideXvalue - padLeft;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
     float4 sum[2];
@@ -96,8 +98,8 @@ __kernel void vxcDepthwiseConv_Fp16kernel_3x3_S2(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
-    int inxStart = gidx * stride - padLeft;
+    int inyStart = gidy * strideYvalue - padTop;
+    int inxStart = gidx * strideXvalue - padLeft;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
     float4 sum[2];
@@ -183,8 +185,8 @@ __kernel void vxcDepthwiseConv_U8kernel_3x3_S1(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
-    int inxStart = gidx * stride - padLeft;
+    int inyStart = gidy * strideYvalue - padTop;
+    int inxStart = gidx * strideXvalue - padLeft;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
     float4 sum[2];
@@ -248,8 +250,8 @@ __kernel void vxcDepthwiseConv_U8kernel_3x3_S2(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
-    int inxStart = gidx * stride - padLeft;
+    int inyStart = gidy * strideYvalue - padTop;
+    int inxStart = gidx * strideXvalue - padLeft;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
     float4 sum[2];
@@ -314,8 +316,8 @@ __kernel void vxcDepthwiseConv_I16kernel_3x3_S1(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
-    int inxStart = gidx * stride - padLeft;
+    int inyStart = gidy * strideYvalue - padTop;
+    int inxStart = gidx * strideXvalue - padLeft;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
     float4 sum[2];
@@ -373,8 +375,8 @@ __kernel void vxcDepthwiseConv_I16kernel_3x3_S1_BI64(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
-    int inxStart = gidx * stride - padLeft;
+    int inyStart = gidy * strideYvalue - padTop;
+    int inxStart = gidx * strideXvalue - padLeft;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
     float4 sum[2];
@@ -440,8 +442,8 @@ __kernel void vxcDepthwiseConv_I16kernel_3x3_S2(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
-    int inxStart = gidx * stride - padLeft;
+    int inyStart = gidy * strideYvalue - padTop;
+    int inxStart = gidx * strideXvalue - padLeft;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
     float4 sum[2];
@@ -500,8 +502,8 @@ __kernel void vxcDepthwiseConv_I16kernel_3x3_S2_BI64(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
-    int inxStart = gidx * stride - padLeft;
+    int inyStart = gidy * strideYvalue - padTop;
+    int inxStart = gidx * strideXvalue - padLeft;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
     float4 sum[2];
@@ -572,8 +574,8 @@ __kernel void vxcDepthwiseConv_I8kernel_3x3_S1(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
-    int inxStart = gidx * stride - padLeft;
+    int inyStart = gidy * strideYvalue - padTop;
+    int inxStart = gidx * strideXvalue - padLeft;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
     float4 sum[2];
@@ -627,8 +629,8 @@ __kernel void vxcDepthwiseConv_I8kernel_3x3_S2(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
-    int inxStart = gidx * stride - padLeft;
+    int inyStart = gidy * strideYvalue - padTop;
+    int inxStart = gidx * strideXvalue - padLeft;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
     float4 sum[2];
@@ -689,10 +691,10 @@ __kernel void vxcDepthwiseConv_Fp16kernelWidthLE4(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
+    int inyStart = gidy * strideYvalue - padTop;
     int inyEnd = inyStart + kernel_height;
     inyEnd = min(inyEnd, input_height);
-    int inxStart = gidx * stride - padLeft;
+    int inxStart = gidx * strideXvalue - padLeft;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
     float sum = read_imagef(bias, coord_wei.yx).x;
@@ -741,10 +743,10 @@ __kernel void vxcDepthwiseConv_Fp16kernelWidthGT4(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
+    int inyStart = gidy * strideYvalue - padTop;
     int inyEnd = inyStart + kernel_height;
     inyEnd = min(inyEnd, input_height);
-    int inxStart = gidx * stride - padLeft;
+    int inxStart = gidx * strideXvalue - padLeft;
     int inxEnd = inxStart + kernel_width;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
@@ -823,9 +825,9 @@ __kernel void vxcDepthwiseConv_U8kernelWidthLE5(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
+    int inyStart = gidy * strideYvalue - padTop;
     int inyEnd = inyStart + kernel_height;
-    int inxStart = gidx * stride - padLeft;
+    int inxStart = gidx * strideXvalue - padLeft;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
 
@@ -872,9 +874,9 @@ __kernel void vxcDepthwiseConv_U8kernelWidthGT5(
     int gidz = get_global_id(2);
     int4 coord_out = (int4)(gidx, gidy, gidz, 0);
     int inz = (short)gidz / (short)channel_multiplier;
-    int inyStart = gidy * stride - padTop;
+    int inyStart = gidy * strideYvalue - padTop;
     int inyEnd = inyStart + kernel_height;
-    int inxStart = gidx * stride - padLeft;
+    int inxStart = gidx * strideXvalue - padLeft;
     int inxEnd = inxStart + kernel_width;
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
@@ -944,8 +946,8 @@ __kernel void vxcDepthwiseConv_i8i8_nopad(
     int padTop,
     __write_only image2d_array_t output)
 {
-    int gidx = get_global_id(0) * stride;
-    int gidy = get_global_id(1) * stride;
+    int gidx = get_global_id(0) * strideXvalue;
+    int gidy = get_global_id(1) * strideYvalue;
     int gidz = get_global_id(2);
     int inz = (short)gidz / (short)channel_multiplier;
     int4 coord = (int4)(gidx, gidy, inz, 0);
@@ -1008,8 +1010,8 @@ __kernel void vxcDepthwiseConv_i8i8(
     int padTop,
     __write_only image2d_array_t output)
 {
-    int gidx = get_global_id(0) * stride - padLeft;
-    int gidy = get_global_id(1) * stride - padTop;
+    int gidx = get_global_id(0) * strideXvalue - padLeft;
+    int gidy = get_global_id(1) * strideYvalue - padTop;
     int gidz = get_global_id(2);
     int inz = (short)gidz / (short)channel_multiplier;
     int4 coord = (int4)(gidx, gidy, inz, 0);
@@ -1072,8 +1074,8 @@ __kernel void vxcDepthwiseConv_i16i16(
     int padTop,
     __write_only image2d_array_t output)
 {
-    int gidx = get_global_id(0) * stride - padLeft;
-    int gidy = get_global_id(1) * stride - padTop;
+    int gidx = get_global_id(0) * strideXvalue - padLeft;
+    int gidy = get_global_id(1) * strideYvalue - padTop;
     int gidz = get_global_id(2);
     int inz = (short)gidz / (short)channel_multiplier;
     int4 coord = (int4)(gidx, gidy, inz, 0);
@@ -1136,8 +1138,8 @@ __kernel void vxcDepthwiseConv_i16i16_BI64(
     int padTop,
     __write_only image2d_array_t output)
 {
-    int gidx = get_global_id(0) * stride - padLeft;
-    int gidy = get_global_id(1) * stride - padTop;
+    int gidx = get_global_id(0) * strideXvalue - padLeft;
+    int gidy = get_global_id(1) * strideYvalue - padTop;
     int gidz = get_global_id(2);
     int inz = (short)gidz / (short)channel_multiplier;
     int4 coord = (int4)(gidx, gidy, inz, 0);

@@ -2927,6 +2927,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_scalar zpWeight = NULL;
     vx_scalar zpOut = NULL;
     vx_uint32 dims              = 0;
+    vx_uint32 weights_dims      = TENSOR_DIM_NUM(weights);
     vx_int32  sizes[4]                       = {1, 1, 1, 1};
     vx_bool   is_write_2data = vx_false_e, is_write_4data = vx_false_e;
     vx_bool   is_write_q32_8data = vx_false_e, is_write_q32_16data = vx_false_e;
@@ -2996,7 +2997,14 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
 
 
     sizes[0] = kernel_width * kernel_height;
-    sizes[1] = TENSOR_VIEW_SIZE_INDEX(weights, 2);
+    if (weights_dims < 4)
+    {
+        sizes[1] = TENSOR_VIEW_SIZE_INDEX(weights, 2);
+    }
+    else
+    {
+        sizes[1] = TENSOR_VIEW_SIZE_INDEX(weights, 2) * TENSOR_VIEW_SIZE_INDEX(weights, 3);
+    }
     reWeights = vxoTensor_ReshapeTensor(weights, sizes, 2);
 
     if (is_no_pad)
