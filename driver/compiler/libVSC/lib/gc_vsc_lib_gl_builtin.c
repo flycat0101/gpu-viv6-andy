@@ -4214,8 +4214,18 @@ gctSTRING gcLibTextureGather_Func_34 =
 gctSTRING gcLibTextureGather_Func_35 =
 "vec4 _viv_textureGather_2DRectShadow(sampler2DShadow sampler, mediump ivec3 levelBaseSize, vec2 p, float refZ)\n"
 "{\n"
+"    vec4 result;\n"
+"    vec2 size = vec2(levelBaseSize.xy);\n"
 "    p = p / vec2(levelBaseSize.xy);\n"
-"    return _viv_textureGather_2DShadow(sampler, levelBaseSize, p, refZ);\n"
+"    result.x = texture(sampler, vec3(p.x - (0.5 / size.x), p.y + (0.5 / size.y), 0.0));\n"
+"    result.x = result.x > refZ ? 1.0 : 0.0;\n"
+"    result.y = texture(sampler, vec3(p.x + (0.5 / size.x), p.y + (0.5 / size.y), 0.0));\n"
+"    result.y = result.y > refZ ? 1.0 : 0.0;\n"
+"    result.z = texture(sampler, vec3(p.x + (0.5 / size.x), p.y - (0.5 / size.y), 0.0));\n"
+"    result.z = result.z > refZ ? 1.0 : 0.0;\n"
+"    result.w = texture(sampler, vec3(p.x - (0.5 / size.x), p.y - (0.5 / size.y), 0.0));\n"
+"    result.w = result.w > refZ ? 1.0 : 0.0;\n"
+"    return result;\n"
 "}\n";
 
 /***********************textureGather implementation that HW can't directly support***********************/
@@ -5208,8 +5218,20 @@ gctSTRING gcLibTextureGatherOffset_Func_20 =
 gctSTRING gcLibTextureGatherOffset_Func_21 =
 "vec4 _viv_textureGatherOffset_float_2DRectShadow(sampler2DShadow sampler, mediump ivec3 levelBaseSize, vec2 p, float refZ, ivec2 offset)\n"
 "{\n"
-"    p = p / vec2(levelBaseSize.xy);\n"
-"    return _viv_textureGatherOffset_float_2DShadow(sampler, levelBaseSize, p, refZ, offset);\n"
+"    vec4 result;\n"
+"    vec2 newCoord;\n"
+"    vec2 size = vec2(levelBaseSize.xy);\n"
+"    p = p / size;\n"
+"    p = _viv_textureGatherCommon_ComputeOffset(levelBaseSize, p, offset);\n"
+"    result.x = texture(sampler, vec3(p.x - (0.5 / size.x), p.y + (0.5 / size.y), 0.0));\n"
+"    result.x = result.x > refZ ? 1.0 : 0.0;\n"
+"    result.y = texture(sampler, vec3(p.x + (0.5 / size.x), p.y + (0.5 / size.y), 0.0));\n"
+"    result.y = result.y > refZ ? 1.0 : 0.0;\n"
+"    result.z = texture(sampler, vec3(p.x + (0.5 / size.x), p.y - (0.5 / size.y), 0.0));\n"
+"    result.z = result.z > refZ ? 1.0 : 0.0;\n"
+"    result.w = texture(sampler, vec3(p.x - (0.5 / size.x), p.y - (0.5 / size.y), 0.0));\n"
+"    result.w = result.w > refZ ? 1.0 : 0.0;\n"
+"    return result;\n"
 "}\n";
 
 /***********************textureGatherOffsets implementation***********************/
@@ -5598,8 +5620,23 @@ gctSTRING gcLibTextureGatherOffsets_Func_20 =
 gctSTRING gcLibTextureGatherOffsets_Func_21 =
 "vec4 _viv_textureGatherOffsets_float_2DRectShadow(sampler2DShadow sampler, mediump ivec3 levelBaseSize, vec2 p, float refZ, ivec2 offsets[4])\n"
 "{\n"
-"    p = p / vec2(levelBaseSize.xy);\n"
-"    return _viv_textureGatherOffsets_float_2DShadow(sampler, levelBaseSize, p, refZ, offsets);\n"
+"    vec4 result;\n"
+"    vec2 newCoord;\n"
+"    vec2 size = vec2(levelBaseSize.xy);\n"
+"    p = p / size;\n"
+"    newCoord = _viv_textureGatherCommon_ComputeOffset(levelBaseSize, p, offsets[0]);\n"
+"    result.x = texture(sampler, vec3(newCoord.x - (0.5 / size.x), newCoord.y - (0.5 / size.y), refZ));\n"
+"    result.x = result.x > refZ ? 1.0 : 0.0;\n"
+"    newCoord = _viv_textureGatherCommon_ComputeOffset(levelBaseSize, p, offsets[1]);\n"
+"    result.y = texture(sampler, vec3(newCoord.x - (0.5 / size.x), newCoord.y - (0.5 / size.y), refZ));\n"
+"    result.y = result.y > refZ ? 1.0 : 0.0;\n"
+"    newCoord = _viv_textureGatherCommon_ComputeOffset(levelBaseSize, p, offsets[2]);\n"
+"    result.z = texture(sampler, vec3(newCoord.x - (0.5 / size.x), newCoord.y - (0.5 / size.y), refZ));\n"
+"    result.z = result.z > refZ ? 1.0 : 0.0;\n"
+"    newCoord = _viv_textureGatherCommon_ComputeOffset(levelBaseSize, p, offsets[3]);\n"
+"    result.w = texture(sampler, vec3(newCoord.x - (0.5 / size.x), newCoord.y - (0.5 / size.y), refZ));\n"
+"    result.w = result.w > refZ ? 1.0 : 0.0;\n"
+"    return result;\n"
 "}\n";
 
 /***********************texelFetch for MSAA implementation that HW can directly support***********************/
