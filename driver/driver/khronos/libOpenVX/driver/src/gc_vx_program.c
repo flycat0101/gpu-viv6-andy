@@ -251,6 +251,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseProgram(vx_program *program)
 
 static gceSTATUS _LoadCompiler(vx_context context)
 {
+#if (VSC_LITE_BUILD)
+    return gcvSTATUS_OK;
+#else
     gceSTATUS status = gcvSTATUS_OK;
     VSC_HW_CONFIG hwCfg;
     gcePATCH_ID patchId;
@@ -305,6 +308,7 @@ OnError:
 
     gcmFOOTER_NO();
     return status;
+#endif
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_string options)
