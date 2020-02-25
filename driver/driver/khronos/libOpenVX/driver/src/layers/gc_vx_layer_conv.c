@@ -3270,7 +3270,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                         && ((outputWidth * outputHeight < IMG_MAX_WIDTH) && outputDepth < IMG_MAX_WIDTH && input_size < IMG_MAX_WIDTH)
                         && (outputDepth % CONV2D_ALIGN_SIZE4 == 0)
                         && CHECK_LIFETIME_IS_STATIC(weights)
-                        && (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE || TENSOR_QUANT_TYPE(weights) == VX_QUANT_NONE))
+                        && ((TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE && TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8)
+                        || (TENSOR_QUANT_TYPE(weights) == VX_QUANT_NONE && TENSOR_DATA_TYPE(weights) == VX_TYPE_FLOAT16)))
                     {
                         enable_packed_weights = vx_true_e;
                     }
