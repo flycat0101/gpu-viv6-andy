@@ -1521,7 +1521,7 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
                                      -1,
                                      skipValue,
                                      doDepthWise,
-                                     do1xN,
+                                     reallyDo1xN,
                                      layer_type);
     if (status != VX_SUCCESS) goto exit;
 
