@@ -1477,23 +1477,7 @@ gceSTATUS __SpvDumpLine(
 
         case OperandLiteralNumber:
             gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpId(stream[word++]));
-
             --numOperands;
-
-            if (opCode == SpvOpExtInst)
-            {
-                ExtInstSet extInstSet = GLSL450Inst;
-                gctUINT entryPoint = stream[word - 1];
-
-                if (gcoOS_MemCmp("OpenCL", (gctSTRING)(&stream[word - 2]), 6) == gcvSTATUS_OK)
-                {
-                    extInstSet = OpenCLExtInst;
-                }
-
-                if (entryPoint == GLSL450Inst)
-                {
-                }
-            }
             break;
 
         case OperandOptionalLiteralString:
