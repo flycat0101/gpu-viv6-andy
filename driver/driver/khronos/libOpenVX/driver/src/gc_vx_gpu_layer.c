@@ -10163,8 +10163,9 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
                 {
                     if (enable_packed_weights)
                     {
-                        execution_parameters.globalWorkScale[1] = 16;
-                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Wpacked_4x16_2D_4X", borderMode);
+                        execution_parameters.globalWorkScale[0] = 16;
+                        execution_parameters.globalWorkScale[1] = 4;
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Wpacked_16x4_2D_4X", borderMode);
                     }
                     else
                     {
@@ -10175,8 +10176,18 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
                 {
                     if (enable_packed_weights)
                     {
-                        execution_parameters.globalWorkScale[1] = 16;
-                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Wpacked_4x16_2D_4S", borderMode);
+                        if ((input_width % 16) < 4 || input_width >= 256)
+                        {
+                            execution_parameters.globalWorkScale[0] = 16;
+                            execution_parameters.globalWorkScale[1] = 4;
+                            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Wpacked_16x4_2D_4S", borderMode);
+                        }
+                        else
+                        {
+                            execution_parameters.globalWorkScale[0] = 4;
+                            execution_parameters.globalWorkScale[1] = 16;
+                            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Wpacked_4x16_2D_4S", borderMode);
+                        }
                     }
                     else
                     {
@@ -10290,7 +10301,7 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
             }
             else
             {
-                execution_parameters.localWorkSize[0]  = 2;
+                execution_parameters.localWorkSize[0]  = 1;
                 execution_parameters.localWorkSize[1]  = _getConvolutionLocalWorkGroupSize(glbWkSclY, 4, maxWkGroupSz/2);
             }
         }
