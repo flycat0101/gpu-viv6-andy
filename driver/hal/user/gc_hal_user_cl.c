@@ -128,7 +128,7 @@ gcoCL_InitializeHardware()
             continue;
         }
 
-        if (tls->defaultHardware != gcvNULL)
+        if (tls->currentType != hwType[i] && tls->defaultHardware != gcvNULL)
         {
             gcmVERIFY_OK(gcoHARDWARE_Destroy(tls->defaultHardware, gcvTRUE));
             tls->defaultHardware = gcvNULL;
