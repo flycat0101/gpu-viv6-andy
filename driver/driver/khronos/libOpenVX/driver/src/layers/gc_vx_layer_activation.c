@@ -836,7 +836,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPReluLayer_ValidateOutput(vx_node node
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPReluLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status                     = VX_SUCCESS;
-
+    vx_context context                   = vxGetContext((vx_reference)node);
     vx_tensor inputs                     = (vx_tensor)parameters[0];
     vx_tensor alpha                      = (vx_tensor)parameters[1];
     vx_tensor outputs                    = (vx_tensor)parameters[2];
@@ -845,7 +845,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPReluLayer_Initializer(vx_node node, c
     vx_enum   alphaFormat                = TENSOR_DATA_TYPE(alpha);
     vx_enum   dstFormat                  = TENSOR_DATA_TYPE(inputs);
     vx_bool   shExe_flag                 = vx_false_e;
-
+    vx_uint32 op_index = 0;
     vxnne_prelu_layer  pReluLayer = VX_NULL;
 
     /* destroy the existing layer */
@@ -895,7 +895,92 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPReluLayer_Initializer(vx_node node, c
                          && (alphaFormat == VX_TYPE_FLOAT16 || alphaFormat == VX_TYPE_FLOAT32));
     }
 
-    if(shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
+    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_ACTIVATION) &&
+            vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs) &&
+            (TENSOR_VIEW_SIZE_INDEX(outputs, 0) * TENSOR_VIEW_SIZE_INDEX(outputs, 1) * TENSOR_VIEW_SIZE_INDEX(outputs, 2) > 1) &&
+            TENSOR_VIEW_SIZE_INDEX(inputs, 2) < PRELU_CHANNEL_MAX)
+        {
+
+        vx_int32    alphaZP           = TENSOR_TF_ZEROPOINT(alpha);
+        vx_int8     alphaFP           = TENSOR_POS(alpha);
+        vx_float32  alphaScale        = TENSOR_TF_SCALE(alpha);
+        vx_uint32   width             = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+        vx_uint32   height            = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+        vx_uint32   channel           = TENSOR_VIEW_SIZE_INDEX(inputs, 2);
+        vx_uint32   dimsionCount      = TENSOR_DIM_NUM(inputs);
+
+        vx_uint32   c;
+        gctPOINTER  alphaBase;
+
+        vx_type_e   alphaFormat       = (vx_type_e)TENSOR_DATA_TYPE(alpha);
+        vx_enum     alphaQuantFormat  = TENSOR_QUANT_TYPE(alpha);
+        assert(dimsionCount < 4 || (dimsionCount == 4 && (TENSOR_VIEW_SIZE_INDEX(inputs, 3) == 1)));
+
+        vxoTensor_GetTensorViewMemory(alpha, &alphaBase, VX_NULL);
+
+        for (c = 0; c < channel; c++) /*Use leakyRelu do Prelu */
+        {
+            vx_op_param_s conv = {0};
+            vx_float32 aV = vxnneGetDataExt(alphaFormat, alphaQuantFormat, c, (vx_uint8_ptr)alphaBase, alphaFP, alphaZP, alphaScale);
+
+            vx_size view_start[4] = {0,0,c,0};
+            vx_size view_end[4] = {width, height, c+1,0};
+            vx_tensor t_in, t_out;
+
+            t_in = vxCreateTensorFromView(inputs, dimsionCount, view_start, view_end);
+            CHECK_NULL(t_in);
+            t_out= vxCreateTensorFromView(outputs, dimsionCount, view_start, view_end);
+            CHECK_NULL(t_out);
+
+            status = vxnneOperation_Initialize(&pReluLayer->activation_tp_operation[c].base,
+                                    &pReluLayer->base,
+                                    VXNNE_OPERATION_TARGET_TP,
+                                    VXNNE_OPERATOR_ACTIVATION,
+                                    VX_NULL,
+                                    vxnneOperation_TP_Deinitialize,
+                                    batchCount,
+                                    0);
+
+            if (status != VX_SUCCESS) goto exit;
+
+            conv.data_buff = vxnneAllocateTPLUTBuffer(context, node);
+            if (conv.data_buff == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                goto exit;
+            }
+
+            conv.pad_x_left = 0;
+            conv.pad_y_top = 0;
+            conv.pool_size_x = 0;
+            conv.pool_size_y = 0;
+            conv.pool_stride = 1;
+            conv.enable_relu = vx_false_e;
+            conv.conv_rounding_type = 0;
+            conv.pad_mode = VX_PAD_CONSTANT;
+            conv.pad_const = 0;
+            conv.tpType = TP_ACTIVATION;
+            conv.other_ref = gcvNULL;
+            conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+            conv.tp_value->e32[0] = VX_NN_ACTIVATION_LEAKYRELU;
+            conv.tp_value->f32[0] = aV;
+
+            vxMemCopy(&pReluLayer->activation_tp_operation[c].base.parameter, &conv, sizeof(vx_op_param_s));
+
+            vxnneLayer_SetOperation(
+                &pReluLayer->base,
+                &pReluLayer->activation_tp_operation[c].base,
+                op_index++);
+
+            pReluLayer->activation_tp_operation[c].input  = t_in;
+            pReluLayer->activation_tp_operation[c].output = t_out;
+
+            vxnneOperation_AddReference(&pReluLayer->activation_tp_operation[c].base, (vx_reference)t_in, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&pReluLayer->activation_tp_operation[c].base, (vx_reference)t_out, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+        }
+    }
+    else if(shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
     {
         vxnne_shader_executable shaderExecutable = VX_NULL;
 

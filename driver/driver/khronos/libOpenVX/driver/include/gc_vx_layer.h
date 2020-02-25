@@ -1124,12 +1124,15 @@ typedef struct _vxnne_prelu_sw_operation_s
 }
 vxnne_prelu_sw_operation_s, *vxnne_prelu_sw_operation;
 
+#define PRELU_CHANNEL_MAX                   64
+
 typedef struct _vxnne_prelu_layer_s
 {
     vxnne_layer_s                                   base;
-    vxnne_operation                                 operations[1];
+    vxnne_operation                                 operations[PRELU_CHANNEL_MAX];
     vxnne_prelu_sw_operation_s                      prelu_operation;
     vxnne_shader_operation_s                        prelu_sh_operation;
+    vxnne_tp_operation_s                            activation_tp_operation[PRELU_CHANNEL_MAX];
 }
 vxnne_prelu_layer_s, *vxnne_prelu_layer;
 
