@@ -3628,6 +3628,30 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                         virUniform->gcslIndex = GetUniformIndex(pTempRegSpillUniform);
                     }
                 }
+                else if (VIR_Symbol_GetUniformKind(virUniformSym) == VIR_UNIFORM_CLIP_DISTANCE_ENABLE)
+                {
+                    gctINT16 clipDistanceIndex;
+                    gcUNIFORM clipDistanceUniform;
+
+                    /* Create viewIndex. */
+                    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+                                                        VIR_Shader_GetSymNameString(VirShader, virUniformSym),
+                                                        gcSHADER_INTEGER_X1,
+                                                        gcSHADER_PRECISION_HIGH,
+                                                        -1,
+                                                        -1,
+                                                        -1,
+                                                        0,
+                                                        gcvNULL,
+                                                        gcSHADER_VAR_CATEGORY_CLIP_DISTANCE_ENABLE,
+                                                        0,
+                                                        -1,
+                                                        -1,
+                                                        gcIMAGE_FORMAT_DEFAULT,
+                                                        &clipDistanceIndex,
+                                                        &clipDistanceUniform));
+                    virUniform->gcslIndex = clipDistanceIndex;
+                }
                 else
                 {
                 }

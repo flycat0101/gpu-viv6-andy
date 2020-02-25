@@ -13665,6 +13665,13 @@ gcLinkTreeThruVirShaders(
                 scParam.cfg.cFlags |= VSC_COMPILER_FLAG_ENABLE_MULTI_GPU;
             }
 
+            if (clientAPI == gcvAPI_OPENGL)
+            {
+                vscCreatePrivateData(sysCtx.pCoreSysCtx,
+                                     &(sysCtx.pCoreSysCtx->hPrivData),
+                                     gcvTRUE);
+            }
+
             pgComParam.cfg.ctx.pSysCtx = &sysCtx;
 
             pgComParam.pGlApiCfg = gcGetGLSLCaps();

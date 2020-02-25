@@ -3985,6 +3985,195 @@ OnError:
     return errCode;
 }
 
+/* Allocate some IOs due to some HW limitations. */
+static VSC_ErrCode _DoIoAllocationAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper)
+{
+    VSC_ErrCode  errCode = VSC_ERR_NONE;
+    VIR_Shader*  pPreStage = gcvNULL;
+    VIR_Shader*  pCurStage;
+    gctUINT      stageIdx;
+
+    /* only support clipDistance in desktop GL */
+    if (pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.ctx.clientAPI != gcvAPI_OPENGL)
+        return errCode;
+
+    for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx ++)
+    {
+        pCurStage = (VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[stageIdx];
+
+        if (pCurStage)
+        {
+            if (VIR_Shader_IsFS(pCurStage) && pPreStage)
+            {
+                /* check if pre stage has clipDistance output or not */
+                VIR_OutputIdList*          pOutputIdLsts;
+                VIR_AttributeIdList*       pAttrIdLists;
+                VIR_Symbol*                pOutputSym = gcvNULL;
+                VIR_Symbol*                pIutputSym;
+                VIR_Symbol*                pSym;
+                gctUINT                    outputIdx;
+                gctUINT                    attrIdx;
+                VIR_Type *                 type = gcvNULL; /* type of gl_clipDistance */
+                VIR_SymId                  symId = 0;      /* symId of gl_clipDistance */
+                gctBOOL                    needToAddClipDistance = gcvTRUE;
+                gctBOOL                    needToPatchClipDistance = gcvFALSE;
+                VIR_TypeId                 typeId;
+                VIR_Uniform                *clipDistanceUniform;
+                VIR_Operand                *newOperand = gcvNULL;
+
+                pOutputIdLsts = VIR_Shader_GetOutputs(pPreStage);
+                for (outputIdx = 0; outputIdx < VIR_IdList_Count(pOutputIdLsts); outputIdx ++)
+                {
+                    pOutputSym = VIR_Shader_GetSymFromId(pPreStage, VIR_IdList_GetId(pOutputIdLsts, outputIdx));
+
+                    if (VIR_Symbol_GetName(pOutputSym) == VIR_NAME_CLIP_DISTANCE)
+                    {
+                        type = VIR_Symbol_GetType(pOutputSym);
+                        needToPatchClipDistance = gcvTRUE;
+                        /* Mark this output used */
+                        VIR_Symbol_ClrFlag(pOutputSym, VIR_SYMFLAG_UNUSED);
+                        break;
+                    }
+                }
+
+                if (!needToPatchClipDistance)
+                    break;
+
+                /* check if fs has clipDistance already */
+                pAttrIdLists = VIR_Shader_GetAttributes(pCurStage);
+                for (attrIdx = 0; attrIdx < VIR_IdList_Count(pAttrIdLists); attrIdx ++)
+                {
+                    pSym = VIR_Shader_GetSymFromId(pCurStage, VIR_IdList_GetId(pAttrIdLists, attrIdx));
+                    if (VIR_Symbol_GetName(pSym) == VIR_NAME_CLIP_DISTANCE)
+                    {
+                        needToAddClipDistance = gcvFALSE;
+                        symId = VIR_Symbol_GetIndex(pSym);
+                        break;
+                    }
+                }
+
+                if (needToAddClipDistance)
+                {
+                    /* add a same type attribute in fragment shader */
+                    errCode = VIR_Shader_AddArrayType(pCurStage,
+                                                 VIR_Type_GetBaseTypeId(type),
+                                                 VIR_Type_GetArrayLength(type),
+                                                 0,
+                                                 &typeId);
+                    errCode = VIR_Shader_AddSymbol(pCurStage,
+                        VIR_SYM_VARIABLE,
+                        VIR_NAME_CLIP_DISTANCE,
+                        VIR_Shader_GetTypeFromId(pCurStage, typeId),
+                        VIR_STORAGE_INPUT,
+                        &symId);
+
+                    if(errCode == VSC_ERR_NONE)
+                    {
+                        VIR_SymId regId, regSymId;
+                        VIR_Symbol *virRegSym;
+                        gctUINT i;
+
+                        pIutputSym = VIR_Shader_GetSymFromId(pCurStage, symId);
+                        VIR_Symbol_SetPrecision(pIutputSym, VIR_Symbol_GetPrecision(pOutputSym));
+                        VIR_Symbol_SetTyQualifier(pIutputSym, VIR_TYQUAL_CONST);
+                        VIR_Symbol_SetFlag(pIutputSym, VIR_SYMFLAG_ENABLED | VIR_SYMFLAG_STATICALLY_USED);
+                        VIR_Symbol_SetLayoutQualifier(pIutputSym, VIR_LAYQUAL_NONE);
+
+                        regId = pCurStage->_tempRegCount;
+                        pIutputSym->u2.tempIndex = regId;
+                        /* add vreg */
+                        for (i = 0; i < VIR_Type_GetArrayLength(type); i++)
+                        {
+                            VIR_Shader_AddSymbol(pCurStage,
+                                                 VIR_SYM_VIRREG,
+                                                 regId,
+                                                 VIR_Shader_GetTypeFromId(pCurStage, VIR_Type_GetBaseTypeId(type)),
+                                                 VIR_STORAGE_UNKNOWN,
+                                                 &regSymId);
+                            virRegSym = VIR_Shader_GetSymFromId(pCurStage, regSymId);
+                            VIR_Symbol_SetVregVariable(virRegSym, pIutputSym);
+                            regId++;
+                        }
+                    }
+                }
+
+                /* add a uniform of userClipEnable in fragment color */
+                clipDistanceUniform = VIR_Shader_GetClipDistanceEnableUniform(pCurStage);
+
+                /* insert an extcall instruction in the main function */
+                {
+                    VIR_Instruction *newInst;
+                    VIR_InstIterator inst_iter;
+                    VIR_Instruction  *firstInst;
+                    VIR_Operand  *funcName;
+                    VIR_Function *func;
+                    VIR_NameId    funcNameId;
+                    VIR_Operand  *parameters;
+                    VIR_ParmPassing *parm;
+                    gctUINT i = 0;
+
+                    VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pCurStage->mainFunction));
+                    firstInst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+                    VIR_Function_AddInstructionBefore(pCurStage->mainFunction,
+                                                           VIR_OP_EXTCALL,
+                                                           VIR_TYPE_VOID,
+                                                           firstInst,
+                                                           gcvTRUE,
+                                                           &newInst);
+
+                    func = VIR_Inst_GetFunction(newInst);
+                    errCode = VIR_Function_NewOperand(func, &funcName);
+                    VIR_Shader_AddString(func->hostShader, "_viv_process_clip_distance", &funcNameId);
+                    VIR_Operand_SetName(funcName, funcNameId);
+
+                    /* create a new VIR_ParmPassing */
+                    VIR_Function_NewOperand(func, &parameters);
+                    VIR_Function_NewParameters(func, 9, &parm);
+
+                    /* set the first argument to the uniform */
+                    errCode = VIR_Function_NewOperand(func, &newOperand);
+                    ON_ERROR(errCode, "new operand");
+                    VIR_Operand_SetSymbol(newOperand, VIR_Shader_GetMainFunction(pCurStage), VIR_Uniform_GetSymID(clipDistanceUniform));
+                    VIR_Operand_SetSwizzle(newOperand, VIR_SWIZZLE_XXXX);
+                    parm->args[0] = newOperand;
+
+                    /* set the second argument */
+                    for (i = 0; i < 8; i++)
+                    {
+                        errCode = VIR_Function_NewOperand(func, &newOperand);
+                        ON_ERROR(errCode, "new operand");
+
+                        VIR_Operand_SetSymbol(newOperand, VIR_Shader_GetMainFunction(pCurStage), symId);
+                        VIR_Operand_SetIsConstIndexing(newOperand, gcvTRUE);
+                        if (i < VIR_Type_GetArrayLength(type))
+                        {
+                            VIR_Operand_SetRelIndexingImmed(newOperand, i);
+                        }
+                        else
+                        {
+                            VIR_Operand_SetRelIndexingImmed(newOperand, 0);
+                        }
+
+                        VIR_Operand_SetTypeId(newOperand, VIR_TYPE_FLOAT32);
+                        VIR_Operand_SetSwizzle(newOperand, VIR_SWIZZLE_XXXX);
+                        parm->args[i+1] = newOperand;
+                    }
+
+                    /* set parameters to new operand */
+                    VIR_Operand_SetParameters(parameters, parm);
+
+                    VIR_Inst_SetSource(newInst, 0, funcName);
+                    VIR_Inst_SetSource(newInst, 1, parameters);
+                    VIR_Inst_SetSrcNum(newInst, 2);
+                }
+            }
+            pPreStage = pCurStage;
+        }
+    }
+OnError:
+    return errCode;
+}
+
 static VSC_ErrCode _DoIoComponentPackAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper)
 {
     VSC_ErrCode  errCode = VSC_ERR_NONE;
@@ -5928,8 +6117,12 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
                 }
             }
 
+            /* Allocate some IOs due to some HW limitations. */
+            errCode = _DoIoAllocationAmongShaderStages(&pgLinkHelper);
+            ON_ERROR(errCode, "IO allocation.");
+
             errCode = _DoIoComponentPackAmongShaderStages(&pgLinkHelper);
-            ON_ERROR(errCode, "IO component packing. ");
+            ON_ERROR(errCode, "IO component packing.");
 
             if (pPgLinkParam->cfg.optFlags | VSC_COMPILER_OPT_VEC)
             {

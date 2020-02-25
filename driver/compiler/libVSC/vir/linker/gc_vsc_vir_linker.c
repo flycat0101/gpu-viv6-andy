@@ -205,6 +205,7 @@ _CreateIntrinsicLib(
     IN VSC_HW_CONFIG            *pHwCfg,
     IN VSC_MM                   *pMM,
     IN gctBOOL                   forGraphics,
+    IN gctBOOL                   forDesktopGL,
     IN gctBOOL                   DumpShader,
     OUT VIR_Shader              **pOutLib
     )
@@ -703,8 +704,16 @@ _CreateIntrinsicLib(
         sloBuiltinSource = (gctSTRING) vscMM_Alloc(pMM, __LL_LIB_LENGTH__ * sizeof(char));
 
         /* add the extension source */
-        length = gcoOS_StrLen(gcLibFunc_Extension, gcvNULL);
-        gcoOS_StrCopySafe(sloBuiltinSource, length + 1, gcLibFunc_Extension);
+        if (forDesktopGL)
+        {
+            length = gcoOS_StrLen(gcLibFunc_Extension_For_GL, gcvNULL);
+            gcoOS_StrCopySafe(sloBuiltinSource, length + 1, gcLibFunc_Extension_For_GL);
+        }
+        else
+        {
+            length = gcoOS_StrLen(gcLibFunc_Extension, gcvNULL);
+            gcoOS_StrCopySafe(sloBuiltinSource, length + 1, gcLibFunc_Extension);
+        }
 
         /* add the extension source */
         if (supportTexMSAA2DArray)
@@ -1668,6 +1677,7 @@ VIR_GetIntrinsicLib(
     IN VSC_MM                   *pMM,
     IN gctBOOL                  forOCL,
     IN gctBOOL                  forGraphics,
+    IN gctBOOL                  forDesktopGL,
     IN gctBOOL                   DumpShader,
     OUT VIR_Shader              **pOutLib
     )
@@ -1701,7 +1711,7 @@ VIR_GetIntrinsicLib(
     }
     else
     {
-        errCode = _CreateIntrinsicLib(pHwCfg, pMM, forGraphics, DumpShader, pOutLib);
+        errCode = _CreateIntrinsicLib(pHwCfg, pMM, forGraphics, forDesktopGL, DumpShader, pOutLib);
     }
 
 #else
@@ -7333,6 +7343,7 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
                                                   gcvTRUE,
                                                   VIR_Shader_IsGraphics(pShader),
                                                   gcvFALSE,
+                                                  gcvFALSE,
                                                   &pIntrinsicLib);
                     CHECK_ERROR(errCode, "VIR_GetIntrinsicLib failed.");
                 }
@@ -7345,6 +7356,7 @@ VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
                                                   &pPrivData->pmp.mmWrapper,
                                                   gcvFALSE,
                                                   VIR_Shader_IsGraphics(pShader),
+                                                  VIR_Shader_IsDesktopGL(pShader),
                                                   gcvFALSE,
                                                   &pIntrinsicLib);
                     CHECK_ERROR(errCode, "VIR_GetIntrinsicLib failed.");

@@ -18885,6 +18885,40 @@ OnError:
     return virUniform;
 }
 
+VIR_Uniform *
+VIR_Shader_GetClipDistanceEnableUniform(
+    IN VIR_Shader *  Shader
+    )
+{
+    VSC_ErrCode  errCode = VSC_ERR_NONE;
+    VIR_Symbol  *clipDistanceEnableSym;
+    VIR_Uniform *virUniform = gcvNULL;
+
+    clipDistanceEnableSym = VIR_Shader_FindSymbolByName(Shader, VIR_SYM_UNIFORM, "#clipDistanceEnable");
+    if (clipDistanceEnableSym != gcvNULL)
+    {
+        return VIR_Symbol_GetUniform(clipDistanceEnableSym);
+    }
+
+    /* not found add a new one */
+    errCode = VIR_Shader_AddNamedUniform(Shader, "#clipDistanceEnable",
+                             VIR_Shader_GetTypeFromId(Shader, VIR_TYPE_INT32), &clipDistanceEnableSym);
+
+    ON_ERROR(errCode, "Failed to add clipDistanceEnable uniform");
+
+    VIR_Symbol_SetUniformKind(clipDistanceEnableSym, VIR_UNIFORM_CLIP_DISTANCE_ENABLE);
+    VIR_Symbol_SetFlag(clipDistanceEnableSym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+    VIR_Symbol_SetFlag(clipDistanceEnableSym, VIR_SYMFLAG_COMPILER_GEN);
+    VIR_Symbol_SetLocation(clipDistanceEnableSym, -1);
+    VIR_Symbol_SetPrecision(clipDistanceEnableSym, VIR_PRECISION_HIGH);
+
+    virUniform = VIR_Symbol_GetUniform(clipDistanceEnableSym);
+    virUniform->index = VIR_IdList_Count(VIR_Shader_GetUniforms(Shader)) - 1;
+
+OnError:
+    return virUniform;
+}
+
 gctBOOL VirSHADER_DumpCodeGenVerbose(void * Shader)
 {
     gctINT ShaderId = ((VIR_Shader *)Shader)->_id;

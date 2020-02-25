@@ -476,6 +476,8 @@ _GetUniformKindString(
         return "texelBufferToImage";
     case VIR_UNIFORM_VIEW_INDEX:
         return "viewIndex";
+    case VIR_UNIFORM_CLIP_DISTANCE_ENABLE:
+        return "clipDistanceEnable";
     case VIR_UNIFORM_THREAD_ID_MEM_ADDR:
         return "threadIdMemAddr";
     default:

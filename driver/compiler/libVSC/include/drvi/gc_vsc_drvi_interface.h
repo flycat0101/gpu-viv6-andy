@@ -56,8 +56,9 @@
 /* 0.0.1.33 Add a new opcode LOGICAL_RSHIFT 05/28/2019 */
 /* 0.0.1.34 Add WorkGroupSizeFactor in VIR_ComputeLayout on 07/18/2019 */
 /* 0.0.1.35 Add skhp flag in VIR_Instruction */
-#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 35)
-#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 35)
+/* 0.0.1.36 Add a function to patch clipDistance in GL VIR lib shader */
+#define gcdVIR_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 36)
+#define gcdVIR_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 36)
 
 #if !defined(gcdTARGETHOST_BIGENDIAN)
 #define gcdTARGETHOST_BIGENDIAN 0  /* default host little endian, to change the
