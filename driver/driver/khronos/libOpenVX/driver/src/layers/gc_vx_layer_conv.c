@@ -751,7 +751,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
     }
 
     /* pre-compress for original ddr nn wb */
-    vxoCompressNNFirstTime(context, weights_biases, outputs);
+    vxoCalculateNNCompressionFirstTime(context, weights_biases, outputs);
 
 
     /* TODO. */
@@ -2642,7 +2642,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     gcoOS_Allocate(gcvNULL, sizeof(vxnne_convolution_relu_pooling_operation_s) * (dilation_x * dilation_y), (gctPOINTER*)&convolutionLayer->convolution_nn_convolution_dynamic_operation);
                     gcoOS_ZeroMemory(convolutionLayer->convolution_nn_convolution_dynamic_operation, sizeof(vxnne_convolution_relu_pooling_operation_s) * (dilation_x * dilation_y));
 
-                    vxoCompressNNFirstTime(context, convolutionLayer->convolution_sw1_reshuffle_operation2.weights_biaes, reshuffled_output);
+                    vxoCalculateNNCompressionFirstTime(context, convolutionLayer->convolution_sw1_reshuffle_operation2.weights_biaes, reshuffled_output);
 
                     for (i = 0; i < loop; i++)
                     {
@@ -2740,7 +2740,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                         &convolutionLayer->convolution_nn_convolution_operation.base,
                         idx++);
 
-                    vxoCompressNNFirstTime(context, convolutionLayer->convolution_sw1_reshuffle_operation.weights_biaes, reshuffled_output);
+                    vxoCalculateNNCompressionFirstTime(context, convolutionLayer->convolution_sw1_reshuffle_operation.weights_biaes, reshuffled_output);
 
                     convolutionLayer->convolution_nn_convolution_operation.inputs           = reshuffled_input;
                     convolutionLayer->convolution_nn_convolution_operation.orig_inputs      = inputs;

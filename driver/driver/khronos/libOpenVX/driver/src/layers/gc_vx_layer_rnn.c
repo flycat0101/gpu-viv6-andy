@@ -685,7 +685,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoRNNLayer_Initializer(vx_node node, const
                 &rnnLayer->convolution_nn_convolution_operation0.base,
                 opt_index++);
 
-            vxoCompressNNFirstTime(context, weights_biases, stages[3]);
+            vxoCalculateNNCompressionFirstTime(context, weights_biases, stages[3]);
 
             rnnLayer->convolution_nn_convolution_operation0.inputs = stages[0];
             rnnLayer->convolution_nn_convolution_operation0.weights_biases = weights_biases;
@@ -1420,7 +1420,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
                 &svdfLayer->svdf_nn_operation[0].base,
                 count++);
 
-            vxoCompressNNFirstTime(context, weights_biases_feature, output_feature);
+            vxoCalculateNNCompressionFirstTime(context, weights_biases_feature, output_feature);
 
             svdfLayer->svdf_nn_operation[0].orig_inputs = inputs;
             svdfLayer->svdf_nn_operation[0].inputs = input_fc;
@@ -1634,7 +1634,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSVDFLayer_Initializer(vx_node node, cons
                 &svdfLayer->svdf_nn_operation[1].base,
                 count++);
 
-            vxoCompressNNFirstTime(context, weights_biases, output_fc);
+            vxoCalculateNNCompressionFirstTime(context, weights_biases, output_fc);
 
             svdfLayer->svdf_nn_operation[1].orig_inputs = state_in;
             svdfLayer->svdf_nn_operation[1].inputs = state_in_fc;
@@ -3442,7 +3442,7 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
                 vxoTensor_ReleaseTensor(&weights_conv);
                 vxoTensor_ReleaseTensor(&biases_conv);
 
-                vxoCompressNNFirstTime(context, weights_biases, output_conv[i]);
+                vxoCalculateNNCompressionFirstTime(context, weights_biases, output_conv[i]);
             }
 
             status = vxnneOperation_Initialize(&lstmUnitNode->lstm_nn_operation.base,
@@ -6222,7 +6222,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNN_LSTMLayer_Initializer(vx_node node, c
                             &lstmLayer->lstm_nn_operation.base,
                             operationIndex++);
 
-                        vxoCompressNNFirstTime(context, weights_biases, output_conv);
+                        vxoCalculateNNCompressionFirstTime(context, weights_biases, output_conv);
 
                         lstmLayer->lstm_nn_operation.inputs = input_conv;
                         lstmLayer->lstm_nn_operation.orig_inputs = input_conv;

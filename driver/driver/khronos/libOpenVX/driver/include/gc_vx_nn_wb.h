@@ -146,11 +146,16 @@ typedef struct _vx_weights_biases_parameter_s
     vx_tensor                                bias_tensor;
     vx_tensor                                alpha_tensor;
 
+    vx_uint8_ptr                             weight_data_ptr;
+    vx_uint32_ptr                            bias_data_ptr;
+    vx_uint8_ptr                             alpha_data_ptr;
+
     /* private function */
     vx_weight_bias_initialize_f              initialize;
     vx_weight_bias_deinitialize_f            deinitialize;
 
     /* public function */
+    vx_weight_bias_compress_f                calc_compress_ratio;
     vx_weight_bias_compress_f                compress;
     vx_weight_bias_set_2_tensor_f            set_weight_bias_tensor;
     vx_weight_bias_set_1_tensor_f            set_alpha_tensor;
@@ -249,6 +254,10 @@ vx_weights_biases_parameter_s;
 #define WB_BIAS_TENSOR(wb)                     (wb)->bias_tensor
 #define WB_ALPHA_TENSOR(wb)                    (wb)->alpha_tensor
 
+#define WB_WEIGHT_DATA(wb)                     (wb)->weight_data_ptr
+#define WB_BIAS_DATA(wb)                       (wb)->bias_data_ptr
+#define WB_ALPHA_DATA(wb)                      (wb)->alpha_data_ptr
+
 
 vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromTensors(
     vx_context  context,
@@ -334,7 +343,7 @@ void vxoWeightBias_Destructor(
     vx_reference ref
     );
 
-vx_status vxoCompressNNFirstTime(
+vx_status vxoCalculateNNCompressionFirstTime(
     vx_context                   context,
     vx_weights_biases_parameter  wb,
     vx_tensor                    output

@@ -1176,7 +1176,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_NN_AVG_Initialize(vxnne_layer ops_layer, c
             memcpy(&poolingLayer->pooling_nne_operation.base.parameter, &conv, sizeof(vx_op_param_s));
         }
 
-        vxmONERROR(vxoCompressNNFirstTime(context, weights_biases, outputs));
+        vxmONERROR(vxoCalculateNNCompressionFirstTime(context, weights_biases, outputs));
 
         poolingLayer->pooling_nne_operation.weights_biases = weights_biases;
 

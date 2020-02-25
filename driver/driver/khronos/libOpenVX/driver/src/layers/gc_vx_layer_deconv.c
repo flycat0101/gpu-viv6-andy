@@ -1479,7 +1479,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDeConvolutionLayer_Initializer(vx_node
                 {
                     vx_weights_biases_parameter weights_biases = deconvolutionLayer->deconvolution_sw1_reshuffle_operation.weights_biaes;
 
-                    vxoCompressNNFirstTime(context, weights_biases, need_upsample ? sample_output : outputs);
+                    vxoCalculateNNCompressionFirstTime(context, weights_biases, need_upsample ? sample_output : outputs);
 
                     /* Initialize covolution operation */
                     status = vxnneOperation_Initialize(&deconvolutionLayer->convolution_operation.base,

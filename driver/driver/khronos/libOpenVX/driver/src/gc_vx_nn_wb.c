@@ -129,6 +129,92 @@ VX_PRIVATE_API void _getNNStride(
 
 /******************************************************************/
 
+VX_PRIVATE_API vx_status _vxoWeightBias_PrepareWBAData(
+    vx_weights_biases_parameter  wb,
+    vx_bool                      prepare_weight,
+    vx_bool                      prepare_bias,
+    vx_bool                      prepare_alpha
+    )
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint8_ptr weightOrigPtr = VX_NULL, alphaOrigPtr = VX_NULL;
+    vx_uint32_ptr biasOrigPtr = VX_NULL;
+    vx_uint32 size;
+
+    if (prepare_weight)
+    {
+        if (WB_WEIGHT_DATA(wb) != VX_NULL)
+        {
+            vxFree(WB_WEIGHT_DATA(wb));
+            WB_WEIGHT_DATA(wb) = VX_NULL;
+        }
+
+        vxoTensor_GetTensorViewMemory(WB_WEIGHT_TENSOR(wb), (gctPOINTER*)&weightOrigPtr, VX_NULL);
+        if (weightOrigPtr != VX_NULL)
+        {
+            size = WB_KERNEL_X(wb) * WB_KERNEL_Y(wb) * WB_KERNEL_Z(wb) * WB_OUTPUT_Z(wb) * (vx_uint32)vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb));
+            WB_WEIGHT_DATA(wb) = (vx_uint8_ptr)vxAllocate(size);
+            if (WB_WEIGHT_DATA(wb) == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                goto exit;
+            }
+            vxMemCopy(WB_WEIGHT_DATA(wb), weightOrigPtr, size);
+        }
+        else
+        {
+            status = VX_ERROR_NO_RESOURCES;
+            goto exit;
+        }
+    }
+
+    if (prepare_bias && WB_BIAS_TENSOR(wb) != VX_NULL)
+    {
+        if (WB_BIAS_DATA(wb) != VX_NULL)
+        {
+            vxFree(WB_BIAS_DATA(wb));
+            WB_BIAS_DATA(wb) = VX_NULL;
+        }
+
+        vxoTensor_GetTensorViewMemory(WB_BIAS_TENSOR(wb), (gctPOINTER*)&biasOrigPtr, VX_NULL);
+        if (biasOrigPtr != VX_NULL)
+        {
+            size = WB_OUTPUT_Z(wb) * (vx_uint32)vxDataType_GetSize((vx_type_e)WB_BIAS_DATA_FORMAT(wb));
+            WB_BIAS_DATA(wb) = (vx_uint32_ptr)vxAllocate(size);
+            if (WB_BIAS_DATA(wb) == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                goto exit;
+            }
+            vxMemCopy(WB_BIAS_DATA(wb), biasOrigPtr, size);
+        }
+        else
+        {
+            status = VX_ERROR_NO_RESOURCES;
+            goto exit;
+        }
+    }
+
+    if (prepare_alpha && WB_ALPHA_TENSOR(wb) != VX_NULL)
+    {
+        WB_ALPHA_DATA(wb) = VX_NULL;
+
+        vxoTensor_GetTensorViewMemory(WB_ALPHA_TENSOR(wb), (gctPOINTER*)&alphaOrigPtr, VX_NULL);
+        if (alphaOrigPtr != VX_NULL)
+        {
+            WB_ALPHA_DATA(wb) = alphaOrigPtr;
+        }
+        else
+        {
+            status = VX_ERROR_NO_RESOURCES;
+            goto exit;
+        }
+    }
+
+exit:
+    return status;
+}
+
 VX_PRIVATE_API vx_status _vxoWeightBias_AllocateMemory(
     vx_context   context,
     vx_memory    memory,
@@ -180,6 +266,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
     vx_enum                      target,
     vx_uint32*                   kernel_per_core,
     vx_uint32                    z_offset,
+    vx_bool                      to_allocate,
     vx_size*                     min_kernel_total_buffer_size,
     vx_size*                     min_kernel_buffer_sizes,
     vx_uint8_ptr*                min_zero_run_lens_ptr,
@@ -190,17 +277,16 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
     vx_uint32 i = 0, j = 0, index = 0, kzOffset = 0, oneFilterSize, weightSize, kzNum = 1, zNum = 1;
     vx_uint32 nonZeroCount = 0, nonZeroTotalCount = 0, totalCount = 0, allTotalCount = 0, sliceCount = 0, filterCount, kernelPerCore = 0;
     vx_uint32 zArray[MAX_ZGROUP_COUNT], kzArray[MAX_KZGROUP_COUNT];
+    vx_size minKernelBufferSizes[MAX_ZGROUP_COUNT*MAX_KZGROUP_COUNT];
     vx_size minTotalKernelBufferSize = 0, origKernelBufferSize = 0, origTotalKernelBufferSize = 0, weightDataBytesOffset = 0, biasDataDWordOffset = 0;
-    vx_uint8_ptr weightPtr = VX_NULL, biasPtr = VX_NULL;
-    vx_uint8_ptr minZeroRunLensBase = VX_NULL, minZeroRunLens;
+    vx_uint8_ptr weightPtr = WB_WEIGHT_DATA(wb);
+    vx_uint32_ptr biasPtr = WB_BIAS_DATA(wb);
+    vx_uint8_ptr minZeroRunLensBase = VX_NULL, minZeroRunLens = VX_NULL;
+
+    vxmASSERT(weightPtr != VX_NULL);
 
     weightSize = (vx_uint32)vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb));
     oneFilterSize = WB_KERNEL_X(wb) * WB_KERNEL_Y(wb) * WB_KERNEL_Z(wb) * weightSize;
-
-    vxoTensor_GetTensorViewMemory(WB_WEIGHT_TENSOR(wb), (gctPOINTER*)&weightPtr, VX_NULL);
-
-    if (WB_BIAS_TENSOR(wb) != VX_NULL)
-        vxoTensor_GetTensorViewMemory(WB_BIAS_TENSOR(wb), (gctPOINTER*)&biasPtr, VX_NULL);
 
     if (target == VXNNE_OPERATION_TARGET_TP)
     {
@@ -253,7 +339,8 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
 
         WB_COMPRESS_TARGET(wb) = VXNNE_OPERATION_TARGET_TP;
 
-        minZeroRunLensBase = (vx_uint8 *)vxAllocate(WB_KERNEL_Z(wb) * zNum);
+        if (to_allocate)
+            minZeroRunLensBase = (vx_uint8 *)vxAllocate(WB_KERNEL_Z(wb) * zNum);
     }
     else
     {
@@ -294,10 +381,11 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
 
         WB_COMPRESS_TARGET(wb) = VXNNE_OPERATION_TARGET_NN;
 
-        minZeroRunLensBase = (vx_uint8 *)vxAllocate(kzNum * zNum);
+        if (to_allocate)
+            minZeroRunLensBase = (vx_uint8 *)vxAllocate(kzNum * zNum);
     }
 
-    if (minZeroRunLensBase == VX_NULL)
+    if (to_allocate && minZeroRunLensBase == VX_NULL)
     {
         status = VX_ERROR_NO_MEMORY;
         goto error;
@@ -307,15 +395,34 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
         minZeroRunLens = minZeroRunLensBase;
     }
 
+    if (WB_SLICE_ARRAY(wb) != VX_NULL && WB_TOTAL_SLICE_NUM(wb) != kzNum * zNum)
+    {
+        for (i = 0; i < WB_TOTAL_SLICE_NUM(wb); i++)
+        {
+            if (WB_HUFFMAN_CONFIG_INDEX(wb, i) != VX_NULL)
+            {
+                vxFree(WB_HUFFMAN_CONFIG_INDEX(wb, i));
+                WB_HUFFMAN_CONFIG_INDEX(wb, i) = VX_NULL;
+            }
+        }
+
+        vxFree(WB_SLICE_ARRAY(wb));
+        WB_SLICE_ARRAY(wb) = VX_NULL;
+    }
+
     /* Create slice for each split wb */
     WB_KERNEL_Z_SLICE_NUM(wb) = kzNum;
     WB_OUTPUT_Z_SLICE_NUM(wb) = zNum;
     WB_TOTAL_SLICE_NUM(wb) = kzNum * zNum;
-    WB_SLICE_ARRAY(wb) = (vx_weight_bias_slice_item)vxAllocateAndZeroMemory(sizeof(vx_weight_bias_slice_item_s) * WB_TOTAL_SLICE_NUM(wb));
+
     if (WB_SLICE_ARRAY(wb) == VX_NULL)
     {
-        status = VX_ERROR_NO_MEMORY;
-        goto error;
+        WB_SLICE_ARRAY(wb) = (vx_weight_bias_slice_item)vxAllocateAndZeroMemory(sizeof(vx_weight_bias_slice_item_s) * WB_TOTAL_SLICE_NUM(wb));
+        if (WB_SLICE_ARRAY(wb) == VX_NULL)
+        {
+            status = VX_ERROR_NO_MEMORY;
+            goto error;
+        }
     }
 
     for (i = 0; i < WB_OUTPUT_Z_SLICE_NUM(wb); i++)
@@ -331,11 +438,14 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
             if ((vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_COMPRESSION_ENHANCEMENT) && WB_IS_TP_COMPRESS(wb)) ||
                 (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_COEF_COMPRESSION_ENHANCEMENT) && !WB_IS_TP_COMPRESS(wb)))
             {
-                WB_HUFFMAN_CONFIG_INDEX(wb, index) = (vx_weight_bias_huffman_cfg)vxAllocateAndZeroMemory(sizeof(vx_weight_bias_huffman_cfg_s) * WB_TOTAL_SLICE_NUM(wb));
                 if (WB_HUFFMAN_CONFIG_INDEX(wb, index) == VX_NULL)
                 {
-                    status = VX_ERROR_NO_MEMORY;
-                    goto error;
+                    WB_HUFFMAN_CONFIG_INDEX(wb, index) = (vx_weight_bias_huffman_cfg)vxAllocateAndZeroMemory(sizeof(vx_weight_bias_huffman_cfg_s));
+                    if (WB_HUFFMAN_CONFIG_INDEX(wb, index) == VX_NULL)
+                    {
+                        status = VX_ERROR_NO_MEMORY;
+                        goto error;
+                    }
                 }
             }
 
@@ -358,10 +468,11 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
                     &totalCount,
                     &nonZeroCount,
                     &origKernelBufferSize,
-                    &min_kernel_buffer_sizes[index],
+                    &minKernelBufferSizes[index],
                     minZeroRunLens);
 
-                minZeroRunLens += sliceCount;
+                if (minZeroRunLens != VX_NULL)
+                    minZeroRunLens += sliceCount;
             }
             else
             {
@@ -387,15 +498,18 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
                     &totalCount,
                     &nonZeroCount,
                     &origKernelBufferSize,
-                    &min_kernel_buffer_sizes[index],
-                    &minZeroRunLens[index],
-                    &max_zero_run_lens[index]);
+                    &minKernelBufferSizes[index],
+                    minZeroRunLens != VX_NULL ? &minZeroRunLens[index] : VX_NULL,
+                    max_zero_run_lens != VX_NULL ? &max_zero_run_lens[index] : VX_NULL);
             }
 
             allTotalCount += totalCount;
             nonZeroTotalCount += nonZeroCount;
             origTotalKernelBufferSize += origKernelBufferSize;
-            minTotalKernelBufferSize += min_kernel_buffer_sizes[index];
+            minTotalKernelBufferSize += minKernelBufferSizes[index];
+
+            if (min_kernel_buffer_sizes != VX_NULL)
+                min_kernel_buffer_sizes[index] = minKernelBufferSizes[index];
 
             kzOffset += sliceCount * weightSize;
             index++;
@@ -421,8 +535,10 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
 
     WB_COMPRESS_RATIO(wb) = (vx_float64)minTotalKernelBufferSize / origTotalKernelBufferSize;
 
-    *min_kernel_total_buffer_size = minTotalKernelBufferSize;
-    *min_zero_run_lens_ptr = minZeroRunLensBase;
+    if (min_kernel_total_buffer_size != VX_NULL)
+        *min_kernel_total_buffer_size = minTotalKernelBufferSize;
+    if (min_zero_run_lens_ptr != VX_NULL)
+        *min_zero_run_lens_ptr = minZeroRunLensBase;
 
     return VX_SUCCESS;
 
@@ -458,20 +574,14 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
     vx_status status = VX_SUCCESS;
     vx_size weightDataBytesOffset = 0, biasDataDWordOffset = 0, compressDataBytesOffset = 0;
     vx_uint32 i, j, index = 0, kzOffset = 0, oneFilterSize, weightSize;
-    vx_uint8_ptr weightPtr = VX_NULL, alphaPtr = VX_NULL;
-    vx_uint32_ptr biasPtr = VX_NULL;
+    vx_uint8_ptr weightPtr = WB_WEIGHT_DATA(wb), alphaPtr = WB_ALPHA_DATA(wb);
+    vx_uint32_ptr biasPtr = WB_BIAS_DATA(wb);
     vx_uint8_ptr zrlTmpPtr = min_zero_run_lens;
+
+    vxmASSERT(weightPtr != VX_NULL);
 
     weightSize = (vx_uint32)vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb));
     oneFilterSize = WB_KERNEL_X(wb) * WB_KERNEL_Y(wb) * WB_KERNEL_Z(wb) * weightSize;
-
-    vxoTensor_GetTensorViewMemory(WB_WEIGHT_TENSOR(wb), (gctPOINTER*)&weightPtr, VX_NULL);
-
-    if (WB_BIAS_TENSOR(wb) != VX_NULL)
-        vxoTensor_GetTensorViewMemory(WB_BIAS_TENSOR(wb), (gctPOINTER*)&biasPtr, VX_NULL);
-
-    if (WB_ALPHA_TENSOR(wb) != VX_NULL)
-        vxoTensor_GetTensorViewMemory(WB_ALPHA_TENSOR(wb), (gctPOINTER*)&alphaPtr, VX_NULL);
 
     vxAcquireMutex(WB_MEMORY_LOCK(wb));
 
@@ -822,22 +932,67 @@ VX_PRIVATE_API vx_status vxoWeightBias_Deinitializer(
         WB_SLICE_ARRAY(wb) = VX_NULL;
     }
 
+    if (WB_WEIGHT_DATA(wb) != VX_NULL)
+    {
+        vxFree(WB_WEIGHT_DATA(wb));
+        WB_WEIGHT_DATA(wb) = VX_NULL;
+    }
     if (WB_WEIGHT_TENSOR(wb) != VX_NULL)
     {
         vxoReference_Release((vx_reference_ptr)&WB_WEIGHT_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
     }
 
+    if (WB_BIAS_DATA(wb) != VX_NULL)
+    {
+        vxFree(WB_BIAS_DATA(wb));
+        WB_BIAS_DATA(wb) = VX_NULL;
+    }
     if (WB_BIAS_TENSOR(wb) != VX_NULL)
     {
         vxoReference_Release((vx_reference_ptr)&WB_BIAS_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
     }
 
+    if (WB_ALPHA_DATA(wb) != VX_NULL)
+    {
+        WB_ALPHA_DATA(wb) = VX_NULL;
+    }
     if (WB_ALPHA_TENSOR(wb) != VX_NULL)
     {
         vxoReference_Release((vx_reference_ptr)&WB_ALPHA_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
     }
 
     return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status vxoWeightBias_CalculateCompressRatio(
+    vx_weights_biases_parameter    wb,
+    vx_enum                        target,
+    vx_uint32                      kernel_per_core,
+    vx_uint32                      z_offset
+    )
+{
+    vx_status status;
+    vx_context context;
+    vx_uint32 kernelPerCore = kernel_per_core;
+    vx_size minTotalKernelBufferSize = 0;
+
+    if (wb == VX_NULL || z_offset == 0) return VX_ERROR_INVALID_PARAMETERS;
+    if (kernel_per_core == 0 && target != VXNNE_OPERATION_TARGET_TP) return VX_ERROR_INVALID_PARAMETERS;
+    if (!vxoReference_IsValidAndSpecific(&wb->base, VX_TYPE_WEIGHTS_BIASES_PARAMETER)) return VX_ERROR_INVALID_TYPE;
+    if (WB_WEIGHT_TENSOR(wb) == VX_NULL) return VX_ERROR_INVALID_VALUE;
+
+    context = wb->base.context;
+
+    status = _vxoWeightBias_CalculateSize(context, wb, target, &kernelPerCore, z_offset, vx_false_e, &minTotalKernelBufferSize, VX_NULL, VX_NULL, VX_NULL);
+    if (status != VX_SUCCESS)
+    {
+        goto exit;
+    }
+
+    WB_MEMORY_SIZE(wb) = minTotalKernelBufferSize;
+
+exit:
+    return status;
 }
 
 VX_PRIVATE_API vx_status vxoWeightBias_Compress(
@@ -861,18 +1016,18 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
 
     context = wb->base.context;
 
+    kernelPerCore = kernel_per_core;
+
+    status = _vxoWeightBias_CalculateSize(context, wb, target, &kernelPerCore, z_offset, vx_true_e, &minTotalKernelBufferSize, minKernelBufferSizes, &minZeroRunLens, maxZeroRunLens);
+    if (status != VX_SUCCESS)
+    {
+        goto exit;
+    }
+
     if (WB_MEMORY_NODE(wb) != VX_NULL)
     {
         vxoMemory_Free(context, &WB_MEMORY(wb));
         WB_MEMORY_NODE(wb) = VX_NULL;
-    }
-
-    kernelPerCore = kernel_per_core;
-
-    status = _vxoWeightBias_CalculateSize(context, wb, target, &kernelPerCore, z_offset, &minTotalKernelBufferSize, minKernelBufferSizes, &minZeroRunLens, maxZeroRunLens);
-    if (status != VX_SUCCESS)
-    {
-        goto exit;
     }
 
     status = _vxoWeightBias_AllocateMemory(context, &WB_MEMORY(wb), &minTotalKernelBufferSize);
@@ -967,6 +1122,11 @@ VX_PRIVATE_API vx_status vxoWeightBias_Set_Weight_Bias_Tensor(
         vxoReference_Increment((vx_reference)WB_BIAS_TENSOR(wb), VX_REF_INTERNAL);
     }
 
+    _vxoWeightBias_PrepareWBAData(wb,
+                                  weight != VX_NULL ? vx_true_e : vx_false_e,
+                                  bias != VX_NULL ? vx_true_e : vx_false_e,
+                                  vx_false_e);
+
     return VX_SUCCESS;
 }
 
@@ -999,6 +1159,8 @@ VX_PRIVATE_API vx_status vxoWeightBias_Set_Alpha_Tensor(
 
     WB_ALPHA_TENSOR(wb) = alpha;
     vxoReference_Increment((vx_reference)WB_ALPHA_TENSOR(wb), VX_REF_INTERNAL);
+
+    _vxoWeightBias_PrepareWBAData(wb, vx_false_e, vx_false_e, vx_true_e);
 
     return VX_SUCCESS;
 }
@@ -1039,6 +1201,7 @@ VX_PRIVATE_API vx_weights_biases_parameter vxoWeightBias_Create(
 
     wb->initialize             = vxoWeightBias_Initializer;
     wb->deinitialize           = vxoWeightBias_Deinitializer;
+    wb->calc_compress_ratio    = vxoWeightBias_CalculateCompressRatio;
     wb->compress               = vxoWeightBias_Compress;
     wb->set_weight_bias_tensor = vxoWeightBias_Set_Weight_Bias_Tensor;
     wb->set_alpha_tensor       = vxoWeightBias_Set_Alpha_Tensor;
@@ -1540,6 +1703,11 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
         vxoReference_Increment((vx_reference)WB_ALPHA_TENSOR(weight_bias), VX_REF_INTERNAL);
     }
 
+    _vxoWeightBias_PrepareWBAData(weight_bias,
+                                  vx_true_e,
+                                  biases != VX_NULL ? vx_true_e : vx_false_e,
+                                  doPRelu && alpha != VX_NULL ? vx_true_e : vx_false_e);
+
     if (optimizations != VX_NULL)
     {
         weight_bias->set_optimization(weight_bias, optimizations, sizeof(vx_weights_biases_parameter_optimizations_t));
@@ -1787,6 +1955,11 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesFromWeightBias
         vxoReference_Increment((vx_reference)WB_ALPHA_TENSOR(wb), VX_REF_INTERNAL);
     }
 
+    _vxoWeightBias_PrepareWBAData(wb,
+                                  WB_WEIGHT_TENSOR(old_wb) != VX_NULL ? vx_true_e : vx_false_e,
+                                  WB_BIAS_TENSOR(old_wb) != VX_NULL ? vx_true_e : vx_false_e,
+                                  WB_ALPHA_TENSOR(old_wb) != VX_NULL ? vx_true_e : vx_false_e);
+
     if (weight_dims != VX_NULL &&
         weight_num_of_dims > 0 &&
         weight_num_of_dims < VX_CONTEXT_TENSOR_MAX_DIMENSION)
@@ -1804,7 +1977,7 @@ VX_INTERNAL_API vx_status vxoReleaseWeightsBiases(
     return vxoWeightBias_Release(wb_ptr);
 }
 
-VX_INTERNAL_API vx_status vxoCompressNNFirstTime(
+VX_INTERNAL_API vx_status vxoCalculateNNCompressionFirstTime(
     vx_context                   context,
     vx_weights_biases_parameter  wb,
     vx_tensor                    output
@@ -1820,11 +1993,11 @@ VX_INTERNAL_API vx_status vxoCompressNNFirstTime(
         vx_uint32 filterPerCore = (WB_OUTPUT_Z(wb) % nnCoreCount == 0) ?
         WB_OUTPUT_Z(wb) / nnCoreCount : WB_OUTPUT_Z(wb) / nnCoreCount + 1;
 
-        wb->compress(wb, VXNNE_OPERATION_TARGET_NN, filterPerCore, TENSOR_STRIDE_INDEX(output, 2));
+        wb->calc_compress_ratio(wb, VXNNE_OPERATION_TARGET_NN, filterPerCore, TENSOR_STRIDE_INDEX(output, 2));
     }
     else
     {
-        wb->compress(wb, VXNNE_OPERATION_TARGET_NN, WB_OUTPUT_Z(wb), TENSOR_STRIDE_INDEX(output, 2));
+        wb->calc_compress_ratio(wb, VXNNE_OPERATION_TARGET_NN, WB_OUTPUT_Z(wb), TENSOR_STRIDE_INDEX(output, 2));
     }
 
     return VX_SUCCESS;
