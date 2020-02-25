@@ -7423,6 +7423,7 @@ VkResult halti5_patch_pipeline(
                      VSC_SHADER_RESOURCE_LAYOUT vscShaderResLayout;
                      VkBool32 compileFlag = VK_FALSE;
                      uint32_t linkIdx = 0;
+                     uint32_t defaultEntriesCnt = 16;
 
                      __VK_ONERROR((VK_SUCCESS == halti5_CopyVkShader(&shaderInfo[stageIdx], chipPipeline->vkShaderDecoded[stageIdx]))
                                                  ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
@@ -7445,7 +7446,7 @@ VkResult halti5_patch_pipeline(
                     vscCompileParams.pShLibLinkTable = (VSC_SHADER_LIB_LINK_TABLE *)__VK_ALLOC(sizeof(VSC_SHADER_LIB_LINK_TABLE), 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                     shaderLinkTable = vscCompileParams.pShLibLinkTable;
                     __VK_ONERROR(shaderLinkTable ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-                    shaderLinkTable->pShLibLinkEntries = (VSC_SHADER_LIB_LINK_ENTRY *)__VK_ALLOC(sizeof(VSC_SHADER_LIB_LINK_ENTRY) * 8, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                    shaderLinkTable->pShLibLinkEntries = (VSC_SHADER_LIB_LINK_ENTRY *)__VK_ALLOC(sizeof(VSC_SHADER_LIB_LINK_ENTRY) * defaultEntriesCnt, 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                     __VK_ONERROR(shaderLinkTable->pShLibLinkEntries ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
 
                     __VK_MEMZERO(shaderLinkTable->pShLibLinkEntries, sizeof(VSC_SHADER_LIB_LINK_ENTRY) * 4);
@@ -7494,7 +7495,7 @@ VkResult halti5_patch_pipeline(
 
                                                 if (patchInfo->patchStages & (1 << stageIdx))
                                                 {
-                                                    __VK_ASSERT(linkIdx < 4);
+                                                    __VK_ASSERT(linkIdx < defaultEntriesCnt);
 
                                                     shaderLinkTable->shLinkEntryCount = linkIdx + 1;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].applyLevel = VSC_SHLEVEL_Pre_High;
@@ -7540,7 +7541,7 @@ VkResult halti5_patch_pipeline(
 
                                                 if (patchInfo->patchStages & (1 << stageIdx))
                                                 {
-                                                    __VK_ASSERT(linkIdx < 4);
+                                                    __VK_ASSERT(linkIdx < defaultEntriesCnt);
 
                                                     shaderLinkTable->shLinkEntryCount = linkIdx + 1;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].applyLevel = VSC_SHLEVEL_Pre_High;
@@ -7575,7 +7576,7 @@ VkResult halti5_patch_pipeline(
 
                                                 if (patchInfo->patchStages & (1 << stageIdx))
                                                 {
-                                                    __VK_ASSERT(linkIdx < 4);
+                                                    __VK_ASSERT(linkIdx < defaultEntriesCnt);
 
                                                     shaderLinkTable->shLinkEntryCount = linkIdx + 1;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].applyLevel = VSC_SHLEVEL_Pre_High;
@@ -7610,7 +7611,7 @@ VkResult halti5_patch_pipeline(
 
                                                 if (patchInfo->patchStages & (1 << stageIdx))
                                                 {
-                                                    __VK_ASSERT(linkIdx < 4);
+                                                    __VK_ASSERT(linkIdx < defaultEntriesCnt);
 
                                                     shaderLinkTable->shLinkEntryCount = linkIdx + 1;
                                                     shaderLinkTable->pShLibLinkEntries[linkIdx].applyLevel = VSC_SHLEVEL_Pre_High;
