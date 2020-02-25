@@ -7143,7 +7143,7 @@ _ParseUpdateHaltiQualifiers(
                 if (sloCOMPILER_IsOGLVersion(Compiler))
                 {
                     if (sloCOMPILER_IsOGL40Version(Compiler) ||
-                        sloCOMPILER_IsOGL33Version(Compiler) ||
+                        sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) ||
                         sloCOMPILER_IsOGL32Version(Compiler))
                     {
                         if (shaderType == slvSHADER_TYPE_FRAGMENT &&
@@ -7803,7 +7803,7 @@ _ParseArrayVariableDecl(
 
         if(shaderType == slvSHADER_TYPE_VERTEX &&
            !sloCOMPILER_IsOGL40Version(Compiler) &&
-           !sloCOMPILER_IsOGL33Version(Compiler) &&
+           !sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) &&
            !sloCOMPILER_IsOGL32Version(Compiler))
         {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
@@ -8018,7 +8018,7 @@ _ParseArrayVariableDeclWithInitializer(
 
         if(shaderType == slvSHADER_TYPE_VERTEX &&
            !sloCOMPILER_IsOGL40Version(Compiler) &&
-           !sloCOMPILER_IsOGL33Version(Compiler) &&
+           !sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) &&
            !sloCOMPILER_IsOGL32Version(Compiler))
         {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
@@ -8327,7 +8327,7 @@ _CheckErrorForArray(
 
            if(shaderType == slvSHADER_TYPE_VERTEX &&
               !sloCOMPILER_IsOGL40Version(Compiler) &&
-              !sloCOMPILER_IsOGL33Version(Compiler) &&
+              !sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) &&
               !sloCOMPILER_IsOGL32Version(Compiler))
            {
               gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
@@ -13241,6 +13241,10 @@ slMergeTypeQualifiers(
                 {
                     Qualifiers->u.qualifiers.layout.maxGSVerticesNumber = ComingQualifier->u.qualifiers.layout.maxGSVerticesNumber;
                 }
+                if (ComingQualifier->u.qualifiers.layout.ext_id & slvLAYOUT_EXT_GS_STREAM)
+                {
+                    Qualifiers->u.qualifiers.layout.currentStreamNumber = ComingQualifier->u.qualifiers.layout.currentStreamNumber;
+                }
                 Qualifiers->u.qualifiers.layout.ext_id |= ComingQualifier->u.qualifiers.layout.ext_id;
             }
             slsQUALIFIERS_SET_FLAG(&Qualifiers->u.qualifiers, slvQUALIFIERS_FLAG_LAYOUT);
@@ -13763,6 +13767,9 @@ _ParseSearchLayoutId(
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(LayoutId->u.identifier, "max_vertices"))) {
         layoutId2 = slvLAYOUT_EXT_MAX_VERTICES;
     }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(LayoutId->u.identifier, "stream"))) {
+        layoutId2 = slvLAYOUT_EXT_GS_STREAM;
+    }
     if (LayoutId1)
     {
         *LayoutId1 = layoutId1;
@@ -13874,6 +13881,29 @@ slParseLayoutId(
            else if (layoutIdExt & slvLAYOUT_EXT_MAX_VERTICES)
            {
                layoutQualifier.u.qualifiers.layout.maxGSVerticesNumber = Value->u.constant.intValue;
+           }
+           else if (layoutIdExt & slvLAYOUT_EXT_GS_STREAM)
+           {
+               if (Value->u.constant.intValue <= 0)
+               {
+                   gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                   LayoutId->lineNo,
+                                                   LayoutId->stringNo,
+                                                   slvREPORT_ERROR,
+                                                   "invalid stream number %d",
+                                                   Value->u.constant.intValue));
+                   break;
+               }
+               else if (!sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvTRUE))
+               {
+                   gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                   LayoutId->lineNo,
+                                                   LayoutId->stringNo,
+                                                   slvREPORT_ERROR,
+                                                   "Can't support layout \"stream\""));
+                   break;
+               }
+               layoutQualifier.u.qualifiers.layout.currentStreamNumber = Value->u.constant.intValue;
            }
        }
 
@@ -14164,6 +14194,8 @@ slParseAddLayoutId(
                LayoutIdList->u.qualifiers.layout.maxGSVerticesNumber = LayoutId->u.qualifiers.layout.maxGSVerticesNumber;
            if (LayoutId->u.qualifiers.layout.ext_id & slvLAYOUT_EXT_INVOCATIONS)
                LayoutIdList->u.qualifiers.layout.gsInvocationTime = LayoutId->u.qualifiers.layout.gsInvocationTime;
+           if (LayoutId->u.qualifiers.layout.ext_id & slvLAYOUT_EXT_GS_STREAM)
+               LayoutIdList->u.qualifiers.layout.currentStreamNumber = LayoutId->u.qualifiers.layout.currentStreamNumber;
            LayoutIdList->u.qualifiers.layout.ext_id |= LayoutId->u.qualifiers.layout.ext_id;
        }
     } while (gcvFALSE);

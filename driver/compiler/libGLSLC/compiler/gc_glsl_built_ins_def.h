@@ -1668,6 +1668,26 @@ _GenEndPrimitiveCode(
     IN slsIOPERAND * IOperand
     );
 
+gceSTATUS
+_GenEmitStreamVertexCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
+gceSTATUS
+_GenEndStreamPrimitiveCode(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator,
+    IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN slsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN slsIOPERAND * IOperand
+    );
+
 /*******************************function flag def*******************************/
 #define ATOMIC              slvFUNC_ATOMIC
 #define MEM_ACCESS          slvFUNC_HAS_MEM_ACCESS
@@ -1830,6 +1850,8 @@ static slsBUILT_IN_FUNCTION GSBuiltInFunctions[] =
 {
     {slvEXTENSION1_EXT_GEOMETRY_SHADER,     "EmitVertex", gcvNULL, _GenEmitVertexCode,            T_VOID,     0, {0}, {0}},
     {slvEXTENSION1_EXT_GEOMETRY_SHADER,     "EndPrimitive", gcvNULL, _GenEndPrimitiveCode,          T_VOID,     0, {0}, {0}},
+    {slvEXTENSION1_EXT_GEOMETRY_SHADER | slvEXTENSION1_SUPPORT_OGL,     "EmitStreamVertex", gcvNULL, _GenEmitStreamVertexCode,            T_VOID,     1, {T_INT}, {0}},
+    {slvEXTENSION1_EXT_GEOMETRY_SHADER | slvEXTENSION1_SUPPORT_OGL,     "EndStreamPrimitive", gcvNULL, _GenEndStreamPrimitiveCode,          T_VOID,     1, {T_INT}, {0}},
 };
 
 static gctUINT GSBuiltInFunctionCount =

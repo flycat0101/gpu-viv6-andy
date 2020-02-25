@@ -250,6 +250,8 @@ gcOpt_RemoveDeadCode(
 
         case gcSL_EMIT_VERTEX:
         case gcSL_END_PRIMITIVE:
+        case gcSL_EMIT_STREAM_VERTEX:
+        case gcSL_END_STREAM_PRIMITIVE:
             /* Skip GS control instructions. */
             break;
 

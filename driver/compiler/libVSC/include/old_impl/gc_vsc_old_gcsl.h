@@ -379,7 +379,9 @@ typedef enum _gcSL_OPCODE
     gcSL_CSUBCJ, /* 0x99 Complex number conjugate sub. */
     gcSL_CADD, /* 0x9A Complex number add. */
     gcSL_GET_IMAGE_TYPE, /* 0x9B get the image type: 0-1d, 1-1dbuffer, 2-1darray, 3-2d, 4-2darray, 5-3d */
-    gcSL_CLAMPCOORD, /* clamp image 2d cooridate to its width and height */
+    gcSL_CLAMPCOORD, /* 0x9C clamp image 2d cooridate to its width and height */
+    gcSL_EMIT_STREAM_VERTEX, /* 0x9D For function "EmitStreamVertex" */
+    gcSL_END_STREAM_PRIMITIVE, /* 0x9E For function "EndStreamPrimitive" */
     gcSL_MAXOPCODE
 }
 gcSL_OPCODE;
@@ -430,7 +432,9 @@ gcSL_OPCODE;
                                                  (Opcode) == gcSL_TEXU_LOD            ||  \
                                                  (Opcode) == gcSL_MEM_BARRIER         ||  \
                                                  (Opcode) == gcSL_EMIT_VERTEX         ||  \
-                                                 (Opcode) == gcSL_END_PRIMITIVE)
+                                                 (Opcode) == gcSL_END_PRIMITIVE       ||  \
+                                                 (Opcode) == gcSL_EMIT_STREAM_VERTEX  ||  \
+                                                 (Opcode) == gcSL_END_STREAM_PRIMITIVE)
 
 #define gcSL_isOpcodeUseTargetAsSource(Opcode)  ((Opcode) == gcSL_STORE               ||  \
                                                  (Opcode) == gcSL_IMAGE_WR            ||  \

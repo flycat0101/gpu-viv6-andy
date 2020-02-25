@@ -21666,7 +21666,9 @@ const gcsSL_PATTERN_PTR  patterns[] =
     patterns_CSUBCJ, /* 0x99 Complex number conjugate sub. */
     patterns_CADD, /* 0x9A Complex number add. */
     gcvNULL, /* 0x9B gcSL_GET_IMAGE_TYPE */
-    gcvNULL, /* gcSL_CLAMPCOORD */
+    gcvNULL, /* 0x9C gcSL_CLAMPCOORD */
+    gcvNULL, /* 0x9D For function "EmitStreamVertex" */
+    gcvNULL, /* 0x9E For function "EndStreamPrimitive" */
 };
 
 #ifdef WIN32

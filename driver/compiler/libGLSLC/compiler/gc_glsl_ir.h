@@ -304,6 +304,7 @@ typedef enum _sleLAYOUT_ID_EXT
                                                      slvLAYOUT_EXT_GS_POINTS,
     slvLAYOUT_EXT_MAX_VERTICES                     = 0x20000,
     slvLAYOUT_EXT_INVOCATIONS                      = 0x40000,
+    slvLAYOUT_EXT_GS_STREAM                        = 0x80000,
 } sleLAYOUT_ID_EXT;
 
 typedef enum _sleIMAGE_FORMAT
@@ -403,6 +404,7 @@ typedef struct _slsLAYOUT_QUALIFIER
     slvTES_POINT_MODE               tesPointMode;
     slvGS_PRIMITIVE                 gsPrimitive;
     gctINT                          gsInvocationTime;
+    gctINT                          currentStreamNumber; /* This is for GS only. */
     gctINT                          maxGSVerticesNumber; /* This is for GS. */
     gctINT                          maxVerticesNumber; /* This is queried from HW. */
     gctINT                          verticesNumber; /* This is setted by layout. */
@@ -420,6 +422,8 @@ typedef struct _slsLAYOUT_QUALIFIER
         (Layout)->tesPointMode          = slvTES_POINT_MODE_NONE; \
         (Layout)->gsPrimitive           = slvGS_PRIMITIVE_NONE; \
         (Layout)->gsInvocationTime      = -1; \
+        /* The initial default stream number is zero. */ \
+        (Layout)->currentStreamNumber   = 0; \
         (Layout)->maxGSVerticesNumber   = -1; \
         (Layout)->verticesNumber        = -1; \
     } \

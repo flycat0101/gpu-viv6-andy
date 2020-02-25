@@ -870,6 +870,8 @@ slGetOpcodeName(
     case slvOPCODE_CLAMPCOORD:          return "clampcoord";
     case slvOPCODE_EMIT_VERTEX:         return "emitVertex";
     case slvOPCODE_END_PRIMITIVE:       return "endPrimitive";
+    case slvOPCODE_EMIT_STREAM_VERTEX:  return "emitStreamVertex";
+    case slvOPCODE_END_STREAM_PRIMITIVE:return "endStreamPrimitive";
 
     case slvOPCODE_LOAD_L:              return "load_l";
     case slvOPCODE_STORE_L:             return "store_l";
@@ -12994,6 +12996,8 @@ slGenGenericNullTargetCode(
     case slvOPCODE_MEMORY_BARRIER:
     case slvOPCODE_EMIT_VERTEX:
     case slvOPCODE_END_PRIMITIVE:
+    case slvOPCODE_EMIT_STREAM_VERTEX:
+    case slvOPCODE_END_STREAM_PRIMITIVE:
         break;
 
     default:
