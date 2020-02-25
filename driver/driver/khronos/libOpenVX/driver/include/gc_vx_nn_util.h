@@ -402,23 +402,7 @@ void vxnneGetKernelPatternBits(
     vx_uint32 oneNum,
     vx_uint32 zeroNum,
     vx_uint64 *kernelPatternBitPtr);
-
-void calculateArchPerfFromWB(
-    vx_context context,
-    vx_arch_perf perf,
-    vx_weights_biases_parameter wb,
-    vx_uint32 orig_input_dims[],
-    vx_uint32 output_dims[],
-    vx_enum output_format,
-    vx_int32* offsets,
-    vx_int32 flush,
-    vx_uint8 src_buf,
-    vx_uint8 dst_buf,
-    vx_uint8 kernel_buf,
-    vx_int32 cached_space,
-    vxnne_operation_target_e op_target,
-    vxnne_operator_e op_type);
-
+/* this function has been declared in libarchmodel, remove here */
 vx_uint8 MemPoolTypeToPerfType(
     vx_enum memPoolType);
 

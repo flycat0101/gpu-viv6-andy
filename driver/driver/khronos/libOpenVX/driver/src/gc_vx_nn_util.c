@@ -5756,9 +5756,32 @@ vx_bool estimateNNTransposeSize(vx_context context, vx_graph graph)
             vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
             vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
             vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
+#ifdef ORI_NNARCHPERF
+            vx_arch_perf_s archPerfHandle;
+#else
             arch_perf_s archPerfHandle;
-
+#endif
             INITIALIZE_STRUCT(archPerfHandle);
+#ifdef ORI_NNARCHPERF
+            calculateArchPerfFromWB(context,
+                                &archPerfHandle,
+                                opInfo.weightsBiases,
+                                inputDims,
+                                outputDims,
+                                TENSOR_DATA_TYPE(output),
+                                opInfo.pad.left,
+                                opInfo.pad.right,
+                                opInfo.pad.top,
+                                opInfo.pad.bottom,
+                                opInfo.poolSizeX,
+                                opInfo.poolStrideX,
+                                VX_NULL,
+                                vx_true_e,
+                                SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
+                                context->vipSRAM.size,
+                                (vxnne_operation_target_e)opInfo.target,
+                                (vxnne_operator_e)opInfo.opType);
+#else
             archCalculateArchPerfFromWB(context,
                                 operation,
                                 &archPerfHandle,
@@ -5778,7 +5801,7 @@ vx_bool estimateNNTransposeSize(vx_context context, vx_graph graph)
                                 context->vipSRAM.size,
                                 (vxnne_operation_target_e)opInfo.target,
                                 (vxnne_operator_e)opInfo.opType);
-
+#endif
             outImageTileX   = archPerfHandle.resultInfo.outImageTileXSize;
             outImageTileY   = archPerfHandle.resultInfo.outImageTileYSize;
             interleaveMode  = archPerfHandle.resultInfo.interleaveMode;

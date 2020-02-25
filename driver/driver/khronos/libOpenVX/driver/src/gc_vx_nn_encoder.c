@@ -21,9 +21,12 @@
 #include <gc_vx_common.h>
 #include <gc_vx_nn_encoder.h>
 #include <gc_vx_nn_util.h>
+#ifdef ORI_NNARCHPERF
+#include "nnArchPerfOri.h"
+#else
 #include "archModelInterface.h"
 #include "nnArchPerf.h"
-
+#endif
 #define MAX_HISTO_COUNT 256
 #define MAX_SIZE_HISTO_COUNT 9
 
