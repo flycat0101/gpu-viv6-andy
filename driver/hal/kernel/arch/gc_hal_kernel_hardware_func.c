@@ -30089,8 +30089,9 @@ _InitializeUSC(
         flushCommands[idx++] = 0x08010e03;
         flushCommands[idx++] = 0x00000040;
     }
-
-    flushCommands[idx++] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    else if (hardware->identity.customerID == 0x21)
+    {
+        flushCommands[idx++] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -30100,7 +30101,7 @@ _InitializeUSC(
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -30110,7 +30111,7 @@ _InitializeUSC(
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  25:16) - (0 ?
  25:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -30120,9 +30121,9 @@ _InitializeUSC(
  25:16) - (0 ?
  25:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));
-    flushCommands[idx++] = 0x00000000;
+        flushCommands[idx++] = 0x00000000;
 
-    flushCommands[idx++] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        flushCommands[idx++] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -30132,7 +30133,7 @@ _InitializeUSC(
  31:27) - (0 ?
  31:27) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -30142,7 +30143,7 @@ _InitializeUSC(
  15:0) - (0 ?
  15:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  25:16) - (0 ?
  25:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -30152,7 +30153,8 @@ _InitializeUSC(
  25:16) - (0 ?
  25:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));
-    flushCommands[idx++] = 0x00000040;
+        flushCommands[idx++] = 0x00000040;
+    }
 
     flushCommands[idx++] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -30384,7 +30386,15 @@ _InitializeUSC(
  25:16) - (0 ?
  25:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));
-    flushCommands[idx++] = 0x000a0000;
+
+    if (hardware->identity.customerID == 0x21)
+    {
+        flushCommands[idx++] = 0x000a0000;
+    }
+    else
+    {
+        flushCommands[idx++] = 0x00000000;
+    }
 
     flushCommands[idx++] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
