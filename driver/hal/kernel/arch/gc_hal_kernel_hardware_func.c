@@ -27849,7 +27849,7 @@ _FuncValidate_PPU(IN gcsFUNCTION_EXECUTION_PTR Execution)
     gckHARDWARE hardware = (gckHARDWARE)Execution->hardware;
 
     Execution->valid = gcvFALSE;
-    if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_EVIS2_FLOP_RESET_FIX))
+    if (!gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_EVIS2_FLOP_RESET_FIX))
     {
         if (hardware->identity.customerID == 0x21 ||
             hardware->identity.customerID == 0x25 ||
@@ -31208,7 +31208,7 @@ _FuncValidate_USC(IN gcsFUNCTION_EXECUTION_PTR Execution)
     gckHARDWARE hardware = (gckHARDWARE)Execution->hardware;
 
     Execution->valid = gcvFALSE;
-    if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_USC_ASYNC_CP_RTN_FLOP_RESET_FIX))
+    if (!gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_USC_ASYNC_CP_RTN_FLOP_RESET_FIX))
     {
         if (hardware->identity.customerID == 0x21 ||
             hardware->identity.customerID == 0x25 ||
@@ -32276,7 +32276,7 @@ _FuncValidate_USC2(IN gcsFUNCTION_EXECUTION_PTR Execution)
     gckHARDWARE hardware = (gckHARDWARE)Execution->hardware;
 
     Execution->valid = gcvFALSE;
-    if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_USC_EVICT_CTRL_FIFO_FLOP_RESET_FIX))
+    if (!gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_USC_EVICT_CTRL_FIFO_FLOP_RESET_FIX))
     {
         if (hardware->identity.customerID == 0x21 ||
             hardware->identity.customerID == 0x25 ||
