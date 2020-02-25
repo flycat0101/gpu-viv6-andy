@@ -10520,7 +10520,7 @@ vxnne_shader_executable vxnneGetNormalizationUint8ShaderExecutable(
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_genSameMapUint8In", borderMode);
         if (!shaderExecutable) goto OnError;
 
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSqrSumUint8_16x1", 1, uniSqrSumUint8_16x1);
+        status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSqrSumUint8_16x1", 1, uniSqrSumUint8_16x1);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSqrSumUint8N_16x1", 1, uniSqrSumUint8N_16x1);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvertInt32toUint8_2x8", 1, uniConvertInt32toUint8_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvertUint8SubZpToFp32_4x4", 1, uniConvertUint8SubZpToFp32_4x4);
