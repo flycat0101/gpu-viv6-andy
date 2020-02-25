@@ -9586,7 +9586,7 @@ vxnne_shader_executable vxnneGetGPUTensorPad2ShaderExecutable(
         /* register an shader kernel */
 #if gcdUSE_VXC_BINARY
         vx_uint32 len;
-        void * ptr = getVXCKernelInfo(context, TensorPad, &len);
+        void * ptr = getGPUKernelInfo(context, TensorPad2, &len);
         program = vxCreateProgramWithBinary(context, ptr, len);
 #else
         char path[_vxcFILENAME_MAX];
