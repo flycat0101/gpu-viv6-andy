@@ -2160,14 +2160,17 @@ vx_status vxnneExecuteSWActivation(struct _vxnne_operation_s *operation)
     vx_tensor outputs = (vx_tensor)activationOperation->outputs;
 
     vx_enum   func_v = func->value->e;
-    vx_int32  a_v = a->value->n32;
-    vx_int32  b_v = b->value->n32;
 
     vx_uint32 elementCount = 0;
     vx_uint32 i;
     vx_float32 value = 0.0f, result = 0.0f;
     gctPOINTER inputBase;
     gctPOINTER outputBase;
+    vx_enum   a_type     = vxoScalar_GetDataType(a);
+    vx_enum   b_type     = vxoScalar_GetDataType(b);
+
+    vx_float32 a_v = a_type == VX_TYPE_FLOAT32 ? a->value->f32 : (vx_float32)a->value->n32;
+    vx_float32 b_v = b_type == VX_TYPE_FLOAT32 ? b->value->f32 : (vx_float32)b->value->n32;
 
 
     vx_status status = VX_SUCCESS;
@@ -9967,42 +9970,43 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
                                         || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16));
 
         enable_tensorABS_SHExe = (vx_bool)(support_dataType[3] && func_v == VX_NN_ACTIVATION_ABS);
-        enable_tensorTR_SHExe  = (vx_bool)(support_dataType[3] &&
-                                           (func_v == VX_NN_ACTIVATION_SQRT  ||
-                                            func_v == VX_NN_ACTIVATION_RSQRT ||
-                                            /*func_v == VX_NN_ACTIVATION_EXP ||*/
-                                            /*func_v == VX_NN_ACTIVATION_LOG ||*/
-                                            /*func_v == VX_NN_ACTIVATION_SIN ||*/
-                                            func_v == VX_NN_ACTIVATION_SOFTRELU ||
-                                            func_v == VX_NN_ACTIVATION_LOGISTIC ||
-                                            func_v == VX_NN_ACTIVATION_SQUARE ||
-                                            func_v == VX_NN_ACTIVATION_HYPERBOLIC_TAN));
 
-        enable_Leaky_SHExe = (vx_bool)((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
-                                     || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
-                                     || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
-                                     || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
-                                     || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
-                                     || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16)
-                                     || (inputFormat == VX_TYPE_FLOAT16 && outputFormat != VX_TYPE_FLOAT32));
+        enable_Leaky_SHExe = (vx_bool)(((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                                      || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
+                                      || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
+                                      || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
+                                      || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+                                      || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16)
+                                      || (inputFormat == VX_TYPE_FLOAT16 && outputFormat != VX_TYPE_FLOAT32))
+                                     && func_v == VX_NN_ACTIVATION_LEAKYRELU);
     }
     else
     {
         support_dataType[0] = (vx_bool)((inputFormat == VX_TYPE_FLOAT32 || inputFormat == VX_TYPE_FLOAT16) && (outputFormat == VX_TYPE_FLOAT32 || outputFormat == VX_TYPE_FLOAT16));
         support_dataType[1] = (vx_bool)((inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32) || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16));
         support_dataType[2] = (vx_bool)((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
-        enable_Leaky_SHExe  = (vx_bool)((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
-                                      || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
-                                      || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
-                                      || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
-                                      || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32));
 
+        support_dataType[3] = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32 || inputFormat == VX_TYPE_UINT8)
+                                  && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32 || outputFormat == VX_TYPE_UINT8));
+
+        enable_Leaky_SHExe  = (vx_bool)(support_dataType[3] && func_v == VX_NN_ACTIVATION_LEAKYRELU);
     }
 
+    enable_tensorTR_SHExe  = (vx_bool)(support_dataType[3] &&
+                                       (func_v == VX_NN_ACTIVATION_SQRT  ||
+                                        func_v == VX_NN_ACTIVATION_RSQRT ||
+                                        /*func_v == VX_NN_ACTIVATION_EXP ||*/
+                                        /*func_v == VX_NN_ACTIVATION_LOG ||*/
+                                        /*func_v == VX_NN_ACTIVATION_SIN ||*/
+                                        func_v == VX_NN_ACTIVATION_SOFTRELU ||
+                                        func_v == VX_NN_ACTIVATION_LOGISTIC ||
+                                        func_v == VX_NN_ACTIVATION_SQUARE ||
+                                        func_v == VX_NN_ACTIVATION_HYPERBOLIC_TAN));
+
     enable_tf_quantize = (vx_bool)((func_v == VX_NN_ACTIVATION_RELU && support_dataType[2]) ||
-                                    (func_v == VX_NN_ACTIVATION_RELU1 && support_dataType[2]) ||
-                                    (func_v == VX_NN_ACTIVATION_BRELU && support_dataType[2]) ||
-                                    (func_v == VX_NN_ACTIVATION_RELU6 && support_dataType[2]));
+                                   (func_v == VX_NN_ACTIVATION_RELU1 && support_dataType[2]) ||
+                                   (func_v == VX_NN_ACTIVATION_BRELU && support_dataType[2]) ||
+                                   (func_v == VX_NN_ACTIVATION_RELU6 && support_dataType[2]));
 
     shExe_flag = (vx_bool)((func_v == VX_NN_ACTIVATION_RELU && support_dataType[0]) ||
                            (func_v == VX_NN_ACTIVATION_RELU1 && support_dataType[1]) ||
@@ -10079,12 +10083,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
     {
         vxnne_shader_executable shaderExecutable = VX_NULL;
         vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
-        vx_uint32  reshpTensor_Dims           = 2;
+        vx_uint32  reshpTensor_Dims = 2;
         vx_tensor input      = NULL;
         vx_tensor output     = NULL;
+        vx_enum   a_type     = vxoScalar_GetDataType(a_s);
+        vx_enum   b_type     = vxoScalar_GetDataType(b_s);
 
-        vx_float32 minVal = (vx_float32)a_s->value->n32;
-        vx_float32 maxVal = (vx_float32)b_s->value->n32;
+        vx_float32 minVal = a_type == VX_TYPE_FLOAT32 ? a_s->value->f32 : (vx_float32)a_s->value->n32;
+        vx_float32 maxVal = b_type == VX_TYPE_FLOAT32 ? b_s->value->f32 : (vx_float32)b_s->value->n32;
 
         vxoElementOptimization_GetTensorShape(inputs, reshpTensor_Sizes, &reshpTensor_Dims);
 
@@ -10131,7 +10137,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
         }
         else
         {
-            shaderExecutable = vxnneGetGPUActivationShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION, &node->kernelAttributes.borderMode, func_v, input, minVal, maxVal, output);
+            if (enable_tensorTR_SHExe)
+                shaderExecutable = vxnneGetGPUTensorTRShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_TRANSCENDENTAL, &node->kernelAttributes.borderMode, input, minVal, maxVal, func_v, output);
+            else
+                shaderExecutable = vxnneGetGPUActivationShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION, &node->kernelAttributes.borderMode, func_v, input, minVal, maxVal, output);
         }
 
         if (!shaderExecutable)
