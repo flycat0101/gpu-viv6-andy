@@ -25917,6 +25917,41 @@ static gctUINT32 nnBuffer2[] = {
     0x00000000
 };
 
+static gctUINT32 nnBuffer3[] = {
+    0x8010010e,
+    0x07383fc2,
+    0xc1000000,
+    0x00a01000,
+    0x08e00008,
+    0x00000000,
+    0x00000000,
+    0x00000000,
+    0x00143000,
+    0x00000000,
+    0x00000000,
+    0x00000000,
+    0x00000000,
+    0x00000000,
+    0x00000800,
+    0x00000000,
+    0x00e700ff,
+    0x00000040,
+    0x00000000,
+    0x03ffffff,
+    0x00000000,
+    0x03ffffff,
+    0x00000000,
+    0x00000000,
+    0x00000000,
+    0x00000000,
+    0x00000000,
+    0x00000000,
+    0x00000000,
+    0x00000000,
+    0x00000000,
+    0x00000000
+};
+
 #define NN_BUFFER_IDX       0
 #define KERNEL_BUFFER_IDX   1
 #define INPUT_BUFFER_IDX    2
@@ -29961,7 +29996,7 @@ _InitializeUSC(
 {
     gctUINT32 i, idx = 0;
     gcePOOL pool = gcvPOOL_DEFAULT;
-    gctUINT32 flushCommands[64] = {0};
+    gctUINT32 flushCommands[128] = {0};
     gctUINT32_PTR nnCommands = gcvNULL;
     gctSIZE_T patchBufferSizes[4];
     gceSTATUS status = gcvSTATUS_OK;
@@ -29983,6 +30018,11 @@ _InitializeUSC(
     {
         patchBufferSizes[NN_BUFFER_IDX] = gcmSIZEOF(nnBuffer2);
         nnCommands = nnBuffer2;
+    }
+    else if (hardware->identity.customerID == 0xad)
+    {
+        patchBufferSizes[NN_BUFFER_IDX] = gcmSIZEOF(nnBuffer3);
+        nnCommands = nnBuffer3;
     }
     else
     {
@@ -30038,6 +30078,18 @@ _InitializeUSC(
     gckOS_MemCopy(Execution->data[NN_BUFFER_IDX].logical, nnCommands, patchBufferSizes[NN_BUFFER_IDX]);
 
     /* construct command */
+    if (hardware->identity.customerID == 0xad)
+    {
+        flushCommands[idx++] = 0x08010e4e;
+        flushCommands[idx++] = 0xf0800000;
+        flushCommands[idx++] = 0x08010e56;
+        flushCommands[idx++] = 0x00000000;
+        flushCommands[idx++] = 0x08010e57;
+        flushCommands[idx++] = 0x00000000;
+        flushCommands[idx++] = 0x08010e03;
+        flushCommands[idx++] = 0x00000040;
+    }
+
     flushCommands[idx++] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
  31:27) + 1) == 32) ?
@@ -30984,6 +31036,46 @@ _InitializeUSC(
  ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));
         flushCommands[idx++] = 0x0000008c;
     }
+    else if (hardware->identity.customerID == 0xad)
+    {
+        flushCommands[idx++] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ?
+ 31:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E4C) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ?
+ 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ?
+ 25:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));
+        flushCommands[idx++] = 0x00000008;
+        flushCommands[idx++] = 0x08010e4e;
+        flushCommands[idx++] = 0xf0800000;
+        flushCommands[idx++] = 0x08010e4f;
+        flushCommands[idx++] = 0x70000000;
+        flushCommands[idx++] = 0x08010e50;
+        flushCommands[idx++] = 0x70000000;
+    }
 
     flushCommands[idx++] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -31120,7 +31212,8 @@ _FuncValidate_USC(IN gcsFUNCTION_EXECUTION_PTR Execution)
     {
         if (hardware->identity.customerID == 0x21 ||
             hardware->identity.customerID == 0x25 ||
-            hardware->identity.customerID == 0x86
+            hardware->identity.customerID == 0x86 ||
+            hardware->identity.customerID == 0xad
             )
         {
             Execution->valid = gcvTRUE;
