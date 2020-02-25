@@ -32280,7 +32280,8 @@ _FuncValidate_USC2(IN gcsFUNCTION_EXECUTION_PTR Execution)
     {
         if (hardware->identity.customerID == 0x21 ||
             hardware->identity.customerID == 0x25 ||
-            hardware->identity.customerID == 0x86
+            hardware->identity.customerID == 0x86 ||
+            hardware->identity.customerID == 0xad
             )
         {
             Execution->valid = gcvTRUE;
