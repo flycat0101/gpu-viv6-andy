@@ -979,7 +979,6 @@ GLvoid GL_APIENTRY __glim_Clear(__GLcontext *gc, GLbitfield mask)
     }
 
 OnExit:
-
 OnError:
     __GL_FOOTER();
 }

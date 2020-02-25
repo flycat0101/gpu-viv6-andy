@@ -450,7 +450,7 @@ OnError:
 
 GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
 {
-//    __GL_HEADER();
+    __GL_HEADER();
 
     /* Fullfill ES Spec requirements */
     if (!gc->imports.conformGLSpec)
@@ -494,9 +494,8 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
         {
             GLenum modeOffset = 0;
             GLenum originalReadBuffer;
-                /*
-            ** gc binding to the window buffer */
 
+            /* gc binding to the window buffer */
             __GL_REDUNDANT_ATTR(gc->state.pixel.readBufferReturn, mode);
 
             __GL_VERTEX_BUFFER_FLUSH(gc);
@@ -518,7 +517,7 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
                   if (!gc->modes.stereoMode) {
                       __glSetError(gc, GL_INVALID_OPERATION);
                       gc->state.pixel.readBuffer = originalReadBuffer;
-                      return;
+                      __GL_EXIT();
                   }
                   break;
 
@@ -529,7 +528,7 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
                   if (!(gc->modes.stereoMode && gc->modes.doubleBufferMode)) {
                       __glSetError(gc, GL_INVALID_OPERATION);
                       gc->state.pixel.readBuffer = originalReadBuffer;
-                      return;
+                      __GL_EXIT();
                   }
                   break;
 
@@ -537,7 +536,7 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
                   if (!gc->modes.doubleBufferMode) {
                       __glSetError(gc, GL_INVALID_OPERATION);
                       gc->state.pixel.readBuffer = originalReadBuffer;
-                      return;
+                      __GL_EXIT();
                   }
                   break;
 
@@ -549,7 +548,7 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
                   if (!gc->modes.doubleBufferMode) {
                       __glSetError(gc, GL_INVALID_OPERATION);
                       gc->state.pixel.readBuffer = originalReadBuffer;
-                      return;
+                      __GL_EXIT();
                   }
                   gc->state.pixel.readBuffer = GL_BACK_LEFT;
                   break;
@@ -562,7 +561,7 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
                   if (!gc->modes.stereoMode) {
                       __glSetError(gc, GL_INVALID_OPERATION);
                       gc->state.pixel.readBuffer = originalReadBuffer;
-                      return;
+                      __GL_EXIT();
                   }
                   gc->state.pixel.readBuffer = GL_FRONT_RIGHT;
                   break;
@@ -571,15 +570,14 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
                   if (modeOffset >= (GLenum)gc->modes.numAuxBuffers) {
                       __glSetError(gc, GL_INVALID_OPERATION);
                       gc->state.pixel.readBuffer = originalReadBuffer;
-                      return;
+                      __GL_EXIT();
                   }
                   mode = modeOffset + GL_AUX0;
                   gc->state.pixel.readBuffer = mode;
                   break;
 
               default:
-                  __glSetError(gc, GL_INVALID_ENUM);
-                  return;
+                  __GL_ERROR_EXIT(GL_INVALID_ENUM);
             }
 
             if (mode != gc->state.pixel.readBuffer)
@@ -608,8 +606,9 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
             }
         }
     }
+OnExit:
 OnError:
-//    __GL_FOOTER();
+    __GL_FOOTER();
 }
 
 
