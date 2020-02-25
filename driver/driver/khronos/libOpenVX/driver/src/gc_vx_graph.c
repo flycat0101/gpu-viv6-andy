@@ -10392,7 +10392,7 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 
 
 #if VIVANTE_PROFILER
-    if (!graph->isChildGraph)
+    if (!graph->isChildGraph && !graph->base.context->options.enableCNNPerf)
     {
         vxoProfiler_End((vx_reference)graph);
     }
