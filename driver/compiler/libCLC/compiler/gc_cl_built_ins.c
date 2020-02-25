@@ -18,6 +18,7 @@
 
 #define FULL_PROFILE_TEST   1
 #define HAS_DOUBLE_SUPPORT  0
+#define IMPL_TRIG_OR_POW_FUNCS_AS_INTRINSICS 1
 
 #define _LOGE_2                ((float)0.693147180559945309417232)
 #define _LOG2_E_high        ((float)1.4426950f)
@@ -49,6 +50,7 @@ typedef struct _clsFAST_RELAXED_MATH_MAPPING
 {
     gctCONST_STRING regFunc;
     gctCONST_STRING fastFunc;
+    gctBOOL check__FAST_RELAXED_MATH__;
 }
 clsFAST_RELAXED_MATH_MAPPING;
 
@@ -62,27 +64,31 @@ clsFAST_RELAXED_MATH_MAPPING_NODE;
 
 static clsFAST_RELAXED_MATH_MAPPING _FastRelaxedMathMapping[] =
 {
-    {"sin",         "native_sin"},
-    {"cos",         "native_cos"},
-    {"tan",         "native_tan"},
-    {"asin",        "native#asin"},
-    {"acos",        "native#acos"},
-    {"atan",        "native#atan"},
+    {"sin",         "native_sin", gcvTRUE},
+    {"cos",         "native_cos", gcvTRUE},
+    {"tan",         "native_tan", gcvTRUE},
+    {"viv_sin_noFMA",  "viv_native_sin", gcvFALSE},
+    {"viv_cos_noFMA",  "viv_native_cos", gcvFALSE},
+    {"viv_tan_noFMA",  "viv_native_tan", gcvFALSE},
+    {"viv_pow_noFMA",  "viv_native_pow", gcvFALSE},
+    {"asin",        "native#asin", gcvFALSE},
+    {"acos",        "native#acos", gcvFALSE},
+    {"atan",        "native#atan", gcvFALSE},
 
     /* Exponential Functions */
-    {"powr",        "native_powr"},
-    {"pow",         "viv_native_pow"},
-    {"exp",         "native_exp"},
-    {"exp10",       "native_exp10"},
-    {"log",         "native_log"},
-    {"exp2",        "native_exp2"},
-    {"log2",        "native_log2"},
-    {"log10",       "native_log10"},
-    {"sqrt",        "native_sqrt"},
-    {"rsqrt",       "native_rsqrt"},
-    {"reciprocal",  "native_recip"},
-    {"viv_reciprocal",  "viv_native_recip"},
-    {"divide#",     "viv_native_divide"},
+    {"powr",        "native_powr", gcvFALSE},
+    {"pow",         "viv_native_pow", gcvTRUE},
+    {"exp",         "native_exp", gcvFALSE},
+    {"exp10",       "native_exp10", gcvFALSE},
+    {"log",         "native_log", gcvFALSE},
+    {"exp2",        "native_exp2", gcvFALSE},
+    {"log2",        "native_log2", gcvFALSE},
+    {"log10",       "native_log10", gcvFALSE},
+    {"sqrt",        "native_sqrt", gcvFALSE},
+    {"rsqrt",       "native_rsqrt", gcvFALSE},
+    {"reciprocal",  "native_recip", gcvFALSE},
+    {"viv_reciprocal",  "viv_native_recip", gcvFALSE},
+    {"divide#",     "viv_native_divide", gcvFALSE},
 
 
     /* Common Functions */
@@ -5060,20 +5066,20 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"radians",         gcvTRUE,       gcvFALSE,       gcvNULL, _GenRadiansCode},
     {"degrees",         gcvTRUE,       gcvFALSE,       gcvNULL, _GenDegreesCode},
     {"half_sin",        gcvTRUE,       gcvTRUE,        gcvNULL, _GenSinCode},
-    {"native_sin",      gcvTRUE,       gcvTRUE,        gcvNULL, _GenNativeSinCode},
+    {"native_sin",      gcvTRUE,       gcvFALSE,       gcvNULL, _GenNativeSinCode},
     {"sin",             gcvTRUE,       gcvTRUE,        gcvNULL, _GenSinCode},
     {"half_cos",        gcvTRUE,       gcvTRUE,        gcvNULL, _GenCosCode},
-    {"native_cos",      gcvTRUE,       gcvTRUE,        gcvNULL, _GenNativeCosCode},
+    {"native_cos",      gcvTRUE,       gcvFALSE,       gcvNULL, _GenNativeCosCode},
     {"cos",             gcvTRUE,       gcvTRUE,        gcvNULL, _GenCosCode},
     {"sincos",          gcvTRUE,       gcvTRUE,        gcvNULL, _GenSinCosCode},
     {"half_tan",        gcvTRUE,       gcvTRUE,        gcvNULL, _GenTanCode},
-    {"native_tan",      gcvTRUE,       gcvTRUE,        gcvNULL, _GenNativeTanCode},
+    {"native_tan",      gcvTRUE,       gcvFALSE,       gcvNULL, _GenNativeTanCode},
     {"tan",             gcvTRUE,       gcvTRUE,        gcvNULL, _GenTanCode},
-    {"native#asin",     gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativeAsinCode},
+    {"native#asin",     gcvFALSE,      gcvFALSE,       gcvNULL, _GenNativeAsinCode},
     {"asin",            gcvTRUE,       gcvTRUE,        gcvNULL, _GenAsinCode},
-    {"native#acos",     gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativeAcosCode},
+    {"native#acos",     gcvFALSE,      gcvFALSE,       gcvNULL, _GenNativeAcosCode},
     {"acos",            gcvTRUE,       gcvTRUE,        gcvNULL, _GenAcosCode},
-    {"native#atan",     gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativeAtanCode},
+    {"native#atan",     gcvFALSE,      gcvFALSE,       gcvNULL, _GenNativeAtanCode},
     {"atan",            gcvTRUE,       gcvTRUE,        gcvNULL, _GenAtanCode},
     {"half_divide",     gcvTRUE,       gcvTRUE,        gcvNULL, _GenDivideCode},
     {"native_divide",   gcvTRUE,       gcvFALSE,       gcvNULL, _GenNativeDivCode},
@@ -5164,13 +5170,16 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"viv_half_sin",        gcvFALSE,       gcvTRUE,        gcvNULL, _GenSinCode},
     {"viv_native_sin",      gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativeSinCode},
     {"viv_sin",             gcvFALSE,       gcvTRUE,        gcvNULL, _GenSinCode},
+    {"viv_sin_noFMA",       gcvFALSE,       gcvTRUE,        gcvNULL, _GenSinCode},
     {"viv_half_cos",        gcvFALSE,       gcvTRUE,        gcvNULL, _GenCosCode},
     {"viv_native_cos",      gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativeCosCode},
     {"viv_cos",             gcvFALSE,       gcvTRUE,        gcvNULL, _GenCosCode},
+    {"viv_cos_noFMA",       gcvFALSE,       gcvTRUE,        gcvNULL, _GenCosCode},
     {"viv_sincos",          gcvFALSE,       gcvTRUE,        gcvNULL, _GenSinCosCode},
     {"viv_half_tan",        gcvFALSE,       gcvTRUE,        gcvNULL, _GenTanCode},
     {"viv_native_tan",      gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativeTanCode},
     {"viv_tan",             gcvFALSE,       gcvTRUE,        gcvNULL, _GenTanCode},
+    {"viv_tan_noFMA",       gcvFALSE,       gcvTRUE,        gcvNULL, _GenTanCode},
     {"native#asin",         gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativeAsinCode},
     {"viv_asin",            gcvFALSE,       gcvTRUE,        gcvNULL, _GenAsinCode},
     {"native#acos",         gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativeAcosCode},
@@ -5203,6 +5212,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"viv_erf",             gcvFALSE,       gcvTRUE,        gcvNULL, _GenErfCode},
 
     /* Vivante Primitive Exponential Functions */
+    {"viv_pow_noFMA",       gcvFALSE,       gcvTRUE,        gcvNULL, _GenPowCode},
     {"viv_pow",             gcvFALSE,       gcvTRUE,        gcvNULL, _GenPowCode},
     {"viv_native_pow",      gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativePowCode},
     {"viv_half_powr",       gcvFALSE,       gcvTRUE,        gcvNULL, _GenPowrCode},
@@ -5421,6 +5431,8 @@ IN gctCONST_STRING Symbol
         if (gcmIS_SUCCESS(gcoOS_StrCmp(node->relaxedMathMapping.regFunc, Symbol))) {
             gceSTATUS status;
             cltPOOL_STRING symbolInPool;
+            if(node->relaxedMathMapping.check__FAST_RELAXED_MATH__ &&
+               !cloCOMPILER_IsFastRelaxedMath(Compiler)) return gcvNULL;
             status = cloCOMPILER_AllocatePoolString(Compiler,
                                                     node->relaxedMathMapping.fastFunc,
                                                     &symbolInPool);

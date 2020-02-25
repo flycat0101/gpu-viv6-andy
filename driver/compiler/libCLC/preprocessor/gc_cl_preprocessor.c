@@ -2314,8 +2314,7 @@ gctCONST_STRING  Options
             }
             else if (gcvSTATUS_OK == gcoOS_StrNCmp(pos, "cl-fast-relaxed-math", sizeof("cl-fast-relaxed-math")-1))
             {
-                status = cloCOMPILER_SetFpConfig(PP->compiler,
-                                                 cldFpFAST_RELAXED_MATH);
+                status = cloCOMPILER_SetFastRelaxedMath(PP->compiler);
                 if(gcmIS_ERROR(status)) return status;
                 status = ppoPREPROCESSOR_addMacroDef_Int(PP, "__FAST_RELAXED_MATH__", "1");
                 if(gcmIS_ERROR(status)) return status;
