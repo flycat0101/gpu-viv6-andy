@@ -23814,6 +23814,7 @@ gcoHARDWARE_SetProbeCmd(
                     if (!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1))
                     {
                         gcmSETSINGLESTATE_DUMMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
+                        gcmSETSINGLESTATE_DUMMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
                     }
                     else
                     {
@@ -24182,15 +24183,16 @@ gcoHARDWARE_SetProbeCmd(
                     }
                     break;
                 case gcvPROBECMD_END:
+                    /* pass address to store counter */
+                    tempAddrs = address + (j + offset) * (gctUINT32)(1 << clusterIDWidth) *  gcmSIZEOF(gctUINT32);
+
                     if (!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1))
                     {
+                        gcmSETSINGLESTATE_DUMMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
                         gcmSETSINGLESTATE_DUMMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
                     }
                     else
                     {
-                        /* pass address to store counter */
-                        tempAddrs = address + (j + offset) * (gctUINT32)(1 << clusterIDWidth) *  gcmSIZEOF(gctUINT32);
-
                          {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?

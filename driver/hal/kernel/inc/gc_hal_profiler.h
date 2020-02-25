@@ -1002,64 +1002,6 @@ typedef struct _gcsPROFILER_COUNTERS_PART1
     gctUINT32       tx_starve_count;
     gctUINT32       tx_stall_count;
     gctUINT32       tx_process_count;
-
-    /* VIP SH */
-
-    /* TP */
-    gctUINT32       tp_layer_id;
-    gctUINT32       tp_layer_id_overflow;
-    gctUINT32       tp_total_busy_cycle;
-    gctUINT32       tp_total_busy_cycle_overflow;
-    gctUINT32       tp_total_read_bandwidth_ddr;
-    gctUINT32       tp_total_read_bandwidth_ddr_overflow;
-    gctUINT32       tp_total_write_bandwidth_ddr;
-    gctUINT32       tp_total_write_bandwidth_ddr_overflow;
-    gctUINT32       tp_total_read_bandwidth_sram;
-    gctUINT32       tp_total_read_bandwidth_sram_overflow;
-    gctUINT32       tp_total_write_bandwidth_sram;
-    gctUINT32       tp_total_write_bandwidth_sram_overflow;
-    gctUINT32       tp_total_read_bandwidth_ocb;
-    gctUINT32       tp_total_read_bandwidth_ocb_overflow;
-    gctUINT32       tp_total_write_bandwidth_ocb;
-    gctUINT32       tp_total_write_bandwidth_ocb_overflow;
-    gctUINT32       tp_fc_pix_count;
-    gctUINT32       tp_fc_zero_skip_count;
-    gctUINT32       tp_fc_pix_count_overflow;
-    gctUINT32       tp_fc_zero_skip_count_overflow;
-    gctUINT32       tp_fc_coef_count;
-    gctUINT32       tp_fc_coef_zero_count;
-    gctUINT32       tp_fc_coef_count_overflow;
-    gctUINT32       tp_fc_coef_zero_count_overflow;
-    gctUINT32       tp_total_idle_cycle_core[4];
-    gctUINT32       tp_total_idle_cycle_core_overflows[4];
-
-    /* NN */
-    gctUINT32       nn_layer_id;
-    gctUINT32       nn_instr_info;
-    gctUINT32       nn_total_busy_cycle;
-    gctUINT32       nn_total_busy_cycle_overflow;
-    gctUINT32       nn_total_read_cycle_ddr;
-    gctUINT32       nn_total_read_cycle_ddr_overflow;
-    gctUINT32       nn_total_read_bandwidth_ddr;
-    gctUINT32       nn_total_read_bandwidth_ddr_overflow;
-    gctUINT32       nn_total_write_cycle_ddr;
-    gctUINT32       nn_total_write_cycle_ddr_overflow;
-    gctUINT32       nn_total_write_bandwidth_ddr;
-    gctUINT32       nn_total_write_bandwidth_ddr_overflow;
-    gctUINT32       nn_total_read_cycle_sram;
-    gctUINT32       nn_total_read_cycle_sram_overflow;
-    gctUINT32       nn_total_write_cycle_sram;
-    gctUINT32       nn_total_write_cycle_sram_overflow;
-    gctUINT32       nn_total_mac_cycle;
-    gctUINT32       nn_total_mac_cycle_overflow;
-    gctUINT32       nn_total_mac_count;
-    gctUINT32       nn_total_mac_count_overflow;
-    gctUINT32       nn_zero_coef_skip_count;
-    gctUINT32       nn_zero_coef_skip_count_overflow;
-    gctUINT32       nn_non_zero_coef_count;
-    gctUINT32       nn_non_zero_coef_count_overflow;
-    gctUINT32       nn_total_idle_cycle_core[32];
-
 }
 gcsPROFILER_COUNTERS_PART1;
 
@@ -1158,10 +1100,71 @@ typedef struct _gcsPROFILER_COUNTERS_PART2
 }
 gcsPROFILER_COUNTERS_PART2;
 
+typedef struct _gcsPROFILER_VIP_PROBE_COUNTERS
+{
+    /* NN */
+    gctUINT32       nn_layer_id;
+    gctUINT32       nn_instr_info;
+    gctUINT32       nn_total_busy_cycle;
+    gctUINT32       nn_total_busy_cycle_overflow;
+    gctUINT32       nn_total_read_cycle_ddr;
+    gctUINT32       nn_total_read_cycle_ddr_overflow;
+    gctUINT32       nn_total_read_bandwidth_ddr;
+    gctUINT32       nn_total_read_bandwidth_ddr_overflow;
+    gctUINT32       nn_total_write_cycle_ddr;
+    gctUINT32       nn_total_write_cycle_ddr_overflow;
+    gctUINT32       nn_total_write_bandwidth_ddr;
+    gctUINT32       nn_total_write_bandwidth_ddr_overflow;
+    gctUINT32       nn_total_read_cycle_sram;
+    gctUINT32       nn_total_read_cycle_sram_overflow;
+    gctUINT32       nn_total_write_cycle_sram;
+    gctUINT32       nn_total_write_cycle_sram_overflow;
+    gctUINT32       nn_total_mac_cycle;
+    gctUINT32       nn_total_mac_cycle_overflow;
+    gctUINT32       nn_total_mac_count;
+    gctUINT32       nn_total_mac_count_overflow;
+    gctUINT32       nn_zero_coef_skip_count;
+    gctUINT32       nn_zero_coef_skip_count_overflow;
+    gctUINT32       nn_non_zero_coef_count;
+    gctUINT32       nn_non_zero_coef_count_overflow;
+    gctUINT32       nn_total_idle_cycle_core[32];
+    /* TP */
+    gctUINT32       tp_layer_id;
+    gctUINT32       tp_layer_id_overflow;
+    gctUINT32       tp_total_busy_cycle;
+    gctUINT32       tp_total_busy_cycle_overflow;
+    gctUINT32       tp_total_read_bandwidth_ddr;
+    gctUINT32       tp_total_read_bandwidth_ddr_overflow;
+    gctUINT32       tp_total_write_bandwidth_ddr;
+    gctUINT32       tp_total_write_bandwidth_ddr_overflow;
+    gctUINT32       tp_total_read_bandwidth_sram;
+    gctUINT32       tp_total_read_bandwidth_sram_overflow;
+    gctUINT32       tp_total_write_bandwidth_sram;
+    gctUINT32       tp_total_write_bandwidth_sram_overflow;
+    gctUINT32       tp_total_read_bandwidth_ocb;
+    gctUINT32       tp_total_read_bandwidth_ocb_overflow;
+    gctUINT32       tp_total_write_bandwidth_ocb;
+    gctUINT32       tp_total_write_bandwidth_ocb_overflow;
+    gctUINT32       tp_fc_pix_count;
+    gctUINT32       tp_fc_zero_skip_count;
+    gctUINT32       tp_fc_pix_count_overflow;
+    gctUINT32       tp_fc_zero_skip_count_overflow;
+    gctUINT32       tp_fc_coef_count;
+    gctUINT32       tp_fc_coef_zero_count;
+    gctUINT32       tp_fc_coef_count_overflow;
+    gctUINT32       tp_fc_coef_zero_count_overflow;
+    gctUINT32       tp_total_idle_cycle_core[4];
+    gctUINT32       tp_total_idle_cycle_core_overflows[4];
+
+    /* VIP SH */
+}
+gcsPROFILER_VIP_PROBE_COUNTERS;
+
 typedef struct _gcsPROFILER_COUNTERS
 {
     gcsPROFILER_COUNTERS_PART1 counters_part1;
     gcsPROFILER_COUNTERS_PART2 counters_part2;
+    gcsPROFILER_VIP_PROBE_COUNTERS counters_part3;
 }
 gcsPROFILER_COUNTERS;
 

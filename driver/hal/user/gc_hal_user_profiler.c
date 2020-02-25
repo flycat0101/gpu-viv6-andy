@@ -176,6 +176,7 @@ _RecordCounters(
 
     gcoOS_ZeroMemory(&Counters->counters_part1, gcmSIZEOF(gcsPROFILER_COUNTERS_PART1));
     gcoOS_ZeroMemory(&Counters->counters_part2, gcmSIZEOF(gcsPROFILER_COUNTERS_PART2));
+    gcoOS_ZeroMemory(&Counters->counters_part3, gcmSIZEOF(gcsPROFILER_VIP_PROBE_COUNTERS));
     /* module FE */
     gcmGET_COUNTER(Counters->counters_part1.fe_out_vertex_count, 0);
     gcmGET_COUNTER(Counters->counters_part1.fe_cache_miss_count, 1);
@@ -343,84 +344,84 @@ _RecordCounters(
     if (Profiler->vipProbe)
     {
         /* module NN */
-        gcmGET_COUNTER(Counters->counters_part1.nn_layer_id, 0);
-        Counters->counters_part1.nn_layer_id &= 0xFFFF;
-        gcmGET_COUNTER(Counters->counters_part1.nn_instr_info, 1);
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_busy_cycle, 2);
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_busy_cycle_overflow, 3);
-        Counters->counters_part1.nn_total_busy_cycle_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_read_cycle_ddr, 4);
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_read_cycle_ddr_overflow, 5);
-        Counters->counters_part1.nn_total_read_cycle_ddr_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_read_bandwidth_ddr, 6);
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_read_bandwidth_ddr_overflow, 7);
-        Counters->counters_part1.nn_total_read_bandwidth_ddr_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_write_cycle_ddr, 8);
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_write_cycle_ddr_overflow, 9);
-        Counters->counters_part1.nn_total_write_cycle_ddr_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_write_bandwidth_ddr, 10);
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_write_bandwidth_ddr_overflow, 11);
-        Counters->counters_part1.nn_total_write_bandwidth_ddr_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_read_cycle_sram, 12);
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_read_cycle_sram_overflow, 13);
-        Counters->counters_part1.nn_total_read_cycle_sram_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_write_cycle_sram, 14);
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_write_cycle_sram_overflow, 15);
-        Counters->counters_part1.nn_total_write_cycle_sram_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_mac_cycle, 16);
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_mac_cycle_overflow, 17);
-        Counters->counters_part1.nn_total_mac_cycle_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_mac_count, 18);
-        gcmGET_COUNTER(Counters->counters_part1.nn_total_mac_count_overflow, 19);
-        Counters->counters_part1.nn_total_mac_count_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.nn_zero_coef_skip_count, 20);
-        gcmGET_COUNTER(Counters->counters_part1.nn_zero_coef_skip_count_overflow, 21);
-        Counters->counters_part1.nn_zero_coef_skip_count_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.nn_non_zero_coef_count, 22);
-        gcmGET_COUNTER(Counters->counters_part1.nn_non_zero_coef_count_overflow, 23);
-        Counters->counters_part1.nn_non_zero_coef_count_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.nn_layer_id, 0);
+        Counters->counters_part3.nn_layer_id &= 0xFFFF;
+        gcmGET_COUNTER(Counters->counters_part3.nn_instr_info, 1);
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_busy_cycle, 2);
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_busy_cycle_overflow, 3);
+        Counters->counters_part3.nn_total_busy_cycle_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_read_cycle_ddr, 4);
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_read_cycle_ddr_overflow, 5);
+        Counters->counters_part3.nn_total_read_cycle_ddr_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_read_bandwidth_ddr, 6);
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_read_bandwidth_ddr_overflow, 7);
+        Counters->counters_part3.nn_total_read_bandwidth_ddr_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_write_cycle_ddr, 8);
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_write_cycle_ddr_overflow, 9);
+        Counters->counters_part3.nn_total_write_cycle_ddr_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_write_bandwidth_ddr, 10);
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_write_bandwidth_ddr_overflow, 11);
+        Counters->counters_part3.nn_total_write_bandwidth_ddr_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_read_cycle_sram, 12);
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_read_cycle_sram_overflow, 13);
+        Counters->counters_part3.nn_total_read_cycle_sram_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_write_cycle_sram, 14);
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_write_cycle_sram_overflow, 15);
+        Counters->counters_part3.nn_total_write_cycle_sram_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_mac_cycle, 16);
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_mac_cycle_overflow, 17);
+        Counters->counters_part3.nn_total_mac_cycle_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_mac_count, 18);
+        gcmGET_COUNTER(Counters->counters_part3.nn_total_mac_count_overflow, 19);
+        Counters->counters_part3.nn_total_mac_count_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.nn_zero_coef_skip_count, 20);
+        gcmGET_COUNTER(Counters->counters_part3.nn_zero_coef_skip_count_overflow, 21);
+        Counters->counters_part3.nn_zero_coef_skip_count_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.nn_non_zero_coef_count, 22);
+        gcmGET_COUNTER(Counters->counters_part3.nn_non_zero_coef_count_overflow, 23);
+        Counters->counters_part3.nn_non_zero_coef_count_overflow &= 0x1;
         offset += EXT_MODULE_NEURAL_NET_COUNTER_NUM * 4;
 
         /* module TP */
-        gcmGET_COUNTER(Counters->counters_part1.tp_layer_id, 0);
-        Counters->counters_part1.tp_layer_id_overflow = (Counters->counters_part1.tp_layer_id >> 8) & 0x1;
-        Counters->counters_part1.tp_layer_id &= 0xFF;
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_busy_cycle, 2);
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_busy_cycle_overflow, 3);
-        Counters->counters_part1.tp_total_busy_cycle_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_read_bandwidth_ddr, 4);
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_read_bandwidth_ddr_overflow, 5);
-        Counters->counters_part1.tp_total_read_bandwidth_ddr_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_write_bandwidth_ddr, 6);
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_write_bandwidth_ddr_overflow, 7);
-        Counters->counters_part1.tp_total_write_bandwidth_ddr_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_read_bandwidth_sram, 8);
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_read_bandwidth_sram_overflow, 9);
-        Counters->counters_part1.tp_total_read_bandwidth_sram_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_write_bandwidth_sram, 10);
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_write_bandwidth_sram_overflow, 11);
-        Counters->counters_part1.tp_total_write_bandwidth_sram_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_read_bandwidth_ocb, 12);
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_read_bandwidth_ocb_overflow, 13);
-        Counters->counters_part1.tp_total_read_bandwidth_ocb_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_write_bandwidth_ocb, 14);
-        gcmGET_COUNTER(Counters->counters_part1.tp_total_write_bandwidth_ocb_overflow, 15);
-        Counters->counters_part1.tp_total_write_bandwidth_ocb_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.tp_fc_pix_count, 16);
-        gcmGET_COUNTER(Counters->counters_part1.tp_fc_zero_skip_count, 17);
-        gcmGET_COUNTER(Counters->counters_part1.tp_fc_pix_count_overflow, 18);
-        Counters->counters_part1.tp_fc_zero_skip_count_overflow = (Counters->counters_part1.tp_fc_pix_count_overflow >> 1) & 0x1;
-        Counters->counters_part1.tp_fc_pix_count_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part1.tp_fc_coef_count, 20);
-        gcmGET_COUNTER(Counters->counters_part1.tp_fc_coef_zero_count, 21);
-        gcmGET_COUNTER(Counters->counters_part1.tp_fc_coef_count_overflow, 22);
-        Counters->counters_part1.tp_fc_coef_zero_count_overflow = (Counters->counters_part1.tp_fc_coef_count_overflow >> 1) & 0x1;
-        Counters->counters_part1.tp_fc_coef_count_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.tp_layer_id, 0);
+        Counters->counters_part3.tp_layer_id_overflow = (Counters->counters_part3.tp_layer_id >> 8) & 0x1;
+        Counters->counters_part3.tp_layer_id &= 0xFF;
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_busy_cycle, 2);
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_busy_cycle_overflow, 3);
+        Counters->counters_part3.tp_total_busy_cycle_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_read_bandwidth_ddr, 4);
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_read_bandwidth_ddr_overflow, 5);
+        Counters->counters_part3.tp_total_read_bandwidth_ddr_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_write_bandwidth_ddr, 6);
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_write_bandwidth_ddr_overflow, 7);
+        Counters->counters_part3.tp_total_write_bandwidth_ddr_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_read_bandwidth_sram, 8);
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_read_bandwidth_sram_overflow, 9);
+        Counters->counters_part3.tp_total_read_bandwidth_sram_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_write_bandwidth_sram, 10);
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_write_bandwidth_sram_overflow, 11);
+        Counters->counters_part3.tp_total_write_bandwidth_sram_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_read_bandwidth_ocb, 12);
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_read_bandwidth_ocb_overflow, 13);
+        Counters->counters_part3.tp_total_read_bandwidth_ocb_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_write_bandwidth_ocb, 14);
+        gcmGET_COUNTER(Counters->counters_part3.tp_total_write_bandwidth_ocb_overflow, 15);
+        Counters->counters_part3.tp_total_write_bandwidth_ocb_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.tp_fc_pix_count, 16);
+        gcmGET_COUNTER(Counters->counters_part3.tp_fc_zero_skip_count, 17);
+        gcmGET_COUNTER(Counters->counters_part3.tp_fc_pix_count_overflow, 18);
+        Counters->counters_part3.tp_fc_zero_skip_count_overflow = (Counters->counters_part3.tp_fc_pix_count_overflow >> 1) & 0x1;
+        Counters->counters_part3.tp_fc_pix_count_overflow &= 0x1;
+        gcmGET_COUNTER(Counters->counters_part3.tp_fc_coef_count, 20);
+        gcmGET_COUNTER(Counters->counters_part3.tp_fc_coef_zero_count, 21);
+        gcmGET_COUNTER(Counters->counters_part3.tp_fc_coef_count_overflow, 22);
+        Counters->counters_part3.tp_fc_coef_zero_count_overflow = (Counters->counters_part3.tp_fc_coef_count_overflow >> 1) & 0x1;
+        Counters->counters_part3.tp_fc_coef_count_overflow &= 0x1;
         for (index = 0; index < 4; index++)
         {
-            gcmGET_COUNTER(Counters->counters_part1.tp_total_idle_cycle_core[index], 24 + index * 2);
-            gcmGET_COUNTER(Counters->counters_part1.tp_total_idle_cycle_core_overflows[index], 25 + index * 2);
-            Counters->counters_part1.tp_total_idle_cycle_core_overflows[index] &= 0x1;
+            gcmGET_COUNTER(Counters->counters_part3.tp_total_idle_cycle_core[index], 24 + index * 2);
+            gcmGET_COUNTER(Counters->counters_part3.tp_total_idle_cycle_core_overflows[index], 25 + index * 2);
+            Counters->counters_part3.tp_total_idle_cycle_core_overflows[index] &= 0x1;
         }
         offset += EXT_MODULE_TENSOR_PROCESSOR_COUNTER_NUM * 4;
     }
@@ -494,7 +495,7 @@ _WriteCounters(
             gcmRECORD_COUNTER(VPNC_FECACHELKCOUNT, gcmGETCOUNTER(counters_part1.fe_cache_lk_count));
             gcmRECORD_COUNTER(VPNC_FESTALLCOUNT, gcmGETCOUNTER(counters_part1.fe_stall_count));
             gcmRECORD_COUNTER(VPNC_FESTARVECOUNT, gcmGETCOUNTER(counters_part1.fe_starve_count));
-            gcmRECORD_COUNTER(VPNC_FEPROCESSCOUNT, gcmGETCOUNTER(counters_part1.fe_stall_count));
+            gcmRECORD_COUNTER(VPNC_FEPROCESSCOUNT, gcmGETCOUNTER(counters_part1.fe_process_count));
             gcmRECORD_CONST(VPG_END);
 
             gcmRECORD_CONST(VPNG_VS);
@@ -1065,85 +1066,85 @@ _WriteCountersFromVIPProbe(
                 if (Profiler->vipProbe)
                 {
                         /* NN. */
-                    gcmPRINT("NN_LAYER_ID: %u\n", gcmGETCOUNTER(counters_part1.nn_layer_id));
-                    gcmPRINT("NN_INSTR_INFO: %u\n", gcmGETCOUNTER(counters_part1.nn_instr_info));
+                    gcmPRINT("NN_LAYER_ID: %u\n", gcmGETCOUNTER(counters_part3.nn_layer_id));
+                    gcmPRINT("NN_INSTR_INFO: %u\n", gcmGETCOUNTER(counters_part3.nn_instr_info));
                     gcmPRINT("NN_TOTAL_BUSY_CYCLE: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.nn_total_busy_cycle),
-                             gcmGETCOUNTER(counters_part1.nn_total_busy_cycle_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.nn_total_busy_cycle),
+                             gcmGETCOUNTER(counters_part3.nn_total_busy_cycle_overflow) ? " (overflow)" : "");
                     gcmPRINT("NN_TOTAL_READ_CYCLE_DDR: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.nn_total_read_cycle_ddr),
-                             gcmGETCOUNTER(counters_part1.nn_total_read_cycle_ddr_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.nn_total_read_cycle_ddr),
+                             gcmGETCOUNTER(counters_part3.nn_total_read_cycle_ddr_overflow) ? " (overflow)" : "");
                     gcmPRINT("NN_TOTAL_READ_VALID_BW_DDR: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.nn_total_read_bandwidth_ddr),
-                             gcmGETCOUNTER(counters_part1.nn_total_read_bandwidth_ddr_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.nn_total_read_bandwidth_ddr),
+                             gcmGETCOUNTER(counters_part3.nn_total_read_bandwidth_ddr_overflow) ? " (overflow)" : "");
                     gcmPRINT("NN_TOTAL_WRITE_CYCLE_DDR: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.nn_total_write_cycle_ddr),
-                             gcmGETCOUNTER(counters_part1.nn_total_write_cycle_ddr_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.nn_total_write_cycle_ddr),
+                             gcmGETCOUNTER(counters_part3.nn_total_write_cycle_ddr_overflow) ? " (overflow)" : "");
                     gcmPRINT("NN_TOTAL_WRITE_VALID_BW_DDR: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.nn_total_write_bandwidth_ddr),
-                             gcmGETCOUNTER(counters_part1.nn_total_write_bandwidth_ddr_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.nn_total_write_bandwidth_ddr),
+                             gcmGETCOUNTER(counters_part3.nn_total_write_bandwidth_ddr_overflow) ? " (overflow)" : "");
                     gcmPRINT("NN_TOTAL_READ_CYCLE_SRAM: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.nn_total_read_cycle_sram),
-                             gcmGETCOUNTER(counters_part1.nn_total_read_cycle_sram_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.nn_total_read_cycle_sram),
+                             gcmGETCOUNTER(counters_part3.nn_total_read_cycle_sram_overflow) ? " (overflow)" : "");
                     gcmPRINT("NN_TOTAL_WRITE_CYCLE_SRAM: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.nn_total_write_cycle_sram),
-                             gcmGETCOUNTER(counters_part1.nn_total_write_cycle_sram_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.nn_total_write_cycle_sram),
+                             gcmGETCOUNTER(counters_part3.nn_total_write_cycle_sram_overflow) ? " (overflow)" : "");
                     gcmPRINT("NN_TOTAL_MAC_CYCLE: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.nn_total_mac_cycle),
-                             gcmGETCOUNTER(counters_part1.nn_total_mac_cycle_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.nn_total_mac_cycle),
+                             gcmGETCOUNTER(counters_part3.nn_total_mac_cycle_overflow) ? " (overflow)" : "");
                     gcmPRINT("NN_TOTAL_MAC_COUNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.nn_total_mac_count),
-                             gcmGETCOUNTER(counters_part1.nn_total_mac_count_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.nn_total_mac_count),
+                             gcmGETCOUNTER(counters_part3.nn_total_mac_count_overflow) ? " (overflow)" : "");
                     gcmPRINT("NN_ZERO_COEF_SKIP_COUNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.nn_zero_coef_skip_count),
-                             gcmGETCOUNTER(counters_part1.nn_zero_coef_skip_count_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.nn_zero_coef_skip_count),
+                             gcmGETCOUNTER(counters_part3.nn_zero_coef_skip_count_overflow) ? " (overflow)" : "");
                     gcmPRINT("NN_NON_ZERO_COEF_COUNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.nn_non_zero_coef_count),
-                             gcmGETCOUNTER(counters_part1.nn_non_zero_coef_count_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.nn_non_zero_coef_count),
+                             gcmGETCOUNTER(counters_part3.nn_non_zero_coef_count_overflow) ? " (overflow)" : "");
 
                     /* TP. */
                     gcmPRINT("TP_LAYER_ID: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.tp_layer_id),
-                             gcmGETCOUNTER(counters_part1.tp_layer_id_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.tp_layer_id),
+                             gcmGETCOUNTER(counters_part3.tp_layer_id_overflow) ? " (overflow)" : "");
                     gcmPRINT("TP_TOTAL_BUSY_CYCLE: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.tp_total_busy_cycle),
-                             gcmGETCOUNTER(counters_part1.tp_total_busy_cycle_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.tp_total_busy_cycle),
+                             gcmGETCOUNTER(counters_part3.tp_total_busy_cycle_overflow) ? " (overflow)" : "");
                     gcmPRINT("TP_TOTAL_READ_BW_CACHE: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.tp_total_read_bandwidth_ddr),
-                             gcmGETCOUNTER(counters_part1.tp_total_read_bandwidth_ddr_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_ddr),
+                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_ddr_overflow) ? " (overflow)" : "");
                     gcmPRINT("TP_TOTAL_WRITE_BW_CACHE: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.tp_total_write_bandwidth_ddr),
-                             gcmGETCOUNTER(counters_part1.tp_total_write_bandwidth_ddr_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.tp_total_write_bandwidth_ddr),
+                             gcmGETCOUNTER(counters_part3.tp_total_write_bandwidth_ddr_overflow) ? " (overflow)" : "");
                     gcmPRINT("TP_TOTAL_READ_BW_SRAM: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.tp_total_read_bandwidth_sram),
-                             gcmGETCOUNTER(counters_part1.tp_total_read_bandwidth_sram_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_sram),
+                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_sram_overflow) ? " (overflow)" : "");
                     gcmPRINT("TP_TOTAL_WRITE_BW_SRAM: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.tp_total_write_bandwidth_sram),
-                             gcmGETCOUNTER(counters_part1.tp_total_write_bandwidth_sram_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.tp_total_write_bandwidth_sram),
+                             gcmGETCOUNTER(counters_part3.tp_total_write_bandwidth_sram_overflow) ? " (overflow)" : "");
                     gcmPRINT("TP_TOTAL_READ_BW_OCB: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.tp_total_read_bandwidth_ocb),
-                             gcmGETCOUNTER(counters_part1.tp_total_read_bandwidth_ocb_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_ocb),
+                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_ocb_overflow) ? " (overflow)" : "");
                     gcmPRINT("TP_TOTAL_WRITE_BW_OCB: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.tp_total_read_bandwidth_ocb),
-                             gcmGETCOUNTER(counters_part1.tp_total_read_bandwidth_ocb_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_ocb),
+                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_ocb_overflow) ? " (overflow)" : "");
                     gcmPRINT("TP_FC_PIX_CNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.tp_fc_pix_count),
-                             gcmGETCOUNTER(counters_part1.tp_fc_pix_count_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.tp_fc_pix_count),
+                             gcmGETCOUNTER(counters_part3.tp_fc_pix_count_overflow) ? " (overflow)" : "");
                     gcmPRINT("TP_FC_ZERO_SKIP_CNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.tp_fc_zero_skip_count),
-                             gcmGETCOUNTER(counters_part1.tp_fc_zero_skip_count_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.tp_fc_zero_skip_count),
+                             gcmGETCOUNTER(counters_part3.tp_fc_zero_skip_count_overflow) ? " (overflow)" : "");
                     gcmPRINT("TP_FC_COEF_CNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.tp_fc_coef_count),
-                             gcmGETCOUNTER(counters_part1.tp_fc_coef_count_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.tp_fc_coef_count),
+                             gcmGETCOUNTER(counters_part3.tp_fc_coef_count_overflow) ? " (overflow)" : "");
                     gcmPRINT("TP_FC_COEF_ZERO_CNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part1.tp_fc_coef_zero_count),
-                             gcmGETCOUNTER(counters_part1.tp_fc_coef_zero_count_overflow) ? " (overflow)" : "");
+                             gcmGETCOUNTER(counters_part3.tp_fc_coef_zero_count),
+                             gcmGETCOUNTER(counters_part3.tp_fc_coef_zero_count_overflow) ? " (overflow)" : "");
                     for (i = 0; i < 4; i++)
                     {
                         gcmPRINT("TP_TOTAL_IDLE_CYCLE_CORE%u: %u%s\n",
                                  i,
-                                 gcmGETCOUNTER(counters_part1.tp_total_idle_cycle_core[i]),
-                                 gcmGETCOUNTER(counters_part1.tp_total_idle_cycle_core_overflows[i]) ? " overflow" : "");
+                                 gcmGETCOUNTER(counters_part3.tp_total_idle_cycle_core[i]),
+                                 gcmGETCOUNTER(counters_part3.tp_total_idle_cycle_core_overflows[i]) ? " overflow" : "");
                     }
 
                     gcmPRINT("*********\n");
@@ -1625,7 +1626,6 @@ gcoPROFILER_Initialize(
             counterBuffer->logicalAddress = logicalAddress;
             counterBuffer->couterBufobj = (gctHANDLE)counterBufobj;
             memset(logicalAddress, 0, size);
-            gcoBUFOBJ_Unlock(counterBufobj);
 
             counterBuffer->opType = gcvCOUNTER_OP_NONE;
             counterBuffer = counterBuffer->next;
@@ -1891,7 +1891,6 @@ gcoPROFILER_End(
 
             if (Profiler->probeMode)
             {
-                gcmONERROR(_UpdateCountersFromProbe(Profiler, clearCounters));
                 gcoBUFOBJ_WaitFence((gcoBUFOBJ)Profiler->counterBuf->couterBufobj, gcvFENCE_TYPE_READ);
                 _WriteCounters(Profiler);
             }
@@ -1899,16 +1898,12 @@ gcoPROFILER_End(
             {
                 if (Profiler->vipProbe)
                 {
-                    gcmONERROR(_UpdateCountersFromAHB(Profiler, clearCounters));
                     _WriteCounters(Profiler);
-
-                    gcmONERROR(_UpdateCountersFromProbe(Profiler, clearCounters));
                     gcoHAL_Commit(gcvNULL, gcvTRUE);
                     _WriteCountersFromVIPProbe(Profiler);
                 }
                 else
                 {
-                    gcmONERROR(_UpdateCountersFromAHB(Profiler, clearCounters));
                     _WriteCounters(Profiler);
                 }
             }
