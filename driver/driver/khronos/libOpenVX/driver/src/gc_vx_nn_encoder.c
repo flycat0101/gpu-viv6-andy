@@ -184,7 +184,7 @@ vx_int32 FindBestSubset(vx_int32 *runZeros, vx_int32 size, vx_int32 subSize, vx_
         }
     }
     for(j = 0, i = 0; i < subSize; i++){
-        if(freq[i] > 0)
+        if(freq[i] >= 0)
             outBest2Run[j++] = subSet[i];
     }
     /*Finally we calculate the number of bits spending. max2Freq, 1 bit, the rest, Log(subSize-2) bits*/
@@ -6592,9 +6592,31 @@ vx_uint32 calcKernelSizeV8Huffman(
                         {
                             if (run >= bestRunsSorted[j] + 1)
                             {
-                                k = run / (bestRunsSorted[j] + 1);
-                                run %= (bestRunsSorted[j] + 1);
-                                break;
+                                vx_bool finded = vx_false_e;
+                                vx_int32 q = 0;
+                                for (q = 0; q < SET_1_SIZE; q++)
+                                {
+                                    if (best2Runs[q] == bestRunsSorted[j])
+                                    {
+                                        finded = vx_true_e;
+                                    }
+                                }
+
+                                for (q = 0; q < numBestRuns - SET_1_SIZE; q++)
+                                {
+                                    if (outBest2Run[q] == bestRunsSorted[j])
+                                    {
+                                        finded = vx_true_e;
+                                    }
+                                }
+
+                                if (finded)
+                                {
+                                    k = run / (bestRunsSorted[j] + 1);
+                                    run %= (bestRunsSorted[j] + 1);
+                                    break;
+                                }
+
                             }
                         }
                         if (j >= 0)
@@ -11436,30 +11458,61 @@ vx_uint32 fillinKernelBufferV8Huffman(
                         {
                             if (run >= bestRunsSorted[j] + 1)
                             {
-                                k = run / (bestRunsSorted[j] + 1);
-                                run %= (bestRunsSorted[j] + 1);
-                                break;
+                                vx_bool finded = vx_false_e;
+                                vx_int32 q = 0;
+                                for (q = 0; q < SET_1_SIZE; q++)
+                                {
+                                    if (best2Runs[q] == bestRunsSorted[j])
+                                    {
+                                        finded = vx_true_e;
+                                    }
+                                }
+
+                                for (q = 0; q < numBestRuns - SET_1_SIZE; q++)
+                                {
+                                    if (outBest2Run[q] == bestRunsSorted[j])
+                                    {
+                                        finded = vx_true_e;
+                                    }
+                                }
+
+                                if (finded)
+                                {
+                                    k = run / (bestRunsSorted[j] + 1);
+                                    run %= (bestRunsSorted[j] + 1);
+                                    break;
+                                }
                             }
                         }
                         if (j >= 0)
                         {
                             vx_int32 n = bestRunsSorted[j];
+                            vx_bool finded = vx_false_e;
                             size = 8;
                             for (m = 0; m<SET_1_SIZE; m++)
                             {
                                 if (best2Runs[m] == n)
                                 {
                                     size = 0;
+                                    finded = vx_true_e;
                                     break;
                                 }
                             }
                             if (size == 8)
                             {
                                 for (m = 0; m<numBestRuns - SET_1_SIZE; m++)
+                                {
                                     if (outBest2Run[m] == n)
+                                    {
+                                        finded = vx_true_e;
                                         break;
+                                    }
+                                }
 
                             }
+
+                            vxmASSERT(finded);
+
                             j = invSizeOrder[size];
                             while(k--){/*k of the runs*/
                                 code = huffCode[j];
