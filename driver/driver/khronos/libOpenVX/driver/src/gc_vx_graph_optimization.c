@@ -4589,7 +4589,7 @@ VX_PRIVATE_API vx_bool vxoGraphOptimization_EltwiseTensorShapeOpt
         // Invalid shape for broadcasting
         if(sx != sy && sx > 1 && sy > 1 )
         {
-            ret = FALSE;
+            ret = vx_false_e;
             break;
         }
         // Update state
@@ -4608,7 +4608,7 @@ VX_PRIVATE_API vx_bool vxoGraphOptimization_EltwiseTensorShapeOpt
         }
         else
         {
-            gcmASSERT(FALSE );
+            gcmASSERT(vx_false_e );
         }
         if(prv_state == VX_ELTWISE_BROADCAST_STATE_EMPTY )
         {
@@ -4617,7 +4617,7 @@ VX_PRIVATE_API vx_bool vxoGraphOptimization_EltwiseTensorShapeOpt
             prv_state = state;
             continue;
         }
-        append_dim = FALSE;
+        append_dim = vx_false_e;
 #define _pack_state(prev_state, cur_state )    (prev_state << 16 | cur_state)
         switch(_pack_state(prv_state, state ) )
         {
@@ -4671,7 +4671,7 @@ VX_PRIVATE_API vx_bool vxoGraphOptimization_EltwiseTensorShapeOpt
             case _pack_state(VX_ELTWISE_BROADCAST_STATE_BROADCAST_Y, VX_ELTWISE_BROADCAST_STATE_NO_BROADCAST ):
                 _swap_size(sx, effective_size_x, tmp_sz);
                 _swap_size(sy, effective_size_y, tmp_sz);
-                append_dim = TRUE;
+                append_dim = vx_true_e;
                 break;
             default:
                 vxError("Get error state (%d -> %d) while computing broadcast shape.",
