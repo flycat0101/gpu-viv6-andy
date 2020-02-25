@@ -530,7 +530,7 @@ veglGLAPIHook;
 
 /* Global gl hooks. Do not need to be thread specific. */
 static veglGLAPIHook glHooks[vegl_OPENVG - vegl_OPENGL_ES11];
-static EGLBoolean    glHoolInitialized[vegl_OPENVG - vegl_OPENGL_ES11];
+static EGLBoolean    glHookInitialized[vegl_OPENVG - vegl_OPENGL_ES11];
 
 veglGLAPIHook *
 _GetGLAPIHook(
@@ -566,7 +566,7 @@ _GetGLAPIHook(
         index = (vegl_OPENGL - vegl_OPENGL_ES11);
     }
 
-    if (glHoolInitialized[index])
+    if (glHookInitialized[index])
     {
         return &glHooks[index];
     }
@@ -575,7 +575,7 @@ _GetGLAPIHook(
     gcoOS_LockPLS();
 
     /* Check again. */
-    if (glHoolInitialized[index])
+    if (glHookInitialized[index])
     {
         gcoOS_UnLockPLS();
         return &glHooks[index];
@@ -596,7 +596,7 @@ _GetGLAPIHook(
     gcmASSERT(dispatch != gcvNULL);
 
     /* Set as initialized. */
-    glHoolInitialized[index] = EGL_TRUE;
+    glHookInitialized[index] = EGL_TRUE;
 
     /* Cast glHook as function pointer array. */
     api = (__eglMustCastToProperFunctionPointerType *) &glHooks[index];
