@@ -2966,7 +2966,10 @@ OnError:
         vxoShader_Free(kernel);
     }
 
-    if(pointer != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, pointer);
+    if(pointer != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, pointer);
+    }
 
     gcmFOOTER_ARG("%d", status);
     return status;
