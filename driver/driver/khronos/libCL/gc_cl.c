@@ -19,6 +19,57 @@
 #ifdef WIN32
 #include <windows.h>
 
+void _DetachCL(void)
+{
+    if(clgDispatchTable)
+    {
+        free(clgDispatchTable);
+        clgDispatchTable = NULL;
+    }
+
+    if(clgDevices)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, clgDevices);
+    }
+
+    if(clgGlobalId)
+    {
+        gcoOS_AtomDestroy(gcvNULL, clgGlobalId);
+    }
+
+    if(clgDefaultPlatform)
+    {
+        if(clgDefaultPlatform->unloadCompiler)
+        {
+            /* Destroy CL patch library. Move it at Process exit */
+            gcmVERIFY_OK(gcFreeCLPatchLibrary());
+
+            /* Destroy vir intrinsic library. */
+            gcmVERIFY_OK(vscFreeVirIntrinsicLib());
+
+            (*clgDefaultPlatform->unloadCompiler)();
+
+            gcoOS_FreeLibrary(gcvNULL, clgDefaultPlatform->dll);
+
+            clgDefaultPlatform->dll = gcvNULL;
+            clgDefaultPlatform->compiler = gcvNULL;
+            clgDefaultPlatform->compiler11 = gcvNULL;
+            clgDefaultPlatform->loadCompiler = gcvNULL;
+            clgDefaultPlatform->unloadCompiler = gcvNULL;
+        }
+
+        if(clgDefaultPlatform->compilerMutex)
+        {
+            gcoOS_DeleteMutex(gcvNULL, clgDefaultPlatform->compilerMutex);
+        }
+
+        if(clgDefaultPlatform->vscCoreSysCtx.hPrivData)
+        {
+            vscDestroyPrivateData(&clgDefaultPlatform->vscCoreSysCtx, clgDefaultPlatform->vscCoreSysCtx.hPrivData);
+        }
+    }
+}
+
 gctBOOL APIENTRY
 DllMain(
     IN HINSTANCE Instance,
@@ -32,54 +83,7 @@ DllMain(
         break;
 
     case DLL_PROCESS_DETACH:
-        if(clgDispatchTable)
-        {
-            free(clgDispatchTable);
-            clgDispatchTable = NULL;
-        }
-
-        if(clgDevices)
-        {
-            gcmOS_SAFE_FREE(gcvNULL, clgDevices);
-        }
-
-        if(clgGlobalId)
-        {
-            gcoOS_AtomDestroy(gcvNULL, clgGlobalId);
-        }
-
-        if(clgDefaultPlatform)
-        {
-            if(clgDefaultPlatform->unloadCompiler)
-            {
-                /* Destroy CL patch library. Move it at Process exit */
-                gcmVERIFY_OK(gcFreeCLPatchLibrary());
-
-                /* Destroy vir intrinsic library. */
-                gcmVERIFY_OK(vscFreeVirIntrinsicLib());
-
-                (*clgDefaultPlatform->unloadCompiler)();
-
-                gcoOS_FreeLibrary(gcvNULL, clgDefaultPlatform->dll);
-
-                clgDefaultPlatform->dll = gcvNULL;
-                clgDefaultPlatform->compiler = gcvNULL;
-                clgDefaultPlatform->compiler11 = gcvNULL;
-                clgDefaultPlatform->loadCompiler = gcvNULL;
-                clgDefaultPlatform->unloadCompiler = gcvNULL;
-            }
-
-            if(clgDefaultPlatform->compilerMutex)
-            {
-                gcoOS_DeleteMutex(gcvNULL, clgDefaultPlatform->compilerMutex);
-            }
-
-            if(clgDefaultPlatform->vscCoreSysCtx.hPrivData)
-            {
-                vscDestroyPrivateData(&clgDefaultPlatform->vscCoreSysCtx, clgDefaultPlatform->vscCoreSysCtx.hPrivData);
-            }
-        }
-
+        _DetachCL();
         break;
 
     case DLL_THREAD_DETACH:
@@ -90,7 +94,13 @@ DllMain(
 #elif defined(__linux__) || defined(ANDROID) || defined(__QNXNTO__)
 static void __attribute__((destructor)) _ModuleDestructor(void);
 
+void _DetachCL(void);
 static void _ModuleDestructor(void)
+{
+    _DetachCL();
+}
+
+void _DetachCL(void)
 {
     if(clgDispatchTable)
     {

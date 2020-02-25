@@ -163,8 +163,12 @@ VX_PRIVATE_API vx_string vxoLoadSource(vx_char *filename, vx_size *programSize)
 
         rewind(pFile);
 
-        programSource = (char*)malloc(sizeof(char)*(size + 1));
-        if (programSource)
+        programSource = (vx_string)vxAllocateAndZeroMemory(sizeof(char)*(size + 1));
+        if (programSource == NULL)
+        {
+            goto OnError;
+        }
+        else
         {
             if (fread(programSource, sizeof(char), size, pFile) != size)
             {

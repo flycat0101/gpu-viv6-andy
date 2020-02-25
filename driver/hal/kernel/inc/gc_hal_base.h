@@ -277,6 +277,7 @@ gcsSystemInfo;
     gcvNULL, /* VX context lock    */ \
     gcvPATCH_NOTINIT,/* global patchID     */ \
     gcvNULL, /* global fenceID*/ \
+    gcvNULL, /* mainThreadHandle */ \
     gcvFALSE, /* memory profile flag */ \
     gcvNULL, /* profileLock;        */ \
     0, /* allocCount;         */ \
