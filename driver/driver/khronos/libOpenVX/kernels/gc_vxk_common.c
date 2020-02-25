@@ -762,7 +762,7 @@ static gceSTATUS _GetInfo(gcoVX_Kernel_Context *Context)
 
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
-            info->physicals[0] = (node->hardwareAddresses[1] != ~0u) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
+            info->physicals[0] = (gcsSURF_NODE_GetHWAddress(node) != ~0u) ? (gcsSURF_NODE_GetHWAddress(node)) : (node->hardwareAddresses[2]);
             info->logicals[0] = node->logical;
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
@@ -774,7 +774,7 @@ static gceSTATUS _GetInfo(gcoVX_Kernel_Context *Context)
             node = gcvNULL;
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
-            info->physicals[0] = (node->hardwareAddresses[1] != ~0u) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
+            info->physicals[0] = (gcsSURF_NODE_GetHWAddress(node) != ~0u) ? (gcsSURF_NODE_GetHWAddress(node)) : (node->hardwareAddresses[2]);
             info->logicals[0] = node->logical;
 
 #if !gcdVX_OPTIMIZER
@@ -792,7 +792,7 @@ static gceSTATUS _GetInfo(gcoVX_Kernel_Context *Context)
             info->height = 1;
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
-            info->physicals[0] = (node->hardwareAddresses[1] != ~0u) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
+            info->physicals[0] = (gcsSURF_NODE_GetHWAddress(node) != ~0u) ? (gcsSURF_NODE_GetHWAddress(node)) : (node->hardwareAddresses[2]);
             info->logicals[0] = node->logical;
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
@@ -809,7 +809,7 @@ static gceSTATUS _GetInfo(gcoVX_Kernel_Context *Context)
 
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
-            info->physicals[0] = (node->hardwareAddresses[1] != ~0u) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
+            info->physicals[0] = (gcsSURF_NODE_GetHWAddress(node) != ~0u) ? (gcsSURF_NODE_GetHWAddress(node)) : (node->hardwareAddresses[2]);
             info->logicals[0] = node->logical;
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
@@ -831,7 +831,7 @@ static gceSTATUS _GetInfo(gcoVX_Kernel_Context *Context)
 
                 vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
-                info->physicals[0] = (node->hardwareAddresses[1] != ~0u) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
+                info->physicals[0] = (gcsSURF_NODE_GetHWAddress(node) != ~0u) ? (gcsSURF_NODE_GetHWAddress(node)) : (node->hardwareAddresses[2]);
                 info->logicals[0] = node->logical;
 
                 gcmONERROR(gcoVX_BindImage(object->index, info));

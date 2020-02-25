@@ -41,7 +41,9 @@ gcoCL_SetHardwareType(
     IN gceHARDWARE_TYPE Type
     )
 {
-    gceHARDWARE_TYPE type;
+    gctUINT chipIDs[32];
+    gctUINT coreCount = 0;
+    static gceHARDWARE_TYPE type = gcvHARDWARE_INVALID;
     gcsTLS_PTR tls;
     gceSTATUS status = gcvSTATUS_OK;
 
@@ -49,7 +51,36 @@ gcoCL_SetHardwareType(
 
     gcmONERROR(gcoOS_GetTLS(&tls));
 
-    type = (tls->targetType != gcvHARDWARE_INVALID) ? tls->targetType : Type;
+    if (tls->targetType != gcvHARDWARE_INVALID)
+    {
+        gcoHAL_SetHardwareType(gcvNULL, type);
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+
+    gcoHAL_SetHardwareType(gcvNULL, Type);
+
+    gcmONERROR(gcoHAL_QueryCoreCount(gcvNULL, Type, &coreCount, chipIDs));
+    if (coreCount)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+    else if (type == gcvHARDWARE_INVALID)
+    {
+        gceHARDWARE_TYPE hwType[] = {gcvHARDWARE_3D, gcvHARDWARE_3D2D, gcvHARDWARE_VIP};
+        gctUINT i;
+
+        for (i = 0; i < gcmCOUNTOF(hwType); i++)
+        {
+            gcmONERROR(gcoHAL_QueryCoreCount(gcvNULL, hwType[i], &coreCount, chipIDs));
+            if (coreCount)
+            {
+                type = hwType[i];
+                break;
+            }
+        }
+    }
 
     gcoHAL_SetHardwareType(gcvNULL, type);
 
