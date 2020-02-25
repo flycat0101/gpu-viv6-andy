@@ -23647,6 +23647,7 @@ gcoHARDWARE_SetProbeCmd(
     gctUINT32 offset = 0;
     gctUINT32 i,j;
     gctUINT32 clusterIDWidth = 0;
+    gctBOOL hostInterface1 = gcvTRUE;
 
     static const gctUINT32 moduleXlate[] =
     {
@@ -23722,6 +23723,11 @@ gcoHARDWARE_SetProbeCmd(
     /* Reserve space in the command buffer. */
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
 
+    if((Hardware->config->chipModel == gcv7000) && (Hardware->config->chipRevision == 0x6203) )
+    {
+        hostInterface1 = gcvFALSE;
+    }
+
     if (ProbeAddress != ~0U)
     {
         gcmASSERT(Cmd == gcvPROBECMD_BEGIN || Cmd == gcvPROBECMD_END);
@@ -23788,8 +23794,14 @@ gcoHARDWARE_SetProbeCmd(
                 switch (Cmd)
                 {
                 case gcvPROBECMD_BEGIN:
+                    if(!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1) )
+                    {
+                        gcmSETSINGLESTATE_DUMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
+                    }
+                    else
+                    {
                     /* reset and resume counter */
-                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -23875,7 +23887,7 @@ gcoHARDWARE_SetProbeCmd(
 };
 
 
-                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                         {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -23960,10 +23972,17 @@ gcoHARDWARE_SetProbeCmd(
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
+                    }
                     break;
                 case gcvPROBECMD_PAUSE:
-                    /* pause the counter */
-                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                    if(!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1) )
+                    {
+                        gcmSETSINGLESTATE_DUMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
+                    }
+                    else
+                    {
+                         /* pause the counter */
+                         {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -24048,10 +24067,17 @@ gcoHARDWARE_SetProbeCmd(
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
+                    }
                     break;
                 case gcvPROBECMD_RESUME:
-                    /* resume the counter */
-                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                    if(!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1) )
+                    {
+                        gcmSETSINGLESTATE_DUMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
+                    }
+                    else
+                    {
+                         /* resume the counter */
+                         {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -24136,12 +24162,19 @@ gcoHARDWARE_SetProbeCmd(
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
+                    }
                     break;
                 case gcvPROBECMD_END:
-                    /* pass address to store counter */
-                    tempAddrs = address + (j + offset) * (gctUINT32)(1 << clusterIDWidth) *  gcmSIZEOF(gctUINT32);
+                    if(!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1) )
+                    {
+                        gcmSETSINGLESTATE_DUMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
+                    }
+                    else
+                    {
+                        /* pass address to store counter */
+                        tempAddrs = address + (j + offset) * (gctUINT32)(1 << clusterIDWidth) *  gcmSIZEOF(gctUINT32);
 
-                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                         {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -24194,8 +24227,8 @@ gcoHARDWARE_SetProbeCmd(
 };
 
 
-                    /* probe and pass the counter */
-                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                         /* probe and pass the counter */
+                         {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -24280,6 +24313,7 @@ gcoHARDWARE_SetProbeCmd(
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
+                    }
                     break;
                 default:
                     gcmASSERT(0);
