@@ -1267,12 +1267,12 @@ gcfVX_LoadKernelArgValues(
                         gcmONERROR(gcfVX_GetImageInfoFromTensor(BorderMode->mode, tensor, batchID, &info));
                     }
 
-                    if (Arg->components > 1 && Arg->components <= 4 && base->evisNoInst.supportEVIS == gcvFALSE)
+                    /* it's w/a for non-evis vxc shader in hw which support EVIS */
+                    info.isVXC =  Kernel->states.programState.hints->useEvisInst;
+                    if (Arg->components > 1 && Arg->components <= 4 && info.isVXC == gcvFALSE)
                     {
                         info.componentCount = Arg->components;
                     }
-
-                    info.isVXC = base->evisNoInst.supportEVIS ? gcvTRUE : gcvFALSE;
 
                     gcmONERROR(gcfVX_SetUniformImageInfo(Arg->uniform, &info));
                 }
