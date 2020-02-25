@@ -219,9 +219,10 @@ static int userClusterMask = 0;
 module_param(userClusterMask, int, 0644);
 MODULE_PARM_DESC(userClusterMask, "User defined cluster enable mask");
 
+/* GPU small batch feature. */
 static int smallBatch = 1;
 module_param(smallBatch, int, 0644);
-MODULE_PARM_DESC(smallBatch, "Enable/disable small batch");
+MODULE_PARM_DESC(smallBatch, "Enable/disable GPU small batch feature, enable by default");
 
 static int allMapInOne = 1;
 module_param(allMapInOne, int, 0644);
@@ -607,7 +608,7 @@ gckOS_DumpParam(
     printk("  stuckDump         = %d\n",      stuckDump);
     printk("  gpuProfiler       = %d\n",      gpuProfiler);
     printk("  userClusterMask   = 0x%x\n",    userClusterMask);
-    printk("  smallBatch        = %d\n",      smallBatch);
+    printk("  GPU smallBatch    = %d\n",      smallBatch);
     printk("  allMapInOne       = %d\n",      allMapInOne);
 
     printk("  irqs              = ");
@@ -1508,4 +1509,5 @@ static void __exit gpu_exit(void)
 }
 
 module_init(gpu_init);
+
 module_exit(gpu_exit);
