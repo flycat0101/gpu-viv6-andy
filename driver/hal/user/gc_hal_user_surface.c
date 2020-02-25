@@ -987,14 +987,17 @@ _FreeSurface(
         gcmGETCURRENTHARDWARE(currentType);
 
         /* Unlock the video memory with initial HW type */
-        if (currentType != Surface->initType)
+        if (Surface->initType != gcvHARDWARE_INVALID)
         {
-            gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, Surface->initType));
-        }
-        gcmONERROR(_Unlock(Surface));
-        if (currentType != Surface->initType)
-        {
-            gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, currentType));
+            if (currentType != Surface->initType)
+            {
+                gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, Surface->initType));
+            }
+            gcmONERROR(_Unlock(Surface));
+            if (currentType != Surface->initType)
+            {
+                gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, currentType));
+            }
         }
 
         if (Surface->node.u.normal.node != 0)
