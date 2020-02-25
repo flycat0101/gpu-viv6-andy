@@ -3051,7 +3051,6 @@ typedef struct _vx_drv_option
     gctSTRING enableOpsDebugInfo;
     gctUINT tpCoreCount;
     gctUINT tpLiteCoreCount;
-    gctUINT enableForce64BitsBiasNN;
     gctUINT enableAllocateContigousMemForKernel;
     gctUINT enableNNTranspose;
     gctUINT disableTPNNEvis;

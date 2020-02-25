@@ -1054,13 +1054,6 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     }
 
     envctrl = gcvNULL;
-    globalData->options.enableForce64BitsBiasNN = 0;
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_64BITS_BIAS_NN", &envctrl)) && envctrl)
-    {
-        globalData->options.enableForce64BitsBiasNN = atoi(envctrl);
-    }
-
-    envctrl = gcvNULL;
     globalData->options.enableAllocateContigousMemForKernel = 0;
     if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_CONTIGOUS_MEM_FOR_KERNEL", &envctrl)) && envctrl)
     {
