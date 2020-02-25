@@ -8083,14 +8083,11 @@ gcSHADER_Conv2VIR(
     VirShader->optionsLen = Shader->optionsLen;
     if (VirShader->optionsLen)
     {
-        gcmONERROR(gcoOS_Allocate(gcvNULL,
-                            VirShader->optionsLen,
-                            &pointer));
+        VirShader->buildOptions = (gctSTRING)vscMM_Alloc(&VirShader->pmp.mmWrapper, VirShader->optionsLen);
 
-        VirShader->buildOptions = pointer;
         gcmONERROR(gcoOS_StrCopySafe(VirShader->buildOptions,
-                                       VirShader->optionsLen,
-                                       Shader->buildOptions));
+                                     VirShader->optionsLen,
+                                     Shader->buildOptions));
     }
 
     VirShader->fragColorUsage = Shader->fragOutUsage;
