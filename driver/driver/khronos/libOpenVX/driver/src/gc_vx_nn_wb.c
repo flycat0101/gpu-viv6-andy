@@ -298,12 +298,11 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
 
     for (i = 0; i < WB_OUTPUT_Z_SLICE_NUM(wb); i++)
     {
-        filterCount = WB_OUTPUT_Z_INDEX(wb, index) = zArray[i];
-
         kzOffset = 0;
 
         for (j = 0; j < WB_KERNEL_Z_SLICE_NUM(wb); j++)
         {
+            filterCount = WB_OUTPUT_Z_INDEX(wb, index) = zArray[i];
             sliceCount = WB_KERNEL_Z_INDEX(wb, index) = kzArray[j];
 
             if ((vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_COMPRESSION_ENHANCEMENT) && WB_IS_TP_COMPRESS(wb)) ||

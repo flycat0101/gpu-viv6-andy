@@ -178,14 +178,15 @@ vx_status vxoNNFullyConnectedLayerInitializer(
     vx_uint32 width                       = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
     vx_uint32 height                      = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(inputs, 1) : 1;
     vx_uint32 depth                       = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
-    vx_uint32 inputDims                   = width * height * depth;
+    vx_uint32 inputDim                    = width * height * depth;
     vx_uint32 op_index = 0;
+    vx_uint32 inputDims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
 
     supportDataFormat0 = (vx_bool)(input_dataformat == VX_TYPE_FLOAT16 && weight_dataformat == VX_TYPE_FLOAT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_FLOAT32) && output_dataformat == VX_TYPE_FLOAT16);
     supportDataFormat1 = (vx_bool)(input_dataformat == VX_TYPE_INT8 && weight_dataformat == VX_TYPE_INT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_INT8);
     supportDataFormat2 = (vx_bool)(input_dataformat == VX_TYPE_INT16 && weight_dataformat == VX_TYPE_INT16 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_INT16);
     supportDataFormat3 = (vx_bool)(input_dataformat == VX_TYPE_UINT8 && weight_dataformat == VX_TYPE_UINT8 && (bias_dataformat == VX_TYPE_INVALID || bias_dataformat == VX_TYPE_INT32) && output_dataformat == VX_TYPE_UINT8);
-    enable_shader      = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
+    enable_shader      = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDim < IMG_MAX_WIDTH);
 
     if (TENSOR_DIM_NUM(inputs) == 2)
     {
@@ -218,10 +219,31 @@ vx_status vxoNNFullyConnectedLayerInitializer(
         aligned64 = vx_false_e;
     }
 
+    if (TENSOR_DIM_NUM(inputs) == 1)
+    {
+        inputDims[0] = 1;
+        inputDims[1] = 1;
+        inputDims[2] = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+    }
+    else if (TENSOR_DIM_NUM(inputs) == 2)
+    {
+        inputDims[0] = 1;
+        inputDims[1] = 1;
+        inputDims[2] = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+        inputDims[3] = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+    }
+    else
+    {
+        for (i = 0; i < TENSOR_DIM_NUM(inputs); i++)
+        {
+            inputDims[i] = TENSOR_VIEW_SIZE_INDEX(inputs, i);
+        }
+    }
+
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP) &&
         vxnneIsTPSupportFormat(context, inputs, weights_biases, outputs) &&
         WB_OUTPUT_Z(weights_biases) > 1 &&
-        (TENSOR_VIEW_SIZE_INDEX(inputs, 0) == 1 || TENSOR_VIEW_SIZE_INDEX(inputs, 1) != 1) &&
+        (inputDims[0] == 1 || inputDims[1] != 1) &&
         aligned64 &&
         !isInt64BiasOverflow(context, WB_WEIGHT_DATA_FORMAT(weights_biases), WB_BIAS_DATA_FORMAT(weights_biases), WB_OUTPUT_Z(weights_biases), WB_BIAS_TENSOR(weights_biases)))
     {
