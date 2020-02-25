@@ -417,7 +417,16 @@ if ((database->SMALLBATCH && phyDev->phyDevConfig.options.smallBatch)){    vsCon
     pVscHwCfg->hwFeatureFlags.supportSeparatedTex    = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.supportMultiGPU        = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.hasPointSizeFix        = gcvTRUE;
-    pVscHwCfg->hwFeatureFlags.hasAtomTimingFix       = !(pVscHwCfg->chipModel == 0x3000 && pVscHwCfg->chipRevision == 0x5450);
+    if ((pVscHwCfg->chipModel == gcv7000 && pVscHwCfg->chipRevision == 0x6009)
+        ||
+        (pVscHwCfg->chipModel == gcv3000 && pVscHwCfg->chipRevision == 0x5450))
+    {
+        pVscHwCfg->hwFeatureFlags.hasAtomTimingFix   = gcvFALSE;
+    }
+    else
+    {
+        pVscHwCfg->hwFeatureFlags.hasAtomTimingFix   = gcvTRUE;
+    }
     pVscHwCfg->hwFeatureFlags.supportVectorB0        = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.FEDrawDirect           = database->FE_DRAW_DIRECT;
 
