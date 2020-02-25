@@ -1661,6 +1661,7 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
     vxnne_operation         operation;
     vxnne_operation_target_e operationTarget;
     vx_graph graph = executionLayer->graph;
+    vx_node node = VX_NULL;
 
 #if VIVANTE_PROFILER
     if (!graph->cmdCaptureOn)
@@ -1680,6 +1681,11 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
 
         operation = executionLayer->operations[executionLayer->opIndices[i].operationID];
 
+        node = ((operation)->layer)->node;
+        if (node->kernel->isUserkernel)
+        {
+            vxoNode_EnableVirtualAccessible(node);
+        }
         if (graph->verified == vx_false_e && graph->base.context->options.enableGraphCommandBuffer == vx_true_e &&
             i == 0 && operation->target == VXNNE_OPERATION_TARGET_SC)
         {
@@ -1876,7 +1882,10 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
             vxoProfiler_End((vx_reference)executionLayer->graph);
 #endif
         }
-
+        if (node->kernel->isUserkernel)
+        {
+            vxoNode_DisableVirtualAccessible(node);
+        }
  #if VXM_FORCE_PER_OPERATION_IDLE
         else
         {

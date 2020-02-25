@@ -2392,7 +2392,7 @@ vxCopyTensorPatch(
         return VX_ERROR_OPTIMIZED_AWAY;
     }
 
-    if (!vxoTensor_MemoryIsAllocated(tensor))
+    if (!vxoTensor_MemoryIsAllocated(tensor) && !(tensor->base.isVirtual && tensor->alloced))
     {
         if (usage != VX_WRITE_ONLY || vxoTensor_AllocateMemory(tensor) != VX_SUCCESS)
         {
