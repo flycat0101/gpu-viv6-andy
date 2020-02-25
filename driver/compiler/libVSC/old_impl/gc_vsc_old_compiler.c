@@ -29909,7 +29909,15 @@ gcIsInstHWBarrier(
     }
     else if (opcode == gcSL_MEM_BARRIER)
     {
-        if (memoryScope == gcSL_MEMORY_SCOPE_WORKGROUP
+        /* Only CS/CL and TCS can support BARRIER instruction. */
+        if (!(GetShaderType(Shader) == gcSHADER_TYPE_COMPUTE || GetShaderType(Shader) == gcSHADER_TYPE_CL || GetShaderType(Shader) == gcSHADER_TYPE_TCS))
+        {
+            return gcvFALSE;
+        }
+
+        if ((memoryScope == gcSL_MEMORY_SCOPE_WORKGROUP ||
+             memoryScope == gcSL_MEMORY_SCOPE_DEVICE    ||
+             memoryScope == gcSL_MEMORY_SCOPE_CROSS_DEVICE)
             &&
             ((memorySemantic & gcSL_MEMORY_SEMANTIC_ACQUIRE) || (memorySemantic & gcSL_MEMORY_SEMANTIC_ACQUIRERELEASE)))
         {
