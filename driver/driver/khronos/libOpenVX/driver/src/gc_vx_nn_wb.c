@@ -824,20 +824,17 @@ VX_PRIVATE_API vx_status vxoWeightBias_Deinitializer(
 
     if (WB_WEIGHT_TENSOR(wb) != VX_NULL)
     {
-        vxoReference_Decrement((vx_reference)WB_WEIGHT_TENSOR(wb), VX_REF_INTERNAL);
-        WB_WEIGHT_TENSOR(wb) = VX_NULL;
+        vxoReference_Release((vx_reference_ptr)&WB_WEIGHT_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
     }
 
     if (WB_BIAS_TENSOR(wb) != VX_NULL)
     {
-        vxoReference_Decrement((vx_reference)WB_BIAS_TENSOR(wb), VX_REF_INTERNAL);
-        WB_BIAS_TENSOR(wb) = VX_NULL;
+        vxoReference_Release((vx_reference_ptr)&WB_BIAS_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
     }
 
     if (WB_ALPHA_TENSOR(wb) != VX_NULL)
     {
-        vxoReference_Decrement((vx_reference)WB_ALPHA_TENSOR(wb), VX_REF_INTERNAL);
-        WB_ALPHA_TENSOR(wb) = VX_NULL;
+        vxoReference_Release((vx_reference_ptr)&WB_ALPHA_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
     }
 
     return VX_SUCCESS;
@@ -927,7 +924,7 @@ VX_PRIVATE_API vx_status vxoWeightBias_Set_Weight_Bias_Tensor(
 
         if (WB_WEIGHT_TENSOR(wb) != VX_NULL)
         {
-            vxoReference_Decrement((vx_reference)WB_WEIGHT_TENSOR(wb), VX_REF_INTERNAL);
+            vxoReference_Release((vx_reference_ptr)&WB_WEIGHT_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
         }
         else
         {
@@ -952,7 +949,7 @@ VX_PRIVATE_API vx_status vxoWeightBias_Set_Weight_Bias_Tensor(
 
         if (WB_BIAS_TENSOR(wb) != VX_NULL)
         {
-            vxoReference_Decrement((vx_reference)WB_BIAS_TENSOR(wb), VX_REF_INTERNAL);
+            vxoReference_Release((vx_reference_ptr)&WB_BIAS_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
         }
         else
         {
@@ -986,7 +983,7 @@ VX_PRIVATE_API vx_status vxoWeightBias_Set_Alpha_Tensor(
 
     if (WB_ALPHA_TENSOR(wb) != VX_NULL)
     {
-        vxoReference_Decrement((vx_reference)WB_ALPHA_TENSOR(wb), VX_REF_INTERNAL);
+        vxoReference_Release((vx_reference_ptr)&WB_ALPHA_TENSOR(wb), VX_TYPE_TENSOR, VX_REF_INTERNAL);
     }
     else
     {
