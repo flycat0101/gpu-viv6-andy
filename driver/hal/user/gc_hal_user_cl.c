@@ -216,6 +216,7 @@ gcoCL_SetHardware(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 coreIndex = 0;
+    gceHARDWARE_TYPE type = gcvHARDWARE_INVALID;
 
     gcmHEADER();
     gcmVERIFY_ARGUMENT(savedHW != gcvNULL);
@@ -226,20 +227,25 @@ gcoCL_SetHardware(
     {
         gcoHAL_GetCurrentCoreIndex(gcvNULL, savedCoreIndex);
         gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, savedType));
-
     }
 
     gcmONERROR(gcoHARDWARE_Set3DHardware(hw));
 
     if (hw)
     {
-        gcoHARDWARE_QueryCoreIndex(hw,0,&coreIndex);
+        gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, &type));
+        if (type != gcvHARDWARE_3D || type != gcvHARDWARE_VIP || type != gcvHARDWARE_3D2D)
+        {
+            gcmONERROR(gcoCL_SetHardwareType(gcvHARDWARE_3D));
+        }
+
+        gcoHARDWARE_QueryCoreIndex(hw, 0, &coreIndex);
         gcoHAL_SetCoreIndex(gcvNULL, coreIndex);
     }
+
 OnError:
     gcmFOOTER();
     return status;
-
 }
 
 
