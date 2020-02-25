@@ -11177,12 +11177,40 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
     vx_uint32 lcdKernelDataPhyIndex = 0;
     vx_uint32 lcdTensorSize = 0;
     vx_uint32 shaderStatesSize = 0;
+    vx_uint32 lcdKernelDataNum = 0;
+
+    for (i = 0; i < executionLayer->opIndicesNum; i++)
+    {
+        operation = executionLayer->operations[executionLayer->opIndices[i].operationID];
+        operationCommand = &executionLayer->opIndices[i];
+        if (operation->target == VXNNE_OPERATION_TARGET_NN)
+        {
+            lcdKernelDataNum++;
+        }
+        else if (operation->target == VXNNE_OPERATION_TARGET_TP)
+        {
+            vx_uint32 j = 0;
+            vx_op_param parameter = &operationCommand->operation->parameter;
+            if (parameter->data_buff != VX_NULL)
+            {
+                lcdKernelDataNum++;
+            }
+            else if (parameter->tpType == TP_SINGLE_FC && parameter->other_ref != VX_NULL)
+            {
+                vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter)parameter->other_ref;
+
+                for (j = 0; j < WB_TOTAL_SLICE_NUM(weights_biases); j++)
+                {
+                    lcdKernelDataNum++;
+                }
+             }
+        }
+    }
 
     lcdTensorsPhysical = (vx_uint32*)vxAllocateAndZeroMemory(sizeof(vx_uint32) * VX_MAX_TEMP_TENSORS);
-    lcdKernelDataPhysical = (vx_uint32*)vxAllocateAndZeroMemory(sizeof(vx_uint32) * executionLayer->opIndicesNum * context->nnConfig.fixedFeature.tpCoreCount);
+    lcdKernelDataPhysical = (vx_uint32*)vxAllocateAndZeroMemory(sizeof(vx_uint32) * (lcdKernelDataNum + 50));
 
     patchCount += 10;
-
     operationCount = 4; /* initialize and end */
     patchCount += 4; /* SRAM */
     lcdtCount = operationCount;
