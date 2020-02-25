@@ -1739,6 +1739,12 @@ gckKERNEL_UnmapMemory(
     IN gctPOINTER Logical,
     IN gctUINT32 ProcessID
     );
+/* Destroy reserved mem when destroy process*/
+gceSTATUS
+gckKERNEL_DestroyProcessReservedUserMap(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 Pid
+    );
 
 /* Notification of events. */
 gceSTATUS

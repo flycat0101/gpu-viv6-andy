@@ -2495,7 +2495,6 @@ gcoOS_DeviceControl(
     gcsHAL_INTERFACE_PTR outputBuffer;
     gcsDRIVER_ARGS args;
     gcsTLS_PTR tls;
-    gctPOINTER logical = gcvNULL;
     gctUINT32 interrupt_count = 0;
 
     gcmHEADER_ARG("IoControlCode=%u InputBuffer=0x%x "
@@ -2526,36 +2525,6 @@ gcoOS_DeviceControl(
             inputBuffer->hardwareType = gcvHARDWARE_2D;
             inputBuffer->coreIndex = 0;
         }
-    }
-
-    switch (inputBuffer->command)
-    {
-    case gcvHAL_MAP_MEMORY:
-        logical = mmap(
-            gcvNULL, inputBuffer->u.MapMemory.bytes,
-            PROT_READ | PROT_WRITE, MAP_SHARED,
-            gcPLS.os->device, (off_t) 0
-            );
-
-        if (logical != MAP_FAILED)
-        {
-            inputBuffer->u.MapMemory.logical = gcmPTR_TO_UINT64(logical);
-            inputBuffer->status = gcvSTATUS_OK;
-            gcmFOOTER_NO();
-            return gcvSTATUS_OK;
-        }
-        break;
-
-    case gcvHAL_UNMAP_MEMORY:
-        munmap(gcmUINT64_TO_PTR(inputBuffer->u.UnmapMemory.logical), inputBuffer->u.UnmapMemory.bytes);
-
-        inputBuffer->status = gcvSTATUS_OK;
-        gcmFOOTER_NO();
-        return gcvSTATUS_OK;
-
-    default:
-        /* This has to be here so that GCC does not complain. */
-        break;
     }
 
     /* Call kernel. */
