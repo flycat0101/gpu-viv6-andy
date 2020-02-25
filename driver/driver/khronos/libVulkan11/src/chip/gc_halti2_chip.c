@@ -682,27 +682,6 @@ VkResult halti2_clearImageWithRS(
         alignHeight = 4;
     }
 
-    if ((realRect.offset.x & 0x3)     || (realRect.offset.y & 0x3) ||
-        (realRect.extent.width & (alignWidth - 1)) ||
-        (realRect.extent.height & (alignHeight - 1)))
-    {
-        __vkBlitRes dstRes;
-
-        dstRes.isImage = VK_TRUE;
-        dstRes.u.img.pImage = img;
-        dstRes.u.img.subRes.aspectMask = subResource->aspectMask;
-        dstRes.u.img.subRes.mipLevel = subResource->mipLevel;
-        dstRes.u.img.offset.x = realRect.offset.x;
-        dstRes.u.img.offset.y = realRect.offset.y;
-        dstRes.u.img.offset.z = 1;
-        dstRes.u.img.extent.width = realRect.extent.width;
-        dstRes.u.img.extent.height = realRect.extent.height;
-        dstRes.u.img.extent.depth = 1;
-        dstRes.u.img.subRes.arrayLayer = subResource->arrayLayer;
-
-        return (halti5_computeClear(commandBuffer, clearValue, &dstRes));
-    }
-
     if (devCtx->database->CACHE128B256BPERLINE)
     {
         if (img->halTiling == gcvSUPERTILED)
@@ -738,9 +717,26 @@ VkResult halti2_clearImageWithRS(
 
     rsConfigTiling(img, &dstTiling, &dstSuperTile);
 
-    if (hwFormat == 0x10)
+    if ((realRect.offset.x & 0x3)     || (realRect.offset.y & 0x3) ||
+        (realRect.extent.width & (alignWidth - 1)) ||
+        (realRect.extent.height & (alignHeight - 1)) ||
+        (hwFormat == 0x10 && dstTiling == 0x0))
     {
-        __VK_ASSERT(dstTiling == 0x1);
+        __vkBlitRes dstRes;
+
+        dstRes.isImage = VK_TRUE;
+        dstRes.u.img.pImage = img;
+        dstRes.u.img.subRes.aspectMask = subResource->aspectMask;
+        dstRes.u.img.subRes.mipLevel = subResource->mipLevel;
+        dstRes.u.img.offset.x = realRect.offset.x;
+        dstRes.u.img.offset.y = realRect.offset.y;
+        dstRes.u.img.offset.z = 1;
+        dstRes.u.img.extent.width = realRect.extent.width;
+        dstRes.u.img.extent.height = realRect.extent.height;
+        dstRes.u.img.extent.depth = 1;
+        dstRes.u.img.subRes.arrayLayer = subResource->arrayLayer;
+
+        return (halti5_computeClear(commandBuffer, clearValue, &dstRes));
     }
 
     __VK_ASSERT(cmd->curScrachBufIndex == 0);
