@@ -5865,13 +5865,34 @@ vxnne_shader_executable vxnneGetFullyConnectedShaderExecutable(
         batch     = TENSOR_VIEW_SIZE_INDEX(input, 1);
         break;
     case 3:
-        inputSize   = TENSOR_VIEW_SIZE_INDEX(input, 0) * TENSOR_VIEW_SIZE_INDEX(input, 1) * TENSOR_VIEW_SIZE_INDEX(input, 2);
-        batch   = 1;
+        if ((1 == TENSOR_VIEW_SIZE_INDEX(input, 2))
+           && (width_wei == TENSOR_VIEW_SIZE_INDEX(input, 0))
+           && (height_wei == TENSOR_VIEW_SIZE_INDEX(output, 0)))
+        {
+            inputSize = TENSOR_VIEW_SIZE_INDEX(input, 0);
+            batch     = TENSOR_VIEW_SIZE_INDEX(input, 1);
+        }
+        else
+        {
+            inputSize   = TENSOR_VIEW_SIZE_INDEX(input, 0) * TENSOR_VIEW_SIZE_INDEX(input, 1) * TENSOR_VIEW_SIZE_INDEX(input, 2);
+            batch   = 1;
+        }
         break;
     case 4:
-        inputSize   = TENSOR_VIEW_SIZE_INDEX(input, 0) * TENSOR_VIEW_SIZE_INDEX(input, 1) * TENSOR_VIEW_SIZE_INDEX(input, 2);
-        batch   = batch0;
-        batch0  = 1;
+        if ((1 == TENSOR_VIEW_SIZE_INDEX(input, 2))
+           && (1 == TENSOR_VIEW_SIZE_INDEX(input, 3))
+           && (width_wei == TENSOR_VIEW_SIZE_INDEX(input, 0))
+           && (height_wei == TENSOR_VIEW_SIZE_INDEX(output, 0)))
+        {
+            inputSize = TENSOR_VIEW_SIZE_INDEX(input, 0);
+            batch     = TENSOR_VIEW_SIZE_INDEX(input, 1);
+        }
+        else
+        {
+            inputSize   = TENSOR_VIEW_SIZE_INDEX(input, 0) * TENSOR_VIEW_SIZE_INDEX(input, 1) * TENSOR_VIEW_SIZE_INDEX(input, 2);
+            batch   = batch0;
+            batch0  = 1;
+        }
         break;
     default:
         vxError("Input tensor OnError dimension[%u]\n", input_dims);
