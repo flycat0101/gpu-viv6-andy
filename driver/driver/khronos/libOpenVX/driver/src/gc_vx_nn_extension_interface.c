@@ -25745,7 +25745,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConcatIndefiniteLayer_Initializer(vx_n
     }
     else
     {
-        enable_SHExe = (vx_bool)(_Is_concat_on_highest_dimension(output_s, axis) || ((dimCount - 1) > axis && dimCount < 4));
+        enable_SHExe = (vx_bool)(_Is_concat_on_highest_dimension(output_s, axis)
+                              || ((dimCount - 1) > axis && dimCount < 4)
+                              || (axis < 3 && batchCount == 1));
     }
 
     for (i = 0; i < itemCount; i++)
