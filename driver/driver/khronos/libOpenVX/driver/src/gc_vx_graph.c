@@ -1945,7 +1945,7 @@ VX_PRIVATE_API vx_status DetectSegments(
 
                         if (!detected)
                         {
-                            k =  gcmCLAMP(((vx_int32)(failedID - i)), 1, k);
+                            k =  gcmCLAMP(((vx_int32)(failedID - i)), 1, (vx_int32)k);
                         }
                     }
                     else
