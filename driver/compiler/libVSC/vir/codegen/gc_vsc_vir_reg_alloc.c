@@ -4106,6 +4106,10 @@ _VIR_RA_LS_AddActiveLRs(
             }
 
             retValue = _VIR_RA_LS_SetUsedColorForLR(pRA, pLR, newColor, reservedDataReg);
+            if (retValue == VSC_RA_ERR_OUT_OF_REG_FAIL)
+            {
+                return retValue;
+            }
             CHECK_ERROR(retValue, "set used color for LR");
 
             /* set the register allocation water mark */
@@ -7299,7 +7303,10 @@ VSC_ErrCode _VIR_RA_LS_AssignColors(
 
                         /* add the LR to the active LRs list */
                         retValue = _VIR_RA_LS_AddActiveLRs(pRA, pLR->webIdx, newColor, pFunc, reservedDataReg);
-
+                        if (retValue != VSC_ERR_NONE)
+                        {
+                            goto OnError;
+                        }
                         /* find a used color */
                         pLR = pLR->nextLR;
                         continue;
