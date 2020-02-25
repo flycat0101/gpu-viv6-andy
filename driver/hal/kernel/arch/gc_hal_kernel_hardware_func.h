@@ -18,8 +18,8 @@
 extern "C" {
 #endif
 
-#define gcdINITIALIZE_PPU       1
-#define gcdRESET_USC            1
+#define gcdINITIALIZE_PPU       0
+#define gcdRESET_USC            0
 
 typedef struct _gcsFUNCTION_EXECUTION * gcsFUNCTION_EXECUTION_PTR;
 
