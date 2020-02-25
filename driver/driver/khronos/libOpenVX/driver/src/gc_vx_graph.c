@@ -1636,9 +1636,15 @@ VX_PRIVATE_API vx_status SetMemoryRequestList(
 {
     vx_uint32 i, j, dims;
     vxnne_mem_request   memRequest = graph->layer->memRequestList + start;
-     vx_memory_s        outputMemory[VX_MAX_MEM_REQUEST_OUTPUT];
+    vx_memory_s        outputMemory[VX_MAX_MEM_REQUEST_OUTPUT];
+    vx_memory_s        inputMemory[VX_MAX_MEM_REQUEST_OUTPUT];
 
     vxmASSERT(allocType == VXNNE_MEM_POOL_TYPE_AXI_SRAM || allocType == VXNNE_MEM_POOL_TYPE_VIP_SRAM);
+
+    for(j = 0; j < memRequest[0].inputCount; j++)
+    {
+        inputMemory[j] = *memRequest[0].inputMemory[j];
+    }
 
     for(j = 0; j < memRequest[count - 1].outputCount; j++)
     {
@@ -1658,6 +1664,11 @@ VX_PRIVATE_API vx_status SetMemoryRequestList(
                 vxmASSERT(memRequest[i].outputMemory[j]->sizes[0] > 0);
             }
         }
+    }
+
+    for(j = 0; j < memRequest[0].inputCount; j++)
+    {
+        *memRequest[0].inputMemory[j] = inputMemory[j];
     }
 
     for(j = 0; j < memRequest[count - 1].outputCount; j++)
@@ -1821,21 +1832,39 @@ VX_PRIVATE_API vx_status DetectABSegment(
     vxmASSERT (status == VX_SUCCESS);
 
 
-    graph->layer->memRequestList[start].inputMemory[0]->allocType &= ~VXNNE_MEM_POOL_TYPE_SRAM;
-    graph->layer->memRequestList[start + count - 1].outputMemory[0]->allocType &= ~VXNNE_MEM_POOL_TYPE_SRAM;
+    for (k = 0; k < graph->layer->memRequestList[start].inputCount; k++)
+    {
+        graph->layer->memRequestList[start].inputMemory[k]->allocType &= ~VXNNE_MEM_POOL_TYPE_SRAM;
+    }
+
+    for (k = 0; k < graph->layer->memRequestList[start + count - 1].outputCount; k++)
+    {
+        graph->layer->memRequestList[start + count - 1].outputMemory[k]->allocType &= ~VXNNE_MEM_POOL_TYPE_SRAM;
+    }
 
     status = SetMemoryRequestList(
         graph, oldStart, oldCount, memType);
     vxmASSERT (status == VX_SUCCESS);
 
-    if (graph->layer->memRequestList[start].inputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM ||
-        graph->layer->memRequestList[start + count - 1].outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
+    for (k = 0; k < graph->layer->memRequestList[start].inputCount; k++)
     {
-        *detected = vx_false_e;
-        *failedID = oldStart + oldCount - 1;
-        goto OnError;
+        if (graph->layer->memRequestList[start].inputMemory[k]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
+        {
+            *detected = vx_false_e;
+            *failedID = oldStart + oldCount - 1;
+            goto OnError;
+        }
     }
 
+    for (k = 0; k < graph->layer->memRequestList[start + count - 1].outputCount; k++)
+    {
+        if (graph->layer->memRequestList[start + count - 1].outputMemory[k]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
+        {
+            *detected = vx_false_e;
+            *failedID = oldStart + oldCount - 1;
+            goto OnError;
+        }
+    }
 
     for (k = start; k < start + count; k++)
     {
