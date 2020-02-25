@@ -8322,7 +8322,14 @@ vx_uint32 fillinKernelBuffer(
     }
 
     if (kernel_align_stream_size != VX_NULL)
-        *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount);
+    {
+                /*bug1980*/
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX))
+            *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount );
+        else
+            *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
+
+    }
 
     if (!hasKernelFullCacheInterleaveFix && kernel_stream_full_cache_size != VX_NULL)
     {
@@ -8395,6 +8402,7 @@ vx_uint32 fillinDepthWiseKernelBuffer(
     vx_uint32 groupCount         = (filterTotalCount + batchSize - 1) / batchSize;
     vx_uint32 totalFilterPerCore = filterTotalCount / nnCoreCount;
     vx_uint32 oddFilterPerCore   = filterTotalCount % nnCoreCount;
+    vx_uint32 usedCoreCount      = (filterTotalCount > nnCoreCount) ? nnCoreCount : filterTotalCount;
 
     vx_uint32 kernelStreamSize   = 0;
     vx_uint32* kernelBufferPtr   = (vx_uint32*) wb_base_ptr;
@@ -8666,7 +8674,14 @@ vx_uint32 fillinDepthWiseKernelBuffer(
     }
 
     if (kernel_align_stream_size != VX_NULL)
-        *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
+    {
+                        /*bug1980*/
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX))
+            *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount );
+        else
+            *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
+
+    }
 
     if (!hasKernelFullCacheInterleaveFix && kernel_stream_full_cache_size != VX_NULL)
     {
@@ -10836,7 +10851,13 @@ vx_uint32 fillinKernelBufferHuffman(
     }
     vxmASSERT(reorderStreamAllCount == reorderStreamCheckCount); /*Check if the data count is the same*/
     if (kernel_align_stream_size != VX_NULL)
-        *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount);
+    {
+                /*bug1980*/
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX))
+            *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount );
+        else
+            *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
+    }
 
     if (!hasKernelFullCacheInterleaveFix && kernel_stream_full_cache_size != VX_NULL)
     {
@@ -11723,7 +11744,14 @@ vx_uint32 fillinKernelBufferV8Huffman(
         maxKernelStreamSizePerCore = kernelStreamSize;
     /*Per HW, post processing stream size is needed in SRAM, when partial mode, need be noted as one core*/
     if (kernel_align_stream_size != VX_NULL)
-        *kernel_align_stream_size = (vx_size)(maxKernelStreamSizePerCore * (usedCoreCount + 1));
+    {
+        /*bug1980*/
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX))
+            *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * (usedCoreCount + 1) );
+        else
+            *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * (nnCoreCount + 1));
+
+    }
 
     if (!hasKernelFullCacheInterleaveFix && kernel_stream_full_cache_size != VX_NULL)
     {
