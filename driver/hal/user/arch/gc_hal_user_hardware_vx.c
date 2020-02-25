@@ -35689,7 +35689,8 @@ gcoHARDWAREVX_TriggerAccelerator(
 
         if (!Hardware->config->parallelNoFix)
         {
-            smallBatch = Hardware->features[gcvFEATURE_NN_SMALLBATCH_PHASE1] ? 0x0 : 0x1;
+            smallBatch = (Hardware->features[gcvFEATURE_NN_SMALLBATCH_PHASE1] && Hardware->features[gcvFEATURE_NN_COMMAND_KERNEL_REQUEST_CONFICT_FIX])
+                         ? 0x0 : 0x1;
         }
         else
         {
