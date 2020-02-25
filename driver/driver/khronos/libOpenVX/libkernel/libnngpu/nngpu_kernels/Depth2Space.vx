@@ -59,7 +59,6 @@ __kernel void gpuReorg2_Depth2SpaceQuant8
     uint4 tmp = {0};
 
     tmp = read_imageui(input, (int4)(inx, iny, inz, 0));
-    tmp.x = floor((tmp.x - zpIn)*scale + zpOut + 0.5);
     write_imageui(output, (int4)(x, y, z, 0), tmp);
 }
 
@@ -83,6 +82,5 @@ __kernel void gpuReorg2_Depth2SpaceQuant8Block2
     uint4 tmp = {0};
 
     tmp = read_imageui(input, (int4)(inx, iny, inz, 0));
-    tmp.x = floor((tmp.x - zpIn)*scale + zpOut + 0.5);
     write_imageui(output, (int4)(x, y, z, 0), tmp);
 }
