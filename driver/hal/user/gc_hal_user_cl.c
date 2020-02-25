@@ -122,8 +122,6 @@ gcoCL_InitializeHardware()
 
     for (i = 0; i < gcmCOUNTOF(hwType); i++)
     {
-        gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, hwType[i]));
-
         gcmONERROR(gcoHAL_QueryCoreCount(gcvNULL, hwType[i], &coreCount, chipIDs));
         if (!coreCount)
         {
@@ -136,6 +134,8 @@ gcoCL_InitializeHardware()
             tls->defaultHardware = gcvNULL;
             tls->currentHardware = gcvNULL;
         }
+
+        gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, hwType[i]));
 
         gcmONERROR(gcoHAL_ConvertCoreIndexGlobal(gcPLS.hal, hwType[i], 1, &localCoreIndex, &globalCoreIndex));
 
@@ -212,18 +212,26 @@ gcoCL_SetHardware(
     OUT gcoHARDWARE *savedHW,
     OUT gceHARDWARE_TYPE *savedType,
     OUT gctUINT32 *savedCoreIndex
-)
+    )
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 coreIndex = 0;
+
     gcmHEADER();
     gcmVERIFY_ARGUMENT(savedHW != gcvNULL);
-    gcoHAL_GetCurrentCoreIndex(gcvNULL, savedCoreIndex);
+
     gcmONERROR(gcoHARDWARE_Get3DHardware(savedHW));
-    gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, savedType));
+
+    if (*savedHW)
+    {
+        gcoHAL_GetCurrentCoreIndex(gcvNULL, savedCoreIndex);
+        gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, savedType));
+
+    }
+
     gcmONERROR(gcoHARDWARE_Set3DHardware(hw));
-    gcmONERROR(gcoCL_SetHardwareType(gcvHARDWARE_3D));
-    if(hw)
+
+    if (hw)
     {
         gcoHARDWARE_QueryCoreIndex(hw,0,&coreIndex);
         gcoHAL_SetCoreIndex(gcvNULL, coreIndex);
@@ -235,24 +243,28 @@ OnError:
 }
 
 
-    gceSTATUS
+gceSTATUS
 gcoCL_RestoreContext(
      gcoHARDWARE preHW,
      gceHARDWARE_TYPE preType,
      gctUINT32 preCoreIndex
     )
-    {
-        gceSTATUS status = gcvSTATUS_OK;
-        gcmHEADER();
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
 
-        gcmONERROR(gcoHARDWARE_Set3DHardware(preHW));
+    gcmONERROR(gcoHARDWARE_Set3DHardware(preHW));
+
+    if (preHW)
+    {
         gcoHAL_SetCoreIndex(gcvNULL, preCoreIndex);
-        gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, preType));
+        gcmONERROR(gcoCL_SetHardwareType(preType));
+    }
 
 OnError:
-        gcmFOOTER();
-        return status;
-    }
+    gcmFOOTER();
+    return status;
+}
 
 /******************************************************************************\
 |****************************** MEMORY MANAGEMENT *****************************|
