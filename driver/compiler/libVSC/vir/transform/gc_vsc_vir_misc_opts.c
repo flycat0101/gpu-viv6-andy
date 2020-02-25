@@ -6773,6 +6773,20 @@ VIR_Inst_Dual16NotSupported(
     return gcvFALSE;
 }
 
+static gctBOOL
+VIR_Inst_Dual16NotSupportedShader(
+    IN VIR_Function *pFunc,
+    IN VIR_Instruction *  pInst
+)
+{
+    if (VIR_Function_GetInstCount(pFunc) > 512 &&
+        VIR_Inst_GetOpcode(pInst) == VIR_OP_EXP2)
+    {
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
 DEF_QUERY_PASS_PROP(VIR_Shader_CheckDual16able)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
@@ -6907,42 +6921,27 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
     VSC_HW_CONFIG*          pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
     gctBOOL                 bHasOneConstFix = pHwCfg->hwFeatureFlags.noOneConstLimit;
 
+    if (compCfg->ctx.appNameId == gcvPATCH_GLBM21 ||
+        compCfg->ctx.appNameId == gcvPATCH_GLBM25 ||
+        compCfg->ctx.appNameId == gcvPATCH_GLBM27 ||
+        compCfg->ctx.appNameId == gcvPATCH_GFXBENCH ||
+        compCfg->ctx.appNameId == gcvPATCH_MM07 ||
+        compCfg->ctx.appNameId == gcvPATCH_NENAMARK2 ||
+        compCfg->ctx.appNameId == gcvPATCH_LEANBACK ||
+        compCfg->ctx.appNameId == gcvPATCH_ANGRYBIRDS)
+    {
+        isPerfBench = gcvTRUE;
+    }
+
     if (dual16Mode == DUAL16_AUTO_BENCH)
     {
         /* Enable dual16 auto-on mode for following games. */
-        switch (compCfg->ctx.appNameId)
+        if (!isPerfBench)
         {
-        case gcvPATCH_GLBM21:
-        case gcvPATCH_GLBM25:
-        case gcvPATCH_GLBM27:
-        case gcvPATCH_GFXBENCH:
-        case gcvPATCH_MM07:
-        case gcvPATCH_NENAMARK2:
-        case gcvPATCH_LEANBACK:
-        case gcvPATCH_ANGRYBIRDS:
-        {
-            isPerfBench = gcvTRUE;
-            break;
-        }
-        default:
             return errCode;
         }
     }
-    /* nxp benchmark render error caused by dual16, this is a workround to disable shader with pow API */
-    else if (dual16Mode == DUAL16_AUTO_ALL)
-    {
-        if (compCfg->ctx.appNameId == gcvPATCH_GLBM21 ||
-            compCfg->ctx.appNameId == gcvPATCH_GLBM25 ||
-            compCfg->ctx.appNameId == gcvPATCH_GLBM27 ||
-            compCfg->ctx.appNameId == gcvPATCH_GFXBENCH ||
-            compCfg->ctx.appNameId == gcvPATCH_MM07 ||
-            compCfg->ctx.appNameId == gcvPATCH_NENAMARK2 ||
-            compCfg->ctx.appNameId == gcvPATCH_LEANBACK ||
-            compCfg->ctx.appNameId == gcvPATCH_ANGRYBIRDS)
-        {
-            isPerfBench = gcvTRUE;
-        }
-    }
+
     /* support triangle test for dual16 */
     if(!VSC_OPTN_InRange(VIR_Shader_GetId(Shader), VSC_OPTN_DUAL16Options_BeforeShader(options), VSC_OPTN_DUAL16Options_AfterShader(options)))
     {
@@ -7038,7 +7037,7 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                 if (VIR_Inst_Dual16NotSupported(pInst)  ||
                     /* A WAR to disable dual16 for some CTS cases because our HW can't support denormalize F16. */
                     (isAppConformance && (VIR_Inst_GetOpcode(pInst) == VIR_OP_SINPI || VIR_Inst_GetOpcode(pInst) == VIR_OP_COSPI)) ||
-                    ((!isPerfBench) && VIR_Inst_GetOpcode(pInst) == VIR_OP_EXP2))
+                    ((!isPerfBench) && (compCfg->ctx.appNameId == gcvPATCH_KANZI) && (VIR_Inst_Dual16NotSupportedShader(pFunc, pInst))))
                 {
                     if(VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
                     {
