@@ -454,10 +454,13 @@ vx_uint32 caculateInputTransposeBufferSize(
     );
 
 vx_uint32 caculateOutTransposeBufferSize(
+    vx_context context,
     vx_uint32 outputTileXSize,
     vx_uint32 outputTileYSize,
+    vx_bool enablePooling,
     vx_enum format
     );
+
 
 void alignTensorChannelToTransposeChannel(
     vx_tensor tensor,

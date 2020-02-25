@@ -4355,7 +4355,7 @@ vx_status vxnneOperation_InitializeCommand(
 
                     alignTensorChannelToTransposeChannel(output, operation->transposeOutChannel);
 
-                    transposeSize = caculateOutTransposeBufferSize(outImageTileX, outImageTileY, output->tensorBuffer->dataFormat);
+                    transposeSize = caculateOutTransposeBufferSize(context, outImageTileX, outImageTileY, convOperation->enable_pooling, output->tensorBuffer->dataFormat);
                     gcoOS_ZeroMemory(&requestList->transposeOut, sizeof(vx_memory_s));
                     requestList->transposeOut.lastUseId = requestList->transposeOut.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
                     requestList->transposeOut.sizes[0] = transposeSize;
@@ -5610,14 +5610,29 @@ vx_uint32 caculateInputTransposeBufferSize(
 }
 
 vx_uint32 caculateOutTransposeBufferSize(
+    vx_context context,
     vx_uint32 outputTileXSize,
     vx_uint32 outputTileYSize,
+    vx_bool enablePooling,
     vx_enum format
     )
 {
+#define NN_CONV_POOLED_STRIDE_HW 2
+
+    vx_uint32 poolStride = 1;
+    vx_uint32 vipSramWidthInByte = context->nnConfig.fixedFeature.physicalVipSramWidthInByte;
     vx_uint32 dataSize        = (vx_uint32)vxDataType_GetSize((vx_type_e)format);
-    /*formular in PRD: N*ceil(PooledOutTX*PooledOutTY/64?)*64?*/
-    return 2 * VX_TRANSPOSE_MAX_INTERLEAVE_CH * gcmALIGN_NP2_SAFE(outputTileXSize * outputTileYSize, 64) * dataSize;
+
+    if(enablePooling)
+    {
+        poolStride = NN_CONV_POOLED_STRIDE_HW;
+    }
+
+    vxmASSERT(vipSramWidthInByte !=0);
+
+    /*formular in PRD: Max(2*N*ceil(PooledOutTX*PooledOutTY/PHYSICAL_VIPSRAM_WIDTH_IN_BYTE),3*N) *PHYSICAL_VIPSRAM_WIDTH_IN_BYTE*/
+    return gcmMAX((2 * VX_TRANSPOSE_MAX_INTERLEAVE_CH * gcmALIGN_NP2_SAFE((outputTileXSize/poolStride) * (outputTileYSize/poolStride), vipSramWidthInByte)), 3 * VX_TRANSPOSE_MAX_INTERLEAVE_CH * vipSramWidthInByte) * dataSize;
+
 }
 
 void alignTensorChannelToTransposeChannel(
@@ -5759,6 +5774,7 @@ vx_bool estimateNNTransposeSize(vx_context context, vx_graph graph)
         vxnneOperation_GetInfo(operation, &opInfo);
         if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
         {
+            vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)operation;
             vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
             vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
             vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
@@ -5827,7 +5843,7 @@ vx_bool estimateNNTransposeSize(vx_context context, vx_graph graph)
                                             operation->transposeInChannel,
                                             input->tensorBuffer->dataFormat);
 
-            operation->transposeOutSize = caculateOutTransposeBufferSize(outImageTileX, outImageTileY, output->tensorBuffer->dataFormat);
+            operation->transposeOutSize = caculateOutTransposeBufferSize(context, outImageTileX, outImageTileY, convOperation->enable_pooling, output->tensorBuffer->dataFormat);
             operation->transposeKernelSize = GetEsitimateWBSize(opInfo.weightsBiases);
             operation->esitimateImageCacheSize = caculate3DTileSize(context, outImageTileX, outImageTileY, kernelX, kernelY, inImageZ, inputDataFormat, interleaveMode);
         }

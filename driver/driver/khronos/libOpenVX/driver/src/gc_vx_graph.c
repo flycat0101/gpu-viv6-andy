@@ -2227,7 +2227,7 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
 
                 alignTensorChannelToTransposeChannel(output, operation->transposeOutChannel);
 
-                transposeSize = caculateOutTransposeBufferSize(outImageTileX, outImageTileY, output->tensorBuffer->dataFormat);
+                transposeSize = caculateOutTransposeBufferSize(graph->base.context, outImageTileX, outImageTileY, convOperation->enable_pooling, output->tensorBuffer->dataFormat);
 
                 gcoOS_ZeroMemory(&requestList->transposeOut, sizeof(vx_memory_s));
                 requestList->transposeOut.lastUseId = requestList->transposeOut.firstUseId = VXNNE_MEM_ID_INIT_VALUE;
@@ -3972,9 +3972,12 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
 
                 if (graph->layer->operations[i]->bTransposeOut)
                 {
+                    vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[i];
                     graph->layer->operations[i]->estimateOutTransposeSize = caculateOutTransposeBufferSize(
+                                                                                graph->base.context,
                                                                                 outImageTileX,
                                                                                 outImageTileY,
+                                                                                convOperation->enable_pooling,
                                                                                 outputDataFormat);
                 }
             }
