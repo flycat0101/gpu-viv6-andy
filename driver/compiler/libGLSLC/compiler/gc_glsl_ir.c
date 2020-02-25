@@ -2183,7 +2183,9 @@ slsNAME_Construct(
         if (gcmIS_ERROR(status)) break;
 
         if (!Compiler->context.loadingBuiltIns &&
-            DataType && sloCOMPILER_IsOGLVersion(Compiler) && DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM)
+            DataType &&
+            (sloCOMPILER_IsOGLVersion(Compiler) && !sloCOMPILER_IsOGL11Version(Compiler))
+            && DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM)
         {
             if (DataType->elementType != slvTYPE_STRUCT)
             {
