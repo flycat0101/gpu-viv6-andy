@@ -11278,4 +11278,239 @@ OnError:
     gcmFOOTER_NO();
     return VX_NULL;
 }
+/********vxcBatchNormalization****************************************************/
+vxnne_shader_executable vxnneGetGPUBatchNormShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_uint32               axis,
+    vx_tensor               input,
+    vx_tensor               weights,
+    vx_tensor               biases,
+    vx_tensor               output)
+{
+#if !gcdUSE_VXC_BINARY
+    vx_size    programLength = 0;
+    char *programSources = NULL;
+#endif
+    vx_program program = VX_NULL;
+    vx_status  status = VX_FAILURE;
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vxnne_kernel_shaders        kernel;
+
+    vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    vx_reference    parameters[4]              = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)output};
+    vx_uint32       dims                       = TENSOR_DIM_NUM(input) == 1 ? 2 : TENSOR_DIM_NUM(input);
+    vx_uint32       width                      = TENSOR_VIEW_SIZE_INDEX(input, 0);
+    vx_uint32       height                     = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
+    vx_uint32       depth                      = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
+    vx_uint32       batch                      = (dims > 3) ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+    vx_enum         inputFormat                = TENSOR_DATA_TYPE(input);
+    vx_int32        input_ZP                   = TENSOR_TF_ZEROPOINT(input);
+    vx_tensor       input_rs                   = NULL;
+    vx_tensor       output_rs                  = NULL;
+    vx_int32        sizes[4]                   = {1, 1, 1, 1};
+    vx_bool         useImage2DFlag             = (vx_bool)((width * height < IMG_MAX_WIDTH) && axis != 0);
+
+    gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, weights=%p, biases=%p, output=%p", context, kernelEnum, borderMode, input, weights, biases, output);
+
+    if (inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_INT16)
+    {
+        input_ZP       = 0;
+    }
+    else if (inputFormat == VX_TYPE_FLOAT16)
+    {
+        input_ZP       = 0;
+    }
+
+    if (useImage2DFlag)
+    {
+        sizes[0] = width * height;
+        sizes[1] = depth;
+        sizes[2] = 1;
+        sizes[3] = batch;
+
+        input_rs = vxoTensor_ReshapeTensor(input, sizes, dims);
+        output_rs = vxoTensor_ReshapeTensor(output, sizes, dims);
+
+        parameters[0] = (vx_reference)input_rs;
+        parameters[3] = (vx_reference)output_rs;
+
+        width = width * height;
+        height = depth;
+        depth = 1;
+    }
+    else if (depth == 1)
+        useImage2DFlag = vx_true_e;
+
+    borderMode->mode = VX_BORDER_REPLICATE;
+
+    kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
+
+    if (!kernel)
+    {
+        /* register an shader kernel */
+#if gcdUSE_VXC_BINARY
+        vx_uint32 len;
+        void * ptr = getGPUKernelInfo(context, BatchNorm, &len);
+        program = vxCreateProgramWithBinary(context, ptr, len);
+#else
+        char path[_vxcFILENAME_MAX];
+
+        vxmONERROR(getFilePath("nngpu_kernels/BatchNorm.vx", path));
+
+        vxmONERROR_NULLPTR(programSources = loadSources(path, &programLength));
+
+        vxmONERROR_NULLPTR(program = vxCreateProgramWithSource(context, 1, (const vx_char**)&programSources, &programLength));
+
+        if (programSources)
+        {
+            vxFree(programSources);
+            programSources = NULL;
+        }
+#endif /*gcdUSE_VXC_BINARY*/
+        vxmONERROR(vxGetStatus((vx_reference)program));
+
+        vxmONERROR(vxBuildProgram(program, VX_NULL));
+
+        vxmONERROR_NULLPTR(kernel = vxnneAddKernelShadersInProgram(context, "vxBatchNorm", program, 0, kernelEnum));
+
+        vxReleaseProgram(&program);
+    }
+
+    if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
+    {
+        if (useImage2DFlag)
+        {
+            if (axis == 0)
+            {
+                if (width % 4 == 0)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_Axis0_2D_4x", borderMode);
+                else
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_Axis0_2D_4s", borderMode);
+            }
+            else
+            {
+                if (width % 4 == 0)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D_4x", borderMode);
+                else
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D_4s", borderMode);
+            }
+            if (!shaderExecutable) goto OnError;
+
+            execution_parameters.workDim             = 2;
+            execution_parameters.globalWorkScale[0]  = 4;
+            execution_parameters.globalWorkScale[1]  = 1;
+        }
+        else
+        {
+            if (width % 4 == 0)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_4x", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_4s", borderMode);
+            if (!shaderExecutable) goto OnError;
+
+            execution_parameters.globalWorkScale[0]  = 4;
+            execution_parameters.globalWorkScale[1]  = 1;
+            execution_parameters.globalWorkScale[2]  = 1;
+        }
+
+        status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        if (width % 4 == 0)
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+
+        if (status != VX_SUCCESS) goto OnError;
+
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if (inputFormat == VX_TYPE_UINT8)
+    {
+        if (useImage2DFlag)
+        {
+            if (axis == 0)
+            {
+                if (width % 4 == 0)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Axis0_2D_4x", borderMode);
+                else
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_Axis0_2D_4s", borderMode);
+            }
+            else
+            {
+                if (width % 4 == 0)
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4x", borderMode);
+                else
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4s", borderMode);
+            }
+            if (!shaderExecutable) goto OnError;
+
+            execution_parameters.workDim             = 2;
+            execution_parameters.globalWorkScale[0]  = 4;
+            execution_parameters.globalWorkScale[1]  = 1;
+        }
+        else
+        {
+            if (width % 4 == 0)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4x", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4s", borderMode);
+            if (!shaderExecutable) goto OnError;
+
+            execution_parameters.globalWorkScale[0]  = 4;
+            execution_parameters.globalWorkScale[1]  = 1;
+            execution_parameters.globalWorkScale[2]  = 1;
+        }
+
+        status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        if (width % 4 == 0)
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+
+        if (status != VX_SUCCESS) goto OnError;
+
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else
+    {
+        vxError("input or output's format is not support");
+        goto OnError;
+    }
+
+    execution_parameters.globalWorkSize[0]   = gcmALIGN((width + execution_parameters.globalWorkScale[0] - 1) / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
+    execution_parameters.globalWorkSize[1]   = (height + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1];
+    execution_parameters.globalWorkSize[2]   = depth;
+
+    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
+    if (status != VX_SUCCESS) goto OnError;
+
+    status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
+    if (status != VX_SUCCESS) goto OnError;
+
+    if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
+    if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
+
+    gcmFOOTER_ARG("shaderExecutable=%p", shaderExecutable);
+    return shaderExecutable;
+
+OnError:
+    if (program)  vxReleaseProgram(&program);
+    if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
+    if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
+    if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
+
+#if !gcdUSE_VXC_BINARY
+    if (programSources)
+    {
+        vxFree(programSources);
+        programSources = NULL;
+    }
+#endif
+
+    gcmFOOTER_NO();
+    return VX_NULL;
+}
 

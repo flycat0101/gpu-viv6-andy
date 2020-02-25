@@ -4095,6 +4095,16 @@ vxnne_shader_executable vxnneGetGPULeakyReluShaderExecutable(
     vx_scalar               alpha,
     vx_tensor               output);
 
+vxnne_shader_executable vxnneGetGPUBatchNormShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_uint32               axis,
+    vx_tensor               input,
+    vx_tensor               weights,
+    vx_tensor               biases,
+    vx_tensor               output);
+
 #ifdef __cplusplus
 }
 #endif

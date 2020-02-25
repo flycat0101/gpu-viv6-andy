@@ -10727,7 +10727,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_ValidateOutput
     return VX_SUCCESS;
 }
 
-vx_status vxnneExecuteSWBatchNormPreProcess(vx_tensor means, vx_tensor variances, vx_tensor gamma, vx_tensor beta, vx_float32 eps, vx_float32 inputScale, vx_float32 outputScale, vx_int32 output_ZP, vx_tensor weights, vx_tensor biases)
+vx_status vxnneExecuteSWBatchNormPreProcess(vx_tensor means, vx_tensor variances, vx_tensor gamma, vx_tensor beta, vx_float32 eps, vx_float32 inputScale, vx_int32 input_ZP, vx_float32 outputScale, vx_float32 output_ZP, vx_tensor weights, vx_tensor biases)
 {
     vx_status       status          = VX_SUCCESS;
     vx_uint8_ptr    weightsLogic    = NULL;
@@ -10742,7 +10742,7 @@ vx_status vxnneExecuteSWBatchNormPreProcess(vx_tensor means, vx_tensor variances
     vx_type_e       varianceFormat  = (vx_type_e)(TENSOR_DATA_TYPE(variances));
     vx_type_e       gammaFormat     = (vx_type_e)(TENSOR_DATA_TYPE(gamma));
     vx_type_e       betaFormat      = (vx_type_e)(TENSOR_DATA_TYPE(beta));
-    vx_uint32       output_size     = TENSOR_VIEW_SIZE_INDEX(weights, 0) * TENSOR_VIEW_SIZE_INDEX(weights, 1) >> 1;
+    vx_uint32       elementCount    = 1;
     vx_uint32       i               = 0;
     vx_float32      meanf           = 0;
     vx_float32      variancef       = 0;
@@ -10750,6 +10750,8 @@ vx_status vxnneExecuteSWBatchNormPreProcess(vx_tensor means, vx_tensor variances
     vx_float32      betaf           = 0;
     vx_float32      weightf         = 0;
     vx_float32      biasf           = 0;
+
+    vxoTensor_GetTensorElementCount(means, &elementCount);
 
     vxoTensor_GetTensorViewMemory(weights, (gctPOINTER*)&weightsLogic, VX_NULL);
     vxoTensor_GetTensorViewMemory(biases, (gctPOINTER*)&biasesLogic, VX_NULL);
@@ -10760,9 +10762,8 @@ vx_status vxnneExecuteSWBatchNormPreProcess(vx_tensor means, vx_tensor variances
 
     weightsF32Ptr = (vx_float32_ptr)weightsLogic;
     biasesF32Ptr  = (vx_float32_ptr)biasesLogic;
-    for (i = 0; i < output_size; i ++)
+    for (i = 0; i < elementCount; i ++)
     {
-
         meanf     = vxnneGetDataExt(meanFormat, TENSOR_QUANT_TYPE(means), i, meanLogic, TENSOR_POS(means), TENSOR_TF_ZEROPOINT(means), TENSOR_TF_SCALE(means));
         variancef = vxnneGetDataExt(varianceFormat, TENSOR_QUANT_TYPE(variances), i, varianceLogic, TENSOR_POS(variances), TENSOR_TF_ZEROPOINT(variances), TENSOR_TF_SCALE(variances));
         gammaf    = vxnneGetDataExt(gammaFormat, TENSOR_QUANT_TYPE(gamma), i, gammaLogic, TENSOR_POS(gamma), TENSOR_TF_ZEROPOINT(gamma), TENSOR_TF_SCALE(gamma));
@@ -10772,7 +10773,7 @@ vx_status vxnneExecuteSWBatchNormPreProcess(vx_tensor means, vx_tensor variances
         biasf        = betaf - meanf * weightf;
 
         weightf      = weightf * inputScale * outputScale;
-        biasf        = biasf * outputScale + output_ZP;
+        biasf        = biasf * outputScale + output_ZP - input_ZP * weightf;
 
         weightsF32Ptr[i] = weightf;
         biasesF32Ptr[i]  = biasf;
@@ -10859,6 +10860,7 @@ vx_status vxnneExecuteSWBatchNormalization(struct _vxnne_operation_s *operation)
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status                     = VX_SUCCESS;
+    vx_context context                    = vxGetContext((vx_reference)node);
 
     vx_scalar  epss                       = (vx_scalar)parameters[0];
     vx_tensor  means                      = (vx_tensor)parameters[1];
@@ -10901,7 +10903,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
                           batchnormLayer->operations,
                           vxnneLayer_Deinitialize);
 
-      shExe_flag = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+    if(context->evisNoInst.supportEVIS)
+    {
+        shExe_flag = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8)
                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16)
                           || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
@@ -10912,6 +10916,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
                           || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
                           || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16));
+    }
+    else
+    {
+        shExe_flag = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32)
+                          || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                          || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
+                          || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
+    }
 
     if (shExe_flag && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER))
     {
@@ -10919,8 +10932,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
         vx_uint32  sizes[]          = {1, 1, 1, 1};
         vx_uint32  dims             = 2;
         vx_float32 inputScale       = 1.0f;
+        vx_int32   input_ZP         = 0;
         vx_float32 outputScale      = 1.0f;
-        vx_int32   output_ZP        = 0;
+        vx_float32 output_ZP        = 0.0f;
         vx_int8    srcFixPointPos   = TENSOR_POS(input);
         vx_int8    dstFixPointPos   = TENSOR_POS(output);
         vx_uint32  axis             = 2;
@@ -10928,13 +10942,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
         if (TENSOR_DIM_NUM(input) < 3)
             axis = 0;
 
-        sizes[0]            = TENSOR_VIEW_SIZE_INDEX(input, axis) * 2;
-        sizes[1]            = 1;
+        sizes[0] = context->evisNoInst.supportEVIS ? TENSOR_VIEW_SIZE_INDEX(input, axis) * 2 : TENSOR_VIEW_SIZE_INDEX(input, axis);
+        sizes[1] = 1;
 
         gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
         tensor_create_params.num_of_dims = dims;
         tensor_create_params.sizes = sizes;
-        tensor_create_params.data_format = VX_TYPE_INT16;
+        tensor_create_params.data_format = context->evisNoInst.supportEVIS ? VX_TYPE_INT16 : VX_TYPE_FLOAT32;
         tensor_create_params.quant_format = VX_QUANT_DYNAMIC_FIXED_POINT;
         tensor_create_params.quant_data.dfp.fixed_point_pos = 0;
 
@@ -10967,6 +10981,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
         }
         else if (inputFormat == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
         {
+            input_ZP   = context->evisNoInst.supportEVIS ? 0 : TENSOR_TF_ZEROPOINT(input);
             inputScale = TENSOR_TF_SCALE(input);
         }
 
@@ -10983,14 +10998,21 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNBatchNormalizationLayer_Initializer(vx
         }
         else if (outputFormat == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
         {
-            outputScale     = 1.0f / TENSOR_TF_SCALE(output);
-            output_ZP       = TENSOR_TF_ZEROPOINT(output);
+            outputScale = 1.0f / TENSOR_TF_SCALE(output);
+            output_ZP   = (vx_float32)TENSOR_TF_ZEROPOINT(output);
+            if (context->evisNoInst.supportEVIS == vx_false_e)
+                output_ZP += 0.5f;
         }
 
-        vxnneExecuteSWBatchNormPreProcess(means, variances, gamma, beta, epss->value->f32, inputScale, outputScale, output_ZP, weights, biases);
-
-        shaderExecutable = vxnneGetBatchNormShaderExecutable(node->base.context, VXNNE_KERNEL_BATCHNORM, &node->kernelAttributes.borderMode, axis,
-                                                              input, weights, biases, output);
+        vxnneExecuteSWBatchNormPreProcess(means, variances, gamma, beta, epss->value->f32, inputScale, input_ZP, outputScale, output_ZP, weights, biases);
+        if(context->evisNoInst.supportEVIS)
+        {
+            shaderExecutable = vxnneGetBatchNormShaderExecutable(node->base.context, VXNNE_KERNEL_BATCHNORM, &node->kernelAttributes.borderMode, axis, input, weights, biases, output);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetGPUBatchNormShaderExecutable(node->base.context, VXNNE_KERNEL_BATCHNORM, &node->kernelAttributes.borderMode, axis, input, weights, biases, output);
+        }
 
         if (!shaderExecutable)
         {
