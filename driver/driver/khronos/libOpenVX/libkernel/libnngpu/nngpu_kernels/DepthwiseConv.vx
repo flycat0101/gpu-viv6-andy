@@ -3,6 +3,90 @@
 #pragma OPENCL EXTENSION cl_viv_bitfield_extension : enable
 #pragma OPENCL EXTENSION cl_viv_vx_extension : enable
 
+
+inline uchar* get_image2D_array_ptr(image2d_array_t  input)
+{
+    int8 desc;
+    _viv_asm(COPY, desc, input, sizeof(desc));
+    uchar *src_ptr = (uchar*)desc.s0;
+
+    return src_ptr;
+}
+
+inline int get_image2D_array_sliceSZ(image2d_array_t  input)
+{
+    int8 desc;
+    int sliceSz = 1;
+
+    _viv_asm(COPY, desc, input, sizeof(desc));
+    sliceSz = desc.s4;
+
+    return sliceSz;
+}
+__kernel void gpuDepthwiseConv_FP16(
+    image2d_array_t input,
+    image2d_t weight,
+    image2d_t bias,
+    int channel_multiplier,
+    int kernelX,
+    int kernelY,
+    int strideX,
+    int strideY,
+    int padX,
+    int padY,
+    image2d_array_t output)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    int inputWeight = get_image_width(input);
+    int inputHeight = get_image_height(input);
+    int inputDepth = get_image_array_size(input);
+    int4 coord_out = (int4)(x, y, z, 0);
+    int inz = convert_int(convert_short(z)/convert_short(channel_multiplier));
+    int inyStart = y * strideY - padY;
+    int inyEnd = inyStart + kernelY;
+    int inxStart = x * strideX - padX;
+    int inxEnd = inxStart + kernelX;
+    int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
+    int2 coord_wei;
+    float sum = 0;
+    int   kernelXLeft = 0;
+    float4 pixel = {0.0};
+    float4 weightValue = {0.0};
+
+    inyEnd = min(inyEnd, inputHeight);
+    inxEnd = min(inxEnd, inputWeight);
+    kernelXLeft = kernelX - (inxEnd - inxStart);
+    sum = read_imagef(bias, (int2)(z, 0)).x;
+    coord_wei = (int2)(0, z);
+
+    if (inz < inputDepth)
+    {
+        for (coord_in.y = inyStart; coord_in.y < inyEnd; coord_in.y++)
+        {
+            for (coord_in.x = inxStart; coord_in.x < inxEnd; coord_in.x++)
+            {
+                pixel = read_imagef(input, coord_in);
+                weightValue = read_imagef(weight, coord_wei);
+                sum += (pixel.x * weightValue.x);
+                coord_wei.x += 1;
+            }
+            coord_wei.x += kernelXLeft;
+        }
+    }
+
+    half dst0;
+    int offset = z * get_image2D_array_sliceSZ(output) + (y * get_image_width(output) + x) * 2;
+    uchar *dst_ptr = get_image2D_array_ptr(output) + offset;
+
+    ushort dst;
+    _viv_asm(CONV, dst0, sum);
+    _viv_asm(COPY, dst, dst0, 4);
+
+    ((ushort*)dst_ptr)[0] = dst;
+}
+
 __kernel void gpuDepthwiseConv_FP32(
     image2d_array_t input,
     image2d_t weight,

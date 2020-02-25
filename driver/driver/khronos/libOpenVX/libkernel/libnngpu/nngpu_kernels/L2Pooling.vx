@@ -1,3 +1,67 @@
+#pragma OPENCL EXTENSION CL_VIV_asm : enable
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#pragma OPENCL EXTENSION cl_viv_vx_extension : enable
+
+inline uchar* get_image2D_array_ptr(image2d_array_t  input)
+{
+    int8 desc;
+    _viv_asm(COPY, desc, input, sizeof(desc));
+    uchar *src_ptr = (uchar*)desc.s0;
+
+    return src_ptr;
+}
+
+inline int get_image2D_array_sliceSZ(image2d_array_t  input)
+{
+    int8 desc;
+    int sliceSz = 1;
+
+    _viv_asm(COPY, desc, input, sizeof(desc));
+    sliceSz = desc.s4;
+
+    return sliceSz;
+}
+
+__kernel void gpuL2Pooling_NoPadFP16
+    (
+    __read_only     image2d_array_t input,
+    int             kernelX,
+    int             kernelY,
+    int             strideX,
+    int             strideY,
+    __write_only    image2d_array_t output
+    )
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int z = get_global_id(2);
+    float sum = 0.0;
+    float4 tmp = {0.0};
+    int i, j, count = 0;
+
+    for (j = 0; j < kernelY; j++)
+    {
+        for (i = 0; i < kernelX; i++)
+        {
+            tmp = read_imagef(input, (int4)(x*strideX+i, y*strideY+j, z, 0));
+            sum += tmp.x * tmp.x;
+            count++;
+        }
+    }
+
+    float result = sqrt(sum/convert_float(count));
+
+    half dst0;
+    int offset = z * get_image2D_array_sliceSZ(output) + (y * get_image_width(output) + x) * 2;
+    uchar *dst_ptr = get_image2D_array_ptr(output) + offset;
+
+    ushort dst;
+    _viv_asm(CONV, dst0, result);
+    _viv_asm(COPY, dst, dst0, 4);
+
+    ((ushort*)dst_ptr)[0] = dst;
+}
+
 __kernel void gpuL2Pooling_NoPadFP32
     (
     __read_only     image2d_array_t input,
