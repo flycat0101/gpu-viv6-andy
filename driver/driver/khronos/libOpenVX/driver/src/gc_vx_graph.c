@@ -5268,8 +5268,8 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForCONV(
     params.ext.base.pool_size_x = srcOperation->parameter.pool_size_x;
     params.ext.base.pool_size_y = srcOperation->parameter.pool_size_y;
     params.ext.base.pool_type = srcOperation->parameter.pool_type;
-    params.ext.stride_x = WB_STRIDE_X(weights_biases);
-    params.ext.stride_y = WB_STRIDE_Y(weights_biases);
+    params.ext.stride_x = 1;
+    params.ext.stride_y = 1;
     params.convert_dst_format = TENSOR_DATA_TYPE(outputTensor);
 
     optimizations.inputZeroPoint = WB_INPUT_ZP(weights_biases);
