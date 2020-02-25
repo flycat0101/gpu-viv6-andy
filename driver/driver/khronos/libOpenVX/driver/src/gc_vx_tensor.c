@@ -2581,6 +2581,7 @@ _ReshapeTensor(
     vx_uint32 newDims[VX_CONTEXT_TENSOR_MAX_DIMENSION], offset = 0;
     vx_context context = GET_CONTEXT(tensor);
     vx_tensor_create_params_t tensor_create_params;
+    vx_tensor    reshapeTensor;
 
     gcmHEADER_ARG("tensor=%p, num_of_dims=%p, sizes=0x%x, kind=0x%x", tensor, num_of_dims, sizes, kind);
 
@@ -2623,7 +2624,7 @@ _ReshapeTensor(
     vxmASSERT(!tensor->base.isVirtual || vxoReference_GetType(tensor->base.scope) == VX_TYPE_GRAPH);
 
     gcmFOOTER_NO();
-    return vxoTensor_Create(
+    reshapeTensor = vxoTensor_Create(
                 context,
                 (vx_graph)(tensor->base.isVirtual ? tensor->base.scope : VX_NULL),
                 &tensor_create_params,
@@ -2634,6 +2635,8 @@ _ReshapeTensor(
                 tensor->base.isVirtual ? VX_TENSOR_SHARED | VX_TENSOR_VIRTUAL : VX_TENSOR_SHARED,
                 kind
                 );
+    vxSetReferenceName((vx_reference)reshapeTensor, ((vx_reference)tensor)->name);
+    return reshapeTensor;
 }
 
 VX_INTERNAL_API vx_tensor
