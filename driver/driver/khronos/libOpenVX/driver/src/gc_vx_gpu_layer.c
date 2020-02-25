@@ -9048,30 +9048,39 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
 
     if (0 == axis)
     {
-        sizes[0]      = 1;
-        sizes[1]      = height;
-        sizes[2]      = depth;
-        sizes[3]      = batch;
-        dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4);
-        parameters[2] = (vx_reference)dst;
+       if ((TENSOR_DIM_NUM(output) != dims) || (TENSOR_VIEW_SIZE_INDEX(output, 0) != 1))
+       {
+            sizes[0]      = 1;
+            sizes[1]      = height;
+            sizes[2]      = depth;
+            sizes[3]      = batch;
+            dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4);
+            parameters[2] = (vx_reference)dst;
+        }
     }
     else if (1 == axis)
     {
-        sizes[0]      = width;
-        sizes[1]      = 1;
-        sizes[2]      = depth;
-        sizes[3]      = batch;
-        dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4);
-        parameters[2] = (vx_reference)dst;
+       if ((TENSOR_DIM_NUM(output) != dims) || (TENSOR_VIEW_SIZE_INDEX(output, 1) != 1))
+       {
+            sizes[0]      = width;
+            sizes[1]      = 1;
+            sizes[2]      = depth;
+            sizes[3]      = batch;
+            dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4);
+            parameters[2] = (vx_reference)dst;
+        }
     }
     else if (2 == axis)
     {
-        sizes[0]      = width;
-        sizes[1]      = height;
-        sizes[2]      = 1;
-        sizes[3]      = batch;
-        dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4);
-        parameters[2] = (vx_reference)dst;
+       if ((TENSOR_DIM_NUM(output) != dims) || (TENSOR_VIEW_SIZE_INDEX(output, 2) != 1))
+       {
+            sizes[0]      = width;
+            sizes[1]      = height;
+            sizes[2]      = 1;
+            sizes[3]      = batch;
+            dst           = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 4);
+            parameters[2] = (vx_reference)dst;
+        }
     }
     else
     {
@@ -9161,6 +9170,7 @@ vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
     if(scaleIn) vxReleaseScalar(&scaleIn);
     if(scaleOut) vxReleaseScalar(&scaleOut);
     if(sCount)   vxReleaseScalar(&sCount);
+    if (dst) vxoTensor_ReleaseTensor(&dst);
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
 
@@ -9172,6 +9182,7 @@ OnError:
     if(scaleOut) vxReleaseScalar(&scaleOut);
     if(sCount)   vxReleaseScalar(&sCount);
     if (program) vxReleaseProgram(&program);
+    if (dst) vxoTensor_ReleaseTensor(&dst);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
 #if !gcdUSE_VXC_BINARY
