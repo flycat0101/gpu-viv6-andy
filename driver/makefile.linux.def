@@ -455,6 +455,11 @@ endif
 #If need to user ori arch model, set to 1
 #CFLAGS              += -DORI_NNARCHPERF
 
+#If need to remove cl libs
+ifeq ($(REMOVE_CL_LIBS),1)
+  CFLAGS            += -DREMOVE_CL_LIBS=$(REMOVE_CL_LIBS)
+endif
+
 ################################################################################
 #
 # Third party resources, DFB_DIR to specify DirectFB SDK path
