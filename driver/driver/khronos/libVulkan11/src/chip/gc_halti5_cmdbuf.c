@@ -7242,7 +7242,8 @@ static VkResult halti5_helper_setDescSetSeperateImage(
                             {
                                 SHADER_PRIV_SAMPLER_ENTRY *privEntry = privCombinedMapping->ppExtraSamplerArray[hwSamplerSlotIdx];
                                 uint32_t extraSamplerNo = privEntry->pSampler->hwSamplerSlot + hints->samplerBaseOffset[stageIdx];
-                                __VK_ASSERT(privEntry->commonPrivm.privmKind ==  VSC_LIB_LINK_TYPE_TEXTURE_REPLACE);
+                                __VK_ASSERT(privEntry->commonPrivm.privmKind ==  VSC_LIB_LINK_TYPE_RESOURCE);
+
 
                                 (*chipModule->minorTable.helper_setSamplerStates)(cmdBuf,
                                                                                   commandBuffer,
@@ -7487,7 +7488,7 @@ static VkResult halti5_helper_setDescSetSeperateSampler(
                             {
                                 SHADER_PRIV_SAMPLER_ENTRY *privEntry = privCombinedMapping->ppExtraSamplerArray[hwSamplerSlotIdx];
                                 uint32_t extraSamplerNo = privEntry->pSampler->hwSamplerSlot + hints->samplerBaseOffset[stageIdx];
-                                __VK_ASSERT(privEntry->commonPrivm.privmKind ==  VSC_LIB_LINK_TYPE_TEXTURE_REPLACE);
+                                __VK_ASSERT(privEntry->commonPrivm.privmKind ==  VSC_LIB_LINK_TYPE_RESOURCE);
 
                                 (*chipModule->minorTable.helper_setSamplerStates)(cmdBuf,
                                                                                   commandBuffer,
@@ -7620,7 +7621,7 @@ static VkResult halti5_helper_setDescSetCombinedImageSampler(
                 {
                     SHADER_PRIV_SAMPLER_ENTRY *privEntry = samplerEntry->hwMappings[stageIdx].ppExtraSamplerArray[arrayIdx];
                     uint32_t extraSamplerNo = privEntry->pSampler->hwSamplerSlot + hints->samplerBaseOffset[stageIdx];
-                    __VK_ASSERT(privEntry->commonPrivm.privmKind ==  VSC_LIB_LINK_TYPE_TEXTURE_REPLACE);
+                    __VK_ASSERT(privEntry->commonPrivm.privmKind ==  VSC_LIB_LINK_TYPE_RESOURCE);
 
                     (*chipModule->minorTable.helper_setSamplerStates)(cmdBuf,
                                                                       commandBuffer,

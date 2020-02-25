@@ -66,8 +66,8 @@ typedef enum _VSC_LIB_LINK_TYPE
     /* Frag-output color */
     VSC_LIB_LINK_TYPE_COLOR_OUTPUT                  = 1,
 
-    /* Texture replacement from shader */
-    VSC_LIB_LINK_TYPE_TEXTURE_REPLACE               = 2,
+    /* Resource access from shader */
+    VSC_LIB_LINK_TYPE_RESOURCE                      = 2,
 
     /* frontfacing is counter clockwise, make to NOT Facing
      * value to make HW happy */
