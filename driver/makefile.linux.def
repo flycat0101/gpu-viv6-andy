@@ -319,6 +319,9 @@ endif
 
 ifeq ($(EGL_API_FB),1)
   CFLAGS            += -DEGL_API_FB
+  ifeq ($(GL4_LINUX_ENABLE),1)
+    CFLAGS            += -DOPENGL40
+  endif
 endif
 
 ifeq ($(EGL_API_WL),1)
@@ -496,11 +499,7 @@ else
 EXA_DIR             := $(AQROOT)/driver/X/EXA/src
 endif
 
-ifeq ($(GL4_LINUX_ENABLE),1)
-GL21_DIR            := $(AQROOT)/driver/khronos/libGL4
-else
-GL21_DIR            := $(AQROOT)/driver/khronos/libGL2
-endif
+GL4X_DIR            := $(AQROOT)/driver/khronos/libGL4
 
 CL11_DIR            := $(AQROOT)/driver/khronos/libCL
 CL11_ICD_DIR        := $(AQROOT)/driver/khronos/libCL/icdloader12
