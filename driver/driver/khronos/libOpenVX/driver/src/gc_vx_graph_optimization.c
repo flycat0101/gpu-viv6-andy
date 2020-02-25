@@ -3080,6 +3080,26 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
                         continue;
             }
 
+            /* the formula is required:
+                  abs(fl1 - fl2) < data's bit width
+
+               such as:
+                    input1's fl = 30,
+                    input2's fl = 7,
+
+                   if the conv's input's fl is 30, the weight should be [1, 2^-23], but 2^-23 is too small.
+                   if 7, weight should be [2^23, 1], 2^23 is overflow for int8 or int16.
+            */
+            if(VX_QUANT_DYNAMIC_FIXED_POINT == TENSOR_QUANT_TYPE(tensorIn[0]) )
+            {
+                vx_uint8 delta = gcmABS(TENSOR_POS(tensorIn[0]) - TENSOR_POS(tensorIn[1]) );
+
+                if((delta > 15 && TENSOR_DATA_TYPE(tensorIn[0]) == VX_TYPE_INT16) ||
+                    (delta > 7 && TENSOR_DATA_TYPE(tensorIn[0]) == VX_TYPE_INT8)
+                    )
+                    continue;
+            }
+
             if(node->kernel->enumeration == VX_KERNEL_TENSOR_SUBTRACT)
                 factor = -1;
             {
