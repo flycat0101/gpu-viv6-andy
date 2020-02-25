@@ -190,7 +190,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
     vx_uint32 i = 0, j = 0, index = 0, kzOffset = 0, oneFilterSize, weightSize, kzNum = 1, zNum = 1;
     vx_uint32 nonZeroCount = 0, nonZeroTotalCount = 0, totalCount = 0, allTotalCount = 0, sliceCount = 0, filterCount, kernelPerCore = 0;
     vx_uint32 zArray[MAX_ZGROUP_COUNT], kzArray[MAX_KZGROUP_COUNT];
-    vx_size minTotalKernelBufferSize = 0, origKernelBufferSize = 0, origTotalKernelBufferSize = 0, weightDataBytesOffset = 0;
+    vx_size minTotalKernelBufferSize = 0, origKernelBufferSize = 0, origTotalKernelBufferSize = 0, weightDataBytesOffset = 0, biasDataDWordOffset = 0;
     vx_uint8_ptr weightPtr = VX_NULL, biasPtr = VX_NULL;
     vx_uint8_ptr minZeroRunLensBase = VX_NULL, minZeroRunLens;
 
@@ -378,10 +378,12 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
                     WB_BIAS_DATA_FORMAT(wb),
                     WB_INPUT_ZP(wb),
                     WB_SKIP_VALUE(wb),
+                    z_offset,
                     WB_KERNEL_Z(wb) <= 1 ? 0 : WB_SET_ZERO_LENGTH(wb),
                     (vx_uint8)context->options.nnZeroRunLen,
                     WB_IS_DEPTH_WISE(wb),
                     weightPtr + kzOffset + weightDataBytesOffset,
+                    (biasPtr != VX_NULL) ? biasPtr + biasDataDWordOffset : VX_NULL,
                     &totalCount,
                     &nonZeroCount,
                     &origKernelBufferSize,
@@ -400,6 +402,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
         }
 
         weightDataBytesOffset += oneFilterSize * filterCount;
+        biasDataDWordOffset += filterCount;
     }
 
     if ((WB_KERNEL_X(wb) == 1 && WB_KERNEL_Y(wb) == 1 &&
