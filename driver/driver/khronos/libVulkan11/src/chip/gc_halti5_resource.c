@@ -10927,6 +10927,11 @@ VkResult halti5_createImageView(
         chipImgv->patchKey = HALTI5_PATCH_SORAGE_IMAGE_FORMAT_BIT;
     }*/
 
+    if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
+    {
+        chipImgv->patchKey = HALTI5_PATCH_SAMPLED_IMAGRE_FORMAT_BIT;
+    }
+
     switch (residentImgFormat)
     {
     case __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT:
@@ -11739,6 +11744,10 @@ VkResult halti5_updateDescriptorSet(
                     __VK_ASSERT(resInfo->type == __VK_DESC_RESOURCE_IMAGEVIEW_INFO);
                     if (chipImgv->patchKey)
                     {
+                        if (chipImgv->patchKey & HALTI5_PATCH_SAMPLED_IMAGRE_FORMAT_BIT)
+                        {
+                            patchInfos[entryIdx].originalFormat = imgv->createInfo.format;
+                        }
                         patchKeys[entryIdx] = chipImgv->patchKey;
                         patchInfos[entryIdx].binding = binding->std.binding;
                         patchInfos[entryIdx].arrayIndex = j;
