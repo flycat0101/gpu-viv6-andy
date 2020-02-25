@@ -23177,6 +23177,46 @@ vxnne_shader_executable vxnneROIRect2ROIListShaderExecutable(
         execution_parameters.globalWorkSize[0]   = 1;
         execution_parameters.globalWorkSize[1]   = gcmALIGN((rois_num  + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1], SHADER_THREAD_COUNT);
     }
+    else if (inputFormat == VX_TYPE_BFLOAT16)
+    {
+        vx_float32  poolingHVInc_coef[2]    = {(vx_float32)256.0f / poolWidth, (vx_float32)256.0f / poolHeight};
+        vx_int32    offset                  = rois_stride == 5 ? 1 : 0;
+        vx_uint32 uniConvBF16toF32_Part0_2x8[16] = {
+            0x11111111, // TCfg
+            0x01010101, // ASelt
+            0x01010000, 0x03030202, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+        };
+        vx_uint32 uniPackedShort4Data_4x4[16] = {
+            0x03030307, // TCfg
+            0x00000100, // ASelt
+            0x00000020, 0x00060004, // ABin
+            0x00000008, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00003600, // AccumType, ConstantType, and PostShift
+            0x01000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+        };
+
+
+        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_rect2roilist_bf16", borderMode);
+        if (!shaderExecutable) goto OnError;
+
+        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvBF16toF32_Part0_2x8", 1, uniConvBF16toF32_Part0_2x8);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackedShort4Data_4x4", 1, uniPackedShort4Data_4x4);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "poolingHVInc_coef", 1, poolingHVInc_coef);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "spatial_scale", 1, &spatial_scale);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "offset", 1, &offset);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "slice", 1, &slice);
+        if (status != VX_SUCCESS) goto OnError;
+
+        execution_parameters.globalWorkScale[0]  = 1;
+        execution_parameters.globalWorkScale[1]  = 1;
+        execution_parameters.globalWorkSize[0]   = 1;
+        execution_parameters.globalWorkSize[1]   = gcmALIGN((rois_num  + execution_parameters.globalWorkScale[1] - 1) / execution_parameters.globalWorkScale[1], SHADER_THREAD_COUNT);
+    }
     else
     {
         vxError("input or output's format is not support");
