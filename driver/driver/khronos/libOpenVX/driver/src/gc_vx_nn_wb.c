@@ -1014,6 +1014,7 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
     vx_size minKernelBufferSizes[MAX_ZGROUP_COUNT*MAX_KZGROUP_COUNT];
     vx_uint8* minZeroRunLens = VX_NULL;
     vx_uint32 maxZeroRunLens[MAX_ZGROUP_COUNT] = {0}, kernelPerCore;
+    vx_uint32 nnCoreCount = 0;
 
     if (wb == VX_NULL || z_offset == 0) return VX_ERROR_INVALID_PARAMETERS;
     if (kernel_per_core == 0 && target != VXNNE_OPERATION_TARGET_TP) return VX_ERROR_INVALID_PARAMETERS;
@@ -1021,6 +1022,17 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
     if (WB_WEIGHT_TENSOR(wb) == VX_NULL) return VX_ERROR_INVALID_VALUE;
 
     context = wb->base.context;
+
+    nnCoreCount = (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_INT16) ?
+                  context->nnConfig.fixedFeature.nnCoreCountInt16 : (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_FLOAT16) ?
+                  context->nnConfig.fixedFeature.nnCoreCountFloat16 : (WB_WEIGHT_DATA_FORMAT(wb) == VX_TYPE_BFLOAT16) ?
+                  context->nnConfig.fixedFeature.nnCoreCountBFloat16 :context->nnConfig.fixedFeature.nnCoreCount;
+
+    if(!(WB_IS_TP_COMPRESS(wb)) && (0 == nnCoreCount))
+    {
+        vxError("\n  No NN Core Count \n");
+        goto exit;
+    }
 
     kernelPerCore = kernel_per_core;
 
