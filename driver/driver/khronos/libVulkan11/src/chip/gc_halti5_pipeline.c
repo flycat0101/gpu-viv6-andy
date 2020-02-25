@@ -2647,14 +2647,14 @@ static VkResult halti5_pip_emit_rt(
         0x7,
     };
 
-    depthOnly = (subPass->colorCount == 0);
+    depthOnly = (subPass->colorCount == 0) || (!(hints->stageBits & gcvPROGRAM_STAGE_FRAGMENT_BIT));
     /* ps shader is not necessary to be excuted */
-    depthOnly |= (!(hints->hasKill
+    depthOnly &= !(hints->hasKill
         || hints->psHasFragDepthOut
         || psHasMemoryAccess
         || (hints->rtArrayComponent != -1)
         || (hints->sampleMaskLoc != -1)
-        || msaaFragmentOp)) || (!(hints->stageBits & gcvPROGRAM_STAGE_FRAGMENT_BIT));
+        || msaaFragmentOp);
 
     chipGfxPipeline->depthOnly = depthOnly;
 
