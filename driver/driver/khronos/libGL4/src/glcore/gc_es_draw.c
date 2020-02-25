@@ -1888,7 +1888,14 @@ GLvoid  __glDrawPrimitive(__GLcontext *gc, GLenum mode)
         {
             if (!__glCheckVBOSize(gc))
            {
-               __GL_ERROR_RET(GL_INVALID_OPERATION);
+               if (gc->vertexArray.fromDrawXFB)
+               {
+                   /* VIV TODO: Comment this in case some XFB errors, it will be uncomment later. */
+               }
+               else
+               {
+                   __GL_ERROR_RET(GL_INVALID_OPERATION);
+               }
            }
 
            if (__GLSL_MODE_GRAPHICS != gc->shaderProgram.mode)

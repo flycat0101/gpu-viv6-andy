@@ -4099,7 +4099,7 @@ gcChipValidateXFB(
         {
             for (i = 0; i < progObj->nextBufferCount + 1; i++)
             {
-                if (__glBitmaskTestAndClear(&bindingDirty, i) && pBindingPoints[i].boundBufObj != gcvNULL)
+                if (__glBitmaskTestAndClear(&bindingDirty, i))
                 {
                     xfbBindingPoint = &pBindingPoints[i];
                     GL_ASSERT(xfbBindingPoint->boundBufObj);

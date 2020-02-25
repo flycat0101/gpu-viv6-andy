@@ -9380,16 +9380,17 @@ __glChipDrawBegin(
                     break;
                 }
 
-                if (gc->imports.conformGLSpec && xfbObj->active && !xfbObj->paused && xfbObj->boundBufObj != gcvNULL)
+                if (gc->imports.conformGLSpec && xfbObj->active && !xfbObj->paused && !gc->vertexArray.fromDrawXFB)
                 {
-                    //TODO: This is max vertices, maybe need to capture GS output vertices after draw.
-                    xfbObj->vertices += gsProgObj->bindingInfo.gsOutVertices;
+                    //TODO: Need to capture GS output vertices.
+                    xfbObj->vertices += 3;
                 }
             }
             else
             {
-                if (gc->imports.conformGLSpec && xfbObj->active && !xfbObj->paused && xfbObj->boundBufObj != gcvNULL)
+                if (gc->imports.conformGLSpec && xfbObj->active && !xfbObj->paused && !gc->vertexArray.fromDrawXFB)
                 {
+                    //TODO: Need to capture vervices in EndTransformFeedback.
                     xfbObj->vertices += (GLuint)(gc->vertexArray.end - gc->vertexArray.start);
                 }
             }

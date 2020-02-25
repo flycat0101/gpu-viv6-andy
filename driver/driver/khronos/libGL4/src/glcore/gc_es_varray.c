@@ -756,6 +756,68 @@ static GLvoid  __glUpdateVertexArray(__GLcontext *gc,
 
 static GLboolean __glCheckXFBState(__GLcontext *gc, GLboolean allowXFB, GLenum mode, GLsizei vertexCount, GLsizei instanceCount)
 {
+    __GLxfbObject *xfbObj;
+
+    xfbObj = gc->xfb.boundXfbObj;
+
+    if (allowXFB)
+    {
+        /* For GS extension enable case, the check is deferred to __glChipDrawBegin */
+        if ((!__glExtension[__GL_EXTID_EXT_geometry_shader].bEnabled) &&
+            (!__glExtension[__GL_EXTID_EXT_tessellation_shader].bEnabled))
+        {
+            if (xfbObj->active && !xfbObj->paused && xfbObj->primMode != mode)
+            {
+                __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+            }
+
+            if (xfbObj->active && !xfbObj->paused)
+            {
+                GLuint numPrims = gc->imports.conformGLSpec ? vertexCount : 0;
+                GLuint numVerts = gc->imports.conformGLSpec ? vertexCount : 0;
+
+                /* VIV TODO: Stream index */
+                __GLqueryObject *queryObj = gc->query.currQuery[__GL_QUERY_XFB_PRIMITIVES_WRITTEN][0];
+
+                switch (mode)
+                {
+                case GL_TRIANGLES:
+                    numPrims = (vertexCount / 3) * instanceCount;
+                    numVerts = numPrims * 3;
+                    break;
+                case GL_LINES:
+                    numPrims = (vertexCount / 2) * instanceCount;
+                    numVerts = numPrims * 2;
+                    break;
+                case GL_POINTS:
+                    numPrims = vertexCount * instanceCount;
+                    numVerts = numPrims;
+                    break;
+                }
+
+                if (!(*gc->dp.checkXFBBufSizes)(gc, xfbObj, numVerts))
+                {
+                    __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                }
+
+                xfbObj->vertices = numVerts;
+
+                /* Update query object for xfb. Handled by the CPU for now. */
+                if (queryObj && queryObj->active)
+                {
+                    queryObj->count += numPrims;
+                }
+            }
+        }
+    }
+    else
+    {
+        if (xfbObj->active && !xfbObj->paused)
+        {
+            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+        }
+    }
+
     return GL_TRUE;
 
 }
@@ -1060,8 +1122,8 @@ OnError:
     __GL_FOOTER();
 }
 
-__GL_INLINE GLvoid __glDrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint first, GLsizei count,
-                                           GLsizei instanceCount)
+GLvoid __glDrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint first, GLsizei count,
+                                           GLsizei instanceCount, GLboolean fromDrawXFB)
 {
     __GLvertexArrayMachine *vertexArray = &gc->vertexArray;
 
@@ -1101,6 +1163,7 @@ __GL_INLINE GLvoid __glDrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint f
     vertexArray->start = first;
     vertexArray->end = first + count;
     vertexArray->baseVertex = first;
+    vertexArray->fromDrawXFB = fromDrawXFB;
     gc->vertexArray.drawIndirect = GL_FALSE;
     gc->vertexArray.multidrawIndirect = GL_FALSE;
 
@@ -1124,7 +1187,7 @@ GLvoid GL_APIENTRY __glim_DrawArraysInstanced(__GLcontext *gc, GLenum mode, GLin
 {
     __GL_HEADER();
 
-    __glDrawArraysInstanced(gc, mode, first, count, instanceCount);
+    __glDrawArraysInstanced(gc, mode, first, count, instanceCount, GL_FALSE);
 
     __GL_FOOTER();
 }
@@ -1133,7 +1196,7 @@ GLvoid GL_APIENTRY __glim_DrawArrays(__GLcontext *gc, GLenum mode, GLint first, 
 {
     __GL_HEADER();
 
-    __glDrawArraysInstanced(gc, mode, first, count, 1);
+    __glDrawArraysInstanced(gc, mode, first, count, 1, GL_FALSE);
 
     __GL_FOOTER();
 }
@@ -2339,6 +2402,7 @@ void __glInitVertexArrayState(__GLcontext *gc)
 #ifdef OPENGL40
     gc->vertexArray.interleaved = GL_FALSE;
     gc->vertexArray.formatChanged =  GL_TRUE;
+    gc->vertexArray.fromDrawXFB =  GL_FALSE;
 #endif
     __GL_FOOTER();
 }
