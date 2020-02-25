@@ -2932,6 +2932,7 @@ _VSC_MC_GEN_GenInst(
     gctUINT                 srcNum       = 0;
     gctBOOL                 bDstWrite    = gcvFALSE;
     gctBOOL                 bNeedGen     = gcvTRUE;
+    gctBOOL                 bForceGen    = (VIR_Inst_GetFlags(Inst) & VIR_INSTFLAG_FORCE_GEN) ? gcvTRUE : gcvFALSE;
 
     VSC_MC_CODEC_INST_CTRL  mcInstCtrl;
     VSC_MC_CODEC_DST        mcDest;
@@ -2961,7 +2962,10 @@ _VSC_MC_GEN_GenInst(
         *GenCount = 0;
         break;
     case VIR_OP_NOP:
-        *GenCount = 0;
+        if (!bForceGen)
+        {
+            *GenCount = 0;
+        }
         break;
     case VIR_OP_JMP:
     case VIR_OP_JMPC:
