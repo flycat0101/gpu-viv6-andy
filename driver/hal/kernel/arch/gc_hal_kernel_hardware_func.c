@@ -27816,7 +27816,14 @@ _FuncValidate_PPU(IN gcsFUNCTION_EXECUTION_PTR Execution)
     Execution->valid = gcvFALSE;
     if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_EVIS2_FLOP_RESET_FIX))
     {
-        Execution->valid = gcvTRUE;
+        if (hardware->identity.customerID == 0x21 ||
+            hardware->identity.customerID == 0x25 ||
+            hardware->identity.customerID == 0x86 ||
+            hardware->identity.customerID == 0xad
+            )
+        {
+            Execution->valid = gcvTRUE;
+        }
     }
 
     return gcvSTATUS_OK;
@@ -31113,7 +31120,8 @@ _FuncValidate_USC(IN gcsFUNCTION_EXECUTION_PTR Execution)
     {
         if (hardware->identity.customerID == 0x21 ||
             hardware->identity.customerID == 0x25 ||
-            hardware->identity.customerID == 0x86)
+            hardware->identity.customerID == 0x86
+            )
         {
             Execution->valid = gcvTRUE;
         }
@@ -32179,7 +32187,8 @@ _FuncValidate_USC2(IN gcsFUNCTION_EXECUTION_PTR Execution)
     {
         if (hardware->identity.customerID == 0x21 ||
             hardware->identity.customerID == 0x25 ||
-            hardware->identity.customerID == 0x86)
+            hardware->identity.customerID == 0x86
+            )
         {
             Execution->valid = gcvTRUE;
         }
