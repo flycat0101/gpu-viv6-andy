@@ -1,3 +1,7 @@
+#pragma OPENCL EXTENSION CL_VIV_asm : enable
+#pragma OPENCL EXTENSION cl_khr_fp16 : enable
+#pragma OPENCL EXTENSION cl_viv_vx_extension : enable
+
 #define TENSOR_COPY_SAME_4X_PROCESS(data_type, read_fun, write_fun) \
     data_type tmpOut = {0.0}; \
     tmpOut = read_fun(input, coord); \
@@ -334,4 +338,83 @@ __kernel void gpuTensorCopy_I16_INT32_4S_2D (__read_only image2d_t  input,
 {
     int2 coord = (int2)(get_global_id(0), get_global_id(1));
     TENSOR_COPY_I16INT32_4S_PROCESS();
+}
+
+inline uchar* get_image2D_array_ptr(image2d_array_t  input)
+{
+    int8 desc;
+    _viv_asm(COPY, desc, input, sizeof(desc));
+    uchar *src_ptr = (uchar*)desc.s0;
+
+    return src_ptr;
+}
+
+__kernel void gpuTensorCopy_FP32toFP16_4X (
+    __read_only image2d_array_t  input,
+    __write_only image2d_array_t output)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    float4 src = read_imagef(input, coord);
+    half4 dst;
+    _viv_asm(CONV, dst, src);
+    ushort4 result;
+    _viv_asm(COPY, result, dst, 16);
+
+    uchar *output_data_ptr = get_image2D_array_ptr(output) + coord.y * get_image_width(output) * 2 + coord.x * 2;
+
+    vstore4(result, 0, (ushort*)output_data_ptr);
+}
+
+__kernel void gpuTensorCopy_FP32toFP16_4X_2D (
+    __read_only image2d_t        input,
+    __write_only image2d_array_t output)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    float4 src = read_imagef(input, coord);
+    half4 dst;
+    _viv_asm(CONV, dst, src);
+    ushort4 result;
+    _viv_asm(COPY, result, dst, 16);
+
+    uchar *output_data_ptr = get_image2D_array_ptr(output) + coord.y * get_image_width(output) * 2 + coord.x * 2;
+
+    vstore4(result, 0, (ushort*)output_data_ptr);
+}
+
+__kernel void gpuTensorCopy_FP32toFP16_4S (
+    __read_only image2d_array_t  input,
+    __write_only image2d_array_t output)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    float4 src = read_imagef(input, coord);
+    half4 dst;
+    _viv_asm(CONV, dst, src);
+    ushort4 result;
+    _viv_asm(COPY, result, dst, 16);
+
+    uchar *output_data_ptr = get_image2D_array_ptr(output) + coord.y * get_image_width(output) * 2 + coord.x * 2;
+
+    ((ushort*)output_data_ptr)[0] = result.x;
+    ((ushort*)output_data_ptr)[1] = result.y;
+    ((ushort*)output_data_ptr)[2] = result.z;
+    ((ushort*)output_data_ptr)[3] = result.w;
+}
+
+__kernel void gpuTensorCopy_FP32toFP16_4S_2D (
+    __read_only image2d_t        input,
+    __write_only image2d_array_t output)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    float4 src = read_imagef(input, coord);
+    half4 dst;
+    _viv_asm(CONV, dst, src);
+    ushort4 result;
+    _viv_asm(COPY, result, dst, 16);
+
+    uchar *output_data_ptr = get_image2D_array_ptr(output) + coord.y * get_image_width(output) * 2 + coord.x * 2;
+
+    ((ushort*)output_data_ptr)[0] = result.x;
+    ((ushort*)output_data_ptr)[1] = result.y;
+    ((ushort*)output_data_ptr)[2] = result.z;
+    ((ushort*)output_data_ptr)[3] = result.w;
 }
