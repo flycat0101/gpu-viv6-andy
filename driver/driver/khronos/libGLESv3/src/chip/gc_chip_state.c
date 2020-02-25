@@ -1676,6 +1676,7 @@ gcChipValidateProgramSamplersCB(
         if ((program->samplerMap[sampler].stage == __GLSL_STAGE_LAST) &&
             (pgInstance->extraSamplerMap[sampler].stage == __GLSL_STAGE_LAST))
         {
+            gcmONERROR(gcoTEXTURE_Disable(chipCtx->hal, sampler, gcvFALSE));
             continue;
         }
 

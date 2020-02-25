@@ -4407,12 +4407,12 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
 
     gcoOS_Allocate(gcvNULL, sizeof(vxnne_lstm_unit_s) * time_steps * 15, (gctPOINTER*)&lstmlayer->operations2);
 
-    vxnneLayer_Initialize(&lstmlayer->base,
+    vxmONERROR(vxnneLayer_Initialize(&lstmlayer->base,
         "_LSTM_Layer",
         node,
         time_steps * 15,
         lstmlayer->operations2,
-        vxoNN_LSTMNNLayer_DeInitializer);
+        vxoNN_LSTMNNLayer_DeInitializer));
 
     gcoOS_Allocate(gcvNULL, sizeof(vxnne_lstm_unit_s) * time_steps, (gctPOINTER*)&lstmlayer->units);
     if (!lstmlayer->units)
@@ -4468,10 +4468,10 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
 
     biases_conv = vxoTensor_CreateTensor(context, node->graph, &tensor_create_params, vx_false_e);
 
-    vxoNNSWLSTMConv_ReshuffleWeightBias(input2input_weight, input2forget_weight, input2cell_weight, input2output_weight,
+    vxmONERROR(vxoNNSWLSTMConv_ReshuffleWeightBias(input2input_weight, input2forget_weight, input2cell_weight, input2output_weight,
         recurrent2input_weight, recurrent2forget_weight, recurrent2cell_weight, recurrent2output_weight,
         VX_NULL, VX_NULL, VX_NULL, input_gate_bias, forget_gate_bias, cell_bias, output_gate_bias,
-        weights_conv, biases_conv);
+        weights_conv, biases_conv));
 
     for (i = 0; i < time_steps; i++)
     {
@@ -4487,7 +4487,7 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
 
             lstmlayer->base.temp_tensors[lstmlayer->base.num_temp_tensors++] = input_view_tensors[i];
 
-            vxReleaseTensorView(&views[i]);
+            vxmONERROR(vxReleaseTensorView(&views[i]));
         }
 
         input_conv[i] = vxoTensor_CreateVirtualTensor(node->graph, 4, sizes[0], TENSOR_DATA_TYPE(input), TENSOR_POS(input));
@@ -4500,29 +4500,29 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
         {
 
             /* Initialize covolution operation */
-            vxnneOperation_Initialize(&lstmUnitNode->lstm_resuffle_input_operation.base,
+            vxmONERROR(vxnneOperation_Initialize(&lstmUnitNode->lstm_resuffle_input_operation.base,
                 &lstmlayer->base,
                 VXNNE_OPERATION_TARGET_SW,
                 VXNNE_OPERATOR_LSTM_RESHUFFLE_INPUT,
                 vxoNNSWLSTM_ReshuffleInput,
                 NULL,
                 batchCount,
-                0);
+                0));
 
             lstmUnitNode->lstm_resuffle_input_operation.input = (time_steps > 1) ? input_view_tensors[i] : input;
             lstmUnitNode->lstm_resuffle_input_operation.output_state_in = output_state_in;
             lstmUnitNode->lstm_resuffle_input_operation.cell_state_in = cell_state_in;
             lstmUnitNode->lstm_resuffle_input_operation.reshuffled_input = input_conv[i];
 
-            vxnneLayer_SetOperation(
+            vxmONERROR(vxnneLayer_SetOperation(
                 &lstmlayer->base,
                 &lstmUnitNode->lstm_resuffle_input_operation.base,
-                count++);
+                count++));
 
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_operation.base, (vx_reference)((time_steps > 1) ? input_view_tensors[i] : input), VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_operation.base, (vx_reference)output_state_in, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_operation.base, (vx_reference)cell_state_in, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_operation.base, (vx_reference)input_conv[i], VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_operation.base, (vx_reference)((time_steps > 1) ? input_view_tensors[i] : input), VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_operation.base, (vx_reference)output_state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_operation.base, (vx_reference)cell_state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_operation.base, (vx_reference)input_conv[i], VXNNE_OPERATION_REFENRENCE_OUTPUT));
         }
         else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP))
         {
@@ -4540,13 +4540,13 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
             lstmUnitNode->lstm_resuffle_input_tp_operation.input = (time_steps > 1) ? input_view_tensors[i] : input;
             lstmUnitNode->lstm_resuffle_input_tp_operation.output = input_conv[i];
 
-            vxnneLayer_SetOperation(
+            vxmONERROR(vxnneLayer_SetOperation(
                 &lstmlayer->base,
                 &lstmUnitNode->lstm_resuffle_input_tp_operation.base,
-                count++);
+                count++));
 
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_tp_operation.base, (vx_reference)((time_steps > 1) ? input_view_tensors[i] : input), VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_tp_operation.base, (vx_reference)input_conv[i], VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_tp_operation.base, (vx_reference)((time_steps > 1) ? input_view_tensors[i] : input), VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_tp_operation.base, (vx_reference)input_conv[i], VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
             conv.tpType = TP_LSTM_RESHUFFLE_INPUT;
             conv.other_ref = (vx_reference)output_state_in;
@@ -4568,13 +4568,13 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
             lstmUnitNode->lstm_resuffle_input_tp_operation2.input = output_state_in;
             lstmUnitNode->lstm_resuffle_input_tp_operation2.output = input_conv[i];
 
-            vxnneLayer_SetOperation(
+            vxmONERROR(vxnneLayer_SetOperation(
                 &lstmlayer->base,
                 &lstmUnitNode->lstm_resuffle_input_tp_operation2.base,
-                count++);
+                count++));
 
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_tp_operation2.base, (vx_reference)output_state_in, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_tp_operation2.base, (vx_reference)input_conv[i], VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_tp_operation2.base, (vx_reference)output_state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_resuffle_input_tp_operation2.base, (vx_reference)input_conv[i], VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
             conv.tpType = TP_LSTM_STATE_OUT;
             conv.other_ref = (vx_reference)((time_steps > 1) ? input_view_tensors[i] : input);
@@ -4587,27 +4587,27 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
 
         if (sw_fc)
         {
-            status = vxnneOperation_Initialize(&lstmUnitNode->lstm_sw_operation.base,
+            vxmONERROR(vxnneOperation_Initialize(&lstmUnitNode->lstm_sw_operation.base,
                 &lstmlayer->base,
                 VXNNE_OPERATION_TARGET_SW,
                 VXNNE_OPERATOR_FULLYCONNECTED,
                 vxnneExecuteSWFullyConnected,
                 VX_NULL,
                 batch,
-                0);
+                0));
 
             lstmUnitNode->lstm_sw_operation.inputs = input_conv[i];
             lstmUnitNode->lstm_sw_operation.weights = weights_conv;
             lstmUnitNode->lstm_sw_operation.biases = biases_conv;
             lstmUnitNode->lstm_sw_operation.outputs = output_conv[i];
 
-            vxnneLayer_SetOperation(
+            vxmONERROR(vxnneLayer_SetOperation(
                 &lstmlayer->base,
                 &lstmUnitNode->lstm_sw_operation.base,
-                count++);
+                count++));
 
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_sw_operation.base, (vx_reference)input_conv[i], VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_sw_operation.base, (vx_reference)output_conv[i], VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_sw_operation.base, (vx_reference)input_conv[i], VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_sw_operation.base, (vx_reference)output_conv[i], VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
             lstmlayer->base.temp_tensors[lstmlayer->base.num_temp_tensors++] = weights_conv;
             lstmlayer->base.temp_tensors[lstmlayer->base.num_temp_tensors++] = biases_conv;
@@ -4650,8 +4650,8 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
                     vx_false_e
                 );
 
-                vxoTensor_ReleaseTensor(&weights_conv);
-                vxoTensor_ReleaseTensor(&biases_conv);
+                vxmONERROR(vxoTensor_ReleaseTensor(&weights_conv));
+                vxmONERROR(vxoTensor_ReleaseTensor(&biases_conv));
 
                 weights_biases->compress(weights_biases, VXNNE_OPERATION_TARGET_TP, 0, TENSOR_STRIDE_INDEX(output_conv[i], 2));
             }
@@ -4707,13 +4707,13 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
                 lstmUnitNode->lstm_tp_fc_operation.weights_biases = weights_biases;
                 lstmUnitNode->lstm_tp_fc_operation.output = output_conv[i];
 
-                vxnneLayer_SetOperation(
+                vxmONERROR(vxnneLayer_SetOperation(
                     &lstmlayer->base,
                     &lstmUnitNode->lstm_tp_fc_operation.base,
-                    count++);
+                    count++));
 
-                vxnneOperation_AddReference(&lstmUnitNode->lstm_tp_fc_operation.base, (vx_reference)input_conv[i], VXNNE_OPERATION_REFENRENCE_INPUT);
-                vxnneOperation_AddReference(&lstmUnitNode->lstm_tp_fc_operation.base, (vx_reference)output_conv[i], VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_tp_fc_operation.base, (vx_reference)input_conv[i], VXNNE_OPERATION_REFENRENCE_INPUT));
+                vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_tp_fc_operation.base, (vx_reference)output_conv[i], VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
             }
             else
@@ -4754,10 +4754,10 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
                     vx_false_e
                 );
 
-                vxoTensor_ReleaseTensor(&weights_conv);
-                vxoTensor_ReleaseTensor(&biases_conv);
+                vxmONERROR(vxoTensor_ReleaseTensor(&weights_conv));
+                vxmONERROR(vxoTensor_ReleaseTensor(&biases_conv));
 
-                vxoCalculateNNCompressionFirstTime(context, weights_biases, output_conv[i]);
+                vxmONERROR(vxoCalculateNNCompressionFirstTime(context, weights_biases, output_conv[i]));
             }
 
             status = vxnneOperation_Initialize(&lstmUnitNode->lstm_nn_operation.base,
@@ -4785,13 +4785,13 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
             lstmUnitNode->lstm_nn_operation.weights_biases = weights_biases;
             lstmUnitNode->lstm_nn_operation.outputs = output_conv[i];
 
-            vxnneLayer_SetOperation(
+            vxmONERROR(vxnneLayer_SetOperation(
                 &lstmlayer->base,
                 &lstmUnitNode->lstm_nn_operation.base,
-                count++);
+                count++));
 
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_nn_operation.base, (vx_reference)input_conv[i], VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_nn_operation.base, (vx_reference)output_conv[i], VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_nn_operation.base, (vx_reference)input_conv[i], VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_nn_operation.base, (vx_reference)output_conv[i], VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
             memcpy(&lstmUnitNode->lstm_nn_operation.base.parameter, &conv, sizeof(vx_op_param_s));
         }
@@ -4799,14 +4799,14 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
         if (sw_state_out)
         {
             /* Initialize state out operation */
-            vxnneOperation_Initialize(&lstmUnitNode->lstm_unit_operation.base,
+            vxmONERROR(vxnneOperation_Initialize(&lstmUnitNode->lstm_unit_operation.base,
                 &lstmlayer->base,
                 VXNNE_OPERATION_TARGET_SW,
                 VXNNE_OPERATOR_LSTM_STATE_OUT,
                 vxoNNSWLSTM_StateOut,
                 NULL,
                 batchCount,
-                0);
+                0));
 
             lstmUnitNode->lstm_unit_operation.input = output_conv[i];
 
@@ -4839,40 +4839,40 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
             lstmUnitNode->lstm_unit_operation.cell_state_out = cell_state_out;
             lstmUnitNode->lstm_unit_operation.output = (i == (time_steps - 1)) ? output : VX_NULL;
 
-            vxnneLayer_SetOperation(
+            vxmONERROR(vxnneLayer_SetOperation(
                 &lstmlayer->base,
                 &lstmUnitNode->lstm_unit_operation.base,
-                count++);
+                count++));
 
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output_conv, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output_conv, VXNNE_OPERATION_REFENRENCE_INPUT));
 
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2cell_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2cell_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
 
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)recurrent2output_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)recurrent2output_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
 
-            if (cell2input_weight)vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell2input_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
-            if (cell2forget_weight)vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
-            if (cell2output_weight)vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell2output_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
+            if (cell2input_weight) vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell2input_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+            if (cell2forget_weight) vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell2forget_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+            if (cell2output_weight) vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell2output_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
 
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input_gate_bias, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)forget_gate_bias, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell_bias, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output_gate_bias, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output_state_in, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell_state_in, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)input_gate_bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)forget_gate_bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell_bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output_gate_bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output_state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell_state_in, VXNNE_OPERATION_REFENRENCE_INPUT));
 
-            if (projection_weight)vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)projection_weight, VXNNE_OPERATION_REFENRENCE_INPUT);
-            if (projection_bias)vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)projection_bias, VXNNE_OPERATION_REFENRENCE_INPUT);
+            if (projection_weight) vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)projection_weight, VXNNE_OPERATION_REFENRENCE_INPUT));
+            if (projection_bias) vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)projection_bias, VXNNE_OPERATION_REFENRENCE_INPUT));
 
-            if (activation)vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)activation, VXNNE_OPERATION_REFENRENCE_INPUT);
-            if (forget_bias)vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)forget_bias, VXNNE_OPERATION_REFENRENCE_INPUT);
-            if (cell_clip)vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell_clip, VXNNE_OPERATION_REFENRENCE_INPUT);
-            if (proj_clip)vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)proj_clip, VXNNE_OPERATION_REFENRENCE_INPUT);
+            if (activation) vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)activation, VXNNE_OPERATION_REFENRENCE_INPUT));
+            if (forget_bias) vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)forget_bias, VXNNE_OPERATION_REFENRENCE_INPUT));
+            if (cell_clip) vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell_clip, VXNNE_OPERATION_REFENRENCE_INPUT));
+            if (proj_clip) vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)proj_clip, VXNNE_OPERATION_REFENRENCE_INPUT));
 
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output_state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-            vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell_state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT);
-            if (output)vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output_state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+            vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)cell_state_out, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+            if (output) vxmONERROR(vxnneOperation_AddReference(&lstmUnitNode->lstm_unit_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
         }
         else
         {
@@ -4894,6 +4894,7 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
 
     return VX_SUCCESS;
 
+OnError:
 exit:
     if (lstmlayer)
     {
@@ -6201,7 +6202,7 @@ OnError:
             {
                 vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
                 status = VX_ERROR_NO_MEMORY;
-                return status;
+                goto exit;
             }
             lstmUnitNode->base.temp_tensors[tmpTensorIndex++] = w_h;
 
@@ -6303,7 +6304,7 @@ OnError:
             {
                 vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
                 status = VX_ERROR_NO_MEMORY;
-                return status;
+                goto exit;
             }
             lstmUnitNode->base.temp_tensors[tmpTensorIndex++] = bias;
 

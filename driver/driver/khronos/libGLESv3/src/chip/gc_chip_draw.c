@@ -4973,13 +4973,6 @@ gcChipValidateChipDirty(
         }
 #endif
 
-        #if gcdALPHA_KILL_IN_SHADER
-        if (chipCtx->chipDirty.uDefer.sDefer.blend || chipCtx->chipDirty.uDefer.sDefer.fsReload)
-        {
-            gcmONERROR(gcChipSetAlphaKill(gc));
-        }
-#endif
-
         if (chipCtx->chipDirty.uDefer.sDefer.polygonOffset)
         {
             gcmONERROR(gcChipSetPolygonOffset(gc));

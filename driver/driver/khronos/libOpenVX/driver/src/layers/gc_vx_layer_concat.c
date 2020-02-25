@@ -1345,8 +1345,8 @@ OnError:
                                                &concatNLayer->tp_operation[i].base,
                                                operationIndex++));
 
-            vxnneOperation_AddReference(&concatNLayer->tp_operation[i].base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&concatNLayer->tp_operation[i].base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxmONERROR(vxnneOperation_AddReference(&concatNLayer->tp_operation[i].base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&concatNLayer->tp_operation[i].base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
             concatNLayer->base.temp_tensors[tmpTensorIndex++] = output;
 
@@ -1435,13 +1435,13 @@ OnError:
                     batchCount,
                     shaderExecutable));
 
-                vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)input_rs, VXNNE_OPERATION_REFENRENCE_INPUT);
-                vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)output_rs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                vxmONERROR(vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)input_rs, VXNNE_OPERATION_REFENRENCE_INPUT));
+                vxmONERROR(vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)output_rs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
-                vxnneLayer_SetOperation(
+                vxmONERROR(vxnneLayer_SetOperation(
                     &concatNLayer->base,
                     &concatNLayer->concat_sh_unit_operation[operationIndex].base,
-                    opIdx++);
+                    opIdx++));
                 operationIndex ++;
 
                 concatNLayer->base.temp_tensors[tmpTensorIndex++] = subtensor;
@@ -1528,13 +1528,13 @@ OnError:
                     batchCount,
                     shaderExecutable));
 
-                vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
-                vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)subtensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                vxmONERROR(vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+                vxmONERROR(vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)subtensor, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
-                vxnneLayer_SetOperation(
+                vxmONERROR(vxnneLayer_SetOperation(
                     &concatNLayer->base,
                     &concatNLayer->concat_sh_unit_operation[operationIndex].base,
-                    opIdx++);
+                    opIdx++));
                 operationIndex ++;
 
                 concatNLayer->base.temp_tensors[tmpTensorIndex++] = subtensor;
@@ -1562,32 +1562,32 @@ OnError:
                 batchCount,
                 shaderExecutable));
 
-            vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)output_tmp, VXNNE_OPERATION_REFENRENCE_INPUT);
-            vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)output_s, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxmONERROR(vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)output_tmp, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&concatNLayer->concat_sh_unit_operation[operationIndex].base, (vx_reference)output_s, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
-            vxnneLayer_SetOperation(
+            vxmONERROR(vxnneLayer_SetOperation(
                 &concatNLayer->base,
                 &concatNLayer->concat_sh_unit_operation[operationIndex].base,
-                opIdx++);
+                opIdx++));
             operationIndex ++;
         }
         concatNLayer->base.num_temp_tensors = tmpTensorIndex;
     }
     else
     {
-        vxnneOperation_Initialize(&concatNLayer->concatIndefinite_operation.base,
+        vxmONERROR(vxnneOperation_Initialize(&concatNLayer->concatIndefinite_operation.base,
             &concatNLayer->base,
             VXNNE_OPERATION_TARGET_SW,
             VXNNE_OPERATOR_CONCATINDEFINITE,
             vxnneExecuteSWConcatIndefinite,
             VX_NULL,
             batchCount,
-            0);
+            0));
 
-        vxnneLayer_SetOperation(
+        vxmONERROR(vxnneLayer_SetOperation(
             &concatNLayer->base,
             &concatNLayer->concatIndefinite_operation.base,
-            0);
+            0));
 
         concatNLayer->concatIndefinite_operation.inputs          = input_s;
         concatNLayer->concatIndefinite_operation.axis            = axis_s;
@@ -1596,9 +1596,9 @@ OnError:
         for (i = 0; i < itemCount; i++)
         {
             vx_tensor input = (vx_tensor)input_s->itemsTable[i];
-            vxnneOperation_AddReference(&concatNLayer->concatIndefinite_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxmONERROR(vxnneOperation_AddReference(&concatNLayer->concatIndefinite_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
         }
-        vxnneOperation_AddReference(&concatNLayer->concatIndefinite_operation.base, (vx_reference)output_s, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+        vxmONERROR(vxnneOperation_AddReference(&concatNLayer->concatIndefinite_operation.base, (vx_reference)output_s, VXNNE_OPERATION_REFENRENCE_OUTPUT));
     }
 
     node->layer = &concatNLayer->base;
