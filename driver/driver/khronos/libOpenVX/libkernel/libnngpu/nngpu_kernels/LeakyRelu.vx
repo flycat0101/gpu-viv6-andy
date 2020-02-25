@@ -1,0 +1,70 @@
+__kernel void gpuLeakyRelu_FP32 (
+    __read_only image2d_array_t   input,
+    __write_only image2d_array_t  output,
+    float                         alpha)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    float4 tmp = {0.0}, dst = {0.0};
+
+    tmp = read_imagef(input, coord);
+    tmp.y = alpha * tmp.x;
+    dst.x = tmp.x >= 0 ? tmp.x : tmp.y;
+    write_imagef(output, coord, dst);
+}
+
+__kernel void gpuLeakyRelu_Quant8 (
+    __read_only image2d_array_t   input,
+    __write_only image2d_array_t  output,
+    float                         alpha,
+    float                         scaleIn,
+    float                         zpIn,
+    float                         scaleOut,
+    float                         zpOut)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    uint4 tmp = {0.0}, dst = {0.0};
+    float inPixel0, inPixel1, outPixel;
+
+    tmp = read_imageui(input, coord);
+    inPixel0 = (convert_float(tmp.x) - zpIn) * scaleIn;
+    inPixel1 = alpha * inPixel0;
+    outPixel = inPixel0 > 0 ? inPixel0 : inPixel1;
+    dst.x = floor(outPixel * scaleOut + zpOut);
+    write_imageui(output, coord, dst);
+}
+
+
+__kernel void gpuLeakyRelu_FP32_2D (
+    __read_only image2d_t   input,
+    __write_only image2d_t  output,
+    float                         alpha)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    float4 tmp = {0.0}, dst = {0.0};
+
+    tmp = read_imagef(input, coord);
+    tmp.y = alpha * tmp.x;
+    dst.x = tmp.x >= 0 ? tmp.x : tmp.y;
+    write_imagef(output, coord, dst);
+}
+
+__kernel void gpuLeakyRelu_Quant8_2D (
+    __read_only image2d_t   input,
+    __write_only image2d_t  output,
+    float                         alpha,
+    float                         scaleIn,
+    float                         zpIn,
+    float                         scaleOut,
+    float                         zpOut)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    uint4 tmp = {0.0}, dst = {0.0};
+    float inPixel0, inPixel1, outPixel;
+
+    tmp = read_imageui(input, coord);
+    inPixel0 = (convert_float(tmp.x) - zpIn) * scaleIn;
+    inPixel1 = alpha * inPixel0;
+    outPixel = inPixel0 > 0 ? inPixel0 : inPixel1;
+    dst.x = floor(outPixel * scaleOut + zpOut);
+    write_imageui(output, coord, dst);
+}

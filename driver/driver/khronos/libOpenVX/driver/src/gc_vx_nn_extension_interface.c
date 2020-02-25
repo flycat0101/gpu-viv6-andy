@@ -9990,6 +9990,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
         support_dataType[0] = (vx_bool)((inputFormat == VX_TYPE_FLOAT32 || inputFormat == VX_TYPE_FLOAT16) && (outputFormat == VX_TYPE_FLOAT32 || outputFormat == VX_TYPE_FLOAT16));
         support_dataType[1] = (vx_bool)((inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32) || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16));
         support_dataType[2] = (vx_bool)((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
+        enable_Leaky_SHExe  = (vx_bool)((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                                      || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                                      || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                                      || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
+                                      || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32));
+
     }
 
     enable_tf_quantize = (vx_bool)((func_v == VX_NN_ACTIVATION_RELU && support_dataType[2]) ||
@@ -10155,8 +10161,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
         vx_scalar negative_slopes = vxCreateScalar(context, VX_TYPE_FLOAT32, &val);
 
         if (negative_slopes != NULL)
-            shaderExecutable = vxnneGetLeakyReluShaderExecutable(node->base.context, VXNNE_KERNEL_NN_LEAKY, &node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
-
+        {
+            if(context->evisNoInst.supportEVIS)
+            {
+                shaderExecutable = vxnneGetLeakyReluShaderExecutable(node->base.context, VXNNE_KERNEL_NN_LEAKY, &node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
+            }
+            else
+            {
+                shaderExecutable = vxnneGetGPULeakyReluShaderExecutable(node->base.context, VXNNE_KERNEL_NN_LEAKY, &node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
+            }
+        }
         if (!shaderExecutable)
         {
             status = VX_FAILURE;
@@ -10334,12 +10348,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNLeakyReluLayer_Initializer(vx_node nod
     }
     else
     {
-        shExe_flag  = (vx_bool)(((srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+        shExe_flag  = (vx_bool)((srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
                               || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
                               || (srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_FLOAT32)
                               || (srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_FLOAT16)
-                              || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT32))
-                              && negative_slopes->value->f32 == -1.0f);
+                              || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT32));
     }
 
     if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_ACTIVATION) &&
@@ -10403,7 +10416,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNLeakyReluLayer_Initializer(vx_node nod
         }
         else
         {
-            shaderExecutable = vxnneGetGPUActivationShaderExecutable(node->base.context, VXNNE_KERNEL_ACTIVATION, &node->kernelAttributes.borderMode, VX_NN_ACTIVATION_ABS, inputs, 0, 0, outputs);
+            shaderExecutable = vxnneGetGPULeakyReluShaderExecutable(node->base.context, VXNNE_KERNEL_NN_LEAKY, &node->kernelAttributes.borderMode, inputs, negative_slopes, outputs);
         }
 
         if (!shaderExecutable)
