@@ -178,7 +178,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
     vx_context                   context,
     vx_weights_biases_parameter  wb,
     vx_enum                      target,
-    vx_uint32                    kernel_per_core,
+    vx_uint32*                   kernel_per_core,
     vx_uint32                    z_offset,
     vx_size*                     min_kernel_total_buffer_size,
     vx_size*                     min_kernel_buffer_sizes,
@@ -188,7 +188,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
 {
     vx_status status;
     vx_uint32 i = 0, j = 0, index = 0, kzOffset = 0, oneFilterSize, weightSize, kzNum = 1, zNum = 1;
-    vx_uint32 nonZeroCount = 0, nonZeroTotalCount = 0, totalCount = 0, allTotalCount = 0, sliceCount = 0, filterCount;
+    vx_uint32 nonZeroCount = 0, nonZeroTotalCount = 0, totalCount = 0, allTotalCount = 0, sliceCount = 0, filterCount, kernelPerCore;
     vx_uint32 zArray[MAX_ZGROUP_COUNT], kzArray[MAX_KZGROUP_COUNT];
     vx_size minTotalKernelBufferSize = 0, origKernelBufferSize = 0, origTotalKernelBufferSize = 0, weightDataBytesOffset = 0;
     vx_uint8_ptr weightPtr = VX_NULL, biasPtr = VX_NULL;
@@ -263,6 +263,28 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
         {
             status = VX_ERROR_NO_RESOURCES;
             goto error;
+        }
+
+        if (kernel_per_core == VX_NULL || *kernel_per_core == 0)
+        {
+            status = VX_ERROR_INVALID_VALUE;
+            goto error;
+        }
+        else
+        {
+            kernelPerCore = *kernel_per_core;
+            for (i = 0; i < zNum; i++)
+            {
+                if (kernelPerCore > zArray[i])
+                {
+                    kernelPerCore = zArray[i];
+                }
+            }
+            if (*kernel_per_core != kernelPerCore)
+            {
+                vxInfo("kernel_per_core is out of max size. Change from %d to %d\n", *kernel_per_core, kernelPerCore);
+                *kernel_per_core = kernelPerCore;
+            }
         }
 
         WB_KERNEL_X(wb) = kx;
@@ -342,22 +364,14 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
             }
             else
             {
-                if (kernel_per_core == 0)
-                {
-                    status = VX_ERROR_INVALID_VALUE;
-                    goto error;
-                }
-
                 calculateWeightBiasStreamRelatedSize(
                     context,
                     WB_HUFFMAN_CONFIG_INDEX(wb, index),
                     WB_KERNEL_X(wb),
                     WB_KERNEL_Y(wb),
-                    WB_KERNEL_Z(wb),
-                    WB_OUTPUT_Z(wb),
                     sliceCount, /* slice */
                     filterCount, /* z count */
-                    kernel_per_core, /* kernel per core */
+                    kernelPerCore, /* kernel per core */
                     WB_WEIGHT_DATA_FORMAT(wb),
                     WB_WEIGHT_ZP(wb),
                     WB_BIAS_DATA_FORMAT(wb),
@@ -829,7 +843,7 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
     vx_size minTotalKernelBufferSize = 0;
     vx_size minKernelBufferSizes[MAX_ZGROUP_COUNT*MAX_KZGROUP_COUNT];
     vx_uint8* minZeroRunLens = VX_NULL;
-    vx_uint32 maxZeroRunLens[MAX_ZGROUP_COUNT] = {0};
+    vx_uint32 maxZeroRunLens[MAX_ZGROUP_COUNT] = {0}, kernelPerCore;
 
     if (wb == VX_NULL || z_offset == 0) return VX_ERROR_INVALID_PARAMETERS;
     if (kernel_per_core == 0 && target != VXNNE_OPERATION_TARGET_TP) return VX_ERROR_INVALID_PARAMETERS;
@@ -844,7 +858,9 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
         WB_MEMORY_NODE(wb) = VX_NULL;
     }
 
-    status = _vxoWeightBias_CalculateSize(context, wb, target, kernel_per_core, z_offset, &minTotalKernelBufferSize, minKernelBufferSizes, &minZeroRunLens, maxZeroRunLens);
+    kernelPerCore = kernel_per_core;
+
+    status = _vxoWeightBias_CalculateSize(context, wb, target, &kernelPerCore, z_offset, &minTotalKernelBufferSize, minKernelBufferSizes, &minZeroRunLens, maxZeroRunLens);
     if (status != VX_SUCCESS)
     {
         goto exit;
@@ -860,7 +876,7 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
         WB_MEMORY_SIZE(wb) = minTotalKernelBufferSize;
     }
 
-    status = _vxoWeightBias_Compress(context, wb, kernel_per_core, z_offset, minKernelBufferSizes, minZeroRunLens, maxZeroRunLens);
+    status = _vxoWeightBias_Compress(context, wb, kernelPerCore, z_offset, minKernelBufferSizes, minZeroRunLens, maxZeroRunLens);
     if (status != VX_SUCCESS)
     {
         goto exit;

@@ -7012,8 +7012,6 @@ void calculateWeightBiasStreamRelatedSize(
     vx_weight_bias_huffman_cfg huffman_config,
     vx_uint32 weight_x,
     vx_uint32 weight_y,
-    vx_uint32 weight_z,
-    vx_uint32 output_z,
     vx_uint32 slice_count,
     vx_uint32 z_count,
     vx_uint32 kernels_per_core,
@@ -7050,8 +7048,8 @@ void calculateWeightBiasStreamRelatedSize(
                                 huffman_config,
                                 weight_x,
                                 weight_y,
-                                weight_z,
-                                output_z,
+                                slice_count,
+                                z_count,
                                 kernels_per_core,
                                 weight_format,
                                 skip_value,
@@ -7061,11 +7059,11 @@ void calculateWeightBiasStreamRelatedSize(
                                 );
 
         if (all_count != VX_NULL)
-            *all_count = weight_x * weight_y * weight_z * output_z;
+            *all_count = weight_x * weight_y * slice_count * z_count;
         if (non_zero_count != VX_NULL)
             *non_zero_count = calcNonZeroCountV8Huffman(context, weight_x, weight_y, slice_count, z_count, kernels_per_core, weight_format, (vx_uint8_ptr)weight_data, skip_value);
         if (orig_kernel_buf_size != VX_NULL)
-            *orig_kernel_buf_size = weight_x * weight_y * weight_z * output_z * weightSize + z_count * biasSize;
+            *orig_kernel_buf_size = weight_x * weight_y * slice_count * z_count * weightSize + z_count * biasSize;
     }
     else if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_COEF_COMPRESSION_ENHANCEMENT))
     {
@@ -7075,8 +7073,8 @@ void calculateWeightBiasStreamRelatedSize(
                                 huffman_config,
                                 weight_x,
                                 weight_y,
-                                weight_z,
-                                output_z,
+                                slice_count,
+                                z_count,
                                 kernels_per_core,
                                 weight_format,
                                 weight_zp,

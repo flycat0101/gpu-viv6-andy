@@ -64,8 +64,6 @@ void calculateWeightBiasStreamRelatedSize(
     vx_weight_bias_huffman_cfg huffman_config,
     vx_uint32 weight_x,
     vx_uint32 weight_y,
-    vx_uint32 weight_z,
-    vx_uint32 output_z,
     vx_uint32 slice_count,
     vx_uint32 z_count,
     vx_uint32 kernels_per_core,
