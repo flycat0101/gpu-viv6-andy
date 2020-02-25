@@ -214,7 +214,7 @@
 #define VX_GRAPH_COMMAND_BUFFER_SIZE        gcdCMD_BUFFER_SIZE
 #define IMG_MAX_WIDTH (65536)
 
-#define REGISTER_FRAME 1
+#define REGISTER_FRAME 0
 #define REGISTER_FRAME_CL_RELAX 0
 
 /* Function macros */

@@ -668,6 +668,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedLayer_ValidateOutput(vx_
 {
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
 
 VX_PRIVATE_API vx_status vxoNNFullyConnectedLayer_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
@@ -914,10 +915,12 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
 
     return status;
 }
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status                     = VX_SUCCESS;
+#if REGISTER_FRAME
 
     vxnne_layer_imp_s registerFullyConnectedLayers[] = {/* Please DON'T adjust the order, it's importent */
         { "FC NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
@@ -930,6 +933,175 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNFullyConnectedLayer_Initializer(vx_nod
     REGISTER_LAYERS(registerFullyConnectedLayers, vxnne_fully_connected_relu_layer_s, "FullyConnectedLayer", vxoNNLayer_GetOperations);
 
 OnError:
+#else
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_tensor  weights                    = (vx_tensor)parameters[1];
+    vx_tensor  biases                     = (vx_tensor)parameters[2];
+    vx_tensor  outputs                    = (vx_tensor)parameters[node->numParameters - 1];
+
+    vx_bool   enable_shader               = vx_false_e;
+    vx_bool   supportDataFormat0          = vx_false_e;
+    vx_bool   supportDataFormat1          = vx_false_e;
+    vx_bool   supportDataFormat2          = vx_false_e;
+    vx_bool   supportDataFormat3          = vx_false_e;
+    vx_enum   input_type                  = TENSOR_DATA_TYPE(inputs);
+    vx_enum   weight_type                 = TENSOR_DATA_TYPE(weights);
+    vx_enum   bias_type                   = biases ? TENSOR_DATA_TYPE(biases) : VX_TYPE_INVALID;
+    vx_enum   output_type                 = TENSOR_DATA_TYPE(outputs);
+    vx_uint32 dims                        = TENSOR_VIEW_DIM_NUM(inputs);
+    vx_uint32 width                       = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+    vx_uint32 height                      = (dims > 1) ? TENSOR_VIEW_SIZE_INDEX(inputs, 1) : 1;
+    vx_uint32 depth                       = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
+    vx_uint32 inputDims                   = dims > 2 ? width * height * depth : width;
+    vx_uint32 batch                       = 1;
+    vxnne_fully_connected_relu_layer  fullyConnectedLayer = gcvNULL;
+    /* destroy the existing layer */
+    if (node->layer)
+    {
+        vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
+    }
+
+    if (TENSOR_DIM_NUM(inputs) == 2)
+    {
+        batch = TENSOR_SIZE_INDEX(inputs, 1);
+    }
+    else if (TENSOR_DIM_NUM(inputs) == 4)
+    {
+        batch = TENSOR_SIZE_INDEX(inputs, 3);
+    }
+
+    if(node->base.context->evisNoInst.supportEVIS)
+    {
+        supportDataFormat0 = (vx_bool)(input_type == VX_TYPE_FLOAT16 && weight_type == VX_TYPE_FLOAT16 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_FLOAT32) && output_type == VX_TYPE_FLOAT16);
+        supportDataFormat1 = (vx_bool)(input_type == VX_TYPE_INT8 && weight_type == VX_TYPE_INT8 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32) && output_type == VX_TYPE_INT8);
+        supportDataFormat2 = (vx_bool)(input_type == VX_TYPE_INT16 && weight_type == VX_TYPE_INT16
+                             && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32 || bias_type == VX_TYPE_INT64 || bias_type == VX_TYPE_INT16) && output_type == VX_TYPE_INT16);
+        supportDataFormat3 = (vx_bool)(input_type == VX_TYPE_UINT8 && weight_type == VX_TYPE_UINT8
+                             && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32 || bias_type == VX_TYPE_UINT8) && output_type != VX_TYPE_FLOAT32);
+        enable_shader      = (supportDataFormat0 || supportDataFormat1 || supportDataFormat2 || supportDataFormat3) && (inputDims < IMG_MAX_WIDTH);
+    }
+    else
+    {
+        supportDataFormat0 = (vx_bool)((input_type == VX_TYPE_FLOAT16 && weight_type == VX_TYPE_FLOAT16 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_FLOAT32) && output_type == VX_TYPE_FLOAT16) ||
+                                        (input_type == VX_TYPE_FLOAT32 && weight_type == VX_TYPE_FLOAT32 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_FLOAT32) && output_type == VX_TYPE_FLOAT32));
+        supportDataFormat3 = (vx_bool)(input_type == VX_TYPE_UINT8 && weight_type == VX_TYPE_UINT8 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32) && output_type == VX_TYPE_UINT8);
+        supportDataFormat2 = (vx_bool)(input_type == VX_TYPE_UINT8 && weight_type == VX_TYPE_UINT8 && (bias_type == VX_TYPE_INVALID || bias_type == VX_TYPE_INT32) &&
+                                      ((output_type == VX_TYPE_INT32) || (output_type == VX_TYPE_FLOAT32) || (output_type == VX_TYPE_FLOAT16) || (output_type == VX_TYPE_INT16)));
+        enable_shader      = (supportDataFormat0 || supportDataFormat3 || supportDataFormat2);
+    }
+
+    gcoOS_Allocate(gcvNULL, sizeof(vxnne_fully_connected_relu_layer_s), (gctPOINTER*)&fullyConnectedLayer);
+    if (!fullyConnectedLayer)
+    {
+        status = VX_ERROR_NO_MEMORY;
+        vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+        goto exit;
+    }
+
+    gcoOS_ZeroMemory(fullyConnectedLayer, sizeof(vxnne_fully_connected_relu_layer_s));
+
+    vxnneLayer_Initialize(&fullyConnectedLayer->base,
+                          "FullyConnectedLayer",
+                          node,
+                          vxmOPERATION_COUNT(fullyConnectedLayer),
+                          fullyConnectedLayer->operations,
+                          vxnneLayer_Deinitialize);
+
+    if (enable_shader && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
+    {
+        vxnne_shader_executable shaderExecutable = VX_NULL;
+        vx_bool enable_cast_format = vx_false_e;
+        vx_tensor input_rs = NULL;
+        vx_tensor weights_rs = NULL;
+
+        if ((inputDims % 16 == 0) && input_type == VX_TYPE_UINT8 && weight_type == VX_TYPE_UINT8 && biases
+            && node->base.context->evisNoInst.supportEVIS == vx_false_e && (output_type  == VX_TYPE_UINT8))
+        {
+            enable_cast_format = vx_true_e;
+
+            input_rs = vxoTensor_ReformatTensor(inputs, VX_TYPE_UINT32);
+            weights_rs = vxoTensor_ReformatTensor(weights, VX_TYPE_UINT32);
+
+            fullyConnectedLayer->base.temp_tensors[0] = input_rs;
+            fullyConnectedLayer->base.temp_tensors[1] = weights_rs;
+
+            fullyConnectedLayer->base.num_temp_tensors = 2;
+        }
+        else
+        {
+            input_rs = inputs;
+            weights_rs = weights;
+        }
+
+        if(node->base.context->evisNoInst.supportEVIS)
+        {
+            shaderExecutable = vxnneGetFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED,
+                &node->kernelAttributes.borderMode, input_rs, weights, biases, VX_NN_ACTIVATION_NONE, outputs);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetGPUFullyConnectedShaderExecutable(node->base.context, VXNNE_KERNEL_FULLYCONNECTED,
+                &node->kernelAttributes.borderMode, enable_cast_format, input_rs, weights_rs, biases, VX_NN_ACTIVATION_NONE, outputs);
+        }
+
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            goto exit;
+        }
+
+        status = vxnneShaderOperation_Initialize(&fullyConnectedLayer->fully_connected_SHoperation,
+            &fullyConnectedLayer->base,
+            VXNNE_OPERATOR_FULLYCONNECTED,
+            1,
+            shaderExecutable);
+
+        if (status != VX_SUCCESS) goto exit;
+
+        vxnneLayer_SetOperation(
+            &fullyConnectedLayer->base,
+            &fullyConnectedLayer->fully_connected_SHoperation.base,
+            0);
+
+        vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_SHoperation.base, (vx_reference)input_rs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_SHoperation.base, (vx_reference)weights_rs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_SHoperation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
+    else
+    {
+        status = vxnneOperation_Initialize(&fullyConnectedLayer->fully_connected_operation.base,
+                                           &fullyConnectedLayer->base,
+                                           VXNNE_OPERATION_TARGET_SW,
+                                           VXNNE_OPERATOR_FULLYCONNECTED,
+                                           vxnneExecuteSWFullyConnected,
+                                           VX_NULL,
+                                           1,
+                                           0);
+
+        vxnneLayer_SetOperation(
+            &fullyConnectedLayer->base,
+            &fullyConnectedLayer->fully_connected_operation.base,
+            0);
+
+        fullyConnectedLayer->fully_connected_operation.inputs           = inputs;
+        fullyConnectedLayer->fully_connected_operation.weights          = weights;
+        fullyConnectedLayer->fully_connected_operation.biases           = biases;
+        fullyConnectedLayer->fully_connected_operation.outputs          = outputs;
+
+        vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&fullyConnectedLayer->fully_connected_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
+
+    node->layer = &fullyConnectedLayer->base;
+    return status;
+
+exit:
+    if (fullyConnectedLayer) gcoOS_Free(gcvNULL, (gctPOINTER)fullyConnectedLayer);
+#endif
 
     return status;
 }

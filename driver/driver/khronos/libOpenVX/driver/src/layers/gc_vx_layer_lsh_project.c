@@ -204,6 +204,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLSHProjection_ValidateOutput(vx_node nod
 {
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
 
 VX_PRIVATE_API vx_status vxoNNLSH_Project_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
@@ -263,11 +264,13 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
 
     return status;
 }
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoLSHProjection_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
 
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
 
     vxnne_layer_imp_s registerLSH_Projects[] = {/* Please DON'T adjust the order, it's importent */
         { "LSH_Project NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
@@ -280,6 +283,67 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLSHProjection_Initializer(vx_node node, 
     REGISTER_LAYERS(registerLSH_Projects, vxnne_lshprojection_layer_s, "LSHProjection", vxoNNLayer_GetOperations);
 
 OnError:
+#else
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_tensor  type                       = (vx_tensor)parameters[1];
+    vx_tensor  hash_func                  = (vx_tensor)parameters[2];
+    vx_tensor  weight                     = (vx_tensor)parameters[3];
+    vx_tensor  outputs                    = (vx_tensor)parameters[4];
+
+    vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
+
+    vxnne_lshprojection_layer  lshprojectionLayer     = VX_NULL;
+
+    /* destroy the existing layer */
+    if (node->layer)
+    {
+        vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
+    }
+    gcoOS_Allocate(gcvNULL, sizeof(vxnne_lshprojection_layer_s), (gctPOINTER*)&lshprojectionLayer);
+    if (!lshprojectionLayer)
+    {
+        status = VX_ERROR_NO_MEMORY;
+        vxError("Out of Memory at function %s line %d", __FUNCTION__, __LINE__);
+        return status;
+    }
+
+    gcoOS_ZeroMemory(lshprojectionLayer, sizeof(vxnne_lshprojection_layer_s));
+
+    vxnneLayer_Initialize(&lshprojectionLayer->base,
+                          "LSHProjection",
+                          node,
+                          vxmOPERATION_COUNT(lshprojectionLayer),
+                          lshprojectionLayer->operations,
+                          VX_NULL);
+
+    vxnneOperation_Initialize(&lshprojectionLayer->lshprojection_sw_operation.base,
+                              &lshprojectionLayer->base,
+                              VXNNE_OPERATION_TARGET_SW,
+                              VXNNE_OPERATOR_LSH_PROJECTION,
+                              vxnneExecuteSWLSHProjection,
+                              VX_NULL,
+                              batchCount,
+                              0);
+
+    vxnneLayer_SetOperation(
+        &lshprojectionLayer->base,
+        &lshprojectionLayer->lshprojection_sw_operation.base,
+        0);
+
+    lshprojectionLayer->lshprojection_sw_operation.inputs           = inputs;
+    lshprojectionLayer->lshprojection_sw_operation.type             = type;
+    lshprojectionLayer->lshprojection_sw_operation.hash_func        = hash_func;
+    lshprojectionLayer->lshprojection_sw_operation.weight           = weight;
+    lshprojectionLayer->lshprojection_sw_operation.outputs          = outputs;
+
+    vxnneOperation_AddReference(&lshprojectionLayer->lshprojection_sw_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+    vxnneOperation_AddReference(&lshprojectionLayer->lshprojection_sw_operation.base, (vx_reference)hash_func, VXNNE_OPERATION_REFENRENCE_INPUT);
+    vxnneOperation_AddReference(&lshprojectionLayer->lshprojection_sw_operation.base, (vx_reference)weight, VXNNE_OPERATION_REFENRENCE_INPUT);
+    vxnneOperation_AddReference(&lshprojectionLayer->lshprojection_sw_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+    node->layer = &lshprojectionLayer->base;
+#endif
 
     return status;
 }

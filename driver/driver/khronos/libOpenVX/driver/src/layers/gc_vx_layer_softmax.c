@@ -188,6 +188,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_ValidateOutput(vx_node node
 
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
 
 VX_PRIVATE_API vx_status vxoNNSoftmax_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
@@ -412,12 +413,14 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
 
     return status;
 }
+#endif
 
 
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status                     = VX_SUCCESS;
+#if REGISTER_FRAME
 
     vxnne_layer_imp_s registerSoftmaxs[] = {/* Please DON'T adjust the order, it's importent */
         { "Softmax NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
@@ -430,6 +433,157 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer_Initializer(vx_node node, c
     REGISTER_LAYERS(registerSoftmaxs, vxnne_softmax_layer_s, "SoftmaxLayer", vxoNNLayer_GetOperations);
 
 OnError:
+#else
+
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_tensor  outputs                    = (vx_tensor)parameters[1];
+    vx_enum    srcFormat                  = TENSOR_DATA_TYPE(inputs);
+    vx_enum    dstFormat                  = TENSOR_DATA_TYPE(outputs);
+    vx_uint32  dims                       = TENSOR_DIM_NUM(inputs);
+    vx_uint32  width                      = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+    vx_uint32  height                     = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+    vx_bool    useShadeExe                = vx_false_e;
+    vx_bool    enable_format              = vx_false_e;
+    vx_bool    enable_tf_quantize         = vx_false_e;
+    vx_bool    enable_float32             = vx_false_e;
+    vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
+    vx_float32 beta                       = 1.0;
+    vxnne_softmax_layer  softmaxLayer = VX_NULL;
+
+    /* destroy the existing layer */
+    if (node->layer)
+    {
+        vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
+    }
+
+    gcoOS_Allocate(gcvNULL, sizeof(vxnne_softmax_layer_s), (gctPOINTER*)&softmaxLayer);
+    if (!softmaxLayer)
+    {
+        status = VX_ERROR_NO_MEMORY;
+        vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+        return status;
+    }
+
+    gcoOS_ZeroMemory(softmaxLayer, sizeof(vxnne_softmax_layer_s));
+
+    vxnneLayer_Initialize(&softmaxLayer->base,
+                          "SoftmaxLayer",
+                          node,
+                          vxmOPERATION_COUNT(softmaxLayer),
+                          softmaxLayer->operations,
+                          VX_NULL);
+
+    switch(dims)
+    {
+        case 1:
+            batchCount   = 1;
+            break;
+        case 2:
+            batchCount   = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+            break;
+        case 3:
+            batchCount   = 1;
+            break;
+        case 4:
+            batchCount   = TENSOR_VIEW_SIZE_INDEX(inputs, 3);
+            break;
+        default:
+            vxError("Input tensor error dimension[%u]\n", dims);
+            status = VX_ERROR_INVALID_DIMENSION;
+            goto exit;
+    }
+
+    if(node->base.context->evisNoInst.supportEVIS)
+    {
+        enable_float32 = (vx_bool)(dstFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
+        enable_format = (((srcFormat == VX_TYPE_INT8 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32))
+                         || ((srcFormat == VX_TYPE_BFLOAT16) && (dstFormat == VX_TYPE_BFLOAT16 || dstFormat == VX_TYPE_FLOAT16 || enable_float32))
+                         || (srcFormat == VX_TYPE_INT16 && (dstFormat == VX_TYPE_INT16 || dstFormat == VX_TYPE_FLOAT16))
+                         || (srcFormat == VX_TYPE_INT8 &&  dstFormat == VX_TYPE_INT8));
+        enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32 || dstFormat == VX_TYPE_UINT8));
+    }
+    else
+    {
+        enable_format = ((srcFormat == VX_TYPE_FLOAT32 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || dstFormat == VX_TYPE_FLOAT32));
+        enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || dstFormat == VX_TYPE_FLOAT32 || dstFormat == VX_TYPE_UINT8));
+    }
+    /* Current the SH layer only process 3D tensor*/
+    useShadeExe  = (enable_format || enable_tf_quantize);
+
+   if(useShadeExe && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
+   {
+        vxnne_shader_executable shaderExecutable = VX_NULL;
+
+        if (dims == 2) batchCount = 1;
+
+        if(node->base.context->evisNoInst.supportEVIS)
+        {
+            shaderExecutable = vxnneGetSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, dims, inputs, beta, outputs);
+
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto exit;
+            }
+        }
+        else
+        {
+            vx_scalar beta_s = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &beta);
+
+            shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, beta_s, inputs, outputs);
+
+            vxReleaseScalar(&beta_s);
+
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto exit;
+            }
+        }
+
+        status = vxnneShaderOperation_Initialize(&softmaxLayer->softmax_SHoperation,
+            &softmaxLayer->base,
+            VXNNE_OPERATOR_SOFTMAX,
+            batchCount,
+            shaderExecutable);
+
+        if (status != VX_SUCCESS) {
+            goto exit;
+        }
+
+        vxnneOperation_AddReference(&softmaxLayer->softmax_SHoperation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&softmaxLayer->softmax_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+        vxnneLayer_SetOperation(&softmaxLayer->base, &softmaxLayer->softmax_SHoperation.base, 0);
+    }
+    else
+    {
+        vxnneOperation_Initialize(&softmaxLayer->softmax_sw_operation.base,
+            &softmaxLayer->base,
+            VXNNE_OPERATION_TARGET_SW,
+            VXNNE_OPERATOR_SOFTMAX,
+            vxnneExecuteSWSoftmax,
+            VX_NULL,
+            batchCount,
+            0);
+
+        vxnneLayer_SetOperation(&softmaxLayer->base, &softmaxLayer->softmax_sw_operation.base, 0);
+        softmaxLayer->softmax_sw_operation.inputs           = inputs;
+        softmaxLayer->softmax_sw_operation.outputs          = outputs;
+
+        vxnneOperation_AddReference(&softmaxLayer->softmax_sw_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&softmaxLayer->softmax_sw_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
+
+    node->layer = &softmaxLayer->base;
+    return status;
+
+exit:
+    if (softmaxLayer) {
+        gcoOS_Free(gcvNULL, (gctPOINTER)softmaxLayer);
+        softmaxLayer = VX_NULL;
+    }
+#endif
 
     return status;
 }
@@ -458,6 +612,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer2_ValidateOutput(vx_node nod
 {
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
 
 VX_PRIVATE_API vx_status vxoNNSoftmax2_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
@@ -670,11 +825,13 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations2(vxnne_layer ops_layer, vx_uin
 
     return status;
 }
+#endif
 
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer2_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
 
     vxnne_layer_imp_s registerSoftmax2s[] = {/* Please DON'T adjust the order, it's importent */
         { "Softmax2 NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
@@ -687,6 +844,148 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSoftmaxLayer2_Initializer(vx_node node, 
     REGISTER_LAYERS(registerSoftmax2s, vxnne_softmax2_layer_s, "Softmax2Layer", vxoNNLayer_GetOperations2);
 
 OnError:
+#else
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_scalar  beta                       = (vx_scalar)parameters[1];
+    vx_tensor  outputs                    = (vx_tensor)parameters[2];
+    vx_float32 betaVal                    = beta->value->f32;
+    vx_bool    useShadeExe                = vx_false_e;
+    vx_bool    enable_format              = vx_false_e;
+    vx_bool    enable_tf_quantize         = vx_false_e;
+    vx_bool    enable_float32             = vx_false_e;
+    vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
+    vx_enum    srcFormat                  = TENSOR_DATA_TYPE(inputs);
+    vx_enum    dstFormat                  = TENSOR_DATA_TYPE(outputs);
+    vx_uint32  dims                       = TENSOR_DIM_NUM(inputs);
+    vx_uint32  width                      = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+    vx_uint32  height                     = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+    vx_uint32  idx                        = 0;
+    vx_uint32  numTmpTensor               = 0;
+    vxnne_softmax2_layer  softmax2Layer   = VX_NULL;
+
+    /* destroy the existing layer */
+    if (node->layer)
+    {
+        vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
+    }
+    gcoOS_Allocate(gcvNULL, sizeof(vxnne_softmax2_layer_s), (gctPOINTER*)&softmax2Layer);
+    if (!softmax2Layer)
+    {
+        status = VX_ERROR_NO_MEMORY;
+        vxError("Out of Memory at function %s line %d", __FUNCTION__, __LINE__);
+        return status;
+    }
+
+    gcoOS_ZeroMemory(softmax2Layer, sizeof(vxnne_softmax2_layer_s));
+
+    vxnneLayer_Initialize(&softmax2Layer->base,
+                          "SoftMax2",
+                          node,
+                          vxmOPERATION_COUNT(softmax2Layer),
+                          softmax2Layer->operations,
+                          VX_NULL);
+
+    if(node->base.context->evisNoInst.supportEVIS)
+    {
+        enable_float32 = (vx_bool)(dstFormat == VX_TYPE_FLOAT32 && ((width % 4 == 0) || ((width * height < IMG_MAX_WIDTH) && ((width * height % 4 == 0) || dims < 3)) || dims == 1));
+        enable_format = (((srcFormat == VX_TYPE_INT8 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32))
+                         || ((srcFormat == VX_TYPE_BFLOAT16) && (dstFormat == VX_TYPE_BFLOAT16 || dstFormat == VX_TYPE_FLOAT16 || enable_float32))
+                         || (srcFormat == VX_TYPE_INT16 && (dstFormat == VX_TYPE_INT16 || dstFormat == VX_TYPE_FLOAT16))
+                         || (srcFormat == VX_TYPE_INT8 &&  dstFormat == VX_TYPE_INT8));
+        enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || enable_float32 || dstFormat == VX_TYPE_UINT8));
+    }
+    else
+    {
+        enable_format = ((srcFormat == VX_TYPE_FLOAT32 ||  srcFormat == VX_TYPE_FLOAT16) && (dstFormat == VX_TYPE_FLOAT16 || dstFormat == VX_TYPE_FLOAT32));
+        enable_tf_quantize = ((srcFormat == VX_TYPE_UINT8) && (dstFormat == VX_TYPE_FLOAT16 || dstFormat == VX_TYPE_FLOAT32 || dstFormat == VX_TYPE_UINT8));
+    }
+
+    /* Current the SH layer only process 3D tensor*/
+    useShadeExe  = (enable_format || enable_tf_quantize);
+
+    if(useShadeExe && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
+    {
+        vxnne_shader_executable shaderExecutable = VX_NULL;
+
+        if(node->base.context->evisNoInst.supportEVIS)
+        {
+            shaderExecutable = vxnneGetSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, dims, inputs, betaVal, outputs);
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto exit;
+            }
+
+            status = vxnneShaderOperation_Initialize(&softmax2Layer->softmax2_SHoperation,
+                &softmax2Layer->base,
+                VXNNE_OPERATOR_SOFTMAX,
+                batchCount,
+                shaderExecutable);
+            if (status != VX_SUCCESS) goto exit;
+
+            vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxnneLayer_SetOperation(
+                &softmax2Layer->base,
+                &softmax2Layer->softmax2_SHoperation.base,
+                0);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetGPUSoftmaxShaderExecutable(node->base.context, VXNNE_KERNEL_SOFTMAX, &node->kernelAttributes.borderMode, beta, inputs, outputs);
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                goto exit;
+            }
+
+            status = vxnneShaderOperation_Initialize(&softmax2Layer->softmax2_SHoperation,
+                &softmax2Layer->base,
+                VXNNE_OPERATOR_SOFTMAX,
+                batchCount,
+                shaderExecutable);
+            if (status != VX_SUCCESS) goto exit;
+
+            vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&softmax2Layer->softmax2_SHoperation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            vxnneLayer_SetOperation(
+                &softmax2Layer->base,
+                &softmax2Layer->softmax2_SHoperation.base,
+                idx++);
+        }
+    }
+    else
+    {
+        vxnneOperation_Initialize(&softmax2Layer->softmax2_sw_operation.base,
+            &softmax2Layer->base,
+            VXNNE_OPERATION_TARGET_SW,
+            VXNNE_OPERATOR_SOFTMAX,
+            vxnneExecuteSWSoftmax,
+            VX_NULL,
+            batchCount,
+            0);
+
+        vxnneLayer_SetOperation(
+            &softmax2Layer->base,
+            &softmax2Layer->softmax2_sw_operation.base,
+            0);
+
+        softmax2Layer->softmax2_sw_operation.inputs           = inputs;
+        softmax2Layer->softmax2_sw_operation.beta             = beta;
+        softmax2Layer->softmax2_sw_operation.outputs          = outputs;
+
+        vxnneOperation_AddReference(&softmax2Layer->softmax2_sw_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&softmax2Layer->softmax2_sw_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
+
+    softmax2Layer->base.num_temp_tensors = numTmpTensor;
+    node->layer = &softmax2Layer->base;
+
+    return status;
+exit:
+    if (softmax2Layer) gcoOS_Free(gcvNULL, (gctPOINTER)softmax2Layer);
+#endif
 
     return status;
 }

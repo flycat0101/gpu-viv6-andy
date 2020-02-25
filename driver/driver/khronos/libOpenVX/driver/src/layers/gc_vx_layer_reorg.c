@@ -99,6 +99,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNReorgLayer_ValidateOutput(vx_node node
 {
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
 
 VX_PRIVATE_API vx_status vxoNNReorgLayer_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
@@ -300,12 +301,14 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
 
     return status;
 }
+#endif
 
 
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNReorgLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
 
     vxnne_layer_imp_s registerReorgLayers[] = {/* Please DON'T adjust the order, it's importent */
         { "ReorgLayer NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
@@ -318,6 +321,155 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNReorgLayer_Initializer(vx_node node, c
     REGISTER_LAYERS(registerReorgLayers, vxnne_reorg_layer_s, "ReorgLayer", vxoNNLayer_GetOperations);
 
 OnError:
+#else
+
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_scalar  stride_s                   = (vx_scalar)parameters[1];
+    vx_tensor  outputs                    = (vx_tensor)parameters[2];
+    vx_uint32  stride                     = stride_s->value->u32;
+    vx_enum    inputFormat                = TENSOR_DATA_TYPE(inputs);
+    vx_enum    outputFormat               = TENSOR_DATA_TYPE(outputs);
+    vx_uint32  input_depth                = TENSOR_SIZE_INDEX(inputs, 2);
+    vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
+    vx_context context                    = vxGetContext((vx_reference)node);
+
+    vxnne_reorg_layer  reorgLayer         = VX_NULL;
+    vx_bool            dataFormat_flag    = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8))
+                                                    || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                                                    || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16));
+    /* destroy the existing layer */
+    if (node->layer)
+    {
+        vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
+    }
+    gcoOS_Allocate(gcvNULL, sizeof(vxnne_reorg_layer_s), (gctPOINTER*)&reorgLayer);
+    if (!reorgLayer)
+    {
+        status = VX_ERROR_NO_MEMORY;
+        vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+        return status;
+    }
+
+    gcoOS_ZeroMemory(reorgLayer, sizeof(vxnne_reorg_layer_s));
+
+    vxnneLayer_Initialize(&reorgLayer->base,
+                          "ReorgLayer",
+                          node,
+                          vxmOPERATION_COUNT(reorgLayer),
+                          reorgLayer->operations,
+                          VX_NULL);
+
+    if (vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs) &&
+        vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_REORG))
+    {
+        vx_op_param_s conv = {0};
+
+        status = vxnneOperation_Initialize(&reorgLayer->reorg_tp_operation.base,
+                                           &reorgLayer->base,
+                                           VXNNE_OPERATION_TARGET_TP,
+                                           VXNNE_OPERATOR_REORG,
+                                           VX_NULL,
+                                           vxnneOperation_TP_Deinitialize,
+                                           batchCount,
+                                           0);
+        if (status != VX_SUCCESS) goto exit;
+
+        conv.pad_x_left = 0;
+        conv.pad_y_top = 0;
+        conv.pool_size_x = 0;
+        conv.pool_size_y = 0;
+        conv.pool_stride = 1;
+        conv.enable_relu = vx_false_e;
+        conv.pad_mode = VX_PAD_CONSTANT;
+        conv.pad_const = 0;
+        conv.tpType = TP_REORG;
+        conv.other_ref = gcvNULL;
+        conv.data_buff = gcvNULL;
+        conv.tp_value = (vx_tp_value_cmd)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+        conv.tp_value->u32[0] = stride;
+
+        vxMemCopy(&reorgLayer->reorg_tp_operation.base.parameter, &conv, sizeof(vx_op_param_s));
+
+        vxnneLayer_SetOperation(
+            &reorgLayer->base,
+            &reorgLayer->reorg_tp_operation.base,
+            0);
+        reorgLayer->reorg_tp_operation.input  = inputs;
+        reorgLayer->reorg_tp_operation.output = outputs;
+
+        vxnneOperation_AddReference(&reorgLayer->reorg_tp_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&reorgLayer->reorg_tp_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
+    else
+    {
+        if (stride == 2 && dataFormat_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
+        {
+            vx_scalar outc_s   = vxCreateScalar(node->base.context, VX_TYPE_UINT32, &input_depth);
+
+            vxnne_shader_executable shaderExecutable = VX_NULL;
+
+            shaderExecutable = vxnneGetReorgShaderExecutable(node->base.context, VXNNE_KERNEL_REORG, &node->kernelAttributes.borderMode,
+                                                                 inputs, stride_s, outc_s, outputs);
+
+            if (!shaderExecutable)
+            {
+                status = VX_FAILURE;
+                if (!outc_s) vxReleaseScalar(&outc_s);
+                goto exit;
+            }
+
+            status = vxnneShaderOperation_Initialize(&reorgLayer->reorg_sh_operation,
+                                            &reorgLayer->base,
+                                            VXNNE_OPERATOR_REORG,
+                                            batchCount,
+                                            shaderExecutable);
+
+            if (status != VX_SUCCESS)
+            {
+                if (!outc_s) vxReleaseScalar(&outc_s);
+                goto exit;
+            }
+
+            vxnneOperation_AddReference(&reorgLayer->reorg_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&reorgLayer->reorg_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+            vxnneLayer_SetOperation(
+                &reorgLayer->base,
+                &reorgLayer->reorg_sh_operation.base,
+                0);
+        }
+        else
+        {
+            vxnneOperation_Initialize(&reorgLayer->reorg_sw_operation.base,
+                                      &reorgLayer->base,
+                                      VXNNE_OPERATION_TARGET_SW,
+                                      VXNNE_OPERATOR_REORG,
+                                      vxnneExecuteSWReorg,
+                                      VX_NULL,
+                                      batchCount,
+                                      0);
+
+            vxnneLayer_SetOperation(
+                &reorgLayer->base,
+                &reorgLayer->reorg_sw_operation.base,
+                0);
+
+            reorgLayer->reorg_sw_operation.inputs           = inputs;
+            reorgLayer->reorg_sw_operation.stride           = (vx_reference)stride_s;
+            reorgLayer->reorg_sw_operation.outputs          = outputs;
+
+            vxnneOperation_AddReference(&reorgLayer->reorg_sw_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&reorgLayer->reorg_sw_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+        }
+    }
+
+    node->layer = &reorgLayer->base;
+    return status;
+
+exit:
+    if (reorgLayer) gcoOS_Free(gcvNULL, (gctPOINTER)reorgLayer);
+#endif
 
     return status;
 }
@@ -1112,6 +1264,7 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSW(
 OnError:
     return status;
 }
+#if REGISTER_FRAME
 
 VX_PRIVATE_API vx_status vxoNNReorgLayer2_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
@@ -1342,12 +1495,77 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations2(vxnne_layer ops_layer, vx_uin
 
     return status;
 }
+#else
+
+VX_PRIVATE_API vx_status _InitializeReorg2Operation(
+    vxnne_reorg_layer layer,
+    vxnne_operation_target_e target,
+    vx_tensor input,
+    vx_tensor output,
+    vx_uint32 batch_count,
+    vx_tensor block_size,
+    vx_scalar type_s,
+    vx_tensor pad,
+    vx_uint32 *op_index)
+{
+    vx_status status = VX_SUCCESS;
+
+    if (!op_index)
+    {
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    switch (target)
+    {
+    case VXNNE_OPERATION_TARGET_TP:
+        vxmONERROR(_InitializeReorg2OperationTP(layer,
+                                                input,
+                                                output,
+                                                batch_count,
+                                                block_size,
+                                                type_s,
+                                                pad,
+                                                op_index));
+        break;
+
+    case VXNNE_OPERATION_TARGET_SH:
+        vxmONERROR(_InitializeReorg2OperationSH(layer,
+                                                input,
+                                                output,
+                                                batch_count,
+                                                block_size,
+                                                type_s,
+                                                pad,
+                                                op_index, layer->base.node->base.context->evisNoInst.supportEVIS));
+        break;
+
+    case VXNNE_OPERATION_TARGET_SW:
+        vxmONERROR(_InitializeReorg2OperationSW(layer,
+                                                input,
+                                                output,
+                                                batch_count,
+                                                block_size,
+                                                type_s,
+                                                pad,
+                                                op_index));
+        break;
+
+    default:
+        status = VX_ERROR_NOT_SUPPORTED;
+        break;
+    }
+
+OnError:
+    return status;
+}
+#endif
 
 
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoReOrg2_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status                = VX_SUCCESS;
+#if REGISTER_FRAME
 
     vxnne_layer_imp_s registerReorgLayer2s[] = {/* Please DON'T adjust the order, it's importent */
         { "ReorgLayer2 NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
@@ -1360,6 +1578,102 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoReOrg2_Initializer(vx_node node, const v
     REGISTER_LAYERS(registerReorgLayer2s, vxnne_reorg_layer_s, "ReorgLayer2", vxoNNLayer_GetOperations2);
 
 OnError:
+#else
+    vx_tensor inputs                = (vx_tensor)parameters[0];
+    vx_tensor block_size            = (vx_tensor)parameters[1];
+    vx_scalar type_s                = (vx_scalar)parameters[2];
+    vx_tensor pad                   = (vx_tensor)parameters[3];
+    vx_tensor outputs               = (vx_tensor)parameters[4];
+    vx_context context              = vxGetContext((vx_reference)node);
+    vx_enum type                    = type_s->value->e;
+    vx_uint32 batch_count           = (type == VX_REORG_BATCH_TO_SPACE_ND || type == VX_REORG_SPACE_TO_BATCH_ND) ? 1 : TENSOR_SIZE_INDEX(inputs, 3);
+    vxnne_operation_target_e target = VXNNE_OPERATION_TARGET_NONE;
+    vx_tp_cmd_type_e tp_cmd_type    = TP_NONE;
+    vxnne_reorg_layer reorg_layer   = VX_NULL;
+    vx_uint32 op_index              = 0;
+    vx_bool    dataFormat_flag[5]   = {vx_false_e};
+    vx_bool    depth2Space_flag     = vx_false_e;
+    vx_bool    space2Depth_flag     = vx_false_e;
+    vx_bool    space2Batch_flag     = vx_false_e;
+    vx_bool    batch2Space_flag     = vx_false_e;
+    vx_int8    in_fixpoint          = TENSOR_POS(inputs);
+    vx_int8    out_fixpoint         = TENSOR_POS(outputs);
+    vx_enum    inputFormat          = TENSOR_DATA_TYPE(inputs);
+    vx_enum    outputFormat         = TENSOR_DATA_TYPE(outputs);
+
+    dataFormat_flag[0] = (vx_bool)((inputFormat == VX_TYPE_UINT8) && (outputFormat == VX_TYPE_UINT8));
+    dataFormat_flag[1] = (vx_bool)((inputFormat == VX_TYPE_FLOAT16) && (outputFormat == VX_TYPE_FLOAT16));
+    dataFormat_flag[2] = (vx_bool)((inputFormat == VX_TYPE_INT16) && (outputFormat == VX_TYPE_INT16) && (in_fixpoint == out_fixpoint));
+    dataFormat_flag[3] = (vx_bool)((inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_INT8) && (in_fixpoint == out_fixpoint));
+    dataFormat_flag[4] = (vx_bool)((inputFormat == VX_TYPE_FLOAT32) && (outputFormat == VX_TYPE_FLOAT32) && (in_fixpoint == out_fixpoint));
+    depth2Space_flag   = (vx_bool)(type == VX_REORG_DEPTH_TO_SPACE && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[4]));
+    space2Depth_flag   = (vx_bool)(type == VX_REORG_SPACE_TO_DEPTH && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[2] || dataFormat_flag[3] || dataFormat_flag[4]));
+    space2Batch_flag   = (vx_bool)(type == VX_REORG_SPACE_TO_BATCH_ND && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[4]));
+    batch2Space_flag   = (vx_bool)(type == VX_REORG_BATCH_TO_SPACE_ND && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[4]));
+
+    /* Destroy the existing layer. */
+    if (node->layer)
+    {
+        vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
+    }
+
+    /* Create the layer. */
+    reorg_layer = (vxnne_reorg_layer)vxAllocate(sizeof(vxnne_reorg_layer_s));
+    if (!reorg_layer)
+    {
+        vxError("Allocate memory fail at function %s line %d.", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_ERROR_NO_MEMORY);
+    }
+
+    vxmONERROR(vxnneLayer_Initialize(&reorg_layer->base,
+                                     "ReorgLayer2",
+                                     node,
+                                     vxmOPERATION_COUNT(reorg_layer),
+                                     reorg_layer->operations,
+                                     VX_NULL));
+
+    /* Choose acceleration path. */
+    if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP) &&
+        vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs) &&
+        !vxmIS_ERROR(_GetTPReorgCmdType(type, &tp_cmd_type)))
+    {
+        target = VXNNE_OPERATION_TARGET_TP;
+    }
+    else if ((depth2Space_flag || space2Depth_flag || space2Batch_flag || batch2Space_flag) && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER))
+    {
+        target = VXNNE_OPERATION_TARGET_SH;
+    }
+    else
+    {
+        target = VXNNE_OPERATION_TARGET_SW;
+    }
+
+    /* Initialize the operation. */
+    vxmONERROR(_InitializeReorg2Operation(reorg_layer,
+                                          target,
+                                          inputs,
+                                          outputs,
+                                          batch_count,
+                                          block_size,
+                                          type_s,
+                                          pad,
+                                          &op_index));
+
+    node->layer = &reorg_layer->base;
+
+    return status;
+
+OnError:
+    if (reorg_layer)
+    {
+        if (reorg_layer->reorg_tp_operation.base.parameter.tp_value)
+        {
+            gcoOS_Free(gcvNULL, (gctPOINTER)reorg_layer->reorg_tp_operation.base.parameter.tp_value);
+        }
+        gcoOS_Free(gcvNULL, (gctPOINTER)reorg_layer);
+    }
+#endif
 
     return status;
 }

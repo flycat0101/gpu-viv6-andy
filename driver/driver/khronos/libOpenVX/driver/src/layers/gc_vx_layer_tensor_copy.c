@@ -101,6 +101,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_ValidateOutput(vx_node node
 }
 
 #define INPUT_SIZE_ALIGN_4  (4)
+#if REGISTER_FRAME
 
 VX_PRIVATE_API vx_status vxoNNTensorCopy_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
@@ -426,11 +427,13 @@ VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint
 
     return status;
 }
+#endif
 
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status                     = VX_SUCCESS;
+#if REGISTER_FRAME
 
     vxnne_layer_imp_s registerTensorCopys[] = {/* Please DON'T adjust the order, it's importent */
         { "TensorCopy NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
@@ -443,6 +446,221 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorCopy_Initializer(vx_node node, c
     REGISTER_LAYERS(registerTensorCopys, vxnne_tensor_copy_s, "TensorCopy", vxoNNLayer_GetOperations);
 
 OnError:
+#else
+
+    vx_tensor  src                     = (vx_tensor)parameters[0];
+    vx_tensor  dst                     = (vx_tensor)parameters[1];
+    vx_uint32  batchCount              = TENSOR_VIEW_DIM_NUM(src) > 3 ? TENSOR_SIZE_INDEX(src, TENSOR_VIEW_DIM_NUM(src) - 1) : 1;
+    vx_enum    inputFormat             = TENSOR_DATA_TYPE(src);
+    vx_enum    outputFormat            = TENSOR_DATA_TYPE(dst);
+    vx_bool    shExe_flag              = vx_false_e;
+    vx_bool    enable_dataConv2F32     = vx_false_e;
+    vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+    vx_uint32  reshpTensor_Dims           = 2;
+    vxnne_tensor_copy  copyNode        = VX_NULL;
+    vx_context context                 = vxGetContext((vx_reference)node);
+
+    /* destroy the existing layer */
+    if (node->layer)
+    {
+        vxnneLayer_Free(node->layer);
+        node->layer = VX_NULL;
+    }
+
+    {
+        vx_uint32 src_elementCount = 0;
+        vx_uint32 dst_elementCount = 0;
+
+        status = vxoTensor_GetTensorElementCount(src, &src_elementCount);
+        status = vxoTensor_GetTensorElementCount(dst, &dst_elementCount);
+
+        if(context->evisNoInst.supportEVIS)
+        {
+            if (src_elementCount < IMG_MAX_WIDTH)
+            {
+                reshpTensor_Sizes[0]   = src_elementCount;
+                reshpTensor_Sizes[1]   = 1;
+                reshpTensor_Dims = 2;
+
+                if (inputFormat != VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                    enable_dataConv2F32 = vx_true_e;
+            }
+            else
+            {
+                vx_uint32 gcd = outputFormat == VX_TYPE_FLOAT32 ? 4 : 1;
+                vx_uint32 divisors = 1;
+                vx_uint32 element_count = src_elementCount;
+
+                vxoGetDataDivisors(element_count, &divisors, gcd);
+                reshpTensor_Sizes[0] = divisors;
+                element_count = element_count / divisors;
+                vxoGetDataDivisors(element_count, &divisors, 1);
+                reshpTensor_Sizes[1] = divisors;
+                element_count = element_count / divisors;
+                reshpTensor_Sizes[2] = element_count;
+                reshpTensor_Dims = 3;
+
+                if (inputFormat != VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32
+                    && (reshpTensor_Sizes[0] % INPUT_SIZE_ALIGN_4 == 0))
+                    enable_dataConv2F32 = vx_true_e;
+            }
+
+            shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat != VX_TYPE_FLOAT32)
+                                 || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+                                 || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8)
+                                 || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16)
+                                 || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT16)
+                                 || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                                 || (inputFormat == VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32)
+                                 || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16)
+                                 || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16)
+                                 || enable_dataConv2F32)
+                                 && src_elementCount == dst_elementCount);
+        }
+        else
+        {
+            vxoElementOptimization_GetTensorShape(src, reshpTensor_Sizes, &reshpTensor_Dims);
+
+            shExe_flag = (vx_bool)(((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                                 || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                                 || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
+                                 || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT32)
+                                 || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_UINT8)
+                                 || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8)
+                                 || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32)
+                                 || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16)
+                                 || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT32)
+                                 || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                                 || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT32)
+                                 || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16))
+                                 && src_elementCount == dst_elementCount);
+        }
+
+        gcoOS_Allocate(gcvNULL, sizeof(vxnne_tensor_copy_s), (gctPOINTER*)&copyNode);
+        if (!copyNode)
+        {
+            status = VX_ERROR_NO_MEMORY;
+            vxError("allocate memory fail at function %s line %d", __FUNCTION__, __LINE__);
+            goto exit;
+        }
+
+        gcoOS_ZeroMemory(copyNode, sizeof(vxnne_tensor_copy_s));
+
+        vxnneLayer_Initialize(&copyNode->base,
+                              "TensorCopy",
+                              node,
+                              vxmOPERATION_COUNT(copyNode),
+                              copyNode->operations,
+                              VX_NULL);
+
+        if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP) &&
+            (TENSOR_VIEW_SIZE_INDEX(dst, 0) * TENSOR_VIEW_SIZE_INDEX(dst, 1) * TENSOR_VIEW_SIZE_INDEX(dst, 2) > 1) &&
+            vxnneIsTPSupportFormat(context, src, VX_NULL, dst))
+        {
+            vx_op_param_s conv = {0};
+
+            status = vxnneOperation_Initialize(&copyNode->tensor_copy_tp_operation.base,
+                &copyNode->base,
+                VXNNE_OPERATION_TARGET_TP,
+                VXNNE_OPERATOR_TENSOR_COPY,
+                VX_NULL,
+                 vxnneOperation_TP_Deinitialize,
+                batchCount,
+                0);
+
+            if (status != VX_SUCCESS) goto exit;
+
+            memset(&conv, 0, sizeof(vx_op_param_s));
+
+            conv.enable_relu = vx_false_e;
+            conv.pool_stride = 1;
+            conv.tpType = TP_TENSOR_COPY;
+
+            memcpy(&copyNode->tensor_copy_tp_operation.base.parameter, &conv, sizeof(vx_op_param_s));
+
+            vxnneOperation_AddReference(&copyNode->tensor_copy_tp_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&copyNode->tensor_copy_tp_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+            copyNode->tensor_copy_tp_operation.input = src;
+            copyNode->tensor_copy_tp_operation.output = dst;
+
+            vxnneLayer_SetOperation(
+                &copyNode->base,
+                &copyNode->tensor_copy_tp_operation.base,
+                0);
+        }
+        else
+        {
+            if (shExe_flag && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)) )
+            {
+                vxnne_shader_executable shaderExecutable = VX_NULL;
+                vx_tensor input      = NULL;
+                vx_tensor output     = NULL;
+
+                input     = vxoTensor_ReshapeTensor(src, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+                output     = vxoTensor_ReshapeTensor(dst, (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+
+                copyNode->base.temp_tensors[0] = input;
+                copyNode->base.temp_tensors[1] = output;
+                copyNode->base.num_temp_tensors = 2;
+
+                if(node->base.context->evisNoInst.supportEVIS)
+                {
+                    if (input && output)
+                        shaderExecutable = vxnneTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
+                }
+                else
+                {
+                    if (input && output)
+                        shaderExecutable = vxnneGPUTensorCopyShaderExecutable(node->base.context, VXNNE_KERNEL_TENSOR_COPY, &node->kernelAttributes.borderMode, input, output);
+                }
+
+                if (!shaderExecutable)
+                {
+                    status = VX_FAILURE;
+                    goto exit;
+                }
+                status = vxnneShaderOperation_Initialize(&copyNode->tensor_copy_sh_operation,
+                    &copyNode->base,
+                    VXNNE_OPERATOR_CONVERT_FORMAT,
+                    1, /*batchCount is 1 after reshape tensor object*/
+                    shaderExecutable);
+
+                if (status != VX_SUCCESS)
+                    goto exit;
+
+                vxnneOperation_AddReference(&copyNode->tensor_copy_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&copyNode->tensor_copy_sh_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+                vxnneLayer_SetOperation(&copyNode->base, &copyNode->tensor_copy_sh_operation.base, 0);
+            }
+            else
+            {
+                vxnneOperation_Initialize(&copyNode->tensor_copy_operation.base,
+                    &copyNode->base,
+                    VXNNE_OPERATION_TARGET_SW,
+                    VXNNE_OPERATOR_TENSOR_COPY,
+                    vxnneExecuteSWTensorCopy,
+                    VX_NULL,
+                    batchCount,
+                    0);
+                vxnneLayer_SetOperation(&copyNode->base, &copyNode->tensor_copy_operation.base, 0);
+
+                copyNode->tensor_copy_operation.src           = src;
+                copyNode->tensor_copy_operation.dst           = dst;
+
+                vxnneOperation_AddReference(&copyNode->tensor_copy_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&copyNode->tensor_copy_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+            }
+        }
+
+        node->layer = &copyNode->base;
+    }
+
+    return status;
+
+exit:
+    if(copyNode) gcoOS_Free(NULL, (gctPOINTER)copyNode);
+#endif
 
     return status;
 
