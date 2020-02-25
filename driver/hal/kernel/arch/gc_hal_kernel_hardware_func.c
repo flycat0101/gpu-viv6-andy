@@ -30072,7 +30072,7 @@ _InitializeUSC(
     }
 
     /* Patch NN command */
-    nnCommands[PATCH_KERNEL_OFFSET] = Execution->data[KERNEL_BUFFER_IDX].address;
+    nnCommands[PATCH_KERNEL_OFFSET] = Execution->data[KERNEL_BUFFER_IDX].address >> 6;
     nnCommands[PATCH_INPUT_OFFSET] = Execution->data[INPUT_BUFFER_IDX].address;
     nnCommands[PATCH_RESULT_OFFSET] = Execution->data[RESULT_BUFFER_IDX].address;
     gckOS_MemCopy(Execution->data[NN_BUFFER_IDX].logical, nnCommands, patchBufferSizes[NN_BUFFER_IDX]);
