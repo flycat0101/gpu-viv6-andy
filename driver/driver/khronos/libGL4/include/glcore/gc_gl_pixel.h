@@ -464,20 +464,28 @@ typedef struct __GLpixelTransferInfoRec{
     GLuint width, height, depth;
     GLuint numOfPixel;              /* Total number of pixels */
     GLuint numOfComponents;         /* Total number of components */
-    GLuint sizeOfElement;           /* Element size */
-    GLuint compNumOfElement;        /* Element number */
 
     GLboolean applyAlign;           /* Whether do alignment */
-    GLuint alignment;               /* Save [un]pack alignment size */
-    GLuint srcRowByteNeedAlign;     /* Bytes need to align a row for src buf */
-    GLuint dstRowByteNeedAlign;     /* Bytes need to align a row for dst buf */
-    GLuint srcRowSizeBeforeAlign;   /* Total size of a row for src buf before calc alignment */
-    GLuint dstRowSizeBeforeAlign;   /* Total size of a row for dst buf before calc alignment */
-    GLuint srcRowSizeAfterAlign;    /* Total size of a row for src buf after calc alignment */
-    GLuint dstRowSizeAfterAlign;    /* Total size of a row for dst buf after calc alignment */
+    GLuint alignment;               /* [un]pack alignment size: [UN]PACK_ALIGNMMENT */
+    GLint swapBytes;
+    GLint lsbFirst;
+    GLint skipPixels, skipLines, skipImages;
+    GLint rowLength, imageHeight;
+
+    GLuint srcSizeOfElement;        /* Element size (in byte) */
+    GLuint dstSizeOfElement;
+    /* Number of element in a group, use for "pixel storage modes", come from format and type, which is diffrent from compNumber. */
+    GLuint srcElementNumOfGroup;
+    GLuint dstElementNumOfGroup;
+    GLuint srcRowByteNeedAlign;     /* Bytes need to align a row for src/dst buf (in byte) */
+    GLuint dstRowByteNeedAlign;
+    GLuint srcRowSizeBeforeAlign;   /* Total size of a row for src/dst buf before calc alignment (in byte) */
+    GLuint dstRowSizeBeforeAlign;
+    GLuint srcRowSizeAfterAlign;    /* Total size of a row for src/dst buf after calc alignment (in byte) */
+    GLuint dstRowSizeAfterAlign;
 
     GLenum baseFormat;
-    GLubyte compNumber;             /* Get component number from base format */
+    GLubyte compNumber;             /* Get component number from base format, use for "pixel transfer" */
     GLubyte compMask[4];            /* R G B A at postion 0 1 2 3, values 1 2 3 4 represent components sequence */
 
     __GLcolor scale;                /* NOT implemented. non pix xfer scale*/
@@ -528,7 +536,10 @@ extern GLvoid __glLoadPackModes(__GLcontext *gc, __GLpixelSpanInfo *spanInfo);
 extern GLvoid __glGenericPixelTransfer(__GLcontext *gc, GLsizei width, GLsizei height,  GLsizei depth, __GLformatInfo *formatInfo, GLenum format, GLenum *type, const GLvoid *buf, __GLpixelTransferInfo *transferInfo, GLenum pixelTransferOperations);
 extern __GLformatInfo* __glGetFormatInfo(GLenum internalFormat);
 extern GLuint __glPixelSize(__GLcontext *gc, GLenum format, GLenum type);
-extern GLvoid __glGetSizeAndNumOfElement(GLenum format, GLenum type, __GLpixelTransferInfo *transferInfo);
+extern GLvoid __glGetSizeOfElement(GLenum type, GLuint *sizeOfElement);
+extern GLvoid __glGetNumOfElement(GLenum format, GLubyte *compNumOfElement);
+extern GLint __glBytesPerElement(GLenum type);
+extern GLint __glElementsPerGroup(GLenum format, GLenum type);
 extern GLvoid __glMemoryAlignment(__GLpixelTransferInfo *transferInfo);
 extern GLboolean __glCheckSpecialFormat(GLenum internalFormat, GLenum format, GLenum* type);
 

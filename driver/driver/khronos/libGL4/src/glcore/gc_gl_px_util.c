@@ -24,6 +24,12 @@ GLint __glBytesPerElement(GLenum type)
 {
     switch (type)
     {
+    case GL_UNSIGNED_BYTE:
+    case GL_BYTE:
+    case GL_UNSIGNED_BYTE_3_3_2:
+    case GL_UNSIGNED_BYTE_2_3_3_REV:
+        return (1);
+
     case GL_UNSIGNED_SHORT:
     case GL_SHORT:
     case GL_UNSIGNED_SHORT_5_6_5:
@@ -33,13 +39,8 @@ GLint __glBytesPerElement(GLenum type)
     case GL_UNSIGNED_SHORT_4_4_4_4_REV:
     case GL_UNSIGNED_SHORT_1_5_5_5_REV:
     case GL_HALF_FLOAT_ARB:
-
         return (2);
-    case GL_UNSIGNED_BYTE:
-    case GL_BYTE:
-    case GL_UNSIGNED_BYTE_3_3_2:
-    case GL_UNSIGNED_BYTE_2_3_3_REV:
-        return (1);
+
     case GL_INT:
     case GL_UNSIGNED_INT:
     case GL_FLOAT:
@@ -47,14 +48,22 @@ GLint __glBytesPerElement(GLenum type)
     case GL_UNSIGNED_INT_10_10_10_2:
     case GL_UNSIGNED_INT_8_8_8_8_REV:
     case GL_UNSIGNED_INT_2_10_10_10_REV:
+    case GL_INT_2_10_10_10_REV:
     case __GL_UNSIGNED_INT_HIGH24:
     case __GL_UNSIGNED_S8_D24:
     case GL_UNSIGNED_INT_5_9_9_9_REV_EXT:
     case GL_UNSIGNED_INT_10F_11F_11F_REV_EXT:
+    case GL_UNSIGNED_INT_24_8:
         return (4);
+
+    case GL_FLOAT_32_UNSIGNED_INT_24_8_REV:
+        return (8);
+
     case GL_BITMAP: /* XXX what should be done here? */
         return (1);
+
     default:
+        GL_ASSERT(0);
         return (0);
     }
 }
@@ -100,15 +109,13 @@ GLint __glElementsPerGroup(GLenum format, GLenum type)
 
     switch (format)
     {
-    case GL_RGB:
-    case GL_BGR:
-        return (3);
-    case GL_LUMINANCE_ALPHA:
-        return (2);
-    case GL_RGBA:
-    case GL_ABGR_EXT:
-    case GL_BGRA:
-        return (4);
+    case GL_ALPHA:
+    case GL_RED:
+    case GL_GREEN:
+    case GL_BLUE:
+    case GL_DEPTH_COMPONENT:
+    case GL_LUMINANCE:
+    case GL_STENCIL:
     /*extension GL_EXT_texture_integer*/
     case GL_RED_INTEGER_EXT:
     case GL_GREEN_INTEGER_EXT:
@@ -116,15 +123,29 @@ GLint __glElementsPerGroup(GLenum format, GLenum type)
     case GL_ALPHA_INTEGER_EXT:
     case GL_LUMINANCE_INTEGER_EXT:
         return (1);
+
+    case GL_RG:
+    case GL_RG_INTEGER:
+    case GL_DEPTH_STENCIL:
+    case GL_LUMINANCE_ALPHA:
     case GL_LUMINANCE_ALPHA_INTEGER_EXT:
         return (2);
+
+    case GL_RGB:
+    case GL_BGR:
     case GL_RGB_INTEGER_EXT:
     case GL_BGR_INTEGER_EXT:
         return (3);
+
+    case GL_RGBA:
+    case GL_BGRA:
+    case GL_ABGR_EXT:
     case GL_RGBA_INTEGER_EXT:
     case GL_BGRA_INTEGER_EXT:
         return (4);
+
     default:
+        GL_ASSERT(0);
         return (1);
     }
 }
@@ -827,10 +848,24 @@ GLboolean __glInitTransferInfo(__GLcontext *gc,
     if (__GL_TexImage == transferInfo->operaitonFlag)
     {
         transferInfo->alignment = gc->clientState.pixel.unpackModes.alignment;
+        transferInfo->swapBytes = gc->clientState.pixel.unpackModes.swapEndian;
+        transferInfo->lsbFirst = gc->clientState.pixel.unpackModes.lsbFirst;
+        transferInfo->skipPixels = gc->clientState.pixel.unpackModes.skipPixels;
+        transferInfo->skipLines = gc->clientState.pixel.unpackModes.skipLines;
+        transferInfo->skipImages = (gc->clientState.pixel.unpackModes.skipImages > 0) ? gc->clientState.pixel.unpackModes.skipImages + 1 : 1;;
+        transferInfo->rowLength = (gc->clientState.pixel.unpackModes.lineLength > 0) ? gc->clientState.pixel.unpackModes.lineLength : transferInfo->width;
+        transferInfo->imageHeight = (gc->clientState.pixel.unpackModes.imageHeight > 0) ? gc->clientState.pixel.unpackModes.imageHeight : transferInfo->height;
     }
     else
     {
         transferInfo->alignment = gc->clientState.pixel.packModes.alignment;
+        transferInfo->swapBytes = gc->clientState.pixel.packModes.swapEndian;
+        transferInfo->lsbFirst = gc->clientState.pixel.packModes.lsbFirst;
+        transferInfo->skipPixels = gc->clientState.pixel.packModes.skipPixels;
+        transferInfo->skipLines = gc->clientState.pixel.packModes.skipLines;
+        transferInfo->skipImages = (gc->clientState.pixel.packModes.skipImages > 0) ? gc->clientState.pixel.packModes.skipImages + 1 : 1;
+        transferInfo->rowLength = (gc->clientState.pixel.packModes.lineLength > 0) ? gc->clientState.pixel.packModes.lineLength : transferInfo->width;
+        transferInfo->imageHeight = (gc->clientState.pixel.packModes.imageHeight > 0) ? gc->clientState.pixel.packModes.imageHeight : transferInfo->height;
     }
     __glMemoryAlignment(transferInfo);
 
@@ -1942,7 +1977,7 @@ GLvoid __glFinalConversion(GLenum interType, GLenum* type, GLsizei numOfComponen
     *type = interType;
 }
 
-GLvoid __glClearAlignmentPlaceOfBuffer(__GLcontext *gc, __GLpixelTransferInfo *transferInfo, GLvoid **srcBuf)
+GLvoid __glClearAlignmentPlaceOfBuffer(__GLpixelTransferInfo *transferInfo)
 {
     GLuint i = 0;
     GLuint j = 0;
@@ -1964,7 +1999,7 @@ GLvoid __glClearAlignmentPlaceOfBuffer(__GLcontext *gc, __GLpixelTransferInfo *t
      }
 }
 
-GLvoid __glAddAlignmentPlaceOfBuffer(__GLcontext *gc, __GLpixelTransferInfo *transferInfo, GLvoid *alignmentBuf)
+GLvoid __glAddAlignmentPlaceOfBuffer(__GLpixelTransferInfo *transferInfo)
 {
     GLuint i = 0;
     GLuint j = 0;
@@ -1998,13 +2033,10 @@ GLvoid __glConvertToFloatOfBufferType(__GLcontext *gc, GLenum format, GLenum *ty
         transferInfo->depth = depth;
         transferInfo->width = width;
 
-        transferInfo->dstSizeOfPixel = transferInfo->srcSizeOfPixel = __glPixelSize(gc, format, *type);
-        transferInfo->alignment = gc->clientState.pixel.unpackModes.alignment;
-        __glMemoryAlignment(transferInfo);
-        __glGetSizeAndNumOfElement(format, *type, transferInfo);
+        __glGetNumOfElement(format, &transferInfo->compNumber);
 
         transferInfo->numOfPixel = height * depth * width;
-        transferInfo->numOfComponents = transferInfo->numOfPixel * transferInfo->compNumOfElement;
+        transferInfo->numOfComponents = transferInfo->numOfPixel * transferInfo->compNumber;
         tmpBuf = (GLfloat *)(*gc->imports.malloc)(gc, transferInfo->numOfComponents * sizeof(GLfloat));
 
         switch (*type)
@@ -2062,8 +2094,6 @@ GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
                                         GLenum *type)
 {
     GLfloat *tmpBuf = gcvNULL;
-    GLvoid  *srcBuf = gcvNULL;
-    GLvoid  *alignmentBuf = gcvNULL;
     GLenum baseFormat = transferInfo->baseFormat;
 
     if ((gcvNULL == transferInfo->srcImage) || (0 == transferInfo->numOfComponents))
@@ -2071,8 +2101,6 @@ GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
         __GL_EXIT();
     }
 
-    /* clear alignment place in the buffer before conversion*/
-    __glClearAlignmentPlaceOfBuffer(gc, transferInfo, &srcBuf);
 
     tmpBuf = (GLfloat *)(*gc->imports.malloc)(gc, transferInfo->numOfComponents * sizeof(GLfloat));
     if (gcvNULL == tmpBuf)
@@ -2123,20 +2151,11 @@ GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
         __glFinalConversion(transferInfo->dstType, type, transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, (GLvoid *)(transferInfo->dstImage));
     }
 
-    /* add alignment place in the buffer after conversion */
-    __glAddAlignmentPlaceOfBuffer(gc, transferInfo, alignmentBuf);
 
 OnExit:
     if (tmpBuf != gcvNULL){
         (*gc->imports.free)(gc, (void*)tmpBuf);
         tmpBuf = gcvNULL;
-    }
-
-    if (srcBuf != gcvNULL)
-    {
-         gcoOS_MemCopy((GLubyte *)transferInfo->srcImage, (GLubyte *)srcBuf, transferInfo->numOfPixel * transferInfo->srcSizeOfPixel);
-        (*gc->imports.free)(gc, (void*)srcBuf);
-        srcBuf = gcvNULL;
     }
 }
 
@@ -2193,7 +2212,7 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
             __GL_EXIT();
         }
 
-        interBuf  = (gc->imports.malloc)(gc, transferInfo->depth * transferInfo->height * transferInfo->dstRowSizeAfterAlign);
+        interBuf  = (gc->imports.malloc)(gc, transferInfo->depth * transferInfo->imageHeight * transferInfo->skipImages * transferInfo->dstRowSizeAfterAlign);
         if (gcvNULL == interBuf)
         {
             __GL_EXIT();
@@ -2224,7 +2243,7 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
             __GL_EXIT();
         }
 
-        interBuf = (gc->imports.malloc)(gc, transferInfo->depth * transferInfo->height * transferInfo->srcRowSizeAfterAlign);
+        interBuf = (gc->imports.malloc)(gc, transferInfo->depth * transferInfo->imageHeight * transferInfo->skipImages * transferInfo->srcRowSizeAfterAlign);
         if (gcvNULL == interBuf)
         {
             __GL_EXIT();

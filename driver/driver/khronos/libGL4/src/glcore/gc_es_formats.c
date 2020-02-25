@@ -4245,36 +4245,32 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
 }
 
 /* calculate element size and component seperately based on format and types */
-GLvoid __glGetSizeAndNumOfElement(GLenum format, GLenum type, __GLpixelTransferInfo *transferInfo)
+GLvoid __glGetSizeOfElement(GLenum type, GLuint *sizeOfElement)
 {
      switch (type)
     {
     case GL_BYTE:
     case GL_UNSIGNED_BYTE:
-        transferInfo->sizeOfElement = 1;
+    case GL_UNSIGNED_BYTE_2_3_3_REV:
+    case GL_UNSIGNED_BYTE_3_3_2:
+        *sizeOfElement = 1;
         break;
 
     case GL_SHORT:
     case GL_UNSIGNED_SHORT:
     case GL_HALF_FLOAT:
-        transferInfo->sizeOfElement = 2;
+    case GL_UNSIGNED_SHORT_5_6_5:
+    case GL_UNSIGNED_SHORT_5_6_5_REV:
+    case GL_UNSIGNED_SHORT_4_4_4_4:
+    case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+    case GL_UNSIGNED_SHORT_5_5_5_1:
+    case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+        *sizeOfElement = 2;
         break;
 
     case GL_INT:
     case GL_UNSIGNED_INT:
     case GL_FLOAT:
-        transferInfo->sizeOfElement = 4;
-        break;
-
-    case GL_FLOAT_32_UNSIGNED_INT_24_8_REV:
-        transferInfo->sizeOfElement = 8;
-        break;
-
-    case GL_UNSIGNED_BYTE_2_3_3_REV:
-    case GL_UNSIGNED_BYTE_3_3_2:
-        transferInfo->sizeOfElement = 1;
-        break;
-
     case GL_UNSIGNED_INT_8_8_8_8:
     case GL_UNSIGNED_INT_8_8_8_8_REV:
     case GL_UNSIGNED_INT_10_10_10_2:
@@ -4283,22 +4279,21 @@ GLvoid __glGetSizeAndNumOfElement(GLenum format, GLenum type, __GLpixelTransferI
     case GL_UNSIGNED_INT_5_9_9_9_REV:
     case GL_INT_2_10_10_10_REV:
     case GL_UNSIGNED_INT_24_8:
-        transferInfo->sizeOfElement = 4;
+        *sizeOfElement = 4;
         break;
 
-    case GL_UNSIGNED_SHORT_5_6_5:
-    case GL_UNSIGNED_SHORT_5_6_5_REV:
-    case GL_UNSIGNED_SHORT_4_4_4_4:
-    case GL_UNSIGNED_SHORT_4_4_4_4_REV:
-    case GL_UNSIGNED_SHORT_5_5_5_1:
-    case GL_UNSIGNED_SHORT_1_5_5_5_REV:
-        transferInfo->sizeOfElement = 2;
+    case GL_FLOAT_32_UNSIGNED_INT_24_8_REV:
+        *sizeOfElement = 8;
         break;
 
     default:
+        GL_ASSERT(0);
         break;
     }
+}
 
+GLvoid __glGetNumOfElement(GLenum format, GLubyte *compNumOfElement)
+{
     switch (format)
     {
     case GL_ALPHA:
@@ -4309,46 +4304,72 @@ GLvoid __glGetSizeAndNumOfElement(GLenum format, GLenum type, __GLpixelTransferI
     case GL_DEPTH_COMPONENT:
     case GL_LUMINANCE:
     case GL_STENCIL:
-        transferInfo->compNumOfElement = 1;
+        *compNumOfElement = 1;
         break;
 
     case GL_RG:
     case GL_RG_INTEGER:
     case GL_DEPTH_STENCIL:
     case GL_LUMINANCE_ALPHA:
-         transferInfo->compNumOfElement = 2;
+        *compNumOfElement = 2;
         break;
 
     case GL_RGB:
     case GL_RGB_INTEGER:
     case GL_BGR:
     case GL_BGR_INTEGER:
-         transferInfo->compNumOfElement = 3;
+        *compNumOfElement = 3;
         break;
 
     case GL_RGBA:
     case GL_RGBA_INTEGER:
     case GL_BGRA_EXT:
     case GL_BGRA_INTEGER:
-         transferInfo->compNumOfElement = 4;
+        *compNumOfElement = 4;
         break;
 
     default:
+        GL_ASSERT(0);
         break;
     }
 }
 
 GLvoid __glMemoryAlignment(__GLpixelTransferInfo *transferInfo)
 {
+    GLint totalRowSizeForAlign = 0;
+
+    /* src buf for unpack before "pixel transfer" */
+    transferInfo->srcSizeOfElement = __glBytesPerElement(transferInfo->srcType);
+    transferInfo->srcElementNumOfGroup = __glElementsPerGroup(transferInfo->baseFormat, transferInfo->srcType);
     transferInfo->srcRowSizeBeforeAlign = transferInfo->width * transferInfo->srcSizeOfPixel;
-    transferInfo->srcRowSizeAfterAlign = (GLuint)(transferInfo->alignment * ceilf(transferInfo->srcRowSizeBeforeAlign / (float)transferInfo->alignment));
+    totalRowSizeForAlign = transferInfo->rowLength * transferInfo->srcElementNumOfGroup * transferInfo->srcSizeOfElement;
+    if (transferInfo->srcSizeOfElement >= transferInfo->alignment)
+    {
+        transferInfo->srcRowSizeAfterAlign = totalRowSizeForAlign;
+    }
+    else
+    {
+        transferInfo->srcRowSizeAfterAlign = (GLuint)(transferInfo->alignment * ceilf(transferInfo->srcSizeOfElement * totalRowSizeForAlign / (float)transferInfo->alignment) / transferInfo->srcSizeOfElement) * transferInfo->srcSizeOfElement;
+    }
     transferInfo->srcRowByteNeedAlign = transferInfo->srcRowSizeAfterAlign - transferInfo->srcRowSizeBeforeAlign;
 
+    /* dst buf for pack after "pixel transfer" */
+    transferInfo->dstSizeOfElement = __glBytesPerElement(transferInfo->dstType);
+    transferInfo->dstElementNumOfGroup = __glElementsPerGroup(transferInfo->baseFormat, transferInfo->dstType);
     transferInfo->dstRowSizeBeforeAlign = transferInfo->width * transferInfo->dstSizeOfPixel;
-    transferInfo->dstRowSizeAfterAlign = (GLuint)(transferInfo->alignment * ceilf(transferInfo->dstRowSizeBeforeAlign / (float)transferInfo->alignment));
+    totalRowSizeForAlign = transferInfo->rowLength * transferInfo->dstElementNumOfGroup * transferInfo->srcSizeOfElement;
+    if (transferInfo->dstSizeOfElement >= transferInfo->alignment)
+    {
+        transferInfo->dstRowSizeAfterAlign = totalRowSizeForAlign;
+    }
+    else
+    {
+        transferInfo->dstRowSizeAfterAlign = (GLuint)(transferInfo->alignment * ceilf(transferInfo->dstSizeOfElement * totalRowSizeForAlign / (float)transferInfo->alignment) / transferInfo->dstSizeOfElement) * transferInfo->dstSizeOfElement;
+    }
     transferInfo->dstRowByteNeedAlign = transferInfo->dstRowSizeAfterAlign - transferInfo->dstRowSizeBeforeAlign;
 
-    transferInfo->applyAlign = (1 != transferInfo->alignment);
+    transferInfo->applyAlign = ((1 != transferInfo->alignment) || (0 < transferInfo->rowLength)
+            || (0 < transferInfo->imageHeight) || (0 < transferInfo->skipImages));
 
     GL_ASSERT((0 != transferInfo->srcRowSizeBeforeAlign) && (0 != transferInfo->srcRowSizeAfterAlign)
             && (0 != transferInfo->dstRowSizeBeforeAlign) && (0 != transferInfo->dstRowSizeAfterAlign));
