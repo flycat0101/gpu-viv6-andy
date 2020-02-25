@@ -3329,7 +3329,7 @@ slsNAME_SPACE_BindFuncName(
     sltPRECISION_QUALIFIER returnPrecision = slvPRECISION_QUALIFIER_ANY;
     gctINT          distance = 0;
     gctINT          minDistance = 0;
-    slsDATA_TYPE    **argDataTypes;
+    slsDATA_TYPE    **argDataTypes = gcvNULL;
     gctPOINTER      nameCandidates[1024];
     gctINT          nameCandidateDistances[1024];
     slsDATA_TYPE    **nameCandidateArgDataTypes[1024];
