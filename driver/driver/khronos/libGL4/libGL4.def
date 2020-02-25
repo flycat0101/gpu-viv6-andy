@@ -348,7 +348,7 @@ EXPORTS
         glTranslated
         glTranslatef
         glViewport
-        /* GL_VERSION_1_1 */
+
         glArrayElement
         glBindTexture
         glColorPointer
@@ -379,12 +379,12 @@ EXPORTS
         glTexSubImage2D
         glPopClientAttrib
         glPushClientAttrib
-        /* GL_VERSION_1_2 */
+
         glDrawRangeElements
         glTexImage3D
         glTexSubImage3D
         glCopyTexSubImage3D
-        /* GL_VERSION_1_3 */
+
         glActiveTexture
         glSampleCoverage
         glCompressedTexImage3D
@@ -431,7 +431,7 @@ EXPORTS
         glLoadTransposeMatrixd
         glMultTransposeMatrixf
         glMultTransposeMatrixd
-        /* GL_VERSION_1_4 */
+
         glBlendFuncSeparate
         glMultiDrawArrays
         glMultiDrawElements
@@ -479,7 +479,7 @@ EXPORTS
         glWindowPos3sv
         glBlendColor
         glBlendEquation
-        /* GL_VERSION_1_5 */
+
         glGenQueries
         glDeleteQueries
         glIsQuery
@@ -499,7 +499,7 @@ EXPORTS
         glUnmapBuffer
         glGetBufferParameteriv
         glGetBufferPointerv
-        /* GL_VERSION_2_0 */
+
         glBlendEquationSeparate
         glDrawBuffers
         glStencilOpSeparate
@@ -593,14 +593,14 @@ EXPORTS
         glVertexAttrib4uiv
         glVertexAttrib4usv
         glVertexAttribPointer
-        /* GL_VERSION_2_1 */
+
         glUniformMatrix2x3fv
         glUniformMatrix3x2fv
         glUniformMatrix2x4fv
         glUniformMatrix4x2fv
         glUniformMatrix3x4fv
         glUniformMatrix4x3fv
-        /* GL_VERSION_3_0 */
+
         glColorMaski
         glGetBooleani_v
         glGetIntegeri_v
@@ -685,7 +685,7 @@ EXPORTS
         glDeleteVertexArrays
         glGenVertexArrays
         glIsVertexArray
-        /* GL_VERSION_3_1 */
+
         glDrawArraysInstanced
         glDrawElementsInstanced
         glTexBuffer
@@ -698,7 +698,7 @@ EXPORTS
         glGetActiveUniformBlockiv
         glGetActiveUniformBlockName
         glUniformBlockBinding
-        /* GL_VERSION_3_2 */
+
         glDrawElementsBaseVertex
         glDrawRangeElementsBaseVertex
         glDrawElementsInstancedBaseVertex
@@ -718,7 +718,7 @@ EXPORTS
         glTexImage3DMultisample
         glGetMultisamplefv
         glSampleMaski
-        /* GL_VERSION_3_3 */
+
         glBindFragDataLocationIndexed
         glGetFragDataIndex
         glGenSamplers
@@ -777,7 +777,7 @@ EXPORTS
         glColorP4uiv
         glSecondaryColorP3ui
         glSecondaryColorP3uiv
-        /* GL_VERSION_4_0 */
+
         glMinSampleShading
         glBlendEquationi
         glBlendEquationSeparatei
@@ -824,7 +824,7 @@ EXPORTS
         glBeginQueryIndexed
         glEndQueryIndexed
         glGetQueryIndexediv
-        /* GL_VERSION_4_1, incomplete: defined by later GL version but required by ES */
+
         glReleaseShaderCompiler
         glShaderBinary
         glGetShaderPrecisionFormat
@@ -876,13 +876,13 @@ EXPORTS
         glProgramUniformMatrix4x3fv
         glValidateProgramPipeline
         glGetProgramPipelineInfoLog
-        /* GL_VERSION_4_2, incomplete: defined by later GL version but required by ES */
+
         glGetInternalformativ
         glBindImageTexture
         glMemoryBarrier
         glTexStorage2D
         glTexStorage3D
-        /* GL_VERSION_4_3, incomplete: defined by later GL version but required by ES */
+
         glDispatchCompute
         glDispatchComputeIndirect
         glCopyImageSubData
@@ -915,7 +915,7 @@ EXPORTS
         glGetObjectLabel
         glObjectPtrLabel
         glGetObjectPtrLabel
-        /* GL_VERSION_4_5, incomplete: defined by later GL version but required by ES */
+
         glMemoryBarrierByRegion
         glGetGraphicsResetStatus
         glReadnPixels
@@ -956,7 +956,6 @@ EXPORTS
         glGetMinmaxParameterfv
         glGetMinmaxParameteriv
 
-        /* OpenGL ES API Entries */
         glActiveTexture
         glAttachShader
         glBindAttribLocation
