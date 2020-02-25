@@ -3836,12 +3836,11 @@ gctSTRING gcCLLibPOW_noFMA_Funcs =
 "}\n"
 "float8 _viv_pow_float8(float8 x, float8 y)\n"
 "{\n"
-"     return (float8)(viv_pow_noFMA(x.s0123, y.s0123), viv_pow_noFMA(x.s4567, y.s4567)); \n"
+"    return viv_pow_noFMA(x, y);\n"
 "}\n"
 "float16 _viv_pow_float16(float16 x, float16 y)\n"
 "{\n"
-"     return (float16)(viv_pow_noFMA(x.s0123, y.s0123), viv_pow_noFMA(x.s4567, y.s4567), \n"
-"                      viv_pow_noFMA(x.s89AB, y.s89AB), viv_pow_noFMA(x.sCDEF, y.sCDEF)); \n"
+"    return viv_pow_noFMA(x, y);\n"
 "}\n";
 
 gctSTRING gcCLLibPOW_Funcs =
@@ -4012,12 +4011,11 @@ gctSTRING gcCLLibSIN_noFMA_Funcs =
 "}\n"
 "float8 _viv_sin_float8(float8 x)\n"
 "{\n"
-"     return (float8)(viv_sin_noFMA(x.s0123), viv_sin_noFMA(x.s4567)); \n"
+"     return viv_sin_noFMA(x); \n"
 "}\n"
 "float16 _viv_sin_float16(float16 x)\n"
 "{\n"
-"     return (float16)(viv_sin_noFMA(x.s0123), viv_sin_noFMA(x.s4567), \n"
-"                      viv_sin_noFMA(x.s89AB), viv_sin_noFMA(x.sCDEF)); \n"
+"     return viv_sin_noFMA(x); \n"
 "}\n";
 
 gctSTRING gcCLLibSIN_Funcs =
@@ -4154,12 +4152,11 @@ gctSTRING gcCLLibCOS_noFMA_Funcs =
 "}\n"
 "float8 _viv_cos_float8(float8 x)\n"
 "{\n"
-"     return (float8)(viv_cos_noFMA(x.s0123), viv_cos_noFMA(x.s4567)); \n"
+"    return viv_cos_noFMA(x);\n"
 "}\n"
 "float16 _viv_cos_float16(float16 x)\n"
 "{\n"
-"     return (float16)(viv_cos_noFMA(x.s0123), viv_cos_noFMA(x.s4567), \n"
-"                      viv_cos_noFMA(x.s89AB), viv_cos_noFMA(x.sCDEF)); \n"
+"    return viv_cos_noFMA(x);\n"
 "}\n";
 
 gctSTRING gcCLLibCOS_Funcs =
@@ -4300,12 +4297,11 @@ gctSTRING gcCLLibTAN_noFMA_Funcs =
 "}\n"
 "float8 _viv_tan_float8(float8 x)\n"
 "{\n"
-"     return (float8)(viv_tan_noFMA(x.s0123), viv_tan_noFMA(x.s4567)); \n"
+"    return viv_tan_noFMA(x);\n"
 "}\n"
 "float16 _viv_tan_float16(float16 x)\n"
 "{\n"
-"     return (float16)(viv_tan_noFMA(x.s0123), viv_tan_noFMA(x.s4567), \n"
-"                      viv_tan_noFMA(x.s89AB), viv_tan_noFMA(x.sCDEF)); \n"
+"    return viv_tan_noFMA(x);\n"
 "}\n";
 
 gctSTRING gcCLLibTAN_Funcs =
