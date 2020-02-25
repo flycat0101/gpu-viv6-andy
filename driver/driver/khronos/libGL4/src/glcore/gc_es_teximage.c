@@ -3459,31 +3459,17 @@ void __glClearProxyTextureState(__GLcontext *gc,
                                      GLint level)
 {
     __GLmipMapLevel *faceMipmap;
-    __GLformatInfo *formatInfo;
 
     gc->error = 0x0;
 
     faceMipmap = &tex->faceMipmap[face][level];
-    formatInfo = faceMipmap->formatInfo;
+    faceMipmap->formatInfo = &__glFormatInfoTable[__GL_FMT_MAX];
 
     faceMipmap->width = 0;
     faceMipmap->height = 0;
     faceMipmap->depth = 0;
     faceMipmap->arrays = 0;
     faceMipmap->internalFormat = GL_RGBA;
-    formatInfo->redSize = 0;
-    formatInfo->greenSize = 0;
-    formatInfo->blueSize = 0;
-    formatInfo->alphaSize = 0;
-    formatInfo->depthSize = 0;
-    formatInfo->stencilSize = 0;
-    formatInfo->sharedSize = 0;
-    formatInfo->redType = 0;
-    formatInfo->greenType = 0;
-    formatInfo->blueType = 0;
-    formatInfo->alphaType = 0;
-    formatInfo->depthType = 0;
-    formatInfo->compressed = 0;
 
     tex->samples = 0;
     tex->fixedSampleLocations = 0;
