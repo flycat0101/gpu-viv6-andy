@@ -53,6 +53,11 @@ include $(MKFILES_ROOT)/qmacros.mk
 
 include $(qnx_build_dir)/math.mk
 
+PRE_TARGET:= prebuild
+
+prebuild:
+	@cp -f $(driver_root)/tools/bin/gc_feature_database.h $(driver_root)/arch/vipArchPerfMdl_dev/vipArchPerf
+
 ifeq ($(filter so dll, $(VARIANT_LIST)),)
 INSTALLDIR=/dev/null
 endif
