@@ -16920,11 +16920,13 @@ vxnne_shader_executable vxnneGemmShaderExecutable(
                         0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
                     };
 
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_fp16_2p", borderMode);
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP16_4x4", borderMode);
                     if (!shaderExecutable) goto OnError;
 
                     status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniSumF16MulF16_8x2_b", 1, &uniSumF16MulF16_8x2_b);
                     if (status != VX_SUCCESS) goto OnError;
+
+                    execution_parameters.globalWorkScale[1]  = 4;
                 }
                 else
                 {
