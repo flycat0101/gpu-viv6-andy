@@ -269,6 +269,7 @@ EXPORTS
     gcoHAL_WrapUserMemory
     gcoHAL_LockVideoMemory
     gcoHAL_UnlockVideoMemory
+    gcoHAL_UnlockVideoMemoryEX
     gcoHAL_ReleaseVideoMemory
     gcoHAL_ScheduleSignal
     gcoHAL_GetPLS
