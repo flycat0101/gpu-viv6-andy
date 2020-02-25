@@ -24,7 +24,7 @@
 
 #define VSC_CPF_MAX_TEMP                    3072
 #define VSC_CPF_MAX_INST_COUNT_GENERAL      3400
-#define VSC_CPF_MAX_INST_COUNT_DEQP         2048
+#define VSC_CPF_MAX_INST_COUNT_DEQP         2000
 
 BEGIN_EXTERN_C()
 
