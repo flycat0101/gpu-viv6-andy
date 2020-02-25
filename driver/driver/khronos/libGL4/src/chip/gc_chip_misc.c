@@ -735,7 +735,7 @@ __glChipEndXFB(
                                gcvWHERE_PIXEL,
                                gcvHOW_SEMAPHORE));
 
-    if (gc->xfb.boundXfbObj)
+    if (gc->xfb.boundXfbObj && gc->xfb.boundXfbObj->boundBufObj)
     {
         __GLBufBindPoint *pXfbBindingPoints = gc->xfb.boundXfbObj->boundBufBinding;
         __GLprogramObject *progObj = gc->xfb.boundXfbObj->programObj;

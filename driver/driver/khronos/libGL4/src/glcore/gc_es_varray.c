@@ -760,6 +760,25 @@ static GLboolean __glCheckXFBState(__GLcontext *gc, GLboolean allowXFB, GLenum m
 
     xfbObj = gc->xfb.boundXfbObj;
 
+    if (xfbObj->active && xfbObj->boundBufObj == gcvNULL)
+    {
+        if (xfbObj->paused)
+        {
+            xfbObj->paused = GL_FALSE;
+        }
+        else
+        {
+            GL_ASSERT(xfbObj->programObj == __glGetLastNonFragProgram(gc));
+        }
+        xfbObj->active = GL_FALSE;
+        (*gc->dp.endXFB)(gc, xfbObj);
+        --xfbObj->programObj->xfbRefCount;
+        xfbObj->programObj = gcvNULL;
+        xfbObj->programObj = gcvNULL;
+        xfbObj->primMode = 0;
+        xfbObj->end = GL_TRUE;
+    }
+
     if (allowXFB)
     {
         /* For GS extension enable case, the check is deferred to __glChipDrawBegin */
