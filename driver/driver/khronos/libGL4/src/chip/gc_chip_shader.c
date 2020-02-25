@@ -16,6 +16,8 @@
 
 #define _GC_OBJ_ZONE gcdZONE_GL40_SHADER
 
+#define MAX_ALIASED_ATTRIB_COUNT 2
+
 #ifdef OPENGL40
 typedef struct _bt_attribute
 {
@@ -370,19 +372,19 @@ __GLchipUniformTypeInfo g_typeInfos[] =
     { gcSHADER_UINT64_X8,  4,  GL_NONE,                      0},                                                                      /* 0xB4 */
     { gcSHADER_UINT64_X16, 4,  GL_NONE,                      0},                                                                      /* 0xB5 */
 
-    { gcSHADER_FLOAT64_X1,  1, GL_FLOAT,                    sizeof(GLfloat)},                                                                      /* 0xB6 */
-    { gcSHADER_FLOAT64_X2,  2, GL_FLOAT_VEC2,               2*sizeof(GLfloat)},                                                                      /* 0xB7 */
-    { gcSHADER_FLOAT64_X3,  3, GL_FLOAT_VEC3,               3*sizeof(GLfloat)},                                                                      /* 0xB8 */
-    { gcSHADER_FLOAT64_X4,  4, GL_FLOAT_VEC4,               4*sizeof(GLfloat)},                                                                      /* 0xB9 */
-    { gcSHADER_FLOAT64_2X2, 2, GL_FLOAT_MAT2,               2*2*sizeof(GLfloat)},                                                                      /* 0xBA */
-    { gcSHADER_FLOAT64_3X3, 3, GL_FLOAT_MAT3,               3*3*sizeof(GLfloat)},                                                                      /* 0xBB */
-    { gcSHADER_FLOAT64_4X4, 4, GL_FLOAT_MAT4,               4*4*sizeof(GLfloat)},                                                                      /* 0xBC */
-    { gcSHADER_FLOAT64_2X3, 3, GL_FLOAT_MAT2x3,             2*3*sizeof(GLfloat)},                                                                      /* 0xBD */
-    { gcSHADER_FLOAT64_2X4, 4, GL_FLOAT_MAT2x4,             2*4*sizeof(GLfloat)},                                                                      /* 0xBE */
-    { gcSHADER_FLOAT64_3X2, 2, GL_FLOAT_MAT3x2,             3*2*sizeof(GLfloat)},                                                                      /* 0xBF */
-    { gcSHADER_FLOAT64_3X4, 4, GL_FLOAT_MAT3x4,             3*4*sizeof(GLfloat)},                                                                      /* 0xC0 */
-    { gcSHADER_FLOAT64_4X2, 2, GL_FLOAT_MAT4x2,             4*2*sizeof(GLfloat)},                                                                      /* 0xC1 */
-    { gcSHADER_FLOAT64_4X3, 3, GL_FLOAT_MAT4x3,             4*3*sizeof(GLfloat)},                                                                      /* 0xC2 */
+    { gcSHADER_FLOAT64_X1,  1, GL_DOUBLE,                    sizeof(GLdouble)},                                                                      /* 0xB6 */
+    { gcSHADER_FLOAT64_X2,  2, GL_DOUBLE_VEC2,               2*sizeof(GLdouble)},                                                                      /* 0xB7 */
+    { gcSHADER_FLOAT64_X3,  3, GL_DOUBLE_VEC3,               3*sizeof(GLdouble)},                                                                      /* 0xB8 */
+    { gcSHADER_FLOAT64_X4,  4, GL_DOUBLE_VEC4,               4*sizeof(GLdouble)},                                                                      /* 0xB9 */
+    { gcSHADER_FLOAT64_2X2, 2, GL_DOUBLE_MAT2,               2*2*sizeof(GLdouble)},                                                                      /* 0xBA */
+    { gcSHADER_FLOAT64_3X3, 3, GL_DOUBLE_MAT3,               3*3*sizeof(GLdouble)},                                                                      /* 0xBB */
+    { gcSHADER_FLOAT64_4X4, 4, GL_DOUBLE_MAT4,               4*4*sizeof(GLdouble)},                                                                      /* 0xBC */
+    { gcSHADER_FLOAT64_2X3, 3, GL_DOUBLE_MAT2x3,             2*3*sizeof(GLdouble)},                                                                      /* 0xBD */
+    { gcSHADER_FLOAT64_2X4, 4, GL_DOUBLE_MAT2x4,             2*4*sizeof(GLdouble)},                                                                      /* 0xBE */
+    { gcSHADER_FLOAT64_3X2, 2, GL_DOUBLE_MAT3x2,             3*2*sizeof(GLdouble)},                                                                      /* 0xBF */
+    { gcSHADER_FLOAT64_3X4, 4, GL_DOUBLE_MAT3x4,             3*4*sizeof(GLdouble)},                                                                      /* 0xC0 */
+    { gcSHADER_FLOAT64_4X2, 2, GL_DOUBLE_MAT4x2,             4*2*sizeof(GLdouble)},                                                                      /* 0xC1 */
+    { gcSHADER_FLOAT64_4X3, 3, GL_DOUBLE_MAT4x3,             4*3*sizeof(GLdouble)},                                                                      /* 0xC2 */
     { gcSHADER_FLOAT64_X8,  4, GL_NONE,                      0},                                                                      /* 0xC3 */
     { gcSHADER_FLOAT64_X16, 4, GL_NONE,                      0},                                                                      /* 0xC4 */
 
@@ -433,6 +435,7 @@ const __GLchipNonUserDefUniformInfo nonUserDefUniformInfo[] =
     { "#sh_yInvert", __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_YINVERT, gcvNULL },
     { "#sh_DepthBias", __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_DEPTH_BIAS, gcvNULL },
     { "#sh_rtImage", __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_RT_IMAGE, gcvNULL },
+    { "#clipDistanceEnable", __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_ENABLE_CLIP_DISTANCE, gcvNULL },
 #ifdef OPENGL40
     { "#ModelViewMatrix",  __GL_CHIP_UNIFORM_USAGE_MODELVIEW,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ModelViewMatrix"},
     { "#ProjectionMatrix",  __GL_CHIP_UNIFORM_USAGE_PROJECTION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ProjectionMatrix"},
@@ -643,6 +646,7 @@ GLuint g_progId = 0;
 /************************************************************************/
 
 #if TEMP_SHADER_PATCH
+#define gcdOFFSET_O_DOT_5(x)            (((x) < 0) ? ((x) - 0.5) : ((x) + 0.5))
 
 __GL_INLINE void
 _FlushChannelOfPatchedUniformImm(
@@ -753,6 +757,34 @@ gcChipUtilCopyDoubleToFloat(
     for (i = 0; i < count; i++)
     {
         dst[i] =  (GLfloat)src[i];  /* treat double as float for now */
+    }
+}
+
+__GL_INLINE void
+gcChipUtilCopyDoubleToInt(
+    GLint *dst,
+    const GLdouble *src,
+    gctSIZE_T count
+    )
+{
+    gctSIZE_T i;
+    for (i = 0; i < count; i++)
+    {
+        dst[i] =  (GLint)(gcdOFFSET_O_DOT_5(src[i]));  /* treat double as int*/
+    }
+}
+
+__GL_INLINE void
+gcChipUtilCopyDoubleToUint(
+    GLuint *dst,
+    const GLdouble *src,
+    gctSIZE_T count
+    )
+{
+    gctSIZE_T i;
+    for (i = 0; i < count; i++)
+    {
+        dst[i] = (src[i] > 0.0) ? (GLuint) (src[i] + 0.5) : 0;  /* treat double as uint*/
     }
 }
 
@@ -928,6 +960,11 @@ gcChipUtilFindUniformUsage(
     {
         usage = __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED;
         subUsage = __GL_CHIP_UNIFORM_SUB_USAGE_MULTISAMPLE_BUFFERS;
+    }
+    else if (isUniformClipDistanceEnable(uniform))
+    {
+        usage = __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED;
+        subUsage = __GL_CHIP_UNIFORM_SUB_USAGE_ENABLE_CLIP_DISTANCE;
     }
     else
     {
@@ -1369,7 +1406,8 @@ gcChipCountUniforms(
             !isUniformLevelBaseSize(uniform) &&
             !isUniformLodMinMax(uniform) &&
             !isUniformSampleLocation(uniform) &&
-            !isUniformMultiSampleBuffers(uniform))
+            !isUniformMultiSampleBuffers(uniform) &&
+            !isUniformClipDistanceEnable(uniform))
         {
             continue;
         }
@@ -1654,7 +1692,8 @@ gcChipProcessUniforms(
             !isUniformLevelBaseSize(uniform) &&
             !isUniformLodMinMax(uniform) &&
             !isUniformSampleLocation(uniform) &&
-            !isUniformMultiSampleBuffers(uniform))
+            !isUniformMultiSampleBuffers(uniform) &&
+            !isUniformClipDistanceEnable(uniform))
         {
             continue;
         }
@@ -1860,21 +1899,23 @@ gcChipProcessUniforms(
             bytes = g_typeInfos[dataType].size * arraySize;
 
             slot->halUniform[stageIdx] = uniform;
-            slot->hasInitializerInShader[stageIdx] = isUniformWithInitializer(uniform);
-            if (slot->hasInitializerInShader[stageIdx])
+            if (gc->imports.conformGLSpec)
             {
-                /* The data is stored in the constant buffer. */
-                if (GetUniformOffset(uniform) >= 0)
+                slot->hasInitializerInShader[stageIdx] = isUniformWithInitializer(uniform);
+                if (slot->hasInitializerInShader[stageIdx])
                 {
-                    slot->initializerData = (gctUINT8*)(GetShaderConstantMemoryBuffer(Shader) + GetUniformOffset(uniform));
-                }
-                else
-                {
-                    slot->initializerData = (gctUINT8*)(GetUniformInitializer(uniform).f32_v16);
-                }
+                    /* The data is stored in the constant buffer. */
+                    if (GetUniformOffset(uniform) >= 0)
+                    {
+                        slot->initializerData = (gctUINT8*)(GetShaderConstantMemoryBuffer(Shader) + GetUniformOffset(uniform));
+                    }
+                    else
+                    {
+                        slot->initializerData = (gctUINT8*)(GetUniformInitializer(uniform).f32_v16);
+                    }
 
+                }
             }
-
             if (!duplicate)
             {
                 /* Assign primary uniform. */
@@ -2061,6 +2102,15 @@ gcChipProcessUniforms(
                         program->samplerMap[samplerIdx].auxiliary = GL_FALSE;
                         program->samplerMap[samplerIdx].subUsage = subUsage;
                         program->samplerMap[samplerIdx].isInteger = isInteger;
+
+                        if(!gc->imports.conformGLSpec)
+                        {
+                            if (GetUniformResOpFlags(uniform) == gcUNIFORM_RES_OP_FLAG_FETCH ||
+                                GetUniformResOpFlags(uniform) == gcUNIFORM_RES_OP_FLAG_FETCH_MS)
+                            {
+                                __glBitmaskSet(&program->texelFetchSamplerMask, samplerIdx);
+                            }
+                        }
 
                         if (binding >= 0)
                         {
@@ -2329,7 +2379,8 @@ gcChipProcessUniformBlocks(
         gcmVERIFY_OK(gcSHADER_GetUniform(Shader, GetUBIndex(uniformBlock), &ubUniform));
 
         /* Skip inactive uniform blocks */
-        if (isUniformInactive(ubUniform))
+        if (isUniformInactive(ubUniform) ||
+            (GetUniformArraySize(ubUniform) > 1 && GetUBArrayIndex(uniformBlock) >= GetUniformUsedArraySize(ubUniform)))
         {
             continue;
         }
@@ -3735,7 +3786,7 @@ gcChipProgramCleanBindingInfo(
         }
     }
 
-    for (i = 0; i < (GLint)gc->constants.shaderCaps.maxVertAttributes; ++i)
+    for (i = 0; i < (GLint)gc->constants.shaderCaps.maxVertAttributes * MAX_ALIASED_ATTRIB_COUNT; ++i)
     {
         program->attribLocation[i].pInput   = gcvNULL;
         program->attribLocation[i].index    = (GLuint)-1;
@@ -3748,6 +3799,7 @@ gcChipProgramCleanBindingInfo(
     programObject->bindingInfo.vsInputMask = 0;
 #endif
     __glBitmaskSetAll(&program->shadowSamplerMask, GL_FALSE);
+    __glBitmaskSetAll(&program->texelFetchSamplerMask, GL_FALSE);
 
     /* Free uniforms */
     if (program->uniforms)
@@ -4173,7 +4225,7 @@ gcChipProgramBindingRecompiledInfo(
                 break;
             }
         }
-        gcoBUFOBJ_Upload(uBlock->halBufObj, data, 0, uBlock->dataSize, gcvBUFOBJ_USAGE_STATIC_READ);
+        gcmONERROR(gcoBUFOBJ_Upload(uBlock->halBufObj, data, 0, uBlock->dataSize, gcvBUFOBJ_USAGE_STATIC_READ));
     }
 
     /* The base address uniform of a SSBO may be changed, so we need to update this uniform. */
@@ -4364,7 +4416,10 @@ gcChipProgramBuildBindingInfo(
     gcmONERROR(gcSHADER_GetAttributeAndBuiltinInputCount(pBinaries[firstStage], &resCount));
     gcmONERROR(gcSHADER_GetAttributeCount(pBinaries[firstStage], &userInputCount));
 #ifdef OPENGL40
-    memset((char *)chipCtx->builtinAttributeIndex, 0xFF, sizeof(chipCtx->builtinAttributeIndex));
+    if (gc->imports.conformGLSpec)
+    {
+        memset((char *)chipCtx->builtinAttributeIndex, 0xFF, sizeof(chipCtx->builtinAttributeIndex));
+    }
 #endif
     /* Query how many active inputs */
     for (i = 0; i < resCount; ++i)
@@ -4402,6 +4457,12 @@ gcChipProgramBuildBindingInfo(
         GLuint count = 0;
         __GLchipSLBinding *binding;
         __GLchipSLInput *input;
+        gctBOOL bGLSL1_0 = (firstStage == __GLSL_STAGE_VS)
+                         ? gcSHADER_IsES11Compiler(pBinaries[firstStage])
+                         : gcvFALSE;
+        gctUINT locationIndex = 0;
+        gctUINT aliasedIndex = 0;
+        gctUINT aliasedCount = 0;
 
         /* Allocate the array for the vertex attributes. */
         bytes = program->inCount * sizeof(__GLchipSLInput);
@@ -4414,6 +4475,7 @@ gcChipProgramBuildBindingInfo(
             gcATTRIBUTE attribute;
             gctBOOL enable = gcvFALSE;
             gctUINT nameLen = 0;
+            gctBOOL bAliased = gcvFALSE;
 
             gcmONERROR(gcSHADER_GetAttribute(pBinaries[firstStage], i, &attribute));
             /* skip NULL inputs, do not know why NULL one was reported by HAL */
@@ -4442,6 +4504,7 @@ gcChipProgramBuildBindingInfo(
             input->fieldIndex = GetATTRFieldIndex(attribute);
             input->isPosition = gcmATTRIBUTE_isPosition(attribute);
             input->isDirectPosition = gcmATTRIBUTE_isDirectPosition(attribute);
+            input->isLocationSetByDriver = gcmATTRIBUTE_isLocSetByDriver(attribute);
             gcmONERROR(gcATTRIBUTE_GetLocation(attribute, &input->location));
             gcmONERROR(gcATTRIBUTE_GetPrecision(attribute, &input->precision));
             gcmONERROR(gcATTRIBUTE_IsPerPatch(attribute, &input->isPerPatch));
@@ -4475,8 +4538,25 @@ gcChipProgramBuildBindingInfo(
             }
             input->refByStage[firstStage] = GL_TRUE;
 
+            /* Set attribute location. */
+            if (input->isLocationSetByDriver && index > 0)
+            {
+                for ( locationIndex = 0; (gctINT)locationIndex < index;)
+                {
+                    if (input->location != -1 &&
+                        program->attribLocation[locationIndex].pInput->isLocationSetByDriver &&
+                        program->attribLocation[locationIndex].pInput->location == input->location)
+                    {
+                        bAliased = gcvTRUE;
+                        break;
+                    }
+
+                    locationIndex += program->attribLocation[locationIndex].pInput->size;
+                }
+            }
+
             /* expand the attribute, if it is a matrix, to basic types */
-            for (j = 0; j < input->size; ++j, ++index)
+            for (j = 0; j < input->size; ++j)
             {
                 if (i < activeUserInputCount && index >= (GLint)gc->constants.shaderCaps.maxUserVertAttributes)
                 {
@@ -4484,12 +4564,34 @@ gcChipProgramBuildBindingInfo(
                     gcmTRACE(gcvLEVEL_ERROR, "LinkShaders: Too many attributes");
                     gcmONERROR(gcvSTATUS_TOO_MANY_ATTRIBUTES);
                 }
-                /* Set attribute location. */
+
+                if (bAliased)
+                {
+                    /* Current attriLocation is not a list, we just use a array and only support
+                    ** one aliased attribute for each slot.
+                    ** the data structure is:
+                    **
+                    ** ------------------------------------------
+                    **| 0~15 attribute slot| 16~31 aliased attrib|
+                    ** ------------------------------------------
+                    */
+                    aliasedIndex = j + gc->constants.shaderCaps.maxVertAttributes + locationIndex;
+                    gcmASSERT( program->attribLocation[aliasedIndex].pInput == gcvNULL);
+
+                    program->attribLocation[aliasedIndex].pInput = input;
+                    program->attribLocation[aliasedIndex].index  = (GLint)j;
+                    continue;
+                }
+
                 program->attribLocation[index].pInput = input;
                 program->attribLocation[index].index  = (GLint)j;
+                ++index;
             }
 #ifdef OPENGL40
-            tagBuiltInAttribute(gc, i, input->name);
+            if (gc->imports.conformGLSpec)
+            {
+                tagBuiltInAttribute(gc, i, input->name);
+            }
 #endif
         }
 
@@ -4504,7 +4606,7 @@ gcChipProgramBuildBindingInfo(
 
             input = program->attribLocation[i].pInput;
 
-            if (input->location != -1)
+            if (input->location != -1 && !(input->isLocationSetByDriver))
             {
                 /* Test for overflow. */
                 if (input->location + (GLuint)input->size > gc->constants.shaderCaps.maxUserVertAttributes)
@@ -4546,18 +4648,20 @@ gcChipProgramBuildBindingInfo(
                 /* Walk all attribute locations. */
                 for (i = 0; i < gc->constants.shaderCaps.maxVertAttributes; ++i)
                 {
-                    /* Ignore if location is unavailable or not the start of an array. */
-                    if ((!program->attribLocation[i].pInput) || (program->attribLocation[i].index != 0))
+                    for ( aliasedCount = 0; aliasedCount < MAX_ALIASED_ATTRIB_COUNT; ++aliasedCount)
                     {
-                        continue;
-                    }
+                        aliasedIndex = i + aliasedCount * gc->constants.shaderCaps.maxVertAttributes;
+                        /* Ignore if location is unavailable or not the start of an array. */
+                        if ((!program->attribLocation[aliasedIndex].pInput) || (program->attribLocation[aliasedIndex].index != 0))
+                        {
+                            continue;
+                        }
 
-                    if (program->attribLocation[i].assigned)
-                    {
-                        continue;
-                    }
-
-                    input = program->attribLocation[i].pInput;
+                        if (program->attribLocation[aliasedIndex].assigned)
+                        {
+                            continue;
+                        }
+                        input = program->attribLocation[aliasedIndex].pInput;
 
                     if (gcmIS_SUCCESS(gcoOS_StrCmp(binding->name, input->name)))
                     {
@@ -4582,7 +4686,7 @@ gcChipProgramBuildBindingInfo(
                             **    is possible in OpenGL ES Shading Language 1.00 vertex shaders.
                             **
                             */
-                            if (!gcSHADER_IsES11Compiler(*pBinaries) && program->attribLinkage[binding->index + j])
+                            if (!bGLSL1_0 && program->attribLinkage[binding->index + j])
                             {
                                 gcmONERROR(gcoOS_PrintStrSafe(logBuffer, __GLSL_LOG_INFO_SIZE, &logOffset, "Binding for %s occupied.", input->name));
                                 gcmTRACE(gcvLEVEL_ERROR, "Binding for %s occupied.", binding->name);
@@ -4597,10 +4701,11 @@ gcChipProgramBuildBindingInfo(
                             attribLinkage->next = program->attribLinkage[binding->index + j];
                             program->attribLinkage[binding->index + j] = attribLinkage;
 
-                            program->attribLocation[i + j].assigned = GL_TRUE;
+                                program->attribLocation[aliasedIndex + j].assigned = GL_TRUE;
+                            }
+                            input->location = binding->index;
+                            break;
                         }
-                        input->location = binding->index;
-                        break;
                     }
                 }
             }
@@ -4630,7 +4735,7 @@ gcChipProgramBuildBindingInfo(
 
                 size = input->size;
                 /* Find continuous un-occupied slot */
-                for (index = 0; index < (GLint)gc->constants.shaderCaps.maxUserVertAttributes; )
+                for (index = 0; index < (GLint)gc->constants.shaderCaps.maxUserVertAttributes; ++index)
                 {
                     for (j = 0; j < size; ++j)
                     {
@@ -4644,7 +4749,6 @@ gcChipProgramBuildBindingInfo(
                     {
                         break;
                     }
-                    index += j + 1;
                 }
 
                 if (index >= (GLint)gc->constants.shaderCaps.maxUserVertAttributes)
@@ -5557,6 +5661,11 @@ gcChipProgramBuildBindingInfo(
         program->rtWHUniform = gcChipGetUniformByName(gc, program, "u_rtWH", (gctSIZE_T)-1);
         program->halfLineWidthUniform = gcChipGetUniformByName(gc, program, "u_halfLineWidth", (gctSIZE_T)-1);
 
+        program->aLocPosition = __glChipGetAttributeLocation(gc, programObject, "a_position");
+    }
+
+    if (program->progFlags.wideLineFix)
+    {
         program->aLocPosition = __glChipGetAttributeLocation(gc, programObject, "a_position");
     }
 
@@ -7578,6 +7687,7 @@ __glChipCompileShader(
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gcSHADER_KIND shaderType = gcSHADER_TYPE_UNKNOWN;
     gceSTATUS status;
+    gcsGLSLCaps *glslCaps = &gc->constants.shaderCaps;
 
     gcmHEADER_ARG("gc=0x%x shaderObject=0x%x", gc, shaderObject);
 
@@ -7620,12 +7730,27 @@ __glChipCompileShader(
         shaderObject->shaderInfo.hBinary = gcvNULL;
     }
 
+    /* Enable it for CTS in nanoUltra3. */
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_OESCTS || chipCtx->patchId == gcvPATCH_GTFES30) &&
+        (chipCtx->chipModel == gcv880 && chipCtx->chipRevision == 0x5124))
+    {
+        gcOPT_SetFeature(FB_TREAT_CONST_ARRAY_AS_UNIFORM);
+    }
+
+    /* re-initialize CompilerCaps ,avoid muti-context ,the shaderCaps.extensions that compiler uses has been released when other context destory */
+    (*chipCtx->pfInitCompilerCaps)(glslCaps);
+
     gcmONERROR((*chipCtx->pfCompile)(shaderType,
                                      shaderObject->shaderInfo.sourceSize,
                                      shaderObject->shaderInfo.source,
                                      (gcSHADER*)&shaderObject->shaderInfo.hBinary,
                                      (gctSTRING*)&shaderObject->shaderInfo.compiledLog));
 
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_OESCTS || chipCtx->patchId == gcvPATCH_GTFES30) &&
+        (chipCtx->chipModel == gcv880 && chipCtx->chipRevision == 0x5124))
+    {
+        gcOPT_ResetFeature(FB_TREAT_CONST_ARRAY_AS_UNIFORM);
+    }
 
     gcmFOOTER_ARG("return=%d", gcvTRUE);
     return gcvTRUE;
@@ -7787,6 +7912,7 @@ __glChipCreateProgram(
     program->inMaxNameLen         = 0;
     program->inputs               = gcvNULL;
 
+    program->mayHasAliasedAttrib  = gcvFALSE;
     program->attribBinding        = gcvNULL;
     program->attribLinkage        = gcvNULL;
     program->attribLocation       = gcvNULL;
@@ -7829,12 +7955,12 @@ __glChipCreateProgram(
     }
 
     gcmONERROR(gcoOS_Allocate(gcvNULL,
-                           gc->constants.shaderCaps.maxVertAttributes * gcmSIZEOF(__GLchipSLLocation),
-                           &pointer));
+                              gc->constants.shaderCaps.maxVertAttributes * MAX_ALIASED_ATTRIB_COUNT * gcmSIZEOF(__GLchipSLLocation),
+                              &pointer));
 
     program->attribLocation = pointer;
 
-    for (i = 0; i < gc->constants.shaderCaps.maxVertAttributes; ++i)
+    for (i = 0; i < gc->constants.shaderCaps.maxVertAttributes * MAX_ALIASED_ATTRIB_COUNT; ++i)
     {
         program->attribLocation[i].pInput = gcvNULL;
     }
@@ -7851,6 +7977,7 @@ __glChipCreateProgram(
     program->stageBits = 0;
 
     __glBitmaskInitAllZero(&program->shadowSamplerMask, gc->constants.shaderCaps.maxTextureSamplers);
+    __glBitmaskInitAllZero(&program->texelFetchSamplerMask, gc->constants.shaderCaps.maxTextureSamplers);
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
@@ -8064,6 +8191,7 @@ __glChipLinkProgram(
     gcsPROGRAM_STATE programState = {0};
     gceSHADER_FLAGS flags;
     gceSHADER_SUB_FLAGS subFlags;
+    gcSHADER vsBinary = gcvNULL;
     gcSHADER_KIND shaderTypes[] =
     {
         gcSHADER_TYPE_VERTEX,
@@ -8102,16 +8230,59 @@ __glChipLinkProgram(
             gcSHADER_TYPE_COMPUTE,
         };
 
+        if (program->progFlags.disableLoopUnrolling)
+        {
+            gcOPT_SetFeature(FB_DISABLE_GL_LOOP_UNROLLING);
+        }
+
         if (patchedSrcs[stage])
         {
             __GLshaderObject *shaderObj = programObject->programInfo.attachedShader[stage]->shader;
+            gcSHADER preBinary = (gcSHADER)shaderObj->shaderInfo.hBinary;
+            gctSTRING preLog = shaderObj->shaderInfo.compiledLog;
+
+            shaderObj->shaderInfo.hBinary = gcvNULL;
+            shaderObj->shaderInfo.compiledLog = gcvNULL;
 
             /* Recompile the patched shaders. */
-            (*chipCtx->pfCompile)(shaderTypes[stage],
-                                  (gctUINT)gcoOS_StrLen(patchedSrcs[stage], gcvNULL),
-                                  patchedSrcs[stage],
-                                  (gcSHADER*)&shaderObj->shaderInfo.hBinary,
-                                  (gctSTRING*)&shaderObj->shaderInfo.compiledLog);
+            status = (*chipCtx->pfCompile)(shaderTypes[stage],
+                                           (gctUINT)gcoOS_StrLen(patchedSrcs[stage], gcvNULL),
+                                           patchedSrcs[stage],
+                                           (gcSHADER*)&shaderObj->shaderInfo.hBinary,
+                                           (gctSTRING*)&shaderObj->shaderInfo.compiledLog);
+
+            /* If patch compile failed, roll back.*/
+            if (gcmIS_ERROR(status))
+            {
+                /* Reset pre value.*/
+                /* If failed, hBinary already destory.*/
+                shaderObj->shaderInfo.hBinary = preBinary;
+
+                if (shaderObj->shaderInfo.compiledLog)
+                {
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, shaderObj->shaderInfo.compiledLog));
+                }
+                shaderObj->shaderInfo.compiledLog = preLog;
+            }
+            else
+            {
+                /* destroy preBinary.*/
+                if (preBinary)
+                {
+                    gcmVERIFY_OK(gcSHADER_Destroy(preBinary));
+                    preBinary = gcvNULL;
+                }
+
+                if (preLog)
+                {
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, preLog));
+                }
+            }
+        }
+
+        if (program->progFlags.disableLoopUnrolling)
+        {
+            gcOPT_ResetFeature(FB_DISABLE_GL_LOOP_UNROLLING);
         }
     }
 #endif
@@ -8155,7 +8326,7 @@ __glChipLinkProgram(
         {
             gctUINT i = 0;
             next = programObject->programInfo.attachedShader[stage];
-            if (next &&  next->shader)
+            if (next &&  next->shader->shaderInfo.hBinary)
             {
                 shaderNum = 0;
                 while (next)
@@ -8227,40 +8398,40 @@ __glChipLinkProgram(
                                                         (gctCONST_STRING*)programObject->ppXfbVaryingNames,
                                                         xfbMode));
 
-
-        if (xfbMode == gcvFEEDBACK_SEPARATE)
+        if (gc->imports.conformGLSpec)
         {
-            for (i = 0; i < programObject->xfbVaryingNum; i++)
+            if (xfbMode == gcvFEEDBACK_SEPARATE)
             {
-                components = g_typeInfos[masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].output->origType].components;
-                if (masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].isArray)
+                for (i = 0; i < programObject->xfbVaryingNum; i++)
                 {
-                    components *= masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].arraySize;
+                    components = g_typeInfos[masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].output->origType].components;
+                    if (masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].isArray)
+                    {
+                        components *= masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].arraySize;
+                    }
+                    if (components >  gc->constants.shaderCaps.maxXfbSeparateComponents)
+                    {
+                        status = gcvSTATUS_TOO_MANY_OUTPUT;
+                        gcmONERROR(status);
+                    }
                 }
-                if (components >  gc->constants.shaderCaps.maxXfbSeparateComponents)
+            }
+            else
+            {
+                for (i = 0; i < masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyingCount; i++)
+                {
+                        components += masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].isArray ?
+                        g_typeInfos[masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].output->origType].components *
+                        masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].arraySize:
+                        g_typeInfos[masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].output->origType].components;
+                }
+                if (components >  gc->constants.shaderCaps.maxXfbInterleavedComponents)
                 {
                     status = gcvSTATUS_TOO_MANY_OUTPUT;
                     gcmONERROR(status);
                 }
             }
         }
-        else
-        {
-            for (i = 0; i < masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyingCount; i++)
-            {
-                components += masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].isArray ?
-                    g_typeInfos[masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].output->origType].components *
-                    masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].arraySize:
-                    g_typeInfos[masterPgInstance->binaries[transformFeedbackStage]->transformFeedback.varyings[i].output->origType].components;
-            }
-            if (components >  gc->constants.shaderCaps.maxXfbInterleavedComponents)
-            {
-                status = gcvSTATUS_TOO_MANY_OUTPUT;
-                gcmONERROR(status);
-            }
-
-        }
-
     }
 
     flags = (gcvSHADER_DEAD_CODE              |
@@ -8343,6 +8514,19 @@ __glChipLinkProgram(
 
     /* Call the HAL backend linker. */
     gcSetGLSLCompiler(chipCtx->pfCompile);
+
+    /* set attribute location */
+    vsBinary = masterPgInstance->binaries[__GLSL_STAGE_VS];
+
+    if (vsBinary && gcSHADER_IsES11Compiler(vsBinary) && program->mayHasAliasedAttrib)
+    {
+        __GLchipSLBinding *binding;
+        for (binding = program->attribBinding; binding != gcvNULL;  binding = binding->next)
+        {
+            gcmONERROR(gcSHADER_SetAttrLocationByDriver(vsBinary, binding->name, binding->index));
+        }
+    }
+
     status = gcLinkProgram(__GLSL_STAGE_LAST,
                              masterPgInstance->binaries,
                              flags,
@@ -8362,7 +8546,7 @@ __glChipLinkProgram(
     /* Only successfully link can replace the previous shader states buffer */
     if (masterPgInstance->programState.stateBuffer != gcvNULL)
     {
-        gcFreeProgramState(masterPgInstance->programState);
+        gcmVERIFY_OK(gcFreeProgramState(masterPgInstance->programState));
     }
     masterPgInstance->programState = programState;
 
@@ -8644,6 +8828,9 @@ gcChipProgramBinary_V0(
         gcSHADER_TYPE_FRAGMENT,
         gcSHADER_TYPE_COMPUTE,
     };
+    gctUINT32 i;
+    gctUINT32 j;
+    gctUINT32 nameCount = 0;
 
     gcmHEADER_ARG("gc=0x%x programObject=0x%x binary=0x%x length=%d", gc, programObject, binary, length);
 
@@ -8711,6 +8898,43 @@ gcChipProgramBinary_V0(
                                          (gctUINT32)length,
                                          masterPgInstance->binaries,
                                          gcvNULL));
+    }
+
+    /* Loop up shaders until the last one non-fragment,and restore program XFB state if need. */
+    for (i = 0; i < gcvPROGRAM_STAGE_FRAGMENT; i++)
+    {
+        if (masterPgInstance->binaries[i] != gcvNULL)
+        {
+            nameCount += GetFeedbackVaryingCount(&(masterPgInstance->binaries[i]->transformFeedback));
+        }
+    }
+
+    /* If some XFB state need to restore. */
+    if (nameCount > 0)
+    {
+        programObject->ppXfbVaryingNames = (GLchar**)(*gc->imports.malloc)(gc, nameCount*sizeof(GLchar*));
+        programObject->xfbVaryingNum = nameCount;
+
+        nameCount = 0;
+
+        for (i = 0; i < gcvPROGRAM_STAGE_FRAGMENT; i++)
+        {
+            if (masterPgInstance->binaries[i] != gcvNULL)
+            {
+                /* Restore XFB state of program,according to binaries sharder info. */
+                if (GetFeedbackVaryingCount(&(masterPgInstance->binaries[i]->transformFeedback)))
+                    programObject->xfbMode = (GetFeedbackBufferMode(&(masterPgInstance->binaries[i]->transformFeedback)) == gcvFEEDBACK_SEPARATE)
+                                                                                                                            ? GL_SEPARATE_ATTRIBS
+                                                                                                                            : GL_INTERLEAVED_ATTRIBS;
+                for (j = 0; j < GetFeedbackVaryingCount(&(masterPgInstance->binaries[i]->transformFeedback)); j++)
+                {
+                    gctUINT32 nameLen = (gctUINT32)strlen(&GetFeedbackVaryings(&(masterPgInstance->binaries[i]->transformFeedback))->name[j]) + 1;
+                    programObject->ppXfbVaryingNames[nameCount] = (GLchar*)(*gc->imports.malloc)(gc, nameLen);
+                    strcpy(programObject->ppXfbVaryingNames[nameCount],&GetFeedbackVaryings(&(masterPgInstance->binaries[i]->transformFeedback))->name[j]);
+                    nameCount += 1;
+                }
+            }
+        }
     }
 
     for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
@@ -8786,6 +9010,7 @@ gcChipProgramBinary_V0(
         program->progFlags.robustEnabled = gcvTRUE;
     }
 
+    gcSetGLSLCompiler(chipCtx->pfCompile);
     status = gcLinkProgram(__GLSL_STAGE_LAST,
                            masterPgInstance->binaries,
                            flags,
@@ -9249,7 +9474,6 @@ __glChipShaderBinary(
         /* Set shader binary according to the format. */
         if (binaryformat == GL_SHADER_BINARY_VIV)
         {
-            gcSHADER        shader          = gcvNULL;
             gctUINT32_PTR   compilerVersion = gcvNULL;
             gcSHADER_KIND   shaderType      = gcSHADER_TYPE_UNKNOWN;
             gctUINT32       shaderVersion   = 0;
@@ -9374,6 +9598,11 @@ __glChipBindAttributeLocation(
             gcmFOOTER_ARG("return=%d", GL_TRUE);
             return GL_TRUE;;
         }
+        /* Check aliased attrib */
+        else if (binding->index == (GLint)index)
+        {
+            program->mayHasAliasedAttrib = gcvTRUE;
+        }
     }
 
     do
@@ -9417,6 +9646,8 @@ __glChipGetAttributeLocation(
     GLuint i;
     gctSIZE_T nameLen = 0;
     gctSIZE_T arrayIdx = 0;
+    gctUINT aliasedCount = 0;
+    gctUINT attribIndex = 0;
     GLboolean isArray = GL_FALSE;
     __GLchipSLProgram *program = (__GLchipSLProgram *)programObject->privateData;
 
@@ -9437,35 +9668,45 @@ __glChipGetAttributeLocation(
 
         for(attribLinkage = program->attribLinkage[i]; attribLinkage != gcvNULL; attribLinkage = attribLinkage->next)
         {
-            /* See if the attribute matches the requested name. */
-            if (nameLen == (gctSIZE_T)program->attribLocation[attribLinkage->attribLocation].pInput->nameLen &&
-                (!isArray || program->attribLocation[attribLinkage->attribLocation].pInput->isArray) &&
-                gcmIS_SUCCESS(gcoOS_StrNCmp(name, program->attribLocation[attribLinkage->attribLocation].pInput->name, nameLen))
-                )
+            for (aliasedCount = 0; aliasedCount < MAX_ALIASED_ATTRIB_COUNT; ++aliasedCount)
             {
-                GLuint comNum = 1;
-                switch (program->attribLocation[attribLinkage->attribLocation].pInput->type)
+                attribIndex = attribLinkage->attribLocation + aliasedCount * gc->constants.shaderCaps.maxVertAttributes;
+
+                if (!program->attribLocation[attribIndex].pInput)
                 {
-                case gcSHADER_FLOAT_2X2:
-                case gcSHADER_FLOAT_2X3:
-                case gcSHADER_FLOAT_2X4:
-                    comNum = 2;
-                    break;
-                case gcSHADER_FLOAT_3X2:
-                case gcSHADER_FLOAT_3X3:
-                case gcSHADER_FLOAT_3X4:
-                    comNum = 3;
-                    break;
-                case gcSHADER_FLOAT_4X2:
-                case gcSHADER_FLOAT_4X3:
-                case gcSHADER_FLOAT_4X4:
-                    comNum = 4;
-                    break;
-                default:
-                    break;
+                    continue;
                 }
-                gcmFOOTER_ARG("return=%d", i);
-                return i + (GLuint)(arrayIdx * comNum);
+
+                /* See if the attribute matches the requested name. */
+                if (nameLen == (gctSIZE_T)program->attribLocation[attribIndex].pInput->nameLen &&
+                    (!isArray || program->attribLocation[attribIndex].pInput->isArray) &&
+                    gcmIS_SUCCESS(gcoOS_StrNCmp(name, program->attribLocation[attribIndex].pInput->name, nameLen))
+                    )
+                {
+                    GLuint comNum = 1;
+                    switch (program->attribLocation[attribIndex].pInput->type)
+                    {
+                    case gcSHADER_FLOAT_2X2:
+                    case gcSHADER_FLOAT_2X3:
+                    case gcSHADER_FLOAT_2X4:
+                        comNum = 2;
+                        break;
+                    case gcSHADER_FLOAT_3X2:
+                    case gcSHADER_FLOAT_3X3:
+                    case gcSHADER_FLOAT_3X4:
+                        comNum = 3;
+                        break;
+                    case gcSHADER_FLOAT_4X2:
+                    case gcSHADER_FLOAT_4X3:
+                    case gcSHADER_FLOAT_4X4:
+                        comNum = 4;
+                        break;
+                    default:
+                        break;
+                    }
+                    gcmFOOTER_ARG("return=%d", i);
+                    return i + (GLuint)(arrayIdx * comNum);
+                }
             }
         }
     }
@@ -10187,6 +10428,29 @@ __glChipGetUniformData(
     {
         gcChipUtilInt2Float(values, (GLint*)((GLbyte*)uniform->data + arrayIdx * bytes), bytes/sizeof(int));
     }
+    /* Convert double uniform to float/int/uint type if app wants to retrieve using
+    ** glGetUniformfv/glGetUniformiv/glGetUniformuiv
+    */
+    else if (uniform->dataType >= gcSHADER_FLOAT64_X1 && uniform->dataType <= gcSHADER_FLOAT64_X16)
+    {
+        switch(type)
+        {
+        case GL_FLOAT:
+            gcChipUtilCopyDoubleToFloat(values, (GLdouble*)((GLbyte*)uniform->data + arrayIdx * bytes), bytes/sizeof(double));
+            break;
+
+        case GL_INT:
+            gcChipUtilCopyDoubleToInt(values, (GLdouble*)((GLbyte*)uniform->data + arrayIdx * bytes), bytes/sizeof(double));
+            break;
+
+        case GL_UNSIGNED_INT:
+            gcChipUtilCopyDoubleToUint(values, (GLdouble*)((GLbyte*)uniform->data + arrayIdx * bytes), bytes/sizeof(double));
+            break;
+
+        default:
+            gcoOS_MemCopy(values, (GLbyte*)(uniform->data) + arrayIdx * bytes, bytes);
+        }
+    }
     else
     {
         gcoOS_MemCopy(values, (GLbyte*)(uniform->data) + arrayIdx * bytes, bytes);
@@ -10297,6 +10561,12 @@ __glChipBuildTexEnableDim(
             {
                 unit = pgInstance[stage]->extraSamplerMap[sampler].unit;
                 enableDim = pgInstance[stage]->extraSamplerMap[sampler].texDim;
+
+                /* For advanced blend, need to set sampler state dirty for programimg rt texture later */
+                if (pgInstance[stage]->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_ADVANCED_BLEND_SAMPLER)
+                {
+                    __glBitmaskSet(&gc->shaderProgram.samplerStateDirty, sampler);
+                }
                 break;
             }
         }
@@ -10366,6 +10636,7 @@ gcChipLoadCompiler(
 
         chipCtx->pfCompile = gcCompileShader;
         chipCtx->pfInitCompiler = gcInitializeCompiler;
+        chipCtx->pfInitCompilerCaps = gcInitializeCompilerCaps;
         chipCtx->pfFinalizeCompiler = gcFinalizeCompiler;
 
         gcmERR_BREAK(gcInitializeCompiler(chipCtx->patchId, &hwCfg, &gc->constants.shaderCaps));
@@ -10382,6 +10653,12 @@ gcChipLoadCompiler(
             gctGLSLInitCompiler initGLSL;
             gctPOINTER          ptr;
         } intializer;
+
+        union __GLinitializerCapsUnion
+        {
+            gctGLSLInitCompilerCaps initCaps;
+            gctPOINTER          ptr;
+        } intializerCaps;
 
         union __GLfinalizerUnion
         {
@@ -10414,10 +10691,12 @@ gcChipLoadCompiler(
 
         gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, chipCtx->dll, "gcCompileShader", &compiler.ptr));
         gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, chipCtx->dll, "gcInitializeCompiler", &intializer.ptr));
+        gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, chipCtx->dll, "gcInitializeCompilerCaps", &intializerCaps.ptr));
         gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, chipCtx->dll, "gcFinalizeCompiler", &finalizer.ptr));
 
         chipCtx->pfCompile = compiler.compile;
         chipCtx->pfInitCompiler = intializer.initGLSL;
+        chipCtx->pfInitCompilerCaps = intializerCaps.initCaps;
         chipCtx->pfFinalizeCompiler = finalizer.finalizeGLSL;
 
         gcmERR_BREAK(chipCtx->pfInitCompiler(chipCtx->patchId, &hwCfg, &gc->constants.shaderCaps));
@@ -11151,6 +11430,13 @@ gcChipPreparePrivateUniform(
         }
         break;
     case __GL_CHIP_UNIFORM_SUB_USAGE_RT_IMAGE:
+        break;
+    case __GL_CHIP_UNIFORM_SUB_USAGE_ENABLE_CLIP_DISTANCE:
+        {
+            GLuint * pData = (GLuint *)uniform->data;
+            *pData = gc->state.enables.transform.clipPlanesMask;
+            uniform->dirty = GL_TRUE;
+        }
         break;
     default:
         GL_ASSERT(0);
@@ -12880,6 +13166,16 @@ gcChipDynamicPatchProgram(
 
         /* Rebuilding uniform tables for the newly created uniform and samplers */
         gcmONERROR(gcChipProgramBindingRecompiledInfo(gc, programObject));
+
+        if (masterPgInstance->programState.hints->unifiedStatus.samplerCount > pgInstance->programState.hints->unifiedStatus.samplerCount)
+        {
+            pgInstance->programState.hints->unifiedStatus.samplerCount =
+            gcmMAX(pgInstance->programState.hints->unifiedStatus.samplerCount, masterPgInstance->programState.hints->unifiedStatus.samplerCount);
+
+            __GLES_PRINT("ES30:The sampelrCount of current program should be maximun between current program and master program after recompile");
+        }
+
+
     }
 
 OnError:
