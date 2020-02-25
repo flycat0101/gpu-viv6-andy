@@ -321,6 +321,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
     for (i = 0; i < WB_OUTPUT_Z_SLICE_NUM(wb); i++)
     {
         kzOffset = 0;
+        filterCount = 0;
 
         for (j = 0; j < WB_KERNEL_Z_SLICE_NUM(wb); j++)
         {
