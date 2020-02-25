@@ -1170,7 +1170,7 @@ gcfVX_LoadKernelArgValues(
             if ((type == gcSHADER_IMAGE_2D_T) && (Arg->data != gcvNULL))
             {
                 vx_reference ref = *(vx_reference*) Arg->data;
-                vx_context base = vxoContext_GetFromReference(ref);
+                /*vx_context base = vxoContext_GetFromReference(ref);*/
 
                 if (ref && ref->type == VX_TYPE_IMAGE)
                 {
@@ -1186,7 +1186,7 @@ gcfVX_LoadKernelArgValues(
 #endif
                     gcmONERROR(gcfVX_GetImageInfo(&context, (vx_image)ref, &info, 0));
 
-                    info.isVXC =  base->evisNoInst.supportEVIS ? gcvTRUE : gcvFALSE;
+                    info.isVXC =  Kernel->states.programState.hints->useEvisInst || ((Shader->flags & gcSHADER_FLAG_HAS_VIV_VX_EXTENSION)  == gcSHADER_FLAG_HAS_VIV_VX_EXTENSION );
 
                     gcmONERROR(gcfVX_SetUniformImageInfo(Arg->uniform, &info));
                 }
@@ -1205,7 +1205,7 @@ gcfVX_LoadKernelArgValues(
                     }
                     /* it's w/a for non-evis vxc shader in hw which support EVIS */
 
-                    info.isVXC =  Kernel->states.programState.hints->useEvisInst;
+                    info.isVXC =  Kernel->states.programState.hints->useEvisInst || ((Shader->flags & gcSHADER_FLAG_HAS_VIV_VX_EXTENSION)  == gcSHADER_FLAG_HAS_VIV_VX_EXTENSION );
                     if (Arg->components > 1 && Arg->components <= 4 && info.isVXC == gcvFALSE)
                     {
                         info.componentCount = Arg->components;
@@ -1224,7 +1224,7 @@ gcfVX_LoadKernelArgValues(
             else if ((type == gcSHADER_IMAGE_2D_ARRAY_T) && (Arg->data != gcvNULL))
             {
                 vx_reference ref = *(vx_reference*) Arg->data;
-                vx_context base = vxoContext_GetFromReference(ref);
+                /*vx_context base = vxoContext_GetFromReference(ref);*/
 
                 if (ref && ref->type == VX_TYPE_OBJECT_ARRAY)
                 {
@@ -1249,7 +1249,7 @@ gcfVX_LoadKernelArgValues(
 
                     gcmONERROR(gcfVX_GetImageInfo(&context, (vx_image)&image, &info, 0));
 
-                    info.isVXC = base->evisNoInst.supportEVIS ? gcvTRUE : gcvFALSE;
+                    info.isVXC = Kernel->states.programState.hints->useEvisInst || ((Shader->flags & gcSHADER_FLAG_HAS_VIV_VX_EXTENSION)  == gcSHADER_FLAG_HAS_VIV_VX_EXTENSION );
 
                     gcmONERROR(gcfVX_SetUniformImageInfo(Arg->uniform, &info));
                 }
@@ -1268,7 +1268,7 @@ gcfVX_LoadKernelArgValues(
                     }
 
                     /* it's w/a for non-evis vxc shader in hw which support EVIS */
-                    info.isVXC =  Kernel->states.programState.hints->useEvisInst;
+                    info.isVXC =  Kernel->states.programState.hints->useEvisInst || ((Shader->flags & gcSHADER_FLAG_HAS_VIV_VX_EXTENSION)  == gcSHADER_FLAG_HAS_VIV_VX_EXTENSION );
                     if (Arg->components > 1 && Arg->components <= 4 && info.isVXC == gcvFALSE)
                     {
                         info.componentCount = Arg->components;
