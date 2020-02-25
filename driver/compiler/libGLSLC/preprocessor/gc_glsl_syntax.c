@@ -83,6 +83,8 @@ static slsEXTENSION_INFO _DefinedExtensions2[] =
 {
     /*GL desktop GL_ARB_explicit_attrib_location extension */
     {"GL_ARB_explicit_attrib_location", slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_HALTI_VERSION, gcvNULL},
+    /*GL desktop GL_ARB_tessellation_shader extension */
+    {"GL_ARB_tessellation_shader", slvEXTENSION2_GL_ARB_TESSELLATION_SHADER, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_GL32_VERSION, gcvNULL},
 };
 
 #define __sldDefinedExtensions2Count (gcmSIZEOF(_DefinedExtensions2) / gcmSIZEOF(slsEXTENSION_INFO))
@@ -188,6 +190,10 @@ gceSTATUS ppoPREPROCESSOR_InitExtensionTable(ppoPREPROCESSOR PP)
         switch (_DefinedExtensions2[i].flag)
         {
         case slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION:
+            _AddExtensionMacro(PP, &_DefinedExtensions2[i]);
+            break;
+
+        case slvEXTENSION2_GL_ARB_TESSELLATION_SHADER:
             _AddExtensionMacro(PP, &_DefinedExtensions2[i]);
             break;
 
@@ -1841,9 +1847,73 @@ OnError:
     return status;
 }
 
+gceSTATUS ppoPREPROCESSOR_SetExtensionWithSel(ppoPREPROCESSOR PP, gctUINT Sel, gctUINT Index, gctBOOL Enable)
+{
+    gctUINT extensionNum = Sel;
+    gctUINT extensionIndex = Index;
+    sloEXTENSION extension = {0};
+    gctBOOL enable = Enable;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    if(extensionNum == 1)
+    {
+        extension.extension1 = _DefinedExtensions1[extensionIndex].flag;
+        gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler, &extension, enable));
+    }
+    else if (extensionNum == 2)
+    {
+        extension.extension2 = _DefinedExtensions2[extensionIndex].flag;
+        gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler, &extension, enable));
+        if(extension.extension2 == slvEXTENSION2_GL_ARB_TESSELLATION_SHADER)
+        {
+            sloEXTENSION tempExtension = {0};
+            tempExtension.extension1 = slvEXTENSION1_TESSELLATION_SHADER;
+            gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler, &tempExtension, enable));
+        }
+    }
+    else
+    {
+        ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR, "Set Extension failed.");
+        status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+    }
+
+    return status;
+}
+
 /******************************************************************************\
 Extension
 \******************************************************************************/
+
+gctBOOL judgeToSetExtension(ppoPREPROCESSOR PP, gctINT ExtensionIndex, gctUINT ExtensionNum, sltPOOL_STRING BehaviorStr)
+{
+    slsEXTENSION_INFO extensionInfo;
+
+    if(ExtensionIndex < 0)
+        return gcvFALSE;
+
+    if(ExtensionNum == 1)
+        extensionInfo = _DefinedExtensions1[ExtensionIndex];
+    else /* extensionNum == 2 */
+        extensionInfo = _DefinedExtensions2[ExtensionIndex];
+
+    if(sloCOMPILER_GetLanguageVersion(PP->compiler) < extensionInfo.minLanguageVersion)
+        return gcvFALSE;
+
+    if(BehaviorStr == PP->keyword->require && extensionInfo.require == gcvFALSE)
+        return gcvFALSE;
+
+    if(BehaviorStr == PP->keyword->enable && extensionInfo.enable == gcvFALSE)
+        return gcvFALSE;
+
+    if(BehaviorStr == PP->keyword->warn && extensionInfo.warn == gcvFALSE)
+        return gcvFALSE;
+
+    if(BehaviorStr == PP->keyword->disable && extensionInfo.disable == gcvFALSE)
+        return gcvFALSE;
+
+    return gcvTRUE;
+}
+
 gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
 {
     gctBOOL doWeInValidArea = PP->doWeInValidArea;
@@ -1851,13 +1921,14 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
     ppoTOKEN    ntoken = gcvNULL;
     ppoTOKEN    feature = gcvNULL;
     ppoTOKEN    behavior = gcvNULL;
+    gctUINT     extensionNum = 0;  /* to select extension1 or extension2.*/
 
     gcmHEADER_ARG("PP=0x%x", PP);
 
     if(doWeInValidArea == gcvTRUE)
     {
-        gceSTATUS    status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
-        gctUINT  i;
+        gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+        gctUINT   i;
         gctINT    extensionIndex = -1;
 
         if(PP->nonpreprocessorStatementHasAlreadyAppeared)
@@ -1878,21 +1949,35 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
         feature = ntoken;
 
 
-        for(i=0; i < __sldDefinedExtensions1Count; i++) {
-
-           if ((gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, _DefinedExtensions1[i].str)))
-            || (_DefinedExtensions1[i].alias
-                && (gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, _DefinedExtensions1[i].alias)))
+        for (i = 0; i < __sldDefinedExtensions1Count; i++)
+        {
+            if ((gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, _DefinedExtensions1[i].str)))
+                || (_DefinedExtensions1[i].alias
+                && (gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, _DefinedExtensions1[i].alias))))
                )
-              )
-           {
-              extensionIndex = i;
-              break;
+            {
+               extensionNum = 1;
+               extensionIndex = i;
+               break;
             }
         }
 
-          if(extensionIndex < 0) {
-           ppoPREPROCESSOR_Report(PP,slvREPORT_WARN,"Extension : %s is not provided by this compiler.", feature->poolString);
+        for (i = 0; i < __sldDefinedExtensions2Count; i++)
+        {
+            if ((gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, _DefinedExtensions2[i].str)))
+                || (_DefinedExtensions2[i].alias
+                && (gcmIS_SUCCESS(gcoOS_StrCmp(feature->poolString, _DefinedExtensions2[i].alias))))
+               )
+            {
+                extensionNum = 2;
+                extensionIndex = i;
+                break;
+            }
+        }
+
+        if(extensionIndex < 0)
+        {
+            ppoPREPROCESSOR_Report(PP,slvREPORT_WARN,"Extension : %s is not provided by this compiler.", feature->poolString);
         }
 
         ntoken = gcvNULL;
@@ -1932,8 +2017,6 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
         }
 
 
-        /*sematic checking*/
-
         /*require*/
         if(behavior->poolString == PP->keyword->require)
         {
@@ -1942,9 +2025,7 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
                 ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,"Expect all's behavior should be warn or disable.");
                 gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
             }
-            else if(extensionIndex < 0 ||
-                    _DefinedExtensions1[extensionIndex].require == gcvFALSE ||
-                    sloCOMPILER_GetLanguageVersion(PP->compiler) < _DefinedExtensions1[extensionIndex].minLanguageVersion)
+            else if(!judgeToSetExtension(PP, extensionIndex, extensionNum, behavior->poolString))
             {
                 ppoPREPROCESSOR_Report(PP,
                                        slvREPORT_ERROR,"Extension : %s is not provided by this compiler.",
@@ -1953,11 +2034,7 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
             }
             else
             {
-                sloEXTENSION extension = {{0}};
-                extension.extension1 = _DefinedExtensions1[extensionIndex].flag;
-                gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler,
-                                                         &extension,
-                                                         gcvTRUE));
+                ppoPREPROCESSOR_SetExtensionWithSel(PP, extensionNum, extensionIndex, gcvTRUE);
             }
         }
 
@@ -1970,9 +2047,7 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
                 gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
 
             }
-            else if(extensionIndex < 0 ||
-                    _DefinedExtensions1[extensionIndex].enable == gcvFALSE ||
-                    sloCOMPILER_GetLanguageVersion(PP->compiler) < _DefinedExtensions1[extensionIndex].minLanguageVersion)
+            else if(!judgeToSetExtension(PP, extensionIndex, extensionNum, behavior->poolString))
             {
                 ppoPREPROCESSOR_Report(PP,
                                        slvREPORT_WARN,"Extension : %s is not provided by this compiler.",
@@ -1980,20 +2055,14 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
             }
             else
             {
-                sloEXTENSION extension = {{0}};
-                extension.extension1 = _DefinedExtensions1[extensionIndex].flag;
-                gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler,
-                                                         &extension,
-                                                         gcvTRUE));
+                ppoPREPROCESSOR_SetExtensionWithSel(PP, extensionNum, extensionIndex, gcvTRUE);
             }
         }
 
         /*warn*/
         if( behavior->poolString == PP->keyword->warn)
         {
-            if(extensionIndex < 0 ||
-               _DefinedExtensions1[extensionIndex].warn == gcvFALSE ||
-               sloCOMPILER_GetLanguageVersion(PP->compiler) < _DefinedExtensions1[extensionIndex].minLanguageVersion)
+            if(!judgeToSetExtension(PP, extensionIndex, extensionNum, behavior->poolString))
             {
                 ppoPREPROCESSOR_Report(PP,
                                        slvREPORT_WARN,"Extension : %s is not provided by this compiler.",
@@ -2001,11 +2070,7 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
             }
             else
             {
-                sloEXTENSION extension = {{0}};
-                extension.extension1 = _DefinedExtensions1[extensionIndex].flag;
-                gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler,
-                                                         &extension,
-                                                         gcvTRUE));
+                ppoPREPROCESSOR_SetExtensionWithSel(PP, extensionNum, extensionIndex, gcvTRUE);
                 ppoPREPROCESSOR_Report(PP,
                                        slvREPORT_WARN,"Extension : %s is used.",
                                        feature->poolString);
@@ -2015,9 +2080,7 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
         /*disable*/
         if( behavior->poolString == PP->keyword->disable)
         {
-            if(extensionIndex < 0 ||
-                    _DefinedExtensions1[extensionIndex].disable == gcvFALSE ||
-                    sloCOMPILER_GetLanguageVersion(PP->compiler) < _DefinedExtensions1[extensionIndex].minLanguageVersion)
+            if(!judgeToSetExtension(PP, extensionIndex, extensionNum, behavior->poolString))
             {
                 ppoPREPROCESSOR_Report(PP,
                                        slvREPORT_WARN,"Extension : %s is not provided by this compiler.",
@@ -2025,11 +2088,7 @@ gceSTATUS ppoPREPROCESSOR_Extension(ppoPREPROCESSOR PP)
             }
             else
             {
-                sloEXTENSION extension = {{0}};
-                extension.extension1 = _DefinedExtensions1[extensionIndex].flag;
-                gcmVERIFY_OK(sloCOMPILER_EnableExtension(PP->compiler,
-                                                         &extension,
-                                                         gcvFALSE));
+                ppoPREPROCESSOR_SetExtensionWithSel(PP, extensionNum, extensionIndex, gcvFALSE);
             }
         }
 
