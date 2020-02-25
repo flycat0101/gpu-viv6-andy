@@ -1945,9 +1945,10 @@ VX_PRIVATE_API vx_status DetectSegments(
 
         if ((vx_uint32)(tilingEnd - tilingStart) > 0)
         {
+            vx_uint32 successedID, failedID;
             for (i = tilingStart; i < tilingEnd; i++)
             {
-                vx_uint32 successedID = i, failedID = tilingEnd + 1;
+                successedID = i, failedID = tilingEnd + 1;
 
                 for (k = tilingEnd - i + 1; (vx_int32)k > 1;)
                 {
