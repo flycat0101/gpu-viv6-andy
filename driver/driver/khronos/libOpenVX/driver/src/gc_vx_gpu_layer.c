@@ -833,6 +833,81 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         }
         if (status != VX_SUCCESS) goto OnError;
     }
+    else if ((inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT32)
+            || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16))
+    {
+        vx_int8 input_fixPointPos = 0;
+        vx_float32 inScale =1.0;
+        vx_int8 output_fixPointPos = 0;
+        vx_float32 outScale = 1.0;
+        vx_reference parameters[3] = {(vx_reference)input_rs, (vx_reference)output_rs, (vx_reference)NULL};
+
+        if (inputFormat == VX_TYPE_INT16)
+        {
+            input_fixPointPos = TENSOR_POS(input_rs);
+            if (input_fixPointPos >= 0)
+            {
+                inScale = 1.0f / (vx_float32) (1 << input_fixPointPos);
+            }
+            else if (input_fixPointPos < 0)
+            {
+                inScale = (vx_float32) (1 << -input_fixPointPos);
+            }
+            scale = vxCreateScalar(context, VX_TYPE_FLOAT32, &inScale);
+        }
+        else if (outputFormat == VX_TYPE_INT16)
+        {
+            output_fixPointPos = TENSOR_POS(output_rs);
+            if (output_fixPointPos >= 0)
+            {
+                outScale = (vx_float32) (1 << output_fixPointPos);
+            }
+            else if (output_fixPointPos < 0)
+            {
+                outScale = 1.0f / (vx_float32) (1 << -output_fixPointPos);
+            }
+
+            scale = vxCreateScalar(context, VX_TYPE_FLOAT32, &outScale);
+        }
+
+        parameters[2] = (vx_reference)scale;
+
+        if (new_width % 4 == 0)
+        {
+            if (enable_2d_img)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_INT32_4X_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_INT32_4X", borderMode);
+            }
+            is_write_4x      = vx_true_e;
+        }
+        else
+        {
+            if (enable_2d_img)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_INT32_4S_2D", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_INT32_4S", borderMode);
+            }
+        }
+        if (!shaderExecutable)
+        {
+            goto OnError;
+        }
+
+        status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        if (is_write_4x)
+        {
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        }
+        if (status != VX_SUCCESS) goto OnError;
+    }
     else
     {
         vxError("input or output's format is not support");

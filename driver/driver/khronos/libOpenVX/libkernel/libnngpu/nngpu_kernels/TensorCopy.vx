@@ -284,3 +284,54 @@ __kernel void gpuTensorCopy_FP32toQ8_4S_2D (__read_only image2d_t  input,
     TENSOR_COPY_FP32TOQ8_4S_PROCESS();
 }
 
+
+#define TENSOR_COPY_I16INT32_4X_PROCESS() \
+    int4 tmp = {0}; \
+    tmp = read_imagei(input, coord); \
+    tmp = convert_int4(convert_float4(tmp) * scale + 0.5); \
+    write_imagei(output, coord, tmp);
+
+
+#define TENSOR_COPY_I16INT32_4S_PROCESS() \
+    int4 tmp = {0}; \
+    tmp = read_imagei(input, coord); \
+    tmp = convert_int4(convert_float4(tmp) * scale + 0.5); \
+    write_imagei(output, coord, tmp.xxxx); \
+    coord.x++; \
+    write_imagei(output, coord, tmp.yyyy); \
+    coord.x++; \
+    write_imagei(output, coord, tmp.zzzz); \
+    coord.x++; \
+    write_imagei(output, coord, tmp.wwww);
+
+__kernel void gpuTensorCopy_I16_INT32_4X (__read_only image2d_array_t  input,
+                                          __write_only image2d_array_t  output,
+                                                            float       scale)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    TENSOR_COPY_I16INT32_4X_PROCESS();
+}
+
+__kernel void gpuTensorCopy_I16_INT32_4X_2D (__read_only image2d_t  input,
+                                             __write_only image2d_t  output,
+                                                         float       scale)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    TENSOR_COPY_I16INT32_4X_PROCESS();
+}
+
+__kernel void gpuTensorCopy_I16_INT32_4S (__read_only image2d_array_t  input,
+                                          __write_only image2d_array_t  output,
+                                                            float       scale)
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    TENSOR_COPY_I16INT32_4S_PROCESS();
+}
+
+__kernel void gpuTensorCopy_I16_INT32_4S_2D (__read_only image2d_t  input,
+                                             __write_only image2d_t  output,
+                                                         float       scale)
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    TENSOR_COPY_I16INT32_4S_PROCESS();
+}
