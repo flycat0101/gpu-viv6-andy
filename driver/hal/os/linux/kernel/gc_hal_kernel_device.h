@@ -106,6 +106,8 @@ typedef struct _gckGALDEVICE
     /* IRQ management. */
     gctINT              irqLines[gcdMAX_GPU_COUNT];
     gctBOOL             isrInitializeds[gcdMAX_GPU_COUNT];
+    struct task_struct  *isrThread[gcdMAX_GPU_COUNT];
+    gctBOOL             killIsrThread;
 
     /* Register memory. */
     gctPOINTER          registerBases[gcdMAX_GPU_COUNT];

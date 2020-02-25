@@ -1307,6 +1307,44 @@ static const char *isrNames[] =
 #endif
 };
 
+static int isrRoutinePoll(void *ctxt)
+{
+    gckGALDEVICE device;
+    gceCORE core = (gceCORE)gcmPTR2INT32(ctxt);
+
+    device = galDevice;
+
+    gcmSTATIC_ASSERT(gcvCORE_COUNT == gcmCOUNTOF(isrNames),
+                     "isrNames array does not match core types");
+
+    while (1)
+    {
+        if (unlikely(device->killThread))
+        {
+            /* The daemon exits. */
+            while (!kthread_should_stop())
+            {
+                gckOS_Delay(device->os, 1);
+            }
+
+            return 0;
+        }
+
+        if (core == gcvCORE_VG)
+        {
+            isrRoutineVG(-1, gcvNULL);
+        }
+        else
+        {
+            isrRoutine(-1, (gctPOINTER)(uintptr_t)(core + 1));
+        }
+
+        gckOS_Delay(device->os, 1);
+    }
+
+    return 0;
+}
+
 static gceSTATUS
 _SetupIsr(
     IN gceCORE Core
@@ -1321,13 +1359,38 @@ _SetupIsr(
 
     gcmkVERIFY_ARGUMENT(Device != NULL);
 
-    if (Device->irqLines[Core] < 0)
-    {
-        gcmkONERROR(gcvSTATUS_GENERIC_IO);
-    }
-
     gcmSTATIC_ASSERT(gcvCORE_COUNT == gcmCOUNTOF(isrNames),
                      "isrNames array does not match core types");
+
+    if (Device->irqLines[Core] < 0)
+    {
+        /* use kthread to poll int stat */
+        if (!Device->isrThread[Core])
+        {
+            struct task_struct * task;
+
+            task = kthread_run(isrRoutinePoll, (gctPOINTER)Core, "%s-poll", isrNames[Core]);
+
+            if (IS_ERR(task))
+            {
+                gcmkTRACE_ZONE(
+                    gcvLEVEL_ERROR, gcvZONE_DRIVER,
+                    "%s(%d): Could not start the intr poll thread.\n",
+                    __FUNCTION__, __LINE__
+                    );
+
+                gcmkONERROR(gcvSTATUS_GENERIC_IO);
+            }
+
+            gcmkPRINT("galcore: polling core%d int state\n", Core);
+
+            Device->isrThread[Core] = task;
+            Device->killIsrThread = gcvFALSE;
+            Device->isrInitializeds[Core] = gcvTRUE;
+        }
+
+        return status;
+    }
 
     handler = (Core == gcvCORE_VG) ? isrRoutineVG : isrRoutine;
 
@@ -1375,7 +1438,17 @@ _ReleaseIsr(
     /* release the irq */
     if (Device->isrInitializeds[Core])
     {
-        free_irq(Device->irqLines[Core], (void *)(uintptr_t)(Core + 1));
+        if (Device->isrThread[Core])
+        {
+            Device->killIsrThread = gcvTRUE;
+            kthread_stop(Device->isrThread[Core]);
+            Device->isrThread[Core] = gcvNULL;
+        }
+        else
+        {
+            free_irq(Device->irqLines[Core], (void *)(uintptr_t)(Core + 1));
+        }
+
         Device->isrInitializeds[Core] = gcvFALSE;
     }
 
