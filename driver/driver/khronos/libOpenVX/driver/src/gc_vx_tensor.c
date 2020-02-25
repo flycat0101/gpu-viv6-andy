@@ -246,8 +246,8 @@ vxoTensor_CalculateSizesFromViewRegion(
     }
 }
 
-#define VX_MAX(a, b) (a) > (b) ? (a) : (b)
-#define VX_MIN(a, b) (a) < (b) ? (a) : (b)
+#define VX_MAX(a, b) ((a) > (b) ? (a) : (b))
+#define VX_MIN(a, b) ((a) < (b) ? (a) : (b))
 
 VX_PRIVATE_API vx_bool
 vxoTensor_MergeTwoViews(
@@ -270,7 +270,7 @@ vxoTensor_MergeTwoViews(
     for (i = 0; i < viewA->dimCount; i++)
     {
         viewOut->viewStarts[i] = VX_MAX(viewA->viewStarts[i], viewB->viewStarts[i]);
-        viewOut->viewEnds[i] = VX_MAX(1, VX_MIN(viewA->viewEnds[i], viewB->viewEnds[i]));
+        viewOut->viewEnds[i] = viewOut->viewStarts[i] + VX_MAX(1, VX_MIN(viewA->viewEnds[i]-viewA->viewStarts[i], (viewB->viewEnds[i]-viewB->viewStarts[i])));
     }
 
     for (i = viewA->dimCount; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
