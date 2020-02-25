@@ -558,6 +558,12 @@ error:
         WB_SLICE_ARRAY(wb) = VX_NULL;
     }
 
+    if (minZeroRunLensBase != VX_NULL)
+    {
+        vxFree(minZeroRunLensBase);
+        minZeroRunLensBase = VX_NULL;
+    }
+
     return status;
 }
 

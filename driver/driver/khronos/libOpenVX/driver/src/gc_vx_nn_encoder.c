@@ -12026,20 +12026,11 @@ vx_bool isInt64BiasOverflow(
         vx_uint32 filterIndex = 0, filterCount = z_count;
         vx_uint32 size = 0;
         vx_int64 *bias_base_ptr = VX_NULL;
-        vx_uint32_ptr* Bias_Gpuptr = VX_NULL, Bias_Cpuptr = VX_NULL;
 
         if (bias_tensor != VX_NULL)
         {
             size = z_count * vxDataType_GetSize((vx_type_e)bias_format);
-            Bias_Cpuptr = (vx_uint32_ptr)vxAllocate(size);
-            if (Bias_Cpuptr == VX_NULL)
-            {
-                status = VX_ERROR_NO_MEMORY;
-                return status;
-            }
-            vxoTensor_GetTensorViewMemory(bias_tensor, (gctPOINTER*)(&Bias_Gpuptr), VX_NULL);
-            vxMemCopy(Bias_Cpuptr, Bias_Gpuptr, size);
-            bias_base_ptr = (vx_int64 *)Bias_Cpuptr;
+            vxoTensor_GetTensorViewMemory(bias_tensor, (gctPOINTER*)(&bias_base_ptr), VX_NULL);
         }
 
         for (filterIndex = 0; filterIndex < filterCount; filterIndex++)
