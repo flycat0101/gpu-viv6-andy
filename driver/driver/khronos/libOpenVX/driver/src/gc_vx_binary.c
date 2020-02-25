@@ -4712,6 +4712,32 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveShaderPatchTable(
             (*patchCount)++;
         }
     }
+    else
+    {   /* fix batch prelu fail issue */
+        if ((multiNum = vxoBinaryGraph_SearchPattern((gctUINT32 *)stateBuffer,
+                                            stateSize/gcmSIZEOF(gctUINT32),
+                                            basePhysical, offsetArray, vx_true_e)) > 0)
+        {
+            if (multiNum > 0)
+            {
+                patchedParamPhy[*patchParamCnt] = basePhysical;
+                (*patchParamCnt)++;
+                if (VX_BINARY_SOURCE_INPUT == patchInfo.sourceType)
+                {
+                    binarySave->inputInPatchedBinOffset[binarySave->inputInPatchedNum] = binarySave->currPatchOffset;
+                    binarySave->inputInPatchedPhysical[binarySave->inputInPatchedNum] = basePhysical;
+                    binarySave->inputInPatchedIndex[binarySave->inputInPatchedNum] = patchInfo.index;
+                    binarySave->inputInPatchedNum++;
+                }
+            }
+            for (i = 0; i < multiNum; i++)
+            {
+                patchInfo.offset = offsetArray[i];
+                vxoBinaryGraph_SavePatchEntry(node->graph, (void *)&patchInfo);
+                (*patchCount)++;
+            }
+        }
+    }
 
 OnError:
     gcmFOOTER_ARG("%d", status);
