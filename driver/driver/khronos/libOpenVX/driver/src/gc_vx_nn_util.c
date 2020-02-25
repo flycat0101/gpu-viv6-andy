@@ -422,6 +422,25 @@ vx_int16 Fp32toInt16(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode)
     return result;
 }
 
+vx_int32 Fp32toInt32(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode)
+{
+    vx_int32 result = 0;
+
+    if (fixedPointPos > 0)
+    {
+        vx_int64 data = (vx_int32) vxnneRound(val * (vx_float32)(1 << fixedPointPos), roundMode);
+        result = (vx_int32)((data > 0x7FFFFFFF) ? 0x7FFFFFFF : (data < (vx_int32)0xFFFFFFFF) ? (vx_int32)0xFFFFFFFF : data);
+
+    }
+    else
+    {
+        vx_int64 data = (vx_int32) vxnneRound(val * (1.0f / (vx_float32)(1 << -fixedPointPos)), roundMode);
+        result = (vx_int32)((data > 0x7FFFFFFF) ? 0x7FFFFFFF : (data < (vx_int32)0xFFFFFFFF) ? (vx_int32)0xFFFFFFFF : data);
+    }
+
+    return result;
+}
+
 vx_float32 vxnneConvertDynamicFixPointValueToFloat32(vx_float32 value, vx_int8 fixedPointPos)
 {
     vx_float32 result = 0.0f;

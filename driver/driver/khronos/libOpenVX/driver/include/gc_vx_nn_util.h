@@ -134,6 +134,7 @@ vx_int16 Fp32toFp16(vx_float32 val);
 vx_int8 Fp32toInt8_fc(vx_float32 val);
 vx_int8 Fp32toInt8(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode);
 vx_int16 Fp32toInt16(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode);
+vx_int32 Fp32toInt32(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode);
 vx_float32 Int8toFp32(vx_int8 val, vx_int8 fixedPointPos);
 vx_float32 Int32toFp32(vx_int32 val, vx_int8 fixedPointPos);
 vx_float32 Int64toFp32(vx_int64 val, vx_int8 fixedPointPos);

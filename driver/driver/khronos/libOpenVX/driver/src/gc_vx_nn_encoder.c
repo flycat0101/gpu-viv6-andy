@@ -11411,6 +11411,7 @@ void fillinTPKernelBufferHuffman(
     vx_uint32 dummyStage[3] = {0};
     vx_uint32 dummyBitLength[3] = {0};
     vx_bool setDummy = vx_false_e;
+    vx_int8 biasFpp = 0;
 
     reorderStream = (vx_uint8 *)vxAllocateAndZeroMemory(reorderStreamSize);
 
@@ -11453,7 +11454,10 @@ void fillinTPKernelBufferHuffman(
         writeBits(&kernelBufferPtr, &bitOffset, kernelStreamSize, 14);
     }
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
-
+    if(bias_format == VX_TYPE_INT64 && (!vxoContext_IsFeatureAvailable(wb->base.context, VX_TP_FEATURE_FP32_BIAS)))
+    {
+        biasFpp = wb->wb_base->biases_fixed_point_pos / 2 + 1;
+    }
     /* Fill bias for each filter. */
     for (filterIndex = 0; filterIndex < filterCount; filterIndex++)
     {
@@ -11476,13 +11480,15 @@ void fillinTPKernelBufferHuffman(
         }
         else
         {
+            vx_float32 biasFloat32;
             if(bias_format == VX_TYPE_INT64)
             {
                 vx_int32 bias32;
                 vx_int64  biasData64bits         = 0;
                 biasBitSize = biasBitSize >= 32 ? 32: biasBitSize;
                 biasData64bits = bias_base_ptr == VX_NULL ? 0 : *((vx_int64 *)bias_base_ptr + filterIndex);
-                bias32 = (biasData64bits >>16) & 0xFFFFFFFF;
+                biasFloat32 = Int64toFp32(biasData64bits & 0xFFFFFFFFFFFF, wb->wb_base->biases_fixed_point_pos);
+                bias32 = Fp32toInt32(biasFloat32, biasFpp, wb->wb_base->origBias->tensorBuffer->roundingMode);
                 writeBits(&kernelBufferPtr, &bitOffset, bias32, biasBitSize);
             }
             else
@@ -11494,6 +11500,10 @@ void fillinTPKernelBufferHuffman(
     }
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
 
+    if(bias_format == VX_TYPE_INT64 && (!vxoContext_IsFeatureAvailable(wb->base.context, VX_TP_FEATURE_FP32_BIAS)))
+    {
+        wb->wb_base->biases_fixed_point_pos = biasFpp;
+    }
 
     for (i = 0; i < THROUGHPUT * 3; i++)
     {
@@ -14532,6 +14542,7 @@ void fillinTPKernelBuffer(
     vx_uint8_ptr kernelStreamBasePtr = VX_NULL;
     vx_uint32 filterIndex, sliceIndex;
     vx_uint32 rsvWeightCount = 0;
+    vx_uint8 biasFpp = 0;
 
     if (weightFomat == VX_TYPE_INT8 || weightFomat == VX_TYPE_UINT8)
     {
@@ -14552,6 +14563,10 @@ void fillinTPKernelBuffer(
     }
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
 
+    if(bias_format == VX_TYPE_INT64 && (!vxoContext_IsFeatureAvailable(wb->base.context, VX_TP_FEATURE_FP32_BIAS)))
+    {
+        biasFpp = wb->wb_base->biases_fixed_point_pos / 2 + 1;
+    }
     /* Fill bias for each filter. */
     for (filterIndex = 0; filterIndex < filterCount; filterIndex++)
     {
@@ -14574,13 +14589,15 @@ void fillinTPKernelBuffer(
         }
         else
         {
+            vx_float32 biasFloat32;
             if(bias_format == VX_TYPE_INT64)
             {
                 vx_int32 bias32;
                 vx_int64  biasData64bits         = 0;
                 biasBitSize = biasBitSize >= 32 ? 32: biasBitSize;
                 biasData64bits = bias_base_ptr == VX_NULL ? 0 : *((vx_int64 *)bias_base_ptr + filterIndex);
-                bias32 = (biasData64bits >>16) & 0xFFFFFFFF;
+                biasFloat32 = Int64toFp32(biasData64bits & 0xFFFFFFFFFFFF, wb->wb_base->biases_fixed_point_pos);
+                bias32 = Fp32toInt32(biasFloat32, biasFpp, wb->wb_base->origBias->tensorBuffer->roundingMode);
                 writeBits(&kernelBufferPtr, &bitOffset, bias32, biasBitSize);
             }
             else
@@ -14590,6 +14607,12 @@ void fillinTPKernelBuffer(
             }
         }
     }
+
+    if(bias_format == VX_TYPE_INT64 && (!vxoContext_IsFeatureAvailable(wb->base.context, VX_TP_FEATURE_FP32_BIAS)))
+    {
+        wb->wb_base->biases_fixed_point_pos = biasFpp;
+    }
+
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
 
     /* Fill weight value for every slice */
