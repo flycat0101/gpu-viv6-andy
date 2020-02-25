@@ -6666,7 +6666,7 @@ VIR_Inst_Dual16NotSupported(
 
     if (VIR_OPCODE_isCall(opcode) || opcode == VIR_OP_RET ||
         opcode == VIR_OP_LOOP || opcode == VIR_OP_ENDLOOP ||
-        opcode == VIR_OP_REP || opcode == VIR_OP_ENDREP)
+        opcode == VIR_OP_REP || opcode == VIR_OP_ENDREP || opcode == VIR_OP_TEXLD_GATHER)
     {
         return gcvTRUE;
     }
