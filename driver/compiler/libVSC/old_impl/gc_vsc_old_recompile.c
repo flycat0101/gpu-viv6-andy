@@ -6445,7 +6445,7 @@ _patchYFlippedShader(
                                                            gcSL_FLOAT,
                                                            frontFacing->precision,
                                                            0));
-            if (gcSHADER_GoVIRPass(Shader))
+            if (gcUseFullNewLinker(gcHWCaps.hwFeatureFlags.hasHalti2))
             {
                 gcSHADER_AddSourceAttributeFormatted(Shader,
                                                      frontFacing,
@@ -6630,7 +6630,7 @@ _patchInvertFrontFacing(
             gcSL_FLOAT,
             frontFacing->precision,
             0));
-        if (gcSHADER_GoVIRPass(Shader))
+        if (gcUseFullNewLinker(gcHWCaps.hwFeatureFlags.hasHalti2))
         {
             gcSHADER_AddSourceAttributeFormatted(Shader,
                                                     frontFacing,
