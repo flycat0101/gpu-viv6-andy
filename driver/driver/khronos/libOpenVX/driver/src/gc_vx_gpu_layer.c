@@ -592,7 +592,7 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
             }
             else
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32toFP16_4X", borderMode);
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32toFP16_4X", borderMode);
             }
             is_write_4x      = vx_true_e;
         }
@@ -600,11 +600,11 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         {
             if (enable_2d_img)
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32toFP16_4S_2D", borderMode);
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32toFP16_4S_2D", borderMode);
             }
             else
             {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32toFP16_4S", borderMode);
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32toFP16_4S", borderMode);
             }
         }
         if (!shaderExecutable) goto OnError;
