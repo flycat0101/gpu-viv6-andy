@@ -1596,7 +1596,7 @@ GLvoid __glClamp2ZeroOne(GLsizei numOfComponent, GLubyte components, GLfloat* tm
     }
 }
 
-GLint _FloorLog2(GLfloat val)
+GLint __FloorLog2(GLfloat val)
 {
     GLint exp = 0;
     gctUINT64 base = 1;
@@ -1956,7 +1956,7 @@ GLvoid __glFinalConversion(GLenum interType, GLenum* type, GLsizei numOfComponen
                 GLfloat bc   = gcmCLAMP(*((GLfloat *)tmpBuf+i+2), 0.0f, sharedExpMax);
                 GLfloat maxc = gcoMATH_MAX(rc, gcoMATH_MAX(gc, bc));
 
-                GLint expp  = gcoMATH_MAX(-eBias - 1, _FloorLog2(maxc)) + 1 + eBias;
+                GLint expp  = gcoMATH_MAX(-eBias - 1, __FloorLog2(maxc)) + 1 + eBias;
                 GLfloat scale = (gctFLOAT)gcoMATH_Power(2.0f, (gctFLOAT)(expp - eBias - mBits));
                 GLint maxs  = (GLint)(maxc / scale + 0.5f);
 
