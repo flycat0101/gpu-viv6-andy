@@ -17,6 +17,7 @@
 #define SH_COMMAND_ALIGN_SIZE             256
 #define VX_MAX_LAYER_NAME_LENGTH          64
 #define VX_MAX_NAME_LEGTH                 64
+#define VX_MAX_IO_NAME_LEGTH              64
 #define NN_MAX_DIMENSION                  4
 #define VX_MAX_NN_INOUT_PARAM_COUNT       1024
 #define VX_MAX_SH_OPERATION_STATE_SIZE    0xE00
@@ -409,6 +410,7 @@ typedef struct _vx_binary_input_output_info_s
     vx_int32                                fixedPointPos;
     vx_float32                              tfScale;
     vx_int32                                tfZeroPoint;
+    vx_char                                 name[VX_MAX_IO_NAME_LEGTH];
 }
 vx_binary_input_output_info_s;
 
@@ -791,6 +793,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveNNTPStates(
     vx_uint32 cmdPhysical,
     gctUINT8 *captureBuffer,
     vx_uint32 actualSize
+    );
+
+VX_INTERNAL_API void* vxoBinaryGraph_GetInputOutputPtrByIndex(
+    vx_binary_loader_s *binLoad,
+    vx_binary_input_output_info_s *ioPtr,
+    vx_int32 index
     );
 
 VX_INTERNAL_API void vxoBinaryGraph_CacheOrImport(

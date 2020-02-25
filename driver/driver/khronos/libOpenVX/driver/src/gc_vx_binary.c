@@ -131,7 +131,6 @@ VX_PRIVATE_API vx_type_e vxoBinaryGraph_ConvertToOVXDataFormat(
     return ret;
 }
 
-
 /****************SW Operation Implement Start**********************/
 
 static vx_status do_RPNLayer(
@@ -834,7 +833,15 @@ static vx_status readBinDynamic(
     {
         vxmONERROR(readerLocate(reader, binLoad->fixed.inputTable.offset));
         binLoad->inputs = (vx_binary_input_output_info_s *)(reader->currentData);
-        binLoad->nInputs = binLoad->fixed.inputTable.size / sizeof(vx_binary_input_output_info_s);
+
+        if (binLoad->fixed.header.version >= 0x00010004)
+        {
+            binLoad->nInputs = binLoad->fixed.inputTable.size / sizeof(vx_binary_input_output_info_s);
+        }
+        else
+        {
+            binLoad->nInputs = binLoad->fixed.inputTable.size / (sizeof(vx_binary_input_output_info_s) - sizeof(vx_char) * VX_MAX_IO_NAME_LEGTH);
+        }
     }
 
     /* Output data entries*/
@@ -842,7 +849,15 @@ static vx_status readBinDynamic(
     {
         vxmONERROR(readerLocate(reader, binLoad->fixed.outputTable.offset));
         binLoad->outputs = (vx_binary_input_output_info_s *)(reader->currentData);
-        binLoad->nOutputs = binLoad->fixed.outputTable.size / sizeof(vx_binary_input_output_info_s);
+
+        if (binLoad->fixed.header.version >= 0x00010004)
+        {
+            binLoad->nOutputs = binLoad->fixed.outputTable.size / sizeof(vx_binary_input_output_info_s);
+        }
+        else
+        {
+            binLoad->nOutputs = binLoad->fixed.outputTable.size / (sizeof(vx_binary_input_output_info_s) - sizeof(vx_char) * VX_MAX_IO_NAME_LEGTH);
+        }
     }
 
     /* Layer data entries*/
@@ -1669,6 +1684,29 @@ OnError:
     return status;
 }
 
+VX_INTERNAL_API void* vxoBinaryGraph_GetInputOutputPtrByIndex(
+    vx_binary_loader_s *binLoad,
+    vx_binary_input_output_info_s *ioPtr,
+    vx_int32 index
+    )
+{
+    void *ptrInOut = VX_NULL;
+    vx_uint32 size = 0;
+
+    size = sizeof(vx_binary_input_output_info_s) - sizeof(vx_char) * VX_MAX_IO_NAME_LEGTH;
+
+    if (binLoad->fixed.header.version >= 0x00010004)
+    {
+        ptrInOut = (void*)(ioPtr + index);
+    }
+    else
+    {
+        ptrInOut = (void*)((vx_char *)ioPtr + index * size);
+    }
+
+    return ptrInOut;
+}
+
 VX_PRIVATE_API vx_status vxoBinaryGraph_GetNetworkNameAndRank(
     vx_binary_save_s *binarySave
     )
@@ -1819,7 +1857,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchNN(
                             dimCount = TENSOR_ORIG_DIM_NUM(tensor);
                             for (j = 0; j < dimCount; j++)
                             {
-                                if (dims[j] != (vx_int32)binLoad->inputs[ioIndex].dims[j])
+                                vx_binary_input_output_info_s *ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binLoad, binLoad->inputs, ioIndex);
+                                if (dims[j] != (vx_int32)ptrInOut->dims[j])
                                     break;
                             }
                             if ((j == dimCount) && (kernel->signature.directionTable[ioIndex] == VX_INPUT))
@@ -1884,7 +1923,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchNN(
                             dimCount = TENSOR_ORIG_DIM_NUM(tensor);
                             for (j = 0; j < dimCount; j++)
                             {
-                                if (dims[j] != (vx_int32)binLoad->outputs[ioIndex].dims[j])
+                                vx_binary_input_output_info_s *ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binLoad, binLoad->outputs, ioIndex);
+                                if (dims[j] != (vx_int32)ptrInOut->dims[j])
                                     break;
                             }
                             if ((j == dimCount) && (kernel->signature.directionTable[outIndex] == VX_OUTPUT))
@@ -2157,7 +2197,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchTP(
                             dimCount = TENSOR_ORIG_DIM_NUM(tensor);
                             for (j = 0; j < dimCount; j++)
                             {
-                                if (dims[j] != (vx_int32)binLoad->inputs[ioIndex].dims[j])
+                                vx_binary_input_output_info_s *ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binLoad, binLoad->inputs, ioIndex);
+                                if (dims[j] != (vx_int32)ptrInOut->dims[j])
                                     break;
                             }
                             if ((j == dimCount) && (kernel->signature.directionTable[ioIndex] == VX_INPUT))
@@ -2223,7 +2264,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchTP(
                             dimCount = TENSOR_ORIG_DIM_NUM(tensor);
                             for (j = 0; j < dimCount; j++)
                             {
-                                if (dims[j] != (vx_int32)binLoad->outputs[ioIndex].dims[j])
+                                vx_binary_input_output_info_s *ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binLoad, binLoad->outputs, ioIndex);
+                                if (dims[j] != (vx_int32)ptrInOut->dims[j])
                                     break;
                             }
                             if ((j == dimCount) && (kernel->signature.directionTable[outIndex] == VX_OUTPUT))
@@ -2493,8 +2535,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
                     if (ref->type == VX_TYPE_SCALAR)
                     {
                         vx_scalar scalar =  (vx_scalar)ref;
+                        vx_binary_input_output_info_s *ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binLoad, binLoad->inputs, ioIndex);
                         if ((kernel->signature.directionTable[ioIndex] == VX_INPUT) &&
-                            (vxoScalar_GetTypeSize(scalar) == binLoad->inputs[ioIndex].dims[0]))
+                            (vxoScalar_GetTypeSize(scalar) == ptrInOut->dims[0]))
                         {
                             *memAddr = (*memAddr - shPatchData->originalBaseAddress) + scalar->physical;
                         }
@@ -2513,7 +2556,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
                         dimCount = TENSOR_ORIG_DIM_NUM(tensor);
                         for (j = 0; j < dimCount; j++)
                         {
-                            if (dims[j] != (vx_int32)binLoad->inputs[ioIndex].dims[j])
+                            vx_binary_input_output_info_s *ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binLoad, binLoad->inputs, ioIndex);
+                            if (dims[j] != (vx_int32)ptrInOut->dims[j])
                                 break;
                         }
                         if ((j == dimCount) && (kernel->signature.directionTable[ioIndex] == VX_INPUT))
@@ -2534,6 +2578,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
                     }
                     else if (ref->type == VX_TYPE_IMAGE)
                     {
+                        vx_binary_input_output_info_s *ptrInOut = VX_NULL;
                         vx_image image = (vx_image)ref;
                         gcoVX_Kernel_Context kernelContext; /* not useful, just fulfill the interface */
                         gcsVX_IMAGE_INFO imageInfo;
@@ -2542,9 +2587,10 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
                         gcoOS_MemFill((gctPOINTER*)(&kernelContext), 0, sizeof(gcoVX_Kernel_Context));
                         gcfVX_GetImageInfo(&kernelContext, image, &imageInfo, 1);
 
+                        ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binLoad, binLoad->inputs, ioIndex);
                         if ((kernel->signature.directionTable[ioIndex] == VX_INPUT) &&
-                            (imageInfo.width == binLoad->inputs[ioIndex].dims[0]) &&
-                            (imageInfo.height == binLoad->inputs[ioIndex].dims[1]) &&
+                            (imageInfo.width == ptrInOut->dims[0]) &&
+                            (imageInfo.height == ptrInOut->dims[1]) &&
                             (image->memory.allocated))
                         {
                             *memAddr = (*memAddr - shPatchData->originalBaseAddress) + image->memory.physicals[0];
@@ -2612,7 +2658,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
 
                         for (j = 0; j < dimCount; j++)
                         {
-                            if (dims[j] != (vx_int32)binLoad->outputs[ioIndex].dims[j])
+                            vx_binary_input_output_info_s *ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binLoad, binLoad->outputs, ioIndex);
+                            if (dims[j] != (vx_int32)ptrInOut->dims[j])
                                 break;
                         }
                         if ((j == dimCount) && (kernel->signature.directionTable[outIndex] == VX_OUTPUT))
@@ -2633,6 +2680,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
                     }
                     else if (ref->type == VX_TYPE_IMAGE)
                     {
+                        vx_binary_input_output_info_s *ptrInOut = VX_NULL;
                         vx_image image = (vx_image)ref;
                         gcoVX_Kernel_Context kernelContext; /* not useful, just fulfill the interface */
                         gcsVX_IMAGE_INFO imageInfo;
@@ -2641,9 +2689,10 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
                         gcoOS_MemFill((gctPOINTER*)(&kernelContext), 0, sizeof(gcoVX_Kernel_Context));
                         gcfVX_GetImageInfo(&kernelContext, image, &imageInfo, 1);
 
+                        ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binLoad, binLoad->outputs, ioIndex);
                         if ((kernel->signature.directionTable[outIndex] == VX_OUTPUT) &&
-                            (imageInfo.width == binLoad->outputs[ioIndex].dims[0]) &&
-                            (imageInfo.height == binLoad->outputs[ioIndex].dims[1]) &&
+                            (imageInfo.width == ptrInOut->dims[0]) &&
+                            (imageInfo.height == ptrInOut->dims[1]) &&
                             (image->memory.allocated))
                         {
                             *memAddr = (*memAddr - shPatchData->originalBaseAddress) + image->memory.physicals[0];
@@ -2671,7 +2720,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSH(
                     {
                         vx_scalar scalar =  (vx_scalar)ref;
                         vx_uint32 size = vxoScalar_GetTypeSize(scalar);
-                        vx_uint32 dim = (vx_uint32)binLoad->outputs[ioIndex].dims[0];
+                        vx_binary_input_output_info_s *ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binLoad, binLoad->outputs, ioIndex);
+                        vx_uint32 dim = (vx_uint32)ptrInOut->dims[0];
                         if ((kernel->signature.directionTable[outIndex] == VX_OUTPUT) &&
                             (size == dim))
                         {
@@ -2892,6 +2942,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
 
                         if (ref->type == VX_TYPE_IMAGE)
                         {
+                            vx_binary_input_output_info_s *ptrInOut = VX_NULL;
                             vx_image image = (vx_image)ref;
                             gcoVX_Kernel_Context kernelContext; /* not useful, just fulfill the interface */
                             gcsVX_IMAGE_INFO imageInfo;
@@ -2899,9 +2950,10 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
 
                             gcfVX_GetImageInfo(&kernelContext, image, &imageInfo, 1);
 
+                            ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binLoad, binLoad->inputs, ioIndex);
                             if ((kernel->signature.directionTable[ioIndex] == VX_INPUT) &&
-                                (imageInfo.width == binLoad->inputs[ioIndex].dims[0]) &&
-                                (imageInfo.height == binLoad->inputs[ioIndex].dims[1]) &&
+                                (imageInfo.width == ptrInOut->dims[0]) &&
+                                (imageInfo.height == ptrInOut->dims[1]) &&
                                 (image->memory.allocated))
                             {
                                 vx_uint32 planePhysicalBase = image->memory.physicals[inputImagePlane];
@@ -2967,7 +3019,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_patchSC(
 
                             for (j = 0; j < dimCount; j++)
                             {
-                                if (dims[j] != (vx_int32)binLoad->outputs[ioIndex].dims[j])
+                                vx_binary_input_output_info_s *ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binLoad, binLoad->outputs, ioIndex);
+                                if (dims[j] != (vx_int32)ptrInOut->dims[j])
                                     break;
                             }
                             if ((j == dimCount) && (kernel->signature.directionTable[outIndex] == VX_OUTPUT))
@@ -9317,6 +9370,16 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                 vxError("error: not support the type as graph input: %d\n", (vx_int32)ref->type);
                 vxmONERROR(VX_FAILURE);
             }
+            if (gcoOS_StrCmp(ref->name, "\0") != gcvSTATUS_OK)
+            {
+                gcoOS_StrCopySafe(inputInfo->name, VX_MAX_IO_NAME_LEGTH, ref->name);
+            }
+            else
+            {
+                vx_char input_name[256];
+                sprintf(input_name, "input[%d]", i);
+                gcoOS_StrCopySafe(inputInfo->name, VX_MAX_IO_NAME_LEGTH, input_name);
+            }
 
             status = vxoBinaryGraph_Write(binarySave, currPos, sizeof(vx_binary_input_output_info_s), inputInfo);
             WRITE_NBG_STATUS_CHECK();
@@ -9519,6 +9582,16 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                vxError("error: not support the type as graph output: %d\n", (vx_int32)ref->type);
                vxmONERROR(VX_FAILURE);
             }
+            if (gcoOS_StrCmp(ref->name, "\0") != gcvSTATUS_OK)
+            {
+                gcoOS_StrCopySafe(outputInfo.name, VX_MAX_IO_NAME_LEGTH, ref->name);
+            }
+            else
+            {
+                vx_char output_name[256];
+                sprintf(output_name, "output[%d]", i);
+                gcoOS_StrCopySafe(outputInfo.name, VX_MAX_IO_NAME_LEGTH, output_name);
+            }
 
             status = vxoBinaryGraph_Write(binarySave, currPos, sizeof(vx_binary_input_output_info_s), &outputInfo);
             WRITE_NBG_STATUS_CHECK();
@@ -9601,7 +9674,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     binarySave->headerInfo.magic[1]= 'P';
     binarySave->headerInfo.magic[2]= 'M';
     binarySave->headerInfo.magic[3]= 'N';
-    binarySave->headerInfo.version = 0x00010003;
+    binarySave->headerInfo.version = 0x00010004;
     binarySave->headerInfo.target = context->pid;
     binarySave->headerInfo.layerCount     = graph->nodeCount;
     binarySave->headerInfo.operationCount = binarySave->operationCount;
@@ -10436,7 +10509,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
     {
         for (i = 0; i < binaryLoad->fixed.header.inputCount; i++)
         {
-            vx_binary_input_output_info_s *input = &binaryLoad->inputs[i];
+            vx_binary_input_output_info_s *ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binaryLoad, binaryLoad->inputs, i);
+            vx_binary_input_output_info_s *input = &ptrInOut[i];
+
             for (j = 0; j < inputNum; j++)
             {
                 vx_bool dupFlag = vx_false_e;
@@ -10571,7 +10646,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
     {
         for (i = 0; i < binaryLoad->fixed.header.outputCount; i++)
         {
-            vx_binary_input_output_info_s *output = &binaryLoad->outputs[i];
+            vx_binary_input_output_info_s * ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binaryLoad, binaryLoad->outputs, i);
+            vx_binary_input_output_info_s *output = &ptrInOut[i];
             for (j = 0; j < outputNum; j++)
             {
                 vx_bool dupFlag = vx_false_e;

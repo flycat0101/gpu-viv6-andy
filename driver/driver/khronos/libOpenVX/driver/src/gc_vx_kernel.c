@@ -6073,17 +6073,17 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxImportKernelFromURL(vx_context context, con
 
         for(i = 0; i < binaryLoad->fixed.header.inputCount; i++)
         {
-            vx_binary_input_output_info_s *inputs = binaryLoad->inputs;
-            vx_enum dataType = vxoBinaryGraph_ConvertToOVXDataType(inputs[i].dataType);
+            vx_binary_input_output_info_s *ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binaryLoad, binaryLoad->inputs, i);
+            vx_enum dataType = vxoBinaryGraph_ConvertToOVXDataType(ptrInOut->dataType);
 
             status |= vxAddParameterToKernel(kernel, i, VX_INPUT,
                                              dataType, VX_PARAMETER_STATE_REQUIRED);
         }
         for(i = binaryLoad->fixed.header.inputCount; i < numParams; i++)
         {
-            vx_binary_input_output_info_s *outputs = binaryLoad->outputs;
             vx_uint32 outIndex = i - binaryLoad->fixed.header.inputCount;
-            vx_enum dataType = vxoBinaryGraph_ConvertToOVXDataType(outputs[outIndex].dataType);
+            vx_binary_input_output_info_s *ptrInOut = (vx_binary_input_output_info_s *)vxoBinaryGraph_GetInputOutputPtrByIndex(binaryLoad, binaryLoad->outputs, outIndex);
+            vx_enum dataType = vxoBinaryGraph_ConvertToOVXDataType(ptrInOut->dataType);
 
             status |= vxAddParameterToKernel(kernel, i, VX_OUTPUT,
                                              dataType, VX_PARAMETER_STATE_REQUIRED);
