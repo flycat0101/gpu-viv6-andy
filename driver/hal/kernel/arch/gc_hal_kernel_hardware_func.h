@@ -18,11 +18,21 @@
 extern "C" {
 #endif
 
+#define gcdINITIALIZE_PPU       0
+#define gcdRESET_USC            0
+
 typedef struct _gcsFUNCTION_EXECUTION * gcsFUNCTION_EXECUTION_PTR;
 
 typedef enum {
     gcvFUNCTION_EXECUTION_MMU,
     gcvFUNCTION_EXECUTION_FLUSH,
+#if gcdRESET_USC
+    gcvFUNCTION_EXECUTION_RESET_USC,
+    gcvFUNCTION_EXECUTION_RESET_USC2,
+#endif
+#if gcdINITIALIZE_PPU
+    gcvFUNCTION_EXECUTION_INITIALIZE_PPU,
+#endif
 
     gcvFUNCTION_EXECUTION_NUM
 }
