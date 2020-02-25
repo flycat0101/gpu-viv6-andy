@@ -7107,9 +7107,10 @@ static VkResult halti5_syncShadowImage(
     pDstRes.u.img.offset.x = 0;
     pDstRes.u.img.offset.y = 0;
     pDstRes.u.img.offset.z = 0;
-    pDstRes.u.img.extent.width = pDstLevel.alignedW;
-    pDstRes.u.img.extent.height = pDstLevel.alignedH;
-    pDstRes.u.img.extent.depth = pDstLevel.requestD;
+
+    pDstRes.u.img.extent.width = pSrcLevel.requestW;
+    pDstRes.u.img.extent.height = pSrcLevel.requestH;
+    pDstRes.u.img.extent.depth = pSrcLevel.requestD;
 
     pDstRes.u.img.pImage = shadowImage;
 
