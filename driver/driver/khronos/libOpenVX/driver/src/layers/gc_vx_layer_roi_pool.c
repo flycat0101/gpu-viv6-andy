@@ -258,7 +258,7 @@ VX_PRIVATE_API vx_status vxnneROIPoolLayer_Initializer(
 
         if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_ROI_POOLING) &&
             vxnneIsTPSupportFormat(context, input_data, VX_NULL, outputs) &&
-            (roisFormat == VX_TYPE_FLOAT16))
+            (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_BFLOAT16))
         {
             vxnne_shader_executable shaderExecutable = VX_NULL;
             vx_uint32 num, size, maxpool, poolx, pooly, poolz;
