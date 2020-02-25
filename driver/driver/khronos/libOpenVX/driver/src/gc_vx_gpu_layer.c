@@ -7351,6 +7351,8 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
     vx_uint32     width                 = TENSOR_VIEW_SIZE_INDEX(output, 0);
     vx_uint32     height                = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(output, 1) : 1;
     vx_uint32     depth                 = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
+    vx_uint32     depth0                = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(input0, 2) : 1;
+    vx_uint32     depth1                = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(input1, 2) : 1;
     vx_enum       input0_format         = TENSOR_DATA_TYPE(input0);
     vx_enum       input1_format         = TENSOR_DATA_TYPE(input1);
     vx_tensor     src0                  = NULL;
@@ -7365,6 +7367,7 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
     vx_uint32     paramNum              = 3;
     vx_uint32     i                     = 0;
     vx_bool       useImage2DFlag        = vx_false_e;
+    vx_bool       enable_broadcast_Z    = vx_false_e;
 
     vx_scalar scaleIn0 = NULL;
     vx_scalar scaleIn1 = NULL;
@@ -7389,6 +7392,8 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
             }
         }
     }
+
+    enable_broadcast_Z  = (vx_bool)(depth0 != depth1);
 
     borderMode->mode = VX_BORDER_REPLICATE;
 
@@ -7507,7 +7512,20 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
         }
         else
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
+            if (enable_broadcast_Z)
+            {
+                if (depth0 == 1)
+                {
+                    parameters[0] = (vx_reference)input1;
+                    parameters[0] = (vx_reference)input0;
+                }
+
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_BroadCastZ", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
+            }
             if (!shaderExecutable) goto OnError;
         }
 
