@@ -10987,7 +10987,7 @@ gcoSURF_QueryFlags(
 
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
 
-    if (Surface->flags & Flag)
+    if (Surface && (Surface->flags & Flag))
     {
         status = gcvSTATUS_TRUE;
     }
