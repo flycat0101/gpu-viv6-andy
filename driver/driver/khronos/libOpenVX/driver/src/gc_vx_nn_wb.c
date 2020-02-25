@@ -493,6 +493,14 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
             {
                 if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_COMPRESSION_ENHANCEMENT))
                 {
+                     vx_uint32* biasStartAddr = VX_NULL;
+                     if(WB_BIAS_DATA_FORMAT(wb) == VX_TYPE_INT64)
+                        biasStartAddr = !j ? ((biasPtr != VX_NULL) ? (vx_uint32*)(((vx_int64*)biasPtr) + biasDataDWordOffset) : VX_NULL) : VX_NULL;
+                    else if(WB_BIAS_DATA_FORMAT(wb) == VX_TYPE_INT32)
+                        biasStartAddr = !j ? ((biasPtr != VX_NULL) ? biasPtr + biasDataDWordOffset : VX_NULL) : VX_NULL;
+                    else
+                        vxmASSERT(0);
+
                     fillSize = fillinTPKernelBufferHuffman(
                         context,
                         WB_HUFFMAN_CONFIG_INDEX(wb, index),
@@ -506,10 +514,18 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
                         WB_SKIP_VALUE(wb),
                         kernelBufferPtr,
                         weightPtr + kzOffset + weightDataBytesOffset,
-                        !j ? ((biasPtr != VX_NULL) ? biasPtr + biasDataDWordOffset : VX_NULL) : VX_NULL);
+                        biasStartAddr);
                 }
                 else
                 {
+                    vx_uint32* biasStartAddr = VX_NULL;
+                    if(WB_BIAS_DATA_FORMAT(wb) == VX_TYPE_INT64)
+                        biasStartAddr = !j ? ((biasPtr != VX_NULL) ? (vx_uint32*)(((vx_int64*)biasPtr) + biasDataDWordOffset) : VX_NULL) : VX_NULL;
+                    else if(WB_BIAS_DATA_FORMAT(wb) == VX_TYPE_INT32)
+                        biasStartAddr = !j ? ((biasPtr != VX_NULL) ? biasPtr + biasDataDWordOffset : VX_NULL) : VX_NULL;
+                    else
+                        vxmASSERT(0);
+
                     fillSize = fillinTPKernelBuffer(
                         context,
                         zrlTmpPtr,
@@ -522,7 +538,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_Compress(
                         WB_SKIP_VALUE(wb),
                         kernelBufferPtr,
                         weightPtr + kzOffset + weightDataBytesOffset,
-                        !j ? ((biasPtr != VX_NULL) ? biasPtr + biasDataDWordOffset : VX_NULL) : VX_NULL);
+                        biasStartAddr);
                 }
 
                 vxmASSERT(fillSize <= min_kernel_buffer_sizes[index]);

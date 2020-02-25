@@ -9532,7 +9532,7 @@ vx_uint32 fillinTPKernelBuffer(
                 vx_int64  biasData64bits         = 0;
                 biasBitSize = 32;
                 biasData64bits = bias_base_ptr == VX_NULL ? 0 : *((vx_int64 *)bias_base_ptr + filterIndex);
-                bias32 = (biasData64bits >>16) & 0xFFFFFFFF;
+                bias32 = biasData64bits & 0xFFFFFFFF;
                 writeBits(&kernelBufferPtr, &bit_offset, bias32, biasBitSize);
             }
             else
@@ -9746,7 +9746,7 @@ vx_uint32 fillinTPKernelBufferHuffman(
                 vx_int64  biasData64bits         = 0;
                 biasBitSize = 32;
                 biasData64bits = bias_base_ptr == VX_NULL ? 0 : *((vx_int64 *)bias_base_ptr + filterIndex);
-                bias32 = (biasData64bits >>16) & 0xFFFFFFFF;
+                bias32 = biasData64bits & 0xFFFFFFFF;
                 writeBits(&kernelBufferPtr, &bit_offset, bias32, biasBitSize);
             }
             else
