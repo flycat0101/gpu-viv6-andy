@@ -16849,6 +16849,10 @@ gcSHADER_GetBuiltinNameKind(
     {
         kind = gcSL_CLUSTER_ID;
     }
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "ClipDistance")))
+    {
+        kind = gcSL_CLIP_DISTANCE;
+    }
     else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "HelperInvocation")))
     {
         kind = gcSL_HELPER_INVOCATION;
@@ -17003,6 +17007,7 @@ gcSHADER_GetBuiltinNameString(
         "gl_BoundingBox", /* -38 gcSL_BOUNDING_BOX */
         "gl_LastFragData", /* -39 gcSL_LAST_FRAG_DATA */
         "#cluster_id", /* -40 gcSL_CLUSTER_ID */
+        "gl_ClipDistance", /* -41 gcSL_CLIP_DISTANCE */
     };
 
     if (Kind < 0 && Kind > (-1 - (gctINT)gcmCOUNTOF(sBuildinNames)))
@@ -22186,13 +22191,14 @@ gcSHADER_AddOutputIndexed(
     {
         gcOUTPUT output = Shader->outputs[i];
 
-        if ((output->nameLength > 0 &&
-             gcmIS_SUCCESS(gcoOS_StrCmp(Name, output->name))) ||
+        if ((output->nameLength > 0 && gcmIS_SUCCESS(gcoOS_StrCmp(Name, output->name)))
+            ||
              ((kind == (gctUINT)output->nameLength) &&
-              ((output->nameLength == gcSL_COLOR) ||
-               (output->nameLength == gcSL_TESS_LEVEL_OUTER) ||
-               (output->nameLength == gcSL_TESS_LEVEL_INNER) ||
-               (output->nameLength == gcSL_BOUNDING_BOX))))
+              ((output->nameLength == gcSL_COLOR)               ||
+               (output->nameLength == gcSL_TESS_LEVEL_OUTER)    ||
+               (output->nameLength == gcSL_TESS_LEVEL_INNER)    ||
+               (output->nameLength == gcSL_BOUNDING_BOX)        ||
+               (output->nameLength == gcSL_CLIP_DISTANCE))))
         {
             if (Index >= (gctUINT32)output->arraySize)
             {
@@ -30222,6 +30228,9 @@ _PredefinedName(
     case gcSL_CLUSTER_ID:
         return "#cluster_id";
 
+    case gcSL_CLIP_DISTANCE:
+        return "gl_ClipDistance";
+
     case gcSL_HELPER_INVOCATION:
         return "gl_HelperInvocation";
 
@@ -34355,6 +34364,9 @@ _findBuiltinVariableTempIndex(
             case gcSL_CLUSTER_ID:
                 BuiltinsTempIndex->ClusterIDTempIndex = attribute->index;
                 break;
+            case gcSL_CLIP_DISTANCE:
+                BuiltinsTempIndex->ClipDistanceTempIndex = attribute->index;
+                break;
             case gcSL_HELPER_INVOCATION:
                 BuiltinsTempIndex->HelperInvocationTempIndex = attribute->index;
                 break;
@@ -34496,6 +34508,9 @@ _findBuiltinVariableTempIndex(
             case gcSL_BOUNDING_BOX:
                 BuiltinsTempIndex->BoundingBoxTempIndex = output->tempIndex;
                 break;
+            case gcSL_CLIP_DISTANCE:
+                BuiltinsTempIndex->ClipDistanceTempIndex = output->tempIndex;
+                break;
             default:
                 gcmASSERT(gcvFALSE);
                 break;
@@ -34587,6 +34602,9 @@ _findBuiltinVariableTempIndex(
                 break;
             case gcSL_FOG_COORD:
                 BuiltinsTempIndex->FogCoordTempIndex = variable->tempIndex;
+                break;
+            case gcSL_CLIP_DISTANCE:
+                BuiltinsTempIndex->ClipDistanceTempIndex = variable->tempIndex;
                 break;
             default:
                 gcmASSERT(gcvFALSE);

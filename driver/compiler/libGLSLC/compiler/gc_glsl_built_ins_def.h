@@ -3568,6 +3568,12 @@ updateForSampleMask(
     OUT slsDATA_TYPE**
     );
 
+gceSTATUS
+updateForClipDistance(
+    IN sloCOMPILER Compiler,
+    OUT slsDATA_TYPE** DataType
+    );
+
 static slsBUILT_IN_VARIABLE PerVertexVariables[] =
 {
     {slvEXTENSION1_NONE,  "gl_Position",              "#In.Position",      slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,   T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
@@ -3579,6 +3585,7 @@ static slsBUILT_IN_VARIABLE VSBuiltInVariables[] =
     {slvEXTENSION1_NONE,  gcvNULL,                    "#Out",              slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_OUT_IO_BLOCK,   T_IO_BLOCK,   0,   slvSTORAGE_QUALIFIER_OUT_IO_BLOCK, PerVertexVariables, "gl_PerVertex", 2, gcvFALSE},
     {slvEXTENSION1_NONE,  "gl_Position",              "#Position",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION1_NONE,  "gl_PointSize",             "#PointSize",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {slvEXTENSION1_NONE,  "gl_ClipDistance",          "#ClipDistance",     slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    1,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE, updateForClipDistance},
     {slvEXTENSION1_HALTI, "gl_VertexID",              "#VertexID",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VERTEX_ID,    T_INT,      0,    slvSTORAGE_QUALIFIER_VERTEX_ID, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION1_HALTI, "gl_InstanceID",            "#InstanceID",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_INSTANCE_ID,  T_INT,      0,    slvSTORAGE_QUALIFIER_INSTANCE_ID, gcvNULL, gcvNULL, 0, gcvFALSE},
 
@@ -3617,6 +3624,7 @@ static slsBUILT_IN_VARIABLE FSBuiltInVariables[] =
 {
     {slvEXTENSION1_NONE,      "gl_FragCoord",        "#Position",    slvPRECISION_QUALIFIER_HIGH,     slvSTORAGE_QUALIFIER_VARYING_IN,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION1_NONE,      "gl_FrontFacing",      "#FrontFacing", slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_VARYING_IN,    T_BOOL,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {slvEXTENSION1_NONE,      "gl_ClipDistance",     "#ClipDistance", slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_IN,    T_FLOAT,    1,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE, updateForClipDistance},
     {slvEXTENSION1_NON_HALTI, "gl_FragColor",        "#Color",       slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION1_NON_HALTI, "gl_FragData",         "#Color",       slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_VEC4,     1,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE, updateForFragData},
     {slvEXTENSION1_SHADER_FRAMEBUFFER_FETCH, "gl_LastFragData",     "#LastFragData",       slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_VARYING_IN,  T_VEC4,     1,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE, updateForFragData},

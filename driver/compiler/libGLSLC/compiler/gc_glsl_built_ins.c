@@ -620,7 +620,7 @@ _LoadBuiltInConstants(
         {"gl_MaxGeometryAtomicCounters",           T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
         {"gl_MaxGeometryAtomicCounterBuffers",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION1_EXT_GEOMETRY_SHADER},
         /* Desktop GL constants */
-        {"gl_MaxClipDistances",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
+        {"gl_MaxClipDistances",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{8}}, 0 },
         {"gl_MaxClipPlanes",                       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
         {"gl_MaxFragmentUniformComponents",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
         {"gl_MaxTextureCoords",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
@@ -950,6 +950,22 @@ updateForSampleMask(
     )
 {
     gctUINT arrayLength = (GetGLMaxSamples() + 31) / 32;
+
+    (*DataType)->arrayLength = arrayLength;
+    (*DataType)->arrayLengthList[0] = arrayLength;
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+updateForClipDistance(
+    IN sloCOMPILER Compiler,
+    OUT slsDATA_TYPE** DataType
+    )
+{
+    gctUINT arrayLength = GetGLMaxClipDistances();
+
+    arrayLength = 8;
 
     (*DataType)->arrayLength = arrayLength;
     (*DataType)->arrayLengthList[0] = arrayLength;
