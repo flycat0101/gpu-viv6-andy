@@ -68,7 +68,7 @@ VkResult halti2_pip_emit_vsinput(
         {
             uint32_t firstValidIoChannel = shAttribTable[entryIdx].pIoRegMapping[0].firstValidIoChannel;
 
-            __VK_ASSERT(shAttribTable[entryIdx].arraySize == 1);
+            __VK_ASSERT(shAttribTable[entryIdx].arraySize > 0 && shAttribTable[entryIdx].arraySize <= devCtx->pPhyDevice->phyDevProp.limits.maxVertexInputAttributes);
 
             if (shAttribTable[entryIdx].pIoRegMapping[0].ioChannelMapping[firstValidIoChannel].ioUsage == SHADER_IO_USAGE_VERTEXID)
             {
