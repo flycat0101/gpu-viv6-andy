@@ -1475,7 +1475,6 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
 
     if (layer_type == VX_NN_DEPTH_WISE_CONVOLUTION_LAYER && hasHwDepthWise &&
         strideXChanged == 1 && strideYChanged == 1 &&
-        (weightDataType == VX_TYPE_INT8 || weightDataType == VX_TYPE_UINT8) &&
         (weightDimsChanged[2] == 1 || weightDimsChanged[3] == 1))
     {
         doDepthWise = vx_true_e;
@@ -1679,7 +1678,7 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
 
     vx_enum layer = layer_type;
 
-    gcmDUMP_API("$VX vxCreateWeightsBiasesParameterFromTensors3: layer_type=0x%x, inputs_dims=%p, "
+    gcmDUMP_API("$VX vxoCreateWeightsBiasesParameterFromTensorsPRelu: layer_type=0x%x, inputs_dims=%p, "
         "convolution_outputs_dims=%p, pool_outputs_dims=%p, convolution_relu_pooling_params=%p, "
         "size_of_convolution_relu_pooling_params=0x%lx, optimizations=%p, size_of_optimizations=0x%lx, weights=%p, biases=%p",
         layer_type, inputs_dims, convolution_outputs_dims, pool_outputs_dims, convolution_relu_pooling_params, size_of_convolution_relu_pooling_params, optimizations, size_of_optimizations, weights, biases);
@@ -2008,7 +2007,6 @@ VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL vxCreateWeightsBiasesParame
         convert_format = conv_ext2.convert_dst_format;
 
         if (conv_ext2.depth_multiplier == 1 &&
-            (TENSOR_DATA_TYPE(weights) == VX_TYPE_INT8 || TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8) &&
             vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_NN_DEPTHWISE_SUPPORT))
             layer = VX_NN_DEPTH_WISE_CONVOLUTION_LAYER;
     }
@@ -2095,7 +2093,6 @@ VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL vxCreateWeightsBiasesParame
         convert_format = conv_ext2.convert_dst_format;
 
         if (conv_ext2.depth_multiplier == 1 &&
-            (TENSOR_DATA_TYPE(weights) == VX_TYPE_INT8 || TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8) &&
             vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_NN_DEPTHWISE_SUPPORT))
             layer = VX_NN_DEPTH_WISE_CONVOLUTION_LAYER;
     }
