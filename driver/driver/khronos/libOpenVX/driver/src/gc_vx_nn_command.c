@@ -3668,6 +3668,8 @@ void _fill_TP_REORG_BATCH2SPACE_Command(
     vxmASSERT(inNSize % (blockWidth * blockHeight) == 0);
     outNSize = inNSize / blockWidth / blockHeight;
 
+    vxmASSERT(outXSize == (inXSize * blockWidth));
+    vxmASSERT(outYSize == (inYSize * blockHeight));
     vxmASSERT(inZSize == outZSize);
 
     for (i = 0; i < split_count; i++)
@@ -3690,19 +3692,19 @@ void _fill_TP_REORG_BATCH2SPACE_Command(
         info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outXSize * outYSize * split_offsets[i] * outputElemSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = blockWidth;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = inXSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = outXSize * blockHeight;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = outXSize * outZSize * blockHeight;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = inYSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outXSize * outYSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outXSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = inZSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = 1;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = blockWidth;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = outXSize * outYSize * outZSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = outNSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = outXSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = blockHeight;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = outXSize * outYSize * outZSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = outNSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 1;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = blockWidth;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = outXSize * outZSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = blockHeight;
         info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = 0;
 
         info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
