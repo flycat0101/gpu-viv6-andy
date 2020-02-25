@@ -5378,17 +5378,12 @@ static void halti5_pip_build_patchKeyMask(
                                 {
                                     patchKey |= HALTI5_PATCH_REPLACE_TXLD_WITH_IMGLD_BIT;
                                 }
-                                if (*pResOp & (VSC_RES_OP_BIT_IMAGE_OP | VSC_RES_OP_BIT_LOAD_STORE))
-                                {
-                                    patchKey |= HALTI5_PATCH_BUF_EXCEED_MAX_WIDTH_BIT;
-                                }
                                 if (*pResOp & VSC_RES_OP_BIT_LOAD_STORE)
                                 {
                                     patchKey |= HALTI5_PATCH_FORMAT_TO_COMPILER_BIT;
-                                    chipPipeline->patchTexBufFormat[setIdx][keyIndex] =
-                                        halti5_pip_getImageFormat(tableEntry->imageDerivedInfo, VSC_MAX_SHADER_STAGE_COUNT);
                                 }
                             }
+                            chipPipeline->patchTexBufFormat[setIdx][keyIndex] = halti5_pip_getImageFormat(tableEntry->imageDerivedInfo, VSC_MAX_SHADER_STAGE_COUNT);
                             chipPipeline->patchKeys[setIdx][keyIndex++] = patchKey;
                         }
                     }
@@ -7744,11 +7739,6 @@ VkResult halti5_patch_pipeline(
                                         VSC_RES_OP_BIT opTypeBits = 0;
                                         VSC_RES_ACT_BIT actBits = 0;
                                         uint32_t subType;
-
-                                        if (k == HALTI5_PATCH_BUF_EXCEED_MAX_WIDTH)
-                                        {
-                                            patchInfo->patchFormat = VK_FORMAT_UNDEFINED;
-                                        }
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.applyLevel = VSC_SHLEVEL_Post_Medium;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
@@ -7761,32 +7751,29 @@ VkResult halti5_patch_pipeline(
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.opTypeBits = opTypeBits;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.actBits = actBits;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.subType = subType;
-                                        if (k != HALTI5_PATCH_BUF_EXCEED_MAX_WIDTH)
+                                        switch (k)
                                         {
-                                            switch (k)
-                                            {
-                                            case HALTI5_PATCH_TX_GATHER_PCF:
-                                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount = 2;
-                                                break;
-                                            default:
-                                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount = 1;
-                                                break;
-                                            }
-                                            vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts =
-                                                          (VSC_LIB_SPECIALIZATION_CONSTANT *)__VK_ALLOC(sizeof(VSC_LIB_SPECIALIZATION_CONSTANT) *
-                                                                                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount,
-                                                                                                        8,
-                                                                                                        VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
-                                            __VK_ONERROR(vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-                                            vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].varName = "swizzles";
-                                            vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].type = VSC_SHADER_DATA_TYPE_INTEGER_X4;
-                                            __VK_MEMCOPY(&vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].value, patchInfo->swizzles, sizeof(patchInfo->swizzles));
-                                            if (k == HALTI5_PATCH_TX_GATHER_PCF)
-                                            {
-                                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].varName = "comparemode";
-                                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].type = VSC_SHADER_DATA_TYPE_INTEGER_X4;
-                                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].value.uValue[0] = patchInfo->compareOp;
-                                            }
+                                        case HALTI5_PATCH_TX_GATHER_PCF:
+                                            vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount = 2;
+                                            break;
+                                        default:
+                                            vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount = 1;
+                                            break;
+                                        }
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts =
+                                                      (VSC_LIB_SPECIALIZATION_CONSTANT *)__VK_ALLOC(sizeof(VSC_LIB_SPECIALIZATION_CONSTANT) *
+                                                                                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount,
+                                                                                                    8,
+                                                                                                    VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                                        __VK_ONERROR(vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].varName = "swizzles";
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].type = VSC_SHADER_DATA_TYPE_INTEGER_X4;
+                                        __VK_MEMCOPY(&vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].value, patchInfo->swizzles, sizeof(patchInfo->swizzles));
+                                        if (k == HALTI5_PATCH_TX_GATHER_PCF)
+                                        {
+                                            vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].varName = "comparemode";
+                                            vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].type = VSC_SHADER_DATA_TYPE_INTEGER_X4;
+                                            vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].value.uValue[0] = patchInfo->compareOp;
                                         }
 
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPointCount = 1;
