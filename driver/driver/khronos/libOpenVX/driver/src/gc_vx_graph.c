@@ -13,7 +13,11 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#ifdef ORI_NNARCHPERF
 #include "gc_nn_arch_model.h"
+#else
+#include "archModelInterface.h"
+#endif
 
 #include "gc_vx_graph_optimization.h"
 #include <ctype.h>
@@ -1041,12 +1045,17 @@ VX_INTERNAL_API vx_bool ComputeMNEx(
             {
                 vx_uint32 outTileY, inputTileY;
                 vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat;
+#ifdef ORI_NNARCHPERF
                 vx_arch_perf_s archPerfHandle;
+                memset(&archPerfHandle, 0, sizeof(vx_arch_perf_s));
+#else
+                arch_perf_s archPerfHandle;
+                memset(&archPerfHandle, 0, sizeof(arch_perf_s));
+#endif
 
                 vxmASSERT(opInfo.opType != VXNNE_OPERATOR_FULLYCONNECTED);
                 vxmASSERT(axiSRAMsize > 0 && !tilingInVIP);
 
-                memset(&archPerfHandle, 0, sizeof(vx_arch_perf_s));
                 outTileY = gcmMIN(TENSOR_SIZE_INDEX(opInfo.output, 1), M);
 
                 status = ComputeInputSizeEx(
@@ -1068,7 +1077,7 @@ VX_INTERNAL_API vx_bool ComputeMNEx(
                 {
                     vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), outTileY, TENSOR_SIZE_INDEX(opInfo.output, 2)};
                     vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), inputTileY, TENSOR_SIZE_INDEX(opInfo.input, 2)};
-
+#ifdef ORI_NNARCHPERF
                     calculateArchPerfFromWB(layer->graph->base.context,
                                         &archPerfHandle,
                                         opInfo.weightsBiases,
@@ -1081,6 +1090,21 @@ VX_INTERNAL_API vx_bool ComputeMNEx(
                                         layer->graph->base.context->vipSRAM.size,
                                         (vxnne_operation_target_e)opInfo.target,
                                         (vxnne_operator_e)opInfo.opType);
+#else
+                    archCalculateArchPerfFromWB(layer->graph->base.context,
+                                        layer->operations[start],
+                                        &archPerfHandle,
+                                        opInfo.weightsBiases,
+                                        inputDims,
+                                        outputDims,
+                                        TENSOR_DATA_TYPE(opInfo.output),
+                                        VX_NULL,
+                                        vx_true_e,
+                                        SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
+                                        layer->graph->base.context->vipSRAM.size,
+                                        (vxnne_operation_target_e)opInfo.target,
+                                        (vxnne_operator_e)opInfo.opType);
+#endif
                 }
 
                 outImageTileX   = archPerfHandle.resultInfo.outImageTileXSize;
@@ -3876,9 +3900,15 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                 vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
                 vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
                 vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat, outputDataFormat;
-                vx_arch_perf_s archPerfHandle;
+#ifdef ORI_NNARCHPERF
+            vx_arch_perf_s archPerfHandle;
+            memset(&archPerfHandle, 0, sizeof(vx_arch_perf_s));
+#else
+            arch_perf_s archPerfHandle;
+            memset(&archPerfHandle, 0, sizeof(arch_perf_s));
+#endif
 
-                memset(&archPerfHandle, 0, sizeof(vx_arch_perf_s));
+#ifdef ORI_NNARCHPERF
                 calculateArchPerfFromWB(graph->base.context,
                                     &archPerfHandle,
                                     opInfo.weightsBiases,
@@ -3891,6 +3921,21 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                                     graph->base.context->vipSRAM.size,
                                     (vxnne_operation_target_e)opInfo.target,
                                     (vxnne_operator_e)opInfo.opType);
+#else
+            archCalculateArchPerfFromWB(graph->base.context,
+                                graph->layer->operations[i],
+                                &archPerfHandle,
+                                opInfo.weightsBiases,
+                                inputDims,
+                                outputDims,
+                                TENSOR_DATA_TYPE(opInfo.output),
+                                VX_NULL,
+                                vx_true_e,
+                                SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
+                                graph->base.context->vipSRAM.size,
+                                (vxnne_operation_target_e)opInfo.target,
+                                (vxnne_operator_e)opInfo.opType);
+#endif
 
                 outImageTileX   = archPerfHandle.resultInfo.outImageTileXSize;
                 outImageTileY   = archPerfHandle.resultInfo.outImageTileYSize;
@@ -9520,7 +9565,11 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyNNTranspose(vx_graph graph)
                 vx_uint32 outputDims[3] = {TENSOR_SIZE_INDEX(opInfo.output, 0), TENSOR_SIZE_INDEX(opInfo.output, 1), TENSOR_SIZE_INDEX(opInfo.output, 2)};
                 vx_uint32 inputDims[3]  = {TENSOR_SIZE_INDEX(opInfo.input, 0), TENSOR_SIZE_INDEX(opInfo.input, 1), TENSOR_SIZE_INDEX(opInfo.input, 2)};
                 vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY;
+#ifdef ORI_NNARCHPERF
                 vx_arch_perf_s archPerfHandle;
+#else
+                arch_perf_s archPerfHandle;
+#endif
                 vx_uint8 transposeInChannel = 0;
 
                 outputZ = TENSOR_VIEW_SIZE_INDEX(output, 2);
@@ -9533,6 +9582,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyNNTranspose(vx_graph graph)
                     transposeInChannel = (vx_uint8)gcmMIN(outputZ, VX_TRANSPOSE_MAX_INTERLEAVE_CH);
 
                 INITIALIZE_STRUCT(archPerfHandle);
+#ifdef ORI_NNARCHPERF
                 calculateArchPerfFromWB(context,
                                     &archPerfHandle,
                                     opInfo.weightsBiases,
@@ -9545,7 +9595,21 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyNNTranspose(vx_graph graph)
                                     context->vipSRAM.size,
                                     (vxnne_operation_target_e)opInfo.target,
                                     (vxnne_operator_e)opInfo.opType);
-
+#else
+                archCalculateArchPerfFromWB(context,
+                                    operation,
+                                    &archPerfHandle,
+                                    opInfo.weightsBiases,
+                                    inputDims,
+                                    outputDims,
+                                    TENSOR_DATA_TYPE(output),
+                                    VX_NULL,
+                                    vx_true_e,
+                                    SW_TILING_FROM_DDR, SW_TILING_FROM_DDR, SW_TILING_FROM_DDR,
+                                    context->vipSRAM.size,
+                                    (vxnne_operation_target_e)opInfo.target,
+                                    (vxnne_operator_e)opInfo.opType);
+#endif
                 outImageTileX   = archPerfHandle.resultInfo.outImageTileXSize;
                 outImageTileY   = archPerfHandle.resultInfo.outImageTileYSize;
                 interleaveMode  = archPerfHandle.resultInfo.interleaveMode;
@@ -9745,7 +9809,11 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyGraph(vx_graph graph)
 
         if (graph->base.context->options.collectPerfType == COLLECT_PERF_ESTIMATE)
         {
+#ifdef ORI_NNARCHPERF
             vxoGraph_PredictPerf(graph);
+#else
+            archGraphPredictPerf(graph);
+#endif
         }
 
         if (context->options.enableAllocateContigousMemForKernel)

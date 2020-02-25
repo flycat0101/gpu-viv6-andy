@@ -80,6 +80,9 @@ USE_VSC_LITE        ?= 0
 
 USE_STATIC_STDCxx   ?= 0
 
+#If need to user ori arch model, set to 1
+ORI_NNARCHPERF   ?= 0
+
 ################################################################
 # Option dependency.
 
@@ -462,6 +465,8 @@ ifeq ($(USE_FILE_OFFSET_BITS_64),1)
   CFLAGS            += -D_FILE_OFFSET_BITS=64
 endif
 
+#If need to user ori arch model, set to 1
+#CFLAGS              += -DORI_NNARCHPERF
 ################################################################################
 #
 # Third party resources, DFB_DIR to specify DirectFB SDK path

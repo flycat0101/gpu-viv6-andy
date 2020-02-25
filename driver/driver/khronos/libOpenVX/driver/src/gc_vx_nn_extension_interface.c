@@ -24,7 +24,11 @@
 #include "gc_hal_types.h"
 #include "anchors.h"
 #include <gc_vx_nn_util.h>
+#ifdef ORI_NNARCHPERF
 #include <gc_nn_arch_model.h>
+#else
+#include "archModelInterface.h"
+#endif
 #include <stdio.h>
 #include <ops/gc_vx_ops.h>
 
@@ -1172,7 +1176,11 @@ VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL vxCreateWeightsBiasesParame
 
     if (readBits(&streamBufferPtr, &bitOffset, 32) == 1)
     {
+#ifdef ORI_NNARCHPERF
         wb->archPerfHandle = (vx_arch_perf)vxAllocateAndZeroMemory(sizeof(vx_arch_perf_s));
+#else
+        wb->archPerfHandle = (arch_perf)vxAllocateAndZeroMemory(sizeof(arch_perf_s));
+#endif
         if (wb->archPerfHandle == VX_NULL)
         {
             status =  VX_ERROR_NO_MEMORY;
@@ -1188,9 +1196,13 @@ VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL vxCreateWeightsBiasesParame
         *((vx_uint32 *)&wb->archPerfHandle->imageCompressRatio + 1) = readBits(&streamBufferPtr, &bitOffset, 32);
         *(vx_uint32 *)&wb->archPerfHandle->imageNonZeroRatio = readBits(&streamBufferPtr, &bitOffset, 32);
         *((vx_uint32 *)&wb->archPerfHandle->imageNonZeroRatio + 1) = readBits(&streamBufferPtr, &bitOffset, 32);
+#ifdef ORI_NNARCHPERF
         wb->archPerfHandle->opType = (vxnne_operator_e)readBits(&streamBufferPtr, &bitOffset, 32);
         wb->archPerfHandle->opTarget = (vxnne_operation_target_e)readBits(&streamBufferPtr, &bitOffset, 32);
-
+#else
+        wb->archPerfHandle->opType = (archnne_operator_e)readBits(&streamBufferPtr, &bitOffset, 32);
+        wb->archPerfHandle->opTarget = (archnne_operation_target_e)readBits(&streamBufferPtr, &bitOffset, 32);
+#endif
         /*archPerfor info: 27*/
         wb->archPerfHandle->info.kx = readBits(&streamBufferPtr, &bitOffset, 32);
         wb->archPerfHandle->info.ky = readBits(&streamBufferPtr, &bitOffset, 32);

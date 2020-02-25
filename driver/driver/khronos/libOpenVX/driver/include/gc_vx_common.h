@@ -71,7 +71,9 @@
 #include "gc_vxk_common.h"
 
 #include <gc_vx_profiler.h>
-#ifdef USE_LIB_NN_ARCH_PERF
+#ifdef ORI_NNARCHPERF
+#include "nnArchPerfOri.h"
+#else
 #include "nnArchPerf.h"
 #endif
 
@@ -1274,9 +1276,8 @@ typedef struct _vx_global_data_s
     gceSTATUS                               (*loadCompiler)(IN gcsHWCaps *HWCaps, IN gcePATCH_ID PatchId);
     gceSTATUS                               (*unloadCompiler)(void);
 
-#ifdef USE_LIB_NN_ARCH_PERF
     APMHandle                               apm;
-#endif
+
     vxnne_sram_s                            axiSRAM[MAX_GPU_CORE_COUNT];
     vxnne_sram_s                            vipSRAM;
 #if gcdUSE_VXC_BINARY
@@ -2291,8 +2292,11 @@ typedef struct _vx_weights_biases_parameter_s
     vx_float64                               general_compression_ratio;
     vx_float64                               max_per_core_compression_ratio;
     vx_float64                               *max_per_core_per_vzgroup_nzr;
-
+#ifdef ORI_NNARCHPERF
     vx_arch_perf                             archPerfHandle;
+#else
+    arch_perf_type                           archPerfHandle;
+#endif
     vx_sub_wb_vdata                          sub_wb_vdata; /*save more sub wb info for vdata when SWTiling is on*/
 
     vx_weights_biases_huffman_cfg            huffmanConfig;

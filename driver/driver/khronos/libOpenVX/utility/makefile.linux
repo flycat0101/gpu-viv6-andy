@@ -28,6 +28,11 @@ INCLUDE += -I$(AQROOT)/hal/inc
 INCLUDE += -I$(AQROOT)/hal/user
 INCLUDE += -I$(AQROOT)/hal/os/linux/user
 INCLUDE += -I$(AQROOT)/compiler/libVSC/include
+ifeq ($(ORI_NNARCHPERF),1)
+INCLUDE += -I$(AQARCH)/../libNNArchPerf/libNNArchPerf
+else
+INCLUDE += -I$(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf
+endif
 CFLAGS += $(INCLUDE)
 
 

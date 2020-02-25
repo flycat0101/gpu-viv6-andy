@@ -19,22 +19,36 @@ include ./makefile.linux.def
 
 ######################################################
 # Components of the project.
-
+ifeq ($(ORI_NNARCHPERF),1)
 ARCH_MODEL             := libarchmodel
+else
+ARCH_MODEL_INTERFACE   := libarchmodelInterface
+ARCH_MODEL_SW          := $(AQARCH)/../vipArchPerfMdl_dev/libarchmodelSw
+endif
 VX_VXU                 := utility
 VX_ENTRY               := driver/src
+ifeq ($(ORI_NNARCHPERF),1)
+else
+NN_ARCH_PERF           := $(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf
+endif
 ifeq ($(USE_VXC_BINARY),1)
 VX_NNVXC_BINARY        := libkernel/libnnvxc
 VX_OVX12_VXC_BINARY    := libkernel/libovx12
 VX_NNGPU_BINARY        := libkernel/libnngpu
 endif
-
+ifeq ($(ORI_NNARCHPERF),1)
 ifeq ($(USE_VXC_BINARY),1)
 LIB_VX := $(ARCH_MODEL) $(VX_NNVXC_BINARY) $(VX_ENTRY) $(VX_VXU)  $(VX_OVX12_VXC_BINARY) $(VX_NNGPU_BINARY)
 else
 LIB_VX := $(ARCH_MODEL) $(VX_ENTRY) $(VX_VXU)
 endif
-
+else
+ifeq ($(USE_VXC_BINARY),1)
+LIB_VX := $(ARCH_MODEL) $(ARCH_MODEL_SW) $(ARCH_MODEL_INTERFACE) $(VX_NNVXC_BINARY) $(VX_ENTRY) $(VX_VXU)  $(VX_OVX12_VXC_BINARY) $(VX_NNGPU_BINARY)
+else
+LIB_VX := $(ARCH_MODEL) $(ARCH_MODEL_SW) $(ARCH_MODEL_INTERFACE) $(VX_ENTRY) $(VX_VXU)
+endif
+endif
 ######################################################
 # Define the macros used in the common file.
 
@@ -53,5 +67,12 @@ $(VX_ENTRY) : $(VX_NNVXC_BINARY)
 $(VX_ENTRY) : $(VX_OVX12_VXC_BINARY)
 $(VX_ENTRY) : $(VX_NNGPU_BINARY)
 endif
+
+ifeq ($(ORI_NNARCHPERF),1)
 $(VX_ENTRY) : $(ARCH_MODEL)
 $(VX_VXU): $(VX_ENTRY)
+else
+$(VX_ENTRY) : $(ARCH_MODEL) $(ARCH_MODEL_SW) $(ARCH_MODEL_INTERFACE)
+$(VX_VXU): $(VX_ENTRY)
+$(ARCH_MODEL_SW):
+endif

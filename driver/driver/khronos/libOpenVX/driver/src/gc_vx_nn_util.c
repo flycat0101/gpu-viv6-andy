@@ -20,8 +20,11 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#ifdef ORI_NNARCHPERF
 #include "gc_nn_arch_model.h"
-#ifdef USE_LIB_NN_ARCH_PERF
+#include "nnArchPerfOri.h"
+#else
+#include "archModelInterface.h"
 #include "nnArchPerf.h"
 #endif
 
@@ -1089,9 +1092,6 @@ void reshuffleData(vx_nn_reshuffle_s *src, vx_uint32 strideStepX, vx_uint32 stri
 
 void initUndefinedHardwareConfig(vx_global_data globalData)
 {
-#ifdef USE_LIB_NN_ARCH_PERF
-    char *useLibNNArchPerf = VX_NULL;
-#endif
 #define USC_CACHE_SIZE                         8
 #define CACHED_DATA_READ_FROM_SRAM             1
 #define DDR_READ_BANDWIDTH_LIMIT               3.8f
@@ -1309,9 +1309,11 @@ void initUndefinedHardwareConfig(vx_global_data globalData)
         }
     }
 
-#ifdef USE_LIB_NN_ARCH_PERF
-    if ((gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "USE_LIB_NN_ARCH_PERF", &useLibNNArchPerf)) && useLibNNArchPerf && atoi(useLibNNArchPerf)))
+    /*if ((gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "USE_LIB_NN_ARCH_PERF", &useLibNNArchPerf)) && useLibNNArchPerf && atoi(useLibNNArchPerf)))*/
     {
+#ifndef ORI_NNARCHPERF
+        arch_uint32 isV8 = 0;
+#endif
         BWL_T bwl = {
             /*ddr bw limit*/globalData->nnConfig.customizedFeature.ddrReadBWLimit, globalData->nnConfig.customizedFeature.ddrWriteBWLimit, globalData->nnConfig.customizedFeature.ddrTotalBWLimit,
             /*axi bw limit*/globalData->nnConfig.customizedFeature.axiSramReadBWLimit,globalData->nnConfig.customizedFeature.axiSramWriteBWLimit,globalData->nnConfig.customizedFeature.axiSramTotalBWLimit,
@@ -1322,17 +1324,41 @@ void initUndefinedHardwareConfig(vx_global_data globalData)
         };
         APM_IN_PARAM_T inParam;
         gcsHAL_CHIPIDENTITY chipIdentity;
+        memset(&inParam,0,sizeof(APM_IN_PARAM_T));
         gcoHAL_QueryChipIdentityEx(VX_NULL, sizeof(gcsHAL_CHIPIDENTITY), &chipIdentity);
         inParam.chipDef.ChipID = (vx_uint32)chipIdentity.chipModel;
         inParam.chipDef.ChipVersion = chipIdentity.chipRevision;
         inParam.chipDef.ProductID = chipIdentity.productID;
         inParam.chipDef.EcoID = chipIdentity.ecoID;
         inParam.chipDef.CustomerID = chipIdentity.customerID;
+#ifndef ORI_NNARCHPERF
+        /* burst setting,hard code to 16 for now */
+        bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_64B = 16.0;
+        bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_128B = 16.0;
+        bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_256B = 16.0;
+        bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_64B = 16.0;
+        bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_128B = 16.0;
+        bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_256B = 16.0;
+        bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_64B = 16.0;
+        bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_128B = 16.0;
+        bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_256B = 16.0;
 
+        /* add new parameters */
+        inParam.NN_DDR_BURST_SIZE = 64;     /* default set as 64, some of the config need to set as 256, will add into freature DB */
+        /*  Only V8 support ddr burst*/
+        isV8 = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_XYDP0);
+        if(!isV8)
+        {
+            inParam.specified_ddr_bw_limit_by_burst = 0;
+        }
+        else
+        {
+            inParam.specified_ddr_bw_limit_by_burst = 1;
+        }
+#endif
         memcpy(&inParam.bwl, &bwl, sizeof(bwl));
         globalData->apm = CreateAPModel(inParam);
     }
-#endif
 }
 
 /* Write dataBits bits from data to buffer starting from bitOffset. */
@@ -2080,7 +2106,11 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateNNCommands(
 
     if (context->options.collectPerfType == COLLECT_PERF_RUN)
     {
+#ifdef ORI_NNARCHPERF
         vx_arch_perf_s perf;
+#else
+        arch_perf_s perf;
+#endif
         vx_tensor input, output;
         vx_weights_biases_parameter wb;
 
@@ -2098,7 +2128,7 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateNNCommands(
 
         perf.swTilingInfo.kernelCacheMode = operationCommand->parameter.kernelCacheMode;
         perf.swTilingInfo.imageCacheMode  = operationCommand->parameter.imageCacheMode;
-
+#ifdef ORI_NNARCHPERF
         calculateArchPerfFromTiling(context,
                                     convOperation->base.layer,
                                     &perf,
@@ -2111,7 +2141,20 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateNNCommands(
 
          if (context->options.enableNNArchPerfPrint)
             showArchPerformance(context, convOperation->base.layer, &convOperation->base, &perf);
+#else
+        archCalculateArchPerfFromTiling(context,
+                                    convOperation->base.layer,
+                                    &perf,
+                                    &inputInfo,
+                                    &outputInfo,
+                                    input, output, wb,
+                                    operationCommand,
+                                    convOperation->base.target,
+                                    convOperation->base.operatorType);
 
+         if (context->options.enableNNArchPerfPrint)
+            showDriverPerformance(context, convOperation->base.layer, &convOperation->base, &perf);
+#endif
     }
 
     return VX_SUCCESS;
@@ -2242,7 +2285,11 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateTPCommands(
 
     if (context->options.collectPerfType == COLLECT_PERF_RUN)
     {
+#ifdef ORI_NNARCHPERF
         vx_arch_perf_s perf;
+#else
+        arch_perf_s perf;
+#endif
         vx_tensor input, output;
         vx_weights_biases_parameter wb;
 
@@ -2255,7 +2302,7 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateTPCommands(
         {
             perf.imageNonZeroRatio = tpOperation->base.imgNonZeroRatio;
         }
-
+#ifdef ORI_NNARCHPERF
         calculateArchPerfFromTiling(context,
                                     tpOperation->base.layer,
                                     &perf,
@@ -2268,7 +2315,20 @@ VX_PRIVATE_API vx_status vxnneOperationCommand_GenerateTPCommands(
 
          if (context->options.enableNNArchPerfPrint)
             showArchPerformance(context, tpOperation->base.layer, &tpOperation->base, &perf);
+#else
+        archCalculateArchPerfFromTiling(context,
+                                    tpOperation->base.layer,
+                                    &perf,
+                                    &inputInfo,
+                                    &outputInfo,
+                                    input, output, wb,
+                                    operationCommand,
+                                    tpOperation->base.target,
+                                    tpOperation->base.operatorType);
 
+         if (context->options.enableNNArchPerfPrint)
+            showDriverPerformance(context, tpOperation->base.layer, &tpOperation->base, &perf);
+#endif
     }
 
     return VX_SUCCESS;
@@ -2322,7 +2382,11 @@ VX_INTERNAL_API vx_status vxnneOperationCommand_GenerateCommands(
         {
             if (context->options.enableNNArchPerfPrint)
             {
+#ifdef ORI_NNARCHPERF
                 showArchPerformance(context, operation->layer, operation, VX_NULL);
+#else
+                showDriverPerformance(context, operation->layer, operation, VX_NULL);
+#endif
             }
         }
     }
@@ -2785,6 +2849,9 @@ vx_char* vxnneGetOperatorTypeName(vxnne_operator_e operationType)
 
     case VXNNE_OPERATOR_DEPTH_WISE_CONV:
         return "VXNNE_OPERATOR_DEPTH_WISE_CONV";
+
+    case VXNNE_OPERATOR_CONCATINDEFINITE:
+        return "VXNNE_OPERATOR_CONCAT_INDEFINITE";
     default:
         return "unkown operation type";
     }
@@ -3842,8 +3909,11 @@ vx_status vxnneCalculateConvTilingParam(
     )
 {
     vx_uint32 i, minKPK=0xFFFFFFFF, imode = 0;
+#ifdef ORI_NNARCHPERF
     vx_arch_perf_s perf;
-
+#else
+    arch_perf_s perf;
+#endif
     for (i = 0; i < count; i++)
     {
         vx_uint32 inputDims[3] = {info[i].input.width, info[i].input.height, TENSOR_SIZE_INDEX(conv_op->inputs, 2)};
@@ -3899,8 +3969,11 @@ vx_status vxnneCalculateConvTilingParam(
                 outputDims[1] = 1;
             }
         }
-
+#ifdef ORI_NNARCHPERF
         memset(&perf, 0, sizeof(vx_arch_perf_s));
+#else
+        memset(&perf, 0, sizeof(arch_perf_s));
+#endif
 
         perf.calculated = vx_false_e;
         perf.swTilingInfo.origInX = TENSOR_SIZE_INDEX(conv_op->inputs, 0);
@@ -3913,6 +3986,7 @@ vx_status vxnneCalculateConvTilingParam(
         /* original output tensor might be reshaped, use reshaped sized to calc imageStride and imageSlice */
         perf.swTilingInfo.outImageStride = outputDims[0];
         perf.swTilingInfo.outImageSlice = outputDims[0] * outputDims[1];
+#ifdef ORI_NNARCHPERF
         calculateArchPerfFromWB(context,
                                 &perf,
                                 conv_op->weights_biases,
@@ -3925,7 +3999,21 @@ vx_status vxnneCalculateConvTilingParam(
                                 vipSize,
                                 VXNNE_OPERATION_TARGET_NN,
                                 conv_op->base.operatorType);
-
+#else
+        archCalculateArchPerfFromWB(context,
+                                (vxnne_operation)conv_op,
+                                &perf,
+                                conv_op->weights_biases,
+                                inputDims,
+                                outputDims,
+                                TENSOR_DATA_TYPE(conv_op->outputs),
+                                offsets,
+                                1,
+                                perf.swTilingInfo.srcBuf, perf.swTilingInfo.dstBuf, perf.swTilingInfo.kernelBuf,
+                                vipSize,
+                                VXNNE_OPERATION_TARGET_NN,
+                                conv_op->base.operatorType);
+#endif
         info[i].tilingParam.outImageTileXSize = perf.resultInfo.outImageTileXSize;
         info[i].tilingParam.outImageTileYSize = perf.resultInfo.outImageTileYSize;
         info[i].tilingParam.interleaveMode    = perf.resultInfo.interleaveMode;

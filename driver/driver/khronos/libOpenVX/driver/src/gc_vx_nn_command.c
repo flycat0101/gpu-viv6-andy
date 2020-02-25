@@ -20,7 +20,11 @@
 
 #include <gc_vx_common.h>
 #include <gc_vx_nn_util.h>
+#ifdef ORI_NNARCHPERF
 #include "gc_nn_arch_model.h"
+#else
+#include "archModelInterface.h"
+#endif
 
 #define TP_SPLIT_Z_MAJOR 0
 #define SHOW_TP_SPLITING_INFO 1
@@ -722,7 +726,6 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
             info->vx_nn_general_cmd_info.outImageTransposeBufEndAddr = conv_cmd_ptr->transposeOutStart + conv_cmd_ptr->transposeOutSize;
             info->vx_nn_general_cmd_info.outImageTransposeChMinusOne = conv_cmd_ptr->transposeOutChannel - 1;
         }
-
         if (conv_cmd_ptr->kernelCacheMode == VXNNE_SRAM_CACHE_MODE_STREAM_CACHE)
         {
             info->vx_nn_general_cmd_info.kernelCachingMode = 0;

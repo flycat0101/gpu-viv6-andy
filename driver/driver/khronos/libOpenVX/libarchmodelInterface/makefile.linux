@@ -1,0 +1,97 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Linux build file for user HAL layer.
+#
+
+################################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+include ../makefile.linux.def
+
+################################################################################
+# Define target module name.
+
+STATIC              := 1
+TARGET_NAME         := libarchmodelInterface.a
+TARGET_MODULE       := $(OBJ_DIR)/$(TARGET_NAME)
+
+################################################################################
+# Installation directory.
+
+INSTALL_DIR         := $(SDK_DIR)/drivers
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE := -I$(AQROOT)/hal/inc \
+           -I$(AQROOT)/hal/user \
+           -I$(AQROOT)/hal/optimizer \
+           -I$(AQROOT)/hal/os/linux/user \
+           -I$(AQROOT)/compiler/libVSC/include \
+           -I$(AQROOT)/sdk/inc \
+           -I$(AQROOT)/driver/khronos/libOpenVX/driver/include \
+           -I$(AQROOT)/driver/khronos/libOpenVX/kernels \
+           -I$(AQROOT)/driver/khronos/libOpenVX/libarchmodelInterface/include \
+           -I$(AQARCH)/../vipArchPerfMdl_dev/libarchmodelSw/include \
+           -I$(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf
+
+CFLAGS += $(INCLUDE)
+
+
+################################################################################
+# Describe object files.
+
+OBJECTS := $(OBJ_DIR)/archModelInterface.o \
+
+################################################################################
+# Define targets.
+
+.PHONY: all clean install
+
+all: $(TARGET_MODULE)
+
+clean:
+	@rm -rf $(OBJ_DIR)
+
+install: all
+
+ifeq ($(gcdSTATIC_LINK), 1)
+install:
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
+endif
+
+################################################################################
+# Module rules.
+
+$(TARGET_MODULE): $(OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $@ $(OBJECTS)
+ifneq ($(USE_ARMCC), 1)
+	@$(RANLIB) $@
+endif
+
+################################################################################
+# Object rules.
+
+$(OBJ_DIR)/%.o: %.c
+	@echo "  COMPILE $(abspath $<)"
+	@mkdir -p $(OBJ_DIR)
+	@$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+# object dependencies.
+-include $(OBJECTS:.o=.d)
+

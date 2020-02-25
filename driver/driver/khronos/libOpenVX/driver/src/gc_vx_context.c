@@ -1694,10 +1694,8 @@ VX_PRIVATE_API vx_uint32 vxoGlobalData_Release(vx_global_data globalData)
 #endif
         gcfVX_UnloadCompiler(globalData);
 
-#ifdef USE_LIB_NN_ARCH_PERF
         if (globalData->apm)
             DestroyAPModel(globalData->apm);
-#endif
 
         vxFree(vxGlobalData);
         vxGlobalData = NULL;
@@ -1848,6 +1846,9 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
         vxDestroyMutex(context->memoryMapsLock);
 
         refCount = vxoGlobalData_Release(context->globalData);
+
+        if (context->globalData->apm)
+            DestroyAPModel(context->globalData->apm);
 
         vxFree(context);
 

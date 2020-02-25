@@ -21,10 +21,14 @@
 #include <gc_vx_common.h>
 #include <gc_vx_nn_encoder.h>
 #include <gc_vx_nn_util.h>
+#ifdef ORI_NNARCHPERF
 #include "gc_nn_arch_model.h"
-#ifdef USE_LIB_NN_ARCH_PERF
+#include "nnArchPerfOri.h"
+#else
+#include "archModelInterface.h"
 #include "nnArchPerf.h"
 #endif
+
 
 #define MAX_HISTO_COUNT 256
 #define MAX_SIZE_HISTO_COUNT 9
@@ -646,8 +650,13 @@ vx_status vxoWeightsBiasesParameter_ProcessHead(
         if (weights_bias->archPerfHandle != VX_NULL)
         {
             *buff++ = 0x1;
+#ifdef ORI_NNARCHPERF
             memcpy(buff, weights_bias->archPerfHandle, sizeof(vx_arch_perf_s));
             buff += sizeof(vx_arch_perf_s);
+#else
+            memcpy(buff, weights_bias->archPerfHandle, sizeof(arch_perf_s));
+            buff += sizeof(arch_perf_s);
+#endif
         }
         else
         {
@@ -681,10 +690,17 @@ vx_status vxoWeightsBiasesParameter_ProcessHead(
 
         if (*buff++ == 1)
         {
+#ifdef ORI_NNARCHPERF
             weights_bias->archPerfHandle = (vx_arch_perf)vxAllocateAndZeroMemory(sizeof(vx_arch_perf_s));
             if (weights_bias->archPerfHandle == VX_NULL) return VX_ERROR_NO_MEMORY;
             memcpy(weights_bias->archPerfHandle, buff, sizeof(vx_arch_perf_s));
             buff += sizeof(vx_arch_perf_s);
+#else
+            weights_bias->archPerfHandle = (arch_perf)vxAllocateAndZeroMemory(sizeof(arch_perf_s));
+            if (weights_bias->archPerfHandle == VX_NULL) return VX_ERROR_NO_MEMORY;
+            memcpy(weights_bias->archPerfHandle, buff, sizeof(arch_perf_s));
+            buff += sizeof(arch_perf_s);
+#endif
         }
     }
     else
@@ -14682,12 +14698,21 @@ vx_bool WeightBiasBufferAllocate(
         /* weight bias file has marks in its head which is aligned to 64 bytes.
          * ---|0x0A0B0C0D|wb_base|slice_num|slice_array[]|1+offsethandle|1+perf|---
          */
+#ifdef ORI_NNARCHPERF
         WB_MEM_HEAD_OFFSET(weight_bias) = gcmALIGN((6 +
                                                     sizeof(vx_weights_biases_parameter_s) +
                                                     sizeof(vx_weights_biases_parameter_base_s) +
                                                     sizeof(vx_weights_biases_slice_s) * weight_bias->slice_num +
                                                     sizeof(vx_weights_biases_z_offset_s) +
                                                     sizeof(vx_arch_perf_s)), 64);
+#else
+        WB_MEM_HEAD_OFFSET(weight_bias) = gcmALIGN((6 +
+                                                    sizeof(vx_weights_biases_parameter_s) +
+                                                    sizeof(vx_weights_biases_parameter_base_s) +
+                                                    sizeof(vx_weights_biases_slice_s) * weight_bias->slice_num +
+                                                    sizeof(vx_weights_biases_z_offset_s) +
+                                                    sizeof(arch_perf_s)), 64);
+#endif
     }
 
     memory = &weight_bias->memory;
@@ -15235,7 +15260,11 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
         wb->slice_kz_num = kzNum;
 
         /* Calculate arch perf in this step and pass it to operation for non-swtiling path. */
+#ifdef ORI_NNARCHPERF
         wb->archPerfHandle = (vx_arch_perf)vxAllocateAndZeroMemory(sizeof(vx_arch_perf_s));
+#else
+        wb->archPerfHandle = (arch_perf)vxAllocateAndZeroMemory(sizeof(arch_perf_s));
+#endif
         if (wb->archPerfHandle == VX_NULL)
         {
             status = VX_ERROR_NO_MEMORY;

@@ -119,9 +119,14 @@ LOCAL_CFLAGS += \
     -DOPENVX_USE_DOT  \
     -DOPENVX_USE_TARGET
 
+#For original nnarchperf
+
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/driver/include \
     $(LOCAL_PATH)/libarchmodel/include \
+ifneq ($(ORI_NNARCHPERF),1)
+    $(LOCAL_PATH)/libarchmodelInterface/include \
+endif
     $(LOCAL_PATH)/kernels \
     $(AQROOT)/sdk/inc \
     $(AQROOT)/hal/inc \
@@ -129,7 +134,11 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/os/linux/user \
     $(AQROOT)/compiler/libVSC/include \
     $(AQARCH)/cmodel/inc
-
+ifeq ($(ORI_NNARCHPERF),1)
+else
+    $(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf \
+    $(AQARCH)/../vipArchPerfMdl_dev/libarchmodelSw/include
+endif
 ifeq ($(USE_VXC_BINARY),1)
 LOCAL_C_INCLUDES += $(LOCAL_C_INCLUDES) \
                     $(AQROOT)/driver/khronos/libOpenVX/libkernel/libnnvxc/ \
@@ -143,22 +152,27 @@ endif
 LOCAL_LDFLAGS := \
     -Wl,-z,defs
 
+ifeq ($(ORI_NNARCHPERF),1)
 LOCAL_STATIC_LIBRARIES += \
     libarchmodel
-
+else
+LOCAL_STATIC_LIBRARIES += \
+    libarchmodelInterface
+endif
 LOCAL_SHARED_LIBRARIES := \
     liblog \
     libdl \
     libcutils \
     libVSC \
     libGAL \
-
+ifeq ($(ORI_NNARCHPERF),1)
+else
+    libNNArchPerf \
+    libarchmodelSw
+endif
 LOCAL_MODULE         := libOpenVX
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
-ifeq ($(PLATFORM_VENDOR),1)
-LOCAL_VENDOR_MODULE  := true
-endif
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk
@@ -183,6 +197,9 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/user \
     $(AQROOT)/hal/os/linux/user \
     $(AQROOT)/compiler/libVSC/include \
+ifneq ($(ORI_NNARCHPERF),1)
+    $(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf
+endif
 
 LOCAL_LDFLAGS := \
     -Wl,-z,defs
@@ -194,9 +211,6 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_MODULE         := libOpenVXU
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
-ifeq ($(PLATFORM_VENDOR),1)
-LOCAL_VENDOR_MODULE  := true
-endif
 include $(BUILD_SHARED_LIBRARY)
 
 include $(AQROOT)/copy_installed_module.mk
@@ -295,4 +309,6 @@ endif
 
 # libarchmodel
 include $(AQROOT)/driver/khronos/libOpenVX/libarchmodel/Android.mk
-
+ifneq ($(ORI_NNARCHPERF),1)
+include $(AQROOT)/driver/khronos/libOpenVX/libarchmodelInterface/Android.mk
+endif

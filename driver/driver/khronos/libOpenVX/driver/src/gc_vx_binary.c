@@ -23,7 +23,9 @@
 #include <windows.h>
 #include <sys/utime.h>
 #endif
-
+#ifndef ORI_NNARCHPERF
+#include "archModelInterface.h"
+#endif
 #define ONCE_FILL_SIZE               1024
 #define BINARY_FILE_NAME_MAX_SIZE    256
 #define LOAD_WHOLE_BINARY_TO_BUFFER  0
@@ -11178,7 +11180,11 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_VerifyGraph(
 
         if (graph->base.context->options.collectPerfType == COLLECT_PERF_ESTIMATE)
         {
+#ifdef ORI_NNARCHPERF
             vxoGraph_PredictPerf(graph);
+#else
+            archGraphPredictPerf(graph);
+#endif
         }
 
         vxmONERROR(vxoGraph_VerifyTiling(graph));

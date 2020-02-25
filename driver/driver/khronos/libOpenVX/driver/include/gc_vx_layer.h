@@ -47,6 +47,9 @@ struct _vxnne_tiling_block_info_s;
 typedef struct _vxnne_mem_param_s *vxnne_mem_param;
 typedef struct _vxnne_mem_request_s *vxnne_mem_request;
 typedef struct _vx_arch_perf_s* vx_arch_perf;
+#ifndef ORI_NNARCHPERF
+typedef struct _arch_perf_s* arch_perf_type;
+#endif
 typedef struct _vx_weights_biases_parameter_base_s *vx_weights_biases_parameter_base;
 
 typedef vx_status (*vxnne_layer_dump_f)(struct _vxnne_layer_s* layer, int verbose, vx_uint32 format);
