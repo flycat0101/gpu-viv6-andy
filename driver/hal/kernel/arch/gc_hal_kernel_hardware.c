@@ -9599,13 +9599,16 @@ _PmSetPowerOffDirection(
     switch (Hardware->chipPowerState)
     {
     case gcvPOWER_ON:
-        /* Stall. */
-        status = _PmStallCommand(Hardware, command, Broadcast);
-
-        if (!gcmIS_SUCCESS(status))
+        if(Hardware->os->device->threadInitializeds[Hardware->core] == gcvTRUE)
         {
-            /* abort for error and NOT READY. */
-            goto OnError;
+            /* Stall. */
+            status = _PmStallCommand(Hardware, command, Broadcast);
+
+            if (!gcmIS_SUCCESS(status))
+            {
+                /* abort for error and NOT READY. */
+                goto OnError;
+            }
         }
 
         if (State == gcvPOWER_IDLE)
@@ -9629,8 +9632,11 @@ _PmSetPowerOffDirection(
         }
 
     case gcvPOWER_SUSPEND:
-        /* Flush. */
-        gcmkONERROR(_PmFlushCache(Hardware, command));
+        if(Hardware->os->device->threadInitializeds[Hardware->core] == gcvTRUE)
+        {
+            /* Flush. */
+            gcmkONERROR(_PmFlushCache(Hardware, command));
+        }
 
         /* Clock control. */
         gcmkONERROR(_PmClockControl(Hardware, gcvPOWER_OFF));
@@ -14902,6 +14908,11 @@ _PrepareFunctions(
             0,
             &physical
             ));
+
+        if(physical >> 32)
+        {
+            gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
+        }
 
         /* Convert to GPU physical address. */
         gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(

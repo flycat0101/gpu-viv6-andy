@@ -972,7 +972,7 @@ static struct miscdevice gal_device = {
 
 static int drv_init(void)
 {
-    int ret = -EINVAL;
+    int result = -EINVAL;
     gceSTATUS status;
     gckGALDEVICE device = gcvNULL;
     struct class* device_class = gcvNULL;
@@ -1016,7 +1016,9 @@ static int drv_init(void)
     if (type == 1)
     {
         /* Register as misc driver. */
-        if (misc_register(&gal_device) < 0)
+        result = misc_register(&gal_device);
+
+        if (result < 0)
         {
             gcmkTRACE_ZONE(
                 gcvLEVEL_ERROR, gcvZONE_DRIVER,
@@ -1030,7 +1032,7 @@ static int drv_init(void)
     else
     {
         /* Register the character device. */
-        int result = register_chrdev(major, DEVICE_NAME, &driver_fops);
+        result = register_chrdev(major, DEVICE_NAME, &driver_fops);
 
         if (result < 0)
         {
@@ -1079,27 +1081,39 @@ static int drv_init(void)
         );
 
     /* Success. */
-    ret = 0;
+    gcmkFOOTER();
+    return 0;
 
 OnError:
-    if (ret)
+    /* Roll back. */
+    if (device_class)
     {
-        /* Roll back. */
-        if (device_class)
-        {
-            device_destroy(device_class, MKDEV(major, 0));
-            class_destroy(device_class);
-        }
-
-        if (device)
-        {
-            gcmkVERIFY_OK(gckGALDEVICE_Stop(device));
-            gcmkVERIFY_OK(gckGALDEVICE_Destroy(device));
-        }
+        device_destroy(device_class, MKDEV(major, 0));
+        class_destroy(device_class);
     }
 
+    if (result < 0)
+    {
+        if (type == 1)
+        {
+            misc_deregister(&gal_device);
+        }
+        else
+        {
+            unregister_chrdev(result, DEVICE_NAME);
+        }
+    }
+    if (device)
+    {
+        gcmkVERIFY_OK(gckGALDEVICE_Stop(device));
+        gcmkVERIFY_OK(gckGALDEVICE_Destroy(device));
+    }
+
+    galcore_device->dma_mask = NULL;
+    galcore_device = NULL;
+
     gcmkFOOTER();
-    return ret;
+    return result;
 }
 
 static void drv_exit(void)
@@ -1139,6 +1153,7 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 #endif
 {
     int ret = -ENODEV;
+    bool getPowerFlag = gcvFALSE;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
     static u64 dma_mask = DMA_BIT_MASK(40);
 #else
@@ -1161,6 +1176,7 @@ static int __devinit gpu_probe(struct platform_device *pdev)
             gcmkFOOTER_NO();
             return ret;
         }
+        getPowerFlag = gcvTRUE;
     }
 
     /* Gather module parameters. */
@@ -1188,6 +1204,14 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 
     if (ret < 0)
     {
+        if(platform->ops->putPower)
+        {
+            if(getPowerFlag == gcvTRUE)
+            {
+                platform->ops->putPower(platform);
+            }
+        }
+
         gcmkFOOTER_ARG(KERN_INFO "Failed to register gpu driver: %d\n", ret);
     }
     else
