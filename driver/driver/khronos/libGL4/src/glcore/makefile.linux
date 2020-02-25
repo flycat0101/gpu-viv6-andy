@@ -22,11 +22,11 @@ else
     DYNAMIC = 1
 endif
 
-ifeq ($(EGL_API_WL), 1)
+ifeq ($(EGL_API_FB), 1)
 ifeq ($(STATIC), 1)
     TARGET_NAME = libGL.a
 else
-    TARGET_NAME = libGL.so
+    TARGET_NAME = libGL.so.1.2
 endif
 else
 ifeq ($(STATIC), 1)
@@ -83,18 +83,41 @@ CFLAGS += -D_GNU_SOURCE
 LIBS += -L $(ROOTDIR)/src/chip/$(OBJ_DIR)
 LIBS += -L $(ROOTDIR)/src/glcore/api/$(OBJ_DIR)
 LIBS += -L $(ROOTDIR)/src/glcore/display_list/$(OBJ_DIR)
-# Path to libGL.so
-LIBS += -L $(ROOTDIR)/src/GLX/client/$(OBJ_DIR)
+LIBS += -lgl4chip -lgl4display_list -lgl4api
 
-LIBS += -lgl4chip -lgl4display_list  -lgl4api
-
-ifeq ($(EGL_API_WL), 1)
-LIBS += -lm -lpthread -lGAL -lVSC
-LDFLAGS += -Wl
+ifeq ($(EGL_API_FB), 1)
+LIBS += -lVSC -lGAL -lm -lpthread
+LDFLAGS += -Wl,--version-script=GL4SymExport
 INSTALL_DIR = $(SDK_DIR)/drivers
+
+install: extra_install
 else
-LIBS += -lm -lpthread -lGAL -lVSC -lGL -lXext -lX11 -lXfixes -lXdamage -ldrm
+LIBS += -L $(ROOTDIR)/src/GLX/client/$(OBJ_DIR) -lGL
+LIBS += -lGAL -lVSC -lXext -lX11 -lXfixes -lXdamage -ldrm -lm -lpthread
 LFLAGS += -Wl,--version-script=glCoreSymExport
 INSTALL_DIR = $(SDK_DIR)/drivers/dri
 endif
+
 include $(AQROOT)/common.target
+
+ifeq ($(EGL_API_FB), 1)
+
+.PHONY: extra_install
+extra_install: $(TARGET_OUTPUT)
+	@mkdir -p $(SDK_DIR)/include/GL
+	@-cp -f $(AQROOT)/sdk/inc/GL/*.h $(SDK_DIR)/include/GL
+	-cd $(OBJ_DIR); ln -sf $(TARGET_NAME) libGL.so; ln -sf $(TARGET_NAME) libGL.so.1
+	cd $(SDK_DIR)/drivers; rm -f libGL.so libGL.so.1; ln -s $(TARGET_NAME) libGL.so; ln -s $(TARGET_NAME) libGL.so.1
+
+# module dependencies
+$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
+                             $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.a) \
+                  $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so \
+                             $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.a)
+
+
+$(TARGET_OUTPUT): $(OBJECTS)
+	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
+	@$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
+
+endif
