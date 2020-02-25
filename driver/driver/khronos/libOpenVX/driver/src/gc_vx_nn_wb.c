@@ -1046,6 +1046,16 @@ VX_PRIVATE_API vx_status vxoWeightBias_Compress(
         goto exit;
     }
 
+#if gcdDUMP
+    gcmDUMP(gcvNULL, "#[weights and biases]\n");
+    gcmDUMP_BUFFER(gcvNULL,
+                   gcvDUMP_BUFFER_MEMORY,
+                   WB_MEM_PHYSICAL_BASE_ADDR(wb),
+                   (gctPOINTER)WB_MEM_LOGICAL_BASE_ADDR(wb),
+                   0,
+                   WB_MEMORY_SIZE(wb));
+#endif
+
 exit:
     if (minZeroRunLens != VX_NULL)
     {
