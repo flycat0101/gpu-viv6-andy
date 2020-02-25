@@ -5012,6 +5012,14 @@ void analysisKernelStreamForHuffman(
     {
         FindBest2PlusRunSets(runZeros, sizeof(runZeros)/sizeof(int), (reorderStreamSize >> bit16_flag) - run);
     }
+    else
+    {
+        memset(outBest2Run, 0, sizeof(outBest2Run));
+        memset(bestRunsSorted, 0, sizeof(bestRunsSorted));
+        memset(best2Runs, 0, sizeof(best2Runs));
+        memset(freq, 0, sizeof(freq));
+        numBestRuns = freqSum = 0;
+    }
 
     if (coding_type == HUFFMAN_CODING_TYPE_NON_RUN_LEN)
     {
