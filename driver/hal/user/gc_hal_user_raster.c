@@ -234,10 +234,6 @@ static gceSTATUS _CheckSurface(
     case gcvSUPERTILED:
     case gcvMULTI_TILED:
     case gcvMULTI_SUPERTILED:
-        if (!Engine->tiling)
-        {
-            return gcvSTATUS_NOT_SUPPORTED;
-        }
         break;
 
     case gcvMINORTILED:
