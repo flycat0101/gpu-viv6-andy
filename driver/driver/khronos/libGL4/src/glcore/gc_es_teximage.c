@@ -584,6 +584,7 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_RGB:
         case GL_RGB8:
         case GL_RGB8_SNORM:
+        case GL_RGB16_SNORM:
         case GL_RGB8I:
         case GL_RGB8UI:
         case GL_RGB16I:
@@ -602,6 +603,7 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_RGBA:
         case GL_RGBA8:
         case GL_RGBA8_SNORM:
+        case GL_RGBA16_SNORM:
         case GL_RGB10_A2:
         case GL_RGB10_A2UI:
         case GL_RGBA8I:
@@ -768,8 +770,19 @@ __glCheckIntegerFormat(
             break;
         case GL_UNSIGNED_INT:
         case GL_INT:
-            if ((GL_RGBA32I != internalFormat) && (GL_RGBA32UI != internalFormat)
-                && (GL_RG32I != internalFormat) && (GL_RG32UI != internalFormat))
+            if ((GL_R8I != internalFormat) && (GL_R8UI != internalFormat)
+                && (GL_R16I != internalFormat) && (GL_R16UI != internalFormat)
+                && (GL_R32I != internalFormat) && (GL_R32UI != internalFormat)
+                && (GL_RG8I != internalFormat) && (GL_RG8UI != internalFormat)
+                && (GL_RG16I != internalFormat) && (GL_RG16UI != internalFormat)
+                && (GL_RG32I != internalFormat) && (GL_RG32UI != internalFormat)
+                && (GL_RGB8I != internalFormat) && (GL_RGB8UI != internalFormat)
+                && (GL_RGB16I != internalFormat) && (GL_RGB16UI != internalFormat)
+                && (GL_RGB32I != internalFormat) && (GL_RGB32UI != internalFormat)
+                && (GL_RGBA8I != internalFormat) && (GL_RGBA8UI != internalFormat)
+                && (GL_RGBA16I != internalFormat) && (GL_RGBA16UI != internalFormat)
+                && (GL_RGBA32I != internalFormat) && (GL_RGBA32UI != internalFormat)
+                && (GL_RGB10_A2UI != internalFormat))
             {
                 goto bad_operation;
             }
@@ -3609,6 +3622,18 @@ GLvoid GL_APIENTRY __glim_TexImage3D(__GLcontext *gc,
 
     __glGenericPixelTransfer(gc, width, height, depth, (tex->faceMipmap[0][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
     (tex->faceMipmap[0][lod]).type = type;
+    if (format == GL_RGBA)
+    {
+        switch (type)
+        {
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+            tex->faceMipmap[0][lod].format = GL_RGB;
+            break;
+        default:
+            break;
+        }
+    }
 
     if (!(*gc->dp.texImage3D)(gc, tex, lod, transferInfo.dstImage))
     {
@@ -3718,6 +3743,18 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
 
     __glGenericPixelTransfer(gc, width, height, 1, (tex->faceMipmap[face][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
     (tex->faceMipmap[face][lod]).type = type;
+    if (format == GL_RGBA)
+    {
+        switch (type)
+        {
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+            tex->faceMipmap[face][lod].format = GL_RGB;
+            break;
+        default:
+            break;
+        }
+    }
 
     if (!(*gc->dp.texImage2D)(gc, tex, face, lod, transferInfo.dstImage))
     {
@@ -4027,6 +4064,18 @@ GLvoid GL_APIENTRY __glim_TexImage1D( __GLcontext *gc,
 
     __glGenericPixelTransfer(gc, width, 1, 1, (tex->faceMipmap[face][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
     (tex->faceMipmap[face][lod]).type = type;
+    if (format == GL_RGBA)
+    {
+        switch (type)
+        {
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+            tex->faceMipmap[face][lod].format = GL_RGB;
+            break;
+        default:
+            break;
+        }
+    }
 
     if (!(*gc->dp.texImage1D)(gc, tex, lod, transferInfo.dstImage))
     {
@@ -4115,6 +4164,19 @@ GLvoid GL_APIENTRY __glim_TexSubImage1D(__GLcontext *gc,
 
     tex->faceMipmap[face][lod].format = format;
     tex->faceMipmap[face][lod].type   = type;
+    if (format == GL_RGBA)
+    {
+        switch (type)
+        {
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+            tex->faceMipmap[face][lod].format = GL_RGB;
+            break;
+        default:
+            break;
+        }
+    }
+
     if (!(*gc->dp.texSubImage1D)(gc, tex, lod, xoffset, width, transferInfo.dstImage))
     {
         __GL_ERROR((*gc->dp.getError)(gc));
@@ -4880,6 +4942,18 @@ GLvoid GL_APIENTRY __glim_TexSubImage3D(__GLcontext *gc,
 
     tex->faceMipmap[0][lod].format = format;
     tex->faceMipmap[0][lod].type   = type;
+    if (format == GL_RGBA)
+    {
+        switch (type)
+        {
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+            tex->faceMipmap[0][lod].format = GL_RGB;
+            break;
+        default:
+            break;
+        }
+    }
 
     if (!(*gc->dp.texSubImage3D)(gc, tex, lod, xoffset, yoffset, zoffset, width, height, depth, transferInfo.dstImage))
     {
@@ -4963,6 +5037,18 @@ GLvoid GL_APIENTRY __glim_TexSubImage2D(__GLcontext *gc,
 
     tex->faceMipmap[face][lod].format = format;
     tex->faceMipmap[face][lod].type   = type;
+    if (format == GL_RGBA)
+    {
+        switch (type)
+        {
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+            tex->faceMipmap[face][lod].format = GL_RGB;
+            break;
+        default:
+            break;
+        }
+    }
 
     if (!(*gc->dp.texSubImage2D)(gc, tex, face, lod, xoffset, yoffset, width, height, transferInfo.dstImage))
     {

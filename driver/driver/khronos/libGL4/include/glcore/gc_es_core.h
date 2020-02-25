@@ -377,6 +377,8 @@ typedef enum
     __GL_FMT_RGB16,
     __GL_FMT_R16_SNORM,
     __GL_FMT_RG16_SNORM,
+    __GL_FMT_RGB16_SNORM,
+    __GL_FMT_RGBA16_SNORM,
 #endif
 
     __GL_FMT_MAX,

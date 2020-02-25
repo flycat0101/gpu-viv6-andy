@@ -1870,6 +1870,19 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
         case GL_RGBA16:
             formatInfo =  &__glFormatInfoTable[__GL_FMT_RGBA16];
             break;
+
+        case GL_R16_SNORM:
+            formatInfo =  &__glFormatInfoTable[__GL_FMT_R16_SNORM];
+            break;
+        case GL_RG16_SNORM:
+            formatInfo =  &__glFormatInfoTable[__GL_FMT_RG16_SNORM];
+            break;
+        case GL_RGB16_SNORM:
+            formatInfo =  &__glFormatInfoTable[__GL_FMT_RGB16_SNORM];
+            break;
+        case GL_RGBA16_SNORM:
+            formatInfo =  &__glFormatInfoTable[__GL_FMT_RGBA16_SNORM];
+            break;
         default:
             break;
         }

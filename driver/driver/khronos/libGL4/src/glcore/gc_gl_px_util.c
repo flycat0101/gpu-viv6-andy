@@ -1919,7 +1919,7 @@ GLvoid __glFinalConversion(GLenum interType, GLenum* type, GLsizei numOfComponen
             }
             break;
         case GL_UNSIGNED_INT_10F_11F_11F_REV:
-            GL_ASSERT(3 == components);
+            GL_ASSERT((3 == components) || (4 == components));
             for(i = 0; i<numOfComponent; i+=components)
             {
                 GLshort r=0,g=0,b=0;
@@ -1932,7 +1932,7 @@ GLvoid __glFinalConversion(GLenum interType, GLenum* type, GLsizei numOfComponen
             }
             break;
         case GL_UNSIGNED_INT_5_9_9_9_REV:
-            GL_ASSERT(3 == components);
+            GL_ASSERT((3 == components) || (4 == components));
             for(i = 0; i<numOfComponent; i+=components)
             {
                 const GLint mBits = 9;
