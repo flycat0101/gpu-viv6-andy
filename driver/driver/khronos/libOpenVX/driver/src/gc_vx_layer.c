@@ -2841,6 +2841,7 @@ vxnne_shader_executable vxnneGetSpace2BatchShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "tmpZP", 1, &uint8_zp);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_width", 1, &input_width);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_height", 1, &input_height);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "out_zeros_point", 1, &out_zeros_point);
         if (status != VX_SUCCESS) goto OnError;
     }
     else if ((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
