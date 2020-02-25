@@ -165,6 +165,13 @@ VkBool32 halti5_isMismatch(VSC_IMAGE_FORMAT vscFormat, VkFormat descFormat)
     VkFormat cmpFormat = mapTable[vscFormat].cmpFormat;
     VkBool32 result = VK_FALSE;
 
+    if (vscFormat == VSC_IMAGE_FORMAT_RGBA16UI &&
+        descFormat == VK_FORMAT_R16_UINT)
+    {
+        result = VK_FALSE;
+        return result;
+    }
+
     if ((descFormat != drvFormat) &&
         (descFormat != cmpFormat))
     {
