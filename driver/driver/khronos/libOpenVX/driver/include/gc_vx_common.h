@@ -213,6 +213,10 @@
 
 #define VX_GRAPH_COMMAND_BUFFER_SIZE        gcdCMD_BUFFER_SIZE
 #define IMG_MAX_WIDTH (65536)
+
+#define REGISTER_FRAME 1
+#define REGISTER_FRAME_CL_RELAX 0
+
 /* Function macros */
 #ifndef vxmLENGTH_OF
 #define vxmLENGTH_OF(array)                 (sizeof(array) / sizeof((array)[0]))
@@ -2549,6 +2553,100 @@ vx_status vxnneGetTensorMemeory(vx_tensor tensor, vx_ptr_ptr ptr, vx_bool stage,
 vx_bool vxoElementOptimization_GetTensorShape(vx_tensor input, vx_uint32 sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION], vx_uint32 * num_of_dims);
 
 vx_status vxnneOperation_Deinitialize(vxnne_operation_s *operation);
+
+#if REGISTER_FRAME
+
+typedef enum _vx_nn_support_type_e
+{
+    VX_NN_QUERY_NN,
+    VX_NN_QUERY_TP,
+    VX_NN_QUERY_SHADER,
+
+    VX_NN_QUERY_COUNT
+}
+vx_nn_support_type_e;
+
+vx_bool vxoLayer_CheckSupport(vx_context context, vx_enum type, vx_enum format, vx_uint32_ptr flag);
+
+typedef struct _vxnne_register_param_s
+{
+    vx_uint32 flag;
+    vx_int32 index;
+    vx_bool support;
+}
+vxnne_register_param_s, *vxnne_register_param;
+
+typedef vx_status (*vxnne_layer_ops_verification_f)(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param);
+typedef vx_status (*vxnne_layer_ops_initialize_f)(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param);
+typedef vx_status(*vxnne_layer_ops_get_ops_f)(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations);
+
+typedef struct _vxnne_layer_imp_s
+{
+    vx_char                         description[32];
+    vxnne_layer_ops_verification_f  verification;
+    vxnne_layer_ops_initialize_f    initialize;
+    vxnne_layer_deinitialize_f      deinitialize;
+}
+vxnne_layer_imp_s, *vxnne_layer_imp;
+
+typedef struct _vxnne_layer_ops_s
+{
+    vxnne_layer_imp imps;
+    vx_uint32       imp_count;
+    vx_enum         imp_type;
+    vxnne_layer_ops_get_ops_f get_operations;
+}
+vxnne_layer_ops_s, *vxnne_layer_ops;
+
+vx_status vxnneLayer_Ops_Initialize(
+    vx_node                     node,
+    vxnne_layer_ops             ops,
+    vx_char*                    name,
+    const vx_uint32             size_of_layer,
+    const vx_reference          parameters[],
+    vx_uint32                   num
+    );
+
+vx_status vxoNNLayer_NotSupport_Initializer(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param);
+
+vx_bool vxoNNCommon_NotSupport(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param);
+
+vx_bool vxoNNCommon_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param);
+
+vx_status vxoNNCommon_Deinitialize(vxnne_layer layer);
+
+vx_status vxoLayer_VerificationHead(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param);
+vx_status vxoLayer_VerificationFoot(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool* support);
+
+vx_status vxoLayer_InitializeHead(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param);
+vx_status vxoLayer_InitializeFoot(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param);
+
+#if REGISTER_FRAME_CL_RELAX
+#define REGISTER_ADDON_DEBUG(list) \
+    { \
+        vxnne_layer_imp_s _register; \
+        gcoOS_MemCopy(&_register, &list[2], sizeof(vxnne_layer_imp_s)); \
+        gcoOS_MemCopy(&list[2], &list[3], sizeof(vxnne_layer_imp_s)); \
+        gcoOS_MemCopy(&list[3], &_register, sizeof(vxnne_layer_imp_s)); \
+    }
+
+#else
+#define REGISTER_ADDON_DEBUG(list)
+#endif
+
+#define REGISTER_LAYERS(list, layer_type, name, callback) \
+    { \
+        vxnne_layer_ops_s ops = { VX_NULL, gcmCOUNTOF(list) };   \
+        REGISTER_ADDON_DEBUG(registerSoftmax2s) \
+        ops.imps = list;  \
+        ops.get_operations = callback;  \
+        vxmONERROR(vxnneLayer_Ops_Initialize(node, &ops, name, sizeof(layer_type), parameters, num)); \
+    }
+
+#define SETBIT(target, value, offset) (target) |= ((value) << (offset))
+#define GETBIT(target, offset) (((target) & (1 << (offset))) >> (offset))
+
+#endif
 
 
 
