@@ -1847,9 +1847,6 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 
         refCount = vxoGlobalData_Release(context->globalData);
 
-        if (context->globalData->apm)
-            DestroyAPModel(context->globalData->apm);
-
         vxFree(context);
 
         /* Free the global resources */
