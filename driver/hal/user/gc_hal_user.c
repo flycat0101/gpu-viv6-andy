@@ -595,25 +595,17 @@ gcoHAL_ConstructEx(
         ||  (iface.u.Version.build != gcvVERSION_BUILD)
         )
         {
-            gcmPRINT("HAL user version %d.%d.%d build %u",
-                     gcvVERSION_MAJOR, gcvVERSION_MINOR,
-                     gcvVERSION_PATCH, gcvVERSION_BUILD);
-            gcmPRINT("HAL kernel version %d.%d.%d build %u",
-                     iface.u.Version.major, iface.u.Version.minor,
-                     iface.u.Version.patch, iface.u.Version.build);
+            gcmPRINT("HAL user version %s", gcvVERSION_STRING);
+            gcmPRINT("HAL kernel version %s", gcvVERSION_STRING);
 
             gcmONERROR(gcvSTATUS_VERSION_MISMATCH);
         }
 
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
-    gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
-                  "HAL user version %d.%d.%d build %u",
-                  gcvVERSION_MAJOR, gcvVERSION_MINOR,
-                  gcvVERSION_PATCH, gcvVERSION_BUILD);
-    gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
-                  "HAL kernel version %d.%d.%d build %u",
-                  iface.u.Version.major, iface.u.Version.minor,
-                  iface.u.Version.patch, iface.u.Version.build);
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
+                      "HAL user version %s", gcvVERSION_STRING);
+        gcmTRACE_ZONE(gcvLEVEL_INFO, _GC_OBJ_ZONE,
+                      "HAL kernel version %s", gcvVERSION_STRING);
 #endif
 
         /* Query chip info */

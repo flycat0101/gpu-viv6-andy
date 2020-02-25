@@ -985,8 +985,7 @@ static int drv_init(void)
 
     gcmkHEADER();
 
-    printk(KERN_INFO "Galcore version %d.%d.%d.%d\n",
-        gcvVERSION_MAJOR, gcvVERSION_MINOR, gcvVERSION_PATCH, gcvVERSION_BUILD);
+    printk(KERN_INFO "Galcore version %s\n", gcvVERSION_STRING);
 
     if (showArgs)
     {

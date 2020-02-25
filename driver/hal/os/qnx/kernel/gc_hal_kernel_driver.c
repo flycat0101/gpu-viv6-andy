@@ -2302,8 +2302,7 @@ static int drv_init(void)
     }
 #endif
 
-    gcmkPRINT("Galcore version %d.%d.%d.%d\n",
-        gcvVERSION_MAJOR, gcvVERSION_MINOR, gcvVERSION_PATCH, gcvVERSION_BUILD);
+    gcmkPRINT("Galcore version %s\n", gcvVERSION_STRING);
 
     if (physSize == 0)
     {
