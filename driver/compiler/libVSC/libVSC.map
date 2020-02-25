@@ -243,6 +243,8 @@
     gcDestroyPatchDirective;
     gcQueryFormatConvertionDirectiveSampler;
     gcCreateYFlippedShaderDirective;
+    gcCreateFrontFacingDirective;
+    gcCreateAlphaTestDirective;
     gcCreateTcsInputMismatch;
     gcQueryOutputConversionDirective;
     gcSHADER_DynamicPatch;

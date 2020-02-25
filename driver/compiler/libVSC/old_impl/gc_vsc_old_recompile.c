@@ -4341,6 +4341,48 @@ OnError:
 }
 
 static gceSTATUS
+_addAlphaTestDataUniform(
+    IN OUT gcSHADER             Shader,
+    IN OUT gcUNIFORM          * AlphaTestData
+    )
+{
+    gceSTATUS    status = gcvSTATUS_OK;
+    gcUNIFORM    uniform = gcvNULL;
+    gctCHAR      name[64];
+    gctUINT      offset   = 0;
+    gctUINT      i;
+
+    /* construct const vector name, create and initialize constant uniform */
+    gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_alphaTestData");
+
+    /* search for uniform "#sh_alphaTestData" in Shader */
+    for(i = 0; i < Shader->uniformCount; i++)
+    {
+        uniform = Shader->uniforms[i];
+        if(uniform)
+        {
+            if(gcmIS_SUCCESS(gcoOS_StrCmp(uniform->name, name)))
+            {
+                break;
+            }
+        }
+    }
+    /* uniform "#sh_alphaTestData" not found, add it */
+    if(i == Shader->uniformCount)
+    {
+        gcmONERROR(gcSHADER_AddUniform(Shader, name, gcSHADER_FLOAT_X2, 1, gcSHADER_PRECISION_HIGH, &uniform));
+        SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILER_GEN);
+    }
+
+    if(AlphaTestData)
+    {
+        *AlphaTestData = uniform;
+    }
+OnError:
+    return status;
+}
+
+static gceSTATUS
 _addBlendSamplerUniform(
     IN OUT gcSHADER             Shader,
     IN OUT gcUNIFORM          * BlendSampler
@@ -6390,12 +6432,22 @@ _patchYFlippedShader(
                                                            gcSL_FLOAT,
                                                            frontFacing->precision,
                                                            0));
-            gcSHADER_AddSourceAttributeFormatted(Shader,
-                                                 frontFacing,
-                                                 gcSL_SWIZZLE_XXXX,
-                                                 0,
-                                                 gcSL_FLOAT);
-
+            if (gcSHADER_GoVIRPass(Shader))
+            {
+                gcSHADER_AddSourceAttributeFormatted(Shader,
+                                                     frontFacing,
+                                                     gcSL_SWIZZLE_XXXX,
+                                                     0,
+                                                     gcSL_BOOLEAN);
+            }
+            else
+            {
+                gcSHADER_AddSourceAttributeFormatted(Shader,
+                                                     frontFacing,
+                                                     gcSL_SWIZZLE_XXXX,
+                                                     0,
+                                                     gcSL_FLOAT);
+            }
             gcmONERROR(gcSHADER_AddSourceConstantFormatted(Shader,
                                                             (void *)&constantZero,
                                                             gcSL_FLOAT));
@@ -6511,6 +6563,88 @@ OnError:
     return status;
 }
 
+static gceSTATUS
+_patchInvertFrontFacing(
+    IN OUT gcSHADER                 Shader
+    )
+{
+    gceSTATUS   status = gcvSTATUS_OK;
+    gcATTRIBUTE                 frontFacing = gcvNULL;
+    gctINT                      tempCodeIndex;
+    gcSHADER_INSTRUCTION_INDEX  instrIndex = 0;
+    gctINT                      i;
+    gctUINT                     lastInstruction = Shader->lastInstruction;
+    gctUINT32                   newTemp;
+    const gctFLOAT              constantZero = 0.0;
+
+    /* only apply the patch to fragment shader */
+    if (Shader->type != gcSHADER_TYPE_FRAGMENT)
+        return status;
+
+    /* find the attribute */
+    for (i = 0; i < (gctINT)Shader->attributeCount; ++i)
+    {
+        if (Shader->attributes[i] == gcvNULL) continue;
+
+        if (Shader->attributes[i]->nameLength == gcSL_FRONT_FACING)
+        {
+            frontFacing = Shader->attributes[i];
+            break;
+        }
+    }
+    if (frontFacing)
+    {
+        /* insert NOPs to the begin of main() */
+        tempCodeIndex = _insertNOP2MainBegin(Shader, 1);
+
+        lastInstruction = Shader->lastInstruction;
+        instrIndex = Shader->instrIndex;
+        Shader->lastInstruction = tempCodeIndex;
+        Shader->instrIndex = gcSHADER_OPCODE;
+
+        /* gl_FrontFacing  = !gl_FrontFacing */
+        /* create a new temp register */
+        newTemp = gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X1);
+        _ChangeAttribToTempForAllCodes(Shader, frontFacing->index, newTemp);
+        /* SET.eq temp.x, gl_FrontFacing, 0.0 */
+        gcmONERROR(gcSHADER_AddOpcodeConditionIndexed(Shader,
+            gcSL_SET,
+            gcSL_EQUAL,
+            newTemp,
+            gcSL_ENABLE_X,
+            gcSL_NOT_INDEXED,
+            0,
+            gcSL_FLOAT,
+            frontFacing->precision,
+            0));
+        if (gcSHADER_GoVIRPass(Shader))
+        {
+            gcSHADER_AddSourceAttributeFormatted(Shader,
+                                                    frontFacing,
+                                                    gcSL_SWIZZLE_XXXX,
+                                                    0,
+                                                    gcSL_BOOLEAN);
+        }
+        else
+        {
+            gcSHADER_AddSourceAttributeFormatted(Shader,
+                                                    frontFacing,
+                                                    gcSL_SWIZZLE_XXXX,
+                                                    0,
+                                                    gcSL_FLOAT);
+        }
+        gcmONERROR(gcSHADER_AddSourceConstantFormatted(Shader,
+            (void *)&constantZero,
+            gcSL_FLOAT));
+
+        Shader->lastInstruction = lastInstruction;
+        Shader->instrIndex = instrIndex;
+    }
+
+OnError:
+    return status;
+}
+
 static gcOUTPUT
 _findFirstRTOutput(IN gcSHADER Shader)
 {
@@ -6527,6 +6661,284 @@ _findFirstRTOutput(IN gcSHADER Shader)
         }
     }
     return rt;
+}
+
+static gcFUNCTION
+_createAlphaTestStubFunction(
+    IN gcSHADER             Shader,
+    IN gcsPatchAlphaTestShader * AlphaTest,
+    IN gcFUNCTION           AlphaTestFunction,
+    IN gctUINT              CodeIndex
+    )
+{
+    gctCHAR          funcName[32];
+    gctUINT          offset         = 0;
+    gcFUNCTION       stubFunction    = gcvNULL;
+    gcSL_INSTRUCTION tempCode = gcvNULL;
+    gctPOINTER       pointer = gcvNULL;
+    gcSL_INSTRUCTION code;
+    gctUINT          argNo;
+    gcsValue         val0;
+
+    gcmVERIFY_OK(
+        gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
+                           "_alphaTestStub_%d", CodeIndex));
+
+    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+
+    tempCode = (gcSL_INSTRUCTION) pointer;
+
+    gcoOS_MemCopy(tempCode, &Shader->code[CodeIndex], sizeof(struct _gcSL_INSTRUCTION));
+    code = tempCode;
+
+    /* Add stubFunction to Shader. */
+    gcSHADER_AddFunction(Shader, funcName, &stubFunction);
+    SetFunctionRecompilerStub(stubFunction);
+
+    /* add arguments */
+    gcSHADER_BeginFunction(Shader, stubFunction);
+
+    argNo = 0;
+
+    /*  mov  arg0, alphaValue */
+    {
+        gcOUTPUT output = _findFirstRTOutput(Shader);
+        gcmASSERT(output != gcvNULL);
+        val0.i32 = GetOutputTempIndex(output);
+        _addArgPassInst(Shader, AlphaTestFunction, stubFunction, code,
+                        argNo++ /*ARG0*/,
+                        gcvFloatTempIndex,
+                        &val0,
+                        gcSL_SWIZZLE_WWWW, gcvFALSE, GetUniformPrecision(output));
+
+    }
+
+    /* mov arg1 alphaTestData */
+    val0.i32 = GetUniformIndex(AlphaTest->alphaTestData);
+    _addArgPassInst(Shader, AlphaTestFunction, stubFunction, gcvNULL, argNo++ /*ARG1*/,
+        gcvFloatUniformIndex, &val0, gcSL_SWIZZLE_XYYY, gcvTRUE, GetUniformPrecision(AlphaTest->alphaTestData));
+
+    /* call _convert_func_n */
+    _addCallInst(Shader, AlphaTestFunction);
+
+    /* ret */
+    _addRetInst(Shader);
+
+    gcSHADER_EndFunction(Shader, stubFunction);
+
+    if (tempCode)
+    {
+        /* Free the current code buffer. */
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, tempCode));
+    }
+
+    return stubFunction;
+}
+
+#define __BLEND_RECOMPILER_SHADER_LENGTH__  5000
+gctSTRING BlendRecompilerShaderSource = gcvNULL;
+
+gceSTATUS
+gcSHADER_FreeBlendLibrary(
+    void
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER();
+
+    if (gcBlendLibrary)
+    {
+        /* Free library. */
+        gcSHADER_Destroy(gcBlendLibrary);
+        gcBlendLibrary = gcvNULL;
+
+        if (BlendRecompilerShaderSource)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, BlendRecompilerShaderSource);
+        }
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcLoadBlendLibrary(
+    void
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctSTRING log = gcvNULL;
+    gctBOOL locked = gcvFALSE;
+
+    gcmONERROR(gcLockLoadLibrary());
+    locked = gcvTRUE;
+
+    if (gcBlendLibrary == gcvNULL)
+    {
+        gcSHADER library = gcvNULL;
+
+        gctSIZE_T sourceSize, length;
+        gctPOINTER  pointer = gcvNULL;
+
+        if (gcGLSLCompiler == gcvNULL)
+        {
+            locked = gcvFALSE;
+            gcUnLockLoadLibrary();
+            return gcvSTATUS_INVALID_ADDRESS;
+        }
+
+        gcmONERROR(gcoOS_Allocate(gcvNULL, __BLEND_RECOMPILER_SHADER_LENGTH__, &pointer));
+        BlendRecompilerShaderSource = pointer;
+
+        length = gcoOS_StrLen(gcLibConvertBlend_Func, gcvNULL);
+        gcoOS_StrCopySafe(BlendRecompilerShaderSource, length + 1, gcLibConvertBlend_Func);
+
+        sourceSize = gcoOS_StrLen(BlendRecompilerShaderSource, gcvNULL);
+        status = (*gcGLSLCompiler)(gcSHADER_TYPE_FRAGMENT /*gcSHADER_TYPE_LIBRARY*/,
+            sourceSize,
+            BlendRecompilerShaderSource,
+            &library,
+            &log);
+
+        if (status != gcvSTATUS_OK)
+        {
+            /* report error */
+            gcoOS_Print("Compiler Error:\n%s\n", log);
+            goto OnError;
+        }
+
+        if (log)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, log);
+        }
+
+        gcBlendLibrary = library;
+
+        locked = gcvFALSE;
+        gcUnLockLoadLibrary();
+        return gcvSTATUS_OK;
+    }
+    else
+    {
+        locked = gcvFALSE;
+        gcUnLockLoadLibrary();
+        return status;
+    }
+
+OnError:
+    if (BlendRecompilerShaderSource)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, BlendRecompilerShaderSource);
+    }
+
+    if (log)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, log);
+    }
+
+    if (locked)
+    {
+        gcmVERIFY_OK(gcUnLockLoadLibrary());
+    }
+
+    /* Return the status. */
+    return status;
+}
+
+gceSTATUS
+_createAlphaTestFunction(
+IN gcSHADER              Shader,
+IN gcSHADER              Library,
+OUT gcFUNCTION          *ConvertFunction
+)
+{
+    gceSTATUS       status = gcvSTATUS_OK;
+    gctSTRING       convertFuncName = "_viv_alpha_test";
+
+    gcmASSERT(Library != gcvNULL);
+
+    /* Check if convertFunction already exists. */
+    gcmONERROR(gcSHADER_GetFunctionByName(Shader,
+        convertFuncName,
+        ConvertFunction));
+
+    if (*ConvertFunction == gcvNULL)
+    {
+        /* Link the convert function from library */
+        gcmONERROR(gcSHADER_LinkLibFunction(Shader,
+            Library,
+            convertFuncName,
+            ConvertFunction));
+
+        if (*ConvertFunction == gcvNULL)
+        {
+            status = gcvSTATUS_NAME_NOT_FOUND;
+        }
+    }
+
+OnError:
+    return status;
+}
+
+static gceSTATUS
+_patchAlphaTest(
+    IN OUT gcSHADER                  Shader,
+    IN OUT gcsPatchAlphaTestShader * AlphaTestShader
+    )
+{
+    gceSTATUS   status = gcvSTATUS_OK;
+    gcFUNCTION  convertFunction = gcvNULL;
+    gcFUNCTION  stubFunction = gcvNULL;
+    gctINT      tempCodeIndex;
+    gctUINT     lastInstruction;
+    gcSHADER_INSTRUCTION_INDEX instrIndex;
+    gcSL_INSTRUCTION  tempCode;
+
+    /* only apply the patch to fragment shader */
+    if (Shader->type != gcSHADER_TYPE_FRAGMENT)
+        return status;
+
+    /* Load blend library. */
+    if (gcBlendLibrary == gcvNULL)
+    {
+        gcmONERROR(gcLoadBlendLibrary());
+    }
+
+    _addAlphaTestDataUniform(Shader, &AlphaTestShader->alphaTestData);
+
+    /* insert a NOP to the end of main(). */
+    tempCodeIndex = _insertNOP2Main(Shader, 1);
+
+    /* Construct convert function. */
+    gcmONERROR(_createAlphaTestFunction(Shader,
+        gcBlendLibrary,
+        &convertFunction));
+
+    /* Construct call stub function. */
+    stubFunction = _createAlphaTestStubFunction(Shader,
+        AlphaTestShader,
+        convertFunction,
+        tempCodeIndex);
+
+    /* Call the stub function. */
+    tempCode = &Shader->code[tempCodeIndex];
+    if (gcmSL_OPCODE_GET(tempCode->opcode, Opcode) != gcSL_NOP)
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    lastInstruction = Shader->lastInstruction;
+    instrIndex = Shader->instrIndex;
+    Shader->lastInstruction = tempCodeIndex;
+    Shader->instrIndex = gcSHADER_OPCODE;
+    _addCallInst(Shader, stubFunction);
+    Shader->lastInstruction = lastInstruction;
+    Shader->instrIndex = instrIndex;
+
+OnError:
+    return status;
 }
 
 /* find the temp register assigned to gl_vertexID variable */
@@ -6949,118 +7361,6 @@ _patchColorKill(
     Shader->instrIndex = instrIndex;
 
 OnError:
-    return status;
-}
-
-#define __BLEND_RECOMPILER_SHADER_LENGTH__  5000
-gctSTRING BlendRecompilerShaderSource = gcvNULL;
-
-gceSTATUS
-gcSHADER_FreeBlendLibrary(
-    void
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmHEADER();
-
-    if (gcBlendLibrary)
-    {
-        /* Free library. */
-        gcSHADER_Destroy(gcBlendLibrary);
-        gcBlendLibrary = gcvNULL;
-
-        if (BlendRecompilerShaderSource)
-        {
-            gcmOS_SAFE_FREE(gcvNULL, BlendRecompilerShaderSource);
-        }
-    }
-
-    gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
-gcLoadBlendLibrary(
-    void
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctSTRING log = gcvNULL;
-    gctBOOL locked = gcvFALSE;
-
-    gcmONERROR(gcLockLoadLibrary());
-    locked = gcvTRUE;
-
-    if (gcBlendLibrary == gcvNULL)
-    {
-        gcSHADER library = gcvNULL;
-
-        gctSIZE_T sourceSize, length;
-        gctPOINTER  pointer = gcvNULL;
-
-        if (gcGLSLCompiler == gcvNULL)
-        {
-            locked = gcvFALSE;
-            gcUnLockLoadLibrary();
-            return gcvSTATUS_INVALID_ADDRESS;
-        }
-
-        gcmONERROR(gcoOS_Allocate(gcvNULL, __BLEND_RECOMPILER_SHADER_LENGTH__, &pointer));
-        BlendRecompilerShaderSource = pointer;
-
-        length = gcoOS_StrLen(gcLibConvertBlend_Func, gcvNULL);
-        gcoOS_StrCopySafe(BlendRecompilerShaderSource, length + 1, gcLibConvertBlend_Func);
-
-        sourceSize = gcoOS_StrLen(BlendRecompilerShaderSource, gcvNULL);
-        status = (*gcGLSLCompiler)(gcSHADER_TYPE_FRAGMENT /*gcSHADER_TYPE_LIBRARY*/,
-            sourceSize,
-            BlendRecompilerShaderSource,
-            &library,
-            &log);
-
-        if (status != gcvSTATUS_OK)
-        {
-            /* report error */
-            gcoOS_Print("Compiler Error:\n%s\n", log);
-            goto OnError;
-        }
-
-        if (log)
-        {
-            gcmOS_SAFE_FREE(gcvNULL, log);
-        }
-
-        gcBlendLibrary = library;
-
-        locked = gcvFALSE;
-        gcUnLockLoadLibrary();
-        return gcvSTATUS_OK;
-    }
-    else
-    {
-        locked = gcvFALSE;
-        gcUnLockLoadLibrary();
-        return status;
-    }
-
-OnError:
-    if (BlendRecompilerShaderSource)
-    {
-        gcmOS_SAFE_FREE(gcvNULL, BlendRecompilerShaderSource);
-    }
-
-    if (log)
-    {
-        gcmOS_SAFE_FREE(gcvNULL, log);
-    }
-
-    if (locked)
-    {
-        gcmVERIFY_OK(gcUnLockLoadLibrary());
-    }
-
-    /* Return the status. */
     return status;
 }
 
@@ -9881,6 +10181,12 @@ gcSHADER_DynamicPatch(
         case gceRK_PATCH_Y_FLIPPED_SHADER:
             status = _patchYFlippedShader(Shader,
                            curDirective->patchValue.yFlippedShader);
+            break;
+        case gceRK_PATCH_INVERT_FRONT_FACING:
+            status = _patchInvertFrontFacing(Shader);
+            break;
+        case gceRK_PATCH_ALPHA_TEST:
+            status = _patchAlphaTest(Shader, curDirective->patchValue.alphaTestShader);
             break;
         case gceRK_PATCH_SAMPLE_MASK:
             status = _patchSampleMask(Shader,
@@ -13121,6 +13427,7 @@ gcSHADER_FindLibFunction(
             /* fall through */
         case gcSL_BARRIER:
         case gcSL_MEM_BARRIER:
+        case gcSL_KILL:
             /* Skip instructions without destination and source. */
             break;
 

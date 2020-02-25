@@ -36801,6 +36801,84 @@ gcCreateYFlippedShaderDirective(
 }
 
 gceSTATUS
+gcCreateFrontFacingDirective(
+    OUT gcPatchDirective  **   PatchDirectivePtr
+    )
+{
+    gceSTATUS          status = gcvSTATUS_OK;
+    gcPatchDirective * pointer;
+
+    gcmHEADER();
+    gcmASSERT(PatchDirectivePtr != gcvNULL);
+
+    status = gcoOS_Allocate(gcvNULL,
+                            gcmSIZEOF(gcPatchDirective),
+                            (gctPOINTER *)&pointer);
+    if (gcmIS_ERROR(status)) {
+        /* Error. */
+        gcmFATAL("gcCreateFrontFacingDirective: gcoOS_Allocate failed status=%d(%s)",
+                 status, gcoOS_DebugStatus2Name(status));
+        gcmFOOTER();
+        return status;
+    }
+
+    /* link the new directive to existing directive */
+    pointer->next      = *PatchDirectivePtr;
+    pointer->kind      = gceRK_PATCH_INVERT_FRONT_FACING;
+
+    *PatchDirectivePtr = pointer;
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcCreateAlphaTestDirective(
+    OUT gcPatchDirective  **   PatchDirectivePtr
+    )
+{
+    gceSTATUS          status = gcvSTATUS_OK;
+    gcPatchDirective * pointer;
+    gcsPatchAlphaTestShader *fc;
+
+    gcmHEADER();
+    gcmASSERT(PatchDirectivePtr != gcvNULL);
+
+    status = gcoOS_Allocate(gcvNULL,
+                            gcmSIZEOF(gcPatchDirective),
+                            (gctPOINTER *)&pointer);
+    if (gcmIS_ERROR(status)) {
+        /* Error. */
+        gcmFATAL("gcCreateAlphaTestDirective: gcoOS_Allocate failed status=%d(%s)",
+                 status, gcoOS_DebugStatus2Name(status));
+        gcmFOOTER();
+        return status;
+    }
+
+    /* link the new directive to existing directive */
+    pointer->next      = *PatchDirectivePtr;
+    pointer->kind      = gceRK_PATCH_ALPHA_TEST;
+
+    *PatchDirectivePtr = pointer;
+
+    status = gcoOS_Allocate(gcvNULL,
+                            gcmSIZEOF(gcsPatchAlphaTestShader),
+                            (gctPOINTER *)&fc);
+    if (gcmIS_ERROR(status)) {
+        /* Error. */
+        gcmFATAL("gcCreateAlphaTestDirective: gcoOS_Allocate failed status=%d(%s)",
+                 status, gcoOS_DebugStatus2Name(status));
+        gcmFOOTER();
+        return status;
+    }
+    pointer->patchValue.alphaTestShader = fc;
+    fc->alphaTestData                   = gcvNULL;
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcCreateSampleMaskDirective(
     IN gctBOOL                 AlphaToConverageEnabled,
     IN gctBOOL                 SampleConverageEnabled,
@@ -37148,6 +37226,12 @@ gcDestroyPatchDirective(
         case gceRK_PATCH_ALPHA_BLEND:
             gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL,
                 curDirective->patchValue.alphaBlend));
+            break;
+        case gceRK_PATCH_INVERT_FRONT_FACING:
+            break;
+        case gceRK_PATCH_ALPHA_TEST:
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL,
+                curDirective->patchValue.alphaTestShader));
             break;
         default:
             gcmASSERT(gcvFALSE);  /* not implemented yet */
