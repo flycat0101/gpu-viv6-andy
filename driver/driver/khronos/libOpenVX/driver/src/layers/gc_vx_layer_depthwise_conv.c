@@ -277,7 +277,10 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SW_Initialize(vxnne_layer ops_l
 
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT));
-    vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    if (biases)
+    {
+        vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    }
     vxmONERROR(vxnneOperation_AddReference(&depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
 
 OnError:
