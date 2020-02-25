@@ -776,7 +776,7 @@ VX_PRIVATE_API vx_bool vxoNormalization_TP_Support(vx_node node, const vx_refere
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_scalar  type_s                     = (vx_scalar)parameters[1];
     vx_scalar  norm_size_s                = (vx_scalar)parameters[2];
-    vx_tensor  outputs                    = (vx_tensor)parameters[6];
+    vx_tensor  outputs                    = (vx_tensor)parameters[7];
 
     vx_enum    norm_type                  = type_s->value->e;
     vx_uint32  norm_size                  = norm_size_s->value->u32;
