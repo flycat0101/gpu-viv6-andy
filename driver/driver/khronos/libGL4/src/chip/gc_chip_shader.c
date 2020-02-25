@@ -2089,6 +2089,16 @@ gcChipProcessUniforms(
                     for (j = 0; j < (GLint)arraySize; ++j)
                     {
                         GL_ASSERT(samplerIdx < (GLint)gcmCOUNTOF(program->samplerMap));
+                        /*
+                        ** While unifiedAllocStrategy is UNIFIED_RF_ALLOC_STRATEGY_UNIFIED,
+                        ** It will allocate in full scope of unified register file, so address offset will be set to zero.
+                        ** Then if there is an uniform sampler in different stages, the sampler map of the previous stage will be covered.
+                        ** VIV TODO: Whether need to use linked list instead of array?
+                        */
+                        if (program->samplerMap[samplerIdx].stage != __GLSL_STAGE_LAST)
+                        {
+                            samplerIdx++;
+                        }
                         program->samplerMap[samplerIdx].shaderType = shaderType;
                         program->samplerMap[samplerIdx].type = dataType;
                         program->samplerMap[samplerIdx].slUniform = slot;
