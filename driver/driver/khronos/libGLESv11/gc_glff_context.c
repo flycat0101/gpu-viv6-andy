@@ -108,6 +108,8 @@ static gctBOOL _IsNeedClearTexture()
 **
 **      SharedContext
 **          TBD.
+**      SharedContextClient
+**          shared context's client, such as es11, es20, es3
 **
 **  OUTPUT:
 **
@@ -119,7 +121,8 @@ glfCreateContext(
     void * Thread,
     gctINT ClientVersion,
     VEGLimports *Imports,
-    void * SharedContext
+    void * SharedContext,
+    GLint SharedContextClient
     )
 {
     gceSTATUS status;
@@ -390,7 +393,13 @@ glfCreateContext(
         context->hw = Engine;
 
         /* Save shared context pointer. */
-        context->shared = SharedContext;
+        /*
+            VIV: We don't support shared context between ES11 and ES20 above.
+        */
+        if (ClientVersion == SharedContextClient)
+        {
+            context->shared = (struct _glsCONTEXT*)SharedContext;
+        }
 
         /* Query chip identity. */
         gcmERR_BREAK(gcoHAL_QueryChipIdentity(

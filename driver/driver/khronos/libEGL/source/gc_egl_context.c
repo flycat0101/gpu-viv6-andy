@@ -483,7 +483,8 @@ _CreateApiContext(
     VEGLThreadData Thread,
     VEGLContext    Context,
     VEGLConfig     Config,
-    void         * SharedContext
+    void         * SharedContext,
+    EGLint         SharedContextClient
     )
 {
     VEGLimports imports =
@@ -557,7 +558,7 @@ _CreateApiContext(
      */
     imports.protectedContext = Context->protectedContent;
 
-    return (*dispatch->createContext)(Thread, Context->client, &imports, SharedContext);
+    return (*dispatch->createContext)(Thread, Context->client, &imports, SharedContext, SharedContextClient);
 }
 
 
@@ -1411,7 +1412,8 @@ eglCreateContext(
     context->context = _CreateApiContext(
         thread, context,
         eglConfig,
-        (sharedContext != gcvNULL) ? sharedContext->context : gcvNULL);
+        (sharedContext != gcvNULL) ? sharedContext->context : gcvNULL,
+        (sharedContext != gcvNULL) ? sharedContext->client : 0);
 
     if (context->context == gcvNULL)
     {

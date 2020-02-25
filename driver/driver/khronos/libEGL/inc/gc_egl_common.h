@@ -326,7 +326,8 @@ typedef void * (* veglCREATECONTEXT) (
     void        * Thread,
     gctINT        ClientVersion,
     VEGLimports * Imports,
-    gctPOINTER    SharedContext
+    gctPOINTER    SharedContext,
+    gctINT        SharedContextClien
     );
 
 typedef EGLBoolean (* veglDESTROYCONTEXT) (
