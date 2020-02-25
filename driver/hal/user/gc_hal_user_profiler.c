@@ -159,7 +159,6 @@ OnError:
 
 static void
 _RecordCounters(
-    IN gcoPROFILER Profiler,
     IN gctPOINTER Logical,
     IN gctUINT32 CoreId,
     OUT gcsPROFILER_COUNTERS * Counters
@@ -168,7 +167,6 @@ _RecordCounters(
     gctUINT32_PTR memory = gcvNULL;
     gctUINT32 offset = 0;
     gctUINT32 clusterIDWidth = 0;
-    gctUINT32 index;
 
     gcoHARDWARE_QueryCluster(gcvNULL, gcvNULL, gcvNULL, gcvNULL, &clusterIDWidth);
 
@@ -176,7 +174,6 @@ _RecordCounters(
 
     gcoOS_ZeroMemory(&Counters->counters_part1, gcmSIZEOF(gcsPROFILER_COUNTERS_PART1));
     gcoOS_ZeroMemory(&Counters->counters_part2, gcmSIZEOF(gcsPROFILER_COUNTERS_PART2));
-    gcoOS_ZeroMemory(&Counters->counters_part3, gcmSIZEOF(gcsPROFILER_VIP_PROBE_COUNTERS));
     /* module FE */
     gcmGET_COUNTER(Counters->counters_part1.fe_out_vertex_count, 0);
     gcmGET_COUNTER(Counters->counters_part1.fe_cache_miss_count, 1);
@@ -339,92 +336,6 @@ _RecordCounters(
     gcmGET_LATENCY_COUNTER(Counters->counters_part2.l2_axi1_min_latency, Counters->counters_part2.l2_axi1_max_latency, 11);
     gcmGET_COUNTER(Counters->counters_part2.l2_axi1_total_latency, 12);
     gcmGET_COUNTER(Counters->counters_part2.l2_axi1_total_request_count, 13);
-    offset += MODULE_GPUL2_CACHE_COUNTER_NUM;
-
-    if (Profiler->vipProbe)
-    {
-        /* module NN */
-        gcmGET_COUNTER(Counters->counters_part3.nn_layer_id, 0);
-        Counters->counters_part3.nn_layer_id &= 0xFFFF;
-        gcmGET_COUNTER(Counters->counters_part3.nn_instr_info, 1);
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_busy_cycle, 2);
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_busy_cycle_overflow, 3);
-        Counters->counters_part3.nn_total_busy_cycle_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_read_cycle_ddr, 4);
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_read_cycle_ddr_overflow, 5);
-        Counters->counters_part3.nn_total_read_cycle_ddr_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_read_bandwidth_ddr, 6);
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_read_bandwidth_ddr_overflow, 7);
-        Counters->counters_part3.nn_total_read_bandwidth_ddr_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_write_cycle_ddr, 8);
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_write_cycle_ddr_overflow, 9);
-        Counters->counters_part3.nn_total_write_cycle_ddr_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_write_bandwidth_ddr, 10);
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_write_bandwidth_ddr_overflow, 11);
-        Counters->counters_part3.nn_total_write_bandwidth_ddr_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_read_cycle_sram, 12);
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_read_cycle_sram_overflow, 13);
-        Counters->counters_part3.nn_total_read_cycle_sram_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_write_cycle_sram, 14);
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_write_cycle_sram_overflow, 15);
-        Counters->counters_part3.nn_total_write_cycle_sram_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_mac_cycle, 16);
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_mac_cycle_overflow, 17);
-        Counters->counters_part3.nn_total_mac_cycle_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_mac_count, 18);
-        gcmGET_COUNTER(Counters->counters_part3.nn_total_mac_count_overflow, 19);
-        Counters->counters_part3.nn_total_mac_count_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.nn_zero_coef_skip_count, 20);
-        gcmGET_COUNTER(Counters->counters_part3.nn_zero_coef_skip_count_overflow, 21);
-        Counters->counters_part3.nn_zero_coef_skip_count_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.nn_non_zero_coef_count, 22);
-        gcmGET_COUNTER(Counters->counters_part3.nn_non_zero_coef_count_overflow, 23);
-        Counters->counters_part3.nn_non_zero_coef_count_overflow &= 0x1;
-        offset += EXT_MODULE_NEURAL_NET_COUNTER_NUM * 4;
-
-        /* module TP */
-        gcmGET_COUNTER(Counters->counters_part3.tp_layer_id, 0);
-        Counters->counters_part3.tp_layer_id_overflow = (Counters->counters_part3.tp_layer_id >> 8) & 0x1;
-        Counters->counters_part3.tp_layer_id &= 0xFF;
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_busy_cycle, 2);
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_busy_cycle_overflow, 3);
-        Counters->counters_part3.tp_total_busy_cycle_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_read_bandwidth_ddr, 4);
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_read_bandwidth_ddr_overflow, 5);
-        Counters->counters_part3.tp_total_read_bandwidth_ddr_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_write_bandwidth_ddr, 6);
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_write_bandwidth_ddr_overflow, 7);
-        Counters->counters_part3.tp_total_write_bandwidth_ddr_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_read_bandwidth_sram, 8);
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_read_bandwidth_sram_overflow, 9);
-        Counters->counters_part3.tp_total_read_bandwidth_sram_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_write_bandwidth_sram, 10);
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_write_bandwidth_sram_overflow, 11);
-        Counters->counters_part3.tp_total_write_bandwidth_sram_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_read_bandwidth_ocb, 12);
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_read_bandwidth_ocb_overflow, 13);
-        Counters->counters_part3.tp_total_read_bandwidth_ocb_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_write_bandwidth_ocb, 14);
-        gcmGET_COUNTER(Counters->counters_part3.tp_total_write_bandwidth_ocb_overflow, 15);
-        Counters->counters_part3.tp_total_write_bandwidth_ocb_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.tp_fc_pix_count, 16);
-        gcmGET_COUNTER(Counters->counters_part3.tp_fc_zero_skip_count, 17);
-        gcmGET_COUNTER(Counters->counters_part3.tp_fc_pix_count_overflow, 18);
-        Counters->counters_part3.tp_fc_zero_skip_count_overflow = (Counters->counters_part3.tp_fc_pix_count_overflow >> 1) & 0x1;
-        Counters->counters_part3.tp_fc_pix_count_overflow &= 0x1;
-        gcmGET_COUNTER(Counters->counters_part3.tp_fc_coef_count, 20);
-        gcmGET_COUNTER(Counters->counters_part3.tp_fc_coef_zero_count, 21);
-        gcmGET_COUNTER(Counters->counters_part3.tp_fc_coef_count_overflow, 22);
-        Counters->counters_part3.tp_fc_coef_zero_count_overflow = (Counters->counters_part3.tp_fc_coef_count_overflow >> 1) & 0x1;
-        Counters->counters_part3.tp_fc_coef_count_overflow &= 0x1;
-        for (index = 0; index < 4; index++)
-        {
-            gcmGET_COUNTER(Counters->counters_part3.tp_total_idle_cycle_core[index], 24 + index * 2);
-            gcmGET_COUNTER(Counters->counters_part3.tp_total_idle_cycle_core_overflows[index], 25 + index * 2);
-            Counters->counters_part3.tp_total_idle_cycle_core_overflows[index] &= 0x1;
-        }
-        offset += EXT_MODULE_TENSOR_PROCESSOR_COUNTER_NUM * 4;
-    }
 }
 
 static void
@@ -446,7 +357,7 @@ _WriteCounters(
     {
         for (coreId = 0; coreId < Profiler->coreCount; coreId++)
         {
-            _RecordCounters(Profiler, Profiler->counterBuf->logicalAddress, coreId, &Profiler->counterBuf->counters[coreId]);
+            _RecordCounters(Profiler->counterBuf->logicalAddress, coreId, &Profiler->counterBuf->counters[coreId]);
         }
     }
 
@@ -495,7 +406,7 @@ _WriteCounters(
             gcmRECORD_COUNTER(VPNC_FECACHELKCOUNT, gcmGETCOUNTER(counters_part1.fe_cache_lk_count));
             gcmRECORD_COUNTER(VPNC_FESTALLCOUNT, gcmGETCOUNTER(counters_part1.fe_stall_count));
             gcmRECORD_COUNTER(VPNC_FESTARVECOUNT, gcmGETCOUNTER(counters_part1.fe_starve_count));
-            gcmRECORD_COUNTER(VPNC_FEPROCESSCOUNT, gcmGETCOUNTER(counters_part1.fe_process_count));
+            gcmRECORD_COUNTER(VPNC_FEPROCESSCOUNT, gcmGETCOUNTER(counters_part1.fe_stall_count));
             gcmRECORD_CONST(VPG_END);
 
             gcmRECORD_CONST(VPNG_VS);
@@ -803,7 +714,6 @@ _WriteCounters(
                 {
                     gcmPRINT("GPU #%d\n", coreId);
                 }
-
                 /* simplify the messages for vx demo */
                 /* 0.00000095367 = 1 / 1024 / 1024*/
                 gcmPRINT("TOTAL_READ_BANDWIDTH  (MByte): %f\n", counters->counters_part2.hi_total_read_8B_count * 8 * 0.00000095367);
@@ -958,213 +868,8 @@ OnError:
 
 }
 
-static void
-_WriteCountersFromVIPProbe(
-    IN gcoPROFILER Profiler
-    )
-{
-    gcsPROFILER_COUNTERS *counters;
-    gcsPROFILER_COUNTERS *preCounters;
-    gceCOUNTER_OPTYPE opType;
-    gctUINT32 opID;
-    gctUINT32 coreId;
-    gceSTATUS status;
-    gctINT32 * counterData = gcvNULL;
-    gctUINT32 i;
-
-    gcmASSERT(Profiler->enable);
-
-    if (Profiler->vipProbe)
-    {
-        for (coreId = 0; coreId < Profiler->coreCount; coreId++)
-        {
-            _RecordCounters(Profiler, Profiler->counterBuf->logicalAddress, coreId, &Profiler->counterBuf->counters[coreId]);
-        }
-    }
-    else
-    {
-        return;
-    }
-
-    opType = Profiler->counterBuf->opType;
-    opID = Profiler->counterBuf->opID;
-
-#define gcmGETCOUNTER(name) ((opID != 0 && opType == gcvCOUNTER_OP_DRAW) ? CalcDelta((counters->name), (preCounters->name)) : (counters->name))
-
-    if (Profiler->counterBuf->needDump)
-    {
-        gctUINT32 counterIndex;
-
-        counterIndex = 0;
-
-        gcmONERROR(gcoOS_Allocate(gcvNULL, Profiler->counterBuf->dataSize, (gctPOINTER *)&counterData));
-        gcoOS_ZeroMemory(counterData, Profiler->counterBuf->dataSize);
-
-        if (opType == gcvCOUNTER_OP_DRAW  && Profiler->perDrawMode)
-        {
-            gcmRECORD_CONST(VPG_ES30_DRAW);
-            gcmRECORD_COUNTER(VPC_ES30_DRAW_NO, opID);
-        }
-        else
-        {
-            if (Profiler->coreCount == 1)
-            {
-                gcmRECORD_CONST(VPG_HW);
-            }
-        }
-
-        for (coreId = 0; coreId < Profiler->coreCount; coreId++)
-        {
-            counters = &(Profiler->counterBuf->counters[coreId]);
-            preCounters = &(Profiler->counterBuf->prev->counters[coreId]);
-
-            if (Profiler->coreCount > 1)
-            {
-                gcmRECORD_CONST(VPG_MULTI_GPU);
-                gcmRECORD_COUNTER(VPC_ES30_GPU_NO, coreId);
-            }
-            gcmRECORD_CONST(VPG_END);
-
-            if (Profiler->coreCount > 1)
-            {
-                gcmRECORD_CONST(VPG_END);
-            }
-        }
-        if (opType == gcvCOUNTER_OP_DRAW  && Profiler->perDrawMode)
-        {
-            gcmRECORD_CONST(VPG_END);
-        }
-        else
-        {
-            if (Profiler->coreCount == 1)
-            {
-                gcmRECORD_CONST(VPG_END);
-            }
-        }
-
-        gcoOS_Seek(gcvNULL, Profiler->file, Profiler->counterBuf->startPos, gcvFILE_SEEK_SET);
-        gcmONERROR(gcoPROFILER_Write(Profiler, Profiler->counterBuf->dataSize, counterData));
-        gcmOS_SAFE_FREE(gcvNULL, counterData);
-
-    }
-
-    if (Profiler->enablePrint)
-    {
-        for (coreId = 0; coreId < Profiler->coreCount; coreId++)
-        {
-            counters = &(Profiler->counterBuf->counters[coreId]);
-            preCounters = &(Profiler->counterBuf->prev->counters[coreId]);
-
-            if (Profiler->profilerClient == gcvCLIENT_OPENCL ||
-                Profiler->profilerClient == gcvCLIENT_OPENVX)
-            {
-                if (Profiler->coreCount > 1)
-                {
-                    gcmPRINT("VIP #%d\n", coreId);
-                }
-
-                if (Profiler->vipProbe)
-                {
-                        /* NN. */
-                    gcmPRINT("NN_LAYER_ID: %u\n", gcmGETCOUNTER(counters_part3.nn_layer_id));
-                    gcmPRINT("NN_INSTR_INFO: %u\n", gcmGETCOUNTER(counters_part3.nn_instr_info));
-                    gcmPRINT("NN_TOTAL_BUSY_CYCLE: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.nn_total_busy_cycle),
-                             gcmGETCOUNTER(counters_part3.nn_total_busy_cycle_overflow) ? " (overflow)" : "");
-                    gcmPRINT("NN_TOTAL_READ_CYCLE_DDR: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.nn_total_read_cycle_ddr),
-                             gcmGETCOUNTER(counters_part3.nn_total_read_cycle_ddr_overflow) ? " (overflow)" : "");
-                    gcmPRINT("NN_TOTAL_READ_VALID_BW_DDR: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.nn_total_read_bandwidth_ddr),
-                             gcmGETCOUNTER(counters_part3.nn_total_read_bandwidth_ddr_overflow) ? " (overflow)" : "");
-                    gcmPRINT("NN_TOTAL_WRITE_CYCLE_DDR: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.nn_total_write_cycle_ddr),
-                             gcmGETCOUNTER(counters_part3.nn_total_write_cycle_ddr_overflow) ? " (overflow)" : "");
-                    gcmPRINT("NN_TOTAL_WRITE_VALID_BW_DDR: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.nn_total_write_bandwidth_ddr),
-                             gcmGETCOUNTER(counters_part3.nn_total_write_bandwidth_ddr_overflow) ? " (overflow)" : "");
-                    gcmPRINT("NN_TOTAL_READ_CYCLE_SRAM: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.nn_total_read_cycle_sram),
-                             gcmGETCOUNTER(counters_part3.nn_total_read_cycle_sram_overflow) ? " (overflow)" : "");
-                    gcmPRINT("NN_TOTAL_WRITE_CYCLE_SRAM: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.nn_total_write_cycle_sram),
-                             gcmGETCOUNTER(counters_part3.nn_total_write_cycle_sram_overflow) ? " (overflow)" : "");
-                    gcmPRINT("NN_TOTAL_MAC_CYCLE: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.nn_total_mac_cycle),
-                             gcmGETCOUNTER(counters_part3.nn_total_mac_cycle_overflow) ? " (overflow)" : "");
-                    gcmPRINT("NN_TOTAL_MAC_COUNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.nn_total_mac_count),
-                             gcmGETCOUNTER(counters_part3.nn_total_mac_count_overflow) ? " (overflow)" : "");
-                    gcmPRINT("NN_ZERO_COEF_SKIP_COUNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.nn_zero_coef_skip_count),
-                             gcmGETCOUNTER(counters_part3.nn_zero_coef_skip_count_overflow) ? " (overflow)" : "");
-                    gcmPRINT("NN_NON_ZERO_COEF_COUNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.nn_non_zero_coef_count),
-                             gcmGETCOUNTER(counters_part3.nn_non_zero_coef_count_overflow) ? " (overflow)" : "");
-
-                    /* TP. */
-                    gcmPRINT("TP_LAYER_ID: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.tp_layer_id),
-                             gcmGETCOUNTER(counters_part3.tp_layer_id_overflow) ? " (overflow)" : "");
-                    gcmPRINT("TP_TOTAL_BUSY_CYCLE: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.tp_total_busy_cycle),
-                             gcmGETCOUNTER(counters_part3.tp_total_busy_cycle_overflow) ? " (overflow)" : "");
-                    gcmPRINT("TP_TOTAL_READ_BW_CACHE: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_ddr),
-                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_ddr_overflow) ? " (overflow)" : "");
-                    gcmPRINT("TP_TOTAL_WRITE_BW_CACHE: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.tp_total_write_bandwidth_ddr),
-                             gcmGETCOUNTER(counters_part3.tp_total_write_bandwidth_ddr_overflow) ? " (overflow)" : "");
-                    gcmPRINT("TP_TOTAL_READ_BW_SRAM: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_sram),
-                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_sram_overflow) ? " (overflow)" : "");
-                    gcmPRINT("TP_TOTAL_WRITE_BW_SRAM: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.tp_total_write_bandwidth_sram),
-                             gcmGETCOUNTER(counters_part3.tp_total_write_bandwidth_sram_overflow) ? " (overflow)" : "");
-                    gcmPRINT("TP_TOTAL_READ_BW_OCB: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_ocb),
-                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_ocb_overflow) ? " (overflow)" : "");
-                    gcmPRINT("TP_TOTAL_WRITE_BW_OCB: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_ocb),
-                             gcmGETCOUNTER(counters_part3.tp_total_read_bandwidth_ocb_overflow) ? " (overflow)" : "");
-                    gcmPRINT("TP_FC_PIX_CNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.tp_fc_pix_count),
-                             gcmGETCOUNTER(counters_part3.tp_fc_pix_count_overflow) ? " (overflow)" : "");
-                    gcmPRINT("TP_FC_ZERO_SKIP_CNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.tp_fc_zero_skip_count),
-                             gcmGETCOUNTER(counters_part3.tp_fc_zero_skip_count_overflow) ? " (overflow)" : "");
-                    gcmPRINT("TP_FC_COEF_CNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.tp_fc_coef_count),
-                             gcmGETCOUNTER(counters_part3.tp_fc_coef_count_overflow) ? " (overflow)" : "");
-                    gcmPRINT("TP_FC_COEF_ZERO_CNT: %u%s\n",
-                             gcmGETCOUNTER(counters_part3.tp_fc_coef_zero_count),
-                             gcmGETCOUNTER(counters_part3.tp_fc_coef_zero_count_overflow) ? " (overflow)" : "");
-                    for (i = 0; i < 4; i++)
-                    {
-                        gcmPRINT("TP_TOTAL_IDLE_CYCLE_CORE%u: %u%s\n",
-                                 i,
-                                 gcmGETCOUNTER(counters_part3.tp_total_idle_cycle_core[i]),
-                                 gcmGETCOUNTER(counters_part3.tp_total_idle_cycle_core_overflows[i]) ? " overflow" : "");
-                    }
-
-                    gcmPRINT("*********\n");
-                }
-            }
-        }
-    }
-
-    Profiler->counterBuf->available = gcvTRUE;
-OnError:
-    if (counterData)
-    {
-        gcmOS_SAFE_FREE(gcvNULL, counterData);
-    }
-    return;
-
-}
-
 static gceSTATUS
-_UpdateCountersFromAHB(
+_UpdateCounters(
     IN gcoPROFILER Profiler,
     IN gctBOOL clearCounters
     )
@@ -1174,6 +879,19 @@ _UpdateCountersFromAHB(
 
     gcmHEADER_ARG("Profiler=0x%x", Profiler);
 
+    if (Profiler->probeMode)
+    {
+        gcmONERROR(gcoHARDWARE_SetProbeCmd(gcvNULL, gcvPROBECMD_END, Profiler->counterBuf->probeAddress, gcvNULL));
+
+        gcmONERROR(gcoBUFOBJ_GetFence((gcoBUFOBJ)Profiler->counterBuf->couterBufobj, gcvFENCE_TYPE_READ));
+
+        if (clearCounters)
+        {
+            /*reset probe counters*/
+            gcmONERROR(gcoHARDWARE_SetProbeCmd(gcvNULL, gcvPROBECMD_BEGIN, Profiler->counterBuf->probeAddress, gcvNULL));
+        }
+    }
+    else
     {
         gcsHAL_INTERFACE iface;
         gctUINT32 context;
@@ -1286,67 +1004,6 @@ OnError:
     gcmFOOTER_NO();
     return status;
 }
-static gceSTATUS
-_UpdateCountersFromProbe(
-    IN gcoPROFILER Profiler,
-    IN gctBOOL clearCounters
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctUINT32 bufferSize;
-
-    gcmHEADER_ARG("Profiler=0x%x", Profiler);
-
-    gcmASSERT(Profiler->probeMode || Profiler->vipProbe);
-    {
-        gcmONERROR(gcoHARDWARE_SetProbeCmd(gcvNULL, gcvPROBECMD_END, Profiler->counterBuf->probeAddress, gcvNULL));
-
-        if (!Profiler->vipProbe)
-        {
-            gcmONERROR(gcoBUFOBJ_GetFence((gcoBUFOBJ)Profiler->counterBuf->couterBufobj, gcvFENCE_TYPE_READ));
-        }
-        else
-        {
-            gcoHAL_Commit(gcvNULL, gcvTRUE);
-        }
-
-        if (clearCounters)
-        {
-            /*reset probe counters*/
-            gcmONERROR(gcoHARDWARE_SetProbeCmd(gcvNULL, gcvPROBECMD_BEGIN, Profiler->counterBuf->probeAddress, gcvNULL));
-        }
-    }
-
-    Profiler->counterBuf->available = gcvFALSE;
-
-    /*caculate the buffer size of current buffer will used*/
-    bufferSize = gcmSIZEOF(gctINT32) * (TOTAL_COUNTER_NUMBER + TOTAL_MODULE_NUMBER) * 2 * Profiler->coreCount;
-
-    if (Profiler->counterBuf->opType == gcvCOUNTER_OP_DRAW  && Profiler->perDrawMode)
-    {
-        bufferSize += gcmSIZEOF(gctINT32) * 2 * 2;
-    }
-    else if (Profiler->coreCount == 1)
-    {
-        bufferSize += gcmSIZEOF(gctINT32) * 2;
-    }
-
-    if (Profiler->coreCount > 1)
-    {
-        bufferSize += gcmSIZEOF(gctINT32) * 2 * 2 * Profiler->coreCount;
-    }
-
-    gcoOS_GetPos(gcvNULL, Profiler->file, &(Profiler->counterBuf->startPos));
-    Profiler->counterBuf->dataSize = bufferSize;
-    Profiler->counterBuf->endPos = Profiler->counterBuf->startPos +
-                                   Profiler->counterBuf->dataSize;
-    gcoOS_Seek(gcvNULL, Profiler->file, Profiler->counterBuf->endPos, gcvFILE_SEEK_SET);
-
-OnError:
-
-    gcmFOOTER_NO();
-    return status;
-}
 
 gceSTATUS
 gcoPROFILER_Construct(
@@ -1374,7 +1031,6 @@ gcoPROFILER_Construct(
 
     profiler->enable = gcvFALSE;
     profiler->probeMode = gcvFALSE;
-    profiler->vipProbe = gcvFALSE;
     profiler->file = gcvNULL;
     profiler->perDrawMode = gcvFALSE;
     profiler->needDump = gcvFALSE;
@@ -1513,8 +1169,6 @@ gcoPROFILER_Initialize(
     gcsHAL_INTERFACE iface;
     gcsCounterBuffer_PTR counterBuffer = gcvNULL;
     gctUINT32 i = 0;
-    gctBOOL vipProbe = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_NN_PROBE);
-    gctBOOL regProbe = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PROBE);
 
     gcmHEADER_ARG("Profiler=0x%x", Profiler);
 
@@ -1545,7 +1199,7 @@ gcoPROFILER_Initialize(
     }
 
     /*do profile in new way by probe*/
-    if ((regProbe || vipProbe) && !Profiler->disableProbe)
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PROBE) && !Profiler->disableProbe)
     {
         gctUINT32 physicalAddress;
         gctPOINTER logicalAddress;
@@ -1553,8 +1207,6 @@ gcoPROFILER_Initialize(
         gctUINT32 clusterIDWidth = 0;
         gcoBUFOBJ counterBufobj;
 
-        if (!vipProbe)
-        {
         gcoHAL_ConfigPowerManagement(gcvTRUE);
 
         /* disable old profiler in kernel. */
@@ -1568,41 +1220,6 @@ gcoPROFILER_Initialize(
             &iface, gcmSIZEOF(iface),
             &iface, gcmSIZEOF(iface)));
 
-        }
-        else
-        {
-        gctUINT32 coreId;
-        gctUINT32 originalCoreIndex;
-
-        /* enable profiler in kernel. */
-        iface.ignoreTLS = gcvFALSE;
-        iface.command = gcvHAL_SET_PROFILE_SETTING;
-        iface.u.SetProfileSetting.enable = gcvTRUE;
-
-        gcmONERROR(gcoHAL_GetCurrentCoreIndex(gcvNULL, &originalCoreIndex));
-
-        for (coreId = 0; coreId < Profiler->coreCount; coreId++)
-        {
-            gctUINT32 coreIndex;
-            /* Convert coreID in this hardware to global core index. */
-            gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, coreId, &coreIndex));
-            /* Set it to TLS to find correct command queue. */
-            gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndex));
-
-            gcoHAL_ConfigPowerManagement(gcvFALSE);
-
-            /* Call the kernel. */
-            gcmONERROR(gcoOS_DeviceControl(gcvNULL,
-                IOCTL_GCHAL_INTERFACE,
-                &iface, gcmSIZEOF(iface),
-                &iface, gcmSIZEOF(iface)));
-        }
-        /* Restore core index in TLS. */
-        gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, originalCoreIndex));
-        }
-
-
-
         gcmONERROR(gcoHARDWARE_QueryCluster(gcvNULL, gcvNULL, gcvNULL, gcvNULL, &clusterIDWidth));
 
         size = gcmSIZEOF(gctUINT32) * TOTAL_PROBE_NUMBER * Profiler->coreCount * (gctUINT32)(1 << clusterIDWidth);
@@ -1612,34 +1229,19 @@ gcoPROFILER_Initialize(
         do
         {
             gcmONERROR(gcoBUFOBJ_Construct(gcvNULL, gcvBUFOBJ_TYPE_GENERIC_BUFFER, &counterBufobj));
-            if (vipProbe)
-            {
-                gcmONERROR(gcoBUFOBJ_Upload(counterBufobj, gcvNULL, 0, size, gcvBUFOBJ_USAGE_STATIC_DRAW | gcvBUFOBJ_USAGE_DISABLE_FENCE_DYNAMIC_STREAM));
-            }
-            if (regProbe)
-            {
-                gcmONERROR(gcoBUFOBJ_Upload(counterBufobj, gcvNULL, 0, size, gcvBUFOBJ_USAGE_STATIC_DRAW));
-            }
+            gcmONERROR(gcoBUFOBJ_Upload(counterBufobj, gcvNULL, 0, size, gcvBUFOBJ_USAGE_STATIC_DRAW));
             gcoBUFOBJ_Lock(counterBufobj, &physicalAddress, &logicalAddress);
 
             counterBuffer->probeAddress = physicalAddress;
             counterBuffer->logicalAddress = logicalAddress;
             counterBuffer->couterBufobj = (gctHANDLE)counterBufobj;
-            memset(logicalAddress, 0, size);
 
             counterBuffer->opType = gcvCOUNTER_OP_NONE;
             counterBuffer = counterBuffer->next;
         }
         while (counterBuffer != Profiler->counterBuf);
 
-        if (vipProbe)
-        {
-            Profiler->vipProbe = gcvTRUE;
-        }
-        if (regProbe)
-        {
-            Profiler->probeMode = gcvTRUE;
-        }
+        Profiler->probeMode = gcvTRUE;
     }
     /* do profiling in old way*/
     else
@@ -1747,7 +1349,7 @@ gcoPROFILER_EnableCounters(
     /* reset profiler counter */
     if (Profiler->counterEnable == gcvFALSE)
     {
-        if (Profiler->probeMode && !Profiler->vipProbe)
+        if (Profiler->probeMode)
         {
             /* enable hw profiler counter here because of cl maybe do begin in another context which hw counter did not enabled */
             gcmONERROR(gcoHARDWARE_EnableCounters(gcvNULL));
@@ -1812,12 +1414,6 @@ gcoPROFILER_EnableCounters(
             gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, originalCoreIndex));
         }
 
-        if (Profiler->vipProbe)
-        {
-            /* enable hw profiler counter here because of cl maybe do begin in another context which hw counter did not enabled */
-            gcmONERROR(gcoHARDWARE_EnableCounters(gcvNULL));
-            gcmONERROR(gcoHARDWARE_SetProbeCmd(gcvNULL, gcvPROBECMD_BEGIN, Profiler->counterBuf->probeAddress, gcvNULL));
-        }
         Profiler->counterEnable = gcvTRUE;
     }
 
@@ -1835,7 +1431,7 @@ gcoPROFILER_End(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctBOOL clearCounters = gcvTRUE;
+    gctBOOL clearCounters;
 
     gcmHEADER_ARG("Profiler=0x%x", Profiler);
 
@@ -1856,29 +1452,11 @@ gcoPROFILER_End(
         Profiler->counterBuf->needDump = Profiler->needDump;
 
         /*update the counters info of currrent buffer*/
-        if (Profiler->probeMode)
-        {
-            gcmONERROR(_UpdateCountersFromProbe(Profiler, clearCounters));
-            gcoBUFOBJ_WaitFence((gcoBUFOBJ)Profiler->counterBuf->couterBufobj, gcvFENCE_TYPE_READ);
-            _WriteCounters(Profiler);
-        }
-        else
-        {
-            if (Profiler->vipProbe)
-            {
-                gcmONERROR(_UpdateCountersFromAHB(Profiler, clearCounters));
-                _WriteCounters(Profiler);
+        gcmONERROR(_UpdateCounters(Profiler, clearCounters));
 
-                gcmONERROR(_UpdateCountersFromProbe(Profiler, clearCounters));
-                gcoHAL_Commit(gcvNULL, gcvTRUE);
-                _WriteCountersFromVIPProbe(Profiler);
-            }
-            else
-            {
-                gcmONERROR(_UpdateCountersFromAHB(Profiler, clearCounters));
-                _WriteCounters(Profiler);
-            }
-        }
+        gcoBUFOBJ_WaitFence((gcoBUFOBJ)Profiler->counterBuf->couterBufobj, gcvFENCE_TYPE_READ);
+
+        _WriteCounters(Profiler);
 
         Profiler->counterBuf->available = gcvTRUE;
     }
@@ -1889,24 +1467,9 @@ gcoPROFILER_End(
             gctUINT32 tempPos;
             gcoOS_GetPos(gcvNULL, Profiler->file, &tempPos);
 
-            if (Profiler->probeMode)
-            {
-                gcoBUFOBJ_WaitFence((gcoBUFOBJ)Profiler->counterBuf->couterBufobj, gcvFENCE_TYPE_READ);
-                _WriteCounters(Profiler);
-            }
-            else
-            {
-                if (Profiler->vipProbe)
-                {
-                    _WriteCounters(Profiler);
-                    gcoHAL_Commit(gcvNULL, gcvTRUE);
-                    _WriteCountersFromVIPProbe(Profiler);
-                }
-                else
-                {
-                    _WriteCounters(Profiler);
-                }
-            }
+            gcoBUFOBJ_WaitFence((gcoBUFOBJ)Profiler->counterBuf->couterBufobj, gcvFENCE_TYPE_READ);
+
+            _WriteCounters(Profiler);
 
             gcoOS_Seek(gcvNULL, Profiler->file, tempPos, gcvFILE_SEEK_SET);
 
@@ -1927,23 +1490,7 @@ gcoPROFILER_End(
         Profiler->counterBuf->needDump = Profiler->needDump;
 
         /*update the counters info of currrent buffer*/
-        if (Profiler->probeMode)
-        {
-            gcmONERROR(_UpdateCountersFromProbe(Profiler, clearCounters));
-        }
-        else
-        {
-            if (Profiler->vipProbe)
-            {
-                gcmONERROR(_UpdateCountersFromAHB(Profiler, clearCounters));
-                gcmONERROR(_UpdateCountersFromProbe(Profiler, clearCounters));
-                gcoHAL_Commit(gcvNULL, gcvTRUE);
-            }
-            else
-            {
-                gcmONERROR(_UpdateCountersFromAHB(Profiler, clearCounters));
-            }
-        }
+        gcmONERROR(_UpdateCounters(Profiler, clearCounters));
     }
 
     Profiler->counterBuf = Profiler->counterBuf->next;
