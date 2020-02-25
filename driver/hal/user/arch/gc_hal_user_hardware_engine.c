@@ -23723,7 +23723,7 @@ gcoHARDWARE_SetProbeCmd(
     /* Reserve space in the command buffer. */
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
 
-    if((Hardware->config->chipModel == gcv7000) && (Hardware->config->chipRevision == 0x6203) )
+    if ((Hardware->config->chipModel == gcv7000) && (Hardware->config->chipRevision == 0x6203))
     {
         hostInterface1 = gcvFALSE;
     }
@@ -23794,9 +23794,9 @@ gcoHARDWARE_SetProbeCmd(
                 switch (Cmd)
                 {
                 case gcvPROBECMD_BEGIN:
-                    if(!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1) )
+                    if (!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1))
                     {
-                        gcmSETSINGLESTATE_DUMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
+                        gcmSETSINGLESTATE_DUMMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
                     }
                     else
                     {
@@ -23975,9 +23975,9 @@ gcoHARDWARE_SetProbeCmd(
                     }
                     break;
                 case gcvPROBECMD_PAUSE:
-                    if(!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1) )
+                    if (!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1))
                     {
-                        gcmSETSINGLESTATE_DUMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
+                        gcmSETSINGLESTATE_DUMMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
                     }
                     else
                     {
@@ -24070,9 +24070,9 @@ gcoHARDWARE_SetProbeCmd(
                     }
                     break;
                 case gcvPROBECMD_RESUME:
-                    if(!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1) )
+                    if (!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1))
                     {
-                        gcmSETSINGLESTATE_DUMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
+                        gcmSETSINGLESTATE_DUMMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
                     }
                     else
                     {
@@ -24165,9 +24165,9 @@ gcoHARDWARE_SetProbeCmd(
                     }
                     break;
                 case gcvPROBECMD_END:
-                    if(!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1) )
+                    if (!hostInterface1 && (module == gcvCOUNTER_HOST_INTERFACE1))
                     {
-                        gcmSETSINGLESTATE_DUMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
+                        gcmSETSINGLESTATE_DUMMY(stateDelta, reserve, memory, gcvFALSE, 0, 0);
                     }
                     else
                     {
