@@ -1422,17 +1422,17 @@ _FuncInit_MMU(IN gcsFUNCTION_EXECUTION_PTR Execution)
         &physical
         ));
 
+    if(physical >> 32)
+    {
+        gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
+    }
+
     /* Convert to GPU physical address. */
     gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(
         hardware->os,
         physical,
         &physical
         ));
-
-    if(physical >> 32)
-    {
-        gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
-    }
 
     if (!(flags & gcvALLOC_FLAG_4GB_ADDR) && (physical & 0xFFFFFFFF00000000ULL))
     {
