@@ -29902,6 +29902,7 @@ vxnne_shader_executable vxnneGetPReluShaderExecutable(
     vx_uint32     batch                 = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
     vx_enum       srcFormat             = TENSOR_DATA_TYPE(input);
     vx_enum       dstFormat             = TENSOR_DATA_TYPE(output);
+    vx_enum       alphaFormat           = TENSOR_DATA_TYPE(alpha);
     vx_float32    input_scale           = TENSOR_TF_SCALE(input);
     vx_float32    output_scale          = TENSOR_TF_SCALE(output);
     vx_int32      inputZP               = TENSOR_TF_ZEROPOINT(input);
@@ -30783,19 +30784,36 @@ vxnne_shader_executable vxnneGetPReluShaderExecutable(
 
         if (enable_image_2d)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16toBF16_2d", borderMode);
+            if (alphaFormat == VX_TYPE_BFLOAT16)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16BF16toBF16_2d", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16toBF16_2d", borderMode);
+            }
             if (!shaderExecutable) goto OnError;
         }
         else
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16toBF16", borderMode);
+            if (alphaFormat == VX_TYPE_BFLOAT16)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16BF16toBF16", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_BF16toBF16", borderMode);
+            }
             if (!shaderExecutable) goto OnError;
         }
 
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvBF16toF32_Part0_2x8", 1, uniConvBF16toF32_Part0_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvBF16toF32_Part1_2x8", 1, uniConvBF16toF32_Part1_2x8);
-        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvF16toF32_Part0_4x4", 1, uniConvF16toF32_Part0_4x4);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackedBF16_2x8", 1, uniPackedBF16_2x8);
+        if (alphaFormat != VX_TYPE_BFLOAT16)
+        {
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvF16toF32_Part0_4x4", 1, uniConvF16toF32_Part0_4x4);
+        }
         if (status != VX_SUCCESS) goto OnError;
     }
 

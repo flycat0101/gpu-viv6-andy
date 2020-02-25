@@ -880,8 +880,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNPReluLayer_Initializer(vx_node node, c
                           || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_FLOAT16)
                           || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
                           || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_FLOAT16)
+                          || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_BFLOAT16)
                           || (srcFormat == VX_TYPE_FLOAT16 && dstFormat != VX_TYPE_FLOAT32))
                          && alphaFormat == VX_TYPE_FLOAT16);
+        shExe_flag  = (vx_bool)(shExe_flag ||
+                               (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_BFLOAT16
+                               && alphaFormat == VX_TYPE_BFLOAT16));
     }
     else
     {
