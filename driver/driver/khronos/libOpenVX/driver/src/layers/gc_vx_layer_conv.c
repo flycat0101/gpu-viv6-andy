@@ -377,6 +377,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
             WB_ORG_KERNEL_X(weights_biases) == 1 &&
             WB_ORG_KERNEL_Y(weights_biases) == 1 &&
             (pad_x_left == 0 && pad_x_right == 0 && pad_y_top == 0 && pad_y_bottom == 0) &&
+            WB_ORG_LAYER_TYPE(weights_biases) == VX_NN_CONVOLUTION_LAYER &&
             (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8 ||
              WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8) &&
             context->options.enableZdpOpt &&
@@ -396,6 +397,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
                  WB_ORG_KERNEL_X(weights_biases) == 1 &&
                  WB_ORG_KERNEL_Y(weights_biases) == 1 &&
                  pool_size_x <= 1 &&
+                 WB_ORG_LAYER_TYPE(weights_biases) == VX_NN_CONVOLUTION_LAYER &&
                  (pad_x_left == 0 && pad_x_right == 0 && pad_y_top == 0 && pad_y_bottom == 0) &&
                  context->options.nn1x1To1xN &&
                  WB_DO_1XN_CONFIG(weights_biases))
@@ -412,10 +414,10 @@ vx_status vxnneConvolutionReluPoolingInitializer(
         if (vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_FIRST_PIXEL_POOLING) &&
             WB_ORG_STRIDE_X(weights_biases) == 2 && WB_ORG_STRIDE_Y(weights_biases) == 2 &&
             !do_zdp_opt &&
-            (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8 ||
-             WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8) &&
             pool_size_x == 0 &&
-            ((TENSOR_VIEW_SIZE_INDEX(inputs, 0) % 2 == 0) ||
+            (((WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8 ||
+               WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8) &&
+              TENSOR_VIEW_SIZE_INDEX(inputs, 0) % 2 == 0 && WB_ORG_LAYER_TYPE(weights_biases) == VX_NN_CONVOLUTION_LAYER) ||
              WB_IS_DEPTH_WISE(weights_biases)))
         {
             /* Per Arch, only support INT8 3x3 conv right now*/

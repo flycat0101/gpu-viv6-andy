@@ -756,7 +756,8 @@ VX_PRIVATE_API vx_status vxoWeightBias_Initializer(
     vx_int8                                     zero_len,
     vx_uint32                                   skip_value,
     vx_bool                                     is_depth_wise,
-    vx_bool                                     do_1xN_config
+    vx_bool                                     do_1xN_config,
+    vx_enum                                     layer_type
     )
 {
     vx_uint32 strideX, strideY;
@@ -780,6 +781,7 @@ VX_PRIVATE_API vx_status vxoWeightBias_Initializer(
     WB_SKIP_VALUE(wb)       = skip_value;
     WB_IS_DEPTH_WISE(wb)    = is_depth_wise;
     WB_DO_1XN_CONFIG(wb)    = do_1xN_config;
+    WB_ORG_LAYER_TYPE(wb)   = layer_type;
 
     return VX_SUCCESS;
 }
@@ -1523,7 +1525,8 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromT
                                      -1,
                                      skipValue,
                                      doDepthWise,
-                                     do1xN);
+                                     do1xN,
+                                     layer_type);
     if (status != VX_SUCCESS) goto exit;
 
     WB_WEIGHT_TENSOR(weight_bias) = weights;
@@ -1639,7 +1642,8 @@ VX_INTERNAL_API vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromP
                             -1,
                             skipValue,
                             vx_false_e,
-                            vx_false_e);
+                            vx_false_e,
+                            layer_type);
 
     if (status != VX_SUCCESS)
     {

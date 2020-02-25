@@ -85,6 +85,7 @@ typedef struct _vx_weight_bias_external_param_s
     vx_uint32                                skip_value;
 
     vx_bool                                  do_1xN_config;
+    vx_enum                                  orig_layer_type;
 }
 vx_weight_bias_external_param_s, *vx_weight_bias_external_param;
 
@@ -125,7 +126,7 @@ typedef struct _vx_weight_bias_compress_param_s
 }
 vx_weight_bias_compress_param_s, *vx_weight_bias_compress_param;
 
-typedef vx_status (*vx_weight_bias_initialize_f)(vx_weights_biases_parameter wb, vx_weight_bias_general_param weight_param, vx_weight_bias_general_param bias_param, vx_uint32 orig_stride_x, vx_uint32 orig_stride_y, vx_uint32 stride_x, vx_uint32 stride_y, vx_int8 zero_len, vx_uint32 skip_value, vx_bool is_depth_wise, vx_bool do_1xN_config);
+typedef vx_status (*vx_weight_bias_initialize_f)(vx_weights_biases_parameter wb, vx_weight_bias_general_param weight_param, vx_weight_bias_general_param bias_param, vx_uint32 orig_stride_x, vx_uint32 orig_stride_y, vx_uint32 stride_x, vx_uint32 stride_y, vx_int8 zero_len, vx_uint32 skip_value, vx_bool is_depth_wise, vx_bool do_1xN_config, vx_enum orig_layer_type);
 
 typedef vx_status (*vx_weight_bias_deinitialize_f)(vx_weights_biases_parameter wb);
 
@@ -161,6 +162,7 @@ vx_weights_biases_parameter_s;
 #define WB_EXTERNAL_PARAM(wb)                  (wb)->external_param
 #define WB_IS_DEPTH_WISE(wb)                   (wb)->external_param.is_depth_wise
 #define WB_DO_1XN_CONFIG(wb)                   (wb)->external_param.do_1xN_config
+#define WB_ORG_LAYER_TYPE(wb)                  (wb)->external_param.orig_layer_type
 #define WB_SKIP_VALUE(wb)                      (wb)->external_param.skip_value
 #define WB_SET_ZERO_LENGTH(wb)                 (wb)->external_param.set_zero_length
 #define WB_INPUT_ZP(wb)                        (wb)->external_param.input_zp
