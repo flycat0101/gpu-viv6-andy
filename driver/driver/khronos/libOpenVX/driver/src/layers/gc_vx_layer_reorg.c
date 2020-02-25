@@ -1177,7 +1177,7 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
                 inputs, block_size_s, pad, outc_s, outputs, pad_list);
         else if(type == VX_REORG_BATCH_TO_SPACE_ND)
             shaderExecutable = vxnneGetBatch2SpaceShaderExecutable(context, VXNNE_KERNEL_BATCH2SPACE, &node->kernelAttributes.borderMode,
-                inputs, block_size_s, outc_s, outputs);
+                inputs, pad_list[0], pad_list[2], block_size_s, outc_s, outputs);
     }
     else
     {
@@ -1189,7 +1189,7 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
                 inputs, stride, outputs);
         else if(type == VX_REORG_BATCH_TO_SPACE_ND)
             shaderExecutable = vxnneGetGPUBatch2SpaceShaderExecutable(context, VXNNE_KERNEL_BATCH2SPACE, &node->kernelAttributes.borderMode,
-                inputs, block_size_s, outputs);
+                inputs, pad_list[0], pad_list[2], block_size_s, outputs);
         else if(type == VX_REORG_SPACE_TO_BATCH_ND)
             shaderExecutable = vxnneGetGPUSpace2BatchShaderExecutable(context, VXNNE_KERNEL_SPACE2BATCH, &node->kernelAttributes.borderMode,
                 inputs, block_size_s, outc_s, outputs, pad_list);

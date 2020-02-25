@@ -2986,6 +2986,8 @@ vxnne_shader_executable vxnneGetBatch2SpaceShaderExecutable(
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
+    vx_uint32               crop_left,
+    vx_uint32               crop_top,
     vx_tensor               stride,
     vx_scalar               outc,
     vx_tensor               output
@@ -3959,6 +3961,8 @@ vxnne_shader_executable vxnneGetGPUBatch2SpaceShaderExecutable(
     vx_enum                 kernelEnum,
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
+    vx_uint32               crop_left,
+    vx_uint32               crop_top,
     vx_tensor               stride,
     vx_tensor               output);
 
