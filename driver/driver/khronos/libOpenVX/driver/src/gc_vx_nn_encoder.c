@@ -9580,7 +9580,14 @@ vx_uint32 fillinKernelBufferBalance(
     }
 
     if (kernel_align_stream_size != VX_NULL)
-        *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount);
+    {
+        /*bug1980*/
+        if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMAGE_NOT_PACKED_IN_SRAM_FIX))
+            *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * usedCoreCount );
+        else
+            *kernel_align_stream_size += (vx_size)(maxKernelStreamSizePerCore * nnCoreCount);
+    }
+
 
     if (!hasKernelFullCacheInterleaveFix && kernel_stream_full_cache_size != VX_NULL)
     {
