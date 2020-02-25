@@ -1713,6 +1713,9 @@ again:
                                 {
                                     for (k = 0; k < pcounts[p]; k++)
                                     {
+                                        if (VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(cplist[k]->allocPriority))
+                                            continue;
+
                                         asize += cplist[k]->sizes[1];
                                         acount++;
 
@@ -1762,11 +1765,7 @@ again:
                                     }
                                     else
                                     {
-                                        if (VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(plist[k]->allocPriority))
-                                        {
-                                            status = VX_FAILURE;
-                                            goto exit;
-                                        }
+                                        vxmASSERT(!VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(plist[k]->allocPriority));
                                         plist[k]->sizes[1] = 0;
                                     }
 
@@ -1824,11 +1823,6 @@ again:
                             msize[ntype] = maxs[ntype];
                             continue;
                         }
-                        else if (!mustHave)
-                        {
-                            vxoMemoryPool_ResetStackItemByPos(&stacks[ntype], pos);
-                            continue;
-                        }
                         else if (VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(mem->allocType) == VXNNE_MEM_POOL_TYPE_SRAM &&
                                  mem->allocTypeTmp == VXNNE_MEM_POOL_TYPE_VIP_SRAM &&
                                  maxs[VXNNE_MEM_POOL_TYPE_AXI_SRAM] != 0)
@@ -1836,6 +1830,11 @@ again:
                             mem->allocTypeTmp = VXNNE_MEM_POOL_TYPE_AXI_SRAM;
                             vxoMemoryPool_ResetStackItemByPos(&stacks[ntype], pos);
                             goto again;
+                        }
+                        else if (!mustHave)
+                        {
+                            vxoMemoryPool_ResetStackItemByPos(&stacks[ntype], pos);
+                            continue;
                         }
                         else
                         {
