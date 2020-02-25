@@ -1496,7 +1496,7 @@ static void halti5_helper_GetPsOutputSetting(
     *outputMode =
     *saturationMode = 0;
 
-    for (i = 0 ; i < subPass->colorCount; i++)
+    for (i = 0 ; fragOutTable != VK_NULL_HANDLE && i < subPass->colorCount; i++)
     {
         __vkAttachmentDesc *attachmentDesc;
         HwPEDesc hwPEDesc;
@@ -2671,7 +2671,7 @@ static VkResult halti5_pip_emit_rt(
     {
         rtEnabled |= subPass->color_attachment_index[i] != VK_ATTACHMENT_UNUSED;
     }
-    if (!rtEnabled)
+    if (!rtEnabled || fragOutTable == VK_NULL_HANDLE)
     {
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x050B, VK_FALSE,
                     (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -2680,7 +2680,7 @@ static VkResult halti5_pip_emit_rt(
  ~0U : (~(~0U << ((1 ?
  6:6) - (0 ?
  6:6) + 1))))))) << (0 ?
- 6:6))) | (((gctUINT32) ((gctUINT32) (!chipGfxPipeline->colorPipeEnable) & ((gctUINT32) ((((1 ?
+ 6:6))) | (((gctUINT32) ((gctUINT32) (!VK_FALSE) & ((gctUINT32) ((((1 ?
  6:6) - (0 ?
  6:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2713,7 +2713,7 @@ static VkResult halti5_pip_emit_rt(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x038D, VK_FALSE, chipGfxPipeline->raControlEx);
 
     /* step 2: rt programming */
-    for (i = 0; blendInfo != NULL && i < subPass->colorCount; i++)
+    for (i = 0; fragOutTable != VK_NULL_HANDLE && blendInfo != NULL && i < subPass->colorCount; i++)
     {
         const VkPipelineColorBlendAttachmentState *blendAttach = blendInfo->pAttachments;
         VkColorComponentFlags colorMask;
