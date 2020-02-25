@@ -1683,6 +1683,7 @@ VX_PRIVATE_API vx_uint32 vxoGlobalData_Release(vx_global_data globalData)
         /* Destroy vir intrinsic library. */
 #if (!VSC_LITE_BUILD)
         vscFreeVirIntrinsicLib();
+        gcSHADER_FreeRecompilerLibrary();
 #endif
         gcfVX_UnloadCompiler(globalData);
 
