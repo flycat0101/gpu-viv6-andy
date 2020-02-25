@@ -76,7 +76,7 @@ _MultiGPUSync(
 
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
 
-    if (Engine == gcvENGINE_RENDER && Hardware->config->gpuCoreCount > 1)
+    if (Engine == gcvENGINE_RENDER && Hardware->config->coreCount > 1)
     {
         if (BeforeBlt == gcvTRUE)
         {
@@ -1188,7 +1188,7 @@ gcoHARDWARE_3DBlitCopy(
     CurrentEngine = Engine;
     clusterMask = Hardware->config->clusterAliveMask;
     clusterCount = Hardware->config->clusterCount;
-    gpuCount = Hardware->config->gpuCoreCount;
+    gpuCount = Hardware->config->coreCount;
 
     if (clusterMask == 0)
     {
@@ -1885,7 +1885,7 @@ gcoHARDWARE_3DBlitBlt(
     }
 
     CurrentEngine = Args->uArgs.v2.engine;
-    gpuCount = Hardware->config->gpuCoreCount;
+    gpuCount = Hardware->config->coreCount;
     clusterMask = Hardware->config->clusterAliveMask;
     clusterCount = Hardware->config->clusterCount;
 
@@ -4389,7 +4389,7 @@ gcoHARDWARE_3DBlitClear(
     gcmASSERT(DstView->numSlices == 1);
 
     CurrentEngine = Engine;
-    gpuCount = Hardware->config->gpuCoreCount;
+    gpuCount = Hardware->config->coreCount;
     clusterMask = Hardware->config->clusterAliveMask;
     clusterCount = Hardware->config->clusterCount;
 
@@ -6396,7 +6396,7 @@ gcoHARDWARE_3DBlitTileFill(
     gcmGETHARDWARE(Hardware);
 
     CurrentEngine = Engine;
-    gpuCount = Hardware->config->gpuCoreCount;
+    gpuCount = Hardware->config->coreCount;
     clusterMask = Hardware->config->clusterAliveMask;
     clusterCount = Hardware->config->clusterCount;
 

@@ -2852,7 +2852,7 @@ gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL
         gcOPT_SetFeature(FB_ENABLE_CONST_BORDER);
     }
 
-    gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
+    gcmONERROR(gcoVX_SetHardwareType(gcvHARDWARE_VIP));
     gcmONERROR(gcoVX_QueryMultiCore(&isMultiCore));
 
     if (isMultiCore)

@@ -466,7 +466,8 @@ gcoHARDWARE_ConstructEx(
     IN gctBOOL Robust,
     IN gceHARDWARE_TYPE Type,
     IN gctUINT32    AttachGpuCount,
-    IN gctUINT32    CoreIndexs[],
+    IN gctUINT32    LocalCoreIndexs[],
+    IN gctUINT32    GlobalCoreIndexs[],
     OUT gcoHARDWARE * Hardware
     );
 
@@ -3924,11 +3925,15 @@ struct _gcoHAL
 #endif
 
     gctINT32                chipCount;
-    gceHARDWARE_TYPE        chipTypes[gcdCHIP_COUNT];
+    gceHARDWARE_TYPE        hwTypes[gcvCORE_COUNT];
     gctUINT                 chipIDs[gcvCORE_COUNT];
+    gctUINT                 coreIndexs[gcvCORE_COUNT];
+    gctUINT                 globalCoreOffsets[gcvHARDWARE_NUM_TYPES];
+
     gctBOOL                 separated2D;
     gctBOOL                 hybrid2D;
     gctBOOL                 is3DAvailable;
+    gctBOOL                 isVIPAvailable;
     gctBOOL                 isGpuBenchSmoothTriangle;
 
     gceHARDWARE_TYPE        defaultHwType;

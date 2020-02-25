@@ -6542,7 +6542,7 @@ clfLoadAndLinkGCShader(
     gcmONERROR(gcoOS_Allocate(gcvNULL, tmpBinarySize, &savedTmpBinary));
     gcmONERROR(gcSHADER_SaveEx(pgmBinary, savedTmpBinary, &tmpBinarySize));
 
-    gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
+    gcmONERROR(gcoCL_SetHardwareType(gcvHARDWARE_3D));
     gcmONERROR(gcoCL_GetHWConfigGpuCount(&gpuCount));
 
     if(gpuCount > 1)
@@ -7054,7 +7054,7 @@ clfLoadAndLinkVIRShader(
 
     vscCopyShader(&localShader, virShader);
 
-    gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
+    gcmONERROR(gcoCL_SetHardwareType(gcvHARDWARE_3D));
     gcmONERROR(gcoCL_QueryDeviceCount(gcvNULL, &gpuCount));
     gcoOS_ZeroMemory(&vscCompileParams, sizeof(VSC_SHADER_COMPILER_PARAM));
     vscCompileParams.cfg.ctx.clientAPI = gcvAPI_OPENCL;

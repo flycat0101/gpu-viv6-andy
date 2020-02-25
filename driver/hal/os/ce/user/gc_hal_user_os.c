@@ -800,6 +800,7 @@ gcoOS_GetTLS(
 
         /* The default hardware type is 2D */
         tls->currentType = gcvHARDWARE_2D;
+        tls->targetType  = gcvHARDWARE_INVALID;
 
 #ifndef VIV_K_GAL
         if (!TlsSetValue(g_ProcessKey, tls))

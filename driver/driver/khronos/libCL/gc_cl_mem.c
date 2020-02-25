@@ -3143,7 +3143,8 @@ clCreateBuffer(
         clmRETURN_ERROR(CL_INVALID_HOST_PTR);
     }
 
-    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+    gcoCL_SetHardwareType(gcvHARDWARE_3D);
+
     /* New buffer object. */
     clmONERROR(clfNewBuffer(Context, &buffer),
                CL_OUT_OF_HOST_MEMORY);
@@ -3376,7 +3377,8 @@ clCreateSubBuffer(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+    gcoCL_SetHardwareType(gcvHARDWARE_3D);
+
     /* New buffer object. */
     clmONERROR(clfNewBuffer(Buffer->context, &buffer),
                CL_OUT_OF_HOST_MEMORY);
@@ -3927,7 +3929,8 @@ clCreateImage(
             "OCL-004065: (clCreateImage) invalid HostPtr.\n");
         clmRETURN_ERROR(CL_INVALID_HOST_PTR);
     }
-    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+
+    gcoCL_SetHardwareType(gcvHARDWARE_3D);
 
     /* New image object. */
     clmONERROR(clfNewImage(Context, &image),
@@ -4235,7 +4238,8 @@ clCreateImage2D(
         clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
     }
 
-    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+    gcoCL_SetHardwareType(gcvHARDWARE_3D);
+
     /* TODO - Set endian hint. */
 
     /* Get row pitch. */
@@ -4478,7 +4482,9 @@ clCreateImage3D(
             "OCL-004020: (clCreateImage3D) invalid format descriptor.\n");
         clmRETURN_ERROR(CL_INVALID_IMAGE_FORMAT_DESCRIPTOR);
     }
-    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+
+    gcoCL_SetHardwareType(gcvHARDWARE_3D);
+
     /* Get row pitch. */
     rowPitch = (ImageRowPitch ? ImageRowPitch
                               : ImageWidth * elementSize);
