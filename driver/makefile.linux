@@ -215,7 +215,6 @@ endif # VIVANTE_ENABLE_3D
 
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
-ifeq ($(USE_VXC_BINARY),0)
 LIB_GL4X            := $(AQROOT)/driver/khronos/libGL4
 ifeq ($(LINUX_VSIMULATOR),0)
 LIB_LIST            += $(LIB_GL4X)
@@ -223,7 +222,6 @@ endif
 $(LIB_GL4X):        $(LIB_GAL) $(LIB_VSC)
 .PHONY: GL4X
 GL4X:               $(LIB_GL4X)
-endif # USE_VXC_BINARY
 endif # VIVANTE_ENABLE_3D
 
 
