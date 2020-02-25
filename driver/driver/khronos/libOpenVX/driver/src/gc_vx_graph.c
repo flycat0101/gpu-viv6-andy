@@ -4459,21 +4459,34 @@ VX_PRIVATE_API vx_bool vxoMultiGPU_IsSupport(
     if (VXNNE_OPERATOR_FULLYCONNECTED == operation->operatorType)
     {
         vx_uint32 count = gpuCount;
-        outputHeight = TENSOR_STRIDE_INDEX(output, 3) / TENSOR_DATA_SIZE(output);
-
-        while (count >= 2)
+        vxnne_tp_operation srcTpOp = (vxnne_tp_operation)operation;
+        vx_weights_biases_parameter weights_biases = (vx_weights_biases_parameter)srcTpOp->base.parameter.other_ref;
+        if (weights_biases != VX_NULL)
         {
-            /* TP can't support 1x1x1 output */
-            if ((outputHeight / count) <= 1)
+            vx_uint32 kzGroup = WB_KERNEL_Z(weights_biases) % MAX_TP_FC_KZ_SIZE == 0 ? WB_KERNEL_Z(weights_biases) / MAX_TP_FC_KZ_SIZE : WB_KERNEL_Z(weights_biases) / MAX_TP_FC_KZ_SIZE + 1;
+            outputHeight = TENSOR_STRIDE_INDEX(output, 3) / TENSOR_DATA_SIZE(output);
+
+            while (count >= 2)
             {
-                splitFlag = vx_false_e;
-                count--;
+                /* TP can't support 1x1x1 output */
+                if ((outputHeight / count) <= 1)
+                {
+                    splitFlag = vx_false_e;
+                    count--;
+                }
+                else
+                {
+                    splitFlag = vx_true_e;
+                    *splitCount = count;
+                    break;
+                }
             }
-            else
+
+            if (kzGroup != 1)
             {
-                splitFlag = vx_true_e;
-                *splitCount = count;
-                break;
+                count = 0;
+                OpFlag = vx_false_e;
+               *splitCount = 0;
             }
         }
     }
@@ -5240,6 +5253,13 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForFC(
                                                                 weightTensor,
                                                                 biasTensor);
 
+    {
+        vx_uint32 zOffset = 0;
+        vx_uint32 dims[2] =  {TENSOR_VIEW_SIZE_INDEX(outputTensor, 0), TENSOR_VIEW_SIZE_INDEX(outputTensor, 1)};
+        calculateZOffset(dims, TENSOR_DATA_TYPE(outputTensor), 0, &zOffset);
+        newWeightBias->compress(newWeightBias, VXNNE_OPERATION_TARGET_TP, 0, zOffset);
+    }
+
     dstOperation->base.references[VX_MULTIVIP_WEIGHT_BIAS_PARAM_REFERENCE] = (vx_reference)newWeightBias;
 
     /*5. construction new TP FullyConnect operation */
@@ -5252,69 +5272,17 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForFC(
 
     if (1 == kzGroup)
     {
-        vx_tp_value_cmd_s values ;
-        vx_uint32 kzgroup = WB_KERNEL_Z(newWeightBias) / WB_KERNEL_Z_INDEX(newWeightBias, 0);
+        vx_op_param conv = VX_NULL;
         vx_uint32 zoffset = 0;
-        vxmASSERT(1 == kzGroup);
-        memset(&values,0,sizeof(vx_tp_value_cmd_s));
-        dstOperation->base.parameter.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(WB_TOTAL_SLICE_NUM(newWeightBias) * sizeof(vx_tp_value_cmd_s));
-        if (dstOperation->base.parameter.tp_value != VX_NULL)
-        {
-            for (i = 0; i < WB_TOTAL_SLICE_NUM(newWeightBias); i++)
-            {
-                values.u32[0] = kzgroup;
-                values.u32[1] = zoffset;
-                vxMemCopy(&dstOperation->base.parameter.tp_value[i], &values, sizeof(vx_tp_value_cmd_s));
-                zoffset += WB_OUTPUT_Z_INDEX(newWeightBias, i);
-            }
-        }
-    }
-    else
-    {
-        vx_tp_value_cmd_s values ;
-        vx_uint32 kzoffset = 0, kzoffset2 = 0, zoffset = 0;
-        memset(&values,0,sizeof(vx_tp_value_cmd_s));
-        if (0 == srcTpOp->base.parameter.tp_value->e32[0])
-        {
-            dstOperation->base.parameter.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(WB_TOTAL_SLICE_NUM(newWeightBias) * sizeof(vx_tp_value_cmd_s));
-            if (dstOperation->base.parameter.tp_value != VX_NULL)
-            {
-                vx_uint32 kzgroup = WB_KERNEL_Z(newWeightBias) / WB_KERNEL_Z_INDEX(newWeightBias, 0);
-                for (i = 0; i < WB_TOTAL_SLICE_NUM(newWeightBias); i++)
-                {
-                    values.e32[0] = 0;
-                    values.u32[0] = kzgroup;
-                    values.u32[1] = zoffset;
-                    values.u32[2] = kzoffset;
-                    values.u32[3] = kzoffset2;
+        vx_uint32 kzgroup = WB_KERNEL_Z(newWeightBias) % MAX_TP_FC_KZ_SIZE == 0 ? WB_KERNEL_Z(newWeightBias) / MAX_TP_FC_KZ_SIZE : WB_KERNEL_Z(newWeightBias) / MAX_TP_FC_KZ_SIZE + 1;
 
-                    vxMemCopy(&dstOperation->base.parameter.tp_value[i], &values, sizeof(vx_tp_value_cmd_s));
-                    if (i % kzgroup == kzgroup - 1)
-                    {
-                        kzoffset = kzoffset2 = 0;
-                        zoffset += WB_OUTPUT_Z_INDEX(newWeightBias, i);
-                    }
-                    else
-                    {
-                        kzoffset += WB_KERNEL_Z_INDEX(newWeightBias, i);
-                        kzoffset2 += WB_OUTPUT_Z(newWeightBias);
-                    }
-                }
-            }
-        }
-        else if (1 == srcTpOp->base.parameter.tp_value->e32[0])
+        conv = &dstOperation->base.parameter;
+        conv->tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(WB_TOTAL_SLICE_NUM(newWeightBias) * sizeof(vx_tp_value_cmd_s));
+        for (i = 0; i < WB_TOTAL_SLICE_NUM(newWeightBias); i++)
         {
-             dstOperation->base.parameter.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
-             if (dstOperation->base.parameter.tp_value != VX_NULL)
-             {
-                values.e32[0] = 1;
-                values.u32[1] = WB_OUTPUT_Z(newWeightBias);
-                vxMemCopy(dstOperation->base.parameter.tp_value, &values, sizeof(vx_tp_value_cmd_s));
-             }
-        }
-        else
-        {
-            vxmASSERT(0);
+            conv->tp_value[i].u32[0] = kzgroup;
+            conv->tp_value[i].u32[1] = zoffset;
+            zoffset += WB_OUTPUT_Z_INDEX(newWeightBias, i);
         }
     }
 
