@@ -4745,6 +4745,11 @@ vx_status vxnneOperation_NodeDump(
                         gcoOS_PrintStrSafe(layerFileName, 256, &offset, "NodeID_%d_%s_w_%d_h_%d_d_%d_batchID_%d_out_%d.txt",
                             opCommand->operation->layer->node->nodeID, opCommand->operation->layer->name, width, height, depth, opCommand->batchID, i);
                     }
+                    if (fpLayer)
+                    {
+                        fclose(fpLayer);
+                        fpLayer = VX_NULL;
+                    }
                     fpLayer = fopen(layerFileName,"w");
                     if(!fpLayer)
                     {
@@ -4801,6 +4806,7 @@ vx_status vxnneOperation_NodeDump(
                 if (fpLayer)
                 {
                     fclose(fpLayer);
+                    fpLayer = VX_NULL;
                 }
 
                 if (fpOperation)
