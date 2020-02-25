@@ -1833,7 +1833,7 @@ gckGALDEVICE_Construct(
             }
             else
             {
-                char sRAMName[20];
+                char sRAMName[40];
                 snprintf(sRAMName, gcmSIZEOF(sRAMName) - 1, "Galcore external sram%d", i);
 
 #if gcdCAPTURE_ONLY_MODE
