@@ -3517,7 +3517,7 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
     vxnne_operator_e op_type
     )
 {
-    vx_uint32 outXSize, outYSize, kernelXSize, kernelYSize, kernelZSize, poolingSize, poolingStride;
+    vx_uint32 outXSize, outYSize, kernelXSize, kernelYSize, kernelZSize;
     vx_int32 inputDataSize, outputDataSize, xOffSet, yOffSet;
 
     ComputeInputSize(
@@ -3525,8 +3525,8 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
         WB_KERNEL_X(wb),
         pad_x_left,
         pad_x_right,
-        poolingSize,
-        poolingStride,
+        pool_size,
+        pool_stride,
         &outXSize,
         1);
 
@@ -3535,8 +3535,8 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
         WB_KERNEL_Y(wb),
         pad_y_top,
         pad_y_bottom,
-        poolingSize,
-        poolingStride,
+        pool_size,
+        pool_stride,
         &outYSize,
         1);
 
@@ -3574,8 +3574,8 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
     perf->info.stridey = WB_STRIDE_Y(wb);
     perf->info.inputDataSize = inputDataSize;
     perf->info.outputDataSize = outputDataSize;
-    perf->info.poolingSize = poolingSize;
-    perf->info.poolingStride = poolingStride;
+    perf->info.poolingSize = pool_size;
+    perf->info.poolingStride = pool_stride;
     perf->info.xOffSet = xOffSet;
     perf->info.yOffSet = yOffSet;
 
@@ -3594,9 +3594,9 @@ VX_INTERNAL_API void calculateArchPerfFromWB(
     perf->swTilingInfo.dstBuf = dst_buf;
     perf->swTilingInfo.kernelBuf = kernel_buf;
 
-    perf->info.p3 = (poolingSize == 3) ? 1: 0;
-    perf->info.pix = (vx_uint32)ceilf((vx_float32)(outXSize - perf->info.p3) / poolingStride);
-    perf->info.piy = (vx_uint32)ceilf((vx_float32)(outYSize - perf->info.p3) / poolingStride);
+    perf->info.p3 = (pool_size == 3) ? 1: 0;
+    perf->info.pix = (vx_uint32)ceilf((vx_float32)(outXSize - perf->info.p3) / pool_stride);
+    perf->info.piy = (vx_uint32)ceilf((vx_float32)(outYSize - perf->info.p3) / pool_stride);
     if ((op_target != VXNNE_OPERATION_TARGET_TP || op_type == VXNNE_OPERATOR_FULLYCONNECTED) && wb)
       perf->info.kernelSize = (vx_uint32)(gcmALIGN_NP2(WB_STREAM_ALIGN_SIZE_INDEX(wb, 0), CACHE_ALIGNMENT_SIZE));
     /* use wb's format as input data format for arch model performance calculation */

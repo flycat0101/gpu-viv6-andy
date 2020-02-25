@@ -248,7 +248,7 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/inc \
     $(AQROOT)/hal/user \
     $(AQROOT)/hal/os/linux/user \
-    $(AQROOT)/compiler/libVSC/include
+    $(AQROOT)/compiler/libVSC/include \
 else
 LOCAL_C_INCLUDES := \
     $(AQROOT)/sdk/inc \
