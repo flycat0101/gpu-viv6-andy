@@ -454,7 +454,7 @@ sloCOMPILER_Construct(
         /* Init output layout. */
         compiler->context.outDefaultLayout.gsPrimitive = slvGS_PRIMITIVE_NONE;
         /* The initial default stream number is zero. */
-        compiler->context.outDefaultLayout.currentStreamNumber = 0;
+        compiler->context.outDefaultLayout.streamNumber = 0;
         compiler->context.outDefaultLayout.maxVerticesNumber = (gctINT)GetGLMaxTessPatchVertices();
         compiler->context.outDefaultLayout.maxGSVerticesNumber = -1;
         compiler->context.outDefaultLayout.verticesNumber = -1;

@@ -2282,7 +2282,7 @@ gcDump_Shader(
             {
                 gcmVERIFY_OK(
                 gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
-                                   "  output(%d) := %s%s%s %s %s[%d] ",
+                                   "  output(%d) := %s%s%s %s %s %s[%d] ",
                                    i,
                                    gcmOUTPUT_isCentroid(output) ? "centroid " : gcmOUTPUT_isSample(output) ? "sample " : "",
                                    gcmOUTPUT_isPerPatch(output) ? "patch " : gcmOUTPUT_isPerVertexArray(output) ? "PerVertexArray " : "",
@@ -2319,6 +2319,13 @@ gcDump_Shader(
             /* dump the layout location*/
             gcmVERIFY_OK(gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
                                        " (location = %d)", output->location));
+
+            /* dump the stream number */
+            if (GetShaderType(shader) == gcSHADER_TYPE_GEOMETRY)
+            {
+                gcmVERIFY_OK(gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
+                                           " (streamNumber = %d)", GetOutputStreamNumber(output)));
+            }
 
             /* dump the field index*/
             gcmVERIFY_OK(gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,

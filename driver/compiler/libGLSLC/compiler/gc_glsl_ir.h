@@ -404,7 +404,7 @@ typedef struct _slsLAYOUT_QUALIFIER
     slvTES_POINT_MODE               tesPointMode;
     slvGS_PRIMITIVE                 gsPrimitive;
     gctINT                          gsInvocationTime;
-    gctINT                          currentStreamNumber; /* This is for GS only. */
+    gctINT                          streamNumber; /* This is for GS only. */
     gctINT                          maxGSVerticesNumber; /* This is for GS. */
     gctINT                          maxVerticesNumber; /* This is queried from HW. */
     gctINT                          verticesNumber; /* This is setted by layout. */
@@ -423,7 +423,7 @@ typedef struct _slsLAYOUT_QUALIFIER
         (Layout)->gsPrimitive           = slvGS_PRIMITIVE_NONE; \
         (Layout)->gsInvocationTime      = -1; \
         /* The initial default stream number is zero. */ \
-        (Layout)->currentStreamNumber   = 0; \
+        (Layout)->streamNumber          = 0; \
         (Layout)->maxGSVerticesNumber   = -1; \
         (Layout)->verticesNumber        = -1; \
     } \

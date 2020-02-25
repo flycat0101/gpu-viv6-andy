@@ -2052,8 +2052,7 @@ _AllocLogicalRegOrArray(
 
         tempRegIndex = slNewTempRegs(Compiler, logicalRegCount * binaryDataTypeSize);
 
-        if (sloCOMPILER_IsHaltiVersion(Compiler) &&
-            !sloCOMPILER_IsOGL20Version(Compiler))
+        if (sloCOMPILER_IsHaltiVersion(Compiler) && !sloCOMPILER_IsOGL20Version(Compiler))
         {
            gctUINT layoutId;
            gctINT layoutLocation = CodeGenerator->layoutLocation;
@@ -2130,6 +2129,8 @@ _AllocLogicalRegOrArray(
                        gcSHADER_GetOutput(binary, (gctUINT)(varIndex + i ), &output);
 
                        SetOutputTypeNameVarIndex(output, typeNameVarIndex);
+                       /* Built-in geometry shader outputs are always associated with vertex stream zero. */
+                       SetOutputStreamNumber(output, Name->isBuiltIn ? 0 : Name->dataType->qualifiers.layout.streamNumber);
 
                        if ((shaderType == slvSHADER_TYPE_TCS || shaderType == slvSHADER_TYPE_TES) &&
                            (slsQUALIFIERS_HAS_FLAG(&DataType->qualifiers, slvQUALIFIERS_FLAG_PATCH) ||
@@ -2228,6 +2229,20 @@ _AllocLogicalRegOrArray(
                                              _ConvOutputBlendSupport(slmDATA_TYPE_layoutId_GET(Name->dataType)),
                                              &output);
             if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            /* Update the stream number. */
+            gcSHADER_GetOutputIndexByOutput(binary, output, &varIndex);
+            {
+                gcOUTPUT output = gcvNULL;
+                gctUINT i;
+
+                for (i = 0; i < logicalRegCount; i++)
+                {
+                    gcSHADER_GetOutput(binary, (gctUINT)(varIndex + i ), &output);
+                    /* Built-in geometry shader outputs are always associated with vertex stream zero. */
+                    SetOutputStreamNumber(output, Name->isBuiltIn ? 0 : Name->dataType->qualifiers.layout.streamNumber);
+                }
+            }
 
             for (i = 0; i < logicalRegCount; i++)
             {

@@ -8857,6 +8857,12 @@ gcSHADER_Load(
             versionAdjustment += sizeof(binaryOutput->typeNameVarIndex);
         }
 
+        if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_SAVING_STREAM_NUMBER_FOR_OUTPUT)
+        {
+            /* layout field which is not in the version */
+            versionAdjustment += sizeof(binaryOutput->streamNumber);
+        }
+
         /* Parse all outputs. */
         psClrOutputLoc = 0;
         for (i = 0; i < Shader->outputCount; i++)
@@ -8965,6 +8971,15 @@ gcSHADER_Load(
             else
             {
                 output->location     = -1;
+            }
+
+            if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_SAVING_STREAM_NUMBER_FOR_OUTPUT)
+            {
+                output->streamNumber = gcSHADER_PRECISION_DEFAULT;
+            }
+            else
+            {
+                output->streamNumber = (gctINT)binaryOutput->streamNumber;
             }
 
             output->nameLength   = binaryOutput->nameLength;
@@ -11263,6 +11278,7 @@ gcSHADER_Save(
         binary->prevSibling         = output->prevSibling;
         binary->typeNameVarIndex    = output->typeNameVarIndex;
         binary->shaderMode          = (gctINT16) output->shaderMode;
+        binary->streamNumber        = (gctINT16) output->streamNumber;
 
         gcoOS_MemCopy(binary->layoutQualifier,
                       (gctPOINTER)&output->layoutQualifier,

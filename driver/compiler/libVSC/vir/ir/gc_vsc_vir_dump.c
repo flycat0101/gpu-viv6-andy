@@ -1161,6 +1161,10 @@ _DumpLayout(
     {
         VERIFY_OK(VIR_LOG(Dumper, "image_format=%x ", VIR_Layout_GetImageFormat(Layout)));
     }
+    if(VIR_Shader_IsGS(Dumper->Shader))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, "streamNumber=%x ", VIR_Layout_GetStreamNumber(Layout)));
+    }
 
     VERIFY_OK(VIR_LOG(Dumper, ") "));
 

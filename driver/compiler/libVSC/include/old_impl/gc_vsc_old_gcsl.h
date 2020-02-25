@@ -122,10 +122,13 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.39 for saving ubo array index into the binary on 08/09/2019 */
 /* bump up version to 1.40 for saving local memory size, uniform's swizzle and shader kind into the binary on 11/07/2019 */
 
-/* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 40)
+/* bump up version to 1.41 for saving the stream number for gcOUTPUT on 11/07/2019 */
+#define gcdSL_SHADER_BINARY_BEFORE_SAVING_STREAM_NUMBER_FOR_OUTPUT gcmCC(0, 0, 1, 41)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 40)
+/* current version */
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 41)
+
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 41)
 
 typedef union _gcsValue
 {
@@ -3135,6 +3138,9 @@ struct _gcOUTPUT
     /* Flat output or smooth output. */
     gcSHADER_SHADERMODE             shaderMode;
 
+    /* The stream number, for GS only. The default value is 0. */
+    gctINT                          streamNumber;
+
     /* Location index. */
     gctINT                          location;
     gctINT                          output2RTIndex; /* user may specify location 1,3,
@@ -3177,6 +3183,8 @@ struct _gcOUTPUT
 #define GetOutputArrayIndex(o)              ((o)->arrayIndex)
 #define GetOutputTempIndex(o)               ((o)->tempIndex)
 #define GetOutputShaderMode(o)              ((o)->shaderMode)
+#define GetOutputStreamNumber(o)            ((o)->streamNumber)
+#define SetOutputStreamNumber(o, i)         (GetOutputStreamNumber(o) = (i))
 #define GetOutputLocation(o)                ((o)->location)
 #define GetOutput2RTIndex(o)                ((o)->output2RTIndex)
 #define GetOutputFieldIndex(o)              ((o)->fieldIndex)
@@ -3238,6 +3246,9 @@ typedef struct _gcBINARY_OUTPUT
 
     /* shader mode: flat/smooth/... */
     gctINT16                        shaderMode;
+
+    /* The stream number, for GS only. The default value is 0. */
+    gctINT16                        streamNumber;
 
     /* layout qualifier */
     char                            layoutQualifier[sizeof(gceLAYOUT_QUALIFIER)];

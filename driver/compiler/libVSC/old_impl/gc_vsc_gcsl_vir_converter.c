@@ -4573,6 +4573,7 @@ _ConvShaderOutput2Vir(
         /* set layout info */
         VIR_Symbol_SetLayoutQualifier(sym, VIR_LAYQUAL_NONE);
         VIR_Symbol_SetLocation(sym, Output->location);
+        VIR_Symbol_SetStreamNumber(sym, GetOutputStreamNumber(Output));
     }
 
     gcTYPE_GetTypeInfo(Output->type, &components, &rows, 0);

@@ -1257,6 +1257,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_GetLocation(Sym)         ((Sym)->layout.location)
 #define VIR_Symbol_GetMasterLocation(Sym)   ((Sym)->layout.masterLocation)
 #define VIR_Symbol_GetLlResSlot(Sym)        ((Sym)->layout.llResSlot)
+#define VIR_Symbol_GetStreamNumber(Sym)     ((Sym)->layout.streamNumber)
 #define VIR_Symbol_GetInputAttIndex(Sym)    ((Sym)->layout.inputAttachmentIndex)
 #define VIR_Symbol_GetDescriptorSet(Sym)    ((Sym)->layout.descriptorSet)
 #define VIR_Symbol_GetBinding(Sym)          ((Sym)->layout.binding)
@@ -1340,6 +1341,8 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
     do {(Sym)->layout.descriptorSet = (Val); } while(0)
 #define VIR_Symbol_SetInputAttIndex(Sym, Val)                \
     do {(Sym)->layout.inputAttachmentIndex = (Val); } while(0)
+#define VIR_Symbol_SetStreamNumber(Sym, Val)                \
+    do {(Sym)->layout.streamNumber = (Val); } while(0)
 
 #define VIR_Symbol_SetKind(Sym, Kind)       do {(Sym)->_kind = Kind; } while (0)
 #define VIR_Symbol_SetStorageClass(Sym, SC) do {(Sym)->_storageClass = SC; } while (0)
@@ -2863,6 +2866,7 @@ typedef struct _VIR_LAYOUT
     gctINT         location;            /* location of in/out variable, uniform, interface block */
     gctINT         component;           /* Indicates which component within a Location input/output will be taken by the decorated entity. */
     gctINT         masterLocation;      /* If the sym is derived from other symbol (master), record the location of master */
+    gctINT         streamNumber;        /* Stream number for a GS output. */
     gctUINT        inputAttachmentIndex;/* Apply to a variable to provide an input-target index. */
     gctUINT        descriptorSet;       /* descriptor set for resources */
     gctUINT        binding;             /* binding for SBO/UBO/AtomicCounter/sampler/image */
@@ -2882,6 +2886,7 @@ typedef struct _VIR_LAYOUT
         (Layout)->imageSampledType = VIR_TYPE_UNKNOWN;                  \
         (Layout)->masterLocation = NOT_ASSIGNED;                        \
         (Layout)->binding = NOT_ASSIGNED;                               \
+        (Layout)->streamNumber = 0;                                     \
         (Layout)->inputAttachmentIndex = NOT_ASSIGNED;                  \
         (Layout)->descriptorSet = NOT_ASSIGNED;                         \
         (Layout)->llFirstSlot = NOT_ASSIGNED;                           \
@@ -2905,6 +2910,7 @@ typedef struct _VIR_LAYOUT
 #define VIR_Layout_SetComponent(Layout, C)  (VIR_Layout_GetComponent(Layout) = (C))
 #define VIR_Layout_GetLlResSlot(Layout)     ((Layout)->llResSlot)
 #define VIR_Layout_GetDescriptorSet(Layout) ((Layout)->descriptorSet)
+#define VIR_Layout_GetStreamNumber(Layout)  ((Layout)->streamNumber)
 #define VIR_Layout_GetInputAttIndex(Layout) ((Layout)->inputAttachmentIndex)
 #define VIR_Layout_HasBinding(Layout)       ((Layout)->layoutQualifier & VIR_LAYQUAL_BINDING)
 #define VIR_Layout_GetBinding(Layout)       ((Layout)->binding)

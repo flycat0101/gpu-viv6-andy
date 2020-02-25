@@ -12836,6 +12836,21 @@ slParseFullySpecifiedType(
                slmDATA_TYPE_layoutBinding_SET(DataType, TypeQualifier->u.qualifiers.layout.binding);
            }
            slmDATA_TYPE_layoutId_SET(DataType, TypeQualifier->u.qualifiers.layout.id);
+
+           /* Use the stream layout if exist, otherwise use the global setting. */
+           if (TypeQualifier->u.qualifiers.layout.ext_id & slvLAYOUT_EXT_GS_STREAM)
+           {
+               DataType->qualifiers.layout.streamNumber = TypeQualifier->u.qualifiers.layout.streamNumber;
+               DataType->qualifiers.layout.ext_id |= slvLAYOUT_EXT_GS_STREAM;
+           }
+           else
+           {
+               slsLAYOUT_QUALIFIER outLayout[1];
+               sloCOMPILER_GetDefaultLayout(Compiler,
+                                            outLayout,
+                                            slvSTORAGE_QUALIFIER_OUT);
+               DataType->qualifiers.layout.streamNumber = outLayout->streamNumber;
+           }
        }
        else
        { /* no layout(especially, no location) specified */
@@ -13243,7 +13258,7 @@ slMergeTypeQualifiers(
                 }
                 if (ComingQualifier->u.qualifiers.layout.ext_id & slvLAYOUT_EXT_GS_STREAM)
                 {
-                    Qualifiers->u.qualifiers.layout.currentStreamNumber = ComingQualifier->u.qualifiers.layout.currentStreamNumber;
+                    Qualifiers->u.qualifiers.layout.streamNumber = ComingQualifier->u.qualifiers.layout.streamNumber;
                 }
                 Qualifiers->u.qualifiers.layout.ext_id |= ComingQualifier->u.qualifiers.layout.ext_id;
             }
@@ -13903,7 +13918,7 @@ slParseLayoutId(
                                                    "Can't support layout \"stream\""));
                    break;
                }
-               layoutQualifier.u.qualifiers.layout.currentStreamNumber = Value->u.constant.intValue;
+               layoutQualifier.u.qualifiers.layout.streamNumber = Value->u.constant.intValue;
            }
        }
 
@@ -14195,7 +14210,7 @@ slParseAddLayoutId(
            if (LayoutId->u.qualifiers.layout.ext_id & slvLAYOUT_EXT_INVOCATIONS)
                LayoutIdList->u.qualifiers.layout.gsInvocationTime = LayoutId->u.qualifiers.layout.gsInvocationTime;
            if (LayoutId->u.qualifiers.layout.ext_id & slvLAYOUT_EXT_GS_STREAM)
-               LayoutIdList->u.qualifiers.layout.currentStreamNumber = LayoutId->u.qualifiers.layout.currentStreamNumber;
+               LayoutIdList->u.qualifiers.layout.streamNumber = LayoutId->u.qualifiers.layout.streamNumber;
            LayoutIdList->u.qualifiers.layout.ext_id |= LayoutId->u.qualifiers.layout.ext_id;
        }
     } while (gcvFALSE);
@@ -15339,8 +15354,8 @@ slParseInterfaceBlockDeclEnd(
     dataType->qualifiers.layout = BlockType->u.qualifiers.layout;
     dataType->qualifiers.flags = BlockType->u.qualifiers.flags;
     status = sloCOMPILER_GetDefaultLayout(Compiler,
-                                            defaultLayout,
-                                            storageQualifier);
+                                          defaultLayout,
+                                          storageQualifier);
     if (gcmIS_ERROR(status)) {
         gcmFOOTER_ARG("<return>=%s", "<nil>");
         return gcvNULL;
@@ -15486,14 +15501,35 @@ slParseInterfaceBlockDeclEnd(
     lastField = slsDLINK_LIST_Last(&(prevNameSpace->names), slsNAME);
 
     /*
-    ** check it there is a embedded structure definition
-    ** and/or implicitly sized array
+    ** Check:
+    ** 1) If there is a embedded structure definition.
+    ** 2) If there is a implicitly sized array.
+    ** 3) If there is unmatched stream number.
+    ** ...
     */
     FOR_EACH_DLINK_NODE(&(prevNameSpace->names), slsNAME, field)
     {
         gctBOOL setLocation = gcvFALSE;
         gctINT location = 0;
         sleSHADER_TYPE shaderType = Compiler->shaderType;
+
+        /* A block member must match the stream associated with the containing block. */
+        if (field->dataType->qualifiers.layout.ext_id & slvLAYOUT_EXT_GS_STREAM
+            &&
+            field->dataType->qualifiers.layout.streamNumber != dataType->qualifiers.layout.streamNumber)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            field->lineNo,
+                                            field->stringNo,
+                                            slvREPORT_ERROR,
+                                            "A block member \"%s\" must match the stream associated with the containing block.",
+                                            field->symbol));
+            hasError = gcvTRUE;
+        }
+        else
+        {
+            field->dataType->qualifiers.layout.streamNumber = dataType->qualifiers.layout.streamNumber;
+        }
 
         /* double input must have "flat" qualifier. */
         if (slmIsElementTypeDouble(field->dataType->elementType) &&
