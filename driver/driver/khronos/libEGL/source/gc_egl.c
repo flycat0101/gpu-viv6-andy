@@ -196,9 +196,8 @@ void veglPopResObj(
     return;
 }
 
-void _InitDispatchTables(
-    VEGLThreadData Thread,
-    veglAPIINDEX index
+static void _InitDispatchTables(
+    VEGLThreadData Thread
     )
 {
 #if gcdSTATIC_LINK
@@ -221,12 +220,15 @@ void _InitDispatchTables(
 #ifndef VIVANTE_NO_VG
     Thread->dispatchTables[vegl_OPENVG]         = &OpenVG_DISPATCH_TABLE;
 #  endif
-#else
+#else /* gcdSTATIC_LINK */
+    gctINT32 index;
 
-Loopback:
 #if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
-        gcoOS_AcquireMutex(gcvNULL, &client_handles_lock, gcvINFINITE);
+    gcoOS_AcquireMutex(gcvNULL, &client_handles_lock, gcvINFINITE);
 #endif
+
+    for (index = 0; index < vegl_API_LAST; index++)
+    {
         if (client_handles[index] == NULL)
         {
             client_handles[index] = Thread->clientHandles[index] =
@@ -238,21 +240,18 @@ Loopback:
             gcoOS_GetProcAddress(NULL, client_handles[index], _dispatchNames[index],
                     (gctPOINTER*) &Thread->dispatchTables[index]);
         }
-#if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
-        gcoOS_ReleaseMutex(gcvNULL, &client_handles_lock);
-#endif
+
         gcmTRACE_ZONE(
             gcvLEVEL_VERBOSE, gcdZONE_EGL_API,
             "%s(%d): APIIndex=%d library=%p dispatch=%p",
             __FUNCTION__, __LINE__,
             index, Thread->clientHandles[index], Thread->dispatchTables[index]
             );
+    }
 
-        if (vegl_OPENGL_ES11 == index)
-        {
-            index = vegl_OPENGL_ES20;
-            goto Loopback;
-        }
+#if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
+    gcoOS_ReleaseMutex(gcvNULL, &client_handles_lock);
+#endif
 
     return;
 #endif /* gcdSTATIC_LINK */
@@ -298,11 +297,8 @@ veglGetThreadData(
         thread->fbMemSize         = 0;
 #endif
 
-        /* Initialize GLES client API dispatch tables. */
-        _InitDispatchTables(thread, vegl_OPENGL_ES11);
-
-        /* Initialize OpenVG API dispatch table to query 2D or 3D VG pipe. */
-        _InitDispatchTables(thread, vegl_OPENVG);
+        /* Initialize client API dispatch tables. */
+        _InitDispatchTables(thread);
 
         /* Set driver tls. */
         gcoOS_SetDriverTLS(gcvTLS_KEY_EGL, &thread->base);

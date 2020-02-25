@@ -13,8 +13,6 @@
 
 #include "gc_egl_precomp.h"
 
-extern void _InitDispatchTables(VEGLThreadData Thread, veglAPIINDEX index);
-
 #if defined(ANDROID) && !defined(GPU_VENDOR)
 #  define GPU_VENDOR "VIVANTE"
 #endif
@@ -788,12 +786,6 @@ veglBindAPI(
     switch (api)
     {
     case EGL_OPENGL_ES_API:
-        if (!thread->dispatchTables[vegl_OPENGL_ES11] ||
-            !thread->dispatchTables[vegl_OPENGL_ES20])
-        {
-            /* Initialize client dispatch tables. */
-            _InitDispatchTables(thread, vegl_OPENGL_ES11);
-        }
         if (!thread->dispatchTables[vegl_OPENGL_ES11_CL] &&
             !thread->dispatchTables[vegl_OPENGL_ES11] &&
             !thread->dispatchTables[vegl_OPENGL_ES20])
@@ -814,11 +806,6 @@ veglBindAPI(
     case EGL_OPENGL_API:
         if (!thread->dispatchTables[vegl_OPENGL])
         {
-            /* Initialize client dispatch tables. */
-            _InitDispatchTables(thread, vegl_OPENGL);
-        }
-        if (!thread->dispatchTables[vegl_OPENGL])
-        {
             /* OpenGL API not supported. */
             veglSetEGLerror(thread,  EGL_BAD_PARAMETER);;
             gcmFOOTER_ARG("%d", EGL_FALSE);
@@ -833,11 +820,6 @@ veglBindAPI(
         break;
 
     case EGL_OPENVG_API:
-        if (!thread->dispatchTables[vegl_OPENVG])
-        {
-            /* Initialize client dispatch tables. */
-            _InitDispatchTables(thread, vegl_OPENVG);
-        }
         if (!thread->dispatchTables[vegl_OPENVG])
         {
             /* OpenVG API not supported. */
