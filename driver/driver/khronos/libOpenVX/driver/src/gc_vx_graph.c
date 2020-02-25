@@ -1787,7 +1787,8 @@ VX_PRIVATE_API vx_status DetectABSegment(
     vx_uint32                  start,
     vx_uint32                  count,
     vx_enum                    memType,
-    vx_bool                    *detected)
+    vx_bool                   *detected,
+    vx_uint32                 *failedID)
 {
     vx_uint32  k = 0, oldStart = start, oldCount = count;
     vxnne_operation_info_s opInfo;
@@ -1898,7 +1899,7 @@ VX_PRIVATE_API vx_status DetectABSegment(
         }
     }
 
-    if (vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, start, count, VX_NULL) == VX_SUCCESS)
+    if (vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, start, count, VX_NULL, failedID) == VX_SUCCESS)
     {
         *detected = vx_true_e;
     }
@@ -1925,7 +1926,7 @@ VX_PRIVATE_API vx_status DetectSegments(
     vx_enum                     memType,
     vxnne_segment_collection    collection)
 {
-    vx_uint32 i = 0, j = 0, k = 0, tilingStart, tilingEnd, M = 0, N = 0, axiSRAMUsed = 0, vipSRAMUsed = 0;
+    vx_uint32 i = 0, j = 0, k = 0, tilingStart, tilingEnd, M = 0, N = 0, axiSRAMUsed = 0, vipSRAMUsed = 0, failedID;
     vx_status status = VX_SUCCESS;
     vxnne_segment_collection_s  detectedCollection;
     vx_bool detected = vx_false_e;
@@ -1955,8 +1956,13 @@ VX_PRIVATE_API vx_status DetectSegments(
 
                     if (segType == VXNNE_SEGMENT_TYPE_AB)
                     {
-                        status = DetectABSegment(graph, i, k, memType, &detected);
+                        status = DetectABSegment(graph, i, k, memType, &detected, &failedID);
                         if (status != VX_SUCCESS) goto OnError;
+
+                        if (!detected)
+                        {
+                            k =  gcmCLAMP(((vx_int32)(failedID - i)), 1, k);
+                        }
                     }
                     else
                     {
@@ -2583,7 +2589,7 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
         }
 #endif
 
-        status = vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, block->start, block->count, peakMemSize);
+        status = vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, block->start, block->count, peakMemSize, VX_NULL);
         if (status != VX_SUCCESS)
         {
             vx_uint32 j = 0;
@@ -6671,7 +6677,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyVirtualBuffer(vx_graph graph)
 
     if (enablePool && count > 0)
     {
-        status = vxoMemoryPool_RequestList(graph, rlist, count, 0, count, VX_NULL);
+        status = vxoMemoryPool_RequestList(graph, rlist, count, 0, count, VX_NULL, VX_NULL);
         gcmASSERT(status == VX_SUCCESS);
     }
 

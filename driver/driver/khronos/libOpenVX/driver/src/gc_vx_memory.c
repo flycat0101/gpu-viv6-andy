@@ -1437,10 +1437,11 @@ vxoMemoryPool_RequestList(
     vx_uint32           list_count,
     vx_uint32           start,
     vx_uint32           count,
-    vx_uint32           *max_sizes
+    vx_uint32           *max_sizes,
+    vx_uint32           *fail_id
     )
 {
-    vx_uint32 i, j, ii, s, tcount = 0, mcounts[VXNNE_MEM_POOL_TYPE_END] = {0};
+    vx_uint32 i, j, ii, s, tcount = 0, mcounts[VXNNE_MEM_POOL_TYPE_END] = {0}, failId = 0;
     vx_size size, msize[VXNNE_MEM_POOL_TYPE_END] = {0};
     vx_size maxs[VXNNE_MEM_POOL_TYPE_ALL] = {0};
     vx_memory * plists[VXNNE_MEM_POOL_TYPE_END] = {VX_NULL};
@@ -1604,6 +1605,7 @@ again:
 
                 if (mem->allocated == vx_false_e && i > mem->firstUseId && mustHave)
                 {
+                    failId = i;
                     status = VX_FAILURE;
                     goto exit;
                 }
@@ -1764,6 +1766,7 @@ again:
                                     {
                                         if (VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(plist[k]->allocPriority))
                                         {
+                                            failId = i;
                                             status = VX_FAILURE;
                                             goto exit;
                                         }
@@ -1795,6 +1798,7 @@ again:
                                     {
                                         if (VXNNE_MEM_ALLOC_TYPE_IS_MUST_HAVE(plist[k]->allocPriority))
                                         {
+                                            failId = i;
                                             status = VX_FAILURE;
                                             goto exit;
                                         }
@@ -1839,6 +1843,7 @@ again:
                         }
                         else
                         {
+                            failId = i;
                             status = VX_FAILURE;
                             goto exit;
                         }
@@ -1939,6 +1944,11 @@ exit:
             gcoOS_FreeMemory(gcvNULL, plists[i]);
             plists[i] = VX_NULL;
         }
+    }
+
+    if (status == VX_FAILURE && fail_id != VX_NULL)
+    {
+        *fail_id = failId;
     }
 
     gcmFOOTER_ARG("%d", status);

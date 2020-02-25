@@ -4309,7 +4309,7 @@ vx_status vxnneOperation_InitializeCommand(
                 }
             }
 
-            status = vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, command->operationID, 1, VX_NULL);
+            status = vxoMemoryPool_RequestList(graph, graph->layer->memRequestList, graph->layer->base.num_operations, command->operationID, 1, VX_NULL, VX_NULL);
             if (status != VX_SUCCESS)
             {
                 vxmASSERT(0);
