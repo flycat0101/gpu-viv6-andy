@@ -8136,7 +8136,7 @@ VX_PRIVATE_API vx_status vxoLRNOperationSH_Initialize(
     dataformat_flag[1] = (vx_bool)(inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16);
     dataformat_flag[2] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8);
     dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16);
-    dataformat_flag[4] = (vx_bool)(inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32);
+    dataformat_flag[4] = (vx_bool)(inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32&&!context->evisNoInst.supportEVIS);
     dataformat_flag[5] = (vx_bool)(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16);
     isuint8_flag       = (vx_bool)((acrossmap_flag && dataformat_flag[5])
                                     || dataformat_flag[2]);
@@ -8586,7 +8586,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNormalizationLayer2_Initializer(vx_node 
     dataformat_flag[1] = (vx_bool)(input_format == VX_TYPE_INT16 && output_format == VX_TYPE_INT16);
     dataformat_flag[2] = (vx_bool)(input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_UINT8);
     dataformat_flag[3] = (vx_bool)(input_format == VX_TYPE_FLOAT16 && output_format == VX_TYPE_FLOAT16);
-    dataformat_flag[4] = (vx_bool)(input_format == VX_TYPE_FLOAT32 && output_format == VX_TYPE_FLOAT32 && !node->base.context->evisNoInst.supportEVIS);
+    dataformat_flag[4] = (vx_bool)(input_format == VX_TYPE_FLOAT32 && output_format == VX_TYPE_FLOAT32&&!context->evisNoInst.supportEVIS);
     dataformat_flag[5] = (vx_bool)(input_format == VX_TYPE_UINT8 && output_format == VX_TYPE_FLOAT16);
     dataformat_flag[6] = (vx_bool)(input_format == VX_TYPE_BFLOAT16 && output_format == VX_TYPE_BFLOAT16);
     isuint8_flag       = (vx_bool)((acrossmap_flag && norm_config[0] && dataformat_flag[2])
@@ -21598,8 +21598,6 @@ vx_status vxnneReorg2_Batch2SpaceND(struct _vxnne_operation_s *operation)
             }
         }
     }
-
-
 
     return status;
 }

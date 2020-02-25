@@ -2921,6 +2921,7 @@ vxnne_shader_executable vxnneGetBatch2SpaceShaderExecutable(
     vx_uint32     stride_width               = TENSOR_VIEW_SIZE_INDEX(stride, 0);
     vx_uint32     input_dimz                 = 0;
     vx_int32      sizes[4]                   = {output_width, output_height, output_depth * output_batch, 1};
+    vx_float32    output_ratio               = 1.0;
 
     vx_float32    uint8_zp                   = 0.0f;
     vx_float32    uint8_scale                = 0.0f;
@@ -2935,6 +2936,8 @@ vxnne_shader_executable vxnneGetBatch2SpaceShaderExecutable(
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
+
+    output_ratio = (float)(1.0 / (output_width * output_height));
 
     borderMode->mode = VX_BORDER_CONSTANT;
     borderMode->constant_value.U8 = 0;
@@ -3061,6 +3064,7 @@ vxnne_shader_executable vxnneGetBatch2SpaceShaderExecutable(
     }
     status = vxnneShaderExecutable_SetUniform(shaderExecutable, "output_width", 1, &output_width);
     status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "output_height", 1, &output_height);
+    status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "output_ratio", 1, &output_ratio);
     if (status != VX_SUCCESS) goto OnError;
 
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
