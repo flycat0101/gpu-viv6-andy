@@ -9617,6 +9617,10 @@ gcChipValidateFixProgram(
     {
         gcmONERROR(gcChipLoadFixFunctionShader(gc));
     }
+    else
+    {
+        chipCtx->programDirty = GL_TRUE;
+    }
 OnError:
     gcmFOOTER();
     return status;
