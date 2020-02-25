@@ -7296,6 +7296,11 @@ DEF_QUERY_PASS_PROP(VIR_LinkInternalLibFunc)
 
 DEF_SH_NECESSITY_CHECK(VIR_LinkInternalLibFunc)
 {
+    if ((pPassWorker->pCompilerParam->cfg.ctx.clientAPI == gcvAPI_OPENVK) &&
+        (!_HasIntrinsicCall((VIR_Shader*)pPassWorker->pCompilerParam->hShader)))
+    {
+        return gcvFALSE;
+    }
     return gcvTRUE;
 }
 
