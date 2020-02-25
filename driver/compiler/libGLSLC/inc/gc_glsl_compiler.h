@@ -606,7 +606,8 @@ typedef enum _sleEXTENSION2
     slvEXTENSION2_NONE                                       = 0x00000000,
     slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION            = 0x00000001,
     slvEXTENSION2_GL_ARB_TESSELLATION_SHADER                 = 0x00000002,
-    slvEXTENSION2_GL_ARB_UNIFORM_BUFFER_OBJECT               = 0x00000004
+    slvEXTENSION2_GL_ARB_UNIFORM_BUFFER_OBJECT               = 0x00000004,
+    slvEXTENSION2_GL_ARB_GPU_SHADER5                         = 0x00000008
 }
 sleEXTENSION2;
 

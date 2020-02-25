@@ -26609,6 +26609,20 @@ sloIR_POLYNARY_EXPR_GenOperandsCodeForFuncCall(
                 {
                     slsLOPERAND_Initialize(&lOperand, logicalRegs + j);
 
+                    if(sloIR_EXPR_ImplicitConversionDone(operand))
+                    {
+                        gcSHADER_TYPE toBeDataType;
+
+                        toBeDataType = slsDATA_TYPE_ConvElementDataType(operand->toBeDataType);
+                        status = slsROPERAND_ChangeDataTypeFamily(Compiler,
+                                                                  PolynaryExpr->exprBase.base.lineNo,
+                                                                  PolynaryExpr->exprBase.base.stringNo,
+                                                                  gcvFALSE,
+                                                                  toBeDataType,
+                                                                  operandsParameters[i].rOperands + j);
+                        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+                    }
+
                     /* Just change assignment for a temp register. */
                     if (operandsParameters[i].rOperands[j].isReg &&
                         operandsParameters[i].rOperands[j].u.reg.u.pointer != gcvNULL &&

@@ -1414,6 +1414,14 @@ sloCOMPILER_Compile(
         sloCOMPILER_EnableExtension(Compiler, &extension, gcvTRUE);
     }
 
+    /* Check if "GL_ARB_gpu_shader5" extention is enable. */
+    if (gcoOS_StrStr(GetGLExtensionString(), "GL_ARB_gpu_shader5", gcvNULL))
+    {
+        sloEXTENSION extension = {0};
+        extension.extension2 = slvEXTENSION2_GL_ARB_GPU_SHADER5;
+        sloCOMPILER_EnableExtension(Compiler, &extension, gcvTRUE);
+    }
+
     /* Check if HW has HALTI5 and FMA support */
     if(GetHWHasHalti5() && GetHWHasFmaSupport())
     {
@@ -2002,6 +2010,44 @@ sloCOMPILER_ExpandNorm(
     )
 {
     return (Compiler->context.optimizationOptions & slvOPTIMIZATION_EXPAND_NORM);
+}
+
+gctBOOL
+sloCOMPILER_Extension1Enabled(
+    IN sloCOMPILER Compiler,
+    IN sleEXTENSION1 Extension
+    )
+{
+    gctBOOL result;
+    gcmHEADER_ARG("Compiler=0x%x Extension=%d",
+                  Compiler, Extension);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    result = (Compiler->context.extensions.extension1 & Extension);
+    gcmFOOTER_ARG("<return>=%d", result);
+
+    return result;
+}
+
+gctBOOL
+sloCOMPILER_Extension2Enabled(
+    IN sloCOMPILER Compiler,
+    IN sleEXTENSION2 Extension
+    )
+{
+    gctBOOL result;
+    gcmHEADER_ARG("Compiler=0x%x Extension=%d",
+                  Compiler, Extension);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    result = (Compiler->context.extensions.extension2 & Extension);
+    gcmFOOTER_ARG("<return>=%d", result);
+
+    return result;
 }
 
 gctBOOL
