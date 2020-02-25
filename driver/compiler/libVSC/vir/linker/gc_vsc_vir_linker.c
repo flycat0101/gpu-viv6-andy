@@ -5353,9 +5353,11 @@ _CheckTextureResource(
     VSC_LINK_POINT_RESOURCE_SUBTYPE linkPointSubType
     )
 {
-    if (linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
+    if (linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LAYER
         ||
-        linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGRAD_EXTRA_LATYER
+        linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LAYER_SPECIFIED_OP
+        ||
+        linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGRAD_EXTRA_LAYER
         ||
         linkPointSubType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXFETCH_REPLACE_WITH_IMGLD
         ||
@@ -5757,15 +5759,22 @@ _InsertCallTexld(
     VIR_Function                     *pFunc = VIR_Inst_GetFunction(texldInst);
     VIR_Instruction                  *newInst = gcvNULL;
     VSC_LIB_SPECIALIZATION_CONSTANT  *specializationConst;
-
+    VSC_LINK_POINT_RESOURCE_SUBTYPE  subType = Context->linkPoint->u.resource.subType;
+    gctBOOL                          bSpecifiedOp = gcvFALSE;
     VIR_Operand                      *texldSrc = gcvNULL, *newOpnd = gcvNULL;
     gctUINT                          argIdx = 0, i;
     gctUINT                          instMod = _texldInstMod(texldInst);
     Vir_TexldModifier_Name           texldMod = instMod2TexldMod(instMod);
     gctSTRING                        paramName;
     gctBOOL                          paraFound = gcvFALSE;
+    VSC_RES_OP_BIT                   resOpBit = _VirResOpType2DrviResOpBit(VIR_Inst_GetResOpType(texldInst));
 
     gcmASSERT(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(texldInst)));
+
+    if (subType == VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LAYER_SPECIFIED_OP)
+    {
+        bSpecifiedOp = gcvTRUE;
+    }
 
     /* insert the MOV to pass arguement
        MOV arg1, sampler
@@ -5773,44 +5782,71 @@ _InsertCallTexld(
     for (argIdx = 0; argIdx < 2; argIdx++)
     {
         errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx, texldInst, &newInst);
-        ON_ERROR(errCode, "_InsertCallTexld");
+        ON_ERROR(errCode, "Insert a parameter.");
 
         texldSrc = VIR_Inst_GetSource(texldInst, argIdx);
 
         VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), texldSrc);
     }
 
-    /* mod */
-    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
-    ON_ERROR(errCode, "_InsertCallTexld");
-    VIR_Operand_SetImmediateInt(newInst->src[0], instMod);
-
-    /* lod_bias */
-    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
-    ON_ERROR(errCode, "_InsertCallTexld");
-    if (texldMod < VIR_TEXLDMODIFIER_COUNT)
+    if (bSpecifiedOp)
     {
-        VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0),
-                         VIR_Operand_GetTexldModifier((VIR_Operand *)VIR_Inst_GetSource(texldInst, 2), texldMod));
+        if ((resOpBit & VSC_RES_OP_BIT_TEXLD_LOD) || (resOpBit & VSC_RES_OP_BIT_TEXLDP_LOD)
+            ||
+            (resOpBit & VSC_RES_OP_BIT_TEXLD_BIAS) || (resOpBit & VSC_RES_OP_BIT_TEXLDP_BIAS)
+            ||
+            (resOpBit & VSC_RES_OP_BIT_FETCH)
+            ||
+            (resOpBit & VSC_RES_OP_BIT_FETCH_MS))
+        {
+            errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+            ON_ERROR(errCode, "Insert a parameter.");
+
+            if (texldMod < VIR_TEXLDMODIFIER_COUNT)
+            {
+                VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0),
+                                 VIR_Operand_GetTexldModifier((VIR_Operand *)VIR_Inst_GetSource(texldInst, 2), texldMod));
+            }
+            else
+            {
+                VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), VIR_Inst_GetSource(texldInst, 2));
+            }
+        }
     }
     else
     {
-        VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), VIR_Inst_GetSource(texldInst, 2));
-    }
+        /* mod */
+        errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+        ON_ERROR(errCode, "Insert a parameter.");
+        VIR_Operand_SetImmediateInt(newInst->src[0], instMod);
 
-    /* type */
-    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
-    ON_ERROR(errCode, "_InsertCallTexld");
-    VIR_Operand_SetImmediateInt(newInst->src[0], _texldInstType(Context, texldInst));
+        /* lod_bias */
+        errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+        ON_ERROR(errCode, "Insert a parameter.");
+        if (texldMod < VIR_TEXLDMODIFIER_COUNT)
+        {
+            VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0),
+                             VIR_Operand_GetTexldModifier((VIR_Operand *)VIR_Inst_GetSource(texldInst, 2), texldMod));
+        }
+        else
+        {
+            VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), VIR_Inst_GetSource(texldInst, 2));
+        }
+
+        /* type */
+        errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+        ON_ERROR(errCode, "Insert a parameter.");
+        VIR_Operand_SetImmediateInt(newInst->src[0], _texldInstType(Context, texldInst));
+    }
 
     /* create extra sampler */
     if (Context->linkPoint->u.resource.actBits & VSC_RES_ACT_BIT_EXTRA_SAMPLER)
     {
         errCode = _AddExtraSampler(pShader, pFunc, VIR_Inst_GetSource(texldInst, 0),
             Context->linkPoint->u.resource.arrayIndex, &newOpnd);
-        ON_ERROR(errCode, "_InsertCallTexld");
+        ON_ERROR(errCode, "Insert a parameter.");
         errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
-        ON_ERROR(errCode, "_InsertCallTexld");
+        ON_ERROR(errCode, "Insert a parameter.");
         newInst->src[0] = newOpnd;
     }
     else
@@ -5832,7 +5868,7 @@ _InsertCallTexld(
             VIR_Const       *new_const;
 
             errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
-            ON_ERROR(errCode, "_InsertCallTexld");
+            ON_ERROR(errCode, "Insert a parameter.");
 
             new_const_val.vecVal.u32Value[0] = specializationConst->value.iValue[0];
             new_const_val.vecVal.u32Value[1] = specializationConst->value.iValue[1];
@@ -6019,7 +6055,7 @@ _InsertCallTexldGatherPCF(
     for (argIdx = 0; argIdx < 2; argIdx++)
     {
         errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx, texldInst, &newInst);
-        ON_ERROR(errCode, "_InsertCallTexld");
+        ON_ERROR(errCode, "Insert a parameter.");
 
         texldSrc = VIR_Inst_GetSource(texldInst, argIdx);
 
@@ -6028,7 +6064,7 @@ _InsertCallTexldGatherPCF(
 
     /* type */
     errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
-    ON_ERROR(errCode, "_InsertCallTexld");
+    ON_ERROR(errCode, "Insert a parameter.");
     texldSrc = VIR_Inst_GetSource(texldInst, 2);
 
     if (VIR_Operand_GetTexldGather_comp(texldSrc))
@@ -6042,7 +6078,7 @@ _InsertCallTexldGatherPCF(
 
     /* mod */
     errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
-    ON_ERROR(errCode, "_InsertCallTexld");
+    ON_ERROR(errCode, "Insert a parameter.");
     texldSrc = VIR_Inst_GetSource(texldInst, 2);
 
     if (VIR_Operand_GetTexldGather_comp(texldSrc))
@@ -6064,7 +6100,7 @@ _InsertCallTexldGatherPCF(
             specializationConst->type == VSC_SHADER_DATA_TYPE_INTEGER_X4)
         {
             errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
-            ON_ERROR(errCode, "_InsertCallTexld");
+            ON_ERROR(errCode, "Insert a parameter.");
 
             VIR_Operand_SetImmediateInt(VIR_Inst_GetSource(newInst, 0), specializationConst->value.iValue[0]);
 
@@ -6079,7 +6115,7 @@ _InsertCallTexldGatherPCF(
 
     /* refZ */
     errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
-    ON_ERROR(errCode, "_InsertCallTexld");
+    ON_ERROR(errCode, "Insert a parameter.");
     texldSrc = VIR_Inst_GetSource(texldInst, 2);
     gcmASSERT(VIR_Operand_GetTexldGather_refz(texldSrc));
     VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), VIR_Operand_GetTexldGather_refz(texldSrc));
@@ -6099,7 +6135,7 @@ _InsertCallTexldGatherPCF(
             VIR_Const       *new_const;
 
             errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
-            ON_ERROR(errCode, "_InsertCallTexld");
+            ON_ERROR(errCode, "Insert a parameter.");
 
             new_const_val.vecVal.u32Value[0] = specializationConst->value.iValue[0];
             new_const_val.vecVal.u32Value[1] = specializationConst->value.iValue[1];
@@ -6563,8 +6599,9 @@ _InsertCallResourcePatch(
     {
         switch (Context->linkPoint->u.resource.subType)
         {
-        case VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER:
-        case VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGRAD_EXTRA_LATYER:
+        case VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LAYER:
+        case VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LAYER_SPECIFIED_OP:
+        case VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGRAD_EXTRA_LAYER:
             errCode = _InsertCallTexld(Context, Transpoint, LibFunc);
             break;
         case VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER:
