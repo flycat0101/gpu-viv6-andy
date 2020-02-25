@@ -9327,8 +9327,7 @@ _SpecialGenAssignCode(
         }
         if (gcmIS_ERROR(status)) return status;
     }
-    else if (gcIsVectorDataType(LOperand->dataType) ||
-             clmIsElementTypePacked(LOperand->dataType.elementType)) {
+    else if (gcIsVectorDataType(LOperand->dataType)) {
         if(clmIsElementTypePacked(ROperand->dataType.elementType) ||
            clmIsElementTypePacked(LOperand->dataType.elementType) ||
            clmIsElementTypeImage(ROperand->dataType.elementType) ||
@@ -9365,15 +9364,21 @@ _SpecialGenAssignCode(
                                             &componentSelection,
                                             gcvFALSE);
                 }
-                else if(ROperand->isReg && gcIsScalarDataType(ROperand->dataType)) {
+                else if((ROperand->isReg && gcIsScalarDataType(ROperand->dataType)) ||
+                        (!ROperand->isReg && (gcIsScalarDataType(ROperand->dataType) || ROperand->u.constant.allValuesEqual))) {
                     clsLOPERAND lOperand;
                     clsROPERAND rOperands[3];
                     gctUINT32 enable;
 
                     rOperands[0] = *ROperand;
-                    rOperands[0].dataType = ROperand->u.reg.dataType;
-                    componentSelection = rOperands[0].u.reg.componentSelection;
-                    rOperands[0].u.reg.componentSelection = clGetDefaultComponentSelection(Compiler, ROperand->u.reg.dataType);
+                    if(!ROperand->isReg) {
+                        componentSelection = ComponentSelection_X;
+                    }
+                    else {
+                        rOperands[0].dataType = ROperand->u.reg.dataType;
+                        componentSelection = rOperands[0].u.reg.componentSelection;
+                        rOperands[0].u.reg.componentSelection = clGetDefaultComponentSelection(Compiler, ROperand->u.reg.dataType);
+                    }
 
                     lOperand = *LOperand;
                     lOperand.dataType = LOperand->reg.dataType;
