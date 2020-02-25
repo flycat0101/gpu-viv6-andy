@@ -2384,7 +2384,7 @@ vxCopyTensorPatch(
     }
 
     /* determine if virtual before checking for memory */
-    if (tensor->base.isVirtual == vx_true_e)
+    if (tensor->base.isVirtual == vx_true_e && tensor->base.accessible == vx_false_e)
     {
         /* User tried to access a "virtual" tensor. */
         vxError("Can not access a virtual tensor\n");
