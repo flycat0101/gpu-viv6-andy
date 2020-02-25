@@ -4009,6 +4009,15 @@ vxnne_shader_executable vxnneGetGPUTensorPadShaderExecutable(
     vx_scalar               padConst,
     vx_tensor               outputs);
 
+vxnne_shader_executable vxnneGetGPUTensorPad2ShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               inputs,
+    vx_scalar               padConst,
+    vx_tensor               outputs,
+    vx_int32                *pad_dims);
+
 vxnne_shader_executable vxnneGetGPUTensorCropShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,

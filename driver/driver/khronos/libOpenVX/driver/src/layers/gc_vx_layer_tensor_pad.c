@@ -1100,6 +1100,36 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
     return support;
 }
 
+VX_PRIVATE_API vx_bool vxoNNTensorPad2_GPU_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_tensor  src = (vx_tensor)parameters[0];
+    vx_tensor  dst = (vx_tensor)parameters[1];
+    vx_scalar  padMode = (vx_scalar)parameters[3];
+    vx_bool shader_flag = vx_false_e;
+    vx_bool dataFormatFlag = vx_false_e;
+    vx_enum pad_mode = padMode->value->e;
+
+    vx_enum    inputFormat             = TENSOR_DATA_TYPE(src);
+    vx_enum    outputFormat            = TENSOR_DATA_TYPE(dst);
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    dataFormatFlag = (vx_bool)((inputFormat == outputFormat) && (inputFormat == VX_TYPE_FLOAT32));
+
+    if(dataFormatFlag && pad_mode == VX_PAD_CONSTANT)
+    {
+        shader_flag = vx_true_e;
+    }
+
+    support = support && shader_flag;
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
 VX_PRIVATE_API vx_status vxoNNTensorPad2_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
     vx_status status = VX_SUCCESS;
@@ -1323,6 +1353,57 @@ OnError:
     return status;
 }
 
+VX_PRIVATE_API vx_status vxoNNTensorPad2_GPU_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vx_tensor  src = (vx_tensor)parameters[0];
+    vx_tensor  dst = (vx_tensor)parameters[1];
+    vx_tensor  pad_dims = (vx_tensor)parameters[2];
+    vx_scalar  padConst = (vx_scalar)parameters[4];
+    vx_uint32  batchCount = TENSOR_SIZE_INDEX(src, 3);
+
+    vx_int32_ptr pad_base = VX_NULL;
+    vxnne_tensor_pad  padNode = (vxnne_tensor_pad)ops_layer;
+    vxnne_shader_executable shaderExecutable;
+
+    vxoTensor_GetTensorViewMemory(pad_dims, (gctPOINTER*)&pad_base, VX_NULL);
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    shaderExecutable = vxnneGetGPUTensorPad2ShaderExecutable(ops_layer->node->base.context,
+            VXNNE_KERNEL_TENSOR_PAD,
+            &ops_layer->node->kernelAttributes.borderMode,
+            src,
+            padConst,
+            dst,
+            pad_base);
+
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    vxmONERROR(vxnneShaderOperation_Initialize(&padNode->tensor_pad_sh_operation,
+        &padNode->base,
+        VXNNE_OPERATOR_TENSOR_PAD,
+        batchCount,
+        shaderExecutable));
+
+    vxmONERROR(vxnneOperation_AddReference(&padNode->tensor_pad_sh_operation.base, (vx_reference)src, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&padNode->tensor_pad_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &padNode->base,
+        &padNode->tensor_pad_sh_operation.base,
+        0));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
 VX_PRIVATE_API vx_bool vxoNNTensorPad2_TP_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
 {
     vx_tensor  src = (vx_tensor)parameters[0];
@@ -1419,7 +1500,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorPad2_Initializer(vx_node node, c
         { "TensorPad2 NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
         { "TensorPad2 TP", vxoNNTensorPad2_TP_Support, vxoNNTensorPad2_TP_Initialize, VX_NULL },
         { "TensorPad2 SH EVIS", vxoNNTensorPad2_SH_EVIS_Support, vxoNNTensorPad2_SH_EVIS_Initialize, VX_NULL },
-        { "TensorPad2 SH F32", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "TensorPad2 SH F32", vxoNNTensorPad2_GPU_Support, vxoNNTensorPad2_GPU_Initialize, VX_NULL },
         { "TensorPad2 SW ", vxoNNCommon_Support, vxoNNTensorPad2_SW_Initialize, VX_NULL },
     };
 
