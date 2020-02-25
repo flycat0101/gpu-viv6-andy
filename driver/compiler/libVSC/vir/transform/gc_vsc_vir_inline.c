@@ -900,7 +900,7 @@ VSC_ErrCode VSC_IL_SelectInlineFunctions(
             callSites += vscSRARR_GetElementCount(&pEdge->callSiteArray);
         }
         /* real uesful instruction counts of current function need to substract MOV instruction used for paraments and extra 2 (nop and ret) */
-        smallfuncBody = (instCount - 2 - pFunc->paramters.count) < (2 + pFunc->paramters.count);
+        smallfuncBody = (gctINT)(instCount - 2 - pFunc->paramters.count) < (gctINT)(2 + pFunc->paramters.count);
         instCount  = (instCount - 1) * (callSites - 1);
         leftBudget = VSC_IL_GetInlineBudget(pInliner) - instCount + pFunc->paramters.count ;
 
