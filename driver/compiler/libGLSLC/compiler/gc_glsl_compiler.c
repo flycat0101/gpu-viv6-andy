@@ -5443,6 +5443,15 @@ sloCOMPILER_SetUniformLocationInUse(
     return status;
 }
 
+gctBOOL
+sloCOMPILER_NeedCheckOutputLocationExist(
+    IN sloCOMPILER Compiler
+    )
+{
+    /* So far only OES requires that "If there is more than one fragment output, the location must be specified for all outputs." */
+    return !sloCOMPILER_IsOGLVersion(Compiler);
+}
+
 gceSTATUS
 sloCOMPILER_SetUnspecifiedOutputLocationExist(
     IN sloCOMPILER Compiler
