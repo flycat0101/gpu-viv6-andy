@@ -240,7 +240,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
             weightX = vxoGraphOptimization_computeFinalKernelSize(weightX, strideX);
             weightY = vxoGraphOptimization_computeFinalKernelSize(weightY, strideY);
 
-            if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
+            if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
                 (TENSOR_SIZE_INDEX(inputTensor,0) > NN_IMAGE_XSIZE_MAX || TENSOR_SIZE_INDEX(inputTensor, 1) > NN_IMAGE_YSIZE_MAX) )
                 break;
 
@@ -396,7 +396,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                 else
                     batch = TENSOR_SIZE_INDEX(input, 3);
 
-                if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
+                if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
                     batch > NN_IMAGE_XSIZE_MAX )
                     break;
             }
@@ -425,7 +425,7 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                 else
                     batch = TENSOR_SIZE_INDEX(input, 3);
 
-                if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
+                if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SWTILING_PHASE1) &&
                     batch > NN_IMAGE_XSIZE_MAX )
                     break;
             }
@@ -1595,7 +1595,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
                 }
             case VX_KERNEL_NN_PRELU:
                 {
-                    if(!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU))
+                    if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_PRELU))
                         break;
 
                     prelu_alpha = (vx_tensor) nodes[i]->paramTable[1];
@@ -3080,12 +3080,12 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
                 TENSOR_DATA_TYPE(tensorIn[0]) != TENSOR_DATA_TYPE(output) )
                 continue;
 
-            if(VX_QUANT_DYNAMIC_FIXED_POINT == TENSOR_QUANT_TYPE(tensorIn[0]) &&
-                !vxoGraphOptimization_isV8((vx_reference)tensorIn[0]))
+            if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NEGATIVE_POST_SHIFT_FIX) &&
+                VX_QUANT_DYNAMIC_FIXED_POINT == TENSOR_QUANT_TYPE(tensorIn[0]))
             {
-                vx_int32 weight_fl = gcmMAX(TENSOR_POS(tensorIn[1]) - TENSOR_POS(tensorIn[0]), 0);
-                if(TENSOR_POS(tensorIn[0]) + weight_fl < TENSOR_POS(output) )
-                    continue;
+                    vx_int32 weight_fl = gcmMAX(TENSOR_POS(tensorIn[1]) - TENSOR_POS(tensorIn[0]), 0);
+                    if(TENSOR_POS(tensorIn[0]) + weight_fl < TENSOR_POS(output) )
+                        continue;
             }
 
             if(node->kernel->enumeration == VX_KERNEL_TENSOR_SUBTRACT)
