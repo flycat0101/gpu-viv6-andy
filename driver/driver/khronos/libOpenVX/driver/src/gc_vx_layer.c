@@ -6287,7 +6287,8 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
     vx_scalar               poolType,
-    vx_scalar               stride_s,
+    vx_scalar               stride_x_s,
+    vx_scalar               stride_y_s,
     vx_scalar               poolSizeX,
     vx_scalar               poolSizeY,
     vx_uint32               pool_pad_x_left,
@@ -6316,7 +6317,8 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
     vx_uint32    out_width          = TENSOR_VIEW_SIZE_INDEX(output, 0);
     vx_uint32    out_height         = TENSOR_VIEW_SIZE_INDEX(output, 1);
     vx_uint32    dims               = TENSOR_DIM_NUM(input) == 1 ? 2 : TENSOR_DIM_NUM(input);
-    vx_uint32    stride_v           = stride_s->value->u32;
+    vx_uint32    stride_v           = stride_x_s->value->u32;
+    vx_uint32    stride_y           = stride_y_s->value->u32;
     vx_uint32    kernel_v           = poolSizeX->value->u32;
     vx_uint32    kernel_size_y      = poolSizeY->value->u32;
     vx_uint32    pad_v              = pool_pad_x_left;
@@ -6328,7 +6330,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
     vx_int8      dstFixPointPos     = TENSOR_POS(output);
     vx_bool      globalPooling_flag = (vx_bool)(out_width == 1 && out_height == 1 && kernel_v == in_width && kernel_size_y == in_height);
     vx_float32   div_scale          = 1.0f;
-    vx_uint32    height             = (out_height - 1) * stride_v + kernel_size_y - 2 * pad_y;
+    vx_uint32    height             = (out_height - 1) * stride_y + kernel_size_y - 2 * pad_y;
     vx_uint32    width              = (out_width - 1) * stride_v + kernel_v - 2 * pad_v;
     vx_uint32    globalWorkSize1    = 1;
     vx_bool      useImage2DFlag     = (vx_bool)(in_width * in_height < IMG_MAX_WIDTH);
@@ -6598,7 +6600,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         if (status != VX_SUCCESS) goto OnError;
 
     }
-    else if (inputFormat == VX_TYPE_FLOAT16 && kernel_v == 2 && kernel_size_y == 2 && stride_v == 2 &&  pad_v == 0)
+    else if (inputFormat == VX_TYPE_FLOAT16 && kernel_v == 2 && kernel_size_y == 2 && stride_v == 2 &&  pad_v == 0 && (stride_y == stride_v))
     {
         vx_float32    scale2x2_FP16toINT8 = div_scale;
         vx_uint32 uniAvg2x2_Stride2_4x4[16] = {
@@ -6641,7 +6643,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         status = vxnneShaderExecutable_SetUniform(shaderExecutable, "scale2x2_FP16toINT8", 1, &scale2x2_FP16toINT8);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && kernel_v == 2 && kernel_size_y == 2 && stride_v == 2 &&  pad_v == 0)
+    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && kernel_v == 2 && kernel_size_y == 2 && stride_v == 2 &&  pad_v == 0  && (stride_y == stride_v))
     {
         vx_float32    scale2x2_INT8toINT8 = div_scale;
         vx_uint32 uniAvg2x2_Stride2_4x8[16] = {
@@ -6674,7 +6676,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         status = vxnneShaderExecutable_SetUniform(shaderExecutable, "scale2x2_INT8toINT8", 1, &scale2x2_INT8toINT8);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && kernel_v == 5 && kernel_size_y == 5 && stride_v == 3)
+    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && kernel_v == 5 && kernel_size_y == 5 && stride_v == 3 && (stride_y == stride_v))
     {
         vx_float32    scaleK5S3_INT8toINT8 = div_scale / (float)(kernel_v * kernel_v);
         vx_uint32 uniInt8AddInt8_k5s3_8x4[16] = {
@@ -6723,7 +6725,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "pad_top", 1, &pad_y);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && kernel_v == 5 && kernel_size_y == 5 && stride_v == 3)
+    else if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && kernel_v == 5 && kernel_size_y == 5 && stride_v == 3 && (stride_y == stride_v))
     {
         vx_float32    scaleK5S3_Fp16toFp16 = 1 / (float)(kernel_v * kernel_v);
         vx_uint32 uniExtractHalf4_4x4[16] = {
@@ -6761,7 +6763,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "pad_top", 1, &pad_y);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && kernel_v == 5 && kernel_size_y == 5 && stride_v == 2)
+    else if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && kernel_v == 5 && kernel_size_y == 5 && stride_v == 2 && (stride_y == stride_v))
     {
         vx_float32    scalek5s2p0_fp16tofp16 = 1 / (float)(kernel_v * kernel_v);
         vx_uint32 uniFp16AddFp16_k5s2p0Lo_8x2[16] = {
@@ -6799,7 +6801,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "pad_top", 1, &pad_y);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && kernel_v == 3 && kernel_size_y == 3 && stride_v == 1)
+    else if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && kernel_v == 3 && kernel_size_y == 3 && stride_v == 1 && (stride_y == stride_v))
     {
         vx_float32    scale_fp16tofp16 = 1 / (float)(kernel_v * kernel_v);
         vx_uint32 uniFp16AddFp16_4x4[16] = {
@@ -6837,7 +6839,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "pad_top", 1, &pad_y);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && in_width == 8 && kernel_v == 3 && kernel_size_y == 3 && stride_v == 1 &&  pad_v == 1)
+    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && in_width == 8 && kernel_v == 3 && kernel_size_y == 3 && stride_v == 1 &&  pad_v == 1 && (stride_y == stride_v))
     {
         vx_float32    scaleInt8_Int8_3_1_1 = div_scale * (1 / (float)(kernel_v * kernel_v));
         vx_uint32 uniS16MulS16toInt8_2x8[16] = {
@@ -6870,7 +6872,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         status = vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleInt8_Int8_3_1_1", 1, &scaleInt8_Int8_3_1_1);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && kernel_v == 3 && kernel_size_y == 3 && stride_v == 1)
+    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && kernel_v == 3 && kernel_size_y == 3 && stride_v == 1 && (stride_y == stride_v))
     {
         vx_float32    scaleInt8_Int8_3_1_1 = div_scale * (1 / (float)(kernel_v * kernel_v));
         vx_uint32 uniS16MulS16toInt8_2x8[16] = {
@@ -6905,7 +6907,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "pad_top", 1, &pad_y);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16 && kernel_v == 13 && kernel_size_y == 13 && stride_v == 1)
+    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16 && kernel_v == 13 && kernel_size_y == 13 && stride_v == 1 && (stride_y == stride_v))
     {
         vx_float32    scaleIn_kernel13 = div_scale * (1 / (float)(13 * 13));
         vx_uint32 uniInt8AddInt8_16x1[16] = {
@@ -7003,7 +7005,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         status = vxnneShaderExecutable_SetUniform(shaderExecutable, "scaleIn_kernel13", 1, &scaleIn_kernel13);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8 && kernel_v == 7 && kernel_size_y == 7 && stride_v == 1 &&  pad_v == 0 )
+    else if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8 && kernel_v == 7 && kernel_size_y == 7 && stride_v == 1 &&  pad_v == 0  && (stride_y == stride_v))
     {
         vx_float32    scale7x7_FP16_INT8 = div_scale * (1 / (float)(7 * 7));
         vx_uint32 uniFp16AddFp16_8x2[16] = {
@@ -7039,7 +7041,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         status = vxnneShaderExecutable_SetUniform(shaderExecutable, "scale7x7_FP16_INT8", 1, &scale7x7_FP16_INT8);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && kernel_v == 7 && kernel_size_y == 7 && stride_v == 1)
+    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && kernel_v == 7 && kernel_size_y == 7 && stride_v == 1 && (stride_y == stride_v))
     {
         vx_float32    scale7x7_INT8_INT8 = div_scale * (1 / (float)(7 * 7));
         vx_uint32 uniInt8AddInt8Lo_8x4[16] = {
@@ -7091,7 +7093,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "pad_top", 1, &pad_y);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16 && kernel_v == 6 && kernel_size_y == 6 && stride_v == 1)
+    else if (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16 && kernel_v == 6 && kernel_size_y == 6 && stride_v == 1 && (stride_y == stride_v))
     {
         vx_float32    scaleInt8_FP16_6_1_0 = div_scale * (1 / (float)(6 * 6));
         vx_uint32 uniS16AddS16Kernel6_2x8[16] = {
@@ -7148,7 +7150,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         vx_float32    genericAvgScale     = div_scale / (float)(kernel_v * kernel_size_y);
         vx_int32 kernelsize[2]            = {kernel_v, kernel_size_y};
         vx_int32 padding[2]               = {pad_v, pad_y};
-        vx_int32 stride[2]                = {stride_v, stride_v};
+        vx_int32 stride[2]                = {stride_v, stride_y};
         vx_int32 x_len_8x                 = kernel_v / 8 * 8;
         vx_int32 x_len_remain             = kernel_v - x_len_8x;
         vx_int32 enable_int8_format       = outputFormat == VX_TYPE_INT8 ? 1 : 0;
@@ -7201,7 +7203,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         vx_float32    genericAvgScale     = div_scale / (float)(kernel_v * kernel_size_y);
         vx_int32 kernelsize[2]            = {kernel_v, kernel_size_y};
         vx_int32 padding[2]               = {pad_v, pad_y};
-        vx_int32 stride[2]                = {stride_v, stride_v};
+        vx_int32 stride[2]                = {stride_v, stride_y};
         vx_int32 x_len_8x                 = kernel_v / 8 * 8;
         vx_int32 x_len_remain             = kernel_v - x_len_8x;
         vx_int32 enable_int8_format       = outputFormat == VX_TYPE_INT8 ? 1 : 0;
@@ -7254,7 +7256,7 @@ vxnne_shader_executable vxnneGetAvgPoolingShaderExecutable(
         vx_float32 genericAvgScale         = div_scale / (float)(kernel_v * kernel_size_y);
         vx_int32   kernelsize[2]           = {kernel_v, kernel_size_y};
         vx_int32   padding[2]              = {pad_v, pad_y};
-        vx_int32   stride[2]               = {stride_v, stride_v};
+        vx_int32   stride[2]               = {stride_v, stride_y};
         vx_int32   x_len_8x                = kernel_v / 8 * 8;
         vx_int32   x_len_remain            = kernel_v - x_len_8x;
         vx_int32   x_len_remain0 = 0, x_len_remain1 = 0;
@@ -7401,7 +7403,8 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
     vx_scalar               poolType,
-    vx_scalar               stride_s,
+    vx_scalar               stride_x_s,
+    vx_scalar               stride_y_s,
     vx_scalar               poolSizeX,
     vx_scalar               poolSizeY,
     vx_uint32               pool_pad_x_left,
@@ -7430,7 +7433,8 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
     vx_uint32    out_width          = TENSOR_VIEW_SIZE_INDEX(output, 0);
     vx_uint32    out_height         = TENSOR_VIEW_SIZE_INDEX(output, 1);
     vx_uint32    dims               = TENSOR_DIM_NUM(input) == 1 ? 2 : TENSOR_DIM_NUM(input);
-    vx_uint32    stride_v           = stride_s->value->u32;
+    vx_uint32    stride_v           = stride_x_s->value->u32;
+    vx_uint32    stride_y           = stride_y_s->value->u32;
     vx_uint32    kernel_size_x      = poolSizeX->value->u32;
     vx_uint32    kernel_size_y      = poolSizeY->value->u32;
     vx_uint32    pad_v              = pool_pad_x_left;
@@ -7442,7 +7446,7 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
     vx_int8      dstFixPointPos     = TENSOR_POS(output);
     vx_bool      globalPooling_flag = (vx_bool)(out_width == 1 && out_height == 1 && kernel_size_x == in_width && kernel_size_y == in_height);
     vx_float32   div_scale          = 1.0f;
-    vx_uint32    height             = (out_height - 1) * stride_v + kernel_size_y - 2 * pad_y;
+    vx_uint32    height             = (out_height - 1) * stride_y + kernel_size_y - 2 * pad_y;
     vx_uint32    width              = (out_width - 1) * stride_v + kernel_size_x - 2 * pad_v;
     vx_uint32    rs_width           = 0;
     vx_uint32    pad_left           = pad_v;
@@ -7617,7 +7621,8 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "Uni16x1_Sum16", 1, Uni16x1_Sum16);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16 && kernel_size_x == 2 && kernel_size_y == 2 && stride_v == 2)
+    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16
+           && kernel_size_x == 2 && kernel_size_y == 2 && stride_v == 2 && (stride_y == stride_v))
     {
         vx_uint32 UniS16AddDiv4toFloat_dp4x4[16] = {
             0xffffffff, // TCfg
@@ -7641,7 +7646,8 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
         execution_parameters.globalWorkScale[1]  = out_height;
         execution_parameters.globalWorkScale[2]  = 1;
     }
-    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16 && kernel_size_x == 5 && kernel_size_y == 5 && stride_v == 2)
+    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16
+           && kernel_size_x == 5 && kernel_size_y == 5 && stride_v == 2  && (stride_y == stride_v))
     {
         vx_uint32 Uni16x2_Add_K5S2[16] = {
             0x03ff03ff, 0x03ff03ff, // TCfg
@@ -7664,7 +7670,8 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
         execution_parameters.globalWorkScale[1]  = 1;
         execution_parameters.globalWorkScale[2]  = 1;
     }
-    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16 && kernel_size_x == 13 && kernel_size_y == 13 && stride_v == 1 ) //kernel=13,7,6,3 stride=1 pad = xx
+    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16
+           && kernel_size_x == 13 && kernel_size_y == 13 && stride_v == 1  && (stride_y == stride_v)) //kernel=13,7,6,3 stride=1 pad = xx
     {
         vx_uint32 Uni16x2_Add13[16] = {
             0x03ffffff, 0x03ffffff, // TCfg
@@ -7687,7 +7694,8 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
         execution_parameters.globalWorkScale[1]  = 1;
         execution_parameters.globalWorkScale[2]  = 1;
     }
-    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16 && kernel_size_x == 7 && kernel_size_y == 7 && stride_v == 1)
+    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16
+           && kernel_size_x == 7 && kernel_size_y == 7 && stride_v == 1  && (stride_y == stride_v))
     {
         vx_uint32 Uni16x2_Add14[16] = {
             0x3fff3fff, 0x3fff3fff, // TCfg
@@ -7711,7 +7719,8 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
         execution_parameters.globalWorkScale[1]  = 1;
         execution_parameters.globalWorkScale[2]  = 1;
     }
-    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16 && kernel_size_x == 6 && kernel_size_y == 6 && stride_v == 1)
+    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16
+           && kernel_size_x == 6 && kernel_size_y == 6 && stride_v == 1  && (stride_y == stride_v))
     {
         vx_uint32 Uni16x2_Add12[16] = {
             0x0fff0fff, 0x0fff0fff, // TCfg
@@ -7735,7 +7744,8 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
         execution_parameters.globalWorkScale[1]  = 1;
         execution_parameters.globalWorkScale[2]  = 1;
     }
-    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16 && kernel_size_x == 3 && kernel_size_y == 3 && stride_v == 1)
+    else if (inputFormat == VX_TYPE_INT16 && outputFormat== VX_TYPE_INT16
+           && kernel_size_x == 3 && kernel_size_y == 3 && stride_v == 1  && (stride_y == stride_v))
     {
         vx_uint32 Uni8x4_Add6[16] = {
             0x3f3f3f3f, 0x3f3f3f3f, // TCfg
@@ -7767,7 +7777,7 @@ vxnne_shader_executable vxnneGetAvgPooling_Int16ShaderExecutable(
         vx_int32     maxData                  = 0;
         vx_int32     kernelsize[2]            = {kernel_size_x, kernel_size_y};
         vx_int32     padding[2]               = {pad_left, pad_top};
-        vx_int32     stride[2]                = {stride_v, stride_v};
+        vx_int32     stride[2]                = {stride_v, stride_y};
         vx_int32     x_len_8x                 = kernel_size_x / 8 * 8;
         vx_int32     x_len_remain             = kernel_size_x - x_len_8x;
         vx_int32     enable_int16_format      = outputFormat == VX_TYPE_INT16 ? 1 : 0;
@@ -7887,7 +7897,8 @@ vxnne_shader_executable vxnneGetAvgPooling_UInt8ShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
     vx_scalar               poolType,
-    vx_scalar               stride_s,
+    vx_scalar               stride_x_s,
+    vx_scalar               stride_y_s,
     vx_scalar               poolSizeX,
     vx_scalar               poolSizeY,
     vx_uint32               pool_pad_x_left,
@@ -7919,7 +7930,8 @@ vxnne_shader_executable vxnneGetAvgPooling_UInt8ShaderExecutable(
     vx_uint32    out_height         = TENSOR_VIEW_SIZE_INDEX(output, 1);
     vx_int32     output_ZP          = TENSOR_TF_ZEROPOINT(output);
     vx_uint32    dims               = TENSOR_DIM_NUM(input) == 1 ? 2 : TENSOR_DIM_NUM(input);
-    vx_uint32    stride_v           = stride_s->value->u32;
+    vx_uint32    stride_v           = stride_x_s->value->u32;
+    vx_uint32    stride_y           = stride_y_s->value->u32;
     vx_uint32    kernel_size_x      = poolSizeX->value->u32;
     vx_uint32    kernel_size_y      = poolSizeY->value->u32;
     vx_uint32    pad_left           = pool_pad_x_left;
@@ -7932,7 +7944,7 @@ vxnne_shader_executable vxnneGetAvgPooling_UInt8ShaderExecutable(
     vx_bool      globalPooling_flag = (vx_bool)(out_width == 1 && out_height == 1 && kernel_size_x == in_width && kernel_size_y == in_height);
     vx_float32   scaleIn            = 1.0f;
     vx_float32   scaleOut           = 1.0f;
-    vx_uint32    height             = (out_height - 1) * stride_v + kernel_size_y - 2 * pad_top;
+    vx_uint32    height             = (out_height - 1) * stride_y + kernel_size_y - 2 * pad_top;
     vx_uint32    width              = (out_width - 1) * stride_v + kernel_size_x - 2 * pad_left;
     vx_uint32    globalWorkSize1    = 1;
     vx_bool      useImage2DFlag     = (vx_bool)(in_width * in_height < IMG_MAX_WIDTH);
@@ -8145,7 +8157,7 @@ vxnne_shader_executable vxnneGetAvgPooling_UInt8ShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "pool_size", 1, &pool_size);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && kernel_size_x == 3 && kernel_size_y == 3 && stride_v == 1)
+    else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && kernel_size_x == 3 && kernel_size_y == 3 && stride_v == 1 && (stride_y == stride_v))
     {
         vx_uint16    M0                 = 0;
         vx_int8      postShift          = 0;
@@ -8249,7 +8261,8 @@ vxnne_shader_executable vxnneGetAvgPooling_UInt8ShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "multAndoutZP", 1, multAndoutZP);
         if (status != VX_SUCCESS) goto OnError;
     }
-    else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && kernel_size_x == kernel_size_y && (kernel_size_x == 7 || kernel_size_x == 6) && stride_v == 1)
+    else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && kernel_size_x == kernel_size_y
+         && (kernel_size_x == 7 || kernel_size_x == 6) && stride_v == 1 && (stride_y == stride_v))
     {
         vx_uint8     minData            = 0;
         vx_uint8     maxData            = 0;
@@ -8361,7 +8374,7 @@ vxnne_shader_executable vxnneGetAvgPooling_UInt8ShaderExecutable(
         vx_float32   output_zeroPoint     = (vx_float32)output_ZP;
         vx_int32 kernelsize[2]            = {kernel_size_x, kernel_size_y};
         vx_int32 padding[2]               = {pad_left, pad_top};
-        vx_int32 stride[2]                = {stride_v, stride_v};
+        vx_int32 stride[2]                = {stride_v, stride_y};
         vx_int32 x_len_8x                 = kernel_size_x / 8 * 8;
         vx_int32 x_len_remain             = kernel_size_x - x_len_8x;
         vx_int32 enable_uint8_format      = outputFormat == VX_TYPE_UINT8 ? 1 : 0;
@@ -8484,7 +8497,8 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
     vx_scalar               poolType,
-    vx_scalar               stride_s,
+    vx_scalar               stride_x_s,
+    vx_scalar               stride_y_s,
     vx_scalar               poolSizeX,
     vx_scalar               poolSizeY,
     vx_uint32               pool_pad_x_left,
@@ -8503,7 +8517,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
     vxnne_kernel_shaders        kernel;
 
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    vx_reference parameters[10] = {(vx_reference)input, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, (vx_reference)stride_s, (vx_reference)poolSizeX, VX_NULL, (vx_reference)output};
+    vx_reference parameters[10] = {(vx_reference)input, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, (vx_reference)stride_x_s, (vx_reference)poolSizeX, VX_NULL, (vx_reference)output};
     vx_enum   inputFormat       = TENSOR_DATA_TYPE(input);
     vx_enum   outputFormat      = TENSOR_DATA_TYPE(output);
     vx_uint32 in_width          = TENSOR_VIEW_SIZE_INDEX(input, 0);
@@ -8511,7 +8525,8 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
     vx_uint32 depth             = TENSOR_VIEW_SIZE_INDEX(input, 2);
     vx_uint32 out_width         = TENSOR_VIEW_SIZE_INDEX(output, 0);
     vx_uint32 out_height        = TENSOR_VIEW_SIZE_INDEX(output, 1);
-    vx_uint32 stride_v          = stride_s->value->u32;
+    vx_uint32 stride_v          = stride_x_s->value->u32;
+    vx_uint32 stride_y          = stride_y_s->value->u32;
     vx_uint32 kernel_v          = poolSizeX->value->u32;
     vx_uint32 kernelSizeY       = poolSizeY->value->u32;
     vx_uint32 pad_v             = pool_pad_x_left;
@@ -8535,7 +8550,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
     vx_float32 uint8_zp                   = 0.0f;
     vx_float32 uint8_scale                = 0.0f;
     vx_int32   kernelSize[2]              = {kernel_v, kernelSizeY};
-    vx_int32   stride[2]                  = {stride_v, stride_v};
+    vx_int32   stride[2]                  = {stride_v, stride_y};
     vx_int32   pad[2]                     = {pad_v, padY};
     vx_int32   kernelXis8x                = kernel_v / 8;
     vx_int32   kernelXremain              = kernel_v % 8;
@@ -8624,7 +8639,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
         vxReleaseProgram(&program);
     }
 
-    if (kernel_v == 1 && kernelSizeY == 1 && stride_v == 2 && pad_v == 0 && padY == 0)
+    if (kernel_v == 1 && kernelSizeY == 1 && stride_v == 2 && (stride_v == stride_y) && pad_v == 0 && padY == 0)
     {
         vx_uint32 uniPackEvenData_2x8[16] = {
             0x33333333, // TCfg
@@ -8741,7 +8756,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
         packedMinData[0] = packedMinData[1] = packedMinData[2] = packedMinData[3] = packedMin;
         packedMaxData[0] = packedMaxData[1] = packedMaxData[2] = packedMaxData[3] = packedMax;
 
-        if (kernel_v == 3 && stride_v == 1 && pad_v == 1)
+        if (kernel_v == 3 && stride_v == 1 && (stride_v == stride_y) && pad_v == 1 && padY == 1)
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_maxUint8knl3str1pad1", borderMode);
             if (!shaderExecutable) goto OnError;
@@ -8756,7 +8771,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "packedMaxVal", 1, packedMaxData);
             if (status != VX_SUCCESS) goto OnError;
         }
-        else if (kernel_v == 3 && stride_v == 2 && pad_v == 1)
+        else if (kernel_v == 3 && stride_v == 2 && (stride_v == stride_y) && pad_v == 1 && padY == 1)
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_maxUint8knl3str2pad1", borderMode);
             if (!shaderExecutable) goto OnError;
@@ -8846,7 +8861,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
         packedMinData[0] = packedMinData[1] = packedMinData[2] = packedMinData[3] = packedMin;
         packedMaxData[0] = packedMaxData[1] = packedMaxData[2] = packedMaxData[3] = packedMax;
 
-        if (kernel_v == 3 && stride_v == 1)
+        if (kernel_v == 3 && stride_v == 1 && (stride_v == stride_y) && pad_v == 1 && padY == 1)
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_maxInt16ker3str1pad1", borderMode);
             if (!shaderExecutable) goto OnError;
@@ -8995,14 +9010,14 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
         packedMinData[0] = packedMinData[1] = packedMinData[2] = packedMinData[3] = packedMin;
         packedMaxData[0] = packedMaxData[1] = packedMaxData[2] = packedMaxData[3] = packedMax;
 
-        if (kernel_v == 3 && stride_v == 2 &&  pad_v == 1)
+        if (kernel_v == 3 && stride_v == 2 && (stride_v == stride_y) &&  pad_v == 1 && padY == 1)
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_maxfp16ker3str2pad1", borderMode);
             if (!shaderExecutable) goto OnError;
             status = vxnneShaderExecutable_SetUniform(shaderExecutable, "UniPackMaxPool2x8_fp16", 1, UniPackMaxPool2x8_fp16);
             if (status != VX_SUCCESS) goto OnError;
         }
-        else if (kernel_v == 2 && stride_v == 2 &&  pad_v == 0)
+        else if (kernel_v == 2 && stride_v == 2 && (stride_v == stride_y) &&  pad_v == 0 && padY == 0)
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_maxfp16ker2str2pad0", borderMode);
             if (!shaderExecutable) goto OnError;
@@ -9011,7 +9026,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "UniPackFP16odd_2x8", 1, UniPackFP16odd_2x8);
             if (status != VX_SUCCESS) goto OnError;
         }
-        else if (kernel_v == 3 && stride_v == 2 &&  pad_v == 0)
+        else if (kernel_v == 3 && stride_v == 2 && (stride_v == stride_y) &&  pad_v == 0 && padY == 0)
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_maxfp16ker3str2pad0", borderMode);
             if (!shaderExecutable) goto OnError;
@@ -9019,7 +9034,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
             status = vxnneShaderExecutable_SetUniform(shaderExecutable, "UniPackMaxPool2x8_fp16", 1, UniPackMaxPool2x8_fp16);
             if (status != VX_SUCCESS) goto OnError;
         }
-        else if (kernel_v == 3 && stride_v == 1 &&  pad_v == 1)
+        else if (kernel_v == 3 && stride_v == 1 && (stride_v == stride_y) &&  pad_v == 1 && padY == 1)
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_maxfp16ker3str1pad1", borderMode);
             if (!shaderExecutable) goto OnError;
@@ -9165,7 +9180,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
         packedMinData[0] = packedMinData[1] = packedMinData[2] = packedMinData[3] = packedMin;
         packedMaxData[0] = packedMaxData[1] = packedMaxData[2] = packedMaxData[3] = packedMax;
 
-        if (kernel_v == 2 && stride_v == 2 &&  pad_v == 0)
+        if (kernel_v == 2 && stride_v == 2 && (stride_v == stride_y) &&  pad_v == 0 && padY == 0)
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_MaxInt8ker2str2pad0", borderMode);
             if (!shaderExecutable) goto OnError;
@@ -9173,14 +9188,14 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "UniS8xFp16Packodd_dp2x8", 1, UniS8xFp16Packodd_dp2x8);
             if (status != VX_SUCCESS) goto OnError;
         }
-        else if (kernel_v == 3 && stride_v == 2 &&  pad_v == 0)
+        else if (kernel_v == 3 && stride_v == 2 && (stride_v == stride_y) &&  pad_v == 0 && padY == 0)
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_MaxInt8ker3str2pad0", borderMode);
             if (!shaderExecutable) goto OnError;
             status = vxnneShaderExecutable_SetUniform(shaderExecutable, "UniMaxPoolS8xFp16_dp2x8", 1, UniMaxPoolS8xFp16_dp2x8);
             if (status != VX_SUCCESS) goto OnError;
         }
-        else if (kernel_v == 3 && stride_v == 2 &&  pad_v == 1)
+        else if (kernel_v == 3 && stride_v == 2 && (stride_v == stride_y) &&  pad_v == 1 && padY == 1)
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_MaxInt8ker3str2pad1", borderMode);
             if (!shaderExecutable) goto OnError;
@@ -9188,7 +9203,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
             status = vxnneShaderExecutable_SetUniform(shaderExecutable, "UniMaxPoolS8xFp16_dp2x8", 1, UniMaxPoolS8xFp16_dp2x8);
             if (status != VX_SUCCESS) goto OnError;
         }
-        else if (kernel_v == 3 && stride_v == 1 &&  pad_v == 1)
+        else if (kernel_v == 3 && stride_v == 1 && (stride_v == stride_y) &&  pad_v == 1 && padY == 1)
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_MaxInt8ker3str1pad1", borderMode);
             if (!shaderExecutable) goto OnError;
@@ -9198,7 +9213,7 @@ vxnne_shader_executable vxnneGetMaxPoolingShaderExecutable(
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outputFormat3", 1, &outputFormat);
             if (status != VX_SUCCESS) goto OnError;
         }
-        else if (kernel_v == 2 && stride_v == 1 &&  pad_v == 0)
+        else if (kernel_v == 2 && stride_v == 1 && (stride_v == stride_y) &&  pad_v == 0 && padY == 0)
         {
             if (div_fractionLengthValue == 0)
             {
@@ -20671,7 +20686,8 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
     vx_scalar               poolType,
-    vx_scalar               stride_s,
+    vx_scalar               stride_x_s,
+    vx_scalar               stride_y_s,
     vx_scalar               poolSizeX,
     vx_scalar               poolSizeY,
     vx_uint32               pad_left,
@@ -20703,7 +20719,8 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
     vx_uint32    out_height         = TENSOR_VIEW_SIZE_INDEX(output, 1);
     vx_int32     output_ZP          = TENSOR_TF_ZEROPOINT(output);
     vx_uint32    dims               = TENSOR_DIM_NUM(input) == 1 ? 2 : TENSOR_DIM_NUM(input);
-    vx_uint32    stride_v           = stride_s->value->u32;
+    vx_uint32    stride_v           = stride_x_s->value->u32;
+    vx_uint32    stride_y           = stride_y_s->value->u32;
     vx_uint32    kernel_size_x      = poolSizeX->value->u32;
     vx_uint32    kernel_size_y      = poolSizeY->value->u32;
     vx_scalar    in_heights         = NULL;
@@ -20714,7 +20731,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
     vx_bool      globalPooling_flag = (vx_bool)(out_width == 1 && out_height == 1 && kernel_size_x == in_width && kernel_size_y == in_height);
     vx_float32   scaleIn            = 1.0f;
     vx_float32   scaleOut           = 1.0f;
-    vx_uint32    height             = (out_height - 1) * stride_v + kernel_size_y - 2 * pad_top;
+    vx_uint32    height             = (out_height - 1) * stride_y + kernel_size_y - 2 * pad_top;
     vx_uint32    width              = (out_width - 1) * stride_v + kernel_size_x - 2 * pad_left;
     vx_uint32    globalWorkSize1    = 1;
     vx_bool      useImage2DFlag     = (vx_bool)(in_width * in_height < IMG_MAX_WIDTH);
@@ -20999,7 +21016,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
         vx_float32   output_zeroPoint     = (vx_float32)output_ZP;
         vx_int32     kernelsize[2]        = {kernel_size_x, kernel_size_y};
         vx_int32     padding[2]           = {pad_left, pad_top};
-        vx_int32     stride[2]            = {stride_v, stride_v};
+        vx_int32     stride[2]            = {stride_v, stride_y};
         vx_int32     x_len_8x             = kernel_size_x / 8 * 8;
         vx_int32     x_len_remain         = kernel_size_x - x_len_8x;
         vx_uint32    input_2ZP            = input_ZP * 2;
@@ -21078,7 +21095,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
         vx_float32   output_zeroPoint     = (vx_float32)output_ZP;
         vx_int32     kernelsize[2]        = {kernel_size_x, kernel_size_y};
         vx_int32     padding[2]           = {pad_left, pad_top};
-        vx_int32     stride[2]            = {stride_v, stride_v};
+        vx_int32     stride[2]            = {stride_v, stride_y};
         vx_int32     x_len_8x             = kernel_size_x / 8 * 8;
         vx_int32     x_len_remain         = kernel_size_x - x_len_8x;
         vx_int32     enable_uint8_format  = outputFormat == VX_TYPE_UINT8 ? 1 : 0;
@@ -21151,7 +21168,7 @@ vxnne_shader_executable vxnneGetL2PoolingShaderExecutable(
         vx_float32   genericL2Scale       = 1.0f / (float)(kernel_size_x * kernel_size_y * scaleOut * scaleOut);
         vx_int32     kernelsize[2]        = {kernel_size_x, kernel_size_y};
         vx_int32     padding[2]           = {pad_left, pad_top};
-        vx_int32     stride[2]            = {stride_v, stride_v};
+        vx_int32     stride[2]            = {stride_v, stride_y};
         vx_int32     x_len_8x             = kernel_size_x / 8 * 8;
         vx_int32     x_len_remain         = kernel_size_x - x_len_8x;
 
@@ -26255,7 +26272,8 @@ vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
     vx_tensor               mask,
-    vx_scalar               stride_s,
+    vx_scalar               stride_x_s,
+    vx_scalar               stride_y_s,
     vx_scalar               poolSizeX,
     vx_scalar               poolSizeY,
     vx_uint32               pad_x_left,
@@ -26284,7 +26302,8 @@ vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
     vx_uint32    out_width          = TENSOR_VIEW_SIZE_INDEX(output, 0);
     vx_uint32    out_height         = TENSOR_VIEW_SIZE_INDEX(output, 1);
     vx_int32     output_ZP          = TENSOR_TF_ZEROPOINT(output);
-    vx_uint32    stride_v           = stride_s->value->u32;
+    vx_uint32    stride_v           = stride_x_s->value->u32;
+    vx_uint32    stride_y           = stride_y_s->value->u32;
     vx_uint32    kernel_size_x      = poolSizeX->value->u32;
     vx_uint32    kernel_size_y      = poolSizeY->value->u32;
     vx_uint32    pad_left           = pad_x_left;
@@ -26294,7 +26313,7 @@ vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
     vx_int8      dstFixPointPos     = TENSOR_POS(output);
     vx_float32   scaleIn            = 1.0f;
     vx_float32   scaleOut           = 1.0f;
-    vx_uint32    height             = (out_height - 1) * stride_v + kernel_size_y - 2 * pad_top;
+    vx_uint32    height             = (out_height - 1) * stride_y + kernel_size_y - 2 * pad_top;
     vx_uint32    globalWorkSize1    = 1;
     vx_uint32    maxWorkGroupSize   = 8;
 
@@ -26412,7 +26431,7 @@ vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
         vx_float32   input_zeroPoint      = (vx_float32)input_ZP;
         vx_int32 kernelsize[2]            = {kernel_size_x, kernel_size_y};
         vx_int32 padding[2]               = {pad_left, pad_top};
-        vx_int32 stride[2]                = {stride_v, stride_v};
+        vx_int32 stride[2]                = {stride_v, stride_y};
         vx_int32 x_len_8x                 = kernel_size_x / 8 * 8;
         vx_int32 x_len_remain             = kernel_size_x - x_len_8x;
         vx_int32 enable_uint8_format      = outputFormat == VX_TYPE_UINT8 ? 1 : 0;
@@ -26476,7 +26495,7 @@ vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
         vx_float32    genericAvgScale     = scaleOut;
         vx_int32 kernelsize[2]            = {kernel_size_x, kernel_size_y};
         vx_int32 padding[2]               = {pad_left, pad_top};
-        vx_int32 stride[2]                = {stride_v, stride_v};
+        vx_int32 stride[2]                = {stride_v, stride_y};
         vx_int32 x_len_8x                 = kernel_size_x / 8 * 8;
         vx_int32 x_len_remain             = kernel_size_x - x_len_8x;
         vx_int32 enable_int8_format       = outputFormat == VX_TYPE_INT8 ? 1 : 0;
@@ -26528,7 +26547,7 @@ vxnne_shader_executable vxnneGetTFAvgPoolingShaderExecutable(
         vx_float32    genericAvgScale     = scaleOut;
         vx_int32 kernelsize[2]            = {kernel_size_x, kernel_size_y};
         vx_int32 padding[2]               = {pad_left, pad_top};
-        vx_int32 stride[2]                = {stride_v, stride_v};
+        vx_int32 stride[2]                = {stride_v, stride_y};
         vx_int32 x_len_8x                 = kernel_size_x / 8 * 8;
         vx_int32 x_len_remain             = kernel_size_x - x_len_8x;
         vx_int32 x_len_remain0, x_len_remain1;

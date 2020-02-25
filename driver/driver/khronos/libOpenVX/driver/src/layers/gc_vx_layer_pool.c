@@ -436,7 +436,8 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
     vx_bool enable_tf_quantize               = GETBIT(reg_param->flag, 6);
     vx_bool enable_int16_sh                  = GETBIT(reg_param->flag, 7);
 
-    vx_uint32  stride = 0;
+    vx_uint32 stride_x = 1;
+    vx_uint32 stride_y = 1;
     vx_uint32 batchCount;
 
     vx_uint32 pool_pad_x_left = poolPadXLeftScalar->value->u32;
@@ -445,7 +446,9 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
     vx_uint32 pool_pad_y_bottom = poolPadYBottomScalar->value->u32;
 
     vxnne_shader_executable shaderExecutable = NULL;
-    vx_scalar stride_s = NULL;
+
+    vx_scalar stride_x_s = NULL;
+    vx_scalar stride_y_s = NULL;
 
     vx_uint32  operation_idx           = 0;
     vx_uint32  numTmpTensor            = 0;
@@ -465,16 +468,34 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
 
     if (outputsWidth == 1)
     {
-        stride = 1;
+        stride_x = 1;
     }
     else
     {
-        stride = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
     }
 
-    stride_s = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_UINT32, &stride);
-    if (!stride_s)
+    if (outputsHeight == 1)
     {
+        stride_y = 1;
+    }
+    else
+    {
+        stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputsHeight + pool_pad_y_top + pool_pad_y_bottom - poolSizeYValue) / (outputsHeight - 1), roundingValue);
+    }
+
+
+    stride_x_s = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_UINT32, &stride_x);
+    if (!stride_x_s)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    stride_y_s = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_UINT32, &stride_y);
+    if (!stride_y_s)
+    {
+        vxReleaseScalar(&stride_x_s);
         status = VX_FAILURE;
         goto OnError;
     }
@@ -519,8 +540,8 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
             vxoTensor_GetTensorElementCount(mask, &mask_size);
             memset(maskData, 1, mask_size);
 
-            shaderExecutable = vxnneGetTFAvgPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TF_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode, inputs, mask, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, VX_NN_ACTIVATION_NONE, outputs);
-
+            shaderExecutable = vxnneGetTFAvgPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TF_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
+            inputs, mask, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, VX_NN_ACTIVATION_NONE, outputs);
 
             poolingLayer->base.num_temp_tensors = 1;
             poolingLayer->base.temp_tensors[0]  = mask;
@@ -530,41 +551,37 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
             vx_float32   scale_factor[2]    = {inputsWidth / (vx_float32)outputsWidth, inputsHeight / (vx_float32)outputsHeight};
 
             if (scale_factor[0] == 2.0f && scale_factor[1] == 2.0f)
-                shaderExecutable = vxnneGetResizeNearestNeighborShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_RESIZE_NEAREST_NEIGHBOR, &ops_layer->node->kernelAttributes.borderMode, inputs, VX_INTERPOLATION_NEAREST_NEIGHBOR, outputs);
+                shaderExecutable = vxnneGetResizeNearestNeighborShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_RESIZE_NEAREST_NEIGHBOR,
+                &ops_layer->node->kernelAttributes.borderMode, inputs, VX_INTERPOLATION_NEAREST_NEIGHBOR, outputs);
             else
-                shaderExecutable = vxnneGetMaxPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_MAXPOOLING, &ops_layer->node->kernelAttributes.borderMode, inputs, pool_type_s, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
-
+                shaderExecutable = vxnneGetMaxPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_MAXPOOLING,
+                &ops_layer->node->kernelAttributes.borderMode, inputs, pool_type_s,
+                stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
         }
         else if (maxPool_flag)
             shaderExecutable = vxnneGetMaxPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_MAXPOOLING, &ops_layer->node->kernelAttributes.borderMode,
-            inputs, pool_type_s, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
+            inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
         else if (enable_L2Pool_SH)
             shaderExecutable = vxnneGetL2PoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_L2POOLING, &ops_layer->node->kernelAttributes.borderMode,
-            inputs, pool_type_s, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
+            inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
         else if(avgPool_flag && enable_tf_quantize)
             shaderExecutable = vxnneGetAvgPooling_UInt8ShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING_UINT8, &ops_layer->node->kernelAttributes.borderMode,
-            inputs, pool_type_s, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
+            inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
         else if(avgPool_flag && enable_int16_sh)
             shaderExecutable = vxnneGetAvgPooling_Int16ShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING_INT16, &ops_layer->node->kernelAttributes.borderMode,
-            inputs, pool_type_s, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
+            inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
         else
             shaderExecutable = vxnneGetAvgPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
-            inputs, pool_type_s, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, outputs);
+            inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, outputs);
     }
     else
     {
-        vx_uint32 stride_y_value = vxoNNExternsionConvlutionRound((vx_float32)(inputsHeight + pool_pad_y_top + pool_pad_y_bottom - poolSizeYValue) / (outputsHeight - 1), roundingValue);
-        vx_scalar stride_y = NULL;
-
-        if (!maxPool_flag)
-            stride_y = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_UINT32, &stride_y_value);
-
         if(avgPool_flag)
         {
             vx_tensor tensorCopy       = NULL;
             vx_bool enable_2d_img  = (vx_bool)(TENSOR_VIEW_SIZE_INDEX(inputs, 1) * TENSOR_VIEW_SIZE_INDEX(inputs, 2) < IMG_MAX_WIDTH);
             vx_bool is_copy_tensor = ((inputdata_format == VX_TYPE_UINT8) && (3 == poolSizeXValue) && (3 == poolSizeYValue)
-                && (stride == 1 || stride == 2) && enable_2d_img && outputdata_format == VX_TYPE_UINT8
+                && (stride_x == 1 || stride_x == 2) && enable_2d_img && outputdata_format == VX_TYPE_UINT8
                 && (pool_pad_x_left == 1 || pool_pad_x_right == 1 || pool_pad_y_top == 1 || pool_pad_y_bottom == 1));
 
             if (is_copy_tensor)
@@ -668,33 +685,29 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
 
             shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(
             ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
-            tensorCopy, pool_type_s, stride_s, stride_y, pool_size_x_s, pool_size_y_s, pool_pad_x_left,
+            tensorCopy, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left,
             pool_pad_y_top, pool_pad_x_right, pool_pad_y_bottom, rounding_s, is_copy_tensor,
             TENSOR_VIEW_SIZE_INDEX(inputs, 0), TENSOR_VIEW_SIZE_INDEX(inputs, 1), outputs);
         }
         else if (enable_L2Pool_SH)
         {
             shaderExecutable = vxnneGetGPUL2PoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_L2POOLING, &ops_layer->node->kernelAttributes.borderMode,
-                            inputs, pool_type_s, stride_s, stride_y, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
+                            inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
                             pool_pad_y_bottom, rounding_s, outputs);
         }
         else if (maxPool_flag)
         {
             shaderExecutable = vxnneGetGPUMaxPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_MAXPOOLING, &ops_layer->node->kernelAttributes.borderMode,
-                           inputs, pool_type_s, stride_s, stride_y_value, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
-                           pool_pad_y_bottom,rounding_s, outputs);
-        }
-
-        if (!maxPool_flag)
-        {
-            if (stride_y) (vxReleaseScalar(&stride_y));
+                            inputs, pool_type_s, stride_x_s, stride_y, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
+                            pool_pad_y_bottom,rounding_s, outputs);
         }
     }
 
     if (!shaderExecutable)
     {
         status = VX_FAILURE;
-        vxReleaseScalar(&stride_s);
+        vxReleaseScalar(&stride_x_s);
+        vxReleaseScalar(&stride_y_s);
         goto OnError;
     }
 
@@ -713,7 +726,8 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
         operation_idx++));
 
 OnError:
-    if (stride_s) (vxReleaseScalar(&stride_s));
+    if (stride_x_s) (vxReleaseScalar(&stride_x_s));
+    if (stride_y_s) (vxReleaseScalar(&stride_y_s));
 
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
 
@@ -1436,7 +1450,8 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
     vx_uint32 inputsWidth, inputsHeight, outputsWidth, outputsHeight;
     vx_int32  inputsDepth, outputsDepth;
     vxnne_pooling_layer  poolingLayer = gcvNULL;
-    vx_uint32  stride = 0;
+    vx_uint32 stride_x   = 1;
+    vx_uint32 stride_y   = 1;
     vx_uint32 totalSize = 0;
     vx_uint32 maxAllocateSize = 256 * 1024 * 1024; /* set max allocate size because fpga out of memory when using nn do avg pooling, max value is 256M */
     vx_uint32 batchCount;
@@ -1476,11 +1491,20 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
 
     if (outputsWidth == 1)
     {
-        stride = 1;
+        stride_x = 1;
     }
     else
     {
-        stride = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+        stride_x = vxoNNExternsionConvlutionRound((vx_float32)(inputsWidth + pool_pad_x_left + pool_pad_x_right - poolSizeXValue) / (outputsWidth - 1), roundingValue);
+    }
+
+    if (outputsHeight == 1)
+    {
+        stride_y = 1;
+    }
+    else
+    {
+        stride_y = vxoNNExternsionConvlutionRound((vx_float32)(inputsHeight + pool_pad_y_top + pool_pad_y_bottom - poolSizeYValue) / (outputsHeight - 1), roundingValue);
     }
 
     totalSize = poolSizeXValue * poolSizeYValue * inputsDepth * outputsDepth * (vx_uint32)vxDataType_GetSize((vx_type_e)TENSOR_DATA_TYPE(inputs)) + outputsDepth * sizeof(vx_float32);
@@ -1521,7 +1545,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
     /* if the needed total size is larger than maxAllocateSize, do pooling with CPU version. maybe need implement avg pooling with shader */
     if (vxnneIsNNSupportFormat(context, inputs, VX_NULL, outputs) &&
         (poolTypeValue == VX_NN_POOLING_AVG) &&
-        (stride == 1) &&
+        (stride_x == 1) && (stride_x == stride_y) &&
         (totalSize <= maxAllocateSize) &&
         (avgPool_flag == vx_false_e) &&
         (avgPool_BF_flag == vx_false_e))
@@ -1874,9 +1898,9 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
     else
     {
         vx_bool isTpSupportFormat = vxnneIsTPSupportFormat(context, inputs, VX_NULL, outputs);
-        vx_bool isStride1Support = ((stride == 1) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_MAX_POOLING_STRIDE1) && poolSizeXValue <= 3) ? vx_true_e : vx_false_e;
-        vx_bool isStride2Support = ((stride == 2) && (stride == poolSizeXValue || stride == poolSizeXValue-1)) ? vx_true_e : vx_false_e;
-        vx_bool isPoolSizeSupport = (poolSizeXValue == 1 && !pool_pad_x_left && !pool_pad_y_top && TENSOR_VIEW_SIZE_INDEX(inputs, 0) % stride == 0 && TENSOR_VIEW_SIZE_INDEX(inputs, 1) % stride == 0) ? vx_true_e : vx_false_e;
+        vx_bool isStride1Support = ((stride_x == 1) && (stride_x == stride_y) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TP_MAX_POOLING_STRIDE1) && poolSizeXValue <= 3) ? vx_true_e : vx_false_e;
+        vx_bool isStride2Support = ((stride_x == 2) && (stride_x == stride_y) && (stride_x == poolSizeXValue || stride_x == poolSizeXValue-1)) ? vx_true_e : vx_false_e;
+        vx_bool isPoolSizeSupport = ((stride_x == stride_y) && poolSizeXValue == 1 && !pool_pad_x_left && !pool_pad_y_top && TENSOR_VIEW_SIZE_INDEX(inputs, 0) % stride_x == 0 && TENSOR_VIEW_SIZE_INDEX(inputs, 1) % stride_x == 0) ? vx_true_e : vx_false_e;
 
         /* stride!=2 is not supported yet */
         if ((poolTypeValue == VX_NN_POOLING_MAX) &&
@@ -1905,7 +1929,7 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
             conv.pad_y_bottom = pool_pad_y_bottom;
             conv.pool_size_x  = poolSizeXValue;
             conv.pool_size_y  = poolSizeYValue;
-            conv.pool_stride  = stride;
+            conv.pool_stride  = stride_x;
             conv.enable_relu  = vx_false_e;
             conv.conv_rounding_type = roundingValue;
             conv.pad_mode = VX_PAD_REPLICATE;
@@ -1938,14 +1962,14 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
             vx_bool generic_flag               = vx_false_e;
             vx_bool maxPool_BF_flag            = vx_false_e;
             vx_bool enable_outputALU           = checkOutputTensorDoAlu(inputs, outputs);
-            vx_bool enable_downSampleSH        = (vx_bool)(stride == 2 && poolSizeXValue == 1 && poolSizeYValue == 1 && (!enable_outputALU));
+            vx_bool enable_downSampleSH        = (vx_bool)(stride_x == 2 && (stride_x == stride_y) && poolSizeXValue == 1 && poolSizeYValue == 1 && (!enable_outputALU));
             vx_bool enable_tf_avgPool          = (vx_bool)(pool_pad_x_left || pool_pad_x_right ||pool_pad_y_top || pool_pad_y_bottom);
 
-            kernel_MaxPool_flag[0]             = (vx_bool)(stride == 2 && poolSizeXValue == 3 && pool_pad_x_left == 1);
-            kernel_MaxPool_flag[1]             = (vx_bool)(stride == 2 && poolSizeXValue == 2 && pool_pad_x_left == 0);
-            kernel_MaxPool_flag[2]             = (vx_bool)(stride == 2 && poolSizeXValue == 3 && pool_pad_x_left == 0);
-            kernel_MaxPool_flag[3]             = (vx_bool)(stride == 1 && poolSizeXValue == 3 && pool_pad_x_left == 1);
-            kernel_MaxPool_flag[4]             = (vx_bool)(stride == 1 && poolSizeXValue == 2 && poolSizeYValue == 2 && pool_pad_x_left == 0 && pool_pad_y_top == 0);
+            kernel_MaxPool_flag[0]             = (vx_bool)(stride_x == 2 && (stride_x == stride_y) && poolSizeXValue == 3 && pool_pad_x_left == 1);
+            kernel_MaxPool_flag[1]             = (vx_bool)(stride_x == 2 && (stride_x == stride_y) && poolSizeXValue == 2 && pool_pad_x_left == 0);
+            kernel_MaxPool_flag[2]             = (vx_bool)(stride_x == 2 && (stride_x == stride_y) && poolSizeXValue == 3 && pool_pad_x_left == 0);
+            kernel_MaxPool_flag[3]             = (vx_bool)(stride_x == 1 && (stride_x == stride_y) && poolSizeXValue == 3 && pool_pad_x_left == 1);
+            kernel_MaxPool_flag[4]             = (vx_bool)(stride_x == 1 && (stride_x == stride_y) && poolSizeXValue == 2 && poolSizeYValue == 2 && pool_pad_x_left == 0 && pool_pad_y_top == 0);
 
             if(context->evisNoInst.supportEVIS)
             {
@@ -1988,15 +2012,23 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
 
             /* tf pad avgpool, now only support fp16 to fp16 and u8 to u8*/
             enable_tf_avgPool  = enable_tf_avgPool && (dataFormat_AvgPool_flag[1] || dataFormat_AvgPool_flag[3] || dataFormat_AvgPool_flag[5] || avgPool_BF_flag);
-
             if ((avgPool_flag || maxPool_flag || enable_L2Pool_SH || enable_downSampleSH || avgPool_BF_flag)
                && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER)))
             {
                 vxnne_shader_executable shaderExecutable = NULL;
-                vx_scalar stride_s = NULL;
-                stride_s = vxCreateScalar(node->base.context, VX_TYPE_UINT32, &stride);
-                if (!stride_s)
+                vx_scalar stride_x_s = NULL;
+                vx_scalar stride_y_s = NULL;
+                stride_x_s = vxCreateScalar(node->base.context, VX_TYPE_UINT32, &stride_x);
+                if (!stride_x_s)
                 {
+                    status = VX_FAILURE;
+                    goto exit;
+                }
+
+                stride_y_s = vxCreateScalar(node->base.context, VX_TYPE_UINT32, &stride_y);
+                if (!stride_y_s)
+                {
+                    vxReleaseScalar(&stride_x_s);
                     status = VX_FAILURE;
                     goto exit;
                 }
@@ -2041,8 +2073,8 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                         vxoTensor_GetTensorElementCount(mask, &mask_size);
                         memset(maskData, 1, mask_size);
 
-                        shaderExecutable = vxnneGetTFAvgPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_TF_AVGPOOLING, &node->kernelAttributes.borderMode, inputs, mask, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, VX_NN_ACTIVATION_NONE, outputs);
-
+                        shaderExecutable = vxnneGetTFAvgPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_TF_AVGPOOLING, &node->kernelAttributes.borderMode,
+                        inputs, mask, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, VX_NN_ACTIVATION_NONE, outputs);
 
                         poolingLayer->base.num_temp_tensors = 1;
                         poolingLayer->base.temp_tensors[0]  = mask;
@@ -2054,39 +2086,33 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                         if (scale_factor[0] == 2.0f && scale_factor[1] == 2.0f)
                             shaderExecutable = vxnneGetResizeNearestNeighborShaderExecutable(node->base.context, VXNNE_KERNEL_RESIZE_NEAREST_NEIGHBOR, &node->kernelAttributes.borderMode, inputs, VX_INTERPOLATION_NEAREST_NEIGHBOR, outputs);
                         else
-                            shaderExecutable = vxnneGetMaxPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_MAXPOOLING, &node->kernelAttributes.borderMode, inputs, pool_type_s, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
-
+                            shaderExecutable = vxnneGetMaxPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_MAXPOOLING, &node->kernelAttributes.borderMode, inputs, pool_type_s,
+                            stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
                     }
                     else if (maxPool_flag)
                         shaderExecutable = vxnneGetMaxPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_MAXPOOLING, &node->kernelAttributes.borderMode,
-                        inputs, pool_type_s, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
+                        inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
                     else if (enable_L2Pool_SH)
                         shaderExecutable = vxnneGetL2PoolingShaderExecutable(node->base.context, VXNNE_KERNEL_L2POOLING, &node->kernelAttributes.borderMode,
-                        inputs, pool_type_s, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
+                        inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
                     else if(avgPool_flag && enable_tf_quantize)
                         shaderExecutable = vxnneGetAvgPooling_UInt8ShaderExecutable(node->base.context, VXNNE_KERNEL_AVGPOOLING_UINT8, &node->kernelAttributes.borderMode,
-                        inputs, pool_type_s, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
+                        inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
                     else if(avgPool_flag && enable_int16_sh)
                         shaderExecutable = vxnneGetAvgPooling_Int16ShaderExecutable(node->base.context, VXNNE_KERNEL_AVGPOOLING_INT16, &node->kernelAttributes.borderMode,
-                        inputs, pool_type_s, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
+                        inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, VX_NN_ACTIVATION_NONE, outputs);
                     else
                         shaderExecutable = vxnneGetAvgPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_AVGPOOLING, &node->kernelAttributes.borderMode,
-                        inputs, pool_type_s, stride_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, outputs);
+                        inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, rounding_s, outputs);
                 }
                 else
                 {
-                    vx_uint32 stride_y_value = vxoNNExternsionConvlutionRound((vx_float32)(inputsHeight + pool_pad_y_top + pool_pad_y_bottom - poolSizeYValue) / (outputsHeight - 1), roundingValue);
-                    vx_scalar stride_y = NULL;
-
-                    if (!maxPool_flag)
-                        stride_y = vxCreateScalar(node->base.context, VX_TYPE_UINT32, &stride_y_value);
-
                     if(avgPool_flag)
                     {
                         vx_tensor tensorCopy       = NULL;
                         vx_bool enable_2d_img  = (vx_bool)(TENSOR_VIEW_SIZE_INDEX(inputs, 1) * TENSOR_VIEW_SIZE_INDEX(inputs, 2) < IMG_MAX_WIDTH);
                         vx_bool is_copy_tensor = ((inputdata_format == VX_TYPE_UINT8) && (3 == poolSizeXValue) && (3 == poolSizeYValue)
-                            && (stride == 1 || stride == 2) && enable_2d_img && outputdata_format == VX_TYPE_UINT8
+                            && (stride_x == 1 || stride_x == 2) && enable_2d_img && outputdata_format == VX_TYPE_UINT8
                             && (pool_pad_x_left == 1 || pool_pad_x_right == 1 || pool_pad_y_top == 1 || pool_pad_y_bottom == 1));
 
                         if (is_copy_tensor)
@@ -2192,33 +2218,30 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
 
                         shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(
                         node->base.context, VXNNE_KERNEL_AVGPOOLING, &node->kernelAttributes.borderMode,
-                        tensorCopy, pool_type_s, stride_s, stride_y, pool_size_x_s, pool_size_y_s, pool_pad_x_left,
+                        tensorCopy, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left,
                         pool_pad_y_top, pool_pad_x_right, pool_pad_y_bottom, rounding_s, is_copy_tensor,
                         TENSOR_VIEW_SIZE_INDEX(inputs, 0), TENSOR_VIEW_SIZE_INDEX(inputs, 1), outputs);
                     }
                     else if (enable_L2Pool_SH)
                     {
                         shaderExecutable = vxnneGetGPUL2PoolingShaderExecutable(node->base.context, VXNNE_KERNEL_L2POOLING, &node->kernelAttributes.borderMode,
-                                        inputs, pool_type_s, stride_s, stride_y, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
+                                        inputs, pool_type_s, stride_x_s, stride_y_s, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
                                         pool_pad_y_bottom, rounding_s, outputs);
                     }
                     else if (maxPool_flag)
                     {
                         shaderExecutable = vxnneGetGPUMaxPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_MAXPOOLING, &node->kernelAttributes.borderMode,
-                                       inputs, pool_type_s, stride_s, stride_y_value, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
+                                       inputs, pool_type_s, stride_x_s, stride_y, pool_size_x_s, pool_size_y_s, pool_pad_x_left, pool_pad_y_top, pool_pad_x_right,
                                        pool_pad_y_bottom,rounding_s, outputs);
                     }
 
-                    if (!maxPool_flag)
-                    {
-                        if (stride_y) (vxReleaseScalar(&stride_y));
-                    }
                 }
 
                 if (!shaderExecutable)
                 {
                     status = VX_FAILURE;
-                    vxReleaseScalar(&stride_s);
+                    vxReleaseScalar(&stride_x_s);
+                    vxReleaseScalar(&stride_y_s);
                     goto exit;
                 }
 
@@ -2230,7 +2253,8 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
 
                 if (status != VX_SUCCESS)
                 {
-                    vxReleaseScalar(&stride_s);
+                    vxReleaseScalar(&stride_x_s);
+                    vxReleaseScalar(&stride_y_s);
                     goto exit;
                 }
 
@@ -2242,7 +2266,8 @@ VX_PRIVATE_API vx_status vxnnePoolingInitializer(
                     &poolingLayer->pooling_sh_operation.base,
                     operation_idx++);
 
-                if (stride_s) (vxReleaseScalar(&stride_s));
+                if (stride_x_s) (vxReleaseScalar(&stride_x_s));
+                if (stride_y_s) (vxReleaseScalar(&stride_y_s));
             }
             else
             {
