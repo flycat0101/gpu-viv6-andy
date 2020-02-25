@@ -149,7 +149,8 @@ void __eglDestruct(void)
 #error "Unsupported compiler version for TLS"
 #endif
 
-static void* veglCreateContext_es3(void *thrData, gctINT ClientVersion, VEGLimports *Imports, gctPOINTER SharedContext)
+static void* veglCreateContext_es3(void *thrData, gctINT ClientVersion, VEGLimports *Imports,
+                                   gctPOINTER SharedContext, gctINT SharedContextClient)
 {
     __GLcontext *gc = __glCreateContext((GLint)ClientVersion, Imports, SharedContext);
 
