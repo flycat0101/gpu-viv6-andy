@@ -718,7 +718,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReleaseNBG(
     vx_binary_loader_s *binLoad
     );
 
-VX_INTERNAL_API void vxoBinaryGraph_SaveTPNNOperation(
+VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
     vx_node node,
     vx_uint8_ptr cmdLogicalAddress,
     vx_uint32 cmdPhysicalAddress,

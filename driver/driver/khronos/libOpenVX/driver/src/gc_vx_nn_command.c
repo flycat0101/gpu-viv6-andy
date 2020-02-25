@@ -6888,7 +6888,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
                 vx_uint32 ksDataPhysical    = (vx_uint32)WB_MEM_PHYSICAL_ADDR_INDEX(weights_biases, 0);
                 vx_uint32 ksDataSize        = (vx_uint32)WB_MEM_SIZE_INDEX(weights_biases, 0);
 
-                vxoBinaryGraph_SaveTPNNOperation(node,
+                vxmONERROR(vxoBinaryGraph_SaveTPNNOperation(node,
                                                  cmdBufPtr,
                                                  cmdBufPhys,
                                                  NNE_COMMAND_SIZE,
@@ -6899,7 +6899,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
                                                  input,
                                                  output,
                                                  info.vx_nn_general_cmd_info.inImageAddress,
-                                                 info.vx_nn_general_cmd_info.outImageAddress);
+                                                 info.vx_nn_general_cmd_info.outImageAddress));
             }
 
             if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_SMALLBATCH_PHASE1))
@@ -6969,7 +6969,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
 
             if (node->graph->binarySave)
             {
-                vxoBinaryGraph_SaveTPNNOperation(node,
+                vxmONERROR(vxoBinaryGraph_SaveTPNNOperation(node,
                                                  cmdBufPtr,
                                                  cmdBufPhys,
                                                  TP_COMMAND_SIZE,
@@ -6980,7 +6980,7 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
                                                  input,
                                                  output,
                                                  info.vx_nn_tp_cmd_info.inImageBaseAddress,
-                                                 info.vx_nn_tp_cmd_info.outBaseAddress);
+                                                 info.vx_nn_tp_cmd_info.outBaseAddress));
             }
 
             command_buffer->eventID[i] = i != command_buffer->commandCount - 1 ? 1 : 0;
