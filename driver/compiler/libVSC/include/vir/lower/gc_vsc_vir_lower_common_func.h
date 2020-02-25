@@ -728,6 +728,13 @@ VIR_Lower_MatchDual16Req(
     IN VIR_Operand        *SrcOpnd
     );
 
+gctBOOL
+VIR_Lower_SkipOperand(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
 END_EXTERN_C()
 #endif
 
