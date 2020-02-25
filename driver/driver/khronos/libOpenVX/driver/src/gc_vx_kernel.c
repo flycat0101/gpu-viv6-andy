@@ -3472,9 +3472,10 @@ VX_PRIVATE_API vx_status vxoKernel_Remove(vx_kernel kernel)
 
     gcmHEADER_ARG("kernel=%p", kernel);
 
-    if (kernel == NULL
+    if (!(kernel->enumeration == VX_KERNEL_IMPORT_FROM_FILE) &&
+        (kernel == NULL
         || !vxoReference_IsValidAndSpecific(&kernel->base, VX_TYPE_KERNEL)
-        || !kernel->isUserkernel)
+        || !kernel->isUserkernel))
     {
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
