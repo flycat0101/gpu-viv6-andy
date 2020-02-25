@@ -241,17 +241,7 @@ static void updateSingleAllSilbling1X1(vxnne_operation operation,archModelOpInfo
     OpInfo[index]->perf.SiblingHas1x1 = 0;
     for (i = 0; i < operation->parentOpNum; i++)
     {
-        if(operation->parentOps[i]->id == -1)
-        {
-            OpInfo[index]->perf.allSibling1x1 = 0;
-            /*  Compute SiblingHas1x1 array  */
-            if(operation->target != VXNNE_OPERATION_TARGET_TP
-                && OpInfo[index]->kx == 1 && OpInfo[index]->ky == 1)
-            {
-                OpInfo[index]->perf.SiblingHas1x1 = 1;
-            }
-        }
-        else
+        /* id type is uint32, it should be never become -1. mremove this if */
         {
             for(j = 0; j < operation->parentOps[i]->childOpNum; j++)
             {
