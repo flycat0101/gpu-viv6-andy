@@ -2052,7 +2052,8 @@ _AllocLogicalRegOrArray(
 
         tempRegIndex = slNewTempRegs(Compiler, logicalRegCount * binaryDataTypeSize);
 
-        if (sloCOMPILER_IsHaltiVersion(Compiler) && !sloCOMPILER_IsOGL20Version(Compiler))
+        if (sloCOMPILER_IsHaltiVersion(Compiler) &&
+            !sloCOMPILER_IsOGL11Version(Compiler))
         {
            gctUINT layoutId;
            gctINT layoutLocation = CodeGenerator->layoutLocation;

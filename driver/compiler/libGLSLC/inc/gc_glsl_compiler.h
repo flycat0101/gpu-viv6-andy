@@ -228,17 +228,17 @@ sloCOMPILER_IsOGL40Version(
 );
 
 gctBOOL
-sloCOMPILER_IsOGL30Version(
+sloCOMPILER_IsOGL13Version(
     IN sloCOMPILER Compiler
 );
 
 gctBOOL
-sloCOMPILER_IsOGL31Version(
+sloCOMPILER_IsOGL14Version(
     IN sloCOMPILER Compiler
 );
 
 gctBOOL
-sloCOMPILER_IsOGL32Version(
+sloCOMPILER_IsOGL15Version(
     IN sloCOMPILER Compiler
 );
 

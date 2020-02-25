@@ -7096,8 +7096,8 @@ _ParseUpdateHaltiQualifiers(
             */
             if (slsDATA_TYPE_IsStruct(DataType))
             {
-                if (sloCOMPILER_IsOGL30Version(Compiler) ||
-                    sloCOMPILER_IsOGL31Version(Compiler))
+                if (sloCOMPILER_IsOGL13Version(Compiler) ||
+                    sloCOMPILER_IsOGL14Version(Compiler))
                 {
                     gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                     Identifier->lineNo,
@@ -7144,7 +7144,7 @@ _ParseUpdateHaltiQualifiers(
                 {
                     if (sloCOMPILER_IsOGL40Version(Compiler) ||
                         sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) ||
-                        sloCOMPILER_IsOGL32Version(Compiler))
+                        sloCOMPILER_IsOGL15Version(Compiler))
                     {
                         if (shaderType == slvSHADER_TYPE_FRAGMENT &&
                             DataType->qualifiers.interpolation != slvINTERPOLATION_QUALIFIER_FLAT &&
@@ -7804,7 +7804,7 @@ _ParseArrayVariableDecl(
         if(shaderType == slvSHADER_TYPE_VERTEX &&
            !sloCOMPILER_IsOGL40Version(Compiler) &&
            !sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) &&
-           !sloCOMPILER_IsOGL32Version(Compiler))
+           !sloCOMPILER_IsOGL15Version(Compiler))
         {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                            Identifier->lineNo,
@@ -8019,7 +8019,7 @@ _ParseArrayVariableDeclWithInitializer(
         if(shaderType == slvSHADER_TYPE_VERTEX &&
            !sloCOMPILER_IsOGL40Version(Compiler) &&
            !sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) &&
-           !sloCOMPILER_IsOGL32Version(Compiler))
+           !sloCOMPILER_IsOGL15Version(Compiler))
         {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                            Identifier->lineNo,
@@ -8347,7 +8347,7 @@ _CheckErrorForArray(
            if(shaderType == slvSHADER_TYPE_VERTEX &&
               !sloCOMPILER_IsOGL40Version(Compiler) &&
               !sloCOMPILER_IsOGL33VersionOrAbove(Compiler, gcvFALSE) &&
-              !sloCOMPILER_IsOGL32Version(Compiler))
+              !sloCOMPILER_IsOGL15Version(Compiler))
            {
               gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                               Identifier->lineNo,
