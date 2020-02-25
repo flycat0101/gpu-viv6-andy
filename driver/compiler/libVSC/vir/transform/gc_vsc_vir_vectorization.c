@@ -2011,6 +2011,11 @@ static void _VectorizeOpndsBasedOnOrgSymOrVirreg(VIR_Shader* pShader,
             for (pUsage = vscVIR_GeneralDuIterator_First(&duIter); pUsage != gcvNULL;
                  pUsage = vscVIR_GeneralDuIterator_Next(&duIter))
             {
+                if (!VIR_IS_OUTPUT_USAGE_INST(pUsage->usageKey.pUsageInst) &&
+                    (pUsage->usageKey.pUsageInst->_opcode < 0 || pUsage->usageKey.pUsageInst->_opcode >= VIR_OP_MAXOPCODE))
+                {
+                    continue;
+                }
                 vscVIR_AddNewUsageToDef(pDuInfo,
                                         pOpndVectorizedInfo->instPair.pSeedInst,
                                         pUsage->usageKey.pUsageInst,
