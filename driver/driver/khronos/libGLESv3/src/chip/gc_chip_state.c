@@ -3352,6 +3352,9 @@ gcChipRecompileEvaluateKeyStates(
     gceSTATUS status = gcvSTATUS_OK;
     gctBOOL needTxRecompile = gcvFALSE;
     gctBOOL needRtRecompile = gcvFALSE;
+    gctBOOL hasGlFrontFacing = gcvFALSE;
+    gcSHADER shaderBinary;
+    GLuint i;
 
     gctBOOL bTriangle = (gc->vertexArray.primMode == GL_TRIANGLES ||
                          gc->vertexArray.primMode == GL_TRIANGLE_FAN ||
@@ -3989,8 +3992,25 @@ gcChipRecompileEvaluateKeyStates(
         {
             if (gc->state.polygon.frontFace == GL_CW)
             {
-                pgKeyState->staticKey->frontFacingClockwice = GL_TRUE;
-                pgKeyDirty = GL_TRUE;
+                shaderBinary = program->curPgInstance->binaries[__GLSL_STAGE_FS];
+                for (i = 0; i < (GLuint)shaderBinary->attributeCount; i++)
+                {
+                    if (shaderBinary->attributes[i] == gcvNULL)
+                    {
+                        continue;
+                    }
+                    if (shaderBinary->attributes[i]->nameLength == gcSL_FRONT_FACING)
+                    {
+                        hasGlFrontFacing = GL_TRUE;
+                        break;
+                    }
+                }
+
+                if (hasGlFrontFacing)
+                {
+                    pgKeyState->staticKey->frontFacingClockwice = GL_TRUE;
+                    pgKeyDirty = GL_TRUE;
+                }
             }
             else if (pgKeyState->staticKey->frontFacingClockwice)
             {
