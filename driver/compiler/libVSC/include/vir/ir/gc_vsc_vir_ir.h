@@ -4727,7 +4727,7 @@ typedef enum _VIR_SHADERFLAGS
     VIR_SHFLAG_BY_SPV_SSA_FORM                  = 0x1000, /* whether the shader is by spirv ssa form */
 
     /* shader specific code characteristic flag */
-    VIR_SHFLAG_GS_HAS_STREAM_OUT                = 0x2000, /* whether the shader has stream out, only in GS */
+    VIR_SHFLAG_GS_HAS_STREAM_OUT                = 0x2000, /* Whether the shader has any stream out other than stream 0, only in GS */
     VIR_SHFLAG_GS_HAS_RESTART_OP                = 0x4000, /* whether the shader has restart op, only in GS */
     VIR_SHFLAG_PS_NEED_SAMPLE_MASK_ID           = 0x8000, /* whether the shader need sample-mask (in & out), sample_id and
                                                               sample_pos (it is got from sample_id), only in PS */
@@ -4815,6 +4815,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
    Otherwise, it is wrong when the flag is used in !flag case. */
 #define VIR_Shader_GS_HasStreamOut(Shader)          (((Shader)->flags & VIR_SHFLAG_GS_HAS_STREAM_OUT) != 0)
 #define VIR_Shader_GS_HasRestartOp(Shader)          (((Shader)->flags & VIR_SHFLAG_GS_HAS_RESTART_OP) != 0)
+#define VIR_Shader_HasRestartOrStreamOut(Shader)    (VIR_Shader_GS_HasStreamOut(Shader) || VIR_Shader_GS_HasRestartOp(Shader))
 #define VIR_Shader_PS_NeedSampleMaskId(Shader)      (((Shader)->flags & VIR_SHFLAG_PS_NEED_SAMPLE_MASK_ID) != 0)
 #define VIR_Shader_PS_NeedSpecAllocPrimId(Shader)   (((Shader)->flags & VIR_SHFLAG_PS_SPECIALLY_ALLOC_PRIMTIVE_ID) != 0)
 #define VIR_Shader_PS_NeedSpecAllocPtCoord(Shader)  (((Shader)->flags & VIR_SHFLAG_PS_SPECIALLY_ALLOC_POINT_COORD) != 0)

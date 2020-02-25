@@ -3462,7 +3462,6 @@ static VSC_ErrCode _ProgramGS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     gctUINT                    firstValidIoChannel;
     gctINT                     lastOutputOfPerVtx = -1;
     gctBOOL                    bGsPrimitiveId = gcvFALSE, bGsInstancingId = gcvFALSE;
-    gctBOOL                    bNeedMetaDataForSO = gcvFALSE;
     gctUINT                    startRemapHwReg, gsOutputSizePerThread;
     gctUINT                    maxThreadsPerHwTG, hwTGSize, gsOutputAttrCount;
     gctUINT                    minUscSize, maxUscSize, extraUscSize;
@@ -3706,11 +3705,10 @@ static VSC_ErrCode _ProgramGS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  ~0U : (~(~0U << ((1 ?
  25:25) - (0 ?
  25:25) + 1))))))) << (0 ?
- 25:25))) | (((gctUINT32) ((gctUINT32) (bNeedMetaDataForSO) & ((gctUINT32) ((((1 ?
+ 25:25))) | (((gctUINT32) ((gctUINT32) (pGsSEP->exeHints.nativeHints.prvStates.gs.bHasStreamOut) & ((gctUINT32) ((((1 ?
  25:25) - (0 ?
  25:25) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 25:25) - (0 ? 25:25) + 1))))))) << (0 ? 25:25)))                          |
+ ~0U : (~(~0U << ((1 ? 25:25) - (0 ? 25:25) + 1))))))) << (0 ? 25:25))) |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  29:28) - (0 ?
  29:28) + 1) == 32) ?

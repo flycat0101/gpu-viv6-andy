@@ -1033,6 +1033,9 @@ typedef struct SHADER_EXECUTABLE_NATIVE_HINTS
 
             /* It is retrieved from inputPrim. Standalone providing this is just for convenience only */
             gctUINT                                      inputVtxCount;
+
+            /* Whether the shader has any stream out other than stream 0. */
+            gctBOOL                                      bHasStreamOut;
         } gs;
 
         /* States acted on PS */

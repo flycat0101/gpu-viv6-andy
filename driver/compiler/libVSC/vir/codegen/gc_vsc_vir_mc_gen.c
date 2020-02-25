@@ -3176,9 +3176,13 @@ _VSC_MC_GEN_GenInst(
                 mcSrc,
                 &srcNum);
 
-            gcmASSERT(srcNum == 2);
-            gcmASSERT(mcSrc[1].regType == 0x7);
-            mcInstCtrl.u.emitCtrl.bNeedRestartPrim = mcSrc[1].u.imm.immData.ui & 0x01;
+            /* The stream number(if exist) and jumpToEnd need to be immediate. */
+            gcmASSERT(mcSrc[1].regType == 0x7
+                      &&
+                      (srcNum == 2 || mcSrc[2].regType == 0x7));
+
+            /* The last source is saved enable/disable jumpToEnd. */
+            mcInstCtrl.u.emitCtrl.bNeedRestartPrim = mcSrc[srcNum - 1].u.imm.immData.ui & 0x01;
             mcInstCtrl.u.emitCtrl.bNoJmpToEndOnMaxVtxCnt = gcvTRUE;
             srcNum --;
 

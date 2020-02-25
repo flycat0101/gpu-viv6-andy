@@ -5215,7 +5215,7 @@ gctBOOL _VIR_RA_LS_handleBuiltinAttr(
     {
         if (VIR_Symbol_GetName(pAttr) == VIR_NAME_INVOCATION_ID)
         {
-            if (!VIR_Shader_GS_HasRestartOp(pShader))
+            if (!VIR_Shader_HasRestartOrStreamOut(pShader))
             {
                 /* instanceId in r0.z*/
                 if (regNo && shift)
@@ -5237,7 +5237,7 @@ gctBOOL _VIR_RA_LS_handleBuiltinAttr(
         }
         else if (VIR_Symbol_GetName(pAttr) == VIR_NAME_PRIMITIVE_ID_IN)
         {
-            if (!VIR_Shader_GS_HasRestartOp(pShader) &&
+            if (!VIR_Shader_HasRestartOrStreamOut(pShader) &&
                 !VIR_Shader_HasInstanceId(pShader))
             {
                 /*primitiveId in r0.z */
@@ -5247,8 +5247,8 @@ gctBOOL _VIR_RA_LS_handleBuiltinAttr(
                     *shift = 2;
                 }
             }
-            else if ((VIR_Shader_GS_HasRestartOp(pShader)) &&
-                        !VIR_Shader_HasInstanceId(pShader))
+            else if (VIR_Shader_HasRestartOrStreamOut(pShader) &&
+                     !VIR_Shader_HasInstanceId(pShader))
             {
                 /*primitiveId in r0.w */
                 if (regNo && shift)
@@ -5545,7 +5545,7 @@ _VIR_RA_LS_GetStartReg(
           r0.z, r1.x, remap for input
           r1.z, r2.x */
 
-        if (!VIR_Shader_GS_HasRestartOp(pShader) &&
+        if (!VIR_Shader_HasRestartOrStreamOut(pShader) &&
             !VIR_Shader_HasInstanceId(pShader) &&
             !VIR_Shader_HasPrimitiveId(pShader))
         {
@@ -5565,7 +5565,7 @@ _VIR_RA_LS_GetStartReg(
                 startReg = 1;
             }
         }
-        else if ((VIR_Shader_GS_HasRestartOp(pShader)) &&
+        else if (VIR_Shader_HasRestartOrStreamOut(pShader) &&
                   VIR_Shader_HasInstanceId(pShader) &&
                   VIR_Shader_HasPrimitiveId(pShader))
         {
@@ -10667,7 +10667,7 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr_Output(
 
     curColor = InvalidColor;
 
-    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0);
+    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 || VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM);
 
     /* set VIR_SYMFLAG_LOAD_STORE_ATTR flag */
     VIR_Symbol_SetFlag(pSym, VIR_SYMFLAG_LOAD_STORE_ATTR);
@@ -11051,14 +11051,24 @@ VSC_ErrCode _VIR_RA_LS_GenEmitRestart(
     VIR_LIVENESS_INFO   *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
     VIR_Function        *pFunc = VIR_Shader_GetCurrentFunction(pShader);
     VIR_SymId           symId = VIR_INVALID_ID;
-
     VIR_Instruction     *newInst = gcvNULL;
-    VIR_RA_HWReg_Color      curColor;
+    VIR_RA_HWReg_Color  curColor;
+    gctBOOL             bCheckAllOutput = gcvTRUE;
+    gctINT              streamNumber = 0;
+
+    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0         ||
+              VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM   ||
+              VIR_Inst_GetOpcode(pInst) == VIR_OP_RESTART0      ||
+              VIR_Inst_GetOpcode(pInst) == VIR_OP_RESTART_STREAM);
+
+    if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT_STREAM)
+    {
+        bCheckAllOutput = gcvFALSE;
+        gcmASSERT(VIR_Operand_isImm(VIR_Inst_GetSource(pInst, 0)));
+        streamNumber = VIR_Operand_GetImmediateInt(VIR_Inst_GetSource(pInst, 0));
+    }
 
     curColor = InvalidColor;
-
-    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
-              VIR_Inst_GetOpcode(pInst) == VIR_OP_RESTART0);
 
     if (isEmit)
     {
@@ -11067,13 +11077,18 @@ VSC_ErrCode _VIR_RA_LS_GenEmitRestart(
         VIR_USAGE_KEY   usageKey;
         gctUINT         i=0;
         for (outputIdx = 0;
-            outputIdx < VIR_IdList_Count(VIR_Shader_GetOutputs(pShader));
-            outputIdx ++)
+             outputIdx < VIR_IdList_Count(VIR_Shader_GetOutputs(pShader));
+             outputIdx ++)
         {
             VIR_Symbol* pOutputSym = VIR_Shader_GetSymFromId(pShader,
                                 VIR_IdList_GetId(VIR_Shader_GetOutputs(pShader), outputIdx));
 
             if (isSymVectorizedOut(pOutputSym))
+            {
+                continue;
+            }
+
+            if (!bCheckAllOutput && VIR_Symbol_GetStreamNumber(pOutputSym) != streamNumber)
             {
                 continue;
             }
@@ -11116,6 +11131,12 @@ VSC_ErrCode _VIR_RA_LS_GenEmitRestart(
     VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src0], VIR_SWIZZLE_XYZW);
     _VIR_RA_MakeColor(0, 0, &curColor);
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src0], curColor);
+
+    /* src1 - streamNumber. */
+    if (VIR_Shader_GS_HasStreamOut(pShader))
+    {
+        VIR_Operand_SetImmediateInt(VIR_Inst_GetSource(newInst, 1), streamNumber);
+    }
 
     /* samperswizzle */
     if (isEmit)
@@ -11345,9 +11366,11 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
         /* nothing to do, already colored when generating */
         break;
     case VIR_OP_EMIT0:
+    case VIR_OP_EMIT_STREAM:
         _VIR_RA_LS_GenEmitRestart(pRA, pInst, gcvTRUE);
         break;
     case VIR_OP_RESTART0:
+    case VIR_OP_RESTART_STREAM:
         /* we don't need to generate restart for the case where
            output primitive type is point */
         if (VIR_Shader_GS_HasRestartOp(pShader))
@@ -12175,7 +12198,7 @@ _VIR_RA_LS_MovHWInputRegisters(
               r0.z, r1.x, remap for input
               r1.z, r2.x */
 
-            if (!VIR_Shader_GS_HasRestartOp(pShader) &&
+            if (!VIR_Shader_HasRestartOrStreamOut(pShader) &&
                 !VIR_Shader_HasInstanceId(pShader) &&
                 !VIR_Shader_HasPrimitiveId(pShader))
             {
@@ -12191,7 +12214,7 @@ _VIR_RA_LS_MovHWInputRegisters(
                     lastRegNum = 0;
                 }
             }
-            else if ((VIR_Shader_GS_HasRestartOp(pShader)) &&
+            else if (VIR_Shader_HasRestartOrStreamOut(pShader) &&
                       VIR_Shader_HasInstanceId(pShader) &&
                       VIR_Shader_HasPrimitiveId(pShader))
             {

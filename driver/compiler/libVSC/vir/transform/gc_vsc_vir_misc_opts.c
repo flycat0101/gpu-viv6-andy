@@ -10983,6 +10983,14 @@ VSC_ErrCode vscVIR_PreprocessCGShader(VSC_SH_PASS_WORKER* pPassWorker)
                     bChanged = gcvTRUE;
                 }
             }
+            else if (VIR_Inst_GetOpcode(inst) == VIR_OP_EMIT_STREAM ||
+                     VIR_Inst_GetOpcode(inst) == VIR_OP_RESTART_STREAM)
+            {
+                if (VIR_Operand_GetImmediateInt(VIR_Inst_GetSource(inst, 0)) != 0)
+                {
+                    VIR_Shader_SetFlag(pShader, VIR_SHFLAG_GS_HAS_STREAM_OUT);
+                }
+            }
         }
     }
 
