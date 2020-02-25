@@ -10930,6 +10930,7 @@ VkResult halti5_createImageView(
     if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
     {
         chipImgv->patchKey = HALTI5_PATCH_SAMPLED_IMAGRE_FORMAT_BIT;
+        chipImgv->patchKey |= HALTI5_PATCH_COMBINED_IMAGE_FORAMT_BIT;
     }
 
     switch (residentImgFormat)
@@ -11711,6 +11712,11 @@ VkResult halti5_updateDescriptorSet(
                         __VK_ASSERT(resInfo->type == __VK_DESC_RESOURCE_IMAGEVIEW_INFO);
                         patchKey |= chipImgv->patchKey;
                         patchFormat = chipImgv->patchFormat;
+
+                        if (patchKey & HALTI5_PATCH_COMBINED_IMAGE_FORAMT_BIT)
+                        {
+                            patchInfos[entryIdx].originalFormat = imgv->createInfo.format;
+                        }
                         viewType = imgv->createInfo.viewType;
                         swizzles[0] = __vkConvertSwizzle(imgv->createInfo.components.r, SWIZZLE_RED);
                         swizzles[1] = __vkConvertSwizzle(imgv->createInfo.components.g, SWIZZLE_GREEN);
