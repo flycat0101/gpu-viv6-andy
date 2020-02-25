@@ -485,8 +485,14 @@ _SyncModuleParam(
         p->chipIDs[i] = chipIDs[i];
     }
 
-    contiguousBase      = (ulong)p->contiguousBase;
-    contiguousSize      = (ulong)p->contiguousSize;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)
+        contiguousBase      = p->contiguousBase;
+        contiguousSize      = p->contiguousSize;
+#else
+        contiguousBase      = (ulong)p->contiguousBase;
+        contiguousSize      = (ulong)p->contiguousSize;
+#endif
+
     contiguousRequested = p->contiguousRequested;   /* not a module param. */
 
     externalBase = p->externalBase;
