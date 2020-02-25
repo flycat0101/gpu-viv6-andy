@@ -139,7 +139,7 @@ VX_PRIVATE_API vx_status _vxoWeightBias_PrepareWBAData(
     vx_status status = VX_SUCCESS;
     vx_uint8_ptr weightOrigPtr = VX_NULL, alphaOrigPtr = VX_NULL;
     vx_uint32_ptr biasOrigPtr = VX_NULL;
-    vx_uint32 size;
+    vx_uint32 size = 0;
 
     if (prepare_weight)
     {
@@ -150,9 +150,9 @@ VX_PRIVATE_API vx_status _vxoWeightBias_PrepareWBAData(
         }
 
         vxoTensor_GetTensorViewMemory(WB_WEIGHT_TENSOR(wb), (gctPOINTER*)&weightOrigPtr, VX_NULL);
-        if (weightOrigPtr != VX_NULL)
+        vxoTensor_GetTensorSize(WB_WEIGHT_TENSOR(wb), &size);
+        if (weightOrigPtr != VX_NULL && size > 0)
         {
-            size = WB_KERNEL_X(wb) * WB_KERNEL_Y(wb) * WB_KERNEL_Z(wb) * WB_OUTPUT_Z(wb) * (vx_uint32)vxDataType_GetSize((vx_type_e)WB_WEIGHT_DATA_FORMAT(wb));
             WB_WEIGHT_DATA(wb) = (vx_uint8_ptr)vxAllocate(size);
             if (WB_WEIGHT_DATA(wb) == VX_NULL)
             {
@@ -177,9 +177,9 @@ VX_PRIVATE_API vx_status _vxoWeightBias_PrepareWBAData(
         }
 
         vxoTensor_GetTensorViewMemory(WB_BIAS_TENSOR(wb), (gctPOINTER*)&biasOrigPtr, VX_NULL);
-        if (biasOrigPtr != VX_NULL)
+        vxoTensor_GetTensorSize(WB_BIAS_TENSOR(wb), &size);
+        if (biasOrigPtr != VX_NULL && size > 0)
         {
-            size = WB_OUTPUT_Z(wb) * (vx_uint32)vxDataType_GetSize((vx_type_e)WB_BIAS_DATA_FORMAT(wb));
             WB_BIAS_DATA(wb) = (vx_uint32_ptr)vxAllocate(size);
             if (WB_BIAS_DATA(wb) == VX_NULL)
             {
