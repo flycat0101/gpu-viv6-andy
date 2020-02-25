@@ -9327,7 +9327,8 @@ _SpecialGenAssignCode(
         }
         if (gcmIS_ERROR(status)) return status;
     }
-    else if (gcIsVectorDataType(LOperand->dataType)) {
+    else if (gcIsVectorDataType(LOperand->dataType) ||
+             clmIsElementTypePacked(LOperand->dataType.elementType)) {
         if(clmIsElementTypePacked(ROperand->dataType.elementType) ||
            clmIsElementTypePacked(LOperand->dataType.elementType) ||
            clmIsElementTypeImage(ROperand->dataType.elementType) ||
