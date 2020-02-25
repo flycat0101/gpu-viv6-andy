@@ -11427,7 +11427,6 @@ void fillinTPKernelBufferHuffman(
     vx_uint32 dummyStage[3] = {0};
     vx_uint32 dummyBitLength[3] = {0};
     vx_bool setDummy = vx_false_e;
-    vx_int8 biasFpp = 0;
 
     reorderStream = (vx_uint8 *)vxAllocateAndZeroMemory(reorderStreamSize);
 
@@ -11470,10 +11469,7 @@ void fillinTPKernelBufferHuffman(
         writeBits(&kernelBufferPtr, &bitOffset, kernelStreamSize, 14);
     }
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
-    if(bias_format == VX_TYPE_INT64 && (!vxoContext_IsFeatureAvailable(wb->base.context, VX_TP_FEATURE_FP32_BIAS)))
-    {
-        biasFpp = wb->wb_base->biases_fixed_point_pos / 2 + 1;
-    }
+
     /* Fill bias for each filter. */
     for (filterIndex = 0; filterIndex < filterCount; filterIndex++)
     {
@@ -11496,15 +11492,13 @@ void fillinTPKernelBufferHuffman(
         }
         else
         {
-            vx_float32 biasFloat32;
             if(bias_format == VX_TYPE_INT64)
             {
                 vx_int32 bias32;
                 vx_int64  biasData64bits         = 0;
                 biasBitSize = biasBitSize >= 32 ? 32: biasBitSize;
                 biasData64bits = bias_base_ptr == VX_NULL ? 0 : *((vx_int64 *)bias_base_ptr + filterIndex);
-                biasFloat32 = Int64toFp32(biasData64bits & 0xFFFFFFFFFFFF, wb->wb_base->biases_fixed_point_pos);
-                bias32 = Fp32toInt32(biasFloat32, biasFpp, wb->wb_base->origBias->tensorBuffer->roundingMode);
+                bias32 = biasData64bits & 0xFFFFFFFF;
                 writeBits(&kernelBufferPtr, &bitOffset, bias32, biasBitSize);
             }
             else
@@ -11515,11 +11509,6 @@ void fillinTPKernelBufferHuffman(
         }
     }
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
-
-    if(bias_format == VX_TYPE_INT64 && (!vxoContext_IsFeatureAvailable(wb->base.context, VX_TP_FEATURE_FP32_BIAS)))
-    {
-        wb->wb_base->biases_fixed_point_pos = biasFpp;
-    }
 
     for (i = 0; i < THROUGHPUT * 3; i++)
     {
@@ -14558,7 +14547,6 @@ void fillinTPKernelBuffer(
     vx_uint8_ptr kernelStreamBasePtr = VX_NULL;
     vx_uint32 filterIndex, sliceIndex;
     vx_uint32 rsvWeightCount = 0;
-    vx_uint8 biasFpp = 0;
 
     if (weightFomat == VX_TYPE_INT8 || weightFomat == VX_TYPE_UINT8)
     {
@@ -14579,10 +14567,6 @@ void fillinTPKernelBuffer(
     }
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
 
-    if(bias_format == VX_TYPE_INT64 && (!vxoContext_IsFeatureAvailable(wb->base.context, VX_TP_FEATURE_FP32_BIAS)))
-    {
-        biasFpp = wb->wb_base->biases_fixed_point_pos / 2 + 1;
-    }
     /* Fill bias for each filter. */
     for (filterIndex = 0; filterIndex < filterCount; filterIndex++)
     {
@@ -14605,15 +14589,13 @@ void fillinTPKernelBuffer(
         }
         else
         {
-            vx_float32 biasFloat32;
             if(bias_format == VX_TYPE_INT64)
             {
                 vx_int32 bias32;
                 vx_int64  biasData64bits         = 0;
                 biasBitSize = biasBitSize >= 32 ? 32: biasBitSize;
                 biasData64bits = bias_base_ptr == VX_NULL ? 0 : *((vx_int64 *)bias_base_ptr + filterIndex);
-                biasFloat32 = Int64toFp32(biasData64bits & 0xFFFFFFFFFFFF, wb->wb_base->biases_fixed_point_pos);
-                bias32 = Fp32toInt32(biasFloat32, biasFpp, wb->wb_base->origBias->tensorBuffer->roundingMode);
+                bias32 = biasData64bits & 0xFFFFFFFF;
                 writeBits(&kernelBufferPtr, &bitOffset, bias32, biasBitSize);
             }
             else
@@ -14622,11 +14604,6 @@ void fillinTPKernelBuffer(
                 writeBits(&kernelBufferPtr, &bitOffset, biasData, biasBitSize);
             }
         }
-    }
-
-    if(bias_format == VX_TYPE_INT64 && (!vxoContext_IsFeatureAvailable(wb->base.context, VX_TP_FEATURE_FP32_BIAS)))
-    {
-        wb->wb_base->biases_fixed_point_pos = biasFpp;
     }
 
     packZeros(&kernelBufferPtr, &bitOffset, alignedOffset);
@@ -14994,7 +14971,45 @@ VX_INTERNAL_CALLBACK_API void vxoWeightsBiasesBase_Destructor(vx_reference ref)
         wbBase->origAlpha = VX_NULL;
     }
 }
+vx_bool isInt64BiasOverflow(vx_context context, vx_weights_biases_parameter_base wb_base )
+{
+    vx_status status = vx_false_e;
+    if(wb_base->weights_data_format == VX_TYPE_INT16 && wb_base->biases_data_format == VX_TYPE_INT64 && (!vxoContext_IsFeatureAvailable(context, VX_TP_FEATURE_FP32_BIAS)))
+    {
+        vx_uint32 filterIndex = 0, filterCount = wb_base->weights_sizes[3];
+        vx_uint32 size = 0;
+        vx_int64 *bias_base_ptr = VX_NULL;
+        vx_uint32_ptr* Bias_Gpuptr = VX_NULL, Bias_Cpuptr = VX_NULL;
 
+        if (wb_base->origBias)
+        {
+            size = wb_base->weights_sizes[3] * vxDataType_GetSize((vx_type_e)wb_base->biases_data_format);
+            Bias_Cpuptr = (vx_uint32_ptr)vxAllocate(size);
+            if (Bias_Cpuptr == VX_NULL)
+            {
+                status = VX_ERROR_NO_MEMORY;
+                return status;
+            }
+            vxoTensor_GetTensorViewMemory(wb_base->origBias, (gctPOINTER*)(&Bias_Gpuptr), VX_NULL);
+            vxMemCopy(Bias_Cpuptr, Bias_Gpuptr, size);
+            bias_base_ptr = (vx_int64 *)Bias_Cpuptr;
+            //bias_base_ptr = (vx_int64 *)wb_base->origBias->tensorBuffer->memory.logicals[0];
+        }
+        for (filterIndex = 0; filterIndex < filterCount; filterIndex++)
+        {
+            vx_int64  biasData64bits         = 0;
+            biasData64bits = bias_base_ptr == VX_NULL ? 0 : *(bias_base_ptr + filterIndex);
+            if((((biasData64bits >>31) & 0x1FFFFFFFF) != 0) && (((biasData64bits >>31) & 0x1FFFFFFFF) != 0x1FFFFFFFF))
+            {
+                vxInfo("\n Real Int64 bias -> NN \n ");
+                return vx_true_e;
+            }
+        }
+        vxInfo("\n Fake Int64 bias -> TP \n ");
+    }
+
+    return status;
+}
 vx_weights_biases_parameter vxoWeightsBiases_Create(
     vx_context                       context,
     vx_weights_biases_parameter_base wb_base,
@@ -15064,7 +15079,7 @@ vx_weights_biases_parameter vxoWeightsBiases_Create(
         if (layer_type == VX_NN_FULLYCONNECTED_LAYER &&
             vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_SINGLE_FC) &&
             weight_dims[3] > 1 && wb_base->nn_fc_batch_mode == vx_false_e &&
-            ((!context->options.enableForce64BitsBiasNN && wb_base->biases_data_format == VX_TYPE_INT64) || wb_base->biases_data_format != VX_TYPE_INT64))
+            (!isInt64BiasOverflow(context, wb_base)))
         {
             vx_uint32 coreCount = context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
             sliceCount = weight_dims[2];
