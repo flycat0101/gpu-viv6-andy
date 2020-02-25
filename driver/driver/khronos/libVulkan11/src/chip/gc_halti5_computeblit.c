@@ -3393,6 +3393,8 @@ VkResult halti5_computeBlit(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&scatch)++ = 0;
 ;
 
+
+        __vkCmdLoadSingleHWState(&scatch, 0x0E80, VK_FALSE, 1);
     }
 
     /*when treat the src image as the texture, need flush the texture data cache*/
