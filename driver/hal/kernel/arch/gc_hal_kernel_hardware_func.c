@@ -1429,6 +1429,11 @@ _FuncInit_MMU(IN gcsFUNCTION_EXECUTION_PTR Execution)
         &physical
         ));
 
+    if(physical >> 32)
+    {
+        gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
+    }
+
     if (!(flags & gcvALLOC_FLAG_4GB_ADDR) && (physical & 0xFFFFFFFF00000000ULL))
     {
         gcmkFATAL("%s(%d): Command buffer physical address (0x%llx) for MMU setup exceeds 32bits, "

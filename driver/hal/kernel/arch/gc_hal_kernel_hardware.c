@@ -8092,7 +8092,7 @@ _PmSetPowerOffDirection(
     switch (Hardware->chipPowerState)
     {
     case gcvPOWER_ON:
-        if(Hardware->os->device->threadInitializeds[Hardware->core] == gcvTRUE)
+        if(Hardware->kernel->threadInitialized == gcvTRUE)
         {
             /* Stall. */
             status = _PmStallCommand(Hardware, command, Broadcast);
@@ -8125,7 +8125,7 @@ _PmSetPowerOffDirection(
         }
 
     case gcvPOWER_SUSPEND:
-        if(Hardware->os->device->threadInitializeds[Hardware->core] == gcvTRUE)
+        if(Hardware->kernel->threadInitialized == gcvTRUE)
         {
             /* Flush. */
             gcmkONERROR(_PmFlushCache(Hardware, command));

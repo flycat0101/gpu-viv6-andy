@@ -429,6 +429,7 @@ gckKERNEL_Construct(
     kernel->core        = Core;
     kernel->device      = Device;
     kernel->chipID      = ChipID;
+    kernel->threadInitialized = gcvTRUE;
 
 #if gcdENABLE_TRUST_APPLICATION
     /* Connect to security service for this GPU. */

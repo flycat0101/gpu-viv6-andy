@@ -632,6 +632,7 @@ struct _gckKERNEL
     gctUINT64                   sRAMLoopMode;
 
     gctUINT32                   timeoutPID;
+    gctBOOL                     threadInitialized;
 };
 
 struct _FrequencyHistory
