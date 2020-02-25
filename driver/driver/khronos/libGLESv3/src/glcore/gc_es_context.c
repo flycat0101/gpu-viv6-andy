@@ -1092,9 +1092,6 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
 
     gc->apiVersion   = apiVersion;
 
-    /*
-        VIV: We don't support shared context between ES11 and ES20 above.
-    */
     if (sharedCtx != gcvNULL && SharedContextClient != 0x10)
     {
         gc->shareCtx = (__GLcontext*)sharedCtx;

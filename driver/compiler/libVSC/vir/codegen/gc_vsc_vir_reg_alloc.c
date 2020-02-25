@@ -11664,12 +11664,6 @@ _VIR_RA_LS_ClearUsedColorFromActiveLR(
         {
             curColor = _VIR_RA_GetLRColor(pCurr);
 
-            /*
-            ** VIV:TODO: now we release all actived LR until there are enough rooms for this LR,
-            ** we need to use a algorithm to choose which activecd LR should be released first.
-            ** Maybe we can use the same algorithm for the spilled LR in function _VIR_RA_LS_computeWeight.
-            */
-
             /* clear the used bits*/
             _VIR_RA_LS_ClearUsedColor(pRA, hwRegType,
                 _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pCurr)),

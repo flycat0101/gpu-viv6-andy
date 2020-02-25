@@ -473,7 +473,6 @@ gcoSURF_AllocateTileStatus(
 
     gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
 
-    /*VIV: gcvFEATURE_MC_FCCACHE_BYTEMASK feature is fix for v621 HW cache overlap bug, And need to make sure that the physical memory is continuous */
     if (((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPRESSION_V4) || gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPRESSION_DEC400))
     &&  !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MC_FCCACHE_BYTEMASK)) || (chipModel == gcv7000 && chipRevision == 0x6203))
     {
