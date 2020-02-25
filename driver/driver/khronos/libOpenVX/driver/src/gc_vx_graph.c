@@ -3147,7 +3147,7 @@ VX_PRIVATE_API vx_status InitializeABSegmentCommands(
         opCommand->cmdInfo.padTop       = opInfo.pad.top;
         opCommand->cmdInfo.convWidth    = opCommand->outputTile.width;
         opCommand->cmdInfo.convHeight   = opCommand->outputTile.height;
-        if (opInfo.enablePooling && opInfo.opType == VXNNE_OPERATOR_CONVOLUTION)
+        if (opInfo.enablePooling)
         {
             vxmONERROR(ComputeInputSizeEx(
                             opInfo.opType,
