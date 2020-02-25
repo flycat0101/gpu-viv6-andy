@@ -25,12 +25,12 @@ __kernel void gpuLeakyRelu_FP32_4X_2D (
 
 #define LEAKRELU_QUANT8_4X_PROCESS() \
     uint4 tmp = {0.0}, dst = {0.0}; \
-    float inPixel0, inPixel1, outPixel; \
+    float4 inPixel0, inPixel1, outPixel; \
     tmp = read_imageui(input, coord); \
-    inPixel0 = (convert_float(tmp) - zpIn) * scaleIn; \
+    inPixel0 = (convert_float4(tmp) - zpIn) * scaleIn; \
     inPixel1 = alpha * inPixel0; \
     outPixel = inPixel0 > 0 ? inPixel0 : inPixel1; \
-    dst = floor(outPixel * scaleOut + zpOut); \
+    dst = convert_uint4(outPixel * scaleOut + zpOut); \
     write_imageui(output, coord, dst);
 
 __kernel void gpuLeakyRelu_Quant8_4X (
@@ -93,12 +93,12 @@ __kernel void gpuLeakyRelu_FP32_4s_2D (
 
 #define LEAKRELU_QUANT8_4S_PROCESS() \
     uint4 tmp = {0.0}, dst = {0.0}; \
-    float inPixel0, inPixel1, outPixel; \
+    float4 inPixel0, inPixel1, outPixel; \
     tmp = read_imageui(input, coord); \
-    inPixel0 = (convert_float(tmp) - zpIn) * scaleIn; \
+    inPixel0 = (convert_float4(tmp) - zpIn) * scaleIn; \
     inPixel1 = alpha * inPixel0; \
     outPixel = inPixel0 > 0 ? inPixel0 : inPixel1; \
-    dst = floor(outPixel * scaleOut + zpOut); \
+    dst = convert_uint4(outPixel * scaleOut + zpOut); \
     write_imageui(output, coord, dst.xxxx); \
     coord.x++; \
     write_imageui(output, coord, dst.yyyy); \
