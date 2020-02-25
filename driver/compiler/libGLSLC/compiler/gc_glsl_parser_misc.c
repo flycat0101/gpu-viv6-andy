@@ -5951,7 +5951,7 @@ slParseNormalBinaryExpr(
             return gcvNULL;
         }
 
-        if (!sloCOMPILER_IsHaltiVersion(Compiler) &&
+        if ((!sloCOMPILER_IsHaltiVersion(Compiler) || sloCOMPILER_IsOGLVersion(Compiler)) &&
             sloIR_OBJECT_GetType(&LeftOperand->base) == slvIR_CONSTANT)
         {
             gcmVERIFY_OK(sloIR_OBJECT_Destroy(Compiler, &LeftOperand->base));
