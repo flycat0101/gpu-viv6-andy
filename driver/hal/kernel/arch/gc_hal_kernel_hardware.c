@@ -1627,6 +1627,17 @@ _QueryFeatureDatabase(
         available = database->HI_REORDER_FIX;
         break;
 
+    case gcvFEATURE_EVIS2_FLOP_RESET_FIX:
+        available = database->EVIS2_FLOP_RESET_FIX;
+        break;
+
+    case gcvFEATURE_USC_ASYNC_CP_RTN_FLOP_RESET_FIX:
+        available = database->USC_ASYNC_CP_RTN_FLOP_RESET_FIX;
+        break;
+
+    case gcvFEATURE_USC_EVICT_CTRL_FIFO_FLOP_RESET_FIX:
+        available = database->USC_EVICT_CTRL_FIFO_FLOP_RESET_FIX;
+
     default:
         gcmkFATAL("Invalid feature has been requested.");
         available = gcvFALSE;
