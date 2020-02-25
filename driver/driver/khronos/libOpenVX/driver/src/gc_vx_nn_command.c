@@ -1058,14 +1058,17 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
 
         case TP_TRANSPOSE:
         {
-            vx_uint32 i, x, y, dnum = value->u32[0], dsize;
+            vx_uint32 i, x, y, dnum = value->u32[0], tsize = 1;
             vx_uint32 dims[VX_CONTEXT_TENSOR_MAX_DIMENSION], strides[VX_CONTEXT_TENSOR_MAX_DIMENSION];
             vxmASSERT(otherRef != VX_NULL);
-            vxoTensor_GetTensorDimStride((vx_tensor)otherRef, &dnum, dims, strides);
+            vxoTensor_GetTensorDimStride(otherRef, &dnum, dims, strides);
             vxmASSERT(dims[0] < TP_MAX_XYSIZE && dims[1] < TP_MAX_XYSIZE);
-            dsize = TENSOR_DATA_SIZE((vx_tensor)otherRef);
+            for (i = 0; i < TENSOR_DIM_NUM(otherRef); i++)
+            {
+                tsize *= dims[i];
+            }
             x = dims[0];
-            y = strides[dnum-1] * dims[dnum-1] / dsize / dims[0];
+            y = tsize / dims[0];
             for (i = 1; i < dnum; i++)
             {
                 if (x >= TP_MAX_XYSIZE || y < TP_MAX_XYSIZE)
@@ -1090,7 +1093,7 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
                 }
                 size = dims[i];
                 /* TP X/Y size has max size limitation, must split */
-                y = strides[dnum-1] * dims[dnum-1] / dsize / dims[0];
+                y = tsize / dims[0];
                 slice = gcmALIGN_NP2(y, TP_MAX_XYSIZE-1) / (TP_MAX_XYSIZE-1);
             }
             if (slice == 1 && (dnum == 3 || (dnum == 4 && dims[3] == 1)))
@@ -1766,7 +1769,7 @@ void _fill_TP_TRANSPOSE_Command(
     perm = (vx_uint32_ptr) value_cmd_ptr->p8[0];
     pnum = value_cmd_ptr->u32[0];
 
-    vxoTensor_GetTensorDimStride((vx_tensor)other_tensor, &pnum, dims, strides);
+    vxoTensor_GetTensorDimStride(other_tensor, &pnum, dims, strides);
     for (i = 0; i < pnum; i++)
     {
         vx_uint32 dim = 1;
@@ -1775,7 +1778,7 @@ void _fill_TP_TRANSPOSE_Command(
         distances[perm[i]] = dim;
     }
 
-    for (i = 0; i < TENSOR_DIM_NUM((vx_tensor)other_tensor); i++)
+    for (i = 0; i < TENSOR_DIM_NUM(other_tensor); i++)
     {
         totalSize *= dims[i];
     }
@@ -1804,17 +1807,20 @@ void _fill_TP_TRANSPOSE_Command(
         {
             if (dims[i] > 1) break;
         }
-        pnum = i + 1;
+        vxmASSERT((vx_int32)i >=0);
+        if (i != pnum - 1)
+        {
+            pnum = i + 1;
+            totalSize = pnum == 1 ? TENSOR_DATA_SIZE(other_tensor) : 1;
+            for (i = 0; i < pnum - 1; i++)
+            {
+                totalSize *= dims[i];
+            }
+        }
     }
 
     for (i = 0; i < split_count; i++)
     {
-        if (split_count > 1 && value_cmd_ptr->e32[0] == 0)
-        {
-            inYSizeNew = totalSize / dims[0] * split_sizes[i];
-        }
-        vxmASSERT(inXSizeNew < TP_MAX_XYSIZE && inYSizeNew < TP_MAX_XYSIZE);
-
         if (value_cmd_ptr->e32[0] == 1)
         {
             vx_uint32 inTileXSize = gcmMIN(8, inXSize);
@@ -1994,6 +2000,12 @@ void _fill_TP_TRANSPOSE_Command(
         }
         else
         {
+            if (split_count > 1)
+            {
+                inYSizeNew = totalSize / dims[0] * split_sizes[i];
+            }
+            vxmASSERT(inXSizeNew < TP_MAX_XYSIZE && inYSizeNew < TP_MAX_XYSIZE);
+
             info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + strides[pnum-1] * split_offsets[i];
             info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + distances[pnum-1] * split_offsets[i] * outputElemSize;
             info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSizeNew;
