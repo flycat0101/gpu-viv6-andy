@@ -25804,21 +25804,19 @@ vxnne_shader_executable vxnneGetTensorPadShaderExecutable(
 
     if (TENSOR_DIM_NUM(inputs) == 1)
     {
-        vx_uint32 w         = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
-        vx_int32  sizes[4]  = {w, 1, 1, 1};
-        vx_int32 dims = 2;
+        vx_int32  sizes[4]  = {1, 1, 1, 1};
+        sizes[0] = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
 
-        rsInput = vxoTensor_ReshapeTensor(inputs, sizes, dims);
+        rsInput = vxoTensor_ReshapeTensor(inputs, sizes, 2);
         parameters[0] = (vx_reference)rsInput;
     }
 
     if (TENSOR_DIM_NUM(outputs) == 1)
     {
-        vx_uint32 w         = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
-        vx_int32  sizes[4]  = {w, 1, 1, 1};
-        vx_int32 dims = 2;
+        vx_int32  sizes[4]  = {1, 1, 1, 1};
+        sizes[0] = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
 
-        rsOutput = vxoTensor_ReshapeTensor(inputs, sizes, dims);
+        rsOutput = vxoTensor_ReshapeTensor(outputs, sizes, 2);
         parameters[5] = (vx_reference)rsOutput;
     }
 
