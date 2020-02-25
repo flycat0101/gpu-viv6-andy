@@ -12937,7 +12937,9 @@ slParseFullySpecifiedType(
         break;
 
     case slvSTORAGE_QUALIFIER_ATTRIBUTE:
-        if (!sloCOMPILER_IsOGLVersion(Compiler) && !slsDATA_TYPE_IsFloatOrVecOrMat(DataType))
+        /* GLES and GLSL11 requires that attribute cannot be integer related types */
+        if (!(sloCOMPILER_IsOGLVersion(Compiler) && !sloCOMPILER_IsOGL11Version(Compiler))
+            && !slsDATA_TYPE_IsFloatOrVecOrMat(DataType))
         {
             gcmVERIFY_OK(sloCOMPILER_Report(
                                             Compiler,
