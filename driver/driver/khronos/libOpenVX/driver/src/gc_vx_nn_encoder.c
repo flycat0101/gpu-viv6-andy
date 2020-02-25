@@ -15493,6 +15493,14 @@ vx_status vxoWeightsBiases_Compress(
                 if (wb->use_tp_fc &&
                     vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP_COMPRESSION_ENHANCEMENT))
                 {
+                    vx_uint32* biasStartAddr = VX_NULL;
+                    if((wb_base)->biases_data_format == VX_TYPE_INT64)
+                        biasStartAddr = !j ? ((bias_ptr != VX_NULL) ? (vx_uint32*)(((vx_int64*)bias_ptr) + biasDataDWordOffset) : VX_NULL) : VX_NULL;
+                    else if((wb_base)->biases_data_format == VX_TYPE_INT32)
+                        biasStartAddr = !j ? ((bias_ptr != VX_NULL) ? bias_ptr + biasDataDWordOffset : VX_NULL) : VX_NULL;
+                    else
+                        vxmASSERT(0);
+
                     fillinTPKernelBufferHuffman(
                         wb,
                         zrlTmpPtr,
@@ -15504,13 +15512,21 @@ vx_status vxoWeightsBiases_Compress(
                         wb_base->skipValue,
                         kernelBufferPtr,
                         weight_ptr + kzoffset + weightDataBytesOffset,
-                        !j ? ((bias_ptr != VX_NULL) ? bias_ptr + biasDataDWordOffset : VX_NULL) : VX_NULL,
+                        biasStartAddr,
                         index);
 
                     zrlTmpPtr += sliceCount;
                 }
                 else if (wb->use_tp_fc)
                 {
+                    vx_uint32* biasStartAddr = VX_NULL;
+                    if((wb_base)->biases_data_format == VX_TYPE_INT64)
+                        biasStartAddr = !j ? ((bias_ptr != VX_NULL) ? (vx_uint32*)(((vx_int64*)bias_ptr) + biasDataDWordOffset) : VX_NULL) : VX_NULL;
+                    else if((wb_base)->biases_data_format == VX_TYPE_INT32)
+                        biasStartAddr = !j ? ((bias_ptr != VX_NULL) ? bias_ptr + biasDataDWordOffset : VX_NULL) : VX_NULL;
+                    else
+                        vxmASSERT(0);
+
                     fillinTPKernelBuffer(
                         wb,
                         zrlTmpPtr,
@@ -15522,7 +15538,7 @@ vx_status vxoWeightsBiases_Compress(
                         wb_base->skipValue,
                         kernelBufferPtr,
                         weight_ptr + kzoffset + weightDataBytesOffset,
-                        !j ? ((bias_ptr != VX_NULL) ? bias_ptr + biasDataDWordOffset : VX_NULL) : VX_NULL,
+                        biasStartAddr,
                         index);
 
                     zrlTmpPtr += sliceCount;
