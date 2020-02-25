@@ -2573,6 +2573,7 @@ typedef struct _vxnne_register_param_s
     vx_uint32 flag;
     vx_int32 index;
     vx_bool support;
+    vx_uint32_ptr ptr;
 }
 vxnne_register_param_s, *vxnne_register_param;
 
