@@ -1970,7 +1970,7 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
                 }
                 else if (perm[0] == 1 && perm[1] == 2) /* y, z, x */ /* use single TP to reduce bandwidth */
                 {
-                    slice = 1;
+                    slice = context->hwChipInfo.customerID == 0xAE && x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
                     size = dims[2];
                     value->e32[0] = 2;
                 }
