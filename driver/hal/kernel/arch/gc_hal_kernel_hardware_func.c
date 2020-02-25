@@ -9950,11 +9950,6 @@ _FuncInit_MMU(IN gcsFUNCTION_EXECUTION_PTR Execution)
         &physical
         ));
 
-    if(physical >> 32)
-    {
-        gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
-    }
-
     /* Convert to GPU physical address. */
     gcmkVERIFY_OK(gckOS_CPUPhysicalToGPUPhysical(
         hardware->os,
@@ -9962,11 +9957,13 @@ _FuncInit_MMU(IN gcsFUNCTION_EXECUTION_PTR Execution)
         &physical
         ));
 
-    if (!(flags & gcvALLOC_FLAG_4GB_ADDR) && (physical & 0xFFFFFFFF00000000ULL))
+    if (physical & 0xFFFFFFFF00000000ULL)
     {
         gcmkFATAL("%s(%d): Command buffer physical address (0x%llx) for MMU setup exceeds 32bits, "
                   "please rebuild kernel with CONFIG_ZONE_DMA32=y.",
                   __FUNCTION__, __LINE__, physical);
+
+        gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
 
     gcmkSAFECASTPHYSADDRT(Execution->address, physical);
