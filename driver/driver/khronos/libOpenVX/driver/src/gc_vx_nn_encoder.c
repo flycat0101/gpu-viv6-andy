@@ -1050,6 +1050,542 @@ vx_size calculateWeightBiasBufferSizeForZeroRunLen(
     return kernelBufferSize;
 }
 
+vx_bool calculateWeightBiasBufferSizeForZeroRunLenEx(
+    vx_context context,
+    vx_uint32 weight_x,
+    vx_uint32 weight_y,
+    vx_uint32 slice_count,
+    vx_uint32 z_count,
+    vx_uint32 filters_per_core,
+    vx_enum  weight_format,
+    vx_enum  bias_format,
+    vx_uint32 skip_value,
+    gctPOINTER weight_data,
+    vx_uint32* all_count,
+    vx_uint32* non_zero_count,
+    vx_size* orig_kernel_buf_size,
+    vx_size* min_size,
+    vx_uint8* zero_run_len
+    )
+{
+    vx_enum weightFomat = weight_format;
+    vx_uint32 skipValue = skip_value;
+
+    vx_uint32 nnCoreCount = (weight_format == VX_TYPE_INT16) ?
+                  context->nnConfig.fixedFeature.nnCoreCountInt16 : (weight_format == VX_TYPE_FLOAT16) ?
+                  context->nnConfig.fixedFeature.nnCoreCountFloat16 : (weight_format == VX_TYPE_BFLOAT16) ?
+                  context->nnConfig.fixedFeature.nnCoreCountBFloat16 :context->nnConfig.fixedFeature.nnCoreCount;
+
+    vx_uint32 filterTotalCount   = z_count;
+    vx_uint32 filterCount        = filters_per_core; /* filter count every group */
+    vx_uint32 batchSize          = nnCoreCount * filterCount;
+    vx_uint32 groupCount         = (filterTotalCount + batchSize - 1) / batchSize;
+    vx_uint32 totalFilterPerCore = filterTotalCount / nnCoreCount;
+    vx_uint32 oddFilterPerCore   = filterTotalCount % nnCoreCount;
+
+    vx_uint32 weightCount        = weight_x * weight_y;
+    vx_uint32 weightSize         = (vx_uint32)vxDataType_GetSize(weightFomat);
+    vx_uint32 weightBitSize      = weightSize * 8;
+    vx_uint32 biasSize           = (vx_uint32)vxDataType_GetSize(bias_format);
+    vx_uint32 biasBitSize        = biasSize * 8;
+
+    vx_uint32 sliceCount         = slice_count;
+    vx_uint32 filterSliceSize    = weightCount * weightSize;
+    vx_uint32 filterSize         = weightCount * weightSize * sliceCount;
+    vx_uint8* startDataPtr       = VX_NULL;
+    vx_uint8* kernelDataPtr      = VX_NULL;
+
+    vx_uint32 bitOffset          = 0;
+
+    vx_uint32 coreIndex;
+    vx_uint32 i, j, groupIndex, filterIndex, sliceIndex;
+    vx_uint32 weightXIndex, weightYIndex;
+
+    vx_uint32 *origBitsArray = VX_NULL, *maxBasePad = VX_NULL;
+    vx_uint32 *zerosPerCoreArray = VX_NULL; /* zerosPerCoreArray[nnCoreCount][MAX_ZRL_LEN + 1 + 2] */
+    vx_uint32 minSize = (vx_uint32)~0UL, maxZRL = 0, maxZRLType, bigZRL = 0, blockCount = 0, nonZeroCount = 0;
+    vx_uint8  minZrl = 0;
+    vx_bool  complete = vx_false_e;
+    vx_bool hasVipV7Feature = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7) == gcvSTATUS_TRUE ? vx_true_e : vx_false_e;
+    vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
+    vx_bool hasZDP6 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6);
+    vx_bool hasXYDP9 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP9);
+    vx_bool hasXYDP6 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP6);
+
+    vx_uint32 maxZeroRunLen = (1 << context->nnConfig.fixedFeature.zrlBits) - 1;
+
+    if (weightFomat == VX_TYPE_INT16) biasBitSize = NN_INTEGER_BIAS_BITS_VIP_V7_INT16;
+
+    origBitsArray = (vx_uint32 *)vxAllocateAndZeroMemory(nnCoreCount * sizeof(vx_uint32));
+    vxmASSERT(origBitsArray != NULL);
+    maxBasePad = (vx_uint32 *)vxAllocateAndZeroMemory(nnCoreCount * sizeof(vx_uint32));
+    vxmASSERT(maxBasePad != NULL);
+    zerosPerCoreArray = (vx_uint32 *)vxAllocateAndZeroMemory(nnCoreCount * (maxZeroRunLen + 1 + 2) * sizeof(vx_uint32));
+    vxmASSERT(zerosPerCoreArray != NULL);
+    if (origBitsArray == VX_NULL || maxBasePad == NULL || zerosPerCoreArray == NULL)
+    {
+        if (origBitsArray)
+            vxFree(origBitsArray);
+        if (maxBasePad)
+            vxFree(maxBasePad);
+        if (zerosPerCoreArray)
+            vxFree(zerosPerCoreArray);
+        vxError("calculateWeightBiasBufferSizeForZeroRunLenEx: OUT OF MEMORY");
+        return vx_false_e;
+    }
+    startDataPtr = (vx_uint8*)weight_data;
+
+    /* Write kernel Buffer size for each core. */
+    for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
+    {
+        vx_uint32 coreFilterCount = (coreIndex < oddFilterPerCore) ? totalFilterPerCore + 1 : totalFilterPerCore;
+        vx_uint32 zeroRun = 0;
+
+        /* Write zeroRunLen and coreFilterCount. */
+        bitOffset = 8 + 16;
+
+        /* Write weight value and bias for every group. */
+        for (groupIndex = 0; groupIndex < groupCount; groupIndex++)
+        {
+            vx_uint32 actualFilterCount = (groupIndex == groupCount - 1) ? (coreFilterCount - groupIndex * filterCount) : filterCount;
+            vx_uint32 filterStart, filterEnd;
+
+            if ((groupIndex == groupCount - 1)
+                && (coreIndex >= (filterTotalCount % nnCoreCount)))
+            {
+                filterStart = groupIndex * nnCoreCount * filterCount
+                            + (filterTotalCount % nnCoreCount) * (actualFilterCount + 1)
+                            + (coreIndex - (filterTotalCount % nnCoreCount)) * actualFilterCount;
+            }
+            else
+            {
+                filterStart = groupIndex * nnCoreCount *filterCount + coreIndex * actualFilterCount;
+            }
+            filterEnd = filterStart + actualFilterCount - 1;
+
+            if (weight_x == 1 && weight_y == 1 &&
+                (hasZDP3 || hasZDP6) &&
+                (weightFomat == VX_TYPE_INT8 || weightFomat == VX_TYPE_UINT8))
+            {
+                vx_uint32 zdpNum = hasZDP6 ? 6 : 3;
+
+                /* zdp3 zdp6 can not enable same time */
+                vxmASSERT(!(hasZDP3 && hasZDP6));
+
+                for (sliceIndex = 0; sliceIndex < sliceCount; sliceIndex += (zdpNum * 2))
+                {
+                    vx_uint8 group2DCoded = 0;
+                    vx_uint32 weight = 0;
+                    vx_uint32 realSliceIndex = 0;
+
+                    /* add slices of every filter*/
+                    for (filterIndex = filterStart; filterIndex <= filterEnd; filterIndex++)
+                    {
+                        vx_uint32 nonZeroInBlock1Count = 0; /*Check if there's non-zero point in first zdpNum block*/
+                        vx_uint32 nonZeroInBlock2Count = 0; /*Check if there's non-zero point in another zdpNum block*/
+
+                        for (realSliceIndex = sliceIndex; realSliceIndex < sliceIndex + (zdpNum * 2); realSliceIndex++)
+                        {
+                            vx_uint8 needToWriteBias = (realSliceIndex == 0) ? 1 : 0;
+
+                            if (realSliceIndex >= slice_count)
+                                break;
+
+                            /* add one slice data every filter */
+                            kernelDataPtr = startDataPtr + filterIndex * filterSize + filterSliceSize * realSliceIndex;
+                            if (weightFomat == VX_TYPE_INT8)
+                                weight = *((vx_int8 *)kernelDataPtr);
+                            else if (weightFomat == VX_TYPE_UINT8)
+                                weight = *((vx_uint8 *)kernelDataPtr);
+                            else
+                                weight = *((vx_uint16 *)kernelDataPtr);
+
+                            if (realSliceIndex - sliceIndex < zdpNum && weight != skipValue)
+                                nonZeroInBlock1Count++;
+                            else if (weight != skipValue)
+                                nonZeroInBlock2Count++;
+
+                            if (((realSliceIndex == 0)
+                                    && needToWriteBias)
+                                || (realSliceIndex == slice_count - 1)
+                                || (weight != skipValue)
+                                || ((filterIndex == filterEnd)
+                                    && (group2DCoded == 0)))
+                            {
+                                /* Write zeroRun and weight. */
+                                if (zeroRun > maxZeroRunLen)
+                                {
+                                    *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1) += 1;
+                                    *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 2) += zeroRun - maxZeroRunLen;
+                                    maxBasePad[coreIndex] += (maxZeroRunLen + 1 + zeroRun) / (maxZeroRunLen + 1);
+                                }
+                                else
+                                {
+                                    *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + zeroRun) += 1;
+                                }
+                                if (zeroRun > maxZRL) maxZRL = zeroRun;
+                                zeroRun = 0;
+
+                                if (needToWriteBias)
+                                {
+                                    bitOffset += biasBitSize;
+                                    needToWriteBias = 0;
+                                }
+                                group2DCoded = 1;
+                            }
+                            else
+                            {
+                                zeroRun++;
+                            }
+
+                            /* add offet behind the last point of the last slice of each filter */
+                            if (realSliceIndex == slice_count - 1)
+                            {
+                                if (hasVipV7Feature)
+                                    bitOffset += NN_Z_POSITION_OFFSET_BITS_VIP_V7;
+                                else
+                                    bitOffset += NN_Z_POSITION_OFFSET_BITS;
+                            }
+                        }
+
+                        if (sliceIndex + zdpNum >= slice_count)
+                            blockCount++;
+                        else
+                            blockCount += 2;
+
+                        if (nonZeroInBlock1Count)
+                            nonZeroCount++;
+                        if (nonZeroInBlock2Count)
+                            nonZeroCount++;
+                    }
+                }
+            }
+            else if ((hasXYDP9 || hasXYDP6)
+                && (weightFomat == VX_TYPE_INT8 || weightFomat == VX_TYPE_UINT8))
+            {
+                vx_uint32 xStep = 3;
+                vx_uint32 yStep = 0;
+                vx_uint32 inImageBufferSize = hasXYDP9 ? 2 : 1;
+
+                if (hasXYDP6)
+                    yStep = 2;
+                else
+                    yStep = 3;
+
+                for (sliceIndex = 0; sliceIndex < slice_count; sliceIndex += inImageBufferSize)
+                {
+                    vx_uint8 group2DCoded = 0;
+                    vx_uint32 weight = 0;
+                    vx_uint32 realSliceIndex = 0;
+                    vx_uint32 realWeightXIndex = 0, realWeightYIndex = 0;
+                    vx_uint32 subKxSize = 0, subKySize = 0, subKzSize = 0;
+
+                    subKzSize = gcmMIN((slice_count - sliceIndex), inImageBufferSize);
+                    /* add slices of every filter*/
+                    for (filterIndex = filterStart; filterIndex <= filterEnd; filterIndex++)
+                    {
+                        vx_bool hasWriteBias = vx_false_e;
+
+                        for (weightYIndex = 0; weightYIndex < weight_y; weightYIndex += yStep)
+                        {
+                            subKySize = gcmMIN((weight_y - weightYIndex), yStep);
+                            for (weightXIndex = 0; weightXIndex < weight_x; weightXIndex += xStep)
+                            {
+                                subKxSize = gcmMIN((weight_x - weightXIndex), xStep);
+                                for (realSliceIndex = sliceIndex; realSliceIndex < sliceIndex + subKzSize; realSliceIndex++)
+                                {
+                                    vx_uint8 needToWriteBias = (sliceIndex == 0) ? 1 : 0;
+                                    vx_uint32 nonZeroInBlockCount = 0; /*Check if there's non-zero point in one 3x3 block*/
+
+                                    /* Add one slice data every filter. */
+                                    kernelDataPtr = startDataPtr + filterIndex * filterSize + filterSliceSize * realSliceIndex;
+
+                                    for (realWeightYIndex = weightYIndex; realWeightYIndex < weightYIndex + subKySize; realWeightYIndex++)
+                                    {
+                                        for (realWeightXIndex = weightXIndex; realWeightXIndex < weightXIndex + subKxSize; realWeightXIndex++)
+                                        {
+                                            vx_uint8_ptr realKernelDataPtr = kernelDataPtr + (realWeightYIndex * weight_x + realWeightXIndex) * weightSize;
+
+                                            if (weightFomat == VX_TYPE_INT8)
+                                                weight = *((vx_int8 *)realKernelDataPtr);
+                                            else if (weightFomat == VX_TYPE_UINT8)
+                                                weight = *((vx_uint8 *)realKernelDataPtr);
+                                            else
+                                                weight = *((vx_uint16 *)realKernelDataPtr);
+
+                                            if (weight != skipValue)
+                                                nonZeroInBlockCount++;
+
+                                            if (((realSliceIndex == 0)
+                                                    && (realWeightXIndex == weight_x - 1)
+                                                    && (realWeightYIndex == weight_y - 1)
+                                                    && needToWriteBias)
+                                                || ((realSliceIndex == slice_count - 1)
+                                                    && (realWeightXIndex == weight_x - 1)
+                                                    && (realWeightYIndex == weight_y - 1))
+                                                || (weight != skipValue)
+                                                || ((filterIndex == filterEnd)
+                                                    && (realWeightXIndex == weight_x - 1)
+                                                    && (realWeightYIndex == weight_y - 1)
+                                                    && (group2DCoded == 0)))
+                                            {
+                                                if (zeroRun > maxZeroRunLen)
+                                                {
+                                                    *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1) += 1;
+                                                    *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 2) += zeroRun - maxZeroRunLen;
+                                                    maxBasePad[coreIndex] += (maxZeroRunLen + 1 + zeroRun) / (maxZeroRunLen + 1);
+                                                }
+                                                else
+                                                {
+                                                    *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + zeroRun) += 1;
+                                                }
+                                                if (zeroRun > maxZRL) maxZRL = zeroRun;
+                                                zeroRun = 0;
+
+                                                if (needToWriteBias && !hasWriteBias)
+                                                {
+                                                    bitOffset += biasBitSize;
+                                                    needToWriteBias = 0;
+                                                    hasWriteBias = vx_true_e;
+                                                }
+                                                group2DCoded = 1;
+                                            }
+                                            else
+                                            {
+                                                zeroRun++;
+                                            }
+
+                                            /* add offet behind the last point of the last slice of each filter */
+                                            if (realSliceIndex == slice_count - 1 && realWeightXIndex == weight_x - 1 && realWeightYIndex == weight_y - 1)
+                                            {
+                                                 /* Write offsetValue. */
+                                                if (hasVipV7Feature)
+                                                    bitOffset += NN_Z_POSITION_OFFSET_BITS_VIP_V7;
+                                                else
+                                                    bitOffset += NN_Z_POSITION_OFFSET_BITS;
+                                            }
+                                        }
+                                    }
+
+                                    blockCount++;
+                                    if (nonZeroInBlockCount)
+                                        nonZeroCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (sliceIndex = 0; sliceIndex < slice_count; sliceIndex++)
+                {
+                    vx_uint8 group2DCoded = 0;
+
+                    /* Add slices of every filter. */
+                    for (filterIndex = filterStart; filterIndex <= filterEnd; filterIndex++)
+                    {
+                        vx_uint8 needToWriteBias = (sliceIndex == 0) ? 1 : 0;
+
+                        /* Add one slice data every filter. */
+                        kernelDataPtr = startDataPtr + filterIndex * filterSize + filterSliceSize * sliceIndex;
+
+                        for (weightYIndex = 0; weightYIndex < weight_y; weightYIndex++)
+                        {
+                            vx_uint32 nonZeroCountInDP3 = 0; /*Check if there's non-zero point in one 3x1 block*/
+
+                            for (weightXIndex = 0; weightXIndex < weight_x; weightXIndex++)
+                            {
+                                vx_uint32 weight;
+
+                                if (weightFomat == VX_TYPE_INT8)
+                                    weight = *((vx_int8 *)kernelDataPtr);
+                                else if (weightFomat == VX_TYPE_UINT8)
+                                    weight = *((vx_uint8 *)kernelDataPtr);
+                                else
+                                    weight = *((vx_uint16 *)kernelDataPtr);
+                                kernelDataPtr = kernelDataPtr + weightSize;
+
+                                if(!hasVipV7Feature || weightFomat == VX_TYPE_FLOAT16)
+                                {
+                                    /*V6 or FP16, DP1, a block is 1x1*/
+                                    blockCount++;
+                                    if (weight != skipValue)
+                                        nonZeroCount++;
+                                }
+                                else
+                                {
+                                    if (weight != skipValue)
+                                        nonZeroCountInDP3++;
+
+                                    /*V7, DP3, one block is 3x1*/
+                                    if ((weightXIndex + 1) % 3 == 0 || weightXIndex == weight_x - 1)
+                                    {
+                                        blockCount++;
+                                        if (nonZeroCountInDP3)
+                                            nonZeroCount++;
+                                        nonZeroCountInDP3 = 0;
+                                    }
+                                }
+
+                                if (((sliceIndex == 0)
+                                        && (weightXIndex == weight_x - 1)
+                                        && (weightYIndex == weight_y - 1)
+                                        && needToWriteBias)
+                                    || ((weightXIndex == weight_x - 1)
+                                        && (weightYIndex == weight_y - 1)
+                                        && (sliceIndex == slice_count - 1))
+                                    || (weight != skipValue)
+                                    || ((filterIndex == filterEnd)
+                                        && (weightXIndex == weight_x - 1)
+                                        && (weightYIndex == weight_y - 1)
+                                        && (group2DCoded == 0))
+                                    )
+                                {
+                                    if (zeroRun > maxZeroRunLen)
+                                    {
+                                        *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1) += 1;
+                                        *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 2) += zeroRun - maxZeroRunLen;
+                                        maxBasePad[coreIndex] += (maxZeroRunLen + 1 + zeroRun) / (maxZeroRunLen + 1);
+                                    }
+                                    else
+                                    {
+                                        *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + zeroRun) += 1;
+                                    }
+                                    if (zeroRun > maxZRL) maxZRL = zeroRun;
+                                    zeroRun = 0;
+
+                                    if (needToWriteBias)
+                                    {
+                                        bitOffset += biasBitSize;
+                                        needToWriteBias = 0;
+                                    }
+                                    group2DCoded = 1;
+                                }
+                                else
+                                {
+                                    zeroRun++;
+                                }
+                            }
+                        }
+
+                        /* add offet behind the last point of the last slice of each filter */
+                        if (sliceIndex == slice_count - 1)
+                        {
+                            /* Write offsetValue. */
+                            if (hasVipV7Feature)
+                                bitOffset += NN_Z_POSITION_OFFSET_BITS_VIP_V7;
+                            else
+                                bitOffset += NN_Z_POSITION_OFFSET_BITS;
+                        }
+                    }
+                }
+            }
+        }
+
+        origBitsArray[coreIndex] = bitOffset;
+        bigZRL += *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1);
+    }
+
+    if (blockCount == 0)
+    {
+        vxError("%s: blockCount should not be zero\n", __FUNCTION__);
+        return vx_false_e;
+    }
+
+    /* analyze compressed size with different zrl */
+    maxZRL = gcmMIN(maxZRL, maxZeroRunLen);
+    maxZRLType = maxZRL ? gcmMIN((vx_uint32)ceilf((vx_float32)(log(maxZRL) / log(2))), context->nnConfig.fixedFeature.zrlBits) : 0;
+
+    if(blockCount != 0)
+        complete = (vx_float32)bigZRL / blockCount > 0.1f ? vx_false_e : vx_true_e;
+
+    for (i = 0; i <= maxZRLType; i++)
+    {
+        vx_uint32 size = 64;
+        vx_uint32 base = (1 << i) - 1;
+
+        for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
+        {
+            vx_uint32 bits = 0, rwc = 0;
+
+            if (base == 0)
+            {
+                /* take care zrl = 0 */
+                for (j = 0; j <= maxZRL; j++)
+                {
+                    rwc += *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + j) * (j+1);
+                }
+
+                if (*(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1) != 0)
+                {
+                    vx_uint32 nsum = *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1);
+                    vx_uint32 dsum = *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 2);
+
+                    rwc += maxZeroRunLen * nsum + dsum + nsum;
+                }
+
+                bits += rwc * weightBitSize;
+            }
+            else
+            {
+                for (j = 0; j <= maxZRL; j++)
+                {
+                    vx_uint32 zerosPerCore = *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + j);
+                    if (!zerosPerCore) continue;
+                    if (j <= base) rwc += zerosPerCore;
+                    else rwc += ((j + 1 + base) / (base + 1)) * zerosPerCore;
+                }
+
+                if (*(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1) != 0)
+                {
+                    vx_uint32 nsum = *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1);
+                    vx_uint32 dsum = *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 2);
+                    if (base != maxZeroRunLen)
+                    {
+                        rwc += ((maxZeroRunLen + 1 + base) * nsum + dsum) / (base + 1);
+                    }
+                    else
+                    {
+                        rwc += maxBasePad[coreIndex];
+                    }
+                }
+
+                bits += rwc * (i + weightBitSize);
+            }
+
+            /* other bits */
+            bits += origBitsArray[coreIndex];
+            size += (gcmALIGN(bits, 32) / 32) * 4;
+            size  = gcmALIGN(size, 64);
+        }
+
+        if (size < minSize)
+        {
+            minSize = size;
+            minZrl = (vx_uint8)i;
+        }
+
+        if (!complete) break;
+    }
+
+    if (origBitsArray)
+        vxFree(origBitsArray);
+    if (maxBasePad)
+        vxFree(maxBasePad);
+    if (zerosPerCoreArray)
+        vxFree(zerosPerCoreArray);
+
+    if (all_count != VX_NULL) *all_count = blockCount;
+    if (non_zero_count != VX_NULL) *non_zero_count = nonZeroCount;
+    if (orig_kernel_buf_size != VX_NULL) *orig_kernel_buf_size = (filterSize + biasSize) * filterTotalCount;
+
+    if (min_size != VX_NULL) *min_size = minSize;
+    if (zero_run_len != VX_NULL) *zero_run_len = minZrl;
+
+    return complete;
+}
+
 vx_size calculateWeightBiasBalanceSizeForZeroRunLen(
     vx_context context,
     vx_uint32 weight_x,
@@ -1669,6 +2205,710 @@ vx_size calculateWeightBiasBalanceSizeForZeroRunLen(
         vxFree(nonZeroWeights);
 
     return kernelBufferSize;
+}
+
+vx_bool calculateWeightBiasBalanceSizeForZeroRunLenEx(
+    vx_context context,
+    vx_uint32 weight_x,
+    vx_uint32 weight_y,
+    vx_uint32 slice_count,
+    vx_uint32 z_count,
+    vx_uint32 filters_per_core,
+    vx_enum  weight_format,
+    vx_enum  bias_format,
+    vx_uint32 skip_value,
+    gctPOINTER weight_data,
+    vx_uint32* all_count,
+    vx_uint32* non_zero_count,
+    vx_size* orig_kernel_buf_size,
+    vx_size* min_size,
+    vx_uint8* zero_run_len
+    )
+{
+    vx_enum weightFomat = weight_format;
+    vx_uint32 skipValue = skip_value;
+
+    vx_uint32 nnCoreCount = (weight_format == VX_TYPE_INT16) ?
+                  context->nnConfig.fixedFeature.nnCoreCountInt16 : (weight_format == VX_TYPE_FLOAT16) ?
+                  context->nnConfig.fixedFeature.nnCoreCountFloat16 : (weight_format == VX_TYPE_BFLOAT16) ?
+                  context->nnConfig.fixedFeature.nnCoreCountBFloat16 :context->nnConfig.fixedFeature.nnCoreCount;
+
+    vx_uint32 filterTotalCount   = z_count;
+    vx_uint32 filterCount        = filters_per_core; /* filter count every group */
+    vx_uint32 batchSize          = nnCoreCount * filterCount;
+    vx_uint32 groupCount         = (filterTotalCount + batchSize - 1) / batchSize;
+    vx_uint32 totalFilterPerCore = filterTotalCount / nnCoreCount;
+    vx_uint32 oddFilterPerCore   = filterTotalCount % nnCoreCount;
+
+    vx_uint32 weightCount        = weight_x * weight_y;
+    vx_uint32 weightSize         = (vx_uint32)vxDataType_GetSize(weightFomat);
+    vx_uint32 weightBitSize      = weightSize * 8;
+    vx_uint32 biasSize           = (vx_uint32)vxDataType_GetSize(bias_format);
+    vx_uint32 biasBitSize        = biasSize * 8;
+
+    vx_uint32 sliceCount         = slice_count;
+    vx_uint32 filterSliceSize    = weightCount * weightSize;
+    vx_uint32 filterSize         = weightCount * weightSize * sliceCount;
+    vx_uint8* startDataPtr       = VX_NULL;
+    vx_uint8* kernelDataPtr      = VX_NULL;
+
+    vx_uint32 bitOffset          = 0;
+
+    vx_uint32 coreIndex;
+    vx_uint32 i, j, groupIndex, filterIndex, sliceIndex;
+    vx_uint32 weightXIndex, weightYIndex;
+
+    vx_uint32 *origBitsArray = VX_NULL, *maxBasePad = VX_NULL;
+    vx_uint32 *zerosPerCoreArray = VX_NULL; /* zerosPerCoreArray[nnCoreCount][MAX_ZRL_LEN + 1 + 2] */
+    vx_uint32 minSize = (vx_uint32)~0UL, maxZRL = 0, maxZRLType, bigZRL = 0, blockCount = 0, nonZeroCount = 0;
+    vx_uint8  minZrl = 0;
+    vx_bool  complete = vx_false_e;
+    vx_bool hasVipV7Feature = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VIP_V7) == gcvSTATUS_TRUE ? vx_true_e : vx_false_e;
+    vx_bool hasZDP3 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP3);
+    vx_bool hasZDP6 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_ZDP6);
+    vx_bool hasXYDP9 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP9);
+    vx_bool hasXYDP6 = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP6);
+
+    vx_uint32 maxZeroRunLen = (1 << context->nnConfig.fixedFeature.zrlBits) - 1;
+
+    vx_uint32 totalNonZeroCount = 0;
+    vx_float32 averageNZCPerFilter = 0;
+    vx_float32 varianceFL32 = 0;
+    vx_uint32 variance = 0;
+    vx_bool reorder = vx_false_e;
+
+    typedef struct _gcVXNonZeroWeights
+    {
+        vx_uint32 nonZeroCount;
+        vx_uint32 filterIdx;
+    }gcVXNonZeroWeights;
+
+    gcVXNonZeroWeights *nonZeroWeights = VX_NULL;
+    vx_int32 m = 0;
+    vx_uint32 core0FilterCount = 0;
+    gcVXNonZeroWeights tmp;
+
+    nonZeroWeights = (gcVXNonZeroWeights*)vxAllocateAndZeroMemory(filterTotalCount * sizeof(gcVXNonZeroWeights));
+    if (nonZeroWeights == VX_NULL)
+    {
+        vxError("fillinKernelBuffer: OUT OF MEMORY");
+        return vx_false_e;
+    }
+
+    /* calc each filter non-zero weights num*/
+    for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
+    {
+        nonZeroWeights[filterIndex].filterIdx = filterIndex;
+        for (sliceIndex = 0; sliceIndex < sliceCount; sliceIndex++)
+        {
+            /* add one slice data every filter */
+            kernelDataPtr = (vx_uint8*)weight_data + filterIndex * filterSize + filterSliceSize * sliceIndex;
+
+            for (weightYIndex = 0; weightYIndex < weight_y; weightYIndex++)
+            {
+                for (weightXIndex = 0; weightXIndex < weight_x; weightXIndex++)
+                {
+                    vx_uint32 weight = 0;
+
+                    if (weightFomat == VX_TYPE_INT8)
+                        weight = *((vx_int8 *)kernelDataPtr);
+                    else if (weightFomat == VX_TYPE_UINT8)
+                        weight = *((vx_uint8 *)kernelDataPtr);
+                    else
+                        weight = *((vx_uint16 *)kernelDataPtr);
+                    kernelDataPtr = kernelDataPtr + weightSize;
+
+                    if (weight != skipValue)
+                        nonZeroWeights[filterIndex].nonZeroCount++;
+
+                }
+            }
+        }
+        totalNonZeroCount += nonZeroWeights[filterIndex].nonZeroCount;
+    }
+
+    /*Sort*/
+    averageNZCPerFilter = (vx_float32)totalNonZeroCount / filterTotalCount;
+    for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
+    {
+        varianceFL32 += gcoMATH_Power((nonZeroWeights[filterIndex].nonZeroCount - averageNZCPerFilter), 2);
+    }
+    variance = (vx_uint32)(varianceFL32 / filterTotalCount + 0.5f);
+
+    if (variance > 12)
+        reorder = vx_true_e;
+
+    if (reorder)
+    {
+        /*Sort*/
+        for (filterIndex = 0; filterIndex < filterTotalCount; filterIndex++)
+        {
+            tmp.nonZeroCount = nonZeroWeights[filterIndex].nonZeroCount;
+            tmp.filterIdx = filterIndex;
+
+            for (m = filterIndex - 1; m >= 0 && nonZeroWeights[m].nonZeroCount > tmp.nonZeroCount; m--)
+            {
+                nonZeroWeights[m+1].nonZeroCount = nonZeroWeights[m].nonZeroCount;
+                nonZeroWeights[m+1].filterIdx = nonZeroWeights[m].filterIdx;
+            }
+            nonZeroWeights[m+1].nonZeroCount = tmp.nonZeroCount;
+            nonZeroWeights[m+1].filterIdx = tmp.filterIdx;
+        }
+    }
+
+
+    if (weightFomat == VX_TYPE_INT16) biasBitSize = NN_INTEGER_BIAS_BITS_VIP_V7_INT16;
+
+    origBitsArray = (vx_uint32 *)vxAllocateAndZeroMemory(nnCoreCount * sizeof(vx_uint32));
+    vxmASSERT(origBitsArray != NULL);
+    maxBasePad = (vx_uint32 *)vxAllocateAndZeroMemory(nnCoreCount * sizeof(vx_uint32));
+    vxmASSERT(maxBasePad != NULL);
+    zerosPerCoreArray = (vx_uint32 *)vxAllocateAndZeroMemory(nnCoreCount * (maxZeroRunLen + 1 + 2) * sizeof(vx_uint32));
+    vxmASSERT(zerosPerCoreArray != NULL);
+    if (origBitsArray == VX_NULL || maxBasePad == NULL || zerosPerCoreArray == NULL)
+    {
+        if (origBitsArray)
+            vxFree(origBitsArray);
+        if (maxBasePad)
+            vxFree(maxBasePad);
+        if (zerosPerCoreArray)
+            vxFree(zerosPerCoreArray);
+        if (nonZeroWeights)
+            vxFree(nonZeroWeights);
+        vxError("calculateWeightBiasBufferSizeForZeroRunLenEx: OUT OF MEMORY");
+        return vx_false_e;
+    }
+    startDataPtr = (vx_uint8*)weight_data;
+
+    /* Write kernel Buffer size for each core. */
+    for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
+    {
+        vx_uint32 coreFilterCount = (coreIndex < oddFilterPerCore) ? totalFilterPerCore + 1 : totalFilterPerCore;
+        vx_uint32 zeroRun = 0;
+        vx_uint32 usedKid = 0;
+        vx_uint32* filterGroup;
+
+        /* Write zeroRunLen and coreFilterCount. */
+        bitOffset = 8 + 16;
+
+        /* Write weight value and bias for every group. */
+        for (groupIndex = 0; groupIndex < groupCount; groupIndex++)
+        {
+            vx_uint32 actualFilterCount = (groupIndex == groupCount - 1) ? (coreFilterCount - groupIndex * filterCount) : filterCount;
+            vx_uint32 groupFilterStart = groupIndex * nnCoreCount * filterCount;
+            vx_uint32 kid = 0;
+            vx_uint32 unusedCoreCount = (filterTotalCount % nnCoreCount == 0) ? 0 : nnCoreCount - (filterTotalCount % nnCoreCount);
+            vx_uint32 sortedIndex = 0;
+            vx_uint32 filterStart = 0;
+
+            if (coreIndex == 0)
+                core0FilterCount = actualFilterCount;
+            if (actualFilterCount)
+            {
+                filterGroup = (vx_uint32*)vxAllocateAndZeroMemory(actualFilterCount * sizeof(vx_uint32));
+                if (filterGroup == VX_NULL)
+                {
+                    vxError("fillinKernelBufferBalance: OUT OF MEMORY");
+                    if (nonZeroWeights)
+                        vxFree(nonZeroWeights);
+                    if (origBitsArray)
+                        vxFree(origBitsArray);
+                    if (maxBasePad)
+                        vxFree(maxBasePad);
+                    if (zerosPerCoreArray)
+                        vxFree(zerosPerCoreArray);
+                    return vx_false_e;
+                }
+            }
+            else
+                continue;
+
+            if (reorder)
+            {
+                /*Dispatch filter to each vzGroup*/
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    if (groupIndex == groupCount - 1 &&
+                        kid == core0FilterCount - 1)
+                    {
+                        if ((kid + usedKid) % 2 == 0)
+                            sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
+                        else
+                            sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1 - unusedCoreCount;
+                    }
+                    else
+                    {
+                        if ((kid + usedKid) % 2 == 0)
+                            sortedIndex = groupFilterStart + kid * nnCoreCount + coreIndex;
+                        else
+                            sortedIndex = groupFilterStart + (kid + 1) * nnCoreCount - coreIndex - 1;
+                    }
+
+                    filterGroup[kid] = nonZeroWeights[sortedIndex].filterIdx;
+                }
+
+                /*sort the vz group real filter to avoid write output cross*/
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    vx_uint32 tmp = filterGroup[kid];
+
+                    for (m = kid - 1; m >= 0 && filterGroup[m] > tmp; m--)
+                    {
+                        filterGroup[m+1] = filterGroup[m];
+                    }
+                    filterGroup[m+1] = tmp;
+                }
+            }
+            else
+            {
+                /*if variance is small, don't reorder the filters*/
+                if ((groupIndex == groupCount - 1)
+                && (coreIndex >= (filterTotalCount % nnCoreCount)))
+                {
+                    filterStart = groupIndex * nnCoreCount * filterCount
+                                + (filterTotalCount % nnCoreCount) * (actualFilterCount + 1)
+                                + (coreIndex - (filterTotalCount % nnCoreCount)) * actualFilterCount;
+                }
+                else
+                {
+                    filterStart = groupIndex * nnCoreCount *filterCount + coreIndex * actualFilterCount;
+                }
+
+                for (kid = 0; kid < actualFilterCount; kid++)
+                {
+                    filterGroup[kid] = filterStart + kid;
+                }
+            }
+
+            if (weight_x == 1 && weight_y == 1 &&
+                (hasZDP3 || hasZDP6) &&
+                (weightFomat == VX_TYPE_INT8 || weightFomat == VX_TYPE_UINT8))
+            {
+                vx_uint32 zdpNum = hasZDP6 ? 6 : 3;
+
+                /* zdp3 zdp6 can not enable same time */
+                vxmASSERT(!(hasZDP3 && hasZDP6));
+
+                for (sliceIndex = 0; sliceIndex < sliceCount; sliceIndex += (zdpNum * 2))
+                {
+                    vx_uint8 group2DCoded = 0;
+                    vx_uint32 weight = 0;
+                    vx_uint32 realSliceIndex = 0;
+
+                    /* add slices of every filter*/
+                    for (kid = 0; kid < actualFilterCount; kid++)
+                    {
+                        vx_uint32 nonZeroInBlock1Count = 0; /*Check if there's non-zero point in first zdpNum block*/
+                        vx_uint32 nonZeroInBlock2Count = 0; /*Check if there's non-zero point in another zdpNum block*/
+
+                        filterIndex = filterGroup[kid];
+
+                        for (realSliceIndex = sliceIndex; realSliceIndex < sliceIndex + (zdpNum * 2); realSliceIndex++)
+                        {
+                            vx_uint8 needToWriteBias = (realSliceIndex == 0) ? 1 : 0;
+
+                            if (realSliceIndex >= slice_count)
+                                break;
+
+                            /* add one slice data every filter */
+                            kernelDataPtr = startDataPtr + filterIndex * filterSize + filterSliceSize * realSliceIndex;
+                            if (weightFomat == VX_TYPE_INT8)
+                                weight = *((vx_int8 *)kernelDataPtr);
+                            else if (weightFomat == VX_TYPE_UINT8)
+                                weight = *((vx_uint8 *)kernelDataPtr);
+                            else
+                                weight = *((vx_uint16 *)kernelDataPtr);
+
+                            if (realSliceIndex - sliceIndex < zdpNum && weight != skipValue)
+                                nonZeroInBlock1Count++;
+                            else if (weight != skipValue)
+                                nonZeroInBlock2Count++;
+
+                            if (((realSliceIndex == 0)
+                                    && needToWriteBias)
+                                || (realSliceIndex == slice_count - 1)
+                                || (weight != skipValue)
+                                || ((kid == actualFilterCount - 1)
+                                    && (group2DCoded == 0)))
+                            {
+                                /* Write zeroRun and weight. */
+                                if (zeroRun > maxZeroRunLen)
+                                {
+                                    *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1) += 1;
+                                    *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 2) += zeroRun - maxZeroRunLen;
+                                    maxBasePad[coreIndex] += (maxZeroRunLen + 1 + zeroRun) / (maxZeroRunLen + 1);
+                                }
+                                else
+                                {
+                                    *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + zeroRun) += 1;
+                                }
+                                if (zeroRun > maxZRL) maxZRL = zeroRun;
+                                zeroRun = 0;
+
+                                if (needToWriteBias)
+                                {
+                                    bitOffset += biasBitSize;
+                                    needToWriteBias = 0;
+                                }
+                                group2DCoded = 1;
+                            }
+                            else
+                            {
+                                zeroRun++;
+                            }
+
+                            /* add offet behind the last point of the last slice of each filter */
+                            if (realSliceIndex == slice_count - 1)
+                            {
+                                if (hasVipV7Feature)
+                                    bitOffset += NN_Z_POSITION_OFFSET_BITS_VIP_V7;
+                                else
+                                    bitOffset += NN_Z_POSITION_OFFSET_BITS;
+                            }
+                        }
+
+                        if (sliceIndex + zdpNum >= slice_count)
+                            blockCount++;
+                        else
+                            blockCount += 2;
+
+                        if (nonZeroInBlock1Count)
+                            nonZeroCount++;
+                        if (nonZeroInBlock2Count)
+                            nonZeroCount++;
+                    }
+                }
+            }
+            else if ((hasXYDP9 || hasXYDP6)
+                && (weightFomat == VX_TYPE_INT8 || weightFomat == VX_TYPE_UINT8))
+            {
+                vx_uint32 xStep = 3;
+                vx_uint32 yStep = 0;
+                vx_uint32 inImageBufferSize = hasXYDP9 ? 2 : 1;
+
+                if (hasXYDP6)
+                    yStep = 2;
+                else
+                    yStep = 3;
+
+                for (sliceIndex = 0; sliceIndex < slice_count; sliceIndex += inImageBufferSize)
+                {
+                    vx_uint8 group2DCoded = 0;
+                    vx_uint32 weight = 0;
+                    vx_uint32 realSliceIndex = 0;
+                    vx_uint32 realWeightXIndex = 0, realWeightYIndex = 0;
+                    vx_uint32 subKxSize = 0, subKySize = 0, subKzSize = 0;
+
+                    subKzSize = gcmMIN((slice_count - sliceIndex), inImageBufferSize);
+                    /* add slices of every filter*/
+                    for (kid = 0; kid < actualFilterCount; kid++)
+                    {
+                        vx_bool hasWriteBias = vx_false_e;
+
+                        filterIndex = filterGroup[kid];
+
+                        for (weightYIndex = 0; weightYIndex < weight_y; weightYIndex += yStep)
+                        {
+                            subKySize = gcmMIN((weight_y - weightYIndex), yStep);
+                            for (weightXIndex = 0; weightXIndex < weight_x; weightXIndex += xStep)
+                            {
+                                subKxSize = gcmMIN((weight_x - weightXIndex), xStep);
+                                for (realSliceIndex = sliceIndex; realSliceIndex < sliceIndex + subKzSize; realSliceIndex++)
+                                {
+                                    vx_uint8 needToWriteBias = (sliceIndex == 0) ? 1 : 0;
+                                    vx_uint32 nonZeroInBlockCount = 0; /*Check if there's non-zero point in one 3x3 block*/
+
+                                    /* Add one slice data every filter. */
+                                    kernelDataPtr = startDataPtr + filterIndex * filterSize + filterSliceSize * realSliceIndex;
+
+                                    for (realWeightYIndex = weightYIndex; realWeightYIndex < weightYIndex + subKySize; realWeightYIndex++)
+                                    {
+                                        for (realWeightXIndex = weightXIndex; realWeightXIndex < weightXIndex + subKxSize; realWeightXIndex++)
+                                        {
+                                            vx_uint8_ptr realKernelDataPtr = kernelDataPtr + (realWeightYIndex * weight_x + realWeightXIndex) * weightSize;
+
+                                            if (weightFomat == VX_TYPE_INT8)
+                                                weight = *((vx_int8 *)realKernelDataPtr);
+                                            else if (weightFomat == VX_TYPE_UINT8)
+                                                weight = *((vx_uint8 *)realKernelDataPtr);
+                                            else
+                                                weight = *((vx_uint16 *)realKernelDataPtr);
+
+                                            if (weight != skipValue)
+                                                nonZeroInBlockCount++;
+
+                                            if (((realSliceIndex == 0)
+                                                    && (realWeightXIndex == weight_x - 1)
+                                                    && (realWeightYIndex == weight_y - 1)
+                                                    && needToWriteBias)
+                                                || ((realSliceIndex == slice_count - 1)
+                                                    && (realWeightXIndex == weight_x - 1)
+                                                    && (realWeightYIndex == weight_y - 1))
+                                                || (weight != skipValue)
+                                                || ((kid == actualFilterCount - 1)
+                                                    && (realWeightXIndex == weight_x - 1)
+                                                    && (realWeightYIndex == weight_y - 1)
+                                                    && (group2DCoded == 0)))
+                                            {
+                                                if (zeroRun > maxZeroRunLen)
+                                                {
+                                                    *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1) += 1;
+                                                    *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 2) += zeroRun - maxZeroRunLen;
+                                                    maxBasePad[coreIndex] += (maxZeroRunLen + 1 + zeroRun) / (maxZeroRunLen + 1);
+                                                }
+                                                else
+                                                {
+                                                    *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + zeroRun) += 1;
+                                                }
+                                                if (zeroRun > maxZRL) maxZRL = zeroRun;
+                                                zeroRun = 0;
+
+                                                if (needToWriteBias && !hasWriteBias)
+                                                {
+                                                    bitOffset += biasBitSize;
+                                                    needToWriteBias = 0;
+                                                    hasWriteBias = vx_true_e;
+                                                }
+                                                group2DCoded = 1;
+                                            }
+                                            else
+                                            {
+                                                zeroRun++;
+                                            }
+
+                                            /* add offet behind the last point of the last slice of each filter */
+                                            if (realSliceIndex == slice_count - 1 && realWeightXIndex == weight_x - 1 && realWeightYIndex == weight_y - 1)
+                                            {
+                                                 /* Write offsetValue. */
+                                                if (hasVipV7Feature)
+                                                    bitOffset += NN_Z_POSITION_OFFSET_BITS_VIP_V7;
+                                                else
+                                                    bitOffset += NN_Z_POSITION_OFFSET_BITS;
+                                            }
+                                        }
+                                    }
+
+                                    blockCount++;
+                                    if (nonZeroInBlockCount)
+                                        nonZeroCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (sliceIndex = 0; sliceIndex < slice_count; sliceIndex++)
+                {
+                    vx_uint8 group2DCoded = 0;
+
+                    /* Add slices of every filter. */
+                    for (kid = 0; kid < actualFilterCount; kid++)
+                    {
+                        vx_uint8 needToWriteBias = (sliceIndex == 0) ? 1 : 0;
+
+                        filterIndex = filterGroup[kid];
+
+                        /* Add one slice data every filter. */
+                        kernelDataPtr = startDataPtr + filterIndex * filterSize + filterSliceSize * sliceIndex;
+
+                        for (weightYIndex = 0; weightYIndex < weight_y; weightYIndex++)
+                        {
+                            vx_uint32 nonZeroCountInDP3 = 0; /*Check if there's non-zero point in one 3x1 block*/
+
+                            for (weightXIndex = 0; weightXIndex < weight_x; weightXIndex++)
+                            {
+                                vx_uint32 weight;
+
+                                if (weightFomat == VX_TYPE_INT8)
+                                    weight = *((vx_int8 *)kernelDataPtr);
+                                else if (weightFomat == VX_TYPE_UINT8)
+                                    weight = *((vx_uint8 *)kernelDataPtr);
+                                else
+                                    weight = *((vx_uint16 *)kernelDataPtr);
+                                kernelDataPtr = kernelDataPtr + weightSize;
+
+                                if(!hasVipV7Feature || weightFomat == VX_TYPE_FLOAT16)
+                                {
+                                    /*V6 or FP16, DP1, a block is 1x1*/
+                                    blockCount++;
+                                    if (weight != skipValue)
+                                        nonZeroCount++;
+                                }
+                                else
+                                {
+                                    if (weight != skipValue)
+                                        nonZeroCountInDP3++;
+
+                                    /*V7, DP3, one block is 3x1*/
+                                    if ((weightXIndex + 1) % 3 == 0 || weightXIndex == weight_x - 1)
+                                    {
+                                        blockCount++;
+                                        if (nonZeroCountInDP3)
+                                            nonZeroCount++;
+                                        nonZeroCountInDP3 = 0;
+                                    }
+                                }
+
+                                if (((sliceIndex == 0)
+                                        && (weightXIndex == weight_x - 1)
+                                        && (weightYIndex == weight_y - 1)
+                                        && needToWriteBias)
+                                    || ((weightXIndex == weight_x - 1)
+                                        && (weightYIndex == weight_y - 1)
+                                        && (sliceIndex == slice_count - 1))
+                                    || (weight != skipValue)
+                                    || ((kid == actualFilterCount - 1)
+                                        && (weightXIndex == weight_x - 1)
+                                        && (weightYIndex == weight_y - 1)
+                                        && (group2DCoded == 0))
+                                    )
+                                {
+                                    if (zeroRun > maxZeroRunLen)
+                                    {
+                                        *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1) += 1;
+                                        *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 2) += zeroRun - maxZeroRunLen;
+                                        maxBasePad[coreIndex] += (maxZeroRunLen + 1 + zeroRun) / (maxZeroRunLen + 1);
+                                    }
+                                    else
+                                    {
+                                        *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + zeroRun) += 1;
+                                    }
+                                    if (zeroRun > maxZRL) maxZRL = zeroRun;
+                                    zeroRun = 0;
+
+                                    if (needToWriteBias)
+                                    {
+                                        bitOffset += biasBitSize;
+                                        needToWriteBias = 0;
+                                    }
+                                    group2DCoded = 1;
+                                }
+                                else
+                                {
+                                    zeroRun++;
+                                }
+                            }
+                        }
+
+                        /* add offet behind the last point of the last slice of each filter */
+                        if (sliceIndex == slice_count - 1)
+                        {
+                            /* Write offsetValue. */
+                            if (hasVipV7Feature)
+                                bitOffset += NN_Z_POSITION_OFFSET_BITS_VIP_V7;
+                            else
+                                bitOffset += NN_Z_POSITION_OFFSET_BITS;
+                        }
+                    }
+                }
+            }
+            usedKid += actualFilterCount;
+            if (filterGroup)
+            {
+                vxFree(filterGroup);
+                filterGroup = VX_NULL;
+            }
+        }
+
+        origBitsArray[coreIndex] = bitOffset;
+        bigZRL += *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1);
+    }
+
+    /* analyze compressed size with different zrl */
+    maxZRL = gcmMIN(maxZRL, maxZeroRunLen);
+    maxZRLType = maxZRL ? gcmMIN((vx_uint32)ceilf((vx_float32)(log(maxZRL) / log(2))), context->nnConfig.fixedFeature.zrlBits) : 0;
+
+    if(blockCount != 0)
+        complete = (vx_float32)bigZRL / blockCount > 0.1f ? vx_false_e : vx_true_e;
+
+    for (i = 0; i <= maxZRLType; i++)
+    {
+        vx_uint32 size = 64;
+        vx_uint32 base = (1 << i) - 1;
+
+        for (coreIndex = 0; coreIndex < nnCoreCount; coreIndex++)
+        {
+            vx_uint32 bits = 0, rwc = 0;
+
+            if (base == 0)
+            {
+                /* take care zrl = 0 */
+                for (j = 0; j <= maxZRL; j++)
+                {
+                    rwc += *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + j) * (j+1);
+                }
+
+                if (*(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1) != 0)
+                {
+                    vx_uint32 nsum = *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1);
+                    vx_uint32 dsum = *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 2);
+
+                    rwc += maxZeroRunLen * nsum + dsum + nsum;
+                }
+
+                bits += rwc * weightBitSize;
+            }
+            else
+            {
+                for (j = 0; j <= maxZRL; j++)
+                {
+                    vx_uint32 zerosPerCore = *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + j);
+                    if (!zerosPerCore) continue;
+                    if (j <= base) rwc += zerosPerCore;
+                    else rwc += ((j + 1 + base) / (base + 1)) * zerosPerCore;
+                }
+
+                if (*(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1) != 0)
+                {
+                    vx_uint32 nsum = *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 1);
+                    vx_uint32 dsum = *(zerosPerCoreArray + coreIndex * (maxZeroRunLen + 1 + 2) + maxZeroRunLen + 2);
+                    if (base != maxZeroRunLen)
+                    {
+                        rwc += ((maxZeroRunLen + 1 + base) * nsum + dsum) / (base + 1);
+                    }
+                    else
+                    {
+                        rwc += maxBasePad[coreIndex];
+                    }
+                }
+
+                bits += rwc * (i + weightBitSize);
+            }
+
+            /* other bits */
+            bits += origBitsArray[coreIndex];
+            size += (gcmALIGN(bits, 32) / 32) * 4;
+            size  = gcmALIGN(size, 64);
+        }
+
+        if (size < minSize)
+        {
+            minSize = size;
+            minZrl = (vx_uint8)i;
+        }
+
+        if (!complete) break;
+    }
+
+    if (origBitsArray)
+        vxFree(origBitsArray);
+    if (maxBasePad)
+        vxFree(maxBasePad);
+    if (zerosPerCoreArray)
+        vxFree(zerosPerCoreArray);
+    if (nonZeroWeights)
+        vxFree(nonZeroWeights);
+
+    if (all_count != VX_NULL) *all_count = blockCount;
+    if (non_zero_count != VX_NULL) *non_zero_count = nonZeroCount;
+    if (orig_kernel_buf_size != VX_NULL) *orig_kernel_buf_size = (filterSize + biasSize) * filterTotalCount;
+
+    if (min_size != VX_NULL) *min_size = minSize;
+    if (zero_run_len != VX_NULL) *zero_run_len = minZrl;
+
+    return complete;
 }
 
 void reorderWeightBiasBufferForHuffman(
@@ -7257,15 +8497,18 @@ void calculateWeightBiasStreamRelatedSize(
         }
         else if (zeroRunLen > 5)
         {
-            /* Back to calulate kernelBufferSize for other zeroRunLen. */
-            for (zeroRunLen = 0; zeroRunLen <= context->nnConfig.fixedFeature.zrlBits; zeroRunLen++)
+            if (!calculateWeightBiasBalanceSizeForZeroRunLenEx(context, weight_x, weight_y, slice_count, z_count, kernels_per_core, weight_format, bias_format, skip_value, weight_data, all_count, non_zero_count, orig_kernel_buf_size, &minKernelBufferSize, &minZeroRunLen))
             {
-                vx_size kernelBufferSize = calculateWeightBiasBalanceSizeForZeroRunLen(context, weight_x, weight_y, slice_count, z_count, kernels_per_core, weight_format, bias_format, skip_value, zeroRunLen, weight_data, all_count, non_zero_count, orig_kernel_buf_size);
-
-                if (kernelBufferSize < minKernelBufferSize)
+                /* Back to calulate kernelBufferSize for other zeroRunLen. */
+                for (zeroRunLen = 0; zeroRunLen <= context->nnConfig.fixedFeature.zrlBits; zeroRunLen++)
                 {
-                    minKernelBufferSize = kernelBufferSize;
-                    minZeroRunLen = zeroRunLen;
+                    vx_size kernelBufferSize = calculateWeightBiasBalanceSizeForZeroRunLen(context, weight_x, weight_y, slice_count, z_count, kernels_per_core, weight_format, bias_format, skip_value, zeroRunLen, weight_data, all_count, non_zero_count, orig_kernel_buf_size);
+
+                    if (kernelBufferSize < minKernelBufferSize)
+                    {
+                        minKernelBufferSize = kernelBufferSize;
+                        minZeroRunLen = zeroRunLen;
+                    }
                 }
             }
         }
@@ -7295,15 +8538,18 @@ void calculateWeightBiasStreamRelatedSize(
         }
         else if (zeroRunLen > 5)
         {
-            /* Back to calulate kernelBufferSize for other zeroRunLen. */
-            for (zeroRunLen = 0; zeroRunLen <= context->nnConfig.fixedFeature.zrlBits; zeroRunLen++)
+            if (!calculateWeightBiasBufferSizeForZeroRunLenEx(context, weight_x, weight_y, slice_count, z_count, kernels_per_core, weight_format, bias_format, skip_value, weight_data, all_count, non_zero_count, orig_kernel_buf_size, &minKernelBufferSize, &minZeroRunLen))
             {
-                vx_size kernelBufferSize = calculateWeightBiasBufferSizeForZeroRunLen(context, weight_x, weight_y, slice_count, z_count, kernels_per_core, weight_format, bias_format, skip_value, zeroRunLen, weight_data, all_count, non_zero_count, orig_kernel_buf_size);
-
-                if (kernelBufferSize < minKernelBufferSize)
+                /* Back to calulate kernelBufferSize for other zeroRunLen. */
+                for (zeroRunLen = 0; zeroRunLen <= context->nnConfig.fixedFeature.zrlBits; zeroRunLen++)
                 {
-                    minKernelBufferSize = kernelBufferSize;
-                    minZeroRunLen = zeroRunLen;
+                    vx_size kernelBufferSize = calculateWeightBiasBufferSizeForZeroRunLen(context, weight_x, weight_y, slice_count, z_count, kernels_per_core, weight_format, bias_format, skip_value, zeroRunLen, weight_data, all_count, non_zero_count, orig_kernel_buf_size);
+
+                    if (kernelBufferSize < minKernelBufferSize)
+                    {
+                        minKernelBufferSize = kernelBufferSize;
+                        minZeroRunLen = zeroRunLen;
+                    }
                 }
             }
         }
