@@ -43,6 +43,9 @@ extern vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node n
         vx_scalar poolingY,
         vx_scalar downScaleSizeRounding,
         vx_tensor outputs);
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx_node node, const vx_reference parameters[], vx_uint32 num);
+#else
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx_node node,
         vx_tensor inputs,
@@ -65,6 +68,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
         vx_scalar poolingY,
         vx_scalar downScaleSizeRounding,
         vx_tensor outputs);
+#endif
 
 vx_status vxnneExecuteSWConvertFormat(struct _vxnne_operation_s *operation)
 {
@@ -1059,6 +1063,19 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionReluPoolingLayer2_Initializ
 
     if ((dilation_x_s && (dilation_x_s->value->n32) > 0) || (dilation_y_s && (dilation_y_s->value->n32) > 0))
     {
+#if REGISTER_FRAME
+        vx_reference params[] = {
+            (vx_reference)inputs, (vx_reference)weights_biases, VX_NULL, VX_NULL, /*input, weights_bias, weights, biases*/
+            (vx_reference)pad_x_left_s, (vx_reference)pad_x_right_s, (vx_reference)pad_y_top_s, (vx_reference)pad_y_bottom_s, /*pad x, x_right, y, y_bottom*/
+            (vx_reference)pad_mode_s, (vx_reference)pad_const_s, /*padmode, padconstant*/
+            (vx_reference)dilation_x_s, (vx_reference)dilation_y_s, parameters[8], parameters[9], /*dilation x/y, stride x/y */
+            (vx_reference)enable_relu_s, (vx_reference)pool_type_s, (vx_reference)pool_size_x_s, (vx_reference)pool_size_y_s, /*relu, pool type, x, y */
+            (vx_reference)down_scale_size_rounding_s, (vx_reference)outputs, /*rounding, output */
+        };
+
+        gcmASSERT(TENSOR_SIZE_INDEX(inputs, 3) == 1);/* not support batch while dilation enabled */
+        status = vxoNNDilationConvolutionLayerInitializer(node, params, gcmCOUNTOF(params));
+#else
         gcmASSERT(TENSOR_SIZE_INDEX(inputs, 3) == 1);/* not support batch while dilation enabled */
 
         status = vxoNNDilationConvolutionLayerInitializer(node,
@@ -1071,6 +1088,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionReluPoolingLayer2_Initializ
             down_scale_size_rounding_s,
             outputs
             );
+#endif
     }
     else
     {
@@ -2077,6 +2095,1584 @@ vx_status vxoNNDilationConvolutionLayer_Deinitialize(vxnne_layer layer)
 
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vx_tensor inputs                = (vx_tensor)parameters[0];
+    vx_tensor weights               = (vx_tensor)parameters[2];
+    vx_tensor biases                = (vx_tensor)parameters[3];
+    vx_scalar padX                  = (vx_scalar)parameters[4];
+    vx_scalar padXRight             = (vx_scalar)parameters[5];
+    vx_scalar padY                  = (vx_scalar)parameters[6];
+    vx_scalar padYBottom            = (vx_scalar)parameters[7];
+    vx_scalar dilationX             = (vx_scalar)parameters[10];
+    vx_scalar dilationY             = (vx_scalar)parameters[11];
+
+    vx_scalar relu_s                = (vx_scalar)parameters[14];
+    vx_scalar pooling_s             = (vx_scalar)parameters[15];
+
+    vx_scalar downScaleSizeRounding = (vx_scalar)parameters[18];
+    vx_tensor outputs               = (vx_tensor)parameters[19];
+
+    vxnne_convolution_layer  convolutionLayer = (vxnne_convolution_layer)ops_layer;
+
+    vx_uint32 batchCount = TENSOR_SIZE_INDEX(inputs, 3);
+
+    vx_bool relu = relu_s?relu_s->value->b:vx_false_e;
+
+    vx_enum pooling = pooling_s?pooling_s->value->e:(VX_NN_POOLING_MAX-1);
+
+    vx_uint32 idx = 0;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    gcmASSERT(relu == vx_false_e);
+    gcmASSERT((pooling != VX_NN_POOLING_MAX) && (pooling != VX_NN_POOLING_AVG));
+
+    vxmONERROR(vxnneOperation_Initialize(&convolutionLayer->convolutionSW.base,
+                            &convolutionLayer->base,
+                            VXNNE_OPERATION_TARGET_SW,
+                            VXNNE_OPERATOR_CONVOLUTION,
+                            vxnneExecuteSWConvolution,
+                            VX_NULL,
+                            batchCount,
+                            0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &convolutionLayer->base,
+        &convolutionLayer->convolutionSW.base,
+        idx++));
+
+    convolutionLayer->convolutionSW.inputs                = inputs;
+    convolutionLayer->convolutionSW.weights               = weights;
+    convolutionLayer->convolutionSW.biases                = biases;
+    convolutionLayer->convolutionSW.padX                  = padX;
+    convolutionLayer->convolutionSW.padXRight             = padXRight;
+    convolutionLayer->convolutionSW.padY                  = padY;
+    convolutionLayer->convolutionSW.padYBottom            = padYBottom;
+    convolutionLayer->convolutionSW.dilationX             = dilationX;
+    convolutionLayer->convolutionSW.dilationY             = dilationY;
+    convolutionLayer->convolutionSW.downScaleSizeRounding = downScaleSizeRounding;
+    convolutionLayer->convolutionSW.outputs               = outputs;
+
+    vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionSW.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionSW.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionSW.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionSW.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_tensor inputs                = (vx_tensor)parameters[0];
+    vx_tensor weights               = (vx_tensor)parameters[2];
+    vx_tensor biases                = (vx_tensor)parameters[3];
+    vx_scalar dilationX             = (vx_scalar)parameters[10];
+    vx_scalar dilationY             = (vx_scalar)parameters[11];
+
+    vx_scalar pooling_s             = (vx_scalar)parameters[15];
+    vx_scalar poolingx              = (vx_scalar)parameters[16];
+    vx_tensor outputs               = (vx_tensor)parameters[19];
+
+    vx_int32 dilation_x = dilationX->value->n32 + 1;
+    vx_int32 dilation_y = dilationY->value->n32 + 1;
+
+    vx_uint32  width             = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
+    vx_uint32  height            = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
+
+    vx_enum    inputFormat       = TENSOR_DATA_TYPE(inputs);
+    vx_enum    outputFormat      = TENSOR_DATA_TYPE(outputs);
+    //vx_bool    enable_shader     = vx_false_e;
+    vx_bool    has_pool          = (pooling_s == NULL && poolingx == 0) ? vx_false_e : vx_true_e;
+    vx_bool    enable_2dTensor   = vx_false_e;
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    if (weights != NULL)
+    {
+        vx_uint32 kernel_x            = TENSOR_VIEW_SIZE_INDEX(weights, 0);
+        vx_uint32 kernel_y            = TENSOR_VIEW_SIZE_INDEX(weights, 1);
+        vx_uint32 ifm                 = TENSOR_VIEW_SIZE_INDEX(weights, 2);
+        vx_enum   weightFormat        = TENSOR_DATA_TYPE(weights);
+        vx_enum   biasFormat          = biases ? TENSOR_DATA_TYPE(biases) : VX_TYPE_FLOAT64;
+        vx_uint32 size                = width * height;
+
+        if(evis)
+        {
+            vx_uint32 convsize        = kernel_x * kernel_y * ifm;
+            vx_bool   support_type    = vx_false_e;
+
+            if (biases)
+            {
+                support_type    = (vx_bool)(
+                    (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
+                    || (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                    || (inputFormat == VX_TYPE_INT8  && weightFormat == VX_TYPE_INT8  && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32)
+                    || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16)
+                    || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT64 && outputFormat == VX_TYPE_INT16)
+                    || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32)
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_UINT8 && outputFormat != VX_TYPE_FLOAT32)
+                    || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16));
+            }
+            else
+            {
+                support_type    = (vx_bool)(
+                    (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                    || (inputFormat == VX_TYPE_INT8  && weightFormat == VX_TYPE_INT8  && outputFormat == VX_TYPE_INT8)
+                    || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16)
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
+            }
+
+            support = (vx_bool)(convsize < IMG_MAX_WIDTH && support_type && has_pool == vx_false_e);
+            enable_2dTensor = (vx_bool)(size < IMG_MAX_WIDTH && dilation_x == 1 && dilation_y == 1);
+        }
+        else
+        {
+            vx_bool   support_type    = vx_false_e;
+
+            if (biases)
+            {
+                support_type    = (vx_bool)
+                    ((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                    || (inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT16)
+                    || (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                    || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT64 && outputFormat == VX_TYPE_INT16)
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8)
+                    || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16));
+            }
+            else
+            {
+                support_type    = (vx_bool)
+                    ((inputFormat == VX_TYPE_FLOAT16 && weightFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+                    || (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                    || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16));
+            }
+
+            /*enable_2dTensor = (vx_bool)(size < IMG_MAX_WIDTH && dilation_x == 1 && dilation_y == 1);*/
+            support = (vx_bool)(support_type && has_pool == vx_false_e);
+        }
+
+        if (!support)return support;
+
+        if (TENSOR_DATA_LIFETIME(weights) == VX_TENSOR_LIFE_TIME_DYNAMIC)
+            support = vx_true_e;
+    }
+
+    if (support)
+    {
+        //reg_param->flag = gcoNNE_CONV_MODE_SH;
+        SETBIT(reg_param->flag, enable_2dTensor, 0);
+    }
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxnne_convolution_layer  convolutionLayer = (vxnne_convolution_layer)ops_layer;
+
+    vx_tensor inputs                = (vx_tensor)parameters[0];
+    vx_weights_biases_parameter weights_biases= (vx_weights_biases_parameter)parameters[1];
+    vx_tensor weights               = (vx_tensor)parameters[2];
+    vx_tensor biases                = (vx_tensor)parameters[3];
+    vx_scalar padXLeft              = (vx_scalar)parameters[4];
+    vx_scalar padXRight             = (vx_scalar)parameters[5];
+    vx_scalar padYTop               = (vx_scalar)parameters[6];
+    vx_scalar padYBottom            = (vx_scalar)parameters[7];
+    vx_scalar dilationX             = (vx_scalar)parameters[10];
+    vx_scalar dilationY             = (vx_scalar)parameters[11];
+    vx_scalar stridesX              = (vx_scalar)parameters[12];
+    vx_scalar stridesY              = (vx_scalar)parameters[13];
+
+    vx_scalar downScaleSizeRounding = (vx_scalar)parameters[18];
+    vx_tensor outputs               = (vx_tensor)parameters[19];
+
+    vx_uint32 batchCount = TENSOR_SIZE_INDEX(inputs, 3);
+
+    vx_int32 dilation_x = dilationX->value->n32 + 1;
+    vx_int32 dilation_y = dilationY->value->n32 + 1;
+
+    vx_bool    enable_2dTensor   = GETBIT(reg_param->flag, 0);
+
+    vx_context context = vxGetContext((vx_reference)inputs);
+    vx_uint32 idx = 0;
+    vx_uint32 numTmpTensor = 0;
+
+#define CONV2D_ALIGN_SIZE4 (4)
+#define CONV2D_ALIGN_SIZE16 (16)
+    vx_tensor tensor2Row    = NULL;
+    vx_uint32 sizes[]       = {1, 1, 1, 1};
+    vx_uint32 dims          = TENSOR_DIM_NUM(inputs);
+    vx_enum   downScaleSizeRoundingValue = downScaleSizeRounding->value->e;
+    vx_int32  paddingLeft   = padXLeft->value->n32;
+    vx_int32  paddingRight  = padXRight->value->n32;
+    vx_int32  paddingTop    = padYTop->value->n32;
+    vx_int32  paddingBottom = padYBottom->value->n32;
+    vx_int32  k_w           = weights ? TENSOR_VIEW_SIZE_INDEX(weights, 0):WB_ORG_KERNEL_X(weights_biases);
+    vx_int32  k_h           = weights ? TENSOR_VIEW_SIZE_INDEX(weights, 1):WB_ORG_KERNEL_Y(weights_biases);
+    vx_int32  inputWidth    = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+    vx_int32  inputHeight   = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+    vx_int32  inputDepth    = TENSOR_VIEW_SIZE_INDEX(inputs, 2);
+    vx_int32  outputWidth   = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
+    vx_int32  outputHeight  = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
+    vx_int32  outputDepth   = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
+    vx_uint32 input_size    = k_w * k_h * inputDepth;
+    /* Calculate stride     = (w + padXLeft + padXRight - weight)/(output_w - 1) */
+    vx_int32  strideX       = (stridesX != VX_NULL) ? (stridesX->value->n32) : (vxoNNExternsionConvlutionRound((vx_float32)(inputWidth + paddingLeft + paddingRight - k_w) / (outputWidth - 1), downScaleSizeRoundingValue));
+    vx_int32  strideY       = (stridesY != VX_NULL) ? (stridesY->value->n32) : (vxoNNExternsionConvlutionRound((vx_float32)(inputHeight + paddingTop + paddingBottom - k_h) / (outputHeight - 1), downScaleSizeRoundingValue));
+    vx_bool   enableAlign4  = vx_false_e;
+    vx_bool   enableAlign16  = vx_false_e;
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vx_tensor_create_params_t tensor_create_params;
+    vx_tensor    newBiases                      = NULL;
+    vx_tensor    weights_new_rs                 = NULL;
+    vx_tensor    input_rs                       = NULL;
+    vx_tensor    outputs_rs                     = NULL;
+    vx_bool      is_static_weights_biases       = vx_false_e;
+    vx_bool      enable_adjust_biases           = vx_false_e;
+    vx_bool      enable_conv2d_1x1              = vx_false_e;
+    vx_bool      is_conv_3x3_s2                 = vx_false_e;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    // step 1, tensor to row
+    if (enable_2dTensor)
+    {
+        sizes[0] = k_w * k_h * inputDepth;
+        sizes[1] = outputWidth * outputHeight;
+        sizes[2] = 1;
+        sizes[3] = batchCount;
+        dims = gcmMAX(2, TENSOR_DIM_NUM(outputs));
+    }
+    else
+    {
+        sizes[0] = k_w * k_h * inputDepth;
+        sizes[1] = outputWidth;
+        sizes[2] = outputHeight;
+        sizes[3] = batchCount;
+        dims = 4;
+    }
+
+    if (evis == vx_false_e
+        && ((inputWidth * inputHeight < IMG_MAX_WIDTH) && inputDepth < IMG_MAX_WIDTH)
+        && (k_w == k_h && k_w == 1)
+        && (strideX == strideY && strideX == 1)
+        && (paddingLeft == paddingRight && paddingLeft == 0)
+        && (paddingTop == paddingBottom && paddingTop == 0)
+        && biases != NULL
+        && (CHECK_LIFETIME_IS_STATIC(weights) || TENSOR_QUANT_TYPE(inputs) != VX_QUANT_AFFINE_SCALE)
+        /*&& ((inputWidth * inputHeight % CONV2D_ALIGN_SIZE4 == 0) || (input_size % CONV2D_ALIGN_SIZE16 != 0) || TENSOR_QUANT_TYPE(inputs) != VX_QUANT_AFFINE_SCALE)*/
+        )
+    {
+        enable_conv2d_1x1 = vx_true_e;
+    }
+
+    if (k_w == 3 && k_h == 3 && paddingLeft == 0 && strideX == 2 && dilation_x == 1 && dilation_y == 1)
+    {
+        is_conv_3x3_s2 = vx_true_e;
+    }
+
+    if (evis == vx_false_e
+        && (sizes[0] % CONV2D_ALIGN_SIZE4) != 0 && CHECK_LIFETIME_IS_STATIC(weights))
+    {
+        if (is_conv_3x3_s2)
+        {
+            sizes[0] = gcmALIGN(sizes[0], CONV2D_ALIGN_SIZE16);
+            enableAlign16 = vx_true_e;
+        }
+        else
+        {
+            sizes[0] = gcmALIGN(sizes[0], CONV2D_ALIGN_SIZE4);
+        }
+        enableAlign4 = vx_true_e;
+        input_size = sizes[0];
+    }
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = dims;
+    tensor_create_params.sizes = sizes;
+    tensor_create_params.data_format = TENSOR_DATA_TYPE(inputs);
+    tensor_create_params.quant_format = TENSOR_QUANT_TYPE(inputs);
+    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(inputs);
+    }
+    else
+    {
+        tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(inputs);
+        tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
+    }
+
+    if (enable_conv2d_1x1 == vx_false_e)
+    {
+        if (enableAlign4)
+        {
+            tensor2Row = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+            if (tensor2Row == VX_NULL || vxoTensor_AllocateMemory(tensor2Row) != VX_SUCCESS)
+            {
+                vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
+                status = VX_ERROR_NO_MEMORY;
+                goto OnError;
+            }
+        }
+        else
+        {
+            tensor2Row = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_true_e);
+            if (tensor2Row == VX_NULL)
+            {
+                vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
+                status = VX_ERROR_NO_MEMORY;
+                goto OnError;
+            }
+        }
+    }
+
+    if(evis)
+    {
+        shaderExecutable = vxnneTensor2RowShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR2ROW, &ops_layer->node->kernelAttributes.borderMode,
+                           inputs, k_w, k_h, dilation_x, dilation_y, strideX, strideY, paddingLeft, paddingTop, outputWidth, outputHeight, tensor2Row);
+    }
+    else
+    {
+        if (enable_conv2d_1x1 == vx_false_e)
+        {
+            shaderExecutable = vxnneGPUTensor2RowShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR2ROW, &ops_layer->node->kernelAttributes.borderMode,
+                           inputs, k_w, k_h, dilation_x, dilation_y, strideX, strideY, paddingLeft, paddingTop, outputWidth, outputHeight, tensor2Row);
+        }
+    }
+
+    if (enable_conv2d_1x1 == vx_false_e)
+    {
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            return status;
+        }
+
+        status = vxnneShaderOperation_Initialize(&convolutionLayer->convolutionTensor2Row_sh_operation,
+            &convolutionLayer->base,
+            VXNNE_OPERATOR_CONVOLUTION,
+            batchCount,
+            shaderExecutable);
+
+        vxnneLayer_SetOperation(
+                &convolutionLayer->base,
+                &convolutionLayer->convolutionTensor2Row_sh_operation.base,
+                idx++);
+
+        vxnneOperation_AddReference(&convolutionLayer->convolutionTensor2Row_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&convolutionLayer->convolutionTensor2Row_sh_operation.base, (vx_reference)tensor2Row, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
+
+    // step 2, gemm
+    {
+        is_static_weights_biases = (vx_bool)(CHECK_LIFETIME_IS_STATIC(weights) && CHECK_LIFETIME_IS_STATIC(biases));
+        enable_adjust_biases     = is_static_weights_biases && TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE && TENSOR_QUANT_TYPE(biases);
+        enable_adjust_biases     = enable_adjust_biases && (TENSOR_DATA_TYPE(biases) != VX_TYPE_UINT8);
+
+        if (enable_adjust_biases)
+        {
+            vx_tensor_create_params_t params;
+            gctPOINTER weightsLogical   = VX_NULL;
+            gctPOINTER biasesLogical    = VX_NULL;
+            gctPOINTER newBiasesLogical = VX_NULL;
+            vx_uint32  i                = 0;
+            vx_uint32  j                = 0;
+            vx_uint32  sizes[4]         = {1};
+            vx_uint32  ofm              = TENSOR_VIEW_SIZE_INDEX(biases, 0);
+            vx_uint32  ifm              = k_w * k_h * inputDepth;
+
+            sizes[0] = TENSOR_VIEW_SIZE_INDEX(biases, 0);
+            sizes[1] = 1;
+
+            gcoOS_MemFill(&params, 0, sizeof(vx_tensor_create_params_t));
+            params.num_of_dims = TENSOR_DIM_NUM(biases);
+            params.sizes = sizes;
+            params.data_format = TENSOR_DATA_TYPE(biases);
+            params.quant_format = TENSOR_QUANT_TYPE(biases);
+            if (params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+            {
+                params.quant_data.dfp.fixed_point_pos = TENSOR_POS(biases);
+            }
+            else
+            {
+                params.quant_data.affine.scale = TENSOR_TF_SCALE(biases);
+            }
+
+            newBiases = vxoTensor_CreateTensor(context, NULL, &params, vx_false_e);
+            convolutionLayer->base.temp_tensors[numTmpTensor++] = newBiases;
+            vxoTensor_AllocateMemory(newBiases);
+            if (newBiases == VX_NULL)
+            {
+                vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
+                status = VX_ERROR_NO_MEMORY;
+                goto OnError;
+            }
+
+            TENSOR_DATA_LIFETIME(newBiases) = VX_TENSOR_LIFE_TIME_STATIC;
+
+            vxoTensor_GetTensorViewMemory(weights, &weightsLogical, VX_NULL);
+            vxoTensor_GetTensorViewMemory(biases, &biasesLogical, VX_NULL);
+            vxoTensor_GetTensorViewMemory(newBiases, &newBiasesLogical, VX_NULL);
+
+            for (j = 0; j < ofm; j++)
+            {
+                vx_int32 offset = 0;
+                vx_int32 dstVal = 0;
+
+                for (i = 0; i < ifm; i++)
+                {
+                    vx_uint32 idx = j * ifm + i;
+                    offset = offset - (((vx_uint8*)weightsLogical)[idx] - TENSOR_TF_ZEROPOINT(weights)) * TENSOR_TF_ZEROPOINT(inputs);
+                }
+
+                dstVal = ((vx_int32*)biasesLogical)[j] + offset;
+                ((vx_int32*)newBiasesLogical)[j] = dstVal;
+            }
+
+            convolutionLayer->base.temp_tensors[numTmpTensor++] = newBiases;
+        }
+        else
+        {
+            newBiases = biases;
+        }
+    }
+
+    if(evis)
+    {
+        weights_new_rs = weights;
+        input_rs = tensor2Row;
+        outputs_rs = outputs;
+        if (biases)
+        {
+            shaderExecutable = vxnneGemmShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GEMM, &ops_layer->node->kernelAttributes.borderMode, tensor2Row, weights_new_rs, newBiases, VX_NN_ACTIVATION_NONE, enable_2dTensor, outputs_rs);
+        }
+        else
+        {
+            shaderExecutable = vxnneGemm_noBiasShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GEMM_NOBIAS, &ops_layer->node->kernelAttributes.borderMode, tensor2Row, weights_new_rs, VX_NN_ACTIVATION_NONE, enable_2dTensor, outputs_rs);
+        }
+    }
+    else
+    {
+        vx_bool   enable_tensor_cast  = vx_false_e;
+        vx_bool   enable_packed_weights = vx_false_e;
+        vx_bool   enable_ofm_gt_xy    = vx_false_e;
+        vx_tensor weights_rs          = NULL;
+        vx_tensor weights_new         = NULL;
+
+        sizes[0] = enableAlign4 ? gcmALIGN(k_w * k_h * inputDepth, CONV2D_ALIGN_SIZE4) : (k_w * k_h * inputDepth);
+        sizes[0] = enableAlign16 ? gcmALIGN(sizes[0], CONV2D_ALIGN_SIZE16) : sizes[0];
+        sizes[1] = outputWidth;
+        sizes[2] = outputHeight;
+        sizes[3] = batchCount;
+        dims = 4;
+
+        if (enable_conv2d_1x1
+         && (inputWidth * inputHeight % CONV2D_ALIGN_SIZE4 == 0)
+         && TENSOR_DATA_TYPE(inputs) == VX_TYPE_UINT8
+         && TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8
+         )
+        {
+            if (/*inputWidth * inputHeight < inputDepth
+              && */(inputWidth * inputHeight % CONV2D_ALIGN_SIZE16 != 0))
+            {
+                if ((outputDepth % CONV2D_ALIGN_SIZE16 == 0) && (input_size % CONV2D_ALIGN_SIZE4 == 0))
+                {
+                     enable_packed_weights = vx_true_e;
+                }
+                else
+                {
+                     enable_ofm_gt_xy = vx_true_e;
+                }
+            }
+            else
+            {
+                enable_tensor_cast = vx_true_e;
+
+                if ((outputDepth % CONV2D_ALIGN_SIZE16 == 0)
+                    && (input_size % CONV2D_ALIGN_SIZE4 == 0)
+                    && (inputWidth * inputHeight % CONV2D_ALIGN_SIZE16 == 0))
+                {
+                     enable_packed_weights = vx_true_e;
+                }
+            }
+        }
+        else if (enable_conv2d_1x1
+                 /*&& (inputWidth * inputHeight < inputDepth)*/
+                 && (inputWidth * inputHeight % CONV2D_ALIGN_SIZE4 != 0)
+                 && (outputDepth % CONV2D_ALIGN_SIZE16 == 0)
+                 && (input_size % CONV2D_ALIGN_SIZE4 == 0)
+                 && TENSOR_DATA_TYPE(inputs) == VX_TYPE_UINT8
+                 && TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8
+                 )
+        {
+            enable_packed_weights = vx_true_e;
+        }
+        else if (enable_conv2d_1x1
+                 && (outputDepth % CONV2D_ALIGN_SIZE4 == 0)
+                 && (input_size % CONV2D_ALIGN_SIZE4 == 0)
+                 && TENSOR_DATA_TYPE(inputs) == VX_TYPE_FLOAT16
+                 && TENSOR_DATA_TYPE(weights) == VX_TYPE_FLOAT16
+                 )
+        {
+            enable_packed_weights = vx_true_e;
+        }
+        else if (!enable_conv2d_1x1 && biases != NULL
+            && ((outputWidth * outputHeight < IMG_MAX_WIDTH) && outputDepth < IMG_MAX_WIDTH && input_size < IMG_MAX_WIDTH)
+            && (outputDepth % CONV2D_ALIGN_SIZE4 == 0)
+            && ((TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE && TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8)
+            || (TENSOR_QUANT_TYPE(weights) == VX_QUANT_NONE && TENSOR_DATA_TYPE(weights) == VX_TYPE_FLOAT16)))
+        {
+            enable_packed_weights = vx_true_e;
+        }
+
+        if (enable_conv2d_1x1)
+        {
+            sizes[0] = inputWidth * inputHeight;
+            sizes[1] = 1;
+            sizes[2] = inputDepth;
+            sizes[3] = batchCount;
+
+            if (enable_tensor_cast)
+            {
+                vx_tensor t = vxoTensor_ReshapeTensor(inputs, (vx_int32*)sizes, TENSOR_DIM_NUM(inputs));
+
+                input_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
+
+                convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
+                convolutionLayer->base.temp_tensors[numTmpTensor++] = input_rs;
+            }
+            else
+                input_rs = inputs;
+        }
+        else
+        {
+            input_rs = tensor2Row;
+        }
+
+        if (enableAlign4)
+        {
+            vx_uint32 ifm = k_w * k_h * TENSOR_VIEW_SIZE_INDEX(weights, 2);
+            vx_uint32 ofm = TENSOR_VIEW_SIZE_INDEX(weights, 3);
+            vx_uint32 ifm_rs = 0;
+
+            sizes[0] = ifm;
+            sizes[1] = ofm;
+            dims     = 2;
+            weights_rs = vxoTensor_ReshapeTensor(weights, (vx_int32*)sizes, dims);
+            convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_rs;
+
+            sizes[0] = gcmALIGN(ifm, CONV2D_ALIGN_SIZE4);
+            sizes[0] = enableAlign16 ? gcmALIGN(sizes[0], CONV2D_ALIGN_SIZE16) : sizes[0];
+            ifm_rs   = sizes[0];
+            sizes[1] = ofm;
+            dims     = 2;
+            gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+            tensor_create_params.num_of_dims = dims;
+            tensor_create_params.sizes = sizes;
+            tensor_create_params.data_format = TENSOR_DATA_TYPE(weights);
+            tensor_create_params.quant_format = TENSOR_QUANT_TYPE(weights);
+            if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+            {
+                tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(weights);
+            }
+            else
+            {
+                tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(weights);
+                tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(weights);
+            }
+
+            weights_new = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+            convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new;
+            vxoTensor_AllocateMemory(weights_new);
+            if (weights_new == VX_NULL)
+            {
+                vxError("vxoTensor_CreateTensor fail at function %s, line %d", __FUNCTION__, __LINE__);
+                status = VX_ERROR_NO_MEMORY;
+                goto OnError;
+            }
+
+            TENSOR_DATA_LIFETIME(weights_new) = VX_TENSOR_LIFE_TIME_STATIC;
+
+            vxnneTensorConstPad(weights_rs, weights_new, 0, ifm_rs - ifm, 0, 0, TENSOR_TF_ZEROPOINT(weights));
+
+            if (enable_packed_weights)
+            {
+                vx_tensor t = NULL;
+
+                t = vxoNNTensor_ReorgWeights(weights_new, ops_layer->node->graph, ifm_rs, ofm);
+
+                if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE)
+                {
+                    weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
+                    convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
+                }
+                else
+                    weights_new_rs = t;
+
+                convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
+            }
+            else
+            {
+                sizes[0] = ifm_rs;
+                sizes[1] = 1;
+                sizes[2] = 1;
+                sizes[3] = ofm;
+                dims     = 4;
+                 weights_new_rs = vxoTensor_ReshapeTensor(weights_new, (vx_int32*)sizes, dims);
+                 convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
+            }
+        }
+        else
+        {
+            if (enable_ofm_gt_xy)
+            {
+                vx_tensor t = NULL;
+
+                sizes[0] = k_w * k_h * TENSOR_VIEW_SIZE_INDEX(weights, 2);
+                sizes[1] = 1;
+                sizes[2] = 1;
+                sizes[3] = TENSOR_VIEW_SIZE_INDEX(weights, 3);
+                dims     = 4;
+
+                t = vxoTensor_ReshapeTensor(weights, (vx_int32*)sizes, dims);
+                convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
+
+                weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
+                convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
+            }
+
+            if (enable_packed_weights && enable_conv2d_1x1)
+            {
+                vx_tensor t = NULL;
+                vx_uint32 ifm = k_w * k_h * TENSOR_VIEW_SIZE_INDEX(weights, 2);
+                vx_uint32 ofm = TENSOR_VIEW_SIZE_INDEX(weights, 3);
+                t = vxoNNTensor_ReorgWeights(weights, ops_layer->node->graph, ifm, ofm);
+                convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
+                weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
+                convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
+            }
+            else if (enable_packed_weights)
+            {
+                vx_tensor t = NULL;
+                vx_uint32 ifm = k_w * k_h * TENSOR_VIEW_SIZE_INDEX(weights, 2);
+                vx_uint32 ofm = TENSOR_VIEW_SIZE_INDEX(weights, 3);
+                t = vxoNNTensor_ReorgWeights(weights, ops_layer->node->graph, ifm, ofm);
+                convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
+                if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE)
+                {
+                    weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
+                    convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
+                }
+                else
+                {
+                    weights_new_rs = t;
+                }
+            }
+            else if (!enable_ofm_gt_xy)
+            {
+                weights_new_rs = weights;
+            }
+        }
+
+        if (biases)
+        {
+            if (enable_conv2d_1x1)
+            {
+                if (enable_tensor_cast || enable_ofm_gt_xy)
+                {
+                    vx_tensor t = NULL;
+
+                    sizes[0] = outputWidth * outputHeight;
+                    sizes[1] = 1;
+                    sizes[2] = outputDepth;
+                    sizes[3] = batchCount;
+
+                    t = vxoTensor_ReshapeTensor(outputs, (vx_int32*)sizes, TENSOR_DIM_NUM(outputs));
+                    convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
+
+                    outputs_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
+                    convolutionLayer->base.temp_tensors[numTmpTensor++] = outputs_rs;
+                }
+                else
+                {
+                    outputs_rs = outputs;
+                }
+
+                shaderExecutable = vxnneGPUConv2D_1x1ShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_CONVOLUTION_1X1,
+                    &ops_layer->node->kernelAttributes.borderMode, enable_tensor_cast || enable_ofm_gt_xy, enable_packed_weights, input_rs, weights_new_rs, newBiases, outputs_rs);
+            }
+            else
+            {
+                outputs_rs = outputs;
+                shaderExecutable = vxnneGPUGemmShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GEMM,
+                    &ops_layer->node->kernelAttributes.borderMode, enable_packed_weights, input_rs, weights_new_rs, newBiases, outputs_rs);
+            }
+        }
+        else
+        {
+            outputs_rs = outputs;
+            shaderExecutable = vxnneGPUGemm_noBiasShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GEMM_NOBIAS, &ops_layer->node->kernelAttributes.borderMode, input_rs, weights_new_rs, outputs_rs);
+        }
+    }
+
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        return status;
+    }
+
+    status = vxnneShaderOperation_Initialize(&convolutionLayer->convolutionGemm_sh_operation,
+        &convolutionLayer->base,
+        VXNNE_OPERATOR_CONVOLUTION,
+        batchCount,
+        shaderExecutable);
+
+    if (batchCount > 1)
+    {
+        vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT);
+        vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT);
+    }
+
+    vxnneLayer_SetOperation(
+        &convolutionLayer->base,
+        &convolutionLayer->convolutionGemm_sh_operation.base,
+        idx++);
+
+    vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionGemm_sh_operation.base, (vx_reference)input_rs, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionGemm_sh_operation.base, (vx_reference)weights_new_rs, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionGemm_sh_operation.base, (vx_reference)newBiases, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&convolutionLayer->convolutionGemm_sh_operation.base, (vx_reference)outputs_rs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    convolutionLayer->base.temp_tensors[numTmpTensor++] = tensor2Row;
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_NN_TP_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_NN, VX_TYPE_INVALID, VX_NULL);
+
+    vx_tensor inputs                = (vx_tensor)parameters[0];
+    vx_tensor weights               = (vx_tensor)parameters[2];
+    vx_scalar dilationX             = (vx_scalar)parameters[10];
+    vx_scalar dilationY             = (vx_scalar)parameters[11];
+    vx_tensor outputs               = (vx_tensor)parameters[19];
+
+    vx_int32 dilation_x = dilationX->value->n32 + 1;
+    vx_int32 dilation_y = dilationY->value->n32 + 1;
+
+    vx_bool   nnSupportFormat    = vxnneIsNNSupportFormat(node->base.context, inputs, VX_NULL, outputs);
+    vx_bool   tpSupportFormat    = vxnneIsTPSupportFormat(node->base.context, inputs, VX_NULL, outputs);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && nnSupportFormat;
+
+    if (!support)return support;
+
+    support =  (tpSupportFormat &&
+        vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP) &&
+        ((dilation_x > 1) || (dilation_y > 1)));
+
+    if (!support)return support;
+
+    if (weights != VX_NULL && TENSOR_DATA_LIFETIME(weights) == VX_TENSOR_LIFE_TIME_DYNAMIC)
+        support = vx_false_e;
+
+    if (support)
+        reg_param->flag = gcoNNE_CONV_MODE_NNE_TP2;
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_NN_TP_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_convolution_layer  convolutionLayer = (vxnne_convolution_layer)ops_layer;
+
+    vx_tensor inputs                = (vx_tensor)parameters[0];
+    vx_weights_biases_parameter weights_biases= (vx_weights_biases_parameter)parameters[1];
+    vx_tensor weights               = (vx_tensor)parameters[2];
+    vx_tensor biases                = (vx_tensor)parameters[3];
+    vx_scalar padXLeft              = (vx_scalar)parameters[4];
+    vx_scalar padXRight             = (vx_scalar)parameters[5];
+    vx_scalar padYTop               = (vx_scalar)parameters[6];
+    vx_scalar padYBottom            = (vx_scalar)parameters[7];
+    vx_scalar padModes              = (vx_scalar)parameters[8];
+    vx_scalar padConstant           = (vx_scalar)parameters[9];
+    vx_scalar dilationX             = (vx_scalar)parameters[10];
+    vx_scalar dilationY             = (vx_scalar)parameters[11];
+
+    vx_scalar relu_s                = (vx_scalar)parameters[14];
+    vx_scalar pooling_s             = (vx_scalar)parameters[15];
+    vx_scalar poolingX              = (vx_scalar)parameters[16];
+    vx_scalar poolingY              = (vx_scalar)parameters[17];
+
+    vx_tensor outputs               = (vx_tensor)parameters[19];
+
+    vx_uint32 batchCount = TENSOR_SIZE_INDEX(inputs, 3);
+
+    gcoNNConv_Mode mode = gcoNNE_CONV_MODE_NNE_TP2;
+
+    vx_int32 dilation_x = dilationX->value->n32 + 1;
+    vx_int32 dilation_y = dilationY->value->n32 + 1;
+
+    vx_bool relu = relu_s?relu_s->value->b:vx_false_e;
+
+    vx_enum pooling = pooling_s?pooling_s->value->e:(VX_NN_POOLING_MAX-1);
+    vx_int32 poolingx = poolingX?poolingX->value->n32:0;
+    vx_int32 poolingy = poolingY?poolingY->value->n32:0;
+
+    vx_context context = vxGetContext((vx_reference)inputs);
+
+    vx_uint32 idx = 0;
+    vx_uint32 numTmpTensor = 0;
+    vx_bool enable_batch = ((gcoNNE_CONV_MODE_SW2 == mode) || (gcoNNE_CONV_MODE_NNE_TP == mode))?vx_false_e:vx_true_e;
+    vx_bool need_reshuffle = ((gcoNNE_CONV_MODE_SW2 == mode) || (gcoNNE_CONV_MODE_NNE_TP == mode))?vx_true_e:vx_false_e;
+
+    vx_type_e output_format = (vx_type_e)(TENSOR_DATA_TYPE(outputs));
+
+    vx_int32 item_size = vxnneGetTypeSize(output_format);
+
+    vx_int32 padding_x = padXLeft->value->n32;
+    vx_int32 padding_y = padYTop->value->n32;
+
+    vx_int32 in_h = TENSOR_SIZE_INDEX(inputs, 1);
+    vx_int32 in_w = TENSOR_SIZE_INDEX(inputs, 0);
+    vx_int32 in_c = TENSOR_SIZE_INDEX(inputs, 2);
+
+    vx_int32 k_w = weights?TENSOR_SIZE_INDEX(weights, 0):WB_ORG_KERNEL_X(weights_biases);
+    vx_int32 k_h = weights?TENSOR_SIZE_INDEX(weights, 1):WB_ORG_KERNEL_Y(weights_biases);
+    vx_int32 out_c = TENSOR_SIZE_INDEX(outputs, 2);
+
+    vx_int32 pad_x = padding_x/dilation_x, pad_y = padding_y/dilation_y;
+
+    vx_int32 inputs_reshuffle_width = gcmALIGN_NP2(in_w, dilation_x)/dilation_x, inputs_reshuffle_height = gcmALIGN_NP2(in_h, dilation_y)/dilation_y;
+    vx_int32 reshuffled_out_w = (inputs_reshuffle_width + 2 * padding_x/dilation_x - k_w) + 1;
+    vx_int32 reshuffled_out_h = (inputs_reshuffle_height + 2 * padding_y/dilation_y - k_h) + 1;
+
+    vx_scalar reshuffled_pad_x = vxCreateScalar(context, VX_TYPE_INT32, &pad_x);
+    vx_scalar reshuffled_pad_y = vxCreateScalar(context, VX_TYPE_INT32, &pad_y);
+
+    vx_uint32 size[][4] = {
+         /*
+          * {4, 4, 512, 6 * 6},reshuffled input
+          * {4, 4, 1024, 6 * 6}, reshuffled output
+          * {3, 3, 512 * 6 * 6, 1024 * 6 * 6}, reshuffled weights
+          * {1, 1, 1, 512 * 6 * 6}, reshuffled biases
+          */
+
+         {inputs_reshuffle_width, inputs_reshuffle_height, in_c, dilation_x * dilation_y},
+         {reshuffled_out_w, reshuffled_out_h, out_c, dilation_x * dilation_y},
+         {k_w, k_h, in_c * dilation_x * dilation_y, dilation_x * dilation_y * out_c},
+         {1, 1, 1, out_c * dilation_x * dilation_y},
+     };
+
+    vx_int32 up_sample_tp = 1;
+    vx_tensor reshuffled_output = VX_NULL;
+    vx_tensor reshuffled_input = VX_NULL;
+    vx_tensor reshuffled_weights = VX_NULL;
+    vx_op_param_s conv;
+    vx_tensor_create_params_t tensor_create_params;
+    vx_uint8_ptr reshuffled_input_base = VX_NULL;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    gcmASSERT((dilation_x > 1) || (dilation_y > 1));
+    memset(&conv, 0, sizeof(vx_op_param_s));
+
+    if ((mode == gcoNNE_CONV_MODE_SW2) || (mode == gcoNNE_CONV_MODE_NNE_TP))
+        gcmASSERT((weights_biases == VX_NULL) && (weights != VX_NULL));
+
+    if (!enable_batch)
+    {
+        size[gcoNNE_CONV_RESHUFFLED_INPUTS][2] *= size[gcoNNE_CONV_RESHUFFLED_INPUTS][3];
+        size[gcoNNE_CONV_RESHUFFLED_INPUTS][3] = 1;
+
+        size[gcoNNE_CONV_RESHUFFLED_OUTPUTS][2] *= size[gcoNNE_CONV_RESHUFFLED_OUTPUTS][3];
+        size[gcoNNE_CONV_RESHUFFLED_OUTPUTS][3] = 1;
+    }
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = 4;
+    tensor_create_params.sizes = size[gcoNNE_CONV_RESHUFFLED_INPUTS];
+    tensor_create_params.data_format = TENSOR_DATA_TYPE(inputs);
+    tensor_create_params.quant_format = TENSOR_QUANT_TYPE(inputs);
+    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(inputs);
+    }
+    else
+    {
+        tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(inputs);
+        tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(inputs);
+    }
+    reshuffled_input = vxoTensor_CreateTensor(context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+
+    gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+    tensor_create_params.num_of_dims = 4;
+    tensor_create_params.sizes = size[gcoNNE_CONV_RESHUFFLED_OUTPUTS];
+    tensor_create_params.data_format = TENSOR_DATA_TYPE(outputs);
+    tensor_create_params.quant_format = TENSOR_QUANT_TYPE(reshuffled_input);
+    if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(outputs);
+    }
+    else
+    {
+        tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(outputs);
+        tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(outputs);
+    }
+    reshuffled_output = vxoTensor_CreateTensor(context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+
+    vxoTensor_AllocateMemory(reshuffled_input);
+    vxoTensor_AllocateMemory(reshuffled_output);
+
+    QUANT8CHECK(inputs, reshuffled_input);
+    QUANT8CHECK(outputs, reshuffled_output);
+
+    if (need_reshuffle)
+    {
+        vx_type_e weight_format = (vx_type_e)(TENSOR_DATA_TYPE(weights));
+
+        gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+        tensor_create_params.num_of_dims = 4;
+        tensor_create_params.sizes = size[gcoNNE_CONV_RESHUFFLED_WEIGHTS];
+        tensor_create_params.data_format = weight_format;
+        tensor_create_params.quant_format = TENSOR_QUANT_TYPE(weights);
+        if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+        {
+            tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(weights);
+        }
+        else
+        {
+            tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(weights);
+            tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(weights);
+        }
+        reshuffled_weights = vxoTensor_CreateTensor(context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+        status = vxoTensor_AllocateMemory(reshuffled_weights);
+        if (status)
+        {
+            vxError("Reshuffled Weights Out of Memeory!");
+            goto OnError;
+        }
+
+        QUANT8CHECK(weights, reshuffled_weights);
+    }
+
+    vxoTensor_GetTensorViewMemory(reshuffled_output, (gctPOINTER*)&reshuffled_input_base, VX_NULL);
+    memset(reshuffled_input_base, 0, size[1][0] * size[1][1] * size[1][2] * size[1][3] * item_size);
+
+    if (need_reshuffle)
+    {
+        vx_type_e bias_format   = (vx_type_e)(TENSOR_DATA_TYPE(biases));
+
+        vx_tensor reshuffled_biases;
+
+        vx_weights_biases_parameter_optimizations_t opt = {0};
+        opt.zrl = -1;
+
+        gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+        tensor_create_params.num_of_dims = 4;
+        tensor_create_params.sizes = size[3];
+        tensor_create_params.data_format = bias_format;
+        tensor_create_params.quant_format = TENSOR_QUANT_TYPE(biases);
+        if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+        {
+            tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(biases);
+        }
+        else
+        {
+            tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(biases);
+            tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(biases);
+        }
+        reshuffled_biases = vxoTensor_CreateTensor(context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+
+        if (TENSOR_DATA_TYPE(reshuffled_input) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(reshuffled_input) == VX_QUANT_AFFINE_SCALE)
+        {
+            opt.inputZeroPoint = TENSOR_TF_ZEROPOINT(reshuffled_input);
+            opt.outputFormat = TENSOR_DATA_TYPE(reshuffled_output);
+        }
+
+        vxoTensor_AllocateMemory(reshuffled_biases);
+
+        QUANT8CHECK(biases, reshuffled_biases);
+
+        convolutionLayer->convolution_sw1_reshuffle_operation.create_wbp                = vx_true_e;
+        convolutionLayer->convolution_sw1_reshuffle_operation.weights                   = (need_reshuffle)?weights:VX_NULL;
+        convolutionLayer->convolution_sw1_reshuffle_operation.stride_x                  = dilationX;/*for dilation x*/
+        convolutionLayer->convolution_sw1_reshuffle_operation.stride_y                  = dilationY;/*for dilation y*/
+        convolutionLayer->convolution_sw1_reshuffle_operation.padding_x_left            = padXLeft;
+        convolutionLayer->convolution_sw1_reshuffle_operation.padding_x_right           = padXRight;
+        convolutionLayer->convolution_sw1_reshuffle_operation.padding_y_top             = padYTop;
+        convolutionLayer->convolution_sw1_reshuffle_operation.padding_y_bottom          = padYBottom;
+        convolutionLayer->convolution_sw1_reshuffle_operation.reshuffled_inputs         = reshuffled_input;
+        convolutionLayer->convolution_sw1_reshuffle_operation.outputs                   = reshuffled_output;
+        convolutionLayer->convolution_sw1_reshuffle_operation.reshuffled_weights        = reshuffled_weights;
+        convolutionLayer->convolution_sw1_reshuffle_operation.bias                      = biases;
+        convolutionLayer->convolution_sw1_reshuffle_operation.reshuffled_biases         = reshuffled_biases;
+        convolutionLayer->convolution_sw1_reshuffle_operation.opt                       = &opt;
+
+        vxnneExecuteSWConv_Reshuffle((struct _vxnne_operation_s *)&convolutionLayer->convolution_sw1_reshuffle_operation);
+    }
+
+    if ((mode == gcoNNE_CONV_MODE_NNE_TP) || (gcoNNE_CONV_MODE_NNE_TP2 == mode) || !(vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP)))
+    {
+        status = vxnneOperation_Initialize(&convolutionLayer->convolution_tp_reshuffle_operation.base,
+                                           &convolutionLayer->base,
+                                           VXNNE_OPERATION_TARGET_TP,
+                                           VXNNE_OPERATOR_DILATION_RESHUFFLE,
+                                           VX_NULL,
+                                           vxnneExecuteSWConv_Reshuffle_DeInilition,
+                                           batchCount,
+                                           0);
+
+        vxnneLayer_SetOperation(
+            &convolutionLayer->base,
+            &convolutionLayer->convolution_tp_reshuffle_operation.base,
+            idx++);
+
+        convolutionLayer->convolution_tp_reshuffle_operation.input            = inputs;
+        convolutionLayer->convolution_tp_reshuffle_operation.output           = reshuffled_input;
+
+        vxnneOperation_AddReference(&convolutionLayer->convolution_tp_reshuffle_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&convolutionLayer->convolution_tp_reshuffle_operation.base, (vx_reference)reshuffled_input, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+        conv.pad_x_left = 0;
+        conv.pad_y_top = 0;
+        conv.pool_size_x = 0;
+        conv.pool_size_y = 0;
+        conv.pool_stride = 1;
+        conv.enable_relu = vx_false_e;
+        conv.pad_mode = padModes->value->e;
+        conv.pad_const = padConstant ? padConstant->value->n32 : 0;
+        conv.tpType = TP_DILATE_RESHUFFLE;
+        conv.other_ref = (vx_reference)dilationX;
+        conv.data_buff = gcvNULL;
+
+        memcpy(&convolutionLayer->convolution_tp_reshuffle_operation.base.parameter, &conv, sizeof(vx_op_param_s));
+    }
+    else
+    {
+        /* Initialize reshuffle weights operation */
+        vxnneOperation_Initialize(&convolutionLayer->convolution_sw1_reshuffle_operation.base,
+                                  &convolutionLayer->base,
+                                  VXNNE_OPERATION_TARGET_SW,
+                                  VXNNE_OPERATOR_DILATION_RESHUFFLE,
+                                  vxnneExecuteSWConv_Reshuffle,
+                                  VX_NULL,
+                                  batchCount,
+                                  0);
+        vxnneLayer_SetOperation(
+            &convolutionLayer->base,
+            &convolutionLayer->convolution_sw1_reshuffle_operation.base,
+            idx++);
+
+        convolutionLayer->convolution_sw1_reshuffle_operation.inputs            = inputs;
+        convolutionLayer->convolution_sw1_reshuffle_operation.weights           = need_reshuffle?weights:VX_NULL;
+        convolutionLayer->convolution_sw1_reshuffle_operation.stride_x          = dilationX;/*for dilation x*/
+        convolutionLayer->convolution_sw1_reshuffle_operation.stride_y          = dilationY;/*for dilation y*/
+        convolutionLayer->convolution_sw1_reshuffle_operation.padding_x_left    = padXLeft;
+        convolutionLayer->convolution_sw1_reshuffle_operation.padding_y_top     = padYTop;
+        convolutionLayer->convolution_sw1_reshuffle_operation.padding_x_right   = padXRight;
+        convolutionLayer->convolution_sw1_reshuffle_operation.padding_y_bottom  = padYBottom;
+        convolutionLayer->convolution_sw1_reshuffle_operation.outputs           = reshuffled_output;
+        convolutionLayer->convolution_sw1_reshuffle_operation.reshuffled_inputs = reshuffled_input;
+        convolutionLayer->convolution_sw1_reshuffle_operation.reshuffled_weights= reshuffled_weights;
+        convolutionLayer->convolution_sw1_reshuffle_operation.weights_biaes     = weights_biases;
+
+        vxnneOperation_AddReference(&convolutionLayer->convolution_sw1_reshuffle_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&convolutionLayer->convolution_sw1_reshuffle_operation.base, (vx_reference)reshuffled_output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+        if (need_reshuffle)
+        {
+            vxnneOperation_AddReference(&convolutionLayer->convolution_sw1_reshuffle_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&convolutionLayer->convolution_sw1_reshuffle_operation.base, (vx_reference)reshuffled_weights, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+        }
+    }
+
+    if (gcoNNE_CONV_MODE_NNE_TP2 == mode)
+    {
+        vx_weights_biases_parameter_optimizations_t opt = {0};
+        opt.zrl = -1;
+
+        if (TENSOR_DATA_TYPE(reshuffled_input) == VX_TYPE_UINT8 && TENSOR_QUANT_TYPE(reshuffled_input) == VX_QUANT_AFFINE_SCALE)
+        {
+            opt.inputZeroPoint = TENSOR_TF_ZEROPOINT(reshuffled_input);
+            opt.outputFormat = TENSOR_DATA_TYPE(reshuffled_output);
+        }
+
+        {
+            if (weights_biases == VX_NULL)
+                convolutionLayer->convolution_sw1_reshuffle_operation2.create_wbp            = vx_true_e;
+            else
+                convolutionLayer->convolution_sw1_reshuffle_operation2.weights_biaes         = weights_biases;
+
+            convolutionLayer->convolution_sw1_reshuffle_operation2.inputs                    = VX_NULL;
+            convolutionLayer->convolution_sw1_reshuffle_operation2.weights                   = weights;
+            convolutionLayer->convolution_sw1_reshuffle_operation2.stride_x                  = dilationX;/*for dilation x*/
+            convolutionLayer->convolution_sw1_reshuffle_operation2.stride_y                  = dilationY;/*for dilation y*/
+            convolutionLayer->convolution_sw1_reshuffle_operation2.padding_x_left            = padXLeft;
+            convolutionLayer->convolution_sw1_reshuffle_operation2.padding_x_right           = padXRight;
+            convolutionLayer->convolution_sw1_reshuffle_operation2.padding_y_top             = padYTop;
+            convolutionLayer->convolution_sw1_reshuffle_operation2.padding_y_bottom          = padYBottom;
+            convolutionLayer->convolution_sw1_reshuffle_operation2.reshuffled_inputs         = reshuffled_input;
+            convolutionLayer->convolution_sw1_reshuffle_operation2.outputs                   = reshuffled_output;
+            convolutionLayer->convolution_sw1_reshuffle_operation2.bias                      = biases;
+            convolutionLayer->convolution_sw1_reshuffle_operation2.opt                       = &opt;
+
+            vxnneExecuteSWConv_Reshuffle((struct _vxnne_operation_s *)&convolutionLayer->convolution_sw1_reshuffle_operation2);
+        }
+
+        if (convolutionLayer->convolution_sw1_reshuffle_operation2.weights_biaes)
+        {
+            /* force enable batch for internal convolution, disabled while sub convolution finished */
+            vx_uint32 loop = dilation_x * dilation_y;
+            vx_uint32 i;
+            vx_tensor *real_inputs = VX_NULL;
+            vx_tensor *real_outputs = VX_NULL;
+            vx_tensor_view input_view = VX_NULL;
+            vx_tensor_view output_view = VX_NULL;
+            vx_uint32 input_start[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+            vx_uint32 input_end[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+            vx_uint32 output_start[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+            vx_uint32 output_end[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {0};
+
+            gcoOS_Allocate(gcvNULL, sizeof(vx_tensor) * loop, (gctPOINTER*)&real_inputs);
+            gcoOS_Allocate(gcvNULL, sizeof(vx_tensor) * loop, (gctPOINTER*)&real_outputs);
+            gcoOS_Allocate(gcvNULL, sizeof(vxnne_convolution_relu_pooling_operation_s) * (dilation_x * dilation_y), (gctPOINTER*)&convolutionLayer->convolution_nn_convolution_dynamic_operation);
+            gcoOS_ZeroMemory(convolutionLayer->convolution_nn_convolution_dynamic_operation, sizeof(vxnne_convolution_relu_pooling_operation_s) * (dilation_x * dilation_y));
+
+            vxoCalculateNNCompressionFirstTime(context, convolutionLayer->convolution_sw1_reshuffle_operation2.weights_biaes, reshuffled_output);
+
+            for (i = 0; i < loop; i++)
+            {
+                /* Initialize covolution operation */
+                status = vxnneOperation_Initialize(&convolutionLayer->convolution_nn_convolution_dynamic_operation[i].base,
+                                                   &convolutionLayer->base,
+                                                   VXNNE_OPERATION_TARGET_NN,
+                                                   VXNNE_OPERATOR_CONVOLUTION,
+                                                   VX_NULL,
+                                                   NULL,
+                                                   batchCount,
+                                                   NNE_COMMAND_SIZE);
+
+                input_end[0] = TENSOR_VIEW_SIZE_INDEX(reshuffled_input, 0);
+                input_end[1] = TENSOR_VIEW_SIZE_INDEX(reshuffled_input, 1);
+                input_end[2] = TENSOR_VIEW_SIZE_INDEX(reshuffled_input, 2);
+                input_end[3] = i + 1;
+
+                input_start[0] = 0;
+                input_start[1] = 0;
+                input_start[2] = 0;
+                input_start[3] = i;
+
+                input_view = vxCreateTensorView(context, input_start, input_end, (vx_uint8)reshuffled_input->dimCount);
+                real_inputs[i] = vxoTensor_CreateTensorFromView(reshuffled_input, input_view);
+
+                output_end[0] = TENSOR_VIEW_SIZE_INDEX(reshuffled_output, 0);
+                output_end[1] = TENSOR_VIEW_SIZE_INDEX(reshuffled_output, 1);
+                output_end[2] = TENSOR_VIEW_SIZE_INDEX(reshuffled_output, 2);
+                output_end[3] = i + 1;
+
+                output_start[0] = 0;
+                output_start[1] = 0;
+                output_start[2] = 0;
+                output_start[3] = i;
+
+                output_view = vxCreateTensorView(context, output_start, output_end, (vx_uint8)reshuffled_output->dimCount);
+                real_outputs[i] = vxoTensor_CreateTensorFromView(reshuffled_output, output_view);
+
+                convolutionLayer->base.temp_tensors[numTmpTensor++] = real_inputs[i];
+                convolutionLayer->base.temp_tensors[numTmpTensor++] = real_outputs[i];
+
+                vxReleaseTensorView(&input_view);
+                vxReleaseTensorView(&output_view);
+
+                convolutionLayer->convolution_nn_convolution_dynamic_operation[i].inputs           = real_inputs[i];
+                convolutionLayer->convolution_nn_convolution_dynamic_operation[i].orig_inputs      = inputs;
+                convolutionLayer->convolution_nn_convolution_dynamic_operation[i].weights_biases   = convolutionLayer->convolution_sw1_reshuffle_operation2.weights_biaes;
+                convolutionLayer->convolution_nn_convolution_dynamic_operation[i].outputs          = real_outputs[i];
+
+                vxnneOperation_AddReference(&convolutionLayer->convolution_nn_convolution_dynamic_operation[i].base, (vx_reference)real_inputs[i], VXNNE_OPERATION_REFENRENCE_INPUT);
+                vxnneOperation_AddReference(&convolutionLayer->convolution_nn_convolution_dynamic_operation[i].base, (vx_reference)real_outputs[i], VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+                {
+                    conv.pad_x_left = pad_x;
+                    conv.pad_x_right = pad_x;
+                    conv.pad_y_top = pad_y;
+                    conv.pad_y_bottom = pad_y;
+                    conv.pad_mode = padModes->value->e;
+                    conv.pad_const = padConstant ? padConstant->value->n32 : 0;
+                    conv.pool_type = pooling;
+                    conv.conv_rounding_type = VX_NN_DS_SIZE_ROUNDING_FLOOR;
+                    conv.enable_relu = relu;
+                    conv.pool_size_x = poolingx;
+                    conv.pool_size_y = poolingy;
+                    conv.pool_stride = (poolingx > 0) ? 2 : 1;
+                    memcpy(&convolutionLayer->convolution_nn_convolution_dynamic_operation[i].base.parameter, &conv, sizeof(vx_op_param_s));
+                }
+
+                vxnneLayer_SetOperation(
+                    &convolutionLayer->base,
+                    &convolutionLayer->convolution_nn_convolution_dynamic_operation[i].base,
+                    idx++);
+            }
+        }
+    }
+    else if (gcoNNE_CONV_MODE_NNE_TP == mode)
+    {
+        if (convolutionLayer->convolution_sw1_reshuffle_operation.weights_biaes)
+        {
+            /* Initialize covolution operation */
+            status = vxnneOperation_Initialize(&convolutionLayer->convolution_nn_convolution_operation.base,
+                                               &convolutionLayer->base,
+                                               VXNNE_OPERATION_TARGET_NN,
+                                               VXNNE_OPERATOR_CONVOLUTION,
+                                               VX_NULL,
+                                               NULL,
+                                               batchCount,
+                                               NNE_COMMAND_SIZE);
+
+            vxnneLayer_SetOperation(
+                &convolutionLayer->base,
+                &convolutionLayer->convolution_nn_convolution_operation.base,
+                idx++);
+
+            vxoCalculateNNCompressionFirstTime(context, convolutionLayer->convolution_sw1_reshuffle_operation.weights_biaes, reshuffled_output);
+
+            convolutionLayer->convolution_nn_convolution_operation.inputs           = reshuffled_input;
+            convolutionLayer->convolution_nn_convolution_operation.orig_inputs      = inputs;
+            convolutionLayer->convolution_nn_convolution_operation.weights_biases   = convolutionLayer->convolution_sw1_reshuffle_operation.weights_biaes;
+            convolutionLayer->convolution_nn_convolution_operation.outputs          = reshuffled_output;
+
+            vxnneOperation_AddReference(&convolutionLayer->convolution_nn_convolution_operation.base, (vx_reference)reshuffled_input, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&convolutionLayer->convolution_nn_convolution_operation.base, (vx_reference)reshuffled_output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+            {
+                conv.pad_x_left = pad_x;
+                conv.pad_x_right = pad_x;
+                conv.pad_y_top = pad_y;
+                conv.pad_y_bottom = pad_y;
+                conv.pad_mode = padModes->value->e;
+                conv.pad_const = padConstant->value->n32;
+                conv.pool_type = pooling;
+                conv.conv_rounding_type = VX_NN_DS_SIZE_ROUNDING_FLOOR;
+                conv.enable_relu = relu;
+                conv.pool_size_x = poolingx;
+                conv.pool_size_y = poolingy;
+                conv.pool_stride = (poolingx > 0) ? 2 : 1;
+                memcpy(&convolutionLayer->convolution_nn_convolution_operation.base.parameter, &conv, sizeof(vx_op_param_s));
+            }
+        }
+    }
+    else
+    {
+        vx_enum downScaleSizeRounding = VX_NN_DS_SIZE_ROUNDING_FLOOR;
+        vx_scalar down_scale_s = vxCreateScalar(context, VX_TYPE_ENUM, &downScaleSizeRounding);
+
+        vxnne_convolution_operation op = (vxnne_convolution_operation)vxAllocateAndZeroMemory(sizeof(vxnne_convolution_operation_s));
+
+        /* Initialize covolution operation */
+        vxnneOperation_Initialize(&op->base,
+                                  &convolutionLayer->base,
+                                  VXNNE_OPERATION_TARGET_SW,
+                                  VXNNE_OPERATOR_CONVOLUTION,
+                                  vxnneExecuteSWConvolution,
+                                  (gcoNNE_CONV_MODE_SW2 == mode)?vxnneExecuteSWConv_Convolution_DeInilition2:vxnneExecuteSWConv_Convolution_DeInilition,
+                                  batchCount,
+                                  0);
+
+        vxnneLayer_SetOperation(
+            &convolutionLayer->base,
+            &op->base,
+            idx++);
+
+        op->inputs                  = reshuffled_input;
+        op->weights                 = (gcoNNE_CONV_MODE_SW2 == mode)?reshuffled_weights:weights;
+        op->biases                  = (gcoNNE_CONV_MODE_SW2 == mode)?convolutionLayer->convolution_sw1_reshuffle_operation.reshuffled_biases:biases;
+        op->padX                    = reshuffled_pad_x;
+        op->padY                    = reshuffled_pad_y;
+
+        op->downScaleSizeRounding   = down_scale_s;
+        op->outputs                 = reshuffled_output;
+
+        vxnneOperation_AddReference(&convolutionLayer->convolution_sw1_reshuffle_operation.base, (vx_reference)reshuffled_input, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&convolutionLayer->convolution_sw1_reshuffle_operation.base, (vx_reference)weights, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&convolutionLayer->convolution_sw1_reshuffle_operation.base, (vx_reference)biases, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&convolutionLayer->convolution_sw1_reshuffle_operation.base, (vx_reference)reshuffled_output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+    }
+
+    if ((mode == gcoNNE_CONV_MODE_NNE_TP) || (mode == gcoNNE_CONV_MODE_NNE_TP2) || !(vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TP)))
+    {
+        vx_bool need_correct = ((dilation_x * inputs_reshuffle_width != in_w) || (dilation_y * inputs_reshuffle_height != in_h))?vx_true_e:vx_false_e;
+        vx_tensor reshuffled_output2 = VX_NULL;
+
+        if (need_correct)
+        {
+            vx_uint32 size2[][4] = {
+                 /*
+                  * {4*6, 4*6, 1024, 1}, reshuffled output2
+                  */
+
+                 {reshuffled_out_w * dilation_x, reshuffled_out_h * dilation_x, out_c, 1},
+             };
+
+            gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+            tensor_create_params.num_of_dims = 4;
+            tensor_create_params.sizes = size2[0];
+            tensor_create_params.data_format = TENSOR_DATA_TYPE(outputs);
+            tensor_create_params.quant_format = TENSOR_QUANT_TYPE(outputs);
+            if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+            {
+                tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(outputs);
+            }
+            else
+            {
+                tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(outputs);
+                tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(outputs);
+            }
+
+            reshuffled_output2 = vxoTensor_CreateTensor(context, ops_layer->node->graph, &tensor_create_params, vx_false_e);
+
+            vxoTensor_AllocateMemory(reshuffled_output2);
+
+            QUANT8CHECK(outputs, reshuffled_output2);
+        }
+
+
+        status = vxnneOperation_Initialize(&convolutionLayer->convolution_tp_upsample_operation.base,
+                                       &convolutionLayer->base,
+                                       VXNNE_OPERATION_TARGET_TP,
+                                       VXNNE_OPERATOR_DILATION_UPSAMPLE,
+                                       VX_NULL,
+                                       vxnneExecuteSWConv_UpSample_DeInilition,
+                                       batchCount,
+                                       0);
+
+        vxnneLayer_SetOperation(
+            &convolutionLayer->base,
+            &convolutionLayer->convolution_tp_upsample_operation.base,
+            idx++);
+
+        convolutionLayer->convolution_tp_upsample_operation.input            = reshuffled_output;
+        convolutionLayer->convolution_tp_upsample_operation.output           = need_correct?reshuffled_output2:outputs;
+
+        vxnneOperation_AddReference(&convolutionLayer->convolution_tp_upsample_operation.base, (vx_reference)reshuffled_output, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&convolutionLayer->convolution_tp_upsample_operation.base, (vx_reference)(need_correct?reshuffled_output2:outputs), VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+        conv.pad_x_left = 0;
+        conv.pad_y_top = 0;
+        conv.pool_size_x = 0;
+        conv.pool_size_y = 0;
+        conv.pool_stride = 1;
+        conv.enable_relu = vx_false_e;
+        conv.pad_mode = padModes->value->e;
+        conv.pad_const = padConstant ? padConstant->value->n32 : 0;
+        conv.tpType = TP_DILATE_UPSAMPLE;
+        conv.other_ref = gcvNULL;
+        conv.data_buff = gcvNULL;
+
+        memcpy(&convolutionLayer->convolution_tp_upsample_operation.base.parameter, &conv, sizeof(vx_op_param_s));
+
+
+
+
+        if (need_correct)
+        {
+
+            up_sample_tp ++;
+            status = vxnneOperation_Initialize(&convolutionLayer->convolution_tp_upsample_operation2.base,
+                                               &convolutionLayer->base,
+                                               VXNNE_OPERATION_TARGET_TP,
+                                               VXNNE_OPERATOR_DILATION_UPSAMPLE2,
+                                               VX_NULL,
+                                               vxnneExecuteSWConv_UpSample_DeInilition,
+                                               batchCount,
+                                               0);
+
+            vxnneLayer_SetOperation(
+                &convolutionLayer->base,
+                &convolutionLayer->convolution_tp_upsample_operation2.base,
+                idx++);
+
+            convolutionLayer->convolution_tp_upsample_operation2.input            = reshuffled_output2;
+            convolutionLayer->convolution_tp_upsample_operation2.output           = outputs;
+
+            vxnneOperation_AddReference(&convolutionLayer->convolution_tp_upsample_operation2.base, (vx_reference)reshuffled_output2, VXNNE_OPERATION_REFENRENCE_INPUT);
+            vxnneOperation_AddReference(&convolutionLayer->convolution_tp_upsample_operation2.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+
+            conv.tpType = TP_DILATE_UPSAMPLE2;
+            conv.other_ref = gcvNULL;
+            conv.data_buff = gcvNULL;
+
+            memcpy(&convolutionLayer->convolution_tp_upsample_operation2.base.parameter, &conv, sizeof(vx_op_param_s));
+
+        }
+    }
+    else
+    {
+
+        /* Initialize upsample operation */
+        vxnneOperation_Initialize(&convolutionLayer->convolution_sw1_upsample_operation.base,
+                                  &convolutionLayer->base,
+                                  VXNNE_OPERATION_TARGET_SW,
+                                  VXNNE_OPERATOR_CONVOLUTION,
+                                  vxnneExecuteSWConv_UpSample,
+                                  vxnneExecuteSWConv_UpSample_DeInilition,
+                                  batchCount,
+                                  0);
+
+        vxnneLayer_SetOperation(
+            &convolutionLayer->base,
+            &convolutionLayer->convolution_sw1_upsample_operation.base,
+            idx++);
+
+        convolutionLayer->convolution_sw1_upsample_operation.inputs           = reshuffled_output;
+        convolutionLayer->convolution_sw1_upsample_operation.dilationX        = dilationX;
+        convolutionLayer->convolution_sw1_upsample_operation.dilationY        = dilationY;
+
+        convolutionLayer->convolution_sw1_upsample_operation.outputs          = outputs;
+
+        vxnneOperation_AddReference(&convolutionLayer->convolution_sw1_upsample_operation.base, (vx_reference)reshuffled_output, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&convolutionLayer->convolution_sw1_upsample_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+    vx_scalar dilationX             = (vx_scalar)ops_layer->node->paramTable[9];
+    vx_scalar dilationY             = (vx_scalar)ops_layer->node->paramTable[10];
+    vxnne_convolution_layer  convolutionLayer = (vxnne_convolution_layer)ops_layer;
+
+    vx_int32 dilation_x = dilationX->value->n32 + 1;
+    vx_int32 dilation_y = dilationY->value->n32 + 1;
+
+    gcoOS_Allocate(gcvNULL, sizeof(vxnne_operation_s) * (dilation_x * dilation_y + vxmOPERATION_COUNT(convolutionLayer)), (gctPOINTER*)&convolutionLayer->dynamic_operations);
+
+    *max_num_operations = dilation_x * dilation_y + vxmOPERATION_COUNT(convolutionLayer);
+
+    *operations = convolutionLayer->dynamic_operations;
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayerInitializer_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxnne_layer_imp_s registerTensorDilationConvLayers[] = {/* Please DON'T adjust the order, it's importent */
+        { "RPNLAYER NN/TP", vxoNNDilationConvolutionLayer_NN_TP_Support, vxoNNDilationConvolutionLayer_NN_TP_Initialize, VX_NULL },
+        { "RPNLAYER TP", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "RPNLAYER SH EVIS", vxoNNDilationConvolutionLayer_SH_EVIS_Support, vxoNNDilationConvolutionLayer_SH_EVIS_Initialize, VX_NULL },
+        { "RPNLAYER SH F32", vxoNNDilationConvolutionLayer_SH_Support, vxoNNDilationConvolutionLayer_SH_Initialize, VX_NULL },
+        { "RPNLAYER SW", vxoNNCommon_Support, vxoNNDilationConvolutionLayer_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerTensorDilationConvLayers, vxnne_convolution_layer_s, "ConvolutionLayer", vxoNNLayer_GetOperations);
+
+OnError:
+    return status;
+}
+#endif
+
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
+{
+
+    return vxoNNDilationConvolutionLayerInitializer_Ext(node, parameters, num);
+}
+
+#else
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx_node node,
         vx_tensor inputs,
@@ -3512,6 +5108,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
 exit:
     return status;
 }
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionLayer_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
@@ -3545,6 +5142,25 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionLayer_Initializer(vx_node n
     }
     else
     {
+#if REGISTER_FRAME
+        vx_status status = VX_SUCCESS;
+        vx_enum padmode = VX_PAD_CONSTANT;
+        vx_reference params[] = {
+            (vx_reference)inputs, VX_NULL, (vx_reference)weights, (vx_reference)biases, /*input, weights_bias, weights, biases*/
+            (vx_reference)padX, (vx_reference)padXRight, (vx_reference)padY, (vx_reference)padYBottom, /*pad x, x_right, y, y_bottom, */
+            (vx_reference)vxCreateScalar(node->base.context, VX_TYPE_ENUM, &padmode), VX_NULL, /*padmode, padconstant*/
+            (vx_reference)dilationX, (vx_reference)dilationY, (vx_reference)strideX, (vx_reference)strideY, /*dilation x/y, stride x/y */
+            VX_NULL, VX_NULL, VX_NULL, VX_NULL, /*relu, pool type, x, y */
+            (vx_reference)downScaleSizeRounding, (vx_reference)outputs, /*rounding, output */
+        };
+
+        status = vxoNNDilationConvolutionLayerInitializer_Ext(node, params, gcmCOUNTOF(params));
+
+        if (params[8])
+            vxReleaseScalar((vx_scalar*)&params[8]);
+
+        return status;
+#else
         return vxoNNDilationConvolutionLayerInitializer(node,
             inputs,
             VX_NULL, weights, biases,
@@ -3555,6 +5171,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNConvolutionLayer_Initializer(vx_node n
             VX_NULL, VX_NULL, VX_NULL,
             downScaleSizeRounding,
             outputs);
+#endif
     }
 }
 

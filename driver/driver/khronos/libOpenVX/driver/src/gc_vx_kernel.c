@@ -1189,7 +1189,7 @@ gcfVX_LoadKernelArgValues(
                     gcmONERROR(gcfVX_GetImageInfo(&context, (vx_image)ref, &info, 0));
 
 #if REGISTER_FRAME
-                    info.isVXC =  Kernel->states.programState.hints->useEvisInst || ((Shader->flags & gcSHADER_FLAG_HAS_VIV_VX_EXTENSION)  == gcSHADER_FLAG_HAS_VIV_VX_EXTENSION );
+                    info.isVXC =  Kernel->states.programState.hints->useEvisInst;
 #else
                     info.isVXC = base->evisNoInst.supportEVIS ? gcvTRUE : gcvFALSE;
 #endif
@@ -1212,7 +1212,7 @@ gcfVX_LoadKernelArgValues(
 #if REGISTER_FRAME
                     /* it's w/a for non-evis vxc shader in hw which support EVIS */
 
-                    info.isVXC =  Kernel->states.programState.hints->useEvisInst || ((Shader->flags & gcSHADER_FLAG_HAS_VIV_VX_EXTENSION)  == gcSHADER_FLAG_HAS_VIV_VX_EXTENSION );
+                    info.isVXC =  Kernel->states.programState.hints->useEvisInst;
                     if (Arg->components > 1 && Arg->components <= 4 && info.isVXC == gcvFALSE)
                     {
                         info.componentCount = Arg->components;
@@ -1267,7 +1267,7 @@ gcfVX_LoadKernelArgValues(
 
                     gcmONERROR(gcfVX_GetImageInfo(&context, (vx_image)&image, &info, 0));
 #if REGISTER_FRAME
-                    info.isVXC = Kernel->states.programState.hints->useEvisInst || ((Shader->flags & gcSHADER_FLAG_HAS_VIV_VX_EXTENSION)  == gcSHADER_FLAG_HAS_VIV_VX_EXTENSION );
+                    info.isVXC = Kernel->states.programState.hints->useEvisInst;
 #else
                     info.isVXC = base->evisNoInst.supportEVIS ? gcvTRUE : gcvFALSE;
 #endif
@@ -1289,7 +1289,7 @@ gcfVX_LoadKernelArgValues(
                     }
 #if REGISTER_FRAME
                     /* it's w/a for non-evis vxc shader in hw which support EVIS */
-                    info.isVXC =  Kernel->states.programState.hints->useEvisInst || ((Shader->flags & gcSHADER_FLAG_HAS_VIV_VX_EXTENSION)  == gcSHADER_FLAG_HAS_VIV_VX_EXTENSION );
+                    info.isVXC =  Kernel->states.programState.hints->useEvisInst;
                     if (Arg->components > 1 && Arg->components <= 4 && info.isVXC == gcvFALSE)
                     {
                         info.componentCount = Arg->components;

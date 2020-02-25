@@ -1243,10 +1243,259 @@ vx_status vxnneExecuteSWTensorMul(vxnne_operation operation)
 
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status vxoNNTensorMul_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vx_tensor input0   = (vx_tensor)parameters[0];
+    vx_tensor input1   = (vx_tensor)parameters[1];
+    vx_scalar scale    = (vx_scalar)parameters[2];
+    vx_scalar policy   = (vx_scalar)parameters[3];
+    vx_scalar rounding = (vx_scalar)parameters[4];
+    vx_tensor output   = (vx_tensor)parameters[5];
+
+    vx_uint32 batchCount = (TENSOR_SIZE_INDEX(output, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(output, 3);
+    vxnne_tensor_mul_layer tensor_mul_layer = (vxnne_tensor_mul_layer)ops_layer;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+    vxmONERROR(vxnneOperation_Initialize(&tensor_mul_layer->tensorMulSW.base,
+                            &tensor_mul_layer->base,
+                            VXNNE_OPERATION_TARGET_SW,
+                            VXNNE_OPERATOR_TENSOR_MUL,
+                            /*vxnneExecuteSWEltwise,*/
+                            vxnneExecuteSWTensorMul,
+                            VX_NULL,
+                            batchCount,
+                            0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &tensor_mul_layer->base,
+        &tensor_mul_layer->tensorMulSW.base,
+        0));
+
+    tensor_mul_layer->tensorMulSW.input0    = input0;
+    tensor_mul_layer->tensorMulSW.input1    = input1;
+    tensor_mul_layer->tensorMulSW.scale     = scale;
+    tensor_mul_layer->tensorMulSW.overflow  = policy;
+    tensor_mul_layer->tensorMulSW.rounding  = rounding;
+    tensor_mul_layer->tensorMulSW.output    = output;
+
+    vxmONERROR(vxnneOperation_AddReference(&tensor_mul_layer->tensorMulSW.base, (vx_reference)input0, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&tensor_mul_layer->tensorMulSW.base, (vx_reference)input1, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&tensor_mul_layer->tensorMulSW.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNNTensorMul_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_tensor input0   = (vx_tensor)parameters[0];
+    vx_tensor input1   = (vx_tensor)parameters[1];
+    vx_tensor output   = (vx_tensor)parameters[5];
+
+    vx_type_e input0Format = TENSOR_DATA_TYPE(input0);
+    vx_type_e input1Format = TENSOR_DATA_TYPE(input1);
+    vx_type_e outputFormat = TENSOR_DATA_TYPE(output);
+
+    vx_bool shExe_flag   = vx_true_e;
+    vx_bool swExe_flag   = vx_false_e;
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    swExe_flag = (TENSOR_DIM_NUM(output) > 4);
+
+    vxoLayer_VerificationHead(node, parameters, _num, reg_param);
+
+    if(evis)
+        shExe_flag = (vx_bool)((input0Format != VX_TYPE_FLOAT32) && (input1Format != VX_TYPE_FLOAT32) && (outputFormat != VX_TYPE_FLOAT32));
+    else
+        shExe_flag = vx_true_e;
+
+    support = shExe_flag && support;
+    support = support && !swExe_flag;
+
+    vxoLayer_VerificationFoot(node, parameters, _num, reg_param, &support);
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorMul_SH_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_status status = VX_SUCCESS;
+    vx_tensor input0   = (vx_tensor)parameters[0];
+    vx_tensor input1   = (vx_tensor)parameters[1];
+    vx_scalar scale    = (vx_scalar)parameters[2];
+    vx_scalar policy   = (vx_scalar)parameters[3];
+    vx_scalar rounding = (vx_scalar)parameters[4];
+    vx_tensor output   = (vx_tensor)parameters[5];
+
+    vx_type_e input0Format = TENSOR_DATA_TYPE(input0);
+    vx_type_e input1Format = TENSOR_DATA_TYPE(input1);
+
+    vx_uint32 batchCount0 = (TENSOR_SIZE_INDEX(input0, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(input0, 3);
+    vx_uint32 batchCount1 = (TENSOR_SIZE_INDEX(input1, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(input1, 3);
+    vx_uint32 batchCount = (TENSOR_SIZE_INDEX(output, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(output, 3);
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vxnne_tensor_mul_layer tensor_mul_layer = (vxnne_tensor_mul_layer)ops_layer;
+    vxoLayer_InitializeHead(ops_layer, parameters, _num, reg_param);
+
+    if(evis)
+    {
+        vx_enum    policyEnum   = policy->value->e;
+        vx_enum    roundingEnum = rounding->value->e;
+        vx_float32 scale_val    = scale->value->f32;
+
+        if ((vxDataType_GetSize(input1Format) == 1 && vxDataType_GetSize(input0Format) == 2) || (input1Format == VX_TYPE_INT16 && input0Format == VX_TYPE_FLOAT16))
+        {
+            if (roundingEnum == VX_ROUND_POLICY_TO_NEAREST_EVEN && policyEnum == VX_CONVERT_POLICY_SATURATE && scale_val == 1.0f)
+                shaderExecutable = vxnneGetTensorMulSatRTEShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MUL_SAT_RTE, &ops_layer->node->kernelAttributes.borderMode, input1, input0, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
+            else
+                shaderExecutable = vxnneGetTensorMulShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MUL, &ops_layer->node->kernelAttributes.borderMode, input1, input0, scale, policy, rounding, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
+
+        }
+        else
+        {
+            if (roundingEnum == VX_ROUND_POLICY_TO_NEAREST_EVEN && policyEnum == VX_CONVERT_POLICY_SATURATE && scale_val == 1.0f)
+                shaderExecutable = vxnneGetTensorMulSatRTEShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MUL_SAT_RTE, &ops_layer->node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
+            else
+                shaderExecutable = vxnneGetTensorMulShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MUL, &ops_layer->node->kernelAttributes.borderMode, input0, input1, scale, policy, rounding, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
+
+        }
+    }
+    else
+    {
+        shaderExecutable = vxnneGetGPUTensorEltwiseShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MUL, &ops_layer->node->kernelAttributes.borderMode, input0, input1, VX_NN_ACTIVATION_NONE, VX_TENSOR_OP_MUL, output);
+    }
+
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    vxmONERROR(vxnneShaderOperation_Initialize(&tensor_mul_layer->tensorMulSH,
+                                    &tensor_mul_layer->base,
+                                    VXNNE_OPERATOR_TENSOR_MUL,
+                                    batchCount,
+                                    shaderExecutable));
+
+    if (batchCount != 1 && batchCount0 != batchCount1)
+    {
+        vx_tensor src0 = (vx_tensor)shaderExecutable->param[0];
+        vx_uint32 batch0 = (TENSOR_SIZE_INDEX(src0, 3) == 0) ? 1 : TENSOR_SIZE_INDEX(src0, 3);
+
+        if (batch0 == 1)
+            vxmONERROR(vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT));
+        else
+            vxmONERROR(vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_NO_BATCH_BIT));
+    }
+
+    vxmONERROR(vxnneOperation_AddReference(&tensor_mul_layer->tensorMulSH.base, (vx_reference)input0, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&tensor_mul_layer->tensorMulSH.base, (vx_reference)input1, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&tensor_mul_layer->tensorMulSH.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &tensor_mul_layer->base,
+        &tensor_mul_layer->tensorMulSH.base,
+        0));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, _num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNNTensorMul_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoNNTensorMul_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorMul_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    status = vxoNNTensorMul_SH_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNNTensorMul_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    support = support && vxoNNTensorMul_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorMul_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    status = vxoNNTensorMul_SH_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations2(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+
+    vxnne_tensor_mul_layer tensor_mul_layer = (vxnne_tensor_mul_layer)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(tensor_mul_layer->operations);
+
+    *operations = tensor_mul_layer->operations;
+
+    return status;
+}
+
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMul_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
+    vxnne_layer_imp_s registerTensorMul[] = {/* Please DON'T adjust the order, it's importent */
+        { "TensorMul NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "TensorMul TP", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "TensorMul SH EVIS", vxoNNTensorMul_SH_EVIS_Support, vxoNNTensorMul_SH_EVIS_Initialize, VX_NULL },
+        { "TensorMul SH F32", vxoNNTensorMul_SH_Support, vxoNNTensorMul_SH_Initialize, VX_NULL },
+        { "TensorMul SW ", vxoNNCommon_Support, vxoNNTensorMul_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerTensorMul, vxnne_tensor_mul_layer_s, "TensorMul", vxoNNLayer_GetOperations2);
+
+OnError:
+#else
 
     vx_tensor input0   = (vx_tensor)parameters[0];
     vx_tensor input1   = (vx_tensor)parameters[1];
@@ -1398,6 +1647,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMul_Initializer(vx_node node, co
 exit:
     if (tensor_mul_layer)
         gcoOS_Free(NULL, (gctPOINTER)tensor_mul_layer);
+#endif
 
     return status;
 }

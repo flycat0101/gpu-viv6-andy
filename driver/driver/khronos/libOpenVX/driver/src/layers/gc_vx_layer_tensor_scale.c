@@ -196,11 +196,270 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorScale_ValidateOutput(vx_node node,
 {
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status vxoTensorScale_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_tensor_scale_layer  tensor_scaleLayer = (vxnne_tensor_scale_layer)ops_layer;
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_scalar  type_s                     = (vx_scalar)parameters[1];
+    vx_tensor  outputs                    = (vx_tensor)parameters[2];
+    vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+    vxmONERROR(vxnneOperation_Initialize(&tensor_scaleLayer->tensor_scale_sw_operation.base,
+        &tensor_scaleLayer->base,
+        VXNNE_OPERATION_TARGET_SW,
+        VXNNE_OPERATOR_TENSOR_SCALE,
+        vxnneExecuteSWTensorScale,
+        VX_NULL,
+        batchCount,
+        0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &tensor_scaleLayer->base,
+        &tensor_scaleLayer->tensor_scale_sw_operation.base,
+        0));
+
+    tensor_scaleLayer->tensor_scale_sw_operation.inputs           = inputs;
+    tensor_scaleLayer->tensor_scale_sw_operation.type             = type_s;
+    tensor_scaleLayer->tensor_scale_sw_operation.outputs          = outputs;
+
+    vxmONERROR(vxnneOperation_AddReference(&tensor_scaleLayer->tensor_scale_sw_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&tensor_scaleLayer->tensor_scale_sw_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoTensorScale_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_scalar  type_s                     = (vx_scalar)parameters[1];
+    vx_tensor  outputs                    = (vx_tensor)parameters[2];
+    vx_bool    useShadeExe                = vx_false_e;
+    vx_bool    enable_format              = vx_false_e;
+    vx_bool    enable_nearest_format      = vx_false_e;
+    vx_bool    enable_tmp_format          = vx_false_e;
+    vx_bool    enable_nearest_neighbor    = vx_false_e;
+    vx_bool    enable_nearest_scaleVal    = vx_false_e;
+    vx_enum    srcFormat                  = TENSOR_DATA_TYPE(inputs);
+    vx_enum    dstFormat                  = TENSOR_DATA_TYPE(outputs);
+    vx_enum    type                       = type_s->value->e;
+    vx_uint32  in_width                   = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+    vx_uint32  in_height                  = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+    vx_uint32  out_width                  = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
+    vx_uint32  out_height                 = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
+    vx_float32 width_scale                = (vx_float32)in_width / out_width;
+    vx_float32 height_scale               = (vx_float32)in_height / out_height;
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, _num, reg_param);
+
+    if(evis)
+    {
+        enable_format           = (vx_bool)((srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+                                         ||(srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT16)
+                                         ||(srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
+                                         ||(srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_INT8)
+                                         ||(srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
+                                         ||(srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+                                         ||(srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_BFLOAT16));
+        enable_nearest_format   = (vx_bool)(!checkOutputTensorDoAlu(inputs, outputs)
+                                        || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+                                        || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
+                                        || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_INT8));
+
+        enable_tmp_format       = (vx_bool)((srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+                                         || (srcFormat == VX_TYPE_INT16 && dstFormat == VX_TYPE_INT16)
+                                         || (srcFormat == VX_TYPE_INT8 && dstFormat == VX_TYPE_INT8)
+                                         || (srcFormat == VX_TYPE_BFLOAT16 && dstFormat == VX_TYPE_BFLOAT16)
+                                         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8));
+    }
+    else
+    {
+        enable_format           = (vx_bool)((srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+                                         ||(srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_FLOAT32)
+                                         ||(srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT16)
+                                         ||(srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_FLOAT32)
+                                         ||(srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
+                                         ||(srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_UINT8)
+                                         ||(srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8));
+        enable_nearest_format   = (vx_bool)(!checkOutputTensorDoAlu(inputs, outputs)
+                                        || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
+                                        || (srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_UINT8)
+                                        || (srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_UINT8));
+
+        enable_tmp_format       = (vx_bool)((srcFormat == VX_TYPE_FLOAT16 && dstFormat == VX_TYPE_FLOAT16)
+                                         || (srcFormat == VX_TYPE_FLOAT32 && dstFormat == VX_TYPE_FLOAT32)
+                                         || (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8));
+    }
+
+    enable_nearest_scaleVal = (vx_bool) ((width_scale == 2.0f && height_scale == 2.0f && in_width * in_height < IMG_MAX_WIDTH) || (width_scale == 0.5f && height_scale == 0.5f));
+    enable_nearest_neighbor = (vx_bool) (((enable_nearest_format  && enable_nearest_scaleVal) || enable_tmp_format) && type == VX_INTERPOLATION_NEAREST_NEIGHBOR);
+
+    useShadeExe     =  (vx_bool)((enable_format && type == VX_INTERPOLATION_BILINEAR) || enable_nearest_neighbor);
+
+    support = useShadeExe && support;
+
+    vxoLayer_VerificationFoot(node, parameters, _num, reg_param, &support);
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoTensorScale_SH_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 _num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_tensor_scale_layer  tensor_scaleLayer = (vxnne_tensor_scale_layer)ops_layer;
+    vx_tensor  inputs                     = (vx_tensor)parameters[0];
+    vx_scalar  type_s                     = (vx_scalar)parameters[1];
+    vx_tensor  outputs                    = (vx_tensor)parameters[2];
+    vx_enum    type                       = type_s->value->e;
+
+    vx_uint32  batchCount                 = TENSOR_SIZE_INDEX(inputs, 3);
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vxoLayer_InitializeHead(ops_layer, parameters, _num, reg_param);
+
+    if (type == VX_INTERPOLATION_BILINEAR)
+    {
+        if(evis)
+        {
+            shaderExecutable = vxnneGetTensorScaleShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_SCALE, &ops_layer->node->kernelAttributes.borderMode, inputs, type, outputs);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetGPUTensorScaleShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_SCALE, &ops_layer->node->kernelAttributes.borderMode, inputs, type, outputs);
+        }
+    }
+    else
+    {
+        if(evis)
+        {
+            shaderExecutable = vxnneGetResizeNearestNeighborShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_RESIZE_NEAREST_NEIGHBOR, &ops_layer->node->kernelAttributes.borderMode, inputs, type, outputs);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetGPUResizeNearestNeighborShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_RESIZE_NEAREST_NEIGHBOR, &ops_layer->node->kernelAttributes.borderMode, inputs, type, outputs);
+        }
+
+    }
+
+    if (!shaderExecutable)
+    {
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    vxmONERROR(vxnneShaderOperation_Initialize(&tensor_scaleLayer->tensor_scale_sh_operation,
+        &tensor_scaleLayer->base,
+        VXNNE_OPERATOR_TENSOR_SCALE,
+        batchCount,
+        shaderExecutable));
+
+    vxmONERROR(vxnneOperation_AddReference(&tensor_scaleLayer->tensor_scale_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&tensor_scaleLayer->tensor_scale_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &tensor_scaleLayer->base,
+        &tensor_scaleLayer->tensor_scale_sh_operation.base,
+        0));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, _num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoTensorScale_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoTensorScale_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoTensorScale_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    status = vxoTensorScale_SH_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoTensorScale_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    support = support && vxoTensorScale_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoTensorScale_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    status = vxoTensorScale_SH_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+
+    vxnne_tensor_scale_layer  tensor_scaleLayer = (vxnne_tensor_scale_layer)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(tensor_scaleLayer->operations);
+
+    *operations = tensor_scaleLayer->operations;
+
+    return status;
+}
+
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorScale_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
 
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
+    vxnne_layer_imp_s registerTensorScale[] = {/* Please DON'T adjust the order, it's importent */
+        { "TensorScale NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "TensorScale TP", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "TensorScale SH EVIS", vxoTensorScale_SH_EVIS_Support, vxoTensorScale_SH_EVIS_Initialize, VX_NULL },
+        { "TensorScale SH F32", vxoTensorScale_SH_Support, vxoTensorScale_SH_Initialize, VX_NULL },
+        { "TensorScale SW ", vxoNNCommon_Support, vxoTensorScale_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerTensorScale, vxnne_tensor_scale_layer_s, "TensorScale", vxoNNLayer_GetOperations);
+
+OnError:
+#else
     vx_tensor  inputs                     = (vx_tensor)parameters[0];
     vx_scalar  type_s                     = (vx_scalar)parameters[1];
     vx_tensor  outputs                    = (vx_tensor)parameters[2];
@@ -373,6 +632,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensorScale_Initializer(vx_node node, co
     return status;
 exit:
     if (tensor_scaleLayer) gcoOS_Free(gcvNULL, (gctPOINTER)tensor_scaleLayer);
+#endif
     return status;
 }
 
@@ -952,10 +1212,265 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoYUV2RGBScale_ValidateOutput(vx_node node
 {
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status vxoYUV2RGBScale_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vx_image   image                      = (vx_image)parameters[0];
+    vx_array   rects                      = (vx_array)parameters[1];
+    vx_scalar  r_mean                     = (vx_scalar)parameters[2];
+    vx_scalar  g_mean                     = (vx_scalar)parameters[3];
+    vx_scalar  b_mean                     = (vx_scalar)parameters[4];
+    vx_scalar  rgb_scale                  = (vx_scalar)parameters[5];
+    vx_scalar  y_only                     = (vx_scalar)parameters[6];
+    vx_scalar  output_rgb                 = (vx_scalar)parameters[7];
+    vx_tensor  outputs                    = (vx_tensor)parameters[8];
+
+    vx_rectangle_t rect;
+
+    vx_uint32 input_rect_width, input_rect_height, input_width, input_height, output_width, output_height, scale_x, scale_y;
+
+    vxnne_yuv2rgb_scale_layer  yuv2rgb_scaleLayer = (vxnne_yuv2rgb_scale_layer)ops_layer;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+    rect.start_x = *((vx_uint32_ptr)rects->memory.logicals[0] + 0);
+    rect.start_y = *((vx_uint32_ptr)rects->memory.logicals[0] + 1);
+    rect.end_x   = *((vx_uint32_ptr)rects->memory.logicals[0] + 2);
+    rect.end_y   = *((vx_uint32_ptr)rects->memory.logicals[0] + 3);
+
+    if (!rect.end_x || rect.start_x >= rect.end_x)
+    {
+        rect.start_x = 0;
+        rect.end_x = image->memory.dims[0][VX_DIM_X];
+    }
+    if (!rect.end_y || rect.start_y >= rect.end_y)
+    {
+        rect.start_y = 0;
+        rect.end_y = image->memory.dims[0][VX_DIM_Y];
+    }
+    if (rect.end_x > (vx_uint32)image->memory.dims[0][VX_DIM_X]) rect.end_x = image->memory.dims[0][VX_DIM_X];
+    if (rect.end_y > (vx_uint32)image->memory.dims[0][VX_DIM_Y]) rect.end_y = image->memory.dims[0][VX_DIM_Y];
+    if (rect.start_x > rect.end_x) rect.start_x = 0;
+    if (rect.start_y > rect.end_y) rect.start_y = 0;
+
+    input_rect_width  = rect.end_x - rect.start_x;
+    input_rect_height = rect.end_y - rect.start_y;
+
+    input_width  = image->region.start_x > image->region.end_x ? image->memory.dims[0][VX_DIM_X] : image->region.end_x - image->region.start_x;
+    input_height = image->region.start_y > image->region.end_y ? image->memory.dims[0][VX_DIM_Y] : image->region.end_y - image->region.start_y;
+
+    vxmASSERT(input_rect_width <= input_width && input_rect_height <= input_height);
+
+    output_width  = TENSOR_SIZE_INDEX(outputs, 0);
+    output_height = TENSOR_SIZE_INDEX(outputs, 1);
+
+    scale_x = (input_rect_width << 15) / output_width;
+    scale_y = (input_rect_height << 15) / output_height;
+
+
+    vxmONERROR(vxnneOperation_Initialize(
+        &yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.base,
+        &yuv2rgb_scaleLayer->base,
+        VXNNE_OPERATION_TARGET_SW,
+        VXNNE_OPERATOR_YUV2RGB_SCALE,
+        vxnneExecuteSWYUV2RGBScale,
+        VX_NULL,
+        1,
+        0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &yuv2rgb_scaleLayer->base,
+        &yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.base,
+        0));
+
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.inputs     = image;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.r_mean     = r_mean;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.g_mean     = g_mean;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.b_mean     = b_mean;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.rgb_scale  = rgb_scale;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.y_only     = y_only;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.output_rgb = output_rgb;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.rect       = rect;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.x_scale    = scale_x;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.y_scale    = scale_y;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.outputs    = outputs;
+
+    vxmONERROR(vxnneOperation_AddReference(&yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.base, (vx_reference)image, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&yuv2rgb_scaleLayer->yuv2rgb_scale_sw_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoYUV2RGBScale_NN_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_image   image                      = (vx_image)parameters[0];
+    vx_array   rects                      = (vx_array)parameters[1];
+
+    vx_rectangle_t rect;
+    vx_uint32 input_rect_width, input_rect_height, input_width, input_height;
+
+    vx_bool support = vx_true_e;
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    rect.start_x = *((vx_uint32_ptr)rects->memory.logicals[0] + 0);
+    rect.start_y = *((vx_uint32_ptr)rects->memory.logicals[0] + 1);
+    rect.end_x   = *((vx_uint32_ptr)rects->memory.logicals[0] + 2);
+    rect.end_y   = *((vx_uint32_ptr)rects->memory.logicals[0] + 3);
+
+    if (!rect.end_x || rect.start_x >= rect.end_x)
+    {
+        rect.start_x = 0;
+        rect.end_x = image->memory.dims[0][VX_DIM_X];
+    }
+    if (!rect.end_y || rect.start_y >= rect.end_y)
+    {
+        rect.start_y = 0;
+        rect.end_y = image->memory.dims[0][VX_DIM_Y];
+    }
+    if (rect.end_x > (vx_uint32)image->memory.dims[0][VX_DIM_X]) rect.end_x = image->memory.dims[0][VX_DIM_X];
+    if (rect.end_y > (vx_uint32)image->memory.dims[0][VX_DIM_Y]) rect.end_y = image->memory.dims[0][VX_DIM_Y];
+    if (rect.start_x > rect.end_x) rect.start_x = 0;
+    if (rect.start_y > rect.end_y) rect.start_y = 0;
+
+    input_rect_width  = rect.end_x - rect.start_x;
+    input_rect_height = rect.end_y - rect.start_y;
+
+    input_width  = image->region.start_x > image->region.end_x ? image->memory.dims[0][VX_DIM_X] : image->region.end_x - image->region.start_x;
+    input_height = image->region.start_y > image->region.end_y ? image->memory.dims[0][VX_DIM_Y] : image->region.end_y - image->region.start_y;
+
+    support = support && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER);
+    support = support && input_width <= 4096 && input_height <= 4096;
+    support = support && (input_rect_width <= 1920 || vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER_4K));
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoYUV2RGBScale_NN_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vx_image   image                      = (vx_image)parameters[0];
+    vx_array   rects                      = (vx_array)parameters[1];
+    vx_scalar  r_mean                     = (vx_scalar)parameters[2];
+    vx_scalar  g_mean                     = (vx_scalar)parameters[3];
+    vx_scalar  b_mean                     = (vx_scalar)parameters[4];
+    vx_scalar  rgb_scale                  = (vx_scalar)parameters[5];
+    vx_scalar  y_only                     = (vx_scalar)parameters[6];
+    vx_scalar  output_rgb                 = (vx_scalar)parameters[7];
+    vx_tensor  outputs                    = (vx_tensor)parameters[8];
+
+    vx_rectangle_t rect;
+    vx_uint32 input_rect_width, input_rect_height, input_width, input_height, output_width, output_height, scale_x, scale_y;
+
+    vxnne_yuv2rgb_scale_layer  yuv2rgb_scaleLayer = (vxnne_yuv2rgb_scale_layer)ops_layer;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+    rect.start_x = *((vx_uint32_ptr)rects->memory.logicals[0] + 0);
+    rect.start_y = *((vx_uint32_ptr)rects->memory.logicals[0] + 1);
+    rect.end_x   = *((vx_uint32_ptr)rects->memory.logicals[0] + 2);
+    rect.end_y   = *((vx_uint32_ptr)rects->memory.logicals[0] + 3);
+
+    if (!rect.end_x || rect.start_x >= rect.end_x)
+    {
+        rect.start_x = 0;
+        rect.end_x = image->memory.dims[0][VX_DIM_X];
+    }
+    if (!rect.end_y || rect.start_y >= rect.end_y)
+    {
+        rect.start_y = 0;
+        rect.end_y = image->memory.dims[0][VX_DIM_Y];
+    }
+    if (rect.end_x > (vx_uint32)image->memory.dims[0][VX_DIM_X]) rect.end_x = image->memory.dims[0][VX_DIM_X];
+    if (rect.end_y > (vx_uint32)image->memory.dims[0][VX_DIM_Y]) rect.end_y = image->memory.dims[0][VX_DIM_Y];
+    if (rect.start_x > rect.end_x) rect.start_x = 0;
+    if (rect.start_y > rect.end_y) rect.start_y = 0;
+
+    input_rect_width  = rect.end_x - rect.start_x;
+    input_rect_height = rect.end_y - rect.start_y;
+
+    input_width  = image->region.start_x > image->region.end_x ? image->memory.dims[0][VX_DIM_X] : image->region.end_x - image->region.start_x;
+    input_height = image->region.start_y > image->region.end_y ? image->memory.dims[0][VX_DIM_Y] : image->region.end_y - image->region.start_y;
+
+    vxmASSERT(input_rect_width <= input_width && input_rect_height <= input_height);
+
+    output_width  = TENSOR_SIZE_INDEX(outputs, 0);
+    output_height = TENSOR_SIZE_INDEX(outputs, 1);
+
+    scale_x = (input_rect_width << 15) / output_width;
+    scale_y = (input_rect_height << 15) / output_height;
+
+
+    vxmONERROR(vxnneOperation_Initialize(
+        &yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.base,
+        &yuv2rgb_scaleLayer->base,
+        VXNNE_OPERATION_TARGET_SC,
+        VXNNE_OPERATOR_YUV2RGB_SCALE,
+        vxnneExecuteSCYUV2RGBScale,
+        VX_NULL,
+        1,
+        0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &yuv2rgb_scaleLayer->base,
+        &yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.base,
+        0));
+
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.inputs     = image;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.r_mean     = r_mean;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.g_mean     = g_mean;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.b_mean     = b_mean;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.rgb_scale  = rgb_scale;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.y_only     = y_only;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.output_rgb = output_rgb;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.rect       = rect;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.x_scale    = scale_x;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.y_scale    = scale_y;
+    yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.outputs    = outputs;
+
+    vxmONERROR(vxnneOperation_AddReference(&yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.base, (vx_reference)image, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations1(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+
+    vxnne_yuv2rgb_scale_layer  yuv2rgb_scaleLayer = (vxnne_yuv2rgb_scale_layer)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(yuv2rgb_scaleLayer->operations);
+
+    *operations = yuv2rgb_scaleLayer->operations;
+
+    return status;
+}
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoYUV2RGBScale_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
+    vxnne_layer_imp_s registerYUV2RGBScale[] = {/* Please DON'T adjust the order, it's importent */
+        { "YUV2RGBScale NN", vxoYUV2RGBScale_NN_Support, vxoYUV2RGBScale_NN_Initialize, VX_NULL },
+        { "YUV2RGBScale TP", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "YUV2RGBScale SH EVIS", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "YUV2RGBScale SH F32", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "YUV2RGBScale SW ", vxoNNCommon_Support, vxoYUV2RGBScale_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerYUV2RGBScale, vxnne_yuv2rgb_scale_layer_s, "YUV2RGBScale", vxoNNLayer_GetOperations1);
+
+OnError:
+#else
     vx_image   image                      = (vx_image)parameters[0];
     vx_array   rects                      = (vx_array)parameters[1];
     vx_scalar  r_mean                     = (vx_scalar)parameters[2];
@@ -1096,6 +1611,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoYUV2RGBScale_Initializer(vx_node node, c
     }
 
     node->layer = &yuv2rgb_scaleLayer->base;
+#endif
 
     return status;
 

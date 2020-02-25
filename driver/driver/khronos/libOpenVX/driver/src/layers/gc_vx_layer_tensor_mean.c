@@ -192,10 +192,761 @@ VX_PRIVATE_API vx_status vxnneExecuteSWTensorMean(struct _vxnne_operation_s *ope
     );
     return VX_SUCCESS;
 }
+#if REGISTER_FRAME
+VX_PRIVATE_API vx_status vxoNNTensorMean_SW_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_tensor_mean_layer  tensor_mean_layer = (vxnne_tensor_mean_layer)ops_layer;
+
+    vx_tensor input     = (vx_tensor)parameters[0];
+    vx_tensor axis      = (vx_tensor)parameters[1];
+    vx_scalar keep_dims = (vx_scalar)parameters[2];
+    vx_tensor output    = (vx_tensor)parameters[3];
+
+    vx_uint32 dims      = TENSOR_DIM_NUM(input);
+    vx_uint32 batchCount= dims > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxnneOperation_Initialize(&tensor_mean_layer->tensor_mean_sw_operation.base,
+        &tensor_mean_layer->base,
+        VXNNE_OPERATION_TARGET_SW,
+        VXNNE_OPERATOR_TENSOR_MEAN,
+        vxnneExecuteSWTensorMean,
+        VX_NULL,
+        batchCount,
+        0));
+
+    vxmONERROR(vxnneLayer_SetOperation(
+        &tensor_mean_layer->base,
+        &tensor_mean_layer->tensor_mean_sw_operation.base,
+        0));
+
+    tensor_mean_layer->tensor_mean_sw_operation.input     = input;
+    tensor_mean_layer->tensor_mean_sw_operation.axis      = axis;
+    tensor_mean_layer->tensor_mean_sw_operation.keep_dims = keep_dims;
+    tensor_mean_layer->tensor_mean_sw_operation.output    = output;
+
+    vxmONERROR(vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_sw_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+    vxmONERROR(vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_sw_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNNTensorMean_SH_EVIS_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
+{
+    vx_tensor input     = (vx_tensor)parameters[0];
+    vx_tensor axis      = (vx_tensor)parameters[1];
+    vx_tensor output    = (vx_tensor)parameters[3];
+
+    vx_int32_ptr axis_base          = VX_NULL;
+    vx_int32     resolved_dim[4]    = {-1, -1, -1, -1};
+    vx_int32     resolved_dim_count = 0;
+    vx_uint32    i                  = 0;
+    vx_uint32    j                  = 0;
+    vx_uint32   input_axis;
+
+
+    vx_enum     inputFormat         = TENSOR_DATA_TYPE(input);
+    vx_enum     outputFormat        = TENSOR_DATA_TYPE(output);
+
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    vxoTensor_GetTensorViewMemory(axis, (gctPOINTER*)&axis_base, VX_NULL);
+
+    for (i = 0; i < TENSOR_SIZE_INDEX(axis, 0); i++)
+    {
+        vx_int32 current_axis = axis_base[i] < 0 ? TENSOR_DIM_NUM(input) + axis_base[i] : axis_base[i];
+
+        if (current_axis < 0 || current_axis >= (vx_int32)TENSOR_DIM_NUM(input))
+        {
+            vxError("error: the axis value must be in the range [0, %d)\n", TENSOR_DIM_NUM(input));
+            gcmASSERT(0);
+        }
+
+        for (j = 0; j < 4; j++)
+        {
+            if (resolved_dim[j] == current_axis)
+                break;
+        }
+
+        if (j == 4)
+            resolved_dim[resolved_dim_count++] = current_axis;
+    }
+
+    input_axis = 0;
+
+    {
+        vx_uint32 dst_elementCount = 0;
+
+        vxoTensor_GetTensorElementCount(output, &dst_elementCount);
+
+        if (dst_elementCount == 1) /* reudce mean all*/
+        {
+            vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+            vx_uint32  reshpTensor_Dims = 2;
+
+            resolved_dim_count = 0;
+
+            vxoElementOptimization_GetTensorShape(input, reshpTensor_Sizes, &reshpTensor_Dims);
+
+            for (i = 0; i < reshpTensor_Dims; i++)
+            {
+                if (reshpTensor_Sizes[i] != 1)
+                {
+                    resolved_dim[resolved_dim_count++] = i;
+                }
+                else
+                    break;
+            }
+        }
+    }
+
+    if(evis)
+    {
+        support  = support && ((inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32 && resolved_dim_count == 2 && resolved_dim[0] <= 3 && resolved_dim[1] <= 3)
+                               || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                               || (inputFormat == VX_TYPE_BFLOAT16 && outputFormat == VX_TYPE_BFLOAT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                               || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                               || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT8 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                               || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                               || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                               || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                               || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                               || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                               || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                               || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3));
+    }
+    else
+    {
+        support  = support && ((inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32 && resolved_dim_count == 2 && resolved_dim[0] <= 3 && resolved_dim[1] <= 3)
+                               || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                               || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32 && resolved_dim_count == 1 && resolved_dim[0] <= 3)
+                               || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16 && resolved_dim_count == 2 && resolved_dim[0] <= 3 && resolved_dim[1] <= 3)
+                               || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 2 && resolved_dim[0] <= 3 && resolved_dim[1] <= 3)
+                               || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8 && resolved_dim_count == 1 && resolved_dim[0] <= 3));
+    }
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_bool vxoNNTensorMean_SH_EVIS_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoNNTensorMean_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorMean_SH_EVIS_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis, vx_bool tp_trans)
+{
+    vx_status status = VX_SUCCESS;
+
+    vx_tensor input     = (vx_tensor)parameters[0];
+    vx_tensor axis      = (vx_tensor)parameters[1];
+
+    vx_tensor output    = (vx_tensor)parameters[3];
+    vx_uint32 batchCount = 1;
+
+    vx_int32_ptr axis_base          = VX_NULL;
+    vx_int32     resolved_dim[4]    = {-1, -1, -1, -1};
+    vx_int32     resolved_dim_count = 0;
+    vx_uint32    i                  = 0;
+    vx_uint32    j                  = 0;
+    vx_uint32   input_axis;
+    vx_enum     inputFormat         = TENSOR_DATA_TYPE(input);
+
+    vx_uint32   tmpTensorIndex      = 0;
+    vx_uint32   operationIdx        = 0;
+
+    vx_context  context             = vxGetContext((vx_reference)ops_layer->node);
+
+    vxnne_tensor_mean_layer  tensor_mean_layer = (vxnne_tensor_mean_layer)ops_layer;
+
+    vx_tensor_create_params_t tensor_create_params;
+    vx_uint32 dims          = TENSOR_DIM_NUM(input);
+    vx_uint32 width         = TENSOR_VIEW_SIZE_INDEX(input, 0);
+    vx_uint32 height        = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
+    vx_uint32 depth         = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
+    vx_uint32 batch         = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+    vx_uint32 sizes[4]      = {width, height, depth, batch};
+    vx_uint32 new_sizes[4]  = {width, height, depth, batch};
+    vx_uint32 perm_array[4] = {0, 1, 2, 3};
+    vx_tensor transTensor   = NULL;
+    vx_tensor dst           = NULL;
+    vx_bool   enable_trans  = vx_false_e;
+    vx_bool   enable_axis  = vx_false_e;
+    vx_bool   is_trans_sw   = vx_false_e;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxoTensor_GetTensorViewMemory(axis, (gctPOINTER*)&axis_base, VX_NULL);
+
+    for (i = 0; i < TENSOR_SIZE_INDEX(axis, 0); i++)
+    {
+        vx_int32 current_axis = axis_base[i] < 0 ? TENSOR_DIM_NUM(input) + axis_base[i] : axis_base[i];
+
+        if (current_axis < 0 || current_axis >= (vx_int32)TENSOR_DIM_NUM(input))
+        {
+            vxError("error: the axis value must be in the range [0, %d)\n", TENSOR_DIM_NUM(input));
+            gcmASSERT(0);
+        }
+
+        for (j = 0; j < 4; j++)
+        {
+            if (resolved_dim[j] == current_axis)
+                break;
+        }
+
+        if (j == 4)
+            resolved_dim[resolved_dim_count++] = current_axis;
+    }
+
+    input_axis = 0;
+
+    {
+        vx_uint32 dst_elementCount = 0;
+
+        status = vxoTensor_GetTensorElementCount(output, &dst_elementCount);
+
+        if (dst_elementCount == 1) /* reudce mean all*/
+        {
+            vx_uint32  reshpTensor_Sizes[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {1};
+            vx_uint32  reshpTensor_Dims = 2;
+
+            resolved_dim_count = 0;
+
+            vxoElementOptimization_GetTensorShape(input, reshpTensor_Sizes, &reshpTensor_Dims);
+
+            for (i = 0; i < reshpTensor_Dims; i++)
+            {
+                if (reshpTensor_Sizes[i] != 1)
+                {
+                    resolved_dim[resolved_dim_count++] = i;
+                }
+                else
+                    break;
+            }
+
+            input = vxoTensor_ReshapeTensor((vx_tensor)parameters[0], (vx_int32*)reshpTensor_Sizes, reshpTensor_Dims);
+
+            tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = input;
+            tensor_mean_layer->base.num_temp_tensors = tmpTensorIndex;
+        }
+    }
+
+    if (resolved_dim_count == 1)
+    {
+        enable_axis = vx_true_e;
+    }
+
+    if (resolved_dim[0] + resolved_dim[1] != 1 && resolved_dim_count == 2)
+    {
+        enable_trans = vx_true_e;
+
+        if (resolved_dim[0] + resolved_dim[1] == 2)
+        {
+            perm_array[0] = 0;
+            perm_array[1] = 2;
+            perm_array[2] = 1;
+            perm_array[3] = 3;
+        }
+        else if (resolved_dim[0] + resolved_dim[1] == 3)
+        {
+            if (abs(resolved_dim[0] - resolved_dim[1]) == 3)
+            {
+                perm_array[0] = 0;
+                perm_array[1] = 3;
+                perm_array[2] = 1;
+                perm_array[3] = 2;
+                is_trans_sw   = vx_true_e;
+            }
+            else
+            {
+                perm_array[0] = 1;
+                perm_array[1] = 2;
+                perm_array[2] = 0;
+                perm_array[3] = 3;
+            }
+        }
+        else if (resolved_dim[0] + resolved_dim[1] == 4)
+        {
+            perm_array[0] = 1;
+            perm_array[1] = 3;
+            perm_array[2] = 0;
+            perm_array[3] = 2;
+            is_trans_sw   = vx_true_e;
+        }
+        else if (resolved_dim[0] + resolved_dim[1] == 5)
+        {
+            perm_array[0] = 2;
+            perm_array[1] = 3;
+            perm_array[2] = 0;
+            perm_array[3] = 1;
+            is_trans_sw   = vx_true_e;
+        }
+    }
+    else if (resolved_dim[0] != 0 && resolved_dim_count == 1)
+    {
+        if (resolved_dim[0] == 3)
+        {
+            enable_trans = vx_true_e;
+            input_axis = 0;
+            perm_array[0] = 3;
+            perm_array[1] = 0;
+            perm_array[2] = 1;
+            perm_array[3] = 2;
+            is_trans_sw   = vx_true_e;
+        }
+        else
+        {
+            transTensor = input;
+            input_axis = resolved_dim[0];
+        }
+    }
+    else
+    {
+        transTensor = input;
+    }
+
+    if (enable_trans)
+    {
+        for (i = 0; i < 4; i ++)
+        {
+            new_sizes[i] = sizes[perm_array[i]];
+        }
+
+        gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
+        tensor_create_params.num_of_dims = dims;
+        tensor_create_params.sizes = new_sizes;
+        tensor_create_params.data_format = TENSOR_DATA_TYPE(input);
+        tensor_create_params.quant_format = TENSOR_QUANT_TYPE(input);
+        if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
+        {
+            tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(input);
+        }
+        else
+        {
+            tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(input);
+            tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(input);
+        }
+
+        transTensor = vxoTensor_CreateTensor(ops_layer->node->base.context, ops_layer->node->graph, &tensor_create_params, vx_true_e);
+
+        tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = transTensor;
+
+        if (tp_trans)
+        {
+            vx_op_param_s conv = {0};
+            vx_uint32 dnum = 4;
+
+            vxmONERROR(vxnneOperation_Initialize(&tensor_mean_layer->tensor_mean_trans_tp_operation.base,
+                &tensor_mean_layer->base,
+                VXNNE_OPERATION_TARGET_TP,
+                VXNNE_OPERATOR_TENSOR_TRANS,
+                VX_NULL,
+                vxnneOperation_TP_Deinitialize,
+                1,
+                0));
+
+            conv.pad_x_left = 0;
+            conv.pad_y_top = 0;
+            conv.pool_size_x = 0;
+            conv.pool_size_y = 0;
+            conv.pool_stride = 1;
+            conv.enable_relu = vx_false_e;
+            conv.conv_rounding_type = 0;
+            conv.pad_mode = VX_PAD_CONSTANT;
+            conv.pad_const = 0;
+            conv.tpType = TP_TRANSPOSE;
+            conv.other_ref = (vx_reference)input;
+            conv.data_buff = gcvNULL;
+            conv.tp_value = (vx_tp_value_cmd)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
+            conv.tp_value->u32[0] = dnum;
+            conv.tp_value->p8[0] = (vx_uint8_ptr)vxAllocateAndZeroMemory(sizeof(vx_uint32) * dnum);
+            vxMemCopy(conv.tp_value->p8[0], perm_array, sizeof(vx_uint32) * dnum);
+
+            vxMemCopy(&tensor_mean_layer->tensor_mean_trans_tp_operation.base.parameter, &conv, sizeof(vx_op_param_s));
+
+            vxmONERROR(vxnneLayer_SetOperation(
+                &tensor_mean_layer->base,
+                &tensor_mean_layer->tensor_mean_trans_tp_operation.base,
+                operationIdx++));
+
+            tensor_mean_layer->tensor_mean_trans_tp_operation.input  = input;
+            tensor_mean_layer->tensor_mean_trans_tp_operation.output = transTensor;
+
+            vxmONERROR(vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_tp_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_tp_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+        }
+        else
+        {
+            vx_bool enable_shader_execute = vx_true_e;
+            vxnne_shader_executable shaderExecutable = VX_NULL;
+            vx_uint32 pnum = dims;
+
+            if (dims > 4)
+            {
+                vx_uint32 i = 0;
+                vx_uint32 elementCnt = 1;
+
+                for (i = 4; i < dims; i++)
+                {
+                    elementCnt *= TENSOR_VIEW_SIZE_INDEX(input, i);
+                }
+
+                if (elementCnt == 1)
+                    pnum = 3;
+                else
+                    enable_shader_execute = vx_false_e;
+            }
+
+            if (is_trans_sw)
+            {
+                enable_shader_execute = vx_false_e;
+            }
+
+            if (enable_shader_execute && vxoContext_IsFeatureAvailable(ops_layer->node->base.context, VX_NN_FEATURE_SHADER))
+            {
+                if (dims == 4)
+                {
+                    pnum = 3;
+                }
+                if(evis)
+                {
+                    shaderExecutable = vxnneTensorTransposeShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &ops_layer->node->kernelAttributes.borderMode, input, perm_array, pnum, transTensor);
+                }
+                else
+                {
+                    shaderExecutable = vxnneGPUTensorTransposeShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_TRANSPOSE, &ops_layer->node->kernelAttributes.borderMode, input, perm_array, pnum, transTensor);
+                }
+
+                if (!shaderExecutable)
+                {
+                    status = VX_FAILURE;
+                    goto OnError;
+                }
+
+            batchCount = new_sizes[3];
+            vxmONERROR(vxnneShaderOperation_Initialize(&tensor_mean_layer->tensor_mean_trans_sh_operation,
+                &tensor_mean_layer->base,
+                VXNNE_OPERATOR_TENSOR_TRANS,
+                batchCount,
+                shaderExecutable));
+
+            vxmONERROR(vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_sh_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+            vxmONERROR(vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_trans_sh_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+            vxmONERROR(vxnneLayer_SetOperation(
+                    &tensor_mean_layer->base,
+                    &tensor_mean_layer->tensor_mean_trans_sh_operation.base,
+                    operationIdx++));
+            }
+            else
+            {
+                vx_array perm = vxCreateArray(context, VX_TYPE_UINT32, pnum);
+                vx_scalar pnum_s = NULL;
+
+                if (!vxoArray_AllocateMemory(perm))
+                {
+                    status = VX_ERROR_NO_MEMORY;
+                    vxError("Fail to vxoArray_AllocateMemory of perm function %s line %d", __FUNCTION__, __LINE__);
+                    goto OnError;
+                }
+                else
+                {
+                    vx_uint32* pos = (vx_uint32*)perm->memory.logicals[0];
+                    memcpy(pos, perm_array, pnum * sizeof(vx_uint32));
+                }
+
+                pnum_s = vxCreateScalar(context, VX_TYPE_UINT32, &pnum);
+                batchCount = new_sizes[3];
+
+                vxmONERROR(vxnneOperation_Initialize(&tensor_mean_layer->tensor_trans_sw_operation.base,
+                                          &tensor_mean_layer->base,
+                                          VXNNE_OPERATION_TARGET_SW,
+                                          VXNNE_OPERATOR_TENSOR_TRANS,
+                                          vxnneExecuteSWTensorTranspose,
+                                          VX_NULL,
+                                          batchCount,
+                                          0));
+
+                vxmONERROR(vxnneLayer_SetOperation(
+                    &tensor_mean_layer->base,
+                    &tensor_mean_layer->tensor_trans_sw_operation.base,
+                    operationIdx++));
+
+                tensor_mean_layer->tensor_trans_sw_operation.input   = input;
+                tensor_mean_layer->tensor_trans_sw_operation.perm    = perm;
+                tensor_mean_layer->tensor_trans_sw_operation.pnum    = pnum_s;
+                tensor_mean_layer->tensor_trans_sw_operation.output  = transTensor;
+
+                vxmONERROR(vxnneOperation_AddReference(&tensor_mean_layer->tensor_trans_sw_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT));
+                vxmONERROR(vxnneOperation_AddReference(&tensor_mean_layer->tensor_trans_sw_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+            }
+        }
+    }
+
+    if (resolved_dim_count == 2)
+    {
+        vx_uint32 output_dims         = dims < 3 ? 3 : dims;
+
+        sizes[0] = 1;
+        sizes[1] = 1;
+        sizes[2] = new_sizes[2];
+        sizes[3] = new_sizes[3];
+        dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims);
+
+        tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = dst;
+    }
+    else if (resolved_dim_count == 1)
+    {
+        vx_uint32 output_dims         = dims < 3 ? 3 : dims;
+
+        sizes[0] = new_sizes[0];
+        sizes[1] = new_sizes[1];
+        sizes[2] = new_sizes[2];
+        sizes[3] = new_sizes[3];
+        sizes[input_axis] = 1;
+        dst = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, output_dims);
+
+        tensor_mean_layer->base.temp_tensors[tmpTensorIndex++] = dst;
+    }
+
+    if (resolved_dim_count == 2)
+    {
+        vxnne_shader_executable shaderExecutable = NULL;
+        vx_bool   enable_tf_quantize  = (vx_bool)(inputFormat == VX_TYPE_UINT8);
+        vx_bool   enable_int16_sh     = (vx_bool)(inputFormat == VX_TYPE_INT16);
+        vx_uint32 stride              = 1;
+        vx_scalar stride_s            = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_UINT32, &stride);
+        vx_scalar poolSizeX           = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_UINT32, &new_sizes[0]);
+        vx_scalar poolSizeY           = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_UINT32, &new_sizes[1]);
+        vx_uint32 pad_x_left          = 0;
+        vx_uint32 pad_y_top           = 0;
+        vx_uint32 batch               = new_sizes[3];
+
+        if (stride_s == NULL || poolSizeX == NULL || poolSizeY == NULL)
+        {
+            if (stride_s)  vxReleaseScalar(&stride_s);
+            if (poolSizeX) vxReleaseScalar(&poolSizeX);
+            if (poolSizeY) vxReleaseScalar(&poolSizeY);
+
+            status = VX_FAILURE;
+            goto OnError;
+        }
+
+        if(evis)
+        {
+            if(enable_tf_quantize)
+                shaderExecutable = vxnneGetAvgPooling_UInt8ShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING_UINT8, &ops_layer->node->kernelAttributes.borderMode, transTensor, NULL, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, VX_NN_ACTIVATION_NONE, dst);
+
+            else if(enable_int16_sh)
+                shaderExecutable = vxnneGetAvgPooling_Int16ShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING_INT16, &ops_layer->node->kernelAttributes.borderMode,
+                transTensor, NULL, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, VX_NN_ACTIVATION_NONE, dst);
+            else
+                shaderExecutable = vxnneGetAvgPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
+                transTensor, NULL, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, NULL, dst);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
+                transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, pad_x_left, pad_y_top, NULL, vx_false_e, 0, 0, dst);
+        }
+
+        if (stride_s)  vxReleaseScalar(&stride_s);
+        if (poolSizeX) vxReleaseScalar(&poolSizeX);
+        if (poolSizeY) vxReleaseScalar(&poolSizeY);
+
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            goto OnError;
+        }
+
+        vxmONERROR(vxnneShaderOperation_Initialize(&tensor_mean_layer->tensor_mean_pool_sh_operation,
+            &tensor_mean_layer->base,
+            VXNNE_OPERATOR_POOLING,
+            batch,
+            shaderExecutable));
+
+        vxmONERROR(vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_pool_sh_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_pool_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &tensor_mean_layer->base,
+            &tensor_mean_layer->tensor_mean_pool_sh_operation.base,
+            operationIdx++));
+    }
+
+    if (enable_axis)
+    {
+        vxnne_shader_executable shaderExecutable = NULL;
+        vx_float32              axis_coef        = 1.0f / (vx_float32)(TENSOR_VIEW_SIZE_INDEX(transTensor,input_axis));
+        vx_uint32               batch            = new_sizes[3];
+
+        if(evis)
+        {
+            shaderExecutable = vxnneGetTensorMeanAxisShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &ops_layer->node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis);
+        }
+        else
+        {
+            shaderExecutable = vxnneGetGPUTensorMeanAxisShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_TENSOR_MEAN_AXIS, &ops_layer->node->kernelAttributes.borderMode, axis_coef, transTensor, dst, input_axis);
+        }
+
+        if (!shaderExecutable)
+        {
+            status = VX_FAILURE;
+            goto OnError;
+        }
+
+        vxmONERROR(vxnneShaderOperation_Initialize(&tensor_mean_layer->tensor_mean_axis0_sh_operation,
+            &tensor_mean_layer->base,
+            VXNNE_OPERATOR_TENSOR_MEAN,
+            batch,
+            shaderExecutable));
+
+        vxmONERROR(vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_axis0_sh_operation.base, (vx_reference)transTensor, VXNNE_OPERATION_REFENRENCE_INPUT));
+        vxmONERROR(vxnneOperation_AddReference(&tensor_mean_layer->tensor_mean_axis0_sh_operation.base, (vx_reference)dst, VXNNE_OPERATION_REFENRENCE_OUTPUT));
+
+        vxmONERROR(vxnneLayer_SetOperation(
+            &tensor_mean_layer->base,
+            &tensor_mean_layer->tensor_mean_axis0_sh_operation.base,
+            operationIdx++));
+    }
+
+    tensor_mean_layer->base.num_temp_tensors = tmpTensorIndex;
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorMean_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNTensorMean_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e, vx_false_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+VX_PRIVATE_API vx_bool vxoNNTensorMean_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && vxoNNTensorMean_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorMean_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNTensorMean_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e, vx_false_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_bool vxoNNTensorMean_SH_TP_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_tensor input     = (vx_tensor)parameters[0];
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_TP, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && vxoNNTensorMean_SH_EVIS_Support_Ext(node, parameters, num, reg_param, vx_true_e);
+
+    if (!support)return support;
+
+    support = support && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP_TRANSPOSE) &&
+                            vxnneIsTPSupportFormat(node->base.context, input, VX_NULL, VX_NULL));
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNTensorMean_SH_TP_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNTensorMean_SH_EVIS_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e, vx_true_e));
+
+OnError:
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNLayer_GetOperations(vxnne_layer ops_layer, vx_uint32_ptr max_num_operations, vxnne_operation **operations)
+{
+    vx_status  status = VX_SUCCESS;
+    vxnne_tensor_mean_layer  tensor_mean_layer = (vxnne_tensor_mean_layer)ops_layer;
+
+    *max_num_operations = gcmCOUNTOF(tensor_mean_layer->operations);
+
+    *operations = tensor_mean_layer->operations;
+
+    return status;
+}
+#endif
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
+#if REGISTER_FRAME
+    vxnne_layer_imp_s registerTensorMeanLayers[] = {/* Please DON'T adjust the order, it's importent */
+        { "TensorMean NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "TensorMean SH/TP", vxoNNTensorMean_SH_TP_Support, vxoNNTensorMean_SH_TP_Initialize, VX_NULL },
+        { "TensorMean SH EVIS", vxoNNTensorMean_SH_EVIS_Support, vxoNNTensorMean_SH_EVIS_Initialize, VX_NULL },
+        { "TensorMean SH F32", vxoNNTensorMean_SH_Support, vxoNNTensorMean_SH_Initialize, VX_NULL },
+        { "TensorMean SW", vxoNNCommon_Support, vxoNNTensorMean_SW_Initialize, VX_NULL },
+    };
+
+    REGISTER_LAYERS(registerTensorMeanLayers, vxnne_tensor_mean_layer_s, "BatchNormalizationLayer", vxoNNLayer_GetOperations);
+
+OnError:
+#else
 
     vx_tensor input     = (vx_tensor)parameters[0];
     vx_tensor axis      = (vx_tensor)parameters[1];
@@ -771,6 +1522,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNTensorMean_Initializer(vx_node node, c
 exit:
     if (tensor_mean_layer)
         gcoOS_Free(NULL, (gctPOINTER)tensor_mean_layer);
+#endif
 
     return status;
 }

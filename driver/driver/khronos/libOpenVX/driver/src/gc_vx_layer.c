@@ -4376,6 +4376,15 @@ vxnne_shader_executable vxnneGetHashLUTShaderExecutable(
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_fp16", borderMode);
             if (!shaderExecutable) goto OnError;
         }
+
+#if REGISTER_FRAME
+        if (shaderExecutable->kernelShader->states.programState.hints->useEvisInst == 0)
+        {
+            status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        }
+#endif
         if (!shaderExecutable) goto OnError;
 
         status = vxnneShaderExecutable_SetUniform(shaderExecutable, "key_count", 1, &key_count);
@@ -19677,6 +19686,15 @@ vxnne_shader_executable vxnneTensorCopyShaderExecutable(
                 execution_parameters.globalWorkScale[0]  = 8;
                 execution_parameters.globalWorkScale[1]  = 1;
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_16Bits_2D", borderMode);
+
+#if REGISTER_FRAME
+                if (shaderExecutable->kernelShader->states.programState.hints->useEvisInst == 0)
+                {
+                    /* the shader implement not use EVIS instruction, compiler generated 32-bits read/write */
+                    status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+                    status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+                }
+#endif
                 if (!shaderExecutable) goto OnError;
             }
         }
@@ -19808,6 +19826,16 @@ vxnne_shader_executable vxnneTensorCopyShaderExecutable(
         execution_parameters.globalWorkScale[2]  = 1;
 
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp32toFp32", borderMode);
+
+#if REGISTER_FRAME
+        if (shaderExecutable->kernelShader->states.programState.hints->useEvisInst == 0)
+        {
+
+            /* the shader implement not use EVIS instruction, compiler generated 32-bits read/write */
+            status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        }
+#endif
         if (!shaderExecutable) goto OnError;
     }
     else if (inputFormat == VX_TYPE_INT8 && TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT && outputFormat != VX_TYPE_FLOAT32)
