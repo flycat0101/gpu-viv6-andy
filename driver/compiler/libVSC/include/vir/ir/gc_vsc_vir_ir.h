@@ -4804,6 +4804,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
     VIR_SHFLAG_EXT1_CALC_LOCAL_INVOCATION_INDEX = 0x00000040, /* Whether need to calculate LocalInvocationIndex. */
     VIR_SHFLAG_EXT1_CAPABILITY_FP16             = 0x00000080, /* Whether instruction support FP16 directly, so the data in register is FP16. */
     VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH       = 0x00000100, /* Whether any image format/sampled type mismatch. */
+    VIR_SHFLAG_EXT1_USE_EVIS_INST               = 0x00000200, /* Whether use EVIS instruction. */
 } VIR_ShaderFlagsExt1;
 
 /* Get the flags. */
@@ -4866,6 +4867,7 @@ typedef enum _VIR_SHADERFLAGS_EXT1
 #define VIR_Shader_CalcLocalInvocationIndex(Shader) (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_CALC_LOCAL_INVOCATION_INDEX) != 0)
 #define VIR_Shader_CapabilityFP16(Shader)           (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_CAPABILITY_FP16) != 0)
 #define VIR_Shader_HasImageFormatMismatch(Shader)   (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_IMAGE_FORMAT_MISMATCH) != 0)
+#define VIR_Shader_UseEvisInst(Shader)              (((Shader)->flagsExt1 & VIR_SHFLAG_EXT1_USE_EVIS_INST) != 0)
 
 typedef struct _VIR_LIBRARYLIST VIR_LibraryList;
 
