@@ -1808,14 +1808,11 @@ void _fill_TP_TRANSPOSE_Command(
             if (dims[i] > 1) break;
         }
         vxmASSERT((vx_int32)i >=0);
-        if (i != pnum - 1)
+        pnum = i + 1;
+        totalSize = pnum == 1 ? TENSOR_DATA_SIZE(other_tensor) : 1;
+        for (i = 0; i < pnum - 1; i++)
         {
-            pnum = i + 1;
-            totalSize = pnum == 1 ? TENSOR_DATA_SIZE(other_tensor) : 1;
-            for (i = 0; i < pnum - 1; i++)
-            {
-                totalSize *= dims[i];
-            }
+            totalSize *= dims[i];
         }
     }
 
