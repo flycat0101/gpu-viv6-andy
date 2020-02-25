@@ -20941,6 +20941,14 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
     vxnne_operation_target_e operationTarget;
     vx_graph graph = executionLayer->graph;
 
+#if VIVANTE_PROFILER
+    if (!graph->cmdCaptureOn)
+    {
+        gcoVX_Flush(gcvTRUE);
+        vxoProfiler_Begin((vx_reference)executionLayer->graph);
+    }
+#endif
+
     vxnneMultiChannel_GetCurrentChannel(&operationTarget);
 
     for (i = 0; i < executionLayer->opIndicesNum; i++)
@@ -20951,7 +20959,7 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
 
         operation = executionLayer->operations[executionLayer->opIndices[i].operationID];
 
-        if (executionLayer->graph->verified == vx_false_e && executionLayer->graph->base.context->options.enableGraphCommandBuffer == vx_true_e &&
+        if (graph->verified == vx_false_e && graph->base.context->options.enableGraphCommandBuffer == vx_true_e &&
             i == 0 && operation->target == VXNNE_OPERATION_TARGET_SC)
         {
             executionLayer->graph->scalerHead = vx_true_e;

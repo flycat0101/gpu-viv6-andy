@@ -1647,6 +1647,9 @@ typedef struct _vx_graph
     vx_uint32                               deviceID; /*the Device CoreId to run this graph*/
     vx_uint32                               graphID; /*graph ID in this owner context */
     vx_uint32                               peakAxiSramUsedSize;
+#if VIVANTE_PROFILER
+    vx_bool                                 cmdCaptureOn;
+#endif
 }
 vx_graph_s;
 
