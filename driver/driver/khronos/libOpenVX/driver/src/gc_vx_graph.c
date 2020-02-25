@@ -834,14 +834,7 @@ VX_INTERNAL_API vx_status ComputeInputSizeEx(
             size =  (outputSize - 1) * poolingStride + poolingSize - padTop - padBottom;
             break;
         }
-        case VXNNE_OPERATOR_NORMALIZATION:
-        {
-            size = normStride * outputSize;
-            break;
-        }
         case VXNNE_OPERATOR_ACTIVATION:
-        case VXNNE_OPERATOR_TENSOR_ADD:
-        case VXNNE_OPERATOR_LSTM_RESHUFFLE_INPUT:
         {
             size = outputSize;
             break;
@@ -1711,23 +1704,17 @@ VX_PRIVATE_API vx_bool SupportAB(
 
 VX_PRIVATE_API vx_bool SupportTiling(
     vx_context          context,
-    vxnne_operation     operation,
-    vx_bool             head,
-    vx_bool             tail
+    vxnne_operation     operation
     )
 {
-    if (((operation->target == VXNNE_OPERATION_TARGET_NN &&
-         operation->operatorType != VXNNE_OPERATOR_FULLYCONNECTED)
+    if ((operation->target == VXNNE_OPERATION_TARGET_NN && (operation->operatorType == VXNNE_OPERATOR_CONVOLUTION || operation->operatorType == VXNNE_OPERATOR_DEPTH_WISE_CONV))
         ||(operation->target == VXNNE_OPERATION_TARGET_TP &&
            vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_SWTILING_PHASE2) &&
           (operation->operatorType == VXNNE_OPERATOR_RESHUFFLE ||
            operation->operatorType == VXNNE_OPERATOR_POOLING   ||
-           operation->operatorType == VXNNE_OPERATOR_ACTIVATION ||
-           operation->operatorType == VXNNE_OPERATOR_TENSOR_ADD
-          )))
-          && (operation->parentOpNum == 1 || head)
-          && (operation->childOpNum == 1 || tail)
-       )
+           operation->operatorType == VXNNE_OPERATOR_ACTIVATION
+          ))
+        )
     {
         return vx_true_e;
     }
@@ -1740,7 +1727,8 @@ VX_PRIVATE_API vx_bool SupportSWTiling(
     vx_uint32 start,
     vx_uint32 count,
     vx_enum   segType,
-    vx_enum   memType)
+    vx_enum   memType,
+    vx_uint32 *failedID)
 {
     vx_uint32 i;
 
@@ -1750,13 +1738,22 @@ VX_PRIVATE_API vx_bool SupportSWTiling(
     {
         if (!SupportAB(graph->base.context, graph->layer->operations[i], memType) )
         {
-            return vx_false_e;
+            *failedID = i;
+            goto exit;
         }
         else if (segType == VXNNE_SEGMENT_TYPE_TILING)
         {
-            if (!SupportTiling(graph->base.context, graph->layer->operations[i], i == start, i == start + count - 1))
+            if (!SupportTiling(graph->base.context, graph->layer->operations[i])
+                || (graph->layer->operations[i]->parentOpNum > 1 && i != start)
+                )
             {
-                return vx_false_e;
+                *failedID = i;
+                goto exit;
+            }
+            else if (graph->layer->operations[i]->childOpNum > 1 && i != start + count - 1)
+            {
+                *failedID = i + 1;
+                goto exit;
             }
             else
             {
@@ -1769,7 +1766,8 @@ VX_PRIVATE_API vx_bool SupportSWTiling(
 
                     if (opInfo1.input != opInfo2.output)
                     {
-                        return vx_false_e;
+                        *failedID = i;
+                        goto exit;
                     }
                 }
             }
@@ -1777,6 +1775,8 @@ VX_PRIVATE_API vx_bool SupportSWTiling(
     }
 
     return vx_true_e;
+exit:
+    return vx_false_e;
 }
 
 VX_PRIVATE_API vx_status DetectABSegment(
@@ -1827,6 +1827,7 @@ VX_PRIVATE_API vx_status DetectABSegment(
         graph->layer->memRequestList[start + count - 1].outputMemory[0]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
     {
         *detected = vx_false_e;
+        *failedID = oldStart + oldCount - 1;
         goto OnError;
     }
 
@@ -1902,6 +1903,7 @@ VX_PRIVATE_API vx_status DetectABSegment(
     }
     else
     {
+        vxmASSERT(*failedID >= start && *failedID < start + count);
         *detected = vx_false_e;
     }
 
@@ -1942,92 +1944,78 @@ VX_PRIVATE_API vx_status DetectSegments(
             tilingStart = (j == 0) ? start : collection->segments[j - 1]->end;
             tilingEnd = (j == collection->segmentNum) ? (start + count - 1) : collection->segments[j]->start;
         }
-
         if ((vx_uint32)(tilingEnd - tilingStart) > 0)
         {
-            vx_uint32 successedID, failedID;
+            vx_uint32  failedID;
             for (i = tilingStart; i < tilingEnd; i++)
             {
-                successedID = i, failedID = tilingEnd + 1;
+                k = tilingEnd - i + 1;
 
-                for (k = tilingEnd - i + 1; (vx_int32)k > 1;)
+                if (!SupportSWTiling(graph, i, k, segType, memType, &failedID))
                 {
-                    if (!SupportSWTiling(graph, i, k, segType, memType))
-                    {
-                        detected = vx_false_e;
-                    }
-                    else
-                    {
-                        if (segType == VXNNE_SEGMENT_TYPE_AB)
-                        {
-                            status = DetectABSegment(graph, i, k, memType, &detected, VX_NULL);
-                            if (status != VX_SUCCESS) goto OnError;
-                        }
-                        else
-                        {
-                            vxmASSERT(segType == VXNNE_SEGMENT_TYPE_TILING);
-                            detected = ComputeMNEx(graph->layer, i, k, &N, &M, &axiSRAMUsed, &vipSRAMUsed, memType);
-                        }
-                    }
-
-                    if (!detected)
-                    {
-                        failedID = i + k - 1;
-                        k = (k + 1) / 2;
-                    }
-                    else
-                    {
-                        successedID = i + k - 1;
-
-                        if (failedID - successedID == 1)
-                            break;
-
-                        k += (failedID - successedID)/2;
-                    }
+                    k = failedID - i;
                 }
 
-                if (k > 1)
+                for (; (vx_int32)k > 1; k--)
                 {
-                    vxmASSERT(detectedCollection.segmentNum < VX_MAX_SEGMENT_COUNT);
-                    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(vxnne_segment_s), (gctPOINTER*)&detectedCollection.segments[detectedCollection.segmentNum])))
+                    if (segType == VXNNE_SEGMENT_TYPE_AB)
                     {
-                        status = VX_ERROR_NO_MEMORY;
-                        goto OnError;
+                        status = DetectABSegment(graph, i, k, memType, &detected, &failedID);
+                        if (status != VX_SUCCESS) goto OnError;
+
+                        if (!detected)
+                        {
+                            k = gcmMIN((vx_uint32)(failedID - i + 2), k);
+                        }
+                    }
+                    else
+                    {
+                        vxmASSERT(segType == VXNNE_SEGMENT_TYPE_TILING);
+                        detected = ComputeMNEx(graph->layer, i, k, &N, &M, &axiSRAMUsed, &vipSRAMUsed, memType);
                     }
 
-                    gcoOS_ZeroMemory(detectedCollection.segments[detectedCollection.segmentNum], sizeof(vxnne_segment_s));
-
-                    detectedCollection.segments[detectedCollection.segmentNum]->type    = segType;
-                    detectedCollection.segments[detectedCollection.segmentNum]->memType = memType;
-                    detectedCollection.segments[detectedCollection.segmentNum]->start = i;
-                    detectedCollection.segments[detectedCollection.segmentNum]->count = k;
-                    detectedCollection.segments[detectedCollection.segmentNum]->end = i + k - 1;
-
-                    if (segType == VXNNE_SEGMENT_TYPE_TILING)
+                    if (detected)
                     {
-                        detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.M = M;
-                        detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.N = N;
-                        detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.estimateAxiSRAMUsed = axiSRAMUsed;
-                        detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.estimateVipSRAMUsed = vipSRAMUsed;
+                        vxmASSERT(detectedCollection.segmentNum < VX_MAX_SEGMENT_COUNT);
+                        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(vxnne_segment_s), (gctPOINTER*)&detectedCollection.segments[detectedCollection.segmentNum])))
+                        {
+                            status = VX_ERROR_NO_MEMORY;
+                            goto OnError;
+                        }
+
+                        gcoOS_ZeroMemory(detectedCollection.segments[detectedCollection.segmentNum], sizeof(vxnne_segment_s));
+
+                        detectedCollection.segments[detectedCollection.segmentNum]->type    = segType;
+                        detectedCollection.segments[detectedCollection.segmentNum]->memType = memType;
+                        detectedCollection.segments[detectedCollection.segmentNum]->start = i;
+                        detectedCollection.segments[detectedCollection.segmentNum]->count = k;
+                        detectedCollection.segments[detectedCollection.segmentNum]->end = i + k - 1;
+
+                        if (segType == VXNNE_SEGMENT_TYPE_TILING)
+                        {
+                            detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.M = M;
+                            detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.N = N;
+                            detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.estimateAxiSRAMUsed = axiSRAMUsed;
+                            detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.estimateVipSRAMUsed = vipSRAMUsed;
+                        }
+
+                        detectedCollection.segmentNum++;
+
+                        status = SetMemoryRequestList(graph, i, k, memType);
+                        vxmASSERT(status == VX_SUCCESS);
+
+                        if (detectedCollection.segmentNum == VX_MAX_SEGMENT_COUNT)
+                        {
+                            status = VX_SUCCESS;
+                            goto OnError;
+                        }
+
+                        i = i + k - 1;
+                        break;
                     }
-
-                    detectedCollection.segmentNum++;
-
-                    status = SetMemoryRequestList(graph, i, k, memType);
-                    vxmASSERT(status == VX_SUCCESS);
-
-                    if (detectedCollection.segmentNum == VX_MAX_SEGMENT_COUNT)
-                    {
-                        status = VX_SUCCESS;
-                        goto OnError;
-                    }
-
-                    i = i + k - 1;
-                    continue;
                 }
             }
         }
-
         /* combine segments */
         if (j != collection->segmentNum)
         {
@@ -3159,7 +3147,7 @@ VX_PRIVATE_API vx_status InitializeABSegmentCommands(
         opCommand->cmdInfo.padTop       = opInfo.pad.top;
         opCommand->cmdInfo.convWidth    = opCommand->outputTile.width;
         opCommand->cmdInfo.convHeight   = opCommand->outputTile.height;
-        if (opInfo.enablePooling)
+        if (opInfo.enablePooling && opInfo.opType == VXNNE_OPERATOR_CONVOLUTION)
         {
             vxmONERROR(ComputeInputSizeEx(
                             opInfo.opType,
