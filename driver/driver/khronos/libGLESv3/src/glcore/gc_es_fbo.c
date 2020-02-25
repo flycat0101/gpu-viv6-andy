@@ -1645,14 +1645,6 @@ GLvoid GL_APIENTRY __gles_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
 
     if (framebufferObj->name == 0)
     {
-        if (__GL_API_VERSION_ES20 == gc->apiVersion)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-        }
-
-        /*
-        ** ES3.0 spec allow query default frame buffer object
-        */
         if (attachment == GL_BACK)
         {
             formatInfo = gc->drawablePrivate->rtFormatInfo;
