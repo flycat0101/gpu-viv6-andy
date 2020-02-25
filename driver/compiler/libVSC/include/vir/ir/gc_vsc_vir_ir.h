@@ -5618,6 +5618,21 @@ VIR_Shader_IsGL40OrAbove(
     IN VIR_Shader * Shader
     );
 
+gctBOOL
+VIR_Shader_IsGL43(
+    IN VIR_Shader * Shader
+    );
+
+gctBOOL
+VIR_Shader_IsGL44(
+    IN VIR_Shader * Shader
+    );
+
+gctBOOL
+VIR_Shader_IsGL45(
+    IN VIR_Shader * Shader
+    );
+
 VSC_ErrCode
 VIR_Shader_AddFunction(
     IN  VIR_Shader *    Shader,
@@ -6420,6 +6435,16 @@ VIR_Shader_SupportImgLdSt(
     IN VIR_Shader*      pShader,
     IN VSC_HW_CONFIG*   pHwCfg,
     IN gctBOOL          bForGraphics
+    );
+
+gctBOOL
+VIR_Shader_SupportAliasedAttribute(
+    IN VIR_Shader*      pShader
+    );
+
+gctBOOL
+VIR_Shader_SupportIoCommponentMapping(
+    IN VIR_Shader*      pShader
     );
 
 /* setters */

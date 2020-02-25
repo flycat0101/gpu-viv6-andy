@@ -2417,7 +2417,6 @@ VIR_Shader_IsGL40(
     return bMatch;
 }
 
-
 gctBOOL
 VIR_Shader_IsGL40OrAbove(
     IN VIR_Shader * Shader
@@ -2429,6 +2428,46 @@ VIR_Shader_IsGL40OrAbove(
 
     return bMatch;
 }
+
+gctBOOL
+VIR_Shader_IsGL43(
+    IN VIR_Shader * Shader
+    )
+{
+    gctBOOL bMatch;
+
+    bMatch = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE &&
+              (Shader->compilerVersion[1] == _SHADER_GL43_VERSION));
+
+    return bMatch;
+}
+
+gctBOOL
+VIR_Shader_IsGL44(
+    IN VIR_Shader * Shader
+    )
+{
+    gctBOOL bMatch;
+
+    bMatch = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE &&
+              (Shader->compilerVersion[1] == _SHADER_GL44_VERSION));
+
+    return bMatch;
+}
+
+gctBOOL
+VIR_Shader_IsGL45(
+    IN VIR_Shader * Shader
+    )
+{
+    gctBOOL bMatch;
+
+    bMatch = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE &&
+              (Shader->compilerVersion[1] == _SHADER_GL45_VERSION));
+
+    return bMatch;
+}
+
 VSC_BT_FREE_ENTRY* VIR_Operand_GetFreeEntry(VIR_Operand * pOperand)
 {
     /* set the operand kind to free entry kind */
@@ -9726,6 +9765,36 @@ VIR_Shader_SupportImgLdSt(
     }
 
     return bSupportImgLdSt;
+}
+
+gctBOOL
+VIR_Shader_SupportAliasedAttribute(
+    IN VIR_Shader*      pShader
+    )
+{
+    /* The attribute aliasing is only allowed in OpenGLES2.0/OpenGL vertex shaders. */
+    if ((VIR_Shader_IsDesktopGL(pShader) || VIR_Shader_IsES20Compiler(pShader))
+        &&
+        VIR_Shader_IsVS(pShader))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+gctBOOL
+VIR_Shader_SupportIoCommponentMapping(
+    IN VIR_Shader*      pShader
+    )
+{
+    if (VIR_Shader_IsVulkan(pShader) ||
+        VIR_Shader_IsGL44(pShader) || VIR_Shader_IsGL45(pShader))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
 }
 
 /* setters */

@@ -1378,19 +1378,6 @@ gcSHADER_IsESCompiler(
 }
 
 gctBOOL
-gcSHADER_IsOGLCompiler(
-    IN gcSHADER Shader
-    )
-{
-    gctBOOL isOGLCompiler;
-
-    isOGLCompiler = (Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE;
-
-    return isOGLCompiler;
-}
-
-#if (!VSC_LITE_BUILD)
-gctBOOL
 gcSHADER_IsES11Compiler(
     IN gcSHADER Shader
     )
@@ -1459,6 +1446,80 @@ gcSHADER_IsHaltiCompiler(
 
     gcmFOOTER_ARG("haltiCompiler=%d", haltiCompiler);
     return haltiCompiler;
+}
+
+/*******************************************************************************
+**  gcSHADER_IsOGLCompiler
+**
+**  Check if the shader is OGL shader.
+**  Note: should use this API instead of VIR_Shader_IsDesktopGL() to do this check,
+**        because detecting by clientApiVersion does not work in some cases.
+**
+*/
+gctBOOL
+gcSHADER_IsOGLCompiler(
+    IN gcSHADER Shader
+    )
+{
+    gctBOOL isOGLCompiler;
+
+    isOGLCompiler = (Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE;
+
+    return isOGLCompiler;
+}
+
+gctBOOL
+gcSHADER_IsGL43(
+    IN gcSHADER Shader
+    )
+{
+    gctBOOL bMatch;
+
+    bMatch = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE &&
+              (Shader->compilerVersion[1] == _SHADER_GL43_VERSION));
+
+    return bMatch;
+}
+
+gctBOOL
+gcSHADER_IsGL44(
+    IN gcSHADER Shader
+    )
+{
+    gctBOOL bMatch;
+
+    bMatch = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE &&
+              (Shader->compilerVersion[1] == _SHADER_GL44_VERSION));
+
+    return bMatch;
+}
+gctBOOL
+gcSHADER_IsGL45(
+    IN gcSHADER Shader
+    )
+{
+    gctBOOL bMatch;
+
+    bMatch = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_OGL_LANGUAGE_TYPE &&
+              (Shader->compilerVersion[1] == _SHADER_GL45_VERSION));
+
+    return bMatch;
+}
+
+#if (!VSC_LITE_BUILD)
+gctBOOL
+gcSHADER_SupportAliasedAttribute(
+    IN gcSHADER      pShader
+    )
+{
+    /* The attribute aliasing is only allowed in OpenGLES2.0/OpenGL vertex shaders. */
+    if (pShader->type == gcSHADER_TYPE_VERTEX &&
+        (gcSHADER_IsOGLCompiler(pShader) || gcSHADER_IsES11Compiler(pShader)))
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
 }
 
 /*******************************************************************************
@@ -7556,7 +7617,9 @@ gcSHADER_MergeShader(
 
                     for (k = 0; k < mainShader->outputCount; k++)
                     {
-                        if ((location != -1) && (location == mainShader->outputs[k]->location))
+                        if (((location != -1) && (location == mainShader->outputs[k]->location))
+                            &&
+                            !gcSHADER_SupportAliasedAttribute(ShaderArray[i]))
                         {
                             ERR_REPORT(VSC_ERR_LOCATION_OVERLAP, "multiple bindings to output semantic : %s", outputAddName);
                             return gcvSTATUS_LOCATION_OVERLAP;

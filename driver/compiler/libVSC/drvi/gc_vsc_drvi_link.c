@@ -924,37 +924,48 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
     gctUINT                    i, virIo, thisVirIoRegCount, location;
     gctUINT                    virIoCount = VIR_IdList_Count(pVirIoIdLsts);
     VSC_BIT_VECTOR             visitedIoIdx;
+    gctBOOL                    bCheckAliasedAttribute = (pAliasListArray != gcvNULL);
+    gctBOOL                    bCheckComponentMapping = (pComponentMapListArray != gcvNULL);
 
-    if (!pAliasListArray)
+    if (bCheckAliasedAttribute && !bInput)
     {
-        /*
-        ** Since in Vulkan, GL440 and above, IOs can consume the individual components within a location,
-        ** so we need to make the locationMask per-component.
-        */
-        vscBV_Initialize(&locationMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM * VIR_CHANNEL_NUM);
-        if (pComponentMapListArray)
-        {
-            vscBV_Initialize(&visitedIoIdx, pBaseLinkHelper->pMM, virIoCount);
-        }
+        /* We can only support the aliased attributes, we can't support the aliased outputs. */
+        gcmASSERT(gcvFALSE);
+    }
+
+    if (bCheckAliasedAttribute && bCheckComponentMapping)
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    /*
+    ** Since in Vulkan, GL440 and above, IOs can consume the individual components within a location,
+    ** so we need to make the locationMask per-component.
+    */
+    vscBV_Initialize(&locationMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM * VIR_CHANNEL_NUM);
+    if (bCheckComponentMapping)
+    {
+        vscBV_Initialize(&visitedIoIdx, pBaseLinkHelper->pMM, virIoCount);
     }
 
     for (virIo = 0; virIo < virIoCount; virIo ++)
     {
         /* if virIo has been dealt because of previous output is array and use same location, skip it */
-        if (!pAliasListArray && pComponentMapListArray && vscBV_TestBit(&visitedIoIdx, virIo))
+        if (!bCheckAliasedAttribute && bCheckComponentMapping && vscBV_TestBit(&visitedIoIdx, virIo))
         {
             continue;
         }
-        if (!pAliasListArray && pComponentMapListArray)
+
+        if (!bCheckAliasedAttribute && bCheckComponentMapping)
         {
             vscBV_SetBit(&visitedIoIdx, virIo);
         }
 
         pVirIoSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirIoIdLsts, virIo));
 
-        /* we could have not enabled attributes/outputs */
+        /* We don't need to check the builtin or unused attributes/outputs. */
         if (VIR_Shader_IsNameBuiltIn(pShader, VIR_Symbol_GetName(pVirIoSym)) ||
-            !isSymEnabled(pVirIoSym))
+            isSymUnused(pVirIoSym))
         {
             continue;
         }
@@ -962,13 +973,22 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
         thisVirIoRegCount = VIR_Symbol_GetVirIoRegCount(pShader, pVirIoSym);
         location = VIR_Symbol_GetLocation(pVirIoSym);
 
-        if (location != -1)
+        /* The location is not specified, skip it. */
+        if (location == -1)
         {
-            for (i = (gctUINT)location;
-                 i < (gctUINT)location + thisVirIoRegCount;
-                 i ++)
+            continue;
+        }
+
+        for (i = (gctUINT)location; i < (gctUINT)location + thisVirIoRegCount; i ++)
+        {
+            gctBOOL    hasComponentQualifier = gcvFALSE;
+
+            if (bCheckAliasedAttribute)
             {
-#if !SUPPORT_ATTR_ALIAS
+                gcmASSERT(i < MAX_SHADER_IO_NUM);
+            }
+            else
+            {
                 if (bInput && (i >= MAX_SHADER_IO_NUM) && (pShader->shaderKind == VIR_SHADER_VERTEX))
                 {
                     errCode = VSC_ERR_NOT_SUPPORTED;
@@ -978,57 +998,53 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
                 {
                     gcmASSERT(i < MAX_SHADER_IO_NUM);
                 }
-#else
-                gcmASSERT(i < MAX_SHADER_IO_NUM);
-#endif
+            }
 
-                /* If the aliased list exist, just copy the symId. */
-                if (pAliasListArray)
-                {
-                    VIR_IdList_Add(&pAliasListArray[i], VIR_Symbol_GetIndex(pVirIoSym));
-                }
-                else
-                {
-                    gctBOOL    hasComponentQualifier;
-                    errCode = _CheckIoLocationMask(pVirIoSym, &locationMask, i, gcvTRUE, &hasComponentQualifier);
-                    ON_ERROR(errCode, "Check aliased location");
+            /* If the aliased list exist, just copy the symId. */
+            if (bCheckAliasedAttribute)
+            {
+                VIR_IdList_Add(&pAliasListArray[i], VIR_Symbol_GetIndex(pVirIoSym));
+            }
+            else
+            {
+                errCode = _CheckIoLocationMask(pVirIoSym, &locationMask, i, gcvTRUE, &hasComponentQualifier);
+                ON_ERROR(errCode, "Check aliased location");
 
-                    /* Save the component qualifier. */
-                    if (hasComponentQualifier && pComponentMapListArray)
+                /* Save the component qualifier. */
+                if (hasComponentQualifier && bCheckComponentMapping)
+                {
+                    VIR_IdList_Add(&pComponentMapListArray[i], VIR_Symbol_GetIndex(pVirIoSym));
+
+                    /* if current output is array, the location covers a range[location, location+thisVirIoRegCount)
+                        * check next outputs if has same location and add the symbol to this list
+                        * an example from vulkan-1.1 glsl.440.linkage.varying.component.frag_out.two_vec4
+                        * layout(location = 0, component = 0) out float dEQP_FragColor_0_0;
+                        * layout(location = 0, component = 1) out vec3  dEQP_FragColor_0_1[2];
+                        * layout(location = 1, component = 0) out float dEQP_FragColor_1_0;
+                        * 3 output symbols are added to pComponentMapListArray[0] since second array output covers location [0,1]
+                        */
+                    if (thisVirIoRegCount > 1)
                     {
-                        VIR_IdList_Add(&pComponentMapListArray[i], VIR_Symbol_GetIndex(pVirIoSym));
-
-                        /* if current output is array, the location covers a range[location, location+thisVirIoRegCount)
-                         * check next outputs if has same location and add the symbol to this list
-                         * an example from vulkan-1.1 glsl.440.linkage.varying.component.frag_out.two_vec4
-                         * layout(location = 0, component = 0) out float dEQP_FragColor_0_0;
-                         * layout(location = 0, component = 1) out vec3  dEQP_FragColor_0_1[2];
-                         * layout(location = 1, component = 0) out float dEQP_FragColor_1_0;
-                         * 3 output symbols are added to pComponentMapListArray[0] since second array output covers location [0,1]
-                         */
-                        if (thisVirIoRegCount > 1)
+                        gctUINT next;
+                        for (next = virIo + 1; next < virIoCount; next++)
                         {
-                            gctUINT next;
-                            for (next = virIo + 1; next < virIoCount; next++)
+                            VIR_Symbol* pNextVirIoSym;
+                            gctUINT nextlocation;
+                            gctBOOL nextHasComonentQualifer;
+                            if (vscBV_TestBit(&visitedIoIdx, next))
                             {
-                                VIR_Symbol* pNextVirIoSym;
-                                gctUINT nextlocation;
-                                gctBOOL nextHasComonentQualifer;
-                                if (vscBV_TestBit(&visitedIoIdx, next))
-                                {
-                                    continue;
-                                }
-                                pNextVirIoSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirIoIdLsts, next));
-                                nextlocation = VIR_Symbol_GetLocation(pNextVirIoSym);
-                                errCode = _CheckIoLocationMask(pNextVirIoSym, &locationMask, nextlocation, gcvFALSE, &nextHasComonentQualifer); /* check only */
+                                continue;
+                            }
+                            pNextVirIoSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirIoIdLsts, next));
+                            nextlocation = VIR_Symbol_GetLocation(pNextVirIoSym);
+                            errCode = _CheckIoLocationMask(pNextVirIoSym, &locationMask, nextlocation, gcvFALSE, &nextHasComonentQualifer); /* check only */
+                            ON_ERROR(errCode, "Check aliased location");
+                            if (nextHasComonentQualifer && (nextlocation > i && (nextlocation < (location + thisVirIoRegCount))))
+                            {
+                                VIR_IdList_Add(&pComponentMapListArray[i], VIR_Symbol_GetIndex(pNextVirIoSym));
+                                vscBV_SetBit(&visitedIoIdx, next);
+                                errCode = _CheckIoLocationMask(pNextVirIoSym, &locationMask, nextlocation, gcvTRUE, &nextHasComonentQualifer); /* set locationMask */
                                 ON_ERROR(errCode, "Check aliased location");
-                                if (nextHasComonentQualifer && (nextlocation > i && (nextlocation < (location + thisVirIoRegCount))))
-                                {
-                                    VIR_IdList_Add(&pComponentMapListArray[i], VIR_Symbol_GetIndex(pNextVirIoSym));
-                                    vscBV_SetBit(&visitedIoIdx, next);
-                                    errCode = _CheckIoLocationMask(pNextVirIoSym, &locationMask, nextlocation, gcvTRUE, &nextHasComonentQualifer); /* set locationMask */
-                                    ON_ERROR(errCode, "Check aliased location");
-                                }
                             }
                         }
                     }
@@ -1037,16 +1053,11 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
         }
     }
 
-#if !SUPPORT_ATTR_ALIAS
 OnError:
-#endif
-    if (!pAliasListArray)
+    vscBV_Finalize(&locationMask);
+    if (bCheckComponentMapping)
     {
-        vscBV_Finalize(&locationMask);
-        if (pComponentMapListArray)
-        {
-            vscBV_Finalize(&visitedIoIdx);
-        }
+        vscBV_Finalize(&visitedIoIdx);
     }
 
     return errCode;
@@ -1404,7 +1415,7 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
         VIR_IdList*                pInputCompArrayList = gcvNULL;
         VIR_IdList*                pList = gcvNULL;
         gctUINT                    i;
-        gctBOOL                    bCheckComponentMap = VIR_Shader_IsVulkan(pUpperShader);
+        gctBOOL                    bCheckComponentMap = VIR_Shader_SupportIoCommponentMapping(pUpperShader);
 
         if (bCheckComponentMap)
         {
@@ -1768,12 +1779,13 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
     gctUINT                    attrIdx, ioIdx = 0;
     gctUINT                    attrCount = VIR_IdList_Count(pAttrIdLsts);
     gctINT                     location;
-    VIR_IdList*                pLocationList = gcvNULL;
+    VIR_IdList*                pAliasedAttrList = gcvNULL;
     VIR_Symbol*                pAttrSym;
     gctUINT                    thisAttrRegCount, i, j;
     VSC_BIT_VECTOR             inputWorkingMask;
     gctBOOL                    bHasNoAssignedLocation = gcvFALSE;
     gctBOOL                    bDirectlyUseLocation = (pShader->shaderKind != VIR_SHADER_VERTEX) && bSeperatedShaders;
+    gctBOOL                    bHasAliasedAttribute = VIR_Shader_HasAliasedAttribute(pShader);
 
     vscBV_Initialize(&inputWorkingMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM);
 
@@ -1789,13 +1801,13 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
             location = VIR_Symbol_GetLocation(pAttrSym);
             gcmASSERT(location < MAX_SHADER_IO_NUM);
 
-            if (location != -1 && VIR_Shader_HasAliasedAttribute(pShader))
+            if (location != -1 && bHasAliasedAttribute)
             {
-                pLocationList = &VIR_Shader_GetAttributeAliasList(pShader)[location];
+                pAliasedAttrList = &VIR_Shader_GetAttributeAliasList(pShader)[location];
             }
             else
             {
-                pLocationList = gcvNULL;
+                pAliasedAttrList = gcvNULL;
             }
 
             /* For vertex shader, GL spec demands location of attribute specified
@@ -1806,8 +1818,7 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
                defined by spec !!! */
             if (pShader->shaderKind == VIR_SHADER_VERTEX && VIR_Symbol_GetLocation(pAttrSym) != -1)
             {
-                if ((pAttrSym->layout.location + thisAttrRegCount) >
-                    pBaseLinkHelper->pHwCfg->maxAttributeCount)
+                if ((pAttrSym->layout.location + thisAttrRegCount) > pBaseLinkHelper->pHwCfg->maxAttributeCount)
                 {
                     errCode = VSC_ERR_TOO_MANY_ATTRIBUTES;
                     ON_ERROR(errCode, "Calc input ll slot");
@@ -1821,14 +1832,14 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
             }
 
             /* Check if any aliased attribute has been processed, if found, just use its info. */
-            if (pLocationList && VIR_IdList_Count(pLocationList) > 1)
+            if (pAliasedAttrList && VIR_IdList_Count(pAliasedAttrList) > 1)
             {
                 gctUINT firstSlot = NOT_ASSIGNED;
                 VIR_Symbol* pCopySym = gcvNULL;
 
-                for (j = 0; j < VIR_IdList_Count(pLocationList); j++)
+                for (j = 0; j < VIR_IdList_Count(pAliasedAttrList); j++)
                 {
-                    VIR_Symbol* pAliasedSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pLocationList, j));
+                    VIR_Symbol* pAliasedSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pAliasedAttrList, j));
 
                     /* Find a valid symbol, use it to set all the other aliased symbol. */
                     if (VIR_Symbol_GetFirstSlot(pAliasedSym) != NOT_ASSIGNED)
@@ -1836,9 +1847,9 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
                         firstSlot = VIR_Symbol_GetFirstSlot(pAliasedSym);
                         pCopySym = pAliasedSym;
 
-                        for (j = 0; j < VIR_IdList_Count(pLocationList); j++)
+                        for (j = 0; j < VIR_IdList_Count(pAliasedAttrList); j++)
                         {
-                            pAliasedSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pLocationList, j));
+                            pAliasedSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pAliasedAttrList, j));
 
                             if (pCopySym == pAliasedSym)
                             {
@@ -1879,19 +1890,22 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
                          i < (gctUINT)location + thisAttrRegCount;
                          i ++)
                     {
-#if !SUPPORT_ATTR_ALIAS
-                        if (i >= MAX_SHADER_IO_NUM && pShader->shaderKind == VIR_SHADER_VERTEX)
-                        {
-                            errCode = VSC_ERR_TOO_MANY_ATTRIBUTES;
-                            ON_ERROR(errCode, "Calc input ll slot");
-                        }
-                        else
+                        if (bHasAliasedAttribute)
                         {
                             gcmASSERT(i < MAX_SHADER_IO_NUM);
                         }
-#else
-                        gcmASSERT(i < MAX_SHADER_IO_NUM);
-#endif
+                        else
+                        {
+                            if (i >= MAX_SHADER_IO_NUM && pShader->shaderKind == VIR_SHADER_VERTEX)
+                            {
+                                errCode = VSC_ERR_TOO_MANY_ATTRIBUTES;
+                                ON_ERROR(errCode, "Calc input ll slot");
+                            }
+                            else
+                            {
+                                gcmASSERT(i < MAX_SHADER_IO_NUM);
+                            }
+                        }
                         vscBV_SetBit(&inputWorkingMask, i);
                     }
                 }
@@ -1908,19 +1922,22 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
                      i < ioIdx + thisAttrRegCount;
                      i ++)
                 {
-#if !SUPPORT_ATTR_ALIAS
-                    if (i >= MAX_SHADER_IO_NUM && pShader->shaderKind == VIR_SHADER_VERTEX)
-                    {
-                        errCode = VSC_ERR_TOO_MANY_ATTRIBUTES;
-                        ON_ERROR(errCode, "Calc input ll slot");
-                    }
-                    else
+                    if (bHasAliasedAttribute)
                     {
                         gcmASSERT(i < MAX_SHADER_IO_NUM);
                     }
-#else
-                    gcmASSERT(i < MAX_SHADER_IO_NUM);
-#endif
+                    else
+                    {
+                        if (i >= MAX_SHADER_IO_NUM && pShader->shaderKind == VIR_SHADER_VERTEX)
+                        {
+                            errCode = VSC_ERR_TOO_MANY_ATTRIBUTES;
+                            ON_ERROR(errCode, "Calc input ll slot");
+                        }
+                        else
+                        {
+                            gcmASSERT(i < MAX_SHADER_IO_NUM);
+                        }
+                    }
 
                     vscBV_SetBit(&inputWorkingMask, i);
                 }
@@ -1961,19 +1978,22 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
                          i < ioIdx + thisAttrRegCount;
                          i ++)
                     {
-#if !SUPPORT_ATTR_ALIAS
-                        if (i >= MAX_SHADER_IO_NUM && pShader->shaderKind == VIR_SHADER_VERTEX)
-                        {
-                            errCode = VSC_ERR_TOO_MANY_ATTRIBUTES;
-                            ON_ERROR(errCode, "Calc input ll slot");
-                        }
-                        else
+                        if (bHasAliasedAttribute)
                         {
                             gcmASSERT(i < MAX_SHADER_IO_NUM);
                         }
-#else
-                        gcmASSERT(i < MAX_SHADER_IO_NUM);
-#endif
+                        else
+                        {
+                            if (i >= MAX_SHADER_IO_NUM && pShader->shaderKind == VIR_SHADER_VERTEX)
+                            {
+                                errCode = VSC_ERR_TOO_MANY_ATTRIBUTES;
+                                ON_ERROR(errCode, "Calc input ll slot");
+                            }
+                            else
+                            {
+                                gcmASSERT(i < MAX_SHADER_IO_NUM);
+                            }
+                        }
 
                         vscBV_SetBit(&inputWorkingMask, i);
                     }
@@ -2169,17 +2189,17 @@ static VSC_ErrCode _CheckInputAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLinkH
     VIR_IdList*                pComponentArrayList = gcvNULL;
     VIR_IdList*                pList = gcvNULL;
     gctUINT                    i;
-    /* So far, check component qualifer for Vulkan only. */
-    gctBOOL                    bCheckComponentMap = VIR_Shader_IsVulkan(pShader);
+    gctBOOL                    bCheckComponentMap = VIR_Shader_SupportIoCommponentMapping(pShader);
+    gctBOOL                    bSupportAliasedAttribute = VIR_Shader_SupportAliasedAttribute(pShader);
 
-    /* So far, check the per-vertex attributes for VX only. */
-    if (VIR_Shader_IsES20Compiler(pShader) && pShader->shaderKind == VIR_SHADER_VERTEX)
+    /* Check if we need to allocate the aliased attribute list. */
+    if (bSupportAliasedAttribute)
     {
         VIR_Shader_CreateAttributeAliasList(pShader);
         pAliasedArrayList = VIR_Shader_GetAttributeAliasList(pShader);
         gcmASSERT(pAliasedArrayList);
     }
-    else if (bCheckComponentMap)
+    if (bCheckComponentMap)
     {
         VIR_Shader_CreateAttributeComponentMapList(pShader);
         pComponentArrayList = VIR_Shader_GetAttributeComponentMapList(pShader);
@@ -2236,10 +2256,8 @@ static VSC_ErrCode _CheckOutputAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLink
     VIR_IdList*                pComponentArrayList = gcvNULL;
     VIR_IdList*                pList = gcvNULL;
     gctUINT                    i;
-    /* So far, check component qualifer for Vulkan only. */
-    gctBOOL                    bCheckComponentMap = VIR_Shader_IsVulkan(pShader);
+    gctBOOL                    bCheckComponentMap = VIR_Shader_SupportIoCommponentMapping(pShader);
 
-    /* So far, check component qualifer for Vulkan only. */
     if (bCheckComponentMap)
     {
         VIR_Shader_CreateOutputComponentMapList(pShader);
