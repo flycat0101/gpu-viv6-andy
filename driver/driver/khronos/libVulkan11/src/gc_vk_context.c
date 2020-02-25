@@ -447,9 +447,15 @@ OnError:
             __vk_DestroyBuffer((VkDevice)devCtx, devCtx->fenceBuffer, gcvNULL);
         }
 
-        __vk_DestroyDeviceQueues(devCtx);
+        if (devCtx->pPhyDevice)
+        {
+            __vk_DestroyDeviceQueues(devCtx);
+        }
 
-        __vki_DetachDevice(devCtx);
+        if (devCtx->chipInfo)
+        {
+            __vki_DetachDevice(devCtx);
+        }
 
         if (devCtx->pEnabledExtensions)
         {
