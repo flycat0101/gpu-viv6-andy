@@ -11442,7 +11442,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
     totalSize = operationSize + lcdtSize + nnSize + tpSize + shSize + patchSize
                 + swSize + layerParamSize;
 
-    *sectionSize = totalSize + SH_COMMAND_ALIGN_SIZE;
+    *sectionSize = totalSize;
     *retLcdSize = lcdSize;
 
     vxInfo("NBG: operationSize: 0x%x, nnSize: 0x%x, tpSize: 0x%x, shSize: 0x%x, swSize: 0x%x, layerParamSize: 0x%x, lcdtSize: 0x%x, patchSize: 0x%x, lcdSize 0x%x\n",
@@ -11743,12 +11743,6 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
     if (graph->nodeCount == 1)
     {
         inputOutputSize = 0;
-    }
-
-    if (inputOutputSize > sectionsSize)
-    {
-        vxError("inputOutputSize: %d, sectionsSize: %d\n", inputOutputSize, sectionsSize);
-        vxmONERROR(VX_FAILURE);
     }
 
     lcdSize = lcdSize - inputOutputSize;
