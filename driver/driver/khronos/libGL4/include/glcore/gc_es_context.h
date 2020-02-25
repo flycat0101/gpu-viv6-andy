@@ -14,6 +14,8 @@
 #ifndef __gc_gl_context_h__
 #define __gc_gl_context_h__
 
+#define OPENGL40    1
+
 /* Some platform (win64) predefined such macro, which make driver code confused. */
 #if defined(MemoryBarrier)
 #undef MemoryBarrier
