@@ -1082,6 +1082,14 @@ gcoHAL_UnlockVideoMemory(
     );
 
 gceSTATUS
+gcoHAL_UnlockVideoMemoryEX(
+    IN gctUINT32 Node,
+    IN gceVIDMEM_TYPE Type,
+    IN gceENGINE Engine,
+    IN gctBOOL Sync
+    );
+
+gceSTATUS
 gcoHAL_ReleaseVideoMemory(
     IN gctUINT32 Node
     );

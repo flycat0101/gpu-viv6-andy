@@ -2817,10 +2817,11 @@ OnError:
 }
 
 gceSTATUS
-gcoHAL_UnlockVideoMemory(
+gcoHAL_UnlockVideoMemoryEX(
     IN gctUINT32 Node,
     IN gceVIDMEM_TYPE Type,
-    IN gceENGINE engine
+    IN gceENGINE Engine,
+    IN gctBOOL Sync
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -2828,7 +2829,7 @@ gcoHAL_UnlockVideoMemory(
 
     gcmHEADER_ARG("Node=0x%x", Node);
 
-    if (engine == gcvENGINE_RENDER)
+    if (Engine == gcvENGINE_RENDER)
     {
         iface.engine = gcvENGINE_RENDER;
         iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
@@ -2837,10 +2838,20 @@ gcoHAL_UnlockVideoMemory(
 
         gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
 
-        /* Schedule an event for the unlock. Always goto render pipe for now */
-        gcmONERROR(gcoHARDWARE_CallEvent(gcvNULL, &iface));
+        if (Sync)
+        {
+            iface.command = gcvHAL_BOTTOM_HALF_UNLOCK_VIDEO_MEMORY;
+            iface.u.BottomHalfUnlockVideoMemory.node = Node;
+            iface.u.BottomHalfUnlockVideoMemory.type = gcvVIDMEM_TYPE_GENERIC;
+            gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+        }
+        else
+        {
+            /* Schedule an event for the unlock. Always goto render pipe for now */
+            gcmONERROR(gcoHARDWARE_CallEvent(gcvNULL, &iface));
+        }
     }
-    else if (engine == gcvENGINE_BLT)
+    else if (Engine == gcvENGINE_BLT)
     {
         if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT) != gcvSTATUS_TRUE)
         {
@@ -2867,6 +2878,18 @@ OnError:
     gcmFOOTER();
     return status;
 }
+
+gceSTATUS
+gcoHAL_UnlockVideoMemory(
+    IN gctUINT32 Node,
+    IN gceVIDMEM_TYPE Type,
+    IN gceENGINE Engine
+    )
+{
+    return gcoHAL_UnlockVideoMemoryEX(Node, Type, Engine, gcvFALSE);
+}
+
+
 
 gceSTATUS
 gcoHAL_ReleaseVideoMemory(
