@@ -532,7 +532,7 @@ EXPORTS
 	VIR_Operand_Change2Src
     VIR_Function_NewOperand
     VIR_ConditionOp_Reverse
-    VIR_IntrisicGetKind
+    VIR_IntrinsicGetKind
     VIR_Link_AddLink
     VIR_Type_AddField
     VIR_Type_GetVirRegCount

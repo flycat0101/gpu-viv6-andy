@@ -2072,7 +2072,7 @@ _ConvDepthImageTypeToNonDepthImageType(
 }
 
 static void
-_IntrisicImageRelatedFuncName(
+_IntrinsicImageRelatedFuncName(
     VIR_Shader      *pShader,
     VSC_HW_CONFIG   *pHwCfg,
     VIR_Instruction *pInst,
@@ -2307,7 +2307,7 @@ _IntrisicImageRelatedFuncName(
 }
 
 static void
-_IntrisicTexldFuncName(
+_IntrinsicTexldFuncName(
     VIR_Shader      *pShader,
     VSC_HW_CONFIG   *pHwCfg,
     VIR_Instruction *pInst,
@@ -2349,7 +2349,7 @@ _IntrisicTexldFuncName(
 }
 
 static void
-_IntrisicImageAddrFuncName(
+_IntrinsicImageAddrFuncName(
     VIR_Shader      *pShader,
     VSC_HW_CONFIG   *pHwCfg,
     VIR_Instruction *pInst,
@@ -2391,7 +2391,7 @@ _IntrisicImageAddrFuncName(
 }
 
 static void
-_IntrisicImageFetchFuncName(
+_IntrinsicImageFetchFuncName(
     VIR_Shader      *pShader,
     VSC_HW_CONFIG   *pHwCfg,
     VIR_Instruction *pInst,
@@ -2498,7 +2498,7 @@ _IntrisicImageFetchFuncName(
 }
 
 static void
-_IntrisicOrExtFuncName(
+_IntrinsicOrExtFuncName(
     VIR_Shader      *pShader,
     VSC_HW_CONFIG   *pHwCfg,
     VIR_Instruction *pInst,
@@ -2636,24 +2636,24 @@ _IntrisicOrExtFuncName(
     /* Check for imageLoad/imageStore. */
     if (VIR_Intrinsics_isImageLoad(intrinsicKind) || VIR_Intrinsics_isImageStore(intrinsicKind))
     {
-        _IntrisicImageRelatedFuncName(pShader, pHwCfg, pInst, imageSym, opndTypeId, pLibName);
+        _IntrinsicImageRelatedFuncName(pShader, pHwCfg, pInst, imageSym, opndTypeId, pLibName);
     }
     else
     {
         /* Check for texld related. */
         if (VIR_Intrinsics_isTexLdRelated(intrinsicKind))
         {
-            _IntrisicTexldFuncName(pShader, pHwCfg, pInst, opndTypeId, pLibName);
+            _IntrinsicTexldFuncName(pShader, pHwCfg, pInst, opndTypeId, pLibName);
         }
         /* Check for image addr. */
         else if (VIR_Intrinsics_isImageAddr(intrinsicKind))
         {
-            _IntrisicImageAddrFuncName(pShader, pHwCfg, pInst, imageSym, opndTypeId, pLibName);
+            _IntrinsicImageAddrFuncName(pShader, pHwCfg, pInst, imageSym, opndTypeId, pLibName);
         }
         /* Check for image fetch. */
         else if (VIR_Intrinsics_isImageFetchForSampler(intrinsicKind))
         {
-            _IntrisicImageFetchFuncName(pShader, pHwCfg, pInst, opndTypeId, pLibName);
+            _IntrinsicImageFetchFuncName(pShader, pHwCfg, pInst, opndTypeId, pLibName);
         }
         else
         {
@@ -4982,8 +4982,8 @@ _GetIntrinsicOrextFuncName(
     VSC_HW_CONFIG               *pHwCfg = Context->pHwCfg;
     VIR_LINKER_CALL_INST_NODE   *callInstNode = (VIR_LINKER_CALL_INST_NODE*) TransPoint;
 
-    /* Get the intrisic function name. */
-    _IntrisicOrExtFuncName(pShader,
+    /* Get the intrinsic function name. */
+    _IntrinsicOrExtFuncName(pShader,
                            pHwCfg,
                            callInstNode->inst,
                            LibFuncName);
