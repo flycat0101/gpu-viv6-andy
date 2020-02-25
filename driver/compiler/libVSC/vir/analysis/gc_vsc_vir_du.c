@@ -4908,7 +4908,11 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsagesInItsDUChain(VIR_DEF_USAGE_INFO* pDuInfo,
                     {
                         continue;
                     }
-
+                    else if (pUsage->usageKey.pUsageInst->_opcode < 0 ||
+                             pUsage->usageKey.pUsageInst->_opcode >= VIR_OP_MAXOPCODE)
+                    {
+                        return gcvFALSE;
+                    }
                     if (!vscVIR_IsUniqueDefInstOfUsageInst(pDuInfo,
                                                            pUsage->usageKey.pUsageInst,
                                                            pUsage->usageKey.pOperand,

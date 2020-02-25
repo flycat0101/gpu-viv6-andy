@@ -1274,11 +1274,6 @@ GLvoid GL_APIENTRY __glim_UseProgram(__GLcontext *gc, GLuint program)
 
     __GL_HEADER();
 
-    xfbObj = gc->xfb.boundXfbObj;
-    if (xfbObj->active && !xfbObj->paused)
-    {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-    }
 
     GL_ASSERT(gc->shaderProgram.spShared);
     if (program != 0)
@@ -4057,56 +4052,6 @@ GLvoid GL_APIENTRY __glim_BeginTransformFeedback(__GLcontext *gc, GLenum primiti
 
     __GL_HEADER();
 
-    switch (primitiveMode)
-    {
-    case GL_POINTS:
-    case GL_LINES:
-    case GL_TRIANGLES:
-        break;
-    default:
-        __GL_ERROR_EXIT(GL_INVALID_ENUM);
-    }
-
-    xfbObj = gc->xfb.boundXfbObj;
-    if (xfbObj->active)
-    {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-    }
-
-    programObj = __glGetLastNonFragProgram(gc);
-    if (!programObj || !programObj->bindingInfo.numActiveXFB)
-    {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-    }
-
-    pXfbBindingPoints = gc->xfb.boundXfbObj->boundBufBinding;
-    if (programObj->bindingInfo.xfbMode == GL_INTERLEAVED_ATTRIBS)
-    {
-        if (!pXfbBindingPoints[0].boundBufName)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-        }
-    }
-    else
-    {
-        GLuint index;
-        for (index = 0; index < programObj->bindingInfo.numActiveXFB; ++index)
-        {
-            if (!pXfbBindingPoints[index].boundBufName)
-            {
-                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-            }
-        }
-    }
-
-    ++programObj->xfbRefCount;
-    xfbObj->primMode = primitiveMode;
-    xfbObj->active = GL_TRUE;
-    xfbObj->offset = 0;
-    xfbObj->programObj = programObj;
-
-    (*gc->dp.beginXFB)(gc, xfbObj);
-
 OnError:
     __GL_FOOTER();
 }
@@ -4116,37 +4061,6 @@ GLvoid GL_APIENTRY __glim_EndTransformFeedback(__GLcontext *gc)
     __GLxfbObject *xfbObj = gc->xfb.boundXfbObj;
 
     __GL_HEADER();
-
-    if (!xfbObj->active)
-    {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-    }
-
-    if (xfbObj->paused)
-    {
-        /* Implicit resume */
-        xfbObj->paused = GL_FALSE;
-    }
-    else
-    {
-        GL_ASSERT(xfbObj->programObj == __glGetLastNonFragProgram(gc));
-    }
-
-    /* Needed in endXFB */
-    xfbObj->active = GL_FALSE;
-
-    (*gc->dp.endXFB)(gc, xfbObj);
-
-    --xfbObj->programObj->xfbRefCount;
-    xfbObj->programObj = gcvNULL;
-    xfbObj->primMode = 0;
-    xfbObj->end = GL_TRUE;
-
-    if (xfbObj->flags & __GL_OBJECT_IS_DELETED)
-    {
-        __glDeleteXfbObj(gc, xfbObj);
-    }
-
 OnError:
     __GL_FOOTER();
 }
