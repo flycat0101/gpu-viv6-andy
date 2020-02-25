@@ -1580,7 +1580,6 @@ _AllocateBaseAddrUniformForIB(
     if (IBSymbolKind == VIR_SYM_UBO)
     {
         VIR_Symbol_SetUniformKind(baseAddrSym, VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS);
-        VIR_Symbol_SetFlag(baseAddrSym, VIR_SYMFLAG_COMPILER_GEN);
     }
     else if (IBSymbolKind == VIR_SYM_SBO)
     {
