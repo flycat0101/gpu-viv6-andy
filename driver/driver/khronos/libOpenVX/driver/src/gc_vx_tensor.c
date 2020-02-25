@@ -2493,7 +2493,7 @@ vxoCopyTensorPatch(
         if (!vxoTensor_CheckValidTensorAddressing(tensor, user_addr)) return VX_ERROR_INVALID_REFERENCE;
     }
 
-    if (tensor->base.isVirtual) return VX_ERROR_OPTIMIZED_AWAY;
+    if (tensor->base.isVirtual && tensor->base.accessible == vx_false_e) return VX_ERROR_OPTIMIZED_AWAY;
 
     if (user_ptr == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
 
