@@ -5234,44 +5234,48 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                     break;
 
                 case VX_NN_ACTIVATION_HYPERBOLIC_TAN:
-                    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
                     {
-                        fixed16 = Fp32toFp16(0.0f);
-                        for (base = 0; base < 0x20; base++)
+                        vx_float32 scaleOut = value_cmd_ptr->f32[0];
+                        vx_float32 scaleIn = value_cmd_ptr->f32[1];
+                        if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
                         {
-                            pwlLUTBase[base] = fixed16;
+                            fixed16 = Fp32toFp16(0.0f);
+                            for (base = 0; base < 0x20; base++)
+                            {
+                                pwlLUTBase[base] = fixed16;
+                            }
+                            for (base = 0x20; base < 0x3E0; base++)
+                            {
+                                baseF16 = base << 5;
+                                baseF32 = Fp16toFp32(baseF16);
+                                pwlValue = scaleOut * gcoMATH_TangentH(baseF32 * value * scaleIn);
+                                pwlLUTBase[base] = Fp32toFp16(pwlValue);
+                            }
+                            fixed16 = Fp32toFp16(1.0f);
+                            for (base = 0x3E0; base < 0x400; base++)
+                            {
+                                pwlLUTBase[base] = fixed16;
+                            }
                         }
-                        for (base = 0x20; base < 0x3E0; base++)
+                        else
                         {
-                            baseF16 = base << 5;
-                            baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = gcoMATH_TangentH(baseF32 * value);
-                            pwlLUTBase[base] = Fp32toFp16(pwlValue);
-                        }
-                        fixed16 = Fp32toFp16(1.0f);
-                        for (base = 0x3E0; base < 0x400; base++)
-                        {
-                            pwlLUTBase[base] = fixed16;
-                        }
-                    }
-                    else
-                    {
-                        fixed21 = Fp32toFp21(0.0f);
-                        for (base = 0; base < 0x20; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;
-                        }
-                        for (base = 0x20; base < 0x3E0; base++)
-                        {
-                            baseF21 = base << 10;
-                            baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = gcoMATH_TangentH(baseF32 * value);
-                            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
-                        }
-                        fixed21 = Fp32toFp21(1.0f);
-                        for (base = 0x3E0; base < 0x400; base++)
-                        {
-                            pwlLUTBaseEx[base] = fixed21;
+                            fixed21 = Fp32toFp21(0.0f);
+                            for (base = 0; base < 0x20; base++)
+                            {
+                                pwlLUTBaseEx[base] = fixed21;
+                            }
+                            for (base = 0x20; base < 0x3E0; base++)
+                            {
+                                baseF21 = base << 10;
+                                baseF32 = Fp21toFp32(baseF21);
+                                pwlValue = scaleOut * gcoMATH_TangentH(baseF32 * value * scaleIn);
+                                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+                            }
+                            fixed21 = Fp32toFp21(1.0f);
+                            for (base = 0x3E0; base < 0x400; base++)
+                            {
+                                pwlLUTBaseEx[base] = fixed21;
+                            }
                         }
                     }
                     break;

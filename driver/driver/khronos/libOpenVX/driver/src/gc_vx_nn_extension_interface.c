@@ -2193,7 +2193,9 @@ vx_status vxnneExecuteSWActivation(struct _vxnne_operation_s *operation)
 
         case VX_NN_ACTIVATION_HYPERBOLIC_TAN:
             {
-                result = a_v * gcoMATH_TangentH(b_v * value);
+                vx_float32 av = vxoScalar_GetDataType(a) == VX_TYPE_FLOAT32 ? a->value->f32 : (vx_float32)a->value->n32;
+                vx_float32 bv = vxoScalar_GetDataType(b) == VX_TYPE_FLOAT32 ? b->value->f32 : (vx_float32)b->value->n32;
+                result = av * gcoMATH_TangentH(bv * value);
             }
             break;
 
@@ -10063,8 +10065,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNActivationLayer_Initializer(vx_node no
         conv.other_ref = gcvNULL;
         conv.tp_value = (vx_tp_value_cmd_s*)vxAllocateAndZeroMemory(sizeof(vx_tp_value_cmd_s));
         conv.tp_value->e32[0] = func_s->value->e;
-        conv.tp_value->f32[0] = a_s->value->f32;
-        conv.tp_value->f32[1] = b_s->value->f32;
+        conv.tp_value->f32[0] = vxoScalar_GetDataType(a_s) == VX_TYPE_FLOAT32 ? a_s->value->f32 : (vx_float32)a_s->value->n32;
+        conv.tp_value->f32[1] = vxoScalar_GetDataType(b_s) == VX_TYPE_FLOAT32 ? b_s->value->f32 : (vx_float32)b_s->value->n32;
 
         vxMemCopy(&activationLayer->activation_tp_operation.base.parameter, &conv, sizeof(vx_op_param_s));
 
