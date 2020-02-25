@@ -2628,78 +2628,81 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
                 }
             }
 
-            maxInOutNum = eachInOutNum * block->count;
-            status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(vx_memory) * graph->layer->base.num_operations * maxInOutNum, (gctPOINTER*)&checkArray);
-            if (gcmIS_ERROR(status)) goto OnError;
-            gcoOS_ZeroMemory(checkArray, gcmSIZEOF(vx_memory) * graph->layer->base.num_operations * maxInOutNum);
-            status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(vx_uint32) * graph->layer->base.num_operations, (gctPOINTER*)&checkCount);
-            if (gcmIS_ERROR(status))
+            if (eachInOutNum > 0)
             {
-                gcoOS_FreeMemory(gcvNULL, checkArray);
-                goto OnError;
-            }
-            gcoOS_ZeroMemory(checkCount, gcmSIZEOF(vx_uint32) * graph->layer->base.num_operations);
-
-            for (ii = block->start; ii < block->start+block->count; ii++)
-            {
-                for (jj = 0; jj < graph->layer->memRequestList[ii].outputCount; jj++)
+                maxInOutNum = eachInOutNum * block->count;
+                status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(vx_memory) * graph->layer->base.num_operations * maxInOutNum, (gctPOINTER*)&checkArray);
+                if (gcmIS_ERROR(status)) goto OnError;
+                gcoOS_ZeroMemory(checkArray, gcmSIZEOF(vx_memory) * graph->layer->base.num_operations * maxInOutNum);
+                status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(vx_uint32) * graph->layer->base.num_operations, (gctPOINTER*)&checkCount);
+                if (gcmIS_ERROR(status))
                 {
-                    if (graph->layer->memRequestList[ii].outputMemory[jj]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
-                    {
-                        for (kk = graph->layer->memRequestList[ii].outputMemory[jj]->firstUseId; kk <= graph->layer->memRequestList[ii].outputMemory[jj]->lastUseId; kk++)
-                        {
-                            vxmASSERT(checkCount[kk] < maxInOutNum);
-                            checkArray[kk * maxInOutNum + checkCount[kk]] = graph->layer->memRequestList[ii].outputMemory[jj];
-                            checkCount[kk]++;
-                        }
-                    }
+                    gcoOS_FreeMemory(gcvNULL, checkArray);
+                    goto OnError;
                 }
+                gcoOS_ZeroMemory(checkCount, gcmSIZEOF(vx_uint32) * graph->layer->base.num_operations);
 
-                for (jj = 0; jj < graph->layer->memRequestList[ii].inputCount; jj++)
+                for (ii = block->start; ii < block->start+block->count; ii++)
                 {
-                    if (graph->layer->memRequestList[ii].inputMemory[jj]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
+                    for (jj = 0; jj < graph->layer->memRequestList[ii].outputCount; jj++)
                     {
-                        for (kk = graph->layer->memRequestList[ii].inputMemory[jj]->firstUseId; kk <= graph->layer->memRequestList[ii].inputMemory[jj]->lastUseId; kk++)
+                        if (graph->layer->memRequestList[ii].outputMemory[jj]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
                         {
-                            vxmASSERT(checkCount[kk] < maxInOutNum);
-                            checkArray[kk * maxInOutNum + checkCount[kk]] = graph->layer->memRequestList[ii].inputMemory[jj];
-                            checkCount[kk]++;
-                        }
-                    }
-                }
-            }
-
-            for (ii = 0; ii < graph->layer->base.num_operations; ii++)
-            {
-                if (checkCount[ii] == 0) continue;
-
-                for (jj = 0; jj < checkCount[ii]; jj++)
-                {
-                    for (kk = jj+1; kk < checkCount[ii]; kk++)
-                    {
-                        vx_memory m1 = checkArray[ii * maxInOutNum + jj];
-                        vx_memory m2 = checkArray[ii * maxInOutNum + kk];
-                        if (!m1->allocated || !m2->allocated ||
-                            VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m1->allocType) != VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m2->allocType) ||
-                            m1 == m2)
-                        {
-                            continue;
-                        }
-                        else
-                        {
-                            vx_uint32 phys1 = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m1->allocType) && VXNNE_MEM_POOL_TYPE_IS_CACHE(m1->allocType) ? graph->base.context->vipSRAM.physBase + m1->physicals[0] : m1->physicals[0];
-                            vx_uint32 phys2 = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m2->allocType) && VXNNE_MEM_POOL_TYPE_IS_CACHE(m2->allocType) ? graph->base.context->vipSRAM.physBase + m2->physicals[0] : m2->physicals[0];
-                            if ((phys1 > phys2 && phys1 < phys2 + m2->sizes[0]) || (phys2 > phys1 && phys2 < phys1 + m1->sizes[0]) || phys1 == phys2)
+                            for (kk = graph->layer->memRequestList[ii].outputMemory[jj]->firstUseId; kk <= graph->layer->memRequestList[ii].outputMemory[jj]->lastUseId; kk++)
                             {
-                                vxmASSERT(0);
+                                vxmASSERT(checkCount[kk] < maxInOutNum);
+                                checkArray[kk * maxInOutNum + checkCount[kk]] = graph->layer->memRequestList[ii].outputMemory[jj];
+                                checkCount[kk]++;
+                            }
+                        }
+                    }
+
+                    for (jj = 0; jj < graph->layer->memRequestList[ii].inputCount; jj++)
+                    {
+                        if (graph->layer->memRequestList[ii].inputMemory[jj]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
+                        {
+                            for (kk = graph->layer->memRequestList[ii].inputMemory[jj]->firstUseId; kk <= graph->layer->memRequestList[ii].inputMemory[jj]->lastUseId; kk++)
+                            {
+                                vxmASSERT(checkCount[kk] < maxInOutNum);
+                                checkArray[kk * maxInOutNum + checkCount[kk]] = graph->layer->memRequestList[ii].inputMemory[jj];
+                                checkCount[kk]++;
                             }
                         }
                     }
                 }
-            }
 
-            gcoOS_FreeMemory(gcvNULL, checkArray);
-            gcoOS_FreeMemory(gcvNULL, checkCount);
+                for (ii = 0; ii < graph->layer->base.num_operations; ii++)
+                {
+                    if (checkCount[ii] == 0) continue;
+
+                    for (jj = 0; jj < checkCount[ii]; jj++)
+                    {
+                        for (kk = jj+1; kk < checkCount[ii]; kk++)
+                        {
+                            vx_memory m1 = checkArray[ii * maxInOutNum + jj];
+                            vx_memory m2 = checkArray[ii * maxInOutNum + kk];
+                            if (!m1->allocated || !m2->allocated ||
+                                VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m1->allocType) != VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m2->allocType) ||
+                                m1 == m2)
+                            {
+                                continue;
+                            }
+                            else
+                            {
+                                vx_uint32 phys1 = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m1->allocType) && VXNNE_MEM_POOL_TYPE_IS_CACHE(m1->allocType) ? graph->base.context->vipSRAM.physBase + m1->physicals[0] : m1->physicals[0];
+                                vx_uint32 phys2 = VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m2->allocType) && VXNNE_MEM_POOL_TYPE_IS_CACHE(m2->allocType) ? graph->base.context->vipSRAM.physBase + m2->physicals[0] : m2->physicals[0];
+                                if ((phys1 > phys2 && phys1 < phys2 + m2->sizes[0]) || (phys2 > phys1 && phys2 < phys1 + m1->sizes[0]) || phys1 == phys2)
+                                {
+                                    vxmASSERT(0);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                gcoOS_FreeMemory(gcvNULL, checkArray);
+                gcoOS_FreeMemory(gcvNULL, checkCount);
+            }
         }
 #endif
 
