@@ -5219,6 +5219,7 @@ static void halti5_pip_build_patchKeyMask(
                                     | VSC_RES_OP_BIT_TEXLDP_LOD))
                                 {
                                     patchKey |= HALTI5_PATCH_TX_EXTRA_INPUT_BIT | HALTI5_PATCH_UNORMALIZED_SAMPLER_BIT;
+                                    chipPipeline->patchResOpBit[setIdx][keyIndex] = *pResOp;
                                 }
                                 if (*pResOp & (VSC_RES_OP_BIT_FETCH | VSC_RES_OP_BIT_FETCH_MS))
                                 {
@@ -5838,6 +5839,9 @@ static VkResult halti5_pip_build_gfxshaders(
                 chipPipeline->patchKeys[i] =
                     (halti5_patch_key *)__VK_ALLOC(sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i], 8,
                                                    VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                chipPipeline->patchResOpBit[i] =
+                    (VSC_RES_OP_BIT *)__VK_ALLOC(sizeof(VSC_RES_OP_BIT) * chipPipeline->patchKeyCount[i], 8,
+                                                   VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                 chipPipeline->patchTexBufFormat[i] =
                     (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i], 8,
                                                    VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
@@ -5867,8 +5871,10 @@ static VkResult halti5_pip_build_gfxshaders(
 
                 __VK_ONERROR(chipPipeline->patchKeys[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                 __VK_ONERROR(chipPipeline->patchTexBufFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                __VK_ONERROR(chipPipeline->patchResOpBit[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                 __VK_MEMZERO(chipPipeline->patchKeys[i], sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i]);
                 __VK_MEMZERO(chipPipeline->patchTexBufFormat[i], sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i]);
+                __VK_MEMZERO(chipPipeline->patchResOpBit[i], sizeof(VSC_RES_OP_BIT) * chipPipeline->patchKeyCount[i]);
 
                 stateKey[keyCount] = (void *)chipPipeline->patchKeys[i];
                 stateKeySizeInBytes[keyCount] = sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i];
@@ -6359,6 +6365,10 @@ OnError:
         {
             __VK_FREE(chipPipeline->patchCombinedImgFormat[i]);
         }
+        if (chipPipeline->patchResOpBit[i])
+        {
+            __VK_FREE(chipPipeline->patchResOpBit[i]);
+        }
     }
 
     for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
@@ -6498,7 +6508,10 @@ static VkResult halti5_pip_build_computeshader(
             {
                 chipPipeline->patchKeys[i] =
                     (halti5_patch_key *)__VK_ALLOC(sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i], 8,
-                    VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                                                   VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+                chipPipeline->patchResOpBit[i] =
+                    (VSC_RES_OP_BIT *)__VK_ALLOC(sizeof(VSC_RES_OP_BIT) * chipPipeline->patchKeyCount[i], 8,
+                                                   VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
                 chipPipeline->patchTexBufFormat[i] =
                     (VSC_IMAGE_FORMAT *)__VK_ALLOC(sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i], 8,
                                                    VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
@@ -6530,8 +6543,10 @@ static VkResult halti5_pip_build_computeshader(
 
                 __VK_ONERROR(chipPipeline->patchKeys[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                 __VK_ONERROR(chipPipeline->patchTexBufFormat[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
+                __VK_ONERROR(chipPipeline->patchResOpBit[i] ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
                 __VK_MEMZERO(chipPipeline->patchKeys[i], sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i]);
                 __VK_MEMZERO(chipPipeline->patchTexBufFormat[i], sizeof(VSC_IMAGE_FORMAT) * chipPipeline->patchKeyCount[i]);
+                __VK_MEMZERO(chipPipeline->patchResOpBit[i], sizeof(VSC_RES_OP_BIT) * chipPipeline->patchKeyCount[i]);
 
                 stateKey[keyCount] = (void *)chipPipeline->patchKeys[i];
                 stateKeySizeInBytes[keyCount] = sizeof(halti5_patch_key) * chipPipeline->patchKeyCount[i];
@@ -6783,6 +6798,10 @@ OnError:
         if (chipPipeline->patchCombinedImgFormat[i])
         {
             __VK_FREE(chipPipeline->patchCombinedImgFormat[i]);
+        }
+        if (chipPipeline->patchResOpBit[i])
+        {
+            __VK_FREE(chipPipeline->patchResOpBit[i]);
         }
     }
     if (virShaderCopy)
@@ -7250,6 +7269,10 @@ VkResult halti5_destroyPipeline(
         if (chipPipeline->patchCombinedImgFormat[i])
         {
             __VK_FREE(chipPipeline->patchCombinedImgFormat[i]);
+        }
+        if (chipPipeline->patchResOpBit[i])
+        {
+            __VK_FREE(chipPipeline->patchResOpBit[i]);
         }
     }
 
@@ -7745,12 +7768,48 @@ VkResult halti5_patch_pipeline(
                                         VSC_RES_OP_BIT opTypeBits = 0;
                                         VSC_RES_ACT_BIT actBits = 0;
                                         uint32_t subType;
+                                        VSC_RES_OP_BIT resOpBits = chipPipeline->patchResOpBit[i][j];
+                                        VkBool32 is128BppFormat =
+                                            (patchInfo->patchFormat <= __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT) &&
+                                            (patchInfo->patchFormat >= __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT);
+
+                                        if (k == 1 && (resOpBits & VSC_RES_OP_BIT_TEXLD_LOD) &&
+                                            is128BppFormat && !(resOpBits & (VSC_RES_OP_BIT_TEXLD_BIAS |
+                                            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLDP |
+                                            VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD)))
+                                        {
+                                            switch (patchInfo->patchFormat)
+                                            {
+                                            case __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT:
+                                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc =
+                                                    "_inputcvt_R32G32B32A32SFLOAT_2_R32G32SFLOAT_TEXLD_LOD";
+                                                break;
+                                            case __VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT:
+                                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc =
+                                                    "_inputcvt_R32G32B32A32SINT_2_R32G32SINT_TEXLD_LOD";
+                                                break;
+                                            case __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT:
+                                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc =
+                                                    "_inputcvt_R32G32B32A32UINT_2_R32G32UINT_TEXLD_LOD";
+                                                break;
+                                            default:
+                                                break;
+                                            }
+
+                                            opTypeBits = VSC_RES_OP_BIT_TEXLD_LOD;
+                                            actBits = VSC_RES_ACT_BIT_EXTRA_SAMPLER;
+                                            subType = VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LAYER_SPECIFIED_OP;
+                                        }
+                                        else
+                                        {
+                                            vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc =
+                                            halti5_helper_patchFuc(patchInfo->patchFormat, k, patchInfo->viewType, &opTypeBits, &actBits, &subType);
+                                        }
+
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.applyLevel = VSC_SHLEVEL_Post_Medium;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_RESOURCE;
-                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc =
-                                            halti5_helper_patchFuc(patchInfo->patchFormat, k, patchInfo->viewType, &opTypeBits, &actBits, &subType);
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.set = i;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.binding = patchInfo->binding;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.arrayIndex = patchInfo->arrayIndex;
