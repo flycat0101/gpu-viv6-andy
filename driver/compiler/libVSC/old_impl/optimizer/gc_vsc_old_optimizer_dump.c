@@ -2282,13 +2282,14 @@ gcDump_Shader(
             {
                 gcmVERIFY_OK(
                 gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
-                                   "  output(%d) := %s%s%s %s %s %s[%d] ",
+                                   "  output(%d) := %s%s%s %s %s[%d] ",
                                    i,
                                    gcmOUTPUT_isCentroid(output) ? "centroid " : gcmOUTPUT_isSample(output) ? "sample " : "",
                                    gcmOUTPUT_isPerPatch(output) ? "patch " : gcmOUTPUT_isPerVertexArray(output) ? "PerVertexArray " : "",
                                    (output->shaderMode == gcSHADER_SHADER_FLAT) ? "flat " : ((output->shaderMode == gcSHADER_SHADER_NOPERSPECTIVE) ? "noperspective " : "smooth "),
                                    GetPrecisionName_(output->precision),
-                                   typeName, output->arraySize));
+                                   typeName,
+                                   output->arraySize));
             }
             else
             {
