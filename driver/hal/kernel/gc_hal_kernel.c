@@ -3276,9 +3276,7 @@ gckKERNEL_Dispatch(
         Interface->u.Version.build = gcvVERSION_BUILD;
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
         gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_KERNEL,
-                       "KERNEL version %d.%d.%d build %u",
-                       gcvVERSION_MAJOR, gcvVERSION_MINOR,
-                       gcvVERSION_PATCH, gcvVERSION_BUILD);
+                       "KERNEL version %s", gcvVERSION_STRING);
 #endif
         break;
 
@@ -5383,9 +5381,7 @@ gckDEVICE_Version(
     Interface->u.Version.build = gcvVERSION_BUILD;
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
     gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_KERNEL,
-                   "KERNEL version %d.%d.%d build %u",
-                   gcvVERSION_MAJOR, gcvVERSION_MINOR,
-                   gcvVERSION_PATCH, gcvVERSION_BUILD);
+                   "KERNEL version %s", gcvVERSION_STRING);
 #endif
 
     return gcvSTATUS_OK;
