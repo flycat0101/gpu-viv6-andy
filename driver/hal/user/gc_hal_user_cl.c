@@ -53,7 +53,7 @@ gcoCL_SetHardwareType(
 
     if (tls->targetType != gcvHARDWARE_INVALID)
     {
-        gcoHAL_SetHardwareType(gcvNULL, type);
+        gcoHAL_SetHardwareType(gcvNULL, tls->targetType);
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
     }
