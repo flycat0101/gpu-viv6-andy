@@ -2430,8 +2430,8 @@ static vx_uint32 _kernel_size_in_pixel_by_arch_perf(
 * Ouput:        TBD
 ***************************************************************************************/
 static vx_int8 gOrigShowType = -1;
-static const vx_char *archModelVersion = "ARCHCTS@229911";
-static const vx_char *SWTilingVersion = "ARCHCTS@2229911";
+static const vx_char *archModelVersion = "ARCHCTS@235166";
+static const vx_char *SWTilingVersion = "ARCHCTS@235166";
 vx_status showDriverPerformance(
     vx_context context,
     vxnne_layer layer,
@@ -2447,6 +2447,8 @@ vx_status showDriverPerformance(
     arch_nn_config          archNNConfig;             /* configration for specific case */
     arch_drv_option         archDrvOption;            /* options defined in env */
     archNN_DATABASE_FEATURE archDataFeature = {0};    /* case feature definition */
+    gcsHAL_CHIPIDENTITY     chipIdentity = {0};
+
     if (gOrigShowType != (vx_int8)context->options.collectPerfType)
     {
         /* update configuration */
@@ -2454,11 +2456,16 @@ vx_status showDriverPerformance(
         memset(&archDrvOption,0,sizeof(arch_drv_option));
         initConfigration(&archNNConfig,&archDrvOption,context);
         updateConfigration(&archDataFeature,&archNNConfig);
+        /* get the chip information */
+        gcoHAL_QueryChipIdentityEx(ARCH_NULL, sizeof(archHAL_CHIPIDENTITY),
+                               (gcsHAL_CHIPIDENTITY *)&chipIdentity);
         vxInfo("\nArchModelVersion: %s\nSWTilingVersion: %s\nProfileMode: %d\n"
+               "chipModel: 0x%x\nchipRevision: 0x%x\nproductID: 0x%x\ncustomerID: 0x%x\necoID: 0x%x\n"
                "NumNNCores:%d\nNumNNCoresInt8: %d\nNumNNCoresInt16: %d\nNumNNCoresFloat16: %d\n"
                "NumTPCores: %d\nNumTPLiteCores: %d\nMadPerCore: %d\nVIP7Version: %d\n"
                "InBuffDepth: %d\nAccumBufferDepth: %d\nDPAmount: %d\n"
                "XYDPX: %d\nXYDPY: %d\nZDP: %d\n"
+               "ZDP3Enable: %d\nZDP6Enable: %d\n"
                "AXISRAMSize: %d\nVIPSRAMSize: %d\nL2CacheWidth: %d\n"
                "USCCacheSize: %d\nBrickMode: %d\nSWTiling: %d\n"
                "SmallBatchEnable: %d\nSWTilingPhase1: %d\nTPWithFCLayer: %d\n"
@@ -2468,10 +2475,15 @@ vx_status showDriverPerformance(
                "PER_3D_TILE_BUBBLE_FIX: %d\nSWConv1x1To1x2: %d\n"
                "TP_LOCALIZATION_REORDER_DISABLED_Fix: %d\nUSCCacheControllers: %d\n"
                "AsyncCopyPerfFix: %d\nZDP3NoCompressFix: %d\n"
-               "ZXDP3KernelReadConflictFix: %d\n",
+               "ZXDP3KernelReadConflictFix: %d\nxyOffsetLimitationFix: %d\n",
                archModelVersion,
                SWTilingVersion,
                (context->options.collectPerfType == COLLECT_PERF_ESTIMATE) ? 1 : profileMode,
+               chipIdentity.chipModel,
+               chipIdentity.chipRevision,
+               chipIdentity.productID,
+               chipIdentity.customerID,
+               chipIdentity.ecoID,
                context->nnConfig.fixedFeature.nnCoreCount,
                context->nnConfig.fixedFeature.nnCoreCountInt8,
                context->nnConfig.fixedFeature.nnCoreCountInt16,
@@ -2486,6 +2498,8 @@ vx_status showDriverPerformance(
                context->nnConfig.derivedFeature.nnXYDPX,
                context->nnConfig.derivedFeature.nnXYDPY,
                context->nnConfig.derivedFeature.nnZDP,
+               gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ZDP3),
+               gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NN_ZDP6),
                context->nnConfig.customizedFeature.axiSRAMSize,
                context->nnConfig.customizedFeature.vipSRAMSize,
                context->nnConfig.fixedFeature.equivalentVipsramWidthInByte,
@@ -2507,7 +2521,8 @@ vx_status showDriverPerformance(
                context->nnConfig.fixedFeature.uscCacheControllers,
                context->nnConfig.unifiedFeature.asyncCopyPerfFix,
                context->nnConfig.unifiedFeature.zdp3NoCompressFix,
-               context->nnConfig.unifiedFeature.zxdp3KernelReadConflictFix
+               context->nnConfig.unifiedFeature.zxdp3KernelReadConflictFix,
+               context->nnConfig.unifiedFeature.xyOffsetLimitationFix
                );
 
         vxInfo("CoefDecodePerf: %d\nVectorPrune: %d\nEnableCacheDataFromSRAM: %d\n"
@@ -2739,10 +2754,8 @@ vx_status showDriverPerformance(
     }
 
 
-    if (perf->opType == ARCHNNE_OPERATOR_CONVOLUTION
-        || perf->opType == ARCHNNE_OPERATOR_DEPTH_WISE_CONV
-        || (perf->opTarget == ARCHNNE_OPERATION_TARGET_NN && perf->opType == ARCHNNE_OPERATOR_FULLYCONNECTED)
-        || perf->opType == ARCHNNE_OPERATOR_TENSOR_ADD)
+    if (perf->opType == ARCHNNE_OPERATOR_TENSOR_ADD
+        || perf->opTarget == ARCHNNE_OPERATION_TARGET_NN)
     {
         vxInfo("OrigInImageX: %d\nOrigInImageY: %d\nOrigInImageZ: %d\nOutImageX: %d (sub: %d)\nOutImageY: %d (sub: %d)\nOutImageZ: %d (sub: %d)\nFinalOutImageX: %d\nFinalOutImageY: %d\nFinalOutImageZ: %d\n",
                     perf->info.oinx, perf->info.oiny, perf->info.oinz,
@@ -2774,10 +2787,11 @@ vx_status showDriverPerformance(
                     perf->swTilingInfo.origOutZ, perf->info.outz);
     }
 
-    vxInfo("KernelX: %d\nKernelY: %d\nKernelZ: %d\nPoolingSize: %d\nPoolingStride: %d\ninputDataSize:%d\noutputDataSize: %d\nFP16: %d\n",
+    vxInfo("KernelX: %d\nKernelY: %d\nKernelZ: %d\nPoolingSize: %d\nPoolingStride: %d\ninputDataSize:%d\noutputDataSize: %d\nFP16: %d\nstridex: %d\nstridey: %d\n",
             perf->info.kx, perf->info.ky, perf->info.kz,
             perf->info.poolingSize, perf->info.poolingStride,
-            perf->info.inputDataSize,perf->info.outputDataSize,perf->info.inputDataFormat == VX_TYPE_FLOAT16 ? 1 : 0);
+            perf->info.inputDataSize,perf->info.outputDataSize,perf->info.inputDataFormat == VX_TYPE_FLOAT16 ? 1 : 0,
+            perf->info.stridex, perf->info.stridey);
 
     vxInfo("archModel_kernelSize: %u\nkernelSize: %u\n",
         _kernel_size_in_pixel_by_arch_perf((vxnne_operation_target_e)perf->opTarget, (vxnne_operator_e)perf->opType, perf, context->nnConfig.unifiedFeature.fullCacheKernelHeadFix ? vx_true_e : vx_false_e),
@@ -2785,9 +2799,9 @@ vx_status showDriverPerformance(
         );
 
     vxInfo("SrcBuf: %s\nDstBuf: %s\nKernelBuf: %s\n",
-            !perf->swTilingInfo.srcBuf ? "DDR" : "SRAM",
-            !perf->swTilingInfo.dstBuf ? "DDR" : "SRAM",
-            !perf->swTilingInfo.kernelBuf ? "DDR" : "SRAM");
+            !perf->swTilingInfo.srcBuf ? "DDR" : (perf->swTilingInfo.srcBuf == SW_TILING_FROM_AXI_SRAM) ? "AXI_SRAM" : "VIP_SRAM",
+            !perf->swTilingInfo.dstBuf ? "DDR" : (perf->swTilingInfo.dstBuf == SW_TILING_FROM_AXI_SRAM) ? "AXI_SRAM" : "VIP_SRAM",
+            !perf->swTilingInfo.kernelBuf ? "DDR" : (perf->swTilingInfo.kernelBuf == SW_TILING_FROM_AXI_SRAM) ? "AXI_SRAM" : "VIP_SRAM");
 
     vxInfo("NN_Transpose_Channel_In: %d\nNN_Transpose_Channel_out: %d\n",
             perf->swTilingInfo.trspIvLayerChsIn, perf->swTilingInfo.trspIvLayerChsOut
@@ -2805,10 +2819,9 @@ vx_status showDriverPerformance(
 
     vxInfo("xOffset: %d, yOffset: %d\n", perf->info.xOffSet, perf->info.yOffSet);
 
-    if (perf->opType == ARCHNNE_OPERATOR_CONVOLUTION ||
-        perf->opType == ARCHNNE_OPERATOR_DEPTH_WISE_CONV ||
-        perf->opType == ARCHNNE_OPERATOR_FULLYCONNECTED ||
-        perf->opType == ARCHNNE_OPERATOR_TENSOR_ADD)
+    if (perf->opType == ARCHNNE_OPERATOR_FULLYCONNECTED ||
+        perf->opType == ARCHNNE_OPERATOR_TENSOR_ADD ||
+        perf->opTarget == ARCHNNE_OPERATION_TARGET_NN)
     {
         //vxInfo("maxPerCoreCompressionRatio: %.15f\n", perf->maxPerCoreCompressionRatio);
         vxInfo("coefNonZeroRatio: %.15f\ncoefCompression: %.15f\nimageCompression: %.15f\nimageNonZeroRatio: %.15f\n\n",
