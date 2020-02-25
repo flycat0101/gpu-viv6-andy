@@ -8625,6 +8625,8 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyAllNodesByTarget(vx_graph graph)
     return VX_SUCCESS;
 }
 
+#if !gcdSTATIC_LINK
+
 #if defined(_WINDOWS)
 #define NNVXC_LIB_NAME "libNNVXCBinary.dll"
 #define OVX12_VXC_LIB_NAME "libOvx12VXCBinary.dll"
@@ -8641,6 +8643,8 @@ static vx_int32 ovx12VxcHandleCnt = 0;
 static vx_int32 nnGpuHandleCnt = 0;
 #endif
 
+#endif
+
 VX_INTERNAL_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
 {
     vx_uint32 nodeIndex;
@@ -8648,7 +8652,7 @@ VX_INTERNAL_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
 
     vxmASSERT(graph);
 
-#if gcdUSE_VXC_BINARY
+#if gcdUSE_VXC_BINARY && !gcdSTATIC_LINK
 #if defined(__QNX__)
     vx_context context = vxoContext_GetFromReference((vx_reference)graph);
     if (vx_false_e == vxoBinaryGraph_HasBinaryInGraph(graph))
@@ -8769,7 +8773,7 @@ VX_INTERNAL_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
     }
     graph->Initilized = vx_true_e;
 
-#if gcdUSE_VXC_BINARY
+#if gcdUSE_VXC_BINARY && !gcdSTATIC_LINK
 #if defined(__QNX__)
     if(context->globalData->libNNVXCKernelHandle)
     {

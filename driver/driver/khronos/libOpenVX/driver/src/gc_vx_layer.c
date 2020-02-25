@@ -29,19 +29,17 @@
 #if gcdUSE_VXC_BINARY
 static void * getVXCKernelInfo(vx_context context, nnvxc_kernel_enum type, vx_uint32_ptr len)
 {
-    gceSTATUS status = gcvSTATUS_OK;
-
-    GetBinaryPtr_FUNC funcHandle = VX_NULL;
-    status = gcoOS_GetProcAddress(gcvNULL, context->globalData->libNNVXCKernelHandle, "GetBinaryPtr", (gctPOINTER *)&funcHandle);
-    if (status != gcvSTATUS_OK)
+#if gcdSTATIC_LINK
+    return GetVIPNNVXCBinaryPtr(type, len);
+#else
+    GetVIPNNVXCBinaryPtr_FUNC funcHandle = VX_NULL;
+    if (gcvSTATUS_OK != gcoOS_GetProcAddress(gcvNULL, context->globalData->libNNVXCKernelHandle, "GetBinaryPtr", (gctPOINTER *)&funcHandle))
     {
         vxError("Can't get binary pointer!\n");
         return VX_NULL;
     }
-
-    void *ptr = funcHandle(type, len);
-
-    return ptr;
+    return funcHandle(type, len);
+#endif
 }
 #endif
 vx_char* loadSources(const vx_char *filename, vx_size *programSize)

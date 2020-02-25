@@ -71,10 +71,10 @@ static ovx12_vxc_kernel_enum getOvx12VXCKernelEnum(vx_enum kernelID)
 
 static void * getOvx12VXCKernelInfo(vx_context context, vx_enum kernelID, vx_uint32_ptr shaderLength)
 {
-    gceSTATUS status = gcvSTATUS_OK;
-    void *ptr = NULL;
     ovx12_vxc_kernel_enum type = OVX12_VXC_KERNEL_NUM;
+#if !gcdSTATIC_LINK
     GetOvx12KernelBinaryPtr_FUNC funcHandle = VX_NULL;
+#endif
 
     type = getOvx12VXCKernelEnum(kernelID);
     if(type >= OVX12_VXC_KERNEL_NUM)
@@ -82,17 +82,17 @@ static void * getOvx12VXCKernelInfo(vx_context context, vx_enum kernelID, vx_uin
         vxError("This kernel is not supported in ovx1.2 kernel binary!\n");
         return VX_NULL;
     }
-
-    status = gcoOS_GetProcAddress(gcvNULL, context->globalData->libOvx12VXCBinaryHandle, "GetOvx12KernelBinaryPtr", (gctPOINTER *)&funcHandle);
-    if(status != gcvSTATUS_OK)
+#if gcdSTATIC_LINK
+    return GetOvx12KernelBinaryPtr(type, shaderLength);
+#else
+    if (gcvSTATUS_OK != gcoOS_GetProcAddress(gcvNULL, context->globalData->libOvx12VXCBinaryHandle, "GetOvx12KernelBinaryPtr", (gctPOINTER *)&funcHandle))
     {
         vxError("Can't get ovx1.2 binary pointer!\n");
         return VX_NULL;
     }
 
-    ptr = funcHandle(type, shaderLength);
-
-    return ptr;
+    return funcHandle(type, shaderLength);
+#endif
 }
 #endif
 

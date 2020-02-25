@@ -31,7 +31,7 @@ void * GetOvx12KernelBinaryPtr(ovx12_vxc_kernel_enum type, unsigned int* len)
     return NULL;
 }
 
-#if defined(_WINDOWS)
+#if defined(_WINDOWS) && !gcdSTATIC_LINK
 #include <windows.h>
 
 int WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID reserved)

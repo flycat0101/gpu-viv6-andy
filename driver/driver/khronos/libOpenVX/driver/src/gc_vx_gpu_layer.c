@@ -26,20 +26,18 @@
 #if gcdUSE_VXC_BINARY
 static void * getGPUKernelInfo(vx_context context, nngpu_kernel_enum type, vx_uint32_ptr len)
 {
-    gceSTATUS status = gcvSTATUS_OK;
-
-    GetBinaryPtr_FUNC funcHandle = VX_NULL;
-    status = gcoOS_GetProcAddress(gcvNULL, context->globalData->libNNGPUKernelHandle, "GetBinaryPtr", (gctPOINTER *)&funcHandle);
+#if gcdSTATIC_LINK
+    return GetGPUNNVXCBinaryPtr(type, len);
+#else
+    GetGPUNNVXCBinaryPtr_FUNC funcHandle = VX_NULL;
+    gceSTATUS status = gcoOS_GetProcAddress(gcvNULL, context->globalData->libNNGPUKernelHandle, "GetGPUNNVXCBinaryPtr", (gctPOINTER *)&funcHandle);
     if (status != gcvSTATUS_OK)
     {
         vxError("Can't get binary pointer!\n");
         return VX_NULL;
     }
-
-    void *ptr = funcHandle(type, len);
-
-    return ptr;
-
+    return funcHandle(type, len);
+#endif
 }
 #endif
 extern vx_char* loadSources(const vx_char *filename, vx_size *programSize);
