@@ -1400,7 +1400,7 @@ sloCOMPILER_Compile(
     /* Check if "GL_ARB_explicit_attrib_location" extention is enable. */
     if (gcoOS_StrStr(GetGLExtensionString(), "GL_ARB_explicit_attrib_location", gcvNULL))
     {
-        sloEXTENSION extension = {{0}};
+        sloEXTENSION extension = {0};
         extension.extension2 = slvEXTENSION2_GL_ARB_EXPLICIT_ATTRIB_LOCATION;
         sloCOMPILER_EnableExtension(Compiler, &extension, gcvTRUE);
     }
@@ -1408,7 +1408,7 @@ sloCOMPILER_Compile(
     /* Check if HW has HALTI5 and FMA support */
     if(GetHWHasHalti5() && GetHWHasFmaSupport())
     {
-        sloEXTENSION extension = {{0}};
+        sloEXTENSION extension = {0};
         extension.extension1 = slvEXTENSION1_HALTI5_WITH_FMA_SUPPORT;
         sloCOMPILER_EnableExtension(Compiler, &extension, gcvTRUE);
     }
@@ -1702,7 +1702,7 @@ sloCOMPILER_CheckExtensions(
 
     /* For TES/TCS/GS shader, if they are not natively supported in this lang version, the corresponding extended behavior must first be enabled. */
     {
-        sloEXTENSION extensionTes = {{0}}, extensionGeo = {{0}};
+        sloEXTENSION extensionTes = {0}, extensionGeo = {0};
         extensionTes.extension1 = slvEXTENSION1_TESSELLATION_SHADER;
         extensionGeo.extension1 = slvEXTENSION1_EXT_GEOMETRY_SHADER;
         switch (Compiler->shaderType)
@@ -3027,7 +3027,7 @@ sloCOMPILER_DuplicateFieldSpaceForDataType(
     slsNAME_SPACE *currentNameSpace = gcvNULL;
     slsNAME *orgFieldName = gcvNULL, *newFieldName = gcvNULL;
     slsDATA_TYPE *newDataType;
-    sloEXTENSION extension = {{0}};
+    sloEXTENSION extension = {0};
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x", Compiler, DataType);
 
     gcmASSERT(DataType->elementType == slvTYPE_STRUCT);
@@ -3385,7 +3385,7 @@ sloCOMPILER_CreateAuxiliaryName(
     {
         gctUINT       offset = 0;
         gctUINT64     curTime;
-        sloEXTENSION  extension = {{0}};
+        sloEXTENSION  extension = {0};
 
         status = gcoOS_Allocate(
                                 gcvNULL,
