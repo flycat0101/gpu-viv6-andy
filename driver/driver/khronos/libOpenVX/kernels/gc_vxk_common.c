@@ -56,7 +56,7 @@ static gceSTATUS _FillImageInfoFromFormat(vx_df_image Format, gcsVX_IMAGE_INFO_P
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 format = 0;
 
-    gcmHEADER_ARG("Format=%d Info=%d", Format, Info);
+    gcmHEADER_ARG("Format=%d Info=%p", Format, Info);
 
     switch(Format)
     {
@@ -201,7 +201,7 @@ static vx_status _SetBorderMode(vx_enum border, gctUINT32 *viv_border)
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("border=%d viv_border=%d", border, viv_border);
+    gcmHEADER_ARG("border=%d viv_border=%p", border, viv_border);
 
     switch(border)
     {
@@ -231,7 +231,7 @@ static gceSTATUS _BindInstructions(
     gceSTATUS                       status = gcvSTATUS_OK;
     gcoVX_Hardware_Context          *hwContext = &C->params;
 
-    gcmHEADER_ARG("C=%d", C);
+    gcmHEADER_ARG("C=%p", C);
 
     _SetBorderMode(C->borders, &hwContext->borders);
 
@@ -262,7 +262,7 @@ static gceSTATUS _BindInstructions(
     gceSTATUS                       status = gcvSTATUS_OK;
     gcoVX_Hardware_Context          *hwContext = gcvNULL;
 
-    gcmHEADER_ARG("C=%d", C);
+    gcmHEADER_ARG("C=%p", C);
 
 #if gcdVX_OPTIMIZER
     {
@@ -494,7 +494,7 @@ gcfVX_GetImageInfo(
     vx_df_image format;
     gcsSURF_NODE_PTR node = gcvNULL;
 
-    gcmHEADER_ARG("Context=%d", *Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
 #if gcdVX_OPTIMIZER
     _SetBorderMode(Context->borders, &Info->border);
@@ -711,7 +711,7 @@ static gceSTATUS _GetInfo(gcoVX_Kernel_Context *Context)
     gcsVX_IMAGE_INFO_PTR global = gcvNULL;
     gcsSURF_NODE_PTR node = gcvNULL;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
     Context->params.input_count = 0;
     Context->params.output_count = 0;
@@ -861,7 +861,7 @@ gceSTATUS gcfVX_BindObjects(
     gceSTATUS status = gcvSTATUS_OK;
     vx_uint32 i = 0;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
     for(i = 0; i < Context->objects_num; i++)
     {
@@ -902,7 +902,7 @@ gceSTATUS gcfVX_Commit(
     gceSTATUS status = gcvSTATUS_OK;
     vx_uint32 i = 0;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
     for(i = 0; i < Context->objects_num; i++)
     {
@@ -931,7 +931,7 @@ static gceSTATUS _SyncMemoryForOutPut(gcoVX_Kernel_Context *Context)
     gceSTATUS status = gcvSTATUS_OK;
     vx_uint32 i = 0, plane = 0;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
     for(i = 0; i < Context->objects_num; i++)
     {
@@ -977,7 +977,7 @@ static gceSTATUS _RunKernel(gcoVX_Kernel_Context *Context)
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
     gcmASSERT(gcoVX_VerifyHardware());
     /* get infos from objects*/
@@ -1049,7 +1049,7 @@ gcfVX_Kernel(
 {
     gceSTATUS status;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%p", Context);
 
     gcmONERROR(_RunKernel(Context));
 
@@ -1111,7 +1111,7 @@ gcfVX_CaptureState(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("CaptureBuffer=0x%x InputSizeInByte=%d pOutputSizeInByte=0x%x Enabled=%d dropCommandEnabled=%d",
+    gcmHEADER_ARG("CaptureBuffer=%p InputSizeInByte=%d pOutputSizeInByte=%p Enabled=%d dropCommandEnabled=%d",
                    CaptureBuffer, InputSizeInByte, pOutputSizeInByte, Enabled, dropCommandEnabled);
 
     gcmASSERT(gcoVX_VerifyHardware());
