@@ -17645,14 +17645,25 @@ _GenEmitStreamVertexCode(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    slsROPERAND* streamROperand = &OperandsParameters->rOperands[0];
 
     gcmHEADER();
+
+    if (streamROperand->isReg)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
+                                        slvREPORT_ERROR,
+                                        "The argument to stream must be a constant integral expression."));
+        return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+    }
 
     status = slGenGenericNullTargetCode(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
                                         slvOPCODE_EMIT_STREAM_VERTEX,
-                                        &OperandsParameters->rOperands[0],
+                                        streamROperand,
                                         gcvNULL);
 
     gcmFOOTER();
@@ -17670,14 +17681,25 @@ _GenEndStreamPrimitiveCode(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    slsROPERAND* streamROperand = &OperandsParameters->rOperands[0];
 
     gcmHEADER();
+
+    if (streamROperand->isReg)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
+                                        slvREPORT_ERROR,
+                                        "The argument to stream must be a constant integral expression."));
+        return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+    }
 
     status = slGenGenericNullTargetCode(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
                                         slvOPCODE_END_STREAM_PRIMITIVE,
-                                        &OperandsParameters->rOperands[0],
+                                        streamROperand,
                                         gcvNULL);
 
     gcmFOOTER();
