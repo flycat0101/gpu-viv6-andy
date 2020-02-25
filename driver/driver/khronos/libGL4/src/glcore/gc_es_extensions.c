@@ -58,6 +58,9 @@ __GLextension __glExtension[] =
     /*Fix: GTF-GL40.gtf33.GL3Tests.explicit_attrib_location.explicit_attrib_location_* */
     {__GL_EXTID_ARB_explicit_attrib_location, "GL_ARB_explicit_attrib_location", GL_FALSE, GL_FALSE},
 
+    /*Fix: GTF-GL31/32/33/40.gtf31.GL3Tests.uniform_buffer_object.uniform_buffer_object_arb_macro */
+    {__GL_EXTID_ARB_uniform_buffer_object, "GL_ARB_uniform_buffer_object", GL_FALSE, GL_FALSE},
+
     {__GL_EXTID_EXT_framebuffer_blit, "GL_EXT_framebuffer_blit", GL_TRUE, GL_FALSE},
     {__GL_EXTID_EXT_framebuffer_object, "GL_EXT_framebuffer_object", GL_TRUE, GL_FALSE},
     {__GL_EXTID_EXT_packed_float, "GL_EXT_packed_float", GL_TRUE, GL_FALSE},

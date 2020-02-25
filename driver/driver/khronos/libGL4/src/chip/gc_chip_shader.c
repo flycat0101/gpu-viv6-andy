@@ -4297,6 +4297,16 @@ gcChipMapLinkError(
             __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: Location aliased.\n"));
         break;
 
+    case gcvSTATUS_LOCATION_OVERLAP:
+        gcmONERROR(gcoOS_PrintStrSafe(logBuffer,
+            __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: Output location overlapped.\n"));
+        break;
+
+    case gcvSTATUS_LOCATION_NOTCONSISTENT:
+        gcmONERROR(gcoOS_PrintStrSafe(logBuffer,
+            __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: Output name has different location.\n"));
+        break;
+
     default:
         break;
     }
@@ -8390,6 +8400,11 @@ __glChipLinkProgram(
     return GL_TRUE;
 
 OnError:
+    if (gcmIS_ERROR(status))
+    {
+        gcChipMapLinkError(gc, programObject, status);
+    }
+
     if (pgStateKey)
     {
         gcChipPgStateKeyFree(gc, &pgStateKey);
@@ -9617,7 +9632,6 @@ __glChipBindFragDataLocation(
 
             if (location != (GLint)colorNumber)
             {
-                output->location = colorNumber;
             }
         }
     }

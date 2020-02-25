@@ -853,6 +853,13 @@ gcChipInitExtension(
         __glExtension[__GL_EXTID_ARB_explicit_attrib_location].bGLSL = GL_TRUE;
     }
 
+    /* extension enabled only for context 3.1 and later */
+    if ((constants->majorVersion >= 4) || ((constants->majorVersion == 3) && (constants->minorVersion >= 1)))
+    {
+        __glExtension[__GL_EXTID_ARB_uniform_buffer_object].bEnabled = GL_TRUE;
+        __glExtension[__GL_EXTID_ARB_uniform_buffer_object].bGLSL = GL_TRUE;
+    }
+
     /*Generate compressed texture format table base on extension status*/
     if (constants->majorVersion >= 3)
     {

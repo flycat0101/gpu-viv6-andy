@@ -2115,6 +2115,7 @@ GLvoid __glDrawDlistPrimitive(__GLcontext *gc, __GLPrimBegin *primBegin)
     indexedPrim = ((bothFaceFill || primBegin->primType <= GL_LINE_STRIP) && primBegin->indexCount > 0);
 
     mode = (indexedPrim) ? indexPrimModeDL[primBegin->primType] : primBegin->primType;
+    mode = (!bothFaceFill) ? GL_LINE_LOOP : mode;
     if (mode != gc->vertexStreams.primMode)
     {
         gc->vertexStreams.primMode = mode;

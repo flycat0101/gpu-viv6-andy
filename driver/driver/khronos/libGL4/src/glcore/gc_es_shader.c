@@ -1371,7 +1371,7 @@ GLvoid GL_APIENTRY __glim_DeleteProgram(__GLcontext *gc,  GLuint program)
 
     __GL_HEADER();
 
-    if (0 == program)
+    if ((0 == program) || (~0 == program))
     {
         __GL_EXIT();
     }
