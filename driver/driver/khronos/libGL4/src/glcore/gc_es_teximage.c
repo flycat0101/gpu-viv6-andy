@@ -3807,7 +3807,7 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
     if (width < 0 || height < 0 || depth < 0)
     {
         errorCode = GL_INVALID_VALUE;
-        __GL_ERROR_EXIT2();
+        __GL_EXIT();
     }
 
     if (__GL_TEXTURE_2D_MS_ARRAY_INDEX == tex->targetIndex)
@@ -3815,7 +3815,7 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
          if (depth > (GLsizei)gc->constants.maxTextureArraySize)
         {
             errorCode = GL_INVALID_VALUE;
-            __GL_ERROR_EXIT2();
+            __GL_EXIT();
         }
     }
     else
@@ -3826,7 +3826,7 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
     if (maxSize > (GLsizei)gc->constants.maxTextureSize)
     {
         errorCode = GL_INVALID_VALUE;
-        __GL_ERROR_EXIT2();
+        __GL_EXIT();
     }
 
     switch (internalformat)
@@ -3872,7 +3872,7 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
         if (samples > (GLsizei)gc->constants.maxSamplesInteger)
         {
             errorCode = GL_INVALID_OPERATION;
-            __GL_ERROR_EXIT2();
+            __GL_EXIT();
         }
         break;
     /* RGBA INTEGER */
@@ -3907,10 +3907,9 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
         if (samples > (GLsizei)gc->constants.maxSamplesInteger)
         {
             errorCode = GL_INVALID_OPERATION;
-            __GL_ERROR_EXIT2();
+            __GL_EXIT();
         }
         break;
-
 
     /* DEPTH STENCIL */
     case GL_DEPTH_COMPONENT:
@@ -3924,22 +3923,22 @@ GLboolean __glCheckTexMultisampleArgs(__GLcontext *gc,
         if (samples > (GLsizei)gc->constants.maxSamples)
         {
             errorCode = GL_INVALID_OPERATION;
-            __GL_ERROR_EXIT2();
+            __GL_EXIT();
         }
         break;
 
-
-
     default:
-    /*according to spec, an INVALID_ENUM error is generated if internalformat is one of the unsized base internal formats*/
-        __GL_ERROR_RET_VAL(GL_INVALID_ENUM, GL_FALSE);
+        /* INVALID_ENUM error if internalformat is one of the unsized base internal formats */
+        errorCode = GL_INVALID_ENUM;
+        __GL_EXIT();
     }
 
     /*
     * Add special handing for proxy texture. If errorCode is NO_ERROR, continue to judge formatSamples,
     * else, clear texture state and return FALSE when target is proxy, or set error and return FALSE when target isn't proxy.
     */
-OnError:
+
+OnExit:
     if (GL_NO_ERROR != errorCode)
     {
         if ((GL_PROXY_TEXTURE_2D_MULTISAMPLE == target) || (GL_PROXY_TEXTURE_2D_MULTISAMPLE_ARRAY == target))

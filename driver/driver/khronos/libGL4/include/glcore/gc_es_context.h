@@ -1307,10 +1307,6 @@ extern GLvoid __glSetError(__GLcontext *gc, GLenum code);
 #define __GL_EXIT()                     \
     goto OnExit;
 
-#define __GL_ERROR_EXIT2()             \
-    goto OnError;
-
-
 
 __GL_INLINE __GLcontext * __glGetGLcontext(GLvoid)
 {

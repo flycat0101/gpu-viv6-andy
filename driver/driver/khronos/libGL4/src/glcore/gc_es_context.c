@@ -1721,7 +1721,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
             break;
         default:
             GL_ASSERT(0);
-            __GL_ERROR_EXIT2();
+            __GL_EXIT();
         }
     }
     else  /* Runing OES api */
@@ -1743,7 +1743,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
             break;
         default:
             GL_ASSERT(0);
-            __GL_ERROR_EXIT2();
+            __GL_EXIT();
         }
     }
 
@@ -1758,7 +1758,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
     gc = (__GLcontext*)(*imports->calloc)(gc, 1, sizeof(__GLcontext));
     if (!gc)
     {
-        __GL_ERROR_EXIT2();
+        __GL_EXIT();
     }
 
     gc->imports = *imports;
@@ -1845,7 +1845,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
     {
         (*imports->free)(gc, gc);
         gc = gcvNULL;
-        __GL_ERROR_EXIT2();
+        __GL_EXIT();
     }
 
 #if gcdPATTERN_FAST_PATH
@@ -1886,7 +1886,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
     __GL_FOOTER();
     return (gc);
 
-OnError:
+OnExit:
     if (gc)
     {
         (*imports->free)(gc, gc);
