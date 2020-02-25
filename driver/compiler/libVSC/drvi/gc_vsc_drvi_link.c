@@ -752,7 +752,7 @@ static gctBOOL _IsFakeSGV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
     {
         /* gl_Position and gl_PointSize (gl_in) for inputs of TS/GS are faked builtins
            because they are actually passed down from upstream shaders (not FFU) */
-        if (pLowerShader->shaderKind != VIR_SHADER_VERTEX &&
+        if (pUpperShader->shaderKind != VIR_SHADER_VERTEX &&
             pLowerShader->shaderKind != VIR_SHADER_FRAGMENT)
         {
             return _CheckFakeSGVForPosAndPtSz(pUpperShader, pLowerShader, attrBuiltinName, bCalcllSlotOrHwCompIdx);
@@ -769,7 +769,7 @@ static gctBOOL _IsFakeSGV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
         (attrBuiltinName == VIR_NAME_CULL_DISTANCE || attrBuiltinName == VIR_NAME_IN_CULL_DISTANCE)
         )
     {
-        if (pLowerShader->shaderKind != VIR_SHADER_VERTEX)
+        if (pUpperShader->shaderKind != VIR_SHADER_VERTEX)
         {
             return gcvTRUE;
         }
