@@ -713,7 +713,13 @@ vx_status vxnneReorg2_Batch2SpaceND(struct _vxnne_operation_s *operation)
     const vx_int32 output_width = TENSOR_SIZE_INDEX(outputs, 0);  /* W */
     const vx_int32 output_height = TENSOR_SIZE_INDEX(outputs, 1); /* H */
     const vx_int32 output_depth = TENSOR_SIZE_INDEX(outputs, 2);  /* C */
+    const vx_int32 output_batch = TENSOR_SIZE_INDEX(outputs, 3);  /* N */
     const vx_int32 item_size = vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(outputs));
+    /* need get from parameter*/
+    const vx_int32 crops_top = 0;
+    const vx_int32 crops_bottom = 0;
+    const vx_int32 crops_left = 0;
+    const vx_int32 crops_right = 0;
 
     vx_int32 in_h = 0, in_w = 0, in_d = 0, in_b = 0;
     vx_float32 data = .0f;
@@ -726,8 +732,8 @@ vx_status vxnneReorg2_Batch2SpaceND(struct _vxnne_operation_s *operation)
     block_w = block_size[0];
     block_h = block_size[1];
 
-    gcmASSERT(output_width == input_width * block_w);
-    gcmASSERT(output_height == input_height * block_h);
+    gcmASSERT(output_width + crops_left + crops_right == input_width * block_w);
+    gcmASSERT(output_height + crops_bottom + crops_top == input_height * block_h);
     /*gcmASSERT(input_batch == output_batch * block_w * block_h);*/
     if (output_depth != input_depth)
     {
@@ -774,19 +780,23 @@ vx_status vxnneReorg2_Batch2SpaceND(struct _vxnne_operation_s *operation)
     for (in_b = 0; in_b < input_batch; in_b++)
     {
         vx_int32 input_batch_index = in_b * input_height * input_width * input_depth;
-
         for (in_d = 0; in_d < input_depth; in_d++)
         {
             for (in_h = 0; in_h < input_height; ++in_h)
             {
                 for (in_w = 0; in_w < input_width; in_w++)
                 {
-                    vx_int32 out_w = in_w * block_w + (in_b % block_w);
-                    vx_int32 out_h = in_h * block_h + (in_b / block_h);
-                    vx_int32 out_b = in_b / (output_width * output_height);
+                    vx_int32 out_b = in_b % output_batch;
+                    vx_int32 spatial_offset= in_b / output_batch;
+                    vx_int32 out_h = in_h * block_h + spatial_offset / block_w - crops_top;
+                    vx_int32 out_w = in_w * block_w + spatial_offset % block_w - crops_left;
                     vx_int32 output_batch_index = out_b * output_height * output_width * output_depth;
-
                     vx_int32 out_index = out_w + out_h * output_width + in_d * output_height * output_width + output_batch_index;
+
+                    if (out_w < 0 || out_w >= output_width || out_h < 0 || out_h >= output_height)
+                    {
+                        continue;
+                    }
 
                     if (in_w < 0 || in_w >= input_width || in_h < 0 || in_h >= input_height)
                     {
