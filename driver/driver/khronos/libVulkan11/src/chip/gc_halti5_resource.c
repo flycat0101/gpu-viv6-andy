@@ -11705,7 +11705,7 @@ VkResult halti5_updateDescriptorSet(
                         compareOp = sampler->createInfo.compareOp;
                     }
 
-                    if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO && resInfo->bUpdate)
+                    if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
                     {
                         __vkImageView *imgv = resInfo->u.imageInfo.imageView;
                         halti5_imageView *chipImgv = (halti5_imageView *)imgv->chipPriv;
@@ -11722,8 +11722,6 @@ VkResult halti5_updateDescriptorSet(
                         swizzles[1] = __vkConvertSwizzle(imgv->createInfo.components.g, SWIZZLE_GREEN);
                         swizzles[2] = __vkConvertSwizzle(imgv->createInfo.components.b, SWIZZLE_BLUE);
                         swizzles[3] = __vkConvertSwizzle(imgv->createInfo.components.a, SWIZZLE_ALPHA);
-
-                        resInfo->bUpdate = VK_FALSE;
                     }
 
                     if (patchKey)
@@ -11745,7 +11743,7 @@ VkResult halti5_updateDescriptorSet(
 
             case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
             case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
-                if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO && resInfo->bUpdate)
+                if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
                 {
                     __vkImageView *imgv = resInfo->u.imageInfo.imageView;
                     halti5_imageView *chipImgv = (halti5_imageView *)imgv->chipPriv;
@@ -11777,13 +11775,12 @@ VkResult halti5_updateDescriptorSet(
                         patchInfos[entryIdx].swizzles[3] = __vkConvertSwizzle(imgv->createInfo.components.a, SWIZZLE_ALPHA);
                         patchIdx++;
                     }
-                    resInfo->bUpdate = VK_FALSE;
                 }
                 entryIdx++;
                 break;
 
             case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-                if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO && resInfo->bUpdate)
+                if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
                 {
                     __vkImageView *imgv = resInfo->u.imageInfo.imageView;
                     halti5_imageView *chipImgv = (halti5_imageView *)imgv->chipPriv;
@@ -11799,13 +11796,12 @@ VkResult halti5_updateDescriptorSet(
                         patchInfos[entryIdx].viewType = imgv->createInfo.viewType;
                         patchIdx++;
                     }
-                    resInfo->bUpdate = VK_FALSE;
                 }
                 entryIdx++;
                 break;
 
             case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-                if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO && resInfo->bUpdate)
+                if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
                 {
                     __vkBufferView *bufv = resInfo->u.bufferView;
                     halti5_bufferView *chipBufv = (halti5_bufferView *)bufv->chipPriv;
@@ -11820,7 +11816,6 @@ VkResult halti5_updateDescriptorSet(
                         patchInfos[entryIdx].viewType = VK_IMAGE_VIEW_TYPE_1D;
                         patchIdx++;
                     }
-                    resInfo->bUpdate = VK_FALSE;
                 }
                 entryIdx++;
                 break;

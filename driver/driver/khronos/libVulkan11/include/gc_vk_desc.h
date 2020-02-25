@@ -38,7 +38,6 @@ typedef struct __vkDescriptorImageInfoRec
 typedef struct __vkDescriptorResourceInfoRec
 {
     enum __VK_DESC_RESOURCE_INFO_TYPE type;
-    VkBool32    bUpdate;
 
     union
     {
