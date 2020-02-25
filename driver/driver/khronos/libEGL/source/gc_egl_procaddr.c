@@ -64,7 +64,7 @@ typedef char GLchar;
 typedef struct __GLsync *GLsync;
 typedef khronos_int64_t GLint64;
 typedef khronos_uint64_t GLuint64;
-typedef float        GLclampf;
+typedef float GLclampf;
 
 typedef void *GLeglImageOES;
 
@@ -2785,138 +2785,28 @@ typedef struct _veglLOOKUP
 }
 veglLOOKUP;
 
-#define eglMAKE_LOOKUP(function) \
-    { #function, (__eglMustCastToProperFunctionPointerType) function }
-
 #define forwardGLFunction(__ret, __api, ...)   \
     {#__api, (__eglMustCastToProperFunctionPointerType) forward_##__api},
 
-static veglLOOKUP _veglLookup[] =
+static veglLOOKUP glForwardTbl[] =
 {
-    eglMAKE_LOOKUP(eglGetError),
-    eglMAKE_LOOKUP(eglGetDisplay),
-    eglMAKE_LOOKUP(eglInitialize),
-    eglMAKE_LOOKUP(eglTerminate),
-    eglMAKE_LOOKUP(eglQueryString),
-    eglMAKE_LOOKUP(eglGetConfigs),
-    eglMAKE_LOOKUP(eglChooseConfig),
-    eglMAKE_LOOKUP(eglGetConfigAttrib),
-    eglMAKE_LOOKUP(eglCreateWindowSurface),
-    eglMAKE_LOOKUP(eglCreatePbufferSurface),
-    eglMAKE_LOOKUP(eglCreatePixmapSurface),
-    eglMAKE_LOOKUP(eglDestroySurface),
-    eglMAKE_LOOKUP(eglQuerySurface),
-    eglMAKE_LOOKUP(eglBindAPI),
-    eglMAKE_LOOKUP(eglQueryAPI),
-    eglMAKE_LOOKUP(eglWaitClient),
-    eglMAKE_LOOKUP(eglReleaseThread),
-    eglMAKE_LOOKUP(eglCreatePbufferFromClientBuffer),
-    eglMAKE_LOOKUP(eglSurfaceAttrib),
-    eglMAKE_LOOKUP(eglBindTexImage),
-    eglMAKE_LOOKUP(eglReleaseTexImage),
-    eglMAKE_LOOKUP(eglSwapInterval),
-    eglMAKE_LOOKUP(eglCreateContext),
-    eglMAKE_LOOKUP(eglDestroyContext),
-    eglMAKE_LOOKUP(eglMakeCurrent),
-    eglMAKE_LOOKUP(eglGetCurrentContext),
-    eglMAKE_LOOKUP(eglGetCurrentSurface),
-    eglMAKE_LOOKUP(eglGetCurrentDisplay),
-    eglMAKE_LOOKUP(eglQueryContext),
-    eglMAKE_LOOKUP(eglWaitGL),
-    eglMAKE_LOOKUP(eglWaitNative),
-    eglMAKE_LOOKUP(eglSwapBuffers),
-    eglMAKE_LOOKUP(eglCopyBuffers),
-    eglMAKE_LOOKUP(eglGetProcAddress),
-    /* EGL 1.5 */
-    eglMAKE_LOOKUP(eglCreateSync),
-    eglMAKE_LOOKUP(eglDestroySync),
-    eglMAKE_LOOKUP(eglClientWaitSync),
-    eglMAKE_LOOKUP(eglGetSyncAttrib),
-    eglMAKE_LOOKUP(eglCreateImage),
-    eglMAKE_LOOKUP(eglDestroyImage),
-    eglMAKE_LOOKUP(eglGetPlatformDisplay),
-    eglMAKE_LOOKUP(eglCreatePlatformWindowSurface),
-    eglMAKE_LOOKUP(eglCreatePlatformPixmapSurface),
-    eglMAKE_LOOKUP(eglWaitSync),
-    /* EGL_KHR_lock_surface. */
-    eglMAKE_LOOKUP(eglLockSurfaceKHR),
-    eglMAKE_LOOKUP(eglUnlockSurfaceKHR),
-    /* EGL_KHR_image. */
-    eglMAKE_LOOKUP(eglCreateImageKHR),
-    eglMAKE_LOOKUP(eglDestroyImageKHR),
-    /* EGL_KHR_fence_sync. */
-    eglMAKE_LOOKUP(eglCreateSyncKHR),
-    eglMAKE_LOOKUP(eglDestroySyncKHR),
-    eglMAKE_LOOKUP(eglClientWaitSyncKHR),
-    eglMAKE_LOOKUP(eglGetSyncAttribKHR),
-    /* EGL_KHR_reusable_sync. */
-    eglMAKE_LOOKUP(eglSignalSyncKHR),
-    /* EGL_KHR_wait_sync. */
-    eglMAKE_LOOKUP(eglWaitSyncKHR),
-    /* EGL_EXT_platform_base. */
-    eglMAKE_LOOKUP(eglGetPlatformDisplayEXT),
-    eglMAKE_LOOKUP(eglCreatePlatformWindowSurfaceEXT),
-    eglMAKE_LOOKUP(eglCreatePlatformPixmapSurfaceEXT),
-#if defined(WL_EGL_PLATFORM)
-    /* EGL_WL_bind_wayland_display. */
-    eglMAKE_LOOKUP(eglBindWaylandDisplayWL),
-    eglMAKE_LOOKUP(eglUnbindWaylandDisplayWL),
-    eglMAKE_LOOKUP(eglQueryWaylandBufferWL),
-#endif
-#if defined(__linux__)
-    /* EGL_ANDROID_native_fence_sync. */
-    eglMAKE_LOOKUP(eglDupNativeFenceFDANDROID),
-#endif
-    eglMAKE_LOOKUP(eglSetDamageRegionKHR),
-    eglMAKE_LOOKUP(eglSwapBuffersWithDamageKHR),
-    eglMAKE_LOOKUP(eglSwapBuffersWithDamageEXT),
-    eglMAKE_LOOKUP(eglQueryDmaBufFormatsEXT),
-    eglMAKE_LOOKUP(eglQueryDmaBufModifiersEXT),
-    eglMAKE_LOOKUP(eglPatchID),
-
     GL_API_ENTRIES(forwardGLFunction)
 
     { gcvNULL, gcvNULL }
 };
+#undef forwardGLFunction
 
-static EGL_PROC
-_Lookup(
-    veglLOOKUP * Lookup,
-    const char * Name,
-    const char * Appendix
-    )
+
+static EGL_PROC _LookupProc(veglLOOKUP *Lookup, const char *Name)
 {
     /* Test for lookup. */
     if (Lookup != gcvNULL)
     {
-        /* Loop while there are entries in the lookup tabke. */
+        /* Loop while there are entries in the lookup table. */
         while (Lookup->name != gcvNULL)
         {
-            const char *p = Name;
-            const char *q = Lookup->name;
-
-            /* Compare the name and the lookup table. */
-            while ((*p == *q) && (*p != '\0') && (*q != '\0'))
-            {
-                ++p;
-                ++q;
-            }
-
-            /* No match yet, see if it matches if we append the appendix. */
-            if ((*p != *q) && (*p == '\0') && (Appendix != gcvNULL))
-            {
-                p = Appendix;
-
-                /* Compare the appendix and the lookup table. */
-                while ((*p == *q) && (*p != '\0') && (*q != '\0'))
-                {
-                    ++p;
-                    ++q;
-                }
-            }
-
             /* See if we have a match. */
-            if (*p == *q)
+            if (gcmIS_SUCCESS(gcoOS_StrCmp(Name, Lookup->name)))
             {
                 /* Return the function pointer. */
                 return Lookup->function;
@@ -2931,118 +2821,59 @@ _Lookup(
     return gcvNULL;
 }
 
-#define gcmDEF2STRING(def) #def
-
 EGLAPI __eglMustCastToProperFunctionPointerType EGLAPIENTRY
 eglGetProcAddress(const char *procname)
 {
     __eglMustCastToProperFunctionPointerType func = gcvNULL;
     VEGLThreadData thread;
-
-    static const char * appendix[] =
-    {
-#ifdef _EGL_APPENDIX
-        gcmDEF2STRING(_EGL_APPENDIX),
-#else
-        gcvNULL,
-#endif
-
-        /* ES11_CL and ES11. */
-#ifdef _GL_11_APPENDIX
-        gcmDEF2STRING(_GL_11_APPENDIX),
-        gcmDEF2STRING(_GL_11_APPENDIX),
-#else
-        gcvNULL,
-        gcvNULL,
-#endif
-
-#ifdef _GL_2_APPENDIX
-        gcmDEF2STRING(_GL_2_APPENDIX),
-#else
-        gcvNULL,
-#endif
-
-#ifdef _GL_3_APPENDIX
-        gcmDEF2STRING(_GL_3_APPENDIX),
-#else
-        gcvNULL,
-#endif
-
-#ifdef _VG_APPENDIX
-        gcmDEF2STRING(_VG_APPENDIX),
-#else
-        gcvNULL,
-#endif
-
-#ifdef _GL_APPENDIX
-        gcmDEF2STRING(_GL_APPENDIX),
-#else
-        gcvNULL,
-#endif
-    };
+    gctHANDLE library;
+    int index;
 
     gcmHEADER_ARG("procname=%s", procname);
     VEGL_TRACE_API_PRE(GetProcAddress)(procname);
 
     do
     {
-        veglAPIINDEX index;
-        gctHANDLE library;
-        veglDISPATCH * dispatch;
+        thread = veglGetThreadData();
+        if (thread == gcvNULL)
+        {
+            gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
+            break;
+        }
 
-        /* Lookup in EGL API. */
-        func = _Lookup(_veglLookup, procname, appendix[vegl_EGL]);
+        /* 1. Look for an EGL function from clientHandles[vegl_EGL] */
+        if (gcmIS_SUCCESS(gcoOS_StrNCmp(procname, "egl", 3)))
+        {
+            library  = thread->clientHandles[vegl_EGL];
+            gcoOS_GetProcAddress(gcvNULL, library, procname, (gctPOINTER *)&func);
+            break;
+        }
 
+        /* 2. Look for a GL forwarding function. */
+        func = _LookupProc(glForwardTbl, procname);
         if (func != gcvNULL)
         {
             break;
         }
 
-        thread = veglGetThreadData();
-        if (thread == gcvNULL)
+        /* 3. No forwarding function; try each API getProcAddr. */
+        for (index = vegl_EGL+1; index < vegl_API_LAST; index++)
         {
-            gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.",
-                    __FUNCTION__, __LINE__);
-
-            break;
-        }
-
-        /* Go through drivers. */
-        for (index = vegl_EGL; index < vegl_API_LAST; index++)
-        {
-            char rename[128];
-            const char *name;
-
-            if (appendix[index])
-            {
-                gcoOS_StrCopySafe(rename, 128, procname);
-                gcoOS_StrCatSafe(rename, 128, appendix[index]);
-                name = rename;
-            }
-            else
-            {
-                name = procname;
-            }
-
+            veglDISPATCH *dispatch;
             library  = thread->clientHandles[index];
             dispatch = thread->dispatchTables[index];
 
             if (dispatch && dispatch->getProcAddr)
             {
-                func = dispatch->getProcAddr(name);
-
+                func = dispatch->getProcAddr(procname);
                 if (func != gcvNULL)
                 {
                     break;
                 }
             }
-
             if (library)
             {
-                if (gcmIS_SUCCESS(gcoOS_GetProcAddress(gcvNULL,
-                                                       library,
-                                                       name,
-                                                       (gctPOINTER *) &func)))
+                if (gcmIS_SUCCESS(gcoOS_GetProcAddress(gcvNULL, library, procname, (gctPOINTER *)&func)))
                 {
                     break;
                 }
@@ -3052,8 +2883,7 @@ eglGetProcAddress(const char *procname)
     while (gcvFALSE);
 
     VEGL_TRACE_API_POST(GetProcAddress)(procname, func);
-    gcmDUMP_API("${EGL eglGetProcAddress (0x%08X) := 0x%08X",
-                procname, func);
+    gcmDUMP_API("${EGL eglGetProcAddress (0x%08X) := 0x%08X", procname, func);
     gcmDUMP_API_DATA(procname, 0);
     gcmDUMP_API("$}");
     gcmFOOTER_ARG("0x%x", func);

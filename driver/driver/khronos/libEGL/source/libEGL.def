@@ -84,3 +84,6 @@ EXPORTS
     eglQueryDmaBufFormatsEXT            @59
     eglQueryDmaBufModifiersEXT          @60
 
+    eglGetPlatformDisplayEXT            @61
+    eglCreatePlatformWindowSurfaceEXT   @62
+    eglCreatePlatformPixmapSurfaceEXT   @63
