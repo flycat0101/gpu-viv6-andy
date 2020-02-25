@@ -48,6 +48,8 @@ VX_INTERNAL_API vx_uint32 gcfVX_PerfEnd(vx_reference ref, gctUINT64 start)
 #define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED32 0x5
 #define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED16 0x6
 #define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED8 0x7
+#define   GCREG_SH_INSTRUCTION_TYPE_BFLOAT16                                 0x8
+#define   GCREG_SH_INSTRUCTION_TYPE_SIGNED64                                 0xA
 
 static gceSTATUS _FillImageInfoFromFormat(vx_df_image Format, gcsVX_IMAGE_INFO_PTR Info)
 {
@@ -673,7 +675,14 @@ gcfVX_GetImageInfoFromTensor(
         Info->internalFormat = gcvSURF_R32;
         Info->isFloat = gcvFALSE;
         break;
-
+    case VX_TYPE_BFLOAT16:
+        Info->format = GCREG_SH_INSTRUCTION_TYPE_BFLOAT16;
+        Info->planes = 1;
+        Info->bpp = 16;
+        Info->componentCount = 1;
+        Info->internalFormat = gcvSURF_R16F;
+        Info->isFloat = gcvTRUE;
+        break;
     default:
         status = gcvSTATUS_INVALID_ARGUMENT;
         goto OnError;

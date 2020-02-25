@@ -54,6 +54,7 @@ VX_PRIVATE_API vx_float32 Fp21toFp32(const vx_uint32 in)
     return out;
 }
 
+
 VX_PRIVATE_API vx_int32 Fp32toFp21(vx_float32 val)
 {
     vx_uint32 f32 = (*(vx_uint32 *) &val);
@@ -114,6 +115,826 @@ VX_PRIVATE_API vx_int32 Fp32toFp21(vx_float32 val)
     return f21;
 }
 
+
+
+VX_PRIVATE_API vx_int32 Fp32toSE8M12(vx_float32 val)
+{
+    vx_uint32 f32 = (*(vx_uint32 *) &val);
+    vx_int32 f21 = 0; //SE8M12
+    /* Decode IEEE 754 little-endian 32-bit floating-point value */
+    int sign = (f32 >> 11) & 0x100000;
+    /* Map exponent to the range [-127,128] */
+    int exponent = ((f32 >> 23) & 0xff);
+    int mantissa = f32 & 0x007fffff;
+    if (exponent == 0xFF)
+    { /* Infinity or NaN */
+        f21 = sign | 0xFEFFF;
+    }
+    else if (exponent > 0)
+    { /* Representable value */
+        /* RTNE */
+        int roundingBit = (mantissa >> (SE8M12_MANTISSA_SHIFT - 1)) & 0x1;
+        int stickyBits = mantissa & 0x3FF;
+
+        mantissa >>= SE8M12_MANTISSA_SHIFT;
+
+        if (roundingBit && stickyBits)
+        {
+            mantissa++;
+            if (mantissa > SE8M12_MANTISSA_BITS)
+            {
+                exponent++;
+                if (exponent > 0xFE)
+                {
+                    /* Clamp to HALF_MAX/HALF_MIN. */
+                    exponent--;
+                    mantissa--;
+                }
+                else
+                {
+                    mantissa &= SE8M12_MANTISSA_BITS;
+                }
+            }
+        }
+        f21 = sign | (exponent << SE8M12_EXPONENT_SHIFT) | mantissa;
+    }
+    else
+        f21 = sign;
+
+    return f21;
+}
+
+VX_PRIVATE_API vx_float32 SE8M12toFp32(vx_uint32 val)
+{
+    vx_float32 f32;
+    *(vx_uint32 *)&f32 = (val << 11);
+    return f32;
+}
+
+
+VX_PRIVATE_API vx_int32 Fp32toSE8M15(vx_float32 val)
+{
+    vx_uint32 f32 = (*(vx_uint32 *) &val);
+    return (f32 >>8);
+}
+
+VX_PRIVATE_API vx_float32 SE8M15toFp32(vx_uint32 val)
+{
+    vx_float32 f32;
+    if(((val >> 15 ) & 0xFF) == 0xFF)
+        *(vx_uint32 *)&f32 = 0x7F7FFFFF | ((val >> 23) & 0x1) << 31;
+    else
+        *(vx_uint32 *)&f32 = (val << 8);
+    return f32;
+}
+
+vx_uint32 getbaseF24(vx_uint32 base, vx_uint32 expBits, vx_bool aluPwlSignSupport)
+{
+    vx_uint32 baseF24 = 0;
+    vx_uint32 baseU17 = 0;
+    vx_uint32 signBits = (aluPwlSignSupport ? 1 : 0);
+    vx_uint32 baseU9;
+
+    if(aluPwlSignSupport)
+    {
+        vx_uint32 baseU9 = base & 0x1FF;
+        if(expBits == 8)
+            baseF24 = base << 14;
+        else if(baseU9 >= (0x1 << 8))
+        {
+            baseU17 = ((0xFF << 10 | ((base & 0x1FF) << signBits)) << expBits) & 0x1FFFF;
+            baseF24 = (base & 0x200) << 14 | baseU17 << 5;
+        }
+        else
+        {
+            baseU17 = (((base & 0x1FF) << signBits ) << expBits) & 0x1FFFF;;
+            baseF24 = (base & 0x200) << 14 | 0x1 << 22 | (baseU17  << 5);
+        }
+    }
+    else
+    {
+        baseU9 = base & 0x1FF;
+
+        if(expBits == 8)
+        {
+            baseF24 = base << 13;
+        }
+        else if(base >= (0x1 << 9))
+        {
+            baseU17 = ((0x7F << 10 | base )<< expBits) & 0x1FFFF;
+            baseF24 = baseU17 << 5;
+        }
+        else
+        {
+
+            baseU17 = (base << expBits) & 0x1FFFF;
+            baseF24 = (baseU17 << 5) | 0x1 << 22;
+        }
+    }
+    return baseF24;
+}
+VX_PRIVATE_API vx_status fillBF16ActivateReluLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_float32 m_out_of_max_range_slope;
+    vx_float32 m_out_of_min_range_slope;
+    vx_float32 scale = 0.0;
+
+
+    for(base = 0; base < 0x400; base++)
+    {
+
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+            baseF24 = (baseF24 & 0x800000) | 0x7F7FFF;
+
+        if(((baseF24 >> 15) & 0xFF) == 0x0)
+            baseF24 = (baseF24 & 0x800000);
+
+        baseF32 = SE8M15toFp32(baseF24);
+
+        if((base >> 9) == 1)
+        {
+            pwlValue = baseF32 * scale;
+             if(format == VX_TYPE_BFLOAT16)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+             else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+        }
+        else
+        {
+            if(format == VX_TYPE_BFLOAT16)
+                pwlLUTBaseEx[base] = (baseF24 >> 3);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(baseF32);
+        }
+    }
+
+    m_out_of_max_range_slope = 1;
+    m_out_of_min_range_slope = scale;
+
+    pwlLUTBaseEx[0x400 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
+    pwlLUTBaseEx[0x400 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
+    pwlLUTBaseEx[0x400 + 2] = expBits;
+    pwlLUTBaseEx[0x400 + 3] = 0;
+
+
+    return VX_SUCCESS;
+}
+VX_PRIVATE_API vx_status fillBF16LeakyReluLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 scale, vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_uint32 baseBF16 = 0x400;
+    vx_float32 m_out_of_max_range_slope;
+    vx_float32 m_out_of_min_range_slope;
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+            baseF24 = (baseF24 & 0x800000) | 0x7F7FFF;
+
+        if(((baseF24 >> 15) & 0xFF) == 0x0)
+            baseF24 = (baseF24 & 0x800000);
+
+        baseF32 = SE8M15toFp32(baseF24);
+
+        if((base >> 9) == 1)
+        {
+            pwlValue = baseF32 * scale;
+
+            if(format == VX_TYPE_BFLOAT16)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+        }
+        else
+        {
+            if(format == VX_TYPE_BFLOAT16)
+                pwlLUTBaseEx[base] = (baseF24 >> 3);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(baseF32);
+        }
+
+    }
+
+    m_out_of_max_range_slope = 1;
+    m_out_of_min_range_slope = scale;
+
+    pwlLUTBaseEx[baseBF16 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
+    pwlLUTBaseEx[baseBF16 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
+    pwlLUTBaseEx[baseBF16 + 2] = expBits;
+    pwlLUTBaseEx[baseBF16 + 3] = 0;
+
+
+    return VX_SUCCESS;
+}
+VX_PRIVATE_API vx_status  fillBF16ActivateRelu1LUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 scale, vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_uint32 baseBF16 = 0x400;
+    vx_float32 m_out_of_max_range_slope;
+    vx_float32 m_out_of_min_range_slope;
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+            baseF24 = (baseF24 & 0x800000) | 0x7F7FFF;
+
+        if(((baseF24 >> 15) & 0xFF) == 0x0)
+            baseF24 = (baseF24 & 0x800000);
+
+        baseF32 = SE8M15toFp32(baseF24);
+
+        pwlValue = baseF32 * scale;
+
+        if(pwlValue  > 1.0f)
+        {
+            if(format == VX_TYPE_BFLOAT16)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(1.0f);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(1.0f);
+        }
+        else
+        {
+            if(format == VX_TYPE_BFLOAT16)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+        }
+
+    }
+
+    m_out_of_max_range_slope = 0.0f;
+    m_out_of_min_range_slope = 0.0f;
+
+    pwlLUTBaseEx[baseBF16 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
+    pwlLUTBaseEx[baseBF16 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
+    pwlLUTBaseEx[baseBF16 + 2] = expBits;
+    pwlLUTBaseEx[baseBF16 + 3] = 0;
+
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status  fillBF16ActivateRelu6LUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 scale, vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_float32 m_out_of_max_range_slope;
+    vx_float32 m_out_of_min_range_slope;
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+            baseF24 = (baseF24 & 0x800000) | 0x7F7FFF;
+
+        if(((baseF24 >> 15) & 0xFF) == 0x0)
+            baseF24 = (baseF24 & 0x800000);
+
+        if((base >> 9) == 1)
+        {
+            baseF32 = SE8M15toFp32(baseF24);
+            pwlValue = baseF32 * 0.0f;
+            if(format == VX_TYPE_BFLOAT16)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+        }
+        else
+        {
+            baseF32 = SE8M15toFp32(baseF24);
+            pwlValue = baseF32 * scale;
+            if(pwlValue > 6.0f)
+            {
+                if(format == VX_TYPE_BFLOAT16)
+                    pwlLUTBaseEx[base] = Fp32toSE8M12(6.0f);
+                else
+                    pwlLUTBaseEx[base] = Fp32toFp21(6.0f);
+            }
+            else
+            {
+                if(format == VX_TYPE_BFLOAT16)
+                    pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+                else
+                    pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+            }
+        }
+    }
+
+    m_out_of_max_range_slope = 0;
+    m_out_of_min_range_slope = 0;
+
+    pwlLUTBaseEx[0x400 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
+    pwlLUTBaseEx[0x400 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
+    pwlLUTBaseEx[0x400 + 2] = expBits;
+    pwlLUTBaseEx[0x400 + 3] = 0;
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status  fillBF16ActivateLogisticLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 scale, vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint16   baseU9;
+    vx_uint32   baseF24;
+    vx_uint32   baseU18;
+    vx_float32  baseF32 = 0;
+    vx_float32  pwlValue;
+    vx_uint32 baseBF16 = 0x400;
+    vx_uint32 signBits = (aluPwlSignSupport ? 1 : 0);
+    vx_uint16 maxLUTinput = expBits == 8 ? 0x3FF >> signBits : 0x1FF >>signBits;
+    vx_uint16 minLUTinput = (vx_uint16)(aluPwlSignSupport ? (expBits == 8 ? (0x3FF >> signBits) | aluPwlSignSupport << 9 : 0x1FF >>signBits | aluPwlSignSupport << 9) :  (expBits == 8 ? 0  : 0x200 >>signBits));
+    vx_float32 m_out_of_max_range_slope = 0;
+    vx_float32 m_out_of_min_range_slope = 0;
+
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = 0;
+        baseU18 = 0;
+        baseF32 = 0;
+        baseU9 = base & 0x1FF;
+
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        baseF32 = SE8M15toFp32(baseF24);
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+        {
+            if((baseF24 >> 23) == 0x1)
+            {
+                if(format == VX_TYPE_BFLOAT16)
+                    pwlLUTBaseEx[base] = Fp32toSE8M12(0.0f);
+                else
+                    pwlLUTBaseEx[base] = Fp32toFp21(0.0f);
+            }
+            else
+            {
+                if(format == VX_TYPE_BFLOAT16)
+                    pwlLUTBaseEx[base] = Fp32toSE8M12(1.0f);
+                else
+                    pwlLUTBaseEx[base] = Fp32toFp21(1.0f);
+            }
+        }
+        else if(((baseF24 >> 15) & 0xFF) == 0x0)
+        {
+            if(format == VX_TYPE_BFLOAT16)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(0.5f);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(0.5f);
+        }
+        else
+        {
+
+            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * scale));
+
+            if(format == VX_TYPE_BFLOAT16)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+
+        }
+
+        if(base == maxLUTinput)
+        {
+            vx_float32 temp = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * scale));
+            m_out_of_max_range_slope = (vx_float32)temp * (1.0f - temp);
+        }
+        if(base == minLUTinput)
+        {
+            vx_float32 temp = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * scale));
+            m_out_of_min_range_slope = (vx_float32)temp * (1.0f - temp);
+        }
+
+    }
+
+    pwlLUTBaseEx[baseBF16 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
+    pwlLUTBaseEx[baseBF16 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
+    pwlLUTBaseEx[baseBF16 + 2] = expBits;
+    pwlLUTBaseEx[baseBF16 + 3] = 0;
+
+    return VX_SUCCESS;
+}
+VX_PRIVATE_API vx_status  fillBF16ActivateHyperbolicTanLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 scaleIn,vx_float32 scaleOut, vx_bool aluPwlSignSupport, vx_enum format)
+{
+
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_uint32 baseBF16 = 0x400;
+    vx_uint32 signBits = (aluPwlSignSupport ? 1 : 0);
+    //vx_uint32 mantissaBits = 10 - signBits - expBits;
+    vx_uint16 maxAbsLUTinput = expBits == 8 ? 0x3FF >> signBits : 0x1FF >>signBits;
+    vx_uint16 minAbsLUTinput = expBits == 8 ? 0  : 0x200 >>signBits;
+    vx_float32 m_out_of_max_range_slope = 0;
+    vx_float32 m_out_of_min_range_slope = 0;
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = 0;
+        baseF32 = 0;
+
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        baseF32 = SE8M15toFp32(baseF24);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+        {
+            if(format == VX_TYPE_BFLOAT16)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(1.0f);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(1.0f);
+        }
+        else if(((baseF24 >> 15) & 0xFF) == 0x0)
+        {
+            if(format == VX_TYPE_BFLOAT16)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(0.0f);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(0.0f);
+        }
+        else
+        {
+            pwlValue = scaleOut * gcoMATH_TangentH(baseF32 * scaleIn);
+
+            if(format == VX_TYPE_BFLOAT16)
+                pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+            else
+                pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+        }
+
+        if(base == maxAbsLUTinput)
+            m_out_of_max_range_slope = (vx_float32)(scaleOut * (1.0f - pow(gcoMATH_TangentH(baseF32 * scaleIn), 2)));
+        if(base == minAbsLUTinput)
+            m_out_of_min_range_slope = (vx_float32)(scaleOut * (1.0f - pow(gcoMATH_TangentH(baseF32 * scaleIn), 2)));
+    }
+
+    pwlLUTBaseEx[baseBF16 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
+    pwlLUTBaseEx[baseBF16 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
+    pwlLUTBaseEx[baseBF16 + 2] = expBits;
+    pwlLUTBaseEx[baseBF16 + 3] = 0;
+
+   return VX_SUCCESS;
+}
+VX_PRIVATE_API vx_status  fillBF16LRNLUT(vx_uint32 *pwlLUTBaseEx, vx_uint32 expBits, vx_float32 u8Scale, vx_tp_value_cmd value_cmd_ptr, vx_uint32 preShiftValue,vx_bool aluPwlSignSupport, vx_enum format)
+{
+    vx_uint16   base;
+    vx_uint32   baseF24;
+    vx_float32  baseF32;
+    vx_float32  pwlValue;
+    vx_uint32 baseBF16 = 0x400;
+    vx_uint32 signBits = (aluPwlSignSupport ? 1 : 0);
+    //vx_uint32 mantissaBits = 10 - signBits - expBits;
+    vx_uint16 maxAbsLUTinput = expBits == 8 ? 0x3FF >> signBits : 0x1FF >>signBits;
+    vx_uint16 minAbsLUTinput = expBits == 8 ? 0  : 0x200 >>signBits;
+    vx_float32 m_out_of_max_range_slope = 0;
+    vx_float32 m_out_of_min_range_slope = 0;
+    vx_float32  alpha, beta, bias, ks;
+    vx_uint32 kernel;
+    vx_float32 tempValue= 0;
+
+    alpha  = value_cmd_ptr->f32[0];
+    beta   = value_cmd_ptr->f32[1];
+    bias   = value_cmd_ptr->f32[2];
+    kernel = value_cmd_ptr->u32[0];
+    ks     = (vx_float32)value_cmd_ptr->u32[1];
+
+
+    for(base = 0; base < 0x400; base++)
+    {
+        baseF24 = 0;
+        baseF32 = 0;
+
+        baseF24 = getbaseF24(base, expBits, aluPwlSignSupport);
+
+        baseF32 = SE8M15toFp32(baseF24);
+
+        if(((baseF24 >> 15) & 0xFF) == 0xFF)
+            baseF24 = (baseF24 & 0x800000) | 0x7F7FFF;
+
+        if(((baseF24 >> 15) & 0xFF) == 0x0)
+            baseF24 = (baseF24 & 0x800000);
+
+        baseF32 = SE8M15toFp32(baseF24);
+        tempValue = bias + alpha * (baseF32 * u8Scale *u8Scale * (vx_float32)preShiftValue / ks);
+        pwlValue = 1.0f / (vx_float32)pow(tempValue, beta);
+        if(format == VX_TYPE_BFLOAT16)
+            pwlLUTBaseEx[base] = Fp32toSE8M12(pwlValue);
+        else
+            pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
+
+        if(base == maxAbsLUTinput)
+            m_out_of_max_range_slope = -1.0f * (beta *alpha* u8Scale * u8Scale * (vx_float32)preShiftValue / ks) / (vx_float32)pow(tempValue, beta + 1);
+        if(base == minAbsLUTinput)
+            m_out_of_min_range_slope = -1.0f * (beta * alpha* u8Scale * u8Scale * (vx_float32)preShiftValue / ks) / (vx_float32)pow(tempValue, beta + 1);
+    }
+
+    pwlLUTBaseEx[baseBF16 + 0] = (*(vx_uint32 *)&m_out_of_max_range_slope) >> 8;
+    pwlLUTBaseEx[baseBF16 + 1] = (*(vx_uint32 *)&m_out_of_min_range_slope) >> 8;
+    pwlLUTBaseEx[baseBF16 + 2] = expBits;
+    pwlLUTBaseEx[baseBF16 + 3] = 0;
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_float64 maxErrorLUT(vx_uint32 * pwlLUTBaseEx, vx_uint32 expBits, vx_uint32 type, vx_float32 u8Scale, vx_bool aluPwlSignSupport, vx_tp_value_cmd value_cmd_ptr, vx_uint32 preShiftValue)
+{
+    vx_uint32 u11 = 0;
+    vx_float64 maxError = 0;
+    vx_float64 error = 0;
+    vx_uint32 signBits = (aluPwlSignSupport ? 1 : 0);
+    vx_uint32 mantissaBits = 10 - signBits - expBits;
+    vx_uint16 maxAbsLUTinput = expBits == 8 ? 0x3FF >> signBits : 0x1FF >>signBits;
+    vx_uint16 minAbsLUTinput = expBits == 8 ? 0  : 0x200 >>signBits;
+
+
+    for(u11 = 1; u11 < ((0x1 << 11) -1); u11 += 2)
+    {
+        vx_float64 slope = 0;
+        vx_float64 predictValue = 0;
+        vx_float64 expectValue = 0;
+        vx_uint32 base = 0;
+
+        vx_uint32 u19 = 0;
+        vx_uint32 f24 = 0;
+
+        if(aluPwlSignSupport)
+        {
+            if(expBits == 8)
+                f24 = u11 << 13;
+            else
+            {
+                vx_uint32 baseU10 = (u11 >> 1) & 0x1FF;
+                if(baseU10 >= (0x1 << 8))
+                {
+                    u19 = ((0xFF << 11 | ((u11 & 0x3FF)) << signBits) << expBits) & 0x7FFFF;
+                    f24 = (u11 & 0x400) << 13 | (0x3FFFF & u19) << 4;
+
+                }
+                else
+                {
+                    u19 = (((u11 & 0x3FF) << signBits) << expBits) & 0x7FFFF;
+                    f24 = (u11 & 0x400) << 13 | (0x40000 | u19) << 4;
+                }
+            }
+        }
+        else
+        {
+
+            if(expBits == 8)
+            {
+                f24 = u11 << 12;
+            }
+            else
+            {
+                if(u11 >= (0x1 << 10))
+                {
+                    u19 = ((0x7F << 11 | u11) << expBits) & 0x3FFFF;
+                    f24 = u19 << 4;
+                }
+                else
+                {
+                    u19 = (u11 << expBits)& 0x3FFFF;
+                    f24 = 0x1 << 22 | u19 << 4;
+                }
+            }
+        }
+        if((((f24 >> 15) & 0xFF) == 0) || (((f24 >> 15) & 0xFF) == 0xFF))
+            continue;
+
+        if(aluPwlSignSupport)
+            base = (f24 & 0x800000) >> 14 | ((((f24 & 0x7FFFFF) >> 5) >> (expBits + signBits)) & 0x1FF);
+        else
+            base = ((f24 >> 5) >> (expBits + signBits)) & 0x3FF;
+
+        if(base == maxAbsLUTinput || base == minAbsLUTinput)
+        {
+            vx_uint32 baseF24 = 0;
+            vx_uint32 minMaxBaseF24 = 0;
+            baseF24 = getbaseF24(base,expBits, aluPwlSignSupport);
+
+            if (type == VX_NN_ACTIVATION_HYPERBOLIC_TAN || type == TP_LRN)
+                vxmASSERT(!aluPwlSignSupport);
+            else
+                vxmASSERT(aluPwlSignSupport);
+
+            if(base == maxAbsLUTinput)
+            {
+                if(((baseF24 >> 15 ) & 0xFF) == 0xFF)
+                    minMaxBaseF24 = baseF24;
+                else
+                    minMaxBaseF24 = (((baseF24 >> 15 ) & 0xFF) + 1) << 15 | (baseF24 & 0x807FFF);
+                predictValue = SE8M12toFp32(pwlLUTBaseEx[maxAbsLUTinput]) + SE8M15toFp32(pwlLUTBaseEx[0x400]) * (SE8M15toFp32(minMaxBaseF24) - SE8M15toFp32(baseF24));
+            }
+            if(base == minAbsLUTinput)
+            {
+                if(((baseF24 >> 15 ) & 0xFF) == 0)
+                    minMaxBaseF24 = baseF24;
+                else
+                    minMaxBaseF24 = (((baseF24 >> 15 ) & 0xFF) - 1) << 15 | (baseF24 & 0x807FFF);
+                predictValue = SE8M12toFp32(pwlLUTBaseEx[minAbsLUTinput]) + SE8M15toFp32(pwlLUTBaseEx[0x401]) * (SE8M15toFp32(minMaxBaseF24) - SE8M15toFp32(baseF24));
+            }
+            f24 = minMaxBaseF24;
+        }
+        else
+        {
+
+            vx_uint32 baseDelta = 0;
+            vx_uint32 expU8 = (f24 >> 15) & 0xFF;
+
+            vx_float64 mantStepDelta = 1.0/(1.0/(0x1 << mantissaBits));
+            vx_uint32 expCount = 0;
+            vx_uint32 mantStepDeltaInt = 0;
+            vx_uint32 absInput = 0;
+            vx_float64 inputDelta = 0;
+            vx_uint32 absF24LUTInput = 0;
+
+            vx_uint32 nextBase = (base + 1) & ((!aluPwlSignSupport) << 9 | 0x1FF) | ((aluPwlSignSupport & (base >> 9)) << 9);
+
+            while(mantStepDelta >= 2)
+            {
+                expCount++;
+                mantStepDelta /=2;
+            }
+
+            mantStepDeltaInt = (vx_uint32)((0x1 << 15) * (mantStepDelta -1.0));
+
+            baseDelta =  (((0xFE - expU8) + expCount)& 0xFF) << 15 | (mantStepDeltaInt & 0x7FFF); //se8m15
+
+            if(aluPwlSignSupport)
+            {
+                vx_uint32 baseU18 = 0;
+                vx_uint32 baseU9 = base & 0x1FF;
+                vx_uint32  mask0 = 0x1FFFF;
+                vx_uint32  mask1 = 0x20000;
+
+                if(expBits == 8)
+                    absF24LUTInput = base << 14;
+                else if(baseU9 >= (0x1 << 8))
+                {
+                    baseU18 = ((0xFF << 10 | ((base & 0x1FF) << signBits)) << expBits) & 0x3FFFF;
+                    absF24LUTInput = (base & 0x200) << 14 | (baseU18 & mask0)<< 5;
+                }
+                else
+                {
+                    baseU18 = (((base & 0x1FF) << signBits ) << expBits) & 0x3FFFF;;
+                    absF24LUTInput = (base & 0x200) << 14 | ((baseU18 | mask1) << 5);
+                }
+            }
+            else
+            {
+                vx_uint32 baseU17 = 0;
+
+                if(expBits == 8)
+                {
+                    absF24LUTInput = base << 13;
+                }
+                else if(base >= (0x1 << 9))
+                {
+                    baseU17 = ((0x7F << 10 | base )<< expBits) & 0x1FFFF;
+                    absF24LUTInput = baseU17 << 5;
+                }
+                else
+                {
+
+                    baseU17 = (base << expBits) & 0x1FFFF;
+                    absF24LUTInput = (baseU17 << 5) | 0x1 << 22;
+                }
+            }
+
+            slope = 1.0 * ((SE8M12toFp32(pwlLUTBaseEx[nextBase]) - SE8M12toFp32(pwlLUTBaseEx[base]))) * SE8M15toFp32((f24 & 0x800000) |baseDelta);
+
+            absInput = f24 & 0x7FFFFF;
+            inputDelta = (SE8M15toFp32((f24 & 0x800000) |absInput ) - SE8M15toFp32(absF24LUTInput));
+
+            if(aluPwlSignSupport)
+                predictValue = slope* inputDelta + SE8M12toFp32(pwlLUTBaseEx[base]);
+            else
+                predictValue = slope* inputDelta + SE8M12toFp32(((f24 & 0x800000) >> 3) | pwlLUTBaseEx[base]);
+
+        }
+
+        switch(type)
+        {
+            case VX_NN_ACTIVATION_LEAKYRELU:
+            case VX_NN_ACTIVATION_RELU:
+            {
+                if(base >= 0x200)
+                    expectValue = (vx_float64)SE8M15toFp32(f24) * u8Scale;
+                else
+                    expectValue = (vx_float64)SE8M15toFp32(f24)/* * scale*/;
+                break;
+            }
+            case VX_NN_ACTIVATION_RELU1:
+            {
+                vx_float64 tempValue;
+                tempValue = (vx_float64)SE8M15toFp32(f24) * u8Scale;
+                if(tempValue > 1.0f)
+                    expectValue = 1.0f;
+                else if(tempValue < -1.0f)
+                    expectValue = -1.0f;
+                else
+                    expectValue = tempValue;
+                 break;
+            }
+            case VX_NN_ACTIVATION_RELU6:
+            {
+                vx_float64 tempValue;
+                tempValue = (vx_float64)SE8M15toFp32(f24) * u8Scale;
+                if(tempValue > 6.0f)
+                    expectValue = 6.0f;
+                else if(base >= 0x200)
+                    expectValue = 0.0f;
+                else
+                    expectValue = tempValue;
+                break;
+            }
+            case VX_NN_ACTIVATION_LOGISTIC :
+            {
+                vx_float32 tempValue;
+
+                if(((f24 >> 15) & 0xFF) == 0xFF)
+                {
+                    expectValue = SE8M15toFp32((f24 & 0x800000) | 0x7F7FFF);
+                }
+                else if(((f24 >> 15) & 0xFF) == 0x0)
+                {
+                    expectValue = 0.5f;
+                }
+                else
+                {
+                    tempValue = SE8M15toFp32(f24);
+                    expectValue = (vx_float64)(1.0f / (1.0f + gcoMATH_Exp(0.0f - tempValue * u8Scale)));
+                }
+                break;
+            }
+            case VX_NN_ACTIVATION_HYPERBOLIC_TAN :
+            {
+                vx_float32 tempValue;
+                vx_float32 scaleOut = value_cmd_ptr->f32[0];
+                vx_float32 scaleIn = value_cmd_ptr->f32[1];
+
+                if(((f24 >> 15) & 0xFF) == 0xFF)
+                {
+                    expectValue = 1.0;
+                }
+                else if(((f24 >> 15) & 0xFF) == 0x0)
+                {
+                    expectValue = 0.0f;
+                }
+                else
+                {
+                    tempValue = SE8M15toFp32(f24);
+                    expectValue = (vx_float64)scaleOut * gcoMATH_TangentH(tempValue * scaleIn * u8Scale);
+                }
+                break;
+            }
+            case TP_LRN:
+            {
+                vx_float64 tempValue, baseF32;
+                vx_float32  alpha, beta, bias, ks;
+                vx_uint32 kernel;
+                alpha  = value_cmd_ptr->f32[0];
+                beta   = value_cmd_ptr->f32[1];
+                bias   = value_cmd_ptr->f32[2];
+                kernel = value_cmd_ptr->u32[0];
+                ks     = (vx_float32)value_cmd_ptr->u32[1];
+                baseF32 = SE8M15toFp32(f24);
+                tempValue = bias + alpha * (baseF32 * u8Scale * u8Scale * (vx_float32)preShiftValue / ks);
+                expectValue = 1.0f / (vx_float32)pow(tempValue, beta);
+                break;
+            }
+
+        }
+        if(expectValue != 0)
+            error = (vx_float64)fabs((vx_float64)(expectValue -predictValue)/expectValue);
+
+        if(u11 == 1)
+            maxError = error;
+        else
+            maxError = gcmMAX(maxError, error);
+    }
+    return maxError;
+}
+
+
 VX_PRIVATE_API vx_int32 getHwPoolingSze(vx_uint32 poolingSize)
 {
     switch (poolingSize)
@@ -129,7 +950,7 @@ VX_PRIVATE_API vx_int32 getHwPoolingSze(vx_uint32 poolingSize)
     return -1;
 }
 
-VX_PRIVATE_API vx_int8 getHWDataFormat(vx_enum dataFormat)
+VX_PRIVATE_API vx_int8 getNNDataFormat(vx_enum dataFormat)
 {
     switch (dataFormat)
     {
@@ -143,6 +964,35 @@ VX_PRIVATE_API vx_int8 getHWDataFormat(vx_enum dataFormat)
         return 0x4;
     case VX_TYPE_BFLOAT16:
         return 0x7;
+    case VX_TYPE_FLOAT32:
+        return 0x8;
+    default:
+        break;
+    }
+
+    vxError("hw not support this data format. function %s line %d", __FUNCTION__, __LINE__);
+    return -1;
+}
+
+
+VX_PRIVATE_API vx_int8 getTPDataFormat(vx_enum dataFormat)
+{
+    switch (dataFormat)
+    {
+    case VX_TYPE_UINT8:
+        return 0x0;
+    case VX_TYPE_INT8:
+        return 0x2;
+    case VX_TYPE_FLOAT16:
+        return 0x1;
+    case VX_TYPE_INT16:
+        return 0x4;
+    case VX_TYPE_UINT16:
+        return 0x3;
+    case VX_TYPE_BFLOAT16:
+        return 0x6;
+    case VX_TYPE_FLOAT32:
+        return 0x5;
     default:
         break;
     }
@@ -184,6 +1034,9 @@ VX_PRIVATE_API void _checkSramOverflow(
         break;
     case VX_TYPE_FLOAT16:
         coreCountUsed = context->nnConfig.fixedFeature.nnCoreCountFloat16;
+        break;
+    case VX_TYPE_BFLOAT16:
+        coreCountUsed = context->nnConfig.fixedFeature.nnCoreCountBFloat16;
         break;
     default:
         break;
@@ -514,21 +1367,22 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
     info->vx_nn_general_cmd_info.outImageTileYSize = outImageTileSizeY;
 
     /* Fixed same type in this stage. */
-    info->vx_nn_general_cmd_info.kernelDataType    = getHWDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
-    info->vx_nn_general_cmd_info.inImageDataType   = getHWDataFormat(inDataFormat);
-    info->vx_nn_general_cmd_info.outImageDataType  = getHWDataFormat(outDataFormat);
+    info->vx_nn_general_cmd_info.kernelDataType    = getNNDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
+    info->vx_nn_general_cmd_info.inImageDataType   = getNNDataFormat(inDataFormat);
+    info->vx_nn_general_cmd_info.outImageDataType  = getNNDataFormat(outDataFormat);
 
     /* Since V7 HW WORD1 only has 2 bits for kerenl data type, input data type & output data type,
      * int16 value 0x4 will overflow, need add MSB value to WORD15 to cover
      */
-    if (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT16 || WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_BFLOAT16)
-        info->vx_nn_general_cmd_info.kernelDataTypeMsb = 1;
+    /*Since v8.1 support FP32, which value is 8, need bit3 now*/
+    info->vx_nn_general_cmd_info.kernelDataTypeMsb = info->vx_nn_general_cmd_info.kernelDataType >> 2;
+    info->vx_nn_general_cmd_info.kernelDataTypeBit3 = info->vx_nn_general_cmd_info.kernelDataType >> 3;
 
-    if (inDataFormat == VX_TYPE_INT16 || inDataFormat == VX_TYPE_BFLOAT16)
-        info->vx_nn_general_cmd_info.inImageDataTypeMsb = 1;
+    info->vx_nn_general_cmd_info.inImageDataTypeMsb = info->vx_nn_general_cmd_info.inImageDataType >> 2;
+    info->vx_nn_general_cmd_info.inImageDataTypeBit3 = info->vx_nn_general_cmd_info.inImageDataType >> 3;
 
-    if (outDataFormat == VX_TYPE_INT16 || outDataFormat == VX_TYPE_BFLOAT16)
-        info->vx_nn_general_cmd_info.outImageDataTypeMsb = 1;
+    info->vx_nn_general_cmd_info.outImageDataTypeMsb = info->vx_nn_general_cmd_info.outImageDataType >> 2;
+    info->vx_nn_general_cmd_info.outImageDataTypeBit3 = info->vx_nn_general_cmd_info.outImageDataType >> 3;
 
     vxmASSERT(info->vx_nn_general_cmd_info.inImageDataType == info->vx_nn_general_cmd_info.kernelDataType);
 
@@ -545,6 +1399,11 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
                   info->vx_nn_general_cmd_info.outImageDataType == 0x7 &&
                   WB_BIAS_DATA_FORMAT(weights_biases) == VX_TYPE_FLOAT32);
     }
+
+    /*For v8, BF16 && FP16 should set noBias to bypass post add bias/*/
+    if (isV8 &&
+        (WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_BFLOAT16 || WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_FLOAT16))
+        info->vx_nn_general_cmd_info.noBias = 1;
 
     if (((inDataFormat == VX_TYPE_UINT8) && (inQuantFormat == VX_QUANT_AFFINE_SCALE)) ||
         ((WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8) && (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_AFFINE_SCALE)) ||
@@ -726,6 +1585,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetNNGeneralCommandInfo(
             info->vx_nn_general_cmd_info.outImageTransposeBufEndAddr = conv_cmd_ptr->transposeOutStart + conv_cmd_ptr->transposeOutSize;
             info->vx_nn_general_cmd_info.outImageTransposeChMinusOne = conv_cmd_ptr->transposeOutChannel - 1;
         }
+
         if (conv_cmd_ptr->kernelCacheMode == VXNNE_SRAM_CACHE_MODE_STREAM_CACHE)
         {
             info->vx_nn_general_cmd_info.kernelCachingMode = 0;
@@ -4713,8 +5573,9 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
     vx_bool hasOutputQuant = vx_false_e;
     vx_bool hasWQuant = vx_false_e;
     vx_bool tpRealInt16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16);
-    vx_bool tpSimpleInt16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_SIMPLE_INT16);
+    //vx_bool tpSimpleInt16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_SIMPLE_INT16);
     vx_bool tfQuant = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_TF_QUANT);
+    vx_bool tpBF16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16);
     vx_tensor other_tensor, data_buff;
     vx_tp_value_cmd value_cmd_ptr;
 
@@ -4780,7 +5641,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 info->vx_nn_tp_cmd_info.inImageGlobalMem = 1;
                 info->vx_nn_tp_cmd_info.aluSquarePreshift = 0;
                 info->vx_nn_tp_cmd_info.aluSquareEnable = 0;
-                info->vx_nn_tp_cmd_info.aluHorzProcessing = getHWDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
+                info->vx_nn_tp_cmd_info.aluHorzProcessing = getTPDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
                 info->vx_nn_tp_cmd_info.aluHorzProcStride = 0;
                 info->vx_nn_tp_cmd_info.aluVertProcessing = 0;
                 info->vx_nn_tp_cmd_info.aluVertProcStride = 0;
@@ -4799,8 +5660,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                      ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0)
                    - (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT ? outFPP : 0)
                    + (WB_WEIGHT_QUANT_FORMAT(weights_biases) == VX_QUANT_DYNAMIC_FIXED_POINT ? WB_WEIGHT_FPP(weights_biases) : 0);
-                info->vx_nn_tp_cmd_info.aluI2FEnable = (inFormat == VX_TYPE_FLOAT16) ? 0 : 1;
-                info->vx_nn_tp_cmd_info.aluF2IEnable = (outFormat == VX_TYPE_FLOAT16) ? 0 : 1;
+                info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+                info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
             }
             else
             {
@@ -4808,7 +5669,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 {
                     info->vx_nn_tp_cmd_info.inTileSequence = 0x3;
                     info->vx_nn_tp_cmd_info.inImageGlobalMem = 1;
-                    info->vx_nn_tp_cmd_info.aluHorzProcessing = getHWDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
+                    info->vx_nn_tp_cmd_info.aluHorzProcessing = getTPDataFormat(WB_WEIGHT_DATA_FORMAT(weights_biases));
                     info->vx_nn_tp_cmd_info.aluHorzProcStride = 0;
                     info->vx_nn_tp_cmd_info.aluVertProcessing = 0;
                     info->vx_nn_tp_cmd_info.aluVertProcStride = 0;
@@ -4846,8 +5707,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 info->vx_nn_tp_cmd_info.aluMultEnable = 0;
                 info->vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
                 info->vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
-                info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-                info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
+                info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+                info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
 
             }
             break;
@@ -4894,8 +5755,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluFilterPwlSwap = 0;
             info->vx_nn_tp_cmd_info.aluPwlSignSupport = 0;
             info->vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
+            info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+            info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
             info->vx_nn_tp_cmd_info.aluInputPreshift   = 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
             break;
@@ -4910,7 +5771,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             vx_uint32   fixed21, baseF21;
             vx_float32  baseF32;
             vx_float32  pwlValue;
-            vx_float32  value = inQFormat == VX_QUANT_AFFINE_SCALE ? inScale : 1.0f;
+            vx_float32  u8Scale= inQFormat == VX_QUANT_AFFINE_SCALE ? inScale : 1.0f;
 
             vxmASSERT(value_cmd_ptr != VX_NULL);
             vxmASSERT(pwlLUTBase != VX_NULL);
@@ -4939,6 +5800,18 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             pwlLUTBase[base] = 0x8000;      /* Half float negative zero. */
                         }
+                    }
+                    else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                    {
+                        vx_uint32 expBits = 0;
+                        if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                            expBits = 5;
+                        else if(inFormat == VX_TYPE_BFLOAT16)
+                            expBits = 8;
+                        else
+                            vxmASSERT(0);
+
+                        fillBF16ActivateReluLUT(pwlLUTBaseEx, expBits, vx_true_e, inFormat);
                     }
                     else
                     {
@@ -4995,6 +5868,18 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                             pwlLUTBase[base] = 0xfbff;      /* Half float negative infinity clamp to max. */
                         }
                     }
+                    else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                    {
+                        vx_uint32 expBits = 0;
+                        if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                            expBits = 5;
+                        else if(inFormat == VX_TYPE_BFLOAT16)
+                            expBits = 8;
+                        else
+                            vxmASSERT(0);
+
+                        fillBF16LeakyReluLUT(pwlLUTBaseEx, expBits, scale, vx_true_e, inFormat);
+                    }
                     else
                     {
                         /* Flush denorms to 0.0f. */
@@ -5040,7 +5925,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF16 = base << 6;
                             baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = baseF32 * value;
+                            pwlValue = baseF32 * u8Scale;
                             if (pwlValue >= 1.0f) break;
                             pwlLUTBase[base] = Fp32toFp16(pwlValue);
                         }
@@ -5057,7 +5942,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF16 = base << 6;
                             baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = baseF32 * value;
+                            pwlValue = baseF32 * u8Scale;
                             if (pwlValue <= -1.0f) break;
                             pwlLUTBase[base] = Fp32toFp16(pwlValue);
                         }
@@ -5066,6 +5951,18 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             pwlLUTBase[base] = fixed16;         /* smaller than negative one to -1.0f. */
                         }
+                    }
+                    else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                    {
+                        vx_uint32 expBits = 0;
+                        if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                            expBits = 5;
+                        else if(inFormat == VX_TYPE_BFLOAT16)
+                            expBits = 8;
+                        else
+                            vxmASSERT(0);
+
+                        fillBF16ActivateRelu1LUT(pwlLUTBaseEx, expBits, u8Scale, vx_true_e, inFormat);
                     }
                     else
                     {
@@ -5077,7 +5974,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF21 = base << 11;
                             baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = baseF32 * value;
+                            pwlValue = baseF32 * u8Scale;
                             if (pwlValue >= 1.0f) break;
                             pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                         }
@@ -5094,7 +5991,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF21 = base << 11;
                             baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = baseF32 * value;
+                            pwlValue = baseF32 * u8Scale;
                             if (pwlValue <= -1.0f) break;
                             pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                         }
@@ -5117,7 +6014,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF16 = base << 6;
                             baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = baseF32 * value;
+                            pwlValue = baseF32 * u8Scale;
                             if (pwlValue >= 6.0f) break;
                             pwlLUTBase[base] = Fp32toFp16(pwlValue);
                         }
@@ -5131,6 +6028,18 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                             pwlLUTBase[base] = 0x0;             /* smaller than zero to 0.0f. */
                         }
                     }
+                    else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                    {
+                        vx_uint32 expBits = 0;
+                        if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                            expBits = 5;
+                        else if(inFormat == VX_TYPE_BFLOAT16)
+                            expBits = 8;
+                        else
+                            vxmASSERT(0);
+
+                        fillBF16ActivateRelu6LUT(pwlLUTBaseEx, expBits, u8Scale,vx_true_e, inFormat);
+                    }
                     else
                     {
                         for (base = 0; base < 0x10; base++)
@@ -5141,7 +6050,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF21 = base << 11;
                             baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = baseF32 * value;
+                            pwlValue = baseF32 * u8Scale;
                             if (pwlValue >= 6.0f) break;
                             pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                         }
@@ -5169,7 +6078,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF16 = base << 6;
                             baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * value));
+                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * u8Scale));
                             pwlLUTBase[base] = Fp32toFp16(pwlValue);
                         }
                         fixed16 = Fp32toFp16(1.0f);
@@ -5187,13 +6096,66 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF16 = base << 6;
                             baseF32 = Fp16toFp32(baseF16);
-                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * value));
+                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * u8Scale));
                             pwlLUTBase[base] = Fp32toFp16(pwlValue);
                         }
                         fixed16 = Fp32toFp16(0.0f);
                         for (base = 0x3F0; base < 0x400; base++)
                         {
                             pwlLUTBase[base] = fixed16;
+                        }
+                    }
+                    else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                    {
+                        if(inFormat == VX_TYPE_BFLOAT16)
+                        {
+                            vx_uint32 expBits;
+                            vx_float64 maxError0 = 0, maxError1 = 1024 * 1024 * 1024;
+                            vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((0x400 + 4) * sizeof(vx_uint32));
+                            vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((0x400 + 4) * sizeof(vx_uint32));
+                            vx_uint16 selBase = 0;
+                            for(expBits = 4; expBits <= 8; expBits++) /*SE8M12 fromat*/
+                            {
+                                if(selBase)
+                                {
+                                    memset(pwlLUTBase1, 0, ((0x400 + 4) * sizeof(vx_uint32)));
+                                    fillBF16ActivateLogisticLUT(pwlLUTBase1, expBits, u8Scale, vx_true_e, inFormat);
+                                    maxError1 = maxErrorLUT(pwlLUTBase1, expBits, VX_NN_ACTIVATION_LOGISTIC, u8Scale, vx_true_e, VX_NULL, 0);
+                                }
+                                else
+                                {
+                                    memset(pwlLUTBase0, 0, ((0x400 + 4) * sizeof(vx_uint32)));
+                                    fillBF16ActivateLogisticLUT(pwlLUTBase0, expBits, u8Scale, vx_true_e, inFormat);
+                                    maxError0 = maxErrorLUT(pwlLUTBase0, expBits, VX_NN_ACTIVATION_LOGISTIC, u8Scale, vx_true_e, VX_NULL, 0);
+                                }
+                                if(maxError0 == maxError1)
+                                {
+                                    if(pwlLUTBase0[0x402] >= pwlLUTBase1[0x402])
+                                        selBase = 0;
+                                    else
+                                        selBase = 1;
+                                }
+                                else if(maxError0 > maxError1)
+                                    selBase = 0;
+                                else
+                                    selBase = 1;
+                            }
+                            if(selBase)
+                                memcpy(pwlLUTBaseEx, pwlLUTBase0, ((0x400 + 4) * sizeof(vx_uint32)));
+                            else
+                                memcpy(pwlLUTBaseEx, pwlLUTBase1, ((0x400 + 4) * sizeof(vx_uint32)));
+
+                            vxFree(pwlLUTBase0);
+                            vxFree(pwlLUTBase1);
+                        }
+                        else
+                        {
+                            vx_uint32 expBits = 0;
+                            if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                                expBits = 5;
+                            else
+                                vxmASSERT(0);
+                            fillBF16ActivateLogisticLUT(pwlLUTBaseEx, expBits, u8Scale,vx_true_e, inFormat);
                         }
                     }
                     else
@@ -5207,7 +6169,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF21 = base << 11;
                             baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * value));
+                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * u8Scale));
                             pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                         }
                         fixed21 = Fp32toFp21(1.0f);
@@ -5225,7 +6187,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                         {
                             baseF21 = base << 11;
                             baseF32 = Fp21toFp32(baseF21);
-                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * value));
+                            pwlValue = 1.0f / (1.0f + gcoMATH_Exp(0.0f - baseF32 * u8Scale));
                             pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                         }
                         fixed21 = Fp32toFp21(0.0f);
@@ -5251,13 +6213,69 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                             {
                                 baseF16 = base << 5;
                                 baseF32 = Fp16toFp32(baseF16);
-                                pwlValue = scaleOut * gcoMATH_TangentH(baseF32 * value * scaleIn);
+                                pwlValue = scaleOut * gcoMATH_TangentH(baseF32 * u8Scale * scaleIn);
                                 pwlLUTBase[base] = Fp32toFp16(pwlValue);
                             }
                             fixed16 = Fp32toFp16(1.0f);
                             for (base = 0x3E0; base < 0x400; base++)
                             {
                                 pwlLUTBase[base] = fixed16;
+                            }
+                        }
+                        else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+                        {
+                            if(inFormat == VX_TYPE_BFLOAT16)
+                            {
+                                vx_uint32 expBits;
+                                vx_float64 maxError0 = 1024, maxError1 = 1024;
+                                vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((0x400 + 4) * sizeof(vx_uint32));
+                                vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((0x400 + 4) * sizeof(vx_uint32));
+                                vx_uint16 selBase = 0;
+                                for(expBits = 5; expBits <= 8; expBits++) /*SE8M12 fromat*/
+                                {
+                                    if(selBase)
+                                    {
+                                        memset(pwlLUTBase1, 0, ((0x400 + 4) * sizeof(vx_uint32)));
+                                        fillBF16ActivateHyperbolicTanLUT(pwlLUTBase1, expBits, scaleIn, scaleOut, vx_false_e, inFormat);
+                                        maxError1 = maxErrorLUT(pwlLUTBase1, expBits, VX_NN_ACTIVATION_HYPERBOLIC_TAN, u8Scale, vx_false_e, value_cmd_ptr, 0);
+                                    }
+                                    else
+                                    {
+                                        memset(pwlLUTBase0, 0, ((0x400 + 4) * sizeof(vx_uint32)));
+                                        fillBF16ActivateHyperbolicTanLUT(pwlLUTBase0, expBits, scaleIn, scaleOut, vx_false_e, inFormat);
+                                        maxError0 = maxErrorLUT(pwlLUTBase0, expBits, VX_NN_ACTIVATION_HYPERBOLIC_TAN, u8Scale, vx_false_e, value_cmd_ptr, 0);
+                                    }
+
+                                    if(maxError0 == maxError1)
+                                    {
+                                        if(pwlLUTBase0[0x402] >= pwlLUTBase1[0x402])
+                                            selBase = 0;
+                                        else
+                                            selBase = 1;
+                                    }
+                                    else if(maxError0 > maxError1)
+                                        selBase = 0;
+                                    else
+                                        selBase = 1;
+                                }
+                                if(selBase)
+                                    memcpy(pwlLUTBaseEx, pwlLUTBase0, ((0x400 + 4) * sizeof(vx_uint32)));
+                                else
+                                    memcpy(pwlLUTBaseEx, pwlLUTBase1, ((0x400 + 4) * sizeof(vx_uint32)));
+
+                                vxFree(pwlLUTBase0);
+                                vxFree(pwlLUTBase1);
+                            }
+                            else
+                            {
+
+                                vx_uint32 expBits = 0;
+                                if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                                    expBits = 5;
+                                else
+                                    vxmASSERT(0);
+                                fillBF16ActivateHyperbolicTanLUT(pwlLUTBaseEx, expBits, scaleIn * u8Scale, scaleOut, vx_false_e, inFormat);
+
                             }
                         }
                         else
@@ -5271,7 +6289,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                             {
                                 baseF21 = base << 10;
                                 baseF32 = Fp21toFp32(baseF21);
-                                pwlValue = scaleOut * gcoMATH_TangentH(baseF32 * value * scaleIn);
+                                pwlValue = scaleOut * gcoMATH_TangentH(baseF32 * u8Scale * scaleIn);
                                 pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                             }
                             fixed21 = Fp32toFp21(1.0f);
@@ -5303,8 +6321,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.outBrickMode  = 0;
             info->vx_nn_tp_cmd_info.aluPwlSignSupport = (value_cmd_ptr->e32[0] == VX_NN_ACTIVATION_HYPERBOLIC_TAN) ? 0 : 1;
             info->vx_nn_tp_cmd_info.aluReluEnable = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
+            info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+            info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
             info->vx_nn_tp_cmd_info.aluInputPreshift = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? (0 - outFPP) : 0;
             break;
@@ -5321,7 +6339,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             vx_uint32   baseU32, fixed21, baseF21;
             vx_float32  pwlValue;
             vx_uint32   halfK, preShift = 4, preShiftValue = 1 << (preShift*2);
-            vx_float32  value = inQFormat == VX_QUANT_AFFINE_SCALE ? inScale * inScale : 1.0f;
+            vx_float32  u8Scale = inQFormat == VX_QUANT_AFFINE_SCALE ? inScale : 1.0f;
 
             vxmASSERT(value_cmd_ptr != VX_NULL);
             vxmASSERT(pwlLUTBase != VX_NULL);
@@ -5348,7 +6366,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 {
                     baseF16 = base << 5;
                     baseF32 = Fp16toFp32(baseF16);
-                    pwlValue = bias + alpha * (baseF32 * value * (vx_float32)preShiftValue / ks);
+                    pwlValue = bias + alpha * (baseF32 * u8Scale * u8Scale * (vx_float32)preShiftValue / ks);
                     pwlValue = 1.0f / (vx_float32)pow(pwlValue, beta);
                     pwlLUTBase[base] = Fp32toFp16(pwlValue);
                 }
@@ -5362,6 +6380,59 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                     pwlLUTBase[base] = fixed16;
                 }
             }
+            else if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_BFLOAT16))
+            {
+                if(inFormat == VX_TYPE_BFLOAT16)
+                {
+                    vx_uint32 expBits;
+                    vx_float64 maxError0 = 1024, maxError1 = 1024;
+                    vx_uint32 *pwlLUTBase0 = (vx_uint32 *)vxAllocate((0x400 + 4) * sizeof(vx_uint32));
+                    vx_uint32 *pwlLUTBase1 = (vx_uint32 *)vxAllocate((0x400 + 4) * sizeof(vx_uint32));
+                    vx_uint16 selBase = 0;
+                    for(expBits = 5; expBits <= 8; expBits++) /*SE8M12 fromat*/
+                    {
+                        if(selBase)
+                        {
+                            memset(pwlLUTBase1, 0, ((0x400 + 4) * sizeof(vx_uint32)));
+                            fillBF16LRNLUT(pwlLUTBase1, expBits, u8Scale, value_cmd_ptr, preShiftValue, vx_false_e, inFormat);
+                            maxError1 = maxErrorLUT(pwlLUTBase1, expBits, TP_LRN, u8Scale, vx_false_e, value_cmd_ptr, preShiftValue);
+                        }
+                        else
+                        {
+                            memset(pwlLUTBase0, 0, ((0x400 + 4) * sizeof(vx_uint32)));
+                            fillBF16LRNLUT(pwlLUTBase0, expBits, u8Scale, value_cmd_ptr, preShiftValue, vx_false_e, inFormat);
+                            maxError0 = maxErrorLUT(pwlLUTBase0, expBits, TP_LRN, u8Scale, vx_false_e, value_cmd_ptr, preShiftValue);
+                        }
+                        if(maxError0 == maxError1)
+                        {
+                            if(pwlLUTBase0[0x402] >= pwlLUTBase1[0x402])
+                                selBase = 0;
+                            else
+                                selBase = 1;
+                        }
+                        else if(maxError0 > maxError1)
+                            selBase = 0;
+                        else
+                            selBase = 1;
+                    }
+                    if(selBase)
+                        memcpy(pwlLUTBaseEx, pwlLUTBase0, ((0x400 + 4) * sizeof(vx_uint32)));
+                    else
+                        memcpy(pwlLUTBaseEx, pwlLUTBase1, ((0x400 + 4) * sizeof(vx_uint32)));
+
+                    vxFree(pwlLUTBase0);
+                    vxFree(pwlLUTBase1);
+                }
+                else
+                {
+                    vx_uint32 expBits = 0;
+                    if(inFormat == VX_TYPE_INT8 || inFormat == VX_TYPE_UINT8 || inFormat == VX_TYPE_INT16 || inFormat == VX_TYPE_FLOAT16)
+                        expBits = 5;
+                    else
+                        vxmASSERT(0);
+                    fillBF16LRNLUT(pwlLUTBaseEx, expBits, u8Scale, value_cmd_ptr, preShiftValue, vx_false_e, inFormat);
+                }
+            }
             else
             {
                 fixed21 = Fp32toFp21(1.0f);
@@ -5373,7 +6444,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
                 {
                     baseF21 = base << 10;
                     baseF32 = Fp21toFp32(baseF21);
-                    pwlValue = bias + alpha * (baseF32 * value * (vx_float32)preShiftValue / ks);
+                    pwlValue = bias + alpha * (baseF32 * u8Scale* u8Scale * (vx_float32)preShiftValue / ks);
                     pwlValue = 1.0f / (vx_float32)pow(pwlValue, beta);
                     pwlLUTBaseEx[base] = Fp32toFp21(pwlValue);
                 }
@@ -5400,8 +6471,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluMultEnable = 1;
             info->vx_nn_tp_cmd_info.aluLoadPwlLUT = 1;
             info->vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
-            info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
+            info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+            info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
             info->vx_nn_tp_cmd_info.aluInputPreshift = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? (0 - outFPP) : 0;
 
@@ -5474,8 +6545,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
             info->vx_nn_tp_cmd_info.outGlobalMem  = 1;
             info->vx_nn_tp_cmd_info.outBrickMode  = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
+            info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+            info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
             info->vx_nn_tp_cmd_info.aluInputPreshift   = 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
 
@@ -5532,8 +6603,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluLoadPwlLUT = 0;
             info->vx_nn_tp_cmd_info.aluLoadPwlLUTAddress = 0;
             info->vx_nn_tp_cmd_info.aluLoadPwlLUTGlobalMem = 1;
-            info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
-            info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
+            info->vx_nn_tp_cmd_info.aluI2FEnable = tpBF16 ? 1 : ((inFormat == VX_TYPE_FLOAT16) ? 0 : 1);
+            info->vx_nn_tp_cmd_info.aluF2IEnable = tpBF16 ? 1 : ((outFormat == VX_TYPE_FLOAT16) ? 0 : 1);
             info->vx_nn_tp_cmd_info.aluInputPreshift = (inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift = (outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? (0 - outFPP) : 0;
             break;
@@ -5566,8 +6637,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
             info->vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
             info->vx_nn_tp_cmd_info.aluReluEnable       = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
-            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0);
+            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0));
+            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0));
             break;
         }
 
@@ -5580,8 +6651,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
             info->vx_nn_tp_cmd_info.aluFilterPwlSwap    = 0;
             info->vx_nn_tp_cmd_info.aluPwlSignSupport   = 0;
             info->vx_nn_tp_cmd_info.aluReluEnable       = 0;
-            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (inFormat == VX_TYPE_FLOAT16 ? 0 : (tpSimpleInt16 ? 0 : 1));
-            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (outFormat == VX_TYPE_FLOAT16 ? 0 : (tpSimpleInt16 ? 0 : 1));
+            info->vx_nn_tp_cmd_info.aluI2FEnable        = (tfQuant && hasInputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (inFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0));
+            info->vx_nn_tp_cmd_info.aluF2IEnable        = (tfQuant && hasOutputQuant) ? 1 : (tpBF16 ? 1 : (tpRealInt16 ? (outFormat == VX_TYPE_FLOAT16 ? 0 : 1) : 0));
             info->vx_nn_tp_cmd_info.aluInputPreshift    = 0;
             info->vx_nn_tp_cmd_info.aluOutputPostshift  = ((inQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? inFPP : 0) - ((outQFormat == VX_QUANT_DYNAMIC_FIXED_POINT) ? outFPP : 0);
             break;
@@ -5590,8 +6661,7 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
         default:
             break;
     }
-
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
+    if (!tpBF16 && gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_REAL_INT16))
     {
         info->vx_nn_tp_cmd_info.aluI2FEnable = inFormat == VX_TYPE_FLOAT16 ? 0 : 1;
         info->vx_nn_tp_cmd_info.aluF2IEnable = outFormat == VX_TYPE_FLOAT16 ? 0 : 1;
@@ -5705,8 +6775,8 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPGeneralCommandInfo(
         info->vx_nn_tp_cmd_info.aluOutputPostMultiplier = 0;
     }
 
-    info->vx_nn_tp_cmd_info.inImageDataType = getHWDataFormat(inFormat);
-    info->vx_nn_tp_cmd_info.outImageDataType = getHWDataFormat(outFormat);
+    info->vx_nn_tp_cmd_info.inImageDataType = getTPDataFormat(inFormat);
+    info->vx_nn_tp_cmd_info.outImageDataType = getTPDataFormat(outFormat);
     info->vx_nn_tp_cmd_info.floatRoundingMode = getHWRoundingMode((vx_nn_round_mode_e)outRMode, outFormat, vx_true_e);
     info->vx_nn_tp_cmd_info.integeroundingMode = 0x1;
 

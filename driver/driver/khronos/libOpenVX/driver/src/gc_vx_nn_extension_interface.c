@@ -246,7 +246,6 @@ VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL vxCreateWeightsBiasesParame
         convert_format = conv_ext2.convert_dst_format;
 
         if (conv_ext2.depth_multiplier == 1 &&
-            (TENSOR_DATA_TYPE(weights) == VX_TYPE_INT8 || TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8) &&
             vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_NN_DEPTHWISE_SUPPORT))
             layer = VX_NN_DEPTH_WISE_CONVOLUTION_LAYER;
     }
@@ -333,7 +332,6 @@ VX_API_ENTRY vx_weights_biases_parameter VX_API_CALL vxCreateWeightsBiasesParame
         convert_format = conv_ext2.convert_dst_format;
 
         if (conv_ext2.depth_multiplier == 1 &&
-            (TENSOR_DATA_TYPE(weights) == VX_TYPE_INT8 || TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8) &&
             vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_NN_DEPTHWISE_SUPPORT))
             layer = VX_NN_DEPTH_WISE_CONVOLUTION_LAYER;
     }

@@ -29,8 +29,18 @@
 #define F21_MANTISSA_SHIFT (23 - F21_EXPONENT_SHIFT)
 #define F21_MAX_EXPONENT (F16_EXPONENT_BITS << F21_EXPONENT_SHIFT)
 
+#define SE8M12_EXPONENT_SHIFT 12
+#define SE8M12_MANTISSA_BITS ((1 << SE8M12_EXPONENT_SHIFT) - 1)
+#define SE8M12_MANTISSA_SHIFT (23 - SE8M12_EXPONENT_SHIFT)
+#define SE8M12_MAX_EXPONENT (SE8M12_MANTISSA_BITS << SE8M12_EXPONENT_SHIFT)
 
-#define TP_LUT_BUFF_SIZE 1024
+#define BF16_EXPONENT_SHIFT 7
+#define BF16_MANTISSA_BITS ((1 << BF16_EXPONENT_SHIFT) - 1)
+#define BF16_MANTISSA_SHIFT (23 - BF16_EXPONENT_SHIFT)
+#define BF16_MAX_EXPONENT (BF16_MANTISSA_BITS << BF16_EXPONENT_SHIFT)
+
+
+#define TP_LUT_BUFF_SIZE 1028
 
 #define FP32_MIN -3.402823466e+38F
 
@@ -134,7 +144,6 @@ vx_int16 Fp32toFp16(vx_float32 val);
 vx_int8 Fp32toInt8_fc(vx_float32 val);
 vx_int8 Fp32toInt8(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode);
 vx_int16 Fp32toInt16(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode);
-vx_int32 Fp32toInt32(vx_float32 val, vx_int8 fixedPointPos, vx_int32 roundMode);
 vx_float32 Int8toFp32(vx_int8 val, vx_int8 fixedPointPos);
 vx_float32 Int32toFp32(vx_int32 val, vx_int8 fixedPointPos);
 vx_float32 Int64toFp32(vx_int64 val, vx_int8 fixedPointPos);
@@ -476,6 +485,10 @@ vx_status vxnnePreLoadWeightsBiases(
     vx_graph   graph,
     vx_uint32  size
     );
+
+vx_uint32  GetEsitimateWBSize(vx_weights_biases_parameter weightsBiases);
+vx_bool estimateNNTransposeSize(vx_context context, vx_graph graph);
+vx_status nnTransposeChannel(vx_context context, vx_graph graph);
 
 #endif
 vx_status patchNodeParamLocation(vx_node node);

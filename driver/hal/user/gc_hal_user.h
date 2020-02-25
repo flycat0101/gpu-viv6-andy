@@ -874,6 +874,7 @@ gcoHARDWARE_Lock(
     OUT gctPOINTER * Memory
     );
 
+/* Unlock a surface. */
 gceSTATUS
 gcoHARDWARE_LockAddCpuPhysicalAddr(
     IN gcsSURF_NODE_PTR Node,
@@ -3258,10 +3259,14 @@ typedef union _vx_nn_cmd_info_union
         gctUINT8  kernelDataTypeMsb;
         gctUINT8  inImageDataTypeMsb;
         gctUINT8  outImageDataTypeMsb;
+        gctUINT8  kernelDataTypeBit3;
+        gctUINT8  inImageDataTypeBit3;
+        gctUINT8  outImageDataTypeBit3;
         gctUINT8  outImageCacheEvictPolicy;
         gctUINT32 noFlush;
         gctUINT8  hwDepthWise;
         gctUINT8  noZOffset;
+        gctUINT8  noBias;
         gctUINT8  perChannelPostMul;
         gctUINT8  pRelu;
     }
