@@ -190,6 +190,7 @@ VSC_ErrCode vscVIR_VX_ReplaceDest(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_Shader*       pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VIR_FuncIterator  func_iter;
     VIR_FunctionNode* func_node;
+    gctBOOL           bChanged = gcvFALSE;
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -201,67 +202,92 @@ VSC_ErrCode vscVIR_VX_ReplaceDest(VSC_SH_PASS_WORKER* pPassWorker)
 
         VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
-             inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+             inst != gcvNULL;
+             inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
-            if (VIR_OPCODE_isVX(VIR_Inst_GetOpcode(inst)))
+            VIR_Operand*        pOrigDestOpnd = VIR_Inst_GetDest(inst);
+            VIR_Symbol*         sym = gcvNULL;
+            VIR_Symbol*         varSym = gcvNULL;
+            VIR_Operand*        varOpnd = gcvNULL;
+            VIR_Instruction*    next = gcvNULL;
+            gctBOOL             bFound = gcvFALSE;
+            VIR_Symbol*         srcSym = gcvNULL;
+            VIR_Symbol*         dstSym = gcvNULL;
+            VIR_Symbol*         dstVarSym = gcvNULL;
+
+            /* Skip the non-vx instruction. */
+            if (!VIR_OPCODE_isVX(VIR_Inst_GetOpcode(inst)))
             {
-                if (VIR_Inst_GetDest(inst))
+                continue;
+            }
+
+            /* Skip the non-dest instruction.*/
+            if (pOrigDestOpnd == gcvNULL)
+            {
+                continue;
+            }
+
+            sym = VIR_Operand_GetSymbol(pOrigDestOpnd);
+            varSym = VIR_Operand_GetUnderlyingSymbol(pOrigDestOpnd);
+
+            /* we generate a global variable for the outparm for VX call return */
+            if (!VIR_Symbol_isVreg(sym) || !VIR_Symbol_isGlobalVar(varSym))
+            {
+                continue;
+            }
+
+            /* Find the usage. */
+            next = VIR_Inst_GetNext(inst);
+            while (next && VIR_Inst_GetOpcode(next) == VIR_OP_MOV)
+            {
+                dstSym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(next));
+                dstVarSym = VIR_Operand_GetUnderlyingSymbol(VIR_Inst_GetDest(next));
+                srcSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(next, 0));
+
+                if (srcSym == sym)
                 {
-                    VIR_Symbol  *sym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(inst));
-                    VIR_Symbol  *varSym = VIR_Operand_GetUnderlyingSymbol(VIR_Inst_GetDest(inst));
-                    VIR_Operand *varOpnd = gcvNULL;
-
-                    if (VIR_Symbol_isVreg(sym))
+                    if (dstVarSym != gcvNULL)
                     {
-                        /* we generate a global variable for the outparm for VX call return */
-                        if (VIR_Symbol_isGlobalVar(varSym))
-                        {
-                            VIR_Instruction *next = VIR_Inst_GetNext(inst);
-                            gctBOOL         found = gcvFALSE;
-                            VIR_Symbol      *srcSym = gcvNULL;
-                            VIR_Symbol      *dstSym = gcvNULL, *dstVarSym = gcvNULL;
-                            while (next && VIR_Inst_GetOpcode(next) == VIR_OP_MOV)
-                            {
-                                dstSym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(next));
-                                dstVarSym = VIR_Operand_GetUnderlyingSymbol(VIR_Inst_GetDest(next));
-                                srcSym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(next, 0));
-
-                                if (srcSym == sym)
-                                {
-                                    if (dstVarSym != gcvNULL)
-                                    {
-                                        varOpnd = VIR_Inst_GetDest(next);
-                                        found = gcvTRUE;
-                                        break;
-                                    }
-                                    else
-                                    {
-                                        sym = dstSym;
-                                        next = VIR_Inst_GetNext(next);
-                                    }
-                                }
-                                else
-                                {
-                                    break;
-                                }
-                            }
-                            if (found)
-                            {
-                                VIR_Instruction *prev = next;
-                                while (prev != inst)
-                                {
-                                    VIR_Inst_SetOpcode(prev, VIR_OP_NOP);
-                                    VIR_Inst_SetSrcNum(prev, 0);
-                                    VIR_Inst_SetDest(prev, gcvNULL);
-                                    prev = VIR_Inst_GetPrev(prev);
-                                }
-                                VIR_Inst_SetDest(inst, varOpnd);
-                            }
-                        }
+                        varOpnd = VIR_Inst_GetDest(next);
+                        bFound = gcvTRUE;
+                        break;
+                    }
+                    else
+                    {
+                        sym = dstSym;
+                        next = VIR_Inst_GetNext(next);
                     }
                 }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (bFound)
+            {
+                VIR_Instruction *prev = next;
+                while (prev != inst)
+                {
+                    VIR_Inst_SetOpcode(prev, VIR_OP_NOP);
+                    VIR_Inst_SetSrcNum(prev, 0);
+                    VIR_Inst_SetDest(prev, gcvNULL);
+                    prev = VIR_Inst_GetPrev(prev);
+                }
+
+                VIR_Inst_SetDest(inst, varOpnd);
+                /* We can't change the original dest type. */
+                VIR_Operand_SetTypeId(VIR_Inst_GetDest(inst), VIR_Operand_GetTypeId(pOrigDestOpnd));
+                bChanged = gcvTRUE;
             }
         }
+    }
+
+    /* Dump if needed. */
+    if (bChanged &&
+        VirSHADER_DumpCodeGenVerbose(pShader))
+    {
+        VIR_Shader_Dump(gcvNULL, "After replace the DEST of the VX instruction.", pShader, gcvTRUE);
     }
 
     return errCode;
