@@ -818,20 +818,19 @@ gctBOOL _VIR_RA_FlaseDepReg_Test(
     return vscBV_TestBit(VIR_RA_LS_GetFalseDepRegVec(pRA), regNo);
 }
 
-void _VIR_RA_ColorMap_Init(
+gctUINT _VIR_RA_GetMaxRegCount(
     VIR_RA_LS           *pRA,
-    VIR_RA_ColorMap     *pCM,
     VSC_HW_CONFIG       *pHwCfg,
-    VSC_MM              *pMM,
     VIR_RA_HWReg_Type   hwRegType)
 {
+    gctUINT             regCount = 0;
     VSC_OPTN_RAOptions  *pOption = VIR_RA_LS_GetOptions(pRA);
     VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
 
     switch (hwRegType)
     {
     case VIR_RA_HWREG_GR:
-        pCM->maxReg = pHwCfg->maxGPRCountPerThread;
+        regCount = pHwCfg->maxGPRCountPerThread;
 
         /* VS/TCS/TES/GS for v6.0 to at most 61 temps*/
         if ((VIR_RA_LS_GetHwCfg(pRA)->hwFeatureFlags.hasHalti5) &&
@@ -840,7 +839,7 @@ void _VIR_RA_ColorMap_Init(
              pShader->shaderKind == VIR_SHADER_TESSELLATION_EVALUATION ||
              pShader->shaderKind == VIR_SHADER_GEOMETRY))
         {
-            pCM->maxReg = pCM->maxReg - 3;
+            regCount -= 3;
         }
 
         if (VSC_OPTN_InRange(VIR_Shader_GetId(pShader),
@@ -852,21 +851,36 @@ void _VIR_RA_ColorMap_Init(
                 /* set the maxReg from the command line, should not larger than maxGPRCountPerThread */
                 if (VSC_OPTN_RAOptions_GetRegisterCount(pOption) < pHwCfg->maxGPRCountPerThread)
                 {
-                    pCM->maxReg = VSC_OPTN_RAOptions_GetRegisterCount(pOption);
+                    regCount = VSC_OPTN_RAOptions_GetRegisterCount(pOption);
                 }
             }
         }
         break;
+
     case VIR_RA_HWREG_A0:
-        pCM->maxReg = 1;
+        regCount = 1;
         break;
+
     case VIR_RA_HWREG_B0:
-        pCM->maxReg = 1;
+        regCount = 1;
         break;
+
     default:
+        gcmASSERT(gcvFALSE);
         break;
     }
 
+    return regCount;
+}
+
+void _VIR_RA_ColorMap_Init(
+    VIR_RA_LS           *pRA,
+    VIR_RA_ColorMap     *pCM,
+    VSC_HW_CONFIG       *pHwCfg,
+    VSC_MM              *pMM,
+    VIR_RA_HWReg_Type   hwRegType)
+{
+    pCM->maxReg = _VIR_RA_GetMaxRegCount(pRA, pHwCfg, hwRegType);
     pCM->maxAllocReg = 0;
     pCM->availReg = 0;
 
@@ -11614,38 +11628,6 @@ VSC_ErrCode _VIR_RA_LS_RewriteColors(
     return retValue;
 }
 
-static gctBOOL
-_VIR_RA_A0B0EnoughChannels(
-    VIR_RA_LS           *pRA,
-    VIR_RA_HWReg_Type   hwRegType,
-    VIR_Enable          reqEnable
-    )
-{
-    VIR_RA_ColorPool    *pCP = VIR_RA_LS_GetColorPool(pRA);
-    VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
-    VSC_BIT_VECTOR      *usedColor = &(pCP->colorMap[hwRegType].usedColor);
-    gctUINT             i;
-
-    if (VIR_Shader_isDual16Mode(pShader))
-    {
-        if (VIR_Enable_Channel_Count(reqEnable) > 2)
-        {
-            return gcvFALSE;
-        }
-    }
-
-    for (i = 0; i < 4; i++)
-    {
-        if (reqEnable & (0x1 << i) &&
-            vscBV_TestBit(usedColor, i))
-        {
-            return gcvFALSE;
-        }
-    }
-
-    return gcvTRUE;
-}
-
 gctBOOL
 _VIR_RA_LS_ClearUsedColorFromActiveLR(
     VIR_RA_LS           *pRA,
@@ -11658,13 +11640,18 @@ _VIR_RA_LS_ClearUsedColorFromActiveLR(
     VIR_RA_LS_Liverange*    pPrev = gcvNULL;
     VIR_RA_LS_Liverange*    pCurr = gcvNULL;
     VIR_RA_LS_Liverange*    pLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
-    VIR_Enable              lrEnable = VIR_RA_LS_LR2WebChannelMask(pRA, pLR);
     VIR_RA_HWReg_Type       hwRegType = pLR->hwType;
+    gctUINT                 shift = 0;
+    gctUINT                 regCount = 0;
 
     if (!(hwRegType == VIR_RA_HWREG_A0 || hwRegType == VIR_RA_HWREG_B0))
     {
         return gcvFALSE;
     }
+
+    /* There are only one A0/B0 register. */
+    regCount  = _VIR_RA_GetMaxRegCount(pRA, pRA->pHwCfg, hwRegType);
+    gcmASSERT(regCount == 1);
 
     curColor = InvalidColor;
     pPrev = VIR_RA_LS_GetActiveLRHead(pRA);
@@ -11713,7 +11700,7 @@ _VIR_RA_LS_ClearUsedColorFromActiveLR(
             }
 
             /* Since we get enough register here, we can leave now. */
-            if (_VIR_RA_A0B0EnoughChannels(pRA, hwRegType, lrEnable))
+            if (_VIR_RA_LS_ChannelFit(pRA, pLR, gcvNULL, regCount - 1, &shift))
             {
                 return gcvTRUE;
             }
