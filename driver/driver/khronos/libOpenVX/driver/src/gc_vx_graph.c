@@ -2597,16 +2597,41 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
 
             goto OnError;
         }
+#if gcdDEBUG
         else
         {
             /* check memory allocation has overlap or not */
-            vx_uint32 ii, jj, kk;
+            vx_uint32 ii, jj, kk, eachInOutNum = 0, maxInOutNum;
             vx_memory *checkArray;
             vx_uint32 *checkCount;
-#define     MAX_INOUT_NUM  128
-            status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(vx_memory) * graph->layer->base.num_operations * MAX_INOUT_NUM, (gctPOINTER*)&checkArray);
+
+            for (ii = block->start; ii < block->start+block->count; ii++)
+            {
+                vx_uint32 count = 0;
+                for (jj = 0; jj < graph->layer->memRequestList[ii].outputCount; jj++)
+                {
+                    if (graph->layer->memRequestList[ii].outputMemory[jj]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
+                    {
+                        count++;
+                    }
+                }
+                for (jj = 0; jj < graph->layer->memRequestList[ii].inputCount; jj++)
+                {
+                    if (graph->layer->memRequestList[ii].inputMemory[jj]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
+                    {
+                        count++;
+                    }
+                }
+                if (count > eachInOutNum)
+                {
+                    eachInOutNum = count;
+                }
+            }
+
+            maxInOutNum = eachInOutNum * block->count;
+            status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(vx_memory) * graph->layer->base.num_operations * maxInOutNum, (gctPOINTER*)&checkArray);
             if (gcmIS_ERROR(status)) goto OnError;
-            gcoOS_ZeroMemory(checkArray, gcmSIZEOF(vx_memory) * graph->layer->base.num_operations * MAX_INOUT_NUM);
+            gcoOS_ZeroMemory(checkArray, gcmSIZEOF(vx_memory) * graph->layer->base.num_operations * maxInOutNum);
             status = gcoOS_Allocate(gcvNULL, gcmSIZEOF(vx_uint32) * graph->layer->base.num_operations, (gctPOINTER*)&checkCount);
             if (gcmIS_ERROR(status))
             {
@@ -2619,36 +2644,26 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
             {
                 for (jj = 0; jj < graph->layer->memRequestList[ii].outputCount; jj++)
                 {
-                    if (graph->layer->memRequestList[ii].outputMemory[jj]->allocType == VXNNE_MEM_POOL_TYPE_ORIG_DDR ||
-                        graph->layer->memRequestList[ii].outputMemory[jj]->allocType == VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR)
-                    {
-                        continue;
-                    }
-                    else
+                    if (graph->layer->memRequestList[ii].outputMemory[jj]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
                     {
                         for (kk = graph->layer->memRequestList[ii].outputMemory[jj]->firstUseId; kk <= graph->layer->memRequestList[ii].outputMemory[jj]->lastUseId; kk++)
                         {
-                            checkArray[kk * MAX_INOUT_NUM + checkCount[kk]] = graph->layer->memRequestList[ii].outputMemory[jj];
+                            vxmASSERT(checkCount[kk] < maxInOutNum);
+                            checkArray[kk * maxInOutNum + checkCount[kk]] = graph->layer->memRequestList[ii].outputMemory[jj];
                             checkCount[kk]++;
-                            vxmASSERT(checkCount[kk] < MAX_INOUT_NUM);
                         }
                     }
                 }
 
                 for (jj = 0; jj < graph->layer->memRequestList[ii].inputCount; jj++)
                 {
-                    if (graph->layer->memRequestList[ii].inputMemory[jj]->allocType == VXNNE_MEM_POOL_TYPE_ORIG_DDR ||
-                        graph->layer->memRequestList[ii].inputMemory[jj]->allocType == VXNNE_MEM_POOL_TYPE_VIRTUAL_DDR)
-                    {
-                        continue;
-                    }
-                    else
+                    if (graph->layer->memRequestList[ii].inputMemory[jj]->allocType & VXNNE_MEM_POOL_TYPE_SRAM)
                     {
                         for (kk = graph->layer->memRequestList[ii].inputMemory[jj]->firstUseId; kk <= graph->layer->memRequestList[ii].inputMemory[jj]->lastUseId; kk++)
                         {
-                            checkArray[kk * MAX_INOUT_NUM + checkCount[kk]] = graph->layer->memRequestList[ii].inputMemory[jj];
+                            vxmASSERT(checkCount[kk] < maxInOutNum);
+                            checkArray[kk * maxInOutNum + checkCount[kk]] = graph->layer->memRequestList[ii].inputMemory[jj];
                             checkCount[kk]++;
-                            vxmASSERT(checkCount[kk] < MAX_INOUT_NUM);
                         }
                     }
                 }
@@ -2662,8 +2677,8 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
                 {
                     for (kk = jj+1; kk < checkCount[ii]; kk++)
                     {
-                        vx_memory m1 = checkArray[ii * MAX_INOUT_NUM + jj];
-                        vx_memory m2 = checkArray[ii * MAX_INOUT_NUM + kk];
+                        vx_memory m1 = checkArray[ii * maxInOutNum + jj];
+                        vx_memory m2 = checkArray[ii * maxInOutNum + kk];
                         if (!m1->allocated || !m2->allocated ||
                             VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m1->allocType) != VXNNE_MEM_POOL_TYPE_WITHOUT_CACHE(m2->allocType) ||
                             m1 == m2)
@@ -2686,6 +2701,7 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
             gcoOS_FreeMemory(gcvNULL, checkArray);
             gcoOS_FreeMemory(gcvNULL, checkCount);
         }
+#endif
 
         graph->peakAxiSramUsedSize = gcmMAX(peakMemSize[VXNNE_MEM_POOL_TYPE_AXI_SRAM], graph->peakAxiSramUsedSize);
 
