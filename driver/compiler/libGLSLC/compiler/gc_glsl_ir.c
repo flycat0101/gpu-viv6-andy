@@ -2932,7 +2932,7 @@ slsNAME_SPACE_CheckNewFuncName(
                 */
                 if (name->symbol == FuncName->symbol)
                 {
-                    if (sloCOMPILER_IsHaltiVersion(Compiler))
+                    if (sloCOMPILER_IsHaltiVersion(Compiler) && sloCOMPILER_GetClientApiVersion(Compiler) != gcvAPI_OPENGL)
                     {
                         gcmVERIFY_OK(sloCOMPILER_Report(
                                                         Compiler,
