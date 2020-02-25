@@ -33,7 +33,7 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/driver/khronos/libOpenVX/kernels \
     $(AQROOT)/driver/khronos/libOpenVX/libarchmodelInterface/include \
     $(AQARCH)/../vipArchPerfMdl_dev/libarchmodelSw/include \
-    $(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf \
+    $(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf
 
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 20),1)
 LOCAL_C_INCLUDES += \

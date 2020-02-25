@@ -121,12 +121,10 @@ LOCAL_CFLAGS += \
 
 #For original nnarchperf
 
+ifeq ($(ORI_NNARCHPERF),1)
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/driver/include \
     $(LOCAL_PATH)/libarchmodel/include \
-ifneq ($(ORI_NNARCHPERF),1)
-    $(LOCAL_PATH)/libarchmodelInterface/include \
-endif
     $(LOCAL_PATH)/kernels \
     $(AQROOT)/sdk/inc \
     $(AQROOT)/hal/inc \
@@ -134,11 +132,21 @@ endif
     $(AQROOT)/hal/os/linux/user \
     $(AQROOT)/compiler/libVSC/include \
     $(AQARCH)/cmodel/inc
-ifeq ($(ORI_NNARCHPERF),1)
 else
+LOCAL_C_INCLUDES := \
+    $(LOCAL_PATH)/driver/include \
+    $(LOCAL_PATH)/libarchmodelInterface/include \
+    $(LOCAL_PATH)/kernels \
+    $(AQROOT)/sdk/inc \
+    $(AQROOT)/hal/inc \
+    $(AQROOT)/hal/user \
+    $(AQROOT)/hal/os/linux/user \
+    $(AQROOT)/compiler/libVSC/include \
+    $(AQARCH)/cmodel/inc
     $(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf \
     $(AQARCH)/../vipArchPerfMdl_dev/libarchmodelSw/include
 endif
+
 ifeq ($(USE_VXC_BINARY),1)
 LOCAL_C_INCLUDES += $(LOCAL_C_INCLUDES) \
                     $(AQROOT)/driver/khronos/libOpenVX/libkernel/libnnvxc/ \
@@ -159,17 +167,25 @@ else
 LOCAL_STATIC_LIBRARIES += \
     libarchmodelInterface
 endif
+
+ifeq ($(ORI_NNARCHPERF),1)
 LOCAL_SHARED_LIBRARIES := \
     liblog \
     libdl \
     libcutils \
     libVSC \
     libGAL \
-ifeq ($(ORI_NNARCHPERF),1)
 else
+LOCAL_SHARED_LIBRARIES := \
+    liblog \
+    libdl \
+    libcutils \
+    libVSC \
+    libGAL \
     libNNArchPerf \
     libarchmodelSw
 endif
+
 LOCAL_MODULE         := libOpenVX
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
@@ -189,6 +205,16 @@ LOCAL_CFLAGS := \
     $(CFLAGS) \
     -DLOG_TAG=\"vxu\"
 
+ifeq ($(ORI_NNARCHPERF),1)
+LOCAL_C_INCLUDES := \
+    $(AQROOT)/sdk/inc \
+    $(AQROOT)/driver/khronos/libOpenVX/driver/include \
+    $(AQROOT)/driver/khronos/libOpenVX/kernels \
+    $(AQROOT)/hal/inc \
+    $(AQROOT)/hal/user \
+    $(AQROOT)/hal/os/linux/user \
+    $(AQROOT)/compiler/libVSC/include
+else
 LOCAL_C_INCLUDES := \
     $(AQROOT)/sdk/inc \
     $(AQROOT)/driver/khronos/libOpenVX/driver/include \
@@ -197,7 +223,6 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/user \
     $(AQROOT)/hal/os/linux/user \
     $(AQROOT)/compiler/libVSC/include \
-ifneq ($(ORI_NNARCHPERF),1)
     $(AQARCH)/../vipArchPerfMdl_dev/vipArchPerf
 endif
 
@@ -308,7 +333,8 @@ include $(AQROOT)/copy_installed_module.mk
 endif
 
 # libarchmodel
+ifeq ($(ORI_NNARCHPERF),1)
 include $(AQROOT)/driver/khronos/libOpenVX/libarchmodel/Android.mk
-ifneq ($(ORI_NNARCHPERF),1)
+else
 include $(AQROOT)/driver/khronos/libOpenVX/libarchmodelInterface/Android.mk
 endif
