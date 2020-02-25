@@ -6594,12 +6594,20 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
         gctUINT32 address;
         vx_int32 ret = -1;
         vx_binary_patch_info_s patchInfo;
+        vx_uint32 SHinstrSize = hints->fsInstCount * sizeof(gctUINT) * 4;
+
+        if (SHinstrSize > (vx_uint32)instMemNode->size)
+        {
+            SHinstrSize = (vx_uint32)instMemNode->size;
+            vxError("%s[%d]: SHinstrSize: 0x%x is large than instMemNode->size: 0x%x\n", __FUNCTION__, __LINE__,
+                     SHinstrSize, (vx_uint32)instMemNode->size);
+        }
 
         gcmGETHARDWAREADDRESSP(instMemNode,address);
 
         instructionLCDTIndex = vxoBinaryGraph_SaveLoadingConfigData(node->graph,
                                                     instMemNode->logical,
-                                                    (vx_uint32)instMemNode->size);
+                                                    SHinstrSize);
         if (instructionLCDTIndex == 0xFFFFFFFF)
         {
             vxmONERROR(VX_ERROR_NO_MEMORY);
@@ -11312,7 +11320,14 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
             instMemNode = (gcsSURF_NODE_PTR)hints->shaderVidNodes.instVidmemNode[gceSGSK_FRAGMENT_SHADER];
             if (VX_NULL != instMemNode)
             {
-                shIntrSize += gcmALIGN_NP2_SAFE((vx_uint32)instMemNode->size, 64);
+                vx_uint32 SHinstrSize = hints->fsInstCount * sizeof(gctUINT) * 4;
+                if (SHinstrSize > (vx_uint32)instMemNode->size)
+                {
+                    SHinstrSize = (vx_uint32)instMemNode->size;
+                    vxError("%s[%d]: SHinstrSize: 0x%x is large than instMemNode->size: 0x%x\n", __FUNCTION__, __LINE__,
+                             SHinstrSize, (vx_uint32)instMemNode->size);
+                }
+                shIntrSize += gcmALIGN_NP2_SAFE(SHinstrSize, 256);
             }
 
             sharedMemNode = (gcsSURF_NODE_PTR)hints->shaderVidNodes.sharedMemVidMemNode;

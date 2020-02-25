@@ -36212,16 +36212,25 @@ gcoHARDWAREVX_TriggerAccelerator(
             0x042E,
             0x042F
         };
+
 #if gcdFRAMEINFO_STATISTIC
         {
             gctUINT32 drawID;
+            gctSTRING envctrl = gcvNULL;
+            gctUINT32 enableSaveBinary = 0;
+            if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_SAVE_NETWORK_BINARY", &envctrl)) && envctrl)
+            {
+                enableSaveBinary = atoi(envctrl);
+            }
 
-            gcoHAL_FrameInfoOps(gcvNULL,
-                                gcvFRAMEINFO_COMPUTE_NUM,
-                                gcvFRAMEINFO_OP_GET,
-                                &drawID);
+            if (0 == enableSaveBinary)
+            {
+                gcoHAL_FrameInfoOps(gcvNULL,
+                                    gcvFRAMEINFO_COMPUTE_NUM,
+                                    gcvFRAMEINFO_OP_GET,
+                                    &drawID);
 
-            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ?
@@ -36273,6 +36282,7 @@ gcoHARDWAREVX_TriggerAccelerator(
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
+            }
         }
 #endif
 
