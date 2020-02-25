@@ -6419,6 +6419,7 @@ VkResult halti5_helper_convertHwTxDesc(
     uint32_t hwDescriptorSize = TX_HW_DESCRIPTOR_MEM_SIZE;
     uint32_t partIdx, partCount = 1;
     uint32_t tmpResidentImgFormat = 0;
+    VkBool32 exceedMaxwidth = VK_FALSE;
 
     __VK_ASSERT(hwTxDesc);
 
@@ -6502,6 +6503,7 @@ VkResult halti5_helper_convertHwTxDesc(
         {
             fakedImageLevel.requestW = fakedImageLevel.allocedW = __VK_FAKED_TEX_MAX_WIDTH;
             fakedImageLevel.requestH = fakedImageLevel.allocedH = (uint32_t)gcoMATH_Ceiling(((float)texelSize / __VK_FAKED_TEX_MAX_WIDTH));
+            exceedMaxwidth = VK_TRUE;
         }
         fakedImageLevel.stride = (uint32_t)(fakedImageLevel.allocedW * (residentFormatInfo->bitsPerBlock >> 3));
         fakedImageLevel.requestD = texelSize;
@@ -6638,7 +6640,15 @@ VkResult halti5_helper_convertHwTxDesc(
         hwTxDesc[partIdx].msaaImage =  msaaImage;
         hwTxDesc[partIdx].isCubmap = (viewType == VK_IMAGE_VIEW_TYPE_CUBE) || (viewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY);
 
-        hwTxDesc[partIdx].baseWidth  = baseLevel->requestW;
+        if (exceedMaxwidth)
+        {
+            hwTxDesc[partIdx].baseWidth  = baseLevel->requestW * baseLevel->requestH;
+        }
+        else
+        {
+            hwTxDesc[partIdx].baseWidth  = baseLevel->requestW;
+        }
+
         hwTxDesc[partIdx].baseHeight = baseLevel->requestH;
         hwTxDesc[partIdx].baseDepth  = baseLevel->requestD;
         hwTxDesc[partIdx].baseSlice  = (uint32_t)(baseLevel->sliceSize) / (residentFormatInfo->bitsPerBlock >> 3);
@@ -11074,6 +11084,14 @@ VkResult halti5_createBufferView(
             }
             break;
         }
+
+        if (chipBufv->imgDesc)
+        {
+            if (chipBufv->imgDesc[0].baseHeight > 1)
+            {
+                chipBufv->patchKey |= HALTI5_PATCH_BUF_EXCEED_MAX_WIDTH_BIT;
+            }
+        }
     }
 
     bufv->chipPriv = chipBufv;
@@ -11606,6 +11624,15 @@ const char * halti5_helper_patchFuc(
             VSC_RES_ACT_BIT_EXTRA_SAMPLER,
             VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGRAD_EXTRA_LATYER
         },
+        {
+            VK_FORMAT_UNDEFINED,
+            HALTI5_PATCH_BUF_EXCEED_MAX_WIDTH,
+            0,
+            "_texfetch_exceed_maxWidth",
+            VSC_RES_OP_BIT_IMAGE_OP,
+            0,
+            0
+        }
     };
 
     uint32_t i;
