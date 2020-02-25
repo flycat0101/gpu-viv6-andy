@@ -316,6 +316,7 @@ vx_status vxnneConvolutionReluPoolingInitializer(
     vx_bool enableBrickMode = vx_false_e;
     vx_bool needExtraBrickOp = vx_true_e;
     vx_bool do_zdp_opt = vx_false_e, do_1xN = vx_false_e, do_fisrt_pixel_pool = vx_false_e;
+    vx_bool hasHwDepthWise = vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_NN_DEPTHWISE_SUPPORT);
 
     vx_weights_biases_parameter reshapeWb = VX_NULL;
 
@@ -422,20 +423,21 @@ vx_status vxnneConvolutionReluPoolingInitializer(
             (((WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_INT8 ||
                WB_WEIGHT_DATA_FORMAT(weights_biases) == VX_TYPE_UINT8) &&
               TENSOR_VIEW_SIZE_INDEX(inputs, 0) % 2 == 0 && WB_ORG_LAYER_TYPE(weights_biases) == VX_NN_CONVOLUTION_LAYER) ||
-             WB_IS_DEPTH_WISE(weights_biases)))
+              (WB_ORG_LAYER_TYPE(weights_biases) == VX_NN_DEPTH_WISE_CONVOLUTION_LAYER && hasHwDepthWise)))
         {
             /* Per Arch, only support INT8 3x3 conv right now*/
             /* First pixel pooling is 2x2 poooling stride is 2, so convolution output should be even*/
+
             vx_float32 nonZeroRatio = calculateWeightNonZeroRatio(context,
                                                                   WB_SKIP_VALUE(weights_biases),
                                                                   WB_WEIGHT_TENSOR(weights_biases));
 
             /*V8 has limitation for 1x2 & 2x1, those shape with 2x2 stride can't do FFP*/
             if ((nonZeroRatio * WB_ORG_KERNEL_X(weights_biases) * WB_ORG_KERNEL_Y(weights_biases) < 6.3 ||
-                 WB_IS_DEPTH_WISE(weights_biases)) &&
+                 WB_ORG_LAYER_TYPE(weights_biases) == VX_NN_DEPTH_WISE_CONVOLUTION_LAYER) &&
                 !(vxoContext_IsFeatureAvailable(context, VX_NN_FEATURE_XYDP0) &&
-                  ((WB_ORG_KERNEL_X(weights_biases) == 1 && WB_ORG_KERNEL_Y(weights_biases) == 2) ||
-                   (WB_ORG_KERNEL_X(weights_biases) == 2 && WB_ORG_KERNEL_Y(weights_biases) == 1))) &&
+                  ((WB_ORG_KERNEL_X(weights_biases) == 1 && WB_ORG_KERNEL_Y(weights_biases)  == 2) ||
+                   (WB_ORG_KERNEL_X(weights_biases)  == 2 && WB_ORG_KERNEL_Y(weights_biases)  == 1))) &&
                 WB_ORG_KERNEL_X(weights_biases) <= 15 && WB_ORG_KERNEL_Y(weights_biases) <= 15)
             {
                 do_fisrt_pixel_pool = vx_true_e;
