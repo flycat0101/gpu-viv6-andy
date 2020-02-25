@@ -321,28 +321,20 @@ ifeq ($(EGL_API_NULLWS),1)
 endif
 
 ifeq ($(EGL_API_FB),1)
-  CFLAGS            += -DEGL_API_FB
+  CFLAGS            += -DEGL_API_FB -DOPENGL40
 endif
 
 ifeq ($(EGL_API_WL),1)
-  CFLAGS            += -DEGL_API_WL -DWL_EGL_PLATFORM -Wno-deprecated-declarations
-  ifeq ($(GL4_LINUX_ENABLE),1)
-    CFLAGS            += -DOPENGL40
-  endif
+  CFLAGS            += -DEGL_API_WL -DWL_EGL_PLATFORM -Wno-deprecated-declarations -DOPENGL40
 endif
 
 ifeq ($(EGL_API_DRI),1)
   ifeq ($(YOCTO_DRI_BUILD),1)
     CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
   endif
-  CFLAGS          += -DDRI_PIXMAPRENDER_ASYNC
-  CFLAGS          += -DDRI_PIXMAPRENDER_GL
-
-  ifeq ($(GL4_LINUX_ENABLE),1)
-   CFLAGS            += -DEGL_API_DRI -DOPENGL40
-  else
-   CFLAGS            += -DEGL_API_DRI
-  endif
+  CFLAGS            += -DDRI_PIXMAPRENDER_ASYNC
+  CFLAGS            += -DDRI_PIXMAPRENDER_GL
+  CFLAGS            += -DEGL_API_DRI -DOPENGL40
   CFLAGS            += -I$(X11_ARM_DIR)/include
 endif
 
@@ -350,14 +342,9 @@ ifeq ($(X11_DRI3),1)
   ifeq ($(YOCTO_DRI_BUILD),1)
     CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
   endif
-  CFLAGS          += -DDRI_PIXMAPRENDER_ASYNC
-  CFLAGS          += -DDRI_PIXMAPRENDER_GL
-
-  ifeq ($(GL4_LINUX_ENABLE),1)
-   CFLAGS            += -DX11_DRI3 -DOPENGL40
-  else
-   CFLAGS            += -DX11_DRI3
-  endif
+  CFLAGS            += -DDRI_PIXMAPRENDER_ASYNC
+  CFLAGS            += -DDRI_PIXMAPRENDER_GL
+  CFLAGS            += -DX11_DRI3 -DOPENGL40
   CFLAGS            += -I$(X11_ARM_DIR)/include
 endif
 
@@ -467,6 +454,7 @@ endif
 
 #If need to user ori arch model, set to 1
 #CFLAGS              += -DORI_NNARCHPERF
+
 ################################################################################
 #
 # Third party resources, DFB_DIR to specify DirectFB SDK path
@@ -501,11 +489,7 @@ else
 EXA_DIR             := $(AQROOT)/driver/X/EXA/src
 endif
 
-ifeq ($(GL4_LINUX_ENABLE),1)
-GL21_DIR            := $(AQROOT)/driver/khronos/libGL4
-else
-GL21_DIR            := $(AQROOT)/driver/khronos/libGL2
-endif
+GL4X_DIR            := $(AQROOT)/driver/khronos/libGL4
 
 CL11_DIR            := $(AQROOT)/driver/khronos/libCL
 CL11_ICD_DIR        := $(AQROOT)/driver/khronos/libCL/icdloader12
