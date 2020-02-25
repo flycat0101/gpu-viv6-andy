@@ -4668,7 +4668,11 @@ vx_status vxnneExecuteLSTM_NN_TP_LAYER(vx_node node,
                 0);
 
             if (status != VX_SUCCESS) goto exit;
-
+            if (conv.tp_value)
+            {
+                vxFree(conv.tp_value);
+                conv.tp_value = VX_NULL;
+            }
             memset(&conv, 0, sizeof(vx_op_param_s));
             conv.pad_x_left = 0;
             conv.pad_y_top = 0;
@@ -4911,6 +4915,27 @@ exit:
         vxFree(conv.tp_value);
         conv.tp_value = VX_NULL;
     }
+
+    if (input_conv)
+    {
+        gcoOS_Free(VX_NULL, input_conv);
+    }
+
+    if (output_conv)
+    {
+        gcoOS_Free(VX_NULL, output_conv);
+    }
+
+    if (views)
+    {
+        gcoOS_Free(gcvNULL, views);
+    }
+
+    if (input_view_tensors)
+    {
+        gcoOS_Free(gcvNULL, input_view_tensors);
+    }
+
     return status;
 }
 
