@@ -5801,6 +5801,7 @@ GLvoid configStream(__GLcontext* gc)
     chipCtx->hashKey.hashTexCoordStreamEnabled = 0;
     chipCtx->hashKey.hashSecondColorStreamEnabled = 0;
     chipCtx->hashKey.hashFogCoordStreamEnabled = 0;
+    chipCtx->attribMask = 0;
 
     for(streamIdx = 0; streamIdx < gc->vertexStreams.numStreams; streamIdx++)
     {
