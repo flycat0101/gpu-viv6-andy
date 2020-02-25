@@ -17198,7 +17198,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                     }
                     else
                     {
-                    sizes[0] = gcmALIGN(sizes[0], CONV2D_ALIGN_SIZE4);
+                        sizes[0] = gcmALIGN(sizes[0], CONV2D_ALIGN_SIZE4);
                     }
                     enableAlign4 = vx_true_e;
                     input_size = sizes[0];
@@ -17425,7 +17425,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                              && TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8
                              )
                     {
-                            enable_packed_weights = vx_true_e;
+                        enable_packed_weights = vx_true_e;
+                    }
+                    else if ( enable_conv2d_1x1
+                             && (outputDepth % CONV2D_ALIGN_SIZE4 == 0)
+                             && (input_size % CONV2D_ALIGN_SIZE4 == 0)
+                             && TENSOR_DATA_TYPE(inputs) == VX_TYPE_FLOAT16
+                             && TENSOR_DATA_TYPE(weights) == VX_TYPE_FLOAT16
+                             )
+                    {
+                        enable_packed_weights = vx_true_e;
                     }
                     else if (!enable_conv2d_1x1 && biases != NULL
                         && ((outputWidth * outputHeight < IMG_MAX_WIDTH) && outputDepth < IMG_MAX_WIDTH && input_size < IMG_MAX_WIDTH)
@@ -17555,71 +17564,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                         if (enable_packed_weights && enable_conv2d_1x1)
                         {
                             vx_tensor t = NULL;
-                            vx_tensor    weight_in      = NULL;
-                            vx_tensor    weight_out     = NULL;
-                            vx_uint32    sizes[4]       = {1};
-                            vx_uint8_ptr inaddr         = NULL;
-                            vx_uint8_ptr outaddr        = NULL;
-                            vx_uint32 elementCount = 0;
-                            vx_int32    i = 0, j = 0, k = 0;
-                            /*permute input fc weight */
-                            sizes[0]        = input_size;
-                            sizes[1]        = 4;
-                            sizes[2]        = outputDepth / 4;
-                            sizes[3]        = 1;
-                            dims            = 4;
-                            gcoOS_MemFill(&tensor_create_params, 0, sizeof(vx_tensor_create_params_t));
-                            tensor_create_params.num_of_dims = dims;
-                            tensor_create_params.sizes = sizes;
-                            tensor_create_params.data_format = TENSOR_DATA_TYPE(weights);
-                            tensor_create_params.quant_format = TENSOR_QUANT_TYPE(weights);
-                            if (tensor_create_params.quant_format == VX_QUANT_DYNAMIC_FIXED_POINT)
-                            {
-                                tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(weights);
-                            }
-                            else
-                            {
-                                tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(weights);
-                                tensor_create_params.quant_data.affine.zeroPoint = TENSOR_TF_ZEROPOINT(weights);
-                            }
-                            weight_in       = vxoTensor_CreateTensor(node->base.context, node->graph, &tensor_create_params, vx_false_e);
-                            if (vxoTensor_AllocateMemory(weight_in) != VX_SUCCESS)
-                            {
-                                vxError("vxoTensor_AllocateMemory fail at function %s, line %d", __FUNCTION__, __LINE__);
-                                status = VX_ERROR_NO_MEMORY;
-                                goto exit;
-                            }
-                            sizes[0]        = input_size * 4;
-                            sizes[1]        = outputDepth / 4;
-                            sizes[2]        = 1;
-                            sizes[3]        = 1;
-                            dims            = 4;
-                            weight_out      = vxoTensor_ReshapeTensor(weights, (vx_int32*)sizes, dims);
-                            vxoTensor_GetTensorViewMemory(weight_in, (gctPOINTER*)&inaddr, VX_NULL);
-                            vxoTensor_GetTensorViewMemory(weight_out, (gctPOINTER*)&outaddr, VX_NULL);
-                            vxoTensor_GetTensorElementCount(weight_in, &elementCount);
-                            memcpy(inaddr, outaddr, elementCount);
-                            for (i = 0; i < outputDepth / 4; i++)
-                            {
-                                for (j  = 0; j < (vx_int32)input_size; j = j + 4)
-                                {
-                                    for (k = 0; k < 4; k++)
-                                    {
-                                        outaddr[i * input_size * 4 + j * 4 + 4 * k] = inaddr[(i * 4 + k) * input_size + j];
-                                        outaddr[i * input_size * 4 + j * 4 + 4 * k + 1] = inaddr[(i * 4 + k) * input_size + j + 1];
-                                        outaddr[i * input_size * 4 + j * 4 + 4 * k + 2] = inaddr[(i * 4 + k) * input_size + j + 2];
-                                        outaddr[i * input_size * 4 + j * 4 + 4 * k + 3] = inaddr[(i * 4 + k) * input_size + j + 3];
-                                    }
-                                }
-                            }
-                            if (weight_in) vxoTensor_ReleaseTensor(&weight_in);
-                            if (weight_out) vxoTensor_ReleaseTensor(&weight_out);
-                            sizes[0]        = input_size * 4;
-                            sizes[1]        = 1;
-                            sizes[2]        = 1;
-                            sizes[3]        = outputDepth / 4;
-                            dims            = 4;
-                            t = vxoTensor_ReshapeTensor(weights, (vx_int32*)sizes, dims);
+                            vx_uint32 ifm = k_w * k_h * TENSOR_VIEW_SIZE_INDEX(weights, 2);
+                            vx_uint32 ofm = TENSOR_VIEW_SIZE_INDEX(weights, 3);
+                            t = vxoNNTensor_ReorgWeights(weights, node->graph, ifm, ofm);
                             convolutionLayer->base.temp_tensors[numTmpTensor++] = t;
                             weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
                             convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
@@ -17637,7 +17584,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                                 convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
                             }
                             else
+                            {
                                 weights_new_rs = t;
+                            }
                         }
                         else if (!enable_ofm_gt_xy)
                         {
@@ -17665,7 +17614,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNDilationConvolutionLayerInitializer(vx
                                 convolutionLayer->base.temp_tensors[numTmpTensor++] = outputs_rs;
                             }
                             else
+                            {
                                 outputs_rs = outputs;
+                            }
 
                             shaderExecutable = vxnneGPUConv2D_1x1ShaderExecutable(node->base.context, VXNNE_KERNEL_CONVOLUTION_1X1,
                                 &node->kernelAttributes.borderMode, enable_tensor_cast || enable_ofm_gt_xy, enable_packed_weights, input_rs, weights_new_rs, newBiases, outputs_rs);

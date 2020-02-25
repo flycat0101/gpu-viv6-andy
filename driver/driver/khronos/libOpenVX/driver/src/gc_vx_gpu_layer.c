@@ -9925,13 +9925,29 @@ vxnne_shader_executable vxnneGPUConv2D_1x1ShaderExecutable(
                 execution_parameters.globalWorkScale[0] = 4;
                 if (enable_four_pixel)
                 {
-                    execution_parameters.globalWorkScale[1] = 4;
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D_4X", borderMode);
+                    if (enable_packed_weights)
+                    {
+                        execution_parameters.globalWorkScale[1] = 16;
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_Wpacked_4x8_2D_4X", borderMode);
+                    }
+                    else
+                    {
+                        execution_parameters.globalWorkScale[1] = 4;
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D_4X", borderMode);
+                    }
                 }
                 else
                 {
-                    execution_parameters.globalWorkScale[1] = 4;
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D", borderMode);
+                    if (enable_packed_weights)
+                    {
+                        execution_parameters.globalWorkScale[1] = 16;
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_Wpacked_4x8_2D", borderMode);
+                    }
+                    else
+                    {
+                        execution_parameters.globalWorkScale[1] = 4;
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_2D", borderMode);
+                    }
                 }
                 if (!shaderExecutable) goto OnError;
             }
