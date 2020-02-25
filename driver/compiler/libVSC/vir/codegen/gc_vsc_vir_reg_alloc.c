@@ -2636,7 +2636,7 @@ gctBOOL _VIR_RA_LS_removableLDARR(
         gctUINT src0WebIdx = _VIR_RA_LS_SrcOpnd2WebIdx(pRA, pInst, VIR_Inst_GetSource(pInst, 1));
         VIR_RA_LS_Liverange *pLR = _VIR_RA_LS_Web2LR(pRA, src0WebIdx);
         if ((_VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pLR)) == 3 ||
-             isLRA0Invalid(pLR)) &&
+             isLRA0B0Invalid(pLR)) &&
             !VIR_Symbol_isSampler(VIR_Operand_GetSymbol(pBaseOpnd)))
         {
             return gcvFALSE;
@@ -4085,8 +4085,7 @@ _VIR_RA_LS_AddActiveLRs(
             pPrev->nextActiveLR = pLR;
             pLR->nextActiveLR = pNext;
 
-            if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
-            VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
+            if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption), VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
             {
                 VIR_LOG(pDumper, "add LR%d to the active list", pLR->webIdx);
                 VIR_LOG_FLUSH(pDumper);
@@ -11616,15 +11615,17 @@ VSC_ErrCode _VIR_RA_LS_RewriteColors(
 }
 
 static gctBOOL
-_VIR_RA_A0EnoughChannels(
+_VIR_RA_A0B0EnoughChannels(
     VIR_RA_LS           *pRA,
-    VIR_Enable          reqEnable)
+    VIR_RA_HWReg_Type   hwRegType,
+    VIR_Enable          reqEnable
+    )
 {
     VIR_RA_ColorPool    *pCP = VIR_RA_LS_GetColorPool(pRA);
     VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
-    VSC_BIT_VECTOR      *usedColor = &(pCP->colorMap[VIR_RA_HWREG_A0].usedColor);
+    VSC_BIT_VECTOR      *usedColor = &(pCP->colorMap[hwRegType].usedColor);
+    gctUINT             i;
 
-    gctUINT i;
     if (VIR_Shader_isDual16Mode(pShader))
     {
         if (VIR_Enable_Channel_Count(reqEnable) > 2)
@@ -11645,38 +11646,45 @@ _VIR_RA_A0EnoughChannels(
     return gcvTRUE;
 }
 
-VIR_RA_HWReg_Color
-_VIR_RA_LS_GetColorFromActiveLR(
+gctBOOL
+_VIR_RA_LS_ClearUsedColorFromActiveLR(
     VIR_RA_LS           *pRA,
     gctUINT             webIdx)
 {
-    VIR_RA_HWReg_Color curColor;
-    VIR_Shader         *pShader = VIR_RA_LS_GetShader(pRA);
-    VIR_Dumper          *pDumper = VIR_RA_LS_GetDumper(pRA);
-    VSC_OPTN_RAOptions  *pOption = VIR_RA_LS_GetOptions(pRA);
+    VIR_RA_HWReg_Color      curColor;
+    VIR_Shader*             pShader = VIR_RA_LS_GetShader(pRA);
+    VIR_Dumper*             pDumper = VIR_RA_LS_GetDumper(pRA);
+    VSC_OPTN_RAOptions*     pOption = VIR_RA_LS_GetOptions(pRA);
+    VIR_RA_LS_Liverange*    pPrev = gcvNULL;
+    VIR_RA_LS_Liverange*    pCurr = gcvNULL;
+    VIR_RA_LS_Liverange*    pLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
+    VIR_Enable              lrEnable = VIR_RA_LS_LR2WebChannelMask(pRA, pLR);
+    VIR_RA_HWReg_Type       hwRegType = pLR->hwType;
 
-    VIR_RA_LS_Liverange *pPrev, *pCurr;
-    VIR_RA_LS_Liverange *pLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
-    VIR_Enable lrEnable = VIR_RA_LS_LR2WebChannelMask(pRA, pLR);
-    gctUINT    shift = 3;
+    if (!(hwRegType == VIR_RA_HWREG_A0 || hwRegType == VIR_RA_HWREG_B0))
+    {
+        return gcvFALSE;
+    }
 
     curColor = InvalidColor;
-
     pPrev = VIR_RA_LS_GetActiveLRHead(pRA);
     pCurr = pPrev->nextActiveLR;
+
     while (pCurr != &LREndMark)
     {
-        if (!_VIR_RA_LS_IsInvalidColor(_VIR_RA_GetLRColor(pCurr)))
+        /* Check the matched HW register type. */
+        if (pCurr->hwType == hwRegType && !_VIR_RA_LS_IsInvalidColor(_VIR_RA_GetLRColor(pCurr)))
         {
             curColor = _VIR_RA_GetLRColor(pCurr);
 
-            if (_VIR_RA_Color_Shift(curColor) < shift)
-            {
-                shift = _VIR_RA_Color_Shift(curColor);
-            }
+            /*
+            ** VIV:TODO: now we release all actived LR until there are enough rooms for this LR,
+            ** we need to use a algorithm to choose which activecd LR should be released first.
+            ** Maybe we can use the same algorithm for the spilled LR in function _VIR_RA_LS_computeWeight.
+            */
 
             /* clear the used bits*/
-            _VIR_RA_LS_ClearUsedColor(pRA, VIR_RA_HWREG_A0,
+            _VIR_RA_LS_ClearUsedColor(pRA, hwRegType,
                 _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pCurr)),
                 _VIR_RA_Color_Channels(
                     VIR_RA_LS_LR2WebChannelMask(pRA, pCurr),
@@ -11684,7 +11692,7 @@ _VIR_RA_LS_GetColorFromActiveLR(
 
             if (VIR_Shader_isDual16Mode(pShader))
             {
-                 _VIR_RA_LS_ClearUsedColor(pRA, VIR_RA_HWREG_A0,
+                 _VIR_RA_LS_ClearUsedColor(pRA, hwRegType,
                     _VIR_RA_Color_HIRegNo(_VIR_RA_GetLRColor(pCurr)),
                     _VIR_RA_Color_Channels(
                         VIR_RA_LS_LR2WebChannelMask(pRA, pCurr),
@@ -11694,10 +11702,9 @@ _VIR_RA_LS_GetColorFromActiveLR(
             /* make the pPrev to be a invalid color */
             _VIR_RA_SetLRColor(pCurr, VIR_RA_INVALID_REG, 0);
             _VIR_RA_SetLRColorHI(pCurr, VIR_RA_INVALID_REG, 0);
-            VIR_RA_LR_SetFlag(pCurr, VIR_RA_LRFLAG_A0_INVALID);
+            VIR_RA_LR_SetFlag(pCurr, VIR_RA_LRFLAG_A0B0_INVALID);
 
-            if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
-                VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
+            if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption), VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
             {
                 VIR_LOG(pDumper, "LR%d ", pCurr->webIdx);
                 _VIR_RA_LS_DumpColor(pRA, curColor, pCurr);
@@ -11705,20 +11712,16 @@ _VIR_RA_LS_GetColorFromActiveLR(
                 VIR_LOG_FLUSH(pDumper);
             }
 
-            if (_VIR_RA_A0EnoughChannels(pRA, lrEnable))
+            /* Since we get enough register here, we can leave now. */
+            if (_VIR_RA_A0B0EnoughChannels(pRA, hwRegType, lrEnable))
             {
-                _VIR_RA_MakeColor(0, shift, &curColor);
-                if (VIR_Shader_isDual16Mode(pShader))
-                {
-                    _VIR_RA_MakeColorHI(0, shift + VIR_Enable_Channel_Count(lrEnable), &curColor);
-                }
-                break;
+                return gcvTRUE;
             }
         }
         pCurr = pCurr->nextActiveLR;
     }
 
-    return curColor;
+    return gcvFALSE;
 }
 
 VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
@@ -11737,6 +11740,7 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
     VIR_Dumper          *pDumper = VIR_RA_LS_GetDumper(pRA);
     VSC_OPTN_RAOptions  *pOption = VIR_RA_LS_GetOptions(pRA);
     VIR_DEF_USAGE_INFO  *pDuInfo = VIR_RA_LS_GetLvInfo(pRA)->pDuInfo;
+    gctBOOL             bClearUsedColor = gcvFALSE;
 
     curColor = InvalidColor;
 
@@ -11760,7 +11764,23 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
 
             if (_VIR_RA_LS_IsInvalidColor(curColor))
             {
-                curColor = _VIR_RA_LS_GetColorFromActiveLR(pRA, webIdx);
+                /* Clear the used color from the active LRs, then try to find the new color again. */
+                bClearUsedColor = _VIR_RA_LS_ClearUsedColorFromActiveLR(pRA, webIdx);
+
+                if (bClearUsedColor)
+                {
+                    if (pMovaLR->hwType == VIR_RA_HWREG_B0)
+                    {
+                        curColor = _VIR_RA_LS_FindNewColor(pRA, webIdx, gcvFALSE, 0, -1, gcvNULL);
+                        curColor._HIhwRegId = curColor._hwRegId;
+                        curColor._HIhwShift = curColor._hwShift;
+                    }
+                    else
+                    {
+                        curColor = _VIR_RA_LS_FindNewColor(pRA, webIdx, VIR_Shader_isDual16Mode(pShader), 0, -1, gcvNULL);
+                    }
+                }
+
                 if(!_VIR_RA_LS_IsInvalidColor(curColor))
                 {
                     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
@@ -11825,7 +11845,14 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
 
             if (_VIR_RA_LS_IsInvalidColor(curColor))
             {
-                curColor = _VIR_RA_LS_GetColorFromActiveLR(pRA, webIdx);
+                /* Clear the used color from the active LRs, then try to find the new color again. */
+                bClearUsedColor = _VIR_RA_LS_ClearUsedColorFromActiveLR(pRA, webIdx);
+
+                if (bClearUsedColor)
+                {
+                    curColor = _VIR_RA_LS_FindNewColor(pRA, webIdx, VIR_Shader_isDual16Mode(pShader), 0, -1, gcvNULL);
+                }
+
                 if(_VIR_RA_LS_IsInvalidColor(curColor))
                 {
                     retValue = VSC_RA_ERR_OUT_OF_REG_FAIL;
