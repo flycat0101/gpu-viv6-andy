@@ -5830,6 +5830,8 @@ vx_uint32 calcKernelStreamSizeHuffman(
         vx_int32 k = 0, j = 0, m = 0;
         vx_bool isCoef;
         vx_bool isLimitZRL;
+        vx_bool setDummy = vx_false_e;
+        vx_uint32 dummyBit2 = 0;
         /* update position of each core's beginning of compressed kernel*/
         reorderStreamCheckCount += reorderStreamPerCoreCount[coreIndex];
 
@@ -5898,6 +5900,23 @@ vx_uint32 calcKernelStreamSizeHuffman(
 
             if (huffmanConfig->run_len_table_size == 0x0) /* non RZL*/
             {
+                if (!setDummy)
+                {
+                    /*Set dummy all to 0,
+                    in nonZRL path 8-bit, 0 belong to group0, -1~0, residue bit length is 1, residue code = 0*/
+                    size = 0;
+                    k = invSizeOrder[size];
+
+                    if (size == 0) size = 1; /*Size = 0 mean 0&0xff, needs 1 bit actually*/
+                    if (sizeCodeLen[k]%2 == 0)
+                        dummyBit2 = size - 1;
+                    else
+                        dummyBit2 = size;
+                    if (huffmanConfig->bit16_flag)
+                       dummyBit2 += 8;
+                    setDummy = vx_true_e;
+                }
+
                 tmp = (coef & 0x80)? (coef ^ 0xff): coef;
                 for (size = 0; size<7; size++)
                 {
@@ -5929,6 +5948,23 @@ vx_uint32 calcKernelStreamSizeHuffman(
             }
             else /* RZL enable*/
             {
+                if (!setDummy)
+                {
+                    /*Set dummy all to 0,
+                    in ZRL path 8-bit, 0 belong to group7, -128~127, residue bit length is 8, residue code = 0*/
+                    size = 7;
+                    j = invSizeOrder[size];
+                    if (size == 7)
+                        size = 8;
+                    if (sizeCodeLen[j] % 2 == 0)
+                        dummyBit2 = size - 1;
+                    else
+                        dummyBit2 = size;
+                    if (huffmanConfig->bit16_flag)
+                        dummyBit2 += 8;
+                    setDummy = vx_true_e;
+                }
+
                 if (coef == 0 && isCoef && !isLimitZRL)
                 {
                     run++;
@@ -6084,10 +6120,8 @@ vx_uint32 calcKernelStreamSizeHuffman(
                 /*Hit the end bitsteam of core, add dummy stage process the next*/
                 kernelBitSize += 3;
                 kernelBitSize += 2;
-                kernelBitSize += 7;
 
-                if (huffmanConfig->bit16_flag)
-                    kernelBitSize += 8;
+                kernelBitSize += dummyBit2;
 
                 for (j = 0; j < 2*THROUGHPUT; j++)
                 {
@@ -10456,7 +10490,8 @@ vx_uint32 fillinKernelBufferHuffman(
             else if (weight_format == VX_TYPE_UINT8)
                 coef = *((vx_uint8 *)kernelDataPtr);
             else if (weight_format == VX_TYPE_INT16 ||
-                weight_format == VX_TYPE_FLOAT16)
+                weight_format == VX_TYPE_FLOAT16 ||
+                weight_format == VX_TYPE_BFLOAT16)
                 coef16 = *((vx_int16 *)kernelDataPtr);
             else
             {
@@ -10502,7 +10537,7 @@ vx_uint32 fillinKernelBufferHuffman(
 
                 if (huffmanConfig->fp16_flag)
                 {
-                    coef16 = (coef16 & 0x7FFF) * 2 + coef16 / (1<<15);
+                    coef16 = (coef16 & 0x7FFF) * 2 + ((coef16 & (1<<15)) >> 15);
                 }
                 coef16 -= huffmanConfig->avg_bias;
                 if (huffmanConfig->run_len_table_size == 0x0)
