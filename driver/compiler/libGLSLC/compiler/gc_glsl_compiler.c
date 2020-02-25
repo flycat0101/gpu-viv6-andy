@@ -17,7 +17,158 @@
 #include "gc_glsl_parser.h"
 #include "gc_glsl_ast_walk.h"
 #include "gc_glsl_emit_code.h"
-#include "gc_glsl_built_ins_def.h"
+
+/*******************************Redeclared built-in variables*******************************/
+typedef gctBOOL
+(*sltREDECLARED_CHECK_FUNC_PTR)(
+    IN sloCOMPILER,
+    IN slsNAME*,
+    IN slsDATA_TYPE*
+    );
+
+typedef gceSTATUS
+(*sltREDECLARED_UPDATE_FUNC_PTR)(
+    IN sloCOMPILER,
+    IN slsNAME*,
+    IN slsDATA_TYPE*
+    );
+
+/*******************************Redeclared built-in functions*******************************/
+gctBOOL
+_CheckRedeclaredForInterpolation(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* Name,
+    IN slsDATA_TYPE* NewDataType
+    )
+{
+    /* Everything in data type must be the same expect for the ineterpolation qualifier. */
+    if (!slsDATA_TYPE_IsEqual(Name->dataType, NewDataType))
+    {
+        return gcvFALSE;
+    }
+
+    if (Name->dataType->qualifiers.auxiliary != NewDataType->qualifiers.auxiliary
+        ||
+        Name->dataType->qualifiers.precision != NewDataType->qualifiers.precision
+        ||
+        Name->dataType->qualifiers.storage != NewDataType->qualifiers.storage
+        ||
+        Name->dataType->qualifiers.memoryAccess != NewDataType->qualifiers.memoryAccess
+        ||
+        Name->dataType->qualifiers.flags != NewDataType->qualifiers.flags)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+gceSTATUS
+_UpdateRedeclaredForInterpolation(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* Name,
+    IN slsDATA_TYPE* NewDataType
+    )
+{
+    Name->dataType->qualifiers.interpolation = NewDataType->qualifiers.interpolation;
+    return gcvSTATUS_OK;
+}
+
+gctBOOL
+_CheckRedeclaredForClipDistance(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* Name,
+    IN slsDATA_TYPE* NewDataType
+    )
+{
+    slsDATA_TYPE* DataType1 = Name->dataType;
+
+    /* Everything in data type must be the same expect for the array size. */
+    if (!((DataType1->elementType == NewDataType->elementType)
+         &&
+         (slmDATA_TYPE_vectorSize_NOCHECK_GET(DataType1) == slmDATA_TYPE_vectorSize_NOCHECK_GET(NewDataType))
+         &&
+         (slmDATA_TYPE_matrixRowCount_GET(DataType1) == slmDATA_TYPE_matrixRowCount_GET(NewDataType))
+         &&
+         (slmDATA_TYPE_matrixColumnCount_GET(DataType1) == slmDATA_TYPE_matrixColumnCount_GET(NewDataType))
+         &&
+         (DataType1->arrayLengthCount == NewDataType->arrayLengthCount)
+         &&
+         (DataType1->orgFieldSpace == NewDataType->orgFieldSpace)))
+    {
+        return gcvFALSE;
+    }
+
+    if (DataType1->qualifiers.interpolation != NewDataType->qualifiers.interpolation
+        ||
+        DataType1->qualifiers.auxiliary != NewDataType->qualifiers.auxiliary
+        ||
+        DataType1->qualifiers.precision != NewDataType->qualifiers.precision
+        ||
+        DataType1->qualifiers.storage != NewDataType->qualifiers.storage
+        ||
+        DataType1->qualifiers.memoryAccess != NewDataType->qualifiers.memoryAccess
+        ||
+        DataType1->qualifiers.flags != NewDataType->qualifiers.flags)
+    {
+        return gcvFALSE;
+    }
+
+    /* The array length can be larger than the MaxClipDistance. */
+    if (NewDataType->arrayLength > (gctINT)GetGLMaxClipDistances())
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+gceSTATUS
+_UpdateRedeclaredForClipDistance(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* Name,
+    IN slsDATA_TYPE* NewDataType
+    )
+{
+    Name->dataType->arrayLength = NewDataType->arrayLength;
+    Name->dataType->arrayLengthList[0] = NewDataType->arrayLengthList[0];
+    return gcvSTATUS_OK;
+}
+
+/* Reclared built-in Variables */
+typedef struct _slsREDECLARED_VARIABLE
+{
+    sloEXTENSION                    extension;
+    gctSTRING                       variableName;
+    sltREDECLARED_CHECK_FUNC_PTR    checkFunc;
+    sltREDECLARED_UPDATE_FUNC_PTR   updateFunc;
+} slsREDECLARED_VARIABLE;
+
+static slsREDECLARED_VARIABLE VSRedeclaredVariables[] =
+{
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_FrontColor",            _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_BackColor",             _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_FrontSecondaryColor",   _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_BackSecondaryColor",    _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_ClipDistance",          _CheckRedeclaredForClipDistance,         _UpdateRedeclaredForClipDistance },
+};
+static gctUINT VSRedeclaredVariableCount = sizeof(VSRedeclaredVariables) / sizeof(slsREDECLARED_VARIABLE);
+
+static slsREDECLARED_VARIABLE GSRedeclaredVariables[] =
+{
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_FrontColor",            _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_BackColor",             _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_FrontSecondaryColor",   _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_BackSecondaryColor",    _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+};
+static gctUINT GSRedeclaredVariableCount = sizeof(GSRedeclaredVariables) / sizeof(slsREDECLARED_VARIABLE);
+
+static slsREDECLARED_VARIABLE FSRedeclaredVariables[] =
+{
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_Color",                 _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_SecondaryColor",        _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+};
+static gctUINT FSRedeclaredVariableCount = sizeof(FSRedeclaredVariables) / sizeof(slsREDECLARED_VARIABLE);
 
 sloCOMPILER gcCompiler[__GC_COMPILER_NUMBER__] = {gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL};
 
