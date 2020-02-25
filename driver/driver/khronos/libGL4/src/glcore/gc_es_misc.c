@@ -3041,15 +3041,21 @@ GLboolean APIENTRY __glim_IsEnabledIndexedEXT(__GLcontext *gc, GLenum target, GL
 /* GL_VERSION_1_0 */
 GLvoid GL_APIENTRY __glim_GetPixelMapfv(__GLcontext *gc, GLenum map, GLfloat *values)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_GetPixelMapuiv(__GLcontext *gc, GLenum map, GLuint *values)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_GetPixelMapusv(__GLcontext *gc, GLenum map, GLushort *values)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_DepthRange(__GLcontext *gc, GLclampd near_val, GLclampd far_val)
 {
@@ -3158,231 +3164,341 @@ GLvoid GL_APIENTRY __glim_PrimitiveRestartIndex(__GLcontext *gc, GLuint index)
 /* GL_VERSION_3_2 */
 GLvoid GL_APIENTRY __glim_ProvokingVertex(__GLcontext *gc, GLenum mode)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 /* GL_VERSION_3_3 */
 GLvoid GL_APIENTRY __glim_BindFragDataLocationIndexed(__GLcontext *gc, GLuint program, GLuint colorNumber, GLuint index, const GLchar *name)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLint GL_APIENTRY __glim_GetFragDataIndex(__GLcontext *gc, GLuint program, const GLchar *name)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
     return -1;
 }
 GLvoid GL_APIENTRY __glim_QueryCounter(__GLcontext *gc, GLuint id, GLenum target)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_GetQueryObjecti64v(__GLcontext *gc, GLuint id, GLenum pname, GLint64 *params)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_GetQueryObjectui64v(__GLcontext *gc, GLuint id, GLenum pname, GLuint64 *params)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP1ui(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, GLuint value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP1uiv(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, const GLuint *value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP2ui(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, GLuint value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP2uiv(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, const GLuint *value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP3ui(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, GLuint value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP3uiv(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, const GLuint *value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP4ui(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, GLuint value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexAttribP4uiv(__GLcontext *gc, GLuint index, GLenum type, GLboolean normalized, const GLuint *value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexP2ui(__GLcontext *gc, GLenum type, GLuint value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexP2uiv(__GLcontext *gc, GLenum type, const GLuint *value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexP3ui(__GLcontext *gc, GLenum type, GLuint value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexP3uiv(__GLcontext *gc, GLenum type, const GLuint *value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexP4ui(__GLcontext *gc, GLenum type, GLuint value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_VertexP4uiv(__GLcontext *gc, GLenum type, const GLuint *value)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_TexCoordP1ui(__GLcontext *gc, GLenum type, GLuint coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_TexCoordP1uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_TexCoordP2ui(__GLcontext *gc, GLenum type, GLuint coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_TexCoordP2uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_TexCoordP3ui(__GLcontext *gc, GLenum type, GLuint coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_TexCoordP3uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_TexCoordP4ui(__GLcontext *gc, GLenum type, GLuint coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_TexCoordP4uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP1ui(__GLcontext *gc, GLenum texture, GLenum type, GLuint coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP1uiv(__GLcontext *gc, GLenum texture, GLenum type, const GLuint *coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP2ui(__GLcontext *gc, GLenum texture, GLenum type, GLuint coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP2uiv(__GLcontext *gc, GLenum texture, GLenum type, const GLuint *coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP3ui(__GLcontext *gc, GLenum texture, GLenum type, GLuint coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP3uiv(__GLcontext *gc, GLenum texture, GLenum type, const GLuint *coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP4ui(__GLcontext *gc, GLenum texture, GLenum type, GLuint coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_MultiTexCoordP4uiv(__GLcontext *gc, GLenum texture, GLenum type, const GLuint *coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_NormalP3ui(__GLcontext *gc, GLenum type, GLuint coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_NormalP3uiv(__GLcontext *gc, GLenum type, const GLuint *coords)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_ColorP3ui(__GLcontext *gc, GLenum type, GLuint color)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_ColorP3uiv(__GLcontext *gc, GLenum type, const GLuint *color)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_ColorP4ui(__GLcontext *gc, GLenum type, GLuint color)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_ColorP4uiv(__GLcontext *gc, GLenum type, const GLuint *color)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_SecondaryColorP3ui(__GLcontext *gc, GLenum type, GLuint color)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_SecondaryColorP3uiv(__GLcontext *gc, GLenum type, const GLuint *color)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 
 /* GL_VERSION_4_0 */
 GLint GL_APIENTRY __glim_GetSubroutineUniformLocation(__GLcontext *gc, GLuint program, GLenum shadertype, const GLchar *name)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
     return -1;
 }
 GLuint GL_APIENTRY __glim_GetSubroutineIndex(__GLcontext *gc, GLuint program, GLenum shadertype, const GLchar *name)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
     return (GLuint)-1;
 }
 GLvoid GL_APIENTRY __glim_GetActiveSubroutineUniformiv(__GLcontext *gc, GLuint program, GLenum shadertype, GLuint index, GLenum pname, GLint *values)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_GetActiveSubroutineUniformName(__GLcontext *gc, GLuint program, GLenum shadertype, GLuint index, GLsizei bufsize, GLsizei *length, GLchar *name)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_GetActiveSubroutineName(__GLcontext *gc, GLuint program, GLenum shadertype, GLuint index, GLsizei bufsize, GLsizei *length, GLchar *name)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_UniformSubroutinesuiv(__GLcontext *gc, GLenum shadertype, GLsizei count, const GLuint *indices)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_GetUniformSubroutineuiv(__GLcontext *gc, GLenum shadertype, GLint location, GLuint *params)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_GetProgramStageiv(__GLcontext *gc, GLuint program, GLenum shadertype, GLenum pname, GLint *values)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_PatchParameterfv(__GLcontext *gc, GLenum pname, const GLfloat *values)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 
 /* GL_ARB_shader_objects */
 GLvoid GL_APIENTRY __glim_DeleteObjectARB(__GLcontext *gc, GLhandleARB obj)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 GLvoid GL_APIENTRY __glim_GetInfoLogARB(__GLcontext *gc, GLhandleARB obj, GLsizei maxLength, GLsizei *length, GLcharARB *infoLog)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 
 

@@ -427,22 +427,30 @@ GLvoid GL_APIENTRY __glim_VertexAttribI3uiv(__GLcontext *gc, GLuint index, const
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4bv(__GLcontext *gc, GLuint index, const GLbyte *v)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4sv(__GLcontext *gc, GLuint index, const GLshort *v)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4ubv(__GLcontext *gc, GLuint index, const GLubyte *v)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4usv(__GLcontext *gc, GLuint index, const GLushort *v)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 
 GLvoid APIENTRY __glim_GetVertexAttribdv(__GLcontext *gc,  GLuint index, GLenum pname, GLdouble *params)
