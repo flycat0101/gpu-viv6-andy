@@ -120,11 +120,12 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.37 for adding intrisinc functions for gSampler2DRect on 08/06/2019 */
 /* bump up version to 1.38 for saving the full graphics shaders into the binary on 08/08/2019 */
 /* bump up version to 1.39 for saving ubo array index into the binary on 08/09/2019 */
+/* bump up version to 1.40 for saving local memory size, uniform's swizzle and shader kind into the binary on 11/07/2019 */
 
 /* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 39)
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 40)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 39)
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(SHADER_64BITMODE, 0, 1, 40)
 
 typedef union _gcsValue
 {
@@ -2937,6 +2938,12 @@ typedef struct _gcBINARY_UNIFORM_EX
        when writing out to a shader binary
     */
     gctTYPE_QUALIFIER               qualifier;
+
+    /* Physically assigned values. */
+    gctUINT8                        swizzle;
+
+    /* Shader type for this uniform. Set this at the end of link. */
+    gcSHADER_KIND                   shaderKind;
 
     /* companion to format field to denote vector size,
        value of 0 denote the underlying type is scalar */
