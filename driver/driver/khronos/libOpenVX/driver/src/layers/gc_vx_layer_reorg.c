@@ -920,7 +920,7 @@ vx_status vxnneReorg2_Space2BatchND(struct _vxnne_operation_s *operation)
                     vx_int32 out_w = (in_w + pad_l) / block_w;
                     vx_int32 out_h = (in_h + pad_t) / block_h;
                     vx_int32 out_b = (in_w + pad_l) % block_w + ((in_h + pad_t) % block_h) * block_w;
-                    vx_int32 output_batch_index = out_b * output_height * output_width * output_depth;
+                    vx_int32 output_batch_index = out_b * output_height * output_width * output_depth * input_batch + in_b * output_height * output_width * output_depth;
 
                     vx_int32 out_index = out_w + out_h * output_width + in_d * output_height * output_width + output_batch_index;
 
@@ -930,7 +930,7 @@ vx_status vxnneReorg2_Space2BatchND(struct _vxnne_operation_s *operation)
                     }
                     else
                     {
-                        vx_int32 in_index = in_w + in_h * input_width + in_d * input_width * input_height;
+                        vx_int32 in_index = in_b * input_width * input_height * input_depth + in_w + in_h * input_width + in_d * input_width * input_height;
 
                         if (item_size == vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(inputs)))
                         {
@@ -1587,6 +1587,7 @@ OnError:
     vx_context context              = vxGetContext((vx_reference)node);
     vx_enum type                    = type_s->value->e;
     vx_uint32 batch_count           = (type == VX_REORG_BATCH_TO_SPACE_ND || type == VX_REORG_SPACE_TO_BATCH_ND) ? 1 : TENSOR_SIZE_INDEX(inputs, 3);
+//    vx_uint32 batch_count           =  TENSOR_SIZE_INDEX(inputs, 3);
     vxnne_operation_target_e target = VXNNE_OPERATION_TARGET_NONE;
     vx_tp_cmd_type_e tp_cmd_type    = TP_NONE;
     vxnne_reorg_layer reorg_layer   = VX_NULL;
