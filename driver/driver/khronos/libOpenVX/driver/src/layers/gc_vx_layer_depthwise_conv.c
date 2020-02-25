@@ -68,6 +68,8 @@ VX_PRIVATE_API vx_status vxoNNSWDepthwiseConvolution(struct _vxnne_operation_s *
     vx_scalar padYTop = dcOperation->padYTop;
     vx_scalar padYBottom = dcOperation->padYBottom;
     vx_scalar downScaleSizeRounding = dcOperation->downScaleSizeRounding;
+    vx_scalar strideX   = dcOperation->stride_x;
+    vx_scalar strideY   = dcOperation->stride_y;
 
     vx_int32 channel_multiplier;
 
@@ -91,22 +93,36 @@ VX_PRIVATE_API vx_status vxoNNSWDepthwiseConvolution(struct _vxnne_operation_s *
     vx_int32 strideXvalue = 1, strideYvalue = 1;
     vx_int32 b = 0, d = 0, h = 0, w = 0, dm = 0, m = 0, n = 0, kstart_x = 0, kstart_y = 0;
 
-    if ((input_width == 1) || (output_width == 1))
+    if (strideX)
     {
-        strideXvalue = 1;
+        strideXvalue = strideX->value->n32;
     }
     else
     {
-        strideXvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_width + pad_left + pad_right - kernel_width) / (output_width - 1), downScaleSizeRounding->value->e);
+        if ((input_width == 1) || (output_width == 1))
+        {
+            strideXvalue = 1;
+        }
+        else
+        {
+            strideXvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_width + pad_left + pad_right - kernel_width) / (output_width - 1), downScaleSizeRounding->value->e);
+        }
     }
 
-    if ((input_height == 1) || (output_height == 1))
+    if (strideY)
     {
-        strideYvalue = 1;
+        strideYvalue = strideY->value->n32;
     }
     else
     {
-        strideYvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_height + pad_top + pad_bottom - kernel_height) / (output_height - 1), downScaleSizeRounding->value->e);
+        if ((input_height == 1) || (output_height == 1))
+        {
+            strideYvalue = 1;
+        }
+        else
+        {
+            strideYvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_height + pad_top + pad_bottom - kernel_height) / (output_height - 1), downScaleSizeRounding->value->e);
+        }
     }
 
     gcmASSERT(strideXvalue > 0);
@@ -240,6 +256,8 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SW_Initialize(vxnne_layer ops_l
     vx_scalar padYBottom = (vx_scalar)parameters[6];
     vx_scalar dilationX = (vx_scalar)parameters[9];
     vx_scalar dilationY = (vx_scalar)parameters[10];
+    vx_scalar strideX   = (vx_scalar)parameters[11];
+    vx_scalar strideY   = (vx_scalar)parameters[12];
     vx_scalar depth_multiplier = (vx_scalar)parameters[13];
     vx_scalar downScaleSizeRounding = (vx_scalar)parameters[18];
     vx_tensor outputs = (vx_tensor)parameters[19];
@@ -272,6 +290,8 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SW_Initialize(vxnne_layer ops_l
     depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.dilationX = dilationX;
     depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.dilationY = dilationY;
     depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.depth_multiplier = depth_multiplier;
+    depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.stride_x  = strideX;
+    depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.stride_y  = strideY;
     depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.downScaleSizeRounding = downScaleSizeRounding;
     depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.outputs = outputs;
 
@@ -327,7 +347,6 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_SH_EVIS_Support_Ext(vx_node node,
     dataformat_flag[2] = (vx_bool)(inputFormat == VX_TYPE_INT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT8);
 
     support = support && (vx_bool)((dataformat_flag[0] || dataformat_flag[1] || dataformat_flag[2] || dataformat_flag[3]) && biases);
-
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
     return support;
@@ -367,6 +386,8 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_EVIS_Initialize(vxnne_layer 
     vx_scalar padYBottom = (vx_scalar)parameters[6];
     vx_scalar dilationX = (vx_scalar)parameters[9];
     vx_scalar dilationY = (vx_scalar)parameters[10];
+    vx_scalar strideX   = (vx_scalar)parameters[11];
+    vx_scalar strideY   = (vx_scalar)parameters[12];
     vx_scalar depth_multiplier = (vx_scalar)parameters[13];
     vx_scalar downScaleSizeRounding = (vx_scalar)parameters[18];
     vx_tensor outputs = (vx_tensor)parameters[19];
@@ -375,13 +396,56 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_EVIS_Initialize(vxnne_layer 
 
     vx_enum  biasFormat = VX_TYPE_INT32;
     vx_uint32  operation_idx = 0;
-
+    vx_int32   strideXvalue  = 0;
+    vx_int32   strideYvalue  = 0;
     vxnne_shader_executable shaderExecutable = NULL;
     vx_tensor               newBiases = NULL;
     vx_tensor               tensorCopy = NULL;
+    vx_uint32     input_width = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+    vx_uint32     input_height = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+    vx_uint32     output_width = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
+    vx_uint32     output_height = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
+    vx_int32      kernel_width = TENSOR_VIEW_SIZE_INDEX(weights, 0);
+    vx_int32      kernel_height = TENSOR_VIEW_SIZE_INDEX(weights, 1);
+    vx_int32      padLeftv = padXLeft->value->n32;
+    vx_int32      padRightv = padXRight->value->n32;
+    vx_int32      padTopv = padYTop->value->n32;
+    vx_int32      padBottomv = padYBottom->value->n32;
 
     if (biases != VX_NULL)
         biasFormat = TENSOR_DATA_TYPE(biases);
+
+    if (strideX)
+    {
+        strideXvalue = strideX->value->n32;
+    }
+    else
+    {
+        if ((input_width == 1) || (output_width == 1))
+        {
+            strideXvalue = 1;
+        }
+        else
+        {
+            strideXvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_width + padLeftv + padRightv - kernel_width) / (output_width - 1), downScaleSizeRounding->value->e);
+        }
+    }
+
+    if (strideY)
+    {
+        strideYvalue = strideY->value->n32;
+    }
+    else
+    {
+        if ((input_height == 1) || (output_height == 1))
+        {
+            strideYvalue = 1;
+        }
+        else
+        {
+            strideYvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_height + padTopv + padBottomv - kernel_height) / (output_height - 1), downScaleSizeRounding->value->e);
+        }
+    }
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
@@ -407,6 +471,8 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_EVIS_Initialize(vxnne_layer 
         VX_NULL,
         VX_NULL,
         downScaleSizeRounding,
+        strideXvalue,
+        strideYvalue,
         outputs);
 
     if (!shaderExecutable)
@@ -470,6 +536,8 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
     vx_scalar padYBottom = (vx_scalar)parameters[6];
     vx_scalar dilationX = (vx_scalar)parameters[9];
     vx_scalar dilationY = (vx_scalar)parameters[10];
+    vx_scalar strideX   = (vx_scalar)parameters[11];
+    vx_scalar strideY   = (vx_scalar)parameters[12];
     vx_scalar depth_multiplier = (vx_scalar)parameters[13];
     vx_scalar downScaleSizeRounding = (vx_scalar)parameters[18];
     vx_tensor outputs = (vx_tensor)parameters[19];
@@ -513,24 +581,37 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
         vx_uint32     output_width = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
         vx_uint32     output_height = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
 
-                if ((input_width == 1) || (output_width == 1))
-                {
-                    strideXvalue = 1;
-                }
-                else
-                {
-                    strideXvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_width + padLeftv + padRightv - kernel_width) / (output_width - 1), downScaleSizeRounding->value->e);
-                }
+        if (strideX)
+        {
+            strideXvalue = strideX->value->n32;
+        }
+        else
+        {
+            if ((input_width == 1) || (output_width == 1))
+            {
+                strideXvalue = 1;
+            }
+            else
+            {
+                strideXvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_width + padLeftv + padRightv - kernel_width) / (output_width - 1), downScaleSizeRounding->value->e);
+            }
+        }
 
-                if ((input_height == 1) || (output_height == 1))
-                {
-                    strideYvalue = 1;
-                }
-                else
-                {
-                    strideYvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_height + padTopv + padBottomv - kernel_height) / (output_height - 1), downScaleSizeRounding->value->e);
-                }
-
+        if (strideY)
+        {
+            strideYvalue = strideY->value->n32;
+        }
+        else
+        {
+            if ((input_height == 1) || (output_height == 1))
+            {
+                strideYvalue = 1;
+            }
+            else
+            {
+                strideYvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_height + padTopv + padBottomv - kernel_height) / (output_height - 1), downScaleSizeRounding->value->e);
+            }
+        }
 
         is_copy_tensor = ((inputFormat == VX_TYPE_UINT8) && (3 == kernel_width) && (3 == kernel_height) && (strideXvalue == 1 || strideXvalue == 2)
             && (padLeftv == 1 || padRightv == 1 || padTopv == 1 || padBottomv == 1));
@@ -1268,6 +1349,51 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
 
             if(node->base.context->evisNoInst.supportEVIS)
             {
+                vx_int32      kernel_width                   = TENSOR_VIEW_SIZE_INDEX(weights, 0);
+                vx_int32      kernel_height                  = TENSOR_VIEW_SIZE_INDEX(weights, 1);
+                vx_int32      padLeftv                       = padXLeft->value->n32;
+                vx_int32      padRightv                      = padXRight->value->n32;
+                vx_int32      padTopv                        = padYTop->value->n32;
+                vx_int32      padBottomv                     = padYBottom->value->n32;
+                vx_int32      strideXvalue                   = 0;
+                vx_int32      strideYvalue                   = 0;
+                vx_uint32     input_width                    = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+                vx_uint32     input_height                   = TENSOR_VIEW_SIZE_INDEX(inputs, 1);
+                vx_uint32     output_width                   = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
+                vx_uint32     output_height                  = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
+
+                if (strideX)
+                {
+                    strideXvalue = strideX->value->n32;
+                }
+                else
+                {
+                    if ((input_width == 1) || (output_width == 1))
+                    {
+                        strideXvalue = 1;
+                    }
+                    else
+                    {
+                        strideXvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_width + padLeftv + padRightv - kernel_width) / (output_width - 1), downScaleSizeRounding->value->e);
+                    }
+                }
+
+                if (strideY)
+                {
+                    strideYvalue = strideY->value->n32;
+                }
+                else
+                {
+                    if ((input_height == 1) || (output_height == 1))
+                    {
+                        strideYvalue = 1;
+                    }
+                    else
+                    {
+                        strideYvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_height + padTopv + padBottomv - kernel_height) / (output_height - 1), downScaleSizeRounding->value->e);
+                    }
+                }
+
                 newBiases  = biases;
                 tensorCopy = inputs;
                 shaderExecutable = vxnneGetDepthwiseConvShaderExecutable(node->base.context,
@@ -1290,6 +1416,8 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
                                                                          poolingX,
                                                                          poolingY,
                                                                          downScaleSizeRounding,
+                                                                         strideXvalue,
+                                                                         strideYvalue,
                                                                          outputs);
             }
             else
@@ -1315,22 +1443,36 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
                 vx_uint32     output_width                   = TENSOR_VIEW_SIZE_INDEX(outputs, 0);
                 vx_uint32     output_height                  = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
 
-                if ((input_width == 1) || (output_width == 1))
+                if (strideX)
                 {
-                    strideXvalue = 1;
+                    strideXvalue = strideX->value->n32;
                 }
                 else
                 {
-                    strideXvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_width + padLeftv + padRightv - kernel_width) / (output_width - 1), downScaleSizeRounding->value->e);
+                    if ((input_width == 1) || (output_width == 1))
+                    {
+                        strideXvalue = 1;
+                    }
+                    else
+                    {
+                        strideXvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_width + padLeftv + padRightv - kernel_width) / (output_width - 1), downScaleSizeRounding->value->e);
+                    }
                 }
 
-                if ((input_height == 1) || (output_height == 1))
+                if (strideY)
                 {
-                    strideYvalue = 1;
+                    strideYvalue = strideY->value->n32;
                 }
                 else
                 {
-                    strideYvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_height + padTopv + padBottomv - kernel_height) / (output_height - 1), downScaleSizeRounding->value->e);
+                    if ((input_height == 1) || (output_height == 1))
+                    {
+                        strideYvalue = 1;
+                    }
+                    else
+                    {
+                        strideYvalue = vxoNNExternsionConvlutionRound((vx_float32)(input_height + padTopv + padBottomv - kernel_height) / (output_height - 1), downScaleSizeRounding->value->e);
+                    }
                 }
 
                 is_copy_tensor = ((inputFormat == VX_TYPE_UINT8) && (3 == kernel_width) && (3 == kernel_height) && (strideXvalue == 1 || strideXvalue == 2)
@@ -1610,6 +1752,8 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
             depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.dilationY             = dilationY;
             depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.depth_multiplier      = depth_multiplier;
             depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.downScaleSizeRounding = downScaleSizeRounding;
+            depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.stride_x              = strideX;
+            depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.stride_y              = strideY;
             depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.outputs               = outputs;
 
             vxnneOperation_AddReference(&depthwiseConvolutionLayer->convolution_sw1_depthwise_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);

@@ -3394,6 +3394,8 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_scalar               poolingX,
     vx_scalar               poolingY,
     vx_scalar               downScaleSizeRounding,
+    vx_int32                strideXvalue,
+    vx_int32                strideYvalue,
     vx_tensor               outputs);
 
 vxnne_shader_executable vxnneGetLSTMUnitProjectionShaderExecutable(
