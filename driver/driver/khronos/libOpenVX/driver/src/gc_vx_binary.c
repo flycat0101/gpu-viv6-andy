@@ -11027,6 +11027,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetShaderStatesSize(
 
     statesSize += gpuCount * 112; /* for gcoHARDWARE_InvokeThreadWalkerCL() for(i = 0; i < usedGPUCount; i++) */
 
+    statesSize += 4 * 25;
+
     statesSize = gcmALIGN_NP2_SAFE(statesSize, 64);
 
     *size = statesSize;
@@ -11087,8 +11089,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetSectionsSize(
 
     patchCount += 10;
 
-    operationCount = 2; /* initialize and end */
-    patchCount += 2; /* SRAM */
+    operationCount = 4; /* initialize and end */
+    patchCount += 4; /* SRAM */
     lcdtCount = operationCount;
     statesSize += 128;
     statesSize += 0X40;
