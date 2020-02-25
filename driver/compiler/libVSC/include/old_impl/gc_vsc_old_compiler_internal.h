@@ -1344,7 +1344,8 @@ gcGetDualFP16Mode(
 gctBOOL
 gcIsInstHWBarrier(
     IN gcSHADER             Shader,
-    IN gcSL_INSTRUCTION     Code
+    IN gcSL_INSTRUCTION     Code,
+    IN gctBOOL              bGenerateMC
     );
 
 #define _MASSAGE_MAX_UNIFORM_FOR_OES30(vsUniform, psUniform)   \

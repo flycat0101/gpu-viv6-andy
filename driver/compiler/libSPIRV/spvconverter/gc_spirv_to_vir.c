@@ -11021,10 +11021,10 @@ VSC_ErrCode __SpvEmitBarrier(gcSPV spv, VIR_Shader * virShader)
     VIR_Operand_SetImmediateInt(pNewOpnd, pMemorySemanticConst->value.scalarVal.iValue);
 
     /* Set the shader flag. */
-    bNeedHwBarrier = VIR_Inst_IsHWBarrier(pNewInst);
+    bNeedHwBarrier = VIR_Inst_IsHWBarrier(pNewInst, gcvTRUE);
     if (bNeedHwBarrier)
     {
-        VIR_Shader_SetFlag(virShader, VIR_SHFLAG_HAS_BARRIER);
+        VIR_Shader_SetFlag(virShader, VIR_SHFLAG_HAS_HW_BARRIER);
     }
 
 OnError:

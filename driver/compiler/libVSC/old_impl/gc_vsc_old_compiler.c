@@ -29881,7 +29881,8 @@ gcGetDualFP16Mode(
 gctBOOL
 gcIsInstHWBarrier(
     IN gcSHADER             Shader,
-    IN gcSL_INSTRUCTION     Code
+    IN gcSL_INSTRUCTION     Code,
+    IN gctBOOL              bGenerateMC
     )
 {
     gcSL_OPCODE                 opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(Code->opcode, Opcode);
@@ -29910,7 +29911,9 @@ gcIsInstHWBarrier(
     else if (opcode == gcSL_MEM_BARRIER)
     {
         /* Only CS/CL and TCS can support BARRIER instruction. */
-        if (!(GetShaderType(Shader) == gcSHADER_TYPE_COMPUTE || GetShaderType(Shader) == gcSHADER_TYPE_CL || GetShaderType(Shader) == gcSHADER_TYPE_TCS))
+        if (bGenerateMC
+            &&
+            !(GetShaderType(Shader) == gcSHADER_TYPE_COMPUTE || GetShaderType(Shader) == gcSHADER_TYPE_CL || GetShaderType(Shader) == gcSHADER_TYPE_TCS))
         {
             return gcvFALSE;
         }

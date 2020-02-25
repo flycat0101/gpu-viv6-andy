@@ -6304,9 +6304,9 @@ _ConvCode2VirInstruction(
         virErrCode = _ConvTexLdForShadow(Shader, Code, &opcode);
     }
 
-    if (gcIsInstHWBarrier(Shader, Code))
+    if (gcIsInstHWBarrier(Shader, Code, gcvTRUE))
     {
-        VIR_Shader_SetFlag(VirShader, VIR_SHFLAG_HAS_BARRIER);
+        VIR_Shader_SetFlag(VirShader, VIR_SHFLAG_HAS_HW_BARRIER);
     }
 
     virOpcode    = _gcmConvShaderOpcodeToVirOpcode(Shader, CodeIndex, opcode);
