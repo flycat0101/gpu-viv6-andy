@@ -4137,6 +4137,8 @@ VkResult halti5_dispatch(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&pCmdBuffer)++ = 0;
 ;
 
+
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E80, VK_FALSE, 1);
     }
 
     data[0] = x - 1;
@@ -4305,6 +4307,8 @@ VkResult halti5_dispatchIndirect(
  31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&pCmdBuffer)++ = 0;
 ;
 
+
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E80, VK_FALSE, 1);
     }
 
     if (chipCmptPipeline->numberOfWorkGroup.bUsed)
