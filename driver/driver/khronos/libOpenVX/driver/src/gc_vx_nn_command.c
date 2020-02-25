@@ -3619,12 +3619,12 @@ void _fill_TP_REORG_SPACE2BATCH_Command(
         info_array[i].vx_tp_general_cmd_split_info.inTileXInc = inXSize + padXLeft + padXRight;
         info_array[i].vx_tp_general_cmd_split_info.inTileYInc = inYSize + padYTop + padYBottom;
         info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outXSize * outYSize * split_offsets[i] * outputElemSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = outXSize * outYSize * outZSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = outXSize * outYSize * outZSize * inNSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = blockWidth;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = outXSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outXSize * outYSize * outZSize * blockWidth;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outXSize * outYSize * outZSize * inNSize * blockWidth;
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = blockHeight;
         info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = outXSize;
@@ -3632,7 +3632,7 @@ void _fill_TP_REORG_SPACE2BATCH_Command(
         info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
         info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = outXSize * outYSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = outZSize;
-        info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = outXSize * outYSize * outZSize * blockWidth * blockHeight;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = outXSize * outYSize * outZSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = inNSize;
         info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = 0;
 

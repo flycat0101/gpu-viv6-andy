@@ -1587,7 +1587,6 @@ OnError:
     vx_context context              = vxGetContext((vx_reference)node);
     vx_enum type                    = type_s->value->e;
     vx_uint32 batch_count           = (type == VX_REORG_BATCH_TO_SPACE_ND || type == VX_REORG_SPACE_TO_BATCH_ND) ? 1 : TENSOR_SIZE_INDEX(inputs, 3);
-//    vx_uint32 batch_count           =  TENSOR_SIZE_INDEX(inputs, 3);
     vxnne_operation_target_e target = VXNNE_OPERATION_TARGET_NONE;
     vx_tp_cmd_type_e tp_cmd_type    = TP_NONE;
     vxnne_reorg_layer reorg_layer   = VX_NULL;
