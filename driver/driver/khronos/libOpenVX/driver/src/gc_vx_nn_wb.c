@@ -240,9 +240,16 @@ VX_PRIVATE_API vx_status _vxoWeightBias_CalculateSize(
     }
     if (target == VXNNE_OPERATION_TARGET_TP && i <= MAX_ZGROUP_COUNT)
     {
+        vx_uint32 splitIndex = 0;
         zNum = i;
-        kzNum = sliceCount / (0x1 << 16) + 1;
-        calculateSplitSize(sliceCount, kzNum, kzArray, VX_NULL);
+        kzNum = sliceCount % MAX_TP_FC_KZ_SIZE == 0 ? sliceCount / MAX_TP_FC_KZ_SIZE : sliceCount / MAX_TP_FC_KZ_SIZE + 1;
+        for(splitIndex = 0; splitIndex < kzNum; splitIndex ++)
+        {
+            if(splitIndex == (kzNum - 1))
+                kzArray[splitIndex] = (sliceCount - MAX_TP_FC_KZ_SIZE * splitIndex);
+            else
+                kzArray[splitIndex] = MAX_TP_FC_KZ_SIZE;
+        }
 
         WB_COMPRESS_TARGET(wb) = VXNNE_OPERATION_TARGET_TP;
 

@@ -136,7 +136,7 @@
 #define VXM_FORCE_PER_OPERATION_IDLE      0
 
 #define TP_FC_Z_MAX         512
-
+#define MAX_TP_FC_KZ_SIZE  ((0x1 <<16) -64)
 #define NN_INTEGER_BIAS_BITS                27
 #define NN_INTEGER_BIAS_BITS_VIP_V7         32
 #define NN_INTEGER_BIAS_BITS_VIP_V7_INT16   48
