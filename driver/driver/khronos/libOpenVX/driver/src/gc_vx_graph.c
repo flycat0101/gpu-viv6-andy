@@ -1923,7 +1923,7 @@ VX_PRIVATE_API vx_status DetectSegments(
     vx_enum                     memType,
     vxnne_segment_collection    collection)
 {
-    vx_uint32 i = 0, j = 0, k = 0, tilingStart, tilingEnd, M = 0, N = 0, axiSRAMUsed = 0, vipSRAMUsed = 0, failedID;
+    vx_uint32 i = 0, j = 0, k = 0, tilingStart, tilingEnd, M = 0, N = 0, axiSRAMUsed = 0, vipSRAMUsed = 0;
     vx_status status = VX_SUCCESS;
     vxnne_segment_collection_s  detectedCollection;
     vx_bool detected = vx_false_e;
@@ -1947,65 +1947,82 @@ VX_PRIVATE_API vx_status DetectSegments(
         {
             for (i = tilingStart; i < tilingEnd; i++)
             {
-                for (k = tilingEnd - i + 1; (vx_int32)k > 1; k--)
+                vx_uint32 successedID = i, failedID = tilingEnd + 1;
+
+                for (k = tilingEnd - i + 1; (vx_int32)k > 1;)
                 {
-                    if (!SupportSWTiling(graph, i, k, segType, memType)) continue;
-
-                    if (segType == VXNNE_SEGMENT_TYPE_AB)
+                    if (!SupportSWTiling(graph, i, k, segType, memType))
                     {
-                        status = DetectABSegment(graph, i, k, memType, &detected, &failedID);
-                        if (status != VX_SUCCESS) goto OnError;
-
-                        if (!detected)
-                        {
-                            k =  gcmCLAMP(((vx_int32)(failedID - i)), 1, (vx_int32)k);
-                        }
+                        detected = vx_false_e;
                     }
                     else
                     {
-                        vxmASSERT(segType == VXNNE_SEGMENT_TYPE_TILING);
-                        detected = ComputeMNEx(graph->layer, i, k, &N, &M, &axiSRAMUsed, &vipSRAMUsed, memType);
+                        if (segType == VXNNE_SEGMENT_TYPE_AB)
+                        {
+                            status = DetectABSegment(graph, i, k, memType, &detected, VX_NULL);
+                            if (status != VX_SUCCESS) goto OnError;
+                        }
+                        else
+                        {
+                            vxmASSERT(segType == VXNNE_SEGMENT_TYPE_TILING);
+                            detected = ComputeMNEx(graph->layer, i, k, &N, &M, &axiSRAMUsed, &vipSRAMUsed, memType);
+                        }
                     }
 
-                    if (detected)
+                    if (!detected)
                     {
-                        vxmASSERT(detectedCollection.segmentNum < VX_MAX_SEGMENT_COUNT);
-                        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(vxnne_segment_s), (gctPOINTER*)&detectedCollection.segments[detectedCollection.segmentNum])))
-                        {
-                            status = VX_ERROR_NO_MEMORY;
-                            goto OnError;
-                        }
-
-                        gcoOS_ZeroMemory(detectedCollection.segments[detectedCollection.segmentNum], sizeof(vxnne_segment_s));
-
-                        detectedCollection.segments[detectedCollection.segmentNum]->type    = segType;
-                        detectedCollection.segments[detectedCollection.segmentNum]->memType = memType;
-                        detectedCollection.segments[detectedCollection.segmentNum]->start = i;
-                        detectedCollection.segments[detectedCollection.segmentNum]->count = k;
-                        detectedCollection.segments[detectedCollection.segmentNum]->end = i + k - 1;
-
-                        if (segType == VXNNE_SEGMENT_TYPE_TILING)
-                        {
-                            detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.M = M;
-                            detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.N = N;
-                            detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.estimateAxiSRAMUsed = axiSRAMUsed;
-                            detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.estimateVipSRAMUsed = vipSRAMUsed;
-                        }
-
-                        detectedCollection.segmentNum++;
-
-                        status = SetMemoryRequestList(graph, i, k, memType);
-                        vxmASSERT(status == VX_SUCCESS);
-
-                        if (detectedCollection.segmentNum == VX_MAX_SEGMENT_COUNT)
-                        {
-                            status = VX_SUCCESS;
-                            goto OnError;
-                        }
-
-                        i = i + k - 1;
-                        break;
+                        failedID = i + k - 1;
+                        k = (k + 1) / 2;
                     }
+                    else
+                    {
+                        successedID = i + k - 1;
+
+                        if (failedID - successedID == 1)
+                            break;
+
+                        k += (failedID - successedID)/2;
+                    }
+                }
+
+                if (k > 1)
+                {
+                    vxmASSERT(detectedCollection.segmentNum < VX_MAX_SEGMENT_COUNT);
+                    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(vxnne_segment_s), (gctPOINTER*)&detectedCollection.segments[detectedCollection.segmentNum])))
+                    {
+                        status = VX_ERROR_NO_MEMORY;
+                        goto OnError;
+                    }
+
+                    gcoOS_ZeroMemory(detectedCollection.segments[detectedCollection.segmentNum], sizeof(vxnne_segment_s));
+
+                    detectedCollection.segments[detectedCollection.segmentNum]->type    = segType;
+                    detectedCollection.segments[detectedCollection.segmentNum]->memType = memType;
+                    detectedCollection.segments[detectedCollection.segmentNum]->start = i;
+                    detectedCollection.segments[detectedCollection.segmentNum]->count = k;
+                    detectedCollection.segments[detectedCollection.segmentNum]->end = i + k - 1;
+
+                    if (segType == VXNNE_SEGMENT_TYPE_TILING)
+                    {
+                        detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.M = M;
+                        detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.N = N;
+                        detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.estimateAxiSRAMUsed = axiSRAMUsed;
+                        detectedCollection.segments[detectedCollection.segmentNum]->segmentInfo.tiling.estimateVipSRAMUsed = vipSRAMUsed;
+                    }
+
+                    detectedCollection.segmentNum++;
+
+                    status = SetMemoryRequestList(graph, i, k, memType);
+                    vxmASSERT(status == VX_SUCCESS);
+
+                    if (detectedCollection.segmentNum == VX_MAX_SEGMENT_COUNT)
+                    {
+                        status = VX_SUCCESS;
+                        goto OnError;
+                    }
+
+                    i = i + k - 1;
+                    continue;
                 }
             }
         }
