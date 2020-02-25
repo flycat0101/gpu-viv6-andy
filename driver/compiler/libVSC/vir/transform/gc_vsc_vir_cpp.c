@@ -285,6 +285,67 @@ static gctBOOL _VSC_CPP_CopySrcTypeFromMov(
     return bCopySrcTypeFromMov;
 }
 
+static gctBOOL _VSC_CPP_AnyOtherUsageCanNotBeOptimize(
+    IN VIR_DEF_USAGE_INFO*          pDuInfo,
+    IN VIR_Instruction*             pCurrentUsageInst,
+    IN VIR_Instruction*             pDefInst,
+    IN VIR_Enable                   currentEnable,
+    IN gctUINT                      defRegNo
+    )
+{
+    gctUINT8                        channel;
+    VIR_GENERAL_DU_ITERATOR         du_iter;
+    VIR_USAGE*                      pUsage = gcvNULL;
+    gctBOOL                         bResult = gcvFALSE;
+
+    for (channel = 0; channel < VIR_CHANNEL_COUNT; ++channel)
+    {
+        if (!(currentEnable & (1 << channel)))
+        {
+            continue;
+        }
+        vscVIR_InitGeneralDuIterator(&du_iter,
+                                     pDuInfo,
+                                     pDefInst,
+                                     defRegNo,
+                                     channel,
+                                     gcvFALSE);
+
+        for (pUsage = vscVIR_GeneralDuIterator_First(&du_iter);
+             pUsage != gcvNULL;
+             pUsage = vscVIR_GeneralDuIterator_Next(&du_iter))
+        {
+            VIR_Instruction* pUsageInst = pUsage->usageKey.pUsageInst;
+
+            if (VIR_IS_OUTPUT_USAGE_INST(pUsageInst))
+            {
+                bResult = gcvTRUE;
+                return bResult;
+            }
+
+            /* A rough check here, only check the previous instructions. */
+            if (pCurrentUsageInst != gcvNULL &&
+                VIR_Inst_GetId(pUsageInst) < VIR_Inst_GetId(pCurrentUsageInst))
+            {
+                continue;
+            }
+
+            if (!vscVIR_IsUniqueDefInstOfUsageInst(pDuInfo,
+                                                   pUsageInst,
+                                                   pUsage->usageKey.pOperand,
+                                                   pUsage->usageKey.bIsIndexingRegUsage,
+                                                   pDefInst,
+                                                   gcvNULL))
+            {
+                bResult = gcvTRUE;
+                return bResult;
+            }
+        }
+    }
+
+    return bResult;
+}
+
 static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
     IN OUT VSC_CPP_CopyPropagation  *cpp,
     IN     VIR_Instruction          *inst,
@@ -302,11 +363,11 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
 
     VIR_OpCode      instOpcode = VIR_Inst_GetOpcode(inst);
     VIR_Operand     *instDst = VIR_Inst_GetDest(inst);
+    VIR_Instruction *defInst = gcvNULL;
 
-    VIR_GENERAL_UD_ITERATOR udIter;
-    VIR_DEF         *pDef;
     gctBOOL         srcOpndIsRelIndexing = (VIR_Operand_GetRelAddrMode(srcOpnd) != VIR_INDEXED_NONE);
     gctBOOL         bCopyFromOutputParam = (VSC_CPP_GetFlag(cpp) & VSC_CPP_COPY_FROM_OUTPUT_PARAM);
+    gctBOOL         bHasUniqueDefInst = gcvFALSE;
 
     do
     {
@@ -354,280 +415,140 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
             continue;
         }
 
-        vscVIR_InitGeneralUdIterator(&udIter, VSC_CPP_GetDUInfo(cpp), inst, srcOpnd, gcvFALSE, gcvFALSE);
-        for (pDef = vscVIR_GeneralUdIterator_First(&udIter); pDef != gcvNULL;
-             pDef = vscVIR_GeneralUdIterator_Next(&udIter))
+        /* this inst's srcOpnd only has one MOV def */
+        bHasUniqueDefInst = vscVIR_IsUniqueDefInstOfUsageInst(VSC_CPP_GetDUInfo(cpp),
+                                                              inst,
+                                                              srcOpnd,
+                                                              gcvFALSE,
+                                                              gcvNULL,
+                                                              &defInst);
+
+        if (!bHasUniqueDefInst || defInst == gcvNULL)
         {
-            VIR_Instruction     *defInst = pDef->defKey.pDefInst;
-            gctUINT8             channel;
+            continue;
+        }
 
-            if (defInst &&
-                (!VIR_IS_IMPLICIT_DEF_INST(defInst) &&
-                 defInst != VIR_UNDEF_INST) &&
-                 (VIR_Inst_GetOpcode(defInst) == VIR_OP_MOV ||
-                  VIR_Inst_GetOpcode(defInst) == VIR_OP_COPY) &&
-                 /* this inst's srcOpnd only has one MOV def */
-                 vscVIR_IsUniqueDefInstOfUsageInst(
-                    VSC_CPP_GetDUInfo(cpp),
-                    inst,
-                    srcOpnd,
-                    gcvFALSE,
-                    defInst,
-                    gcvNULL)
-                    )
+        if (!VIR_IS_IMPLICIT_DEF_INST(defInst) &&
+            defInst != VIR_UNDEF_INST &&
+            (VIR_Inst_GetOpcode(defInst) == VIR_OP_MOV || VIR_Inst_GetOpcode(defInst) == VIR_OP_COPY)
+            )
+        {
+            VIR_Operand     *movDst = VIR_Inst_GetDest(defInst);
+            VIR_Operand     *movSrc = VIR_Inst_GetSource(defInst, 0);
+            VIR_OperandInfo  movSrcInfo;
+            VIR_Operand      *newSrc;
+            /*VIR_Symbol       *dstSym, *srcSym;*/
+
+            VIR_Swizzle movSrcSwizzle = VIR_Operand_GetSwizzle(movSrc);
+            VIR_Enable  movEnable = VIR_Operand_GetEnable(movDst);
+            VIR_Swizzle instSrcSwizzle = VIR_Operand_GetSwizzle(srcOpnd);
+            VIR_Enable  instEnable = instDst ? VIR_Operand_GetEnable(instDst) : VIR_ENABLE_XYZW;
+            VIR_Swizzle newSwizzle = instSrcSwizzle;
+            VIR_Swizzle channelMapping = VIR_SWIZZLE_X;
+
+            VIR_Swizzle lastSwizzle = VIR_SWIZZLE_X;
+            gctINT      lastChannel = -1;
+            gctUINT8    channel;
+
+            if (!VIR_Inst_isComponentwise(inst))
             {
-                VIR_Operand     *movDst = VIR_Inst_GetDest(defInst);
-                VIR_Operand     *movSrc = VIR_Inst_GetSource(defInst, 0);
-                VIR_OperandInfo  movSrcInfo;
-                VIR_Operand      *newSrc;
-                /*VIR_Symbol       *dstSym, *srcSym;*/
-
-                VIR_Swizzle movSrcSwizzle = VIR_Operand_GetSwizzle(movSrc);
-                VIR_Enable  movEnable = VIR_Operand_GetEnable(movDst);
-                VIR_Swizzle instSrcSwizzle = VIR_Operand_GetSwizzle(srcOpnd);
-                VIR_Enable  instEnable = instDst ? VIR_Operand_GetEnable(instDst) : VIR_ENABLE_XYZW;
-                VIR_Swizzle newSwizzle = instSrcSwizzle;
-                VIR_Swizzle channelMapping = VIR_SWIZZLE_X;
-
-                VIR_Swizzle lastSwizzle = VIR_SWIZZLE_X;
-                gctINT      lastChannel = -1;
-
-                if(!VIR_Inst_isComponentwise(inst))
+                if ((instOpcode == VIR_OP_DP2) || (instOpcode == VIR_OP_NORM_DP2))
                 {
-                    if ((instOpcode == VIR_OP_DP2) ||
-                        (instOpcode == VIR_OP_NORM_DP2))
-                    {
-                        instEnable = VIR_ENABLE_XY;
-                    }
-                    else if ((instOpcode == VIR_OP_DP3) ||
-                        (instOpcode == VIR_OP_NORM_DP3))
-                    {
-                        instEnable = VIR_ENABLE_XYZ;
-                    }
-                    else if ((instOpcode == VIR_OP_DP4) ||
-                        (instOpcode == VIR_OP_NORM_DP4) ||
-                        (instOpcode == VIR_OP_JMPC) ||
-                        VIR_OPCODE_isAtomCmpxChg(instOpcode))
-                    {
-                        instEnable = VIR_ENABLE_XYZW;
-                    }
-                    else if (instOpcode == VIR_OP_CROSS)
-                    {
-                        instEnable = VIR_ENABLE_XYZ;
-                    }
-                    else
-                    {
-                        instEnable = VIR_ENABLE_XYZW;
-                    }
+                    instEnable = VIR_ENABLE_XY;
                 }
+                else if ((instOpcode == VIR_OP_DP3) || (instOpcode == VIR_OP_NORM_DP3))
+                {
+                    instEnable = VIR_ENABLE_XYZ;
+                }
+                else if ((instOpcode == VIR_OP_DP4) || (instOpcode == VIR_OP_NORM_DP4) || (instOpcode == VIR_OP_JMPC) || VIR_OPCODE_isAtomCmpxChg(instOpcode))
+                {
+                    instEnable = VIR_ENABLE_XYZW;
+                }
+                else if (instOpcode == VIR_OP_CROSS)
+                {
+                    instEnable = VIR_ENABLE_XYZ;
+                }
+                else
+                {
+                    instEnable = VIR_ENABLE_XYZW;
+                }
+            }
 
-                gcmASSERT(instEnable != VIR_ENABLE_NONE);
+            gcmASSERT(instEnable != VIR_ENABLE_NONE);
 
-                if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                  VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+            if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+            {
+                VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                VIR_LOG(dumper, "\n[FW] instruction:\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Inst_Dump(dumper, inst);
+                VIR_LOG_FLUSH(dumper);
+
+                VIR_LOG(dumper, "[FW] def Instruction:\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Inst_Dump(dumper, defInst);
+                VIR_LOG_FLUSH(dumper);
+            }
+
+            VIR_Operand_GetOperandInfo(defInst, movSrc, &movSrcInfo);
+
+            if (movSrcInfo.isOutputParm && VIR_Shader_GetLevel(cpp->shader) < VIR_SHLEVEL_Pre_Low)
+            {
+                /* do not copy output parameter to its use before Lowlevel, so the inliner
+                 * can find the out parameter and rename it */
+                if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
                 {
                     VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                    VIR_LOG(dumper, "\n[FW] instruction:\n");
-                    VIR_LOG_FLUSH(dumper);
-                    VIR_Inst_Dump(dumper, inst);
-                    VIR_LOG_FLUSH(dumper);
-
-                    VIR_LOG(dumper, "[FW] def Instruction:\n");
-                    VIR_LOG_FLUSH(dumper);
-                    VIR_Inst_Dump(dumper, defInst);
+                    VIR_LOG(dumper, "[FW] ==> bail out: output parameter not copied before lowlevel");
                     VIR_LOG_FLUSH(dumper);
                 }
+                break;
+            }
 
-                VIR_Operand_GetOperandInfo(defInst, movSrc, &movSrcInfo);
-
-                if (movSrcInfo.isOutputParm && VIR_Shader_GetLevel(cpp->shader) < VIR_SHLEVEL_Pre_Low)
+            if (VIR_Operand_GetRelAddrMode(movSrc) != VIR_INDEXED_NONE)
+            {
+                VIR_Instruction* pUsageInst = gcvNULL;
+                VIR_Operand *pUsageOper = gcvNULL;
+                gctBOOL bIsIndexingRegUsage;
+                /* if movSrc and srcOpnd are indexing access, skip this case */
+                if (srcOpndIsRelIndexing)
                 {
-                    /* do not copy output parameter to its use before Lowlevel, so the inliner
-                     * can find the out parameter and rename it */
-                    if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                        VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                    /* do not copy src with relAddr to its use */
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
                     {
                         VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                        VIR_LOG(dumper, "[FW] ==> bail out: output parameter not copied before lowlevel");
+                        VIR_LOG(dumper, "[FW] ==> bail out: movSrc and being replaced src are relindexing access");
                         VIR_LOG_FLUSH(dumper);
                     }
                     break;
                 }
-
-                if (VIR_Operand_GetRelAddrMode(movSrc) != VIR_INDEXED_NONE)
+                /* if movDst has 1+ usage, no benefit to copy propagation since more mova/ldarr are generated */
+                if (!vscVIR_DoesDefInstHaveUniqueUsageInst(VSC_CPP_GetDUInfo(cpp),
+                                                           defInst, gcvTRUE,
+                                                           &pUsageInst, &pUsageOper, &bIsIndexingRegUsage))
                 {
-                    VIR_Instruction* pUsageInst = gcvNULL;
-                    VIR_Operand *pUsageOper = gcvNULL;
-                    gctBOOL bIsIndexingRegUsage;
-                    /* if movSrc and srcOpnd are indexing access, skip this case */
-                    if (srcOpndIsRelIndexing)
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
                     {
-                        /* do not copy src with relAddr to its use */
-                        if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                          VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                        {
-                            VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                            VIR_LOG(dumper, "[FW] ==> bail out: movSrc and being replaced src are relindexing access");
-                            VIR_LOG_FLUSH(dumper);
-                        }
-                        break;
+                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                        VIR_LOG(dumper, "[FW] ==> bail out: movSrc is indexing access and dest has 1+ usage no good for propagation");
+                        VIR_LOG_FLUSH(dumper);
                     }
-                    /* if movDst has 1+ usage, no benefit to copy propagation since more mova/ldarr are generated */
-                    if (!vscVIR_DoesDefInstHaveUniqueUsageInst(VSC_CPP_GetDUInfo(cpp),
-                                                              defInst, gcvTRUE,
-                                                              &pUsageInst, &pUsageOper, &bIsIndexingRegUsage))
-                    {
-                        if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                          VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                        {
-                            VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                            VIR_LOG(dumper, "[FW] ==> bail out: movSrc is indexing access and dest has 1+ usage no good for propagation");
-                            VIR_LOG_FLUSH(dumper);
-                        }
-                        break;
-                    }
+                    break;
                 }
-                /* mov src is constant. do very limited constant propagation */
-                if (movSrcInfo.isImmVal || movSrcInfo.isVecConst)
+            }
+            /* mov src is constant. do very limited constant propagation */
+            if (movSrcInfo.isImmVal || movSrcInfo.isVecConst)
+            {
+                if (VIR_OPCODE_isVX(instOpcode))
                 {
-                    if (VIR_OPCODE_isVX(instOpcode))
+                    gctINT evisSrcNo = VIR_OPCODE_EVISModifier_SrcNo(instOpcode);
+                    gcmASSERT(evisSrcNo >= 0 && (gctUINT)evisSrcNo < VIR_Inst_GetSrcNum(inst));
+
+                    /* VX instruction's operand can not be immediate number */
+                    if (evisSrcNo != (gctINT)srcNum)
                     {
-                        gctINT evisSrcNo = VIR_OPCODE_EVISModifier_SrcNo(instOpcode);
-                        gcmASSERT(evisSrcNo >= 0 && (gctUINT)evisSrcNo < VIR_Inst_GetSrcNum(inst));
-
-                        /* VX instruction's operand can not be immediate number */
-                        if (evisSrcNo != (gctINT)srcNum)
-                        {
-                            /* define and user must in same function */
-                            if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                              VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                            {
-                                VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                                VIR_LOG(dumper, "[FW] ==> bail out: definition and user are not in same function");
-                                VIR_LOG_FLUSH(dumper);
-                            }
-                            break;
-                        }
-                    }
-                    /* update the DU, remove the usage of srcOpnd */
-                    vscVIR_DeleteUsage(VSC_CPP_GetDUInfo(cpp),
-                        defInst,
-                        inst,
-                        srcOpnd,
-                        gcvFALSE,
-                        srcInfo.u1.virRegInfo.virReg,
-                        1,
-                        srcEnable,
-                        VIR_HALF_CHANNEL_MASK_FULL,
-                        gcvNULL);
-
-                    /* duplicate movSrc */
-                    VIR_Function_DupOperand(func, movSrc, &newSrc);
-                    VIR_Operand_SetLShift(newSrc, VIR_Operand_GetLShift(srcOpnd));
-                    VIR_Operand_SetTypeId(newSrc, VIR_Operand_GetTypeId(srcOpnd));
-
-                    /* we need to map swizzle for a vector constant. */
-                    if (movSrcInfo.isVecConst)
-                    {
-                        for (channel = 0; channel < VIR_CHANNEL_NUM; channel++ )
-                        {
-                            if (movEnable & (1 << channel))
-                            {
-                                VIR_Swizzle_SetChannel(channelMapping, channel,
-                                    VIR_Swizzle_GetChannel(movSrcSwizzle, channel));
-                            }
-                        }
-
-                        /*
-                        ** We must also update the used components because after Peephole,
-                        ** the enable count of dest may change.
-                        */
-                        for (channel = 0; channel < VIR_CHANNEL_NUM; channel++ )
-                        {
-                            if (instEnable & (1 << channel))
-                            {
-                                lastSwizzle = VIR_Swizzle_GetChannel(channelMapping,
-                                        VIR_Swizzle_GetChannel(instSrcSwizzle, channel));
-
-                                VIR_Swizzle_SetChannel(newSwizzle, channel, lastSwizzle);
-
-                                /* It is the first enable component. Set the prev-unenable components. */
-                                if (lastChannel == -1)
-                                {
-                                    gctUINT8 i;
-
-                                    for (i = 0; i < channel; i++)
-                                    {
-                                        VIR_Swizzle_SetChannel(newSwizzle, i, lastSwizzle);
-                                    }
-                                }
-                                lastChannel = (gctINT8)channel;
-                            }
-                            /* Use the swizzle of last enable component. */
-                            else if (lastChannel != -1)
-                            {
-                                VIR_Swizzle_SetChannel(newSwizzle, channel, lastSwizzle);
-                            }
-                        }
-                        VIR_Operand_SetSwizzle(newSrc, newSwizzle);
-
-                        /* If this is a simple swizzle, we can just change it to a immediate operand. */
-                        if (VIR_Swizzle_Channel_Count(newSwizzle) == 1)
-                        {
-                            VIR_Const*  pConstValue;
-                            pConstValue = (VIR_Const*)VIR_GetSymFromId(&shader->constTable, VIR_Operand_GetConstId(newSrc));
-
-                            VIR_Operand_SetOpKind(newSrc, VIR_OPND_IMMEDIATE);
-                            VIR_Operand_SetImmUint(newSrc, pConstValue->value.vecVal.u32Value[VIR_Swizzle_GetChannel(newSwizzle, 0)]);
-                            VIR_Operand_SetTypeId(newSrc, VIR_GetTypeComponentType(VIR_Operand_GetTypeId(newSrc)));
-                        }
-                    }
-                    else
-                    {
-                        gcmASSERT(movSrcInfo.isImmVal);
-                        VIR_Operand_SetSwizzle(newSrc, VIR_SWIZZLE_XXXX);
-                        VIR_Operand_SetTypeId(newSrc, VIR_GetTypeComponentType(VIR_Operand_GetTypeId(newSrc)));
-                    }
-
-                    /* Replace the source. */
-                    _VSC_CPP_ReplaceSource(cpp, inst, parentSrcOpnd, srcNum, newSrc);
-
-                    /* change the immediate to EvisModifier for EVIS inst if it is modifier operand */
-                    if (VIR_OPCODE_isVX(instOpcode))
-                    {
-                        gctINT evisSrcNo = VIR_OPCODE_EVISModifier_SrcNo(instOpcode);
-                        gcmASSERT(evisSrcNo >= 0 && (gctUINT)evisSrcNo < VIR_Inst_GetSrcNum(inst));
-
-                        if (evisSrcNo == (gctINT)srcNum)
-                        {
-                            /* set newSrc to EVISModifier operand */
-                            VIR_Operand_SetOpKind(newSrc, VIR_OPND_EVIS_MODIFIER);
-                        }
-                    }
-
-                    _VSC_CPP_RemoveDefInst(cpp, defInst);
-                }
-                else
-                {
-                    /* In the IR, there exists implict type conversion, thus we need
-                       to bail out if the types mismatch */
-                    VIR_TypeId ty0 = VIR_Operand_GetTypeId(movDst);
-                    VIR_TypeId ty1 = VIR_Operand_GetTypeId(srcOpnd);
-
-                    if(!VIR_TypeId_isPrimitive(ty0)) {
-                        ty0 = VIR_Type_GetBaseTypeId(VIR_Shader_GetTypeFromId(shader, ty0));
-                    }
-                    if(!VIR_TypeId_isPrimitive(ty1)) {
-                        ty1 = VIR_Type_GetBaseTypeId(VIR_Shader_GetTypeFromId(shader, ty1));
-                    }
-                    gcmASSERT(ty0 < VIR_TYPE_PRIMITIVETYPE_COUNT &&
-                        ty1 < VIR_TYPE_PRIMITIVETYPE_COUNT);
-
-                    if  (VIR_Inst_GetFunction(inst) != VIR_Inst_GetFunction(defInst))
-                    {
-                     /* define and user must in same function */
-                        if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                          VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                        /* define and user must in same function */
+                        if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
                         {
                             VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
                             VIR_LOG(dumper, "[FW] ==> bail out: definition and user are not in same function");
@@ -635,334 +556,27 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                         }
                         break;
                     }
+                }
+                /* update the DU, remove the usage of srcOpnd */
+                vscVIR_DeleteUsage(VSC_CPP_GetDUInfo(cpp),
+                                   defInst,
+                                   inst,
+                                   srcOpnd,
+                                   gcvFALSE,
+                                   srcInfo.u1.virRegInfo.virReg,
+                                   1,
+                                   srcEnable,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL);
 
-                    if (VIR_Shader_isDual16Mode(shader) &&
-                        VIR_Operand_GetPrecision(movDst) != VIR_Operand_GetPrecision(movSrc))
-                    {
-                        if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                          VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                        {
-                            VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                            VIR_LOG(dumper, "[FW] ==> bail out: because of different precision in dual16 mode");
-                            VIR_LOG_FLUSH(dumper);
-                        }
-                        break;
-                    }
+                /* duplicate movSrc */
+                VIR_Function_DupOperand(func, movSrc, &newSrc);
+                VIR_Operand_SetLShift(newSrc, VIR_Operand_GetLShift(srcOpnd));
+                VIR_Operand_SetTypeId(newSrc, VIR_Operand_GetTypeId(srcOpnd));
 
-                    if  (VIR_Inst_GetOpcode(defInst) == VIR_OP_COPY)
-                    {
-                        if (!VIR_Symbol_isImage(VIR_Operand_GetSymbol(defInst->src[0])) &&
-                            !VIR_Symbol_isImageT(VIR_Operand_GetSymbol(defInst->src[0])) &&
-                            !VIR_Symbol_isUniform(VIR_Operand_GetSymbol(defInst->src[0])) &&
-                            !VIR_Symbol_isSampler(VIR_Operand_GetSymbol(defInst->src[0])))
-                        {
-                            /* mov's dest is per patch output */
-                            if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                              VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                            {
-                                VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                                VIR_LOG(dumper, "[FW] ==> bail out: copy's src is not uniform");
-                                VIR_LOG_FLUSH(dumper);
-                            }
-                            break;
-                        }
-                    }
-
-                    if  (VIR_Operand_IsPerPatch(defInst->dest))
-                    {
-                        /* mov's dest is per patch output */
-                        if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                          VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                        {
-                            VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                            VIR_LOG(dumper, "[FW] ==> bail out: mov's dest is per patch output");
-                            VIR_LOG_FLUSH(dumper);
-                        }
-                        break;
-                    }
-
-                    if(!(((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) &&
-                        (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT)) ||
-                        (((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) ||
-                          (VIR_GetTypeTypeKind(ty0) == VIR_TY_IMAGE)) &&
-                         ((VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER) ||
-                          (VIR_GetTypeTypeKind(ty1) == VIR_TY_IMAGE))) ||
-                          (VIR_GetTypeTypeKind(ty1) == VIR_TY_SAMPLER &&
-                           (VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER)) ||
-                        ((ty0 == ty1) && (VIR_GetTypeFlag(ty0) & VIR_TYFLAG_IS_SAMPLER))
-                          ))
-                    {
-                        if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                          VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                        {
-                            VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                            VIR_LOG(dumper, "[FW] ==> bail out because of not same type");
-                            VIR_LOG_FLUSH(dumper);
-                        }
-                        break;
-                    }
-
-                    if (VIR_Operand_GetOpKind(movDst) != VIR_OPND_SYMBOL ||
-                        VIR_Operand_GetOpKind(movSrc) != VIR_OPND_SYMBOL)
-                    {
-                        if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                          VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                        {
-                            VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                            VIR_LOG(dumper, "[FW] ==> bail out because of not symbol");
-                            VIR_LOG_FLUSH(dumper);
-                        }
-                        break;
-                    }
-
-                    /* If COPY_FROM_OUTPUT_PARAM is disabled, we need to check if this source is a output parameter. */
-                    if (!bCopyFromOutputParam && movSrcInfo.isVreg && VIR_Operand_isSymbol(movSrc))
-                    {
-                        VIR_Symbol*     pSrcSym = VIR_Operand_GetSymbol(movSrc);
-
-                        if (VIR_Symbol_isVreg(pSrcSym))
-                        {
-                            if (VIR_Symbol_isOutParamVirReg(pSrcSym) || VIR_Symbol_isOutParam(VIR_Symbol_GetVregVariable(pSrcSym)))
-                            {
-                                break;
-                            }
-                        }
-                        else if (VIR_Symbol_isOutParam(pSrcSym))
-                        {
-                            break;
-                        }
-                    }
-
-                    /*  if there is a use that has def other than mov, this mov
-                        could not be removed. This copy could increase the live range of movSrc.
-                    */
-                    {
-                        VIR_USAGE               *pUsage;
-                        VSC_DU_ITERATOR         duIter;
-                        VIR_DU_CHAIN_USAGE_NODE *pUsageNode;
-                        VIR_Instruction         *pUseInst;
-                        gctBOOL                 invalidCase = gcvFALSE;
-
-                        /* go through all the uses */
-                        VSC_DU_ITERATOR_INIT(&duIter, &pDef->duChain);
-                        pUsageNode = VSC_DU_ITERATOR_FIRST(&duIter);
-                        for (; pUsageNode != gcvNULL; pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter))
-                        {
-                            pUsage = GET_USAGE_BY_IDX(&VSC_CPP_GetDUInfo(cpp)->usageTable, pUsageNode->usageIdx);
-                            pUseInst = pUsage->usageKey.pUsageInst;
-
-                            if (VIR_IS_OUTPUT_USAGE_INST(pUseInst) ||
-                                VIR_Inst_GetOpcode(pUseInst) == VIR_OP_EMIT ||
-                                VIR_Inst_GetOpcode(pUseInst) == VIR_OP_EMIT0) /* skip copy if usage is emit */
-                            {
-                                invalidCase = gcvTRUE;
-                                break;
-                            }
-                            if(!vscVIR_IsUniqueDefInstOfUsageInst(
-                                        VSC_CPP_GetDUInfo(cpp),
-                                        pUseInst,
-                                        pUsage->usageKey.pOperand,
-                                        pUsage->usageKey.bIsIndexingRegUsage,
-                                        defInst,
-                                        gcvNULL))
-                            {
-                                invalidCase = gcvTRUE;
-                                break;
-                            }
-                        }
-                        if (invalidCase)
-                        {
-                            if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                              VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                            {
-                                VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                                VIR_LOG(dumper, "[FW] ==> bail out because one use could not be replaced\n");
-                                VIR_LOG_FLUSH(dumper);
-                            }
-                            break;
-                        }
-                    }
-
-                    /* copy to LDARR with attribute is not benefial at all. For example,
-                       MOV t1.x, att1.x
-                       LDARR t2, base, t1.x
-                       ADD  t3, t2, t4
-                       ==> (after CPP)
-                       LDARR t2, base, att1.x
-                       ADD t3, t2, t4
-                       ==> (after converter)
-                       MOV t5.x, att1.x
-                       LDARR t2, base, t5.x
-                       ADD t3, t2, t4
-
-                       There is no gain in the above case. While, if more components are used in
-                       one MOV and shared by more LDARRs, there will be performance loss.
-
-                       MOV t1.xy, att1.xy
-                       LDARR t2, base, t1.x
-                       ADD  t3, t2, t4
-                       LDARR t5, base, t1.y
-                       ADD  t6, t5, t4
-                       ==> (after CPP)
-                       LDARR t2, base, att1.x
-                       ADD  t3, t2, t4
-                       LDARR t5, base, att1.y
-                       ADD  t6, t5, t4
-                       ==> (after converter)
-                       MOV  t7.x, att1.x
-                       LDARR t2, base, t7.x
-                       ADD  t3, t2, t4
-                       MOV t8.x, att1.y
-                       LDARR t5, base, t8.x
-                       ADD  t6, t5, t4
-
-                       Thus disable such case.
-
-                    */
-                    if (movSrcInfo.isInput &&
-                        VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
-                    {
-                        if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                          VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                        {
-                            VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                            VIR_LOG(dumper, "[FW] ==> bail out because movSrc is input");
-                            VIR_LOG_FLUSH(dumper);
-                        }
-                        break;
-
-                    }
-
-                    /* old CG, in base[index], index has to be temp */
-                    if (VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR &&
-                        srcNum == 1 &&
-                       !VIR_Symbol_isVreg(VIR_Operand_GetSymbol(movSrc))
-                       )
-                    {
-                        if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                          VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                        {
-                            VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                            VIR_LOG(dumper, "[FW] ==> bail out because LDARR index has to be temp ");
-                            VIR_LOG_FLUSH(dumper);
-                        }
-                        break;
-
-                    }
-
-                    /* we could move between different precison  */
-
-                    if (VIR_Operand_GetModifier(movDst) ||
-                        VIR_Operand_GetRoundMode(movDst) ||
-                        VIR_Operand_GetModifier(movSrc) ||
-                        VIR_Operand_GetRoundMode(movSrc))
-                    {
-                        if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                          VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                        {
-                            VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                            VIR_LOG(dumper, "[FW] ==> bail out because of modifier");
-                            VIR_LOG_FLUSH(dumper);
-                        }
-                        break;
-                    }
-
-                    /* inst and its def in the same bb */
-                    if(VIR_Inst_GetBasicBlock(inst) == VIR_Inst_GetBasicBlock(defInst))
-                    {
-                        /* no redefine of movSrc between defInst and inst */
-                        VIR_Instruction* next = VIR_Inst_GetNext(defInst);
-                        gctBOOL         invalidCase = gcvFALSE;
-                        while(next != inst)
-                        {
-                            if(VIR_Operand_SameLocation(defInst, movSrc, next, VIR_Inst_GetDest(next)) ||
-                               VIR_Inst_GetOpcode(next) == VIR_OP_CALL)
-                            {
-                                if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                              VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                                {
-                                    VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                                    VIR_LOG(dumper, "[FW] ==> bail out because of redefine or call\n");
-                                    VIR_LOG_FLUSH(dumper);
-                                    VIR_Inst_Dump(dumper, next);
-                                    VIR_LOG_FLUSH(dumper);
-                                }
-                                invalidCase = gcvTRUE;
-                                break;
-                            }
-                            next = VIR_Inst_GetNext(next);
-                        }
-                        if (invalidCase)
-                        {
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        if (!VSC_CPP_isGlobalCPP(cpp) &&
-                            !(VIR_Symbol_isUniform(VIR_Operand_GetSymbol(movSrc)) ||
-                             VIR_Symbol_isSampler(VIR_Operand_GetSymbol(movSrc)) ||
-                             VIR_Symbol_isImage(VIR_Operand_GetSymbol(movSrc)) ||
-                             VIR_Symbol_isImageT(VIR_Operand_GetSymbol(movSrc))))
-                        {
-                            if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                                  VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                                {
-                                    VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                                    VIR_LOG(dumper, "[FW] ==> bail out because of not same BB\n");
-                                    VIR_LOG_FLUSH(dumper);
-                                }
-                                break;
-                        }
-                        else
-                        {
-                            /* no call between defInst and inst */
-                            {
-                                if (!(movSrcInfo.isInput ||
-                                      VIR_Symbol_isUniform(VIR_Operand_GetSymbol(movSrc)) ||
-                                      VIR_Symbol_isSampler(VIR_Operand_GetSymbol(movSrc)) ||
-                                      VIR_Symbol_isImage(VIR_Operand_GetSymbol(movSrc)) ||
-                                      VIR_Symbol_isImageT(VIR_Operand_GetSymbol(movSrc))     ) &&
-                                    _VSC_CPP_CallInstInBetween(defInst, inst, visitSet))
-                                {
-                                    if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                                      VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                                    {
-                                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                                        VIR_LOG(dumper, "[FW] ==> bail out because of call\n");
-                                        VIR_LOG_FLUSH(dumper);
-                                    }
-                                    vscHTBL_Reset(visitSet);
-                                    break;
-                                }
-                                vscHTBL_Reset(visitSet);
-                            }
-
-                            {
-                                /* no redefine of movSrc between defInst and inst */
-                                VIR_Instruction *redefInst = gcvNULL;
-                                if (!(VIR_Symbol_isUniform(VIR_Operand_GetSymbol(movSrc)) ||
-                                      VIR_Symbol_isSampler(VIR_Operand_GetSymbol(movSrc)) ||
-                                      VIR_Symbol_isImage(VIR_Operand_GetSymbol(movSrc)) ||
-                                      VIR_Symbol_isImageT(VIR_Operand_GetSymbol(movSrc))) &&
-                                    vscVIR_RedefineBetweenInsts(VSC_CPP_GetMM(cpp), VSC_CPP_GetDUInfo(cpp),
-                                        defInst, inst, movSrc, &redefInst))
-                                {
-                                    if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                                      VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
-                                    {
-                                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                                        VIR_LOG(dumper, "[FW] ==> bail out because of redefine\n");
-                                        VIR_LOG_FLUSH(dumper);
-                                        VIR_Inst_Dump(dumper, redefInst);
-                                        VIR_LOG_FLUSH(dumper);
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
+                /* we need to map swizzle for a vector constant. */
+                if (movSrcInfo.isVecConst)
+                {
                     for (channel = 0; channel < VIR_CHANNEL_NUM; channel++ )
                     {
                         if (movEnable & (1 << channel))
@@ -1003,119 +617,499 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOVOnOperand(
                             VIR_Swizzle_SetChannel(newSwizzle, channel, lastSwizzle);
                         }
                     }
+                    VIR_Operand_SetSwizzle(newSrc, newSwizzle);
 
-                    if (VIR_OPCODE_isVX(VIR_Inst_GetOpcode(inst)) &&
-                        !VIR_OPCODE_isImgRelated(VIR_Inst_GetOpcode(inst)) &&
-                        newSwizzle != VIR_SWIZZLE_XXXX &&
-                        newSwizzle != VIR_SWIZZLE_XYYY &&
-                        newSwizzle != VIR_SWIZZLE_XYZZ &&
-                        newSwizzle != VIR_SWIZZLE_XYZW    )
+                    /* If this is a simple swizzle, we can just change it to a immediate operand. */
+                    if (VIR_Swizzle_Channel_Count(newSwizzle) == 1)
                     {
-                        /* the EVIS inst src0's swizzle bits are used for EVIS info like startBin,
-                         * make sure the src0 operand does NOT use them
-                         * VX_IMG_xxx instruction has no this restriction
-                         */
-                        if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                            VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                        VIR_Const*  pConstValue;
+                        pConstValue = (VIR_Const*)VIR_GetSymFromId(&shader->constTable, VIR_Operand_GetConstId(newSrc));
+
+                        VIR_Operand_SetOpKind(newSrc, VIR_OPND_IMMEDIATE);
+                        VIR_Operand_SetImmUint(newSrc, pConstValue->value.vecVal.u32Value[VIR_Swizzle_GetChannel(newSwizzle, 0)]);
+                        VIR_Operand_SetTypeId(newSrc, VIR_GetTypeComponentType(VIR_Operand_GetTypeId(newSrc)));
+                    }
+                }
+                else
+                {
+                    gcmASSERT(movSrcInfo.isImmVal);
+                    VIR_Operand_SetSwizzle(newSrc, VIR_SWIZZLE_XXXX);
+                    VIR_Operand_SetTypeId(newSrc, VIR_GetTypeComponentType(VIR_Operand_GetTypeId(newSrc)));
+                }
+
+                /* Replace the source. */
+                _VSC_CPP_ReplaceSource(cpp, inst, parentSrcOpnd, srcNum, newSrc);
+
+                /* change the immediate to EvisModifier for EVIS inst if it is modifier operand */
+                if (VIR_OPCODE_isVX(instOpcode))
+                {
+                    gctINT evisSrcNo = VIR_OPCODE_EVISModifier_SrcNo(instOpcode);
+                    gcmASSERT(evisSrcNo >= 0 && (gctUINT)evisSrcNo < VIR_Inst_GetSrcNum(inst));
+
+                    if (evisSrcNo == (gctINT)srcNum)
+                    {
+                        /* set newSrc to EVISModifier operand */
+                        VIR_Operand_SetOpKind(newSrc, VIR_OPND_EVIS_MODIFIER);
+                    }
+                }
+
+                _VSC_CPP_RemoveDefInst(cpp, defInst);
+            }
+            else
+            {
+                /* In the IR, there exists implict type conversion, thus we need to bail out if the types mismatch */
+                VIR_TypeId ty0 = VIR_Operand_GetTypeId(movDst);
+                VIR_TypeId ty1 = VIR_Operand_GetTypeId(srcOpnd);
+
+                if(!VIR_TypeId_isPrimitive(ty0)) {
+                    ty0 = VIR_Type_GetBaseTypeId(VIR_Shader_GetTypeFromId(shader, ty0));
+                }
+                if(!VIR_TypeId_isPrimitive(ty1)) {
+                    ty1 = VIR_Type_GetBaseTypeId(VIR_Shader_GetTypeFromId(shader, ty1));
+                }
+                gcmASSERT(ty0 < VIR_TYPE_PRIMITIVETYPE_COUNT &&
+                    ty1 < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+                if (VIR_Inst_GetFunction(inst) != VIR_Inst_GetFunction(defInst))
+                {
+                    /* define and user must in same function */
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                    {
+                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                        VIR_LOG(dumper, "[FW] ==> bail out: definition and user are not in same function");
+                        VIR_LOG_FLUSH(dumper);
+                    }
+                    break;
+                }
+
+                if (VIR_Shader_isDual16Mode(shader) &&
+                    VIR_Operand_GetPrecision(movDst) != VIR_Operand_GetPrecision(movSrc))
+                {
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                    {
+                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                        VIR_LOG(dumper, "[FW] ==> bail out: because of different precision in dual16 mode");
+                        VIR_LOG_FLUSH(dumper);
+                    }
+                    break;
+                }
+
+                if (VIR_Inst_GetOpcode(defInst) == VIR_OP_COPY)
+                {
+                    if (!VIR_Symbol_isImage(VIR_Operand_GetSymbol(defInst->src[0])) &&
+                        !VIR_Symbol_isImageT(VIR_Operand_GetSymbol(defInst->src[0])) &&
+                        !VIR_Symbol_isUniform(VIR_Operand_GetSymbol(defInst->src[0])) &&
+                        !VIR_Symbol_isSampler(VIR_Operand_GetSymbol(defInst->src[0])))
+                    {
+                        /* mov's dest is per patch output */
+                        if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
                         {
                             VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                            VIR_LOG(dumper, "[FW] ==> bail out because of VX instruction cannot swizzle source\n");
+                            VIR_LOG(dumper, "[FW] ==> bail out: copy's src is not uniform");
                             VIR_LOG_FLUSH(dumper);
                         }
                         break;
                     }
+                }
 
-                    if (VIR_Inst_GetThreadMode(defInst) == VIR_THREAD_D16_DUAL_32 &&
-                        VIR_Operand_GetPrecision(movSrc) == VIR_PRECISION_HIGH)
+                if (VIR_Operand_IsPerPatch(defInst->dest))
+                {
+                    /* mov's dest is per patch output */
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
                     {
-                        VIR_Inst_SetThreadMode(inst, VIR_THREAD_D16_DUAL_32);
+                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                        VIR_LOG(dumper, "[FW] ==> bail out: mov's dest is per patch output");
+                        VIR_LOG_FLUSH(dumper);
                     }
+                    break;
+                }
 
-                    vscVIR_DeleteUsage(VSC_CPP_GetDUInfo(cpp),
-                        VIR_ANY_DEF_INST,
-                        inst,
-                        srcOpnd,
-                        gcvFALSE,
-                        srcInfo.u1.virRegInfo.virReg,
-                        1,
-                        srcEnable,
-                        VIR_HALF_CHANNEL_MASK_FULL,
-                        gcvNULL);
-
-                    /* duplicate movSrc */
+                if (!(
+                      ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISFLOAT) && (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT))
+                      ||
+                      (((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) || (VIR_GetTypeTypeKind(ty0) == VIR_TY_IMAGE))
+                       &&
+                       ((VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER) || (VIR_GetTypeTypeKind(ty1) == VIR_TY_IMAGE)))
+                      ||
+                      (VIR_GetTypeTypeKind(ty1) == VIR_TY_SAMPLER && (VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER))
+                      ||
+                      ((ty0 == ty1) && (VIR_GetTypeFlag(ty0) & VIR_TYFLAG_IS_SAMPLER))
+                     ))
+                {
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
                     {
-                        VIR_TypeId ty = VIR_Operand_GetTypeId(srcOpnd);
-
-                        VIR_Function_DupOperand(func, movSrc, &newSrc);
-                        VIR_Operand_SetSwizzle(newSrc, newSwizzle);
-                        VIR_Operand_SetLShift(newSrc, VIR_Operand_GetLShift(srcOpnd));
-
-                        if (!_VSC_CPP_CopySrcTypeFromMov(cpp, inst, defInst, newSrc))
-                        {
-                            VIR_Operand_SetTypeId(newSrc, ty);
-                        }
-                        /* copy reladdr info to newSrc if needed */
-                        if (VIR_Operand_GetRelAddrMode(srcOpnd))
-                        {
-                            VIR_Operand_SetRelAddrMode(newSrc, VIR_Operand_GetRelAddrMode(srcOpnd));
-                            VIR_Operand_SetRelIndexing(newSrc, VIR_Operand_GetRelIndexing(srcOpnd));
-                        }
-                        else if (VIR_Operand_GetRelAddrMode(movSrc))
-                        {
-                            VIR_Operand_SetRelAddrMode(newSrc, VIR_Operand_GetRelAddrMode(movSrc));
-                            VIR_Operand_SetRelIndexing(newSrc, VIR_Operand_GetRelIndexing(movSrc));
-                        }
-                        /* Replace the source. */
-                        _VSC_CPP_ReplaceSource(cpp, inst, parentSrcOpnd, srcNum, newSrc);
-
-                        srcOpnd = gcvNULL;    /* reset srcOpnd to avoid misuse */
+                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                        VIR_LOG(dumper, "[FW] ==> bail out because of not same type");
+                        VIR_LOG_FLUSH(dumper);
                     }
+                    break;
+                }
 
-                    /* update the du info */
+                if (VIR_Operand_GetOpKind(movDst) != VIR_OPND_SYMBOL || VIR_Operand_GetOpKind(movSrc) != VIR_OPND_SYMBOL)
+                {
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
                     {
-                        VIR_GENERAL_UD_ITERATOR udIter;
-                        VIR_DEF* pDef;
-                        vscVIR_InitGeneralUdIterator(&udIter,
-                            VSC_CPP_GetDUInfo(cpp), defInst, movSrc, gcvFALSE, gcvFALSE);
+                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                        VIR_LOG(dumper, "[FW] ==> bail out because of not symbol");
+                        VIR_LOG_FLUSH(dumper);
+                    }
+                    break;
+                }
 
-                        for(pDef = vscVIR_GeneralUdIterator_First(&udIter);
-                            pDef != gcvNULL;
-                            pDef = vscVIR_GeneralUdIterator_Next(&udIter))
+                /* If COPY_FROM_OUTPUT_PARAM is disabled, we need to check if this source is a output parameter. */
+                if (!bCopyFromOutputParam && movSrcInfo.isVreg && VIR_Operand_isSymbol(movSrc))
+                {
+                    VIR_Symbol*     pSrcSym = VIR_Operand_GetSymbol(movSrc);
+
+                    if (VIR_Symbol_isVreg(pSrcSym))
+                    {
+                        if (VIR_Symbol_isOutParamVirReg(pSrcSym) || VIR_Symbol_isOutParam(VIR_Symbol_GetVregVariable(pSrcSym)))
                         {
-                            if (VIR_Swizzle_2_Enable(newSwizzle) & (1 << pDef->defKey.channel))
+                            break;
+                        }
+                    }
+                    else if (VIR_Symbol_isOutParam(pSrcSym))
+                    {
+                        break;
+                    }
+                }
+
+                /*
+                ** If any usage instruction of this MOV has more than one DEF instruction, which means we can't remove this MOV,
+                ** we don't generate this new copy because it may increase the live range of SOURCE0.
+                */
+                if (_VSC_CPP_AnyOtherUsageCanNotBeOptimize(VSC_CPP_GetDUInfo(cpp),
+                                                           inst,
+                                                           defInst,
+                                                           movEnable,
+                                                           srcInfo.u1.virRegInfo.virReg))
+                {
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                    {
+                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                        VIR_LOG(dumper, "[FW] ==> bail out because one use could not be replaced\n");
+                        VIR_LOG_FLUSH(dumper);
+                    }
+                    break;
+                }
+
+                /* copy to LDARR with attribute is not benefial at all. For example,
+                    MOV t1.x, att1.x
+                    LDARR t2, base, t1.x
+                    ADD  t3, t2, t4
+                    ==> (after CPP)
+                    LDARR t2, base, att1.x
+                    ADD t3, t2, t4
+                    ==> (after converter)
+                    MOV t5.x, att1.x
+                    LDARR t2, base, t5.x
+                    ADD t3, t2, t4
+
+                    There is no gain in the above case. While, if more components are used in
+                    one MOV and shared by more LDARRs, there will be performance loss.
+
+                    MOV t1.xy, att1.xy
+                    LDARR t2, base, t1.x
+                    ADD  t3, t2, t4
+                    LDARR t5, base, t1.y
+                    ADD  t6, t5, t4
+                    ==> (after CPP)
+                    LDARR t2, base, att1.x
+                    ADD  t3, t2, t4
+                    LDARR t5, base, att1.y
+                    ADD  t6, t5, t4
+                    ==> (after converter)
+                    MOV  t7.x, att1.x
+                    LDARR t2, base, t7.x
+                    ADD  t3, t2, t4
+                    MOV t8.x, att1.y
+                    LDARR t5, base, t8.x
+                    ADD  t6, t5, t4
+
+                    Thus disable such case.
+                */
+                if (movSrcInfo.isInput && VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
+                {
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                    {
+                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                        VIR_LOG(dumper, "[FW] ==> bail out because movSrc is input");
+                        VIR_LOG_FLUSH(dumper);
+                    }
+                    break;
+                }
+
+                /* old CG, in base[index], index has to be temp */
+                if (VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR &&
+                    srcNum == 1 &&
+                    !VIR_Symbol_isVreg(VIR_Operand_GetSymbol(movSrc))
+                    )
+                {
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                    {
+                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                        VIR_LOG(dumper, "[FW] ==> bail out because LDARR index has to be temp ");
+                        VIR_LOG_FLUSH(dumper);
+                    }
+                    break;
+                }
+
+                if (VIR_Operand_GetModifier(movDst) ||
+                    VIR_Operand_GetRoundMode(movDst) ||
+                    VIR_Operand_GetModifier(movSrc) ||
+                    VIR_Operand_GetRoundMode(movSrc))
+                {
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                    {
+                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                        VIR_LOG(dumper, "[FW] ==> bail out because of modifier");
+                        VIR_LOG_FLUSH(dumper);
+                    }
+                    break;
+                }
+
+                /* inst and its def in the same bb */
+                if (VIR_Inst_GetBasicBlock(inst) == VIR_Inst_GetBasicBlock(defInst))
+                {
+                    /* no redefine of movSrc between defInst and inst */
+                    VIR_Instruction* next = VIR_Inst_GetNext(defInst);
+                    gctBOOL         invalidCase = gcvFALSE;
+                    while (next != inst)
+                    {
+                        if (VIR_Operand_SameLocation(defInst, movSrc, next, VIR_Inst_GetDest(next)) ||
+                            VIR_Inst_GetOpcode(next) == VIR_OP_CALL)
+                        {
+                            if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
                             {
-                                vscVIR_AddNewUsageToDef(VSC_CPP_GetDUInfo(cpp),
-                                    pDef->defKey.pDefInst,
-                                    inst,
-                                    newSrc,
-                                    gcvFALSE,
-                                    movSrcInfo.u1.virRegInfo.virReg,
-                                    1,
-                                    (1 << pDef->defKey.channel),
-                                    VIR_HALF_CHANNEL_MASK_FULL,
-                                    gcvNULL);
+                                VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                                VIR_LOG(dumper, "[FW] ==> bail out because of redefine or call\n");
+                                VIR_LOG_FLUSH(dumper);
+                                VIR_Inst_Dump(dumper, next);
+                                VIR_LOG_FLUSH(dumper);
+                            }
+                            invalidCase = gcvTRUE;
+                            break;
+                        }
+                        next = VIR_Inst_GetNext(next);
+                    }
+                    if (invalidCase)
+                    {
+                        break;
+                    }
+                }
+                else
+                {
+                    if (!VSC_CPP_isGlobalCPP(cpp) &&
+                        !(VIR_Symbol_isUniform(VIR_Operand_GetSymbol(movSrc)) ||
+                          VIR_Symbol_isSampler(VIR_Operand_GetSymbol(movSrc)) ||
+                          VIR_Symbol_isImage(VIR_Operand_GetSymbol(movSrc)) ||
+                          VIR_Symbol_isImageT(VIR_Operand_GetSymbol(movSrc))))
+                    {
+                        if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                        {
+                            VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                            VIR_LOG(dumper, "[FW] ==> bail out because of not same BB\n");
+                            VIR_LOG_FLUSH(dumper);
+                        }
+                        break;
+                    }
+                    else
+                    {
+                        /* no call between defInst and inst */
+                        {
+                            if (!(movSrcInfo.isInput ||
+                                  VIR_Symbol_isUniform(VIR_Operand_GetSymbol(movSrc)) ||
+                                  VIR_Symbol_isSampler(VIR_Operand_GetSymbol(movSrc)) ||
+                                  VIR_Symbol_isImage(VIR_Operand_GetSymbol(movSrc)) ||
+                                  VIR_Symbol_isImageT(VIR_Operand_GetSymbol(movSrc)))
+                                 &&
+                                _VSC_CPP_CallInstInBetween(defInst, inst, visitSet))
+                            {
+                                if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                                {
+                                    VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                                    VIR_LOG(dumper, "[FW] ==> bail out because of call\n");
+                                    VIR_LOG_FLUSH(dumper);
+                                }
+                                vscHTBL_Reset(visitSet);
+                                break;
+                            }
+                            vscHTBL_Reset(visitSet);
+                        }
+
+                        {
+                            /* no redefine of movSrc between defInst and inst */
+                            VIR_Instruction *redefInst = gcvNULL;
+                            if (!(VIR_Symbol_isUniform(VIR_Operand_GetSymbol(movSrc)) ||
+                                  VIR_Symbol_isSampler(VIR_Operand_GetSymbol(movSrc)) ||
+                                  VIR_Symbol_isImage(VIR_Operand_GetSymbol(movSrc)) ||
+                                  VIR_Symbol_isImageT(VIR_Operand_GetSymbol(movSrc)))
+                                &&
+                                vscVIR_RedefineBetweenInsts(VSC_CPP_GetMM(cpp), VSC_CPP_GetDUInfo(cpp),
+                                    defInst, inst, movSrc, &redefInst))
+                            {
+                                if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                                {
+                                    VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                                    VIR_LOG(dumper, "[FW] ==> bail out because of redefine\n");
+                                    VIR_LOG_FLUSH(dumper);
+                                    VIR_Inst_Dump(dumper, redefInst);
+                                    VIR_LOG_FLUSH(dumper);
+                                }
+                                break;
                             }
                         }
                     }
-
-                    _VSC_CPP_RemoveDefInst(cpp, defInst);
                 }
 
-                if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                  VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                for (channel = 0; channel < VIR_CHANNEL_NUM; channel++ )
                 {
-                    VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                    VIR_LOG(dumper, "[FW] ==> change to:\n");
-                    VIR_LOG_FLUSH(dumper);
-                    VIR_Inst_Dump(dumper, inst);
-                    VIR_LOG_FLUSH(dumper);
+                    if (movEnable & (1 << channel))
+                    {
+                        VIR_Swizzle_SetChannel(channelMapping, channel, VIR_Swizzle_GetChannel(movSrcSwizzle, channel));
+                    }
                 }
 
-                VSC_CPP_SetFWOptCount(cpp, VSC_CPP_GetFWOptCount(cpp) + 1);
+                /*
+                ** We must also update the used components because after Peephole,
+                ** the enable count of dest may change.
+                */
+                for (channel = 0; channel < VIR_CHANNEL_NUM; channel++ )
+                {
+                    if (instEnable & (1 << channel))
+                    {
+                        lastSwizzle = VIR_Swizzle_GetChannel(channelMapping, VIR_Swizzle_GetChannel(instSrcSwizzle, channel));
 
-                /* since defInst is the unique def of srcOpnd, thus break out*/
-                break;
+                        VIR_Swizzle_SetChannel(newSwizzle, channel, lastSwizzle);
+
+                        /* It is the first enable component. Set the prev-unenable components. */
+                        if (lastChannel == -1)
+                        {
+                            gctUINT8 i;
+
+                            for (i = 0; i < channel; i++)
+                            {
+                                VIR_Swizzle_SetChannel(newSwizzle, i, lastSwizzle);
+                            }
+                        }
+                        lastChannel = (gctINT8)channel;
+                    }
+                    /* Use the swizzle of last enable component. */
+                    else if (lastChannel != -1)
+                    {
+                        VIR_Swizzle_SetChannel(newSwizzle, channel, lastSwizzle);
+                    }
+                }
+
+                if (VIR_OPCODE_isVX(VIR_Inst_GetOpcode(inst)) &&
+                    !VIR_OPCODE_isImgRelated(VIR_Inst_GetOpcode(inst)) &&
+                    newSwizzle != VIR_SWIZZLE_XXXX &&
+                    newSwizzle != VIR_SWIZZLE_XYYY &&
+                    newSwizzle != VIR_SWIZZLE_XYZZ &&
+                    newSwizzle != VIR_SWIZZLE_XYZW    )
+                {
+                    /* the EVIS inst src0's swizzle bits are used for EVIS info like startBin,
+                        * make sure the src0 operand does NOT use them
+                        * VX_IMG_xxx instruction has no this restriction
+                        */
+                    if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                    {
+                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                        VIR_LOG(dumper, "[FW] ==> bail out because of VX instruction cannot swizzle source\n");
+                        VIR_LOG_FLUSH(dumper);
+                    }
+                    break;
+                }
+
+                if (VIR_Inst_GetThreadMode(defInst) == VIR_THREAD_D16_DUAL_32 &&
+                    VIR_Operand_GetPrecision(movSrc) == VIR_PRECISION_HIGH)
+                {
+                    VIR_Inst_SetThreadMode(inst, VIR_THREAD_D16_DUAL_32);
+                }
+
+                vscVIR_DeleteUsage(VSC_CPP_GetDUInfo(cpp),
+                                   VIR_ANY_DEF_INST,
+                                   inst,
+                                   srcOpnd,
+                                   gcvFALSE,
+                                   srcInfo.u1.virRegInfo.virReg,
+                                   1,
+                                   srcEnable,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL);
+
+                /* duplicate movSrc */
+                {
+                    VIR_TypeId ty = VIR_Operand_GetTypeId(srcOpnd);
+
+                    VIR_Function_DupOperand(func, movSrc, &newSrc);
+                    VIR_Operand_SetSwizzle(newSrc, newSwizzle);
+                    VIR_Operand_SetLShift(newSrc, VIR_Operand_GetLShift(srcOpnd));
+
+                    if (!_VSC_CPP_CopySrcTypeFromMov(cpp, inst, defInst, newSrc))
+                    {
+                        VIR_Operand_SetTypeId(newSrc, ty);
+                    }
+                    /* copy reladdr info to newSrc if needed */
+                    if (VIR_Operand_GetRelAddrMode(srcOpnd))
+                    {
+                        VIR_Operand_SetRelAddrMode(newSrc, VIR_Operand_GetRelAddrMode(srcOpnd));
+                        VIR_Operand_SetRelIndexing(newSrc, VIR_Operand_GetRelIndexing(srcOpnd));
+                    }
+                    else if (VIR_Operand_GetRelAddrMode(movSrc))
+                    {
+                        VIR_Operand_SetRelAddrMode(newSrc, VIR_Operand_GetRelAddrMode(movSrc));
+                        VIR_Operand_SetRelIndexing(newSrc, VIR_Operand_GetRelIndexing(movSrc));
+                    }
+                    /* Replace the source. */
+                    _VSC_CPP_ReplaceSource(cpp, inst, parentSrcOpnd, srcNum, newSrc);
+
+                    srcOpnd = gcvNULL;    /* reset srcOpnd to avoid misuse */
+                }
+
+                /* update the du info */
+                {
+                    VIR_GENERAL_UD_ITERATOR udIter;
+                    VIR_DEF* pDef;
+                    vscVIR_InitGeneralUdIterator(&udIter,
+                        VSC_CPP_GetDUInfo(cpp), defInst, movSrc, gcvFALSE, gcvFALSE);
+
+                    for(pDef = vscVIR_GeneralUdIterator_First(&udIter);
+                        pDef != gcvNULL;
+                        pDef = vscVIR_GeneralUdIterator_Next(&udIter))
+                    {
+                        if (VIR_Swizzle_2_Enable(newSwizzle) & (1 << pDef->defKey.channel))
+                        {
+                            vscVIR_AddNewUsageToDef(VSC_CPP_GetDUInfo(cpp),
+                                                    pDef->defKey.pDefInst,
+                                                    inst,
+                                                    newSrc,
+                                                    gcvFALSE,
+                                                    movSrcInfo.u1.virRegInfo.virReg,
+                                                    1,
+                                                    (1 << pDef->defKey.channel),
+                                                    VIR_HALF_CHANNEL_MASK_FULL,
+                                                    gcvNULL);
+                        }
+                    }
+                }
+
+                _VSC_CPP_RemoveDefInst(cpp, defInst);
             }
+
+            if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options), VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+            {
+                VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                VIR_LOG(dumper, "[FW] ==> change to:\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Inst_Dump(dumper, inst);
+                VIR_LOG_FLUSH(dumper);
+            }
+
+            VSC_CPP_SetFWOptCount(cpp, VSC_CPP_GetFWOptCount(cpp) + 1);
+
+            /* since defInst is the unique def of srcOpnd, thus break out*/
+            break;
         }
     } while (gcvFALSE);
 
