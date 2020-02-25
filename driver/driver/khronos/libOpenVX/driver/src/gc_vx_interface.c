@@ -1063,8 +1063,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Magnitude(vx_node node, const
     grad_y = (vx_image)parameters[1];
     output = (vx_image)parameters[2];
 
-    node->kernelAttributes.isAllGPU = vx_true_e;
-
     gcmFOOTER_NO();
     return vxMagnitude(node, grad_x, grad_y, output);
 }
@@ -1166,7 +1164,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Phase(vx_node node, const vx_
     grad_x = (vx_image)parameters[0];
     grad_y = (vx_image)parameters[1];
     output = (vx_image)parameters[2];
-    node->kernelAttributes.isAllGPU = vx_true_e;
 
     gcmFOOTER_NO();
     return vxPhase(node, grad_x, grad_y, output);
@@ -1188,8 +1185,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_PhaseF16(vx_node node, co
     grad_x = (vx_image)parameters[0];
     grad_y = (vx_image)parameters[1];
     output = (vx_image)parameters[2];
-
-    node->kernelAttributes.isAllGPU = vx_true_e;
 
     gcmFOOTER_NO();
     return vxPhase_F16(node, grad_x, grad_y, output);
@@ -1386,7 +1381,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ScaleImage(vx_node node, cons
     vxQueryNode(node, VX_NODE_LOCAL_DATA_PTR, &localDataPtr, sizeof(localDataPtr));
     vxQueryNode(node, VX_NODE_LOCAL_DATA_SIZE,&size, sizeof(size));
 
-    node->kernelAttributes.isAllGPU = vx_true_e;
     gcmFOOTER_NO();
     return vxScaleImage(node, srcImage, dstImage, type, &borderMode, localDataPtr, size);
 }
@@ -1552,7 +1546,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBasekernel_HalfscaleGaussian(vx_node nod
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_true_e;
+
     graph = vxoNode_GetChildGraph(node);
 
     gcmFOOTER_NO();
@@ -1805,8 +1799,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Histogram(vx_node node, const
     srcImage   = (vx_image) parameters[0];
     dist = (vx_distribution)parameters[1];
 
-    node->kernelAttributes.isAllGPU = vx_false_e;
-
     gcmFOOTER_NO();
     return vxHistogram(node, srcImage, dist, node->kernelAttributes.stagings);
 }
@@ -1886,7 +1878,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_EqualizeHist(vx_node node, co
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -2091,7 +2082,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_AbsDiff(vx_node node, const v
     inputImage2 = (vx_image)parameters[1];
     outputImage = (vx_image)parameters[2];
 
-    node->kernelAttributes.isAllGPU = vx_true_e;
     gcmFOOTER_NO();
     return vxAbsDiff(node, inputImage1, inputImage2, outputImage);
 }
@@ -2211,8 +2201,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_MeanStdDev(vx_node node, cons
     inputImage   = (vx_image) parameters[0];
     meanScalar   = (vx_scalar)parameters[1];
     stddevScalar = (vx_scalar)parameters[2];
-
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     gcmFOOTER_NO();
     return vxMeanStdDev(node, inputImage, meanScalar, stddevScalar);
@@ -2477,7 +2465,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_IntegralImage(vx_node node, c
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -2751,7 +2738,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Median3x3(vx_node node, const
         return vxMedian3x3(node, srcImage, dstImage, &bordermode);
     }
 
-    node->kernelAttributes.isAllGPU = vx_true_e;
     gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
     return VX_ERROR_INVALID_PARAMETERS;
 }
@@ -2799,7 +2785,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Gaussian3x3(vx_node node, con
     srcImage  = (vx_image)parameters[0];
     dstImage = (vx_image)parameters[1];
 
-    node->kernelAttributes.isAllGPU = vx_true_e;
     if (vxQueryNode(node, VX_NODE_BORDER, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
     {
         gcmFOOTER_NO();
@@ -3262,7 +3247,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_LaplacianPyramid(vx_node node
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -3544,7 +3528,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_LaplacianReconstruct(vx_node 
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -3972,7 +3955,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Accumulate(vx_node node, cons
     inputImage = (vx_image)parameters[0];
     accumImage = (vx_image)parameters[1];
 
-    node->kernelAttributes.isAllGPU = vx_true_e;
     gcmFOOTER_NO();
     return vxAccumulate(node, inputImage, accumImage);
 }
@@ -4044,8 +4026,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_AccumulateWeighted(vx_node no
     inputImage = (vx_image)parameters[0];
     scalar = (vx_scalar)parameters[1];
     accumImage = (vx_image)parameters[2];
-
-    node->kernelAttributes.isAllGPU = vx_true_e;
 
     gcmFOOTER_NO();
     return vxAccumulateWeighted(node, inputImage, scalar, accumImage);
@@ -4144,8 +4124,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_AccumulateSquare(vx_node node
     scalar     = (vx_scalar)parameters[1];
     accumImage = (vx_image)parameters[2];
 
-    node->kernelAttributes.isAllGPU = vx_true_e;
-
     gcmFOOTER_NO();
     return vxAccumulateSquare(node, inputImage, scalar, accumImage);
 }
@@ -4227,7 +4205,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_MinMaxLoc(vx_node node, const
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -4726,7 +4703,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_CannyEdge(vx_node node, const
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_true_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -5036,7 +5012,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_And(vx_node node, const vx_re
     inputImage2 = (vx_image)parameters[1];
     outputImage = (vx_image)parameters[2];
 
-    node->kernelAttributes.isAllGPU = vx_true_e;
     gcmFOOTER_NO();
     return vxAnd(node, inputImage1, inputImage2, outputImage);
 }
@@ -5078,8 +5053,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBasekernel_Xor(vx_node node, const vx_re
     inputImage1 = (vx_image)parameters[0];
     inputImage2 = (vx_image)parameters[1];
     outputImage = (vx_image)parameters[2];
-
-    node->kernelAttributes.isAllGPU = vx_true_e;
 
     gcmFOOTER_NO();
     return vxXor(node, inputImage1, inputImage2, outputImage);
@@ -5147,7 +5120,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Not(vx_node node, const vx_re
     inputImage  = (vx_image)parameters[0];
     outputImage = (vx_image)parameters[1];
 
-    node->kernelAttributes.isAllGPU = vx_true_e;
     gcmFOOTER_NO();
     return vxNot(node, inputImage, outputImage);
 }
@@ -5184,7 +5156,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Multiply(vx_node node, const 
         gcmFOOTER_ARG("%d", status);
         return status;
     }
-    node->kernelAttributes.isAllGPU = vx_true_e;
+
     gcmFOOTER_NO();
     return vxMultiply(node, inputImage0, inputImage1, scale_param, opolicy_param, rpolicy_param, outputImage);
 }
@@ -5383,7 +5355,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Add(vx_node node, const vx_re
         gcmFOOTER_ARG("%d", status);
         return status;
     }
-    node->kernelAttributes.isAllGPU = vx_true_e;
 
     gcmFOOTER_NO();
     return vxAddition(node, inputImage0, inputImage1, policy_param, outputImage);
@@ -5417,7 +5388,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Sub(vx_node node, const vx_re
         gcmFOOTER_ARG("%d", status);
         return status;
     }
-    node->kernelAttributes.isAllGPU = vx_true_e;
 
     gcmFOOTER_NO();
     return vxSubtraction(node, inputImage0, inputImage1, policy_param, outputImage);
@@ -5713,7 +5683,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_HarrisCorners(vx_node node, c
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -6010,7 +5979,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Fast9Corners(vx_node node, co
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -6263,7 +6231,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_OpticalFlowPyrLK(vx_node node
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -7274,7 +7241,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_ImageLister(vx_node node,
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -7461,7 +7427,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Norm(vx_node node, const 
     inputY   = (vx_image)parameters[1];
     normType = (vx_scalar)parameters[2];
     output   = (vx_image)parameters[3];
-    node->kernelAttributes.isAllGPU = vx_true_e;
 
     gcmFOOTER_NO();
     return vxNorm(node, inputX, inputY, normType, output);
@@ -7486,7 +7451,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_NormF16(vx_node node, con
     normType = (vx_scalar)parameters[2];
     output   = (vx_image)parameters[3];
 
-    node->kernelAttributes.isAllGPU = vx_true_e;
     gcmFOOTER_NO();
     return vxNorm_F16(node, inputX, inputY, normType, output);
 }
@@ -7703,7 +7667,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTrace(vx_node node, c
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -7886,7 +7849,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTraceThreshold(vx_nod
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_true_e;
+
     norm = (vx_image)parameters[0];
     threshold = (vx_threshold)parameters[1];
     img = (vx_image)parameters[2];
@@ -7942,7 +7905,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTraceHysteresis(vx_no
 
     img = (vx_image)parameters[0];
     flag = (vx_scalar)parameters[1];
-    node->kernelAttributes.isAllGPU = vx_true_e;
 
     gcmFOOTER_NO();
     return vxEdgeTraceHysteresis(node, img, flag);
@@ -7989,7 +7951,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTraceClamp(vx_node no
     }
     inputImage = (vx_image)parameters[0];
     outputImage = (vx_image)parameters[1];
-    node->kernelAttributes.isAllGPU = vx_true_e;
 
     gcmFOOTER_NO();
     return vxEdgeTraceClamp(node, inputImage, outputImage);
@@ -8034,7 +7995,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SGM(vx_node node, const v
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -10905,7 +10865,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHoughMakepoints_Initialize(vx_node node,
         shaderParam.globalWorkSize[1] = height;
         vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -10961,7 +10921,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHoughFillaccum_Initialize(vx_node node, 
         shaderParam.globalWorkSize[1] = 1;
         vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -11020,7 +10979,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHoughGetlines_Initialize(vx_node node, c
         shaderParam.globalWorkSize[1] = anglenum;
         vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -11037,7 +10995,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_hough_lines_p(vx_node node, c
 
     gcmHEADER_ARG("node=%p, parameters=%p, num=0x%x", node, parameters, num);
 
-    node->kernelAttributes.isAllGPU = vx_false_e;
     graph = vxoNode_GetChildGraph(node);
     status = vxProcessGraph(graph);
     status = gcfVX_Flush(gcvTRUE);
@@ -11752,7 +11709,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTensor_matrix_multiply(vx_node node, con
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -13372,7 +13328,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Copy(vx_node node, const vx_r
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_true_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -13907,7 +13862,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ScalarOperation(vx_node node,
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -14743,7 +14697,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_BilateralFilter(vx_node node,
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
     }
-    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -15148,7 +15101,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalBilateral_filter_Initialize(vx_n
         out_size *= dst->dims[i];
     }
 
-    node->kernelAttributes.isAllGPU = vx_false_e;
     shaderParam.globalWorkSize[0] = out_size;
 
     vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
@@ -15244,7 +15196,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Select(vx_node node, const vx
     {
         gcmFOOTER_ARG("%d", VX_ERROR_INVALID_PARAMETERS);
         return VX_ERROR_INVALID_PARAMETERS;
-    }node->kernelAttributes.isAllGPU = vx_true_e;
+    }
 
     graph = vxoNode_GetChildGraph(node);
 

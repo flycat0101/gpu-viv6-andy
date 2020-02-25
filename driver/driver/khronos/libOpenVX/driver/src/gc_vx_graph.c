@@ -9384,6 +9384,7 @@ VX_PRIVATE_API void vxoGraph_GenerateCommandBuffer(vx_graph graph)
         graph->base.context->options.enableSaveBinary          ||
         graph->binarySave                                      ||
         !graph->base.context->options.enableGraphCommandBuffer ||
+        !graph->layer                                          ||
         mcfeEnabled)
     {
         vxmONERROR(VX_ERROR_NOT_SUPPORTED);
@@ -9429,12 +9430,14 @@ OnError:
 #if gcdDEBUG
     vxInfo("Graph=%p doesn't support graph command: "
              "hasCPUFunction=%d CNNPERF=%d NNLayerDump=%d"
-             "MCFE=%d networkBinary=%d enableGraphCommandBuffer=%d\n",
+             "MCFE=%d networkBinary=%d enableGraphCommandBuffer=%d"
+             "layer=0x%x\n",
              graph, graph->hasCPUFunction,
              graph->base.context->options.enableCNNPerf,
              graph->base.context->options.enableNNLayerDump,
              mcfeEnabled, graph->base.context->options.enableSaveBinary,
-             graph->base.context->options.enableGraphCommandBuffer);
+             graph->base.context->options.enableGraphCommandBuffer,
+             graph->layer);
 #endif
     if (commandBuffer)
         vxFree(commandBuffer);

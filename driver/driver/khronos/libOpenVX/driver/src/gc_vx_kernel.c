@@ -3307,6 +3307,7 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
 #endif
 
     kernel->attributes.isGPUKernel                  = vx_true_e;
+    kernel->attributes.isAllGPU                     = vx_true_e;
 
     if (kernel->program != VX_NULL)
     {
