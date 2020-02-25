@@ -7772,11 +7772,13 @@ VkResult halti5_patch_pipeline(
                                         VkBool32 is128BppFormat =
                                             (patchInfo->patchFormat <= __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT) &&
                                             (patchInfo->patchFormat >= __VK_FORMAT_R32G32B32A32_SFLOAT_2_R32G32_SFLOAT);
+                                        VkBool32 is2DViewType = (VK_IMAGE_VIEW_TYPE_2D == patchInfo->viewType);
+                                        VkBool32 onlyTexLod = (resOpBits & VSC_RES_OP_BIT_TEXLD_LOD) &&
+                                                              !(resOpBits & (VSC_RES_OP_BIT_TEXLD_BIAS |
+                                                              VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLDP |
+                                                              VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD));
 
-                                        if (k == 1 && (resOpBits & VSC_RES_OP_BIT_TEXLD_LOD) &&
-                                            is128BppFormat && !(resOpBits & (VSC_RES_OP_BIT_TEXLD_BIAS |
-                                            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLDP |
-                                            VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD)))
+                                        if (k == 1 && onlyTexLod && is128BppFormat && is2DViewType)
                                         {
                                             switch (patchInfo->patchFormat)
                                             {
