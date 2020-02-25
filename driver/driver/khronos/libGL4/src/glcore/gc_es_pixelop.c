@@ -496,8 +496,6 @@ GLvoid GL_APIENTRY __glim_ReadBuffer(__GLcontext *gc, GLenum mode)
             GLenum originalReadBuffer;
 
             /* gc binding to the window buffer */
-            __GL_REDUNDANT_ATTR(gc->state.pixel.readBufferReturn, mode);
-
             __GL_VERTEX_BUFFER_FLUSH(gc);
 
             if ((mode & GL_FRONT_LEFT) && (mode >= GL_AUX0)) {
@@ -1192,9 +1190,6 @@ GLvoid APIENTRY __glim_DrawBuffer(__GLcontext *gc, GLenum mode)
     }
     else
     {
-
-//    __GL_REDUNDANT_ATTR(gc->state.raster.drawBufferReturn, mode);
-
         __GL_VERTEX_BUFFER_FLUSH(gc);
 
         if ((mode & GL_FRONT_LEFT) && (mode >= GL_AUX0)) {
