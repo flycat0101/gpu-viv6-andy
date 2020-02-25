@@ -20928,6 +20928,12 @@ VX_PRIVATE_API vx_status vxnneOperation_ExecuteYUVScalerCommand(vx_node node, vx
     scaleOp->x_scale = (imageInputWidth << 15) / outputWidth;
     scaleOp->y_scale = (imageInputHeight << 15) / outputHeight;
 
+    if (imageInputWidth > 4096 || imageInputHeight > 2048 ||
+        ((imageInputWidth > 1920 || imageInputHeight > 1080) && !vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER_4K)))
+    {
+        vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
+    }
+
     memcpy(&SCOperation, scaleOp, sizeof(vxnne_yuv2rgb_scale_operation_s));
 
     /* for X */
@@ -24214,7 +24220,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoYUV2RGBScale_Initializer(vx_node node, c
     scale_x = (input_rect_width << 15) / output_width;
     scale_y = (input_rect_height << 15) / output_height;
 
-    if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER))
+    if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER) &&
+        ((input_rect_width <= 1920 && input_rect_height <= 1080) ||
+         (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER_4K) && input_rect_width <= 4096 && input_rect_height <= 2048)))
     {
         vxnneOperation_Initialize(
             &yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.base,

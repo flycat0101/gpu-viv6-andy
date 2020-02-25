@@ -3120,6 +3120,9 @@ VX_INTERNAL_API vx_bool vxoGlobalData_IsFeatureAvailable(vx_global_data globalDa
     case VX_NN_FEATURE_SCALER:
         return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VIP_SCALER) && globalData->options.enableYUV2RGBScaler ? vx_true_e : vx_false_e;
 
+    case VX_NN_FEATURE_SCALER_4K:
+        return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VIP_SCALER_4K) ? vx_true_e : vx_false_e;
+
     case VX_NN_FEATURE_VIP_DEC400:
         return (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VIP_DEC400) && globalData->options.enableVIPDEC400) ? vx_true_e : vx_false_e;
 
