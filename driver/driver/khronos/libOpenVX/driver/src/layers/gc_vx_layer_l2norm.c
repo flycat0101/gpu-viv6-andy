@@ -323,7 +323,9 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
 
     src      = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
     dst      = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
-
+    l2normalizeLayer->base.temp_tensors[0] = src;
+    l2normalizeLayer->base.temp_tensors[1] = dst;
+    l2normalizeLayer->base.num_temp_tensors = 2;
     vxoLayer_InitializeHead(ops_layer, parameters, _num, reg_param);
 
     if(evis)
@@ -351,7 +353,8 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
         status = VX_ERROR_NO_MEMORY;
         goto OnError;
     }
-
+    l2normalizeLayer->base.temp_tensors[2] = sumTmp;
+    l2normalizeLayer->base.num_temp_tensors = 3;
     //node 1
     if(evis)
     {
@@ -411,9 +414,6 @@ VX_PRIVATE_API vx_status vxoNNL2NormalizeLayer_SH_Initialize_Ext(vxnne_layer ops
         1));
 
 OnError:
-    if (src) vxoTensor_ReleaseTensor(&src);
-    if (dst) vxoTensor_ReleaseTensor(&dst);
-    if (sumTmp) vxoTensor_ReleaseTensor(&sumTmp);
 
     vxoLayer_InitializeFoot(ops_layer, parameters, _num, reg_param);
 
