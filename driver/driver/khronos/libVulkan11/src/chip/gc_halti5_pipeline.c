@@ -7269,12 +7269,14 @@ VkResult halti5_patch_pipeline(
     VSC_PROG_LIB_LINK_ENTRY *vscLinkEntriesCur = VK_NULL_HANDLE;
     VkBool32 needCleanInstance = VK_TRUE;
     vkShader_HANDLE hShaderArrayCopy[VSC_MAX_SHADER_STAGE_COUNT];
+    vkShader_HANDLE shaderInfo[VSC_MAX_SHADER_STAGE_COUNT];
     VkBool32 newInstance = VK_FALSE;
     struct _gcsHINT *vscHints = VK_NULL_HANDLE;
     VkBool32 txClearPendingFix = devCtx->database->TX_CLEAR_PENDING_FIX;
 
     __VK_SET_ALLOCATIONCB(&pip->memCb);
     __VK_MEMZERO(hShaderArrayCopy, sizeof(hShaderArrayCopy));
+    __VK_MEMZERO(shaderInfo, sizeof(shaderInfo));
 
     if (patchMask)
     {
@@ -7415,12 +7417,11 @@ VkResult halti5_patch_pipeline(
                 {
                      VSC_SHADER_COMPILER_PARAM vscCompileParams;
                      VSC_SHADER_LIB_LINK_TABLE *shaderLinkTable = VK_NULL_HANDLE;
-                     vkShader_HANDLE shaderInfo;
                      VSC_SHADER_RESOURCE_LAYOUT vscShaderResLayout;
                      VkBool32 compileFlag = VK_FALSE;
                      uint32_t linkIdx = 0;
 
-                     __VK_ONERROR((VK_SUCCESS == halti5_CopyVkShader(&shaderInfo, chipPipeline->vkShaderDecoded[stageIdx]))
+                     __VK_ONERROR((VK_SUCCESS == halti5_CopyVkShader(&shaderInfo[stageIdx], chipPipeline->vkShaderDecoded[stageIdx]))
                                                  ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
                     __VK_MEMZERO(&vscCompileParams, sizeof(VSC_SHADER_COMPILER_PARAM));
                     __VK_MEMZERO(&vscShaderResLayout, sizeof(vscShaderResLayout));
@@ -7435,7 +7436,7 @@ VkResult halti5_patch_pipeline(
                                                     : VSC_COMPILER_OPT_FULL;
                     halti5_helper_createVscShaderResLayout(pip, chipPipeline->vscResLayout, stageIdx, &vscShaderResLayout);
                     __VK_ASSERT(chipPipeline->vkShaderDecoded[stageIdx]);
-                    vscCompileParams.hShader = shaderInfo->vscHandle;
+                    vscCompileParams.hShader = shaderInfo[stageIdx]->vscHandle;
                     vscCompileParams.pShResourceLayout = &vscShaderResLayout;
 
                     vscCompileParams.pShLibLinkTable = (VSC_SHADER_LIB_LINK_TABLE *)__VK_ALLOC(sizeof(VSC_SHADER_LIB_LINK_TABLE), 8, VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
@@ -7644,7 +7645,7 @@ VkResult halti5_patch_pipeline(
                         __VK_ONERROR((gcvSTATUS_OK == vscCompileShader(&vscCompileParams, gcvNULL))
                                                       ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
 
-                        vscLinkParams.hShaderArray[stageIdx] =  shaderInfo->vscHandle;
+                        vscLinkParams.hShaderArray[stageIdx] = shaderInfo[stageIdx]->vscHandle;
                         recompiled = VK_TRUE;
                     }
 
@@ -7666,6 +7667,10 @@ VkResult halti5_patch_pipeline(
                     if (hShaderArrayCopy[i])
                     {
                         halti5_DestroyVkShader(hShaderArrayCopy[i]);
+                    }
+                    if (shaderInfo[i])
+                    {
+                        halti5_DestroyVkShader(shaderInfo[i]);
                     }
                 }
                 if (vscProgInstance)
@@ -7812,6 +7817,10 @@ VkResult halti5_patch_pipeline(
                 if (hShaderArrayCopy[i])
                 {
                     halti5_DestroyVkShader(hShaderArrayCopy[i]);
+                }
+                if (shaderInfo[i])
+                {
+                    halti5_DestroyVkShader(shaderInfo[i]);
                 }
             }
         }
