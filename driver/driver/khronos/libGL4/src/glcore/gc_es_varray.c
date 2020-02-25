@@ -781,6 +781,10 @@ static GLboolean __glCheckXFBState(__GLcontext *gc, GLboolean allowXFB, GLenum m
                     numPrims = (vertexCount / 2) * instanceCount;
                     numVerts = numPrims * 2;
                     break;
+                case GL_POINTS:
+                    numPrims = vertexCount * instanceCount;
+                    numVerts = numPrims;
+                    break;
                 }
 
                 if (!(*gc->dp.checkXFBBufSizes)(gc, xfbObj, numVerts))
@@ -1124,7 +1128,14 @@ __GL_INLINE GLvoid __glDrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint f
         ((mode < GL_LINES_ADJACENCY_EXT) ||
          (mode > GL_PATCHES_EXT)))
     {
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        if (gc->imports.coreProfile)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+        else if (mode != GL_QUADS && mode != GL_QUAD_STRIP && mode != GL_POLYGON)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
     }
 
     __GL_CHECK_INSTANCE_COUNT(instanceCount);
@@ -2293,6 +2304,8 @@ GLboolean __glDeleteVertexArrayObject(__GLcontext *gc, __GLvertexArrayObject *ve
     __GLbufferObject *bufObj;
 
     __GL_HEADER();
+
+    GL_ASSERT(vertexArrayObj->name);
 
     for (i = 0; i < __GL_MAX_VERTEX_ATTRIBUTE_BINDINGS; i++)
     {

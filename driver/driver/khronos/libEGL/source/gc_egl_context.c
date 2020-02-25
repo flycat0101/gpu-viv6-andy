@@ -420,7 +420,7 @@ _Realloc(
         return gcvNULL;
     }
 
-    if (oldPtr)
+    if ((oldPtr) && (0 != oldSize))
     {
         gcoOS_MemCopy(newPtr, oldPtr, oldSize);
         gcoOS_Free(gcvNULL, oldPtr);

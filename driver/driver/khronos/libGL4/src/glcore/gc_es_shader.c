@@ -430,6 +430,8 @@ GLboolean __glDeleteXfbObj(__GLcontext *gc, __GLxfbObject *xfbObj)
 GLvoid __glInitShaderProgramState(__GLcontext *gc)
 {
     __GLSLStage stage;
+    GLuint unit;
+    GLuint sampler;
 
     /* Shader and program objects can be shared across contexts */
     if (gc->shareCtx)
@@ -490,6 +492,12 @@ GLvoid __glInitShaderProgramState(__GLcontext *gc)
     __glBitmaskInitAllZero(&gc->shaderProgram.samplerStateDirty, gc->constants.shaderCaps.maxTextureSamplers);
     __glBitmaskInitAllZero(&gc->shaderProgram.samplerStateKeepDirty ,gc->constants.shaderCaps.maxTextureSamplers);
 
+    if (!gc->imports.conformGLSpec)
+    {
+       __glBitmaskInitAllZero(&gc->shaderProgram.samplerTexelFetchDirty, gc->constants.shaderCaps.maxTextureSamplers);
+       __glBitmaskInitAllZero(&gc->shaderProgram.samplerPrevTexelFetchDirty, gc->constants.shaderCaps.maxTextureSamplers);
+    }
+
     gc->shaderProgram.samplerSeq = 0;
     gc->shaderProgram.mode = __GLSL_MODE_GRAPHICS;
     gc->shaderProgram.patchVertices = 3;
@@ -498,6 +506,20 @@ GLvoid __glInitShaderProgramState(__GLcontext *gc)
     {
         gc->shaderProgram.lastProgObjs[stage] = gcvNULL;
         gc->shaderProgram.lastCodeSeqs[stage] = 0xFFFFFFFF;
+    }
+
+    if (!gc->imports.conformGLSpec)
+    {
+        for (unit = 0; unit < gc->constants.shaderCaps.maxCombinedTextureImageUnits; unit++)
+        {
+            gc->state.texture.texUnits[unit].enableDim = __GL_MAX_TEXTURE_UNITS;
+            gc->shaderProgram.texUnit2Sampler[unit].numSamplers = 0;
+        }
+
+        for (sampler = 0; sampler < gc->constants.shaderCaps.maxTextureSamplers; sampler++)
+        {
+            gc->state.program.sampler2TexUnit[sampler] = __GL_MAX_TEXTURE_UNITS;
+        }
     }
 
     gc->shaderProgram.maxSampler = 0;
@@ -647,7 +669,7 @@ GLvoid GL_APIENTRY __glim_ShaderSource(__GLcontext *gc, GLuint shader, GLsizei c
 
         len = (length && length[i] >= 0) ? (GLsizei)length[i] : (GLsizei)strlen(string[i]);
 
-        gcoOS_StrCatSafe(source, len + 1, string[i]);
+        strncat(source, string[i], len);
     }
 
     /* Free the previsou shader source. */
@@ -917,9 +939,12 @@ GLvoid GL_APIENTRY __glim_AttachShader(__GLcontext *gc,  GLuint program, GLuint 
     }
     else
     {
-#ifndef OPENGL40
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-#endif
+        if (!gc->imports.conformGLSpec)
+        {
+            /*GL_INVALID_OPERATION is generated if shader is already attached to program*/
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
+
         next = *pHead;
         while (gcvNULL != next)
         {
@@ -1047,17 +1072,26 @@ GLvoid GL_APIENTRY __glim_LinkProgram(__GLcontext *gc,  GLuint program)
     }
     else
     {
-        GLuint i;
-        for (i = 0; i < __GLSL_STAGE_LAST; i++)
+        if(gc->imports.conformGLSpec)
         {
-            if (programObject->programInfo.attachedShader[i])
+            GLuint i;
+            for (i = 0; i < __GLSL_STAGE_LAST; i++)
             {
-               if (!programObject->programInfo.attachedShader[i]->shader->shaderInfo.compiledStatus)
-               {
-                   gcoOS_StrCopySafe(programObject->programInfo.infoLog, __GLSL_LOG_INFO_SIZE, "one attached shader in program is bad");
-                   programObject->programInfo.linkedStatus = GL_FALSE;
-                   __GL_EXIT();
-               }
+                if (programObject->programInfo.attachedShader[i])
+                {
+                    /* In GL, one program may attach two or more VS/PS shader. */
+                    __GLshaderObjectList * attachShader = programObject->programInfo.attachedShader[i];
+                    do
+                    {
+                        if (!attachShader->shader->shaderInfo.compiledStatus)
+                        {
+                            gcoOS_StrCopySafe(programObject->programInfo.infoLog, __GLSL_LOG_INFO_SIZE, "one attached shader in program is bad");
+                            programObject->programInfo.linkedStatus = GL_FALSE;
+                            __GL_EXIT();
+                        }
+                        attachShader = attachShader->next;
+                    } while(gcvNULL != attachShader);
+                }
             }
         }
 

@@ -469,7 +469,7 @@ typedef struct __GLpixelTransferInfoRec{
     GLuint sizeOfElement;           /* Element size */
     GLuint compNumOfElement;        /* Element number */
     GLuint numOfAlign;              /* number of alignment */
-    GLuint numOfAlignSrc;       /* number of alignment about source memory */
+    GLuint numOfAlignSrc;           /* number of alignment about source memory */
     GLuint alignment;               /* alignment size */
 
     GLenum baseFormat;
@@ -481,6 +481,8 @@ typedef struct __GLpixelTransferInfoRec{
 
     GLboolean applyPixelTransfer;   /* apply pixel transfer operations */
     GLboolean applyGenericScaleBias;/* apply non pix xfer scale and bias.*/
+
+    GLenum operaitonFlag;           /* Record pixelTransferOperations */
 
     /*
     ** Generic source info.

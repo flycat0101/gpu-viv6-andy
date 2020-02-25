@@ -183,7 +183,7 @@ __GL_INLINE GLvoid __glLogSourceStrings(__GLcontext *gc, GLsizei count, const GL
     GLint i, j;
     GLchar tmpbuf[256], *chptr;
 
-    if (gcvNULL == *string)
+    if ((gcvNULL == string) || (gcvNULL == *string))
     {
         __GL_LOG_API("####\n\n####\n");
         return;
@@ -8033,7 +8033,7 @@ GLvoid GLAPIENTRY __glProfile_PrimitiveBoundingBox(__GLcontext *gc, GLfloat minX
 
     if (__glApiTraceMode == gcvTRACEMODE_FULL || __glApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GL_LOG_API("(gc=%p, tid=%p): glPrimitiveBoundingBox %d %d %d %d %d %d %d %d\n",
+        __GL_LOG_API("(gc=%p, tid=%p): glPrimitiveBoundingBox %f %f %f %f %f %f %f %f\n",
                         gc, tid, minX, minY, minZ, minW, maxX, maxY, maxZ, maxW);
     }
 

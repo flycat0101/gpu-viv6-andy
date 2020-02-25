@@ -194,6 +194,11 @@ enum {
     __GL_ASTC_12x10_BLOCK                       = 0x0027FFFF,
     __GL_ASTC_12x12_BLOCK                       = 0x0028FFFF,
 
+    __GL_ARGB4                                  = 0x0029FFFF,
+    __GL_ABGR4                                  = 0x002AFFFF,
+    __GL_XRGB4                                  = 0x002BFFFF,
+    __GL_XBGR4                                  = 0x002CFFFF,
+
     __GL_MAX_FMT_TYPE                           = __GL_ASTC_12x12_BLOCK,
 };
 

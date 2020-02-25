@@ -371,19 +371,18 @@ GLvoid __glFreeSharedObjectState(__GLcontext *gc, __GLsharedObjectMachine *share
     __GLnameAllocation *name = shared->nameArray;
     GLuint i;
 
-    if (shared->lock)
-    {
-        (*gc->imports.lockMutex)(shared->lock);
-    }
+    gcoOS_LockPLS();
 
     if (shared->refcount > 1)
     {
         shared->refcount--;
-        if (shared->lock)
-        {
-            (*gc->imports.unlockMutex)(shared->lock);
-        }
+        gcoOS_UnLockPLS();
         return;
+    }
+
+    if (shared->lock)
+    {
+        (*gc->imports.lockMutex)(shared->lock);
     }
 
     /* Free every name node on "shared->nameArray" chain.
@@ -460,6 +459,8 @@ GLvoid __glFreeSharedObjectState(__GLcontext *gc, __GLsharedObjectMachine *share
     /* Free the shared structure itself.
     */
     (*gc->imports.free)(gc, shared);
+
+    gcoOS_UnLockPLS();
 }
 
 GLvoid __glCheckLinearTableSize(__GLcontext *gc, __GLsharedObjectMachine *shared, GLuint size)

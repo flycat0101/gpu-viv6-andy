@@ -297,6 +297,40 @@ gcChipUtilConvertDSMode(
     return ret;
 }
 
+__GL_INLINE gceTEXTURE_DS_TEX_MODE
+gcChipUtilConvertDSTexMode(
+    GLenum depthStencilTextureMode
+    )
+{
+    gceTEXTURE_DS_TEX_MODE ret;
+    gcmHEADER_ARG("depthStencilTextureMode=0x%04x", depthStencilTextureMode);
+    switch (depthStencilTextureMode)
+    {
+    case GL_LUMINANCE:
+        ret = gcvTEXTURE_DS_TEXTURE_MODE_LUMINANCE;
+        break;
+
+    case GL_INTENSITY:
+        ret = gcvTEXTURE_DS_TEXTURE_MODE_INTENSITY;
+        break;
+
+    case GL_ALPHA:
+        ret = gcvTEXTURE_DS_TEXTURE_MODE_ALPHA;
+        break;
+
+    case GL_RED:
+        ret = gcvTEXTURE_DS_TEXTURE_MODE_RED;
+        break;
+
+    default:
+        GL_ASSERT(0);
+        ret = gcvTEXTURE_DS_TEXTURE_MODE_INVALID;
+        break;
+    }
+    gcmFOOTER_ARG("return=%d", ret);
+    return ret;
+}
+
 __GL_INLINE gceTEXTURE_SRGBDECODE
 gcChipUtilConvertSRGB(
     GLenum mode
@@ -1207,19 +1241,51 @@ gcChipSetTextureParameters(
     samplerStates = samplerObj ? &samplerObj->params : (__GLsamplerParamState*)&tex->params;
     halTexture = &chipCtx->texture.halTexture[unit];
 
-    if (localMask & __GL_TEXPARAM_WRAP_S_BIT)
+    /*
+    ** For wrap mode GL_CLAMP, process as glspec40 table 3.24.
+    ** Process GL_CLAMP as GL_CLAMP_TO_BORDER for GL_LINEAR filtering.
+    ** Process GL_CLAMP as GL_CLAMP_TO_EDGE   for GL_NEAREST filtering.
+    */
+    if (localMask & __GL_TEXPARAM_WRAP_S_BIT || localMask & __GL_TEXTURE_BORDER_BIT)
     {
-        halTexture->s = gcChipUtilConvertWrapMode(samplerStates->sWrapMode);
+        if (samplerStates->sWrapMode == GL_CLAMP && samplerStates->magFilter == GL_LINEAR
+            && (samplerStates->minFilter == GL_LINEAR || samplerStates->minFilter == GL_LINEAR_MIPMAP_LINEAR || samplerStates->minFilter == GL_LINEAR_MIPMAP_NEAREST)
+            && (*((tex)->faceMipmap))->border == 0)
+        {
+            halTexture->s = gcChipUtilConvertWrapMode(GL_CLAMP_TO_BORDER_EXT);
+        }
+        else
+        {
+            halTexture->s = gcChipUtilConvertWrapMode(samplerStates->sWrapMode);
+        }
     }
 
-    if (localMask & __GL_TEXPARAM_WRAP_T_BIT)
+    if (localMask & __GL_TEXPARAM_WRAP_T_BIT || localMask & __GL_TEXTURE_BORDER_BIT)
     {
-        halTexture->t = gcChipUtilConvertWrapMode(samplerStates->tWrapMode);
+        if (samplerStates->tWrapMode == GL_CLAMP && samplerStates->magFilter == GL_LINEAR
+            && (samplerStates->minFilter == GL_LINEAR || samplerStates->minFilter == GL_LINEAR_MIPMAP_LINEAR || samplerStates->minFilter == GL_LINEAR_MIPMAP_NEAREST)
+            && (*((tex)->faceMipmap))->border == 0)
+        {
+            halTexture->t = gcChipUtilConvertWrapMode(GL_CLAMP_TO_BORDER_EXT);
+        }
+        else
+        {
+            halTexture->t = gcChipUtilConvertWrapMode(samplerStates->tWrapMode);
+        }
     }
 
-    if (localMask & __GL_TEXPARAM_WRAP_R_BIT)
+    if (localMask & __GL_TEXPARAM_WRAP_R_BIT || localMask & __GL_TEXTURE_BORDER_BIT)
     {
-        halTexture->r = gcChipUtilConvertWrapMode(samplerStates->rWrapMode);
+        if (samplerStates->rWrapMode == GL_CLAMP && samplerStates->magFilter == GL_LINEAR
+            && (samplerStates->minFilter == GL_LINEAR || samplerStates->minFilter == GL_LINEAR_MIPMAP_LINEAR || samplerStates->minFilter == GL_LINEAR_MIPMAP_NEAREST)
+            && (*((tex)->faceMipmap))->border == 0)
+        {
+            halTexture->r = gcChipUtilConvertWrapMode(GL_CLAMP_TO_BORDER_EXT);
+        }
+        else
+        {
+            halTexture->r = gcChipUtilConvertWrapMode(samplerStates->rWrapMode);
+        }
     }
 
     if (localMask & __GL_TEXPARAM_SWIZZLE_R_BIT)
@@ -1361,6 +1427,11 @@ gcChipSetTextureParameters(
         halTexture->compareFunc = gcChipUtilConvertCompareFunc(samplerStates->compareFunc);
     }
 
+    if (localMask & __GL_TEXPARAM_DEPTH_TEX_MODE_BIT)
+    {
+        halTexture->dsTextureMode = gcChipUtilConvertDSTexMode(samplerStates->depthTexMode);
+    }
+
     if (localMask & __GL_TEXPARAM_MAX_ANISOTROPY_BIT)
     {
         halTexture->anisoFilter = __GL_MIN(gc->constants.maxAnistropic, gcoMATH_Float2UInt(samplerStates->maxAnistropy));
@@ -1368,7 +1439,12 @@ gcChipSetTextureParameters(
 
     if (localMask & __GL_TEXPARAM_BORDER_COLOR_BIT)
     {
-        __GL_MEMCOPY(halTexture->borderColor, samplerStates->borderColor.fv, 4 * gcmSIZEOF(GLfloat));
+        if (__GL_MEMCMP(halTexture->borderColor, samplerStates->borderColor.fv, 4 * sizeof(GLfloat)))
+        {
+            __GL_MEMCOPY(halTexture->borderColor, samplerStates->borderColor.fv, 4 * gcmSIZEOF(GLfloat));
+            /* Border color change will cause desc node dirty.*/
+            halTexture->descDirty = gcvTRUE;
+        }
     }
 
     if (chipCtx->chipFeature.hwFeature.hasTxDescriptor)
@@ -1783,6 +1859,9 @@ GLvoid updatePrimitive(__GLcontext *gc,
         case GL_POLYGON:
             chipCtx->hashKey.hashTwoSidedLighting =
             chipCtx->lightingStates.doTwoSidedlighting = gc->state.light.model.twoSided ? GL_TRUE : GL_FALSE;
+            /* Only set different hashClockwiseFront in two-sided light mode. */
+            chipCtx->hashKey.hashClockwiseFront =
+                ((gc->state.light.model.twoSided) && (gc->state.polygon.frontFace == GL_CW)) ? GL_TRUE : GL_FALSE;
             break;
         default:
             break;
@@ -1888,9 +1967,21 @@ gcChipValidateAttribGroup1(
             chipCtx->chipDirty.uDefer.sDefer.culling = 1;
         }
 
+        if (localMask & __GL_FRONTFACE_BIT)
+        {
+            updatePrimitive(gc, chipCtx);
+        }
+
         if (localMask & (__GL_POLYGONOFFSET_FILL_ENDISABLE_BIT | __GL_POLYGONOFFSET_BIT))
         {
-            gcmONERROR(gcChipSetPolygonOffset(gc));
+            if (gc->imports.conformGLSpec)
+            {
+                gcmONERROR(gcChipSetPolygonOffset(gc));
+            }
+            else
+            {
+                chipCtx->chipDirty.uDefer.sDefer.polygonOffset = 1;
+            }
         }
 
         if (localMask & __GL_RASTERIZER_DISCARD_ENDISABLE_BIT)
@@ -2418,9 +2509,19 @@ gcChipValidateLightSrcAttrib(
     {
         GLbitfield localMask = gc->globalDirtyState[__GL_LIGHT_SRC_ATTRS];
         GLuint lightIndex = 0;
-        while (localMask & (GLbitfield)(1)) {
+        while (localMask) {
             GLbitfield lightAttr = gc->lightAttrState[lightIndex];
             __GLlightSourceState * src = &gc->state.light.source[lightIndex];
+
+            /*
+            ** Handling discontinuous GL_LIGHT0~MAX_LIGHT_NUMBER.
+            */
+            if (!(localMask & (GLbitfield)(1)))
+            {
+                localMask >>= 1;
+                lightIndex++;
+                continue;
+            }
 
             if (lightAttr & __GL_LIGHT_ENDISABLE_BIT) {
                 glmSETHASH_1BIT(hashLightEnabled,
@@ -2799,6 +2900,55 @@ gcChipValidateProgramSamplersCB(
                 chipCtx->texture.halTexture[unit].magFilter = gcvTEXTURE_POINT;
         }
 
+        if (!gc->imports.conformGLSpec)
+        {
+            if (program->samplerMap[sampler].uniform != gcvNULL)
+            {
+                __GLsamplerObject *samplerObj = gc->texture.units[unit].boundSampler;
+
+                if (__glBitmaskTest(&gc->shaderProgram.samplerTexelFetchDirty, sampler))
+                {
+                    chipCtx->texture.halTexture[unit].sRGB = gcvTEXTURE_DECODE;
+                }
+                else if (samplerObj || texObj)
+                {
+                    __GLsamplerParamState *samplerStates;
+
+                    samplerStates = samplerObj ? &samplerObj->params : (__GLsamplerParamState*)&texObj->params;
+
+                    /*Convert srgb here may have overhead cause it will convert when validate texture*/
+                    chipCtx->texture.halTexture[unit].sRGB = gcChipUtilConvertSRGB(samplerStates->sRGB);
+                }
+            }
+
+            /* As webgl spec is inconsistent with oes spec when fetch a texel outside of the texture's size.
+               Es would return undefined result but webgl hopes(0,0,0,0). */
+            if (gcdPROC_IS_WEBGL(chipCtx->patchId) &&
+                (program->samplerMap[sampler].uniform != gcvNULL ) &&
+                __glBitmaskTest(&gc->shaderProgram.samplerTexelFetchDirty, sampler) &&
+                chipCtx->chipFeature.hwFeature.hasTxBorderClamp)
+            {
+                if ((chipCtx->texture.halTexture[unit].s == gcvTEXTURE_CLAMP) ||
+                    (chipCtx->texture.halTexture[unit].t == gcvTEXTURE_CLAMP) ||
+                    (chipCtx->texture.halTexture[unit].r == gcvTEXTURE_CLAMP))
+                {
+                    gctFLOAT bordercolor[4] = {0.0f};
+                    __GL_MEMCOPY(chipCtx->texture.halTexture[unit].borderColor, bordercolor, 4 * gcmSIZEOF(gctFLOAT));
+                }
+                if (chipCtx->texture.halTexture[unit].s == gcvTEXTURE_CLAMP)
+                {
+                    chipCtx->texture.halTexture[unit].s = gcvTEXTURE_BORDER;
+                }
+                if (chipCtx->texture.halTexture[unit].t == gcvTEXTURE_CLAMP)
+                {
+                    chipCtx->texture.halTexture[unit].t = gcvTEXTURE_BORDER;
+                }
+                if (chipCtx->texture.halTexture[unit].r == gcvTEXTURE_CLAMP)
+                {
+                    chipCtx->texture.halTexture[unit].r = gcvTEXTURE_BORDER;
+                }
+            }
+        }
         if (pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_ADVANCED_BLEND_SAMPLER
          || pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_SAMPLER )
         {
@@ -3802,7 +3952,7 @@ gceSTATUS gcChipValidateGL4Texture(__GLcontext *gc, __GLchipContext *chipCtx)
                 continue;
             }
 */
-            if (localMask & __GL_SAMPLERPARAMETER_BITS)
+            if (localMask & __GL_SAMPLERPARAMETER_BITS || localMask & __GL_TEXTURE_BORDER_BIT)
             {
                 gctUINT8 hashTextureWrapBit = 0;
                 gcChipSetTextureParameters(gc, tex, unit, localMask);
@@ -3824,7 +3974,6 @@ gceSTATUS gcChipValidateGL4Texture(__GLcontext *gc, __GLchipContext *chipCtx)
                 glmSETHASH_2BITS(hashTextureWrap, hashTextureWrapBit, unit);
             }
 
-            /* hardware does not support border color */
             if (localMask & __GL_TEXPARAM_BORDER_COLOR_BIT) {
                 updateTextureBorderColor(gc, tex, unit);
             }
@@ -4125,7 +4274,7 @@ gcChipValidateMiscState(
     }
 
 #ifdef OPENGL40
-    if (chipCtx->fixProgramFlag == gcvFALSE)
+    if ((gc->imports.conformGLSpec && chipCtx->fixProgramFlag == gcvFALSE) || (!gc->imports.conformGLSpec))
 #endif
     {
         if (pointPrimTypeSwitch || (gc->globalDirtyState[__GL_PROGRAM_ATTRS] & __GL_DIRTY_GLSL_PROGRAM_SWITCH))
@@ -4145,6 +4294,13 @@ gcChipValidateMiscState(
             /* Enable primtive-id. */
             gcmONERROR(gco3D_SetPrimitiveIdEnable(chipCtx->engine, ((psHints->primIdComponent != -1) && !prePAhints->prePaShaderHasPrimitiveId)));
         }
+    }
+    else if (pointPrimTypeSwitch && (gc->imports.conformGLSpec && chipCtx->fixProgramFlag == gcvTRUE))
+    {
+        gctBOOL enable = (GL_POINTS == chipCtx->primitveType) ? gcvTRUE : gcvFALSE;
+
+        /* Enable point size for points. */
+        gcmONERROR(gco3D_SetPointSizeEnable(chipCtx->engine, enable));
     }
 
     /* Save current primitive type. */
@@ -4223,8 +4379,9 @@ gcChipSetAlphaBlend(
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gceSTATUS status = gcvSTATUS_OK;
-    __GLchipSLProgramInstance *fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS] ? chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance : gcvNULL;
-    GLboolean shaderBlendPatch = fsInstance ? ((fsInstance->pgStateKeyMask.s.hasShaderBlend == 1) ? GL_TRUE : GL_FALSE) : GL_FALSE;
+    __GLchipSLProgramInstance *fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS] ?
+        chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance : gcvNULL;
+    GLboolean shaderBlendPatch = (fsInstance && (fsInstance->pgStateKeyMask.s.hasShaderBlend == 1)) ? GL_TRUE : GL_FALSE;
     gctUINT i, j;
 
     gcmHEADER_ARG("gc=0x%x", gc);
@@ -4264,8 +4421,66 @@ gcChipSetAlphaBlend(
 OnError:
     gcmFOOTER();
     return status;
-
 }
+
+#if gcdALPHA_KILL_IN_SHADER
+gceSTATUS
+gcChipSetAlphaKill(
+    __GLcontext *gc
+    )
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gceSTATUS status = gcvSTATUS_OK;
+    __GLchipSLProgramInstance *fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS] ?
+        chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance : gcvNULL;
+    GLboolean shaderBlendPatch = (fsInstance && (fsInstance->pgStateKeyMask.s.hasShaderBlend == 1)) ? GL_TRUE : GL_FALSE;
+    GLboolean alphaBlend = (fsInstance && (fsInstance->pgStateKeyMask.s.hasAlphaBlend == 1)) ? GL_TRUE : GL_FALSE;
+    GLboolean hwBlend, alphaKill, colorKill;
+
+    gcmHEADER_ARG("gc=0x%x", gc);
+
+    hwBlend = (!shaderBlendPatch &&
+                !chipCtx->advBlendInShader &&
+                !alphaBlend &&
+                gc->state.enables.colorBuffer.blend[0] &&
+                !chipCtx->fixProgramFlag);
+
+    alphaKill = (hwBlend &&
+                (gc->state.raster.blendSrcRGB[0] == GL_SRC_ALPHA) &&
+                (gc->state.raster.blendSrcAlpha[0] == GL_SRC_ALPHA) &&
+                (gc->state.raster.blendDstRGB[0] == GL_ONE_MINUS_SRC_ALPHA) &&
+                (gc->state.raster.blendDstAlpha[0] == GL_ONE_MINUS_SRC_ALPHA) &&
+                (gc->state.raster.blendEquationRGB[0] == GL_FUNC_ADD) &&
+                (gc->state.raster.blendEquationAlpha[0] == GL_FUNC_ADD) &&
+                (fsInstance->programState.hints->killStateAddress != 0)
+                );
+
+    colorKill = (hwBlend &&
+                (gc->state.raster.blendSrcRGB[0] == GL_ONE) &&
+                (gc->state.raster.blendSrcAlpha[0] == GL_ONE) &&
+                (gc->state.raster.blendDstRGB[0] == GL_ONE) &&
+                (gc->state.raster.blendDstAlpha[0] == GL_ONE) &&
+                (gc->state.raster.blendEquationRGB[0] == GL_FUNC_ADD) &&
+                (gc->state.raster.blendEquationAlpha[0] == GL_FUNC_ADD) &&
+                (fsInstance->programState.hints->killStateAddress != 0)
+                );
+
+    gcmONERROR(gco3D_SetAlphaKill(chipCtx->engine, alphaKill, colorKill));
+
+    /*program should reload because of alphaKill value change from 1 to 0 , the shader instruction code will changed*/
+    if (!chipCtx->chipDirty.uDefer.sDefer.fsReload &&
+        !alphaKill && chipCtx->alphaKillInShader )
+    {
+        chipCtx->chipDirty.uDefer.sDefer.fsReload = 1;
+    }
+
+    chipCtx->alphaKillInShader = alphaKill;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+#endif
 
 gceSTATUS
 gcChipSetColorMask(
@@ -4506,15 +4721,20 @@ gcChipSetDrawBuffers(
         chipDirty->uBuffer.sBuffer.sOffsetDirty = GL_TRUE;
     }
 
-    if (chipCtx->drawDepthView.surf != dView->surf)
+    if ((chipCtx->drawDepthView.surf != dView->surf) ||
+        (chipCtx->drawDepthView.numSlices != dView->numSlices))
     {
         chipCtx->drawDepthView.surf = dView->surf;
+        chipCtx->drawDepthView.numSlices = dView->numSlices;
         chipDirty->uBuffer.sBuffer.zSurfDirty = GL_TRUE;
+        chipCtx->chipDirty.uDefer.sDefer.polygonOffset = GL_TRUE;
     }
 
-    if (chipCtx->drawStencilView.surf != sView->surf)
+    if ((chipCtx->drawStencilView.surf != sView->surf) ||
+        (chipCtx->drawStencilView.numSlices != sView->numSlices))
     {
         chipCtx->drawStencilView.surf = sView->surf;
+        chipCtx->drawStencilView.numSlices = sView->numSlices;
         chipDirty->uBuffer.sBuffer.sSurfDirty = GL_TRUE;
     }
 
@@ -5746,7 +5966,7 @@ gcChipRecompileEvaluateKeyStates(
         }
     }
 
-    if ((chipCtx->patchId == gcvPATCH_DEQP) &&
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) &&
         (gc->apiVersion == __GL_API_VERSION_ES20) &&
         (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_ALPHABLEND_ATTR_BITS) &&
         (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_HALF_FLOAT_PIPE) == gcvFALSE)
@@ -5773,7 +5993,7 @@ gcChipRecompileEvaluateKeyStates(
         }
     }
 
-    if ((chipCtx->patchId == gcvPATCH_DEQP) && (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_POLYGONOFFSET_FILL_ENDISABLE_BIT) &&
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) && (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_POLYGONOFFSET_FILL_ENDISABLE_BIT) &&
         (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DEPTH_BIAS_FIX) == gcvFALSE))
     {
         if (gc->state.enables.polygon.polygonOffsetFill)
@@ -5856,10 +6076,18 @@ gcChipValidateRecompileStateCB(
 
             if (newPgInstance != oldPgInstance)
             {
+                /* Pre-compile failed.*/
+                if ((newPgInstance->programState.stateBuffer == gcvNULL || newPgInstance->programState.stateBufferSize == 0) &&
+                    newPgInstance->pgStateKeyMask.value != 0)
+                {
+                    gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+                }
+
                 program->curPgInstance = newPgInstance;
 
                 /* Increase non-master instance's ref and historyRef */
                 gcChipUtilsObjectAddRef(pgInstanceObj);
+                pgInstanceChanged = GL_TRUE;
 
                 if ((newPgInstance->programState.stateBuffer == gcvNULL || newPgInstance->programState.stateBufferSize == 0) &&
                     newPgInstance->pgStateKeyMask.value == 0)
@@ -5869,7 +6097,18 @@ gcChipValidateRecompileStateCB(
                     newPgInstance->pgStateKeyMask.value = pgStateKeyMask.value;
 
                     /* Recompile to generate new instance */
-                    gcmONERROR(gcChipRecompileShader(gc, chipCtx, progObj, program));
+                    status = gcChipRecompileShader(gc, chipCtx, progObj, program);
+
+                    if (gcmIS_ERROR(status))
+                    {
+                        /* recompile failed, need roll back newPgInstance.*/
+                        program->curPgInstance = oldPgInstance;
+                        pgInstanceChanged = GL_FALSE;
+
+                        gcChipUtilsObjectReleaseRef(pgInstanceObj);
+                        /* Do not delete the newPginstanceObj from hash Table, delay it when destory program obj.*/
+                        gcmONERROR(status);
+                    }
                 }
 
                 /* If program change, the sampler dirty is full, but when only instance change
@@ -5881,8 +6120,6 @@ gcChipValidateRecompileStateCB(
                 {
                     __glBitmaskSet(&gc->shaderProgram.samplerMapDirty, newPgInstance->rtSampler);
                 }
-
-                pgInstanceChanged = GL_TRUE;
             }
         }
         else
@@ -5968,6 +6205,15 @@ gcChipValidateRecompileStateCB(
                 chipCtx->chipDirty.uBuffer.sBuffer.rtSurfDirty = 1;
             }
 
+            if (!gc->imports.conformGLSpec)
+            {
+                if ((program->curPgInstance->pgStateKeyMask.s.hasShaderBlend) ||
+                    (program->curPgInstance->pgStateKeyMask.s.hasAlphaBlend))
+                {
+                    chipCtx->chipDirty.uDefer.sDefer.blend = 1;
+                }
+            }
+
             /* If any of the const base was changed due to recompile, need to reflush all active uniforms. */
             if (__GL_MEMCMP(newPgInstance->programState.hints->hwConstRegBases,
                             oldPgInstance->programState.hints->hwConstRegBases,
@@ -6047,6 +6293,19 @@ gcChipValidateRecompileStateCB(
         chipCtx->chipDirty.uBuffer.sBuffer.rtSurfDirty = 1;
     }
 
+    if ((!gc->imports.conformGLSpec) && (gc->globalDirtyState[__GL_PROGRAM_ATTRS] & __GL_DIRTY_GLSL_PROGRAM_SWITCH))
+    {
+        __GLbitmask texelFetchChangedMask;
+
+        __glBitmaskInitXOR(&texelFetchChangedMask,
+                           &gc->shaderProgram.samplerTexelFetchDirty,
+                           &gc->shaderProgram.samplerPrevTexelFetchDirty);
+
+        if (!__glBitmaskIsAllZero(&texelFetchChangedMask))
+        {
+            __glBitmaskOR2(&gc->shaderProgram.samplerStateDirty, &texelFetchChangedMask);
+        }
+    }
 OnError:
 
     if (pgStateKey)

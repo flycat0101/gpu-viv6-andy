@@ -43,6 +43,7 @@ typedef enum
     __GL_EXTID_ARB_texture_multisample,
     __GL_EXTID_ARB_explicit_attrib_location,
     __GL_EXTID_ARB_uniform_buffer_object,
+    __GL_EXTID_ARB_gpu_shader5,
 
     __GL_EXTID_EXT_framebuffer_blit,
     __GL_EXTID_EXT_framebuffer_object,

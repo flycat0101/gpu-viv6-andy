@@ -349,13 +349,12 @@ vdkGetAddress(
 #define VDK_CONFIG_RGB888           ((const EGLint *) 19)
 #define VDK_CONFIG_RGB565_AA        ((const EGLint *) 21)
 #define VDK_CONFIG_RGB888_AA        ((const EGLint *) 23)
-
+#define VDK_CONFIG_RGBA8888_D24S8   ((const EGLint *) 25)
 
 #define VDK_CONTEXT_ES11            ((const EGLint *) 0)
 #define VDK_CONTEXT_ES20            ((const EGLint *) 2)
 #define VDK_CONTEXT_OPENGL          ((const EGLint *) 4)
 #define VDK_CONTEXT_OPENVG          ((const EGLint *) 8)
-
 
 VDKAPI int VDKLANG
 vdkSetupEGL(

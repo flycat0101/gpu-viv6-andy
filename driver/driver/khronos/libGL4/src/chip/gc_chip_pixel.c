@@ -101,6 +101,7 @@ gcChipProcessPixelStore(
     __GLpixelPackMode *packMode,
     gctSIZE_T width,
     gctSIZE_T height,
+    gctSIZE_T border,
     GLenum format,
     GLenum type,
     gctSIZE_T skipImgs,
@@ -114,9 +115,9 @@ gcChipProcessPixelStore(
     gctSIZE_T imgLength = packMode->lineLength  ? (gctSIZE_T)packMode->lineLength  : width;
     gctSIZE_T imgHeight = packMode->imageHeight ? (gctSIZE_T)packMode->imageHeight : height;
 
-    gcmHEADER_ARG("gc=0x%x packMode=0x%x width=%u height=%u format=0x%04x type=0x%04x "
+    gcmHEADER_ARG("gc=0x%x packMode=0x%x width=%u height=%u border=%u format=0x%04x type=0x%04x "
                   "skipImgs=%u pRowStride=0x%x pImgHeight=0x%x pSkipBytes=0x%x",
-                  gc, packMode, width, height, format, type, skipImgs,
+                  gc, packMode, width, height, border, format, type, skipImgs,
                   pRowStride, pImgHeight, pSkipBytes);
 
     /* pixel store unpack parameters */
@@ -139,8 +140,8 @@ gcChipProcessPixelStore(
         gctSIZE_T imgStride = rowStride * imgHeight;
 
         *pSkipBytes = skipImgs * imgStride                /* skip images */
-                    + packMode->skipLines * rowStride     /* skip lines */
-                    + packMode->skipPixels * bpp / 8;     /* skip pixels */
+                    + (packMode->skipLines + border) * rowStride     /* skip lines */
+                    + (packMode->skipPixels + border) * bpp / 8;     /* skip pixels */
     }
 
     gcmFOOTER_NO();
@@ -1574,6 +1575,7 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE0 + texStage, 1, 0 );
     pDispatchTable->Vertex3fv(gc, (GLfloat *)&vertex);
     pDispatchTable->End(gc);
+    pDispatchTable->Disable(gc, GL_TEXTURE_2D);      /* Disable texture */
 
     pDispatchTable->Flush(gc);
 
@@ -2152,7 +2154,7 @@ __glChipReadPixels(
         wrapformat = formatMapInfo->requestFormat;
     }
 
-    gcChipProcessPixelStore(gc, &ps->packModes, (gctSIZE_T)width, (gctSIZE_T)height,
+    gcChipProcessPixelStore(gc, &ps->packModes, (gctSIZE_T)width, (gctSIZE_T)height, 0,
                             format, type, 0, gcvNULL, gcvNULL, &skipOffset);
 
     /* The image is from pack buffer object? */

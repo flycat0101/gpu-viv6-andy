@@ -753,6 +753,13 @@ GLboolean __glGetComponentAndMaskFromFormat(GLenum format, GLubyte* components, 
             mask[2] = 1;
             mask[3] = 4;
             break;
+        case GL_ABGR_EXT:
+            *components = 4;
+            mask[0] = 4;
+            mask[1] = 3;
+            mask[2] = 2;
+            mask[3] = 1;
+            break;
         default:
             return GL_TRUE;
     }
@@ -2149,8 +2156,12 @@ GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
         __glFinalConversion(transferInfo->dstType, type, transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, (GLvoid *)(transferInfo->dstImage));
     }
 
-    /* add alignment place in the buffer after conversion */
-    __glAddAlignmentPlaceOfBuffer(gc, transferInfo, alignmentBuf);
+    /* TODO: opration of pixel storage mode for glReadPixels may cause some crash, need to refine in the future. */
+    if (transferInfo->operaitonFlag != __GL_ReadPixels)
+    {
+        /* add alignment place in the buffer after conversion */
+        __glAddAlignmentPlaceOfBuffer(gc, transferInfo, alignmentBuf);
+    }
 
 OnExit:
     if (tmpBuf != gcvNULL){
@@ -2198,6 +2209,8 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
         }
         __GL_EXIT();
     }
+
+    transferInfo->operaitonFlag = pixelTransferOperations;
 
     if (pixelTransferOperations == __GL_TexImage)// Tex
     {

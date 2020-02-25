@@ -210,10 +210,20 @@ vdkSetupEGL(
             EGL_SAMPLES,            0,
             EGL_RENDERABLE_TYPE,    EGL_DONT_CARE,
             EGL_SURFACE_TYPE,       EGL_WINDOW_BIT,
+            EGL_ALPHA_SIZE,         0,
+            EGL_STENCIL_SIZE,       0,
             EGL_NONE,
         };
 
         int defaultConfig = 0;
+
+        /* When use VDK to run GL demo, it may need alpha channel and stencil buffer. */
+        if (ConfigurationAttributes == VDK_CONFIG_RGBA8888_D24S8)
+        {
+            defaultConfig = 1;
+            configuration[15] = 8;
+            configuration[17] = 8;
+        }
 
         /* Test for the default configuration. */
         if (ConfigurationAttributes == VDK_CONFIG_RGB888_D24)

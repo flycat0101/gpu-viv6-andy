@@ -1869,6 +1869,31 @@ static gceSTATUS using_aNormal(
     return status;
 }
 
+static gceSTATUS using_aFogCoord(
+    __GLcontext * gc,
+    glsVSCONTROL_PTR ShaderControl
+    )
+{
+    __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
+    glsATTRIBUTEINFO_PTR info = &chipCtx->attributeInfo[__GL_INPUT_FOGCOORD_INDEX];
+
+    gceSTATUS status;
+    gcmHEADER_ARG("gc=0x%x ShaderControl=0x%x", gc, ShaderControl);
+    status = glfUsingAttribute(
+        ShaderControl->i,
+        "aFogCoord",
+        info->attributeType,
+        1,
+        gcvFALSE,
+        info,
+        &glmATTRIBUTE_WRAP(VS, aFogCoord),
+        __GL_INPUT_FOGCOORD_INDEX,
+        gcSHADER_SHADER_DEFAULT
+        );
+    gcmFOOTER();
+    return status;
+}
+
 static gceSTATUS using_aColor(
     __GLcontext * gc,
     glsVSCONTROL_PTR ShaderControl
@@ -5294,6 +5319,9 @@ static gceSTATUS processFog(
         if (gc->state.fog.coordSource == GL_FOG_COORDINATE) {
             /* Allocate eye position register. */
             glmALLOCATE_TEMP(ShaderControl->vEyePosition);
+
+            /* Allocate aFogCoord attribute. */
+            glmUSING_ATTRIBUTE(aFogCoord);
 
             if (chipCtx->attributeInfo[__GL_INPUT_FOGCOORD_INDEX].streamEnabled) {
                 glmOPCODE(MOV, ShaderControl->vEyePosition, X);

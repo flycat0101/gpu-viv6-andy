@@ -327,6 +327,12 @@ GLvoid __glSetAttributeStatesDirty(__GLcontext *gc)
         gc->globalDirtyState[index] = (GLbitfield)(-1);
     }
 
+    /* Initialize light attribute state bits */
+    for (index = 0; index < __GL_MAX_LIGHT_NUMBER; index++)
+    {
+        gc->lightAttrState[index] = (GLbitfield)(-1);
+    }
+
     __glBitmaskSetAll(&gc->texUnitAttrDirtyMask, GL_TRUE);
     __glBitmaskSetAll(&gc->imageUnitDirtyMask, GL_TRUE);
 
@@ -1600,6 +1606,11 @@ __GL_INLINE GLboolean __glDrawEnd(__GLcontext *gc)
         __glBitmaskSetAll(&gc->shaderProgram.samplerMapDirty, GL_FALSE);
         gc->shaderProgram.samplerStateDirty = gc->shaderProgram.samplerStateKeepDirty;
         __glBitmaskSetAll(&gc->shaderProgram.samplerStateKeepDirty, GL_FALSE);
+        if (!gc->imports.conformGLSpec)
+        {
+            gc->shaderProgram.samplerPrevTexelFetchDirty = gc->shaderProgram.samplerTexelFetchDirty;
+            __glBitmaskSetAll(&gc->shaderProgram.samplerTexelFetchDirty, GL_FALSE);
+        }
 
         if (gc->globalDirtyState[__GL_ALL_ATTRS])
         {
@@ -1863,9 +1874,9 @@ GLvoid  __glDrawPrimitive(__GLcontext *gc, GLenum mode)
         __GL_SET_VARRAY_MODE_BIT(gc);
     }
 
-#ifdef OPENGL40
     if(gc->imports.conformGLSpec)
     {
+#ifdef OPENGL40
         if (gc->vertexStreams.primMode != mode)
         {
             gc->vertexStreams.primMode = mode;
@@ -1965,6 +1976,11 @@ GLvoid  __glDrawImmedPrimitive(__GLcontext *gc)
 
     ENTERFUNC_TM();
     mode = (gc->input.indexCount ? indexPrimMode[gc->input.primMode] : gc->input.primMode);
+
+    if (GL_POINT == gc->state.polygon.frontMode)
+    {
+        mode = GL_POINTS;
+    }
 
     if (mode != gc->vertexStreams.primMode)
     {
@@ -2212,6 +2228,12 @@ __GL_INLINE GLboolean __glComputeEnd(__GLcontext *gc)
     __glBitmaskSetAll(&gc->shaderProgram.samplerMapDirty, GL_FALSE);
     gc->shaderProgram.samplerStateDirty = gc->shaderProgram.samplerStateKeepDirty;
     __glBitmaskSetAll(&gc->shaderProgram.samplerStateKeepDirty, GL_FALSE);
+
+    if(!gc->imports.conformGLSpec)
+    {
+        gc->shaderProgram.samplerPrevTexelFetchDirty = gc->shaderProgram.samplerTexelFetchDirty;
+        __glBitmaskSetAll(&gc->shaderProgram.samplerTexelFetchDirty, GL_FALSE);
+    }
 
     __glBitmaskSetAll(&gc->texUnitAttrDirtyMask, GL_FALSE);
     __glBitmaskSetAll(&gc->imageUnitDirtyMask, GL_FALSE);

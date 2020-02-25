@@ -931,7 +931,14 @@ GLvoid GL_APIENTRY __glim_Clear(__GLcontext *gc, GLbitfield mask)
 
     if (mask & ~(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT))
     {
-        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+        if (gc->imports.coreProfile)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
+        }
+        else if (mask & ~(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_ACCUM_BUFFER_BIT))
+        {
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
+        }
     }
 
 #ifdef OPENGL40
@@ -3381,184 +3388,6 @@ GLvoid GL_APIENTRY __glim_GetInfoLogARB(__GLcontext *gc, GLhandleARB obj, GLsize
 
 
 #endif
-
-__GL_INLINE GLboolean seMaskTest(GLbitmask_PTR Bitmask, GLuint Loc)
-{
-    GL_ASSERT(Loc < Bitmask->size);
-    return ((Bitmask->me[0] & ((__GL_BITMASK_ELT_TYPE) 1 << Loc)) ? gcvTRUE: gcvFALSE);
-}
-
-__GL_INLINE GLvoid seMaskSet(GLbitmask_PTR Bitmask, GLuint Loc)
-{
-    GL_ASSERT(Loc < Bitmask->size);
-    Bitmask->me[0] |= (__GL_BITMASK_ELT_TYPE) 1 << Loc;
-}
-
-__GL_INLINE GLvoid seMaskOR(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2)
-{
-    BitmaskResult->me[0] = Bitmask1->me[0] | Bitmask2->me[0];
-}
-
-__GL_INLINE GLboolean seMaskTestAndClear(GLbitmask_PTR Bitmask, GLuint Loc)
-{
-    GL_ASSERT(Loc < Bitmask->size);
-    if (Bitmask->me[0] & ((__GL_BITMASK_ELT_TYPE) 1 << Loc))
-    {
-        Bitmask->me[0] &= ~((__GL_BITMASK_ELT_TYPE) 1 << Loc);
-        return gcvTRUE;
-    }
-    return gcvFALSE;
-}
-
-__GL_INLINE GLboolean seMaskIsAllZero(GLbitmask_PTR Bitmask)
-{
-    return (Bitmask->me[0]== (__GL_BITMASK_ELT_TYPE) 0);
-}
-
-__GL_INLINE GLvoid seMaskInit(GLbitmask_PTR Bitmask, GLboolean AllOne)
-{
-    Bitmask->numOfElts = 1;
-    Bitmask->me[0] = AllOne ?  ((__GL_BITMASK_ELT_TYPE) ~0 >> (__GL_BITMASK_ELT_BITS - Bitmask->size))
-                            :  (__GL_BITMASK_ELT_TYPE) 0;
-}
-
-__GL_INLINE GLvoid seMaskSetAll(GLbitmask_PTR Bitmask, GLboolean AllOne)
-{
-    Bitmask->me[0] = AllOne ?  ((__GL_BITMASK_ELT_TYPE) ~0 >> (__GL_BITMASK_ELT_BITS - Bitmask->size))
-                            :  (__GL_BITMASK_ELT_TYPE) 0;
-}
-
-__GL_INLINE GLvoid seMaskClear(GLbitmask_PTR Bitmask, GLuint Loc)
-{
-    GL_ASSERT(Loc < Bitmask->size);
-    Bitmask->me[0] &= ~((__GL_BITMASK_ELT_TYPE) 1 << Loc);
-}
-
-__GL_INLINE GLvoid seMaskSetValue(GLbitmask_PTR Bitmask, GLuint Value)
-{
-    GL_ASSERT(Bitmask->size >= 32);
-    Bitmask->me[0] = (__GL_BITMASK_ELT_TYPE) Value;
-}
-
-
-GLbitmaskFUNCS seMaskFuncs =
-{
-    seMaskTest,
-    seMaskSet,
-    seMaskOR,
-    seMaskTestAndClear,
-    seMaskIsAllZero,
-    seMaskInit,
-    seMaskClear,
-    seMaskSetAll,
-    seMaskSetValue,
-};
-
-__GL_INLINE GLboolean meMaskTest(GLbitmask_PTR Bitmask, GLuint Loc)
-{
-    GL_ASSERT(Loc < Bitmask->size);
-    return ((Bitmask->me[Loc / __GL_BITMASK_ELT_BITS] & ((__GL_BITMASK_ELT_TYPE) 1 << (Loc % __GL_BITMASK_ELT_BITS))) ? gcvTRUE: gcvFALSE);
-}
-
-
-__GL_INLINE GLvoid meMaskSet(GLbitmask_PTR Bitmask, GLuint Loc)
-{
-    GL_ASSERT(Loc < Bitmask->size);
-    Bitmask->me[Loc / __GL_BITMASK_ELT_BITS] |= ((__GL_BITMASK_ELT_TYPE) 1 << (Loc % __GL_BITMASK_ELT_BITS));
-}
-
-__GL_INLINE GLvoid meMaskOR(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2)
-{
-    GLuint i;
-    GLuint minIndex = __GL_MIN(Bitmask1->numOfElts, Bitmask2->numOfElts);
-    for (i = 0; i < minIndex; i++)
-    {
-        BitmaskResult->me[i] = Bitmask1->me[i] | Bitmask2->me[i];
-    }
-}
-
-__GL_INLINE GLboolean meMaskTestAndClear(GLbitmask_PTR Bitmask, GLuint Loc)
-{
-    GL_ASSERT(Loc < Bitmask->size);
-    if (Bitmask->me[Loc / __GL_BITMASK_ELT_BITS] & ((__GL_BITMASK_ELT_TYPE) 1 << (Loc % __GL_BITMASK_ELT_BITS)))
-    {
-        Bitmask->me[Loc / __GL_BITMASK_ELT_BITS] &= ~((__GL_BITMASK_ELT_TYPE) 1 << (Loc % __GL_BITMASK_ELT_BITS));
-        return gcvTRUE;
-    }
-    return gcvFALSE;
-}
-
-__GL_INLINE GLboolean meMaskIsAllZero(GLbitmask_PTR Bitmask)
-{
-    GLuint i;
-    for (i = 0; i < Bitmask->numOfElts; i++)
-    {
-        if (Bitmask->me[i])
-        {
-            return gcvFALSE;
-        }
-    }
-
-    return gcvTRUE;
-}
-
-
-__GL_INLINE GLvoid meMaskInit(GLbitmask_PTR Bitmask, GLboolean AllOne)
-{
-    GLuint i;
-    Bitmask->numOfElts = (Bitmask->size + (__GL_BITMASK_ELT_BITS -1)) / __GL_BITMASK_ELT_BITS;
-    Bitmask->remainedSize = Bitmask->size & (__GL_BITMASK_ELT_BITS -1);
-    GL_ASSERT(Bitmask->numOfElts <= __GL_BITMASK_ELT_MAXNUM);
-
-    for (i = 0; i < Bitmask->numOfElts; i++)
-    {
-        Bitmask->me[i] = AllOne ? (__GL_BITMASK_ELT_TYPE) ~0 : 0;
-    }
-
-    if (Bitmask->remainedSize)
-    {
-        Bitmask->me[Bitmask->numOfElts-1] >>= (__GL_BITMASK_ELT_BITS - Bitmask->remainedSize);
-    }
-}
-
-__GL_INLINE GLvoid meMaskSetAll(GLbitmask_PTR Bitmask, GLboolean AllOne)
-{
-    GLuint i;
-    for (i = 0; i < Bitmask->numOfElts; i++)
-    {
-        Bitmask->me[i] = AllOne ? (__GL_BITMASK_ELT_TYPE) ~0 : 0;
-    }
-
-    if (Bitmask->remainedSize)
-    {
-        Bitmask->me[Bitmask->numOfElts-1] >>= (__GL_BITMASK_ELT_BITS - Bitmask->remainedSize);
-    }
-}
-
-
-__GL_INLINE GLvoid meMaskClear(GLbitmask_PTR Bitmask, GLuint Loc)
-{
-    Bitmask->me[Loc / __GL_BITMASK_ELT_BITS] &= ~((__GL_BITMASK_ELT_TYPE) 1 << (Loc % __GL_BITMASK_ELT_BITS));
-}
-
-__GL_INLINE GLvoid meMaskSetValue(GLbitmask_PTR Bitmask, GLuint Value)
-{
-    Bitmask->me[0] = (__GL_BITMASK_ELT_TYPE) Value;
-}
-
-GLbitmaskFUNCS meMaskFuncs =
-{
-    meMaskTest,
-    meMaskSet,
-    meMaskOR,
-    meMaskTestAndClear,
-    meMaskIsAllZero,
-    meMaskInit,
-    meMaskClear,
-    meMaskSetAll,
-    meMaskSetValue,
-};
-
 
 
 

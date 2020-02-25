@@ -691,6 +691,7 @@ enum {
 #define __GL_TEXENV_ALPHA_SCALE_BIT             (__GL_ONE_64 << 54)
 #define __GL_TEXENV_COORD_REPLACE_BIT           (__GL_ONE_64 << 55)
 #define __GL_TEX_UNIT_LODBIAS_BIT               (__GL_ONE_64 << 56)
+#define __GL_TEXTURE_BORDER_BIT                 (__GL_ONE_64 << 57)
 #endif
 
 
@@ -1133,6 +1134,9 @@ struct __GLcontextRec
     /* Record which context this one will share with */
     __GLcontext *shareCtx;
 
+    /* GL_CONTEXT_FLAGS. */
+    GLbitfield contextFlags;
+
     /*
     ** Mode information that describes the kind of buffers and rendering
     ** modes that this context manages.
@@ -1480,6 +1484,7 @@ enum
 
     __GL_PERDRAW_DUMP_AS_TGA        = 1 << 16,
     __GL_PERDRAW_DUMP_AS_RAW        = 1 << 17,
+    __GL_PERDRAW_DUMP_AS_COMPRESSED = 1 << 18,
 
     __GL_PERDRAW_DUMP_NONE      = 0x0,
     __GL_PERDRAW_DUMP_ALL       = 0xFFFFFFFF,
