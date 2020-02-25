@@ -3741,4 +3741,82 @@ static slsBUILT_IN_VARIABLE GSBuiltInVariables[] =
 static gctUINT GSBuiltInVariableCount =
                     sizeof(GSBuiltInVariables) / sizeof(slsBUILT_IN_VARIABLE);
 
+/*******************************Redeclared built-in variables*******************************/
+typedef gctBOOL
+(*sltREDECLARED_CHECK_FUNC_PTR)(
+    IN sloCOMPILER,
+    IN slsNAME*,
+    IN slsDATA_TYPE*
+    );
+
+typedef gceSTATUS
+(*sltREDECLARED_UPDATE_FUNC_PTR)(
+    IN sloCOMPILER,
+    IN slsNAME*,
+    IN slsDATA_TYPE*
+    );
+
+/* Reclared built-in Variables */
+typedef struct _slsREDECLARED_VARIABLE
+{
+    sloEXTENSION                    extension;
+    gctSTRING                       variableName;
+    sltREDECLARED_CHECK_FUNC_PTR    checkFunc;
+    sltREDECLARED_UPDATE_FUNC_PTR   updateFunc;
+} slsREDECLARED_VARIABLE;
+
+gctBOOL
+_CheckRedeclaredForInterpolation(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* Name,
+    IN slsDATA_TYPE* NewDataType
+    );
+
+gceSTATUS
+_UpdateRedeclaredForInterpolation(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* Name,
+    IN slsDATA_TYPE* NewDataType
+    );
+
+gctBOOL
+_CheckRedeclaredForClipDistance(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* Name,
+    IN slsDATA_TYPE* NewDataType
+    );
+
+gceSTATUS
+_UpdateRedeclaredForClipDistance(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* Name,
+    IN slsDATA_TYPE* NewDataType
+    );
+
+static slsREDECLARED_VARIABLE VSRedeclaredVariables[] =
+{
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_FrontColor",            _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_BackColor",             _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_FrontSecondaryColor",   _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_BackSecondaryColor",    _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_ClipDistance",          _CheckRedeclaredForClipDistance,         _UpdateRedeclaredForClipDistance },
+};
+static gctUINT VSRedeclaredVariableCount = sizeof(VSRedeclaredVariables) / sizeof(slsREDECLARED_VARIABLE);
+
+static slsREDECLARED_VARIABLE GSRedeclaredVariables[] =
+{
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_FrontColor",            _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_BackColor",             _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_FrontSecondaryColor",   _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_BackSecondaryColor",    _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+};
+static gctUINT GSRedeclaredVariableCount = sizeof(GSRedeclaredVariables) / sizeof(slsREDECLARED_VARIABLE);
+
+static slsREDECLARED_VARIABLE FSRedeclaredVariables[] =
+{
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_Color",                 _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+    { {slvEXTENSION1_SUPPORT_OGL, slvEXTENSION2_NONE },         "gl_SecondaryColor",        _CheckRedeclaredForInterpolation,        _UpdateRedeclaredForInterpolation },
+};
+static gctUINT FSRedeclaredVariableCount = sizeof(FSRedeclaredVariables) / sizeof(slsREDECLARED_VARIABLE);
+
 #endif /* __gc_glsl_built_ins_def_h_ */

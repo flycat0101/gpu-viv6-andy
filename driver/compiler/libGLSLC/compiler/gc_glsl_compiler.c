@@ -17,6 +17,7 @@
 #include "gc_glsl_parser.h"
 #include "gc_glsl_ast_walk.h"
 #include "gc_glsl_emit_code.h"
+#include "gc_glsl_built_ins_def.h"
 
 sloCOMPILER gcCompiler[__GC_COMPILER_NUMBER__] = {gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL};
 
@@ -3026,28 +3027,67 @@ sloCOMPILER_CreateName(
     if (!Compiler->context.loadingBuiltIns &&
         !Compiler->context.redeclareBuiltInVar)
     {
+        /* Some built-in variables can be redeclared, do some checking here. */
         length = gcoOS_StrLen(Symbol, gcvNULL);
         if (length >= 3 &&
             Symbol[0] == 'g' && Symbol[1] == 'l' && Symbol[2] == '_')
         {
-            sleSHADER_TYPE shaderType;
-            shaderType = Compiler->shaderType;
-           /* The following predeclared variables can be redeclared with an interpolation qualifier:
-              Vertex and geometry languages: gl_FrontColor / gl_BackColor / gl_FrontSecondaryColor / gl_BackSecondaryColor
-              Fragment language: gl_Color / gl_SecondaryColor */
-            if (sloCOMPILER_IsOGLVersion(Compiler) &&
-               (((shaderType == slvSHADER_TYPE_VERTEX || shaderType == slvSHADER_TYPE_GS ) &&
-                 (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_FrontColor")) ||
-                  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_BackColor")) ||
-                  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_FrontSecondaryColor")) ||
-                  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_BackSecondaryColor")))) ||
-                 (shaderType == slvSHADER_TYPE_FRAGMENT &&
-                 (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_Color")) ||
-                  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "gl_SecondaryColor"))))))
+            sleSHADER_TYPE              shaderType = Compiler->shaderType;
+            slsREDECLARED_VARIABLE*     pRedeclaredVariableList = gcvNULL;
+            slsREDECLARED_VARIABLE      redeclaredVariable = { 0 };
+            slsNAME*                    pBuiltinName = gcvNULL;
+            gctUINT                     redeclaredVariableCount = 0, i = 0;
+            gctBOOL                     bMatch = gcvTRUE;
+
+            if (shaderType == slvSHADER_TYPE_VERTEX)
             {
-                isBuiltIn = gcvTRUE;
+                pRedeclaredVariableList = VSRedeclaredVariables;
+                redeclaredVariableCount = VSRedeclaredVariableCount;
             }
-            else
+            else if (shaderType == slvSHADER_TYPE_GS)
+            {
+                pRedeclaredVariableList = GSRedeclaredVariables;
+                redeclaredVariableCount = GSRedeclaredVariableCount;
+            }
+            else if (shaderType == slvSHADER_TYPE_FRAGMENT)
+            {
+                pRedeclaredVariableList = FSRedeclaredVariables;
+                redeclaredVariableCount = FSRedeclaredVariableCount;
+            }
+
+            for (i = 0; i < redeclaredVariableCount; i++)
+            {
+                redeclaredVariable = pRedeclaredVariableList[i];
+
+                if (!sloCOMPILER_ExtensionEnabled(Compiler, &redeclaredVariable.extension))
+                {
+                    continue;
+                }
+
+                if (!gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, redeclaredVariable.variableName)))
+                {
+                    continue;
+                }
+
+                gcmONERROR(slsNAME_SPACE_SearchBuiltinVariable(Compiler,
+                                                               Compiler->context.builtinSpace,
+                                                               Symbol,
+                                                               Extension,
+                                                               &pBuiltinName));
+
+                if (redeclaredVariable.checkFunc == gcvNULL)
+                {
+                    bMatch = gcvTRUE;
+                }
+                else
+                {
+                    bMatch = redeclaredVariable.checkFunc(Compiler, pBuiltinName, DataType);
+                }
+
+                break;
+            }
+
+            if (!bMatch)
             {
                 gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                 LineNo,
@@ -3056,10 +3096,22 @@ sloCOMPILER_CreateName(
                                                 "The identifier: '%s' starting with 'gl_' is reserved",
                                                 Symbol));
 
-                status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
                 gcmFOOTER();
-                return status;
+                return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
             }
+
+            if (redeclaredVariable.updateFunc)
+            {
+                gcmONERROR(redeclaredVariable.updateFunc(Compiler, pBuiltinName, DataType));
+            }
+
+            if (Name)
+            {
+                *Name = pBuiltinName;
+            }
+
+            gcmFOOTER();
+            return gcvSTATUS_OK;
         }
     }
 
@@ -3075,6 +3127,7 @@ sloCOMPILER_CreateName(
                                       CheckExistedName,
                                       Name);
 
+OnError:
     gcmFOOTER();
     return status;
 }

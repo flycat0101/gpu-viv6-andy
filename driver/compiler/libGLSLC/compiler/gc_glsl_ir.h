@@ -1494,6 +1494,15 @@ slsNAME_SPACE_Search(
     );
 
 gceSTATUS
+slsNAME_SPACE_SearchBuiltinVariable(
+    IN sloCOMPILER Compiler,
+    IN slsNAME_SPACE * NameSpace,
+    IN sltPOOL_STRING Symbol,
+    IN sloEXTENSION Extension,
+    OUT slsNAME ** Name
+    );
+
+gceSTATUS
 slsNAME_SPACE_CheckNewFuncName(
     IN sloCOMPILER Compiler,
     IN slsNAME_SPACE * NameSpace,
