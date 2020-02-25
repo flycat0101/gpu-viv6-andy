@@ -1524,7 +1524,7 @@ VX_PRIVATE_API vx_status vxnneOperation_ExecuteYUVScalerCommand(vx_node node, vx
 {
     vx_status status = VX_SUCCESS;
     vxnne_yuv2rgb_scale_operation scaleOp = (vxnne_yuv2rgb_scale_operation)operation;
-    vx_uint32 imageInputWidth, imageInputHeight, i, splitCount;
+    vx_uint32 imageInputWidth, imageInputHeight, i, splitCount, inImageWidth, inImageHeight;
     vx_uint32 outputWidth = TENSOR_VIEW_SIZE_INDEX(scaleOp->outputs, 0); /* x-axis*/
     vx_uint32 outputHeight = TENSOR_VIEW_SIZE_INDEX(scaleOp->outputs, 1); /* y-axis*/
     vx_rectangle_t rect;
@@ -1532,6 +1532,7 @@ VX_PRIVATE_API vx_status vxnneOperation_ExecuteYUVScalerCommand(vx_node node, vx
     vx_uint32 outputStarts[gcdMAX_3DGPU_COUNT], outputSizes[gcdMAX_3DGPU_COUNT];
     vx_uint16 inputInitErrors[gcdMAX_3DGPU_COUNT], inputInitIntErrors[gcdMAX_3DGPU_COUNT];
     vxnne_yuv2rgb_scale_operation_s SCOperation;
+    vx_image image = scaleOp->inputs;
 
     vxmASSERT(VXNNE_OPERATOR_YUV2RGB_SCALE == operation->operatorType);
 
@@ -1558,7 +1559,6 @@ VX_PRIVATE_API vx_status vxnneOperation_ExecuteYUVScalerCommand(vx_node node, vx
     }
     if (!rect.end_x || !rect.end_y || rect.end_x < rect.start_x || rect.end_y < rect.start_y)
     {
-        vx_image image = scaleOp->inputs;
         if (image->region.start_x > image->region.end_x)
         {
             rect.start_x = 0;
@@ -1587,8 +1587,13 @@ VX_PRIVATE_API vx_status vxnneOperation_ExecuteYUVScalerCommand(vx_node node, vx
     scaleOp->x_scale = (imageInputWidth << 15) / outputWidth;
     scaleOp->y_scale = (imageInputHeight << 15) / outputHeight;
 
-    if (imageInputWidth > 4096 || imageInputHeight > 2048 ||
-        ((imageInputWidth > 1920 || imageInputHeight > 1080) && !vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER_4K)))
+    inImageWidth  = image->region.start_x > image->region.end_x ? image->memory.dims[0][VX_DIM_X] : image->region.end_x - image->region.start_x;
+    inImageHeight = image->region.start_y > image->region.end_y ? image->memory.dims[0][VX_DIM_Y] : image->region.end_y - image->region.start_y;
+
+    vxmASSERT(imageInputWidth <= inImageWidth && imageInputHeight <= inImageHeight);
+
+    if (inImageWidth > 4096 || inImageHeight > 4096 ||
+        (imageInputWidth > 1920 && !vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER_4K)))
     {
         vxmONERROR(VX_ERROR_INVALID_PARAMETERS);
     }

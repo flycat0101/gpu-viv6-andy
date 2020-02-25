@@ -967,7 +967,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoYUV2RGBScale_Initializer(vx_node node, c
     vx_tensor  outputs                    = (vx_tensor)parameters[8];
 
     vx_rectangle_t rect;
-    vx_uint32 input_rect_width, input_rect_height, output_width, output_height, scale_x, scale_y;
+    vx_uint32 input_rect_width, input_rect_height, input_width, input_height, output_width, output_height, scale_x, scale_y;
 
     vxnne_yuv2rgb_scale_layer  yuv2rgb_scaleLayer = VX_NULL;
 
@@ -1017,6 +1017,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoYUV2RGBScale_Initializer(vx_node node, c
     input_rect_width  = rect.end_x - rect.start_x;
     input_rect_height = rect.end_y - rect.start_y;
 
+    input_width  = image->region.start_x > image->region.end_x ? image->memory.dims[0][VX_DIM_X] : image->region.end_x - image->region.start_x;
+    input_height = image->region.start_y > image->region.end_y ? image->memory.dims[0][VX_DIM_Y] : image->region.end_y - image->region.start_y;
+
+    vxmASSERT(input_rect_width <= input_width && input_rect_height <= input_height);
+
     output_width  = TENSOR_SIZE_INDEX(outputs, 0);
     output_height = TENSOR_SIZE_INDEX(outputs, 1);
 
@@ -1024,8 +1029,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoYUV2RGBScale_Initializer(vx_node node, c
     scale_y = (input_rect_height << 15) / output_height;
 
     if (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER) &&
-        ((input_rect_width <= 1920 && input_rect_height <= 1080) ||
-         (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER_4K) && input_rect_width <= 4096 && input_rect_height <= 2048)))
+        input_width <= 4096 && input_height <= 4096 &&
+        (input_rect_width <= 1920 || vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SCALER_4K)))
     {
         vxnneOperation_Initialize(
             &yuv2rgb_scaleLayer->yuv2rgb_scale_sc_operation.base,
