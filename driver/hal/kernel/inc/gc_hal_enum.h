@@ -640,6 +640,8 @@ typedef enum _gceFEATURE
     gcvFEATURE_MAX_POINTSIZE_CLAMP,
     gcvFEATURE_2D_FAST_CLEAR, /* For tilestatus Fast Clear feature*/
     gcvFEATURE_NN_PER_CHANNEL_QUANT_ASYM,
+    gcvFEATURE_SMALL_BATCH_FLOPS_RESET_FIX,
+    gcvFEATURE_SMALL_BATCH_DISBLE_FIX,
 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
