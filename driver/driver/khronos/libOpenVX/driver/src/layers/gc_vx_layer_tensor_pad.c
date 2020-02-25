@@ -1592,6 +1592,7 @@ OnError:
     {
         vx_int32 inWidth = 0, inHeight = 0, inDepth = 0, inBatch = 0;
         vx_int32 outWidth = 0, outHeight = 0, outDepth = 0, outBatch = 0;
+        vx_bool isFp32Flag = vx_false_e;
         vx_bool dataFormatFlag = vx_false_e;
         vx_bool shader_flag = vx_false_e;
         vx_bool pad_flag = vx_false_e;
@@ -1611,6 +1612,7 @@ OnError:
 
         dataFormatFlag = (vx_bool)((inputFormat == outputFormat) && (inputElementSize & 3) && (inputFixPointPos == outputFixPointPos)
             && (inputZeroPoint == outputZeroPoint) && (inputScale == outputScale));
+        isFp32Flag = (vx_bool)((inputFormat == outputFormat) && (inputFormat == VX_TYPE_FLOAT32));
 
         outWidth  = TENSOR_VIEW_SIZE_INDEX(dst, 0);
         outHeight = TENSOR_VIEW_SIZE_INDEX(dst, 1);
@@ -1659,7 +1661,7 @@ OnError:
             whc_flag = vx_true_e;
         }
 
-        if(!dataFormatFlag)
+        if(!dataFormatFlag && !isFp32Flag)
         {
             shader_flag = vx_false_e;
         }
@@ -1668,7 +1670,17 @@ OnError:
         {
             vxnne_shader_executable shaderExecutable;
 
-            if(pad_flag)
+            if(isFp32Flag)
+            {
+                shaderExecutable = vxnneGetGPUTensorPad2ShaderExecutable(node->base.context,
+                    VXNNE_KERNEL_TENSOR_PAD,
+                    &node->kernelAttributes.borderMode,
+                    src,
+                    padConst,
+                    dst,
+                    pad_base);
+            }
+            else if(pad_flag)
             {
                 vx_scalar padLeft = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &pad_base[0]);
                 vx_scalar padRight = vxCreateScalar(node->base.context, VX_TYPE_FLOAT32, &pad_base[1]);
