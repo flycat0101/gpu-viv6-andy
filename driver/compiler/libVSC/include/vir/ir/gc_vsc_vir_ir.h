@@ -138,6 +138,9 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
      (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_VX2)      ||  \
      (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_VX1_2))
 
+#define VIR_OPCODE_isVX2Only(Opcode)   \
+    ((VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_VX1_2))
+
 #define VIR_OPCODE_U512_SrcNo(Opcode)   \
     ((VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_Use512Unifrom_MASK) >> VIR_OPFLAG_Use512Unifrom_SHIFT)
 

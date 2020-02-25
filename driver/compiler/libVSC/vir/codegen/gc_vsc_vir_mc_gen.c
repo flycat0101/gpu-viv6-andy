@@ -3333,7 +3333,7 @@ _VSC_MC_GEN_GenInst(
             Gen->Shader->hasDsy = gcvTRUE;
         }
 
-        if (baseOpcode == 0x45)
+        if (baseOpcode == 0x45 || mcInstCtrl.u.maCtrl.bUnderEvisMode)
         {
             VIR_Shader_SetFlagExt1(Gen->Shader, VIR_SHFLAG_EXT1_USE_EVIS_INST);
         }

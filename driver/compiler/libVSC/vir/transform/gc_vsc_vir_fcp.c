@@ -1787,6 +1787,15 @@ VSC_ErrCode vscVIR_PostMCCleanup(
         {
             VIR_OpCode opCode = VIR_Inst_GetOpcode(inst);
 
+            /* We need to report ERROR if this chip can't support EVIS but we meet a EVIS instruction. */
+            if ((VIR_OPCODE_isVX(opCode) && !pHwCfg->hwFeatureFlags.supportEVIS)
+                ||
+                (VIR_OPCODE_isVX2Only(opCode) && !pHwCfg->hwFeatureFlags.supportEVISVX2))
+            {
+                errCode = VSC_ERR_NOT_SUPPORTED;
+                ON_ERROR(errCode, "This chip can't support EVIS instruction \"%s\".", VIR_OPCODE_GetName(opCode));
+            }
+
             /* disable this when RA enabled for now, since DU and RA has not supported indexed opnd yet */
             if (!bRAEnabled)
             {
