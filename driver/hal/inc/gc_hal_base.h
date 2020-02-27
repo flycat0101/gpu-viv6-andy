@@ -5322,6 +5322,18 @@ gcoHAL_GetUserDebugOption(
 
 /*----------------------------------------------------------------------------*/
 
+#define gcmSETSINGLESTATE_DUMY(StateDelta, CommandBuffer, Memory, FixedPoint, \
+                                Address, Data) \
+ { \
+    gctUINT32 __temp_data32__; \
+    __temp_data32__ = Data ; \
+    gcmVERIFYLOADSTATEALIGNED(CommandBuffer, Memory); \
+    *Memory++ = \
+        (gctUINT32)(0) | (0xFFFF & Address); \
+    *Memory++ = __temp_data32__; \
+    gcmENDSTATEBATCH_NEW(CommandBuffer, Memory); \
+}
+
 #define gcmSETSINGLESTATE_NEW(StateDelta, CommandBuffer, Memory, FixedPoint, \
                               Address, Data) \
 { \
