@@ -6786,9 +6786,9 @@ vxnne_shader_executable vxnneGetGPUMaxPoolingShaderExecutable(
             parameters[3] = (vx_reference)stride_y;
         }
 
-        if (pack_key == _OVX_PACK_SELECT_KEY(vx_true_e, vx_true_e, 2, 2, vx_true_e, 3, 3, vx_true_e)
+        if ((pack_key == _OVX_PACK_SELECT_KEY(vx_true_e, vx_true_e, 2, 2, vx_true_e, 3, 3, vx_true_e)
           || pack_key == _OVX_PACK_SELECT_KEY(vx_true_e, vx_true_e, 1, 1, vx_true_e, 3, 3, vx_true_e)
-          || pack_key == _OVX_PACK_SELECT_KEY(vx_true_e, vx_true_e, 2, 2, vx_true_e, 2, 2, vx_true_e)
+          || pack_key == _OVX_PACK_SELECT_KEY(vx_true_e, vx_true_e, 2, 2, vx_true_e, 2, 2, vx_true_e))
            && enable_2d_image)
         {
             vx_bool _is_algn4 = (vx_bool)(out_width % 4 == 0);
@@ -12947,22 +12947,12 @@ vxnne_shader_executable vxnneGetGPUBatchNormShaderExecutable(
     vx_uint32       depth                      = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
     vx_uint32       batch                      = (dims > 3) ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
     vx_enum         inputFormat                = TENSOR_DATA_TYPE(input);
-    vx_int32        input_ZP                   = TENSOR_TF_ZEROPOINT(input);
     vx_tensor       input_rs                   = NULL;
     vx_tensor       output_rs                  = NULL;
     vx_int32        sizes[4]                   = {1, 1, 1, 1};
     vx_bool         useImage2DFlag             = (vx_bool)((width * height < IMG_MAX_WIDTH) && axis != 0);
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, weights=%p, biases=%p, output=%p", context, kernelEnum, borderMode, input, weights, biases, output);
-
-    if (inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_INT16)
-    {
-        input_ZP       = 0;
-    }
-    else if (inputFormat == VX_TYPE_FLOAT16)
-    {
-        input_ZP       = 0;
-    }
 
     if (useImage2DFlag)
     {
