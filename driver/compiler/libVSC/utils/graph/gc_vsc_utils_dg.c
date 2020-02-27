@@ -517,6 +517,66 @@ gctUINT vscDG_GetTailCount(VSC_DIRECTED_GRAPH* pDG)
     return vscSRARR_GetElementCount(&pDG->tailNodeArray);
 }
 
+/* Node stack with edge. */
+typedef struct _VSC_DG_NODE_WITH_EDGE
+{
+    VSC_DG_NODE*    pNode;
+    VSC_DG_EDGE*    pEdge;
+    gctUINT         nextEdgeIndex;
+} VSC_DG_NODE_WITH_EDGE;
+
+static void _PushStackWithEdge(VSC_SIMPLE_STACK* pStack, VSC_DG_NODE* pNode, VSC_DG_EDGE* pEdge, gctUINT nextEdgeIndex, VSC_MM* pMM)
+{
+    VSC_QUEUE_STACK_ENTRY* pStackEntry;
+    VSC_DG_NODE_WITH_EDGE*  pNodeWithEdge;
+
+    /* Allocate the node with edge. */
+    pNodeWithEdge = (VSC_DG_NODE_WITH_EDGE*)vscMM_Alloc(pMM, sizeof(VSC_DG_NODE_WITH_EDGE));
+    pNodeWithEdge->pNode = pNode;
+    pNodeWithEdge->pEdge = pEdge;
+    pNodeWithEdge->nextEdgeIndex = nextEdgeIndex;
+
+    /* Allocate the stack entry. */
+    pStackEntry = (VSC_QUEUE_STACK_ENTRY*)vscMM_Alloc(pMM, sizeof(VSC_QUEUE_STACK_ENTRY));
+
+    /* Push the entry. */
+    SQE_INITIALIZE(pStackEntry, pNodeWithEdge);
+    STACK_PUSH_ENTRY(pStack, pStackEntry);
+}
+
+static void* _PopStackWithEdge(VSC_SIMPLE_STACK* pStack, VSC_DG_NODE_WITH_EDGE* pNodeWithEdge, VSC_MM* pMM)
+{
+    VSC_QUEUE_STACK_ENTRY*       pStackEntry;
+    VSC_DG_NODE_WITH_EDGE*       pRetNode;
+
+    pStackEntry = STACK_POP_ENTRY(pStack);
+    pRetNode = (VSC_DG_NODE_WITH_EDGE*)SQE_GET_CONTENT(pStackEntry);
+
+    if (pNodeWithEdge)
+    {
+        pNodeWithEdge->pNode = pRetNode->pNode;
+        pNodeWithEdge->pEdge = pRetNode->pEdge;
+        pNodeWithEdge->nextEdgeIndex = pRetNode->nextEdgeIndex;
+    }
+
+    vscMM_Free(pMM, pRetNode);
+    vscMM_Free(pMM, pStackEntry);
+
+    return pRetNode;
+}
+
+static VSC_DG_NODE_WITH_EDGE* _TopStackWithEdge(VSC_SIMPLE_STACK* pStack)
+{
+    VSC_QUEUE_STACK_ENTRY*       pStackEntry;
+    VSC_DG_NODE_WITH_EDGE*       pRetNode;
+
+    pStackEntry = STACK_PEEK_TOP_ENTRY(pStack);
+    pRetNode = (VSC_DG_NODE_WITH_EDGE*)SQE_GET_CONTENT(pStackEntry);
+
+    return pRetNode;
+}
+
+/* Node stack for DG_NODE. */
 static void _PushStack(VSC_SIMPLE_STACK* pStack, VSC_DG_NODE* pNode, VSC_MM* pMM)
 {
     VSC_QUEUE_STACK_ENTRY* pStackEntry;
@@ -564,9 +624,6 @@ static VSC_SIMPLE_RESIZABLE_ARRAY* _PrepareTraversal(VSC_DIRECTED_GRAPH* pDG,
 {
     VSC_DG_NODE* pNode = gcvNULL;
 
-    gcmASSERT(searchMode >= VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST ||
-              searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE);
-
     for (pNode = DGNLST_GET_FIRST_NODE(&pDG->nodeList);
          pNode != NULL;
          pNode = DGND_GET_NEXT_NODE(pNode))
@@ -591,6 +648,45 @@ static void _ReverseResult(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE** ppRetNodeOrder
     }
 }
 
+static gctBOOL _UseRecursiveTraversalForDFS(VSC_DIRECTED_GRAPH* pDG,
+                                            VSC_GRAPH_SEARCH_MODE searchMode)
+{
+    if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST)
+    {
+        if (pDG->nextEdgeId > MAX_EDGE_COUNT_TO_USE_RECURSION_FOR_DFS)
+        {
+            return gcvFALSE;
+        }
+    }
+    else if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_ITERATIVE)
+    {
+        return gcvFALSE;
+    }
+
+    return gcvTRUE;
+}
+
+static VSC_GRAPH_SEARCH_MODE _ChooseImplementSearchMode(VSC_DIRECTED_GRAPH* pDG,
+                                                        VSC_GRAPH_SEARCH_MODE searchMode)
+{
+    /* We have the resursive/iterative implementations for DFS. */
+    if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST             ||
+        searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_RECURSIVE   ||
+        searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_ITERATIVE)
+    {
+        if (_UseRecursiveTraversalForDFS(pDG, searchMode))
+        {
+            return VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_RECURSIVE;
+        }
+        else
+        {
+            return VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_ITERATIVE;
+        }
+    }
+
+    return searchMode;
+}
+
 static void _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
                                  VSC_DG_NODE* pNode,
                                  VSC_GRAPH_SEARCH_MODE searchMode,
@@ -602,7 +698,7 @@ static void _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
     VSC_ADJACENT_LIST* pAdjList;
 
     /* Traversal descendants based on search mode now */
-    if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST)
+    if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_RECURSIVE)
     {
         /* Determine direction */
         pAdjList = (bFromTail) ? &pNode->predList : &pNode->succList;
@@ -624,6 +720,51 @@ static void _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
                 _DoPreOrderTraversal(pDG, pEdge->pToNode, searchMode, bFromTail, ppRetNodeOrder, pPreOrderIdx);
             }
         }
+    }
+    else if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_ITERATIVE)
+    {
+        VSC_SIMPLE_STACK        stack;
+        VSC_DG_NODE*            pPopNode;
+
+        STACK_INITIALIZE(&stack);
+
+        _PushStack(&stack, pNode, pDG->pMM);
+
+        while (!STACK_CHECK_EMPTY(&stack))
+        {
+            pPopNode = _PopStack(&stack, pDG->pMM);
+            if (pPopNode->bVisited)
+            {
+                continue;
+            }
+            pPopNode->bVisited = gcvTRUE;
+
+            /* Record pre-order seq */
+            ppRetNodeOrder[(*pPreOrderIdx) ++] = pPopNode;
+
+            /* Determine direction */
+            pAdjList = (bFromTail) ? &pPopNode->predList : &pPopNode->succList;
+
+            vscUNILST_Reverse(pAdjList);
+
+            /* Visit descendants before siblings */
+            for (pEdge = AJLST_GET_FIRST_EDGE(pAdjList);
+                 pEdge != NULL;
+                 pEdge = DGEG_GET_NEXT_EDGE(pEdge))
+            {
+                gcmASSERT(pEdge->pFromNode == pPopNode);
+
+                if (!pEdge->pToNode->bVisited)
+                {
+                    _PushStack(&stack, pEdge->pToNode, pDG->pMM);
+                }
+            }
+
+            /* Reverse the list again. */
+            vscUNILST_Reverse(pAdjList);
+        }
+
+        STACK_FINALIZE(&stack);
     }
     else if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW)
     {
@@ -662,12 +803,10 @@ static void _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
 
         vscSRARR_Finalize(&unvisitedDescendantArray);
     }
-    else
+    else if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE)
     {
         VSC_SIMPLE_QUEUE  queue;
         VSC_DG_NODE*      pDequeuedNode;
-
-        gcmASSERT(searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE);
 
         QUEUE_INITIALIZE(&queue);
 
@@ -702,6 +841,10 @@ static void _DoPreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
 
         QUEUE_FINALIZE(&queue);
     }
+    else
+    {
+        gcmASSERT(gcvFALSE);
+    }
 }
 
 void vscDG_PreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
@@ -713,6 +856,8 @@ void vscDG_PreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
     gctUINT                     i, preOrderIdx = 0;
     VSC_DG_NODE*                pStartNode;
     VSC_SIMPLE_RESIZABLE_ARRAY* pStartNodeArray;
+
+    searchMode = _ChooseImplementSearchMode(pDG, searchMode);
 
     /* Prepare firstly */
     pStartNodeArray = _PrepareTraversal(pDG, searchMode, bFromTail);
@@ -739,6 +884,30 @@ void vscDG_PreOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
     }
 }
 
+static VSC_DG_EDGE* _GetEdgeByIndex(VSC_DIRECTED_GRAPH* pDG,
+                                    VSC_DG_NODE* pNode,
+                                    VSC_ADJACENT_LIST* pAdjList,
+                                    gctUINT edgeIndex)
+{
+    VSC_DG_EDGE*       pEdge = gcvNULL;
+    gctUINT            i;
+
+    /* Visit descendants before siblings */
+    for (pEdge = AJLST_GET_FIRST_EDGE(pAdjList), i = 0;
+         pEdge != NULL;
+         pEdge = DGEG_GET_NEXT_EDGE(pEdge), i++)
+    {
+        gcmASSERT(pEdge->pFromNode == pNode);
+
+        if (i == edgeIndex)
+        {
+            return pEdge;
+        }
+    }
+
+    return gcvNULL;
+}
+
 static void _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
                                   VSC_DG_NODE* pNode,
                                   VSC_GRAPH_SEARCH_MODE searchMode,
@@ -750,7 +919,7 @@ static void _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
     VSC_ADJACENT_LIST* pAdjList;
 
     /* Traversal descendants based on search mode now */
-    if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST)
+    if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_RECURSIVE)
     {
         /* Determine direction */
         pAdjList = (bFromTail) ? &pNode->predList : &pNode->succList;
@@ -772,6 +941,64 @@ static void _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
 
         /* Record post-order seq */
         ppRetNodeOrder[(*pPostOrderIdx) ++] = pNode;
+    }
+    else if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_ITERATIVE)
+    {
+        VSC_SIMPLE_STACK        stack;
+
+        STACK_INITIALIZE(&stack);
+
+        _PushStackWithEdge(&stack, pNode, gcvNULL, 0, pDG->pMM);
+
+        while (!STACK_CHECK_EMPTY(&stack))
+        {
+            VSC_DG_NODE_WITH_EDGE*  pPopNodeWithEdge = _TopStackWithEdge(&stack);
+            VSC_DG_NODE*            pPopNode = pPopNodeWithEdge->pNode;
+            gctUINT                 nextEdgeIndex = pPopNodeWithEdge->nextEdgeIndex;
+            gctBOOL                 bPopNode = gcvFALSE;
+
+            pPopNode->bVisited = gcvTRUE;
+
+            /* Determine direction */
+            pAdjList = (bFromTail) ? &pPopNode->predList : &pPopNode->succList;
+
+            /* Get the next visit edge. */
+            while (gcvTRUE)
+            {
+                pEdge = _GetEdgeByIndex(pDG, pPopNode, pAdjList, nextEdgeIndex);
+                nextEdgeIndex++;
+
+                /* All edges have been visited, we can pop this node. */
+                if (pEdge == gcvNULL)
+                {
+                    bPopNode = gcvTRUE;
+                    break;
+                }
+                /* Revisit, find next one. */
+                else if (pEdge->pToNode->bVisited == gcvTRUE)
+                {
+                }
+                else
+                {
+                    _PushStackWithEdge(&stack, pEdge->pToNode, pEdge, 0, pDG->pMM);
+                    break;
+                }
+            };
+
+            if (bPopNode)
+            {
+                _PopStackWithEdge(&stack, gcvNULL, pDG->pMM);
+
+                /* Record post-order seq */
+                ppRetNodeOrder[(*pPostOrderIdx) ++] = pPopNode;
+            }
+            else
+            {
+                pPopNodeWithEdge->nextEdgeIndex = nextEdgeIndex;
+            }
+        }
+
+        STACK_FINALIZE(&stack);
     }
     else if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW)
     {
@@ -810,6 +1037,10 @@ static void _DoPostOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
         /* Record post-order seq */
         ppRetNodeOrder[(*pPostOrderIdx) ++] = pNode;
     }
+    else
+    {
+        gcmASSERT(gcvFALSE);
+    }
 }
 
 void vscDG_PstOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
@@ -821,6 +1052,8 @@ void vscDG_PstOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
     gctUINT                     i, postOrderIdx = 0;
     VSC_DG_NODE*                pStartNode;
     VSC_SIMPLE_RESIZABLE_ARRAY* pStartNodeArray;
+
+    searchMode = _ChooseImplementSearchMode(pDG, searchMode);
 
     /* For post order with BFS_wide, we just do reversed preorder with BFS_wide */
     if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE)
@@ -873,7 +1106,7 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
     VSC_ADJACENT_LIST* pAdjList;
 
     /* Traversal descendants based on search mode now */
-    if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST)
+    if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_RECURSIVE)
     {
         /* Determine direction */
         pAdjList = (bFromTail) ? &pNode->predList : &pNode->succList;
@@ -909,6 +1142,86 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
         }
 
         SAFE_CALL_DG_NODE_HANDLER_RETURN(pfnHandlerOwnPost, pNode, pParam);
+    }
+    /* We need to use post-order to implement this here so that we can call all node handlers correctly. */
+    else if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_ITERATIVE)
+    {
+        VSC_SIMPLE_STACK        stack;
+
+        STACK_INITIALIZE(&stack);
+
+        _PushStackWithEdge(&stack, pNode, gcvNULL, 0, pDG->pMM);
+
+        while (!STACK_CHECK_EMPTY(&stack))
+        {
+            VSC_DG_EDGE*            pEdge;
+            VSC_DG_NODE_WITH_EDGE*  pPopNodeWithEdge = _TopStackWithEdge(&stack);
+            VSC_DG_NODE*            pPopNode = pPopNodeWithEdge->pNode;
+            VSC_DG_EDGE*            pPopEdge = pPopNodeWithEdge->pEdge;
+            gctUINT                 nextEdgeIndex = pPopNodeWithEdge->nextEdgeIndex;
+            gctBOOL                 bPopNode = gcvFALSE;
+
+            if (!pPopNode->bVisited)
+            {
+                if (pPopEdge != gcvNULL
+                    &&
+                    SAFE_CALL_DG_NODE_HANDLER_CHECK(pfnHandlerDescendantPre, pPopNode, pParam))
+                {
+                    _PopStackWithEdge(&stack, gcvNULL, pDG->pMM);
+                }
+
+                if (SAFE_CALL_DG_NODE_HANDLER_CHECK(pfnHandlerOwnPre, pPopNode, pParam))
+                {
+                    _PopStackWithEdge(&stack, gcvNULL, pDG->pMM);
+                }
+
+                pPopNode->bVisited = gcvTRUE;
+            }
+
+            /* Determine direction */
+            pAdjList = (bFromTail) ? &pPopNode->predList : &pPopNode->succList;
+
+            /* Get the next visit edge. */
+            while (gcvTRUE)
+            {
+                pEdge = _GetEdgeByIndex(pDG, pPopNode, pAdjList, nextEdgeIndex);
+                nextEdgeIndex++;
+
+                /* All edges have been visited, we can pop this node. */
+                if (pEdge == gcvNULL)
+                {
+                    bPopNode = gcvTRUE;
+                    break;
+                }
+                /* Revisit, find next one. */
+                else if (pEdge->pToNode->bVisited == gcvTRUE)
+                {
+                    SAFE_CALL_DG_EDGE_HANDLER(pfnHandlerDFSEdgeOnRevisit, pEdge, pParam);
+                }
+                else
+                {
+                    _PushStackWithEdge(&stack, pEdge->pToNode, pEdge, 0, pDG->pMM);
+                    break;
+                }
+            };
+
+            if (bPopNode)
+            {
+                SAFE_CALL_DG_NODE_HANDLER(pfnHandlerOwnPost, pPopNode, pParam);
+                if (pPopEdge != gcvNULL)
+                {
+                    SAFE_CALL_DG_NODE_HANDLER(pfnHandlerDescendantPost, pPopNode, pParam);
+                }
+
+                _PopStackWithEdge(&stack, gcvNULL, pDG->pMM);
+            }
+            else
+            {
+                pPopNodeWithEdge->nextEdgeIndex = nextEdgeIndex;
+            }
+        }
+
+        STACK_FINALIZE(&stack);
     }
     else if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW)
     {
@@ -956,12 +1269,10 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
 
         SAFE_CALL_DG_NODE_HANDLER_RETURN(pfnHandlerOwnPost, pNode, pParam);
     }
-    else
+    else if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE)
     {
         VSC_SIMPLE_QUEUE  queue;
         VSC_DG_NODE*      pDequeuedNode;
-
-        gcmASSERT(searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE);
 
         QUEUE_INITIALIZE(&queue);
 
@@ -1001,6 +1312,10 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
 
         QUEUE_FINALIZE(&queue);
     }
+    else
+    {
+        gcmASSERT(gcvFALSE);
+    }
 }
 
 void vscDG_TraversalCB(VSC_DIRECTED_GRAPH* pDG,
@@ -1017,6 +1332,8 @@ void vscDG_TraversalCB(VSC_DIRECTED_GRAPH* pDG,
     gctUINT                     i;
     VSC_DG_NODE*                pStartNode;
     VSC_SIMPLE_RESIZABLE_ARRAY* pStartNodeArray;
+
+    searchMode = _ChooseImplementSearchMode(pDG, searchMode);
 
     /* Prepare firstly */
     pStartNodeArray = _PrepareTraversal(pDG, searchMode, bFromTail);
