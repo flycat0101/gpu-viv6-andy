@@ -5133,7 +5133,6 @@ vxnne_shader_executable vxnneGetLeakyReluShaderExecutable(
     vx_uint32     width                 = TENSOR_VIEW_SIZE_INDEX(output, 0);
     vx_uint32     height                = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(output, 1) : 1;
     vx_uint32     depth                 = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
-    vx_uint32     batch                 = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
     vx_enum       srcFormat             = TENSOR_DATA_TYPE(input);
     vx_enum       dstFormat             = TENSOR_DATA_TYPE(output);
     vx_float32    input_scale           = TENSOR_TF_SCALE(input);
@@ -5145,14 +5144,13 @@ vxnne_shader_executable vxnneGetLeakyReluShaderExecutable(
     vx_tensor     src0                  = NULL;
     vx_tensor     dst                   = NULL;
     vx_bool       enable_image_2d       = vx_false_e;
-    vx_uint32     hwLitimLen            = IMG_MAX_WIDTH;
     vx_uint16     M0                    = 0;
     vx_int8       postShift             = 0;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
          context, kernelEnum, borderMode, input, output);
 
-    enable_image_2d = (vx_bool)((width * height < hwLitimLen) && depth < hwLitimLen);
+    enable_image_2d = (vx_bool)(depth == 1);
 
     borderMode->mode = VX_BORDER_REPLICATE;
 
@@ -5216,13 +5214,6 @@ vxnne_shader_executable vxnneGetLeakyReluShaderExecutable(
         src0          = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 2);
         parameters[0] = (vx_reference)src0;
     }
-    else if (enable_image_2d)
-    {
-        vx_uint32 sizes[4] = {width * height, depth, 1, batch};
-
-        src0          = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
-        parameters[0] = (vx_reference)src0;
-    }
 
     if(TENSOR_DIM_NUM(output) == 1)
     {
@@ -5230,13 +5221,6 @@ vxnne_shader_executable vxnneGetLeakyReluShaderExecutable(
 
         sizes[0]    = TENSOR_VIEW_SIZE_INDEX(output, 0);
         dst         = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 2);
-        parameters[2] = (vx_reference)dst;
-    }
-    else if (enable_image_2d)
-    {
-        vx_uint32 sizes[4] = {width * height, depth, 1, batch};
-
-        dst         = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
         parameters[2] = (vx_reference)dst;
     }
 
@@ -5659,7 +5643,87 @@ vxnne_shader_executable vxnneGetLeakyReluShaderExecutable(
     }
     else if (srcFormat == VX_TYPE_UINT8 && dstFormat == VX_TYPE_UINT8)
     {
-        if (enable_image_2d)
+        if (alpha->value->f32 >= 0)
+        {
+            vx_uint32 multAndoutZP0[2]    = {0};
+            vx_uint32 multAndoutZP1[2]    = {0};
+            vx_uint32 packedInputZP[4]    = {0};
+            vx_uint8  zp0 = (vx_uint8)TENSOR_TF_ZEROPOINT(input);
+            vx_uint32 uniU8MulAndPostShift0_Lo_2x8[16] = {
+                0xdddddddd, // TCfg
+                0x44444444, // ASelt
+                0x13121110, 0x17161514, // ABin
+                0x11111111, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00002600, // AccumType, ConstantType, and PostShift
+                0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+            };
+            vx_uint32 uniU8MulAndPostShift0_Hi_2x8[16] = {
+                0xdddddddd, // TCfg
+                0x44444444, // ASelt
+                0x1b1a1918, 0x1f1e1d1c, // ABin
+                0x11111111, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00002600, // AccumType, ConstantType, and PostShift
+                0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+            };
+            vx_uint32 uniU8MulAndPostShift1_Lo_2x8[16] = {
+                0xdddddddd, // TCfg
+                0x44444444, // ASelt
+                0x13121110, 0x17161514, // ABin
+                0x11111111, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00002600, // AccumType, ConstantType, and PostShift
+                0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+            };
+            vx_uint32 uniU8MulAndPostShift1_Hi_2x8[16] = {
+                0xdddddddd, // TCfg
+                0x44444444, // ASelt
+                0x1b1a1918, 0x1f1e1d1c, // ABin
+                0x11111111, // BSelt
+                0x00000000, 0x00000000, // BBin
+                0x00002600, // AccumType, ConstantType, and PostShift
+                0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+            };
+
+            multAndoutZP0[0] = (vx_uint32)(M0);
+            multAndoutZP0[1] = (vx_uint32)((outputZP << postShift) - inputZP * M0);
+
+            uniU8MulAndPostShift0_Lo_2x8[7] |= (postShift & 0x1F);
+            uniU8MulAndPostShift0_Hi_2x8[7] |= (postShift & 0x1F);
+
+            getFP32M0AndN(input_scale * alpha->value->f32/ output_scale, &M0, &postShift);
+            multAndoutZP1[0] = (vx_uint32)(M0);
+            multAndoutZP1[1] = (vx_uint32)((outputZP << postShift) - inputZP * M0);
+
+            uniU8MulAndPostShift1_Lo_2x8[7] |= (postShift & 0x1F);
+            uniU8MulAndPostShift1_Hi_2x8[7] |= (postShift & 0x1F);
+
+            packedInputZP[0] = packedInputZP[1] =
+            packedInputZP[2] = packedInputZP[3] = (vx_uint32)((zp0 << 24) | (zp0 << 16) | (zp0 << 8) | zp0);
+
+            if (enable_image_2d)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8toU8_2D_opt", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8toU8_opt", borderMode);
+            }
+            if (!shaderExecutable) goto OnError;
+
+            status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniU8MulAndPostShift0_Lo_2x8", 1, uniU8MulAndPostShift0_Lo_2x8);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniU8MulAndPostShift0_Hi_2x8", 1, uniU8MulAndPostShift0_Hi_2x8);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniU8MulAndPostShift1_Lo_2x8", 1, uniU8MulAndPostShift1_Lo_2x8);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniU8MulAndPostShift1_Hi_2x8", 1, uniU8MulAndPostShift1_Hi_2x8);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "multAndoutZP0", 1, multAndoutZP0);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "multAndoutZP1", 1, multAndoutZP1);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "packedInputZP", 1, packedInputZP);
+            if (status != VX_SUCCESS) goto OnError;
+
+            execution_parameters.globalWorkScale[0]  = 16;
+        }
+        else if (enable_image_2d)
         {
             vx_uint32 idx = 0;
             vx_uint32 uniU8SubZP_MulM_PStoF16Lo_2x8[16] = {
@@ -5967,27 +6031,12 @@ vxnne_shader_executable vxnneGetLeakyReluShaderExecutable(
         }
     }
 
-    if (enable_image_2d)
-    {
-        execution_parameters.workDim             = 2;
-        execution_parameters.globalWorkOffset[0] = 0;
-        execution_parameters.globalWorkOffset[1] = 0;
-        execution_parameters.globalWorkSize[0]   = gcmALIGN((width * height + execution_parameters.globalWorkScale[0] - 1)
-            / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
-        execution_parameters.globalWorkSize[1]   = (depth + execution_parameters.globalWorkScale[1] - 1)
-            / execution_parameters.globalWorkScale[1];
-    }
-    else
-    {
-        execution_parameters.globalWorkOffset[0] = 0;
-        execution_parameters.globalWorkOffset[1] = 0;
-        execution_parameters.globalWorkOffset[2] = 0;
-        execution_parameters.globalWorkSize[0]   = gcmALIGN((width + execution_parameters.globalWorkScale[0] - 1)
-            / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
-        execution_parameters.globalWorkSize[1]   = (height + execution_parameters.globalWorkScale[1] - 1)
-            / execution_parameters.globalWorkScale[1];
-        execution_parameters.globalWorkSize[2]   = depth;
-    }
+
+    execution_parameters.globalWorkSize[0]   = gcmALIGN((width + execution_parameters.globalWorkScale[0] - 1)
+        / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
+    execution_parameters.globalWorkSize[1]   = (height + execution_parameters.globalWorkScale[1] - 1)
+        / execution_parameters.globalWorkScale[1];
+    execution_parameters.globalWorkSize[2]   = depth;
 
     if (!shaderExecutable) goto OnError;
     status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);

@@ -778,3 +778,63 @@ __kernel void vxLeakyRelu_F16toI16
     VXC_DP2x8(outval, tmpVal0, tmpVal1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 1), uniConvertInt32toUint8_2x8);
     VXC_WriteImage2DArray(output, coord, outval, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
 }
+
+
+_viv_uniform VXC_512Bits uniU8MulAndPostShift0_Lo_2x8;
+_viv_uniform VXC_512Bits uniU8MulAndPostShift0_Hi_2x8;
+_viv_uniform VXC_512Bits uniU8MulAndPostShift1_Lo_2x8;
+_viv_uniform VXC_512Bits uniU8MulAndPostShift1_Hi_2x8;
+_viv_uniform int2 multAndoutZP0;//[0:15] multiplier, [31:63] output zp
+_viv_uniform int2 multAndoutZP1;//[0:15] multiplier, [31:63] output zp
+_viv_uniform int4 packedInputZP;
+__kernel void vxLeakyRelu_U8toU8_opt
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), 0);
+    vxc_uchar16 src0, dst0, dst1, dst;
+    VXC_ReadImage2DArray(src0, input,coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+
+    vxc_ushort8 multiplier;
+    _viv_asm(COPY, multiplier, multAndoutZP0, 16);
+    VXC_DP2x8(dst0, src0, multiplier, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift0_Lo_2x8);
+    VXC_DP2x8(dst0, src0, multiplier, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift0_Hi_2x8);
+    _viv_asm(COPY, multiplier, multAndoutZP1, 16);
+    VXC_DP2x8(dst1, src0, multiplier, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift1_Lo_2x8);
+    VXC_DP2x8(dst1, src0, multiplier, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift1_Hi_2x8);
+
+    vxc_uchar16 zp;
+    _viv_asm(COPY, zp, packedInputZP, 16);
+    dst = src0 >= zp ? dst0 : dst1;
+
+    VXC_WriteImage2DArray(output, coord, dst, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
+}
+
+__kernel void vxLeakyRelu_U8toU8_2D_opt
+    (
+    __read_only image2d_array_t  input,
+                    float        alpha,
+    __write_only image2d_array_t output
+    )
+{
+    int2 coord = (int2)(get_global_id(0), get_global_id(1));
+    vxc_uchar16 src0, dst0, dst1, dst;
+    VXC_ReadImage(src0, input,coord, VXC_5BITOFFSET_XY(0, 0), VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0));
+
+    vxc_ushort8 multiplier;
+    _viv_asm(COPY, multiplier, multAndoutZP0, 16);
+    VXC_DP2x8(dst0, src0, multiplier, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift0_Lo_2x8);
+    VXC_DP2x8(dst0, src0, multiplier, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift0_Hi_2x8);
+    _viv_asm(COPY, multiplier, multAndoutZP1, 16);
+    VXC_DP2x8(dst1, src0, multiplier, VXC_MODIFIER(0, 7, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift1_Lo_2x8);
+    VXC_DP2x8(dst1, src0, multiplier, VXC_MODIFIER(8, 15, 0, VXC_RM_ToNearestEven, 1), uniU8MulAndPostShift1_Hi_2x8);
+
+    vxc_uchar16 zp;
+    _viv_asm(COPY, zp, packedInputZP, 16);
+    dst = src0 >= zp ? dst0 : dst1;
+
+    VXC_WriteImage(output, coord, dst, VXC_MODIFIER(0, 15, 0,VXC_RM_TowardZero, 0));
+}
