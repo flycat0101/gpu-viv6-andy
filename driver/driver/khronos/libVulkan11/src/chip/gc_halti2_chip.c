@@ -1173,6 +1173,7 @@ VkResult halti2_copyImageWithRS(
         srcWidth = gcmALIGN_NP2(srcWidth, fmtInfo->blockSize.width);
         srcStride = (srcWidth / fmtInfo->blockSize.width) * fmtInfo->bitsPerBlock / 8;
         srcSampleInfo = dstImg->sampleInfo;
+        useComputeBlit = !__VK_ISALIGNED(srcWidth, 16) ? VK_TRUE : VK_FALSE;
     }
 
     if (dstRes->isImage)

@@ -62,6 +62,7 @@
 
 /* Align with power of two value. */
 #define __VK_ALIGN(val, align) (((val) + ((align) - 1)) & ~((align) - 1))
+#define __VK_ISALIGNED(val, align) (((val) & (align - 1)) == 0)
 
 #define __VK_PTR2UINT(ptr)  ((uint32_t)(gctUINTPTR_T)(ptr))
 #define __VK_PTR2INT(ptr)   ((int32_t)(gctUINTPTR_T)(ptr))
