@@ -4487,6 +4487,20 @@ gcoHARDWARE_InitializeFormatArrayTable(
            }
         }
     }
+
+    if (Hardware->features[gcvFEATURE_PE_A8B8G8R8])
+    {
+        info = gcmGET_SURF_FORMAT_INFO(gcvSURF_A8B8G8R8);
+        info->closestTXFormat = gcvSURF_A8B8G8R8;
+        info->txFormat        = 0x09;
+        info->txSwizzle       = baseComponents_rgba;
+        info->txIntFilter     = gcvTRUE;
+
+        info->closestRenderFormat = gcvSURF_A8B8G8R8;
+        info->renderFormat        = 0x2B;
+        info->pixelSwizzle        = baseComponents_rgba;
+    }
+
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
