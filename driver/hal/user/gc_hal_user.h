@@ -3035,6 +3035,7 @@ typedef struct _vx_drv_option
     gctUINT enableGraphMergeTranspose;
     gctUINT enableGraphDeleteRelu;
     gctUINT enableGraphDeleteSqueeze;
+    gctUINT enableGraphAvgPoolandPWConv;
     gctUINT enableGraphWar1x1x1weight;
     gctUINT freqInMHZ;
     gctUINT axiClockFreqInMHZ;
