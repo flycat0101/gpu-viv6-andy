@@ -12669,7 +12669,6 @@ vxnne_shader_executable vxnneGetGPULeakyReluShaderExecutable(
     vx_uint32      width            = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32      height           = dims > 1 ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
     vx_uint32      depth            = dims > 2 ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
-    vx_uint32      batch            = dims > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
     vx_uint32      new_width        = width;
     vx_uint32      new_height       = height;
     vx_tensor      input_rs         = NULL;
@@ -12710,38 +12709,11 @@ vxnne_shader_executable vxnneGetGPULeakyReluShaderExecutable(
         new_width     = width;
         new_height    = 1;
     }
-    else if(width == 1 && height ==1 && batch != 1)
+    else if(depth == 1)
     {
-        vx_int32 sizes[2] = {depth, batch};
-
-        width = depth;
-        height = batch;
-        input_rs  = vxoTensor_ReshapeTensor(input, sizes, 2);
-        output_rs = vxoTensor_ReshapeTensor(output, sizes, 2);
-        paramChanged = vx_true_e;
-        enable_2d_img = vx_true_e;
-        new_width     = depth;
-        new_height    = batch;
-    }
-    else if (width * height < IMG_MAX_WIDTH && depth < IMG_MAX_WIDTH)
-    {
-        vx_int32 sizes[4] = {width * height, depth, 1, batch};
-        input_rs  = vxoTensor_ReshapeTensor(input, sizes, 4);
-        output_rs = vxoTensor_ReshapeTensor(output, sizes, 4);
-        paramChanged = vx_true_e;
-        enable_2d_img = vx_true_e;
-        new_width     = width * height;
-        new_height    = depth;
-    }
-    else if (width < IMG_MAX_WIDTH && height * depth < IMG_MAX_WIDTH)
-    {
-        vx_int32 sizes[4] = {width, height * depth, 1, batch};
-        input_rs  = vxoTensor_ReshapeTensor(input, sizes, 4);
-        output_rs = vxoTensor_ReshapeTensor(output, sizes, 4);
-        paramChanged = vx_true_e;
         enable_2d_img = vx_true_e;
         new_width     = width;
-        new_height    = height * depth;
+        new_height    = height;
     }
 
     kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
