@@ -1080,3 +1080,423 @@ __kernel void gpuPooling_AvgNoPadQuant8_K3S2_M4_2D
 
     write_imageui(output, coord.xy, result);
 }
+
+__kernel void gpuPooling_AvgNoPadFP32_K3S1_M1_2D
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+    int                     inputWidth,
+    int                     inputHeight,
+    int                     inputHeightPad,
+    int                     pad_left,
+    int                     pad_top,
+    int                     outputHeight
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1) + coord.z * inputHeightPad, get_global_id(0), get_global_id(0));
+
+    float4 src00 = read_imagef(input, coord_in.xy);
+    coord_in.zw = coord_in.xy + (int2)(4, 1);
+    float4 src01 = read_imagef(input, coord_in.zy);
+    float4 src10 = read_imagef(input, coord_in.xw);
+    float4 src11 = read_imagef(input, coord_in.zw);
+    coord_in.y += 2;
+    float4 src20 = read_imagef(input, coord_in.xy);
+    float4 src21 = read_imagef(input, coord_in.zy);
+
+    coord.y = coord.z * outputHeight + coord.y;
+    coord.zw = coord.xx + (int2)(1, 2);
+    float4 scale = calculate_avg_scale4(3, inputWidth, inputHeight, pad_left, pad_top, 1, 1);
+
+    float8 data00 = src00.xyzyzwzw;
+    float4 data01 = (float4)(src01.x, src00.w, src01.x, src01.y);
+    float8 data10 = src10.xyzyzwzw;
+    float4 data11 = (float4)(src11.x, src10.w, src11.x, src11.y);
+    float8 data20 = src20.xyzyzwzw;
+    float4 data21 = (float4)(src21.x, src20.w, src21.x, src21.y);
+
+    data00 += data10;
+    data01 += data11;
+    data00 += data20;
+    data01 += data21;
+
+    float4 result = (float4)(data00.s0, data00.s3, data00.s6, data01.y) + (float4)(data00.s1, data00.s4, data00.s7, data01.z);
+    result += (float4)(data00.s2, data00.s5, data01.x, data01.w);
+
+    result *= scale;
+
+    write_imagef(output, coord.xy, result.xxxx);
+    coord.x += 3;
+    write_imagef(output, coord.zy, result.yyyy);
+    write_imagef(output, coord.wy, result.zzzz);
+    write_imagef(output, coord.xy, result.wwww);
+}
+
+__kernel void gpuPooling_AvgNoPadFP32_K3S1_M2_2D
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+    int                     inputWidth,
+    int                     inputHeight,
+    int                     inputHeightPad,
+    int                     pad_left,
+    int                     pad_top,
+    int                     outputHeight
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1) + coord.z * inputHeightPad, get_global_id(0), get_global_id(0));
+
+    float4 src00 = read_imagef(input, coord_in.xy);
+    coord_in.zw = coord_in.xy + (int2)(4, 1);
+    float4 src01 = read_imagef(input, coord_in.zy);
+    float4 src10 = read_imagef(input, coord_in.xw);
+    float4 src11 = read_imagef(input, coord_in.zw);
+    coord_in.y += 2;
+    float4 src20 = read_imagef(input, coord_in.xy);
+    float4 src21 = read_imagef(input, coord_in.zy);
+
+    coord.y = coord.z * outputHeight + coord.y;
+    coord.zw = coord.xx + (int2)(1, 2);
+    float4 scale = calculate_avg_scale4(3, inputWidth, inputHeight, pad_left, pad_top, 1, 1);
+
+    float8 data00 = src00.xyzyzwzw;
+    float4 data01 = (float4)(src01.x, src00.w, src01.x, src01.y);
+    float8 data10 = src10.xyzyzwzw;
+    float4 data11 = (float4)(src11.x, src10.w, src11.x, src11.y);
+    float8 data20 = src20.xyzyzwzw;
+    float4 data21 = (float4)(src21.x, src20.w, src21.x, src21.y);
+
+    data00 += data10;
+    data01 += data11;
+    data00 += data20;
+    data01 += data21;
+
+    float4 result = (float4)(data00.s0, data00.s3, data00.s6, data01.y) + (float4)(data00.s1, data00.s4, data00.s7, data01.z);
+    result += (float4)(data00.s2, data00.s5, data01.x, data01.w);
+
+    result *= scale;
+
+    write_imagef(output, coord.xy, result.xyxy);
+    write_imagef(output, coord.wy, result.zwzw);
+}
+
+__kernel void gpuPooling_AvgNoPadFP32_K3S1_M4_2D
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+    int                     inputWidth,
+    int                     inputHeight,
+    int                     inputHeightPad,
+    int                     pad_left,
+    int                     pad_top,
+    int                     outputHeight
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0), get_global_id(1) + coord.z * inputHeightPad, get_global_id(0), get_global_id(0));
+
+    float4 src00 = read_imagef(input, coord_in.xy);
+    coord_in.zw = coord_in.xy + (int2)(4, 1);
+    float4 src01 = read_imagef(input, coord_in.zy);
+    float4 src10 = read_imagef(input, coord_in.xw);
+    float4 src11 = read_imagef(input, coord_in.zw);
+    coord_in.y += 2;
+    float4 src20 = read_imagef(input, coord_in.xy);
+    float4 src21 = read_imagef(input, coord_in.zy);
+
+    coord.y = coord.z * outputHeight + coord.y;
+    float4 scale = calculate_avg_scale4(3, inputWidth, inputHeight, pad_left, pad_top, 1, 1);
+
+    float8 data00 = src00.xyzyzwzw;
+    float4 data01 = (float4)(src01.x, src00.w, src01.x, src01.y);
+    float8 data10 = src10.xyzyzwzw;
+    float4 data11 = (float4)(src11.x, src10.w, src11.x, src11.y);
+    float8 data20 = src20.xyzyzwzw;
+    float4 data21 = (float4)(src21.x, src20.w, src21.x, src21.y);
+
+    data00 += data10;
+    data01 += data11;
+    data00 += data20;
+    data01 += data21;
+
+    float4 result = (float4)(data00.s0, data00.s3, data00.s6, data01.y) + (float4)(data00.s1, data00.s4, data00.s7, data01.z);
+    result += (float4)(data00.s2, data00.s5, data01.x, data01.w);
+
+    result *= scale;
+
+    write_imagef(output, coord.xy, result);
+}
+
+__kernel void gpuPooling_AvgNoPadFP32_K3S2_M1_2D
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+    int                     inputWidth,
+    int                     inputHeight,
+    int                     inputHeightPad,
+    int                     pad_left,
+    int                     pad_top,
+    int                     outputHeight
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0) << 1, (get_global_id(1) << 1) + coord.z * inputHeightPad, get_global_id(0), get_global_id(0));
+
+    float4 src00 = read_imagef(input, coord_in.xy);
+    coord_in.zw = coord_in.xx + (int2)(4, 8);
+    float4 src01 = read_imagef(input, coord_in.zy);
+    float4 src02 = read_imagef(input, coord_in.wy);
+    coord_in.y ++;
+    float4 src10 = read_imagef(input, coord_in.xy);
+    float4 src11 = read_imagef(input, coord_in.zy);
+    float4 src12 = read_imagef(input, coord_in.wy);
+    coord_in.y ++;
+    float4 src20 = read_imagef(input, coord_in.xy);
+    float4 src21 = read_imagef(input, coord_in.zy);
+    float4 src22 = read_imagef(input, coord_in.wy);
+
+    coord.y = coord.z * outputHeight + coord.y;
+    coord.zw = coord.xx + (int2)(1, 2);
+    float4 scale = calculate_avg_scale4(3, inputWidth, inputHeight, pad_left, pad_top, 2, 2);
+
+    float8 data00 = (float8)(src00.xyz, src00.zw, src01.xxy);
+    float4 data01 = (float4)(src01.zzw, src02.x);
+    float8 data10 = (float8)(src10.xyz, src10.zw, src11.xxy);
+    float4 data11 = (float4)(src11.zzw, src12.x);
+    float8 data20 = (float8)(src20.xyz, src20.zw, src21.xxy);
+    float4 data21 = (float4)(src21.zzw, src22.x);
+
+    data00 += data10;
+    data01 += data11;
+    data00 += data20;
+    data01 += data21;
+
+    float4 result = (float4)(data00.s0, data00.s3, data00.s6, data01.y) + (float4)(data00.s1, data00.s4, data00.s7, data01.z);
+    result += (float4)(data00.s2, data00.s5, data01.x, data01.w);
+
+    result *= scale;
+
+    write_imagef(output, coord.xy, result.xxxx);
+    coord.x += 3;
+    write_imagef(output, coord.zy, result.yyyy);
+    write_imagef(output, coord.wy, result.zzzz);
+    write_imagef(output, coord.xy, result.wwww);
+}
+
+__kernel void gpuPooling_AvgNoPadFP32_K3S2_M2_2D
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+    int                     inputWidth,
+    int                     inputHeight,
+    int                     inputHeightPad,
+    int                     pad_left,
+    int                     pad_top,
+    int                     outputHeight
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0) << 1, (get_global_id(1) << 1) + coord.z * inputHeightPad, get_global_id(0), get_global_id(0));
+
+    float4 src00 = read_imagef(input, coord_in.xy);
+    coord_in.zw = coord_in.xx + (int2)(4, 8);
+    float4 src01 = read_imagef(input, coord_in.zy);
+    float4 src02 = read_imagef(input, coord_in.wy);
+    coord_in.y ++;
+    float4 src10 = read_imagef(input, coord_in.xy);
+    float4 src11 = read_imagef(input, coord_in.zy);
+    float4 src12 = read_imagef(input, coord_in.wy);
+    coord_in.y ++;
+    float4 src20 = read_imagef(input, coord_in.xy);
+    float4 src21 = read_imagef(input, coord_in.zy);
+    float4 src22 = read_imagef(input, coord_in.wy);
+
+    coord.y = coord.z * outputHeight + coord.y;
+    coord.zw = coord.xx + (int2)(1, 2);
+    float4 scale = calculate_avg_scale4(3, inputWidth, inputHeight, pad_left, pad_top, 2, 2);
+
+    float8 data00 = (float8)(src00.xyz, src00.zw, src01.xxy);
+    float4 data01 = (float4)(src01.zzw, src02.x);
+    float8 data10 = (float8)(src10.xyz, src10.zw, src11.xxy);
+    float4 data11 = (float4)(src11.zzw, src12.x);
+    float8 data20 = (float8)(src20.xyz, src20.zw, src21.xxy);
+    float4 data21 = (float4)(src21.zzw, src22.x);
+
+    data00 += data10;
+    data01 += data11;
+    data00 += data20;
+    data01 += data21;
+
+    float4 result = (float4)(data00.s0, data00.s3, data00.s6, data01.y) + (float4)(data00.s1, data00.s4, data00.s7, data01.z);
+    result += (float4)(data00.s2, data00.s5, data01.x, data01.w);
+
+    result *= scale;
+
+    write_imagef(output, coord.xy, result.xyxy);
+    write_imagef(output, coord.wy, result.zwzw);
+}
+
+__kernel void gpuPooling_AvgNoPadFP32_K3S2_M4_2D
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+    int                     inputWidth,
+    int                     inputHeight,
+    int                     inputHeightPad,
+    int                     pad_left,
+    int                     pad_top,
+    int                     outputHeight
+    )
+{
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(0));
+    int4 coord_in = (int4)(get_global_id(0) << 1, (get_global_id(1) << 1) + coord.z * inputHeightPad, get_global_id(0), get_global_id(0));
+
+    float4 src00 = read_imagef(input, coord_in.xy);
+    coord_in.zw = coord_in.xx + (int2)(4, 8);
+    float4 src01 = read_imagef(input, coord_in.zy);
+    float4 src02 = read_imagef(input, coord_in.wy);
+    coord_in.y ++;
+    float4 src10 = read_imagef(input, coord_in.xy);
+    float4 src11 = read_imagef(input, coord_in.zy);
+    float4 src12 = read_imagef(input, coord_in.wy);
+    coord_in.y ++;
+    float4 src20 = read_imagef(input, coord_in.xy);
+    float4 src21 = read_imagef(input, coord_in.zy);
+    float4 src22 = read_imagef(input, coord_in.wy);
+
+    coord.y = coord.z * outputHeight + coord.y;
+    float4 scale = calculate_avg_scale4(3, inputWidth, inputHeight, pad_left, pad_top, 2, 2);
+
+    float8 data00 = (float8)(src00.xyz, src00.zw, src01.xxy);
+    float4 data01 = (float4)(src01.zzw, src02.x);
+    float8 data10 = (float8)(src10.xyz, src10.zw, src11.xxy);
+    float4 data11 = (float4)(src11.zzw, src12.x);
+    float8 data20 = (float8)(src20.xyz, src20.zw, src21.xxy);
+    float4 data21 = (float4)(src21.zzw, src22.x);
+
+    data00 += data10;
+    data01 += data11;
+    data00 += data20;
+    data01 += data21;
+
+    float4 result = (float4)(data00.s0, data00.s3, data00.s6, data01.y) + (float4)(data00.s1, data00.s4, data00.s7, data01.z);
+    result += (float4)(data00.s2, data00.s5, data01.x, data01.w);
+
+    result *= scale;
+
+    write_imagef(output, coord.xy, result);
+}
+
+__kernel void gpuPooling_globalpooling_FP32_M4
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+                 int        kernel_size,
+                 float      scale
+    )
+{
+    int4 coord = (int4)(0, get_global_id(1), 0, get_global_id(1));
+    float4 result = 0;
+
+    do
+    {
+        float4 src00 = read_imagef(input, coord.xy);
+        coord.x += 4;
+
+        result = result + src00;
+    } while (coord.x < kernel_size);
+
+    float4 one = (float4)(1.0f, 1.0f, 1.0f, 1.0f);
+    result.x = dot(result, one);
+
+    result *= scale;
+
+    write_imagef(output, coord.zy, result);
+}
+
+__kernel void gpuPooling_globalpooling_FP32_M1
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+                 int        kernel_size,
+                 float      scale
+    )
+{
+    int4 coord = (int4)(0, get_global_id(1), 0, get_global_id(1));
+    float4 result = 0;
+
+    do
+    {
+        float4 src00 = read_imagef(input, coord.xy);
+        coord.x ++;
+
+        result = result + src00;
+    } while (coord.x < kernel_size);
+
+    result *= scale;
+
+    write_imagef(output, coord.zy, result);
+}
+
+__kernel void gpuPooling_globalpooling_U8_M4
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+                 int        kernel_size,
+                 float      scale,
+                 float      input_tail,
+                 float      outputZP
+    )
+{
+    int4 coord = (int4)(0, get_global_id(1), 0, get_global_id(1));
+    uint4 sum = 0;
+
+    do
+    {
+        uint4 src00 = read_imageui(input, coord.xy);
+        coord.x += 4;
+
+        sum = sum + src00;
+    } while (coord.x < kernel_size);
+
+    float4 one = (float4)(1.0f, 1.0f, 1.0f, 1.0f);
+    float4 result = convert_float4(sum);
+    result.x = dot(result, one);
+
+    result.x = (result.x - input_tail) * scale + outputZP;
+    sum = convert_uint4(convert_uchar4_sat(result));
+
+    write_imageui(output, coord.zy, sum);
+}
+
+__kernel void gpuPooling_globalpooling_U8_M1
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+                 int        kernel_size,
+                 float      scale,
+                 float      input_tail,
+                 float      outputZP
+    )
+{
+    int4 coord = (int4)(0, get_global_id(1), 0, get_global_id(1));
+    uint4 sum = 0;
+
+    do
+    {
+        uint4 src00 = read_imageui(input, coord.xy);
+        coord.x ++;
+
+        sum = sum + src00;
+    } while (coord.x < kernel_size);
+
+    float4 result = convert_float4(sum);
+
+    result.x = (result.x - input_tail) * scale + outputZP;
+    sum = convert_uint4(convert_uchar4_sat(result));
+
+    write_imageui(output, coord.zy, sum);
+}
+
