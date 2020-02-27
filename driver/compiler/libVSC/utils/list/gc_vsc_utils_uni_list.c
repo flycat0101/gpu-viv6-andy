@@ -196,6 +196,41 @@ void vscUNILST_Finalize(VSC_UNI_LIST* pList)
     /* Nothing to do */
 }
 
+void vscUNILST_Reverse(VSC_UNI_LIST* pList)
+{
+    VSC_UNI_LIST_NODE*      pPrevNode = gcvNULL;
+    VSC_UNI_LIST_NODE*      pCurNode = gcvNULL;
+    VSC_UNI_LIST_NODE*      pNextNode = gcvNULL;
+    VSC_UNI_LIST_NODE*      pHeadNode = pList->pHead;
+    VSC_UNI_LIST_NODE*      pTailNode = pList->pTail;
+
+    if (pList == gcvNULL || pList->pHead == gcvNULL || pList->info.count == 1)
+    {
+        return;
+    }
+
+    pPrevNode = pList->pHead;
+    pCurNode = pPrevNode->pNextNode;
+
+    pPrevNode->pNextNode = gcvNULL;
+    while (pCurNode)
+    {
+        /* Save the next node. */
+        pNextNode = pCurNode->pNextNode;
+
+        /* Sawp the nodes. */
+        pCurNode->pNextNode = pPrevNode;
+
+        /* Go to the next node pair. */
+        pPrevNode = pCurNode;
+        pCurNode = pNextNode;
+    }
+
+    /* Swap the head and the tail. */
+    pList->pHead = pTailNode;
+    pList->pTail = pHeadNode;
+}
+
 VSC_UNI_LIST_NODE* vscUNILST_GetHead(VSC_UNI_LIST* pList)
 {
     return pList->pHead;

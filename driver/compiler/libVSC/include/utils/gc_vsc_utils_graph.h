@@ -37,11 +37,15 @@ typedef VSC_BL_ITERATOR VSC_GNODE_LIST_ITERATOR;
 
 #define INVALID_GNODE_ID   0xFFFFFFFF
 
+#define MAX_EDGE_COUNT_TO_USE_RECURSION_FOR_DFS     (2056)
+
 typedef enum _VSC_GRAPH_SEARCH_MODE
 {
-    VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
-    VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW,
-    VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE
+    VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST               = 0, /* By choosing recursive or iterative automatically. */
+    VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_RECURSIVE     = 1,
+    VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_ITERATIVE     = 2,
+    VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW      = 3,
+    VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE        = 4,
 }VSC_GRAPH_SEARCH_MODE;
 
 typedef enum _VSC_GRAPH_TRAVERSAL_ORDER
@@ -180,6 +184,7 @@ typedef VSC_UNI_LIST VSC_ADJACENT_LIST;
 #define AJLST_FINALIZE(pAdjList)           vscUNILST_Finalize((pAdjList))
 #define AJLST_ADD_EDGE(pAdjList, pEdge)    vscUNILST_Append((pAdjList), CAST_DGEG_2_ULN((pEdge)))
 #define AJLST_GET_FIRST_EDGE(pAdjList)     CAST_ULN_2_DGEG(vscUNILST_GetHead((pAdjList)))
+#define AJLST_GET_LAST_EDGE(pAdjList)      CAST_ULN_2_DGEG(vscUNILST_GetTail((pAdjList)))
 #define AJLST_REMOVE_EDGE(pAdjList, pEdge) vscUNILST_Remove((pAdjList), CAST_DGEG_2_ULN((pEdge)))
 #define AJLST_CHECK_EMPTY(pAdjList)        vscUNILST_IsEmpty((pAdjList))
 #define AJLST_GET_EDGE_COUNT(pAdjList)     vscUNILST_GetNodeCount((pAdjList))
@@ -297,6 +302,15 @@ typedef void    (*PFN_DG_EDGE_HANLDER)(VSC_DIRECTED_GRAPH* pDG, VSC_DG_EDGE* pEd
         {                                                                \
             continue;                                                    \
         }                                                                \
+    }
+
+#define SAFE_CALL_DG_NODE_HANDLER_CHECK(dgNodeHandler, pNode, pParam)    \
+    ((dgNodeHandler) && ((dgNodeHandler)(pDG, (pNode), (pParam))))
+
+#define SAFE_CALL_DG_NODE_HANDLER(dgNodeHandler, pNode, pParam)          \
+    if ((dgNodeHandler))                                                 \
+    {                                                                    \
+        (dgNodeHandler)(pDG, (pNode), (pParam));                         \
     }
 
 #define SAFE_CALL_DG_EDGE_HANDLER(dgEdgeHandler, pEdge, pParam)          \
