@@ -1250,3 +1250,259 @@ __kernel void gpuPooling_MaxNoPadSameFLQuant8_k2_s2
     coord_out.x ++;
     write_imageui(output, coord_out, dst.wwww);
 }
+
+__kernel void gpuPooling_MaxNoPadFP32_k2_s2_ALN4_2D
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+    int                     input_height,
+    int                     output_height
+    )
+{
+    int4 coord_out = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(2));
+    int4 coord_in = (int4)(coord_out.x << 1, coord_out.y << 1, coord_out.z, 0);
+
+    coord_in.y = coord_in.z * input_height + coord_in.y;
+    coord_in.zw = coord_in.xy + (int2)(4, 1);
+
+    float4 src00 = read_imagef(input, coord_in.xy);
+    float4 src01 = read_imagef(input, coord_in.zy);
+    float4 src10 = read_imagef(input, coord_in.xw);
+    float4 src11 = read_imagef(input, coord_in.zw);
+
+    coord_out.y = coord_out.z * output_height + coord_out.y;
+    //coord_out.zw = coord_out.xx + (int2)(4, 8);
+
+    float4 maxVal00 = src00 > src10 ? src00 : src10;
+    float4 maxVal01 = src01 > src11 ? src01 : src11;
+
+    float4 src0 = (float4)(maxVal00.xz, maxVal01.xz);
+    float4 src1 = (float4)(maxVal00.yw, maxVal01.yw);
+
+    float4 dst = src0 > src1 ? src0 : src1;
+
+    write_imagef(output, coord_out.xy, dst);
+}
+
+__kernel void gpuPooling_MaxNoPadFP32_k2_s2_2D
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+    int                     input_height,
+    int                     output_height
+    )
+{
+    int4 coord_out = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(2));
+    int4 coord_in = (int4)(coord_out.x << 1, coord_out.y << 1, coord_out.z, 0);
+
+    coord_in.y = coord_in.z * input_height + coord_in.y;
+    coord_in.zw = coord_in.xy + (int2)(4, 1);
+
+    float4 src00 = read_imagef(input, coord_in.xy);
+    float4 src01 = read_imagef(input, coord_in.zy);
+    float4 src10 = read_imagef(input, coord_in.xw);
+    float4 src11 = read_imagef(input, coord_in.zw);
+
+    coord_out.y = coord_out.z * output_height + coord_out.y;
+    coord_out.zw = coord_out.xx + (int2)(1, 2);
+
+    float4 maxVal00 = src00 > src10 ? src00 : src10;
+    float4 maxVal01 = src01 > src11 ? src01 : src11;
+
+    float4 src0 = (float4)(maxVal00.xz, maxVal01.xz);
+    float4 src1 = (float4)(maxVal00.yw, maxVal01.yw);
+
+    float4 dst = src0 > src1 ? src0 : src1;
+
+    write_imagef(output, coord_out.xy, dst.xxxx);
+    write_imagef(output, coord_out.zy, dst.yyyy);
+    write_imagef(output, coord_out.wy, dst.zzzz);
+    coord_out.x += 3;
+    write_imagef(output, coord_out.xy, dst.wwww);
+}
+
+__kernel void gpuPooling_MaxNoPadFP32_k3_s2_ALN4_2D
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+    int                     input_height,
+    int                     output_height
+    )
+{
+    int4 coord_out = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(2));
+    int4 coord_in = (int4)(coord_out.x << 1, coord_out.y << 1, coord_out.z, 0);
+
+    coord_in.y = coord_in.z * input_height + coord_in.y;
+    coord_in.zw = coord_in.xx + (int2)(4, 8);
+
+    float4 src00 = read_imagef(input, coord_in.xy);
+    float4 src01 = read_imagef(input, coord_in.zy);
+    float4 src02 = read_imagef(input, coord_in.wy);
+    coord_in.y ++;
+    float4 src10 = read_imagef(input, coord_in.xy);
+    float4 src11 = read_imagef(input, coord_in.zy);
+    float4 src12 = read_imagef(input, coord_in.wy);
+    coord_in.y ++;
+    float4 src20 = read_imagef(input, coord_in.xy);
+    float4 src21 = read_imagef(input, coord_in.zy);
+    float4 src22 = read_imagef(input, coord_in.wy);
+
+    coord_out.y = coord_out.z * output_height + coord_out.y;
+    coord_out.zw = coord_out.xx + (int2)(1, 2);
+
+    float4 maxVal00 = src00 > src10 ? src00 : src10;
+    float4 maxVal01 = src01 > src11 ? src01 : src11;
+    float4 maxVal02 = src02 > src12 ? src02 : src12;
+
+    maxVal00 = maxVal00 > src20 ? maxVal00 : src20;
+    maxVal01 = maxVal01 > src21 ? maxVal01 : src21;
+    maxVal02 = maxVal02 > src22 ? maxVal02 : src22;
+
+    float4 src0 = (float4)(maxVal00.xz, maxVal01.xz);
+    float4 src1 = (float4)(maxVal00.yw, maxVal01.yw);
+    float4 src2 = (float4)(maxVal00.z, maxVal01.xz, maxVal02.x);
+
+    float4 dst = src0 > src1 ? src0 : src1;
+    dst = dst > src2 ? dst : src2;
+
+    write_imagef(output, coord_out.xy, dst);
+}
+
+__kernel void gpuPooling_MaxNoPadFP32_k3_s2_2D
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+    int                     input_height,
+    int                     output_height
+    )
+{
+    int4 coord_out = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(2));
+    int4 coord_in = (int4)(coord_out.x << 1, coord_out.y << 1, coord_out.z, 0);
+
+    coord_in.y = coord_in.z * input_height + coord_in.y;
+    coord_in.zw = coord_in.xx + (int2)(4, 8);
+
+    float4 src00 = read_imagef(input, coord_in.xy);
+    float4 src01 = read_imagef(input, coord_in.zy);
+    float4 src02 = read_imagef(input, coord_in.wy);
+    coord_in.y ++;
+    float4 src10 = read_imagef(input, coord_in.xy);
+    float4 src11 = read_imagef(input, coord_in.zy);
+    float4 src12 = read_imagef(input, coord_in.wy);
+    coord_in.y ++;
+    float4 src20 = read_imagef(input, coord_in.xy);
+    float4 src21 = read_imagef(input, coord_in.zy);
+    float4 src22 = read_imagef(input, coord_in.wy);
+
+    coord_out.y = coord_out.z * output_height + coord_out.y;
+    coord_out.zw = coord_out.xx + (int2)(1, 2);
+
+    float4 maxVal00 = src00 > src10 ? src00 : src10;
+    float4 maxVal01 = src01 > src11 ? src01 : src11;
+    float4 maxVal02 = src02 > src12 ? src02 : src12;
+
+    maxVal00 = maxVal00 > src20 ? maxVal00 : src20;
+    maxVal01 = maxVal01 > src21 ? maxVal01 : src21;
+    maxVal02 = maxVal02 > src22 ? maxVal02 : src22;
+
+    float4 src0 = (float4)(maxVal00.xz, maxVal01.xz);
+    float4 src1 = (float4)(maxVal00.yw, maxVal01.yw);
+    float4 src2 = (float4)(maxVal00.z, maxVal01.xz, maxVal02.x);
+
+    float4 dst = src0 > src1 ? src0 : src1;
+    dst = dst > src2 ? dst : src2;
+
+    write_imagef(output, coord_out.xy, dst.xxxx);
+    write_imagef(output, coord_out.zy, dst.yyyy);
+    write_imagef(output, coord_out.wy, dst.zzzz);
+    coord_out.x += 3;
+    write_imagef(output, coord_out.xy, dst.wwww);
+}
+
+__kernel void gpuPooling_MaxNoPadFP32_k3_s1_ALN4_2D
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+    int                     input_height,
+    int                     output_height
+    )
+{
+    int4 coord_out = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(2));
+    int4 coord_in = (int4)(coord_out.x, coord_out.y, coord_out.z, 0);
+
+    coord_in.y = coord_in.z * input_height + coord_in.y;
+    coord_in.zw = coord_in.xy + (int2)(4, 1);
+
+    float4 src00 = read_imagef(input, coord_in.xy);
+    float4 src01 = read_imagef(input, coord_in.zy);
+    float4 src10 = read_imagef(input, coord_in.xw);
+    float4 src11 = read_imagef(input, coord_in.zw);
+    coord_in.y += 2;
+    float4 src20 = read_imagef(input, coord_in.xy);
+    float4 src21 = read_imagef(input, coord_in.zy);
+
+    coord_out.y = coord_out.z * output_height + coord_out.y;
+    coord_out.zw = coord_out.xx + (int2)(1, 2);
+
+    float4 maxVal00 = src00 > src10 ? src00 : src10;
+    float4 maxVal01 = src01 > src11 ? src01 : src11;
+
+    maxVal00 = maxVal00 > src20 ? maxVal00 : src20;
+    maxVal01 = maxVal01 > src21 ? maxVal01 : src21;
+
+    float4 src0 = maxVal00;
+    float4 src1 = (float4)(maxVal00.yzw, maxVal01.x);
+    float4 src2 = (float4)(maxVal00.zw, maxVal01.xy);
+
+    float4 dst = src0 > src1 ? src0 : src1;
+    dst = dst > src2 ? dst : src2;
+
+    write_imagef(output, coord_out.xy, dst);
+}
+
+__kernel void gpuPooling_MaxNoPadFP32_k3_s1_2D
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+    int                     input_height,
+    int                     output_height
+    )
+{
+    int4 coord_out = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(2));
+    int4 coord_in = (int4)(coord_out.x, coord_out.y, coord_out.z, 0);
+
+    coord_in.y = coord_in.z * input_height + coord_in.y;
+    coord_in.zw = coord_in.xy + (int2)(4, 1);
+
+    float4 src00 = read_imagef(input, coord_in.xy);
+    float4 src01 = read_imagef(input, coord_in.zy);
+    float4 src10 = read_imagef(input, coord_in.xw);
+    float4 src11 = read_imagef(input, coord_in.zw);
+    coord_in.y += 2;
+    float4 src20 = read_imagef(input, coord_in.xy);
+    float4 src21 = read_imagef(input, coord_in.zy);
+
+    coord_out.y = coord_out.z * output_height + coord_out.y;
+    coord_out.zw = coord_out.xx + (int2)(1, 2);
+
+    float4 maxVal00 = src00 > src10 ? src00 : src10;
+    float4 maxVal01 = src01 > src11 ? src01 : src11;
+
+    maxVal00 = maxVal00 > src20 ? maxVal00 : src20;
+    maxVal01 = maxVal01 > src21 ? maxVal01 : src21;
+
+    float4 src0 = maxVal00;
+    float4 src1 = (float4)(maxVal00.yzw, maxVal01.x);
+    float4 src2 = (float4)(maxVal00.zw, maxVal01.xy);
+
+    float4 dst = src0 > src1 ? src0 : src1;
+    dst = dst > src2 ? dst : src2;
+
+    write_imagef(output, coord_out.xy, dst.xxxx);
+    write_imagef(output, coord_out.zy, dst.yyyy);
+    write_imagef(output, coord_out.wy, dst.zzzz);
+    coord_out.x += 3;
+    write_imagef(output, coord_out.xy, dst.wwww);
+}
+
+
