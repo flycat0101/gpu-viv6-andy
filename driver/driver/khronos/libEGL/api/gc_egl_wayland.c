@@ -2019,16 +2019,7 @@ static gcePATCH_ID indirectList[] =
 
 static EGLBoolean _CanSupport2DTilestatus()
 {
-    gceCHIPMODEL chipModel;
-    gctUINT32 chipRevision;
-
-    gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
-
-    if (chipModel == gcv7000 && chipRevision == 0x6204)
-    {
-        return EGL_TRUE;
-    }
-    return EGL_FALSE;
+    return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_FAST_CLEAR);
 }
 
 static EGLBoolean
