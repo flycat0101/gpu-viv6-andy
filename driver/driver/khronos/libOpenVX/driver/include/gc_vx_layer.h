@@ -894,7 +894,7 @@ typedef struct _vx_swapHandel
 }
 vx_swapHandel;
 
-#define MAX_HANDEL 1024
+#define MAX_HANDLE 2048
 
 typedef struct _vxnne_execution_layer_s
 {
@@ -910,7 +910,7 @@ typedef struct _vxnne_execution_layer_s
 
     vx_uint32                    opIndicesNum;
     vxnne_operation_command      opIndices;
-    vx_swapHandel*               swapHandle[MAX_HANDEL];
+    vx_swapHandel*               swapHandle[MAX_HANDLE];
     vx_uint32                    swapcount;
 }
 vxnne_execution_layer_s, *vxnne_execution_layer;
