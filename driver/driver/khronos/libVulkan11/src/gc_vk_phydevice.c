@@ -2220,6 +2220,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceExternalFenceProperties(
     case VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_BIT:
     case VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT:
     case VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT:
+#if gcdLINUX_SYNC_FILE || defined(ANDROID)
         pExternalFenceProperties->externalFenceFeatures = 0xF;
         break;
     default:
