@@ -191,7 +191,8 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
             }
             attribBufSizeInKbyte -= fragmentSizeInKbyte;
 
-            if ((attribBufSizeInKbyte > 0) && !(IS_HW_SUPPORT(gcvFEATURE_PSCS_THROTTLE) && IS_HW_SUPPORT(gcvFEATURE_HWMANAGED_LS)))
+            if (!(Hardware->patchID == gcvPATCH_OPENCV_TEST_PHOTO && (pVscHwCfg->chipModel == gcv7000 && pVscHwCfg->chipRevision  == 0x6214)) &&
+                ((attribBufSizeInKbyte > 0) && !(IS_HW_SUPPORT(gcvFEATURE_PSCS_THROTTLE) && IS_HW_SUPPORT(gcvFEATURE_HWMANAGED_LS))))
             {
                 attribBufSizeInKbyte -= 1;
             }
