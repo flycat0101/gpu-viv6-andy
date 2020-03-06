@@ -26,8 +26,11 @@ LOCAL_PATH := $(AQROOT)
 
 ifeq ($(VIVANTE_ENABLE_VSIMULATOR),0)
 
-VIVANTE_MAKEFILES := $(LOCAL_PATH)/hal/kernel/Android.mk \
+VIVANTE_MAKEFILES := \
                      $(LOCAL_PATH)/hal/user/Android.mk
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) "<" 29),1)
+VIVANTE_MAKEFILES += $(LOCAL_PATH)/hal/kernel/Android.mk
+endif
 
 ifeq ($(DRM_GRALLOC),1)
   VIVANTE_MAKEFILES += $(LOCAL_PATH)/driver/android/gralloc_drm/Android.mk
