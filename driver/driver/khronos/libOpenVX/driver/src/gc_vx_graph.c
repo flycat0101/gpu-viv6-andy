@@ -92,12 +92,15 @@ VX_INTERNAL_CALLBACK_API void vxoGraph_Destructor(vx_reference ref)
         }
     }
 
-    for(j = 0; j < MAX_HANDLE; ++j)
+    if (executionLayer)
     {
-        if(executionLayer->swapHandle[j] != VX_NULL)
+        for(j = 0; j < MAX_HANDLE; ++j)
         {
-            vxFree(executionLayer->swapHandle[j]);
-            executionLayer->swapHandle[j] = VX_NULL;
+            if(executionLayer->swapHandle[j] != VX_NULL)
+            {
+                vxFree(executionLayer->swapHandle[j]);
+                executionLayer->swapHandle[j] = VX_NULL;
+            }
         }
     }
 
