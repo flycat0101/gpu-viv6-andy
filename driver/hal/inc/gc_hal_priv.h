@@ -154,6 +154,7 @@ typedef enum _gcePATCH_ID
     gcvPATCH_DEQP_VK,
     gcvPATCH_KANZI,
     gcvPATCH_OPENCV_TEST_PHOTO,
+    gcvPATCH_VKMARK,
 
     gcvPATCH_COUNT
 } gcePATCH_ID;

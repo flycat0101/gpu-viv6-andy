@@ -335,6 +335,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
         {
             const char* deqpName = "\x9b\x9a\x8e\x8f"; /* "deqp".*/
             const char* saschaWillemsName = "\x89\x8a\x93\x94\x9e\x91\xba\x87\x9e\x92\x8f\x93\x9a"; /* "vulkanExample".*/
+            const char* vkMarkName = "\x89\x94\x92\x9e\x8d\x94";/*vkmark*/
             gcoOS_StrCopySafe((gctSTRING)inst->applicationName, __VK_MAX_NAME_LENGTH, pAppInfo->pApplicationName);
 
             if (__vk_utils_reverseMatch(inst->applicationName, deqpName))
@@ -344,6 +345,10 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateInstance(
             else if (__vk_utils_reverseMatch(inst->applicationName, saschaWillemsName))
             {
                 inst->patchID = gcvPATCH_SASCHAWILLEMS;
+            }
+            else if (__vk_utils_reverseMatch(inst->applicationName, vkMarkName))
+            {
+                inst->patchID = gcvPATCH_VKMARK;
             }
         }
         if (pAppInfo->pEngineName)
