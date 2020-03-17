@@ -404,12 +404,6 @@ typedef struct _gcsHAL_LOCK_VIDEO_MEMORY
 
     /* Bus address of a contiguous video node. */
     OUT gctUINT64               physicalAddress;
-
-#if gcdCAPTURE_ONLY_MODE
-    IN gctBOOL                  queryCapSize;
-    IN gctPOINTER               captureLogical;
-    OUT gctSIZE_T               captureSize;
-#endif
 }
 gcsHAL_LOCK_VIDEO_MEMORY;
 
@@ -430,10 +424,6 @@ typedef struct _gcsHAL_UNLOCK_VIDEO_MEMORY
 
     /* Flag to unlock surface asynchroneously. */
     IN OUT gctBOOL              asynchroneous;
-
-#if gcdCAPTURE_ONLY_MODE
-    OUT gctPOINTER              captureLogical;
-#endif
 }
 gcsHAL_UNLOCK_VIDEO_MEMORY;
 
@@ -537,12 +527,6 @@ typedef struct _gcsHAL_ATTACH
 
     /* Bytes of context buffer. */
     OUT gctUINT32               bytes;
-
-#if gcdCAPTURE_ONLY_MODE
-    IN gctBOOL                  queryCapSize;
-    IN gctPOINTER               contextLogical[gcdCONTEXT_BUFFER_NUM];
-    OUT gctSIZE_T               captureSize;
-#endif
 }
 gcsHAL_ATTACH;
 
@@ -593,9 +577,6 @@ typedef struct _gcsHAL_COMMAND_LOCATION
 
     /* struct _gcsHAL_COMMAND_LOCATION * next; */
     gctUINT64                   next;
-#if gcdCAPTURE_ONLY_MODE
-    gctPOINTER                  contextLogical[gcdCONTEXT_BUFFER_NUM];
-#endif
 }
 gcsHAL_COMMAND_LOCATION;
 
