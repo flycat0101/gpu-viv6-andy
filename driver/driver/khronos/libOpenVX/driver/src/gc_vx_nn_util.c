@@ -22,7 +22,7 @@
 #include <gc_vx_nn_util.h>
 #include "gc_nn_arch_model.h"
 #ifdef USE_LIB_NN_ARCH_PERF
-#include "nnArchPerf.h"
+#include "nnArchPerfOri.h"
 #endif
 
 #define AXI_BURST_SIZE 64

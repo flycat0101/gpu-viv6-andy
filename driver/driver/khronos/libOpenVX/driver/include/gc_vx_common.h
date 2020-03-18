@@ -72,7 +72,7 @@
 
 #include <gc_vx_profiler.h>
 #ifdef USE_LIB_NN_ARCH_PERF
-#include "nnArchPerf.h"
+#include "nnArchPerfOri.h"
 #endif
 
 
