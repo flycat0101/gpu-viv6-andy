@@ -14,7 +14,7 @@
 #ifndef __gc_es_extensions_h__
 #define __gc_es_extensions_h__
 #ifdef OPENGL40
-#include "gc_hal_types.h"
+#include "shared/gc_hal_types.h"
 #endif
 
 typedef enum
