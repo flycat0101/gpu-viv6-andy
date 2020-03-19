@@ -2565,6 +2565,8 @@ GLenum GL_APIENTRY __glim_GetError(__GLcontext *gc)
 */
 const GLubyte * GL_APIENTRY __glim_GetString(__GLcontext *gc, GLenum name)
 {
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
+
     switch (name)
     {
     case GL_VENDOR:
@@ -2576,10 +2578,12 @@ const GLubyte * GL_APIENTRY __glim_GetString(__GLcontext *gc, GLenum name)
     case GL_SHADING_LANGUAGE_VERSION:
         return (GLubyte*)gc->constants.GLSLVersion;
     case GL_EXTENSIONS:
-        /* glGetString can't support GL_EXTENSIONS in core profile.
+        /*
+        ** glGetString can't support GL_EXTENSIONS in core profile.
         ** glGetString can   support GL_EXTENSIONS in compatibility profile.
         */
-        if (gc->imports.conformGLSpec && gc->imports.coreProfile)
+        gcoHAL_GetPatchID(gcvNULL, &patchId);
+        if (gc->imports.conformGLSpec && (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP || gc->imports.coreProfile))
         {
             __GL_ERROR_RET_VAL(GL_INVALID_ENUM, gcvNULL);
         }

@@ -30,6 +30,8 @@ __glChipBeginQuery(
     __GLchipQueryObject *chipQuery;
     __GLchipQueryHeader *queryHeader = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
+    __GLprogramObject *fsProgObj = __glGetCurrentStageProgram(gc, __GLSL_STAGE_FS);
+    __GLchipSLProgram *fsProgram = fsProgObj ? (__GLchipSLProgram*)fsProgObj->privateData : gcvNULL;
     gctUINT32 physical;
 
     gcmHEADER_ARG("gc=0x%x queryObj=0x%x", gc, queryObj);
@@ -64,14 +66,23 @@ __glChipBeginQuery(
         (queryObj->target == GL_ANY_SAMPLES_PASSED) ||
         (queryObj->target == GL_ANY_SAMPLES_PASSED_CONSERVATIVE))
     {
+        if ((!gc->imports.conformGLSpec) && (fsProgram && fsProgram->progFlags.msaaOQ) &&
+            !chipCtx->chipFeature.hwFeature.hasBugFixes18)
+        {
+            gcmFOOTER_ARG("return=%d", GL_TRUE);
+            return GL_TRUE;
+        }
+
         if (chipQuery->queryHeader == gcvNULL)
         {
             gctUINT32 gpuCount = 0;
+            gctUINT32 clusterIDWidth = 0;
 
             gcmONERROR(gcoHAL_Query3DCoreCount(chipCtx->hal, &gpuCount));
+            gcmONERROR(gcoHAL_QueryCluster(chipCtx->hal, gcvNULL, gcvNULL, gcvNULL, &clusterIDWidth));
 
             queryHeader = (__GLchipQueryHeader*)(*gc->imports.calloc)(gc, 1, sizeof(__GLchipQueryHeader));
-            queryHeader->headerSize = 64 * gcmSIZEOF(gctUINT64) * gpuCount;
+            queryHeader->headerSize = 64 * gpuCount * gcmSIZEOF(gctUINT32) * (gctUINT32)(1<< clusterIDWidth);
             queryHeader->headerIndex = -1;
             queryHeader->headerSurfType = gcvSURF_INDEX;
             chipQuery->type = gcvQUERY_OCCLUSION;
@@ -128,8 +139,14 @@ __glChipBeginQuery(
                    queryHeader->headerLocked,
                    0,
                    queryHeader->headerSize);
-
-    gcmONERROR(gco3D_SetQuery(chipCtx->engine, physical, chipQuery->type, gcvTRUE, queryObj->index));
+    if (gc->imports.conformGLSpec)
+    {
+        gcmONERROR(gco3D_SetQuery(chipCtx->engine, physical, chipQuery->type, gcvTRUE, queryObj->index));
+    }
+    else
+    {
+        gcmONERROR(gco3D_SetQuery(chipCtx->engine, physical, chipQuery->type, gcvTRUE, 0));
+    }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
@@ -148,6 +165,8 @@ __glChipEndQuery(
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     __GLchipQueryObject *chipQuery = (__GLchipQueryObject *)queryObj->privateData;
+    __GLprogramObject *fsProgObj = __glGetCurrentStageProgram(gc, __GLSL_STAGE_FS);
+    __GLchipSLProgram *fsProgram = fsProgObj ? (__GLchipSLProgram*)fsProgObj->privateData : gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
     gcsHAL_INTERFACE iface;
 
@@ -164,6 +183,15 @@ __glChipEndQuery(
         return GL_TRUE;
     }
 
+    if ((!gc->imports.conformGLSpec) && (fsProgram && fsProgram->progFlags.msaaOQ) &&
+        ((queryObj->target == GL_ANY_SAMPLES_PASSED) ||
+        (queryObj->target == GL_ANY_SAMPLES_PASSED_CONSERVATIVE)) &&
+        !chipCtx->chipFeature.hwFeature.hasBugFixes18)
+    {
+        gcmFOOTER_ARG("return=%d", GL_TRUE);
+        return GL_TRUE;
+    }
+
     gcmASSERT(chipQuery);
 
     if (chipQuery->querySignal == gcvNULL)
@@ -172,7 +200,14 @@ __glChipEndQuery(
     }
 
     /* Send value to data addr reg to end QUERY mode. */
-    gcmONERROR(gco3D_SetQuery(chipCtx->engine, 0, chipQuery->type, gcvFALSE, queryObj->index));
+    if (gc->imports.conformGLSpec)
+    {
+        gcmONERROR(gco3D_SetQuery(chipCtx->engine, 0, chipQuery->type, gcvFALSE, queryObj->index));
+    }
+    else
+    {
+        gcmONERROR(gco3D_SetQuery(chipCtx->engine, 0, chipQuery->type, gcvFALSE, 0));
+    }
 
     /* Send an event to signal that the data is in the buffer. */
     iface.command            = gcvHAL_SIGNAL;
@@ -206,6 +241,8 @@ __glChipGetQueryObject(
     __GLchipQueryObject *chipQuery ;
     gctUINT32 timeout;
     gctINT i;
+    __GLprogramObject *fsProgObj = __glGetCurrentStageProgram(gc, __GLSL_STAGE_FS);
+    __GLchipSLProgram *fsProgram = fsProgObj ? (__GLchipSLProgram*)fsProgObj->privateData : gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x pname=0x%04x queryObj=0x%x", gc, pname, queryObj);
@@ -215,6 +252,36 @@ __glChipGetQueryObject(
          queryObj->target == GL_PRIMITIVES_GENERATED_EXT) &&
          !chipCtx->chipFeature.hwFeature.hasHwTFB)
     {
+        queryObj->resultAvailable = GL_TRUE;
+        gcmFOOTER_ARG("return=%d", GL_TRUE);
+        return GL_TRUE;
+    }
+
+    if ((!gc->imports.conformGLSpec) && (fsProgram && fsProgram->progFlags.msaaOQ) &&
+        ((queryObj->target == GL_ANY_SAMPLES_PASSED) ||
+        (queryObj->target == GL_ANY_SAMPLES_PASSED_CONSERVATIVE)) &&
+        !chipCtx->chipFeature.hwFeature.hasBugFixes18)
+    {
+        gctSIZE_T num = chipCtx->drawRTWidth * chipCtx->drawRTHeight;
+        GLubyte *pixels = (GLubyte*)gc->imports.malloc(gc, 4 * num);
+
+        __glEvaluateDrawableChange(gc, __GL_BUFFER_READ_BIT);
+
+        if (__glChipReadPixels(gc, 0, 0, (GLsizei)chipCtx->drawRTWidth, (GLsizei)chipCtx->drawRTHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels))
+        {
+            gctSIZE_T i = 0;
+            queryObj->count = 0;
+            for (i = 0; i < num; ++i)
+            {
+                if (pixels[i * 4] != 0)
+                {
+                    queryObj->count++;
+                    break;
+                }
+            }
+        }
+
+        gc->imports.free(gc, pixels);
         queryObj->resultAvailable = GL_TRUE;
         gcmFOOTER_ARG("return=%d", GL_TRUE);
         return GL_TRUE;
@@ -237,8 +304,6 @@ __glChipGetQueryObject(
     if (gcmIS_SUCCESS(status))
     {
         __GLattribute *cState = &gc->commitState;
-        __GLprogramObject *fsProgObj = __glGetCurrentStageProgram(gc, __GLSL_STAGE_FS);
-        __GLchipSLProgram *fsProgram = fsProgObj ? (__GLchipSLProgram*)fsProgObj->privateData : gcvNULL;
 
         queryHeader = chipQuery->queryHeader;
 
@@ -264,7 +329,8 @@ __glChipGetQueryObject(
             cState->stencil.front.testFunc == GL_EQUAL &&
             cState->stencil.back.testFunc == GL_EQUAL &&
             cState->stencil.front.reference == 0 &&
-            cState->stencil.back.reference == 0)
+            cState->stencil.back.reference == 0 &&
+            queryObj->count != 0)
         {
             gctSIZE_T num = chipCtx->drawRTWidth * chipCtx->drawRTHeight;
             GLubyte *pixels = (GLubyte*)gc->imports.malloc(gc, 4 * num);

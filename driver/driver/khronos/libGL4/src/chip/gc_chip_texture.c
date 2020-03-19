@@ -749,7 +749,22 @@ gcChipUtilGetImageFormat(
 #ifdef OPENGL40
         case GL_UNSIGNED_SHORT_5_6_5:
             bpp = 16;
-            imageFormat = gcvSURF_R5G6B5;
+            imageFormat = gcvSURF_R5G6B5UI;
+            break;
+        case GL_UNSIGNED_SHORT_5_6_5_REV:
+            bpp = 16;
+            imageFormat = gcvSURF_B5G6R5UI;
+            break;
+        case GL_UNSIGNED_BYTE_3_3_2:
+            bpp = 8;
+            imageFormat = gcvSURF_R3G3B2UI;
+            break;
+        case GL_UNSIGNED_BYTE_2_3_3_REV:
+            bpp = 8;
+            imageFormat = gcvSURF_B2G3R3UI;
+            break;
+        default:
+            GL_ASSERT(0);
             break;
 #endif
          }
@@ -858,14 +873,52 @@ gcChipUtilGetImageFormat(
             bpp = 32;
             imageFormat = gcvSURF_A2B10G10R10UI;
             break;
+
+        case GL_UNSIGNED_INT_10_10_10_2:
+            bpp = 32;
+            imageFormat = gcvSURF_R10G10B10A2UI;
+            break;
 #ifdef OPENGL40
-        case GL_UNSIGNED_INT_8_8_8_8:
+        case GL_UNSIGNED_INT_8_8_8_8_REV:
             bpp = 32;
             imageFormat = gcvSURF_A8B8G8R8UI;
+            break;
+        case GL_UNSIGNED_INT_8_8_8_8:
+            bpp = 32;
+            imageFormat = gcvSURF_R8G8B8A8UI;
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4:
+            bpp = 16;
+            imageFormat = gcvSURF_R4G4B4A4UI;
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+            bpp = 16;
+            imageFormat = gcvSURF_A4B4G4R4UI;
+            break;
+        case GL_UNSIGNED_SHORT_5_5_5_1:
+            bpp = 16;
+            imageFormat = gcvSURF_R5G5B5A1UI;
+            break;
+        case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+            bpp = 16;
+            imageFormat = gcvSURF_A1B5G5R5UI;
+            break;
+        default:
+            GL_ASSERT(0);
             break;
 #endif
          }
          break;
+
+    case GL_ABGR_EXT:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            bpp = 32;
+            imageFormat = gcvSURF_R8G8B8A8;
+            break;
+        }
+        break;
 
     case GL_BGRA_EXT:
         switch (type)
@@ -876,6 +929,7 @@ gcChipUtilGetImageFormat(
             break;
         }
         break;
+
 #ifdef OPENGL40
     case GL_BGR_EXT:
         switch (type)
@@ -887,6 +941,7 @@ gcChipUtilGetImageFormat(
         }
         break;
 #endif
+
     case GL_GREEN:
         switch (type)
         {
@@ -902,6 +957,7 @@ gcChipUtilGetImageFormat(
             break;
         }
         break;
+
     case GL_BLUE:
         switch (type)
         {
@@ -909,9 +965,15 @@ gcChipUtilGetImageFormat(
             bpp = 8;
             imageFormat = gcvSURF_B8;
             break;
+        case GL_FLOAT:
+            bpp = 32;
+            imageFormat = gcvSURF_B32F;
+            break;
         default:
             break;
         }
+        break;
+
     case GL_RED:
         switch (type)
         {
@@ -928,6 +990,11 @@ gcChipUtilGetImageFormat(
         case GL_UNSIGNED_SHORT:
             bpp = 16;
             imageFormat = gcvSURF_R16;
+            break;
+
+        case GL_UNSIGNED_INT:
+            bpp = 32;
+            imageFormat = gcvSURF_R32;
             break;
 
         case GL_HALF_FLOAT:
@@ -978,6 +1045,9 @@ gcChipUtilGetImageFormat(
             bpp = 32;
             imageFormat = gcvSURF_R32I;
             break;
+        default:
+            GL_ASSERT(0);
+            break;
         }
         break;
 
@@ -992,6 +1062,16 @@ gcChipUtilGetImageFormat(
         case GL_BYTE:
             bpp = 16;
             imageFormat = gcvSURF_G8R8_SNORM;
+            break;
+
+        case GL_UNSIGNED_SHORT:
+            bpp = 32;
+            imageFormat = gcvSURF_G16R16;
+            break;
+
+        case GL_UNSIGNED_INT:
+            bpp = 64;
+            imageFormat = gcvSURF_G32R32;
             break;
 
         case GL_HALF_FLOAT:
@@ -1041,6 +1121,9 @@ gcChipUtilGetImageFormat(
         case GL_INT:
             bpp = 64;
             imageFormat = gcvSURF_G32R32I;
+            break;
+        default:
+            GL_ASSERT(0);
             break;
         }
         break;
@@ -1122,6 +1205,26 @@ gcChipUtilGetImageFormat(
         case GL_UNSIGNED_BYTE:
             bpp = 8;
             imageFormat = gcvSURF_S8;
+            break;
+        }
+        break;
+
+    case GL_SRGB_EXT:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            bpp = 24;
+            imageFormat = gcvSURF_SBGR8;
+            break;
+        }
+        break;
+
+    case GL_SRGB_ALPHA_EXT:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            bpp = 32;
+            imageFormat = gcvSURF_A8_SBGR8;
             break;
         }
         break;
@@ -1325,10 +1428,13 @@ gcChipResidentTextureLevel(
     gceTEXTURE_FACE halFace = (__GL_TEXTURE_CUBEMAP_INDEX == texObj->targetIndex)
                             ? gcvFACE_POSITIVE_X + face : gcvFACE_NONE;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
+    __GLpixelTransferInfo transferInfo;
 
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x texObj=0x%x face=%d level=%d buf=0x%x",
                    gc, chipCtx, texObj, face, level, buf);
 
+    memset(&transferInfo, 0, sizeof(__GLpixelTransferInfo));
+    transferInfo.isPBO = unpackBufObj;
     if (!texInfo)
     {
         gcmFOOTER();
@@ -1386,6 +1492,59 @@ gcChipResidentTextureLevel(
     if (unpackBufObj)
     {
         gcmONERROR(gcChipProcessPBO(gc, unpackBufObj, &buf));
+        __gl_doSwizzleForSpecialFormat(&transferInfo, &mipmap->format);
+        __glGenericPixelTransfer(gc, mipmap->width, mipmap->height, 1, (texObj->faceMipmap[face][level]).formatInfo, mipmap->format, &(mipmap->type), buf, &transferInfo, __GL_TexImage);
+        buf = transferInfo.dstImage;
+
+        switch (mipmap->type)
+        {
+        case GL_UNSIGNED_INT_2_10_10_10_REV:
+        switch (mipmap->format)
+        {
+        case GL_RED:
+        case GL_RG:
+        case GL_RGB:
+            mipmap->format = GL_RGBA;
+            break;
+        case GL_RGB_INTEGER:
+            mipmap->format = GL_RGBA_INTEGER;
+            break;
+        default:
+            break;
+        }
+            break;
+        case GL_UNSIGNED_INT_10_10_10_2:
+        switch (mipmap->format)
+        {
+        case GL_RED:
+        case GL_RG:
+        case GL_RGB:
+            mipmap->format = GL_RGBA;
+            break;
+        case GL_RGB_INTEGER:
+            mipmap->format = GL_RGBA_INTEGER;
+            break;
+        default:
+            break;
+        }
+            break;
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+        case GL_UNSIGNED_SHORT_5_6_5:
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+        switch (mipmap->format)
+        {
+        case GL_RED:
+        case GL_RG:
+        case GL_RGBA:
+            mipmap->format = GL_RGB;
+            break;
+        default:
+            break;
+        }
+            break;
+        default:
+            break;
+        }
     }
 
     while (lods-- > 0)
@@ -1426,6 +1585,12 @@ gcChipResidentTextureLevel(
         {
             patchCase = __GL_CHIP_FMT_PATCH_CASE3;
         }
+        else if (chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653 &&
+                (chipCtx->patchId == gcvPATCH_ANDROID_CTS_UIRENDERING ) &&
+                (mipmap->formatInfo->dataType == GL_HALF_FLOAT))
+        {
+            patchCase = __GL_CHIP_FMT_PATCH_CASE3;
+        }
         else if ((mipmap->formatInfo->drvFormat == __GL_FMT_Z16) &&
                  (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMPRESSION_V1) == gcvTRUE) &&
                  ((gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvTRUE) ||
@@ -1463,6 +1628,11 @@ gcChipResidentTextureLevel(
                  (__GL_IS_TEXTURE_CUBE(texObj->targetIndex) || __GL_IS_TEXTURE_ARRAY(texObj->targetIndex)))
         {
             patchCase = __GL_CHIP_FMT_PATCH_ASTC;
+        }
+        else if ((mipmap->requestedFormat == GL_COMPRESSED_RGBA8_ETC2_EAC || mipmap->requestedFormat ==  GL_COMPRESSED_RGB8_ETC2) &&
+                (chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653))
+        {
+            patchCase = __GL_CHIP_FMT_PATCH_ETC2_EAC;
         }
         else if ((texObj->targetIndex == __GL_TEXTURE_2D_ARRAY_INDEX) ||
                  (texObj->targetIndex == __GL_TEXTURE_3D_INDEX))
@@ -1706,10 +1876,29 @@ gcChipResidentTextureLevel(
                 break;
 
              case GL_COMPRESSED_RGB8_ETC2:
+             case GL_COMPRESSED_RGBA8_ETC2_EAC:
+                if (needDecompress)
+                {
+                    /* Decompress. */
+                    pixels = gcChipDecompressETC2EAC(gc,
+                                                  (gctSIZE_T)mipmap->width,
+                                                  (gctSIZE_T)mipmap->height,
+                                                  (gctSIZE_T)mipmap->compressedSize,
+                                                  buf,
+                                                  mipmap->requestedFormat,
+                                                  &srcImageFormat,
+                                                  &rowStride);
+                    compressed = GL_FALSE;
+                    needClean = GL_TRUE;
+                }
+                else
+                {
+                    pixels = buf;
+                }
+                break;
              case GL_COMPRESSED_SRGB8_ETC2:
              case GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2:
              case GL_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2:
-             case GL_COMPRESSED_RGBA8_ETC2_EAC:
              case GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC:
                 if (needDecompress)
                 {
@@ -1903,6 +2092,7 @@ gcChipResidentTextureLevel(
                                             &gc->clientState.pixel.unpackModes,
                                             (gctSIZE_T)mipmap->width,
                                             (gctSIZE_T)mipmap->height,
+                                            (gctSIZE_T)mipmap->border,
                                             mipmap->format,
                                             mipmap->type,
                                             skipImgs,
@@ -2511,6 +2701,11 @@ gcChipCopyTexImage(
 
     texView.firstSlice = face;
 
+    if (!gc->imports.conformGLSpec)
+    {
+        gcmONERROR(gcoTEXTURE_GetMipMap(texInfo->object, level, &texView.surf));
+    }
+
     /* Whether resolve can handle the copy? Should be aligned and face==0 */
     if (__GL_TEXTURE_2D_INDEX == texObj->targetIndex)
     {
@@ -2566,6 +2761,12 @@ gcChipCopyTexImage(
     {
         gctINT width  = __GL_MIN(mipmap->width,  (gctINT32)chipCtx->readRTWidth  - x);
         gctINT height = __GL_MIN(mipmap->height, (gctINT32)chipCtx->readRTHeight - y);
+
+        /* Skip copy for zero dim */
+        if (width <= 0 || height <= 0)
+        {
+            goto OnExit;
+        }
 
         if (tryResolve)
         {
@@ -2697,6 +2898,7 @@ gcChipCopyTexImage(
     texInfo->mipLevels[level].shadow[face].masterDirty = GL_TRUE;
     CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
 
+OnExit:
 OnError:
     if (gcmIS_ERROR(status))
     {
@@ -2814,6 +3016,7 @@ gcChipTexSubImage(
                                 &gc->clientState.pixel.unpackModes,
                                 (gctSIZE_T)width,
                                 (gctSIZE_T)height,
+                                0,
                                 mipmap->format,
                                 mipmap->type,
                                 skipImgs,
@@ -2828,7 +3031,14 @@ gcChipTexSubImage(
             skipOffset += __GL_PTR2SIZE(buf);
             GL_ASSERT(unpackBufInfo);
             gcmONERROR(gcoBUFOBJ_Lock(unpackBufInfo->bufObj, &physicalAddress, (gctPOINTER*)&buf));
-            gcmONERROR(gcoBUFOBJ_GetFence(unpackBufInfo->bufObj, gcvFENCE_TYPE_READ));
+            if (gc->imports.conformGLSpec)
+            {
+                gcmONERROR(gcoBUFOBJ_GetFence(unpackBufInfo->bufObj, gcvFENCE_TYPE_READ));
+            }
+            else
+            {
+                gcmONERROR(gcoBUFOBJ_WaitFence(unpackBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
+            }
 
             physicalAddress += (gctUINT32)skipOffset;
         }
@@ -2937,6 +3147,8 @@ gcChipCopyTexSubImage(
     gcsSURF_VIEW        texView      = {gcvNULL, 0, 1};
     gcsSURF_VIEW        srcView      = {gcvNULL, 0, 1};
     gceSTATUS status = gcvSTATUS_OK;
+    gcePATCH_ID patchId = chipCtx->patchId;
+    gcoSURF     mip = gcvNULL;
 
     gcmHEADER_ARG("gc=0x%x texObj=0x%x face=%d level=%d x=%d y=%d xoffset=%d yoffset=%d zoffset=%d width=%d height=%d",
                    gc, texObj, face, level, x, y, xoffset, yoffset, zoffset, width, height);
@@ -3005,6 +3217,24 @@ gcChipCopyTexSubImage(
             tryResolve = gcvFALSE;
         }
         tryShader = gcvFALSE;
+    }
+
+    if (!gc->imports.conformGLSpec )
+    {
+        /* Just to check whether it has only 1 level of mipmap. */
+        gcoTEXTURE_GetMipMap(texInfo->object, texObj->params.baseLevel + 1, &mip);
+
+        /* When texture owns mipmap, gcoSURF_DrawBlit path would modify the tiling mode
+        ** which could cause mipmap level address and maxLevel incorrect when drawing.
+        */
+        if (patchId == gcvPATCH_DEQP &&
+            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MULTI_PIXELPIPES) &&
+            !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SINGLE_BUFFER) &&
+            (mip || (texObj->params.sampler.minFilter != GL_NEAREST &&
+            texObj->params.sampler.minFilter != GL_LINEAR)))
+        {
+            tryShader = GL_FALSE;
+        }
     }
 
     /* If tex is bound to FBO and draw before calling CopyTexSubImage2D, shadow surface is dirty.
@@ -3146,6 +3376,13 @@ gcChipCopyTexSubImage(
             blitArgs.scissorTest        = gcvFALSE;
             blitArgs.srcNumSlice        = srcView.firstSlice;
             blitArgs.dstNumSlice        = texView.numSlices;
+
+            if (!gc->imports.conformGLSpec && chipCtx->readYInverted)
+            {
+                blitArgs.yReverse       = GL_TRUE;
+                blitArgs.srcY           = (gctINT)(chipCtx->readRTHeight - (y + mipmap->height));
+            }
+
             gcmONERROR(gcoSURF_BlitCPU(&blitArgs));
         }
     }
@@ -3422,6 +3659,10 @@ __glGetWrapFormat(
         case GL_UNSIGNED_INT_5_9_9_9_REV:
             (*wrapformat) = gcvSURF_E5B9G9R9;
             break;
+
+        case GL_FLOAT:
+            (*wrapformat) = gcvSURF_B32G32R32F;
+            break;
         }
         break;
 
@@ -3453,7 +3694,19 @@ __glGetWrapFormat(
             break;
 #ifdef OPENGL40
         case GL_UNSIGNED_SHORT_5_6_5:
-            (*wrapformat) = gcvSURF_R5G6B5;
+            (*wrapformat) = gcvSURF_R5G6B5UI;
+            break;
+        case GL_UNSIGNED_SHORT_5_6_5_REV:
+            (*wrapformat) = gcvSURF_B5G6R5UI;
+            break;
+        case GL_UNSIGNED_BYTE_3_3_2:
+            (*wrapformat) = gcvSURF_R3G3B2UI;
+            break;
+        case GL_UNSIGNED_BYTE_2_3_3_REV:
+            (*wrapformat) = gcvSURF_B2G3R3UI;
+            break;
+        default:
+            GL_ASSERT(0);
             break;
 #endif
          }
@@ -3553,9 +3806,30 @@ __glGetWrapFormat(
         case GL_UNSIGNED_INT_2_10_10_10_REV:
             (*wrapformat) = gcvSURF_A2B10G10R10UI;
             break;
+        case GL_UNSIGNED_INT_10_10_10_2:
+            (*wrapformat) = gcvSURF_R10G10B10A2UI;
+            break;
 #ifdef OPENGL40
-        case GL_UNSIGNED_INT_8_8_8_8:
+        case GL_UNSIGNED_INT_8_8_8_8_REV:
             (*wrapformat) = gcvSURF_A8B8G8R8UI;
+            break;
+        case GL_UNSIGNED_INT_8_8_8_8:
+            (*wrapformat) = gcvSURF_R8G8B8A8UI;
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4:
+            (*wrapformat) = gcvSURF_R4G4B4A4UI;
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+            (*wrapformat) = gcvSURF_A4B4G4R4UI;
+            break;
+        case GL_UNSIGNED_SHORT_5_5_5_1:
+            (*wrapformat) = gcvSURF_R5G5B5A1UI;
+            break;
+        case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+            (*wrapformat) = gcvSURF_A1B5G5R5UI;
+            break;
+        default:
+            GL_ASSERT(0);
             break;
 #endif
          }
@@ -3780,6 +4054,24 @@ __glGetWrapFormat(
             break;
         }
         break;
+
+    case GL_SRGB:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_SBGR8;
+            break;
+        }
+        break;
+
+    case GL_SRGB_ALPHA:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_A8_SBGR8;
+            break;
+        }
+        break;
     }
 }
 
@@ -3991,6 +4283,13 @@ __glChipDeleteTexture(
     {
         gcmVERIFY_OK(gcoTEXTURE_Destroy(texInfo->object));
         texInfo->object = gcvNULL;
+    }
+
+    /* Dereference EGLImageKHR. */
+    if ((!gc->imports.conformGLSpec) && (texInfo->eglImage.image != gcvNULL))
+    {
+        gc->imports.dereferenceImage(texInfo->eglImage.image);
+        texInfo->eglImage.image = gcvNULL;
     }
 
 #if __GL_CHIP_PATCH_ENABLED
@@ -5218,6 +5517,7 @@ __glChipGetTexImage(
     gceSURF_FORMAT wrapformat = gcvSURF_UNKNOWN;
     gceSURF_FORMAT srcFormat = gcvSURF_UNKNOWN;
     __GLformatInfo *formatInfo = mipmap->formatInfo;
+    __GLpixelTransferInfo transferInfo;
     gctUINT w, h;
     gctUINT dstWidth, dstHeight;
     gctUINT numSlice = 0;
@@ -5232,12 +5532,22 @@ __glChipGetTexImage(
     GLint dx, dy, sx, sy;
     GLuint width;
 
-
     gcmHEADER_ARG("gc=0x%x, texObj=0x%x, face=%d, level=%d, buf=0x%x",
         gc, texObj, face, level, buf);
 
     srcView = gcChipGetTextureSurface(chipCtx, texObj, gcvFALSE, level, slice);
 
+    /* The image is from pack buffer object? */
+    packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
+    memset(&transferInfo, 0, sizeof(__GLpixelTransferInfo));
+    transferInfo.isPBO = packBufObj;
+
+    /* Do PixelTransfer for PBO */
+    if (packBufObj)
+    {
+        __gl_doSwizzleForSpecialFormat(&transferInfo, &format);
+        __glGenericPixelTransfer(gc, mipmap->width, mipmap->height, 1, (texObj->faceMipmap[face][level]).formatInfo, format, &type, gcvNULL, &transferInfo, __GL_GetTexImagePre);
+    }
     __glGetWrapFormat(format ,type, &wrapformat);
 
     if (formatInfo == gcvNULL)
@@ -5256,19 +5566,19 @@ __glChipGetTexImage(
         wrapformat = formatMapInfo->requestFormat;
     }
 
+    /* Need use format/type as a base to calculate bpp when them are different from mipmap->format/mipmap->type. */
     gcChipProcessPixelStore(gc,
         &ps->packModes,
         (gctSIZE_T)mipmap->width,
         (gctSIZE_T)mipmap->height,
-        mipmap->format,
-        mipmap->type,
+        0,
+        format,
+        type,
         skipImgs,
         &rowStride,
         &imgHeight,
         &skipOffset);
 
-    /* The image is from pack buffer object? */
-    packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
     if (packBufObj)
     {
         packBufInfo = (__GLchipVertexBufferInfo *)(packBufObj->privateData);
@@ -5281,6 +5591,13 @@ __glChipGetTexImage(
     }
     logicalAddress = (gctPOINTER)((gctINT8_PTR)logicalAddress + skipOffset);
 
+    if (format == GL_DEPTH_STENCIL || format == GL_DEPTH_COMPONENT || format == GL_STENCIL_INDEX)
+    {
+        if(transferInfo.srcImage == gcvNULL && gcvNULL != packBufObj)
+        {
+            transferInfo.srcImage = logicalAddress;
+        }
+    }
     switch (texObj->targetIndex)
     {
     case __GL_TEXTURE_1D_INDEX:
@@ -5334,7 +5651,7 @@ __glChipGetTexImage(
         /*
         ** Set Non-Linear space for SRGB8_ALPHA8
         */
-        if (formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8)
+        if ((formatInfo->drvFormat == __GL_FMT_SRGB8) || (formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8))
         {
             gcmONERROR(gcoSURF_SetColorSpace(dstView.surf, gcvSURF_COLOR_SPACE_NONLINEAR));
         }
@@ -5353,9 +5670,14 @@ __glChipGetTexImage(
 
             if (packBufObj)
             {
-                if (gcmIS_SUCCESS(gcoSURF_ResolveRect(&srcView, &dstView, &rlvArgs)))
+                if (format != GL_DEPTH_COMPONENT && format != GL_DEPTH_STENCIL && format != GL_STENCIL_INDEX)
                 {
-                    break;
+                    transferInfo.dstImage = dstView.surf->node.logical;
+
+                    if (transferInfo.srcImage)
+                    {
+                        dstView.surf->node.logical = (gctUINT8_PTR)transferInfo.srcImage;
+                    }
                 }
             }
             gcmERR_BREAK(gcoSURF_CopyPixels(&srcView, &dstView, &rlvArgs));
@@ -5371,7 +5693,15 @@ __glChipGetTexImage(
 
             gcmONERROR(gcoSURF_Lock(dstView.surf, gcvNULL, srcData));
 
-            dstData = (GLubyte*)buf + rowStride * imgHeight * i; sx = 0; sy = 0; dx = 0; dy = 0;
+            if (packBufObj)
+            {
+                dstData = (GLubyte*)transferInfo.srcImage + rowStride * imgHeight * i;
+            }
+            else
+            {
+                dstData = (GLubyte*)buf + rowStride * imgHeight * i;
+            }
+            sx = 0; sy = 0; dx = 0; dy = 0;
             w = gcmMIN(mipmap->width, (gctINT)w);
             h = gcmMIN(mipmap->height, (gctINT)h);
             width = mipmap->width;
@@ -5512,6 +5842,20 @@ __glChipGetTexImage(
             gcoSURF_Unlock(dstView.surf, gcvNULL);
         }
 
+        if (GL_TRUE == transferInfo.applyPixelTransfer)
+        {
+            if (format == GL_DEPTH_COMPONENT || format == GL_DEPTH_STENCIL || format == GL_STENCIL_INDEX)
+            {
+                transferInfo.dstImage = logicalAddress;
+            }
+
+            __glGenericPixelTransfer(gc, mipmap->width, mipmap->height, 1, mipmap->formatInfo, format, &type, gcvNULL, &transferInfo, __GL_ReadPixels);
+        }
+
+        if ((GL_TRUE == transferInfo.srcNeedFree) && (gcvNULL != transferInfo.srcImage)){
+        (*gc->imports.free)(gc, (void*)transferInfo.srcImage);
+        transferInfo.srcImage = gcvNULL;
+        }
         if (dstView.surf)
         {
             gcmONERROR(gcoSURF_Destroy(dstView.surf));
@@ -5782,6 +6126,12 @@ __glChipTexDirectVIV(
         gcoTEXTURE_GetClosestFormat(gcvNULL, sourceFormat, &textureFormat);
         break;
 
+    case GL_LUMINANCE8_ALPHA8_EXT:
+        sourceFormat = gcvSURF_A8L8;
+        gcoTEXTURE_GetClosestFormat(gcvNULL, sourceFormat, &textureFormat);
+        break;
+
+
     default:
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
@@ -5859,6 +6209,12 @@ __glChipTexDirectVIV(
     /* Construct the source surface. */
     gcmONERROR(gcoSURF_Construct(
         chipCtx->hal, width, height, 1, gcvSURF_BITMAP, sourceFormat, gcvPOOL_DEFAULT, &texInfo->direct.source));
+
+    if (!gc->imports.conformGLSpec)
+    {
+        texInfo->direct.directRender = texInfo->direct.source->formatInfo.format == texInfo->direct.source->formatInfo.closestRenderFormat;
+        gcmASSERT(!(texInfo->direct.directRender == gcvTRUE && texInfo->direct.directSample == gcvFALSE));
+    }
 
     /* Lock the source surface. */
     gcmONERROR(gcoSURF_Lock(texInfo->direct.source, gcvNULL, memory));
@@ -6062,6 +6418,11 @@ __glChipTexDirectVIVMap(
 
     case GL_DEPTH_COMPONENT16:
         sourceFormat = gcvSURF_D16;
+        gcoTEXTURE_GetClosestFormat(gcvNULL, sourceFormat, &textureFormat);
+        break;
+
+    case GL_LUMINANCE8_ALPHA8_EXT:
+        sourceFormat = gcvSURF_A8L8;
         gcoTEXTURE_GetClosestFormat(gcvNULL, sourceFormat, &textureFormat);
         break;
 
@@ -7112,6 +7473,18 @@ __glChipGetTextureAttribFromImage(
             type = GL_UNSIGNED_BYTE;
             break;
 
+        case gcvSURF_A16B16G16R16F:
+            format = GL_RGBA;
+            internalFormat = GL_RGBA16F;
+            type = GL_HALF_FLOAT;
+            break;
+
+        case gcvSURF_A2B10G10R10:
+            format = GL_RGBA;
+            internalFormat = GL_RGB10_A2;
+            type = GL_UNSIGNED_INT_2_10_10_10_REV;
+            break;
+
         case gcvSURF_X8B8G8R8:
             format = internalFormat = __GL_RGBX8;
             type = GL_UNSIGNED_BYTE;
@@ -7147,15 +7520,35 @@ __glChipGetTextureAttribFromImage(
             type = GL_UNSIGNED_SHORT_5_5_5_1;
             break;
 
-        case gcvSURF_A4R4G4B4:
         case gcvSURF_R4G4B4A4:
             format = internalFormat = GL_RGBA4;
             type = GL_UNSIGNED_SHORT_4_4_4_4;
             break;
 
-        case gcvSURF_X4R4G4B4:
-            format = internalFormat = GL_RGB;
+        case gcvSURF_A4R4G4B4:
+            format = internalFormat = gc->imports.conformGLSpec ? GL_RGBA4  : __GL_ARGB4;
             type = GL_UNSIGNED_SHORT_4_4_4_4;
+            break;
+
+
+        case gcvSURF_X4R4G4B4:
+            format = internalFormat = gc->imports.conformGLSpec ? GL_RGB : __GL_XRGB4;
+            type = GL_UNSIGNED_SHORT_4_4_4_4;
+            break;
+
+        case gcvSURF_R8:
+            format = internalFormat = GL_RED;
+            type = GL_UNSIGNED_BYTE;
+            break;
+
+        case gcvSURF_G8R8:
+            format = internalFormat = GL_RG;
+            type = GL_UNSIGNED_BYTE;
+            break;
+
+        case gcvSURF_B8G8R8:
+            format = internalFormat = GL_RGB;
+            type = GL_UNSIGNED_BYTE;
             break;
 
         case gcvSURF_YV12:
@@ -7210,6 +7603,18 @@ __glChipGetTextureAttribFromImage(
             format = GL_VIV_UYVY;
             internalFormat = GL_RGBA;
             type = GL_NONE;
+            break;
+
+        case gcvSURF_L8_RAW:
+            format = GL_LUMINANCE;
+            internalFormat = GL_LUMINANCE;
+            type = GL_UNSIGNED_BYTE;
+            break;
+
+        case gcvSURF_A8L8_RAW:
+            format = GL_LUMINANCE_ALPHA;
+            internalFormat = GL_LUMINANCE_ALPHA;
+            type = GL_UNSIGNED_BYTE;
             break;
 
         default:
@@ -7270,7 +7675,9 @@ __glChipEglImageTargetTexture2DOES(
     gcoSURF surface;
     __GLmipMapLevel *mipmap = &texObj->faceMipmap[0][0];
     __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevels[0];
-
+#if defined(ANDROID)
+    __GLchipFmtPatch patchCase = __GL_CHIP_FMT_PATCH_NONE;
+#endif
     gcmHEADER_ARG("gc=0x%x texObj=0x%x target=0x%04x eglImage=0x%x", gc, texObj, target, eglImage);
 
     /* Get texture attributes from eglImage. */
@@ -7294,7 +7701,17 @@ __glChipEglImageTargetTexture2DOES(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+#if defined(ANDROID)
+    if ((chipCtx->patchId == gcvPATCH_NATIVEHARDWARE_CTS) &&
+        (mipmap->formatInfo->dataType == GL_HALF_FLOAT) &&
+        (chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4653))
+    {
+        patchCase = __GL_CHIP_FMT_PATCH_CASE3;
+    }
+    chipMipLevel->formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, patchCase);
+#else
     chipMipLevel->formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_NONE);
+#endif
 
     /* Validate the format. */
     switch (srcFormat)
@@ -7420,6 +7837,11 @@ __glChipEglImageTargetTexture2DOES(
                     break;
                 }
             }
+        }
+
+        if (srcFormat == gcvSURF_L8_RAW  || srcFormat == gcvSURF_A8L8_RAW)
+        {
+            texInfo->eglImage.directSample = gcvTRUE;
         }
 
         /* More checks. */

@@ -5741,6 +5741,42 @@ GLvoid GL_APIENTRY __GL_APINAME(EGLImageTargetRenderbufferStorageOES)(GLenum tar
 }
 #endif
 
+#if GL_EXT_multi_draw_arrays
+GLvoid GL_APIENTRY __GL_APINAME(MultiDrawArraysEXT)(GLenum mode, const GLint *first, const GLsizei *count, GLsizei primcount)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiDrawArrays(gc, mode, first, count, primcount);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiDrawElementsEXT)(GLenum mode, const GLsizei *count, GLenum type, const GLvoid*const*indices, GLsizei primcount)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiDrawElements(gc, mode, count, type, indices, primcount);
+}
+
+#if GL_EXT_draw_elements_base_vertex
+GLvoid GL_APIENTRY __GL_APINAME(MultiDrawElementsBaseVertexEXT)(GLenum mode, const GLsizei * count, GLenum type, const void *const*indices, GLsizei drawcount, const GLint *basevertex)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiDrawElementsBaseVertex(gc, mode, count, type, indices, drawcount, basevertex);
+}
+#endif
+#endif
+
+#if GL_EXT_multi_draw_indirect
+GLvoid GL_APIENTRY __GL_APINAME(MultiDrawArraysIndirectEXT)(GLenum mode, const void *indirect, GLsizei drawcount, GLsizei stride)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiDrawArraysIndirect(gc, mode, indirect, drawcount, stride);
+}
+
+GLvoid GL_APIENTRY __GL_APINAME(MultiDrawElementsIndirectEXT)(GLenum mode, GLenum type, const void *indirect, GLsizei drawcount, GLsizei stride)
+{
+    __GL_GET_CONTEXT;
+    gc->pEntryDispatch->MultiDrawElementsIndirect(gc, mode, type, indirect, drawcount, stride);
+}
+#endif
+
 #if GL_VIV_direct_texture
 GLvoid GL_APIENTRY __GL_APINAME(TexDirectVIV)(GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** pixels)
 {
@@ -5806,20 +5842,6 @@ GLvoid GL_APIENTRY __GL_APINAME(GetBufferPointervOES)(GLenum target, GLenum pnam
 {
     __GL_GET_CONTEXT;
     gc->pEntryDispatch->GetBufferPointerv(gc, target, pname, params);
-}
-#endif
-
-#if GL_EXT_multi_draw_arrays
-GLvoid GL_APIENTRY __GL_APINAME(MultiDrawArraysEXT)(GLenum mode, const GLint *first, const GLsizei *count, GLsizei primcount)
-{
-    __GL_GET_CONTEXT;
-    gc->pEntryDispatch->MultiDrawArrays(gc, mode, first, count, primcount);
-}
-
-GLvoid GL_APIENTRY __GL_APINAME(MultiDrawElementsEXT)(GLenum mode, const GLsizei *count, GLenum type, const GLvoid*const*indices, GLsizei primcount)
-{
-    __GL_GET_CONTEXT;
-    gc->pEntryDispatch->MultiDrawElements(gc, mode, count, type, indices, primcount);
 }
 #endif
 
@@ -5910,8 +5932,5 @@ const __GLprocInfo __glProcInfoTable[] =
 {
     __GL_API_ENTRIES(__glProcInfo)
 };
-
-
-
 
 const GLuint __glProcTabSize = __GL_TABLE_SIZE(__glProcInfoTable);

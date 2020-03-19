@@ -19,11 +19,11 @@
 
 #define _GC_OBJ_ZONE            gcdZONE_EGL_API
 
+#if !gcdSTATIC_LINK
 #if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__)
 static pthread_mutex_t client_lib_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
-#if !gcdSTATIC_LINK
 static gctHANDLE client_lib[vegl_API_LAST] = {NULL};
 
 static gctCONST_STRING _dispatchNames[] =
@@ -273,9 +273,7 @@ static void _InitDispatchTables(
         veglInitClientApiProcTbl(client_lib[vegl_EGL], glesCommonApiEntryTbl, "forward_gl", "ES_Common");
         veglInitClientApiProcTbl(client_lib[vegl_OPENGL_ES11], gles11ApiEntryTbl, "gl", "GLES11");
         veglInitClientApiProcTbl(client_lib[vegl_OPENGL_ES20], gles32ApiEntryTbl, "gl", "GLES32");
-#if defined(EGL_API_FB)
         veglInitClientApiProcTbl(client_lib[vegl_OPENGL], gl4xApiEntryTbl, "gl", "GL4X");
-#endif
 #if !defined(VIVANTE_NO_VG)
         veglInitClientApiProcTbl(client_lib[vegl_OPENVG], vgApiEntryTbl, "vg", "OpenVG");
 #endif

@@ -105,6 +105,11 @@ GLvoid APIENTRY __glim_SelectBuffer(__GLcontext *gc, GLsizei bufferLength, GLuin
 {
     __GL_SETUP_NOT_IN_BEGIN(gc);
 
+    if (gcvNULL == gc->select.stack)
+    {
+        __glInitSelect(gc);
+    }
+
     if (bufferLength < 0) {
         __glSetError(gc, GL_INVALID_VALUE);
         return;
@@ -232,6 +237,11 @@ GLvoid APIENTRY __glim_PushName(__GLcontext *gc, GLuint name)
 
 GLvoid __glInitSelect(__GLcontext *gc)
 {
+    if (gcvNULL != gc->select.stack)
+    {
+        return;
+    }
+
     /* Allocate Name stack depth based on maxNameStackDepth */
     gc->select.stack = (GLuint*)(*gc->imports.malloc)
         (gc, gc->constants.maxNameStackDepth * sizeof(GLuint) );

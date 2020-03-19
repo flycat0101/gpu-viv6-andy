@@ -29,7 +29,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef __VIV_LOCK_H__
 #define __VIV_LOCK_H__
 
-#if defined(_LINUX_) && !defined(__VXWORKS__)
+#if defined(_LINUX_) && defined(DRI_PIXMAPRENDER_GL)
 
 #include "dri_util.h"
 extern GLvoid vivGetLock( __GLcontext *gc, GLuint flags );
@@ -99,48 +99,46 @@ extern _glthread_Mutex __glDrmMutex;
  * OpenGL driver needs to access framebuffer hardware.
  */
 #define LINUX_LOCK_FRAMEBUFFER( gc )                            \
-    do {                                                        \
+    if (!gc->imports.fromEGL) {                                 \
         GLbyte __ret = 0;                                       \
         vivDriMirror *dri = (vivDriMirror *)gc->imports.other;  \
         DEBUG_CHECK_LOCK();                                     \
-        _glthread_LOCK_MUTEX(__glDrmMutex);        \
-        if (dri->screen->dri3)                           \
-        {                           \
-                 vivGetLock( gc, 0 );                           \
-                 DEBUG_LOCK();                                           \
-                 break;                                           \
-        }                           \
-        if (dri->lockCnt++ == 0) {                              \
+        _glthread_LOCK_MUTEX(__glDrmMutex);                     \
+        if (dri->screen->dri3)                                  \
+        {                                                       \
+            vivGetLock( gc, 0 );                                \
+        }                                                       \
+        else                                                    \
+        {                                                       \
+          if (dri->lockCnt++ == 0) {                            \
             if (!dri->bDrawableInitied) {                       \
-                 vivGetLock( gc, 0 );                           \
-                 dri->bDrawableInitied = 1;                     \
+                vivGetLock( gc, 0 );                            \
+                dri->bDrawableInitied = 1;                      \
             } else {                                            \
-                DRMGL_CAS( dri->hwLock, dri->hwContext,           \
+                DRMGL_CAS( dri->hwLock, dri->hwContext,         \
                    (DRM_LOCK_HELD | dri->hwContext), __ret );   \
                 if ( __ret)                                     \
                     vivGetLock( gc, 0 );                        \
             }                                                   \
-         }                                                      \
+          }                                                     \
+        }                                                       \
         DEBUG_LOCK();                                           \
-    } while (0)
+    }
 
 #define LINUX_UNLOCK_FRAMEBUFFER( gc )                          \
-    do {                                                        \
+    if (!gc->imports.fromEGL) {                                 \
         vivDriMirror *dri = (vivDriMirror *)gc->imports.other;  \
-        if (dri->screen->dri3)                           \
-        {                           \
-             _glthread_UNLOCK_MUTEX(__glDrmMutex);   \
-             DEBUG_RESET();                                          \
-             break;                                           \
-        }                           \
-        if (--dri->lockCnt == 0) {                              \
-            DRMGL_UNLOCK( dri->fd,                                \
+        if (!dri->screen->dri3)                                 \
+        {                                                       \
+          if (--dri->lockCnt == 0) {                            \
+            DRMGL_UNLOCK( dri->fd,                              \
               dri->hwLock,                                      \
               dri->hwContext );                                 \
+          }                                                     \
         }                                                       \
-        _glthread_UNLOCK_MUTEX(__glDrmMutex);   \
+        _glthread_UNLOCK_MUTEX(__glDrmMutex);                   \
         DEBUG_RESET();                                          \
-    } while (0)
+    }
 
 #define LINUX_LOCK_FRAMEBUFFER_DUMMY( sPriv ) \
     do { \

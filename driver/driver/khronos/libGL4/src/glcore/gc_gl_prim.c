@@ -1418,6 +1418,12 @@ GLvoid __glImmediateFlushBuffer(__GLcontext *gc)
     startIndex = gc->input.lastVertexIndex;
     endIndex = gc->input.vertex.index;
     vertexCount = endIndex - startIndex;
+
+    if (vertexCount == 0)
+    {
+        return;
+    }
+
     switch (gc->input.currentPrimMode)
     {
     case GL_POINTS:

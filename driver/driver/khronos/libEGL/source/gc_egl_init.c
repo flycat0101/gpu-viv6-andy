@@ -450,14 +450,9 @@ _FillIn(
         if (patchId == gcvPATCH_GTFES30)
         {
             gctSTRING env;
-            gctINT enableAllConfig = 1;
             static gctBOOL printed = gcvFALSE;
             gcoOS_GetEnv(gcvNULL, "VIV_EGL_ALL_CONFIG", &env);
-            if (env)
-            {
-                gcoOS_StrToInt(env, &enableAllConfig);
-            }
-            if (!enableAllConfig)
+            if (!env)
             {
                 if (!printed)
                 {
@@ -478,8 +473,13 @@ _FillIn(
                     printed = gcvTRUE;
                 }
             }
-            config->renderableType &= ~EGL_OPENGL_BIT;
-            config->conformant     &= ~EGL_OPENGL_BIT;
+            gcoOS_GetEnv(gcvNULL, "VIV_EGL_OPENGL_CTS", &env);
+            if (!env)
+            {
+                /* Clear EGL_OPENGL_BIT if CTS run is not OpenGL CTS */
+                config->renderableType &= ~EGL_OPENGL_BIT;
+                config->conformant     &= ~EGL_OPENGL_BIT;
+            }
         }
     }
 #endif
@@ -767,6 +767,9 @@ veglGetPlatformDisplay(
     void * nativeScreen = gcvNULL;
     VEGLPlatform eglPlatform = gcvNULL;
     gctSTRING platEnv = gcvNULL;
+
+    /* Detect trace mode. */
+    _SetTraceMode();
 
     gcoOS_GetEnv(gcvNULL, "VIV_EGL_PLATFORM", &platEnv);
 

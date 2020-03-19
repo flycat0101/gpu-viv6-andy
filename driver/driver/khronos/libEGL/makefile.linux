@@ -57,17 +57,22 @@ ifeq ($(EGL_API_X),1)
   INCLUDE += -I$(X11_ARM_DIR)/include
 endif
 
-ifeq ($(EGL_API_DRI),1)
-  INCLUDE += -I$(X11_ARM_DIR)/include \
+ifeq ($(EGL_API_WL),1)
+  INCLUDE += -I$(AQROOT)/driver/wayland \
+             -I$(WAYLAND_DIR)/include
+else
+  ifeq ($(EGL_API_DRI),1)
+    INCLUDE += -I$(X11_ARM_DIR)/include \
              -I$(X11_ARM_DIR)/include/X11/extensions \
              -I$(X11_ARM_DIR)/include/libdrm \
              -I$(AQROOT)/driver/X/DRI/src
-endif
+  endif
 
-ifeq ($(X11_DRI3),1)
-  INCLUDE += -I$(X11_ARM_DIR)/include \
+  ifeq ($(X11_DRI3),1)
+    INCLUDE += -I$(X11_ARM_DIR)/include \
              -I$(X11_ARM_DIR)/include/X11/extensions \
              -I${ROOTFS_USR}/include/libdrm
+  endif
 endif
 
 ifeq ($(EGL_API_FB),1)
@@ -81,11 +86,6 @@ ifeq ($(EGL_API_GBM),1)
     INCLUDE += -I$(AQROOT)/driver/gbm/main
     INCLUDE += -I$(AQROOT)/driver/gbm/backends/viv
   endif
-endif
-
-ifeq ($(EGL_API_WL),1)
-  INCLUDE += -I$(AQROOT)/driver/wayland \
-             -I$(WAYLAND_DIR)/include
 endif
 
 ifeq ($(EGL_API_DFB),1)
@@ -160,12 +160,16 @@ ifeq ($(EGL_API_X),1)
   LDLIBS += -L$(X11_ARM_DIR)/lib -lX11
 endif
 
-ifeq ($(EGL_API_DRI),1)
-  LDLIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXext -ldrm
-endif
+ifeq ($(EGL_API_WL),1)
+  LDLIBS += -L$(WAYLAND_DIR)/lib -lwayland-server -lwayland-client
+else
+  ifeq ($(EGL_API_DRI),1)
+    LDLIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXext -ldrm
+  endif
 
-ifeq ($(X11_DRI3),1)
-  LDLIBS += -L$(X11_ARM_DIR)/lib -lX11 -lX11-xcb -lXext -lxcb -lxcb-shm -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync -ldrm_vivante
+  ifeq ($(X11_DRI3),1)
+    LDLIBS += -L$(X11_ARM_DIR)/lib -lX11 -lX11-xcb -lXext -lxcb -lxcb-shm -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync -ldrm_vivante
+  endif
 endif
 
 ifeq ($(EGL_API_GBM),1)
@@ -176,12 +180,6 @@ ifeq ($(EGL_API_GBM),1)
   else
     LDLIBS += -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/gbm/main/$(OBJ_DIR) -lgbm -L$(AQROOT)/driver/gbm/backends/viv/$(OBJ_DIR) -lgbm_viv
   endif
-endif
-
-ifeq ($(EGL_API_WL),1)
-  LDLIBS += -L$(WAYLAND_DIR)/lib \
-            -lwayland-server \
-            -lwayland-client
 endif
 
 ifeq ($(EGL_API_DFB),1)
@@ -211,21 +209,21 @@ ifeq ($(EGL_API_X),1)
   OBJECTS += $(OBJ_DIR)/gc_egl_x11.o
 endif
 
-ifeq ($(EGL_API_DRI),1)
-  OBJECTS += $(OBJ_DIR)/gc_egl_dri.o
-  OBJECTS += $(OBJ_DIR)/XF86dri.o
-endif
-
-ifeq ($(X11_DRI3),1)
-  OBJECTS += $(OBJ_DIR)/gc_egl_dri3.o
-endif
-
 ifeq ($(EGL_API_WL),1)
   OBJECTS += $(OBJ_DIR)/gc_egl_wayland.o \
              $(OBJ_DIR)/wayland-egl.o \
              $(OBJ_DIR)/gc_egl_wayland_server.o \
              $(OBJ_DIR)/wayland-viv-protocol.o \
              $(OBJ_DIR)/linux-explicit-synchronization-unstable-v1-protocol.o
+else
+  ifeq ($(EGL_API_DRI),1)
+    OBJECTS += $(OBJ_DIR)/gc_egl_dri.o
+    OBJECTS += $(OBJ_DIR)/XF86dri.o
+  endif
+
+  ifeq ($(X11_DRI3),1)
+    OBJECTS += $(OBJ_DIR)/gc_egl_dri3.o
+  endif
 endif
 
 ifeq ($(EGL_API_GBM),1)
@@ -294,12 +292,12 @@ vpath
 vpath %.c api
 vpath %.c source
 
-ifeq ($(EGL_API_DRI),1)
-  vpath %.c ../../X/DRI/src
-endif
-
 ifeq ($(EGL_API_WL),1)
   vpath %.c ../../wayland
+else
+  ifeq ($(EGL_API_DRI),1)
+    vpath %.c ../../X/DRI/src
+  endif
 endif
 
 $(OBJ_DIR)/%.o: %.c

@@ -116,6 +116,20 @@
 #define __GL_PIXELTRANSFER_ENABLED_DEPTH(gc)            \
     ((gc)->state.pixel.transferMode.d_scale != 1.0 ||   \
      (gc)->state.pixel.transferMode.d_bias != 0.0)
+
+#define __GL_CASE_IS_INTEGER_FORMAT             \
+    case GL_RED_INTEGER_EXT:                    \
+    case GL_GREEN_INTEGER_EXT:                  \
+    case GL_BLUE_INTEGER_EXT:                   \
+    case GL_ALPHA_INTEGER_EXT:                  \
+    case GL_RG_INTEGER:                         \
+    case GL_RGB_INTEGER_EXT:                    \
+    case GL_RGBA_INTEGER_EXT:                   \
+    case GL_BGR_INTEGER_EXT:                    \
+    case GL_BGRA_INTEGER_EXT:                   \
+    case GL_LUMINANCE_INTEGER_EXT:              \
+    case GL_LUMINANCE_ALPHA_INTEGER_EXT
+
 /************************************************************************/
 
 /*
@@ -457,34 +471,83 @@ typedef struct __GLpixelMachineRec {
     spanInfo->srcLinesPerSpan = 1;                    \
 }
 
+/* Where to use pixel transfer. */
+typedef enum __GLPixelTransferOperationsRec {
+    __GL_TexImage = 0,
+    __GL_ReadPixels,
+    __GL_ReadPixelsPre,
+    __GL_GetTexImagePre,
+    __GL_CopyPixels
+} __GLPixelTransferOperations;
+
+/* How to use pixel transfer */
+typedef enum __GLPixelTransferConfigurationRec {
+    __GL_transferUnknown = -1,
+    __GL_transferNormal = 0,
+    __GL_transferDepthStencilForRead,
+    __GL_transferIntegerFormat,
+    __GL_transferLuminanceIntensity,
+    __GL_transferGBFormat
+} __GLPixelTransferConfiguration;
+
 typedef struct __GLpixelTransferInfoRec{
     /*
     ** Public info.
     */
     GLuint width, height, depth;
-    GLuint numOfPixel;               /* Total number of pixels */
-    GLuint numOfComponents;          /* Total number of components */
-    GLuint sizeOfAlignMemory;           /* size of alignment of memory */
-    GLuint widthAlign, dstWidthAlign;   /* alignment width */
-    GLuint sizeOfElement;           /* Element size */
-    GLuint compNumOfElement;        /* Element number */
-    GLuint numOfAlign;              /* number of alignment */
-    GLuint numOfAlignSrc;       /* number of alignment about source memory */
-    GLuint alignment;               /* alignment size */
+    GLuint numOfPixel;              /* Total number of pixels */
+    GLuint numOfComponents;         /* Total number of components */
+
+    GLuint alignment;               /* [un]pack alignment size: [UN]PACK_ALIGNMMENT */
+    GLint swapBytes;
+    GLint lsbFirst;
+    GLint skipPixels, skipLines, skipImages;
+    GLint rowLength, imageHeight;
+
+    GLuint srcSizeOfElement;        /* Element size (in byte) */
+    GLuint dstSizeOfElement;
+    /* Number of element in a group, use for "pixel storage modes", come from format and type, which is diffrent from compNumber. */
+    GLuint srcElementNumOfGroup;
+    GLuint dstElementNumOfGroup;
+    GLuint srcRowByteNeedAlign;     /* Bytes need to align a row for src/dst buf (in byte) */
+    GLuint dstRowByteNeedAlign;
+    GLuint srcRowSizeBeforeAlign;   /* Total size of a row for src/dst buf before calc alignment (in byte) */
+    GLuint dstRowSizeBeforeAlign;
+    GLuint srcRowSizeAfterAlign;    /* Total size of a row for src/dst buf after calc alignment (in byte) */
+    GLuint dstRowSizeAfterAlign;
+    GLuint srcTotalBufSize;         /* Total buffer size need for "pixel storage modes" (in byte) */
+    GLuint dstTotalBufSize;
+    GLuint srcIncreByteOfTotal;     /* Incrementing pointer by [UN]PACK_SKIP_IMAGE or [UN]PACK_SKIP_ROW (in byte) */
+    GLuint dstIncreByteOfTotal;
+    GLuint srcIncreBytePerRow;      /* Incrementing pointer by [UN]PACK_SKIP_PIXEL (in byte) */
+    GLuint dstIncreBytePerRow;
 
     GLenum baseFormat;
-    GLubyte compNumber;             /* Get component number from base format */
-    GLubyte compMask[4];            /* R G B A at postion 0 1 2 3, values 1 2 3 4 represent components sequence */
+    GLubyte compNumber;             /* Get component number from base format, use for "pixel transfer" */
+    /*
+    ** The number of nonzero values represents the number of components.
+    ** Index represents component sequence.
+    ** Value 1 2 3 4 represents R G B A.
+    */
+    GLubyte compMask[4];
 
     __GLcolor scale;                /* NOT implemented. non pix xfer scale*/
     __GLcolor bias;                 /* NOT implemented. non pix xfer bias*/
 
     GLboolean applyPixelTransfer;   /* apply pixel transfer operations */
     GLboolean applyGenericScaleBias;/* apply non pix xfer scale and bias.*/
+    GLboolean applySpecialSwizzle;  /* apply pixel transfer for special formats */
+    GLboolean applyGBConvert;       /* apply pixel transfer for Green and Blue */
+
+    GLenum operaitonFlag;           /* Record pixelTransferOperations */
+    __GLPixelTransferConfiguration configFlag;          /* How to use pixel transfer? */
+    __GLbufferObject *isPBO;        /* Judge whether use PBO */
 
     /*
     ** Generic source info.
     */
+    GLubyte srcCompNumber;          /* component number before convert to RGB for Green and Blue */
+    GLenum srcFormat;               /* Format of source image */
     GLenum srcType;                 /* Form of source image */
     GLboolean srcPackedComp;        /* Speicial type, such as ushort565 */
     GLuint srcSizeOfPixel;
@@ -503,12 +566,10 @@ typedef struct __GLpixelTransferInfoRec{
     GLboolean dstNeedFree;
 }__GLpixelTransferInfo;
 
-typedef enum __GLPixelTransferOperations {
-    __GL_TexImage = 0,
-    __GL_ReadPixels,
-    __GL_ReadPixelsPre,
-    __GL_CopyPixels
-} __GLPixelTransferOperations;
+typedef struct __GLpixelTransferDealFuncRec {
+    __GLPixelTransferConfiguration config;
+    GLvoid (*deal)(__GLcontext *gc, __GLpixelTransferInfo *transferInfo, GLenum *type);
+} __GLpixelTransferDealFunc;
 
 typedef enum __GLParameterTypeJudge{
     __GL_InputFormat=0,
@@ -522,10 +583,13 @@ extern GLvoid __glLoadPackModes(__GLcontext *gc, __GLpixelSpanInfo *spanInfo);
 extern GLvoid __glGenericPixelTransfer(__GLcontext *gc, GLsizei width, GLsizei height,  GLsizei depth, __GLformatInfo *formatInfo, GLenum format, GLenum *type, const GLvoid *buf, __GLpixelTransferInfo *transferInfo, GLenum pixelTransferOperations);
 extern __GLformatInfo* __glGetFormatInfo(GLenum internalFormat);
 extern GLuint __glPixelSize(__GLcontext *gc, GLenum format, GLenum type);
-extern GLvoid __glGetSizeAndNumOfElement(GLenum format, GLenum type, __GLpixelTransferInfo *transferInfo);
-extern GLvoid __glMemoryAlignment(GLenum baseFmt, GLenum srcType, GLenum dstType, __GLpixelTransferInfo *transferInfo, GLenum __GLPixelTransferOperations);
-extern GLvoid __glGetSizeOfBuffer(__GLtextureObject *tex, GLint face, GLint level , __GLmipMapLevel *mipmap, GLuint *width, GLuint *height, GLuint *depth);
+extern GLvoid __glGetSizeOfElement(GLenum type, GLuint *sizeOfElement);
+extern GLvoid __glGetNumOfElement(GLenum format, GLubyte *compNumOfElement);
+extern GLint __glBytesPerElement(GLenum type);
+extern GLint __glElementsPerGroup(GLenum format, GLenum type);
+extern GLvoid __glMemoryAlignment(__GLpixelTransferInfo *transferInfo);
 extern GLboolean __glCheckSpecialFormat(GLenum internalFormat, GLenum format, GLenum* type);
+extern GLvoid __gl_doSwizzleForSpecialFormat(__GLpixelTransferInfo *transferInfo, GLenum * format);
 
 /*data types which aren't defined by spec. but supported by Vivante internal*/
 #define __GL_UNSIGNED_BYTE_4_4_REV_VIVPRIV                   0x1FFFF

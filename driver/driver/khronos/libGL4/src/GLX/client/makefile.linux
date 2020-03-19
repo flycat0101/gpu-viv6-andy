@@ -11,6 +11,8 @@
 ##############################################################################
 
 
+##############################################################################
+
 # Makefile for GLX client
 
 ################################################################################
@@ -18,48 +20,28 @@
 #Include common definitions.
 include $(AQROOT)/makefile.linux.def
 
-DYNAMIC = 1
-
 TOPDIR = ../../..
 CLIENT_GLX_DIR = $(TOPDIR)/src/GLX/client
 
-CLIENT_GLX_SOURCE_FILES = \
-	glxcmds.c \
-	clientattrib.c \
-	compsize.c \
-	eval.c \
-	g_render.c \
-	g_single.c \
-	g_vendpriv.c \
-	glxext.c \
-	glx_pbuffer.c \
-	glx_query.c \
-	indirect_init.c \
-	glthread.c \
-	pixel.c \
-	pixelstore.c \
-	render2.c \
-	renderpix.c \
-	single2.c \
-	singlepix.c \
-	vertarr.c \
-	xfont.c \
-	dri_glx.c \
-	dri_util.c \
-	XF86dri.c \
-	g_api_entry.c \
-	g_pri_api_entry.c
+################################################################################
+# Define target module name.
 
-# compiler define
-GCC=$(CC)
+ifeq ($(gcdSTATIC_LINK), 1)
+  TARGET_MODULE     := $(OBJ_DIR)/libGL.a
+else
+  TARGET_MODULE     := $(OBJ_DIR)/libGL.so.1.2
+  TARGET_SONAME     := libGL.so.1.2
+  TARGET_LINKS      :=
+endif
 
-LIBDIR=-L$(SDK_DIR)/drivers -L$(ROOTFS_USR)/lib
-LLDLIBS = -lXdamage -lXfixes -lXext -lX11 -lpthread -lGAL -lglapi -lm  -ldl -ldrm
+INSTALL_DIR = $(SDK_DIR)/drivers
+
+LDLIBS = -L$(SDK_DIR)/drivers -lGAL -L$(ROOTFS_USR)/lib -lXdamage -lXfixes -lXext -lX11 -lpthread -lm  -ldl -ldrm
 
 ifeq ($(DEBUG),1)
-CFLAGS +=-g -O0 -DDEBUG -fPIC
+CFLAGS += -g -O0 -DDEBUG -fPIC
 else
-CFLAGS +=-O3 -fPIC -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
+CFLAGS += -O3 -fPIC -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
 endif
 
 CFLAGS += -D_LINUX_ -DPTHREADS -D_POSIX_SOURCE -D_POSIX_C_SOURCE=199309L -D_GNU_SOURCE -DUSE_DRM_MAP
@@ -75,7 +57,11 @@ INCLUDE += \
 	-I$(AQROOT)/sdk/inc \
 	-I$(AQROOT)/driver/khronos/libEGL/inc \
 	-I$(AQROOT)/driver/khronos/libEGL/source \
-	-I$(TOPDIR)/include -I$(TOPDIR)/include/backend -I$(TOPDIR)/include/dri -I$(TOPDIR)/include/gl  -I$(TOPDIR)/include/glcore \
+	-I$(TOPDIR)/include \
+	-I$(TOPDIR)/include/backend \
+	-I$(TOPDIR)/include/dri \
+	-I$(TOPDIR)/include/gl \
+	-I$(TOPDIR)/include/glcore \
 	-I$(ROOTFS_USR)/include/X11/extensions \
 	-I$(ROOTFS_USR)/include \
 	-I$(ROOTFS_USR)/include/pixman-1
@@ -83,16 +69,15 @@ INCLUDE += \
 ifeq ($(X11_DRI3),1)
 INCLUDE += -I$(AQROOT)/driver/X/libdrm-2.4.91/include/drm \
            -I$(AQROOT)/driver/X/libdrm-2.4.91/vivante
-LLDLIBS += -lX11-xcb -ldrm_vivante -lxcb -lxcb-shm -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync
+LDLIBS += -lX11-xcb -ldrm_vivante -lxcb -lxcb-shm -lxcb-dri3 -lxcb-present -lxshmfence -lxcb-sync
 else
 INCLUDE += -I$(ROOTFS_USR)/include/libdrm
 endif
 
 CFLAGS += $(INCLUDE)
 
-TARGET_NAME=libGL.so.1.2
-INSTALL_DIR = $(SDK_DIR)/drivers
-TARGET_OUTPUT=$(OBJ_DIR)/$(TARGET_NAME)
+################################################################################
+# Describe object files.
 
 OBJECTS = \
 	$(OBJ_DIR)/glxcmds.o \
@@ -122,32 +107,61 @@ OBJECTS = \
 	$(OBJ_DIR)/g_api_entry.o \
 	$(OBJ_DIR)/g_pri_api_entry.o
 
+################################################################################
+# Define flags for the linker.
 
+LDFLAGS := $(LFLAGS)
+LDFLAGS += -Wl,--version-script=GLSymExport
+LDFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
 
+################################################################################
+# Define targets.
 
-LFLAGS += -Wl,--version-script=GLSymExport $(LIBDIR)
+.PHONY: all clean install
 
-install: extra_install
+all: $(TARGET_MODULE)
 
-include $(AQROOT)/common.target
+clean:
+	@rm -rf $(OBJ_DIR)
 
-.PHONY: extra_install
-extra_install: $(TARGET_OUTPUT)
+install: all
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
 	@mkdir -p $(SDK_DIR)/include/GL
 	@-cp -f $(AQROOT)/sdk/inc/GL/*.h $(SDK_DIR)/include/GL
-	-cd $(OBJ_DIR); ln -sf $(TARGET_NAME) libGL.so; ln -sf $(TARGET_NAME) libGL.so.1
-	cd $(SDK_DIR)/drivers; rm -f libGL.so libGL.so.1; ln -s $(TARGET_NAME) libGL.so; ln -s $(TARGET_NAME) libGL.so.1
+	-cd $(OBJ_DIR); ln -sf $(TARGET_SONAME) libGL.so; ln -sf $(TARGET_SONAME) libGL.so.1
+	cd $(SDK_DIR)/drivers; rm -f libGL.so libGL.so.1; ln -s $(TARGET_SONAME) libGL.so; ln -s $(TARGET_SONAME) libGL.so.1
 
+################################################################################
+# Module rules.
 
+ifeq ($(gcdSTATIC_LINK),1)
+$(TARGET_MODULE): $(OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $@ $(OBJECTS)
+ifneq ($(USE_ARMCC), 1)
+	@$(RANLIB) $@
+endif
+
+else
 
 # module dependencies
-$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
-                             $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.a) \
-                  $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so \
-                             $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.a)
+$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so) \
+                  $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so)
 
-
-$(TARGET_OUTPUT): $(OBJECTS)
+$(TARGET_MODULE): $(OBJECTS)
 	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
-	@$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LLDLIBS)
+	@$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
+endif
+
+################################################################################
+# Object rules.
+
+$(OBJ_DIR)/%.o: %.c
+	@echo "  COMPILE $(abspath $<)"
+	@mkdir -p $(OBJ_DIR)
+	@$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+# object dependencies.
+-include $(OBJECTS:.o=.d)
 

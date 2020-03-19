@@ -11,7 +11,6 @@
 *****************************************************************************/
 
 
-#include "gc_es_types.h"
 #include "gc_es_context.h"
 
 extern GLvoid __gllc_InvalidValue(__GLcontext *gc);

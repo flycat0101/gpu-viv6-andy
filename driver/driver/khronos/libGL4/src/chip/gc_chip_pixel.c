@@ -101,6 +101,7 @@ gcChipProcessPixelStore(
     __GLpixelPackMode *packMode,
     gctSIZE_T width,
     gctSIZE_T height,
+    gctSIZE_T border,
     GLenum format,
     GLenum type,
     gctSIZE_T skipImgs,
@@ -114,9 +115,9 @@ gcChipProcessPixelStore(
     gctSIZE_T imgLength = packMode->lineLength  ? (gctSIZE_T)packMode->lineLength  : width;
     gctSIZE_T imgHeight = packMode->imageHeight ? (gctSIZE_T)packMode->imageHeight : height;
 
-    gcmHEADER_ARG("gc=0x%x packMode=0x%x width=%u height=%u format=0x%04x type=0x%04x "
+    gcmHEADER_ARG("gc=0x%x packMode=0x%x width=%u height=%u border=%u format=0x%04x type=0x%04x "
                   "skipImgs=%u pRowStride=0x%x pImgHeight=0x%x pSkipBytes=0x%x",
-                  gc, packMode, width, height, format, type, skipImgs,
+                  gc, packMode, width, height, border, format, type, skipImgs,
                   pRowStride, pImgHeight, pSkipBytes);
 
     /* pixel store unpack parameters */
@@ -139,8 +140,8 @@ gcChipProcessPixelStore(
         gctSIZE_T imgStride = rowStride * imgHeight;
 
         *pSkipBytes = skipImgs * imgStride                /* skip images */
-                    + packMode->skipLines * rowStride     /* skip lines */
-                    + packMode->skipPixels * bpp / 8;     /* skip pixels */
+                    + (packMode->skipLines + border) * rowStride     /* skip lines */
+                    + (packMode->skipPixels + border) * bpp / 8;     /* skip pixels */
     }
 
     gcmFOOTER_NO();
@@ -1574,6 +1575,7 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
     pDispatchTable->MultiTexCoord2f(gc, GL_TEXTURE0 + texStage, 1, 0 );
     pDispatchTable->Vertex3fv(gc, (GLfloat *)&vertex);
     pDispatchTable->End(gc);
+    pDispatchTable->Disable(gc, GL_TEXTURE_2D);      /* Disable texture */
 
     pDispatchTable->Flush(gc);
 
@@ -1806,8 +1808,26 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
     gctPOINTER dstData;
     gcsSURF_VIEW srcView;
     gcsSURF_VIEW tmpView = {gcvNULL, 0, 1};
-
+    __GLchipVertexBufferInfo *packBufInfo = gcvNULL;
+    __GLbufferObject *packBufObj = gcvNULL;
+    gctUINT32 physicalAddress = gcvINVALID_ADDRESS;
+    gctPOINTER logicalAddress = buf;
+    gctSIZE_T skipOffset = 0;
     gceSTATUS status = gcvSTATUS_OK;
+
+    /* The image is from pack buffer object? */
+    packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
+    if (packBufObj)
+    {
+        packBufInfo = (__GLchipVertexBufferInfo *)(packBufObj->privateData);
+        GL_ASSERT(packBufInfo);
+        gcmONERROR(gcoBUFOBJ_Lock(packBufInfo->bufObj, &physicalAddress, &logicalAddress));
+        gcmONERROR(gcoBUFOBJ_GetFence(packBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
+
+        skipOffset += __GL_PTR2SIZE(buf);
+        physicalAddress += (gctUINT32)skipOffset;
+    }
+    logicalAddress = (gctPOINTER)((gctINT8_PTR)logicalAddress + skipOffset);
 
     srcView = chipCtx->readDepthView.surf ? gcChipFboSyncFromShadowSurface(gc, &chipCtx->readDepthView, GL_TRUE):
         gcChipFboSyncFromShadowSurface(gc, &chipCtx->readStencilView, GL_TRUE);
@@ -1887,7 +1907,15 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
 
     gcmONERROR(gcoSURF_Lock(tmpView.surf, gcvNULL, srcData));
 
-    dstData = buf; sx = 0; sy = 0;
+    if (packBufObj)
+    {
+        dstData = logicalAddress;
+    }
+    else
+    {
+        dstData = buf;
+    }
+    sx = 0; sy = 0;
     w = Width;
     h = Height;
 
@@ -2012,7 +2040,7 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
             CONVERT_DEPTH_PIXELS(gctFLOAT, D32F_S8_1_G32R32F, CONVERT_DEPTH_ONLY);
             break;
         case GL_UNSIGNED_INT:
-            dstStride = width * 8;
+            dstStride = width * 4;
             CONVERT_DEPTH_PIXELS(gctUINT32, D32F_S8_1_G32R32F, CONVERT_STENCIL_ONLY);
             break;
         default:
@@ -2038,7 +2066,14 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
     gcoSURF_Unlock(tmpView.surf, gcvNULL);
 
 OnError:
-
+    if (packBufInfo && gcvINVALID_ADDRESS != physicalAddress) /* The image is from pack buffer object */
+    {
+        /* CPU cache will not be flushed in HAL, bc HAL only see wrapped user pool surface.
+        ** Instead it will be flushed when unlock the packed buffer as non-user pool node.
+        */
+        gcmVERIFY_OK(gcoBUFOBJ_Unlock(packBufInfo->bufObj));
+        gcmVERIFY_OK(gcoBUFOBJ_CPUCacheOperation(packBufInfo->bufObj, gcvCACHE_CLEAN));
+    }
     if (tmpView.surf != gcvNULL)
     {
         gcoSURF_Destroy(tmpView.surf);
@@ -2078,6 +2113,7 @@ __glChipReadPixels(
     GLuint lineLength = ps->packModes.lineLength ? ps->packModes.lineLength : (GLuint)width;
     GLuint imageHeight = ps->packModes.imageHeight ? ps->packModes.imageHeight : (GLuint)height;
     __GLformatInfo *formatInfo;
+    __GLpixelTransferInfo transferInfo;
 #ifdef OPENGL40
     GLboolean RGBFloat = GL_FALSE;
     gceSURF_FORMAT floatFmt = gcvSURF_UNKNOWN;
@@ -2089,6 +2125,12 @@ __glChipReadPixels(
 
     gcmHEADER_ARG("gc=0x%x x=%d y=%d width=%d height=%d format=0x%04x type=0x%04x buf=%x",
                    gc, x, y, width, height, format, type, buf);
+
+    /* The image is from pack buffer object? */
+    packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
+    memset(&transferInfo, 0 ,sizeof(__GLpixelTransferInfo));
+    transferInfo.isPBO = packBufObj;
+    transferInfo.applyPixelTransfer = GL_FALSE;
 
     /* If chipCtx->readRT is a shadow surface, we should sync it to master resource
     ** And read pixels from master resource, as shadow resource may have different
@@ -2128,8 +2170,6 @@ __glChipReadPixels(
         srcView.numSlices = 1;
     }
 
-    __glGetWrapFormat(format ,type, &wrapformat);
-
     /* Check if framebuffer is complete */
     if (READ_FRAMEBUFFER_BINDING_NAME == 0)
     {
@@ -2145,6 +2185,12 @@ __glChipReadPixels(
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+    if (packBufObj)
+    {
+        __gl_doSwizzleForSpecialFormat(&transferInfo, &format);
+        __glGenericPixelTransfer(gc, width, height, 1, formatInfo, format, &type, gcvNULL, &transferInfo, __GL_ReadPixelsPre);
+    }
+    __glGetWrapFormat(format ,type, &wrapformat);
 
     if (gcvSURF_UNKNOWN == wrapformat)
     {
@@ -2152,11 +2198,9 @@ __glChipReadPixels(
         wrapformat = formatMapInfo->requestFormat;
     }
 
-    gcChipProcessPixelStore(gc, &ps->packModes, (gctSIZE_T)width, (gctSIZE_T)height,
+    gcChipProcessPixelStore(gc, &ps->packModes, (gctSIZE_T)width, (gctSIZE_T)height, 0,
                             format, type, 0, gcvNULL, gcvNULL, &skipOffset);
 
-    /* The image is from pack buffer object? */
-    packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
     if (packBufObj)
     {
         packBufInfo = (__GLchipVertexBufferInfo *)(packBufObj->privateData);
@@ -2204,7 +2248,7 @@ __glChipReadPixels(
     /*
     ** Set Non-Linear space for SRGB8_ALPHA8
     */
-    if (formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8)
+    if ((formatInfo->drvFormat == __GL_FMT_SRGB8) || (formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8))
     {
         gcmONERROR(gcoSURF_SetColorSpace(dstView.surf, gcvSURF_COLOR_SPACE_NONLINEAR));
     }
@@ -2237,14 +2281,26 @@ __glChipReadPixels(
 
         if (packBufObj)
         {
-            if (gcmIS_SUCCESS(gcoSURF_ResolveRect(&srcView, &dstView, &rlvArgs)))
+            transferInfo.dstImage = dstView.surf->node.logical;
+
+            if (transferInfo.srcImage)
             {
-                break;
+                dstView.surf->node.logical = (gctUINT8_PTR)transferInfo.srcImage;
             }
         }
         gcmERR_BREAK(gcoSURF_CopyPixels(&srcView, &dstView, &rlvArgs));
     }
     while (gcvFALSE);
+
+    if (GL_TRUE == transferInfo.applyPixelTransfer)
+    {
+        __glGenericPixelTransfer(gc, width, height, 1, formatInfo, format, &type, gcvNULL, &transferInfo, __GL_ReadPixels);
+    }
+
+    if ((GL_TRUE == transferInfo.srcNeedFree) && (gcvNULL != transferInfo.srcImage)){
+    (*gc->imports.free)(gc, (void*)transferInfo.srcImage);
+    transferInfo.srcImage = gcvNULL;
+    }
 
 #ifdef OPENGL40
     if (gc->imports.conformGLSpec && RGBFloat)

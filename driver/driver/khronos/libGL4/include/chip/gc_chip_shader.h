@@ -316,6 +316,8 @@ typedef enum __GLchipUniformSubUsageRec
 
     __GL_CHIP_UNIFORM_SUB_USAGE_RT_IMAGE,
 
+    __GL_CHIP_UNIFORM_SUB_USAGE_ENABLE_CLIP_DISTANCE,
+
     __GL_CHIP_UNIFORM_SUB_USAGE_LAST
 } __GLchipUniformSubUsage;
 
@@ -567,6 +569,7 @@ typedef struct __GLchipSLInputRec
     gctBOOL             isPerPatch;
     gctBOOL             isSampleIn;
     gctBOOL             isDirectPosition;
+    gctBOOL             isLocationSetByDriver;
 } __GLchipSLInput;
 
 typedef struct __GLchipSLLocationRec
@@ -733,14 +736,19 @@ typedef struct __GLchipProgramFlagsRec
 
     gctUINT outputHighpConversion   : 1;
 
+    gctUINT helperInvocationCheck   : 1;
+    gctUINT wideLineFix             : 1;
+
+    /* Link flags. */
     gctUINT VIRCGNone               : 1;    /* for compile-time purpose */
     gctUINT VIRCGOne                : 1;    /* for compile-time purpose */
     gctUINT disableInline           : 1;
     gctUINT deqpMinCompTime         : 1;    /* for compile-time purpose */
 
-    gctUINT helperInvocationCheck   : 1;
+    /* Compile flags. */
+    gctUINT disableLoopUnrolling    : 1;
 
-    gctUINT reserved                : 10;
+    gctUINT reserved                : 8;
 
 
 } __GLchipProgramFlags;
@@ -861,6 +869,7 @@ struct __GLchipSLProgramRec
     GLuint                              inMaxNameLen;
     __GLchipSLInput*                    inputs;
 
+    gctBOOL                             mayHasAliasedAttrib;
     __GLchipSLBinding*                  attribBinding;
     __GLchipSLLocation*                 attribLocation;
     /* The table maps app visible location to program attrib index */
@@ -891,6 +900,9 @@ struct __GLchipSLProgramRec
 
     /* Bit-mask to record which samplers are of any shadow type, they need to be recompiled */
     __GLbitmask                         shadowSamplerMask;
+
+    /* Bit-mask to record which samplers used as texelFetch and related builtin functions */
+    __GLbitmask                         texelFetchSamplerMask;
 
     /* The array is indexed by HAL sampler physical index, which should be same as HW's sampler index */
     __GLchipSampler                     samplerMap[__GL_MAX_GLSL_SAMPLERS];

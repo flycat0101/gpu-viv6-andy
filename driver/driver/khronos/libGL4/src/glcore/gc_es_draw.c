@@ -327,6 +327,12 @@ GLvoid __glSetAttributeStatesDirty(__GLcontext *gc)
         gc->globalDirtyState[index] = (GLbitfield)(-1);
     }
 
+    /* Initialize light attribute state bits */
+    for (index = 0; index < __GL_MAX_LIGHT_NUMBER; index++)
+    {
+        gc->lightAttrState[index] = (GLbitfield)(-1);
+    }
+
     __glBitmaskSetAll(&gc->texUnitAttrDirtyMask, GL_TRUE);
     __glBitmaskSetAll(&gc->imageUnitDirtyMask, GL_TRUE);
 
@@ -1142,6 +1148,7 @@ __GL_INLINE GLvoid __glEvaluateTextureAttrib(__GLcontext* gc, __GLattribute* cs,
                         __GL_CHECK_SAMPLER_PARAM1(__GL_TEXPARAM_COMPARE_MODE_BIT, compareMode);
                         __GL_CHECK_SAMPLER_PARAM1(__GL_TEXPARAM_COMPARE_FUNC_BIT, compareFunc);
                         __GL_CHECK_SAMPLER_PARAM1(__GL_TEXPARAM_SRGB_BIT, sRGB);
+                        __GL_CHECK_SAMPLER_PARAM1(__GL_TEXPARAM_LOD_BIAS_BIT, lodBias);
 
                         if (localMask & __GL_TEXPARAM_BORDER_COLOR_BIT)
                         {
@@ -1600,6 +1607,11 @@ __GL_INLINE GLboolean __glDrawEnd(__GLcontext *gc)
         __glBitmaskSetAll(&gc->shaderProgram.samplerMapDirty, GL_FALSE);
         gc->shaderProgram.samplerStateDirty = gc->shaderProgram.samplerStateKeepDirty;
         __glBitmaskSetAll(&gc->shaderProgram.samplerStateKeepDirty, GL_FALSE);
+        if (!gc->imports.conformGLSpec)
+        {
+            gc->shaderProgram.samplerPrevTexelFetchDirty = gc->shaderProgram.samplerTexelFetchDirty;
+            __glBitmaskSetAll(&gc->shaderProgram.samplerTexelFetchDirty, GL_FALSE);
+        }
 
         if (gc->globalDirtyState[__GL_ALL_ATTRS])
         {
@@ -1863,9 +1875,9 @@ GLvoid  __glDrawPrimitive(__GLcontext *gc, GLenum mode)
         __GL_SET_VARRAY_MODE_BIT(gc);
     }
 
-#ifdef OPENGL40
     if(gc->imports.conformGLSpec)
     {
+#ifdef OPENGL40
         if (gc->vertexStreams.primMode != mode)
         {
             gc->vertexStreams.primMode = mode;
@@ -1877,7 +1889,14 @@ GLvoid  __glDrawPrimitive(__GLcontext *gc, GLenum mode)
         {
             if (!__glCheckVBOSize(gc))
            {
-               __GL_ERROR_RET(GL_INVALID_OPERATION);
+               if (gc->vertexArray.fromDrawXFB)
+               {
+                   /* VIV TODO: Comment this in case some XFB errors, it will be uncomment later. */
+               }
+               else
+               {
+                   __GL_ERROR_RET(GL_INVALID_OPERATION);
+               }
            }
 
            if (__GLSL_MODE_GRAPHICS != gc->shaderProgram.mode)
@@ -1965,6 +1984,11 @@ GLvoid  __glDrawImmedPrimitive(__GLcontext *gc)
 
     ENTERFUNC_TM();
     mode = (gc->input.indexCount ? indexPrimMode[gc->input.primMode] : gc->input.primMode);
+
+    if (GL_POINT == gc->state.polygon.frontMode)
+    {
+        mode = GL_POINTS;
+    }
 
     if (mode != gc->vertexStreams.primMode)
     {
@@ -2115,6 +2139,12 @@ GLvoid __glDrawDlistPrimitive(__GLcontext *gc, __GLPrimBegin *primBegin)
     indexedPrim = ((bothFaceFill || primBegin->primType <= GL_LINE_STRIP) && primBegin->indexCount > 0);
 
     mode = (indexedPrim) ? indexPrimModeDL[primBegin->primType] : primBegin->primType;
+
+    if (mode >= GL_TRIANGLES)
+    {
+        mode = (!bothFaceFill) ? GL_LINE_LOOP : mode;
+    }
+
     if (mode != gc->vertexStreams.primMode)
     {
         gc->vertexStreams.primMode = mode;
@@ -2211,6 +2241,12 @@ __GL_INLINE GLboolean __glComputeEnd(__GLcontext *gc)
     __glBitmaskSetAll(&gc->shaderProgram.samplerMapDirty, GL_FALSE);
     gc->shaderProgram.samplerStateDirty = gc->shaderProgram.samplerStateKeepDirty;
     __glBitmaskSetAll(&gc->shaderProgram.samplerStateKeepDirty, GL_FALSE);
+
+    if(!gc->imports.conformGLSpec)
+    {
+        gc->shaderProgram.samplerPrevTexelFetchDirty = gc->shaderProgram.samplerTexelFetchDirty;
+        __glBitmaskSetAll(&gc->shaderProgram.samplerTexelFetchDirty, GL_FALSE);
+    }
 
     __glBitmaskSetAll(&gc->texUnitAttrDirtyMask, GL_FALSE);
     __glBitmaskSetAll(&gc->imageUnitDirtyMask, GL_FALSE);

@@ -281,10 +281,24 @@ gcChipClearDepthAndStencil(
         */
         GL_ASSERT(!dsView || !dsView->surf || dsView->surf == chipCtx->drawStencilView.surf);
 
-        dsView = &chipCtx->drawStencilView;
-        clearArg.flags |= gcvCLEAR_STENCIL;
-        clearArg.stencil = (gc->state.stencil.clear & chipCtx->drawStencilMask);
-        clearArg.stencilMask = (gc->state.stencil.front.writeMask & 0xFF);
+        /*for es20 depth/stencil clear which surface are not same , only clear depth surface,
+        if the format has stencil component can both clear*/
+        if (!gc->imports.conformGLSpec && dsView && dsView->surf && dsView->surf != chipCtx->drawStencilView.surf)
+        {
+            if (dsView->surf->hasStencilComponent == gcvTRUE)
+            {
+                clearArg.flags |= gcvCLEAR_STENCIL;
+                clearArg.stencil = (gc->state.stencil.clear & chipCtx->drawStencilMask);
+                clearArg.stencilMask = (gc->state.stencil.front.writeMask & 0xFF);
+            }
+        }
+        else
+        {
+            dsView = &chipCtx->drawStencilView;
+            clearArg.flags |= gcvCLEAR_STENCIL;
+            clearArg.stencil = (gc->state.stencil.clear & chipCtx->drawStencilMask);
+            clearArg.stencilMask = (gc->state.stencil.front.writeMask & 0xFF);
+        }
 
         if ((!gcoSURF_QueryFlags(dsView->surf, gcvSURF_FLAG_CONTENT_PRESERVED)) &&
             (!gcoSURF_QueryFlags(dsView->surf, gcvSURF_FLAG_CONTENT_UPDATED))
@@ -810,10 +824,25 @@ __glChipClearBufferfi(
         ** We only support stencil buffer packed with depth buffer.
         */
         GL_ASSERT(!dsView || !dsView->surf || dsView->surf == chipCtx->drawStencilView.surf);
-        dsView = &chipCtx->drawStencilView;
-        clearArg.flags |= gcvCLEAR_STENCIL;
-        clearArg.stencil = stencil;
-        clearArg.stencilMask = (gc->state.stencil.front.writeMask & 0xFF);
+
+        /*for es20 depth/stencil clear which surface are not same , only clear depth surface,
+        if the format has stencil component can both clear*/
+        if (!gc->imports.conformGLSpec && dsView && dsView->surf && dsView->surf != chipCtx->drawStencilView.surf)
+        {
+            if (dsView->surf->hasStencilComponent == gcvTRUE)
+            {
+                clearArg.flags |= gcvCLEAR_STENCIL;
+                clearArg.stencil = stencil;
+                clearArg.stencilMask = (gc->state.stencil.front.writeMask & 0xFF);
+            }
+        }
+        else
+        {
+            dsView = &chipCtx->drawStencilView;
+            clearArg.flags |= gcvCLEAR_STENCIL;
+            clearArg.stencil = stencil;
+            clearArg.stencilMask = (gc->state.stencil.front.writeMask & 0xFF);
+        }
     }
 
     if (dsView && dsView->surf)

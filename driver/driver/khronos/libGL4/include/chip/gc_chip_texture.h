@@ -26,6 +26,7 @@ typedef struct __GLchipDirectTextureRec
     gctBOOL         dirty;              /* Direct texture change flag. */
     gcoSURF         source;             /* Surface exposed to the user. */
     gctBOOL         directSample;
+    gctBOOL         directRender;
     gceSURF_FORMAT  textureFormat;      /* closet texture format if indirect sampling. */
 } __GLchipDirectTexture;
 

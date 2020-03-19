@@ -572,6 +572,7 @@ gceSTATUS gcChipLoadFixFunctionShader(
                 chipCtx->hal,
                 &chipCtx->currProgram->programState
                 ));
+            chipCtx->programDirty = GL_FALSE;
         } else {
             /* Shader switched from GLSH to fix function */
             if (chipCtx->programDirty) {

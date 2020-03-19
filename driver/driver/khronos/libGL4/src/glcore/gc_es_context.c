@@ -744,6 +744,7 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable)
         {
             glDrawable->gc = gcvNULL;
             glDrawable->privateData = gcvNULL;
+            glDrawable->flags = 0;
 #ifdef OPENGL40
             glDrawable->pbufferTex = gcvNULL;
 #endif
@@ -1202,6 +1203,8 @@ GLvoid __glInitContextState(__GLcontext *gc)
     gc->invalidCommonCommit = gcvTRUE;
     gc->invalidDrawCommit = gcvTRUE;
     gc->conditionalRenderDiscard = gcvFALSE;
+    gc->snorm8Flag = gcvFALSE;
+    gc->snorm16Flag = gcvFALSE;
 
     /* Some init functions should be isolated from ES3, TO DO */
     __glInitCurrentState(gc);
@@ -1251,7 +1254,7 @@ GLvoid __glInitContextState(__GLcontext *gc)
 
 GLvoid __glOverturnCommitStates(__GLcontext *gc)
 {
-    GLuint i;
+    GLuint i, j;
     __GLattribute *pState = &gc->state;
     __GLattribute *pCommit = &gc->commitState;
     GLubyte *puState = (GLubyte*)pState;
@@ -1284,25 +1287,130 @@ GLvoid __glOverturnCommitStates(__GLcontext *gc)
         pCommit->raster.colorMask[i].alphaMask = !pState->raster.colorMask[i].alphaMask;
         pCommit->enables.colorBuffer.blend[i]  = !pState->enables.colorBuffer.blend[i];
     }
+    pCommit->raster.mrtEnable = !pState->raster.mrtEnable;
+
     for (i = 0; i < __GL_MAX_IMAGE_UNITS; ++i)
     {
         pCommit->image.imageUnit[i].invalid = !pState->image.imageUnit[i].invalid;
         pCommit->image.imageUnit[i].layered = !pState->image.imageUnit[i].layered;
         pCommit->image.imageUnit[i].singleLayered = !pState->image.imageUnit[i].singleLayered;
     }
-    pCommit->raster.mrtEnable = !pState->raster.mrtEnable;
+
     pCommit->depth.writeEnable = !pState->depth.writeEnable;
+
+    pCommit->enables.colorBuffer.dither = !pState->enables.colorBuffer.dither;
+#ifdef OPENGL40
+    pCommit->enables.colorBuffer.alphaTest = !pState->enables.colorBuffer.alphaTest;
+    pCommit->enables.colorBuffer.logicOp = !pState->enables.colorBuffer.logicOp;
+    pCommit->enables.colorBuffer.colorLogicOp = !pState->enables.colorBuffer.colorLogicOp;
+    pCommit->enables.colorBuffer.indexLogicOp = !pState->enables.colorBuffer.indexLogicOp;
+#endif
+
+    pCommit->enables.polygon.cullFace = !pState->enables.polygon.cullFace;
+    pCommit->enables.polygon.polygonOffsetFill = !pState->enables.polygon.polygonOffsetFill;
+#ifdef OPENGL40
+    pCommit->enables.polygon.smooth = !pState->enables.polygon.smooth;
+    pCommit->enables.polygon.stipple = !pState->enables.polygon.stipple;
+    pCommit->enables.polygon.polygonOffsetPoint = !pState->enables.polygon.polygonOffsetPoint;
+    pCommit->enables.polygon.polygonOffsetLine = !pState->enables.polygon.polygonOffsetLine;
+#endif
+
+    pCommit->enables.multisample.alphaToCoverage = !pState->enables.multisample.alphaToCoverage;
+    pCommit->enables.multisample.coverage = !pState->enables.multisample.coverage;
+    pCommit->enables.multisample.sampleMask = !pState->enables.multisample.sampleMask;
+    pCommit->enables.multisample.sampleShading = !pState->enables.multisample.sampleShading;
+#ifdef OPENGL40
+    pCommit->enables.multisample.multisampleOn = !pState->enables.multisample.multisampleOn;
+    pCommit->enables.multisample.alphaToOne = !pState->enables.multisample.alphaToOne;
+#endif
+
     pCommit->enables.scissorTest = !pState->enables.scissorTest;
     pCommit->enables.depthTest = !pState->enables.depthTest;
     pCommit->enables.stencilTest = !pState->enables.stencilTest;
     pCommit->enables.primitiveRestart = !pState->enables.primitiveRestart;
     pCommit->enables.rasterizerDiscard = !pState->enables.rasterizerDiscard;
-    pCommit->enables.colorBuffer.dither = !pState->enables.colorBuffer.dither;
-    pCommit->enables.polygon.cullFace = !pState->enables.polygon.cullFace;
-    pCommit->enables.polygon.polygonOffsetFill = !pState->enables.polygon.polygonOffsetFill;
-    pCommit->enables.multisample.alphaToCoverage = !pState->enables.multisample.alphaToCoverage;
-    pCommit->enables.multisample.coverage = !pState->enables.multisample.coverage;
-    pCommit->enables.multisample.sampleMask = !pState->enables.multisample.sampleMask;
+
+#ifdef OPENGL40
+    pCommit->enables.transform.normalize = !pState->enables.transform.normalize;
+    pCommit->enables.transform.rescaleNormal = !pState->enables.transform.rescaleNormal;
+
+    pCommit->enables.lighting.lighting = !pState->enables.lighting.lighting;
+    pCommit->enables.lighting.colorMaterial = !pState->enables.lighting.colorMaterial;
+    for (i = 0; i < __GL_MAX_LIGHT_NUMBER; i++)
+    {
+        pCommit->enables.lighting.light[i] = !pState->enables.lighting.light[i];
+    }
+
+    pCommit->enables.eval.autonormal = !pState->enables.eval.autonormal;
+    for (i = 0; i < __GL_MAP_RANGE_COUNT; i++)
+    {
+        pCommit->enables.eval.map1[i] = !pState->enables.eval.map1[i];
+        pCommit->enables.eval.map2[i] = !pState->enables.eval.map2[i];
+    }
+
+    for (i = 0; i < __GL_MAX_TEXTURE_UNITS; i++)
+    {
+        pCommit->enables.texUnits[i].texGen[0] = !pState->enables.texUnits[i].texGen[0];
+        pCommit->enables.texUnits[i].texGen[1] = !pState->enables.texUnits[i].texGen[1];
+        pCommit->enables.texUnits[i].texGen[2] = !pState->enables.texUnits[i].texGen[2];
+        pCommit->enables.texUnits[i].texGen[3] = !pState->enables.texUnits[i].texGen[3];
+        pCommit->enables.texUnits[i].texture1D = !pState->enables.texUnits[i].texture1D;
+        pCommit->enables.texUnits[i].texture2D = !pState->enables.texUnits[i].texture2D;
+        pCommit->enables.texUnits[i].texture3D = !pState->enables.texUnits[i].texture3D;
+        pCommit->enables.texUnits[i].textureCubeMap = !pState->enables.texUnits[i].textureCubeMap;
+        pCommit->enables.texUnits[i].textureRec = !pState->enables.texUnits[i].textureRec;
+    }
+
+    pCommit->enables.depthBuffer.test = !pState->enables.depthBuffer.test;
+
+    pCommit->enables.line.smooth = !pState->enables.line.smooth;
+    pCommit->enables.line.stipple = !pState->enables.line.stipple;
+    pCommit->enables.line.stippleRequested = !pState->enables.line.stippleRequested;
+
+    pCommit->enables.program.fragmentProgram = !pState->enables.program.fragmentProgram;
+    pCommit->enables.program.vertexProgram = !pState->enables.program.vertexProgram;
+    pCommit->enables.program.vpPointSize = !pState->enables.program.vpPointSize;
+    pCommit->enables.program.vpTwoSize = !pState->enables.program.vpTwoSize;
+
+    pCommit->enables.pointSmooth = !pState->enables.pointSmooth;
+    pCommit->enables.fog = !pState->enables.fog;
+    pCommit->enables.scissor = !pState->enables.scissor;
+    pCommit->enables.stencilTestTwoSideExt = !pState->enables.stencilTestTwoSideExt;
+    pCommit->enables.colorSum = !pState->enables.colorSum;
+    pCommit->enables.depthBoundTest = !pState->enables.depthBoundTest;
+    pCommit->enables.pointSprite = !pState->enables.pointSprite;
+#endif
+
+    pCommit->multisample.coverageInvert = !pState->multisample.coverageInvert;
+#ifdef OPENGL40
+    pCommit->multisample.alphaToCoverage = !pState->multisample.alphaToCoverage;
+    pCommit->multisample.alphaToOne = !pState->multisample.alphaToOne;
+    pCommit->multisample.coverage = !pState->multisample.coverage;
+#endif
+
+    for (i = 0; i < __GL_MAX_TEXTURE_UNITS; i++)
+    {
+        pCommit->texture.texUnits[i].commitParams.contentProtected = !pState->texture.texUnits[i].commitParams.contentProtected;
+#ifdef OPENGL40
+        pCommit->texture.texUnits[i].commitParams.sampler.generateMipmap = !pState->texture.texUnits[i].commitParams.sampler.generateMipmap;
+        pCommit->texture.texUnits[i].env.coordReplace = !pState->texture.texUnits[i].env.coordReplace;
+#endif
+        for (j = 0; j < __GL_MAX_TEXTURE_BINDINGS; j++)
+        {
+            pCommit->texture.texUnits[i].texObj[j].params.contentProtected = !pState->texture.texUnits[i].texObj[j].params.contentProtected;
+#ifdef OPENGL40
+            pCommit->texture.texUnits[i].texObj[j].params.sampler.generateMipmap = !pState->texture.texUnits[i].texObj[j].params.sampler.generateMipmap;
+#endif
+        }
+    }
+
+#ifdef OPENGL40
+    pCommit->rasterPos.validRasterPos = !pState->rasterPos.validRasterPos;
+
+    pCommit->pixel.transferMode.mapColor = !pState->pixel.transferMode.mapColor;
+    pCommit->pixel.transferMode.mapStencil = !pState->pixel.transferMode.mapStencil;
+#endif
+
 }
 
 #if gcdPATTERN_FAST_PATH
@@ -1505,7 +1613,7 @@ GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
     retVal = (*gc->dp.makeCurrent)(gc);
 
 #if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
-    if (gc->imports.conformGLSpec)
+    if (gc->imports.conformGLSpec && !gc->imports.fromEGL)
     {
         /* Get the latest drawable information */
         LINUX_LOCK_FRAMEBUFFER(gc);
@@ -1615,7 +1723,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
             break;
         default:
             GL_ASSERT(0);
-            __GL_ERROR_EXIT2();
+            __GL_EXIT();
         }
     }
     else  /* Runing OES api */
@@ -1637,7 +1745,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
             break;
         default:
             GL_ASSERT(0);
-            __GL_ERROR_EXIT2();
+            __GL_EXIT();
         }
     }
 
@@ -1652,7 +1760,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
     gc = (__GLcontext*)(*imports->calloc)(gc, 1, sizeof(__GLcontext));
     if (!gc)
     {
-        __GL_ERROR_EXIT2();
+        __GL_EXIT();
     }
 
     gc->imports = *imports;
@@ -1676,14 +1784,44 @@ GLvoid *__glCreateContext(GLint clientVersion,
 
     /* Fill in the export functions.
     */
-    gc->exports.createContext  = __glCreateContext;
-    gc->exports.destroyContext = __glDestroyContext;
-    gc->exports.setDrawable    = __glSetDrawable;
-    gc->exports.makeCurrent    = __glMakeCurrent;
-    gc->exports.loseCurrent    = __glLoseCurrent;
-    gc->exports.getThreadData  = __eglGetThreadEsPrivData;
-    gc->apiVersion   = apiVersion;
-    gc->shareCtx     = (__GLcontext*)sharedCtx;
+    if (gc->imports.conformGLSpec)
+    {
+        gc->exports.createContext  = __glCreateContext;
+        gc->exports.destroyContext = __glDestroyContext;
+        gc->exports.setDrawable    = __glSetDrawable;
+        gc->exports.makeCurrent    = __glMakeCurrent;
+        gc->exports.loseCurrent    = __glLoseCurrent;
+        gc->exports.getThreadData  = __eglGetThreadEsPrivData;
+        gc->apiVersion   = apiVersion;
+        gc->shareCtx     = (__GLcontext*)sharedCtx;
+    }
+
+    if (!gc->imports.conformGLSpec)
+    {
+        gc->apiVersion   = apiVersion;
+        gc->shareCtx     = (__GLcontext*)sharedCtx;
+        gc->contextFlags = 0;
+
+        if (imports->contextFlags & EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR)
+        {
+            gc->contextFlags |= GL_CONTEXT_FLAG_DEBUG_BIT_KHR;
+        }
+
+        /* Robust buffer access is enabled by creating a context with robust access enabled
+         * through the window system binding APIs.
+         * Robust buffer access behavior may be queried by calling  GetIntegerv with pname CONTEXT_FLAGS.
+         */
+        if ((imports->contextFlags & EGL_CONTEXT_OPENGL_ROBUST_ACCESS_BIT_KHR) ||
+            (imports->robustAccess == gcvTRUE))
+        {
+            gc->contextFlags |= GL_CONTEXT_FLAG_ROBUST_ACCESS_BIT;
+        }
+
+        if (imports->protectedContext)
+        {
+            gc->contextFlags |= GL_CONTEXT_FLAG_PROTECTED_CONTENT_BIT_EXT;
+        }
+    }
 
     /* Initialize the device constants with GL defaults.
     */
@@ -1709,7 +1847,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
     {
         (*imports->free)(gc, gc);
         gc = gcvNULL;
-        __GL_ERROR_EXIT2();
+        __GL_EXIT();
     }
 
 #if gcdPATTERN_FAST_PATH
@@ -1750,7 +1888,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
     __GL_FOOTER();
     return (gc);
 
-OnError:
+OnExit:
     if (gc)
     {
         (*imports->free)(gc, gc);

@@ -11,30 +11,73 @@
 ##############################################################################
 
 
-#
-# This is the SOURCES file for OpenGL code
-#
-include ../../makefile.linux.def
+#############################################################################
+# Include common definitions.
 
+include $(AQROOT)/makefile.linux.def
+
+ROOTDIR = $(AQROOT)/driver/khronos/libGL4
+
+################################################################################
+# Define target module name.
+
+ifeq ($(YOCTO_DRI_BUILD),1)
 ifeq ($(gcdSTATIC_LINK), 1)
-    STATIC = 1
+  TARGET_MODULE     := $(OBJ_DIR)/vivante_dri.a
 else
-    DYNAMIC = 1
+  TARGET_MODULE     := $(OBJ_DIR)/vivante_dri.so
+  TARGET_SONAME     := vivante_dri.so
+  TARGET_LINKS      :=
+endif
+else
+ifeq ($(gcdSTATIC_LINK), 1)
+  TARGET_MODULE     := $(OBJ_DIR)/libGL.a
+else
+  TARGET_MODULE     := $(OBJ_DIR)/libGL.so.1.2
+  TARGET_SONAME     := libGL.so.1.2
+  TARGET_LINKS      :=
+endif
 endif
 
-ifeq ($(EGL_API_FB), 1)
-ifeq ($(STATIC), 1)
-    TARGET_NAME = libGL.a
+################################################################################
+# Supply additional include directories and extra compile flags
+
+ifeq ($(DEBUG),1)
+CFLAGS += -g -O0 -fPIC
 else
-    TARGET_NAME = libGL.so.1.2
+CFLAGS += -O3 -fPIC
 endif
-else
-ifeq ($(STATIC), 1)
-    TARGET_NAME = vivante_dri.a
-else
-    TARGET_NAME = vivante_dri.so
-endif
-endif
+
+CFLAGS += -D_LINUX_ -D_GNU_SOURCE -DPTHREADS -D_POSIX_SOURCE -D_POSIX_C_SOURCE=199309L \
+          -DOPENGL40 -DDIRECT_TO_FB -DDISABLE_SWAP_THREAD -DUSE_CPU -D__declspec=""
+
+INCLUDE += \
+	-I$(AQROOT)/hal/inc \
+	-I$(AQROOT)/hal/user \
+	-I$(AQROOT)/hal/user/arch \
+	-I$(AQROOT)/hal/user/archvg \
+	-I$(AQROOT)/hal/os/linux/user \
+	-I$(AQROOT)/compiler/libVSC/include \
+	-I$(AQROOT)/sdk/inc/GL \
+	-I$(AQROOT)/sdk/inc \
+	-I$(AQROOT)/driver/khronos/libEGL/inc \
+	-I$(AQROOT)/driver/khronos/libEGL/source \
+	-I$(AQROOT)/driver/khronos/libGL4/src/glcore \
+	-I$(ROOTDIR)/include -I$(ROOTDIR)/include/backend -I$(ROOTDIR)/include/gl \
+	-I$(ROOTDIR)/include/dri -I$(ROOTDIR)/include/glcore \
+	-I$(ROOTDIR)/include/chip \
+	-I$(ROOTDIR)/include/dri \
+	-I$(AQROOT)/driver/X/libdrm-2.4.91/include/drm \
+	-I$(AQROOT)/driver/X/libdrm-2.4.91 \
+	-I$(ROOTFS_USR)/include/pixman-1 \
+	-I$(ROOTFS_USR)/include/libdrm \
+	-I$(ROOTFS_USR)/include \
+	$(OSINCLUDEDIR)
+
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Describe object files.
 
 OBJECTS :=  \
     $(OBJ_DIR)/gc_glcore_dri.o \
@@ -74,50 +117,134 @@ OBJECTS :=  \
     $(OBJ_DIR)/gc_gl_rect.o \
     $(OBJ_DIR)/gc_gl_select.o \
     $(OBJ_DIR)/gc_gl_varray.o \
-    $(OBJ_DIR)/gc_gl_xform.o
+    $(OBJ_DIR)/gc_gl_xform.o \
+    $(OBJ_DIR)/gc_gl_api_inline.o \
+    $(OBJ_DIR)/gc_gl_c2api.o \
+    $(OBJ_DIR)/gc_gl_capi.o \
+    $(OBJ_DIR)/gc_gl_cindex.o \
+    $(OBJ_DIR)/gc_gl_edgeflag.o \
+    $(OBJ_DIR)/gc_gl_fapi.o \
+    $(OBJ_DIR)/gc_gl_napi.o \
+    $(OBJ_DIR)/gc_gl_rapi.o \
+    $(OBJ_DIR)/gc_gl_tapi.o \
+    $(OBJ_DIR)/gc_gl_vapi.o \
+    $(OBJ_DIR)/gc_gl_dl_init.o \
+    $(OBJ_DIR)/gc_gl_dl_list.o \
+    $(OBJ_DIR)/gc_gl_dl_opt.o \
+    $(OBJ_DIR)/gc_gl_dl_utils.o \
+    $(OBJ_DIR)/gc_gl_dl_varray.o \
+    $(OBJ_DIR)/gc_gl_dl_varrayutil.o \
+    $(OBJ_DIR)/gc_gl_dl_vfcull.o \
+    $(OBJ_DIR)/g_lcomp.o \
+    $(OBJ_DIR)/g_lexec.o \
+    $(OBJ_DIR)/gc_chip_basic_types.o \
+    $(OBJ_DIR)/gc_chip_buffer.o \
+    $(OBJ_DIR)/gc_chip_clear.o \
+    $(OBJ_DIR)/gc_chip_codec.o \
+    $(OBJ_DIR)/gc_chip_context.o \
+    $(OBJ_DIR)/gc_chip_depth.o \
+    $(OBJ_DIR)/gc_chip_device.o \
+    $(OBJ_DIR)/gc_chip_draw.o \
+    $(OBJ_DIR)/gc_chip_drawable.o \
+    $(OBJ_DIR)/gc_chip_fbo.o \
+    $(OBJ_DIR)/gc_chip_misc.o \
+    $(OBJ_DIR)/gc_chip_patch.o \
+    $(OBJ_DIR)/gc_chip_pixel.o \
+    $(OBJ_DIR)/gc_chip_profiler.o \
+    $(OBJ_DIR)/gc_chip_hash.o \
+    $(OBJ_DIR)/gc_chip_fragment_shader.o \
+    $(OBJ_DIR)/gc_chip_func.o \
+    $(OBJ_DIR)/gc_chip_vertex_shader.o \
+    $(OBJ_DIR)/gc_chip_shader.o \
+    $(OBJ_DIR)/gc_chip_state.o \
+    $(OBJ_DIR)/gc_chip_texture.o \
+    $(OBJ_DIR)/gc_chip_utils.o
 
+################################################################################
+# Define flags for the linker.
 
-CFLAGS += -D_GNU_SOURCE
-
-# Specify Vivante library paths.
-LIBS += -L $(ROOTDIR)/src/chip/$(OBJ_DIR)
-LIBS += -L $(ROOTDIR)/src/glcore/api/$(OBJ_DIR)
-LIBS += -L $(ROOTDIR)/src/glcore/display_list/$(OBJ_DIR)
-LIBS += -lgl4chip -lgl4display_list -lgl4api
-
-ifeq ($(EGL_API_FB), 1)
-LIBS += -lVSC -lGAL -lm -lpthread
+LDFLAGS := $(LFLAGS)
 LDFLAGS += -Wl,--version-script=GL4SymExport
-INSTALL_DIR = $(SDK_DIR)/drivers
+LDFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
 
-install: extra_install
-else
-LIBS += -L $(ROOTDIR)/src/GLX/client/$(OBJ_DIR) -lGL
-LIBS += -lGAL -lVSC -lXext -lX11 -lXfixes -lXdamage -ldrm -lm -lpthread
-LFLAGS += -Wl,--version-script=glCoreSymExport
+################################################################################
+# Supply dependent libraries.
+
+ifeq ($(YOCTO_DRI_BUILD),1)
 INSTALL_DIR = $(SDK_DIR)/drivers/dri
+LDLIBS := -L$(ROOTDIR)/src/GLX/client/$(OBJ_DIR) -lGL \
+          -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL \
+          -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC \
+          -lXext -lX11 -lXfixes -lXdamage -ldrm -lm -lpthread
+else
+INSTALL_DIR = $(SDK_DIR)/drivers
+LDLIBS := -L$(SDK_DIR)/drivers \
+          -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL \
+          -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC \
+          -lm -lpthread
 endif
 
-include $(AQROOT)/common.target
+################################################################################
+# Define targets.
 
-ifeq ($(EGL_API_FB), 1)
+.PHONY: all clean install
 
-.PHONY: extra_install
-extra_install: $(TARGET_OUTPUT)
+all: $(TARGET_MODULE)
+
+clean:
+	@rm -rf $(OBJ_DIR)
+
+ifeq ($(YOCTO_DRI_BUILD),1)
+install: all
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
 	@mkdir -p $(SDK_DIR)/include/GL
 	@-cp -f $(AQROOT)/sdk/inc/GL/*.h $(SDK_DIR)/include/GL
-	-cd $(OBJ_DIR); ln -sf $(TARGET_NAME) libGL.so; ln -sf $(TARGET_NAME) libGL.so.1
-	cd $(SDK_DIR)/drivers; rm -f libGL.so libGL.so.1; ln -s $(TARGET_NAME) libGL.so; ln -s $(TARGET_NAME) libGL.so.1
+else
+install: all
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
+	@mkdir -p $(SDK_DIR)/include/GL
+	@-cp -f $(AQROOT)/sdk/inc/GL/*.h $(SDK_DIR)/include/GL
+	-cd $(OBJ_DIR); ln -sf $(TARGET_SONAME) libGL.so; ln -sf $(TARGET_SONAME) libGL.so.1
+	cd $(SDK_DIR)/drivers; rm -f libGL.so libGL.so.1; ln -s $(TARGET_SONAME) libGL.so; ln -s $(TARGET_SONAME) libGL.so.1
+endif
+
+################################################################################
+# Module rules.
+
+ifeq ($(gcdSTATIC_LINK),1)
+$(TARGET_MODULE): $(OBJECTS)
+	@echo "  ARCHIVE \033[1m$(notdir $@)\033[0m"
+	@$(AR) -r -c $@ $(OBJECTS)
+ifneq ($(USE_ARMCC), 1)
+	@$(RANLIB) $@
+endif
+
+else
 
 # module dependencies
-$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
-                             $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.a) \
-                  $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so \
-                             $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.a)
+$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so) \
+                  $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so)
 
-
-$(TARGET_OUTPUT): $(OBJECTS)
+$(TARGET_MODULE): $(OBJECTS)
 	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
-	@$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
-
+	@$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
 endif
+
+################################################################################
+# Object rules.
+
+vpath
+vpath %.c api
+vpath %.c display_list
+vpath %.c ../chip
+
+$(OBJ_DIR)/%.o: %.c
+	@echo "  COMPILE $(abspath $<)"
+	@mkdir -p $(OBJ_DIR)
+	@$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+# object dependencies.
+-include $(OBJECTS:.o=.d)
+

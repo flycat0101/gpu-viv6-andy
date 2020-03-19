@@ -437,7 +437,10 @@ gcChipInitExtension(
     __GLdeviceConstants *constants = &gc->constants;
     GLubyte *pCurFmt = gcvNULL;
     GLboolean enableOESExtension = GL_FALSE;
-
+#if defined(ANDROID)
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
+    gcmVERIFY_OK(gcoHAL_GetPatchID(gcvNULL, &patchId));
+#endif
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
     if (gc->imports.conformGLSpec)
@@ -447,6 +450,35 @@ gcChipInitExtension(
     else
     {
         enableOESExtension = GL_TRUE;
+    }
+
+    if (!gc->imports.conformGLSpec)
+    {
+        __glFormatInfoTable[__GL_FMT_A8].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_R8_SNORM].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RG8_SNORM].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGB8_SNORM].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGBA8_SNORM].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGB10_A2].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGB10_A2].dataType = GL_UNSIGNED_INT_2_10_10_10_REV;
+        __glFormatInfoTable[__GL_FMT_SRGB8].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_R16F].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RG16F].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGB16F].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGBA16F].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_R32F].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RG32F].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGB32F].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGBA32F].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_R11F_G11F_B10F].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGB8I].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGB8UI].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGB16I].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGB16UI].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGB32I].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGB32UI].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_A16].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGBA16].renderable = GL_FALSE;
     }
 
     /* OES Extensions for context 2.0 */
@@ -853,6 +885,20 @@ gcChipInitExtension(
         __glExtension[__GL_EXTID_ARB_explicit_attrib_location].bGLSL = GL_TRUE;
     }
 
+    /* extension enabled only for context 3.1 and later */
+    if ((constants->majorVersion >= 4) || ((constants->majorVersion == 3) && (constants->minorVersion >= 1)))
+    {
+        __glExtension[__GL_EXTID_ARB_uniform_buffer_object].bEnabled = GL_TRUE;
+        __glExtension[__GL_EXTID_ARB_uniform_buffer_object].bGLSL = GL_TRUE;
+    }
+
+    /* extension enabled only for context 3.0 and later */
+    if (constants->majorVersion >= 3)
+    {
+        __glExtension[__GL_EXTID_ARB_gpu_shader5].bEnabled = GL_TRUE;
+        __glExtension[__GL_EXTID_ARB_gpu_shader5].bGLSL = GL_TRUE;
+    }
+
     /*Generate compressed texture format table base on extension status*/
     if (constants->majorVersion >= 3)
     {
@@ -920,19 +966,20 @@ gcChipInitExtension(
     }
 
     /* Go through the extension table to get the extension string length */
-    curExt = __glExtension;
-    while (curExt->index < __GL_EXTID_EXT_LAST)
+    for (curExt = __glExtension; curExt->name; curExt++)
     {
         if (curExt->bEnabled)
         {
+            gctSIZE_T len = gcoOS_StrLen(curExt->name, gcvNULL) + 1;
+
             /* Add one more space to separate extension strings*/
-            extLen += (gcoOS_StrLen(curExt->name, gcvNULL) + 1);
+            extLen += len;
+
             if (curExt->bGLSL)
             {
-                extGLSLLen += (gcoOS_StrLen(curExt->name, gcvNULL) + 1);
+                extGLSLLen += len;
             }
         }
-        curExt++;
     }
     extLen++; /* One more for the null character */
     extGLSLLen++;
@@ -948,8 +995,7 @@ gcChipInitExtension(
     constants->shaderCaps.extensions[0] = '\0';
 
     /* Go through the extension table again to construct the extension string */
-    curExt = __glExtension;
-    while (curExt->index < __GL_EXTID_EXT_LAST)
+    for (curExt = __glExtension; curExt->name; curExt++)
     {
         if (curExt->bEnabled)
         {
@@ -964,7 +1010,6 @@ gcChipInitExtension(
                 gcoOS_StrCatSafe(constants->shaderCaps.extensions, extGLSLLen, " ");
             }
         }
-        curExt++;
     }
     GL_ASSERT(extLen == gcoOS_StrLen(constants->extensions, gcvNULL) + 1);
     GL_ASSERT(extGLSLLen == gcoOS_StrLen(constants->shaderCaps.extensions, gcvNULL) + 1);
@@ -1078,6 +1123,7 @@ gcChipInitChipFeature(
     chipFeature->hwFeature.hasSingleBuffer = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SINGLE_BUFFER);
     chipFeature->hwFeature.hasPaLineClipFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PA_LINECLIP_FIX);
     chipFeature->hwFeature.hasMSAA = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MSAA);
+    chipFeature->hwFeature.hasLogicOp = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_LOGIC_OP);
 
     /* Get Halti support level */
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI5))
@@ -1192,7 +1238,7 @@ gcChipDetachSurface(
 }
 
 static gceSTATUS
-gcChipInitDeafultObjects(
+gcChipInitDefaultObjects(
     __GLcontext *gc
     )
 {
@@ -1323,6 +1369,9 @@ __glChipGetDeviceConstants(
     gceCHIPMODEL chipModel;
     gctUINT32 chipRevision;
     gctBOOL isEs31;
+#if defined(ANDROID)
+    gctSTRING esVersion = gcvNULL;
+#endif
 
     gcmHEADER_ARG("gc=0x%x constants=0x%x", gc, constants);
 #ifdef OPENGL40
@@ -1370,23 +1419,44 @@ __glChipGetDeviceConstants(
         if (patchId == gcvPATCH_ANTUTU6X)
         {
             gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
+            constants->GLSLVersion = __GL_GLSL_VERSION20;
+            constants->majorVersion = 2;
+            constants->minorVersion = 0;
         }
+#if defined(ANDROID)
+        else if (patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION && (chipModel == gcv3000 && chipRevision == 0x5450))
+        {
+            gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION30);
+            constants->GLSLVersion =__GL_GLSL_VERSION30;
+            constants->majorVersion = 3;
+            constants->minorVersion = 0;
+        }
+#endif
         else
         {
             gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION31);
+            constants->GLSLVersion =__GL_GLSL_VERSION31;
+            constants->majorVersion = 3;
+            constants->minorVersion = 1;
         }
-        constants->GLSLVersion =__GL_GLSL_VERSION31;
-        constants->majorVersion = 3;
-        constants->minorVersion = 1;
     }
     else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0))
     {
 #if defined(ANDROID)
-#if (ANDROID_SDK_VERSION < 19)
-        if (patchId == gcvPATCH_OESCTS)
-#else
-        if ((patchId == gcvPATCH_OESCTS) && !gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2))
-#endif
+        gctSTRING esVersion = gcvNULL;
+        if ((patchId == gcvPATCH_OESCTS) ||
+            ((patchId == gcePATCH_ANDROID_CTS_GRAPHICS_GLVERSION)
+            && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
+            esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072"))))
+            )
+        {
+            gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
+            constants->GLSLVersion = __GL_GLSL_VERSION20;
+            constants->majorVersion = 2;
+        }
+        else if (((patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
+            && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
+            esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072"))))
         {
             gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
             constants->GLSLVersion = __GL_GLSL_VERSION20;
@@ -1413,6 +1483,12 @@ __glChipGetDeviceConstants(
     }
     else
     {
+        /* If app request client=3, while hw cannot support, it should be blocked in EGL. */
+        if (!gc->imports.conformGLSpec)
+        {
+            GL_ASSERT(gc->apiVersion == __GL_API_VERSION_ES20);
+        }
+
         gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
         constants->GLSLVersion = __GL_GLSL_VERSION20;
         constants->majorVersion = 2;
@@ -1435,8 +1511,7 @@ __glChipGetDeviceConstants(
     constants->maxTextureDepthSize  = __GL_MAX_HW_DEPTH_SIZE;
 
     constants->lineWidthMin = 1.0f;
-    if ((gc->imports.conformGLSpec) ||
-        (chipModel == gcv880 && chipRevision == 0x5106) ||
+    if ((chipModel == gcv880 && chipRevision == 0x5106) ||
         (chipModel == gcv2000 && chipRevision == 0x5108))
     {
         constants->lineWidthMax = gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_WIDE_LINE) ? 16.0f : 1.0f;
@@ -1657,11 +1732,20 @@ __glChipGetDeviceConstants(
             minFragUniforms = (constants->majorVersion < 3) ?  16 : (isEs31 ? 256 : 224);
         }
 
-        if (gc->apiVersion == __GL_API_VERSION_ES20 &&
+        if ((gc->apiVersion == __GL_API_VERSION_ES20) &&
             (gcvPATCH_OES20SFT == patchId ||
              gcvPATCH_GLBM27 == patchId   ||
              gcvPATCH_GFXBENCH == patchId ||
              gcdPROC_IS_WEBGL(patchId)))
+        {
+            minVertUniforms = 128;
+            minFragUniforms = 16;
+        }
+
+        if ((gc->apiVersion == __GL_API_VERSION_ES30 && gcdPROC_IS_WEBGL(patchId)) &&
+            ((chipModel == gcv880 && chipRevision == 0x5106) ||
+            (chipModel == gcv2000 && chipRevision == 0x5108) ||
+            (chipModel == gcv3000 && chipRevision == 0x5450)))
         {
             minVertUniforms = 128;
             minFragUniforms = 16;
@@ -1701,7 +1785,7 @@ __glChipGetDeviceConstants(
         else /* Running OES api */
 #endif
         {
-            shaderCaps->maxDrawBuffers = __GL_MAX(shaderCaps->maxDrawBuffers / 2, 4);
+            shaderCaps->maxDrawBuffers = __GL_MAX(shaderCaps->maxDrawBuffers / 4, 4);
         }
 
         if (shaderCaps->maxDrawBuffers > __GL_MAX_DRAW_BUFFERS)
@@ -1885,7 +1969,7 @@ __glChipGetDeviceConstants(
     } while (GL_FALSE);
 
     constants->maxNumTextureLevels = __glFloorLog2(constants->maxTextureSize) + 1;
-    shaderCaps->maxClipPlanes = glvMAX_CLIP_PLANES;
+    shaderCaps->maxClipPlanes = 8;
     shaderCaps->maxClipDistances = 8;
     shaderCaps->maxTextureUnits = shaderCaps->maxVertTextureImageUnits;
     shaderCaps->maxTextureCoords = shaderCaps->maxVertTextureImageUnits;
@@ -2044,6 +2128,7 @@ __glChipCreateContext(
     __GLchipContext *chipCtx = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
     __GLdeviceConstants *constants = &gc->constants;
+    __GLchipContext * shareCtx;
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
@@ -2174,6 +2259,10 @@ __glChipCreateContext(
 
     gcmONERROR(gco3D_SetShading(chipCtx->engine, gcvSHADING_SMOOTH));
 
+#if gcdALPHA_KILL_IN_SHADER
+    chipCtx->alphaKillInShader = gcvFALSE;
+#endif
+
 #if gcdUSE_WCLIP_PATCH
     /* For WClipping. */
     chipCtx->wLimitRms = 0.0f;
@@ -2255,7 +2344,7 @@ __glChipCreateContext(
         initLineStipplePatch(gc, chipCtx);
     }
 #endif
-    gcmONERROR(gcChipInitDeafultObjects(gc));
+    gcmONERROR(gcChipInitDefaultObjects(gc));
 #if VIVANTE_PROFILER
     gcmONERROR(gcChipProfilerInitialize(gc));
 #endif
@@ -2295,12 +2384,23 @@ __glChipCreateContext(
 
     if (gc->shareCtx != gcvNULL)
     {
-        __GLchipContext *shareCtx = (__GLchipContext*)(gc->shareCtx->dp.privateData);
+        shareCtx = (__GLchipContext*)(gc->shareCtx->dp.privateData);
         chipCtx->needRTRecompile = chipCtx->needRTRecompile || shareCtx->needRTRecompile;
         chipCtx->needTexRecompile = chipCtx->needTexRecompile || shareCtx->needTexRecompile;
     }
 
     chipCtx->robust = (gc->imports.robustAccess && chipCtx->chipFeature.hwFeature.hasRobustness);
+
+/* obtain hwFeature for logic operation */
+#ifdef OPENGL40
+    if (gc->imports.conformGLSpec)
+    {
+        if (chipCtx->chipFeature.hwFeature.hasLogicOp)
+            chipCtx->hwLogicOp = gcvTRUE;
+        else
+            chipCtx->hwLogicOp = gcvFALSE;
+    }
+#endif
 
 OnError:
     if (gcmIS_ERROR(status) && chipCtx)

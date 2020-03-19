@@ -170,7 +170,7 @@ typedef struct __GLsamplerParamStateRec
 #ifdef OPENGL40
     /* priority of the texture */
     GLfloat priority;
-    /* depth texture */
+    /* depth texture mode*/
     GLenum depthTexMode;
 
     /* shadow extension */
@@ -354,6 +354,9 @@ struct __GLtextureObjectRec
         GLint    iv[4];
         GLuint  uiv[4];
     } borderColorUsed;
+
+    /* State below to specify if there is a border toggle. */
+    GLint borderToggle;
 
     union
     {

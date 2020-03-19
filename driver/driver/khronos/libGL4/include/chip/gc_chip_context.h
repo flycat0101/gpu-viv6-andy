@@ -211,6 +211,7 @@ typedef struct __GLchipFeatureRec
         GLuint                   hasSingleBuffer            : 1;
         GLuint                   hasPaLineClipFix           : 1;
         GLuint                   hasMSAA                    : 1;
+        GLuint                   hasLogicOp                 : 1;
     }hwFeature;
 } __GLchipFeature;
 
@@ -258,7 +259,8 @@ typedef struct __GLchipDirtyRec
             unsigned int activeUniform   : 1;
             unsigned int lastFragData    : 1;
             unsigned int pgInsChanged    : 1;
-            unsigned int reserved        : 12;
+            unsigned int polygonOffset   : 1;
+            unsigned int reserved        : 11;
         } sDefer;
         unsigned int deferDirty;
     } uDefer;
@@ -343,6 +345,7 @@ struct __GLchipContextRec
     gctHANDLE                   dll;
     gctGLSLCompiler             pfCompile;
     gctGLSLInitCompiler         pfInitCompiler;
+    gctGLSLInitCompilerCaps     pfInitCompilerCaps;
     gctGLSLFinalizeCompiler     pfFinalizeCompiler;
 
     /* Attention: Below 3 shortcuts ONLY can be used within draw/compute validation,
@@ -496,6 +499,10 @@ struct __GLchipContextRec
     /* flags quickly check if we need do recompile */
     gctBOOL                     needTexRecompile;
     gctBOOL                     needRTRecompile;
+
+#if gcdALPHA_KILL_IN_SHADER
+    gctBOOL                     alphaKillInShader;
+#endif
 
 #if VIVANTE_PROFILER
     gcoPROFILER                 profiler;
@@ -852,6 +859,12 @@ gcChipSetAlphaBlend(
     __GLcontext *gc
     );
 
+#if gcdALPHA_KILL_IN_SHADER
+gceSTATUS
+gcChipSetAlphaKill(
+    __GLcontext *gc
+    );
+#endif
 
 extern gceSTATUS
 gcChipSetViewportScissor(
@@ -1025,6 +1038,7 @@ gcChipProcessPixelStore(
     __GLpixelPackMode *packMode,
     gctSIZE_T width,
     gctSIZE_T height,
+    gctSIZE_T border,
     GLenum format,
     GLenum type,
     gctSIZE_T skipImgs,
@@ -1055,6 +1069,18 @@ gcChipDecompressDXT(
     IN  GLenum InternalFormat,
     OUT gceSURF_FORMAT *Format,
     OUT gctSIZE_T* pRowStride
+    );
+
+extern GLvoid*
+gcChipDecompressETC2EAC(
+    IN  __GLcontext *gc,
+    IN  gctSIZE_T Width,
+    IN  gctSIZE_T Height,
+    IN  gctSIZE_T ImageSize,
+    IN  const void * Data,
+    IN  GLenum InternalFormat,
+    OUT gceSURF_FORMAT *Format,
+    OUT gctSIZE_T *pRowStride
     );
 
 extern GLvoid*

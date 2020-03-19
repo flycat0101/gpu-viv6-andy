@@ -270,6 +270,10 @@ gcChipGetFramebufferAttachedSurfaceAndImage(
             {
                 surfView.surf = shadow->surface;
             }
+            else if (texInfo->direct.directRender)
+            {
+                surfView.surf = texInfo->direct.source;
+            }
             else
             {
                 surfView = gcChipGetTextureSurface(chipCtx, tex, attachPoint->layered, attachPoint->level, attachPoint->slice);
@@ -483,9 +487,15 @@ gcChipFboSyncFromShadow(
             {
                 __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
                 __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
+                __GLchipFmtMapInfo *fmtMapInfo = texInfo->mipLevels[attachPoint->level].formatMapInfo;
 
                 if ((texInfo->eglImage.image) ||
-                    (texInfo->direct.source))
+                    (texInfo->direct.source && !texInfo->direct.directRender)  ||
+                    (gc->texture.shared->refcount > 1 &&
+                     fmtMapInfo &&
+                     (fmtMapInfo->flags & (__GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE | __GL_CHIP_FMTFLAGS_LAYOUT_DIFF_READ_WRITE))
+                    )
+                   )
                 {
                     gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc,
                                                                texObj,
@@ -966,7 +976,7 @@ __glChipIsFramebufferComplete(
             /*
             ** For ES3.0, only canonical format combination is legal.
             */
-            if (gc->apiVersion == __GL_API_VERSION_ES30)
+            if (!gc->imports.conformGLSpec)
             {
                 renderable &= tex->canonicalFormat;
             }
@@ -1035,7 +1045,10 @@ __glChipIsFramebufferComplete(
             fbLayered = layered;
             fbLayeredTarget = layeredTarget;
         }
-        else if ((gc->apiVersion == __GL_API_VERSION_ES20) && (fbwidth != width || fbheight != height))
+        /* Make the latest cts case follow the ES3.2 spec. */
+        else if ((gc->apiVersion == __GL_API_VERSION_ES20) &&
+                (fbwidth != width || fbheight != height) &&
+                ((chipCtx->patchId != gcvPATCH_GTFES30) || (gc->constants.majorVersion == 2)))
         {
             /* ES30 will not generate the error */
             error = GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS;
@@ -1378,6 +1391,22 @@ gcChipBlitFramebufferResolve(
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
+    if (!gc->imports.conformGLSpec)
+    {
+        /* webgl 2.0 spec: For any source pixel lying outside the read framebuffer, the corresponding pixel remains untouched */
+        if (srcX0 < 0)
+        {
+            dstX0 = dstX0 - srcX0;
+            srcX0 = 0;
+        }
+
+        if (srcY0 < 0)
+        {
+            dstY0 = dstY0 - srcY0;
+            srcY0 = 0;
+        }
+    }
+
     rlvArgs.version = gcvHAL_ARG_VERSION_V2;
     rlvArgs.uArgs.v2.srcOrigin.x = __GL_MAX(0, srcX0);
     rlvArgs.uArgs.v2.srcOrigin.y = __GL_MAX(0, srcY0);
@@ -1402,7 +1431,7 @@ gcChipBlitFramebufferResolve(
             gcsSURF_VIEW rtView = {chipCtx->drawRtViews[i].surf, chipCtx->drawRtViews[i].firstSlice, chipCtx->drawRtViews[i].numSlices};
             if (rtView.surf)
             {
-                if (rtView.surf->isMsaa)
+                if (gc->imports.conformGLSpec && rtView.surf->isMsaa)
                 {
                     status = gcChipBlitFramebufferSoftware(gc,
                                                         srcX0, srcY0, srcX1, srcY1,
@@ -1469,7 +1498,7 @@ gcChipBlitFramebufferResolve(
         /* Consider stencil and depth sharing same surface */
         if (readDsView->surf && drawDsView->surf)
         {
-            if (drawDsView->surf->isMsaa)
+            if (gc->imports.conformGLSpec && drawDsView->surf->isMsaa)
             {
                 status = gcChipBlitFramebufferSoftware(gc,
                                                     srcX0, srcY0, srcX1, srcY1,
@@ -1971,6 +2000,14 @@ __glChipDeleteRenderbuffer(
         (gc->imports.free)(NULL, chipRBO);
         rbo->privateData = NULL;
     }
+
+    /* Dereference EGLImageKHR. */
+    if ((!gc->imports.conformGLSpec) && (rbo->eglImage))
+    {
+        gc->imports.dereferenceImage(rbo->eglImage);
+        rbo->eglImage = gcvNULL;
+    }
+
     gcmFOOTER_NO();
 }
 
@@ -2105,7 +2142,7 @@ __glChipRenderbufferStorage(
         patchCase = __GL_CHIP_FMT_PATCH_8BIT_MSAA;
     }
 
-    if (drvFormat == __GL_FMT_RGBA4 &&
+    if (gc->imports.conformGLSpec && drvFormat == __GL_FMT_RGBA4 &&
         chipCtx->patchId == gcvPATCH_DEQP &&
         gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_DITHER_FIX2) == gcvFALSE)
     {
@@ -2345,6 +2382,13 @@ __glChipCreateEglImageRenderbuffer(
     gceSURF_FORMAT format;
     gcmHEADER_ARG("gc=0x%x rbo=0x%x image=0x%x", gc, rbo, image);
 
+    /* Test if rbo is a sibling of any eglImage. */
+    if ((!gc->imports.conformGLSpec) && (rbo->eglImage != gcvNULL))
+    {
+        ret = EGL_BAD_ACCESS;
+        gcmFOOTER_ARG("return=0x%04x", ret);
+        return ret;
+    }
 
     if (chipRBO == gcvNULL)
     {
@@ -2362,15 +2406,18 @@ __glChipCreateEglImageRenderbuffer(
         return ret;
     }
 
-    /* Get source surface reference count. */
-    gcoSURF_QueryReferenceCount(surface, &referenceCount);
-
-    /* Test if surface is a sibling of any eglImage. */
-    if (referenceCount > 1)
+    if (gc->imports.conformGLSpec)
     {
-        ret = EGL_BAD_ACCESS;
-        gcmFOOTER_ARG("return=0x%04x", ret);
-        return ret;
+        /* Get source surface reference count. */
+        gcoSURF_QueryReferenceCount(surface, &referenceCount);
+
+        /* Test if surface is a sibling of any eglImage. */
+        if (referenceCount > 1)
+        {
+            ret = EGL_BAD_ACCESS;
+            gcmFOOTER_ARG("return=0x%04x", ret);
+            return ret;
+        }
     }
 
     eglImage = (khrEGL_IMAGE*)image;
@@ -2390,6 +2437,13 @@ __glChipCreateEglImageRenderbuffer(
     gcoSURF_GetFormat(surface, gcvNULL, &format);
 
     chipCtx->needRTRecompile = chipCtx->needRTRecompile || gcChipCheckRecompileEnable(gc, format);
+
+    /* Reference EGLImage. */
+    if ((!gc->imports.conformGLSpec) && (rbo->eglImage == NULL))
+    {
+        rbo->eglImage = eglImage;
+        gc->imports.referenceImage(eglImage);
+    }
 
     ret = EGL_SUCCESS;
     gcmFOOTER_ARG("return=0x%04x", ret);
@@ -2432,6 +2486,7 @@ __glChipEglImageTargetRenderbufferStorageOES(
     switch (format)
     {
     case gcvSURF_R5G6B5:
+    case gcvSURF_B8G8R8:
     case gcvSURF_A4R4G4B4:
     case gcvSURF_A1R5G5B5:
     case gcvSURF_A8R8G8B8:
@@ -2442,6 +2497,8 @@ __glChipEglImageTargetRenderbufferStorageOES(
     case gcvSURF_X1R5G5B5:
     case gcvSURF_R4G4B4A4:
     case gcvSURF_X4R4G4B4:
+    case gcvSURF_A16B16G16R16F:
+    case gcvSURF_A2B10G10R10:
         type = gcvSURF_RENDER_TARGET;
         break;
 
@@ -2925,6 +2982,12 @@ gcChipTexMipSliceSyncFromShadow(
 
                 /* Commit commands. */
                 gcmONERROR(gcoHAL_Commit(gcvNULL, gcvFALSE));
+
+                /* Get fence for master surface if needed. */
+                if ((!gc->imports.conformGLSpec) && (!chipCtx->chipFeature.hwFeature.hasBlitEngine))
+                {
+                    gcmONERROR(gcoSURF_GetFence(texView.surf, gcvFENCE_TYPE_WRITE));
+                }
             }
             else
             {
