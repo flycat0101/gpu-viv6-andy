@@ -1910,7 +1910,7 @@ fbdev_GetDisplayInfoEx2(
              DisplayInfo->physical = gcvINVALID_PHYSICAL_ADDRESS;
         }
 
-        if((DisplayInfo->logical == gcvNULL) && (DisplayInfo->physical = gcvINVALID_PHYSICAL_ADDRESS))
+        if((DisplayInfo->logical == gcvNULL) && (DisplayInfo->physical == gcvINVALID_PHYSICAL_ADDRESS))
         {
             /* No offset. */
             status = gcvSTATUS_NOT_SUPPORTED;
