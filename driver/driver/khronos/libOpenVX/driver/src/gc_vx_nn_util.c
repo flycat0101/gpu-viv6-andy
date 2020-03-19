@@ -811,6 +811,12 @@ vx_status vxnneSaveDataQuant(vx_type_e format, vx_int32 index, vx_float64 data, 
             dst_data_p[index] = Fp32toUint8((vx_float32)data, zeroPoint, scale, roundMode);
         }
         break;
+    case VX_TYPE_INT32:
+        {
+            vx_int32* dst_data_p = (vx_int32*)dst_data;
+            dst_data_p[index] = (vx_int32) vxnneRound((vx_float32)(data / scale + (vx_uint8)zeroPoint), roundMode);
+        }
+        break;
     default:
         vxError("Not support format :%d\n", format);
         return VX_ERROR_INVALID_FORMAT;
@@ -993,7 +999,7 @@ vx_float32 vxnneGetDataExt(vx_type_e format, vx_enum quant_format, vx_int32 inde
 
 vx_status vxnneSaveDataExt(vx_type_e format, vx_enum quant_format, vx_int32 index, vx_float64 data, vx_ptr dst_data, vx_int8 fixedPointPos, vx_int32 zeroPoint, vx_float32 scale, vx_enum roundMode)
 {
-    if (format == VX_TYPE_UINT8 && quant_format == VX_QUANT_AFFINE_SCALE)
+    if ((format == VX_TYPE_UINT8 || format == VX_TYPE_INT32)&& quant_format == VX_QUANT_AFFINE_SCALE)
         return vxnneSaveDataQuant(format, index, data, dst_data, zeroPoint, scale, roundMode);
     else
         return vxnneSaveData(format, index, data, dst_data, fixedPointPos, roundMode);
