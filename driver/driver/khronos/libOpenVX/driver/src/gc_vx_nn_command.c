@@ -3648,6 +3648,63 @@ void _fill_TP_TENSOR_COPY_Command(
 }
 
 VX_PRIVATE_API void
+_fill_TP_TENSOR_COPY_Command_EX2(
+    vx_context                  context,
+    vxnne_tensor_info           input,
+    vxnne_tensor_info           output,
+    vx_op_param                 parameter,
+    vx_nn_cmd_info_u*           general_info,
+    vx_enum                     split_type,
+    vx_uint32                   split_count,
+    vx_uint32                   split_sizes[],
+    vx_uint32                   split_offsets[],
+    vx_nn_cmd_split_info_u*     info_array
+    )
+{
+    vx_uint32 i;
+    DEFINE_TP_GENERAL_PARAMETER();
+
+    for (i = 0; i < split_count; i++)
+    {
+        info_array[i].vx_tp_general_cmd_split_info.inImageXSize = inXSize;
+        info_array[i].vx_tp_general_cmd_split_info.inImageYSize = inYSize;
+        info_array[i].vx_tp_general_cmd_split_info.inImageZSize = split_sizes[i];
+        info_array[i].vx_tp_general_cmd_split_info.inImageStride = inYStride / inputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.inImageSlice  = inZStride / inputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd = inXSize - 1;
+        info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd = inYSize - 1;
+        info_array[i].vx_tp_general_cmd_split_info.inTileSequence = 0x0;
+        info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inZStride * split_offsets[i];
+        info_array[i].vx_tp_general_cmd_split_info.inTileXSize = inXSize;
+        info_array[i].vx_tp_general_cmd_split_info.inTileYSize = inYSize;
+        info_array[i].vx_tp_general_cmd_split_info.inTileXInc = inXSize;
+        info_array[i].vx_tp_general_cmd_split_info.inTileYInc = inYSize;
+        info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outZStride * split_offsets[i];
+        info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = 1;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 1;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = outXSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outYStride / outputElemSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = outYSize;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = 1;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
+        info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = outZStride / outputElemSize;
+
+        info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
+        info_array[i].vx_tp_general_cmd_split_info.last = 1;
+    }
+}
+
+VX_PRIVATE_API void
 _fill_TP_TENSOR_COPY_Command_EX(
     vx_context                  context,
     vxnne_tensor_info           input,
@@ -4575,7 +4632,6 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     switch (tpType)
     {
     case TP_RESHUFFLE:
-    case TP_TENSOR_COPY:
     case TP_TENSOR_COPY4CONCAT:
         _SplitInputAndOutputForMultiTPCores(context,
                                             input,
@@ -4585,6 +4641,24 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
                                             &input_splits,
                                             &output_splits
                                             );
+        break;
+
+    case TP_TENSOR_COPY:
+        if((input->width != output->width) || (input->height != output->height) || (input->depth != output->depth))
+        {
+            _calculateTPSplitSizeOffset(context, input, output, parameter, splitTypes[tpType], &splitCount, splitSizes, splitOffsets);
+        }
+        else
+        {
+            _SplitInputAndOutputForMultiTPCores(context,
+                                            input,
+                                            output,
+                                            parameter,
+                                            &splitCount,
+                                            &input_splits,
+                                            &output_splits
+                                            );
+        }
         break;
 
     default:
@@ -4746,6 +4820,18 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
         }
 
         case TP_TENSOR_COPY:
+        {
+            if((input->width != output->width) || (input->height != output->height) || (input->depth != output->depth))
+            {
+                _fill_TP_TENSOR_COPY_Command_EX2(context, input, output, parameter, info_ptr, splitTypes[tpType], splitCount, splitSizes, splitOffsets, sinfoArray);
+            }
+            else
+            {
+                FILL_TP_COMMAND(context, input, output, parameter, splitTypes[tpType], splitCount, (vx_uint32*)input_splits, (vx_uint32*)output_splits, sinfoArray, info_ptr, TP_TENSOR_COPY);
+            }
+            break;
+        }
+
         case TP_TENSOR_COPY4CONCAT:
         {
             FILL_TP_COMMAND(context, input, output, parameter, splitTypes[tpType], splitCount, (vx_uint32*)input_splits, (vx_uint32*)output_splits, sinfoArray, info_ptr, TP_TENSOR_COPY);
