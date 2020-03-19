@@ -16,7 +16,7 @@
 #include <devload.h>
 #include <nkintr.h>
 #include "gc_hal_kernel.h"
-#include "gc_hal_driver.h"
+#include "shared/gc_hal_driver.h"
 #include "gc_hal_kernel_ce.h"
 
 // Reference counter.

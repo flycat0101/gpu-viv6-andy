@@ -12,7 +12,7 @@
 
 
 #include "gc_hal_kernel_qnx.h"
-#include "gc_hal_driver.h"
+#include "shared/gc_hal_driver.h"
 
 #include <screen/gpu.h>
 

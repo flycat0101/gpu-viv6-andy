@@ -30,7 +30,7 @@
 #define ALLOC_BUF_INITIAL_SIZE  (8 * 1024)
 
 #include "gc_hal_kernel_qnx.h"
-#include "gc_hal_driver.h"
+#include "shared/gc_hal_driver.h"
 #include "gc_hal_kernel_resource_manager.h"
 #include "gc_hal_kernel_resource_manager_buf.h"
 #include "gc_hal_kernel_resource_manager_info.h"

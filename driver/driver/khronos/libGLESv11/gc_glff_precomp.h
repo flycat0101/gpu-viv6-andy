@@ -84,7 +84,7 @@ typedef struct _glsCONTEXT * glsCONTEXT_PTR;
 #include "gc_hal_engine.h"
 #include "gc_hal_priv.h"
 #include "drvi/gc_vsc_drvi_interface.h"
-#include "gc_hal_driver.h"
+#include "shared/gc_hal_driver.h"
 #include "gc_hal_user.h"
 #include "gc_hal_user_os_memory.h"
 #include "gc_glff_basic_defines.h"

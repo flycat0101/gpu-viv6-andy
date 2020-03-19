@@ -1,12 +1,54 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2020 by Vivante Corp.  All rights reserved.
+*    The MIT License (MIT)
 *
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
+*    Copyright (c) 2014 - 2020 Vivante Corporation
+*
+*    Permission is hereby granted, free of charge, to any person obtaining a
+*    copy of this software and associated documentation files (the "Software"),
+*    to deal in the Software without restriction, including without limitation
+*    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+*    and/or sell copies of the Software, and to permit persons to whom the
+*    Software is furnished to do so, subject to the following conditions:
+*
+*    The above copyright notice and this permission notice shall be included in
+*    all copies or substantial portions of the Software.
+*
+*    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+*    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+*    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+*    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+*    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+*    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+*    DEALINGS IN THE SOFTWARE.
+*
+*****************************************************************************
+*
+*    The GPL License (GPL)
+*
+*    Copyright (C) 2014 - 2019 Vivante Corporation
+*
+*    This program is free software; you can redistribute it and/or
+*    modify it under the terms of the GNU General Public License
+*    as published by the Free Software Foundation; either version 2
+*    of the License, or (at your option) any later version.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU General Public License for more details.
+*
+*    You should have received a copy of the GNU General Public License
+*    along with this program; if not, write to the Free Software Foundation,
+*    Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+*
+*****************************************************************************
+*
+*    Note: This software is released under dual MIT and GPL licenses. A
+*    recipient may use this file under the terms of either the MIT license or
+*    GPL License. If you wish to use only one license not the other, you can
+*    indicate your decision by deleting one of the above license notices in your
+*    version of this file.
 *
 *****************************************************************************/
 
@@ -294,41 +336,6 @@ gcuFLOAT_UINT32;
 ******************************* Multicast Values *******************************
 \******************************************************************************/
 
-/* Value types. */
-typedef enum _gceVALUE_TYPE
-{
-    gcvVALUE_UINT = 0x0,
-    gcvVALUE_FIXED,
-    gcvVALUE_FLOAT,
-    gcvVALUE_INT,
-
-    /*
-    ** The value need be unsigned denormalized. clamp (0.0-1.0) should be done first.
-    */
-    gcvVALUE_FLAG_UNSIGNED_DENORM = 0x00010000,
-
-    /*
-    ** The value need be signed denormalized. clamp (-1.0-1.0) should be done first.
-    */
-    gcvVALUE_FLAG_SIGNED_DENORM   = 0x00020000,
-
-    /*
-    ** The value need to gammar
-    */
-    gcvVALUE_FLAG_GAMMAR          = 0x00040000,
-
-    /*
-    ** The value need to convert from float to float16
-    */
-    gcvVALUE_FLAG_FLOAT_TO_FLOAT16 = 0x0080000,
-
-    /*
-    ** Mask for flag field.
-    */
-    gcvVALUE_FLAG_MASK            = 0xFFFF0000,
-}
-gceVALUE_TYPE;
-
 /* Value unions. */
 typedef union _gcuVALUE
 {
@@ -368,18 +375,6 @@ typedef struct _gcs2D_PROFILE
 }
 gcs2D_PROFILE;
 
-/* Macro to combine four characters into a Charcater Code. */
-#define gcmCC(c1, c2, c3, c4) \
-(\
-    (char) (c1) \
-    | \
-    ((char) (c2) <<  8) \
-    | \
-    ((char) (c3) << 16) \
-    | \
-    ((char) (c4) << 24) \
-)
-
 #define gcmPRINTABLE(c)         ((((c) >= ' ') && ((c) <= '}')) ? ((c) != '%' ?  (c) : ' ') : ' ')
 
 #define gcmCC_PRINT(cc) \
@@ -396,106 +391,6 @@ gcs2D_PROFILE;
 #define OUT
 #define INOUT
 #define OPTIONAL
-
-/******************************************************************************\
-********************************* Status Codes *********************************
-\******************************************************************************/
-
-typedef enum _gceSTATUS
-{
-    gcvSTATUS_OK                    =   0,
-    gcvSTATUS_FALSE                 =   0,
-    gcvSTATUS_TRUE                  =   1,
-    gcvSTATUS_NO_MORE_DATA          =   2,
-    gcvSTATUS_CACHED                =   3,
-    gcvSTATUS_MIPMAP_TOO_LARGE      =   4,
-    gcvSTATUS_NAME_NOT_FOUND        =   5,
-    gcvSTATUS_NOT_OUR_INTERRUPT     =   6,
-    gcvSTATUS_MISMATCH              =   7,
-    gcvSTATUS_MIPMAP_TOO_SMALL      =   8,
-    gcvSTATUS_LARGER                =   9,
-    gcvSTATUS_SMALLER               =   10,
-    gcvSTATUS_CHIP_NOT_READY        =   11,
-    gcvSTATUS_NEED_CONVERSION       =   12,
-    gcvSTATUS_SKIP                  =   13,
-    gcvSTATUS_DATA_TOO_LARGE        =   14,
-    gcvSTATUS_INVALID_CONFIG        =   15,
-    gcvSTATUS_CHANGED               =   16,
-    gcvSTATUS_NOT_SUPPORT_DITHER    =   17,
-    gcvSTATUS_EXECUTED              =   18,
-    gcvSTATUS_TERMINATE             =   19,
-
-    gcvSTATUS_INVALID_ARGUMENT      =   -1,
-    gcvSTATUS_INVALID_OBJECT        =   -2,
-    gcvSTATUS_OUT_OF_MEMORY         =   -3,
-    gcvSTATUS_MEMORY_LOCKED         =   -4,
-    gcvSTATUS_MEMORY_UNLOCKED       =   -5,
-    gcvSTATUS_HEAP_CORRUPTED        =   -6,
-    gcvSTATUS_GENERIC_IO            =   -7,
-    gcvSTATUS_INVALID_ADDRESS       =   -8,
-    gcvSTATUS_CONTEXT_LOSSED        =   -9,
-    gcvSTATUS_TOO_COMPLEX           =   -10,
-    gcvSTATUS_BUFFER_TOO_SMALL      =   -11,
-    gcvSTATUS_INTERFACE_ERROR       =   -12,
-    gcvSTATUS_NOT_SUPPORTED         =   -13,
-    gcvSTATUS_MORE_DATA             =   -14,
-    gcvSTATUS_TIMEOUT               =   -15,
-    gcvSTATUS_OUT_OF_RESOURCES      =   -16,
-    gcvSTATUS_INVALID_DATA          =   -17,
-    gcvSTATUS_INVALID_MIPMAP        =   -18,
-    gcvSTATUS_NOT_FOUND             =   -19,
-    gcvSTATUS_NOT_ALIGNED           =   -20,
-    gcvSTATUS_INVALID_REQUEST       =   -21,
-    gcvSTATUS_GPU_NOT_RESPONDING    =   -22,
-    gcvSTATUS_TIMER_OVERFLOW        =   -23,
-    gcvSTATUS_VERSION_MISMATCH      =   -24,
-    gcvSTATUS_LOCKED                =   -25,
-    gcvSTATUS_INTERRUPTED           =   -26,
-    gcvSTATUS_DEVICE                =   -27,
-    gcvSTATUS_NOT_MULTI_PIPE_ALIGNED =   -28,
-    gcvSTATUS_OUT_OF_SAMPLER         =   -29,
-
-    /* Linker errors. */
-    gcvSTATUS_GLOBAL_TYPE_MISMATCH              =   -1000,
-    gcvSTATUS_TOO_MANY_ATTRIBUTES               =   -1001,
-    gcvSTATUS_TOO_MANY_UNIFORMS                 =   -1002,
-    gcvSTATUS_TOO_MANY_VARYINGS                 =   -1003,
-    gcvSTATUS_UNDECLARED_VARYING                =   -1004,
-    gcvSTATUS_VARYING_TYPE_MISMATCH             =   -1005,
-    gcvSTATUS_MISSING_MAIN                      =   -1006,
-    gcvSTATUS_NAME_MISMATCH                     =   -1007,
-    gcvSTATUS_INVALID_INDEX                     =   -1008,
-    gcvSTATUS_UNIFORM_MISMATCH                  =   -1009,
-    gcvSTATUS_UNSAT_LIB_SYMBOL                  =   -1010,
-    gcvSTATUS_TOO_MANY_SHADERS                  =   -1011,
-    gcvSTATUS_LINK_INVALID_SHADERS              =   -1012,
-    gcvSTATUS_CS_NO_WORKGROUP_SIZE              =   -1013,
-    gcvSTATUS_LINK_LIB_ERROR                    =   -1014,
-
-    gcvSTATUS_SHADER_VERSION_MISMATCH           =   -1015,
-    gcvSTATUS_TOO_MANY_INSTRUCTION              =   -1016,
-    gcvSTATUS_SSBO_MISMATCH                     =   -1017,
-    gcvSTATUS_TOO_MANY_OUTPUT                   =   -1018,
-    gcvSTATUS_TOO_MANY_INPUT                    =   -1019,
-    gcvSTATUS_NOT_SUPPORT_CL                    =   -1020,
-    gcvSTATUS_NOT_SUPPORT_INTEGER               =   -1021,
-    gcvSTATUS_UNIFORM_TYPE_MISMATCH             =   -1022,
-
-    gcvSTATUS_MISSING_PRIMITIVE_TYPE            =   -1023,
-    gcvSTATUS_MISSING_OUTPUT_VERTEX_COUNT       =   -1024,
-    gcvSTATUS_NON_INVOCATION_ID_AS_INDEX        =   -1025,
-    gcvSTATUS_INPUT_ARRAY_SIZE_MISMATCH         =   -1026,
-    gcvSTATUS_OUTPUT_ARRAY_SIZE_MISMATCH        =   -1027,
-    gcvSTATUS_LOCATION_ALIASED                  =   -1028,
-
-    /* Compiler errors. */
-    gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR    =   -2000,
-    gcvSTATUS_COMPILER_FE_PARSER_ERROR          =   -2001,
-
-    /* Recompilation Errors */
-    gcvSTATUS_RECOMPILER_CONVERT_UNIMPLEMENTED  =   -3000,
-}
-gceSTATUS;
 
 /******************************************************************************\
 ********************************* Status Macros ********************************
@@ -748,7 +643,10 @@ gceSTATUS;
 /******************************************************************************\
 ******************************** Bit Macro ********************************
 \******************************************************************************/
-#define gcmBITSET(x, y)         ((x) & (y))
+#define gcmBITSET(x, bit)         ((x) | (1 << (bit)))
+#define gcmBITCLEAR(x, bit)       ((x) & ~(1 << (bit)))
+#define gcmBITTEST(x, bit)        ((x) & (1 << (bit)))
+
 /*******************************************************************************
 **
 **  gcmPTR2SIZE
@@ -962,16 +860,6 @@ struct _gckQUEUE
     gctUINT32                   size;
 };
 
-typedef enum _gceTRACEMODE
-{
-    gcvTRACEMODE_NONE     = 0,
-    gcvTRACEMODE_FULL     = 1,
-    gcvTRACEMODE_LOGGER   = 2,
-    gcvTRACEMODE_ALLZONE  = 3,
-    gcvTRACEMODE_PRE      = 4,
-    gcvTRACEMODE_POST     = 5,
-} gceTRACEMODE;
-
 typedef struct _gcsLISTHEAD * gcsLISTHEAD_PTR;
 typedef struct _gcsLISTHEAD
 {
@@ -997,17 +885,6 @@ gcsLISTHEAD;
  * Be aware of the order and values! Tables in gc_hal_user_buffer.c and
  * gc_hal_kernel_command.c depend on this.
  */
-/* The patch types. */
-enum _gceHAL_PATCH_TYPE
-{
-    gcvHAL_PATCH_VIDMEM_ADDRESS = 1,
-    gcvHAL_PATCH_MCFE_SEMAPHORE,
-    gcvHAL_PATCH_VIDMEM_TIMESTAMP,
-
-    /* Must be the last one for counting. */
-    gcvHAL_PATCH_TYPE_COUNT,
-};
-
 /* The patch array. */
 typedef struct _gcsHAL_PATCH_LIST
 {
@@ -1078,7 +955,6 @@ typedef struct _gcsHAL_PATCH_VIDMEM_TIMESTAMP
     gctUINT32           flag;
 }
 gcsHAL_PATCH_VIDMEM_TIMESTAMP;
-
 
 /*
     gcvFEATURE_DATABASE_DATE_MASK

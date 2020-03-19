@@ -53,11 +53,53 @@
 *****************************************************************************/
 
 
-#ifndef __gc_hal_kernel_precomp_h_
-#define __gc_hal_kernel_precomp_h_
+#ifndef __gc_hal_base_shared_h_
+#define __gc_hal_base_shared_h_
 
-#include "gc_hal.h"
-#include "shared/gc_hal_driver.h"
-#include "gc_hal_kernel.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#endif /* __gc_hal_kernel_precomp_h_ */
+#define gcdEXTERNAL_MEMORY_NAME_MAX 32
+#define gcdEXTERNAL_MEMORY_DATA_MAX 8
+
+typedef struct _gcsEXTERNAL_MEMORY_INFO
+{
+    /* Name of allocator used to attach this memory. */
+    gctCHAR                allocatorName[gcdEXTERNAL_MEMORY_NAME_MAX];
+
+    /* User defined data which will be passed to allocator. */
+    gctUINT32              userData[gcdEXTERNAL_MEMORY_DATA_MAX];
+}
+gcsEXTERNAL_MEMORY_INFO;
+
+#define gcdBINARY_TRACE_MESSAGE_SIZE 240
+
+typedef struct _gcsBINARY_TRACE_MESSAGE * gcsBINARY_TRACE_MESSAGE_PTR;
+typedef struct _gcsBINARY_TRACE_MESSAGE
+{
+    gctUINT32   signature;
+    gctUINT32   pid;
+    gctUINT32   tid;
+    gctUINT32   line;
+    gctUINT32   numArguments;
+    gctUINT8    payload;
+}
+gcsBINARY_TRACE_MESSAGE;
+
+/* gcsOBJECT object defintinon. */
+typedef struct _gcsOBJECT
+{
+    /* Type of an object. */
+    gceOBJECT_TYPE              type;
+}
+gcsOBJECT;
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __gc_hal_base_shared_h_ */
+
+
+

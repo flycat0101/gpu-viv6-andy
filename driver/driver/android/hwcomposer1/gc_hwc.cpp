@@ -15,7 +15,7 @@
 #include <EGL/eglext.h>
 
 #include <gc_hal.h>
-#include <gc_hal_driver.h>
+#include <shared/gc_hal_driver.h>
 
 #include "gc_hwc.h"
 #include "gc_hwc_display.h"

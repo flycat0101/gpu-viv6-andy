@@ -11,7 +11,7 @@
 *****************************************************************************/
 
 
-#include "gc_hal_types.h"
+#include "shared/gc_hal_types.h"
 #include "gc_hal.h"
 
 #define SPV_MEMPOOL_PAGESIZE    1024*16
