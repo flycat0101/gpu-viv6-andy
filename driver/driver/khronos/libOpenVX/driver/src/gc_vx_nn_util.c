@@ -835,6 +835,7 @@ vx_float32 vxnneGetData(vx_type_e format, vx_int32 index, vx_uint8_ptr data, vx_
         switch(format)
         {
         case VX_TYPE_INT8:
+        case VX_TYPE_BOOL8:
             {
                 vx_int8_ptr data_ptr = (vx_int8*)data;
                 value = Int8toFp32(data_ptr[index], fpPos);
