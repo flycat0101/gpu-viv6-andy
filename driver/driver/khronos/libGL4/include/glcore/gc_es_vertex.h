@@ -464,6 +464,9 @@ typedef struct __GLvertexArrayMachineRec
     GLbitfield               globalDirtyBackup;
     GLboolean                fastStreamSetup;
 
+    /* Record whether the draw call comes from XFB.
+    */
+    GLboolean                fromDrawXFB;
 
     GLvoid (APIENTRY *drawArraysFunc)(__GLcontext *, GLenum mode, GLint first, GLsizei count);
     GLvoid (APIENTRY *drawElementsFunc)(__GLcontext *, GLenum mode, GLsizei count, GLenum type, const GLvoid *indices);

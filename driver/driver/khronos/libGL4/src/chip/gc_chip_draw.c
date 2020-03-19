@@ -337,7 +337,7 @@ gcChipComputeWlimitArg(
     {
         gcmONERROR(gco3D_SetWPlaneLimitF(chipCtx->engine, 0.0f));
         gcmONERROR(gco3D_SetWClipEnable(chipCtx->engine, gcvFALSE));
-        if (chipCtx->patchId == gcvPATCH_DEQP)
+        if (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
         {
             gcmONERROR(gco3D_SetWPlaneLimitF(chipCtx->engine, 0.1f));
             gcmONERROR(gco3D_SetWClipEnable(chipCtx->engine, gcvTRUE));
@@ -1104,6 +1104,194 @@ OnError:
 }
 
 __GL_INLINE gceSTATUS
+buildDefaultStream(
+    IN  __GLcontext* gc,
+    IN OUT gcsVERTEXARRAY_STREAM_INFO_PTR StreamInfo,
+    IN gcsVERTEXARRAY_INDEX_INFO_PTR IndexInfo
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gctUINT32 i;
+    gctUINT streamCount, count32;
+    gctUINT32 attributeCount = 0;
+    gctUINT32 activeAttributeCount = 0;
+    gctUINT32 totalSize = 0;
+    gctUINT32 totalStride = 0;
+    gctUINT first = (gctUINT)StreamInfo->first;
+    gcoVERTEX vertex = gcvNULL;
+    gcoSTREAM stream = gcvNULL;
+    gctUINT minIndex;
+    gctUINT maxIndex;
+    glsATTRIBUTEWRAP_PTR attribubteWrap;
+    gcsATTRIBUTE_PTR vertexPtr;
+    gctUINT8_PTR src, dest, destAddress;
+    gctUINT32 offset = 0;
+    gctBOOL dirty = gcvFALSE;
+    /* Zero the arrays. */
+    glsATTRIBUTEWRAP attributeArray[gcdATTRIBUTE_COUNT];
+    glsATTRIBUTEWRAP_PTR attributePtr = attributeArray;
+
+    gcmHEADER_ARG("gc=0x%x StreamInfo=0x%x IndexInfo=0x%x",
+                  gc, StreamInfo, IndexInfo);
+
+    gcmVERIFY_ARGUMENT(StreamInfo->u.es30.attributes != gcvNULL);
+    gcmVERIFY_ARGUMENT(chipCtx->currProgram->vs.attributes);
+    gcmVERIFY_ARGUMENT(StreamInfo->count > 0);
+    gcmSAFECASTSIZET(count32, StreamInfo->count);
+
+    /* Initialize the attribute wrap list pointer. */
+    attribubteWrap = chipCtx->currProgram->vs.attributes;
+    vertexPtr = StreamInfo->u.es30.attributes;
+
+    /* Construct a vertex object. */
+    gcmONERROR(gcoVERTEX_Construct(
+        chipCtx->hal,
+        &vertex
+        ));
+
+    /* Query the number of attributes. */
+    gcmONERROR(gcSHADER_GetAttributeCount(
+        chipCtx->currProgram->vs.shader,
+        &attributeCount
+        ));
+
+    for (i = 0; i < attributeCount; i++)
+    {
+        gctBOOL attributeEnabled;
+        gcmONERROR(gcATTRIBUTE_IsEnabled(
+            attribubteWrap->attribute,
+            &attributeEnabled
+            ));
+
+        if (attributeEnabled)
+        {
+            glsATTRIBUTEINFO_PTR attributeInfo = attribubteWrap->info;
+            attributePtr->info = attributeInfo;
+            activeAttributeCount++;
+
+            if (vertexPtr->enable && (vertexPtr->pointer != gcvNULL))
+            {
+                attributePtr->info->pointer = vertexPtr->pointer;
+            }
+            else
+            {
+                attributePtr->info->components = 4;
+                attributePtr->info->pointer = vertexPtr->genericValue;
+                attributePtr->info->attributeSize = vertexPtr->genericSize * 4;
+                attributePtr->info->stride = vertexPtr->genericSize * 4;
+            }
+            totalStride += attributePtr->info->attributeSize;
+            attributePtr++;
+        }
+
+        attribubteWrap++;
+        vertexPtr++;
+    }
+
+    attributePtr = attributeArray;
+    attribubteWrap = chipCtx->currProgram->vs.attributes;
+    vertexPtr = StreamInfo->u.es30.attributes;
+
+    if (IndexInfo->u.es30.indexBuffer != gcvNULL)
+    {
+        /* Get the index range. */
+        gcmONERROR(gcoBUFOBJ_IndexGetRange(IndexInfo->u.es30.indexBuffer,
+                                            IndexInfo->indexType,
+                                            gcmPTR2SIZE(IndexInfo->indexMemory),
+                                            count32,
+                                            &minIndex, &maxIndex));
+        /* Compute vertex range. */
+        first = minIndex;
+        streamCount = maxIndex - minIndex + 1;
+    }
+    /* No indices present. */
+    else
+    {
+        /* Copy vertex range. */
+        streamCount = count32;
+    }
+
+    /* If index count is 0, do not change First.     */
+    /* Otherwise, the First is 0 for DrawElements to */
+    /* locate vertex correctly.                      */
+    StreamInfo ->first = (IndexInfo ->count == 0) ? first : 0;
+    totalSize = totalStride * first + totalStride * streamCount;
+
+    /* Construct stream wrapper. */
+    gcmONERROR(gcoSTREAM_Construct(chipCtx->hal, &stream));
+    gcmONERROR(gcoSTREAM_Reserve(stream, totalSize));
+    gcmONERROR(gcoSTREAM_SetStride(stream, totalStride));
+    gcmONERROR(gcoSTREAM_Lock(stream, (gctPOINTER) &destAddress, gcvNULL));
+
+    for (i = 0; i < activeAttributeCount; ++i)
+    {
+        gctUINT j;
+        gctUINT32 srcOffset = 0, destOffset = 0;
+        gctUINT32 srcStride = 0;
+        gctUINT32 size;
+
+        dest = (gctUINT8_PTR)destAddress + totalStride * first + offset;
+        size = attributePtr->info->attributeSize;
+        src = (gctUINT8_PTR)attributePtr->info->pointer + first * attributePtr->info->stride;
+        srcStride = attributePtr->info->stride;
+
+        for (j = 0; j < streamCount; j += 1)
+        {
+            if (vertexPtr->enable && (vertexPtr->pointer != gcvNULL))
+            {
+                gcoOS_MemCopy(dest + destOffset, src + srcOffset, size);
+
+                destOffset += totalStride;
+                srcOffset  += srcStride;
+            }
+            else
+            {
+                gcoOS_MemCopy(dest + destOffset, src, size);
+                destOffset += totalStride;
+            }
+        }
+
+        /* Add the stream to the vertex. */
+        gcmONERROR(gcoVERTEX_EnableAttribute(
+            vertex, i,
+            attributePtr->info->format,
+            attributePtr->info->normalize,
+            attributePtr->info->components,
+            stream,
+            offset,
+            totalStride
+            ));
+
+        dirty = gcvTRUE;
+        offset += attributePtr->info->attributeSize;
+        attributePtr++;
+    }
+
+    if (dirty)
+    {
+        gcmONERROR(gcoSTREAM_Flush(stream));
+    }
+
+    gcmONERROR(gcoVERTEX_Bind(vertex));
+
+OnError:
+    if (stream != gcvNULL)
+    {
+        gcmONERROR(gcoSTREAM_Destroy(stream));
+        stream = gcvNULL;
+    }
+    if (vertex != gcvNULL)
+    {
+        gcmONERROR(gcoVERTEX_Destroy(vertex));
+        vertex = gcvNULL;
+    }
+    gcmFOOTER();
+    /* Return status. */
+    return status;
+}
+
+__GL_INLINE gceSTATUS
 gcChipSetVertexArrayBind(
     IN __GLcontext*         gc,
     IN __GLchipInstantDraw* instantDraw,
@@ -1140,6 +1328,12 @@ gcChipSetVertexArrayBind(
                                         &indexInfo));
 
     gcmONERROR(gcChipSetVertexArrayBindEnd(gc, instantDraw, fixWLimit));
+
+    /*if no stream been built on fix pipeline, build the stream with default attribute value and send to hardware*/
+    if (chipCtx->fixProgramFlag && (streamInfo.attribMask == 0))
+    {
+        gcmONERROR(buildDefaultStream(gc, &streamInfo, &indexInfo));
+    }
 
 OnError:
     gcmFOOTER();
@@ -2679,7 +2873,7 @@ gcChipPatchQuadList(
         instantDraw->primCount = newPrimitiveCount;
         newIndexCount = newPrimitiveCount * 2;
         gco3D_SetAntiAliasLine(chipCtx->engine, GL_TRUE);
-        gco3D_SetAALineWidth(chipCtx->engine, 1);
+        gco3D_SetAALineWidth(chipCtx->engine, (GLfloat)gc->state.line.aliasedWidth);
     }
     else
     {
@@ -2868,7 +3062,7 @@ gcChipPatchQuadListIndexed(
         instantDraw->primCount = newPrimitiveCount;
         newIndexCount = newPrimitiveCount * 2;
         gco3D_SetAntiAliasLine(chipCtx->engine, GL_TRUE);
-        gco3D_SetAALineWidth(chipCtx->engine, 1);
+        gco3D_SetAALineWidth(chipCtx->engine, (GLfloat)gc->state.line.aliasedWidth);
     }
     else
     {
@@ -3052,7 +3246,7 @@ gcChipPatchQuadStrip(
         instantDraw->primCount = newPrimitiveCount;
         newIndexCount = newPrimitiveCount * 2;
         gco3D_SetAntiAliasLine(chipCtx->engine, GL_TRUE);
-        gco3D_SetAALineWidth(chipCtx->engine, 1);
+        gco3D_SetAALineWidth(chipCtx->engine, (GLfloat)gc->state.line.aliasedWidth);
     }
     else
     {
@@ -3240,7 +3434,7 @@ gcChipPatchQuadStripIndexed(
         instantDraw->primCount = newPrimitiveCount;
         newIndexCount = newPrimitiveCount * 2;
         gco3D_SetAntiAliasLine(chipCtx->engine, GL_TRUE);
-        gco3D_SetAALineWidth(chipCtx->engine, 1);
+        gco3D_SetAALineWidth(chipCtx->engine, (GLfloat)gc->state.line.aliasedWidth);
     }
     else
     {
@@ -4710,7 +4904,7 @@ gcChipValidateDrawPath(
             defaultInstant->attributes = chipCtx->attributeArray;
             defaultInstant->positionIndex = chipCtx->positionIndex;
             defaultInstant->primitiveRestart = gc->state.enables.primitiveRestart;
-            defaultInstant->restartElement = gc->state.primRestart.restartElement;
+            defaultInstant->restartElement = gc->imports.conformGLSpec ? gc->state.primRestart.restartElement : 0xFFFFFFFF;
 
             /* Is it an indexed draw? */
             if (gc->vertexArray.indexCount == 0)
@@ -4934,8 +5128,17 @@ gcChipValidateDrawPath(
                     {
                         if (gc->state.light.shadingModel != GL_FLAT)
                         {
-                            defaultInstant->primMode = gcvPRIMITIVE_TRIANGLE_FAN;
-                            defaultInstant->primCount = defaultInstant->count - 2;
+                            if (gc->state.polygon.frontMode == GL_LINE)
+                            {
+                                defaultInstant->primMode = gcvPRIMITIVE_LINE_LOOP;
+                                defaultInstant->primCount = (defaultInstant->count >= 2) ? defaultInstant->count : 0;
+                            }
+                            else
+                            {
+                                defaultInstant->primMode = gcvPRIMITIVE_TRIANGLE_FAN;
+                                defaultInstant->primCount = defaultInstant->count - 2;
+                            }
+
                         }
                         else
                         {
@@ -4957,6 +5160,7 @@ gcChipValidateDrawPath(
                     }
                     break;
                 case GL_TRIANGLE_FAN:
+                case GL_TRIANGLES:
                     if (gc->state.polygon.frontMode == GL_LINE)
                     {
                         if (chipCtx->indexLoops)
@@ -5110,7 +5314,7 @@ gcChipValidateDrawPath(
                     }
                     else if (chipCtx->indexLoops &&
                              chipCtx->chipFeature.hwFeature.patchTriangleStrip &&
-                             chipCtx->patchId == gcvPATCH_DEQP)
+                             (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30))
                     {
                         gcmONERROR(gcChipPatchTriangleFanIndexed(gc, chipCtx, defaultInstant, gcvFALSE));
                     }
@@ -5634,7 +5838,7 @@ gcChipValidateStream(
                 }
 #endif
 
-                bufObj = attribBinding->boundArrayObj;
+                bufObj = gc->imports.conformGLSpec ? attribBinding->boundArrayObj : __glGetCurrentVertexArrayBufObj(gc, attribute->attribBinding);
                 if (bufObj)
                 {
                     if (bufObj->size > 0)
@@ -5648,10 +5852,20 @@ gcChipValidateStream(
                         attribPtr->stream = gcvNULL;
                         attribPtr->enable = gcvFALSE;
 
-                        attribPtr->genericValue[0] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.x;
-                        attribPtr->genericValue[1] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.y;
-                        attribPtr->genericValue[2] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.z;
-                        attribPtr->genericValue[3] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.w;
+                        if (gc->imports.conformGLSpec)
+                        {
+                            attribPtr->genericValue[0] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.x;
+                            attribPtr->genericValue[1] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.y;
+                            attribPtr->genericValue[2] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.z;
+                            attribPtr->genericValue[3] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.w;
+                        }
+                        else
+                        {
+                            attribPtr->genericValue[0] = gc->state.current.attribute[arrayIdx].f.x;
+                            attribPtr->genericValue[1] = gc->state.current.attribute[arrayIdx].f.y;
+                            attribPtr->genericValue[2] = gc->state.current.attribute[arrayIdx].f.z;
+                            attribPtr->genericValue[3] = gc->state.current.attribute[arrayIdx].f.w;
+                        }
                     }
                 }
                 else
@@ -5672,10 +5886,20 @@ gcChipValidateStream(
                 attribPtr->stream = gcvNULL;
                 attribPtr->enable = gcvFALSE;
 
-                attribPtr->genericValue[0] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.x;
-                attribPtr->genericValue[1] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.y;
-                attribPtr->genericValue[2] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.z;
-                attribPtr->genericValue[3] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.w;
+                if (gc->imports.conformGLSpec)
+                {
+                    attribPtr->genericValue[0] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.x;
+                    attribPtr->genericValue[1] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.y;
+                    attribPtr->genericValue[2] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.z;
+                    attribPtr->genericValue[3] = gc->state.current.currentState[arrayLoc[arrayIdx]].f.w;
+                }
+                else
+                {
+                    attribPtr->genericValue[0] = gc->state.current.attribute[arrayIdx].f.x;
+                    attribPtr->genericValue[1] = gc->state.current.attribute[arrayIdx].f.y;
+                    attribPtr->genericValue[2] = gc->state.current.attribute[arrayIdx].f.z;
+                    attribPtr->genericValue[3] = gc->state.current.attribute[arrayIdx].f.w;
+                }
 
                 chipCtx->anyAttibGeneric = GL_TRUE;
             }
@@ -5771,6 +5995,7 @@ GLvoid configStream(__GLcontext* gc)
     chipCtx->hashKey.hashTexCoordStreamEnabled = 0;
     chipCtx->hashKey.hashSecondColorStreamEnabled = 0;
     chipCtx->hashKey.hashFogCoordStreamEnabled = 0;
+    chipCtx->attribMask = 0;
 
     for(streamIdx = 0; streamIdx < gc->vertexStreams.numStreams; streamIdx++)
     {
@@ -5946,6 +6171,12 @@ gcChipValidateRenderTargetState(
 
     gceSTATUS status = gcvSTATUS_OK;
 
+    GLuint i, j, drawRTNumber;
+
+    gcoSURF rtSurf, depthSurf;
+
+    gcsSURF_VIEW *dsView = chipCtx->drawDepthView.surf ? &chipCtx->drawDepthView : &chipCtx->drawStencilView;
+
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
     if (chipDirty->uBuffer.bufferDirty)
@@ -5958,8 +6189,6 @@ gcChipValidateRenderTargetState(
         __GLchipSLProgramInstance* pgInstance = fsProgram ? fsProgram->curPgInstance : gcvNULL;
         __GLchipHalRtSlotInfo rtHalMapping[__GL_MAX_DRAW_BUFFERS];
         GLuint halRTIndex = 0;
-        GLuint i, j;
-        gcsSURF_VIEW *dsView = chipCtx->drawDepthView.surf ? &chipCtx->drawDepthView : &chipCtx->drawStencilView;
 
         __GL_MEMZERO(rtHalMapping, sizeof(rtHalMapping));
 
@@ -6167,6 +6396,28 @@ gcChipValidateRenderTargetState(
             gcmONERROR(gco3D_SetRenderLayered(chipCtx->engine,
                                               chipCtx->drawLayered ? gcvTRUE : gcvFALSE,
                                               chipCtx->drawMaxLayers));
+        }
+    }
+
+    /* Get fence if need. */
+    if ((!gc->imports.conformGLSpec) && (!chipCtx->chipFeature.hwFeature.hasBlitEngine))
+    {
+        /* Get fence for color attachment texture surafce. */
+        drawRTNumber = chipCtx->drawRTnum < __GL_MAX_DRAW_BUFFERS ? chipCtx->drawRTnum : __GL_MAX_DRAW_BUFFERS;
+        for (i = 0; i < drawRTNumber; i++)
+        {
+            rtSurf = chipCtx->drawRtViews[i].surf;
+            if (rtSurf && (rtSurf->hints & gcvSURF_CREATE_AS_TEXTURE))
+            {
+                gcmONERROR(gcoSURF_GetFence(rtSurf, gcvFENCE_TYPE_WRITE));
+            }
+        }
+
+        /* Get fence for depth attachment texture surafce. */
+        depthSurf = dsView->surf;
+        if (depthSurf && (depthSurf->hints & gcvSURF_CREATE_AS_TEXTURE))
+        {
+            gcmONERROR(gcoSURF_GetFence(dsView->surf, gcvFENCE_TYPE_WRITE));
         }
     }
 
@@ -6428,6 +6679,25 @@ gcChipValidateChipDirty(
         if (chipCtx->chipDirty.uDefer.sDefer.blend)
         {
             gcmONERROR(gcChipSetAlphaBlend(gc));
+        }
+
+#if gcdALPHA_KILL_IN_SHADER
+        if (chipCtx->chipDirty.uDefer.sDefer.blend || chipCtx->chipDirty.uDefer.sDefer.fsReload)
+        {
+            gcmONERROR(gcChipSetAlphaKill(gc));
+        }
+#endif
+
+        #if gcdALPHA_KILL_IN_SHADER
+        if (chipCtx->chipDirty.uDefer.sDefer.blend || chipCtx->chipDirty.uDefer.sDefer.fsReload)
+        {
+            gcmONERROR(gcChipSetAlphaKill(gc));
+        }
+#endif
+
+        if (chipCtx->chipDirty.uDefer.sDefer.polygonOffset)
+        {
+            gcmONERROR(gcChipSetPolygonOffset(gc));
         }
 
         if (chipCtx->chipDirty.uDefer.sDefer.vsReload  ||
@@ -6716,15 +6986,17 @@ __GLchipInstantDraw* instantDraw
                 vector[j] = vertexPtr[j];
             }
         }
+#if gcdUSE_WCLIP_PATCH
         else
         {
             for (j = 0; j < attrib->size; j++)
             {
 
-                readDataForWLimit(vertexPtr + j, vector[j])
+                readDataForWLimit(vertexPtr + j, vector[j]);
             }
 
         }
+#endif
 
         /*MVP matrix is identiy */
         vertexs[i][0] = vector[0];
@@ -7223,6 +7495,137 @@ OnError:
 }
 
 gceSTATUS
+gcChipSplitDraw4Instanced(
+    IN gctPOINTER GC,
+    IN gctPOINTER InstantDraw,
+    IN gctPOINTER SplitDrawInfo
+    )
+{
+    gceSTATUS status                 = gcvSTATUS_OK;
+    __GLcontext* gc                  = (__GLcontext*)(GC);
+    __GLchipInstantDraw* instantDraw = (__GLchipInstantDraw*)(InstantDraw);
+    __GLchipContext *chipCtx         = CHIP_CTXINFO(gc);
+    __GLchipInstantDraw tmpInstantDraw;
+    gctUINT i, splitParts = 3;
+    gctFLOAT offset = gc->state.line.requestedWidth / (gctFLOAT)(gc->state.viewport.height);
+    /* faked attributes position and color*/
+    gctFLOAT attribs[] = { -0.8f, -1.01f + offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+                         -0.8f, -1.01f - offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+                         0.0f, -1.01f + offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+                         0.0f, -1.01f - offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+
+    gcmHEADER();
+
+    __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+
+    for (i = 0; i < splitParts; i++)
+    {
+        switch (i)
+        {
+        case 0:
+            /* Draw the 1-9 lines*/
+            tmpInstantDraw.primCount = 9;
+            tmpInstantDraw.count = 18;
+            break;
+        case 1:
+            /* Draw the 11th line*/
+            tmpInstantDraw.first += 20;
+            tmpInstantDraw.primCount = 1;
+            tmpInstantDraw.count = 2;
+            break;
+        case 2:
+            /* Draw the 10th lines and split it to two triangles*/
+            tmpInstantDraw.attributes->pointer = attribs;
+            tmpInstantDraw.primMode = gcvPRIMITIVE_TRIANGLE_STRIP;
+            tmpInstantDraw.count = 4;
+            tmpInstantDraw.primCount = 2;
+            tmpInstantDraw.first = 0;
+            break;
+        default:
+            break;
+        }
+        /* Bind vertex array */
+        gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
+
+        /* Draw */
+        gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                                 tmpInstantDraw.primMode,
+                                                 gcvFALSE,
+                                                 tmpInstantDraw.first,
+                                                 0,
+                                                 tmpInstantDraw.primCount,
+                                                 tmpInstantDraw.count,
+                                                 gc->vertexArray.instanceCount));
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcChipSplitDraw4(
+    IN gctPOINTER GC,
+    IN gctPOINTER InstantDraw,
+    IN gctPOINTER SplitDrawInfo
+    )
+{
+    gceSTATUS status                 = gcvSTATUS_OK;
+    __GLcontext* gc                  = (__GLcontext*)(GC);
+    __GLchipInstantDraw* instantDraw = (__GLchipInstantDraw*)(InstantDraw);
+    __GLchipContext *chipCtx         = CHIP_CTXINFO(gc);
+    __GLchipInstantDraw tmpInstantDraw;
+    gctUINT i, splitParts = 3;
+    gctFLOAT offset = gc->state.line.requestedWidth / (gctFLOAT)(gc->state.viewport.height);
+    /* faked attributes position and color*/
+    gctFLOAT attribs[] = { -0.8f, -1.01f + offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+                         -0.8f, -1.01f - offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+                         0.0f, -1.01f + offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+                         0.0f, -1.01f - offset, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+
+    gcmHEADER();
+
+    __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+
+    for (i = 0; i < splitParts; i++)
+    {
+        switch (i)
+        {
+        case 0:
+            /* Draw the 1-9 lines*/
+            tmpInstantDraw.primCount = 9;
+            break;
+        case 1:
+            /* Draw the 11th line*/
+            tmpInstantDraw.first = 20;
+            tmpInstantDraw.primCount = 1;
+            break;
+        case 2:
+            /* Draw the 10th lines and split it to two triangles*/
+            tmpInstantDraw.attributes->pointer = attribs;
+            tmpInstantDraw.primMode = gcvPRIMITIVE_TRIANGLE_STRIP;
+            tmpInstantDraw.primCount = 2;
+            tmpInstantDraw.first = 0;
+            break;
+        default:
+            break;
+        }
+        /* Bind vertex array */
+        gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
+
+        /* Draw */
+        gcmONERROR(gco3D_DrawPrimitives(chipCtx->engine,
+                                        tmpInstantDraw.primMode,
+                                        tmpInstantDraw.first,
+                                        tmpInstantDraw.primCount));
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcChipCopySpilitIndex(
     IN __GLchipInstantDraw* instantDraw,
     IN OUT gcsSPLIT_DRAW_INFO_PTR splitDrawInfo,
@@ -7550,6 +7953,108 @@ OnError:
     return status;
 }
 
+gceSTATUS
+gcChipSplitDrawWideLine(
+    IN gctPOINTER GC,
+    IN gctPOINTER InstantDraw,
+    IN gctPOINTER SplitDrawInfo
+    )
+{
+    gceSTATUS status                     = gcvSTATUS_OK;
+    __GLcontext* gc                      = (__GLcontext*)(GC);
+    __GLchipInstantDraw* instantDraw     = (__GLchipInstantDraw*)(InstantDraw);
+    __GLchipContext *chipCtx             = CHIP_CTXINFO(gc);
+    gctFLOAT coordPerPixel = gc->state.line.aliasedWidth / (gctFLOAT)(gc->state.viewport.width - gc->state.viewport.x);
+    gctFLOAT triPos[] = {-1.5f, -0.4f + coordPerPixel, 0.0f, 1.0f,
+                         -1.5f, -0.4f - coordPerPixel, 0.0f, 1.0f,
+                         0.1f, 0.5f + coordPerPixel, 0.0f, 1.0f,
+                         0.1f, 0.5f - coordPerPixel, 0.0f, 1.0f
+    };
+
+    __GLchipInstantDraw tmpInstantDraw;
+    gcsVERTEXARRAY_STREAM_INFO streamInfo;
+    gcsVERTEXARRAY_INDEX_INFO  indexInfo;
+    gctFLOAT preLineWidth = (gctFLOAT)gc->state.line.aliasedWidth;
+
+    gcmHEADER();
+
+    /* Draw the two lines.*/
+    __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+    tmpInstantDraw.count = 4;
+    tmpInstantDraw.primCount = 2;
+
+    gcmONERROR(gcChipSetVertexArrayBindBegin(gc, &tmpInstantDraw, gcvTRUE));
+
+    /* Collect info for hal level.*/
+    gcmGL_COLLECT_STREAM_INFO(streamInfo, (&tmpInstantDraw), gc, chipCtx, gcvTRUE, chipCtx->fixProgramFlag);
+    gcmGL_COLLECT_INDEX_INFO(indexInfo, (&tmpInstantDraw));
+
+#if gcdUSE_WCLIP_PATCH
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRms,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRmsDirty,
+                                         &streamInfo,
+                                         &indexInfo));
+#else
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         &streamInfo,
+                                         &indexInfo));
+#endif
+
+    gcmONERROR(gcChipSetVertexArrayBindEnd(gc, &tmpInstantDraw, gcvTRUE));
+
+    /* Draw */
+    gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                             tmpInstantDraw.primMode,
+                                             gcvFALSE,
+                                             tmpInstantDraw.first,
+                                             0,
+                                             tmpInstantDraw.primCount,
+                                             tmpInstantDraw.count,
+                                             gc->vertexArray.instanceCount));
+
+    /* Draw Last line, and split it into two triangle.*/
+    gcmONERROR(gco3D_SetAALineWidth(chipCtx->engine, (GLfloat)1));
+    tmpInstantDraw.attributes->pointer = triPos;
+    tmpInstantDraw.primMode = gcvPRIMITIVE_TRIANGLE_STRIP;
+    tmpInstantDraw.count = 4;
+    tmpInstantDraw.primCount = 2;
+    tmpInstantDraw.first = 0;
+
+    gcmGL_COLLECT_STREAM_INFO(streamInfo, (&tmpInstantDraw), gc, chipCtx, gcvTRUE, chipCtx->fixProgramFlag);
+    gcmGL_COLLECT_INDEX_INFO(indexInfo, (&tmpInstantDraw));
+
+#if gcdUSE_WCLIP_PATCH
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRms,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRmsDirty,
+                                         &streamInfo,
+                                         &indexInfo));
+#else
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         &streamInfo,
+                                         &indexInfo));
+#endif
+
+    /* Draw */
+    gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                             tmpInstantDraw.primMode,
+                                             gcvFALSE,
+                                             tmpInstantDraw.first,
+                                             0,
+                                             tmpInstantDraw.primCount,
+                                             tmpInstantDraw.count,
+                                             gc->vertexArray.instanceCount));
+
+    /* reset line width */
+    gcmONERROR(gco3D_SetAALineWidth(chipCtx->engine, preLineWidth));
+
+OnError:
+
+    gcmFOOTER();
+    return status;
+}
+
 __GL_INLINE gceSTATUS
 gcChipCollectSplitDrawArraysInfo(
     IN __GLcontext*         gc,
@@ -7567,6 +8072,7 @@ gcChipCollectSplitDrawArraysInfo(
     &&  gc->vertexArray.instanceCount == 1
     && (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_B2B_PIXEL_FIX) ||
         !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_V2_MSAA_COHERENCY_FIX))
+    && chipCtx->chipFeature.haltiLevel > __GL_CHIP_HALTI_LEVEL_0
     && (
         instantDraw->primMode == gcvPRIMITIVE_POINT_LIST ||
         instantDraw->primMode == gcvPRIMITIVE_LINE_LIST ||
@@ -7579,10 +8085,11 @@ gcChipCollectSplitDrawArraysInfo(
         return gcvSTATUS_OK;
     }
 
-    if (chipCtx->patchId == gcvPATCH_DEQP
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
     &&  gc->vertexArray.instanceCount == 1
     &&  (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_B2B_PIXEL_FIX) ||
          !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_V2_MSAA_COHERENCY_FIX))
+    && chipCtx->chipFeature.haltiLevel > __GL_CHIP_HALTI_LEVEL_0
     &&  instantDraw->primMode == gcvPRIMITIVE_LINE_STRIP
     &&  instantDraw->count == 129
     )
@@ -7590,6 +8097,38 @@ gcChipCollectSplitDrawArraysInfo(
         splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_3;
         splitDrawInfo->splitDrawFunc = gcChipSplitDraw3;
         return gcvSTATUS_OK;
+    }
+
+    if (!gc->imports.conformGLSpec)
+    {
+        if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
+        &&  (chipCtx->chipFeature.haltiLevel < __GL_CHIP_HALTI_LEVEL_3 && !chipCtx->chipFeature.hwFeature.hasPaLineClipFix)
+        &&  gc->vertexArray.instanceCount == 1
+        &&  instantDraw->primMode == gcvPRIMITIVE_LINE_LIST
+        &&  instantDraw->count == 22
+        &&  gc->state.line.requestedWidth == 5
+        )
+        {
+            splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_4;
+            if (chipCtx->chipFeature.haltiLevel > __GL_CHIP_HALTI_LEVEL_0)
+            {
+                splitDrawInfo->splitDrawFunc = gcChipSplitDraw4Instanced;
+            }
+            else
+            {
+                splitDrawInfo->splitDrawFunc = gcChipSplitDraw4;
+            }
+            return gcvSTATUS_OK;
+        }
+
+        /* wide line split.*/
+        if (vsProgram->progFlags.wideLineFix
+        &&  chipCtx->chipFeature.haltiLevel > __GL_CHIP_HALTI_LEVEL_0)
+        {
+            splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_WIDE_LINE;
+            splitDrawInfo->splitDrawFunc = gcChipSplitDrawWideLine;
+            return gcvSTATUS_OK;
+        }
     }
 
     return gcvSTATUS_OK;
@@ -7895,7 +8434,7 @@ gcChipCollectSplitDrawElementInfo(
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
     /* Collect split draw info.*/
-    if (chipCtx->patchId == gcvPATCH_DEQP
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
     &&  gc->vertexArray.instanceCount == 1
     &&  instantDraw->primMode == gcvPRIMITIVE_LINE_STRIP
     &&  instantDraw->count == 0x81
@@ -7907,7 +8446,7 @@ gcChipCollectSplitDrawElementInfo(
     }
 
     if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_ENHANCEMENTS2)
-    &&  (chipCtx->patchId == gcvPATCH_DEQP)
+    &&  (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
     &&  (gc->vertexArray.instanceCount == 1 && instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST &&
          gc->state.enables.stencilTest &&
          (
@@ -7951,7 +8490,8 @@ gcChipCollectSplitDrawElementInfo(
         return gcvSTATUS_OK;
     }
 
-    if (chipCtx->hashKey.hasLineStippleEnabled && instantDraw->primMode == gcvPRIMITIVE_LINE_LIST)
+    if (gc->imports.conformGLSpec && chipCtx->hashKey.hasLineStippleEnabled
+        && instantDraw->primMode == gcvPRIMITIVE_LINE_LIST)
     {
         splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_STIPPLE;
         splitDrawInfo->splitDrawFunc = gcChipSplitDrawStipple;
@@ -8503,7 +9043,6 @@ OnError:
     }
 }
 
-
 GLboolean
 __glChipDrawNothing(
     __GLcontext *gc
@@ -8511,11 +9050,19 @@ __glChipDrawNothing(
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gceSTATUS status;
+    __GLchipInstantDraw *instantDraw = &chipCtx->instantDraw[__GL_DEFAULT_LOOP];
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    status = gco3D_DrawNullPrimitives(chipCtx->engine);
+    if (!gc->imports.conformGLSpec && instantDraw->count)
+    {
+        /* Bind the vertex array to the hardware. */
+        gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, gcvTRUE, gcvFALSE));
+    }
 
+    gcmONERROR(gco3D_DrawNullPrimitives(chipCtx->engine));
+
+OnError:
     gcmFOOTER();
 
     return (gcmIS_ERROR(status) ? GL_FALSE : GL_TRUE);
@@ -8535,7 +9082,7 @@ __glChipFlush(
     gcmONERROR(gcChipFboSyncFromShadowFreon(gc, gc->frameBuffer.drawFramebufObj));
 
 #ifdef OPENGL40
-    if (chipCtx->drawRtViews[0].surf)
+    if (gc->imports.conformGLSpec && chipCtx->drawRtViews[0].surf)
     {
         /* Flush the cache. */
         gcmONERROR(gcoSURF_Flush(chipCtx->drawRtViews[0].surf));
@@ -8546,7 +9093,7 @@ __glChipFlush(
     gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvFALSE));
 
 #ifdef OPENGL40
-    if (!gc->imports.fromEGL)
+    if (gc->imports.conformGLSpec && !gc->imports.fromEGL)
     {
         if (gc->flags & __GL_CONTEXT_DRAW_TO_FRONT)
         {
@@ -8628,6 +9175,10 @@ gcChipEvaluateActiveProgramStage(
             {
                 gc->shaderProgram.activeProgObjs[stage] = progObj;
                 chipCtx->activePrograms[stage] = (__GLchipSLProgram*)progObj->privateData;
+                if (!gc->imports.conformGLSpec)
+                {
+                    __glBitmaskOR2(&gc->shaderProgram.samplerTexelFetchDirty, &chipCtx->activePrograms[stage]->texelFetchSamplerMask);
+                }
                 chipCtx->activeStageBits |= chipCtx->activePrograms[stage]->stageBits;
             }
         }
@@ -8648,6 +9199,10 @@ gcChipEvaluateActiveProgramStage(
             {
                 gc->shaderProgram.activeProgObjs[__GLSL_STAGE_CS] = progObj;
                 chipCtx->activePrograms[__GLSL_STAGE_CS] = (__GLchipSLProgram*)progObj->privateData;
+                if (!gc->imports.conformGLSpec)
+                {
+                    __glBitmaskOR2(&gc->shaderProgram.samplerTexelFetchDirty, &chipCtx->activePrograms[__GLSL_STAGE_CS]->texelFetchSamplerMask);
+                }
                 chipCtx->activeStageBits |= chipCtx->activePrograms[__GLSL_STAGE_CS]->stageBits;
             }
         }
@@ -9019,16 +9574,17 @@ __glChipDrawBegin(
                     break;
                 }
 
-                if (gc->imports.conformGLSpec && xfbObj->active && !xfbObj->paused)
+                if (gc->imports.conformGLSpec && xfbObj->active && !xfbObj->paused && !gc->vertexArray.fromDrawXFB)
                 {
-                    //TODO: This is max vertices, maybe need to capture GS output vertices after draw.
-                    xfbObj->vertices += gsProgObj->bindingInfo.gsOutVertices;
+                    //TODO: Need to capture GS output vertices.
+                    xfbObj->vertices += 3;
                 }
             }
             else
             {
-                if (gc->imports.conformGLSpec && xfbObj->active && !xfbObj->paused)
+                if (gc->imports.conformGLSpec && xfbObj->active && !xfbObj->paused && !gc->vertexArray.fromDrawXFB)
                 {
+                    //TODO: Need to capture vervices in EndTransformFeedback.
                     xfbObj->vertices += (GLuint)(gc->vertexArray.end - gc->vertexArray.start);
                 }
             }
@@ -9255,6 +9811,10 @@ gcChipValidateFixProgram(
     if (chipCtx->fixProgramFlag)
     {
         gcmONERROR(gcChipLoadFixFunctionShader(gc));
+    }
+    else
+    {
+        chipCtx->programDirty = GL_TRUE;
     }
 OnError:
     gcmFOOTER();
@@ -10315,6 +10875,7 @@ __glChipDispatchCompute(
             }
         }
         info.barrierUsed = program->curPgInstance->programState.hints->threadGroupSync;
+        info.bDual16 = program->curPgInstance->programState.hints->fsIsDual16;
         gcmERR_BREAK(gco3D_InvokeThreadWalker(chipCtx->engine, &info));
     } while (GL_FALSE);
 

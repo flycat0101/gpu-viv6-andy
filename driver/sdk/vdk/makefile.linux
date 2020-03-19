@@ -63,18 +63,23 @@ ifeq ($(EGL_API_X),1)
   INCLUDE += -I$(X11_ARM_DIR)/include
 endif
 
-ifeq ($(EGL_API_DRI),1)
+ifeq ($(EGL_API_WL),1)
+  INCLUDE += -I$(AQROOT)/driver/wl \
+             -I$(WAYLAND_DIR)/include \
+             -I$(WAYLAND_DIR)/include/wayland-viv
+else
+  ifeq ($(EGL_API_DRI),1)
   INCLUDE += -I$(X11_ARM_DIR)/include \
              -I$(X11_ARM_DIR)/include/X11/extensions \
              -I$(X11_ARM_DIR)/include/libdrm \
              -I$(AQROOT)/driver/X/DRI/src
-endif
-
-ifeq ($(X11_DRI3),1)
+  endif
+  ifeq ($(X11_DRI3),1)
   INCLUDE += -I$(X11_ARM_DIR)/include \
              -I$(X11_ARM_DIR)/include/X11/extensions \
              -I$(X11_ARM_DIR)/include/libdrm \
              -I$(X11_ARM_DIR)/include/drm
+  endif
 endif
 
 ifeq ($(EGL_API_GBM),1)
@@ -83,12 +88,6 @@ ifeq ($(EGL_API_GBM),1)
   else
     INCLUDE += -I$(AQROOT)/driver/gbm/main
   endif
-endif
-
-ifeq ($(EGL_API_WL),1)
-  INCLUDE += -I$(AQROOT)/driver/wl \
-             -I$(WAYLAND_DIR)/include \
-             -I$(WAYLAND_DIR)/include/wayland-viv
 endif
 
 ifeq ($(EGL_API_DFB), 1)
@@ -133,18 +132,21 @@ else
   LDFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
 endif
 
-
 ################################################################################
 # Supply necessary libraries.
 
 LDLIBS := -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR) -lEGL -ldl
 
-ifeq ($(EGL_API_DRI), 1)
-  LDLIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
-endif
+ifeq ($(EGL_API_WL),1)
+  LDLIBS += -L$(WAYLAND_DIR)/lib -lwayland-client -lwayland-cursor -lpthread
+else
+  ifeq ($(EGL_API_DRI), 1)
+    LDLIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
+  endif
 
-ifeq ($(X11_DRI3), 1)
-  LDLIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11 -lX11-xcb -lxcb -lxcb-dri3
+  ifeq ($(X11_DRI3), 1)
+    LDLIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11 -lX11-xcb -lxcb -lxcb-dri3
+  endif
 endif
 
 ifeq ($(EGL_API_X),1)
@@ -159,14 +161,6 @@ ifeq ($(EGL_API_GBM),1)
   endif
 endif
 
-ifeq ($(EGL_API_WL),1)
-  LDLIBS += -L$(WAYLAND_DIR)/lib \
-            -lwayland-client \
-            -lwayland-cursor
-
-  LDLIBS += -pthread
-endif
-
 ################################################################################
 # Describe object files.
 # Make sure choose default platform when multiple option exist
@@ -175,19 +169,16 @@ OBJECTS := $(OBJ_DIR)/gc_vdk_egl.o \
            $(OBJ_DIR)/gc_vdk_gl.o
 
 EGL_API_OBJECT :=
-
-ifeq ($(EGL_API_X),1)
+ifeq ($(EGL_API_WL),1)
+  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_wayland.o $(OBJ_DIR)/ivi-application-protocol.o
+else ifeq ($(EGL_API_X),1)
   EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_x11.o
 else ifeq ($(EGL_API_DRI),1)
-  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_x11.o \
-                    $(OBJ_DIR)/XF86dri.o
+  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_x11.o $(OBJ_DIR)/XF86dri.o
 else ifeq ($(X11_DRI3),1)
   EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_x11.o
 else ifeq ($(EGL_API_NULLWS),1)
   EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_nullws.o
-else ifeq ($(EGL_API_WL),1)
-  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_wayland.o \
-                    $(OBJ_DIR)/ivi-application-protocol.o
 else ifeq ($(EGL_API_FB),1)
   EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_fbdev.o
 else ifeq ($(EGL_API_DFB),1)
@@ -229,11 +220,9 @@ endif
 endif
 
 ifeq ($(DYNAMIC),1)
-
 # module dependencies
 $(TARGET_MODULES): $(wildcard $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.so \
                               $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.a)
-
 
 $(TARGET_MODULE): $(OBJECTS)
 	@echo "  LINK    \033[1m$(notdir $@)\033[0m"

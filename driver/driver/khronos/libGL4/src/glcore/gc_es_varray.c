@@ -427,22 +427,30 @@ GLvoid GL_APIENTRY __glim_VertexAttribI3uiv(__GLcontext *gc, GLuint index, const
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4bv(__GLcontext *gc, GLuint index, const GLbyte *v)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4sv(__GLcontext *gc, GLuint index, const GLshort *v)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4ubv(__GLcontext *gc, GLuint index, const GLubyte *v)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 
 GLvoid GL_APIENTRY __glim_VertexAttribI4usv(__GLcontext *gc, GLuint index, const GLushort *v)
 {
-    gcoOS_Print(" VIV: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#ifdef VIV_GL4_TODO_API
+    gcoOS_Print(" VIV Warning: [TODO] File:%s, Line:%d Not Implemented API! \n",__FILE__,__LINE__);
+#endif
 }
 
 GLvoid APIENTRY __glim_GetVertexAttribdv(__GLcontext *gc,  GLuint index, GLenum pname, GLdouble *params)
@@ -781,6 +789,10 @@ static GLboolean __glCheckXFBState(__GLcontext *gc, GLboolean allowXFB, GLenum m
                     numPrims = (vertexCount / 2) * instanceCount;
                     numVerts = numPrims * 2;
                     break;
+                case GL_POINTS:
+                    numPrims = vertexCount * instanceCount;
+                    numVerts = numPrims;
+                    break;
                 }
 
                 if (!(*gc->dp.checkXFBBufSizes)(gc, xfbObj, numVerts))
@@ -1110,8 +1122,8 @@ OnError:
     __GL_FOOTER();
 }
 
-__GL_INLINE GLvoid __glDrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint first, GLsizei count,
-                                           GLsizei instanceCount)
+GLvoid __glDrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint first, GLsizei count,
+                                           GLsizei instanceCount, GLboolean fromDrawXFB)
 {
     __GLvertexArrayMachine *vertexArray = &gc->vertexArray;
 
@@ -1124,7 +1136,14 @@ __GL_INLINE GLvoid __glDrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint f
         ((mode < GL_LINES_ADJACENCY_EXT) ||
          (mode > GL_PATCHES_EXT)))
     {
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        if (gc->imports.coreProfile)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+        else if (mode != GL_QUADS && mode != GL_QUAD_STRIP && mode != GL_POLYGON)
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
     }
 
     __GL_CHECK_INSTANCE_COUNT(instanceCount);
@@ -1144,6 +1163,7 @@ __GL_INLINE GLvoid __glDrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint f
     vertexArray->start = first;
     vertexArray->end = first + count;
     vertexArray->baseVertex = first;
+    vertexArray->fromDrawXFB = fromDrawXFB;
     gc->vertexArray.drawIndirect = GL_FALSE;
     gc->vertexArray.multidrawIndirect = GL_FALSE;
 
@@ -1167,7 +1187,7 @@ GLvoid GL_APIENTRY __glim_DrawArraysInstanced(__GLcontext *gc, GLenum mode, GLin
 {
     __GL_HEADER();
 
-    __glDrawArraysInstanced(gc, mode, first, count, instanceCount);
+    __glDrawArraysInstanced(gc, mode, first, count, instanceCount, GL_FALSE);
 
     __GL_FOOTER();
 }
@@ -1176,7 +1196,7 @@ GLvoid GL_APIENTRY __glim_DrawArrays(__GLcontext *gc, GLenum mode, GLint first, 
 {
     __GL_HEADER();
 
-    __glDrawArraysInstanced(gc, mode, first, count, 1);
+    __glDrawArraysInstanced(gc, mode, first, count, 1, GL_FALSE);
 
     __GL_FOOTER();
 }
@@ -2294,6 +2314,8 @@ GLboolean __glDeleteVertexArrayObject(__GLcontext *gc, __GLvertexArrayObject *ve
 
     __GL_HEADER();
 
+    GL_ASSERT(vertexArrayObj->name);
+
     for (i = 0; i < __GL_MAX_VERTEX_ATTRIBUTE_BINDINGS; i++)
     {
         bufObj = vertexArrayObj->vertexArray.attributeBinding[i].boundArrayObj;
@@ -2380,6 +2402,7 @@ void __glInitVertexArrayState(__GLcontext *gc)
 #ifdef OPENGL40
     gc->vertexArray.interleaved = GL_FALSE;
     gc->vertexArray.formatChanged =  GL_TRUE;
+    gc->vertexArray.fromDrawXFB =  GL_FALSE;
 #endif
     __GL_FOOTER();
 }
@@ -2532,7 +2555,7 @@ OnError:
 GLvoid GL_APIENTRY __glim_BindVertexBuffer(__GLcontext *gc, GLuint bindingindex, GLuint buffer,
                                            GLintptr offset, GLsizei stride)
 {
-    __GLbufferObject *bufObj;
+    __GLbufferObject *bufObj, *oldBufObj;
     __GLvertexAttribBinding *pAttribBinding;
 
     __GL_HEADER();
@@ -2591,11 +2614,10 @@ GLvoid GL_APIENTRY __glim_BindVertexBuffer(__GLcontext *gc, GLuint bindingindex,
     }
 
     pAttribBinding = &gc->vertexArray.boundVAO->vertexArray.attributeBinding[bindingindex];
+    oldBufObj = pAttribBinding->boundArrayObj;
 
-    if (pAttribBinding->boundArrayName != buffer)
+    if (pAttribBinding->boundArrayName != buffer || (oldBufObj && oldBufObj != bufObj))
     {
-        __GLbufferObject *oldBufObj = pAttribBinding->boundArrayObj;
-
         /* Remove current VAO from old buffer object's vaoList */
         if (oldBufObj)
         {

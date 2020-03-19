@@ -442,8 +442,10 @@ __GL_INLINE GLvoid __glWindowPos3fv(__GLcontext* gc, GLfloat *v)
     else
         rp->rPos.winPos.f.z = gc->state.viewport.zNear*(1.0f-v[2]) + v[2]*gc->state.viewport.zFar;
 
+    rp->rPos.winPos.f.w = 1.0f;
+
     /*CURRENT_RASTER_DISTANCE*/
-    if (gc->state.fog.coordSource == GL_FOG_COORDINATE)
+    if (gc->state.fog.coordSource == GL_FOG_COORDINATE_SOURCE)
         rp->rPos.eyeDistance = gc->state.current.fog;
     else
         rp->rPos.eyeDistance = 0;

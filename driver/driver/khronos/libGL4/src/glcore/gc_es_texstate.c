@@ -132,6 +132,23 @@ GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id,
 
     __GL_MEMSET(tex->params.sampler.borderColor.fv, 0, 4 * sizeof(GLuint));
 
+#ifdef OPENGL40
+    tex->params.sampler.priority = 1.0f;
+    if (gc->imports.coreProfile)
+    {
+        tex->params.sampler.depthTexMode = GL_RED;
+    }
+    else
+    {
+        tex->params.sampler.depthTexMode = GL_LUMINANCE;
+    }
+    tex->params.sampler.compareFailValue = 0.0f;
+    tex->params.sampler.generateMipmap = GL_FALSE;
+    tex->params.sampler.lodBias = 0.0f;
+#endif
+
+    tex->borderToggle = 0;
+
     maxLevels = gc->constants.maxNumTextureLevels;
     switch (targetIndex)
     {
@@ -772,6 +789,7 @@ __GL_INLINE GLvoid  __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint t
               case GL_LUMINANCE:
               case GL_INTENSITY:
               case GL_ALPHA:
+              case GL_RED:
                   tex->params.sampler.depthTexMode = (GLenum)pv[0];
                   dirty = __GL_TEXPARAM_DEPTH_TEX_MODE_BIT;
                   /* border color dirty bit will be set after evaluating border color dirty,
@@ -1852,6 +1870,19 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
         case GL_RGBA16:
             formatInfo =  &__glFormatInfoTable[__GL_FMT_RGBA16];
             break;
+
+        case GL_R16_SNORM:
+            formatInfo =  &__glFormatInfoTable[__GL_FMT_R16_SNORM];
+            break;
+        case GL_RG16_SNORM:
+            formatInfo =  &__glFormatInfoTable[__GL_FMT_RG16_SNORM];
+            break;
+        case GL_RGB16_SNORM:
+            formatInfo =  &__glFormatInfoTable[__GL_FMT_RGB16_SNORM];
+            break;
+        case GL_RGBA16_SNORM:
+            formatInfo =  &__glFormatInfoTable[__GL_FMT_RGBA16_SNORM];
+            break;
         default:
             break;
         }
@@ -2218,6 +2249,7 @@ GLvoid GL_APIENTRY __glim_BindTexture(__GLcontext *gc, GLenum target, GLuint tex
             targetIndex = __GL_TEXTURE_CUBEMAP_ARRAY_INDEX;
             break;
         }
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
 
     case GL_TEXTURE_BUFFER_EXT:
         if (__glExtension[__GL_EXTID_EXT_texture_buffer].bEnabled)
@@ -3439,6 +3471,7 @@ __glTexEnvfv(__GLcontext *gc, GLenum target, GLenum pname, GLfloat *pv)
                   case GL_ADD:
                   case GL_COMBINE:
                   case __GL_STIPPLE:
+                  case GL_REPLACE_EXT:
                       break;
                   default:
                       __glSetError(gc, GL_INVALID_ENUM);

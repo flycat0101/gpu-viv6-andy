@@ -11,7 +11,6 @@
 *****************************************************************************/
 
 
-#include "gc_es_types.h"
 #include "gc_es_context.h"
 #include "g_lcomp.h"
 #include "memmgr.h"

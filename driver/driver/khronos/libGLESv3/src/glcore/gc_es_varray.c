@@ -1986,7 +1986,7 @@ OnError:
 GLvoid GL_APIENTRY __gles_BindVertexBuffer(__GLcontext *gc, GLuint bindingindex, GLuint buffer,
                                            GLintptr offset, GLsizei stride)
 {
-    __GLbufferObject *bufObj;
+    __GLbufferObject *bufObj, *oldBufObj;
     __GLvertexAttribBinding *pAttribBinding;
 
     __GL_HEADER();
@@ -2045,11 +2045,10 @@ GLvoid GL_APIENTRY __gles_BindVertexBuffer(__GLcontext *gc, GLuint bindingindex,
     }
 
     pAttribBinding = &gc->vertexArray.boundVAO->vertexArray.attributeBinding[bindingindex];
+    oldBufObj = pAttribBinding->boundArrayObj;
 
-    if (pAttribBinding->boundArrayName != buffer)
+    if (pAttribBinding->boundArrayName != buffer || (oldBufObj && oldBufObj != bufObj))
     {
-        __GLbufferObject *oldBufObj = pAttribBinding->boundArrayObj;
-
         /* Remove current VAO from old buffer object's vaoList */
         if (oldBufObj)
         {

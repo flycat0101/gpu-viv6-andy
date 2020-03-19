@@ -690,6 +690,90 @@ gcChipUtilsDumpSurfaceRAW(
 }
 
 gceSTATUS
+gcChipUtilsDumpSurfaceCOMPRAW(
+    __GLcontext *gc,
+    gcsSURF_VIEW *surfView,
+    gctCONST_STRING fileName,
+    GLboolean yInverted
+    )
+{
+    gctFILE compressedDatafile = gcvNULL;
+    gctFILE tileStatusDatafile = gcvNULL;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctPOINTER logical[3]  = {0};
+    gctPOINTER tileStatusLogical = {0};
+    gctUINT height = 0;
+    gctINT stride = 0;
+    char compressedlevel[16] = "+compressed.raw";
+    char tileStatuslevel[16] = "+tilestatus.raw";
+    GLchar compressedfName[__GLES_MAX_FILENAME_LEN] = {0};
+    GLchar tileStatusfName[__GLES_MAX_FILENAME_LEN] = {0};
+
+    gcmHEADER_ARG("gc=0x%x, surfView=0x%x, fileName=%s, yInverted=%d", gc, surfView, fileName, yInverted);
+
+    do
+    {
+        gcmERR_BREAK(gcoSURF_GetAlignedSize(surfView->surf, gcvNULL, &height, &stride));
+
+        /* Commit command and stall hardware. */
+        gcmERR_BREAK(gcoHAL_Commit(gcvNULL, gcvTRUE));
+        gcmERR_BREAK(gcoSURF_Lock(surfView->surf, gcvNULL, logical));
+
+        compressedlevel[0] = '-';
+    } while (GL_FALSE);
+
+    gcmVERIFY_OK(gcoOS_StrCatSafe(compressedfName, __GLES_MAX_FILENAME_LEN, gcdDUMP_PATH));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(compressedfName, __GLES_MAX_FILENAME_LEN, fileName));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(compressedfName, __GLES_MAX_FILENAME_LEN, compressedlevel));
+
+    gcmVERIFY_OK(gcoOS_Open(gcvNULL, compressedfName, gcvFILE_CREATE, &compressedDatafile));
+
+    if (logical[0])
+    {
+        /* Write pixel data. */
+        gcmVERIFY_OK(gcoOS_Write(gcvNULL, compressedDatafile, stride * height, logical[0]));
+    }
+
+    if (gcvNULL != compressedDatafile)
+    {
+        /* Close tga file. */
+        gcmVERIFY_OK(gcoOS_Close(gcvNULL, compressedDatafile));
+    }
+
+    tileStatusLogical = surfView->surf->tileStatusNode.logical;
+
+    tileStatuslevel[0] = '-';
+
+    gcmVERIFY_OK(gcoOS_StrCatSafe(tileStatusfName, __GLES_MAX_FILENAME_LEN, gcdDUMP_PATH));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(tileStatusfName, __GLES_MAX_FILENAME_LEN, fileName));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(tileStatusfName, __GLES_MAX_FILENAME_LEN, tileStatuslevel));
+
+    gcmVERIFY_OK(gcoOS_Open(gcvNULL, tileStatusfName, gcvFILE_CREATE, &tileStatusDatafile));
+
+    if (tileStatusLogical)
+    {
+        /* Write pixel data. */
+        gcmVERIFY_OK(gcoOS_Write(gcvNULL, tileStatusDatafile, surfView->surf->tileStatusNode.size, tileStatusLogical));
+    }
+
+    if (gcvNULL != tileStatusDatafile)
+    {
+        /* Close tga file. */
+        gcmVERIFY_OK(gcoOS_Close(gcvNULL, tileStatusDatafile));
+    }
+
+    if (logical[0])
+    {
+        /* Unlock linear surface. */
+        gcmVERIFY_OK(gcoSURF_Unlock(surfView->surf, logical[0]));
+        logical[0] = gcvNULL;
+    }
+
+    gcmFOOTER();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
 gcChipUtilsDumpSurface(
     __GLcontext *gc,
     gcsSURF_VIEW *surfView,
@@ -743,6 +827,10 @@ gcChipUtilsDumpSurface(
         gcChipUtilsDumpSurfaceRAW(gc, surfView, fileName, yInverted);
     }
 
+    if (saveMask & __GL_SAVE_SURF_AS_COMPRESSED)
+    {
+        gcChipUtilsDumpSurfaceCOMPRAW(gc, surfView, fileName, yInverted);
+    }
     gcmFOOTER();
     return status;
 }

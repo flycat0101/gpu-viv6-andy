@@ -41,7 +41,11 @@ extern __GLformatInfo __glFormatInfoTable[];
     default:                                                                                \
         __GL_ERROR_EXIT(GL_INVALID_ENUM);                                                    \
     }                                                                                       \
-    if (((attachment < GL_COLOR_ATTACHMENT0) || (attachment > __GL_COLOR_ATTACHMENTn)) &&     \
+    if ((attachment < GL_DEPTH_ATTACHMENT) && (attachment > __GL_COLOR_ATTACHMENTn))        \
+    {                                                                                       \
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);                                              \
+    }                                                                                       \
+    if (((attachment < GL_COLOR_ATTACHMENT0) || (attachment >= GL_DEPTH_ATTACHMENT)) &&     \
         (attachment != GL_DEPTH_ATTACHMENT) && (attachment != GL_STENCIL_ATTACHMENT) &&     \
         (attachment != GL_DEPTH_STENCIL_ATTACHMENT))                                        \
     {                                                                                       \
@@ -541,204 +545,209 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
-    if ((width < 0 || height < 0) ||
+    if ((width < 0 || height < 0) || samples < 0 ||
         ((width > (GLsizei)gc->constants.maxRenderBufferSize) || (height > (GLsizei)gc->constants.maxRenderBufferSize)))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
-    switch(internalformat)
+    if (gc->imports.conformGLSpec)
     {
-#ifdef OPENGL40
-    /* color-renderable format */
-    case GL_RGB:
-    case GL_RGBA:
-    case GL_FLOAT_R_NV:
-    case GL_FLOAT_RG_NV:
-    case GL_FLOAT_RGB_NV:
-    case GL_FLOAT_RGBA_NV:
-    case GL_R3_G3_B2:
-    case GL_RGB4:
-    case GL_RGB5:
-    case GL_RGB8:
-    case GL_RGB10:
-    case GL_RGB12:
-    case GL_RGB16:
-    case GL_RGB565:
-    case GL_RGBA2:
-    case GL_RGBA4:
-    case GL_RGB5_A1:
-    case GL_RGBA8:
-    case GL_RGB10_A2:
-    case GL_RGBA12:
-    case GL_RGBA16:
-    case GL_R32F:    /* R32F is a renderbuffer internalformat as GL30~40's spec */
-    case GL_ALPHA16:
-    case GL_RGB16F:
-    case GL_RG16F:
-    case GL_R16F:
-    case GL_RG8:
-    case GL_R8:
-    case GL_RG32F:
-    case GL_SRGB8_ALPHA8:
-    case GL_SRGB8:  /* Add color-renderbuffer internalformat as GL30~40's spec */
-        /* depth-renderable */
-    case GL_DEPTH_COMPONENT:
-    case GL_DEPTH_COMPONENT16:
-    case GL_DEPTH_COMPONENT24:
-    case GL_DEPTH_COMPONENT32:
-    case GL_DEPTH_COMPONENT32F:
-        /* stencil-renderable */
-    case GL_STENCIL_INDEX:
-    case GL_STENCIL_INDEX1_EXT:
-    case GL_STENCIL_INDEX4_EXT:
-    case GL_STENCIL_INDEX8_EXT:
-    case GL_STENCIL_INDEX16_EXT:
-    case GL_DEPTH24_STENCIL8:
-    case GL_DEPTH32F_STENCIL8:
-        break;
-        /*GL_EXT_texture_integer*/
-    case GL_RGBA32UI_EXT:
-    case GL_RGB32UI_EXT:
-    case GL_RGBA16UI_EXT:
-    case GL_RGB16UI_EXT:
-    case GL_RGBA8UI_EXT:
-    case GL_RGB8UI_EXT:
-    case GL_RGBA32I_EXT:
-    case GL_RGB32I_EXT:
-    case GL_RGBA16I_EXT:
-    case GL_RGB16I_EXT:
-    case GL_RGBA8I_EXT:
-    case GL_RGB8I_EXT:
-        if (!__glExtension[__GL_EXTID_EXT_texture_integer].bEnabled)
+        switch(internalformat)
         {
+        /* color-renderable format */
+        case GL_RGB:
+        case GL_RGBA:
+        case GL_FLOAT_R_NV:
+        case GL_FLOAT_RG_NV:
+        case GL_FLOAT_RGB_NV:
+        case GL_FLOAT_RGBA_NV:
+        case GL_R3_G3_B2:
+        case GL_RGB4:
+        case GL_RGB5:
+        case GL_RGB8:
+        case GL_RGB10:
+        case GL_RGB12:
+        case GL_RGB16:
+        case GL_RGBA2:
+        case GL_RGBA4:
+        case GL_RGB5_A1:
+        case GL_RGBA8:
+        case GL_RGB10_A2:
+        case GL_RGBA12:
+        case GL_RGBA16:
+        case GL_R32F:    /* R32F is a renderbuffer internalformat as GL30~40's spec */
+        case GL_ALPHA16:
+        case GL_RGB16F:
+        case GL_RG16F:
+        case GL_R16F:
+        case GL_RG8:
+        case GL_R8:
+        case GL_RG32F:
+        case GL_SRGB8_ALPHA8:
+        case GL_SRGB8:  /* Add color-renderbuffer internalformat as GL30~40's spec */
+            /* depth-renderable */
+        case GL_DEPTH_COMPONENT:
+        case GL_DEPTH_COMPONENT16:
+        case GL_DEPTH_COMPONENT24:
+        case GL_DEPTH_COMPONENT32:
+        case GL_DEPTH_COMPONENT32F:
+            /* stencil-renderable */
+        case GL_STENCIL_INDEX:
+        case GL_STENCIL_INDEX1_EXT:
+        case GL_STENCIL_INDEX4_EXT:
+        case GL_STENCIL_INDEX8_EXT:
+        case GL_STENCIL_INDEX16_EXT:
+        case GL_DEPTH_STENCIL:
+        case GL_DEPTH24_STENCIL8:
+        case GL_DEPTH32F_STENCIL8:
+            break;
+            /*GL_EXT_texture_integer*/
+        case GL_RGBA32UI_EXT:
+        case GL_RGB32UI_EXT:
+        case GL_RGBA16UI_EXT:
+        case GL_RGB16UI_EXT:
+        case GL_RGBA8UI_EXT:
+        case GL_RGB8UI_EXT:
+        case GL_RGBA32I_EXT:
+        case GL_RGB32I_EXT:
+        case GL_RGBA16I_EXT:
+        case GL_RGB16I_EXT:
+        case GL_RGBA8I_EXT:
+        case GL_RGB8I_EXT:
+            if (!__glExtension[__GL_EXTID_EXT_texture_integer].bEnabled)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_ENUM);
+            }
+            break;
+        case GL_RGB9_E5_EXT:
+            if (!__glExtension[__GL_EXTID_EXT_texture_shared_exponent].bEnabled)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_ENUM);
+            }
+            break;
+        case GL_R11F_G11F_B10F_EXT:
+            if (!__glExtension[__GL_EXTID_EXT_packed_float].bEnabled)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_ENUM);
+            }
+            break;
+
+        case GL_RGBA32F_ARB:
+        case GL_RGBA16F_ARB:
+        case GL_RGB32F_ARB:
+            /*cann't support downsampling for D2, but support on D3
+            **only RGBA16F support Fog on D3, others not
+            */
+            if (!__glExtension[__GL_EXTID_ARB_texture_float].bEnabled)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_ENUM);
+            }
+            break;
+        case GL_ALPHA32F_ARB:
+        case GL_LUMINANCE32F_ARB:
+        case GL_LUMINANCE16F_ARB:
+        case GL_LUMINANCE_ALPHA32F_ARB:
+        case GL_LUMINANCE_ALPHA16F_ARB:
+        case GL_INTENSITY32F_ARB:
+        case GL_INTENSITY16F_ARB:
+            /*cann't be RT format for D2/D3*/
+
+        default:
             __GL_ERROR_EXIT(GL_INVALID_ENUM);
         }
-        break;
-    case GL_RGB9_E5_EXT:
-        if (!__glExtension[__GL_EXTID_EXT_texture_shared_exponent].bEnabled)
+    }
+    else
+    {
+        switch(internalformat)
         {
+        case GL_RGBA8:
+        case GL_RGBA4:
+        case GL_RGB8:
+        case GL_RGB565:
+        case GL_RGB5_A1:
+        case GL_RGB10_A2:
+        case GL_R8:
+        case GL_RG8:
+            break;
+
+        case GL_R8I:
+        case GL_R8UI:
+        case GL_R16I:
+        case GL_R16UI:
+        case GL_R32I:
+        case GL_R32UI:
+        case GL_RG8I:
+        case GL_RG8UI:
+        case GL_RG16I:
+        case GL_RG16UI:
+        case GL_RG32I:
+        case GL_RG32UI:
+        case GL_RGBA8UI:
+        case GL_RGBA8I:
+        case GL_RGBA16I:
+        case GL_RGBA16UI:
+        case GL_RGBA32I:
+        case GL_RGBA32UI:
+        case GL_RGB10_A2UI:
+            break;
+
+        case GL_SRGB8_ALPHA8:
+            if (!__glExtension[__GL_EXTID_EXT_sRGB].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_ENUM);
+            }
+            break;
+
+        case GL_DEPTH_COMPONENT16:
+        case GL_DEPTH_COMPONENT24:
+        case GL_DEPTH_COMPONENT32_OES:
+        case GL_DEPTH_COMPONENT32F:
+        case GL_DEPTH24_STENCIL8:
+        case GL_DEPTH32F_STENCIL8:
+            break;
+
+        case GL_STENCIL_INDEX8:
+            break;
+
+        case GL_STENCIL_INDEX1_OES:
+            if (!__glExtension[__GL_EXTID_OES_stencil1].bEnabled)
+            {
+               __GL_ERROR_EXIT(GL_INVALID_ENUM);
+            }
+            break;
+
+        case GL_STENCIL_INDEX4_OES:
+            if (!__glExtension[__GL_EXTID_OES_stencil4].bEnabled)
+            {
+               __GL_ERROR_EXIT(GL_INVALID_ENUM);
+            }
+            break;
+
+        case GL_R16F:
+        case GL_RG16F:
+        case GL_RGB16F:
+        case GL_RGBA16F:
+            if (!__glExtension[__GL_EXTID_EXT_color_buffer_half_float].bEnabled)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_ENUM);
+            }
+            break;
+
+        case GL_R32F:
+        case GL_RG32F:
+        case GL_RGB32F:
+        case GL_RGBA32F:
+        case GL_R11F_G11F_B10F:
+            if (!__glExtension[__GL_EXTID_EXT_color_buffer_float].bEnabled)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_ENUM);
+            }
+            break;
+
+        default:
             __GL_ERROR_EXIT(GL_INVALID_ENUM);
         }
-        break;
-    case GL_R11F_G11F_B10F_EXT:
-        if (!__glExtension[__GL_EXTID_EXT_packed_float].bEnabled)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_ENUM);
-        }
-        break;
-
-    case GL_RGBA32F_ARB:
-    case GL_RGBA16F_ARB:
-    case GL_RGB32F_ARB:
-        /*cann't support downsampling for D2, but support on D3
-        **only RGBA16F support Fog on D3, others not
-        */
-        if (!__glExtension[__GL_EXTID_ARB_texture_float].bEnabled)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_ENUM);
-        }
-        break;
-    case GL_ALPHA32F_ARB:
-    case GL_LUMINANCE32F_ARB:
-    case GL_LUMINANCE16F_ARB:
-    case GL_LUMINANCE_ALPHA32F_ARB:
-    case GL_LUMINANCE_ALPHA16F_ARB:
-    case GL_INTENSITY32F_ARB:
-    case GL_INTENSITY16F_ARB:
-        /*cann't be RT format for D2/D3*/
-
-    default:
-        __GL_ERROR_EXIT(GL_INVALID_ENUM);
-#else
-    case GL_RGBA8:
-    case GL_RGBA4:
-    case GL_RGB8:
-    case GL_RGB565:
-    case GL_RGB5_A1:
-    case GL_RGB10_A2:
-    case GL_R8:
-    case GL_RG8:
-        break;
-
-    case GL_R8I:
-    case GL_R8UI:
-    case GL_R16I:
-    case GL_R16UI:
-    case GL_R32I:
-    case GL_R32UI:
-    case GL_RG8I:
-    case GL_RG8UI:
-    case GL_RG16I:
-    case GL_RG16UI:
-    case GL_RG32I:
-    case GL_RG32UI:
-    case GL_RGBA8UI:
-    case GL_RGBA8I:
-    case GL_RGBA16I:
-    case GL_RGBA16UI:
-    case GL_RGBA32I:
-    case GL_RGBA32UI:
-    case GL_RGB10_A2UI:
-        break;
-
-    case GL_SRGB8_ALPHA8:
-        if (!gc->imports.conformGLSpec && !__glExtension[__GL_EXTID_EXT_sRGB].bEnabled
-            && gc->apiVersion < __GL_API_VERSION_ES30)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_ENUM);
-        }
-        break;
-
-    case GL_DEPTH_COMPONENT16:
-    case GL_DEPTH_COMPONENT24:
-    case GL_DEPTH_COMPONENT32_OES:
-    case GL_DEPTH_COMPONENT32F:
-    case GL_DEPTH24_STENCIL8:
-    case GL_DEPTH32F_STENCIL8:
-        break;
-
-    case GL_STENCIL_INDEX8:
-        break;
-
-    case GL_STENCIL_INDEX1_OES:
-        if (!__glExtension[__GL_EXTID_OES_stencil1].bEnabled)
-        {
-           __GL_ERROR_EXIT(GL_INVALID_ENUM);
-        }
-        break;
-
-    case GL_STENCIL_INDEX4_OES:
-        if (!__glExtension[__GL_EXTID_OES_stencil4].bEnabled)
-        {
-           __GL_ERROR_EXIT(GL_INVALID_ENUM);
-        }
-        break;
-
-    case GL_R16F:
-    case GL_RG16F:
-    case GL_RGB16F:
-    case GL_RGBA16F:
-        if (!__glExtension[__GL_EXTID_EXT_color_buffer_half_float].bEnabled)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_ENUM);
-        }
-        break;
-
-    case GL_R32F:
-    case GL_RG32F:
-    case GL_RGB32F:
-    case GL_RGBA32F:
-    case GL_R11F_G11F_B10F:
-        if (!__glExtension[__GL_EXTID_EXT_color_buffer_float].bEnabled)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_ENUM);
-        }
-        break;
-
-    default:
-        __GL_ERROR_EXIT(GL_INVALID_ENUM);
-#endif
     }
 
     if (gc->imports.conformGLSpec)
@@ -1850,7 +1859,7 @@ GLvoid GL_APIENTRY __glim_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
 
     /* According to the ES2.0 spec, if the value of FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE is NONE,
     then querying any other pname will generate INVALID_ENUM */
-    if ((!gc->imports.conformGLSpec) && (2 == gc->constants.majorVersion) &&
+    if ((!gc->imports.conformGLSpec) && (2 == (gc->imports.version >> 4)) &&
        (GL_NONE == attachPoint->object) &&
        (GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE != pname))
     {
@@ -2180,7 +2189,7 @@ GLvoid GL_APIENTRY __glim_BlitFramebuffer(__GLcontext *gc,
                     }
                 }
 #endif
-                if (!readHandle)
+                if (((gc->imports.conformGLSpec) && (!readHandle)) || ((!gc->imports.conformGLSpec) && (!readable->rtHandles[0])))
                 {
                     mask &= ~GL_COLOR_BUFFER_BIT;
                 }
@@ -3193,13 +3202,16 @@ GLvoid GL_APIENTRY __glim_FramebufferTexture(__GLcontext *gc, GLenum target, GLe
 
     if (texture != 0)
     {
+        GLint maxLevels;
         /* Tex object must exist */
         texObj = (__GLtextureObject *)__glGetObject(gc, gc->texture.shared, texture);
         if (!texObj)
         {
-            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
         }
-        if ((level >= (GLint)gc->constants.maxNumTextureLevels) ||(level < 0))
+        maxLevels = texObj->immutable ? texObj->immutableLevels : texObj->mipMaxLevel;
+        maxLevels = __GL_MIN(maxLevels, (GLint)gc->constants.maxNumTextureLevels);
+        if ((level >= maxLevels) || (level < 0))
         {
             __GL_ERROR_EXIT(GL_INVALID_VALUE);
         }

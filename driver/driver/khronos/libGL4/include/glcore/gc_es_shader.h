@@ -348,6 +348,11 @@ typedef struct __GLshaderProgramMachineRec
     /* Dirty flag to indicate which sampler needs keep dirty state. Build at draw time */
     __GLbitmask                 samplerStateKeepDirty;
 
+    /* Dirty flag to indicate which sampler used in texelFetch and related builtin function */
+    __GLbitmask                 samplerTexelFetchDirty;
+    /* Record the dirty flag of previous program*/
+    __GLbitmask                 samplerPrevTexelFetchDirty;
+
     /* mapping table from texture unit to sampler index, built at draw time */
     __GLtexUnit2Sampler         texUnit2Sampler[__GL_MAX_TEXTURE_UNITS];
 

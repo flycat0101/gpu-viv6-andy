@@ -1439,7 +1439,7 @@ static gceSTATUS getInitialColor(
             }
             /* If the front face specified as clockwise (GL_CW), then we pick
                the front color whenever the area is negative. */
-            if (gc->state.polygon.frontFace == GL_CCW)
+            if (gc->state.polygon.frontFace == GL_CW)
             {
                 /* if (face == 1) goto lblFrontFace. */
                 glmOPCODE_BRANCH(JMP, EQUAL, lblFrontFace);

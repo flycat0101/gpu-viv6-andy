@@ -424,8 +424,14 @@ GLvoid APIENTRY __glim_PopAttrib(__GLcontext *gc)
                     ** 1. the parameters have been changed after being pushed (but the binding does not change)
                     ** 2. the texture object has been deleted after being pushed
                     */
-                    boundTexObj = gc->texture.units[unit].boundTextures[targetIdx];
-                    boundTexObj->params = spts->texObj[targetIdx].params;
+                    /*
+                    ** Don't need to restore states of reserved texture object 0.
+                    */
+                    if (gcts->texObj[targetIdx].name != 0)
+                    {
+                        boundTexObj = gc->texture.units[unit].boundTextures[targetIdx];
+                        boundTexObj->params = spts->texObj[targetIdx].params;
+                    }
                 }
             }
 
