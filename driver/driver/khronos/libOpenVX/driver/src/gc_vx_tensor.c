@@ -3963,6 +3963,13 @@ VX_API_ENTRY vx_status VX_API_CALL vxFlushHandle(vx_reference ref)
             {
                 gcoOS_CacheFlush(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
                 gcoOS_CacheInvalidate(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
+
+                if (tensor->tensorBuffer->memory.nodePtrs[0] != VX_NULL &&
+                    tensor->tensorBuffer->memory.logicals[0] != tensor->tensorBuffer->memory.nodePtrs[0]->logical)
+                {
+                    gcoOS_MemCopy(tensor->tensorBuffer->memory.nodePtrs[0]->logical, tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.sizes[0]);
+                }
+
                 tensor->tensorBuffer->memory.isDirty = vx_false_e;
             }
             status = VX_SUCCESS;
@@ -3982,6 +3989,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxFlushHandle(vx_reference ref)
                 {
                     gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
                     gcoOS_CacheInvalidate(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+
+                    if (image->memory.nodePtrs[p] != VX_NULL && image->memory.logicals[p] != image->memory.nodePtrs[p]->logical)
+                    {
+                        gcoOS_MemCopy(image->memory.nodePtrs[p]->logical, image->memory.logicals[p], image->memory.sizes[p]);
+                    }
+
                     image->memory.isDirty = vx_false_e;
                 }
             }

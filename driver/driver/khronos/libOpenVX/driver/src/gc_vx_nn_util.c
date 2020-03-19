@@ -5255,6 +5255,7 @@ exit:
 
 vx_status vxo_insertHandle(vxnne_execution_layer   executionLayer)
 {
+
 #define TP_INPUT_PHYSICAL_OFFSET    10
 #define TP_OUTPUT_PHYSICAL_OFFSET   13
 #define NN_INPUT_PHYSICAL_OFFSET    6
@@ -5430,7 +5431,7 @@ vx_status vxo_updateSwapHandle(vx_graph graph)
         vxInfo("\nWarning: swapHandel, CMD changed\n");
         if (executionLayer->swapHandle[j] != VX_NULL && executionLayer->swapHandle[j]->ref != VX_NULL)
         {
-            if (executionLayer->swapHandle[j]->ref->type == VX_TYPE_TENSOR )
+            if (executionLayer->swapHandle[j]->ref->type == VX_TYPE_TENSOR)
             {
                 vx_uint32 offset;
                 vxoTensor_GetTensorViewOffset(((vx_tensor)executionLayer->swapHandle[j]->ref), &offset);
@@ -5476,7 +5477,7 @@ vx_status vxo_updateSwapHandle(vx_graph graph)
                     {
                         if((node->paramTable[paramIndex] ->type == VX_TYPE_IMAGE) && (executionLayer->swapHandle[j]->ref == node->paramTable[paramIndex]))
                         {
-                            if(graph->commandBuffer)
+                            if(graph->commandBuffer && node->patchLocation[paramIndex][0] != 0xFFFFFFFF)
                                 graph->commandBuffer[node->patchLocation[paramIndex][0]] = ((vx_image)executionLayer->swapHandle[j]->ref)->memory.physicals[0];
                             break;
                         }
@@ -5506,7 +5507,7 @@ vx_status vxoFlushTensorImage(vx_graph graph)
     vxnne_execution_layer   executionLayer = (vxnne_execution_layer)&graph->layer->base;
 
     if(executionLayer == VX_NULL)
-        return vx_false_e;
+        return VX_FAILURE;
 
     for (j = 0; j < executionLayer->swapcount; ++j)
     {
@@ -5515,10 +5516,16 @@ vx_status vxoFlushTensorImage(vx_graph graph)
             if(executionLayer->swapHandle[j]->ref->type == VX_TYPE_TENSOR)
             {
                 vx_tensor tensor  = (vx_tensor)executionLayer->swapHandle[j]->ref;
-                /*if(tensor->tensorBuffer->memory.isDirty)*/
+                if(tensor->tensorBuffer->memory.isDirty)
                 {
                     gcoOS_CacheFlush(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
                     gcoOS_CacheInvalidate(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
+
+                    if (tensor->tensorBuffer->memory.nodePtrs[0] != VX_NULL &&
+                    tensor->tensorBuffer->memory.logicals[0] != tensor->tensorBuffer->memory.nodePtrs[0]->logical)
+                    {
+                        gcoOS_MemCopy(tensor->tensorBuffer->memory.nodePtrs[0]->logical, tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.sizes[0]);
+                    }
                 }
             }
             else if(executionLayer->swapHandle[j]->ref->type == VX_TYPE_IMAGE)
@@ -5531,13 +5538,18 @@ vx_status vxoFlushTensorImage(vx_graph graph)
                     {
                         gcoOS_CacheFlush(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
                         gcoOS_CacheInvalidate(gcvNULL, image->memory.wrappedNode[p], image->memory.logicals[p], image->memory.wrappedSize[p]);
+
+                        if (image->memory.nodePtrs[p] != VX_NULL && image->memory.logicals[p] != image->memory.nodePtrs[p]->logical)
+                        {
+                            gcoOS_MemCopy(image->memory.nodePtrs[p]->logical, image->memory.logicals[p], image->memory.sizes[p]);
+                        }
                     }
                 }
             }
         }
     }
 
-    return  vx_true_e;
+    return  VX_SUCCESS;
 }
 vx_bool _IsSameDataType(
     vx_tensor src,
@@ -5700,6 +5712,9 @@ vx_status patchNodeParamLocation(vx_node node)
                 vx_uint32 commandSizeInUint = graph->commandBufferSizeInByte / 4;
                 vx_uint32 physical = tensor->tensorBuffer->memory.physicals[0];
                 vx_uint32 location = 0;
+                vx_uint32 offset;
+                vxoTensor_GetTensorViewOffset(tensor, &offset);
+                physical += offset;
                 for (location = 0; location < commandSizeInUint; location++)
                 {
                     if (physical == graph->commandBuffer[location])
@@ -5728,7 +5743,7 @@ vx_status patchNodeParamLocation(vx_node node)
                             break;
                     }
                     if (location == commandSizeInUint)
-                        location = 0;
+                        location = 0xFFFFFFFF;
                     node->patchLocation[j][planeIndx] = location;
 
                 }
@@ -5746,7 +5761,7 @@ vx_status patchNodeParamLocation(vx_node node)
                         break;
                 }
                 if (location == commandSizeInUint)
-                    location = 0;
+                    location = 0xFFFFFFFF;
                 node->patchLocation[j][0] = location;
             }
             break;
