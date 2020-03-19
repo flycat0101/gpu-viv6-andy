@@ -8197,6 +8197,8 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
     }
 
     if((input0_format == VX_TYPE_FLOAT16 && input1_format == VX_TYPE_FLOAT16) ||
+       (input0_format == VX_TYPE_FLOAT32 && input1_format == VX_TYPE_FLOAT16) ||
+       (input0_format == VX_TYPE_FLOAT16 && input1_format == VX_TYPE_FLOAT32) ||
        (input0_format == VX_TYPE_FLOAT32 && input1_format == VX_TYPE_FLOAT32))
     {
         if (useImage2DFlag)
