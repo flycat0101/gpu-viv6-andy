@@ -3392,6 +3392,10 @@ gcoSURF_UpdateMetadata(
     )
 {
     gcsHAL_INTERFACE iface = {0};
+#if gcdENABLE_3D
+    gcsSURF_VIEW srcView = {gcvNULL, 0, 1};
+    srcView.surf = Surface;
+#endif
 
     iface.command = gcvHAL_SET_VIDEO_MEMORY_METADATA;
     iface.u.SetVidMemMetadata.node              = Surface->node.u.normal.node;
@@ -3407,7 +3411,7 @@ gcoSURF_UpdateMetadata(
         iface.u.SetVidMemMetadata.fc_enabled        = !Surface->tileStatusDisabled[0];
         iface.u.SetVidMemMetadata.fc_value          = Surface->fcValue[0];
         iface.u.SetVidMemMetadata.fc_value_upper    = Surface->fcValueUpper[0];
-        iface.u.SetVidMemMetadata.compressed        = Surface->compressed;
+        iface.u.SetVidMemMetadata.compressed        = gcoSURF_IsCompressed(&srcView);
         iface.u.SetVidMemMetadata.compress_format   = compressFmt;
     }
 #endif
