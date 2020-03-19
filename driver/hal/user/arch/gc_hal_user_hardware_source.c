@@ -64,6 +64,7 @@ _GetHwTileStatusFormat(
         *hwformat = 0x2;
         break;
 
+    case gcvSURF_A8B8G8R8:
     case gcvSURF_A8R8G8B8:
         *hwformat = 0x3;
         break;
