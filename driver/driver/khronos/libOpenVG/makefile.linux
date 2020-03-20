@@ -61,7 +61,7 @@ ifeq ($(ADROID),0)
 CFLAGS += -ansi
 endif
 
-LFLAGS += -Wl,--version-script=libOpenVG.map
+LDFLAGS += -Wl,--version-script=libOpenVG.map
 
 ################################################################################
 # Supply dependent libraries.

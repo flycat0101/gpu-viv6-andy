@@ -95,11 +95,11 @@ else
 CFLAGS += -I./vivante_gal -I./vivante_ext -I./vivante_fbdev -I./vivante_util -I./vivante_exa -I$(AQROOT)/hal/kernel/inc
 endif
 
-LFLAGS += -L$(SDK_DIR)/drivers -lGAL -lm -ldl -Wl,-soname -Wl,vivante_drv.so
+LDFLAGS += -L$(SDK_DIR)/drivers -lGAL -lm -ldl -Wl,-soname -Wl,vivante_drv.so
 
 ifeq ($(X11_DRI3),1)
 CFLAGS += -I$(ROOTFS_USR)/include/libdrm
-LFLAGS += -ldrm -ldrm_vivante
+LDFLAGS += -ldrm -ldrm_vivante
 else
 CFLAGS += -I$(ROOTFS_USR)/include/libdrm
 endif
@@ -107,7 +107,7 @@ endif
 all: .libs/$(target)
 
 .libs/$(target): .libs $(OBJS)
-	$(CC) -shared -fPIC -o .libs/$(target) $(OBJS) $(LFLAGS)
+	$(CC) -shared -fPIC -o .libs/$(target) $(OBJS) $(LDFLAGS)
 .libs:
 	mkdir .libs
 

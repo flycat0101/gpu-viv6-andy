@@ -82,7 +82,7 @@ endif
 ifneq ($(USE_ARMCC),1)
 CFLAGS += -fPIC
 ifeq (,$(GL_2_APPENDIX))
-LFLAGS += -Wl,--version-script=libOpenCL12.map
+LDFLAGS += -Wl,--version-script=libOpenCL12.map
 endif
 endif
 

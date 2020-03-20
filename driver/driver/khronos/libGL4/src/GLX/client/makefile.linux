@@ -110,7 +110,6 @@ OBJECTS = \
 ################################################################################
 # Define flags for the linker.
 
-LDFLAGS := $(LFLAGS)
 LDFLAGS += -Wl,--version-script=GLSymExport
 LDFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
 

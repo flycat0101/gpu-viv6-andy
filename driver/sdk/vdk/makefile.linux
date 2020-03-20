@@ -118,8 +118,6 @@ endif
 ################################################################################
 # Define flags for the linker.
 
-LDFLAGS := $(LFLAGS)
-
 ifneq ($(USE_ARMCC),1)
   ifeq ($(EGL_APPENDIX),)
     LDFLAGS += -Wl,--version-script=libVDK.map

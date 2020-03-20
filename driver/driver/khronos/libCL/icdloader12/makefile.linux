@@ -56,9 +56,9 @@ ifneq ($(USE_ARMCC), 1)
 CFLAGS += -fPIC
 ifeq (,$(GL_2_APPENDIX))
 ifeq ($(ENABLE_CL_GL), 1)
-LFLAGS += -Wl,--version-script=icd_exports_GL.map
+LDFLAGS += -Wl,--version-script=icd_exports_GL.map
 else
-LFLAGS += -Wl,--version-script=icd_exports.map
+LDFLAGS += -Wl,--version-script=icd_exports.map
 endif
 endif
 endif

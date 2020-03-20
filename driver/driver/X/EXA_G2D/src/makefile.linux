@@ -100,15 +100,15 @@ CFLAGS += -I. -I.. -I$(ROOTFS_USR)/include -I$(ROOTFS_USR)/include/xorg \
           -I$(ROOTFS_USR)/include/X11/dri -I$(ROOTFS_USR)/include/$(PIXMAN)
 CFLAGS += -I./vivante_gal -I./vivante_fbdev -I./vivante_util -I./vivante_exa -I./vivante_extension -I$(AQROOT)/hal/kernel/inc
 
-LFLAGS += -fPIC -Wall -Wl,-soname,vivante_drv.so -lm -ldl -L$(SDK_DIR)/drivers -lGAL
+LDFLAGS += -fPIC -Wall -Wl,-soname,vivante_drv.so -lm -ldl -L$(SDK_DIR)/drivers -lGAL
 ifeq ($(HAVE_G2D),1)
-    LFLAGS  += -lg2d
+    LDFLAGS  += -lg2d
 endif
 
 ifeq ($(X11_DRI3),1)
 CFLAGS += -I./imx_drm \
           -I$(ROOTFS_USR)/include/libdrm
-LFLAGS += -ldrm -ldrm_vivante
+LDFLAGS += -ldrm -ldrm_vivante
 else
 CFLAGS += -I$(ROOTFS_USR)/include/libdrm
 endif
@@ -117,7 +117,7 @@ all: .libs/$(target)
 
 .libs/$(target): .libs $(OBJS)
 	@echo "  LINK  \033[1m$(notdir $@)\033[0m"
-	@$(CC) -shared -fPIC -o .libs/$(target) $(OBJS) $(LFLAGS)
+	@$(CC) -shared -fPIC -o .libs/$(target) $(OBJS) $(LDFLAGS)
 .libs:
 	mkdir .libs
 

@@ -69,9 +69,6 @@ CFLAGS += -D_LINUX_ -DGL_GLEXT_PROTOTYPES
 ################################################################################
 # Define flags for the linker.
 
-LDFLAGS := \
-    $(LFLAGS)
-
 ifneq ($(USE_ARMCC), 1)
   ifeq (,$(GL_3_APPENDIX))
     LDFLAGS += -Wl,--version-script=libGLESv3.map

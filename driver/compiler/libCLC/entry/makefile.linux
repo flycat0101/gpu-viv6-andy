@@ -31,7 +31,7 @@ CFLAGS	+=	$(INCLUDE)
 
 ifneq ($(USE_ARMCC), 1)
 CFLAGS += -fPIC
-LFLAGS += -Wl,--version-script=libCLC.map
+LDFLAGS += -Wl,--version-script=libCLC.map
 endif
 
 ################################################################################

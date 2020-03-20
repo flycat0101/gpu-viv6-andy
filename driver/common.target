@@ -77,13 +77,13 @@ endif
 
 ifeq ($(DYNAMIC), 1)
 ifeq ($(USE_ARMCC), 1)
-LFLAGS += --shared -L--soname=,$(TARGET_SONAME)
+LDFLAGS += --shared -L--soname=,$(TARGET_NAME)
 else
-LFLAGS += -Wall -shared -Wl,-soname,$(TARGET_SONAME) -Wl,-z,defs
+LDFLAGS += -Wall -shared -Wl,-soname,$(TARGET_NAME) -Wl,-z,defs
 endif
 $(TARGET_OUTPUT): $(OBJECTS)
 	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
-	@$(CC) $(LFLAGS) $(OBJECTS) -o $(TARGET_OUTPUT) $(LIBS)
+	@$(CC) $(LDFLAGS) $(OBJECTS) -o $(TARGET_OUTPUT) $(LIBS)
 endif
 
 ifeq ($(STATIC), 1)

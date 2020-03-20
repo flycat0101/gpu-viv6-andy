@@ -53,7 +53,7 @@ OBJECTS			=	$(OBJ_DIR)/icd.o \
 ifneq ($(USE_ARMCC), 1)
 CFLAGS += -fPIC
 ifeq (,$(GL_2_APPENDIX))
-LFLAGS += -Wl,--version-script=icd_exports.map
+LDFLAGS += -Wl,--version-script=icd_exports.map
 endif
 endif
 
