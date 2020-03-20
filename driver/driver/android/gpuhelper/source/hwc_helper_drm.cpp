@@ -23,7 +23,7 @@
 #include <sys/time.h>
 #include <gc_hal.h>
 #include <gc_hal_base.h>
-#include <gc_hal_driver.h>
+#include <shared/gc_hal_driver.h>
 #include <gc_hal_raster.h>
 #include <gc_hal_engine_vg.h>
 #include <gralloc_helper.h>
@@ -150,7 +150,8 @@ enum g2d_format hwc_alterFormat(buffer_handle_t hnd, enum g2d_format format)
         switch (format)
         {
         case G2D_RGBA8888:
-            halFormat = G2D_BGRA8888;
+            /*VIV: Check PE_A8B8G8R8 feature. */
+            halFormat = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_PE_A8B8G8R8) ? G2D_RGBA8888 : G2D_BGRA8888;
             break;
         case G2D_RGBX8888:
             halFormat = G2D_BGRX8888;
