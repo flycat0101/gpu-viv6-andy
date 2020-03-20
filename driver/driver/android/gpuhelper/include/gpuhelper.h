@@ -1,5 +1,6 @@
 /*
- *  Copyright (C) 2014 Freescale Semiconductor, Inc.
+ *  Copyright (C) 2014-2016 Freescale Semiconductor, Inc.
+ *  Copyright 2017-2020 NXP
  *  All Rights Reserved.
  *
  *  The following programs are the sole property of Freescale Semiconductor Inc.,
@@ -13,6 +14,7 @@
  *  History :
  *  Date(y.m.d)        Author            Version        Description
  *  2014-06-23         Li Xianzhong      0.1            Created
+ *  2020-02-26         Liu Xuegang       0.2            Support tile status
 */
 
 #ifndef __GPU_HELPER_H__
@@ -67,6 +69,8 @@ int hwc_getTiling(buffer_handle_t hnd, enum g2d_tiling* tile);
 enum g2d_format hwc_alterFormat(buffer_handle_t hnd, enum g2d_format format);
 int hwc_lockSurface(buffer_handle_t hnd);
 int hwc_unlockSurface(buffer_handle_t hnd);
+int hwc_align_tile(int *width, int *height, int format, int usage);
+int hwc_get_tileStatus(buffer_handle_t hnd, struct g2d_surfaceEx *surfaceX);
 
 #ifdef __cplusplus
 }
