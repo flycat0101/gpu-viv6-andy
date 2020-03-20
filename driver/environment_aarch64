@@ -20,7 +20,7 @@ export X11_ARM_DIR=$ROOTFS/usr
 #export DFB_DIR=/home/software/Linux/YOCTO/dfb_sp_yocto
 #export WAYLAND_DIR=/home/software/Linux/wayland
 export CFLAGS="--sysroot=$ROOTFS -D__arm64"
-export LFLAGS="--sysroot=$ROOTFS"
+export LDFLAGS="--sysroot=$ROOTFS"
 export PFLAGS="--sysroot=$ROOTFS"
 export BUILD_HARD_VFP=1
 export HAVE_G2D=1
