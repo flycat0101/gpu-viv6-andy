@@ -77,13 +77,13 @@ endif
 # Define flags for the linker.
 
 ifneq ($(USE_ARMCC), 1)
-  LFLAGS += -Wl,--version-script=libVSC.map -Wl,-z,defs
+  LDFLAGS += -Wl,--version-script=libVSC.map -Wl,-z,defs
 endif
 
 ifeq ($(USE_ARMCC),1)
-  LFLAGS += --shared -L--soname=,$(TARGET_SONAME)
+  LDFLAGS += --shared -L--soname=,$(TARGET_SONAME)
 else
-  LFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
+  LDFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
 endif
 
 ################################################################################
@@ -227,7 +227,7 @@ $(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
 
 $(TARGET_MODULE): $(OBJECTS)
 	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
-	@$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
+	@$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LIBS)
 endif
 
 ################################################################################

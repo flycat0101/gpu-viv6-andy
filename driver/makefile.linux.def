@@ -80,8 +80,6 @@ USE_VSC_LITE        ?= 0
 
 USE_STATIC_STDCxx   ?= 0
 
-#If need to user ori arch model, set to 1
-ORI_NNARCHPERF   ?= 0
 
 ################################################################
 # Option dependency.
@@ -122,14 +120,14 @@ endif
 
 ORIG_CFLAGS         ?= $(CFLAGS)
 ORIG_CXXFLAGS       ?= $(CXXFLAGS)
-ORIG_LFLAGS         ?= $(LFLAGS)
+ORIG_LDFLAGS         ?= $(LDFLAGS)
 ORIG_PFLAGS         ?= $(PFLAGS)
 
-export ORIG_CFLAGS ORIG_CXXFLAGS ORIG_LFLAGS ORIG_PFLAGS
+export ORIG_CFLAGS ORIG_CXXFLAGS ORIG_LDFLAGS ORIG_PFLAGS
 
 CFLAGS              := $(ORIG_CFLAGS)
 CXXFLAGS            := $(ORIG_CXXFLAGS)
-LFLAGS              := $(ORIG_LFLAGS)
+LDFLAGS              := $(ORIG_LDFLAGS)
 PFLAGS              := $(ORIG_PFLAGS)
 
 ################################################################
@@ -236,7 +234,7 @@ else
 
   ifneq ($(ENDIANNESS),)
     CFLAGS          += $(ENDIANNESS)
-    LFLAGS          += $(ENDIANNESS)
+#   LDFLAGS         += $(ENDIANNESS)
     PFLAGS          += $(ENDIANNESS)
   endif
 
@@ -246,7 +244,7 @@ else
   ifneq ($(CPU_TYPE),)
     ifneq ($(CPU_TYPE),0)
       CFLAGS        += -mtune=$(CPU_TYPE)
-      LFLAGS        += -mtune=$(CPU_TYPE)
+#     LDFLAGS       += -mtune=$(CPU_TYPE)
       PFLAGS        += -mtune=$(CPU_TYPE)
     endif
   endif
@@ -254,7 +252,7 @@ else
   ifneq ($(CPU_ARCH),)
     ifneq ($(CPU_ARCH),0)
       CFLAGS        += -march=$(CPU_ARCH)
-      LFLAGS        += -march=$(CPU_ARCH)
+#     LDFLAGS       += -march=$(CPU_ARCH)
       PFLAGS        += -march=$(CPU_ARCH)
     endif
   endif
@@ -268,7 +266,7 @@ endif
 ifneq ($(FLOAT_ABI),)
   CFLAGS            += -mfloat-abi=$(FLOAT_ABI)
   CXXFLAGS          += -mfloat-abi=$(FLOAT_ABI)
-  LFLAGS            += -mfloat-abi=$(FLOAT_ABI)
+# LDFLAGS           += -mfloat-abi=$(FLOAT_ABI)
   PFLAGS            += -mfloat-abi=$(FLOAT_ABI)
 endif
 

@@ -92,12 +92,12 @@ endif
 
 ifeq ($(DYNAMIC1), 1)
 ifeq ($(USE_ARMCC), 1)
-LFLAGS += --shared -L--soname=,$(TARGET_NAME)
+LDFLAGS += --shared -L--soname=,$(TARGET_NAME)
 else
-LFLAGS += -Wall -shared -Wl,-soname,$(TARGET_NAME) -Wl,-z,defs
+LDFLAGS += -Wall -shared -Wl,-soname,$(TARGET_NAME) -Wl,-z,defs
 endif
 $(TARGET_OUTPUT1): $(PREREQUISITES) $(OBJECTS1)
-	$(CC) $(LFLAGS) $(OBJECTS1) -o $(TARGET_OUTPUT1) $(LIBS)
+	$(CC) $(LDFLAGS) $(OBJECTS1) -o $(TARGET_OUTPUT1) $(LIBS)
 endif
 
 ifeq ($(STATIC1), 1)
