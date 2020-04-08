@@ -476,6 +476,19 @@ vx_status vxnnePreLoadWeightsBiases(
     vx_uint32  size
     );
 
+
+vx_bool vx_nn_kernel_optimize_softmax_shape
+    (
+    const vx_int32* shape_x, const vx_uint32 rank_x, const vx_int32 axis,
+    vx_int32* out_shape_x, vx_uint32* out_rank_x, vx_int32* out_axis
+    );
+
+vx_bool vx_nn_kernel_optimize_element_shape
+    (
+    const vx_int32* shape_x, const vx_uint32 rank_x,
+    vx_int32* out_shape_x, vx_int32* out_rank_x
+    );
+
 #endif
 vx_status patchNodeParamLocation(vx_node node);
 
