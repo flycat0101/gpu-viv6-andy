@@ -154,7 +154,11 @@
         forward_glEGLImageTargetTexture2DOES;
         forward_glEGLImageTargetRenderbufferStorageOES;
         forward_glMultiDrawArraysEXT;
-        forward_glMultiDrawElementsEXT;
+      	forward_glMultiDrawElementsEXT;
+        forward_glTexDirectVIV;
+        forward_glTexDirectInvalidateVIV;
+        forward_glTexDirectVIVMap;
+        forward_glTexDirectTiledMapVIV;
 
     local:
         *;

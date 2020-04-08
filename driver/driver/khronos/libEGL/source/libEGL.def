@@ -153,5 +153,9 @@ EXPORTS
     forward_glEGLImageTargetRenderbufferStorageOES  @126
     forward_glMultiDrawArraysEXT        @127
     forward_glMultiDrawElementsEXT      @128
+    forward_glTexDirectVIV              @129
+    forward_glTexDirectInvalidateVIV    @130
+    forward_glTexDirectVIVMap           @131
+    forward_glTexDirectTiledMapVIV      @132
 
-    eglPatchID                          @129
+    eglPatchID                          @133
