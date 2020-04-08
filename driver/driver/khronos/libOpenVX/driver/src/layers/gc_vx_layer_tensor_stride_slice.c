@@ -468,12 +468,17 @@ VX_PRIVATE_API vx_bool vxoNNTensorStrideSlice_SH_EVIS_Support_Ext(vx_node node, 
 
     vxoNNTensorStrideSlice_getStartStopStride(input, begin_dims, end_dims, stride_dims, begin_mask, end_mask, shrink_axis_mask, start, stop, stride);
 
-    enable_sh_crop = (vx_bool)((inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[1]) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[2]) && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && batch == 1);
-
+    enable_sh_crop = (vx_bool)((inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32)
+                            && (inputFormat != VX_TYPE_INT32 && outputFormat != VX_TYPE_INT32)
+                            && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[1])
+                            && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[2])
+                            && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && batch == 1);
 
     support = support && (((_IsSameType(input, output) && batch == 1) || enable_sh_crop) && (TENSOR_VIEW_SIZE_INDEX(input, 0) < IMG_MAX_WIDTH && TENSOR_VIEW_SIZE_INDEX(input, 1) < IMG_MAX_WIDTH)) ;
 
-    if (evis && ((inputFormat == VX_TYPE_FLOAT32) || (outputFormat == VX_TYPE_FLOAT32)))
+    if (evis &&
+       ((inputFormat == VX_TYPE_FLOAT32 || inputFormat == VX_TYPE_INT32)
+       || (outputFormat == VX_TYPE_FLOAT32 || outputFormat == VX_TYPE_INT32)))
         support = vx_false_e;
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
@@ -541,8 +546,11 @@ VX_PRIVATE_API vx_status vxoNNTensorStrideSlice_SH_EVIS_Initialize_Ext(vxnne_lay
 
     vxmONERROR(vxoNNTensorStrideSlice_getStartStopStride(input, begin_dims, end_dims, stride_dims, begin_mask, end_mask, shrink_axis_mask, start, stop, stride));
 
-    enable_sh_crop = (vx_bool)((inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[1]) && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[2]) && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && batch == 1);
-
+    enable_sh_crop = (vx_bool)((inputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_FLOAT32)
+                            && (inputFormat != VX_TYPE_INT32 && outputFormat != VX_TYPE_INT32)
+                            && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[1])
+                            && gcoMATH_Absolute((vx_float32)stride[0]) == gcoMATH_Absolute((vx_float32)stride[2])
+                            && gcoMATH_Absolute((vx_float32)stride[0]) == 1 && batch == 1);
 
     vxmONERROR(vxoNNTensorStrideSlice_getReverseAxis(start, stop, stride, reverseAxis, &numOfAxis, input_size));
 
