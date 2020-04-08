@@ -22,7 +22,7 @@
 /************************************************************************/
 
 #define SCALE 2
-#define MAX_LENGTH 1024*50
+#define MAX_LENGTH 1024*500
 #define SHADER_TYPE_VERT 0
 #define SHADER_TYPE_FRAG 1
 
