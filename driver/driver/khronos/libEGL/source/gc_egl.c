@@ -273,12 +273,14 @@ static void _InitDispatchTables(
         veglInitClientApiProcTbl(client_lib[vegl_EGL], glesCommonApiEntryTbl, "forward_gl", "ES_Common");
         veglInitClientApiProcTbl(client_lib[vegl_OPENGL_ES11], gles11ApiEntryTbl, "gl", "GLES11");
         veglInitClientApiProcTbl(client_lib[vegl_OPENGL_ES20], gles32ApiEntryTbl, "gl", "GLES32");
+        veglInitEsCommonApiDispatchTbl(
+            client_lib[vegl_OPENGL_ES11], client_lib[vegl_OPENGL_ES20], glesCommonApiDispatchTbl, "gl");
+#if !defined(VIVANTE_NO_GL4)
         veglInitClientApiProcTbl(client_lib[vegl_OPENGL], gl4xApiEntryTbl, "gl", "GL4X");
+#endif
 #if !defined(VIVANTE_NO_VG)
         veglInitClientApiProcTbl(client_lib[vegl_OPENVG], vgApiEntryTbl, "vg", "OpenVG");
 #endif
-        veglInitEsCommonApiDispatchTbl(client_lib[vegl_OPENGL_ES11], client_lib[vegl_OPENGL_ES20],
-                                       glesCommonApiDispatchTbl, "gl");
         apiTblInitialized = gcvTRUE;
     }
 
