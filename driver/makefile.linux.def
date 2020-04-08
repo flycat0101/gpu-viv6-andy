@@ -504,7 +504,7 @@ GLSLC_DIR           := $(AQROOT)/compiler/libGLSLC
 VSC_DIR             := $(AQROOT)/compiler/libVSC
 VSC_Lite_DIR        := $(AQROOT)/compiler/libVSC_Lite
 
-VULKAN_DIR          := $(AQROOT)/driver/khronos/libVulkan10
+VULKAN_DIR          := $(AQROOT)/driver/khronos/libVulkan11
 SPIRV_DIR           := $(AQROOT)/compiler/libSPIRV
 
 VG113D_DIR          := $(AQROOT)/driver/khronos/libOpenVG_3D/vg11/driver
