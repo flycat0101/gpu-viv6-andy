@@ -199,10 +199,12 @@ viv_handle_create_buffer(struct wl_client *client,
     gcmONERROR(gcoSURF_GetAlignedSize(surface, &buffer->alignedWidth, &buffer->alignedHeight, gcvNULL));
     buffer->format = format;
 
+#if gcdENABLE_3D
     if(tsNode)
     {
         gcmGETHARDWAREADDRESS(surface->tileStatusNode, buffer->ts_addr);
     }
+#endif
     /* End freescale 2D composition. */
 
     buffer->fd = (gctINT32)fd;

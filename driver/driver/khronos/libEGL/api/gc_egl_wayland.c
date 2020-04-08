@@ -2017,10 +2017,35 @@ static gcePATCH_ID indirectList[] =
 
 #endif
 
+#if gcdENABLE_3D
 static EGLBoolean _CanSupport2DTilestatus()
 {
+    char *dir, *path;
+    FILE *fp = NULL;
+    int transform = 0;
+    int n = 0;
+
+    dir = getenv("XDG_RUNTIME_DIR");
+    path = malloc(strlen(dir) + 40);
+    strcpy(path, dir);
+    strcat(path, "/use-g2d-renderer");
+
+    fp = fopen(path, "r");
+    if(fp) {
+        n = fscanf(fp, "transform=%d", &transform);
+        fclose(fp);
+    }
+    free(path);
+
+    if(n == 1 && transform == 1)
+    {
+        return EGL_FALSE;
+    }
+
+
     return gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_FAST_CLEAR);
 }
+#endif
 
 static EGLBoolean
 _BindWindow(

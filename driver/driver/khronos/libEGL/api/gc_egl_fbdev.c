@@ -85,10 +85,10 @@ struct _FBDisplay
 
     struct _FBDisplay *     next;
     gctBOOL                 serverSide;
-
     /* FSL: external resolve and special PAN timing. */
     gctBOOL                 fbPrefetch;
     gctUINT32               bufferStatus;
+
 };
 
 /* Structure that defines a window. */
@@ -332,6 +332,7 @@ fbdev_GetDisplayByIndex(
             {
                 display->multiBuffer = 8;
             }
+
         }
 
         sprintf(fbDevName,"FB_FRAMEBUFFER_%d",DisplayIndex);
@@ -1011,7 +1012,6 @@ fbdev_SetDisplayVirtual(
             display->varInfo.xoffset  = X;
             display->varInfo.yoffset  = Y;
             display->varInfo.activate = FB_ACTIVATE_VBL;
-
             /* FSL: ywrap required. */
             if (display->varInfo.yoffset % display->varInfo.yres != 0)
             {
@@ -1023,7 +1023,6 @@ fbdev_SetDisplayVirtual(
             }
 
             ioctl(display->file, FBIOPAN_DISPLAY, &display->varInfo);
-
             {
                 /* FSL: buffer PAN'ed. */
                 gctINT index;
