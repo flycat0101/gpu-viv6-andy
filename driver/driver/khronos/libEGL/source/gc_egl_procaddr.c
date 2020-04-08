@@ -94,7 +94,11 @@
     esApiMacro(EGLImageTargetTexture2DOES), \
     esApiMacro(EGLImageTargetRenderbufferStorageOES), \
     esApiMacro(MultiDrawArraysEXT), \
-    esApiMacro(MultiDrawElementsEXT),
+    esApiMacro(MultiDrawElementsEXT), \
+    esApiMacro(TexDirectVIV), \
+    esApiMacro(TexDirectInvalidateVIV), \
+    esApiMacro(TexDirectVIVMap), \
+    esApiMacro(TexDirectTiledMapVIV),
 
 enum {
     __GLES_COMMON_API(COMMON_ES_INDEX,=0)
@@ -439,6 +443,27 @@ void GL_APIENTRY COMMON_ES_API(glMultiDrawElementsEXT)(GLenum mode, const GLsize
 {
     CALL_ES_API(PFNGLMULTIDRAWELEMENTSEXTPROC, MultiDrawElementsEXT, mode, count, type, indices, primcount);
 }
+
+void GL_APIENTRY COMMON_ES_API(glTexDirectVIV)(GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Pixels)
+{
+    CALL_ES_API(PFNGLTEXDIRECTVIVPROC, TexDirectVIV, Target, Width, Height, Format, Pixels);
+}
+
+void GL_APIENTRY COMMON_ES_API(glTexDirectInvalidateVIV)(GLenum Target)
+{
+    CALL_ES_API(PFNGLTEXDIRECTINVALIDATEVIVPROC, TexDirectInvalidateVIV, Target);
+}
+
+void GL_APIENTRY COMMON_ES_API(glTexDirectVIVMap)(GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Logical, const GLuint * Physical)
+{
+    CALL_ES_API(PFNGLTEXDIRECTVIVMAPPROC, TexDirectVIVMap, Target, Width, Height, Format, Logical, Physical);
+}
+
+void GL_APIENTRY COMMON_ES_API(glTexDirectTiledMapVIV)(GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Logical, const GLuint * Physical)
+{
+    CALL_ES_API(PFNGLTEXDIRECTTILEDMAPVIVPROC, TexDirectTiledMapVIV, Target, Width, Height, Format, Logical, Physical);
+}
+
 
 EGLAPI EGLBoolean EGLAPIENTRY eglPatchID(EGLenum *PatchID, EGLBoolean Set)
 {
