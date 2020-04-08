@@ -3727,6 +3727,7 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
     vx_bool                 is_roi_copy,
     vx_uint32               input_width,
     vx_uint32               input_height,
+    vx_bool                 enable_tf_avgPool,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
@@ -3881,6 +3882,15 @@ vxnne_shader_executable vxnneGPUL2NormSumScaleShaderExecutable(
     vx_border_mode_t        *borderMode,
     vx_tensor               input,
     vx_tensor               sumTmp,
+    vx_tensor               output);
+
+vxnne_shader_executable vxnneGetGPUReorgShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               stride,
+    vx_scalar               outc,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneGetGPUL2PoolingShaderExecutable(

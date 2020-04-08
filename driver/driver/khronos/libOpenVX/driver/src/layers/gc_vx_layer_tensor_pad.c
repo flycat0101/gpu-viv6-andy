@@ -1044,12 +1044,12 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
 
     outWidth  = TENSOR_VIEW_SIZE_INDEX(dst, 0);
     outHeight = TENSOR_VIEW_SIZE_INDEX(dst, 1);
-    outDepth = TENSOR_VIEW_SIZE_INDEX(dst, 2);
-    outBatch = TENSOR_VIEW_SIZE_INDEX(dst, 3);
-    inWidth  = TENSOR_VIEW_SIZE_INDEX(src, 0);
-    inHeight = TENSOR_VIEW_SIZE_INDEX(src, 1);
-    inDepth = TENSOR_VIEW_SIZE_INDEX(src, 2);
-    inBatch = TENSOR_VIEW_SIZE_INDEX(src, 3);
+    outDepth  = TENSOR_VIEW_SIZE_INDEX(dst, 2);
+    outBatch  = TENSOR_VIEW_SIZE_INDEX(dst, 3);
+    inWidth   = TENSOR_VIEW_SIZE_INDEX(src, 0);
+    inHeight  = TENSOR_VIEW_SIZE_INDEX(src, 1);
+    inDepth   = TENSOR_VIEW_SIZE_INDEX(src, 2);
+    inBatch   = TENSOR_VIEW_SIZE_INDEX(src, 3);
     vxoTensor_GetTensorViewMemory(pad_dims, (gctPOINTER*)&pad_base, VX_NULL);
 
     dataFormatFlag = (vx_bool)((inputFormat == outputFormat) && (inputElementSize & 3) && (inputFixPointPos == outputFixPointPos)
@@ -1105,24 +1105,47 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_GPU_Support(vx_node node, const vx_refere
     vx_tensor  dst = (vx_tensor)parameters[1];
     vx_scalar  padMode = (vx_scalar)parameters[3];
     vx_bool shader_flag = vx_false_e;
-    vx_bool dataFormatFlag = vx_false_e;
+    vx_bool dataFormatFlag  = vx_false_e;
+    vx_bool dataFormatFlag2 = vx_false_e;
     vx_enum pad_mode = padMode->value->e;
 
-    vx_enum    inputFormat             = TENSOR_DATA_TYPE(src);
-    vx_enum    outputFormat            = TENSOR_DATA_TYPE(dst);
+    vx_enum    inputFormat       = TENSOR_DATA_TYPE(src);
+    vx_enum    outputFormat      = TENSOR_DATA_TYPE(dst);
+    vx_int32   inputZeroPoint    = TENSOR_TF_ZEROPOINT(src);
+    vx_float32 inputScale        = TENSOR_TF_SCALE(src);
+    vx_int32   outputZeroPoint   = TENSOR_TF_ZEROPOINT(dst);
+    vx_float32 outputScale       = TENSOR_TF_SCALE(dst);
+    vx_uint32  indims            = TENSOR_DIM_NUM(src);
+    vx_uint32  outdims           = TENSOR_DIM_NUM(dst);
+    vx_int32   outDepth          = outdims > 2 ? TENSOR_VIEW_SIZE_INDEX(dst, 2) : 1;
+    vx_int32   outBatch          = outdims > 3 ? TENSOR_VIEW_SIZE_INDEX(dst, 3) : 1;
+    vx_int32   inDepth           = indims  > 2 ? TENSOR_VIEW_SIZE_INDEX(src, 2) : 1;
+    vx_int32   inBatch           = indims  > 3 ? TENSOR_VIEW_SIZE_INDEX(src, 3) : 1;
 
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
-    dataFormatFlag = (vx_bool)((inputFormat == outputFormat) && (inputFormat == VX_TYPE_FLOAT32));
+    dataFormatFlag = (vx_bool)((pad_mode == VX_PAD_CONSTANT) && (inputFormat == outputFormat) && (inputFormat == VX_TYPE_FLOAT32));
 
-    if(dataFormatFlag && pad_mode == VX_PAD_CONSTANT)
+
+    dataFormatFlag2 = (vx_bool)((inputFormat == outputFormat) && ((inputFormat == VX_TYPE_FLOAT32 || inputFormat == VX_TYPE_FLOAT16) ||
+                                ((inputFormat == VX_TYPE_UINT8) && (inputZeroPoint == outputZeroPoint) && (inputScale == outputScale))));
+
+    dataFormatFlag2 = dataFormatFlag2 && (vx_bool)(pad_mode == VX_PAD_REPLICATE && (outDepth == inDepth) && (outBatch == inBatch));
+
+    if(dataFormatFlag || dataFormatFlag2)
     {
         shader_flag = vx_true_e;
     }
 
     support = support && shader_flag;
+
+    if (support)
+    {
+        SETBIT(reg_param->flag, (dataFormatFlag == vx_true_e)?1:0, 0);
+        SETBIT(reg_param->flag, (dataFormatFlag2 == vx_true_e)?1:0, 1);
+    }
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -1358,24 +1381,66 @@ VX_PRIVATE_API vx_status vxoNNTensorPad2_GPU_Initialize(vxnne_layer ops_layer, c
     vx_tensor  src = (vx_tensor)parameters[0];
     vx_tensor  dst = (vx_tensor)parameters[1];
     vx_tensor  pad_dims = (vx_tensor)parameters[2];
+    vx_scalar  padMode = (vx_scalar)parameters[3];
     vx_scalar  padConst = (vx_scalar)parameters[4];
     vx_uint32  batchCount = TENSOR_SIZE_INDEX(src, 3);
 
     vx_int32_ptr pad_base = VX_NULL;
     vxnne_tensor_pad  padNode = (vxnne_tensor_pad)ops_layer;
-    vxnne_shader_executable shaderExecutable;
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vx_bool dataFormatFlag    = GETBIT(reg_param->flag, 0);
+    vx_bool dataFormatFlag2   = GETBIT(reg_param->flag, 1);
+
+
+
 
     vxoTensor_GetTensorViewMemory(pad_dims, (gctPOINTER*)&pad_base, VX_NULL);
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
-    shaderExecutable = vxnneGetGPUTensorPad2ShaderExecutable(ops_layer->node->base.context,
-            VXNNE_KERNEL_GPU_TENSOR_PAD2,
-            &ops_layer->node->kernelAttributes.borderMode,
-            src,
-            padConst,
-            dst,
-            pad_base);
+    if (dataFormatFlag)
+    {
+        shaderExecutable = vxnneGetGPUTensorPad2ShaderExecutable(ops_layer->node->base.context,
+                VXNNE_KERNEL_GPU_TENSOR_PAD2,
+                &ops_layer->node->kernelAttributes.borderMode,
+                src,
+                padConst,
+                dst,
+                pad_base);
+    }
+    else if (dataFormatFlag2)
+    {
+        vx_int32 left_h_padding = 0, left_w_padding = 0;
+        vx_int32  right_h_padding = 0, right_w_padding = 0;
+        vx_scalar padLeft                        = VX_NULL;
+        vx_scalar padTop                         = VX_NULL;
+        vx_scalar padRight                       = VX_NULL;
+        vx_scalar padBottom                        = VX_NULL;
+
+        left_h_padding  = pad_base[2];
+        left_w_padding  = pad_base[0];
+        right_h_padding = pad_base[3];
+        right_w_padding = pad_base[1];
+        padLeft         = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_INT32, &left_w_padding);
+        padTop          = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_INT32, &left_h_padding);
+        padRight        = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_INT32, &right_w_padding);
+        padBottom       = vxCreateScalar(ops_layer->node->base.context, VX_TYPE_INT32, &right_h_padding);
+        shaderExecutable = vxnneGetGPUTensorPadShaderExecutable(ops_layer->node->base.context,
+                                                                VXNNE_KERNEL_GPU_TENSOR_PAD,
+                                                                &ops_layer->node->kernelAttributes.borderMode,
+                                                                src,
+                                                                padLeft,
+                                                                padRight,
+                                                                padTop,
+                                                                padBottom,
+                                                                padMode,
+                                                                padConst,
+                                                                dst);
+        if(padLeft) vxReleaseScalar(&padLeft);
+        if(padTop) vxReleaseScalar(&padTop);
+        if(padBottom) vxReleaseScalar(&padBottom);
+        if(padRight) vxReleaseScalar(&padRight);
+    }
 
     if (!shaderExecutable)
     {
