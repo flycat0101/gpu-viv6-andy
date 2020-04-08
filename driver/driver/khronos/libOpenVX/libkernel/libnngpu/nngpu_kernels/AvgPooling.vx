@@ -70,6 +70,7 @@ __kernel void gpuPooling_AvgPadFP32(__read_only image2d_array_t   input,
                                       int strideY,
                                       int padX,
                                       int padY,
+                                      int enable_tf,
                                       __write_only image2d_array_t  output)
 {
     int x = get_global_id(0);
@@ -97,7 +98,14 @@ __kernel void gpuPooling_AvgPadFP32(__read_only image2d_array_t   input,
         }
     }
 
-    tmpOut.x = tmpOut.x/convert_float(count);
+    if (enable_tf)
+    {
+        tmpOut.x = tmpOut.x/convert_float(count);
+    }
+    else
+    {
+        tmpOut.x = tmpOut.x/convert_float(filterX * filterY);
+    }
 
     write_imagef(output, (int4)(x, y, z, 0), tmpOut);
 }
@@ -113,6 +121,7 @@ __kernel void gpuPooling_AvgPadQuant8(__read_only image2d_array_t   input,
                                       int   zeroPointOut,
                                       int   padX,
                                       int   padY,
+                                      int   enable_tf,
                                       __write_only image2d_array_t  output)
 {
     int x = get_global_id(0);
@@ -141,8 +150,14 @@ __kernel void gpuPooling_AvgPadQuant8(__read_only image2d_array_t   input,
             count++;
         }
     }
-
-    tmpOut.x = tmpOut.x/convert_float(count);
+    if (enable_tf)
+    {
+        tmpOut.x = tmpOut.x/convert_float(count);
+    }
+    else
+    {
+        tmpOut.x = tmpOut.x/convert_float(filterX * filterY);
+    }
     tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
 
     write_imageui(output, (int4)(x, y, z, 0), tmp);
@@ -515,6 +530,7 @@ __kernel void gpuPooling_AvgPadFP32_opt(__read_only image2d_array_t   input,
                                       int strideY,
                                       int padX,
                                       int padY,
+                                      int enable_tf,
                                       __write_only image2d_array_t  output)
 {
     int x = get_global_id(0);
@@ -554,7 +570,14 @@ __kernel void gpuPooling_AvgPadFP32_opt(__read_only image2d_array_t   input,
         }
     }
     sum += tmpOut.x + tmpOut.y + tmpOut.z + tmpOut.w;
-    tmpOut.x = sum/convert_float(count);
+    if (enable_tf)
+    {
+        tmpOut.x = sum/convert_float(count);
+    }
+    else
+    {
+        tmpOut.x = sum/convert_float(filterX * filterY);
+    }
 
     write_imagef(output, (int4)(x, y, z, 0), tmpOut);
 }
@@ -570,6 +593,7 @@ __kernel void gpuPooling_AvgPadQuant8_opt(__read_only image2d_array_t   input,
                                       int   zeroPointOut,
                                       int   padX,
                                       int   padY,
+                                      int   enable_tf,
                                       __write_only image2d_array_t  output)
 {
     int x = get_global_id(0);
@@ -611,7 +635,15 @@ __kernel void gpuPooling_AvgPadQuant8_opt(__read_only image2d_array_t   input,
     }
     tmpSum += tmp.x + tmp.y + tmp.z + tmp.w;
     tmpOut.x = convert_int(tmpSum - count * zeroPointIn) * scaleIn;
-    tmpOut.x = tmpOut.x/convert_float(count);
+    if (enable_tf)
+    {
+        tmpOut.x = tmpOut.x/convert_float(count);
+    }
+    else
+    {
+        tmpOut.x = tmpOut.x/convert_float(filterX * filterY);
+    }
+
     tmp.x = floor(tmpOut.x*scaleOut + zeroPointOut + 0.5);
 
     write_imageui(output, (int4)(x, y, z, 0), tmp);

@@ -780,7 +780,7 @@ VX_PRIVATE_API vx_status vxoNNTensorMean_SH_EVIS_Initialize_Ext(vxnne_layer ops_
         else
         {
             shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_AVGPOOLING, &ops_layer->node->kernelAttributes.borderMode,
-                transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, pad_x_left, pad_y_top, NULL, vx_false_e, 0, 0, dst);
+                transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, pad_x_left, pad_y_top, NULL, vx_false_e, 0, 0, vx_false_e, dst);
         }
 
         if (stride_s)  vxReleaseScalar(&stride_s);
@@ -1422,7 +1422,7 @@ OnError:
             else
             {
                 shaderExecutable = vxnneGetGPUAvgPoolingShaderExecutable(node->base.context, VXNNE_KERNEL_GPU_AVGPOOLING, &node->kernelAttributes.borderMode,
-                    transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, pad_x_left, pad_y_top, NULL, vx_false_e, 0, 0, dst);
+                    transTensor, NULL, stride_s, stride_s, poolSizeX, poolSizeY, pad_x_left, pad_y_top, pad_x_left, pad_y_top, NULL, vx_false_e, 0, 0, vx_false_e, dst);
             }
 
             if (stride_s)  vxReleaseScalar(&stride_s);

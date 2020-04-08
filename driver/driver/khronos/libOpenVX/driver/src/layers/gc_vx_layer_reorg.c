@@ -53,8 +53,8 @@ vx_status vxnneExecuteSWReorg(struct _vxnne_operation_s *operation)
     vxoTensor_GetTensorViewMemory(inputs, &inputBase, VX_NULL);
     vxoTensor_GetTensorViewMemory(outputs, &outputBase, VX_NULL);
 
-    if ((TENSOR_DATA_TYPE(inputs) != VX_TYPE_BFLOAT16 && TENSOR_DATA_TYPE(inputs) != VX_TYPE_FLOAT16 && TENSOR_DATA_TYPE(inputs) != VX_TYPE_FLOAT32 && TENSOR_DATA_TYPE(inputs) != VX_TYPE_INT8)
-        || (TENSOR_DATA_TYPE(outputs) != VX_TYPE_BFLOAT16 && TENSOR_DATA_TYPE(outputs) != VX_TYPE_FLOAT16 && TENSOR_DATA_TYPE(outputs) != VX_TYPE_FLOAT32 && TENSOR_DATA_TYPE(outputs) != VX_TYPE_INT8))
+    if ((TENSOR_DATA_TYPE(inputs) != VX_TYPE_BFLOAT16 && TENSOR_DATA_TYPE(inputs) != VX_TYPE_FLOAT16 && TENSOR_DATA_TYPE(inputs) != VX_TYPE_FLOAT32 && TENSOR_DATA_TYPE(inputs) != VX_TYPE_INT8 && TENSOR_DATA_TYPE(inputs) != VX_TYPE_UINT8)
+        || (TENSOR_DATA_TYPE(outputs) != VX_TYPE_BFLOAT16 && TENSOR_DATA_TYPE(outputs) != VX_TYPE_FLOAT16 && TENSOR_DATA_TYPE(outputs) != VX_TYPE_FLOAT32 && TENSOR_DATA_TYPE(outputs) != VX_TYPE_INT8 && TENSOR_DATA_TYPE(outputs) != VX_TYPE_UINT8))
     {
         vxError("input or outputs format is not support");
         status = VX_ERROR_NOT_SUPPORTED;
@@ -137,7 +137,7 @@ OnError:
     return status;
 }
 
-VX_PRIVATE_API vx_bool vxoNNReorgLayer_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+VX_PRIVATE_API vx_bool vxoNNReorgLayer_SH_Support_Ext(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
 {
     vx_tensor  inputs = (vx_tensor)parameters[0];
     vx_scalar  stride_s = (vx_scalar)parameters[1];
@@ -150,24 +150,59 @@ VX_PRIVATE_API vx_bool vxoNNReorgLayer_SH_Support(vx_node node, const vx_referen
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
-    if (!support)return support;
-
-    /*support = support && node->base.context->evisNoInst.supportEVIS;*/
-
-    if (!support)return support;
-
-    support = support && (((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8))
-                        || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
-                        || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16));
-
+    if (evis)
+    {
+        support = support && (((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT8))
+                            || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                            || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16));
+    }
+    else
+    {
+        support = support && ((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+                             || ((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32)));
+    }
     support = support && (stride == 2);
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+
+VX_PRIVATE_API vx_bool vxoNNReorgLayer_SH_Evis_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && node->base.context->evisNoInst.supportEVIS;
+
+    if (!support)return support;
+
+    support = support && vxoNNReorgLayer_SH_Support_Ext(node, parameters, num, reg_param, vx_true_e);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
     return support;
 }
 
-VX_PRIVATE_API vx_status vxoNNReorgLayer_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+VX_PRIVATE_API vx_bool vxoNNReorgLayer_SH_Support(vx_node node, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+
+    vxoLayer_VerificationHead(node, parameters, num, reg_param);
+
+    if (!support)return support;
+
+    support = support && vxoNNReorgLayer_SH_Support_Ext(node, parameters, num, reg_param, vx_false_e);
+
+    vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
+
+    return support;
+}
+
+VX_PRIVATE_API vx_status vxoNNReorgLayer_SH_Initialize_Ext(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param, vx_bool evis)
 {
     vx_status status = VX_SUCCESS;
 
@@ -186,8 +221,16 @@ VX_PRIVATE_API vx_status vxoNNReorgLayer_SH_Initialize(vxnne_layer ops_layer, co
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
 
-    shaderExecutable = vxnneGetReorgShaderExecutable(context, VXNNE_KERNEL_REORG, &ops_layer->node->kernelAttributes.borderMode,
-        inputs, stride_s, outc_s, outputs);
+    if (evis)
+    {
+        shaderExecutable = vxnneGetReorgShaderExecutable(context, VXNNE_KERNEL_REORG, &ops_layer->node->kernelAttributes.borderMode,
+            inputs, stride_s, outc_s, outputs);
+    }
+    else
+    {
+        shaderExecutable = vxnneGetGPUReorgShaderExecutable(context, VXNNE_KERNEL_GPU_REORG, &ops_layer->node->kernelAttributes.borderMode,
+            inputs, stride_s, outc_s, outputs);
+    }
 
     if (!shaderExecutable)
     {
@@ -214,6 +257,34 @@ VX_PRIVATE_API vx_status vxoNNReorgLayer_SH_Initialize(vxnne_layer ops_layer, co
 
 OnError:
     if (!outc_s) vxReleaseScalar(&outc_s);
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNReorgLayer_SH_EVIS_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNReorgLayer_SH_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_true_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoNNReorgLayer_SH_Initialize(vxnne_layer ops_layer, const vx_reference parameters[], vx_uint32 num, vxnne_register_param reg_param)
+{
+    vx_status status = VX_SUCCESS;
+
+    vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmONERROR(vxoNNReorgLayer_SH_Initialize_Ext(ops_layer, parameters, num, reg_param, vx_false_e));
+
+    vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
+
+OnError:
     return status;
 }
 
@@ -311,8 +382,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoNNReorgLayer_Initializer(vx_node node, c
     vxnne_layer_imp_s registerReorgLayers[] = {/* Please DON'T adjust the order, it's importent */
         { "ReorgLayer NN", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
         { "ReorgLayer TP", vxoNNReorgLayer_TP_Support, vxoNNReorgLayer_TP_Initialize, vxoNNCommon_Deinitialize },
-        { "ReorgLayer SH EVIS", vxoNNReorgLayer_SH_Support, vxoNNReorgLayer_SH_Initialize, VX_NULL },
-        { "ReorgLayer SH F32", vxoNNCommon_NotSupport, vxoNNLayer_NotSupport_Initializer, VX_NULL },
+        { "ReorgLayer SH EVIS", vxoNNReorgLayer_SH_Evis_Support, vxoNNReorgLayer_SH_EVIS_Initialize, VX_NULL },
+        { "ReorgLayer SH F32", vxoNNReorgLayer_SH_Support, vxoNNReorgLayer_SH_Initialize, VX_NULL },
         { "ReorgLayer SW ", vxoNNCommon_Support, vxoNNReorgLayer_SW_Initialize, VX_NULL },
     };
 
