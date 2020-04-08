@@ -253,10 +253,10 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
         desc.physical = gcvINVALID_PHYSICAL_ADDRESS;
 
         /*TODO: add more check to make sure memory size 4k alignment*/
-        desc.size     = gcmALIGN((gctUINT32)memory->sizes[planeIndex], 0x1000);
+        desc.size     = gcmALIGN((gctUINT32)memory->sizes[planeIndex], VX_WRAP_USER_MEMORY_SIZE_ALIGNMENT);
 
         /*page size alignment for CPU*/
-        if(desc.logical & 0x3f || desc.size & 0xfff ) goto ErrorExit;
+        if(desc.logical & 0x3f) goto ErrorExit;
 
         memory->wrappedSize[planeIndex] = desc.size;
 

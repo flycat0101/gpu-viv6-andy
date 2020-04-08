@@ -51,6 +51,12 @@ enum vx_graph_attribute_internal_type_e
     VX_GRAPH_DEVICE_INDEX_VIV                     =  VX_ATTRIBUTE_BASE(VX_ID_VIVANTE, VX_TYPE_GRAPH) + 0x0,
 };
 
+/*! \brief Size Alignment of User Memory
+ * \0x40   64Byte Align
+ * \0x1000 4k Align
+ */
+#define VX_WRAP_USER_MEMORY_SIZE_ALIGNMENT (0x40)
+
 /*==============================================================================
 CONVOLUTIONAL_NETWORK structs and enums
 =============================================================================*/
