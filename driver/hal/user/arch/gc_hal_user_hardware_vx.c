@@ -31487,8 +31487,8 @@ static gceSTATUS _optLKTracker_no_bilinear(
 
     if(1==maxLevel)
     {
-        if(isUseInitialEstimate) OPT_INS_COUNT[0] = 119 - 7 + 5;
-        else OPT_INS_COUNT[0] = 118 - 7 + 5;
+        if(isUseInitialEstimate) OPT_INS_COUNT[0] = 129 - 7 + 5;
+        else OPT_INS_COUNT[0] = 128 - 7 + 5;
     }
     else
     {
