@@ -891,7 +891,7 @@ gceSTATUS _ResolveTileStatusFilter(
 
     /* Backup the original settings*/
     gcoOS_MemCopy(OrigSrc, srcSurface, sizeof(state->dstSurface));
-    gcoOS_MemCopy(OrigDest, srcSurface, sizeof(state->dstSurface));
+    gcoOS_MemCopy(OrigDest, dstSurface, sizeof(state->dstSurface));
     gcoOS_MemCopy(&OrigCurSrc, pCurSrc, sizeof(gcs2D_MULTI_SOURCE));
     gcoOS_MemCopy(&OrigState, state, sizeof(gcs2D_State));
 
@@ -922,12 +922,12 @@ gceSTATUS _ResolveTileStatusFilter(
     gcoOS_MemCopy(pCurSrc, &OrigCurSrc, sizeof(gcs2D_MULTI_SOURCE));
     gcoOS_MemCopy(&pCurSrc->srcSurface, OrigSrc, sizeof(state->dstSurface));
     _CopySurfaceMemoryInfo(&pCurSrc->srcSurface, tempSurf);
-    gcoOS_MemCopy(srcSurface, OrigDest, sizeof(state->dstSurface));
+    gcoOS_MemCopy(dstSurface, OrigDest, sizeof(state->dstSurface));
     gcmONERROR(gcoHARDWARE_FilterBlit(
         hardware,
         state,
-        tempSurf,
         srcSurface,
+        dstSurface,
         SrcRect,
         dstRect,
         DstSubRect
