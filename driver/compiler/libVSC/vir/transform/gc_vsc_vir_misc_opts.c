@@ -5676,6 +5676,80 @@ static void _vscVIR_ConvertIntegerInstructionToFloat(
 
     switch(opcode)
     {
+        case VIR_OP_DIV:
+        {
+            VIR_Operand* dest = VIR_Inst_GetDest(inst);
+            VIR_Operand* src = VIR_Inst_GetSource(inst, 0);
+            if(VIR_GetTypeComponentType(VIR_Operand_GetTypeId(dest)) == VIR_GetTypeComponentType(VIR_Operand_GetTypeId(src)))
+            {
+                if(ConvertedDest)
+                {
+                    VIR_Function* func = VIR_Inst_GetFunction(inst);
+                    VIR_TypeId destTypeId = VIR_Operand_GetTypeId(dest);
+                    VIR_Enable newEnable = VIR_Operand_GetEnable(VIR_Inst_GetDest(inst));
+                    VIR_Swizzle newSwizzle = VIR_Enable_2_Swizzle_WShift(newEnable);
+
+                    gcmASSERT(VIR_GetTypeComponentType(destTypeId) == VIR_TYPE_FLOAT32);
+
+                    if(!supportInteger && hasSignFloorCeil)
+                    {
+                        VIR_VirRegId newRegId;
+                        VIR_SymId signDestSymId, absDestSymId;
+                        VIR_Symbol* signDestSym, *absDestSym;
+                        VIR_Instruction* signInst, *absInst, *floorInst, *mulInst;
+
+                        VIR_Function_AddInstructionAfter(func, VIR_OP_MUL, destTypeId, inst, gcvTRUE, &mulInst);
+                        VIR_Operand_Copy(VIR_Inst_GetDest(mulInst), dest);
+                        VIR_Function_AddInstructionAfter(func, VIR_OP_FLOOR, destTypeId, inst, gcvTRUE, &floorInst);
+                        VIR_Function_AddInstructionAfter(func, VIR_OP_ABS, destTypeId, inst, gcvTRUE,&absInst);
+                        VIR_Operand_Copy(VIR_Inst_GetSource(absInst, 0), dest);
+                        VIR_Operand_Change2Src(VIR_Inst_GetSource(absInst, 0));
+                        VIR_Function_AddInstructionAfter(func, VIR_OP_SIGN, destTypeId, inst, gcvTRUE, &signInst);
+                        VIR_Operand_Copy(VIR_Inst_GetSource(signInst, 0), dest);
+                        VIR_Operand_Change2Src(VIR_Inst_GetSource(signInst, 0));
+
+                        /* update the dest of sign */
+                        newRegId = VIR_Shader_NewVirRegId(pShader, 1);
+                        VIR_Shader_AddSymbol(pShader,
+                                             VIR_SYM_VIRREG,
+                                             newRegId,
+                                             VIR_Shader_GetTypeFromId(pShader, destTypeId),
+                                             VIR_STORAGE_UNKNOWN,
+                                             &signDestSymId);
+                        signDestSym = VIR_Shader_GetSymFromId(pShader, signDestSymId);
+                        VIR_Symbol_SetPrecision(signDestSym, VIR_PRECISION_MEDIUM);
+                        VIR_Operand_SetSymbol(VIR_Inst_GetDest(signInst), func, signDestSymId);
+                        VIR_Operand_SetEnable(VIR_Inst_GetDest(signInst), newEnable);
+
+                        /* update the dest of abs */
+                        newRegId = VIR_Shader_NewVirRegId(pShader, 1);
+                        VIR_Shader_AddSymbol(pShader,
+                                             VIR_SYM_VIRREG,
+                                             newRegId,
+                                             VIR_Shader_GetTypeFromId(pShader, destTypeId),
+                                             VIR_STORAGE_UNKNOWN,
+                                             &absDestSymId);
+                        absDestSym = VIR_Shader_GetSymFromId(pShader, absDestSymId);
+                        VIR_Symbol_SetPrecision(absDestSym, VIR_Operand_GetPrecision(VIR_Inst_GetSource(absInst, 0)));
+                        VIR_Operand_SetSymbol(VIR_Inst_GetDest(absInst), func, absDestSymId);
+                        VIR_Operand_SetEnable(VIR_Inst_GetDest(absInst), newEnable);
+
+                        /* update the dest and src of floor */
+                        VIR_Operand_SetSymbol(VIR_Inst_GetDest(floorInst), func, absDestSymId);
+                        VIR_Operand_SetEnable(VIR_Inst_GetDest(floorInst), newEnable);
+                        VIR_Operand_SetSymbol(VIR_Inst_GetSource(floorInst, 0), func, absDestSymId);
+                        VIR_Operand_SetSwizzle(VIR_Inst_GetSource(floorInst, 0), newSwizzle);
+
+                        /* update src0 and src1 of abs */
+                        VIR_Operand_SetSymbol(VIR_Inst_GetSource(mulInst, 0), func, signDestSymId);
+                        VIR_Operand_SetSwizzle(VIR_Inst_GetSource(mulInst, 0), newSwizzle);
+                        VIR_Operand_SetSymbol(VIR_Inst_GetSource(mulInst, 1), func, absDestSymId);
+                        VIR_Operand_SetSwizzle(VIR_Inst_GetSource(mulInst, 1), newSwizzle);
+                    }
+                }
+            }
+        }
+        break;
         case VIR_OP_CONVERT:
         {
             VIR_Operand* dest = VIR_Inst_GetDest(inst);
