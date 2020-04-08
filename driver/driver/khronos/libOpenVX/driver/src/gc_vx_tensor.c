@@ -2775,6 +2775,11 @@ vxoTensor_Destructor(
         vx_context context = GET_CONTEXT(tensor);
         context->allTensorNum--;
 
+        if (tensor->tensorBuffer->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
+        {
+            vxoTensor_FreeWrappedMemory(tensor);
+        }
+
         vxoTensor_ReleaseMemory(tensor);
 
         vxFree(tensor->tensorBuffer);
