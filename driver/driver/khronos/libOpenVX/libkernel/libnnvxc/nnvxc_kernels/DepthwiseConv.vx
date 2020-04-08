@@ -857,6 +857,9 @@ __kernel void vxcDepthwiseConv_U8kernelWidthLE5(
     VXC_WriteImage2DArray(output, coord_out, dst, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
 }
 
+_viv_uniform float inZpMulWeZp5x;
+_viv_uniform float inZpMulWeZpRem;
+
 __kernel void vxcDepthwiseConv_U8kernelWidthGT5(
     __read_only image2d_array_t input,
     __read_only image2d_array_t weight,
@@ -881,7 +884,7 @@ __kernel void vxcDepthwiseConv_U8kernelWidthGT5(
     int4 coord_in = (int4)(inxStart, inyStart, inz, 0);
     int2 coord_wei = (int2)(0, coord_out.z);
     int bival;
-    bival = read_imagei(bias, coord_wei.yx).x + ksZPinZPwe;
+    bival = read_imagei(bias, coord_wei.yx).x;
     float sum;
     sum = convert_float(bival);
 
@@ -907,6 +910,7 @@ __kernel void vxcDepthwiseConv_U8kernelWidthGT5(
                     float tmp;
                     VXC_DP16x1(tmp, inval, weval, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), uniU8MulAccumtoF32_dp16x1);
                     sum += tmp;
+                    sum += inZpMulWeZp5x;
                 }
             }
 
@@ -918,6 +922,7 @@ __kernel void vxcDepthwiseConv_U8kernelWidthGT5(
                 float tmp;
                 VXC_DP16x1(tmp, inval, weval, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), uniU8MulAccumNtoF32_dp16x1);
                 sum += tmp;
+                sum += inZpMulWeZpRem;
             }
         }
     }

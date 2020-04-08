@@ -15554,7 +15554,6 @@ vxnne_shader_executable vxnneRPNRegressionShaderExecutable(
     };
     */
 
-
     vx_bool is_float32_output = vx_false_e;
     vx_uint32 imgWid = 0, imgHei = 0, imgChe = 0;
 
@@ -24432,15 +24431,17 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     }
     else if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_UINT8)
     {
-        vx_int32 x_len_4x       = kernel_width / 4;
-        vx_int32 x_len_remain   = kernel_width % 4;
-        vx_int32 x_len_5x       = kernel_width / 5;
-        vx_int32 x_len5x_remain = kernel_width % 5;
-        vx_uint32 packZPin      = (inputZP << 16) | inputZP;
-        vx_uint32 packZPwe      = (weightZP << 16) | weightZP;
-        vx_int32 ksZPinZPwe     = kernel_width * kernel_height * inputZP * weightZP;
-        vx_float32 outScale     = biasScale / outputScale;
-        vx_float32 outZP        = (vx_float32)outputZP;
+        vx_int32 x_len_4x         = kernel_width / 4;
+        vx_int32 x_len_remain     = kernel_width % 4;
+        vx_int32 x_len_5x         = kernel_width / 5;
+        vx_int32 x_len5x_remain   = kernel_width % 5;
+        vx_uint32 packZPin        = (inputZP << 16) | inputZP;
+        vx_uint32 packZPwe        = (weightZP << 16) | weightZP;
+        vx_int32 ksZPinZPwe       = kernel_width * kernel_height * inputZP * weightZP;
+        vx_float32 outScale       = biasScale / outputScale;
+        vx_float32 outZP          = (vx_float32)outputZP;
+        vx_float32 inZpMulWeZp5x  = (vx_float32)(5 * inputZP * weightZP);
+        vx_float32 inZpMulWeZpRem = (vx_float32)(x_len5x_remain * inputZP * weightZP);
         vx_uint32 uniFp16MulAccumtoF32_dp4x4[16] = {
             0x00000055, // TCfg
             0x00000000, // ASelt
@@ -24513,6 +24514,8 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "ksZPinZPwe", 1, &ksZPinZPwe);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outScale", 1, &outScale);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outZP", 1, &outZP);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inZpMulWeZp5x", 1, &inZpMulWeZp5x);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inZpMulWeZpRem", 1, &inZpMulWeZpRem);
 
         if (status != VX_SUCCESS) goto OnError;
     }
