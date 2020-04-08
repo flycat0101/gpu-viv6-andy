@@ -22,7 +22,7 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <gc_hal.h>
-#include <gc_hal_base.h>
+#include <gc_hal_user.h>
 #include <shared/gc_hal_driver.h>
 #include <gc_hal_raster.h>
 #include <gc_hal_engine_vg.h>
@@ -31,7 +31,7 @@
 #include "g2dExt.h"
 #include "gpuhelper.h"
 
-#include <cutils/log.h>
+#include <log/log.h>
 
 #if defined(LOGE)
 #define g2d_printf LOGE
@@ -336,3 +336,41 @@ int hwc_align_tile(int *width, int *height, int format, int usage)
     return 0;
 }
 
+#if ANDROID_SDK_VERSION >= 29
+int hwc_get_tileStatus(buffer_handle_t hnd, struct g2d_surfaceEx *surfaceX)
+{
+    gcoSURF surface;
+    static const int sMagic = 0x3141592;
+    gceSURF_TYPE type = gcvSURF_TYPE_UNKNOWN;
+    const struct private_handle_t* handle = (struct private_handle_t*)hnd;
+
+    if (!hnd || hnd->version != sizeof(native_handle_t)
+            || handle->magic != sMagic)
+    {
+        g2d_printf("invalid gralloc handle (at %p)", hnd);
+        return -1;
+    }
+
+    surface = (gcoSURF) (handle->surface);
+
+    if (surface != NULL) {
+        unsigned int ts_addr;
+        gctUINT32 tsNode = surface->tileStatusNode.u.normal.node;
+
+        if(tsNode && !surface->tileStatusDisabled[0])
+        {
+            gcmGETHARDWAREADDRESS(surface->tileStatusNode, ts_addr);
+
+            if (ts_addr) {
+                surfaceX->tiling = (enum g2d_tiling)(surfaceX->tiling | G2D_TILED_STATUS);
+                surfaceX->ts.ts_addr = ts_addr;
+                surfaceX->ts.fc_enabled = !surface->tileStatusDisabled[0];
+                surfaceX->ts.fc_value = surface->fcValue[0];
+                surfaceX->ts.fc_value_upper = surface->fcValueUpper[0];
+            }
+        }
+    }
+
+    return 0;
+}
+#endif
