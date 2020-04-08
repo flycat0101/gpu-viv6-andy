@@ -69,6 +69,8 @@ VX_PRIVATE_API vx_status vxoNNSWDepthwiseConvolution(struct _vxnne_operation_s *
     vx_scalar downScaleSizeRounding = dcOperation->downScaleSizeRounding;
     vx_scalar strideX   = dcOperation->stride_x;
     vx_scalar strideY   = dcOperation->stride_y;
+    vx_scalar dilationX = dcOperation->dilationX;
+    vx_scalar dilationY = dcOperation->dilationY;
 
     vx_int32 channel_multiplier;
 
@@ -91,6 +93,9 @@ VX_PRIVATE_API vx_status vxoNNSWDepthwiseConvolution(struct _vxnne_operation_s *
     vx_float64 sum = .0f, in = .0f, weight = .0f;
     vx_int32 strideXvalue = 1, strideYvalue = 1;
     vx_int32 b = 0, d = 0, h = 0, w = 0, dm = 0, m = 0, n = 0, kstart_x = 0, kstart_y = 0;
+    vx_int32 dilation_x = (dilationX) ? dilationX->value->n32 + 1 : 1;
+    vx_int32 dilation_y = (dilationY) ? dilationY->value->n32 + 1 : 1;
+
 
     if (strideX)
     {
@@ -149,28 +154,43 @@ VX_PRIVATE_API vx_status vxoNNSWDepthwiseConvolution(struct _vxnne_operation_s *
             for (h = 0; h < output_height; h ++)
             {
                 vx_int32 y_start = h * strideYvalue - pad_top;
-                vx_int32 y_end = gcmMIN((y_start + kernel_height), input_height);
+                vx_int32 y_end = gcmMIN((y_start + kernel_height * dilation_y), input_height);
 
-                kstart_y = (y_start < 0) ? -y_start : 0;
+                kstart_y = (y_start < 0) ? (gcmALIGN_NP2_SAFE(-y_start, dilation_y) / dilation_y) : 0;
                 y_start = gcmMAX(0, y_start);
+                if (y_start < 0 && dilation_y > 1)
+                {
+                    y_start = gcmMAX(y_start, (h * strideYvalue) % dilation_y);
+                }
+                else
+                {
+                    y_start = gcmMAX(y_start, 0);
+                }
 
                 for (w = 0; w < output_width; w ++)
                 {
                     vx_int32 x = 0, y = 0;
                     vx_int32 x_start = w * strideXvalue - pad_left;
-                    vx_int32 x_end = gcmMIN((x_start + kernel_width), input_width);
+                    vx_int32 x_end = gcmMIN((x_start + kernel_width * dilation_x), input_width);
 
-
-                    kstart_x = (x_start < 0)?-x_start:0;
+                    kstart_x = (x_start < 0) ? (gcmALIGN_NP2_SAFE(-x_start, dilation_x) / dilation_x) : 0;
                     x_start = gcmMAX(0, x_start);
+                    if (x_start < 0 && dilation_x > 1)
+                    {
+                        x_start = gcmMAX(x_start, (w * strideXvalue) % dilation_x);
+                    }
+                    else
+                    {
+                        x_start = gcmMAX(x_start, 0);
+                    }
 
                     sum = 0.f;
 
                     if (input_base_offset != -1)
                     {
-                        for (y = y_start, n = kstart_y; y < y_end; y++, n ++)
+                        for (y = y_start, n = kstart_y; y < y_end; y += dilation_y, n ++)
                         {
-                            for (x = x_start, m = kstart_x; x < x_end; x++, m ++)
+                            for (x = x_start, m = kstart_x; x < x_end; x += dilation_x, m ++)
                             {
                                 in = VX_GET_DATA_FROM_TENSOR(inputs, y * input_width + x + input_base_offset);
                                 weight = VX_GET_DATA_FROM_TENSOR(weights, n * kernel_width + m + (d + dm) * kernel_width * kernel_height);
@@ -322,6 +342,11 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_SH_EVIS_Support_Ext(vx_node node,
     vx_bool  dataformat_flag[4] = { vx_false_e };
 
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+    vx_scalar dilationX  = (vx_scalar)parameters[9];
+    vx_scalar dilationY  = (vx_scalar)parameters[10];
+    vx_int32  dilation_x = dilationX->value->n32 + 1;
+    vx_int32  dilation_y = dilationY->value->n32 + 1;
+    vx_bool   is_support_dilation = vx_true_e;
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
@@ -334,6 +359,10 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_SH_EVIS_Support_Ext(vx_node node,
         dataformat_flag[3] = (vx_bool)(inputFormat == VX_TYPE_INT16 && weightFormat == VX_TYPE_INT16
             && (biasFormat == VX_TYPE_INT32 || biasFormat == VX_TYPE_INT64)
             && outputFormat == VX_TYPE_INT16);
+        if ((biases == VX_NULL) && ((1 != dilation_x) || (1 != dilation_y)))
+        {
+            is_support_dilation = vx_false_e;
+        }
     }
     else
     {
@@ -346,7 +375,7 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_SH_EVIS_Support_Ext(vx_node node,
     dataformat_flag[2] = (vx_bool)(inputFormat == VX_TYPE_INT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT8);
 
     support = support && (vx_bool)((dataformat_flag[0] || dataformat_flag[1] || dataformat_flag[2] || dataformat_flag[3]) && biases);
-
+    support = support && is_support_dilation;
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
     return support;
@@ -547,8 +576,9 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
     vx_context context = vxGetContext((vx_reference)inputs);
     vx_uint32  operation_idx = 0;
     vx_uint32  numTmpTensor = 0;
-
-    vx_uint32  batchCount = TENSOR_SIZE_INDEX(inputs, 3);
+    vx_int32   dilation_x  = dilationX->value->n32 + 1;
+    vx_int32   dilation_y  = dilationY->value->n32 + 1;
+    vx_uint32  batchCount  = TENSOR_SIZE_INDEX(inputs, 3);
 
     vxnne_shader_executable shaderExecutable = NULL;
     vx_tensor               newBiases = NULL;
@@ -712,7 +742,10 @@ VX_PRIVATE_API vx_status vxoNNDepthwiseConvLayer_SH_Initialize(vxnne_layer ops_l
         {
             is_static_weights_biases = (vx_bool)(CHECK_LIFETIME_IS_STATIC(weights));
         }
+
         enable_adjust_biases = (is_static_weights_biases && (inputFormat == VX_TYPE_UINT8) && (3 == kernel_width) && (3 == kernel_height));
+        enable_adjust_biases = enable_adjust_biases && (1 == dilation_x) && (1 == dilation_y);
+
         if (enable_adjust_biases)
         {
             vx_tensor_create_params_t params;
@@ -870,15 +903,20 @@ VX_PRIVATE_API vx_bool vxoNNDepthwiseConvLayer_NN_Support(vx_node node, const vx
     vx_tensor inputs = (vx_tensor)parameters[0];
     vx_tensor weights = (vx_tensor)parameters[1];
     vx_tensor biases = (vx_tensor)parameters[2];
+    vx_scalar dilationX = (vx_scalar)parameters[9];
+    vx_scalar dilationY = (vx_scalar)parameters[10];
     vx_scalar depth_multiplier = (vx_scalar)parameters[13];
     vx_tensor outputs = (vx_tensor)parameters[19];
 
     vx_context context = vxGetContext((vx_reference)inputs);
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_NN, VX_TYPE_INVALID, VX_NULL);
+    vx_int32   dilation_x  = dilationX->value->n32 + 1;
+    vx_int32   dilation_y  = dilationY->value->n32 + 1;
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
     support = support && ((depth_multiplier != NULL) && (depth_multiplier->value->n32 > 0));
+    support = support && (1 == dilation_x) && (1 == dilation_y);
 
     if ((TENSOR_DATA_LIFETIME(weights) == VX_TENSOR_LIFE_TIME_STATIC) &&
         (biases == VX_NULL) &&
@@ -1102,7 +1140,7 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
     vx_reference params[] = {
         (vx_reference)inputs, (vx_reference)weights, (vx_reference)biases,
         (vx_reference)padXLeft, (vx_reference)padXRight, (vx_reference)padYTop, (vx_reference)padYBottom,
-        (vx_reference)dilationX, (vx_reference)dilationY, (vx_reference)vxCreateScalar(node->base.context, VX_TYPE_ENUM, &padMode), (vx_reference)padConstant,
+        (vx_reference)vxCreateScalar(node->base.context, VX_TYPE_ENUM, &padMode), (vx_reference)padConstant, (vx_reference)dilationX, (vx_reference)dilationY,
         (vx_reference)strideX, (vx_reference)strideY, (vx_reference)depth_multiplier,
         (vx_reference)relu_s, (vx_reference)pooling_s, (vx_reference)poolingX, (vx_reference)poolingY,
         (vx_reference)downScaleSizeRounding, (vx_reference)outputs
@@ -1110,7 +1148,7 @@ vx_status VX_CALLBACK vxoNNDepthwiseConvolutionLayerInitializer(vx_node node,
 
     status = vxoNNDepthwiseConvolutionLayer_Initializer(node, params, gcmCOUNTOF(params));
 
-    vxReleaseScalar((vx_scalar*)&params[9]);
+    vxReleaseScalar((vx_scalar*)&params[7]);
     return status;
 }
 #else

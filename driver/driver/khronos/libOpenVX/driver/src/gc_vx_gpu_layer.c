@@ -3614,6 +3614,12 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     vx_scalar    outputHeight         = NULL;
     vx_scalar    heightDiff           = NULL;
     vx_size      thread_scale0        = 1;
+    vx_int32     dilation_x           = dilationX->value->n32 + 1;
+    vx_int32     dilation_y           = dilationY->value->n32 + 1;
+    vx_scalar    dilateX              = NULL;
+    vx_scalar    dilateY              = NULL;
+    vx_uint32    paraNum              = 0;
+    vx_bool      is_dilation_one      = (vx_bool)((1 == dilation_x) && (1 == dilation_y));
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, inputs=%p, outputs=%p", context, kernelEnum, inputs, outputs);
 
@@ -3653,7 +3659,9 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     {
         is_static_weights_biases = (vx_bool)((TENSOR_DATA_LIFETIME(weights) == VX_TENSOR_LIFE_TIME_STATIC) && (TENSOR_DATA_LIFETIME(biases) == VX_TENSOR_LIFE_TIME_STATIC));
         enable_adjust_biases     = (is_static_weights_biases && (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE) && (TENSOR_QUANT_TYPE(biases) == VX_QUANT_AFFINE_SCALE));
+        enable_adjust_biases = enable_adjust_biases && (1 == dilation_x) && (1 == dilation_y);
     }
+
 
     strideX = vxCreateScalar(context, VX_TYPE_INT32, &strideXvalue);
     strideY = vxCreateScalar(context, VX_TYPE_INT32, &strideYvalue);
@@ -3733,45 +3741,41 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
         vxReleaseProgram(&program);
     }
 
+    dilateX = vxCreateScalar(context, VX_TYPE_INT32, &dilation_x);
+    dilateY = vxCreateScalar(context, VX_TYPE_INT32, &dilation_y);
+
     {
         if((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32) && biases != VX_NULL)
         {
-            vx_reference  parameters[11] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)reBiases, (vx_reference)channel_multiplier,
+            vx_reference  parameters[13] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)reBiases, (vx_reference)channel_multiplier,
                                             (vx_reference)kernelX, (vx_reference)kernelY, (vx_reference)strideX, (vx_reference)strideY,
-                                            (vx_reference)padXLeft, (vx_reference)padYTop, (vx_reference)outputs};
-            if ((3 == kernel_width) && (3 == kernel_height))
+                                            (vx_reference)padXLeft, (vx_reference)padYTop, (vx_reference)outputs, (vx_reference)dilateX, (vx_reference)dilateY};
+            if ((3 == kernel_width) && (3 == kernel_height) && is_dilation_one)
             {
-                if (inputFormat == VX_TYPE_FLOAT16)
-                {
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_FP16", borderMode);
-                }
-                else
-                {
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_FP32", borderMode);
-                }
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_3x3_FP32", borderMode);
                 if (!shaderExecutable)
                 {
                     goto OnError;
                 }
                 status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
+                paraNum = 11;
                 if (status != VX_SUCCESS) goto OnError;
             }
             else
             {
-                if (inputFormat == VX_TYPE_FLOAT16)
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP16", borderMode);
-                else
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32", borderMode);
+                paraNum = 13;
                 if (!shaderExecutable) goto OnError;
             }
-            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 11);
+            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paraNum);
             if (status != VX_SUCCESS) goto OnError;
         }
         else if (inputFormat == VX_TYPE_UINT8 && biases != VX_NULL)
         {
+            vx_bool dilation_flag = vx_false_e;
 
-            if ((3 == kernel_width) && (3 == kernel_height) && enable_adjust_biases)
+            if ((3 == kernel_width) && (3 == kernel_height) && enable_adjust_biases && is_dilation_one)
             {
                 if (1 == channel_multiplier->value->n32)
                 {
@@ -3918,6 +3922,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
             else
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+                dilation_flag = vx_true_e;
                 if (!shaderExecutable)
                 {
                     goto OnError;
@@ -3926,9 +3931,10 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
 
             if (is_use_2d_fun)
             {
-                vx_reference  parameters[11] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)reBiases,
+                vx_reference  parameters[14] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)reBiases,
                         (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL,
-                        (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)outputs};
+                        (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)outputs, (vx_reference)NULL,
+                        (vx_reference)NULL, (vx_reference)NULL};
                 vx_float32  scale_out_value;
                 vx_float32  inputZP_f   = (vx_float32)inputZP;
                 vx_float32  weightZP_f  = (vx_float32)weightZP;
@@ -3968,14 +3974,22 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 parameters[9] = (vx_reference)zpIn_int;
                 parameters[0] = (vx_reference)inputs_rs;
                 parameters[10] = (vx_reference)outputs_rs;
-                status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 11);
+                paraNum = 11;
+                if (dilation_flag)
+                {
+                    parameters[paraNum++] = (vx_reference)dilateX;
+                    parameters[paraNum++] = (vx_reference)dilateY;
+                }
+
+                status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paraNum);
             }
             else
             {
-                vx_reference  parameters[16] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)reBiases, (vx_reference)channel_multiplier,
+                vx_reference  parameters[19] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)reBiases, (vx_reference)channel_multiplier,
                         (vx_reference)kernelX, (vx_reference)kernelY, (vx_reference)strideX, (vx_reference)strideY,
                         (vx_reference)padXLeft, (vx_reference)padYTop, (vx_reference)NULL, (vx_reference)NULL,
-                        (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)outputs};
+                        (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)outputs, (vx_reference)NULL,
+                        (vx_reference)NULL, (vx_reference)NULL};
                 vx_float32  scale_out_value;
                 vx_float32  inputZP_f   = (vx_float32)inputZP;
                 vx_float32  weightZP_f  = (vx_float32)weightZP;
@@ -3991,17 +4005,25 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 parameters[12] = (vx_reference)zpWeight;
                 parameters[13] = (vx_reference)zpOut;
                 parameters[14] = (vx_reference)zpIn_int;
-                status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 16);
+                paraNum = 16;
+                if (dilation_flag)
+                {
+                    parameters[paraNum++] = (vx_reference)dilateX;
+                    parameters[paraNum++] = (vx_reference)dilateY;
+                }
+
+                status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paraNum);
             }
 
             if (status != VX_SUCCESS) goto OnError;
         }
         else if((inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32) && biases == VX_NULL)
         {
-            vx_reference  parameters[10] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)channel_multiplier,
+            vx_reference  parameters[12] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)channel_multiplier,
                                 (vx_reference)kernelX, (vx_reference)kernelY, (vx_reference)strideX, (vx_reference)strideY,
-                                (vx_reference)padXLeft, (vx_reference)padYTop, (vx_reference)outputs};
-            if ((3 == kernel_width) && (3 == kernel_height))
+                                (vx_reference)padXLeft, (vx_reference)padYTop, (vx_reference)outputs, (vx_reference)dilateX, (vx_reference)dilateY};
+
+            if ((3 == kernel_width) && (3 == kernel_height) && is_dilation_one)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoBias_3x3_FP32", borderMode);
                 if (!shaderExecutable)
@@ -4010,22 +4032,26 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 }
                 status  = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_THREE_COMPONENTS);
+                paraNum = 10;
                 if (status != VX_SUCCESS) goto OnError;
             }
             else
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "NoBias_FP32", borderMode);
+                paraNum = 12;
                 if (!shaderExecutable) goto OnError;
             }
-            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 10);
+
+            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, paraNum);
             if (status != VX_SUCCESS) goto OnError;
         }
         else if (inputFormat == VX_TYPE_UINT8 && biases == VX_NULL)
         {
-            vx_reference  parameters[16] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)channel_multiplier,
+            vx_reference  parameters[18] = {(vx_reference)inputs, (vx_reference)reWeights, (vx_reference)channel_multiplier,
                                 (vx_reference)kernelX, (vx_reference)kernelY, (vx_reference)strideX, (vx_reference)strideY,
                                 (vx_reference)padXLeft, (vx_reference)padYTop, (vx_reference)NULL, (vx_reference)NULL,
-                                (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL,(vx_reference)outputs};
+                                (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL,(vx_reference)outputs,
+                                (vx_reference)dilateX, (vx_reference)dilateY};
 
 
             scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &inputScale);
@@ -4047,7 +4073,7 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
                 goto OnError;
             }
 
-            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 16);
+            status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 18);
             if (status != VX_SUCCESS) goto OnError;
         }
     }
@@ -4116,6 +4142,8 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
     if (strideX) vxReleaseScalar(&strideX);
     if (strideY) vxReleaseScalar(&strideY);
     if (scaleIn) vxReleaseScalar(&scaleIn);
+    if (dilateX) vxReleaseScalar(&dilateX);
+    if (dilateY) vxReleaseScalar(&dilateY);
     if (scaleWeight) vxReleaseScalar(&scaleWeight);
     if (scaleOut) vxReleaseScalar(&scaleOut);
     if (zpIn) vxReleaseScalar(&zpIn);
@@ -4131,6 +4159,8 @@ vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(
 
 OnError:
     if (scaleIn) vxReleaseScalar(&scaleIn);
+    if (dilateX) vxReleaseScalar(&dilateX);
+    if (dilateY) vxReleaseScalar(&dilateY);
     if (scaleWeight) vxReleaseScalar(&scaleWeight);
     if (scaleOut) vxReleaseScalar(&scaleOut);
     if (zpIn) vxReleaseScalar(&zpIn);

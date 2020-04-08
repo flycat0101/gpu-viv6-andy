@@ -23925,6 +23925,9 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
     vx_uint32     weights_dims               = TENSOR_DIM_NUM(weights);
     vx_uint32     maxWorkGroupSize           = 8;
     vx_bool       is_use_k3_fast    = vx_true_e;
+    vx_int32      dilation_x                 = dilationX->value->n32 + 1;
+    vx_int32      dilation_y                 = dilationY->value->n32 + 1;
+    vx_bool       is_dilation_one            = (vx_bool)((1 == dilation_x) && (1 == dilation_y));
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, inputs=%p, outputs=%p",
          context, kernelEnum, borderMode, inputs, outputs);
@@ -24072,7 +24075,7 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
        && (3 == kernel_width)
        && (3 == kernel_height)
        && (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_INT16)
-       && is_use_k3_fast)
+       && is_use_k3_fast && is_dilation_one)
     {
         vx_uint32 uniSumOrderShort4_2x8[16] = {
             0x11111111, // TCfg
@@ -24271,7 +24274,7 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
             && (3 == kernel_width)
             && (3 == kernel_height)
             && (inputFormat == VX_TYPE_UINT8)
-            && is_use_k3_fast)
+            && is_use_k3_fast && is_dilation_one)
     {
         vx_uint32 packZPin      = (inputZP << 16) | inputZP;
         vx_uint32 packZPwe      = (weightZP << 16) | weightZP;
@@ -24520,19 +24523,47 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
 
         if (kernel_width <= 4 && inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16kernelWidthLE4", borderMode);
+            if (is_dilation_one)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16kernelWidthLE4", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16kernelWidthLE4_Dilation", borderMode);
+            }
         }
         else if (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16kernelWidthGT4", borderMode);
+            if (is_dilation_one)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16kernelWidthGT4", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Fp16kernelWidthGT4_Dilation", borderMode);
+            }
         }
         else if (kernel_width <= 5 && inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8kernelWidthLE5", borderMode);
+            if (is_dilation_one)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8kernelWidthLE5", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8kernelWidthLE5_Dilation", borderMode);
+            }
         }
         else if (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8kernelWidthGT5", borderMode);
+            if (is_dilation_one)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8kernelWidthGT5", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8kernelWidthGT5_Dilation", borderMode);
+            }
         }
         if (!shaderExecutable) goto OnError;
 
@@ -24551,6 +24582,12 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outZP", 1, &outZP);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inZpMulWeZp5x", 1, &inZpMulWeZp5x);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inZpMulWeZpRem", 1, &inZpMulWeZpRem);
+
+        if (!is_dilation_one)
+        {
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "dilation_x", 1, &dilation_x);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "dilation_y", 1, &dilation_y);
+        }
 
         if (status != VX_SUCCESS) goto OnError;
     }
@@ -24601,14 +24638,21 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
                 uniI8MulAccumNtoI32_16x1[6] = uniConfigMulAccPosiN1[res];
             }
         }
-        if (padLeftv == 0 && padRightv == 0)
+        if (padLeftv == 0 && padRightv == 0 && is_dilation_one)
         {
             shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i8i8_nopad", borderMode);
             if (!shaderExecutable) goto OnError;
         }
         else
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i8i8", borderMode);
+            if (is_dilation_one)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i8i8", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i8i8_Dilation", borderMode);
+            }
             if (!shaderExecutable) goto OnError;
         }
 
@@ -24620,6 +24664,12 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "widthIter", 1, &widthIter);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "widthRes", 1, &widthRes);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_depth", 1, &input_depth);
+        if (!is_dilation_one)
+        {
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "dilation_x", 1, &dilation_x);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "dilation_y", 1, &dilation_y);
+        }
+
     }
     else if(inputFormat == VX_TYPE_INT16)
     {
@@ -24654,11 +24704,25 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
 
         if (biasesFormat == VX_TYPE_INT64)
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i16i16_BI64", borderMode);
+            if (is_dilation_one)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i16i16_BI64", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i16i16_BI64_Dilation", borderMode);
+            }
         }
         else
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i16i16", borderMode);
+            if (is_dilation_one)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i16i16", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_i16i16_Dilation", borderMode);
+            }
         }
         if (!shaderExecutable) goto OnError;
 
@@ -24670,6 +24734,11 @@ vxnne_shader_executable vxnneGetDepthwiseConvShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "widthIter", 1, &widthIter);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "widthRes", 1, &widthRes);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_depth", 1, &input_depth);
+        if (!is_dilation_one)
+        {
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "dilation_x", 1, &dilation_x);
+            status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "dilation_y", 1, &dilation_y);
+        }
         if (status != VX_SUCCESS) goto OnError;
     }
     else
