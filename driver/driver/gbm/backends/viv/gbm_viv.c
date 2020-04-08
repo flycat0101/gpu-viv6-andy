@@ -716,7 +716,10 @@ gbm_viv_bo_destroy(struct gbm_bo *_bo)
 
         gbm_viv_bo_unmap_fd(bo);
 
-        drmIoctl(dev->base.fd, DRM_IOCTL_MODE_DESTROY_DUMB, &arg);
+        if (drmIoctl(dev->base.fd, DRM_IOCTL_GEM_CLOSE, &arg))
+        {
+            gcmPRINT("ioctl(DRM_IOCTL_GEM_CLOSE) failed\n)");
+        }
 
         if (bo->fd >= 0)
         {
