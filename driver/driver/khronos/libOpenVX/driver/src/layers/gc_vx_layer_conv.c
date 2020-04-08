@@ -2074,6 +2074,8 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
     vx_tensor inputs                = (vx_tensor)parameters[0];
     vx_tensor weights               = (vx_tensor)parameters[2];
     vx_tensor biases                = (vx_tensor)parameters[3];
+    vx_scalar padXLeft              = (vx_scalar)parameters[4];
+    vx_scalar padXRight             = (vx_scalar)parameters[5];
     vx_scalar dilationX             = (vx_scalar)parameters[10];
     vx_scalar dilationY             = (vx_scalar)parameters[11];
 
@@ -2110,8 +2112,15 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
 
         if(evis)
         {
-            vx_uint32 convsize        = kernel_x * kernel_y * ifm;
-            vx_bool   support_type    = vx_false_e;
+            vx_uint32 convsize              = kernel_x * kernel_y * ifm;
+            vx_bool   support_type          = vx_false_e;
+            vx_bool   is_cross_width_read   = vx_false_e;
+            vx_int32  paddingLeft           = padXLeft->value->n32;
+            vx_int32  paddingRight          = padXRight->value->n32;
+            vx_int32  input_width           = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+
+            is_cross_width_read = (vx_bool)(paddingLeft > 0 && paddingRight > 0
+                                        && (input_width + paddingLeft) <= 8);
 
             if (biases)
             {
@@ -2125,6 +2134,8 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat != VX_TYPE_FLOAT32)
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_UINT8 && outputFormat != VX_TYPE_FLOAT32)
                     || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16));
+
+                support_type = support_type && (is_cross_width_read == vx_false_e);
             }
             else
             {
