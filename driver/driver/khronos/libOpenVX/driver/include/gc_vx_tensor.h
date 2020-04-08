@@ -359,6 +359,11 @@ vxoTensor_ReformatTensor(
     vx_enum format
     );
 
+VX_INTERNAL_API void
+vxoTensor_FreeWrappedMemory(
+    vx_tensor tensor
+    );
+
 EXTERN_C_END
 
 #endif /* __GC_VX_TENSOR_H__*/
