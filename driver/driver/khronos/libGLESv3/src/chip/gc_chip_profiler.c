@@ -745,7 +745,7 @@ __glChipProfilerSet(
     case GL3_PROGRAM_VERTEX_SHADER:
         if (!profiler->need_dump)
             break;
-        if (dump_program && GetShaderSourceCode((gcSHADER)Value))
+        if (dump_program && Value && GetShaderSourceCode((gcSHADER)Value))
         {
             gcmWRITE_CONST(VPG_PVS);
             gcmWRITE_CONST(VPC_PVSSOURCE);
@@ -757,7 +757,7 @@ __glChipProfilerSet(
     case GL3_PROGRAM_FRAGMENT_SHADER:
         if (!profiler->need_dump)
             break;
-        if (dump_program && GetShaderSourceCode((gcSHADER)Value))
+        if (dump_program && Value && GetShaderSourceCode((gcSHADER)Value))
         {
             gcmWRITE_CONST(VPG_PPS);
             gcmWRITE_CONST(VPC_PPSSOURCE);
