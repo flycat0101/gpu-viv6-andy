@@ -1492,11 +1492,19 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
         goto OnError;
     }
 
-    vxnneOperation_AddReference(&reorgLayer->reorg_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+    if (type == VX_REORG_SHUFFLE_CHANNEL)
+    {
+        vxnneOperation_AddReference(&reorgLayer->reorg_sh_operation.base, (vx_reference)inTensor, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&reorgLayer->reorg_sh_operation.base, (vx_reference)outTensor, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
+    else
+    {
+        vxnneOperation_AddReference(&reorgLayer->reorg_sh_operation.base, (vx_reference)inputs, VXNNE_OPERATION_REFENRENCE_INPUT);
+        vxnneOperation_AddReference(&reorgLayer->reorg_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
+    }
     vxnneOperation_AddReference(&reorgLayer->reorg_sh_operation.base, (vx_reference)block_size_s, VXNNE_OPERATION_REFENRENCE_INPUT);
     if(pad)
         vxnneOperation_AddReference(&reorgLayer->reorg_sh_operation.base, (vx_reference)pad, VXNNE_OPERATION_REFENRENCE_INPUT);
-    vxnneOperation_AddReference(&reorgLayer->reorg_sh_operation.base, (vx_reference)outputs, VXNNE_OPERATION_REFENRENCE_OUTPUT);
 
     vxnneLayer_SetOperation(
         &reorgLayer->base,
@@ -1506,8 +1514,6 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
     if (outc_s) vxReleaseScalar(&outc_s);
     if (stride) vxReleaseScalar(&stride);
     if (axis_new_s) vxReleaseScalar(&axis_new_s);
-    if (inTensor)  vxoTensor_ReleaseTensor(&inTensor);
-    if (outTensor)  vxoTensor_ReleaseTensor(&outTensor);
     return status;
 OnError:
     if (outc_s) vxReleaseScalar(&outc_s);
