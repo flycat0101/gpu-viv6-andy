@@ -18,8 +18,12 @@
 #define VIV_EGL_BUILD
 #include "../../libGLESv11/gc_glff_functions.h"
 #include "../../libGLESv3/include/glcore/gc_es_dispatch.h"
+#if !defined(VIVANTE_NO_GL4)
 #include "../../libGL4/include/glcore/gc_es_dispatch.h"
+#endif
+#if !defined(VIVANTE_NO_VG)
 #include "../../libOpenVG_3D/vg11/driver/gc_vgsh_dump.h"
+#endif
 #undef VIV_EGL_BUILD
 
 /* Zone used for header/footer. */
@@ -814,17 +818,21 @@ veglClientApiEntry gles32ApiEntryTbl[] =
     { gcvNULL, gcvNULL }
 };
 
+#if !defined(VIVANTE_NO_GL4)
 veglClientApiEntry gl4xApiEntryTbl[] =
 {
     __GL_API_ENTRIES(eglApiEntry)
     { gcvNULL, gcvNULL }
 };
+#endif
 
+#if !defined(VIVANTE_NO_VG)
 veglClientApiEntry vgApiEntryTbl[] =
 {
     __VG_API_ENTRIES(eglApiEntry)
     { gcvNULL, gcvNULL }
 };
+#endif
 
 #undef eglApiEntry
 
@@ -1019,6 +1027,7 @@ eglGetProcAddress(const char *procname)
                 break;
             }
 
+#if !defined(VIVANTE_NO_GL4)
             if (thread->api == EGL_OPENGL_API)
             {
                 /* Change some GL extension API name to alias core API name */
@@ -1028,14 +1037,17 @@ eglGetProcAddress(const char *procname)
                 func = _LookupProc(gl4xApiEntryTbl, apiName, 2);
                 break;
             }
+#endif
         }
 
+#if !defined(VIVANTE_NO_VG)
         /* Look for OpenVG function from vgApiEntryTbl[] */
         if (gcmIS_SUCCESS(gcoOS_StrNCmp(apiName, "vg", 2)))
         {
             func = _LookupProc(vgApiEntryTbl, apiName, 2);
             break;
         }
+#endif
     }
     while (gcvFALSE);
 
