@@ -2257,7 +2257,6 @@ vxnne_shader_executable vxnneGetSpace2DepthShaderExecutable(
     vx_uint32     input_width                = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32     input_height               = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32     input_depth                = TENSOR_VIEW_SIZE_INDEX(input, 2);
-    vx_uint32     input_batch                = TENSOR_VIEW_SIZE_INDEX(input, 3);
     vx_uint32     input_dimz                 = 0;
 
     vx_float32    uint8_zp                   = 0.0f;
@@ -2289,8 +2288,7 @@ vxnne_shader_executable vxnneGetSpace2DepthShaderExecutable(
         goto OnError;
     }
 
-    input_batch = (input_batch == 0) ? 1 : input_batch;
-    input_dimz = input_batch * input_depth;
+    input_dimz = input_depth;
 
     out_scale = TENSOR_TF_SCALE(output);
     uint8_scale = in_scale / out_scale;
