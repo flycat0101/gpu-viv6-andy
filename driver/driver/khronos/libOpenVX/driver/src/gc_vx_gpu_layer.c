@@ -80,6 +80,8 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
 
     vx_enum      inputFormat        = TENSOR_DATA_TYPE(input);
     vx_enum      outputFormat       = TENSOR_DATA_TYPE(output);
+    vx_enum      inputQuantType     = TENSOR_QUANT_TYPE(input);
+    vx_enum      outputQuantType    = TENSOR_QUANT_TYPE(output);
     vx_uint32    width              = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32    height             = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32    depth              = TENSOR_VIEW_SIZE_INDEX(output, 2);
@@ -105,8 +107,51 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
     vx_bool      globalPooling_flag = vx_false_e;
     vx_int32     res                = filterValue[0] % 4;
     vx_uint32    kernel_size        = filterValue[0] * filterValue[1];
+    vx_float32   input_scale        = 1.0f;
+    vx_float32   output_scale       = 1.0f;
+    vx_int32     inputZP            = 0;
+    vx_int32     outputZP           = 0;
+
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
+
+    if (inputQuantType == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        vx_int8 srcFixPointPos = TENSOR_POS(input);
+
+        if (srcFixPointPos >= 0)
+        {
+            input_scale    = 1.0f / (vx_float32) (1 << srcFixPointPos);
+        }
+        else if (srcFixPointPos < 0)
+        {
+            input_scale    = (vx_float32)(1 << -srcFixPointPos);
+        }
+    }
+    else if (inputQuantType == VX_QUANT_AFFINE_SCALE)
+    {
+        input_scale   = TENSOR_TF_SCALE(input);
+        inputZP   = TENSOR_TF_ZEROPOINT(input);
+    }
+
+    if (outputQuantType == VX_QUANT_DYNAMIC_FIXED_POINT)
+    {
+        vx_int8 dstFixPointPos = TENSOR_POS(output);
+
+        if (dstFixPointPos >= 0)
+        {
+            output_scale = (vx_float32) (1 << dstFixPointPos);
+        }
+        else if (dstFixPointPos < 0)
+        {
+            output_scale = 1.0f / (vx_float32) (1 << -dstFixPointPos);
+        }
+    }
+    else if (outputQuantType == VX_QUANT_AFFINE_SCALE)
+    {
+        output_scale   = 1.0f / TENSOR_TF_SCALE(output);
+        outputZP  = TENSOR_TF_ZEROPOINT(output);
+    }
 
     if((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
      || (inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
@@ -250,10 +295,9 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
         else
         {
             vx_reference parameters[6] = {(vx_reference)input_rs, (vx_reference)output_rs, NULL, NULL, NULL, NULL};
-            vx_float32 input_scale = TENSOR_TF_SCALE(input);
-            vx_float32 input_tail  = (vx_float32)TENSOR_TF_ZEROPOINT(input) * kernel_size;
-            vx_float32 output_zp  = (vx_float32)TENSOR_TF_ZEROPOINT(output) + 0.5f;
-            vx_float32 scale = input_scale / (vx_float32)(kernel_size * TENSOR_TF_SCALE(output));
+            vx_float32 input_tail  = (vx_float32)inputZP * kernel_size;
+            vx_float32 output_zp  = (vx_float32)outputZP + 0.5f;
+            vx_float32 scale = input_scale * output_scale/ (vx_float32)(kernel_size);
 
             if (kernel_size % 4 == 0)
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_globalpooling_U8_M4", borderMode);
@@ -334,10 +378,8 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
     else if ((is_roi_copy || enable_2d_img) && inputFormat == VX_TYPE_UINT8)
     {
         vx_reference parameters[12] = {(vx_reference)input, (vx_reference)output, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
-        vx_float32 input_scale = TENSOR_TF_SCALE(input);
-        vx_float32 input_tail  = (vx_float32)TENSOR_TF_ZEROPOINT(input) * input_scale * 9.0f;
-        vx_float32 output_scale = 1.0f / TENSOR_TF_SCALE(output);
-        vx_float32 output_zp  = (vx_float32)TENSOR_TF_ZEROPOINT(output) + 0.5f;
+        vx_float32 input_tail  = (vx_float32)inputZP * input_scale * 9.0f;
+        vx_float32 output_zp  = (vx_float32)outputZP + 0.5f;
 
         execution_parameters.globalWorkScale[0] = 4;
 
@@ -403,7 +445,7 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
     {
         if(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
         {
-            vx_float32 outScaleValue = (vx_float32)1.0/TENSOR_TF_SCALE(output);
+            vx_float32 outScaleValue = output_scale;
             vx_reference parameters[10] = {(vx_reference)input, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, (vx_reference)output};
 
             if(filterValue[0] == 1)
@@ -426,10 +468,10 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
                 if (status != VX_SUCCESS) goto OnError;
             }
 
-            scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &input->scale);
+            scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &(TENSOR_TF_SCALE(input)));
             scaleOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &outScaleValue);
-            zeroPointIn = vxCreateScalar(context, VX_TYPE_INT32, &input->zeroPoint);
-            zeroPointOut = vxCreateScalar(context, VX_TYPE_INT32, &output->zeroPoint);
+            zeroPointIn = vxCreateScalar(context, VX_TYPE_INT32, &(TENSOR_TF_ZEROPOINT(input)));
+            zeroPointOut = vxCreateScalar(context, VX_TYPE_INT32, &(TENSOR_TF_ZEROPOINT(output)));
 
             parameters[1] = (vx_reference)poolSizeX;
             parameters[2] = (vx_reference)poolSizeY;
@@ -485,7 +527,7 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
     {
         if(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
         {
-            vx_float32 outScaleValue = (vx_float32)1.0/TENSOR_TF_SCALE(output);
+            vx_float32 outScaleValue = output_scale;
             vx_reference parameters[13] = {(vx_reference)input, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL,
                 VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, VX_NULL, (vx_reference)output};
 
@@ -501,10 +543,10 @@ vxnne_shader_executable vxnneGetGPUAvgPoolingShaderExecutable(
                 if (status != VX_SUCCESS) goto OnError;
             }
 
-            scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &input->scale);
+            scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &input_scale);
             scaleOut = vxCreateScalar(context, VX_TYPE_FLOAT32, &outScaleValue);
-            zeroPointIn = vxCreateScalar(context, VX_TYPE_INT32, &input->zeroPoint);
-            zeroPointOut = vxCreateScalar(context, VX_TYPE_INT32, &output->zeroPoint);
+            zeroPointIn = vxCreateScalar(context, VX_TYPE_INT32, &inputZP);
+            zeroPointOut = vxCreateScalar(context, VX_TYPE_INT32, &outputZP);
             padX = vxCreateScalar(context, VX_TYPE_INT32, &pool_pad_x_left);
             padY = vxCreateScalar(context, VX_TYPE_INT32, &pool_pad_y_top);
             enable_tf_s = vxCreateScalar(context, VX_TYPE_INT32, &enable_tf_avgPool);
