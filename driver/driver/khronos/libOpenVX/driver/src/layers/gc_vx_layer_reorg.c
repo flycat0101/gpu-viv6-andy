@@ -1260,6 +1260,131 @@ OnError:
     return status;
 }
 
+VX_PRIVATE_API vx_bool get_shuffle_channel_reshape_size(vx_tensor inputs, vx_scalar axis_s, vx_int32* out_shape, vx_int32* out_rank, vx_uint32* out_axis)
+{
+    vx_bool     ret                = vx_true_e;
+    vx_uint32   in_rank            = TENSOR_DIM_NUM(inputs);
+    vx_uint32   in_sizes[4]        = {1, 1, 1, 1};
+    vx_uint32   tmp_sizes[4]       = {1, 1, 1, 1};
+    vx_uint32   tmp_out_sizes[4]   = {1, 1, 1, 1};
+    vx_uint32   out_sizes[4]       = {1, 1, 1, 1};
+    vx_uint32   in_axis            = axis_s->value->n32;
+    vx_uint32   new_axis           = 0;
+    vx_uint32   new_rank           = 2;
+    vx_uint32   tmp_rank           = 1;
+    vx_int32    tmp_out_rank       = 1;
+    vx_uint32   before_size        = 1;
+    vx_uint32   after_size         = 1;
+    vx_uint32   i                  = 0;
+
+    in_sizes[0] = TENSOR_VIEW_SIZE_INDEX(inputs, 0);
+    in_sizes[1] = in_rank > 1 ? TENSOR_VIEW_SIZE_INDEX(inputs, 1) : 1;
+    in_sizes[2] = in_rank > 2 ? TENSOR_VIEW_SIZE_INDEX(inputs, 2) : 1;
+    in_sizes[3] = in_rank > 3 ? TENSOR_VIEW_SIZE_INDEX(inputs, 3) : 1;
+
+    for (i = 0; i < in_axis; i++)
+    {
+        before_size *= in_sizes[i];
+    }
+    for (i = in_axis + 1; i < in_rank; i++)
+    {
+        after_size  *= in_sizes[i];
+    }
+
+    if (1 == before_size)
+    {
+        out_sizes[0] = in_sizes[in_axis];
+        new_axis = 0;
+        new_rank = 1;
+    }
+    else
+    {
+        tmp_sizes[0] = before_size;
+        tmp_rank     = 1;
+        ret = vx_nn_kernel_optimize_element_shape(
+                (int32_t *)tmp_sizes, tmp_rank,
+                (int32_t *)tmp_out_sizes, &tmp_out_rank );
+
+        if (!ret)
+        {
+            for (i = 0; i < in_axis; i++)
+            {
+                tmp_out_sizes[i] = in_sizes[i];
+                tmp_out_rank     = in_axis;
+            }
+        }
+
+        if ((2 == tmp_out_rank) && (1 == tmp_out_sizes[1]))
+        {
+            tmp_out_rank = 1;
+        }
+
+        for (i = 0; i < (vx_uint32)tmp_out_rank; i++)
+        {
+            out_sizes[i] = tmp_out_sizes[i];
+        }
+        out_sizes[tmp_out_rank] = in_sizes[in_axis];
+        new_rank = tmp_out_rank + 1;
+        new_axis = tmp_out_rank;
+    }
+
+    if (after_size > 1)
+    {
+        tmp_sizes[0] = after_size;
+        tmp_rank = 1;
+        ret = vx_nn_kernel_optimize_element_shape(
+                (int32_t *)tmp_sizes, tmp_rank,
+                (int32_t *)tmp_out_sizes, &tmp_out_rank );
+
+        if (!ret)
+        {
+            for (i = in_axis + 1; i < in_rank; i++)
+            {
+                tmp_out_sizes[i - in_axis - 1] = in_sizes[i];
+                tmp_out_rank = in_rank - in_axis - 1;
+            }
+        }
+
+        if ((2 == tmp_out_rank) && (1 == tmp_out_sizes[1]))
+        {
+            tmp_out_rank = 1;
+        }
+
+        for (i = 0; i < (vx_uint32)tmp_out_rank; i++)
+        {
+            out_sizes[new_rank + i] = tmp_out_sizes[i];
+        }
+        new_rank = new_rank + tmp_out_rank;
+    }
+
+    if (1 == new_rank)
+    {
+        out_sizes[1] = 1;
+        new_rank = 2;
+    }
+
+    if (out_shape)
+    {
+        for (i = 0; i < new_rank; i++)
+        {
+            out_shape[i] = (vx_int32)out_sizes[i];
+        }
+    }
+
+    if (out_rank)
+    {
+        *out_rank = new_rank;
+    }
+
+    if (out_axis)
+    {
+        *out_axis = new_axis;
+    }
+
+    return vx_true_e;
+}
+
+
 VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
     vxnne_reorg_layer reorgLayer,
     vx_tensor inputs,
@@ -1284,6 +1409,12 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
     vx_node node           = reorgLayer->base.node;
     vx_context context     = vxGetContext((vx_reference)node);
     vxnne_shader_executable shaderExecutable = NULL;
+    vx_scalar axis_new_s      = VX_NULL;
+    vx_uint32 axis_new        = 0;
+    vx_int32  out_rank        = 2;
+    vx_int32  out_shape[4]    = {1, 1, 1, 1};
+    vx_tensor inTensor        = NULL;
+    vx_tensor outTensor       = NULL;
 
     if(pad)
     {
@@ -1294,6 +1425,15 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
     }
 
     stride = vxCreateScalar(context, VX_TYPE_UINT32, &block_size);
+
+    if (type == VX_REORG_SHUFFLE_CHANNEL)
+    {
+        get_shuffle_channel_reshape_size(inputs, axis_s, out_shape, &out_rank, &axis_new);
+        axis_new_s = vxCreateScalar(context, VX_TYPE_UINT32, &axis_new);
+        inTensor   = vxoTensor_ReshapeTensor(inputs, out_shape, out_rank);
+        outTensor  = vxoTensor_ReshapeTensor(outputs, out_shape, out_rank);
+        batchCount      = out_rank > 3 ? out_shape[3] : 1;
+    }
 
     if(evis)
     {
@@ -1311,7 +1451,7 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
                 inputs, pad_list[0], pad_list[2], block_size_s, outc_s, outputs);
         else if(type == VX_REORG_SHUFFLE_CHANNEL)
             shaderExecutable = vxnneGetShuffleChannelShaderExecutable(context, VXNNE_KERNEL_SHUFFLECHANNEL, &node->kernelAttributes.borderMode,
-                inputs, num_group_s, axis_s, outputs);
+                inTensor, num_group_s, axis_new_s, outTensor);
     }
     else
     {
@@ -1329,7 +1469,7 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
                 inputs, block_size_s, outc_s, outputs, pad_list);
         else if(type == VX_REORG_SHUFFLE_CHANNEL)
             shaderExecutable = vxnneGetGPUShuffleChannelShaderExecutable(context, VXNNE_KERNEL_GPU_SHUFFLECHANNEL, &node->kernelAttributes.borderMode,
-                inputs, num_group_s, axis_s, outputs);
+                inTensor, num_group_s, axis_new_s, outTensor);
 
         if(type == VX_REORG_BATCH_TO_SPACE_ND || type == VX_REORG_SPACE_TO_BATCH_ND)
             batchCount = 1;
@@ -1338,8 +1478,6 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
     if (!shaderExecutable)
     {
         status = VX_FAILURE;
-        if (outc_s) vxReleaseScalar(&outc_s);
-        if (stride) vxReleaseScalar(&stride);
         goto OnError;
     }
 
@@ -1351,9 +1489,6 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
 
     if (status != VX_SUCCESS)
     {
-        if (outc_s) vxReleaseScalar(&outc_s);
-        if (stride) vxReleaseScalar(&stride);
-        if (outc_s) vxReleaseScalar(&outc_s);
         goto OnError;
     }
 
@@ -1370,8 +1505,16 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
 
     if (outc_s) vxReleaseScalar(&outc_s);
     if (stride) vxReleaseScalar(&stride);
-
+    if (axis_new_s) vxReleaseScalar(&axis_new_s);
+    if (inTensor)  vxoTensor_ReleaseTensor(&inTensor);
+    if (outTensor)  vxoTensor_ReleaseTensor(&outTensor);
+    return status;
 OnError:
+    if (outc_s) vxReleaseScalar(&outc_s);
+    if (stride) vxReleaseScalar(&stride);
+    if (axis_new_s) vxReleaseScalar(&axis_new_s);
+    if (inTensor)  vxoTensor_ReleaseTensor(&inTensor);
+    if (outTensor)  vxoTensor_ReleaseTensor(&outTensor);
     return status;
 }
 
@@ -1488,7 +1631,7 @@ VX_PRIVATE_API vx_bool vxoNNReorgLayer2_SH_EVIS_Support_Ext(vx_node node, const 
     space2Depth_flag = (vx_bool)(type == VX_REORG_SPACE_TO_DEPTH && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[2] || dataFormat_flag[3]));
     space2Batch_flag = (vx_bool)(type == VX_REORG_SPACE_TO_BATCH_ND && (dataFormat_flag[0] || dataFormat_flag[1]));
     batch2Space_flag = (vx_bool)(type == VX_REORG_BATCH_TO_SPACE_ND && (dataFormat_flag[0] || dataFormat_flag[1]));
-    shuffle_flag     = (vx_bool)(type == VX_REORG_SHUFFLE_CHANNEL && (axis_s->value->n32 <= 2) && _IsSameType(inputs, outputs)
+    shuffle_flag     = (vx_bool)(type == VX_REORG_SHUFFLE_CHANNEL &&  _IsSameType(inputs, outputs)
                                 && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[2] || dataFormat_flag[3]));
 
     if (!evis)
@@ -1498,6 +1641,16 @@ VX_PRIVATE_API vx_bool vxoNNReorgLayer2_SH_EVIS_Support_Ext(vx_node node, const 
         space2Batch_flag = space2Batch_flag || (type == VX_REORG_SPACE_TO_BATCH_ND && dataFormat_flag[4]);
         batch2Space_flag = batch2Space_flag || (type == VX_REORG_BATCH_TO_SPACE_ND && dataFormat_flag[4]);
         shuffle_flag     = shuffle_flag     || (type == VX_REORG_SHUFFLE_CHANNEL && dataFormat_flag[4]);
+    }
+
+    if (type == VX_REORG_SHUFFLE_CHANNEL && shuffle_flag)
+    {
+        vx_uint32 new_axis = 0;
+        get_shuffle_channel_reshape_size(inputs, axis_s, VX_NULL, VX_NULL, &new_axis);
+        if (new_axis >= 2)
+        {
+            shuffle_flag = vx_false_e;
+        }
     }
 
     support = support && (depth2Space_flag || space2Depth_flag || space2Batch_flag || batch2Space_flag || shuffle_flag);
