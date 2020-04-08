@@ -8351,6 +8351,11 @@ static VkResult halti5_helper_setDescSetSeperateImage(
         }
     }
 
+    if (!texEntry)
+    {
+        return VK_SUCCESS;
+    }
+
     __VK_ASSERT(entryIdx < progResourceSet->separatedTexTable.countOfEntries);
     __VK_ASSERT(texEntry->texBinding.set == descSetIndex);
     __VK_ASSERT(texEntry->texBinding.arraySize == descriptorBinding->std.descriptorCount);
@@ -8601,6 +8606,11 @@ static VkResult halti5_helper_setDescSetSeperateSampler(
         {
             break;
         }
+    }
+
+    if (!samplerEntry)
+    {
+        return VK_SUCCESS;
     }
 
     __VK_ASSERT(entryIdx < progResourceSet->separatedSamplerTable.countOfEntries);
