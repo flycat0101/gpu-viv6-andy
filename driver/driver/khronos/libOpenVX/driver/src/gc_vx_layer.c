@@ -20336,6 +20336,7 @@ vxnne_shader_executable vxnneTensorCopyShaderExecutable(
     }
     else if (inputFormat != VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
     {
+        vx_float32 outputScale = 1.0f;
         vx_uint32 uniConvertIntegertoF32Lo_4x4[16] = {
             0x09090909, // TCfg
             0x04040404, // ASelt
@@ -20398,20 +20399,7 @@ vxnne_shader_executable vxnneTensorCopyShaderExecutable(
         }
         else if (TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
         {
-            vx_uint16  multiplier   = 0;
-            vx_int8    postShift    = 0;
-            vx_uint32  i            = 0;
-
-            getFP32M0AndN(scaleIn, &multiplier, &postShift);
-
-            uniConvertIntegertoF32Lo_4x4[7] |= (postShift & 0x1F);
-            uniConvertIntegertoF32Hi_4x4[7] |= (postShift & 0x1F);
-
-            for (i = 0; i < 8; i++)
-            {
-                uniConvertIntegertoF32Lo_4x4[i + 8] = (multiplier << 16) | multiplier;
-                uniConvertIntegertoF32Hi_4x4[i + 8] = (multiplier << 16) | multiplier;
-            }
+            outputScale = scaleIn;
 
             if (useImage2DFlag)
             {
@@ -20432,6 +20420,7 @@ vxnne_shader_executable vxnneTensorCopyShaderExecutable(
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvertIntegertoF32Lo_4x4", 1, uniConvertIntegertoF32Lo_4x4);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvertIntegertoF32Hi_4x4", 1, uniConvertIntegertoF32Hi_4x4);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "inputZP", 1, &inputZP);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "outputScale", 1, &outputScale);
         if (status != VX_SUCCESS) goto OnError;
     }
     else if (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT32)

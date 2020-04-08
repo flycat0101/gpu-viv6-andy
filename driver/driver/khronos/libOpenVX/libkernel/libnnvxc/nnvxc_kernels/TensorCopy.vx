@@ -387,6 +387,8 @@ __kernel void tensorCopy_##src_name##toF32 \
     VXC_DP4x4(dst0, src, input_zp, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertIntegertoF32Lo_4x4); \
     VXC_DP4x4(dst1, src, input_zp, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertIntegertoF32Hi_4x4); \
  \
+    dst0 *= outputScale; \
+    dst1 *= outputScale; \
     write_imagef(output, coord, dst0); \
     coord.x += 4; \
     write_imagef(output, coord, dst1); \
@@ -412,6 +414,8 @@ __kernel void tensorCopy_##src_name##toF32_2D \
     VXC_DP4x4(dst0, src, input_zp, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertIntegertoF32Lo_4x4); \
     VXC_DP4x4(dst1, src, input_zp, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), uniConvertIntegertoF32Hi_4x4); \
  \
+    dst0 *= outputScale; \
+    dst1 *= outputScale; \
     write_imagef(output, coord, dst0); \
     coord.x += 4; \
     write_imagef(output, coord, dst1); \
