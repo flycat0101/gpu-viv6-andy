@@ -19,7 +19,7 @@
 #define __gc_dfb_state_h_
 
 #include <core/coretypes.h>
-#include <shared/gc_hal_types.h>
+#include <gc_hal_types.h>
 
 /**
  * Validation flags.

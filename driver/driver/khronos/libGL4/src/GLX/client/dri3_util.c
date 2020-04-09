@@ -82,7 +82,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <xcb/present.h>
 #endif
 
-#include <shared/gc_hal_types.h>
+#include <gc_hal_types.h>
 #include <gc_hal_base.h>
 
 

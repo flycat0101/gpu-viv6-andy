@@ -26,7 +26,7 @@
 
 #include "gc_hal.h"
 #include "gc_hal_priv.h"
-#include "shared/gc_hal_driver.h"
+#include "gc_hal_driver.h"
 #include "gc_hal_engine.h"
 #include "gc_egl_common.h"
 

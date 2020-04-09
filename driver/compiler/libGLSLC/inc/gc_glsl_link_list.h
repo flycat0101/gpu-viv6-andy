@@ -14,7 +14,7 @@
 #ifndef __gc_glsl_list_h_
 #define __gc_glsl_list_h_
 
-#include "shared/gc_hal_types.h"
+#include "gc_hal_types.h"
 
 #define INVALID_ADDRESS            ((gctPOINTER)gcvMAXUINTPTR_T)
 

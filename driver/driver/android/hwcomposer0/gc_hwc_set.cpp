@@ -18,7 +18,7 @@
 #include "gc_hwc_debug.h"
 
 #include <gc_hal.h>
-#include <shared/gc_hal_driver.h>
+#include <gc_hal_driver.h>
 #include <gc_gralloc_priv.h>
 
 #include <linux/fb.h>

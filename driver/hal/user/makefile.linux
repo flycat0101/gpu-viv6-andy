@@ -175,7 +175,7 @@ extra_install: all
 	@mkdir -p $(SDK_DIR)/drivers
 	@mkdir -p $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_enum.h $(SDK_DIR)/include/HAL
-	@-cp -f $(AQROOT)/hal/inc/shared/gc_hal_types.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_types.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_version.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_base.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_debug_zones.h $(SDK_DIR)/include/HAL
@@ -188,9 +188,9 @@ extra_install: all
 ifeq ($(VIVANTE_ENABLE_VG),1)
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_vg.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_engine_vg.h $(SDK_DIR)/include/HAL
-	@-cp -f $(AQROOT)/hal/inc/shared/gc_hal_driver_vg.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_driver_vg.h $(SDK_DIR)/include/HAL
 endif
-	@-cp -f $(AQROOT)/hal/inc/shared/gc_hal_driver.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_driver.h $(SDK_DIR)/include/HAL
 ifeq ($(VIVANTE_ENABLE_3D),1)
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_engine.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_statistics.h $(SDK_DIR)/include/HAL

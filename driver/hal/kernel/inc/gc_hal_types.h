@@ -53,11 +53,7 @@
 *****************************************************************************/
 
 
-#ifndef __gc_hal_kernel_precomp_h_
-#define __gc_hal_kernel_precomp_h_
+#include "shared/gc_hal_types_shared.h"
 
-#include "gc_hal.h"
-#include "gc_hal_driver.h"
-#include "gc_hal_kernel.h"
 
-#endif /* __gc_hal_kernel_precomp_h_ */
+

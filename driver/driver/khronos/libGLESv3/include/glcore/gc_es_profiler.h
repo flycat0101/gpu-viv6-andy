@@ -14,7 +14,7 @@
 #ifndef __gc_es_profiler_h__
 #define __gc_es_profiler_h__
 
-#include "shared/gc_hal_types.h"
+#include "gc_hal_types.h"
 
 #define GLES3_APICALLBASE 100
 
