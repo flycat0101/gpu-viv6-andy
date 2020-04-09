@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "gc_hal_kernel_qnx.h"
-#include "shared/gc_hal_driver.h"
+#include "gc_hal_driver.h"
 #include "gc_hal_base.h"
 
 #include "gc_hal_kernel_resource_manager.h"

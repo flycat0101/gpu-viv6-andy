@@ -21,7 +21,7 @@
 #include <gc_vx_common.h>
 #include <gc_vx_nn_extension_interface.h>
 #include <gc_vx_internal_node_api.h>
-#include "shared/gc_hal_types.h"
+#include "gc_hal_types.h"
 #include "anchors.h"
 #include <gc_vx_nn_util.h>
 #include <gc_nn_arch_model.h>

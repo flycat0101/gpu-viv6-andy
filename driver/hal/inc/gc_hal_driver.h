@@ -11,33 +11,7 @@
 *****************************************************************************/
 
 
-#include "gc_hal_types.h"
-#include "gc_hal.h"
+#include "shared/gc_hal_driver_shared.h"
 
-#define SPV_MEMPOOL_PAGESIZE    1024*16
 
-typedef struct _SpvMemPool {
 
-    gctPOINTER ptr;
-    gctUINT poolSize;
-    gctUINT curPos;
-    struct _SpvMemPool *next;
-
-} SpvMemPool;
-
-gceSTATUS spvInitializeMemPool(IN gctUINT memSize, INOUT SpvMemPool **memPool);
-
-gceSTATUS spvUninitializeMemPool(IN SpvMemPool *memPool);
-
-gceSTATUS
-spvAllocate(
-    IN SpvMemPool *memPool,
-    IN gctSIZE_T Bytes,
-    OUT gctPOINTER * Memory
-    );
-
-gceSTATUS
-spvFree(
-    IN SpvMemPool *memPool,
-    IN gctPOINTER Memory
-    );

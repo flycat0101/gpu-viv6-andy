@@ -16,7 +16,7 @@
 #include <gc_vx_common.h>
 #include <gc_vx_interface.h>
 #include <gc_vx_internal_node_api.h>
-#include "shared/gc_hal_types.h"
+#include "gc_hal_types.h"
 #include <float.h>
 #if gcdUSE_VXC_BINARY
 #include "ovx12_vxc_binary_interface.h"

@@ -22,7 +22,7 @@
 #include <gc_hal.h>
 #include <gc_hal_base.h>
 #include <gc_hal_raster.h>
-#include <shared/gc_hal_driver.h>
+#include <gc_hal_driver.h>
 
 #include <sync/sync.h>
 #include <cutils/properties.h>

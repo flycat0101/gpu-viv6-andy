@@ -42,7 +42,7 @@
 #include "drmgl.h"
 #include <xf86dri.h>
 
-#include <shared/gc_hal_types.h>
+#include <gc_hal_types.h>
 #include <gc_hal_base.h>
 #include "gc_egl_platform.h"
 

@@ -248,7 +248,7 @@ _SignalHandler(
 
 #include "gc_hal_base.h"
 #include "gc_hal_profiler.h"
-#include "shared/gc_hal_driver.h"
+#include "gc_hal_driver.h"
 
 static int (* _ImportVideoMemory)(uint32_t name,
                                   uint32_t *node);

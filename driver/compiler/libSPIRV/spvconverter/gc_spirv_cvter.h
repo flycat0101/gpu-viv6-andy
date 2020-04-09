@@ -16,7 +16,7 @@
 
 #include "gc_vsc_precomp.h"
 #include "gc_hal.h"
-#include "shared/gc_hal_types.h"
+#include "gc_hal_types.h"
 #include "gc_hal_priv.h"
 #include "drvi/gc_vsc_drvi_interface.h"
 

@@ -12,7 +12,7 @@
 
 
 #include "gc_hal_kernel_qnx.h"
-#include "shared/gc_hal_driver.h"
+#include "gc_hal_driver.h"
 #include <ctype.h>
 #include <errno.h>
 #include <pthread.h>

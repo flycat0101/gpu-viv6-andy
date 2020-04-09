@@ -21,7 +21,7 @@
 
 #include "gc_hal.h"
 #include "gc_hal_user.h"
-#include "shared/gc_hal_types.h"
+#include "gc_hal_types.h"
 #include "drvi/gc_vsc_drvi_interface.h"
 
 typedef char *            gctCHAR_PTR;

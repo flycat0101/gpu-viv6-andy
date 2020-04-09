@@ -54,7 +54,7 @@
 
 
 #include "gc_hal_kernel_vxworks.h"
-#include "shared/gc_hal_driver.h"
+#include "gc_hal_driver.h"
 
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcvZONE_DRIVER
