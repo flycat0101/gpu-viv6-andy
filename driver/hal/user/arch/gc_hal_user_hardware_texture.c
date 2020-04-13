@@ -1632,6 +1632,16 @@ static void _GetBorderColor(
         }
         break;
 
+    case 0x09:
+        {
+            resultColor[0] = (gctUINT8)gcmFLOAT_TO_UNORM(borderColor32[0], 8);
+            resultColor[3] = resultColor[2] = resultColor[1] = resultColor[0];
+
+            borderColor32[0] = gcmFLOATCLAMP_0_TO_1(borderColor32[0]);
+            borderColor32[3] = borderColor32[2] = borderColor32[1] = borderColor32[0];
+        }
+        break;
+
     case 0x03:
         break;
 

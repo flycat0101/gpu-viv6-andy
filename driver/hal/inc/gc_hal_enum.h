@@ -605,6 +605,7 @@ typedef enum _gceFEATURE
     gcvFEATURE_FORMAT_10BIT_CROSS_4K,
     gcvFEATURE_ENDIAN_CONTROL,
     gcvFEATURE_SH_VX2_FLOATING_MAD_FIX,
+    gcvFEATURE_PE_A8B8G8R8, /* For PE support A8B8G8R8 format feature*/
 
     /* AIGPU feature. */
     gcvFEATURE_AI_GPU,

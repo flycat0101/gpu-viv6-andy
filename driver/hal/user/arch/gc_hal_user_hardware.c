@@ -1709,6 +1709,7 @@ Fill2DFeaturesByDatabase(
 
     Features[gcvFEATURE_2D_FC_SOURCE] = database->REG_DEEnhancements2;
     Features[gcvFEATURE_2D_FAST_CLEAR] = database->DE_2D_FAST_CLEAR;
+    Features[gcvFEATURE_PE_A8B8G8R8] =  database->PE_A8B8G8R8;
 
     if (chipModel > gcv520 && Features[gcvFEATURE_2D_FC_SOURCE])
     {
