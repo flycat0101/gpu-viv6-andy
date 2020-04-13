@@ -3731,7 +3731,7 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
             vxnne_operation_info_s opInfo;
             for (i = 0; i < block->segmentNum; i++)
             {
-                if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_TILING)
+                if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_TILING || block->segments[i]->type == VXNNE_SEGMENT_TYPE_AB)
                 {
                     for (j = 0; j < block->segments[i]->count; j++)
                     {
@@ -3739,8 +3739,12 @@ VX_PRIVATE_API vx_status GenerateBlockInfo(
                         if (opInfo.target == VXNNE_OPERATION_TARGET_NN)
                         {
                             vxnne_convolution_relu_pooling_operation convOperation = (vxnne_convolution_relu_pooling_operation)graph->layer->operations[j + block->segments[i]->start];
-                            vxoReleaseWeightsBiases(&convOperation->swtWeightBiases);
-                            convOperation->swtWeightBiases = VX_NULL;
+                            if (block->segments[i]->type == VXNNE_SEGMENT_TYPE_TILING)
+                            {
+                                vxoReleaseWeightsBiases(&convOperation->swtWeightBiases);
+                                convOperation->swtWeightBiases = VX_NULL;
+                            }
+                            convOperation->resultInfo.kernelsPerCore = 0;
                         }
                     }
                 }
