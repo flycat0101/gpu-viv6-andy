@@ -1004,6 +1004,12 @@ void vscDG_PstOrderTraversal(VSC_DIRECTED_GRAPH* pDG,
 
     searchMode = _ChooseImplementSearchMode(pDG, searchMode);
 
+    /* Disable iterative DFS temporarily when the check function is set, need to refine it later. */
+    if (searchMode == VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_ITERATIVE)
+    {
+        searchMode = VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST_RECURSIVE;
+    }
+
     /* For post order with BFS_wide, we just do reversed preorder with BFS_wide */
     if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE)
     {
