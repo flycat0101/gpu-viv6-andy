@@ -33804,7 +33804,7 @@ vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
         vxReleaseProgram(&program);
     }
 
-    if (input_format != VX_TYPE_FLOAT32 && output_format != VX_TYPE_FLOAT32)
+    if (output_format != VX_TYPE_FLOAT32)
     {
         char kernelName[1024];
         vx_uint32 offset = 0;
@@ -33839,6 +33839,9 @@ vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
 
         switch (input_format)
         {
+        case VX_TYPE_FLOAT32:
+            gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_F32");
+            break;
         case VX_TYPE_FLOAT16:
             gcoOS_PrintStrSafe(kernelName, sizeof(kernelName), &offset, "_F16");
             break;
@@ -33888,7 +33891,7 @@ vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
     }
     if (!shaderExecutable) goto OnError;
 
-    if (input_format != VX_TYPE_FLOAT32)
+    if (output_format != VX_TYPE_FLOAT32)
     {
         vx_uint32 uniExtractInteger_2x8[16] = {
             0x33333333, // TCfg
@@ -33961,6 +33964,10 @@ vxnne_shader_executable vxnneGetTensorTRShaderExecutable(
             status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvBF16toF32_Part0_2x8", 1, uniConvBF16toF32_Part0_2x8);
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvBF16toF32_Part1_2x8", 1, uniConvBF16toF32_Part1_2x8);
             status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtractOddData_2x8", 1, uniExtractOddData_2x8);
+        }
+        else if (input_format == VX_TYPE_FLOAT32 && output_format == VX_TYPE_BFLOAT16)
+        {
+            status = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniExtractOddData_2x8", 1, uniExtractOddData_2x8);
         }
         else
         {
