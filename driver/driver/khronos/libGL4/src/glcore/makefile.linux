@@ -194,7 +194,7 @@ all: $(TARGET_MODULE)
 clean:
 	@rm -rf $(OBJ_DIR)
 
-ifneq ($(YOCTO_DRI_BUILD),1)
+ifeq ($(YOCTO_DRI_BUILD),1)
 install: all
 	@mkdir -p $(INSTALL_DIR)
 	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
