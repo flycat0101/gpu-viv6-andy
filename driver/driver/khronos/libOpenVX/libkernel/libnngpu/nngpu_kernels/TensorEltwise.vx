@@ -2,29 +2,16 @@
 #pragma OPENCL EXTENSION cl_viv_bitfield_extension : enable
 #pragma OPENCL EXTENSION cl_viv_vx_extension : enable
 
-float4 read_image2DArrayf
-    (
-    __read_only     image2d_array_t input,
-    int4            Coord
-    )
-{
-    int8 desc;
-    _viv_asm(COPY, desc, input, sizeof(desc));
-    _viv_asm(CLAMP0MAX, (Coord).z, (Coord).z, desc.s5 - 1);
-    return read_imagef(input, Coord);
-}
+#define readImage2DArray(Dest, Image, Coord)         \
+    do {                                                       \
+       int8 desc;                                              \
+       _viv_asm(COPY, desc, Image, sizeof(desc));              \
+       _viv_asm(CLAMP0MAX, (Coord).w, (Coord).z, desc.s5 - 1); \
+       int baseAddr =  (int)(Coord).w * desc.s4 + desc.s0;     \
+       _viv_asm(MOV, (Coord).w, baseAddr);                     \
+       _viv_asm(IMAGE_READ_3D, Dest, Image, (Coord).xyww);     \
+    } while (0)
 
-uint4 read_image2DArrayui
-    (
-    __read_only     image2d_array_t input,
-    int4            Coord
-    )
-{
-    int8 desc;
-    _viv_asm(COPY, desc, input, sizeof(desc));
-    _viv_asm(CLAMP0MAX, (Coord).z, (Coord).z, desc.s5 - 1);
-    return read_imageui(input, Coord);
-}
 /*tensor add*/
 __kernel void gpuTensorAdd_FP32
     (
@@ -39,8 +26,9 @@ __kernel void gpuTensorAdd_FP32
     int4 coord = (int4)(x, y, z, 0);
     float4 src0, src1, dst = {0.0};
 
-    src0 = read_image2DArrayf(input0, coord);
-    src1 = read_image2DArrayf(input1, coord);
+    readImage2DArray(src0, input0, coord);
+    readImage2DArray(src1, input1, coord);
+
     dst.x = src0.x + src1.x;
     write_imagef(output, coord, dst);
 }
@@ -122,9 +110,10 @@ __kernel void gpuTensorAdd_Quant8
     uint4 src0, src1, dst = {0.0};
     float inPixel0, inPixel1, outPixel;
 
-    src0 = read_image2DArrayui(input0, coord);
+    readImage2DArray(src0, input0, coord);
+    readImage2DArray(src1, input1, coord);
+
     inPixel0 = convert_int(src0.x-zpIn0)*scaleIn0;
-    src1 = read_image2DArrayui(input1, coord);
     inPixel1 = convert_int(src1.x-zpIn1)*scaleIn1;
     outPixel = inPixel0 + inPixel1;
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
@@ -209,8 +198,9 @@ __kernel void gpuTensorSub_FP32
     int4 coord = (int4)(x, y, z, 0);
     float4 src0, src1, dst = {0.0};
 
-    src0 = read_image2DArrayf(input0, coord);
-    src1 = read_image2DArrayf(input1, coord);
+    readImage2DArray(src0, input0, coord);
+    readImage2DArray(src1, input1, coord);
+
     dst.x = src0.x - src1.x;
     write_imagef(output, coord, dst);
 }
@@ -254,9 +244,10 @@ __kernel void gpuTensorSub_Quant8
     uint4 src0, src1, dst = {0.0};
     float inPixel0, inPixel1, outPixel;
 
-    src0 = read_image2DArrayui(input0, coord);
+    readImage2DArray(src0, input0, coord);
+    readImage2DArray(src1, input1, coord);
+
     inPixel0 = convert_int(src0.x-zpIn0)*scaleIn0;
-    src1 = read_image2DArrayui(input1, coord);
     inPixel1 = convert_int(src1.x-zpIn1)*scaleIn1;
     outPixel = inPixel0 - inPixel1;
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
@@ -277,8 +268,9 @@ __kernel void gpuTensorMul_FP32
     int4 coord = (int4)(x, y, z, 0);
     float4 src0, src1, dst = {0.0};
 
-    src0 = read_image2DArrayf(input0, coord);
-    src1 = read_image2DArrayf(input1, coord);
+    readImage2DArray(src0, input0, coord);
+    readImage2DArray(src1, input1, coord);
+
     dst.x = src0.x * src1.x;
     write_imagef(output, coord, dst);
 }
@@ -322,9 +314,10 @@ __kernel void gpuTensorMul_Quant8
     uint4 src0, src1, dst = {0.0};
     float inPixel0, inPixel1, outPixel;
 
-    src0 = read_image2DArrayui(input0, coord);
+    readImage2DArray(src0, input0, coord);
+    readImage2DArray(src1, input1, coord);
+
     inPixel0 = convert_int(src0.x-zpIn0)*scaleIn0;
-    src1 = read_image2DArrayui(input1, coord);
     inPixel1 = convert_int(src1.x-zpIn1)*scaleIn1;
     outPixel = inPixel0 * inPixel1;
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);
@@ -345,8 +338,9 @@ __kernel void gpuTensorDiv_FP32
     int4 coord = (int4)(x, y, z, 0);
     float4 src0, src1, dst = {0.0};
 
-    src0 = read_image2DArrayf(input0, coord);
-    src1 = read_image2DArrayf(input1, coord);
+    readImage2DArray(src0, input0, coord);
+    readImage2DArray(src1, input1, coord);
+
     dst.x = src0.x / src1.x;
     write_imagef(output, coord, dst);
 }
@@ -390,9 +384,10 @@ __kernel void gpuTensorDiv_Quant8
     uint4 src0, src1, dst = {0.0};
     float inPixel0, inPixel1, outPixel;
 
-    src0 = read_image2DArrayui(input0, coord);
+    readImage2DArray(src0, input0, coord);
+    readImage2DArray(src1, input1, coord);
+
     inPixel0 = convert_int(src0.x-zpIn0)*scaleIn0;
-    src1 = read_image2DArrayui(input1, coord);
     inPixel1 = convert_int(src1.x-zpIn1)*scaleIn1;
     outPixel = inPixel0 / inPixel1;
     dst.x = floor(outPixel*scaleOut + zpOut + 0.5);

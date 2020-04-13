@@ -418,3 +418,65 @@ __kernel void gpuTensorCopy_FP32toFP16_4S_2D (
     ((ushort*)output_data_ptr)[2] = result.z;
     ((ushort*)output_data_ptr)[3] = result.w;
 }
+
+#define DATA_CONVERT_TO_INT32_2D_4X(name, image_load_inst, input_type) \
+__kernel void gpuTensorCopy_##name##toI32_2D_4X ( \
+    __read_only  image2d_t input, \
+    __write_only image2d_t output, \
+                  float    scale, \
+                  float    tail) \
+{ \
+    int2 coord = (int2)(get_global_id(0), get_global_id(1)); \
+    input_type src = image_load_inst(input, coord); \
+ \
+    float4 data = convert_float4(src) * scale + tail; \
+    int4 dst = convert_int4(data); \
+ \
+    write_imagei(output, coord, dst); \
+}
+DATA_CONVERT_TO_INT32_2D_4X(U8, read_imageui, uint4)
+DATA_CONVERT_TO_INT32_2D_4X(F32, read_imagef, float4)
+
+#define DATA_CONVERT_TO_INT32_2D_4S(name, image_load_inst, input_type) \
+__kernel void gpuTensorCopy_##name##toI32_2D_4S ( \
+    __read_only  image2d_t input, \
+    __write_only image2d_t output, \
+                  float    scale, \
+                  float    tail) \
+{ \
+    int2 coord = (int2)(get_global_id(0), get_global_id(1)); \
+    input_type src = image_load_inst(input, coord); \
+ \
+    float4 data = convert_float4(src) * scale + tail; \
+    int4 dst = convert_int4(data); \
+ \
+    write_imagei(output, coord, dst.xxxx); \
+    coord.x++; \
+    write_imagei(output, coord, dst.yyyy); \
+    coord.x++; \
+    write_imagei(output, coord, dst.zzzz); \
+    coord.x++; \
+    write_imagei(output, coord, dst.wwww); \
+}
+DATA_CONVERT_TO_INT32_2D_4S(U8, read_imageui, uint4)
+DATA_CONVERT_TO_INT32_2D_4S(F32, read_imagef, float4)
+
+#define DATA_CONVERT_TO_INT32(name, image_load_inst, input_type) \
+__kernel void gpuTensorCopy_##name##toI32 ( \
+    __read_only  image2d_array_t input, \
+    __write_only image2d_array_t output, \
+                  float    scale, \
+                  float    tail) \
+{ \
+    int4 coord = (int4)(get_global_id(0), get_global_id(1), get_global_id(2), get_global_id(2)); \
+    input_type src = image_load_inst(input, coord); \
+ \
+    float4 data = convert_float4(src) * scale + tail; \
+    int4 dst = convert_int4(data); \
+ \
+    write_imagei(output, coord, dst); \
+}
+DATA_CONVERT_TO_INT32(U8, read_imageui, uint4)
+DATA_CONVERT_TO_INT32(F32, read_imagef, float4)
+
+

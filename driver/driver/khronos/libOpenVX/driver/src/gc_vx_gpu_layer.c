@@ -499,7 +499,7 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
 
     borderMode->mode = VX_BORDER_REPLICATE;
 
-    if (input_dims <= 2)
+    if (input_dims <= 2 || depth == 1)
     {
         enable_2d_img = vx_true_e;
     }
@@ -868,7 +868,8 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         if (status != VX_SUCCESS) goto OnError;
     }
     else if ((inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT32)
-            || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16))
+          || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT32)
+          || (inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT16))
     {
         vx_int8 input_fixPointPos = 0;
         vx_float32 inScale =1.0;
@@ -876,9 +877,9 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
         vx_float32 outScale = 1.0;
         vx_reference parameters[3] = {(vx_reference)input_rs, (vx_reference)output_rs, (vx_reference)NULL};
 
-        if (inputFormat == VX_TYPE_INT16)
+        if (TENSOR_QUANT_TYPE(input) == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
-            input_fixPointPos = TENSOR_POS(input_rs);
+            input_fixPointPos = TENSOR_POS(input);
             if (input_fixPointPos >= 0)
             {
                 inScale = 1.0f / (vx_float32) (1 << input_fixPointPos);
@@ -889,9 +890,9 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
             }
             scale = vxCreateScalar(context, VX_TYPE_FLOAT32, &inScale);
         }
-        else if (outputFormat == VX_TYPE_INT16)
+        else if (TENSOR_QUANT_TYPE(output) == VX_QUANT_DYNAMIC_FIXED_POINT)
         {
-            output_fixPointPos = TENSOR_POS(output_rs);
+            output_fixPointPos = TENSOR_POS(output);
             if (output_fixPointPos >= 0)
             {
                 outScale = (vx_float32) (1 << output_fixPointPos);
@@ -929,6 +930,81 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I16_INT32_4S", borderMode);
             }
         }
+        if (!shaderExecutable)
+        {
+            goto OnError;
+        }
+
+        status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
+        status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        if (is_write_4x)
+        {
+            status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+        }
+        if (status != VX_SUCCESS) goto OnError;
+    }
+    else if ((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_INT32)
+          || (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_INT32)
+          || (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_INT32))
+    {
+        vx_float32 inscale =1.0;
+        vx_float32 tail = 0;
+        vx_reference parameters[4] = {(vx_reference)input_rs, (vx_reference)output_rs, (vx_reference)NULL};
+
+        if (TENSOR_QUANT_TYPE(input) == VX_QUANT_AFFINE_SCALE)
+        {
+            vx_float32 inzp = 0;
+            inscale = TENSOR_TF_SCALE(input);
+            inzp = (vx_float32)TENSOR_TF_ZEROPOINT(input);
+
+            tail = 0 - inzp * inscale;
+
+            scale = vxCreateScalar(context, VX_TYPE_FLOAT32, &inscale);
+            zp = vxCreateScalar(context, VX_TYPE_FLOAT32, &tail);
+        }
+
+        parameters[2] = (vx_reference)scale;
+        parameters[3] = (vx_reference)zp;
+
+        if (enable_2d_img)
+        {
+            if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
+            {
+                if (new_width % 4 == 0)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toI32_2D_4X", borderMode);
+                    is_write_4x      = vx_true_e;
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toI32_2D_4S", borderMode);
+                }
+            }
+            else
+            {
+                if (new_width % 4 == 0)
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8toI32_2D_4X", borderMode);
+                    is_write_4x      = vx_true_e;
+                }
+                else
+                {
+                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8toI32_2D_4S", borderMode);
+                }
+            }
+        }
+        else
+        {
+            if (inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toI32", borderMode);
+            }
+            else
+            {
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8toI32", borderMode);
+            }
+        }
+
         if (!shaderExecutable)
         {
             goto OnError;
@@ -7716,12 +7792,12 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
     vx_tensor     src0                  = NULL;
     vx_tensor     src1                  = NULL;
     vx_tensor     dst                   = NULL;
-    vx_float32    input_scale0          = TENSOR_TF_SCALE(input0);
-    vx_float32    input_scale1          = TENSOR_TF_SCALE(input1);
-    vx_float32    output_scale          = 1.0f/TENSOR_TF_SCALE(output);
-    vx_int32      input_ZP0             = TENSOR_TF_ZEROPOINT(input0);
-    vx_int32      input_ZP1             = TENSOR_TF_ZEROPOINT(input1);
-    vx_int32      output_ZP             = TENSOR_TF_ZEROPOINT(output);
+    vx_float32    input_scale0          = 1.0f;
+    vx_float32    input_scale1          = 1.0f;
+    vx_float32    output_scale          = 1.0f;
+    vx_int32      input_ZP0             = 0;
+    vx_int32      input_ZP1             = 0;
+    vx_int32      output_ZP             = 0;
     vx_uint32     paramNum              = 3;
     vx_uint32     i                     = 0;
     vx_bool       useImage2DFlag        = vx_false_e;
@@ -7736,6 +7812,24 @@ vxnne_shader_executable vxnneGetGPUTensorEltwiseShaderExecutable(
     vx_scalar zpOut = NULL;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input0=%p, input1=%p, output=%p", context, kernelEnum, input0, input1, output);
+
+    if (TENSOR_QUANT_TYPE(input0) == VX_QUANT_AFFINE_SCALE)
+    {
+        input_scale0 = TENSOR_TF_SCALE(input0);
+        input_ZP0    = TENSOR_TF_ZEROPOINT(input0);
+    }
+
+    if (TENSOR_QUANT_TYPE(input1) == VX_QUANT_AFFINE_SCALE)
+    {
+        input_scale1 = TENSOR_TF_SCALE(input1);
+        input_ZP1    = TENSOR_TF_ZEROPOINT(input1);
+    }
+
+    if (TENSOR_QUANT_TYPE(output) == VX_QUANT_AFFINE_SCALE)
+    {
+        output_scale = 1.0f / TENSOR_TF_SCALE(output);
+        output_ZP    = TENSOR_TF_ZEROPOINT(output);
+    }
 
     /* parameter check for inputs, accordding to nn api, the two input tensorshould be of identical operancode and compatible dimensions. */
     for (i = 0; i < TENSOR_DIM_NUM(output); i++)

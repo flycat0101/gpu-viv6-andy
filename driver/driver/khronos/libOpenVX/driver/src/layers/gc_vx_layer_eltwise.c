@@ -220,12 +220,13 @@ VX_PRIVATE_API vx_bool vxoNNTensorAdd_SH_EVIS_Support_Ext(vx_node node, const vx
     reg_param->flag = 0;
     if(evis)
     {
-        format_flag = (vx_bool)((input0Format != VX_TYPE_FLOAT32) && (input1Format != VX_TYPE_FLOAT32) && (outputFormat != VX_TYPE_FLOAT32));
+        format_flag = (vx_bool)((input0Format != VX_TYPE_FLOAT32) && (input1Format != VX_TYPE_FLOAT32) && (outputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_INT32));
         enable_2d_tensor = (vx_bool)(depth == 1 && ((input0Format == VX_TYPE_FLOAT16 && (input1Format == VX_TYPE_FLOAT16 || input1Format == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16) || format_flag) && policyEnum == VX_CONVERT_POLICY_SATURATE);
     }
     else
     {
-        format_flag = vx_true_e;
+        format_flag = (vx_bool)((input0Format == VX_TYPE_FLOAT16 || input0Format == VX_TYPE_FLOAT32) && (input1Format == VX_TYPE_FLOAT16 || input1Format == VX_TYPE_FLOAT32) && (outputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_FLOAT32)
+                               || (input0Format == VX_TYPE_UINT8 && input1Format == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
     }
     shExe_flag = format_flag || enable_2d_tensor;
 
