@@ -1022,6 +1022,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
     vx_int32 outWidth = 0, outHeight = 0, outDepth = 0, outBatch = 0;
     vx_bool shader_flag = vx_false_e;
     vx_bool dataFormatFlag = vx_false_e;
+    vx_bool fp2bfp16Flag = vx_false_e;
     vx_bool pad_flag = vx_false_e;
     vx_bool whc_flag = vx_false_e;
     vx_int32_ptr pad_base = VX_NULL;
@@ -1054,6 +1055,9 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
 
     dataFormatFlag = (vx_bool)((inputFormat == outputFormat) && (inputElementSize & 3) && (inputFixPointPos == outputFixPointPos)
             && (inputZeroPoint == outputZeroPoint) && (inputScale == outputScale));
+
+    fp2bfp16Flag = (vx_bool)(inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16
+                                && (pad_mode == VX_PAD_MIRROR_REFLECT || pad_mode == VX_PAD_MIRROR_SYMMETRIC));
 
     if(outDepth == inDepth && outBatch == inBatch)
     {
@@ -1097,7 +1101,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
         shader_flag = vx_true_e;
     }
 
-    support = support && shader_flag && dataFormatFlag;
+    support = support && shader_flag && (dataFormatFlag || fp2bfp16Flag);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 

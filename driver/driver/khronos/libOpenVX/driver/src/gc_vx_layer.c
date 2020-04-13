@@ -26996,6 +26996,7 @@ vxnne_shader_executable vxnneGetTensorPadSymShaderExecutable(
     vx_uint32     output_height              = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
     vx_uint32     output_depth               = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
     vx_enum       inputFormat                = TENSOR_DATA_TYPE(inputs);
+    vx_enum       outputFormat               = TENSOR_DATA_TYPE(outputs);
     vx_uint32     inputElementSize           = TENSOR_DATA_SIZE(inputs);
     vx_int32      padConstv                  = 0;
     vx_uint32     maxWorkGroupSize           = 8;
@@ -27102,6 +27103,11 @@ vxnne_shader_executable vxnneGetTensorPadSymShaderExecutable(
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_16Bits_whc", borderMode);
         if (!shaderExecutable) goto OnError;
     }
+    else if (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16)
+    {
+        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toBF16_whc", borderMode);
+        if (!shaderExecutable) goto OnError;
+    }
 
     status = vxnneShaderExecutable_GetMaxWorkGroupSize(shaderExecutable, &maxWorkGroupSize);
     if (status != VX_SUCCESS) goto OnError;
@@ -27179,6 +27185,7 @@ vxnne_shader_executable vxnneGetTensorPadRefShaderExecutable(
     vx_uint32     output_height              = TENSOR_VIEW_SIZE_INDEX(outputs, 1);
     vx_uint32     output_depth               = TENSOR_VIEW_SIZE_INDEX(outputs, 2);
     vx_enum       inputFormat                = TENSOR_DATA_TYPE(inputs);
+    vx_enum       outputFormat               = TENSOR_DATA_TYPE(outputs);
     vx_uint32     inputElementSize           = TENSOR_DATA_SIZE(inputs);
     vx_int32      padConstv                  = 0;
     vx_uint32     maxWorkGroupSize           = 8;
@@ -27283,6 +27290,11 @@ vxnne_shader_executable vxnneGetTensorPadRefShaderExecutable(
     else if (inputElementSize ==2)
     {
         shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_16Bits_whc", borderMode);
+        if (!shaderExecutable) goto OnError;
+    }
+    else if (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16)
+    {
+        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32toBF16_whc", borderMode);
         if (!shaderExecutable) goto OnError;
     }
 
