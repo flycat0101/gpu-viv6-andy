@@ -12629,7 +12629,7 @@ gcoSURF_BlitCPU(
 
     gcmONERROR(gcoHARDWARE_GetAPI(gcvNULL, &currentApi, gcvNULL));
 
-    if(currentApi != gcvAPI_OPENGL)
+    if (currentApi != gcvAPI_OPENGL)
     {
         if (args->srcSurface == args->dstSurface)
         {
@@ -12711,9 +12711,10 @@ gcoSURF_BlitCPU(
     ** For integer format upload/blit, the data type must be totally matched.
     ** And we should not do conversion to float per spec, or precision will be lost.
     */
-    if (((srcFmtInfo->fmtDataType == gcvFORMAT_DATATYPE_UNSIGNED_INTEGER) ||
-         (srcFmtInfo->fmtDataType == gcvFORMAT_DATATYPE_SIGNED_INTEGER)) &&
-         (srcFmtInfo->fmtDataType != dstFmtInfo->fmtDataType))
+    if ((currentApi != gcvAPI_OPENGL) &&
+        ((srcFmtInfo->fmtDataType == gcvFORMAT_DATATYPE_UNSIGNED_INTEGER) ||
+        (srcFmtInfo->fmtDataType == gcvFORMAT_DATATYPE_SIGNED_INTEGER)) &&
+        (srcFmtInfo->fmtDataType != dstFmtInfo->fmtDataType))
     {
         return gcvSTATUS_NOT_SUPPORTED;
     }
@@ -12926,6 +12927,13 @@ gcoSURF_BlitCPU(
                 else
                 {
                     internal = samplePixels[0];
+                }
+
+                if ((currentApi == gcvAPI_OPENGL) &&
+                    (srcFmtInfo->fmtDataType == gcvFORMAT_DATATYPE_UNSIGNED_INTEGER) &&
+                    (dstFmtInfo->fmtDataType == gcvFORMAT_DATATYPE_SIGNED_INTEGER))
+                {
+                    gcoSURF_PixelToSignedInteger(&internal, dstFmtInfo->u.rgba);
                 }
 
                 dstSurf->pfGetAddr(dstSurf, (gctSIZE_T)iDst, (gctSIZE_T)jDst, (gctSIZE_T)kDst, dstAddr_l);

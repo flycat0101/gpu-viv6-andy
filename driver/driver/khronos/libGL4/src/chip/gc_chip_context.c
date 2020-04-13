@@ -460,6 +460,7 @@ gcChipInitExtension(
         __glFormatInfoTable[__GL_FMT_RGB8_SNORM].renderable = GL_FALSE;
         __glFormatInfoTable[__GL_FMT_RGBA8_SNORM].renderable = GL_FALSE;
         __glFormatInfoTable[__GL_FMT_RGB10_A2].renderable = GL_FALSE;
+        __glFormatInfoTable[__GL_FMT_RGB10_A2].dataType = GL_UNSIGNED_INT_2_10_10_10_REV;
         __glFormatInfoTable[__GL_FMT_SRGB8].renderable = GL_FALSE;
         __glFormatInfoTable[__GL_FMT_R16F].renderable = GL_FALSE;
         __glFormatInfoTable[__GL_FMT_RG16F].renderable = GL_FALSE;

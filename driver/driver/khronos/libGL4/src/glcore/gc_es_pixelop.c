@@ -811,17 +811,8 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
           case GL_LUMINANCE_ALPHA:
               break;
 
-          case GL_RED_INTEGER_EXT:
-          case GL_GREEN_INTEGER_EXT:
-          case GL_BLUE_INTEGER_EXT:
-          case GL_ALPHA_INTEGER_EXT:
-          case GL_RGB_INTEGER_EXT:
-          case GL_RGBA_INTEGER_EXT:
-          case GL_BGR_INTEGER_EXT:
-          case GL_BGRA_INTEGER_EXT:
-          case GL_LUMINANCE_INTEGER_EXT:
-          case GL_LUMINANCE_ALPHA_INTEGER_EXT:
-              if (!__glExtension[__GL_EXTID_EXT_texture_integer].bEnabled || (type == GL_FLOAT ))
+          __GL_CASE_IS_INTEGER_FORMAT:
+              if (!__glExtension[__GL_EXTID_EXT_texture_integer].bEnabled || (type == GL_FLOAT) || (type == GL_HALF_FLOAT))
               {
                  __glSetError(gc, GL_INVALID_ENUM);
                  return GL_FALSE;
@@ -833,9 +824,7 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
                  return GL_FALSE;
               }
               break;
-        case GL_RG_INTEGER:
-            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
-            break;
+
         case GL_RG:
             if (((type == GL_UNSIGNED_INT_24_8) || (type == GL_FLOAT_32_UNSIGNED_INT_24_8_REV)))
             {
@@ -878,6 +867,7 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
           case GL_UNSIGNED_SHORT_5_6_5_REV:
               switch (format) {
                   case GL_RGB:
+                  case GL_RGB_INTEGER:
                       break;
                   default:
                       __glSetError(gc, GL_INVALID_OPERATION);
@@ -896,6 +886,8 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
                   case GL_RGBA:
                   case GL_ABGR_EXT:
                   case GL_BGRA:
+                  case GL_RGBA_INTEGER:
+                  case GL_BGRA_INTEGER:
                       break;
                   default:
                       __glSetError(gc, GL_INVALID_OPERATION);
@@ -1049,6 +1041,7 @@ __GL_INLINE GLvoid __glReadPixelsEnd(__GLcontext *gc)
     }
 }
 
+extern void __gl_doSwizzleForSpecialFormat(__GLpixelTransferInfo *transferInfo, GLenum * format);
 
 GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei width, GLsizei height,
                                      GLenum format, GLenum type, GLvoid* pixels)
@@ -1067,6 +1060,8 @@ GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei 
         __GL_EXIT();
     }
 
+    __gl_doSwizzleForSpecialFormat(&transferInfo, &format);
+
     /* Check if framebuffer is complete */
     if (READ_FRAMEBUFFER_BINDING_NAME == 0)
     {
@@ -1076,6 +1071,17 @@ GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei 
     {
         __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
         formatInfo = __glGetFramebufferFormatInfo(gc, readFBO, readFBO->readBuffer);
+    }
+
+    if ((formatInfo == gcvNULL) &&(format == GL_DEPTH_COMPONENT))
+    {
+        /* When formatInfo is NULL, using GL_DEPTH24_STENCIL8 for a tmporary formatInfo to do pixel transfer. */
+        formatInfo =  __glGetFormatInfo(GL_DEPTH24_STENCIL8);
+    }
+    else if ((formatInfo == gcvNULL) && ((format == GL_DEPTH_STENCIL) || (format == GL_STENCIL_INDEX)))
+    {
+        /* When formatInfo is NULL, using DEPTH32F_STENCIL8/DEPTH24_STENCIL8 for a tmporary formatInfo to do pixel transfer. */
+        formatInfo =  (GL_FLOAT_32_UNSIGNED_INT_24_8_REV == type) ? __glGetFormatInfo(GL_DEPTH32F_STENCIL8) : __glGetFormatInfo(GL_DEPTH24_STENCIL8);
     }
 
     if (formatInfo != gcvNULL)
@@ -1094,6 +1100,36 @@ GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei 
         if (!__glCheckPBO(gc, &gc->clientState.pixel.packModes, packBufObj, width, height, 0, format, type, transferInfo.srcImage))
         {
             __GL_EXIT();
+        }
+    }
+
+    if (formatInfo)
+    {
+        /* Check for integer format. */
+        switch (formatInfo->dataFormat)
+        {
+        __GL_CASE_IS_INTEGER_FORMAT:
+            switch(format)
+            {
+            __GL_CASE_IS_INTEGER_FORMAT:
+                break;
+            default:
+                __glSetError(gc, GL_INVALID_OPERATION);
+                __GL_EXIT();
+                break;
+            }
+            break;
+        default:
+            switch(format)
+            {
+            __GL_CASE_IS_INTEGER_FORMAT:
+                __glSetError(gc, GL_INVALID_OPERATION);
+                __GL_EXIT();
+                break;
+            default:
+                break;
+            }
+            break;
         }
     }
 

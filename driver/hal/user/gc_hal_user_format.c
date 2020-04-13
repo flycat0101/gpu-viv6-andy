@@ -1232,6 +1232,18 @@ void _ReadPixelFrom_A8B8G8R8I_1_A8R8G8B8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], 
     outPixel->s = 0;
 }
 
+void _ReadPixelFrom_X8B8G8R8I(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctINT8* pI = (gctINT8*)inAddr[0];
+
+    outPixel->color.i.r = pI[0];
+    outPixel->color.i.g = pI[1];
+    outPixel->color.i.b = pI[2];
+    outPixel->color.i.a = 1;
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
 void _ReadPixelFrom_A8B8G8R8UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
 {
     gctUINT8* pI = (gctUINT8*)inAddr[0];
@@ -1240,6 +1252,30 @@ void _ReadPixelFrom_A8B8G8R8UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* 
     outPixel->color.ui.g = pI[1];
     outPixel->color.ui.b = pI[2];
     outPixel->color.ui.a = pI[3];
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_X8B8G8R8UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT8* pI = (gctUINT8*)inAddr[0];
+
+    outPixel->color.ui.r = pI[0];
+    outPixel->color.ui.g = pI[1];
+    outPixel->color.ui.b = pI[2];
+    outPixel->color.ui.a = 1;
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_R8G8B8A8UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT8* pI = (gctUINT8*)inAddr[0];
+
+    outPixel->color.ui.r = pI[3];
+    outPixel->color.ui.g = pI[2];
+    outPixel->color.ui.b = pI[1];
+    outPixel->color.ui.a = pI[0];
     outPixel->d = 0.0f;
     outPixel->s = 0;
 }
@@ -1541,6 +1577,114 @@ void _ReadPixelFrom_A2B10G10R10UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXE
     outPixel->color.ui.g = gcdGET_FIELD(ui, 10, 10);
     outPixel->color.ui.b = gcdGET_FIELD(ui, 20, 10);
     outPixel->color.ui.a = gcdGET_FIELD(ui, 30,  2);
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_R5G6B5UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT16 ui = *(gctUINT16*)inAddr[0];
+
+    outPixel->color.ui.r = gcdGET_FIELD(ui, 11, 5);
+    outPixel->color.ui.g = gcdGET_FIELD(ui,  5, 6);
+    outPixel->color.ui.b = gcdGET_FIELD(ui,  0, 5);
+    outPixel->color.ui.a = 0;
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_B5G6R5UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT16 ui = *(gctUINT16*)inAddr[0];
+
+    outPixel->color.ui.r = gcdGET_FIELD(ui,  0, 5);
+    outPixel->color.ui.g = gcdGET_FIELD(ui,  5, 6);
+    outPixel->color.ui.b = gcdGET_FIELD(ui, 11, 5);
+    outPixel->color.ui.a = 0;
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_R3G3B2UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT8 ui = *(gctUINT8*)inAddr[0];
+
+    outPixel->color.ui.r = gcdGET_FIELD(ui, 5, 3);
+    outPixel->color.ui.g = gcdGET_FIELD(ui, 2, 3);
+    outPixel->color.ui.b = gcdGET_FIELD(ui, 0, 2);
+    outPixel->color.ui.a = 1;
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_B2G3R3UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT8 ui = *(gctUINT8*)inAddr[0];
+
+    outPixel->color.ui.r = gcdGET_FIELD(ui, 0, 3);
+    outPixel->color.ui.g = gcdGET_FIELD(ui, 3, 3);
+    outPixel->color.ui.b = gcdGET_FIELD(ui, 6, 2);
+    outPixel->color.ui.a = 1;
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_R4G4B4A4UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT16 ui = *(gctUINT16*)inAddr[0];
+
+    outPixel->color.ui.r = gcdGET_FIELD(ui, 12, 4);
+    outPixel->color.ui.g = gcdGET_FIELD(ui,  8, 4);
+    outPixel->color.ui.b = gcdGET_FIELD(ui,  4, 4);
+    outPixel->color.ui.a = gcdGET_FIELD(ui,  0, 4);
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_A4B4G4R4UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT16 ui = *(gctUINT16*)inAddr[0];
+
+    outPixel->color.ui.a = gcdGET_FIELD(ui, 12, 4);
+    outPixel->color.ui.b = gcdGET_FIELD(ui,  8, 4);
+    outPixel->color.ui.g = gcdGET_FIELD(ui,  4, 4);
+    outPixel->color.ui.r = gcdGET_FIELD(ui,  0, 4);
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_R5G5B5A1UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT16 ui = *(gctUINT16*)inAddr[0];
+
+    outPixel->color.ui.r = gcdGET_FIELD(ui, 11, 5);
+    outPixel->color.ui.g = gcdGET_FIELD(ui,  6, 5);
+    outPixel->color.ui.b = gcdGET_FIELD(ui,  1, 5);
+    outPixel->color.ui.a = gcdGET_FIELD(ui,  0, 1);
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_A1B5G5R5UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT16 ui = *(gctUINT16*)inAddr[0];
+
+    outPixel->color.ui.a = gcdGET_FIELD(ui, 15, 1);
+    outPixel->color.ui.b = gcdGET_FIELD(ui, 10, 5);
+    outPixel->color.ui.g = gcdGET_FIELD(ui,  5, 5);
+    outPixel->color.ui.r = gcdGET_FIELD(ui,  0, 5);
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_R10G10B10A2UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT32 ui = *(gctUINT32*)inAddr[0];
+
+    outPixel->color.ui.r = gcdGET_FIELD(ui, 22, 10);
+    outPixel->color.ui.g = gcdGET_FIELD(ui, 12, 10);
+    outPixel->color.ui.b = gcdGET_FIELD(ui, 2,  10);
+    outPixel->color.ui.a = gcdGET_FIELD(ui, 0,  2);
     outPixel->d = 0.0f;
     outPixel->s = 0;
 }
@@ -1890,11 +2034,17 @@ _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
         return _ReadPixelFrom_A8B8G8R8I;
     case gcvSURF_A8B8G8R8I_1_A8R8G8B8:
         return _ReadPixelFrom_A8B8G8R8I_1_A8R8G8B8;
+    case gcvSURF_X8B8G8R8I:
+        return _ReadPixelFrom_X8B8G8R8I;
 
     case gcvSURF_A8B8G8R8UI:
         return _ReadPixelFrom_A8B8G8R8UI;
     case gcvSURF_A8B8G8R8UI_1_A8R8G8B8:
         return _ReadPixelFrom_A8B8G8R8UI_1_A8R8G8B8;
+    case gcvSURF_X8B8G8R8UI:
+        return _ReadPixelFrom_X8B8G8R8UI;
+    case gcvSURF_R8G8B8A8UI:
+        return _ReadPixelFrom_R8G8B8A8UI;
 
 
     case gcvSURF_X16B16G16R16I:
@@ -1951,6 +2101,25 @@ _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
     case gcvSURF_A2B10G10R10UI_1_A8R8G8B8:
         return _ReadPixelFrom_A2B10G10R10UI;
 
+    case gcvSURF_R10G10B10A2UI:
+        return _ReadPixelFrom_R10G10B10A2UI;
+    case gcvSURF_R5G6B5UI:
+        return _ReadPixelFrom_R5G6B5UI;
+    case gcvSURF_B5G6R5UI:
+        return _ReadPixelFrom_B5G6R5UI;
+    case gcvSURF_R3G3B2UI:
+        return _ReadPixelFrom_R3G3B2UI;
+    case gcvSURF_B2G3R3UI:
+        return _ReadPixelFrom_B2G3R3UI;
+    case gcvSURF_R4G4B4A4UI:
+        return _ReadPixelFrom_R4G4B4A4UI;
+    case gcvSURF_A4B4G4R4UI:
+        return _ReadPixelFrom_A4B4G4R4UI;
+    case gcvSURF_R5G5B5A1UI:
+        return _ReadPixelFrom_R5G5B5A1UI;
+    case gcvSURF_A1B5G5R5UI:
+        return _ReadPixelFrom_A1B5G5R5UI;
+
     case gcvSURF_SBGR8:
         return _ReadPixelFrom_B8G8R8;
 
@@ -1994,6 +2163,48 @@ void _WritePixelTo_L8(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS],
 void _WritePixelTo_R8(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
 {
     *(gctUINT8*)outAddr[0] = (gctUINT8)gcdFLOAT_TO_UNORM(inPixel->color.f.r, 8);
+}
+
+void _WritePixelTo_R16(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    *(gctUINT16*)outAddr[0] = (gctUINT16)gcdFLOAT_TO_UNORM(inPixel->color.f.r, 16);
+}
+
+void _WritePixelTo_R32(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    *(gctUINT32*)outAddr[0] = (gctUINT32)gcdFLOAT_TO_UNORM(inPixel->color.f.r, 32);
+}
+
+void _WritePixelTo_G16R16(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT16 *pUB = (gctUINT16*)outAddr[0];
+    pUB[0] = (gctUINT16)gcdFLOAT_TO_UNORM(inPixel->color.f.r, 16);
+    pUB[1] = (gctUINT16)gcdFLOAT_TO_UNORM(inPixel->color.f.g, 16);
+}
+
+void _WritePixelTo_A16B16G16R16(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT16 *pUB = (gctUINT16*)outAddr[0];
+    pUB[0] = (gctUINT16)gcdFLOAT_TO_UNORM(inPixel->color.f.r, 16);
+    pUB[1] = (gctUINT16)gcdFLOAT_TO_UNORM(inPixel->color.f.g, 16);
+    pUB[2] = (gctUINT16)gcdFLOAT_TO_UNORM(inPixel->color.f.b, 16);
+    pUB[3] = (gctUINT16)gcdFLOAT_TO_UNORM(inPixel->color.f.a, 16);
+}
+
+void _WritePixelTo_G32R32(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 *pUB = (gctUINT32*)outAddr[0];
+    pUB[0] = (gctUINT32)gcdFLOAT_TO_UNORM(inPixel->color.f.r, 32);
+    pUB[1] = (gctUINT32)gcdFLOAT_TO_UNORM(inPixel->color.f.g, 32);
+}
+
+void _WritePixelTo_A32B32G32R32(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 *pUB = (gctUINT32*)outAddr[0];
+    pUB[0] = (gctUINT32)gcdFLOAT_TO_UNORM(inPixel->color.f.r, 32);
+    pUB[1] = (gctUINT32)gcdFLOAT_TO_UNORM(inPixel->color.f.g, 32);
+    pUB[2] = (gctUINT32)gcdFLOAT_TO_UNORM(inPixel->color.f.b, 32);
+    pUB[3] = (gctUINT32)gcdFLOAT_TO_UNORM(inPixel->color.f.a, 32);
 }
 
 void _WritePixelTo_R8_1_X8R8G8B8(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
@@ -2064,12 +2275,36 @@ void _WritePixelTo_A4R4G4B4(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LA
                                           gcdFLOAT_TO_UNORM(inPixel->color.f.b, 4));
 }
 
+void _WritePixelTo_R5G5B5A1(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    *(gctUINT16*)outAddr[0] = (gctUINT16)(gcdFLOAT_TO_UNORM(inPixel->color.f.r, 5) << 11 |
+                                          gcdFLOAT_TO_UNORM(inPixel->color.f.g, 5) << 6  |
+                                          gcdFLOAT_TO_UNORM(inPixel->color.f.b, 5) << 1  |
+                                          gcdFLOAT_TO_UNORM(inPixel->color.f.a, 1));
+}
+
+void _WritePixelTo_R5G5B5A1_REV(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    *(gctUINT16*)outAddr[0] = (gctUINT16)(gcdFLOAT_TO_UNORM(inPixel->color.f.a, 1) << 15 |
+                                          gcdFLOAT_TO_UNORM(inPixel->color.f.b, 5) << 10 |
+                                          gcdFLOAT_TO_UNORM(inPixel->color.f.g, 5) << 5  |
+                                          gcdFLOAT_TO_UNORM(inPixel->color.f.r, 5));
+}
+
 void _WritePixelTo_R4G4B4A4(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
 {
     *(gctUINT16*)outAddr[0] = (gctUINT16)(gcdFLOAT_TO_UNORM(inPixel->color.f.r, 4) << 12 |
                                           gcdFLOAT_TO_UNORM(inPixel->color.f.g, 4) << 8  |
                                           gcdFLOAT_TO_UNORM(inPixel->color.f.b, 4) << 4  |
                                           gcdFLOAT_TO_UNORM(inPixel->color.f.a, 4));
+}
+
+void _WritePixelTo_R4G4B4A4_REV(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    *(gctUINT16*)outAddr[0] = (gctUINT16)(gcdFLOAT_TO_UNORM(inPixel->color.f.a, 4) << 12 |
+                                          gcdFLOAT_TO_UNORM(inPixel->color.f.b, 4) << 8  |
+                                          gcdFLOAT_TO_UNORM(inPixel->color.f.g, 4) << 4  |
+                                          gcdFLOAT_TO_UNORM(inPixel->color.f.r, 4));
 }
 
 void _WritePixelTo_X1R5G5B5(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
@@ -2095,6 +2330,16 @@ void _WritePixelTo_X8R8G8B8(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LA
     pUB[1] = (gctUINT8)gcdFLOAT_TO_UNORM(inPixel->color.f.g, 8);
     pUB[2] = (gctUINT8)gcdFLOAT_TO_UNORM(inPixel->color.f.r, 8);
     pUB[3] = 0xFF;
+}
+
+void _WritePixelTo_R8G8B8A8(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT8 *pUB = (gctUINT8*)outAddr[0];
+
+    pUB[0] = (gctUINT8)gcdFLOAT_TO_UNORM(inPixel->color.f.a, 8);
+    pUB[1] = (gctUINT8)gcdFLOAT_TO_UNORM(inPixel->color.f.b, 8);
+    pUB[2] = (gctUINT8)gcdFLOAT_TO_UNORM(inPixel->color.f.g, 8);
+    pUB[3] = (gctUINT8)gcdFLOAT_TO_UNORM(inPixel->color.f.r, 8);
 }
 
 void _WritePixelTo_A8B8G8R8(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
@@ -2616,6 +2861,16 @@ void _WritePixelTo_A8B8G8R8UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_
     pI[3] = (gctUINT8)gcmMIN(inPixel->color.ui.a, gcdUINT_MAX(8));
 }
 
+void _WritePixelTo_R8G8B8A8UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT8* pI = (gctUINT8*)outAddr[0];
+
+    pI[0] = (gctUINT8)gcmMIN(inPixel->color.ui.a, gcdUINT_MAX(8));
+    pI[1] = (gctUINT8)gcmMIN(inPixel->color.ui.b, gcdUINT_MAX(8));
+    pI[2] = (gctUINT8)gcmMIN(inPixel->color.ui.g, gcdUINT_MAX(8));
+    pI[3] = (gctUINT8)gcmMIN(inPixel->color.ui.r, gcdUINT_MAX(8));
+}
+
 void _WritePixelTo_A8B8G8R8UI_1_A8R8G8B8(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
 {
     gctUINT8* pI = (gctUINT8*)outAddr[0];
@@ -2904,6 +3159,15 @@ void _WritePixelTo_X32B32G32R32UI_2_G32R32UI(gcsPIXEL* inPixel, gctPOINTER outAd
     pI1[1] = (gctUINT32)(1);
 }
 
+void _WritePixelTo_B32G32R32F(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctFLOAT* pI = (gctFLOAT*)outAddr[0];
+
+    pI[0] = (gctFLOAT)(inPixel->color.f.r);
+    pI[1] = (gctFLOAT)(inPixel->color.f.g);
+    pI[2] = (gctFLOAT)(inPixel->color.f.b);
+}
+
 void _WritePixelTo_A32B32G32R32F(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
 {
     gctFLOAT* pI = (gctFLOAT*)outAddr[0];
@@ -2972,12 +3236,108 @@ void _WritePixelTo_A2B10G10R10UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SU
     *(gctUINT32*)outAddr[0] = (gctUINT32)((a << 30) | (b << 20) | (g << 10) | r);
 }
 
+void _WritePixelTo_R10G10B10A2UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 r = gcmMIN(inPixel->color.ui.r, gcdUINT_MAX(10));
+    gctUINT32 g = gcmMIN(inPixel->color.ui.g, gcdUINT_MAX(10));
+    gctUINT32 b = gcmMIN(inPixel->color.ui.b, gcdUINT_MAX(10));
+    gctUINT32 a = gcmMIN(inPixel->color.ui.a, gcdUINT_MAX(2));
+
+    *(gctUINT32*)outAddr[0] = (gctUINT32)((r << 22) | (g << 12) | (b << 2) | a);
+}
+
+void _WritePixelTo_R5G6B5UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 r = gcmMIN(inPixel->color.ui.r, gcdUINT_MAX(5));
+    gctUINT32 g = gcmMIN(inPixel->color.ui.g, gcdUINT_MAX(6));
+    gctUINT32 b = gcmMIN(inPixel->color.ui.b, gcdUINT_MAX(5));
+
+    *(gctUINT16*)outAddr[0] = (gctUINT16)((r << 11) | (g << 5) | b);
+}
+
+void _WritePixelTo_B5G6R5UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 r = gcmMIN(inPixel->color.ui.r, gcdUINT_MAX(5));
+    gctUINT32 g = gcmMIN(inPixel->color.ui.g, gcdUINT_MAX(6));
+    gctUINT32 b = gcmMIN(inPixel->color.ui.b, gcdUINT_MAX(5));
+
+    *(gctUINT16*)outAddr[0] = (gctUINT16)((b << 11) | (g << 5) | r);
+}
+
+void _WritePixelTo_R3G3B2UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 r = gcmMIN(inPixel->color.ui.r, gcdUINT_MAX(3));
+    gctUINT32 g = gcmMIN(inPixel->color.ui.g, gcdUINT_MAX(3));
+    gctUINT32 b = gcmMIN(inPixel->color.ui.b, gcdUINT_MAX(2));
+
+    *(gctUINT8*)outAddr[0] = (gctUINT8)((r << 5) | (g << 2) | b);
+}
+
+void _WritePixelTo_B2G3R3UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 r = gcmMIN(inPixel->color.ui.r, gcdUINT_MAX(3));
+    gctUINT32 g = gcmMIN(inPixel->color.ui.g, gcdUINT_MAX(3));
+    gctUINT32 b = gcmMIN(inPixel->color.ui.b, gcdUINT_MAX(2));
+
+    *(gctUINT8*)outAddr[0] = (gctUINT8)((b << 6) | (g << 3) | r);
+}
+
+void _WritePixelTo_R4G4B4A4UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 r = gcmMIN(inPixel->color.ui.r, gcdUINT_MAX(4));
+    gctUINT32 g = gcmMIN(inPixel->color.ui.g, gcdUINT_MAX(4));
+    gctUINT32 b = gcmMIN(inPixel->color.ui.b, gcdUINT_MAX(4));
+    gctUINT32 a = gcmMIN(inPixel->color.ui.a, gcdUINT_MAX(4));
+
+    *(gctUINT16*)outAddr[0] = (gctUINT16)((r << 12) | (g << 8) | (b << 4) | a);
+}
+
+void _WritePixelTo_A4B4G4R4UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 r = gcmMIN(inPixel->color.ui.r, gcdUINT_MAX(4));
+    gctUINT32 g = gcmMIN(inPixel->color.ui.g, gcdUINT_MAX(4));
+    gctUINT32 b = gcmMIN(inPixel->color.ui.b, gcdUINT_MAX(4));
+    gctUINT32 a = gcmMIN(inPixel->color.ui.a, gcdUINT_MAX(4));
+
+    *(gctUINT16*)outAddr[0] = (gctUINT16)((a << 12) | (b << 8) | (g << 4) | r);
+}
+
+void _WritePixelTo_R5G5B5A1UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 r = gcmMIN(inPixel->color.ui.r, gcdUINT_MAX(5));
+    gctUINT32 g = gcmMIN(inPixel->color.ui.g, gcdUINT_MAX(5));
+    gctUINT32 b = gcmMIN(inPixel->color.ui.b, gcdUINT_MAX(5));
+    gctUINT32 a = gcmMIN(inPixel->color.ui.a, gcdUINT_MAX(1));
+
+    *(gctUINT16*)outAddr[0] = (gctUINT16)((r << 11) | (g << 6) | (b << 1) | a);
+}
+
+void _WritePixelTo_A1B5G5R5UI(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 r = gcmMIN(inPixel->color.ui.r, gcdUINT_MAX(5));
+    gctUINT32 g = gcmMIN(inPixel->color.ui.g, gcdUINT_MAX(5));
+    gctUINT32 b = gcmMIN(inPixel->color.ui.b, gcdUINT_MAX(5));
+    gctUINT32 a = gcmMIN(inPixel->color.ui.a, gcdUINT_MAX(1));
+
+    *(gctUINT16*)outAddr[0] = (gctUINT16)((a << 15) | (b << 10) | (g << 5) | r);
+}
+
 void _WritePixelTo_B10G10R10A2(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
 {
     gctUINT32 r = gcmMIN(inPixel->color.ui.r, gcdUINT_MAX(10));
     gctUINT32 g = gcmMIN(inPixel->color.ui.g, gcdUINT_MAX(10));
     gctUINT32 b = gcmMIN(inPixel->color.ui.b, gcdUINT_MAX(10));
     gctUINT32 a = gcmMIN(inPixel->color.ui.a, gcdUINT_MAX(2));
+
+    *(gctUINT32*)outAddr[0] = (gctUINT32)((r << 22) | (g << 12) | (b << 2) | a);
+}
+
+void _WritePixelTo_R10G10B10A2(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags)
+{
+    gctUINT32 r = (gctUINT32)gcdFLOAT_TO_UNORM(inPixel->color.f.r, 10);
+    gctUINT32 g = (gctUINT32)gcdFLOAT_TO_UNORM(inPixel->color.f.g, 10);
+    gctUINT32 b = (gctUINT32)gcdFLOAT_TO_UNORM(inPixel->color.f.b, 10);
+    gctUINT32 a = (gctUINT32)gcdFLOAT_TO_UNORM(inPixel->color.f.a, 2);
 
     *(gctUINT32*)outAddr[0] = (gctUINT32)((r << 22) | (g << 12) | (b << 2) | a);
 }
@@ -3062,6 +3422,22 @@ _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf)
         return _WritePixelTo_L8;
     case gcvSURF_R8:
         return _WritePixelTo_R8;
+    case gcvSURF_R16:
+        return _WritePixelTo_R16;
+    case gcvSURF_R32:
+        return _WritePixelTo_R32;
+    case gcvSURF_G16R16:
+        return _WritePixelTo_G16R16;
+    case gcvSURF_G32R32:
+        return _WritePixelTo_G32R32;
+    case gcvSURF_A16B16G16R16:
+        return _WritePixelTo_A16B16G16R16;
+    case gcvSURF_A32B32G32R32:
+        return _WritePixelTo_A32B32G32R32;
+    case gcvSURF_R5G5B5A1:
+        return _WritePixelTo_R5G5B5A1;
+    case gcvSURF_A1B5G5R5:
+        return _WritePixelTo_R5G5B5A1_REV;
     case gcvSURF_R8_1_X8R8G8B8:
         return _WritePixelTo_R8_1_X8R8G8B8;
     case gcvSURF_A8L8:
@@ -3080,12 +3456,18 @@ _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf)
         return _WritePixelTo_A4R4G4B4;
     case gcvSURF_R4G4B4A4:
         return _WritePixelTo_R4G4B4A4;
+    case gcvSURF_A4B4G4R4:
+        return _WritePixelTo_R4G4B4A4_REV;
     case gcvSURF_X1R5G5B5:
         return _WritePixelTo_X1R5G5B5;
     case gcvSURF_A1R5G5B5:
         return _WritePixelTo_A1R5G5B5;
     case gcvSURF_X8R8G8B8:
         return _WritePixelTo_X8R8G8B8;
+    case gcvSURF_R8G8B8A8:
+        return _WritePixelTo_R8G8B8A8;
+    case gcvSURF_B8G8R8:
+        return _WritePixelTo_B8G8R8;
     case gcvSURF_A8B8G8R8:
         return _WritePixelTo_A8B8G8R8;
     case gcvSURF_X8B8G8R8:
@@ -3234,6 +3616,8 @@ _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf)
         return _WritePixelTo_A8B8G8R8UI;
     case gcvSURF_A8B8G8R8UI_1_A8R8G8B8:
         return _WritePixelTo_A8B8G8R8UI_1_A8R8G8B8;
+    case gcvSURF_R8G8B8A8UI:
+        return _WritePixelTo_R8G8B8A8UI;
 
     case gcvSURF_X8B8G8R8UI:
         return _WritePixelTo_X8B8G8R8UI;
@@ -3298,6 +3682,25 @@ _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf)
     case gcvSURF_A2B10G10R10UI_1_A8R8G8B8:
         return _WritePixelTo_A2B10G10R10UI;
 
+    case gcvSURF_R10G10B10A2UI:
+        return _WritePixelTo_R10G10B10A2UI;
+    case gcvSURF_R5G6B5UI:
+        return _WritePixelTo_R5G6B5UI;
+    case gcvSURF_B5G6R5UI:
+        return _WritePixelTo_B5G6R5UI;
+    case gcvSURF_R3G3B2UI:
+        return _WritePixelTo_R3G3B2UI;
+    case gcvSURF_B2G3R3UI:
+        return _WritePixelTo_B2G3R3UI;
+    case gcvSURF_R4G4B4A4UI:
+        return _WritePixelTo_R4G4B4A4UI;
+    case gcvSURF_A4B4G4R4UI:
+        return _WritePixelTo_A4B4G4R4UI;
+    case gcvSURF_R5G5B5A1UI:
+        return _WritePixelTo_R5G5B5A1UI;
+    case gcvSURF_A1B5G5R5UI:
+        return _WritePixelTo_A1B5G5R5UI;
+
     case gcvSURF_SBGR8:
         return _WritePixelTo_B8G8R8;
     case gcvSURF_A8_SBGR8:
@@ -3351,6 +3754,9 @@ _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf)
     case gcvSURF_G32R32F_2_A8R8G8B8:
         return _WritePixelTo_G32R32F_2_A8R8G8B8;
 
+    case gcvSURF_B32G32R32F:
+        return _WritePixelTo_B32G32R32F;
+
     case gcvSURF_A32B32G32R32F:
         return _WritePixelTo_A32B32G32R32F;
 
@@ -3393,6 +3799,9 @@ _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf)
 
     case gcvSURF_B10G10R10A2:
         return _WritePixelTo_B10G10R10A2;
+
+    case gcvSURF_R10G10B10A2:
+        return _WritePixelTo_R10G10B10A2;
 
     default:
         gcmASSERT(0);
@@ -3459,6 +3868,20 @@ void gcoSURF_PixelToLinear(gcsPIXEL* inPixel)
     inPixel->color.f.g = (sG <= 0.04045f) ? (sG / 12.92f) : gcoMATH_Power((sG + 0.055f) / 1.055f, 2.4f);
     inPixel->color.f.b = (sB <= 0.04045f) ? (sB / 12.92f) : gcoMATH_Power((sB + 0.055f) / 1.055f, 2.4f);
     inPixel->color.f.a = sA;
+}
+
+#define gcmClampUint(Value, MaxValue) \
+    (((gctUINT)(Value) > (gctUINT)(MaxValue)) ? (gctUINT)(MaxValue) : (gctUINT)(Value))
+
+/*
+** Unsigned integer to signed integer conversion for input pixel
+*/
+void gcoSURF_PixelToSignedInteger(gcsPIXEL* inPixel, gcsFORMAT_CLASS_TYPE_RGBA rgba)
+{
+    inPixel->color.ui.r = gcmClampUint(inPixel->color.ui.r, gcdUINT_MAX(rgba.red.width - 1));
+    inPixel->color.ui.g = gcmClampUint(inPixel->color.ui.g, gcdUINT_MAX(rgba.green.width - 1));
+    inPixel->color.ui.b = gcmClampUint(inPixel->color.ui.b, gcdUINT_MAX(rgba.blue.width - 1));
+    inPixel->color.ui.a = gcmClampUint(inPixel->color.ui.a, gcdUINT_MAX(rgba.alpha.width - 1));
 }
 
 #endif /* gcdENABLE_3D */

@@ -499,6 +499,8 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_COMPRESSED_LUMINANCE:
         case GL_COMPRESSED_LUMINANCE_ALPHA:
         case GL_COMPRESSED_INTENSITY:
+        case GL_COMPRESSED_RED:
+        case GL_COMPRESSED_RG:
         case GL_COMPRESSED_RGB:
         case GL_COMPRESSED_RGBA:
         case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
@@ -683,13 +685,9 @@ GLboolean __glCheckTexImgFmtArg(__GLcontext *gc,
         case GL_RED:
         case GL_GREEN:
         case GL_BLUE:
-        case GL_RED_INTEGER:
         case GL_RG:
-        case GL_RG_INTEGER:
         case GL_RGB:
-        case GL_RGB_INTEGER:
         case GL_RGBA:
-        case GL_RGBA_INTEGER:
         case GL_DEPTH_COMPONENT:
         case GL_DEPTH_STENCIL:
         case GL_LUMINANCE:
@@ -705,6 +703,7 @@ GLboolean __glCheckTexImgFmtArg(__GLcontext *gc,
         case GL_ABGR_EXT:
 #ifdef OPENGL40
         case GL_BGR_EXT:
+        __GL_CASE_IS_INTEGER_FORMAT:
 #endif
             break;
         case GL_STENCIL_INDEX:
@@ -961,6 +960,21 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
     /* check type */
     switch (type)
     {
+    case GL_BYTE:
+    case GL_UNSIGNED_BYTE:
+    case GL_SHORT:
+    case GL_UNSIGNED_SHORT:
+    case GL_INT:
+    case GL_UNSIGNED_INT:
+    case GL_HALF_FLOAT:
+    case GL_FLOAT:
+        break;
+    case GL_ALPHA4:
+        if (format != GL_ALPHA)
+        {
+            goto bad_operation;
+        }
+        break;
     case GL_UNSIGNED_BYTE_3_3_2:
     case GL_UNSIGNED_BYTE_2_3_3_REV:
     case GL_UNSIGNED_SHORT_5_6_5:
@@ -998,6 +1012,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         }
         break;
     default:
+        GL_ASSERT(0);
         break;
     }
 
@@ -1015,8 +1030,6 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
     default:
         break;
     }
-
-    __glCheckIntegerFormat(gc, tex, internalFormat, format, type);
 
     /*check internalFormat*/
     switch (internalFormat)
@@ -1081,16 +1094,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_R16_SNORM:
             switch (format)
             {
-                case GL_RED_INTEGER_EXT:
-                case GL_BLUE_INTEGER_EXT:
-                case GL_GREEN_INTEGER_EXT:
-                case GL_ALPHA_INTEGER_EXT:
-                case GL_RGB_INTEGER_EXT:
-                case GL_RGBA_INTEGER_EXT:
-                case GL_BGR_INTEGER_EXT:
-                case GL_BGRA_INTEGER_EXT:
-                case GL_LUMINANCE_INTEGER_EXT:
-                case GL_LUMINANCE_ALPHA_INTEGER_EXT:
+                __GL_CASE_IS_INTEGER_FORMAT:
                     __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
                     break;
                 case GL_DEPTH_COMPONENT:
@@ -1194,7 +1198,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_COMPRESSED_INTENSITY:
         case GL_COMPRESSED_RGB:
         case GL_COMPRESSED_RGBA:
-            if (format == GL_DEPTH_COMPONENT)
+            if ((format == GL_DEPTH_COMPONENT) || (format == GL_DEPTH_STENCIL))
                 goto bad_operation;
             break;
 
@@ -1205,7 +1209,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
             if (!__glExtension[__GL_EXTID_EXT_texture_compression_s3tc].bEnabled)
                 goto bad_enum;
-            if (format == GL_DEPTH_COMPONENT)
+            if ((format == GL_DEPTH_COMPONENT) || (format == GL_DEPTH_STENCIL))
                 goto bad_operation;
             break;
         case GL_COMPRESSED_LUMINANCE_LATC1_EXT:
@@ -1214,7 +1218,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_COMPRESSED_SIGNED_LUMINANCE_ALPHA_LATC2_EXT:
             if (!__glExtension[__GL_EXTID_EXT_texture_compression_latc].bEnabled)
                 goto bad_enum;
-            if (format == GL_DEPTH_COMPONENT)
+            if ((format == GL_DEPTH_COMPONENT) || (format == GL_DEPTH_STENCIL))
                 goto bad_operation;
 
             break;
@@ -1226,7 +1230,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
             if (!__glExtension[__GL_EXTID_EXT_texture_compression_rgtc].bEnabled)
                 goto bad_enum;
 
-            if (format == GL_DEPTH_COMPONENT)
+            if ((format == GL_DEPTH_COMPONENT) || (format == GL_DEPTH_STENCIL))
                 goto bad_operation;
 
             break;
@@ -1279,17 +1283,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
 
             switch(format)
             {
-            case GL_RED_INTEGER_EXT:
-            case GL_BLUE_INTEGER_EXT:
-            case GL_GREEN_INTEGER_EXT:
-            case GL_ALPHA_INTEGER_EXT:
-            case GL_RG_INTEGER:
-            case GL_RGB_INTEGER_EXT:
-            case GL_RGBA_INTEGER_EXT:
-            case GL_BGR_INTEGER_EXT:
-            case GL_BGRA_INTEGER_EXT:
-            case GL_LUMINANCE_INTEGER_EXT:
-            case GL_LUMINANCE_ALPHA_INTEGER_EXT:
+            __GL_CASE_IS_INTEGER_FORMAT:
                 if (type == GL_HALF_FLOAT || type == GL_FLOAT)
                     goto bad_operation;
                 break;
@@ -1311,8 +1305,17 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_COMPRESSED_SRGB_ALPHA:
         case GL_COMPRESSED_SLUMINANCE:
         case GL_COMPRESSED_SLUMINANCE_ALPHA:
-            if (format == GL_DEPTH_COMPONENT)
+            switch(format)
+            {
+            __GL_CASE_IS_INTEGER_FORMAT:
+            case GL_DEPTH_COMPONENT:
+            case GL_DEPTH_STENCIL:
+            case GL_STENCIL_INDEX:
                 goto bad_operation;
+                break;
+            default:
+                break;
+            }
             break;
         case GL_COMPRESSED_SRGB_S3TC_DXT1_EXT:
         case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT:
@@ -1321,7 +1324,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
             if (!__glExtension[__GL_EXTID_EXT_texture_sRGB].bEnabled)
                 goto bad_enum;
 
-            if (format == GL_DEPTH_COMPONENT)
+            if ((format == GL_DEPTH_COMPONENT) || (format == GL_DEPTH_STENCIL))
                 goto bad_operation;
 
             break;
@@ -1331,8 +1334,17 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
              if (!__glExtension[__GL_EXTID_EXT_texture_shared_exponent].bEnabled)
                 goto bad_enum;
 
-            if (format == GL_DEPTH_COMPONENT)
+            switch(format)
+            {
+            __GL_CASE_IS_INTEGER_FORMAT:
+            case GL_DEPTH_COMPONENT:
+            case GL_DEPTH_STENCIL:
+            case GL_STENCIL_INDEX:
                 goto bad_operation;
+                break;
+            default:
+                break;
+            }
 
              break;
 
@@ -1340,15 +1352,15 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_RGBA32F_ARB:
         case GL_RGB32F_ARB:
         case GL_RG32F_EXT:
-        case GL_RG16F_EXT:
         case GL_R32F_EXT:
-        case GL_R16F_EXT:
         case GL_ALPHA32F_ARB:
         case GL_INTENSITY32F_ARB:
         case GL_LUMINANCE32F_ARB:
         case GL_LUMINANCE_ALPHA32F_ARB:
         case GL_RGBA16F_ARB:
         case GL_RGB16F_ARB:
+        case GL_RG16F_EXT:
+        case GL_R16F_EXT:
         case GL_ALPHA16F_ARB:
         case GL_INTENSITY16F_ARB:
         case GL_LUMINANCE16F_ARB:
@@ -1356,21 +1368,13 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
             if (!__glExtension[__GL_EXTID_ARB_texture_float].bEnabled)
                 goto bad_enum;
 
-            if (format == GL_DEPTH_COMPONENT)
+            if ((format == GL_DEPTH_COMPONENT) || (format == GL_DEPTH_STENCIL))
                 goto bad_operation;
 
-            switch(format){
-                case GL_RED_INTEGER_EXT:
-                case GL_BLUE_INTEGER_EXT:
-                case GL_GREEN_INTEGER_EXT:
-                case GL_ALPHA_INTEGER_EXT:
-                case GL_RGB_INTEGER_EXT:
-                case GL_RGBA_INTEGER_EXT:
-                case GL_BGR_INTEGER_EXT:
-                case GL_BGRA_INTEGER_EXT:
-                case GL_LUMINANCE_INTEGER_EXT:
-                case GL_LUMINANCE_ALPHA_INTEGER_EXT:
-                     goto bad_operation;
+            switch(format)
+            {
+            __GL_CASE_IS_INTEGER_FORMAT:
+                goto bad_operation;
             }
 
             break;
@@ -1378,8 +1382,17 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
             if (!__glExtension[__GL_EXTID_EXT_packed_float].bEnabled)
                 goto bad_enum;
 
-            if (format == GL_DEPTH_COMPONENT)
+            switch(format)
+            {
+            __GL_CASE_IS_INTEGER_FORMAT:
+            case GL_DEPTH_COMPONENT:
+            case GL_DEPTH_STENCIL:
+            case GL_STENCIL_INDEX:
                 goto bad_operation;
+                break;
+            default:
+                break;
+            }
             break;
 
         default:
@@ -3480,6 +3493,79 @@ void __glClearProxyTextureState(__GLcontext *gc,
     faceMipmap->border = 0;
 }
 
+/* TODO: Conver G/B/BGR/GBRA to R/R/RGB/RGBA to avoid the crash for now.
+ * May use "TEXTURE_SWIZZLE_*" or convert them to RGB/RGBA to handle them. */
+void __gl_doSwizzleForSpecialFormat(__GLpixelTransferInfo *transferInfo, GLenum *format)
+{
+    transferInfo->applyGBConvert = GL_FALSE;
+    transferInfo->srcFormat = *format;
+    switch (*format)
+    {
+    case GL_GREEN:
+    case GL_BLUE:
+        *format = GL_RGB;
+        transferInfo->applyGBConvert = GL_TRUE;
+        break;
+    case GL_BGR:
+        *format = GL_RGB;
+        transferInfo->applySpecialSwizzle = GL_TRUE;
+        break;
+    case GL_BGRA:
+        *format = GL_RGBA;
+        transferInfo->applySpecialSwizzle = GL_TRUE;
+        break;
+    case GL_GREEN_INTEGER:
+    case GL_BLUE_INTEGER:
+        *format = GL_RGB_INTEGER;
+        transferInfo->applyGBConvert = GL_TRUE;
+        break;
+    case GL_BGR_INTEGER:
+        *format = GL_RGB_INTEGER;
+        transferInfo->applySpecialSwizzle = GL_TRUE;
+        break;
+    case GL_BGRA_INTEGER:
+        *format = GL_RGBA_INTEGER;
+        transferInfo->applySpecialSwizzle = GL_TRUE;
+        break;
+    default:
+        break;
+    }
+}
+
+void __gl_ConvertCompressedInternalFormat(GLint *internalFormat)
+{
+    switch (*internalFormat)
+    {
+    case GL_COMPRESSED_RED:
+    case GL_COMPRESSED_RED_RGTC1:
+        *internalFormat = GL_R8;
+        break;
+    case GL_COMPRESSED_SIGNED_RED_RGTC1:
+        *internalFormat = GL_R8_SNORM;
+        break;
+    case GL_COMPRESSED_RG:
+    case GL_COMPRESSED_RG_RGTC2:
+        *internalFormat = GL_RG8;
+        break;
+    case GL_COMPRESSED_SIGNED_RG_RGTC2:
+        *internalFormat = GL_RG8_SNORM;
+        break;
+    case GL_COMPRESSED_RGB:
+        *internalFormat = GL_RGB8;
+        break;
+    case GL_COMPRESSED_RGBA:
+        *internalFormat = GL_RGBA8;
+        break;
+    case GL_COMPRESSED_SRGB:
+        *internalFormat = GL_SRGB8;
+        break;
+    case GL_COMPRESSED_SRGB_ALPHA:
+        *internalFormat = GL_SRGB8_ALPHA8;
+        break;
+    default:
+        break;
+    }
+}
 
 GLvoid GL_APIENTRY __glim_TexImage3D(__GLcontext *gc,
                                      GLenum target,
@@ -3540,6 +3626,23 @@ GLvoid GL_APIENTRY __glim_TexImage3D(__GLcontext *gc,
         __GL_EXIT();
     }
 
+    if (gcvNULL != buf)
+    {
+        switch(internalFormat)
+        {
+        case GL_COMPRESSED_RED_RGTC1:
+        case GL_COMPRESSED_SIGNED_RED_RGTC1:
+        case GL_COMPRESSED_RG_RGTC2:
+        case GL_COMPRESSED_SIGNED_RG_RGTC2:
+            __glSetError(gc, GL_INVALID_OPERATION);
+            __GL_EXIT();
+            break;
+        default:
+            __gl_ConvertCompressedInternalFormat(&internalFormat);
+            break;
+        }
+    }
+
     if (!__glCheckTexImgInternalFmtArg(gc, tex, internalFormat))
     {
         __GL_EXIT();
@@ -3549,6 +3652,8 @@ GLvoid GL_APIENTRY __glim_TexImage3D(__GLcontext *gc,
     {
         __GL_EXIT();
     }
+
+    __gl_doSwizzleForSpecialFormat(&transferInfo, &format);
 
     /* The image is from unpack buffer object? */
     if (unpackBufObj)
@@ -3568,17 +3673,54 @@ GLvoid GL_APIENTRY __glim_TexImage3D(__GLcontext *gc,
 
     __glGenericPixelTransfer(gc, width, height, depth, (tex->faceMipmap[0][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
     (tex->faceMipmap[0][lod]).type = type;
-    if (format == GL_RGBA)
+    switch (type)
     {
-        switch (type)
+    case GL_UNSIGNED_INT_2_10_10_10_REV:
+        switch (format)
         {
-        case GL_UNSIGNED_INT_10F_11F_11F_REV:
-        case GL_UNSIGNED_INT_5_9_9_9_REV:
+        case GL_RED:
+        case GL_RG:
+        case GL_RGB:
+            tex->faceMipmap[0][lod].format = GL_RGBA;
+            break;
+        case GL_RGB_INTEGER:
+            tex->faceMipmap[0][lod].format = GL_RGBA_INTEGER;
+            break;
+        default:
+            break;
+        }
+        break;
+    case GL_UNSIGNED_INT_10_10_10_2:
+        switch (format)
+        {
+        case GL_RED:
+        case GL_RG:
+        case GL_RGB:
+            tex->faceMipmap[0][lod].format = GL_RGBA;
+            break;
+        case GL_RGB_INTEGER:
+            tex->faceMipmap[0][lod].format = GL_RGBA_INTEGER;
+            break;
+        default:
+            break;
+        }
+        break;
+    case GL_UNSIGNED_INT_10F_11F_11F_REV:
+    case GL_UNSIGNED_SHORT_5_6_5:
+    case GL_UNSIGNED_INT_5_9_9_9_REV:
+        switch (format)
+        {
+        case GL_RED:
+        case GL_RG:
+        case GL_RGBA:
             tex->faceMipmap[0][lod].format = GL_RGB;
             break;
         default:
             break;
         }
+        break;
+    default:
+        break;
     }
 
     if (!(*gc->dp.texImage3D)(gc, tex, lod, transferInfo.dstImage))
@@ -3661,6 +3803,11 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
         __GL_EXIT();
     }
 
+    if (gcvNULL != buf)
+    {
+        __gl_ConvertCompressedInternalFormat(&internalFormat);
+    }
+
     if (!__glCheckTexImgInternalFmtArg(gc, tex, internalFormat))
     {
         __GL_EXIT();
@@ -3680,6 +3827,8 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
         }
     }
 
+    __gl_doSwizzleForSpecialFormat(&transferInfo, &format);
+
     /* Init the mipmap info which will be queried by app */
     if (__glSetMipmapLevelInfo(gc, tex, face, lod, internalFormat,
                                format, type, width, height, 1, border) == GL_FALSE)
@@ -3689,17 +3838,54 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
 
     __glGenericPixelTransfer(gc, width, height, 1, (tex->faceMipmap[face][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
     (tex->faceMipmap[face][lod]).type = type;
-    if (format == GL_RGBA)
+    switch (type)
     {
-        switch (type)
+    case GL_UNSIGNED_INT_2_10_10_10_REV:
+        switch (format)
         {
-        case GL_UNSIGNED_INT_10F_11F_11F_REV:
-        case GL_UNSIGNED_INT_5_9_9_9_REV:
+        case GL_RED:
+        case GL_RG:
+        case GL_RGB:
+            tex->faceMipmap[face][lod].format = GL_RGBA;
+            break;
+        case GL_RGB_INTEGER:
+            tex->faceMipmap[face][lod].format = GL_RGBA_INTEGER;
+            break;
+        default:
+            break;
+        }
+        break;
+    case GL_UNSIGNED_INT_10_10_10_2:
+        switch (format)
+        {
+        case GL_RED:
+        case GL_RG:
+        case GL_RGB:
+            tex->faceMipmap[face][lod].format = GL_RGBA;
+            break;
+        case GL_RGB_INTEGER:
+            tex->faceMipmap[face][lod].format = GL_RGBA_INTEGER;
+            break;
+        default:
+            break;
+        }
+        break;
+    case GL_UNSIGNED_INT_10F_11F_11F_REV:
+    case GL_UNSIGNED_SHORT_5_6_5:
+    case GL_UNSIGNED_INT_5_9_9_9_REV:
+        switch (format)
+        {
+        case GL_RED:
+        case GL_RG:
+        case GL_RGBA:
             tex->faceMipmap[face][lod].format = GL_RGB;
             break;
         default:
             break;
         }
+        break;
+    default:
+        break;
     }
 
     if (!(*gc->dp.texImage2D)(gc, tex, face, lod, transferInfo.dstImage))
@@ -7989,6 +8175,9 @@ GLvoid GL_APIENTRY __glim_GetTexImage(__GLcontext *gc, GLenum target, GLint leve
     {
         __GL_EXIT();
     }
+
+    __gl_doSwizzleForSpecialFormat(&transferInfo, &format);
+
     /* The image is from unpack buffer object? */
     if (packBufObj)
     {
@@ -8003,7 +8192,7 @@ GLvoid GL_APIENTRY __glim_GetTexImage(__GLcontext *gc, GLenum target, GLint leve
     faceMipmap = &tex->faceMipmap[face][level];
 
     __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo);
-    __glGenericPixelTransfer(gc, faceMipmap->width, faceMipmap->height, 1, faceMipmap->formatInfo, format, &type, pixels, &transferInfo, __GL_ReadPixelsPre);
+    __glGenericPixelTransfer(gc, faceMipmap->width, faceMipmap->height, 1, faceMipmap->formatInfo, format, &type, pixels, &transferInfo, __GL_GetTexImagePre);
 
     if (!(*gc->dp.getTexImage)(gc, tex, face, level, format, type, (GLvoid*)transferInfo.srcImage))
     {

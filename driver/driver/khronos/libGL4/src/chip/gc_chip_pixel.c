@@ -2014,7 +2014,7 @@ __glChipReadDepthStencilPixels(__GLcontext *gc,
             CONVERT_DEPTH_PIXELS(gctFLOAT, D32F_S8_1_G32R32F, CONVERT_DEPTH_ONLY);
             break;
         case GL_UNSIGNED_INT:
-            dstStride = width * 8;
+            dstStride = width * 4;
             CONVERT_DEPTH_PIXELS(gctUINT32, D32F_S8_1_G32R32F, CONVERT_STENCIL_ONLY);
             break;
         default:
@@ -2206,7 +2206,7 @@ __glChipReadPixels(
     /*
     ** Set Non-Linear space for SRGB8_ALPHA8
     */
-    if (formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8)
+    if ((formatInfo->drvFormat == __GL_FMT_SRGB8) || (formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8))
     {
         gcmONERROR(gcoSURF_SetColorSpace(dstView.surf, gcvSURF_COLOR_SPACE_NONLINEAR));
     }

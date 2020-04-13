@@ -4322,6 +4322,7 @@ _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf);
 _PFNcalcPixelAddr gcoHARDWARE_GetProcCalcPixelAddr(gcoHARDWARE Hardware, gcoSURF Surf);
 void gcoSURF_PixelToNonLinear(gcsPIXEL* inPixel);
 void gcoSURF_PixelToLinear(gcsPIXEL* inPixel);
+void gcoSURF_PixelToSignedInteger(gcsPIXEL* inPixel, gcsFORMAT_CLASS_TYPE_RGBA rgba);
 
 #define gcd_QUERY_COLOR_SPACE(format)   \
     (format == gcvSURF_A8_SBGR8 ||      \

@@ -1329,8 +1329,20 @@ typedef enum _gceSURF_FORMAT
     gcvSURF_Q16W16V16U16_1_A8R8G8B8,
     gcvSURF_A16B16G16R16_1_A8R8G8B8,
 
+    /* Integer formats (2)) */
+    gcvSURF_R10G10B10A2UI   = 1800,
+    gcvSURF_R5G6B5UI,
+    gcvSURF_B5G6R5UI,
+    gcvSURF_R3G3B2UI,
+    gcvSURF_B2G3R3UI,
+    gcvSURF_R4G4B4A4UI,
+    gcvSURF_A4B4G4R4UI,
+    gcvSURF_R5G5B5A1UI,
+    gcvSURF_A1B5G5R5UI,
+    gcvSURF_R8G8B8A8UI,
+
     /* GL4 formats */
-    gcvSURF_G8                  = 1800,
+    gcvSURF_G8              = 1900,
     gcvSURF_B8,
     gcvSURF_G32F,
     gcvSURF_B32F,

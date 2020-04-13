@@ -352,7 +352,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         1, 1,                               /* blockW/H */
         10, 10, 10, 2, 0, 0,                /* r/g/b/a/d/s size */
         GL_RGBA,                            /* data format */
-        GL_UNSIGNED_INT_2_10_10_10_REV,     /* data type */
+        GL_UNSIGNED_INT_10_10_10_2,         /* data type */
         0,                                  /* shared size */
         GL_UNSIGNED_NORMALIZED,
         GL_UNSIGNED_NORMALIZED,
@@ -3587,11 +3587,7 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
         drvFormat = __GL_FMT_RGB565;
         break;
     case GL_RGBA4:
-        drvFormat = __GL_FMT_RGBA4;
-        break;
     case GL_RGB5_A1:
-        drvFormat = __GL_FMT_RGB5_A1;
-        break;
     case GL_RGBA:
     case GL_RGBA8:
         drvFormat = __GL_FMT_RGBA8;
@@ -3979,7 +3975,7 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
     case GL_R3_G3_B2:
     case GL_RGB4:
     case GL_RGB5:
-        drvFormat = __GL_FMT_BGR565;
+        drvFormat = __GL_FMT_RGB565;
         break;
 
     case 3:
@@ -3991,7 +3987,7 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
     case GL_RGB16:
         if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
         {
-            drvFormat = __GL_FMT_RGB16F;
+            drvFormat = __GL_FMT_RGB32F;
         }
         else
         {
@@ -4004,9 +4000,6 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
         break;
 
     case GL_RGBA2:
-        drvFormat = __GL_FMT_BGRA4444;
-        break;
-
     case 4:
         drvFormat = __GL_FMT_RGBA8;
         break;
@@ -4018,7 +4011,7 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
     case GL_RGBA16:
         if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
         {
-             drvFormat = __GL_FMT_RGBA16F;
+             drvFormat = __GL_FMT_RGBA32F;
         }
         else
         {
@@ -4161,7 +4154,7 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
     case GL_R16:
         if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
         {
-             drvFormat = __GL_FMT_R16F;
+             drvFormat = __GL_FMT_R32F;
         }
         else
         {
@@ -4171,7 +4164,7 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
     case GL_RG16:
         if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
         {
-             drvFormat = __GL_FMT_RG16F;
+             drvFormat = __GL_FMT_RG32F;
         }
         else
         {
@@ -4340,7 +4333,16 @@ GLvoid __glMemoryAlignment(__GLpixelTransferInfo *transferInfo)
 
     /* src buf for unpack before "pixel transfer" */
     transferInfo->srcSizeOfElement = __glBytesPerElement(transferInfo->srcType);
-    transferInfo->srcElementNumOfGroup = __glElementsPerGroup(transferInfo->baseFormat, transferInfo->srcType);
+
+    if (transferInfo->applyGBConvert == GL_TRUE &&  transferInfo->operaitonFlag == __GL_TexImage)
+    {
+        transferInfo->srcElementNumOfGroup = __glElementsPerGroup(transferInfo->srcFormat, transferInfo->srcType);
+    }
+    else
+    {
+        transferInfo->srcElementNumOfGroup = __glElementsPerGroup(transferInfo->baseFormat, transferInfo->srcType);
+    }
+
     transferInfo->srcRowSizeBeforeAlign = transferInfo->width * transferInfo->srcSizeOfPixel;
     totalRowSizeForAlign = transferInfo->rowLength * transferInfo->srcElementNumOfGroup * transferInfo->srcSizeOfElement;
     if (transferInfo->srcSizeOfElement >= transferInfo->alignment)
@@ -4349,27 +4351,41 @@ GLvoid __glMemoryAlignment(__GLpixelTransferInfo *transferInfo)
     }
     else
     {
-        transferInfo->srcRowSizeAfterAlign = (GLuint)(transferInfo->alignment * ceilf(transferInfo->srcSizeOfElement * totalRowSizeForAlign / (float)transferInfo->alignment) / transferInfo->srcSizeOfElement) * transferInfo->srcSizeOfElement;
+        transferInfo->srcRowSizeAfterAlign = (GLuint)(transferInfo->alignment * ceilf(totalRowSizeForAlign / (float)transferInfo->alignment));
     }
-    transferInfo->srcRowByteNeedAlign = transferInfo->srcRowSizeAfterAlign - transferInfo->srcRowSizeBeforeAlign;
+    transferInfo->srcTotalBufSize = (transferInfo->skipImages + 1) * (transferInfo->skipImages + transferInfo->depth) * transferInfo->imageHeight * transferInfo->srcRowSizeAfterAlign;
+    transferInfo->srcIncreBytePerRow = transferInfo->skipPixels * transferInfo->srcElementNumOfGroup * transferInfo->srcSizeOfElement;
+    transferInfo->srcIncreByteOfTotal = (transferInfo->skipLines + transferInfo->skipImages * transferInfo->height * transferInfo->depth) * transferInfo->srcRowSizeAfterAlign + transferInfo->srcIncreBytePerRow;
+    transferInfo->srcRowByteNeedAlign = transferInfo->srcRowSizeAfterAlign - transferInfo->srcRowSizeBeforeAlign - transferInfo->srcIncreBytePerRow;
+    GL_ASSERT(transferInfo->srcRowSizeAfterAlign >= transferInfo->srcRowSizeBeforeAlign + transferInfo->srcIncreBytePerRow);
 
     /* dst buf for pack after "pixel transfer" */
     transferInfo->dstSizeOfElement = __glBytesPerElement(transferInfo->dstType);
-    transferInfo->dstElementNumOfGroup = __glElementsPerGroup(transferInfo->baseFormat, transferInfo->dstType);
+
+    if (transferInfo->applyGBConvert == GL_TRUE && (transferInfo->operaitonFlag == __GL_GetTexImagePre || transferInfo->operaitonFlag == __GL_ReadPixelsPre))
+    {
+        transferInfo->dstElementNumOfGroup = __glElementsPerGroup(transferInfo->srcFormat, transferInfo->dstType);
+    }
+    else
+    {
+        transferInfo->dstElementNumOfGroup = __glElementsPerGroup(transferInfo->baseFormat, transferInfo->dstType);
+    }
+
     transferInfo->dstRowSizeBeforeAlign = transferInfo->width * transferInfo->dstSizeOfPixel;
-    totalRowSizeForAlign = transferInfo->rowLength * transferInfo->dstElementNumOfGroup * transferInfo->srcSizeOfElement;
+    totalRowSizeForAlign = transferInfo->rowLength * transferInfo->dstElementNumOfGroup * transferInfo->dstSizeOfElement;
     if (transferInfo->dstSizeOfElement >= transferInfo->alignment)
     {
         transferInfo->dstRowSizeAfterAlign = totalRowSizeForAlign;
     }
     else
     {
-        transferInfo->dstRowSizeAfterAlign = (GLuint)(transferInfo->alignment * ceilf(transferInfo->dstSizeOfElement * totalRowSizeForAlign / (float)transferInfo->alignment) / transferInfo->dstSizeOfElement) * transferInfo->dstSizeOfElement;
+        transferInfo->dstRowSizeAfterAlign = (GLuint)(transferInfo->alignment * ceilf(totalRowSizeForAlign / (float)transferInfo->alignment));
     }
-    transferInfo->dstRowByteNeedAlign = transferInfo->dstRowSizeAfterAlign - transferInfo->dstRowSizeBeforeAlign;
-
-    transferInfo->applyAlign = ((1 != transferInfo->alignment) || (0 < transferInfo->rowLength)
-            || (0 < transferInfo->imageHeight) || (0 < transferInfo->skipImages));
+    transferInfo->dstTotalBufSize = (transferInfo->skipImages + 1) * (transferInfo->skipImages + transferInfo->depth) * transferInfo->imageHeight * transferInfo->dstRowSizeAfterAlign;
+    transferInfo->dstIncreBytePerRow = transferInfo->skipPixels * transferInfo->dstElementNumOfGroup * transferInfo->dstSizeOfElement;
+    transferInfo->dstIncreByteOfTotal = (transferInfo->skipLines + transferInfo->skipImages * transferInfo->height * transferInfo->depth) * transferInfo->dstRowSizeAfterAlign + transferInfo->dstIncreBytePerRow;
+    transferInfo->dstRowByteNeedAlign = transferInfo->dstRowSizeAfterAlign - transferInfo->dstRowSizeBeforeAlign - transferInfo->dstIncreBytePerRow;
+    GL_ASSERT(transferInfo->dstRowSizeAfterAlign >= transferInfo->dstRowSizeBeforeAlign + transferInfo->dstIncreBytePerRow);
 
     GL_ASSERT((0 != transferInfo->srcRowSizeBeforeAlign) && (0 != transferInfo->srcRowSizeAfterAlign)
             && (0 != transferInfo->dstRowSizeBeforeAlign) && (0 != transferInfo->dstRowSizeAfterAlign));
@@ -4449,13 +4465,17 @@ GLuint __glPixelSize(__GLcontext *gc, GLenum format, GLenum type)
     case GL_RED_INTEGER:
     case GL_DEPTH_COMPONENT:
     case GL_LUMINANCE:
-    case GL_STENCIL:
+    /* Treat DEPTH_STENCIL as one component. */
+    case GL_DEPTH_STENCIL:
+    case GL_STENCIL_INDEX:
+    case GL_GREEN_INTEGER:
+    case GL_BLUE_INTEGER:
+    case GL_ALPHA_INTEGER:
         compNumber = 1;
         break;
 
     case GL_RG:
     case GL_RG_INTEGER:
-    case GL_DEPTH_STENCIL:
     case GL_LUMINANCE_ALPHA:
         compNumber = 2;
         break;

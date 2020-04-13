@@ -749,7 +749,22 @@ gcChipUtilGetImageFormat(
 #ifdef OPENGL40
         case GL_UNSIGNED_SHORT_5_6_5:
             bpp = 16;
-            imageFormat = gcvSURF_R5G6B5;
+            imageFormat = gcvSURF_R5G6B5UI;
+            break;
+        case GL_UNSIGNED_SHORT_5_6_5_REV:
+            bpp = 16;
+            imageFormat = gcvSURF_B5G6R5UI;
+            break;
+        case GL_UNSIGNED_BYTE_3_3_2:
+            bpp = 8;
+            imageFormat = gcvSURF_R3G3B2UI;
+            break;
+        case GL_UNSIGNED_BYTE_2_3_3_REV:
+            bpp = 8;
+            imageFormat = gcvSURF_B2G3R3UI;
+            break;
+        default:
+            GL_ASSERT(0);
             break;
 #endif
          }
@@ -861,12 +876,35 @@ gcChipUtilGetImageFormat(
 
         case GL_UNSIGNED_INT_10_10_10_2:
             bpp = 32;
-            imageFormat = gcvSURF_B10G10R10A2;
+            imageFormat = gcvSURF_R10G10B10A2UI;
             break;
 #ifdef OPENGL40
-        case GL_UNSIGNED_INT_8_8_8_8:
+        case GL_UNSIGNED_INT_8_8_8_8_REV:
             bpp = 32;
             imageFormat = gcvSURF_A8B8G8R8UI;
+            break;
+        case GL_UNSIGNED_INT_8_8_8_8:
+            bpp = 32;
+            imageFormat = gcvSURF_R8G8B8A8UI;
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4:
+            bpp = 16;
+            imageFormat = gcvSURF_R4G4B4A4UI;
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+            bpp = 16;
+            imageFormat = gcvSURF_A4B4G4R4UI;
+            break;
+        case GL_UNSIGNED_SHORT_5_5_5_1:
+            bpp = 16;
+            imageFormat = gcvSURF_R5G5B5A1UI;
+            break;
+        case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+            bpp = 16;
+            imageFormat = gcvSURF_A1B5G5R5UI;
+            break;
+        default:
+            GL_ASSERT(0);
             break;
 #endif
          }
@@ -954,6 +992,11 @@ gcChipUtilGetImageFormat(
             imageFormat = gcvSURF_R16;
             break;
 
+        case GL_UNSIGNED_INT:
+            bpp = 32;
+            imageFormat = gcvSURF_R32;
+            break;
+
         case GL_HALF_FLOAT:
         case GL_HALF_FLOAT_OES:
             bpp = 16;
@@ -1002,6 +1045,9 @@ gcChipUtilGetImageFormat(
             bpp = 32;
             imageFormat = gcvSURF_R32I;
             break;
+        default:
+            GL_ASSERT(0);
+            break;
         }
         break;
 
@@ -1016,6 +1062,16 @@ gcChipUtilGetImageFormat(
         case GL_BYTE:
             bpp = 16;
             imageFormat = gcvSURF_G8R8_SNORM;
+            break;
+
+        case GL_UNSIGNED_SHORT:
+            bpp = 32;
+            imageFormat = gcvSURF_G16R16;
+            break;
+
+        case GL_UNSIGNED_INT:
+            bpp = 64;
+            imageFormat = gcvSURF_G32R32;
             break;
 
         case GL_HALF_FLOAT:
@@ -1065,6 +1121,9 @@ gcChipUtilGetImageFormat(
         case GL_INT:
             bpp = 64;
             imageFormat = gcvSURF_G32R32I;
+            break;
+        default:
+            GL_ASSERT(0);
             break;
         }
         break;
@@ -3544,6 +3603,10 @@ __glGetWrapFormat(
         case GL_UNSIGNED_INT_5_9_9_9_REV:
             (*wrapformat) = gcvSURF_E5B9G9R9;
             break;
+
+        case GL_FLOAT:
+            (*wrapformat) = gcvSURF_B32G32R32F;
+            break;
         }
         break;
 
@@ -3575,7 +3638,19 @@ __glGetWrapFormat(
             break;
 #ifdef OPENGL40
         case GL_UNSIGNED_SHORT_5_6_5:
-            (*wrapformat) = gcvSURF_R5G6B5;
+            (*wrapformat) = gcvSURF_R5G6B5UI;
+            break;
+        case GL_UNSIGNED_SHORT_5_6_5_REV:
+            (*wrapformat) = gcvSURF_B5G6R5UI;
+            break;
+        case GL_UNSIGNED_BYTE_3_3_2:
+            (*wrapformat) = gcvSURF_R3G3B2UI;
+            break;
+        case GL_UNSIGNED_BYTE_2_3_3_REV:
+            (*wrapformat) = gcvSURF_B2G3R3UI;
+            break;
+        default:
+            GL_ASSERT(0);
             break;
 #endif
          }
@@ -3675,9 +3750,30 @@ __glGetWrapFormat(
         case GL_UNSIGNED_INT_2_10_10_10_REV:
             (*wrapformat) = gcvSURF_A2B10G10R10UI;
             break;
+        case GL_UNSIGNED_INT_10_10_10_2:
+            (*wrapformat) = gcvSURF_R10G10B10A2UI;
+            break;
 #ifdef OPENGL40
-        case GL_UNSIGNED_INT_8_8_8_8:
+        case GL_UNSIGNED_INT_8_8_8_8_REV:
             (*wrapformat) = gcvSURF_A8B8G8R8UI;
+            break;
+        case GL_UNSIGNED_INT_8_8_8_8:
+            (*wrapformat) = gcvSURF_R8G8B8A8UI;
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4:
+            (*wrapformat) = gcvSURF_R4G4B4A4UI;
+            break;
+        case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+            (*wrapformat) = gcvSURF_A4B4G4R4UI;
+            break;
+        case GL_UNSIGNED_SHORT_5_5_5_1:
+            (*wrapformat) = gcvSURF_R5G5B5A1UI;
+            break;
+        case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+            (*wrapformat) = gcvSURF_A1B5G5R5UI;
+            break;
+        default:
+            GL_ASSERT(0);
             break;
 #endif
          }
@@ -3899,6 +3995,24 @@ __glGetWrapFormat(
         {
         case GL_UNSIGNED_BYTE:
             (*wrapformat) = gcvSURF_S8;
+            break;
+        }
+        break;
+
+    case GL_SRGB:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_SBGR8;
+            break;
+        }
+        break;
+
+    case GL_SRGB_ALPHA:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            (*wrapformat) = gcvSURF_A8_SBGR8;
             break;
         }
         break;
@@ -5385,13 +5499,14 @@ __glChipGetTexImage(
         wrapformat = formatMapInfo->requestFormat;
     }
 
+    /* Need use format/type as a base to calculate bpp when them are different from mipmap->format/mipmap->type. */
     gcChipProcessPixelStore(gc,
         &ps->packModes,
         (gctSIZE_T)mipmap->width,
         (gctSIZE_T)mipmap->height,
         0,
-        mipmap->format,
-        mipmap->type,
+        format,
+        type,
         skipImgs,
         &rowStride,
         &imgHeight,
@@ -5464,7 +5579,7 @@ __glChipGetTexImage(
         /*
         ** Set Non-Linear space for SRGB8_ALPHA8
         */
-        if (formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8)
+        if ((formatInfo->drvFormat == __GL_FMT_SRGB8) || (formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8))
         {
             gcmONERROR(gcoSURF_SetColorSpace(dstView.surf, gcvSURF_COLOR_SPACE_NONLINEAR));
         }

@@ -116,6 +116,20 @@
 #define __GL_PIXELTRANSFER_ENABLED_DEPTH(gc)            \
     ((gc)->state.pixel.transferMode.d_scale != 1.0 ||   \
      (gc)->state.pixel.transferMode.d_bias != 0.0)
+
+#define __GL_CASE_IS_INTEGER_FORMAT             \
+    case GL_RED_INTEGER_EXT:                    \
+    case GL_GREEN_INTEGER_EXT:                  \
+    case GL_BLUE_INTEGER_EXT:                   \
+    case GL_ALPHA_INTEGER_EXT:                  \
+    case GL_RG_INTEGER:                         \
+    case GL_RGB_INTEGER_EXT:                    \
+    case GL_RGBA_INTEGER_EXT:                   \
+    case GL_BGR_INTEGER_EXT:                    \
+    case GL_BGRA_INTEGER_EXT:                   \
+    case GL_LUMINANCE_INTEGER_EXT:              \
+    case GL_LUMINANCE_ALPHA_INTEGER_EXT
+
 /************************************************************************/
 
 /*
@@ -457,6 +471,25 @@ typedef struct __GLpixelMachineRec {
     spanInfo->srcLinesPerSpan = 1;                    \
 }
 
+/* Where to use pixel transfer. */
+typedef enum __GLPixelTransferOperationsRec {
+    __GL_TexImage = 0,
+    __GL_ReadPixels,
+    __GL_ReadPixelsPre,
+    __GL_GetTexImagePre,
+    __GL_CopyPixels
+} __GLPixelTransferOperations;
+
+/* How to use pixel transfer */
+typedef enum __GLPixelTransferConfigurationRec {
+    __GL_transferUnknown = -1,
+    __GL_transferNormal = 0,
+    __GL_transferDepthStencilForRead,
+    __GL_transferIntegerFormat,
+    __GL_transferLuminanceIntensity,
+    __GL_transferGBFormat
+} __GLPixelTransferConfiguration;
+
 typedef struct __GLpixelTransferInfoRec{
     /*
     ** Public info.
@@ -465,7 +498,6 @@ typedef struct __GLpixelTransferInfoRec{
     GLuint numOfPixel;              /* Total number of pixels */
     GLuint numOfComponents;         /* Total number of components */
 
-    GLboolean applyAlign;           /* Whether do alignment */
     GLuint alignment;               /* [un]pack alignment size: [UN]PACK_ALIGNMMENT */
     GLint swapBytes;
     GLint lsbFirst;
@@ -483,22 +515,38 @@ typedef struct __GLpixelTransferInfoRec{
     GLuint dstRowSizeBeforeAlign;
     GLuint srcRowSizeAfterAlign;    /* Total size of a row for src/dst buf after calc alignment (in byte) */
     GLuint dstRowSizeAfterAlign;
+    GLuint srcTotalBufSize;         /* Total buffer size need for "pixel storage modes" (in byte) */
+    GLuint dstTotalBufSize;
+    GLuint srcIncreByteOfTotal;     /* Incrementing pointer by [UN]PACK_SKIP_IMAGE or [UN]PACK_SKIP_ROW (in byte) */
+    GLuint dstIncreByteOfTotal;
+    GLuint srcIncreBytePerRow;      /* Incrementing pointer by [UN]PACK_SKIP_PIXEL (in byte) */
+    GLuint dstIncreBytePerRow;
 
     GLenum baseFormat;
     GLubyte compNumber;             /* Get component number from base format, use for "pixel transfer" */
-    GLubyte compMask[4];            /* R G B A at postion 0 1 2 3, values 1 2 3 4 represent components sequence */
+    /*
+    ** The number of nonzero values represents the number of components.
+    ** Index represents component sequence.
+    ** Value 1 2 3 4 represents R G B A.
+    */
+    GLubyte compMask[4];
 
     __GLcolor scale;                /* NOT implemented. non pix xfer scale*/
     __GLcolor bias;                 /* NOT implemented. non pix xfer bias*/
 
     GLboolean applyPixelTransfer;   /* apply pixel transfer operations */
     GLboolean applyGenericScaleBias;/* apply non pix xfer scale and bias.*/
+    GLboolean applySpecialSwizzle;  /* apply pixel transfer for special formats */
+    GLboolean applyGBConvert;       /* apply pixel transfer for Green and Blue */
 
     GLenum operaitonFlag;           /* Record pixelTransferOperations */
+    __GLPixelTransferConfiguration configFlag;          /* How to use pixel transfer? */
 
     /*
     ** Generic source info.
     */
+    GLubyte srcCompNumber;          /* component number before convert to RGB for Green and Blue */
+    GLenum srcFormat;               /* Format of source image */
     GLenum srcType;                 /* Form of source image */
     GLboolean srcPackedComp;        /* Speicial type, such as ushort565 */
     GLuint srcSizeOfPixel;
@@ -517,12 +565,10 @@ typedef struct __GLpixelTransferInfoRec{
     GLboolean dstNeedFree;
 }__GLpixelTransferInfo;
 
-typedef enum __GLPixelTransferOperations {
-    __GL_TexImage = 0,
-    __GL_ReadPixels,
-    __GL_ReadPixelsPre,
-    __GL_CopyPixels
-} __GLPixelTransferOperations;
+typedef struct __GLpixelTransferDealFuncRec {
+    __GLPixelTransferConfiguration config;
+    GLvoid (*deal)(__GLcontext *gc, __GLpixelTransferInfo *transferInfo, GLenum *type);
+} __GLpixelTransferDealFunc;
 
 typedef enum __GLParameterTypeJudge{
     __GL_InputFormat=0,
