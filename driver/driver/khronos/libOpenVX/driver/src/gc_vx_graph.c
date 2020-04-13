@@ -4722,7 +4722,7 @@ VX_PRIVATE_API vx_bool vxoMultiGPU_IsSupport(
 
         }
     }
-    else if ((VXNNE_OPERATOR_CONCATINDEFINITE == operation->operatorType) || (VXNNE_OPERATOR_TENSOR_PAD == operation->operatorType))
+    else if ((VXNNE_OPERATOR_CONCATINDEFINITE == operation->operatorType) || (VXNNE_OPERATOR_TENSOR_PAD == operation->operatorType) || (VXNNE_OPERATOR_NORMALIZATION == operation->operatorType))
     {
         vxnne_tp_operation srcTpOp = (vxnne_tp_operation)operation;
         vx_uint32 outputDim = 0;
@@ -5671,7 +5671,7 @@ OnError:
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForCONCAT_PAD(
+VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForZDirection(
     vx_node node,
     vxnne_tp_operation dstOperation,
     vxnne_operation srcOperation,
@@ -6473,9 +6473,9 @@ VX_PRIVATE_API vx_status vxoMultiGPU_Handle(
                                                             operation,
                                                             splitCount, gpuIndex));
             }
-            else if ((VXNNE_OPERATOR_CONCATINDEFINITE == operation->operatorType) || (VXNNE_OPERATOR_TENSOR_PAD == operation->operatorType))
+            else if ((VXNNE_OPERATOR_CONCATINDEFINITE == operation->operatorType) || (VXNNE_OPERATOR_TENSOR_PAD == operation->operatorType) ||(VXNNE_OPERATOR_NORMALIZATION == operation->operatorType))
             {
-                vxmONERROR(vxoMultiGPU_SplitResourceForCONCAT_PAD(node, tpOperation,
+                vxmONERROR(vxoMultiGPU_SplitResourceForZDirection(node, tpOperation,
                                                             operation,
                                                             splitCount, gpuIndex));
             }
