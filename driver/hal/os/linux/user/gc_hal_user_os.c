@@ -7376,3 +7376,79 @@ gceSTATUS gcoOS_DeInitMemoryProfile(void)
 }
 
 #endif
+
+gceSTATUS gcoOS_DMAAllocate(
+    IN gcvEDMA_DIRECTION dir,
+    OUT gctEDMA_HANDLE *handle
+    )
+{
+    gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
+    gcoOS os = gcPLS.os;
+    gcoPLATFORM platform;
+
+    gcmHEADER();
+    gcmVERIFY_ARGUMENT(os);
+
+    platform = &os->platform;
+
+    if (platform->ops->dmaAllocate)
+    {
+        status = platform->ops->dmaAllocate(dir, handle);
+    }
+
+    gcmFOOTER_NO();
+    return status;
+}
+
+gceSTATUS gcoOS_DMACopy(
+    IN gctEDMA_HANDLE handle,
+    IN gctUINT64 src,
+    IN gctUINT64 dst,
+    IN gctSIZE_T len
+    )
+{
+
+    gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
+    gcoOS os = gcPLS.os;
+    gcoPLATFORM platform;
+
+    gcmHEADER();
+    gcmVERIFY_ARGUMENT(os);
+
+    platform = &os->platform;
+
+    if (platform->ops->dmaPrepare)
+    {
+        status = platform->ops->dmaPrepare(handle, src, dst, len);
+    }
+
+    if (status == gcvSTATUS_OK && platform->ops->dmaStart)
+    {
+        status = platform->ops->dmaStart(handle, gcvFALSE);
+    }
+
+    gcmFOOTER_NO();
+    return status;
+}
+
+gceSTATUS gcoOS_DMAFree(
+     IN gctEDMA_HANDLE handle
+    )
+{
+    gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
+    gcoOS os = gcPLS.os;
+    gcoPLATFORM platform;
+
+    gcmHEADER();
+    gcmVERIFY_ARGUMENT(os);
+
+    platform = &os->platform;
+
+    if (platform->ops->dmaFree)
+    {
+        status = platform->ops->dmaFree(handle);
+    }
+
+    gcmFOOTER_NO();
+    return status;
+}
