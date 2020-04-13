@@ -2183,10 +2183,6 @@ vxCreateTensorAddressing(
     for (i = 0; i < numViewDimensions; i++)
     {
         addressing->dimSizesUser[i]   = addressing_array_dimension[i];
-    }
-
-    for (i = 0; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
-    {
         addressing->dimStridesUser[i] = addressing_array_stride[i];
     }
 
@@ -3740,6 +3736,7 @@ VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle(
 {
     vx_tensor   tensor = VX_NULL;
     vx_uint32 i;
+    vx_uint32 dimCount = addrs[0].dimCount;
 
      gcmHEADER_ARG("context=%p, tensor_create_params=%p, size_of_create_params=0x%lx, addrs=%p, ptr=%p, import_type=0x%x",
          context, tensor_create_params, size_of_create_params, addrs, ptr, import_type);
@@ -3792,9 +3789,14 @@ VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle(
 
     tensor->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)ptr;
 
-    for (i = 0;i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
+    for (i = 0; i < dimCount; i++)
     {
         tensor->strides[i] = tensor->tensorBuffer->memory.strides[0][i] = addrs[0].dimStridesUser[i];
+    }
+
+    for (i = dimCount; i < VX_CONTEXT_TENSOR_MAX_DIMENSION; i++)
+    {
+        tensor->strides[i] = tensor->tensorBuffer->memory.strides[0][i] = addrs[0].dimStridesUser[dimCount-1] * addrs[0].dimSizesUser[dimCount-1] ;
     }
 
     if (!vxoTensro_WrapUserMemory(tensor)) goto OnError;
