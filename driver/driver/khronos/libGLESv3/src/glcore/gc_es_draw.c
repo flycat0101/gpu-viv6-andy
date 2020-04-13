@@ -800,7 +800,8 @@ __GL_INLINE GLboolean __glDrawEnd(__GLcontext *gc)
         for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; i++)
         {
             if (gc->state.raster.blendEquationRGB[i] >= GL_MULTIPLY_KHR &&
-                gc->state.raster.blendEquationRGB[i] <= GL_HSL_LUMINOSITY_KHR)
+                gc->state.raster.blendEquationRGB[i] <= GL_HSL_LUMINOSITY_KHR &&
+                gc->state.enables.colorBuffer.blend[i] == GL_TRUE)
             {
                 bAdvancedBlendEquation = GL_TRUE;
                 break;
