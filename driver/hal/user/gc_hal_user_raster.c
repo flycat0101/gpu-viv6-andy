@@ -692,8 +692,13 @@ gceSTATUS _InitResolveState(
     pCurSrc->horMirror = gcvFALSE;
     pCurSrc->verMirror = gcvFALSE;
 
+    pCurSrc->srcRect.left = 0;
+    pCurSrc->srcRect.top = 0;
     pCurSrc->srcRect.right = dest->alignedW;
     pCurSrc->srcRect.bottom = dest->alignedH;
+
+    pCurSrc->clipRect.left = 0;
+    pCurSrc->clipRect.top = 0;
     pCurSrc->clipRect.right = dest->alignedW;
     pCurSrc->clipRect.bottom = dest->alignedH;
 
@@ -759,7 +764,7 @@ gceSTATUS _ResolveTileStatus(
         0,
         gcvNULL,
         1,
-        &pCurSrc->srcRect
+        &state->dstClipRect
         ));
 
     /*Blit temp surface to dest*/
@@ -839,7 +844,7 @@ gceSTATUS _ResolveTileStatusStretch(
         0,
         gcvNULL,
         1,
-        &pCurSrc->srcRect
+        &state->dstClipRect
         ));
 
     /*Blit temp surface to dest*/
@@ -922,7 +927,7 @@ gceSTATUS _ResolveTileStatusFilter(
         0,
         gcvNULL,
         1,
-        &pCurSrc->clipRect
+        &state->dstClipRect
         ));
 
     /*FilterBlit tempsurface to Dest*/
