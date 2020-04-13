@@ -261,6 +261,15 @@ enum
 
 #define __VK_CMDBUF_SCRATCH_BUFFER_SIZE 2048
 
+#if __VK_ENABLETS
+typedef struct __vkClearValueRec
+{
+    uint32_t **fcValue;
+    uint32_t **fcValueUpper;
+
+} __vkClearValue;
+#endif
+
 typedef struct __vkCommandBufferRec
 {
     __vkObject obj; /* Must be the first field */
@@ -328,6 +337,14 @@ typedef struct __vkCommandBufferRec
     uint32_t sequenceID;
 
     gceMULTI_GPU_RENDERING_MODE gpuRenderingMode;
+
+#if __VK_ENABLETS
+    __vkImage* fastClearImage[19];
+
+    __vkClearValue* clearValue[19];
+
+    uint32_t clearImgCount;
+#endif
 
 } __vkCommandBuffer;
 
