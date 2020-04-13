@@ -5403,7 +5403,7 @@ VX_PRIVATE_API vx_status _SplitInputAndOutputForMultiTPCores(vx_context context,
                     }
                     else
                     {
-                        div_z = gcmMIN(core, num_slice);
+                        div_z = gcmMIN(gcmMIN(core, num_slice), (output_size_z / stride_x / stride_y));
                     }
                 }
             }
