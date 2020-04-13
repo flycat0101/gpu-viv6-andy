@@ -6435,7 +6435,7 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveArrayToLayerParamTable(
     vx_uint32 physical = array->memory.physicals[0];
     vx_uint8_ptr logical = array->memory.logicals[0];
     vx_enum allocType = vxoMemory_GetType(&array->memory);
-    vx_uint32 size = array->itemSize * array->capacity;
+    vx_uint32 size = (vx_uint32)(array->itemSize * array->capacity);
 
     vxMemCopy((vx_ptr)layerParam.paramName, (vx_const_ptr)paramName, sizeof(layerParam.paramName));
     layerParam.dataFormat = vxoBinaryGraph_ConvertToBinaryDataFormat(array->itemType);
