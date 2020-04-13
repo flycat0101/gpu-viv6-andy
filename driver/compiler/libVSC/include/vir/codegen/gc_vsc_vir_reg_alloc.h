@@ -320,6 +320,9 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
     /* Save the current max general register count. */
     gctUINT                     currentMaxGRCount;
 
+    /* Save the resource to check the redefined instruction. */
+    VSC_CHECK_REDEFINED_RES     checkRedefinedResInfo;
+
     gctBOOL                     bEnableDebug;
     VSC_DIContext               *DIContext;
 
