@@ -1059,7 +1059,7 @@ VX_PRIVATE_API vx_status GenerateTilingInfo(
 
                 if (status != VX_SUCCESS) goto exit;
 
-                initY = gcmCLAMP(initY, 0, TENSOR_SIZE_INDEX(opInfo.output, 1));
+                initY = gcmCLAMP((vx_int32)initY, 0, (vx_int32)TENSOR_SIZE_INDEX(opInfo.output, 1));
 
                 initY = (initY % M == 0 ? M : initY % M);
 
