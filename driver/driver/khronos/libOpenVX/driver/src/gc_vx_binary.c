@@ -4515,7 +4515,8 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Write(
         vx_uint8_ptr buffer = (vx_uint8_ptr)binarySave->NBGBuffer + offset;
         if ((offset + size) > binarySave->NBGInMemorySize)
         {
-            vxError("%s[%d]:generate NBG in memory, out of buffer boundary\n", __FUNCTION__, __LINE__);
+            vxError("%s[%d]:generate NBG in memory, out of buffer boundary, offset=%d, size=%d, nbg size=%d\n",
+                    __FUNCTION__, __LINE__, offset, size, binarySave->NBGInMemorySize);
             vxmASSERT(0);
             vxmONERROR(VX_ERROR_NO_MEMORY);
         }
