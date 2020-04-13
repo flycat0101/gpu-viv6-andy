@@ -3730,6 +3730,23 @@ VX_API_ENTRY vx_tensor VX_API_CALL vxCreateTensorFromHandle(
 
     if (!vxoTensro_WrapUserMemory(tensor)) goto OnError;
 
+#if gcdDUMP
+    {
+        gctPOINTER logical;
+        vx_uint32 size, physical;
+        vxoTensor_GetTensorSize(tensor, &size);
+        vxoTensor_GetTensorViewMemory(tensor, &logical, &physical);
+
+        gcmDUMP(gcvNULL, "#[input]\n");
+        gcmDUMP_BUFFER(gcvNULL,
+                       gcvDUMP_BUFFER_MEMORY,
+                       physical,
+                       logical,
+                       0,
+                       size);
+    }
+#endif
+
     gcmFOOTER_NO();
     return tensor;
 

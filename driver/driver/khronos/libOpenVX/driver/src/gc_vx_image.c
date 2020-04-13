@@ -1314,6 +1314,20 @@ VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromHandle(
 
     if (!vxoImage_WrapUserMemory(image)) goto OnError;
 
+#if gcdDUMP
+        {
+            vx_uint32 size = image->memory.strides[planeIndex][VX_DIM_Y] * image->memory.dims[planeIndex][VX_DIM_Y];
+
+            gcmDUMP(gcvNULL, "#[input]\n");
+            gcmDUMP_BUFFER(gcvNULL,
+                           gcvDUMP_BUFFER_MEMORY,
+                           image->memory.physicals[planeIndex],
+                           image->memory.logicals[planeIndex],
+                           0,
+                           size);
+        }
+#endif
+
     gcmFOOTER_ARG("image=%p", image);
     return image;
 
@@ -2569,6 +2583,20 @@ VX_API_ENTRY vx_status VX_API_CALL vxMapImagePatch(
             status = VX_FAILURE;
         }
     }
+
+#if gcdDUMP
+        {
+            vx_uint32 size = image->memory.strides[plane_index][VX_DIM_Y] * image->memory.dims[plane_index][VX_DIM_Y];
+
+            gcmDUMP(gcvNULL, "#[input]\n");
+            gcmDUMP_BUFFER(gcvNULL,
+                           gcvDUMP_BUFFER_MEMORY,
+                           image->memory.physicals[plane_index],
+                           image->memory.logicals[plane_index],
+                           0,
+                           size);
+        }
+#endif
 
 exit:
     gcmFOOTER_ARG("%d", status);
