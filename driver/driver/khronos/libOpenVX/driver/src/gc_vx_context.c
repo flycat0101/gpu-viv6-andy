@@ -1295,7 +1295,14 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitSRAM(
         vxmASSERT(quot % 64 == 0);
 
         globalData->axiSRAM[0].size     = quot * gpuCountArray[0];
+
+#if gcdCAPTURE_ONLY_MODE
+        globalData->axiSRAM[0].captureLogical = vxAllocateAndZeroMemory(globalData->axiSRAM[0].size);
+        globalData->axiSRAM[0].logical  = globalData->axiSRAM[0].captureLogical;
+#else
         globalData->axiSRAM[0].logical  = axiSRAMLogical;
+#endif
+
         globalData->axiSRAM[0].physical = axiSRAMPhysical;
         globalData->axiSRAM[0].used     = 0;
         globalData->axiSRAM[0].node     = axiSRAMNode;
@@ -1303,7 +1310,14 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitSRAM(
         for (i = 1; i < deviceCount; i++)
         {
             globalData->axiSRAM[i].size     = quot * gpuCountArray[i];
+
+#if gcdCAPTURE_ONLY_MODE
+            globalData->axiSRAM[i].captureLogical = vxAllocateAndZeroMemory(globalData->axiSRAM[i].size);
+            globalData->axiSRAM[i].logical  = globalData->axiSRAM[i].captureLogical;
+#else
             globalData->axiSRAM[i].logical  = (vx_uint8_ptr)axiSRAMLogical + globalData->axiSRAM[i-1].size;
+#endif
+
             globalData->axiSRAM[i].physical = axiSRAMPhysical + globalData->axiSRAM[i-1].size;
             globalData->axiSRAM[i].used     = 0;
         }
@@ -1654,6 +1668,21 @@ VX_PRIVATE_API vx_uint32 vxoGlobalData_Release(vx_global_data globalData)
     refCount = globalData->refGlobalDataCount;
     if (refCount == 0)
     {
+
+#if gcdCAPTURE_ONLY_MODE
+        vx_uint32 deviceCount = 0;
+        gcoVX_QueryDeviceCount(&deviceCount);
+
+        for (i = 0; i < deviceCount; i++)
+        {
+            if (globalData->axiSRAM[i].logical)
+            {
+                vxFree(globalData->axiSRAM[i].logical);
+                globalData->axiSRAM[i].logical = VX_NULL;
+            }
+        }
+#endif
+
         if (globalData->options.flagTPFunc)
             vxFree(globalData->options.flagTPFunc);
 

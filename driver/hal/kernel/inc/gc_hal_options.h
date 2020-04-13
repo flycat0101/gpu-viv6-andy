@@ -307,7 +307,7 @@ This define enables the use of VM for gckCommand and fence buffers.
 
 
 /*
-    gcdDEBUG_FORCE_CONTEXT_UPDATE
+    gcdDEBUG_OPTION_SPECIFY_POOL
         When set to 1, pool of each type surface can be specified by
         changing poolPerType[] in gcsSURF_NODE_Construct.
 */
@@ -331,7 +331,9 @@ This define enables the use of VM for gckCommand and fence buffers.
         When non-zero, driver is built with capture only mode.
         1) Set DDR address range in capture file with contiguousBase and contiguoutsSize.
            Video memory allocation will go through reserved pool with capture only mode.
-        2) TODO: SRAM.
+        2) Set SRAM address range in capture file with sRAMBases, sRAMSizes and extSRAMBases, extSRAMSizes.
+           Video memory querion will go through reserved pool with capture only mode.
+        3) TODO: SRAM video memory allocation.
 */
 #ifndef gcdCAPTURE_ONLY_MODE
 #   define gcdCAPTURE_ONLY_MODE                 0
