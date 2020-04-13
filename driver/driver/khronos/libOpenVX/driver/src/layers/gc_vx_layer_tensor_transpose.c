@@ -139,13 +139,19 @@ VX_PRIVATE_API vx_bool vxoNNTensorTrans_SH_EVIS_Support_Ext(vx_node node, const 
         enable_dataFormat = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
             (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32) ||
             (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
-
-        enable_4D_perm = (vx_bool)(enable_dataFormat && num == 4 && batch != 1 && pPerm[3] != 3
-                    && TENSOR_DIM_NUM(input) == 4 && _IsSameQuantType(input, output));
     }
 
     enable_4Dtensor = (vx_bool)(enable_dataFormat && pPerm[0] == 1 && pPerm[1] == 2 && pPerm[2] == 3 && pPerm[3] == 0 && num == 4 && batch == 1);
     enable_batch_sh = (vx_bool)(enable_dataFormat &&  pPerm[3] == 3 && num == 4 && TENSOR_DIM_NUM(input) == 4);
+
+    if (evis == vx_false_e && enable_4Dtensor == vx_false_e && enable_4Dtensor == vx_false_e)
+    {
+        vx_bool support_format = (vx_bool)((inputFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_INT32) ||
+                                            (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16) ||
+                                            (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8));
+
+        enable_4D_perm = (vx_bool)((enable_dataFormat || support_format) && num == 4 && TENSOR_DIM_NUM(input) == 4 && _IsSameQuantType(input, output));
+    }
 
     shExe_flag = (vx_bool)((enable_dataFormat && pPerm[0] == 2 && pPerm[1] == 0 && pPerm[2] == 1 && num == 3)
         || (enable_dataFormat && pPerm[0] == 2 && pPerm[1] == 1 && pPerm[2] == 0 && num == 3)

@@ -1276,7 +1276,7 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
 
-    if (pnum == 4 && perm[3] != 3 && batch != 1 && _IsSameQuantType(input, output))
+    if (pnum == 4 && perm[3] != 3 && _IsSameQuantType(input, output))
         enable_4D_trans = vx_true_e;
 
     if (enable_4D_trans)
