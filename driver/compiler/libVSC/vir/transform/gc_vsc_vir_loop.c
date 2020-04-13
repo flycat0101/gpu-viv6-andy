@@ -5105,7 +5105,7 @@ _VIR_LoopInfo_DynamicallyUnroll(
             VIR_Operand* src1 = VIR_Inst_GetSource(preHeadEnd, 1);
 
             VIR_Operand_SetSymbol(src0, func, VIR_Symbol_GetIndex(ivSym));
-            VIR_Operand_SetSwizzle(src1, VIR_Enable_2_Swizzle((VIR_Enable)(1 << ivSymChannel)));
+            VIR_Operand_SetSwizzle(src0, VIR_Enable_2_Swizzle((VIR_Enable)(1 << ivSymChannel)));
             VIR_Operand_SetSymbol(src1, func, newUpboundSymId);
             VIR_Operand_SetSwizzle(src1, VIR_SWIZZLE_XXXX);
             VIR_Inst_SetConditionOp(preHeadEnd, VIR_ConditionOp_Reverse(VIR_LoopUpbound_GetCOP(upbound)));
