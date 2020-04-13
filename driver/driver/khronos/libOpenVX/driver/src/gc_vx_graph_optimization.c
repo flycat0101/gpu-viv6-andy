@@ -18,10 +18,61 @@
 
 #define _GC_OBJ_ZONE            gcdZONE_VX_GRAPH
 #define QUANT_BIT_WIDTH         (8)
+#define HW_KERNEL_SIZE          15
 
 static vx_uint32 optPhase = 1;
 
 extern vx_int16 Fp32toBF16(vx_float32 val);
+
+VX_INTERNAL_API void vxoGraphOptimization_printTensorData(vx_char *name, vx_tensor tensor)
+{
+    vx_uint32 index, elementCount;
+    FILE *fp = NULL;
+
+    vxmASSERT(name);
+
+    fp = fopen(name, "w");
+    if(!fp)
+        return;
+    vxoTensor_GetTensorElementCount(tensor, &elementCount);
+
+    for(index = 0; index < elementCount; index++)
+    {
+        if (fp)
+        {
+            fprintf(fp, "%f\n", vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(tensor), TENSOR_QUANT_TYPE(tensor), index,
+                                    TENSOR_LOGICAL_ADDR(tensor), TENSOR_POS(tensor), TENSOR_TF_ZEROPOINT(tensor), TENSOR_TF_SCALE(tensor)));
+        }
+    }
+
+    fclose(fp);
+}
+
+/*get the max and miin of the tensor*/
+VX_INTERNAL_API void vxoGraphOptimization_getTensorMaxOrMinValue(vx_tensor tensor, vx_float32* minData, vx_float32 *maxData)
+{
+    vx_uint32 index, elementCount;
+    vx_float32 minD = 0.0f, maxD = 0.0f;
+
+    vxmASSERT(tensor);
+
+    vxoTensor_GetTensorElementCount(tensor, &elementCount);
+    for(index = 0; index < elementCount; index++)
+    {
+        vx_float32 realData = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(tensor), TENSOR_QUANT_TYPE(tensor), index,
+                                    TENSOR_LOGICAL_ADDR(tensor), TENSOR_POS(tensor), TENSOR_TF_ZEROPOINT(tensor), TENSOR_TF_SCALE(tensor));
+        if(index == 1)
+        {
+            minD = realData;
+            maxD = realData;
+        }
+        minD = gcmMIN(minD, realData);
+        maxD = gcmMAX(maxD, realData);
+    }
+
+    if(minData) *minData = minD;
+    if(maxData) *maxData = maxD;
+}
 
 VX_INTERNAL_API vx_uint32 vxoGraphOptimization_getOutputIndex(vx_node node)
 {
@@ -1719,7 +1770,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
                 return VX_SUCCESS;
         }
     }/*for(i = 0; i < nodeCount; i++)*/
-
 
     finalOutTensor = (vx_tensor)nodes[lastNode]->paramTable[lastNodeOutputIndex];
     if(!vxoGraphOptimization_isSameShapeTensor(finalOutTensor, convOutputTensor) && pool_type != VX_NN_POOLING_MAX)
@@ -5020,6 +5070,319 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_war1x1x1weight(vx_graph graph)
     return VX_SUCCESS;
 }
 
+VX_INTERNAL_API vx_node vxoGraphOptimization_avgPoolAnd1x1Conv_createNewConv(vx_graph graph, vx_node avgPoolNode, vx_node pwConvNode,
+                                                          vx_tensor newWeight, vx_tensor newBias)
+{
+    vx_node     newNode = VX_NULL;
+    vx_size     dilation[2]                 = {0,0};
+    vx_uint32   stride[2]                   = {0, 0};
+    vx_uint32   pad[4]                      = {0,0,0,0};
+    vx_enum     overflow_policy             = VX_CONVERT_POLICY_WRAP;
+    vx_enum     rounding_policy             = VX_ROUND_POLICY_TO_ZERO;
+    vx_enum     down_scale_size_rounding    = VX_NN_DS_SIZE_ROUNDING_FLOOR;
+    vx_enum     pad_mode                    = VX_PAD_CONSTANT;
+    vx_uint32   pad_const                   = 0;
+    vx_uint32   depth_multiplier            = 0;
+
+    gcmHEADER_ARG("graph=%p,avgPoolNode=%p,pwConvNode=%p,newWeight=%p,newBias=%p",
+        graph, avgPoolNode, pwConvNode,newWeight, newBias);
+
+    vxoGraphOptimization_MergeConvolutionNodes_GetParmFromConv(
+        pwConvNode, VX_NULL, VX_NULL,
+        dilation, stride, pad,
+        &overflow_policy,
+        &rounding_policy, &down_scale_size_rounding,
+        &depth_multiplier, &pad_mode, &pad_const);
+
+    /*TODO: conv' pad should be 0, stride be 1, dilation be 0.*/
+    if(pad[0] != 0 || pad[1] != 0 || pad[2] != 0 || pad[3] != 0)
+        goto out;
+
+    if(stride[0] != 1 || stride[1] != 1)
+        goto out;
+
+    if(dilation[0] != 0 || dilation[1] != 0)
+        goto out;
+
+    pad[0] = SCALAR_VALUE(avgPoolNode->paramTable[PARAM_POOLING_POOL_PAD_X_L_INDEX], u32);
+    pad[1] = SCALAR_VALUE(avgPoolNode->paramTable[PARAM_POOLING_POOL_PAD_X_R_INDEX], u32);
+    pad[2] = SCALAR_VALUE(avgPoolNode->paramTable[PARAM_POOLING_POOL_PAD_Y_T_INDEX], u32);
+    pad[3] = SCALAR_VALUE(avgPoolNode->paramTable[PARAM_POOLING_POOL_PAD_Y_B_INDEX], u32);
+
+    stride[0] = SCALAR_VALUE(avgPoolNode->paramTable[PARAM_POOLING_POOL_STRIDE_X_INDEX], u32);
+    stride[1] = SCALAR_VALUE(avgPoolNode->paramTable[PARAM_POOLING_POOL_STRIDE_Y_INDEX], u32);
+    {
+        vx_tensor   inputTensor     = (vx_tensor)avgPoolNode->paramTable[0];
+        vx_tensor   outputTensor    = (vx_tensor)pwConvNode->paramTable[pwConvNode->numParameters - 1];
+
+        vx_nn_convolution_params_ext2_t p =
+        {
+            {
+                {
+                    pad[0], pad[2], overflow_policy, rounding_policy, down_scale_size_rounding, dilation[0], dilation[1]
+                },
+                pad[1], pad[3], pad_mode, 0
+            },
+            stride[0], stride[1], depth_multiplier
+        };
+
+        newNode = vxConvolutionLayer(graph, inputTensor, newWeight, newBias, (vx_nn_convolution_params_t *)&p, sizeof(p), outputTensor);
+        CHECK_NULL(newNode);
+    }
+
+out:
+    gcmFOOTER_ARG("node=%p",newNode);
+    return newNode;
+}
+
+VX_INTERNAL_API vx_tensor vxoGraphOptimization_avgPoolAnd1x1Conv_resetBiasQuantAttribute(vx_graph graph, vx_tensor input, vx_tensor weight, vx_tensor bias)
+{
+    vx_uint32   i           = 0;
+    vx_uint32   biasSize    = 0;
+    vx_float32  newScale    = 0;
+    vx_float32  minData     =0.0f;
+    vx_float32  maxData     =0.0f;
+    vx_tensor   newBias     = bias;
+
+    gcmHEADER_ARG("graph=%p, input=%p, weight=%p, bias=%p", graph, input, weight, bias);
+
+    if(bias == NULL)
+        goto out;
+
+    if(TENSOR_QUANT_TYPE(weight) != VX_QUANT_AFFINE_SCALE)
+        goto out;
+
+    if(TENSOR_TF_SCALE(bias) == TENSOR_TF_SCALE(input) * TENSOR_TF_SCALE(weight))
+        goto out;
+
+    newBias     = vxoGraphOptimization_cloneTensor(bias, graph);
+    CHECK_NULL(newBias);
+
+    newScale    = TENSOR_TF_SCALE(input) * TENSOR_TF_SCALE(weight);
+    TENSOR_TF_SCALE(newBias) = newScale;
+
+    vxoGraphOptimization_getTensorMaxOrMinValue(bias, &minData, &maxData);
+    TENSOR_TF_ZEROPOINT(newBias) = gcmMIN(255, gcmMAX(0, (vx_int32)roundRTNE(0 - minData/ newScale)));
+
+    vxoTensor_AllocateMemory(newBias);
+    vxoTensor_GetTensorElementCount(bias, &biasSize);
+    for(i = 0; i < biasSize; i++)
+    {
+        float value = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(bias), TENSOR_QUANT_TYPE(bias), i,
+                                    TENSOR_LOGICAL_ADDR(bias), TENSOR_POS(bias), TENSOR_TF_ZEROPOINT(bias), TENSOR_TF_SCALE(bias));
+        vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(newBias), TENSOR_QUANT_TYPE(newBias), i, value,
+                        TENSOR_LOGICAL_ADDR(newBias), TENSOR_POS(newBias), TENSOR_TF_ZEROPOINT(newBias), newScale, TENSOR_ROUNDING_MODE(newBias));
+    }
+
+out:
+    gcmFOOTER_ARG("newBias = %p", newBias);
+    return newBias;
+}
+
+/*check whether it is valid to merge avgPool + 1x1Conv*/
+VX_INTERNAL_API vx_bool vxoGraphOptimization_avgPoolAnd1x1Conv_isValid(vx_node avgNode)
+{
+    vx_graph    graph       = avgNode->graph;
+    vx_node *   nodeTable   = avgNode->graph->nodeTable;
+    vx_node     pwConvNode  = NULL;
+    vx_tensor   weight1x1   = NULL;
+    vx_uint32   avgPoolSize[2] = {0, 0};
+    vx_uint32   convPad[4]  = {0,0,0,0};
+    vx_uint32   convStride[2] = {1, 1};
+    vx_uint32   avgPoolStride[2] = {1, 1};
+    vx_uint32   depth_multipler = 0;
+
+    vx_bool     isValid     = vx_false_e;
+    vx_enum     poolType;
+
+    gcmHEADER_ARG("avgNode=%p", avgNode);
+    vxmASSERT(avgNode);
+
+    if(avgNode->merged || avgNode->numChildren != 1 ||
+        avgNode->kernel->enumeration != VX_KERNEL_NN_POOLING_LAYER2)
+        goto out;
+
+    poolType = SCALAR_VALUE(avgNode->paramTable[PARAM_POOLING_POOL_TYPE_INDEX], u32);
+    if(poolType != VX_NN_POOLING_AVG && poolType != VX_NN_POOLING_AVG_ANDROID)
+        goto out;
+
+    avgPoolSize[0] = SCALAR_VALUE(avgNode->paramTable[PARAM_POOLING_POOL_SIZE_X_INDEX], u32);
+    avgPoolSize[1] = SCALAR_VALUE(avgNode->paramTable[PARAM_POOLING_POOL_SIZE_Y_INDEX], u32);
+    avgPoolStride[0] = SCALAR_VALUE(avgNode->paramTable[PARAM_POOLING_POOL_STRIDE_X_INDEX], u32);
+    avgPoolStride[0] = SCALAR_VALUE(avgNode->paramTable[PARAM_POOLING_POOL_STRIDE_Y_INDEX], u32);
+
+    if(pwConvNode == NULL || pwConvNode->numParents > 1 || pwConvNode->merged == vx_true_e)
+        goto out;
+    if(VX_KERNEL_CONVOLUTION_LAYER != pwConvNode->kernel->enumeration)
+        goto out;
+
+    pwConvNode = nodeTable[avgNode->childNodes[0]];
+    vxoGraphOptimization_MergeConvolutionNodes_GetParmFromConv(pwConvNode, VX_NULL, VX_NULL, VX_NULL, convStride, convPad,
+        NULL, VX_NULL, VX_NULL, &depth_multipler, VX_NULL, VX_NULL);
+
+    if(depth_multipler == 0)
+    {
+        vx_uint32 acutalKernelX = vxoGraphOptimization_computeFinalKernelSize(avgPoolSize[0], avgPoolStride[0]);
+        vx_uint32 acutalKernelY = vxoGraphOptimization_computeFinalKernelSize(avgPoolSize[1], avgPoolStride[1]);
+        if(acutalKernelX > HW_KERNEL_SIZE || acutalKernelY > HW_KERNEL_SIZE)
+            goto out;
+    }
+    else
+    {
+        /*for depthwise conv, reshuffle should not be taken into account*/
+        if((avgPoolStride[0] > 2 || avgPoolStride[1] >2) ||
+            (avgPoolSize[0] > HW_KERNEL_SIZE || avgPoolSize[1] > HW_KERNEL_SIZE))
+            goto out;
+    }
+
+    weight1x1 = (vx_tensor)pwConvNode->paramTable[1];
+    if(TENSOR_SIZE_INDEX(weight1x1, 0) != 1 || TENSOR_SIZE_INDEX(weight1x1, 1) != 1 )
+        goto out;
+    if(!vxnneIsNNSupportFormat(graph->base.context, (vx_tensor)avgNode->paramTable[0],
+                                NULL, (vx_tensor)pwConvNode->paramTable[pwConvNode->numParameters - 1]))
+        goto out;
+    if(!vxoGraphOptimization_nnHalSupport(weight1x1) )
+        goto out;
+
+    if(convPad[0] + convPad[1] + convPad[2] + convPad[3] != 0)
+        goto out;
+    if(convStride[0] != 1 || convStride[1] != 1 )
+        goto out;
+
+    isValid = vx_true_e;
+out:
+    gcmFOOTER_ARG("isValid = %d", isValid);
+    return isValid;
+}
+
+/*creat a new weight [1/windowsize, 1/windowsize, c, n] from the old weight[1,1,c,n]*/
+VX_INTERNAL_API vx_tensor vxoGraphOptimization_avgPoolAnd1x1Conv_prepareNewWeight(vx_tensor pwWeight, vx_uint32 avgPoolSize[2])
+{
+    vx_uint32   i           = 0;
+    vx_uint32   sliceSize   = avgPoolSize[0] * avgPoolSize[1];
+    vx_uint32   orgSize     = 0;
+    vx_uint32   weightDims[VX_CONTEXT_TENSOR_MAX_DIMENSION] = {avgPoolSize[0], avgPoolSize[1], 0};
+
+    vx_uint8_ptr orgWeightAddr = TENSOR_LOGICAL_ADDR(pwWeight);
+    vx_tensor_create_params_t p;
+    vx_tensor   newWeight = VX_NULL;
+
+    gcmHEADER_ARG("pwWeight=%p, avgPoolSize=%p", pwWeight, avgPoolSize);
+
+    vxmASSERT(pwWeight || avgPoolSize);
+    vxmASSERT(TENSOR_SIZE_INDEX(pwWeight, 0) == 1 && TENSOR_SIZE_INDEX(pwWeight, 1) == 1 );
+
+    for(i = 2; i < TENSOR_DIM_NUM(pwWeight); i++)
+        weightDims[i] = TENSOR_SIZE_INDEX(pwWeight, i);
+
+    {
+        /*compute new quant attribute of new weight.*/
+        vx_int8     fixedPointPos   = 0;
+        vx_int32    zeroPoint       = 0;
+        vx_float32  scale           = 0;
+        vx_float32  maxdata = 0, mindata = 0;
+
+        vxoGraphOptimization_getTensorMaxOrMinValue(pwWeight, &mindata, &maxdata);
+        CHECK_STATUS(vxoGraphOptimization_computeQuantAttribute(TENSOR_QUANT_TYPE(pwWeight), maxdata/sliceSize, mindata/sliceSize, &fixedPointPos,
+            &zeroPoint, &scale) );
+        p = vxoGraphOptimization_createParamsForTensor(TENSOR_DIM_NUM(pwWeight), weightDims, TENSOR_DATA_TYPE(pwWeight),
+            TENSOR_QUANT_TYPE(pwWeight),fixedPointPos, zeroPoint, scale);
+    }
+
+    newWeight = vxCreateTensor2(pwWeight->base.context, &p, sizeof(p));    CHECK_NULL(newWeight);
+    CHECK_STATUS(vxoTensor_AllocateMemory(newWeight));
+
+    /* set new value into weight */
+    vxoTensor_GetTensorElementCount(pwWeight, &orgSize);
+    for(i = 0; i < orgSize; i++)
+    {
+        vx_uint32 k = 0;
+        vx_float32 orgData = vxnneGetDataExt((vx_type_e)TENSOR_DATA_TYPE(pwWeight), TENSOR_QUANT_TYPE(pwWeight), i,
+                        orgWeightAddr, TENSOR_POS(pwWeight), TENSOR_TF_ZEROPOINT(pwWeight), TENSOR_TF_SCALE(pwWeight));
+        orgData /= sliceSize;
+        for(k = 0; k < sliceSize; k++)
+        {
+            vxnneSaveDataExt((vx_type_e)TENSOR_DATA_TYPE(newWeight), TENSOR_QUANT_TYPE(newWeight), i* sliceSize + k, orgData,
+                TENSOR_LOGICAL_ADDR(newWeight), TENSOR_POS(newWeight), TENSOR_TF_ZEROPOINT(newWeight),
+                TENSOR_TF_SCALE(newWeight), TENSOR_ROUNDING_MODE(pwWeight));
+        }
+    }
+
+    gcmFOOTER_ARG("newWeight = %p", newWeight);
+    return newWeight;
+}
+
+/* merge (nxn)avgpool + (1x1)conv to nxn conv for NN or TP. */
+VX_INTERNAL_API vx_status vxoGraphOptimization_avgPoolAnd1x1Conv(vx_graph graph)
+{
+    vx_int32 nodeIndex;
+    vx_int32 nodeCount = graph->nodeCount;
+    vx_node* nodeTable = graph->nodeTable;
+
+    gcmHEADER_ARG("graph=%p", graph);
+    vxmASSERT(graph);
+
+    for (nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++)
+    {
+        vx_node avgNode = nodeTable[nodeIndex];
+        vx_node pwConvNode  = VX_NULL;
+        vx_node newNode     = VX_NULL;
+
+        vx_tensor pwWeight  = VX_NULL;
+        vx_tensor newWeight = VX_NULL;
+        vx_tensor pwBias    = VX_NULL;
+        vx_tensor newBias   = VX_NULL;
+
+        vx_uint32 avgPoolSize[2] = {0, 0};
+
+        if(!vxoGraphOptimization_avgPoolAnd1x1Conv_isValid(avgNode))
+            continue;
+
+        avgPoolSize[0] = SCALAR_VALUE(avgNode->paramTable[PARAM_POOLING_POOL_SIZE_X_INDEX], u32);
+        avgPoolSize[1] = SCALAR_VALUE(avgNode->paramTable[PARAM_POOLING_POOL_SIZE_Y_INDEX], u32);
+
+        pwConvNode  = nodeTable[avgNode->childNodes[0]];
+        pwWeight    = (vx_tensor)pwConvNode->paramTable[1];
+        pwBias      = (vx_tensor )pwConvNode->paramTable[2];
+
+        /*  windowsize = avgPoolSize[0] * avgPoolSize[1];
+            new weight's dim will be [1/windowSize, 1/windowSize, c, n)
+            relactively, each of the weight's data will be diviede by windowsize;
+        */
+        newWeight = vxoGraphOptimization_avgPoolAnd1x1Conv_prepareNewWeight(pwWeight, avgPoolSize);
+        CHECK_NULL(newWeight);
+
+        newBias = vxoGraphOptimization_avgPoolAnd1x1Conv_resetBiasQuantAttribute(graph, (vx_tensor)avgNode->paramTable[0], newWeight, pwBias);
+        if(VX_NULL == newBias)
+            goto out;
+
+        TENSOR_DATA_LIFETIME(newBias) = VX_TENSOR_LIFE_TIME_STATIC;
+        TENSOR_DATA_LIFETIME(newWeight) = VX_TENSOR_LIFE_TIME_STATIC;
+        newNode = vxoGraphOptimization_avgPoolAnd1x1Conv_createNewConv(graph, avgNode, pwConvNode, newWeight, newBias);
+
+ out:
+        if(newBias != pwBias)
+            vxReleaseTensor(&newBias);
+
+        if(newNode)
+        {
+            avgNode->merged = vx_true_e;
+            pwConvNode->merged = vx_true_e;
+            vxReleaseNode(&newNode);
+        }
+
+        if(newWeight)
+            vxReleaseTensor(&newWeight);
+
+    }
+
+    REMOVE_MERGED_NODE_FROM_GRAPH();
+    REBUILD_TOPOLOGY_GRAPH();
+    OPTIMIZATION_RESLUT();
+    gcmFOOTER_ARG("%d", VX_SUCCESS);
+    return VX_SUCCESS;
+}
+
 VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
@@ -5042,6 +5405,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization(vx_graph graph)
 
         if(context->options.enableGraphEltwiseOpShape)
             vxoGraphOptimization_eltwiseOp(graph);
+
+        if(context->options.enableGraphAvgPoolandPWConv)
+            vxoGraphOptimization_avgPoolAnd1x1Conv(graph);
 
         if(context->options.enableGraphConvertAvgPool2Conv)
             vxoGraphOptimization_ConvertAvgPool2Conv(graph);
