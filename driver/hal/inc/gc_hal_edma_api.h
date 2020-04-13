@@ -42,11 +42,8 @@ gceSTATUS gcoOS_DMAAllocate(
 **  INPUT:
 **      gctEDMA_HANDLE handle
 **          dma channel handle for tranaction.
-**
-**      gctUINT64 src
-**          host dma memory name or vram handle
-**      gctUINT64 dst
-**          vram handle or host dma memory name
+**      gctUINT32 node
+**          vodeo memory handle
 **      gctSIZE_T len
 **          transaction size in bytes
 **  OUTPUT:
@@ -54,8 +51,7 @@ gceSTATUS gcoOS_DMAAllocate(
 */
 gceSTATUS gcoOS_DMACopy(
     IN gctEDMA_HANDLE handle,
-    IN gctUINT64 src,
-    IN gctUINT64 dst,
+    IN gctUINT32 node,
     IN gctSIZE_T len
     );
 

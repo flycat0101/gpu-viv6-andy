@@ -44,8 +44,7 @@ typedef struct
     IN gcvEDMA_IOCTL_CMD cmd;
 
     INOUT gctEDMA_HANDLE edma_chan;
-    IN gctUINT64 src;
-    IN gctUINT64 dst;
+    IN gctUINT32 node;
     INOUT size_t len;
     IN gcvEDMA_DIRECTION dir;
     IN gctBOOL sync_wait;

@@ -68,8 +68,7 @@ typedef struct _gcsPLATFORM_OPERATIONS
     gceSTATUS
     (*dmaPrepare)(
         IN gctEDMA_HANDLE handle,
-        IN gctUINT64 src,
-        IN gctUINT64 dst,
+        IN gctUINT32 node,
         IN gctSIZE_T len
         );
 

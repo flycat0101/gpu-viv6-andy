@@ -7402,8 +7402,7 @@ gceSTATUS gcoOS_DMAAllocate(
 
 gceSTATUS gcoOS_DMACopy(
     IN gctEDMA_HANDLE handle,
-    IN gctUINT64 src,
-    IN gctUINT64 dst,
+    IN gctUINT32 node,
     IN gctSIZE_T len
     )
 {
@@ -7419,7 +7418,7 @@ gceSTATUS gcoOS_DMACopy(
 
     if (platform->ops->dmaPrepare)
     {
-        status = platform->ops->dmaPrepare(handle, src, dst, len);
+        status = platform->ops->dmaPrepare(handle, node, len);
     }
 
     if (status == gcvSTATUS_OK && platform->ops->dmaStart)
