@@ -444,7 +444,6 @@ VIR_CFO_PerformOnShader(
     VIR_CFO cfo;
     VSC_OPTN_CFOOptions* options = (VSC_OPTN_CFOOptions*)pPassWorker->basePassWorker.pBaseOption;
     gctBOOL globalChanged = gcvFALSE;
-    VSC_CFO_PASS_DATA*    cfoPassData = (VSC_CFO_PASS_DATA *)pPassWorker->basePassWorker.pPassSpecificData;
 
     if(!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_CFOOptions_GetBeforeShader(options), VSC_OPTN_CFOOptions_GetAfterShader(options)))
     {
@@ -495,10 +494,6 @@ VIR_CFO_PerformOnShader(
     if(globalChanged || VIR_CFO_GetInvalidCfg(&cfo))
     {
         pPassWorker->pResDestroyReq->s.bInvalidateCfg = gcvTRUE;
-        if (cfoPassData)
-        {
-            cfoPassData->cfgChanged =  VIR_CFO_GetInvalidCfg(&cfo);
-        }
     }
 
     VIR_CFO_Final(&cfo);

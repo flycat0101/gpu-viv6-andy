@@ -810,7 +810,6 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     VSC_PRELL_PASS_DATA preLLPassData = { gcvFALSE };
     VSC_CPP_PASS_DATA   cppPassData = { VSC_CPP_NONE, gcvTRUE };
     VSC_IL_PASS_DATA    ilPassData = { 3, gcvFALSE };
-    VSC_CFO_PASS_DATA   cfoPassData = { gcvFALSE }; /* record if control flow changed in cfo pass */
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Low ||
               VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Post_Medium);
@@ -856,7 +855,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     CALL_SH_PASS(VSC_PH_Peephole_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_LCSE_PerformOnShader, 0, gcvNULL);
     CALL_SH_PASS(VSC_DCE_Perform, 0, gcvNULL);
-    CALL_SH_PASS(VIR_CFO_PerformOnShader, 1, &cfoPassData);
+    CALL_SH_PASS(VIR_CFO_PerformOnShader, 1, gcvNULL);
     CALL_SH_PASS(vscVIR_AdjustPrecision, 0, gcvNULL);
     CALL_SH_PASS(vscVIR_DoLocalVectorization, 0, gcvNULL);
     CALL_SH_PASS(vscVIR_AddOutOfBoundCheckSupport, 0, gcvNULL);
@@ -864,10 +863,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     CALL_SH_PASS(vscVIR_ClampPointSize, 0, gcvNULL);
 
     /* Call CPF one more time because after CFO we can optimize more instructions. */
-    if (cfoPassData.cfgChanged)
-    {
-        CALL_SH_PASS(VSC_CPF_PerformOnShader, 0, gcvNULL);
-    }
+    CALL_SH_PASS(VSC_CPF_PerformOnShader, 0, gcvNULL);
 
     /* Lower ML to LL post */
     CALL_SH_PASS(VIR_Lower_MiddleLevel_To_LowLevel_Post, 0, &bRAEnabled);
