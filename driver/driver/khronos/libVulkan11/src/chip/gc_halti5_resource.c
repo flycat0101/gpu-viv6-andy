@@ -11130,9 +11130,12 @@ VkResult halti5_createImageView(
             }
             break;
         default:
+            if (ext->sType != VK_STRUCTURE_TYPE_MAX_ENUM ||
+                ext->pNext != VK_NULL_HANDLE)
             {
                 __VK_ASSERT(!"unknown pNext in imageView createInfo ");
             }
+            ext = (VkBaseInStructure *)ext->pNext;
             break;
         }
     }
