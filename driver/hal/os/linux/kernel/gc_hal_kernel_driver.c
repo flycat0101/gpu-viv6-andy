@@ -1216,7 +1216,7 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 
     if ((contiguousBaseCap + contiguousSizeCap) > 0x80000000)
     {
-        gcmkPRINT("Capture only mode: contiguousBase + contiguousSize > 2G, there is error in CModel and old MMU version vsimulation.");
+        gcmkPRINT("Capture only mode: contiguousBase + contiguousSize > 2G, there is error in CModel and old MMU version RTL simulation.");
     }
 
     for (i = 0; i < gcvCORE_COUNT; i++)

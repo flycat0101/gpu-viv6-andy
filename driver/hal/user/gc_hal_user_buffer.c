@@ -340,8 +340,6 @@ _ConstructCommandBuffer(
         iface.u.LockVideoMemory.cacheable = gcvFALSE;
 
 #if gcdCAPTURE_ONLY_MODE
-        gcmPRINT("Capture only mode is enabled in Hal User.");
-
         gcmONERROR(gcoOS_Allocate(gcvNULL, Bytes, &iface.u.LockVideoMemory.captureLogical));
 
         iface.u.LockVideoMemory.queryCapSize = gcvFALSE;
