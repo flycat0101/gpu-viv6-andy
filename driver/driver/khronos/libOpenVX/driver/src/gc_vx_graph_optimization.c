@@ -2701,8 +2701,9 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertBatchFCtoConv(vx_graph gra
     return VX_SUCCESS;
 }
 
-VX_INTERNAL_API vx_status vxoGraphOptimization_computeQuantAttribute(vx_enum quantType, vx_float32 maxValue, vx_float32 minValue,
-                                                                 vx_int8 *fixedPointPos, vx_int32 *zeroPoint, vx_float32 * scale)
+VX_INTERNAL_API vx_status vxoGraphOptimization_computeQuantAttribute(vx_enum quantType, vx_enum dataType,
+                                                                     vx_float32 maxValue, vx_float32 minValue,
+                                                                     vx_int8 *fixedPointPos, vx_int32 *zeroPoint, vx_float32 * scale)
 {
     gcmHEADER_ARG("quantType=%d, maxValue=%f, minValue=%f, fixedPointPos=%p, zeroPoint=%p, scale=%p",
         quantType, maxValue, minValue, fixedPointPos, zeroPoint, scale);
@@ -2716,12 +2717,30 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_computeQuantAttribute(vx_enum qua
         maxValue = gcmMAX(maxValue, 0);
         minValue = gcmMIN(minValue, 0);
         *scale = (maxValue - minValue)/drange;
-        *zeroPoint = gcmMIN(255, gcmMAX(0, (vx_int32)roundRTNE(0 - minValue/ *scale)));
+
+        if(VX_TYPE_UINT8 == dataType)
+        {
+            *zeroPoint = gcmMIN(255, gcmMAX(0, (vx_int32)roundRTNE(0 - minValue/ *scale)));
+        }
+        else if(VX_TYPE_INT8 == dataType)
+        {
+            *zeroPoint = gcmMIN(127, gcmMAX(-128, (vx_int32)roundRTNE(-128 - minValue/ *scale)));
+        }
+        else
+        {
+            vxError("unsupported datatype for asym quantize\n");
+            vxmASSERT(0);
+        }
+
     }
     else if(quantType == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         gcmASSERT(fixedPointPos);
-
+        if(VX_TYPE_INT8 != dataType)
+        {
+            vxError("unsupported datatype for dfp quantization\n");
+            vxmASSERT(0);
+        }
         minValue = (vx_float32)fabs(minValue);
         maxValue = gcmMAX(maxValue, minValue);
         if(maxValue <= 0.0)
@@ -2762,7 +2781,7 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_ConvertAvgPool2Conv_createWeight(
     }
     else
     {
-        vxoGraphOptimization_computeQuantAttribute(TENSOR_QUANT_TYPE(input), fill_data, 0,
+        vxoGraphOptimization_computeQuantAttribute(TENSOR_QUANT_TYPE(input), TENSOR_DATA_TYPE(input),fill_data, 0,
             &parm.quant_data.dfp.fixed_point_pos, &parm.quant_data.affine.zeroPoint, &parm.quant_data.affine.scale);
     }
 
@@ -5396,8 +5415,8 @@ VX_INTERNAL_API vx_tensor vxoGraphOptimization_avgPoolAnd1x1Conv_prepareNewWeigh
         vx_float32  maxdata = 0, mindata = 0;
 
         vxoGraphOptimization_getTensorMaxOrMinValue(pwWeight, &mindata, &maxdata);
-        CHECK_STATUS(vxoGraphOptimization_computeQuantAttribute(TENSOR_QUANT_TYPE(pwWeight), maxdata/sliceSize, mindata/sliceSize, &fixedPointPos,
-            &zeroPoint, &scale) );
+        CHECK_STATUS(vxoGraphOptimization_computeQuantAttribute(TENSOR_QUANT_TYPE(pwWeight), TENSOR_DATA_TYPE(pwWeight),
+            maxdata/sliceSize, mindata/sliceSize, &fixedPointPos, &zeroPoint, &scale) );
         p = vxoGraphOptimization_createParamsForTensor(TENSOR_DIM_NUM(pwWeight), weightDims, TENSOR_DATA_TYPE(pwWeight),
             TENSOR_QUANT_TYPE(pwWeight),fixedPointPos, zeroPoint, scale);
     }
