@@ -28598,6 +28598,31 @@ vxnne_shader_executable vxnneGetTensorAddShaderExecutable(
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackedBF16_2x8", 1, uniPackedBF16_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_scale1", 1, &input_scale1);
         if (status != VX_SUCCESS) goto OnError;
+        execution_parameters.globalWorkScale[0]  = 8;
+        execution_parameters.globalWorkScale[1]  = 1;
+        execution_parameters.globalWorkScale[2]  = 1;
+    }
+    else if (input0_format == VX_TYPE_FLOAT32 && input1_format == VX_TYPE_FLOAT32 && output_format == VX_TYPE_BFLOAT16)
+    {
+        vx_uint32 uniPackedBF16_2x8[16] = {
+            0x11111111, // TCfg
+            0x11110000, // ASelt
+            0x07050301, 0x07050301, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+        };
+        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32AddF32ToBF16", borderMode);
+
+        if (!shaderExecutable) goto OnError;
+
+        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackedBF16_2x8", 1, uniPackedBF16_2x8);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_scale1", 1, &input_scale1);
+        if (status != VX_SUCCESS) goto OnError;
+        execution_parameters.globalWorkScale[0]  = 8;
+        execution_parameters.globalWorkScale[1]  = 1;
+        execution_parameters.globalWorkScale[2]  = 1;
     }
     else
     {
@@ -33098,6 +33123,28 @@ vxnne_shader_executable vxnneGetTensor2DAddShaderExecutable(
         status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvBF16toF32_Part0_2x8", 1, uniConvBF16toF32_Part0_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniConvBF16toF32_Part1_2x8", 1, uniConvBF16toF32_Part1_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackedBF16_2x8", 1, uniPackedBF16_2x8);
+        status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_scale1", 1, &input_scale1);
+        if (status != VX_SUCCESS) goto OnError;
+
+        execution_parameters.globalWorkScale[0]  = 8;
+        execution_parameters.globalWorkScale[1]  = 1;
+    }
+    else if (input0_format == VX_TYPE_FLOAT32 && input1_format == VX_TYPE_FLOAT32 && output_format == VX_TYPE_BFLOAT16)
+    {
+        vx_uint32 uniPackedBF16_2x8[16] = {
+            0x11111111, // TCfg
+            0x11110000, // ASelt
+            0x07050301, 0x07050301, // ABin
+            0x22222222, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00000600, // AccumType, ConstantType, and PostShift
+            0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001, 0x00000001 // Constant
+        };
+
+        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_F32AddF32ToBF16_2D", borderMode);
+        if (!shaderExecutable) goto OnError;
+
+        status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "uniPackedBF16_2x8", 1, uniPackedBF16_2x8);
         status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "input_scale1", 1, &input_scale1);
         if (status != VX_SUCCESS) goto OnError;
 

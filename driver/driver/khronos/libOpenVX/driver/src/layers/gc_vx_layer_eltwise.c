@@ -221,6 +221,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorAdd_SH_EVIS_Support_Ext(vx_node node, const vx
     if(evis)
     {
         format_flag = (vx_bool)((input0Format != VX_TYPE_FLOAT32) && (input1Format != VX_TYPE_FLOAT32) && (outputFormat != VX_TYPE_FLOAT32 && outputFormat != VX_TYPE_INT32));
+        format_flag = format_flag || (vx_bool)((input0Format == VX_TYPE_FLOAT32) && (input1Format == VX_TYPE_FLOAT32) && (outputFormat == VX_TYPE_BFLOAT16));
         enable_2d_tensor = (vx_bool)(depth == 1 && ((input0Format == VX_TYPE_FLOAT16 && (input1Format == VX_TYPE_FLOAT16 || input1Format == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16) || format_flag) && policyEnum == VX_CONVERT_POLICY_SATURATE);
     }
     else
@@ -542,6 +543,7 @@ OnError:
     if(context->evisNoInst.supportEVIS)
     {
         format_flag = (vx_bool)((input0Format != VX_TYPE_FLOAT32) && (input1Format != VX_TYPE_FLOAT32) && (outputFormat != VX_TYPE_FLOAT32));
+        format_flag = format_flag || (vx_bool)((input0Format == VX_TYPE_FLOAT32) && (input1Format == VX_TYPE_FLOAT32) && (outputFormat == VX_TYPE_BFLOAT16));
         enable_2d_tensor = (vx_bool)(depth == 1 && ((input0Format == VX_TYPE_FLOAT16 && (input1Format == VX_TYPE_FLOAT16 || input1Format == VX_TYPE_FLOAT32) && outputFormat == VX_TYPE_FLOAT16) || format_flag) && policyEnum == VX_CONVERT_POLICY_SATURATE);
     }
     else
