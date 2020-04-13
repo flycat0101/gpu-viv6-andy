@@ -613,6 +613,7 @@ typedef struct _arch_drv_option
     arch_uint32    enableVIPDEC400;
     arch_uint32    enableCacheBinaryGraph;         /* NO */
     char          *enableOpsDebugInfo;                  /* NO */
+    arch_uint32    enableSubnetworkSplitting;
 }
 arch_drv_option;
 /******* DONE:Configration struction definition ***************************/
