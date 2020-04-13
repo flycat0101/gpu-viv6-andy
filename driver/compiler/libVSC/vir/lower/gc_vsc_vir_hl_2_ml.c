@@ -93,10 +93,8 @@ _RemoveUnreachableBlockOnFunction(
         while (caller)
         {
             callerInst = (VIR_Instruction *)VIR_Link_GetReference(caller);
-            VIR_Inst_SetOpcode(callerInst, VIR_OP_NOP);
-            VIR_Inst_SetConditionOp(callerInst, VIR_COP_ALWAYS);
-            VIR_Inst_SetSrcNum(callerInst, 0);
-            VIR_Inst_SetDest(callerInst, gcvNULL);
+
+            VIR_Function_ChangeInstToNop(Func, callerInst);
 
             caller = caller->next;
         }
@@ -104,17 +102,7 @@ _RemoveUnreachableBlockOnFunction(
         /* Change all instructions in this block to NOPs*/
         for (instIter = labelInst; instIter && instIter != VIR_Inst_GetNext(inst); instIter = VIR_Inst_GetNext(instIter))
         {
-            VIR_Label*         pLabel;
-            if (VIR_Inst_GetOpcode(instIter) == VIR_OP_LABEL)
-            {
-                pLabel = VIR_Inst_GetJmpLabel(instIter);
-                /* reset label defined */
-                VIR_Label_SetDefInst(pLabel, gcvNULL);
-            }
-            VIR_Inst_SetOpcode(instIter, VIR_OP_NOP);
-            VIR_Inst_SetConditionOp(instIter, VIR_COP_ALWAYS);
-            VIR_Inst_SetSrcNum(instIter, 0);
-            VIR_Inst_SetDest(instIter, gcvNULL);
+            VIR_Function_ChangeInstToNop(Func, callerInst);
         }
     }
 
@@ -255,17 +243,7 @@ _RemoveRedundantLabelForFunction(
 
             for (; pInst != pNextLabelInst; pInst = VIR_Inst_GetNext(pInst))
             {
-                VIR_Label*         pLabel;
-                if (VIR_Inst_GetOpcode(pInst) == VIR_OP_LABEL)
-                {
-                    pLabel = VIR_Inst_GetJmpLabel(pInst);
-                    /* reset label defined */
-                    VIR_Label_SetDefInst(pLabel, gcvNULL);
-                }
-                VIR_Inst_SetOpcode(pInst, VIR_OP_NOP);
-                VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
-                VIR_Inst_SetSrcNum(pInst, 0);
-                VIR_Inst_SetDest(pInst, gcvNULL);
+                VIR_Function_ChangeInstToNop(pFunc, pInst);
             }
         }
     }
@@ -296,14 +274,8 @@ _RemoveRedundantLabelForFunction(
 
             if (VIR_Inst_GetJmpLabel(pNextNonNopInst) == pJmpLabel)
             {
-                /* Dereference. */
-                VIR_Link_RemoveLink(&pJmpLabel->referenced, (gctUINTPTR_T)pInst);
-
                 /* Change JMP to NOP. */
-                VIR_Inst_SetOpcode(pInst, VIR_OP_NOP);
-                VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
-                VIR_Inst_SetSrcNum(pInst, 0);
-                VIR_Inst_SetDest(pInst, gcvNULL);
+                VIR_Function_ChangeInstToNop(pFunc, pInst);
             }
         }
     }
@@ -319,11 +291,7 @@ _RemoveRedundantLabelForFunction(
 
             if (pLabel->referenced == gcvNULL)
             {
-                VIR_Label_SetDefInst(pLabel, gcvNULL);
-                VIR_Inst_SetOpcode(pInst, VIR_OP_NOP);
-                VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
-                VIR_Inst_SetSrcNum(pInst, 0);
-                VIR_Inst_SetDest(pInst, gcvNULL);
+                VIR_Function_ChangeInstToNop(pFunc, pInst);
             }
         }
     }
