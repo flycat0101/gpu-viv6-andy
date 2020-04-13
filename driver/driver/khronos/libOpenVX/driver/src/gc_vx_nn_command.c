@@ -5593,7 +5593,6 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
     switch (tpType)
     {
     case TP_RESHUFFLE:
-    case TP_TENSOR_COPY:
     case TP_TENSOR_COPY4CONCAT:
         _SplitInputAndOutputForMultiTPCores(context,
                                             input,
@@ -5603,6 +5602,24 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
                                             &input_splits,
                                             &output_splits
                                             );
+        break;
+
+    case TP_TENSOR_COPY:
+        if((input->width != output->width) || (input->height != output->height) || (input->depth != output->depth))
+        {
+            _calculateTPSplitSizeOffset(context, input, output, parameter, splitTypes[tpType], &splitCount, splitSizes, splitOffsets);
+        }
+        else
+        {
+            _SplitInputAndOutputForMultiTPCores(context,
+                                            input,
+                                            output,
+                                            parameter,
+                                            &splitCount,
+                                            &input_splits,
+                                            &output_splits
+                                            );
+        }
         break;
 
     default:
