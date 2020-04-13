@@ -1148,6 +1148,7 @@ __GL_INLINE GLvoid __glEvaluateTextureAttrib(__GLcontext* gc, __GLattribute* cs,
                         __GL_CHECK_SAMPLER_PARAM1(__GL_TEXPARAM_COMPARE_MODE_BIT, compareMode);
                         __GL_CHECK_SAMPLER_PARAM1(__GL_TEXPARAM_COMPARE_FUNC_BIT, compareFunc);
                         __GL_CHECK_SAMPLER_PARAM1(__GL_TEXPARAM_SRGB_BIT, sRGB);
+                        __GL_CHECK_SAMPLER_PARAM1(__GL_TEXPARAM_LOD_BIAS_BIT, lodBias);
 
                         if (localMask & __GL_TEXPARAM_BORDER_COLOR_BIT)
                         {
