@@ -1086,6 +1086,32 @@ IN OUT clsOPERAND_CONSTANT * OperandConstant
     clmGEN_CODE_elementType_SET(OperandConstant->dataType, elementType);
 }
 
+gctBOOL
+_IsDualPackedVectorType(
+IN clsGEN_CODE_DATA_TYPE DataType1,
+IN clsGEN_CODE_DATA_TYPE DataType2
+)
+{
+    cltELEMENT_TYPE type1 = DataType1.elementType, type2 = DataType2.elementType;
+
+    if(clmIsElementTypePacked(type1) &&
+       !clmIsElementTypePacked(type2))
+    {
+        type1 = _ConvPackedTypeToBasicType(type1);
+    }
+    else if(!clmIsElementTypePacked(type1) &&
+            clmIsElementTypePacked(type2))
+    {
+        type2 = _ConvPackedTypeToBasicType(type2);
+    }
+    else return gcvFALSE;
+
+    return (type1 == type2) &&
+           (clmGEN_CODE_vectorSize_GET(DataType1) ==
+            clmGEN_CODE_vectorSize_GET(DataType2)) &&
+           clmGEN_CODE_vectorSize_GET(DataType1);
+}
+
 gceSTATUS
 clsROPERAND_ChangeDataTypeFamily(
 IN cloCOMPILER Compiler,
@@ -1116,7 +1142,8 @@ IN OUT clsROPERAND * ROperand
 
        elementType = clmGEN_CODE_elementType_GET(ROperand->dataType);
        newElementType = clmGEN_CODE_elementType_GET(NewDataType);
-       if(clmIsElementTypePacked(newElementType)) {
+       if(clmIsElementTypePacked(newElementType) ||
+          clmIsElementTypePacked(elementType)) {
            elementType = _ConvPackedTypeToBasicType(elementType);
            newElementType = _ConvPackedTypeToBasicType(newElementType);
        }
@@ -1221,7 +1248,27 @@ IN OUT clsROPERAND * ROperand
            clsROPERAND_InitializeUsingIOperand(ROperand, intermIOperand);
        }
 
-       if(gcIsScalarDataType(ROperand->dataType) && gcIsVectorDataType(NewDataType)) {
+       if(_IsDualPackedVectorType(NewDataType, ROperand->dataType)) {
+           clsIOPERAND_New(Compiler, intermIOperand, NewDataType);
+           if(clmIsElementTypePacked(ROperand->dataType.elementType)) { /* new type is unpacked */
+               status = clUnpackROperand(Compiler,
+                                         LineNo,
+                                         StringNo,
+                                         ROperand,
+                                         intermIOperand);
+               if(gcmIS_ERROR(status)) return status;
+           }
+           else {  /* new type is packed */
+               status = clPackROperand(Compiler,
+                                       LineNo,
+                                       StringNo,
+                                       ROperand,
+                                       intermIOperand);
+               if(gcmIS_ERROR(status)) return status;
+           }
+           clsROPERAND_InitializeUsingIOperand(ROperand, intermIOperand);
+       }
+       else if(gcIsScalarDataType(ROperand->dataType) && gcIsVectorDataType(NewDataType)) {
            clsLOPERAND lOperand[1];
 
            clsIOPERAND_New(Compiler, intermIOperand, NewDataType);
@@ -1231,9 +1278,9 @@ IN OUT clsROPERAND * ROperand
                                     StringNo,
                                     lOperand,
                                     ROperand);
-          if (gcmIS_ERROR(status)) return status;
+           if (gcmIS_ERROR(status)) return status;
 
-          clsROPERAND_InitializeUsingIOperand(ROperand, intermIOperand);
+           clsROPERAND_InitializeUsingIOperand(ROperand, intermIOperand);
        }
     }
     else {
@@ -1307,14 +1354,14 @@ IN OUT clsROPERAND *Operand
         clmGEN_CODE_IsScalarDataType(Operand->dataType) &&
         clmGEN_CODE_IsVectorDataType(resultType)) ||
       (fromElementType != toElementType &&
-       clmGEN_CODE_IsScalarDataType(Operand->dataType))) {
-      status = clsROPERAND_ChangeDataTypeFamily(Compiler,
-                                                LineNo,
-                                                StringNo,
-                                                gcvFALSE,
-                                                resultType,
-                                                Operand);
-      if(gcmIS_ERROR(status)) return status;
+       clmGEN_CODE_IsScalarDataType(Operand->dataType)) ||
+      _IsDualPackedVectorType(resultType, Operand->dataType)) {
+      return clsROPERAND_ChangeDataTypeFamily(Compiler,
+                                              LineNo,
+                                              StringNo,
+                                              gcvFALSE,
+                                              resultType,
+                                              Operand);
    }
    return gcvSTATUS_OK;
 }
@@ -7171,6 +7218,15 @@ clUnpackROperand(
                                     From->dataType);
     gcmASSERT(dataType.elementType == To->dataType.elementType &&
               vectorSize == clmGEN_CODE_vectorSize_GET(To->dataType));
+    if(clmIsElementTypeUnsigned(To->dataType.elementType))
+    {
+        status = clGenAssignCode(Compiler,
+                                 LineNo,
+                                 StringNo,
+                                 lOperand,
+                                 constantZero);
+        if (gcmIS_ERROR(status)) return status;
+    }
     switch(From->dataType.elementType) {
     case clvTYPE_USHORT_PACKED:
     case clvTYPE_SHORT_PACKED:
@@ -7184,13 +7240,6 @@ clUnpackROperand(
             swizzleMaskValue = 0x0333;
         }
         else swizzleMaskValue = 0x3333;
-
-        status = clGenAssignCode(Compiler,
-                                 LineNo,
-                                 StringNo,
-                                 lOperand,
-                                 constantZero);
-        if (gcmIS_ERROR(status)) return status;
 
         dataType = regDataType;
         packedSwizzleValue[0] = (gctUINT)0x03020100;
@@ -7259,13 +7308,6 @@ clUnpackROperand(
             break;
         }
 
-        status = clGenAssignCode(Compiler,
-                                 LineNo,
-                                 StringNo,
-                                 lOperand,
-                                 constantZero);
-        if (gcmIS_ERROR(status)) return status;
-
         rOperands[0] = *From;
         for(i = 0, j = 0; i < vectorSize; i += 4, j++) {
             if(vectorSize == 2) {
@@ -7303,6 +7345,36 @@ clUnpackROperand(
     default:
         gcmASSERT(0);
         return gcvSTATUS_INVALID_ARGUMENT;
+    }
+    if(clmIsElementTypeSigned(To->dataType.elementType)) {
+        clsROPERAND shiftOperand[1], rOperand[1];
+        clsIOPERAND iOperand[1];
+
+        clsROPERAND_InitializeIntOrIVecConstant(shiftOperand,
+                                                clmGenCodeDataType(T_INT),
+                                                To->dataType.elementType == clvTYPE_CHAR ?
+                                                (gctUINT)24 : (gctUINT)16);
+
+        clsROPERAND_InitializeUsingIOperand(rOperand, To);
+        clsIOPERAND_New(Compiler, iOperand, To->dataType);
+        status = clGenShiftExprCode(Compiler,
+                                    LineNo,
+                                    StringNo,
+                                    clvOPCODE_LSHIFT,
+                                    iOperand,
+                                    rOperand,
+                                    shiftOperand);
+        if (gcmIS_ERROR(status)) return status;
+
+        clsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+        status = clGenShiftExprCode(Compiler,
+                                    LineNo,
+                                    StringNo,
+                                    clvOPCODE_RSHIFT,
+                                    To,
+                                    rOperand,
+                                    shiftOperand);
+        if (gcmIS_ERROR(status)) return status;
     }
 
     return gcvSTATUS_OK;
@@ -15440,6 +15512,49 @@ IN OUT clsGEN_CODE_PARAMETERS *RightParameters
              }
           }
        }
+       else if(_IsDualPackedVectorType(LeftParameters->dataTypes[i].def, RightParameters->dataTypes[i].def)) {
+          if(clmIsElementTypePacked(RightParameters->dataTypes[i].def.elementType)) {
+             gcmASSERT(!clmIsElementTypePacked(LeftParameters->dataTypes[i].def.elementType));
+             status = _ImplicitConvertOperand(Compiler,
+                                              operand2->base.lineNo,
+                                              operand2->base.stringNo,
+                                              LeftParameters->dataTypes[i].def,
+                                              &RightParameters->rOperands[i]);
+             if(gcmIS_ERROR(status)) return status;
+             RightParameters->dataTypes[i].def = LeftParameters->dataTypes[i].def;
+             if(!exprCloned) {
+                 status = _CloneExpr(Compiler,
+                                     operand2->base.lineNo,
+                                     operand2->base.stringNo,
+                                     operand2,
+                                     &operand2);
+                 if(gcmIS_ERROR(status)) return status;
+                 operand2->decl.dataType = operand1->decl.dataType;
+                 exprCloned = gcvTRUE;
+             }
+          }
+          else {
+             gcmASSERT(clmIsElementTypePacked(LeftParameters->dataTypes[i].def.elementType) &&
+                       !clmIsElementTypePacked(RightParameters->dataTypes[i].def.elementType));
+             status = _ImplicitConvertOperand(Compiler,
+                                              operand1->base.lineNo,
+                                              operand1->base.stringNo,
+                                              RightParameters->dataTypes[i].def,
+                                              &LeftParameters->rOperands[i]);
+             if(gcmIS_ERROR(status)) return status;
+             LeftParameters->dataTypes[i].def = RightParameters->dataTypes[i].def;
+             if(!exprCloned) {
+                 status = _CloneExpr(Compiler,
+                                     operand1->base.lineNo,
+                                     operand1->base.stringNo,
+                                     operand1,
+                                     &operand1);
+                 if(gcmIS_ERROR(status)) return status;
+                 operand1->decl.dataType = operand2->decl.dataType;
+                 exprCloned = gcvTRUE;
+             }
+          }
+       }
        else {
           if(leftElementType > rightElementType) { /* convert right */
              gcmASSERT(gcIsScalarDataType(RightParameters->dataTypes[i].def));
@@ -15682,8 +15797,6 @@ IN clsROPERAND *ROperand
       }
    }
    else {
-      gcmASSERT(gcIsScalarDataType(ROperand->dataType));
-
       status = clsROPERAND_ChangeDataTypeFamily(Compiler,
                                                 LineNo,
                                                 StringNo,
