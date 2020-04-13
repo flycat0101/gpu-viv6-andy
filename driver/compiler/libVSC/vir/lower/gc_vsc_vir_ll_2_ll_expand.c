@@ -18529,7 +18529,6 @@ _InsertSTARR(
 
     VIR_Symbol      *sym = VIR_Operand_GetSymbol(Opnd);
     VIR_TypeId       typeId = VIR_Operand_GetTypeId(Opnd);
-    VIR_OperandId    opndId;
     VIR_Operand     *dest = gcvNULL;
     VIR_Precision    precision;
 
@@ -18588,10 +18587,8 @@ _InsertSTARR(
             immIdxNo += VIR_Operand_GetConstIndexingImmed(Opnd);
         }
 
-        opndId = VIR_Operand_GetIndex(VIR_Inst_GetDest(stArrInst));
-        *stArrInst->dest = *Opnd;
         dest = VIR_Inst_GetDest(stArrInst);
-        VIR_Operand_SetIndex(dest, opndId);
+        VIR_Operand_Copy(dest, Opnd);
         VIR_Operand_SetMatrixConstIndex(dest, 0);
         VIR_Operand_SetRelIndexingImmed(dest, 0);
         VIR_Operand_SetRelAddrMode(dest, VIR_INDEXED_NONE);
@@ -18605,10 +18602,8 @@ _InsertSTARR(
     }
     else
     {
-        opndId = VIR_Operand_GetIndex(VIR_Inst_GetDest(stArrInst));
-        *stArrInst->dest = *Opnd;
         dest = VIR_Inst_GetDest(stArrInst);
-        VIR_Operand_SetIndex(dest, opndId);
+        VIR_Operand_Copy(dest, Opnd);
         VIR_Operand_SetMatrixConstIndex(dest, VIR_Operand_GetMatrixConstIndex(Opnd));
         VIR_Operand_SetRelIndexingImmed(dest, 0);
         VIR_Operand_SetRelAddrMode(dest, VIR_INDEXED_NONE);
@@ -18710,7 +18705,6 @@ _InsertLDARR(
     VIR_Type        *symType    = VIR_Symbol_GetType(sym);
     VIR_TypeId       typeId     = VIR_Type_GetBaseTypeId(symType);
     VIR_TypeId       newVirRegTypeId;
-    VIR_OperandId    opndId;
 
     VIR_Swizzle     src0Swizzle = VIR_SWIZZLE_INVALID;
 
@@ -18820,11 +18814,10 @@ _InsertLDARR(
         }
 
         /* src[0], cannot have constant indexing here expect for matrix indexing. */
-        opndId = VIR_Operand_GetIndex(VIR_Inst_GetSource(ldArrInst, 0));
-        *ldArrInst->src[0] = *Opnd;
         src = VIR_Inst_GetSource(ldArrInst, 0);
+        VIR_Operand_Copy(src, Opnd);
         VIR_Operand_SetSwizzle(src, src0Swizzle);
-        VIR_Operand_SetIndex(src, opndId);
+
         if (isMatrix)
         {
             VIR_Operand_SetMatrixConstIndex(src, immIdxNo);
@@ -18871,11 +18864,9 @@ _InsertLDARR(
     else
     {
         /* src[0] */
-        opndId = VIR_Operand_GetIndex(VIR_Inst_GetSource(ldArrInst, 0));
-        *ldArrInst->src[0] = *Opnd;
         src = VIR_Inst_GetSource(ldArrInst, 0);
+        VIR_Operand_Copy(src, Opnd);
         VIR_Operand_SetSwizzle(src, src0Swizzle);
-        VIR_Operand_SetIndex(src, opndId);
         VIR_Operand_SetMatrixConstIndex(src, VIR_Operand_GetMatrixConstIndex(Opnd));
         VIR_Operand_SetRelIndexingImmed(src, 0);
         VIR_Operand_SetRelAddrMode(src, VIR_INDEXED_NONE);
