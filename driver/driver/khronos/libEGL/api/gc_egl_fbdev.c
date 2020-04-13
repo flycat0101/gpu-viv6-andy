@@ -2608,7 +2608,7 @@ _QueryWindowInfo(
                                      sizeof (fbdevDISPLAY_INFO),
                                      &dInfo);
 
-#ifdef EMULATOR
+#if defined(EMULATOR) || gcdCAPTURE_ONLY_MODE
     if (gcvTRUE)
 #else
     if (gcmIS_ERROR(status))
