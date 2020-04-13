@@ -7099,6 +7099,21 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
         gcoOS_MemCopy(stateBuffer, stateLogical, stateSize);
     }
 
+    /* remove draw ID command in shader states buffer */
+    #if (ENABLE_SAVE_OFFSET_IN_NBG == 1)
+    {
+    vx_uint32 *tmpBuffer = (vx_uint32*)stateBuffer;
+    vx_uint32 size = stateSize / sizeof(vx_uint32);
+    for (index = 0; index < size; index++)
+    {
+        if (tmpBuffer[index] == 0x08010E27)
+        {
+            tmpBuffer[index + 1] = 0x00;
+        }
+    }
+    }
+    #endif
+
     /*1. save shader's instruction to LCD */
     instMemNode = (gcsSURF_NODE_PTR)hints->shaderVidNodes.instVidmemNode[gceSGSK_FRAGMENT_SHADER];
     if (VX_NULL != instMemNode)
