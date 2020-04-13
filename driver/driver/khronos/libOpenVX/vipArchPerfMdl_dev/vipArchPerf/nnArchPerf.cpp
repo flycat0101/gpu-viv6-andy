@@ -5256,7 +5256,14 @@ void InitHWModeling(
 {
     float totalLatency = bwl.total_latency; // total_latency is generate in archApmInit
     float OUTSTANDING_TRANSFER = bwl.maxSocOTNumber;
-    float MaxOutstandingCycle = OUTSTANDING_TRANSFER * 4;
+
+    if (OUTSTANDING_TRANSFER == 0)
+    {
+        printf("CArch SOC Out Standing Number is 0!, set 32 as default"); // //
+        OUTSTANDING_TRANSFER = 32;
+    }
+
+    float MaxOutstandingCycle = OUTSTANDING_TRANSFER * 4; // 4 cycles one request, latency hiding at full axi bw
     if (totalLatency > MaxOutstandingCycle)
     {
         float DDR_BW_limited_by_latency    = (16 * MaxOutstandingCycle) / totalLatency;
