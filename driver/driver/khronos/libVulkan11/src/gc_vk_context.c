@@ -360,10 +360,9 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDevice(
         devCtx->enabledFeatures.robustBufferAccess = VK_TRUE;
     }
 
-    if (devCtx->database->customerID != 0x4 &&
-        devCtx->database->customerID != 0x11)
+    if (devCtx->database->MSAA_FLOAT_64BIT)
     {
-        devCtx->msaa_64bpp = devCtx->database->CACHE128B256BPERLINE;
+        devCtx->msaa_64bpp = 1;
     }
 
 #if __VK_RESOURCE_INFO
