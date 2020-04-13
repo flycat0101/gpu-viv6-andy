@@ -415,9 +415,9 @@ void GL_APIENTRY COMMON_ES_API(glMapBufferOES)(GLenum target, GLenum access)
     CALL_ES_API(PFNGLMAPBUFFEROESPROC, MapBufferOES, target, access);
 }
 
-void GL_APIENTRY COMMON_ES_API(glUnmapBufferOES)(GLenum target, GLenum pname, void **params)
+void GL_APIENTRY COMMON_ES_API(glUnmapBufferOES)(GLenum target)
 {
-    CALL_ES_API(PFNGLUNMAPBUFFEROESPROC, UnmapBufferOES, target, pname, params);
+    CALL_ES_API(PFNGLUNMAPBUFFEROESPROC, UnmapBufferOES, target);
 }
 
 void GL_APIENTRY COMMON_ES_API(glEGLImageTargetTexture2DOES)(GLenum target, GLeglImageOES image)
