@@ -180,6 +180,7 @@ vxoProfiler_Begin(
     {
         return status;
     }
+    gcoVX_Flush(gcvTRUE);
 
     gcoOS_GetTime(&context->profiler.frameStartTimeusec);
     gcoPROFILER_EnableCounters(context->halProfile, gcvCOUNTER_OP_FRAME);

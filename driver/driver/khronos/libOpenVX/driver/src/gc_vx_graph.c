@@ -10617,7 +10617,6 @@ VX_INTERNAL_API vx_status vxoGraph_Submit(vx_graph graph)
 #if VIVANTE_PROFILER
     if (graph->cmdCaptureOn)
     {
-        gcoVX_Flush(gcvTRUE);
         vxoProfiler_Begin((vx_reference)graph);
     }
 #endif
