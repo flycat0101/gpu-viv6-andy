@@ -15535,9 +15535,6 @@ IN OUT clsGEN_CODE_PARAMETERS *ToParameters
        fromElementType = clmGEN_CODE_elementType_GET(FromParameters->dataTypes[i].def);
        toElementType = clmGEN_CODE_elementType_GET(ToParameters->dataTypes[i].def);
 
-       if(clmIsElementTypeFloating(fromElementType) && clmIsElementTypeFloating(toElementType) &&
-          (fromElementType == clvTYPE_HALF || toElementType == clvTYPE_HALF)) continue;
-
        if(fromElementType == toElementType ||
           (clmIsElementTypePackedGenType(fromElementType) &&
            clmIsElementTypePacked(toElementType))) {

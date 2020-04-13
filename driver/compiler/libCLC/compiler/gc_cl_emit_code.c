@@ -4974,7 +4974,18 @@ clEmitConvCode(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcsSOURCE source1[1];
-    gcSHADER binary;
+
+    if(!cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))
+    {
+        if(clmIsElementTypePacked(Target->dataType.elementType) &&
+           !clmIsElementTypePacked(Source->dataType.elementType)) {
+            Source->dataType = clConvToPackedType(Compiler, Source->dataType);
+        }
+        else if(clmIsElementTypePacked(Source->dataType.elementType) &&
+                !clmIsElementTypePacked(Target->dataType.elementType)) {
+            Target->dataType = clConvToPackedType(Compiler, Target->dataType);
+        }
+    }
 
     gcsSOURCE_InitializeTargetFormat(source1, DataType);
     status =  clEmitCode2(Compiler,
@@ -4985,20 +4996,6 @@ clEmitConvCode(
                           Source,
                           source1);
     if (gcmIS_ERROR(status)) return status;
-
-    if(clmIsElementTypePacked(Target->dataType.elementType) &&
-       !clmIsElementTypePacked(Source->dataType.elementType)) {
-        gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
-        return gcSHADER_UpdateSourcePacked(binary,
-                                           gcSHADER_SOURCE0,
-                                           clmGEN_CODE_vectorSize_GET(Source->dataType));
-    }
-    else if(clmIsElementTypePacked(Source->dataType.elementType) &&
-            !clmIsElementTypePacked(Target->dataType.elementType)) {
-        gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
-        return gcSHADER_UpdateTargetPacked(binary,
-                                           clmGEN_CODE_vectorSize_GET(Target->dataType));
-    }
     return status;
 }
 
