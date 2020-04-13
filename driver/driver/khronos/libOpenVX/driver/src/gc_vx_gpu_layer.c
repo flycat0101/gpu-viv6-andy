@@ -9728,15 +9728,31 @@ vxnne_shader_executable vxnneGetGPUTensorPad2ShaderExecutable(
         vxReleaseProgram(&program);
     }
 
-    if(input_width != output_width || input_height != output_height)
+    if(inputFormat == VX_TYPE_FLOAT32 || inputFormat == VX_TYPE_FLOAT16)
     {
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_whc", borderMode);
-        if (!shaderExecutable) goto OnError;
+        if(output_depth == input_depth)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_wh", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_chn", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
     }
-    else
+    else if(inputFormat == VX_TYPE_UINT8)
     {
-        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32_chn", borderMode);
-        if (!shaderExecutable) goto OnError;
+        if(output_depth == input_depth)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8_wh", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U8_chn", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
     }
 
     status = vxnneShaderExecutable_GetMaxWorkGroupSize(shaderExecutable, &maxWorkGroupSize);

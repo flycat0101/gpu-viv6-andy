@@ -1038,6 +1038,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_SH_EVIS_Support(vx_node node, const vx_re
     vx_float32 outputScale             = TENSOR_TF_SCALE(dst);
 
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
+    support = support && node->base.context->evisNoInst.supportEVIS;
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
@@ -1114,7 +1115,8 @@ VX_PRIVATE_API vx_bool vxoNNTensorPad2_GPU_Support(vx_node node, const vx_refere
 
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
-    dataFormatFlag = (vx_bool)((inputFormat == outputFormat) && (inputFormat == VX_TYPE_FLOAT32));
+    dataFormatFlag = (vx_bool)((inputFormat == outputFormat) &&
+                            (inputFormat == VX_TYPE_FLOAT32 || inputFormat == VX_TYPE_UINT8 || inputFormat == VX_TYPE_FLOAT16));
 
     if(dataFormatFlag && pad_mode == VX_PAD_CONSTANT)
     {
