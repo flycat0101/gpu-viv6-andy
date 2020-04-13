@@ -542,7 +542,7 @@ vx_bool calcFitZdp3N(vx_context context,vx_uint32 inputX, vx_uint32 inputY, vx_u
             }
         }
 
-        if ((tempX < maxInImageXSize) && (tempY < maxInImageYSize))
+        if ((tempX < maxInImageXSize) && (tempY < maxInImageYSize) && (tempY > 0))
         {
             *fitN = tempY;
             return vx_true_e;
