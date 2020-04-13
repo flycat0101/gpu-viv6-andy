@@ -1936,7 +1936,7 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
             vxmASSERT(otherRef != VX_NULL);
             vxoTensor_GetTensorDimStride(otherRef, &dnum, dims, strides);
             vxmASSERT(dims[0] < TP_MAX_XYSIZE && dims[1] < TP_MAX_XYSIZE);
-            for (i = 0; i < TENSOR_DIM_NUM(otherRef); i++)
+            for (i = 0; i < dnum; i++)
             {
                 tsize *= dims[i];
             }
@@ -2649,10 +2649,6 @@ void _fill_TP_TRANSPOSE_Command(
         for (j = 0; j < i; j++)
             dim *= dims[perm[j]];
         distances[perm[i]] = dim;
-    }
-
-    for (i = 0; i < TENSOR_DIM_NUM(other_tensor); i++)
-    {
         totalSize *= dims[i];
     }
 
