@@ -1838,7 +1838,7 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
                 operation->id,
                 vxnneGetOperatorTypeName(operation->operatorType),
                 vxnneGetOperatorTargetName(operation->target),
-                getUserIDFromOutputTensor((vx_tensor)operation->outputs[0]));
+                getUserIDFromOutputTensor(operation->outputs[0]));
 
             gcfVX_Flush(gcvTRUE);
 

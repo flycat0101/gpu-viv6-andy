@@ -2718,7 +2718,7 @@ vx_status showDriverPerformance(
              layer->node->id, layer->name,
              op->id, vxnneGetOperatorTypeName(op->operatorType), vxnneGetOperatorTargetName(op->target));
 
-    vxInfo("abs_op_id:%d\nuid:%d\n", op->absoluteOperationID, getUserIDFromOutputTensor((vx_tensor)op->outputs[0]));
+    vxInfo("abs_op_id:%d\nuid:%d\n", op->absoluteOperationID, getUserIDFromOutputTensor(op->outputs[0]));
 
     vxInfo("upstream_layer_num:%d upstream_opertaion_num:%d\n",
              op->parentLayerNum, op->parentOpNum);
