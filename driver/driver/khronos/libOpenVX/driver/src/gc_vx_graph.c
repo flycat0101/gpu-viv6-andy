@@ -2101,14 +2101,14 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
             vx_uint32 outImageTileX, outImageTileY, interleaveMode, kernelX, kernelY, inImageZ, inputDataFormat, imageTileSize, kernelbufferSize;
             vx_uint32 transposeSize = 0;
 
-            /*if (convOperation->resultInfo.kernelsPerCore == 0)*/
+            if (convOperation->resultInfo.kernelsPerCore == 0)
             {
                 vxnne_tiling_info_s tilingsInfo[8];
                 vxnne_operation op;
                 vx_uint32 j;
 
                 j = 0;
-                op = (operation->mGpuHead != NULL) ? operation->mGpuHead : operation;
+                op = (operation->mGpuHead != NULL && operation->mGpuSplitType != VX_MULTIVIP_CONV_SPLIT_Z_AXIS) ? operation->mGpuHead : operation;
                 while (op != VX_NULL)
                 {
                     vxnne_convolution_relu_pooling_operation convOperationT = (vxnne_convolution_relu_pooling_operation)op;
@@ -2119,7 +2119,10 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                     tilingsInfo[j].padLeft = op->parameter.pad_x_left;
                     tilingsInfo[j].padTop  = op->parameter.pad_y_top;
                     j++;
-                    op = op->mGpuNext;
+                    if (operation->mGpuSplitType != VX_MULTIVIP_CONV_SPLIT_Z_AXIS)
+                        op = op->mGpuNext;
+                    else
+                        op = VX_NULL;
                 }
                 vxmASSERT(j > 0);
 
@@ -2133,7 +2136,7 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                                                         graph->base.context->vipSRAM.size);
 
                 j = 0;
-                op = (operation->mGpuHead != NULL) ? operation->mGpuHead : operation;
+                op = (operation->mGpuHead != NULL && operation->mGpuSplitType != VX_MULTIVIP_CONV_SPLIT_Z_AXIS) ? operation->mGpuHead : operation;
                 while (op != VX_NULL)
                 {
                     vxnne_convolution_relu_pooling_operation convOperationT = (vxnne_convolution_relu_pooling_operation)op;
@@ -2143,7 +2146,10 @@ VX_PRIVATE_API vx_status GenerateABSegmentInfo(
                     convOperationT->resultInfo.interleaveMode    = tilingsInfo[j].tilingParam.interleaveMode;
                     convOperationT->resultInfo.nnCoreCount       = tilingsInfo[j].tilingParam.nnCoreCount;
                     j++;
-                    op = op->mGpuNext;
+                    if (operation->mGpuSplitType != VX_MULTIVIP_CONV_SPLIT_Z_AXIS)
+                        op = op->mGpuNext;
+                    else
+                        op = VX_NULL;
                 }
             }
             vxmASSERT(convOperation->resultInfo.kernelsPerCore != 0);
@@ -4067,7 +4073,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                     vx_uint32 j;
 
                     j = 0;
-                    op = (operation->mGpuHead != NULL) ? operation->mGpuHead : operation;
+                    op = (operation->mGpuHead != NULL && operation->mGpuSplitType != VX_MULTIVIP_CONV_SPLIT_Z_AXIS) ? operation->mGpuHead : operation;
                     while (op != VX_NULL)
                     {
                         vxnne_convolution_relu_pooling_operation convOperationT = (vxnne_convolution_relu_pooling_operation)op;
@@ -4078,7 +4084,10 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                         tilingsInfo[j].padLeft = op->parameter.pad_x_left;
                         tilingsInfo[j].padTop  = op->parameter.pad_y_top;
                         j++;
-                        op = op->mGpuNext;
+                        if (operation->mGpuSplitType != VX_MULTIVIP_CONV_SPLIT_Z_AXIS)
+                            op = op->mGpuNext;
+                        else
+                            op = VX_NULL;
                     }
                     vxmASSERT(j > 0);
 
@@ -4092,7 +4101,7 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                                                            graph->base.context->vipSRAM.size);
 
                     j = 0;
-                    op = (operation->mGpuHead != NULL) ? operation->mGpuHead : operation;
+                    op = (operation->mGpuHead != NULL && operation->mGpuSplitType != VX_MULTIVIP_CONV_SPLIT_Z_AXIS) ? operation->mGpuHead : operation;
                     while (op != VX_NULL)
                     {
                         vxnne_convolution_relu_pooling_operation convOperationT = (vxnne_convolution_relu_pooling_operation)op;
@@ -4102,7 +4111,10 @@ VX_INTERNAL_API vx_status vxoGraph_VerifyTiling(vx_graph graph)
                         convOperationT->resultInfo.interleaveMode    = tilingsInfo[j].tilingParam.interleaveMode;
                         convOperationT->resultInfo.nnCoreCount       = tilingsInfo[j].tilingParam.nnCoreCount;
                         j++;
-                        op = op->mGpuNext;
+                        if (operation->mGpuSplitType != VX_MULTIVIP_CONV_SPLIT_Z_AXIS)
+                            op = op->mGpuNext;
+                        else
+                            op = VX_NULL;
                     }
                 }
                 vxmASSERT(convOperation->resultInfo.kernelsPerCore != 0);
@@ -5305,12 +5317,8 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForCONV(
                                                                 (vx_weights_biases_parameter_optimizations_t*)&optimizations,
                                                                 weightTensor,
                                                                 biasTensor);
-    {
-        vx_uint32 zOffset = 0;
-        vx_uint32 dims[2] =  {TENSOR_VIEW_SIZE_INDEX(outputTensor, 0), TENSOR_VIEW_SIZE_INDEX(outputTensor, 1)};
-        calculateZOffset(dims, TENSOR_DATA_TYPE(outputTensor), 0, &zOffset);
-        newWeightBias->compress(newWeightBias, VXNNE_OPERATION_TARGET_TP, 0, zOffset);
-    }
+
+    vxoCalculateNNCompressionFirstTime(node->base.context, newWeightBias, outputTensor);
 
     vxmASSERT(newWeightBias != VX_NULL);
     dstConvOp->weights_biases =  newWeightBias;
@@ -5583,6 +5591,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_Handle(
             }
             layer->operations[layer->base.num_operations] = &tpOperation->base;
             layer->operations[layer->base.num_operations]->gpuId = gpuIndex;
+            layer->operations[layer->base.num_operations]->mGpuSplitType = VX_MULTIVIP_CONV_SPLIT_NONE;
             if (gpuIndex == splitCount - 1)
             {
                 layer->operations[layer->base.num_operations]->mGpuSync = vx_true_e;
@@ -5629,6 +5638,7 @@ VX_PRIVATE_API vx_status vxoMultiGPU_Handle(
 
                 layer->operations[layer->base.num_operations] = &nnOperation->base;
                 layer->operations[layer->base.num_operations]->gpuId = gpuIndex;
+                layer->operations[layer->base.num_operations]->mGpuSplitType = splitAxis;
                 if (gpuIndex == 0)
                 {
                     gpuHead = layer->operations[layer->base.num_operations];
