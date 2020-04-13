@@ -6747,11 +6747,9 @@ VkResult halti5_helper_convertHwTxDesc(
 
         if (yuvImage)
         {
-            VkSamplerYcbcrConversionInfo* ycbcrConversionInfo = (VkSamplerYcbcrConversionInfo*)imgv->createInfo.pNext;
-            if (ycbcrConversionInfo)
+            __vkSamplerYcbcrConversion *ycbcrConversion = imgv->ycbcrConversion;
+            if (ycbcrConversion)
             {
-                /* */
-                __vkSamplerYcbcrConversion *ycbcrConversion = (__vkSamplerYcbcrConversion*)ycbcrConversionInfo->conversion;
                 __vkFormatInfo *formatInfo = __vk_GetVkFormatInfo(ycbcrConversion->createInfo.format);
                 uint32_t xFormat = 0, yFormat = 0;
 
