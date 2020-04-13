@@ -3143,8 +3143,8 @@ _destUnsignedRankHigher_setSrcToZero_elseNop(
         case VIR_TYPE_INT32:
         case VIR_TYPE_UINT32:
         case VIR_TYPE_FLOAT32:
-            if(srcFormat != VIR_TYPE_INT32 ||
-               srcFormat != VIR_TYPE_UINT32 ||
+            if(srcFormat != VIR_TYPE_INT32 &&
+               srcFormat != VIR_TYPE_UINT32 &&
                srcFormat != VIR_TYPE_FLOAT32) {
                 rankHigher = gcvTRUE;
             }
