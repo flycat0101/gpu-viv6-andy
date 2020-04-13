@@ -284,7 +284,7 @@
             SPV_CHECK_DYNAMIC_SIZE(spv->spvMemPool, spv->idDescriptor, SpvCovIDDescriptor, spv->idDescSize, id, SPV_DESCRIPTOR_PAGESIZE); \
             for (i = oldSize; i < spv->idDescSize; i++) \
             { \
-                spv->idDescriptor[i].idType = SPV_ID_TYPE_UNKNOW;\
+                spv->idDescriptor[i].idType = SPV_ID_TYPE_UNKNOWN;\
                 spv->idDescriptor[i].virNameId = VIR_INVALID_ID; \
                 spv->idDescriptor[i].virTypeId = VIR_TYPE_UNKNOWN; \
                 gcoOS_MemFill(&spv->idDescriptor[i].interfaceFlag, 0xFF, gcmSIZEOF(SpvInterfaceFlag)); \

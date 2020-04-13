@@ -285,7 +285,7 @@ typedef struct _SpvCovDecorator
 }SpvCovDecorator;
 
 typedef enum{
-    SPV_ID_TYPE_UNKNOW = 0,
+    SPV_ID_TYPE_UNKNOWN = 0,
     SPV_ID_TYPE_SYMBOL,
     SPV_ID_TYPE_CONST,
     SPV_ID_TYPE_TYPE,

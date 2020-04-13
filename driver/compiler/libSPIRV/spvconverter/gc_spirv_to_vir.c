@@ -2712,7 +2712,7 @@ static VIR_SymId __SpvAddIdSymbol(
     }
     else
     {
-        gcmASSERT(SPV_ID_TYPE(id) == SPV_ID_TYPE_UNKNOW);
+        gcmASSERT(SPV_ID_TYPE(id) == SPV_ID_TYPE_UNKNOWN);
     }
 
     /* Get the type id. */
@@ -5564,7 +5564,7 @@ VSC_ErrCode __SpvEmitLabel(gcSPV spv, VIR_Shader * virShader)
     if (labelNameId != VIR_INVALID_ID)
     {
         /* The type of the target of a OpName must be UNKNOWN*/
-        gcmASSERT(SPV_ID_TYPE(spv->resultId) == SPV_ID_TYPE_UNKNOW);
+        gcmASSERT(SPV_ID_TYPE(spv->resultId) == SPV_ID_TYPE_UNKNOWN);
         labelNameString = VIR_Shader_GetStringFromId(virShader, labelNameId);
     }
     else
@@ -7248,7 +7248,7 @@ VSC_ErrCode __SpvEmitPhi(gcSPV spv, VIR_Shader * virShader)
 
         phiOperand = VIR_Operand_GetNthPhiOperand(operand, i);
 
-        if (SPV_ID_TYPE(spvOperand) != SPV_ID_TYPE_UNKNOW)
+        if (SPV_ID_TYPE(spvOperand) != SPV_ID_TYPE_UNKNOWN)
         {
             virSwizzle = __SpvID2Swizzle(spv, spvOperand);
 
