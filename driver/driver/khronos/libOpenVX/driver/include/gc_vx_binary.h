@@ -358,6 +358,7 @@ typedef struct _vx_binary_layer_info_s
     vx_char                                layerName[VX_MAX_LAYER_NAME_LENGTH];
     vx_uint32                              layerId;
     vx_uint32                              operationCount;
+    vx_uint32                              uid;
 }
 vx_binary_layers_info_s;
 

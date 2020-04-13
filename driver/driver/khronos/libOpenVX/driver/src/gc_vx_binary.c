@@ -15,6 +15,7 @@
 #include <gc_vx_nn_util.h>
 #include <gc_vx_nn_wb.h>
 #include <gc_vx_nn_encoder.h>
+#include <gc_vx_nn_util.h>
 #if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__) || defined(__APPLE__) || defined(__CYGWIN__)
 #include <utime.h>
 #include <sys/stat.h>
@@ -877,7 +878,15 @@ static vx_status readBinDynamic(
     {
         vxmONERROR(readerLocate(reader, binLoad->fixed.layerTable.offset));
         binLoad->layersInfo = (vx_binary_layers_info_s *)(reader->currentData);
-        binLoad->nLayersInfo = binLoad->fixed.layerTable.size / sizeof(vx_binary_layers_info_s);
+
+        if (binLoad->fixed.header.version >= 0x00010008)
+        {
+            binLoad->nLayersInfo = binLoad->fixed.layerTable.size / sizeof(vx_binary_layers_info_s);
+        }
+        else
+        {
+            binLoad->nLayersInfo = binLoad->fixed.layerTable.size / (sizeof(vx_binary_layers_info_s) - sizeof(vx_uint32));
+        }
     }
 
     /* Operation data entries*/
@@ -1243,6 +1252,29 @@ VX_PRIVATE_API vx_bool vxoBinaryGraph_IsSWOperationInBinary(
     return isSW;
 }
 
+VX_INTERNAL_API void* vxoBinaryGraph_GetLayerInfoPtrByIndex(
+    vx_binary_loader_s *binLoad,
+    vx_binary_layers_info_s *layerPtr,
+    vx_int32 index
+    )
+{
+    void *ptr = VX_NULL;
+    vx_uint32 size = 0;
+
+    size = sizeof(vx_binary_layers_info_s) - sizeof(vx_uint32);
+
+    if (binLoad->fixed.header.version >= 0x00010008)
+    {
+        ptr = (void*)(layerPtr + index);
+    }
+    else
+    {
+        ptr = (void*)((vx_char *)layerPtr + index * size);
+    }
+
+    return ptr;
+}
+
 VX_PRIVATE_API vx_status vxoBinaryGraph_NNLayerDump(
     vx_node node,
     vx_binary_loader_s *binLoad
@@ -1270,7 +1302,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_NNLayerDump(
         vx_uint32 dumpCount = 0;
         vx_uint32 layerLastOpindex = 0;
 
-        layer = &binLoad->layersInfo[index];
+        layer = (vx_binary_layers_info_s*)vxoBinaryGraph_GetLayerInfoPtrByIndex(binLoad, binLoad->layersInfo, (vx_int32)index);
         layerStatesBuffer = (vx_uint8_ptr)layerStatesBufferBase;
 
         /* get this layer command */
@@ -10274,6 +10306,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     for (i = 0; i < graph->nodeCount; i++)
     {
         vx_node node = graph->nodeTable[graph->allNodeIndexTable[i]];
+        vx_kernel kernel = node->kernel;
+        vx_uint32 k = 0;
 
         gcoOS_ZeroMemory(&layersInfo, sizeof(vx_binary_layers_info_s));
         /* The ID is execution order of the nodes */
@@ -10281,6 +10315,28 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
         gcoOS_StrCopySafe(layersInfo.layerName, VX_MAX_LAYER_NAME_LENGTH, node->layer->name);
 
         layersInfo.operationCount = node->layer->num_operations;
+
+        /* get UID */
+        layersInfo.uid = 0xFFFFFFFF;
+        for (k = 0; k < VX_MAX_PARAMETERS; k++)
+        {
+            vx_reference ref = node->paramTable[k];
+            if ((ref != VX_NULL) && (ref->type != VX_TYPE_SCALAR) && (ref->type != VX_TYPE_VENDOR_OBJECT_START))
+            {
+                if (kernel->signature.directionTable[k] != VX_INPUT)
+                {
+                    if (gcoOS_StrStr(ref->name, "out", VX_NULL))
+                    {
+                        vx_int32 uid = getUserIDFromOutputTensor((vx_tensor)ref);
+                        if (uid >= 0)
+                        {
+                            layersInfo.uid = uid;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
 
         status = vxoBinaryGraph_Write(binarySave, currPos, sizeof(vx_binary_layers_info_s), &layersInfo);
         WRITE_NBG_STATUS_CHECK();
@@ -10333,7 +10389,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     binarySave->headerInfo.magic[1]= 'P';
     binarySave->headerInfo.magic[2]= 'M';
     binarySave->headerInfo.magic[3]= 'N';
-    binarySave->headerInfo.version = 0x00010007;
+    binarySave->headerInfo.version = 0x00010008;
     binarySave->headerInfo.target = context->pid;
     binarySave->headerInfo.layerCount     = graph->nodeCount;
     binarySave->headerInfo.operationCount = binarySave->operationCount;
