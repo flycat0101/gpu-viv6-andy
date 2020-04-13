@@ -1969,7 +1969,6 @@ static int32_t get_used_color_count(
         {
             colorOutCount++;
         }
-        __VK_ASSERT(!(colorOutCount > 0 && hints->psOutput2RtIndex[i] != -1 && subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED) );
     }
 
     return colorOutCount;
@@ -2601,7 +2600,7 @@ static VkResult halti5_pip_emit_rt(
     VkBool32 fullfuncZ;
     uint32_t regDepthConfig = 0, regRAControl = 0;
     VkBool32 hasDsSurface = (subPass->dsAttachIndex != VK_ATTACHMENT_UNUSED) ? VK_TRUE : VK_FALSE;
-    uint32_t i;
+    uint32_t i, j;
     VkBool32 rtEnabled = gcvFALSE;
     VkBool32 noShader = VK_FALSE;
 
@@ -2742,7 +2741,7 @@ static VkResult halti5_pip_emit_rt(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x038D, VK_FALSE, chipGfxPipeline->raControlEx);
 
     /* step 2: rt programming */
-    for (i = 0; fragOutTable != VK_NULL_HANDLE && blendInfo != NULL && i < subPass->colorCount; i++)
+    for (i = 0, j = 0; fragOutTable != VK_NULL_HANDLE && blendInfo != NULL && i < subPass->colorCount; i++)
     {
         const VkPipelineColorBlendAttachmentState *blendAttach = blendInfo->pAttachments;
         VkColorComponentFlags colorMask;
@@ -2755,8 +2754,12 @@ static VkResult halti5_pip_emit_rt(
 
         __VK_ASSERT(subPass->colorCount == blendInfo->attachmentCount);
 
+        if (subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED)
+        {
+            continue;
+        }
         attachMent = &rdp->attachments[subPass->color_attachment_index[i]];
-        is16BitStorage = (fragOutTable[i].resEntryBit & VSC_RES_ENTRY_BIT_16BIT) != 0;
+        is16BitStorage = (fragOutTable[j].resEntryBit & VSC_RES_ENTRY_BIT_16BIT) != 0;
         __VK_VERIFY_OK(halti5_helper_convertHwPEDesc(devCtx, attachMent->formatInfo->residentImgFormat, is16BitStorage, &hwPEDesc));
         switch (attachMent->formatInfo->residentImgFormat)
         {
@@ -2928,6 +2931,7 @@ static VkResult halti5_pip_emit_rt(
             }
             partIndex++;
         }
+        j++;
     }
 
     /* step 3: depth programming */

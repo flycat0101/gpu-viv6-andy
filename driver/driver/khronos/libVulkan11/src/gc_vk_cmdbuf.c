@@ -1344,6 +1344,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
     VkBool32 enableView = VK_FALSE;
     VkResult result = VK_SUCCESS;
     uint32_t ia, ir, j;
+    VkBool32 cleared = VK_FALSE;
 
     const VkMemoryBarrier memBarrier =
     {
@@ -1368,6 +1369,10 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
             imgViewIndex = cmd->bindInfo.renderPass.subPass->color_attachment_index[pAttachments[ia].colorAttachment];
         else
             imgViewIndex = cmd->bindInfo.renderPass.subPass->dsAttachIndex;
+        if (imgViewIndex == VK_ATTACHMENT_UNUSED)
+        {
+            continue;
+        }
 
         for (ir = 0; ir < rectCount; ir++)
         {
@@ -1392,6 +1397,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
                     (VkClearValue *)&pAttachments[ia].clearValue,
                     (VkRect2D *)&pRects[ir].rect
                     ));
+
+                    cleared = VK_TRUE;
                 }
             }
             else
@@ -1406,6 +1413,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
                         (VkClearValue *)&pAttachments[ia].clearValue,
                         (VkRect2D *)&pRects[ir].rect
                         ));
+
+                    cleared = VK_TRUE;
                 }
             }
         }
@@ -1414,8 +1423,11 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
     /* For clear in renderPass, if TS enable, postphone setTS in drawValidate. */
     cmd->bindInfo.renderPass.dirty = VK_TRUE;
 
-    __vk_CmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
-        1, &memBarrier, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE);
+    if (cleared)
+    {
+        __vk_CmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
+            1, &memBarrier, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE);
+    }
 
 
 OnError:
