@@ -620,7 +620,6 @@ static gceSTATUS _CheckSurface(
 
     return gcvSTATUS_OK;
 }
-#endif
 
 /*Resolve tilestatus buffer by a temp buffer*/
 gceSTATUS _ResolveTileStatus(
@@ -864,6 +863,8 @@ _ResolveTileStatusWithFilter(
 OnError:
     return status;
 }
+
+#endif
 
 
 /*******************************************************************************
