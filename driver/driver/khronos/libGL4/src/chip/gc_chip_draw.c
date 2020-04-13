@@ -1104,6 +1104,194 @@ OnError:
 }
 
 __GL_INLINE gceSTATUS
+buildDefaultStream(
+    IN  __GLcontext* gc,
+    IN OUT gcsVERTEXARRAY_STREAM_INFO_PTR StreamInfo,
+    IN gcsVERTEXARRAY_INDEX_INFO_PTR IndexInfo
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gctUINT32 i;
+    gctUINT streamCount, count32;
+    gctUINT32 attributeCount = 0;
+    gctUINT32 activeAttributeCount = 0;
+    gctUINT32 totalSize = 0;
+    gctUINT32 totalStride = 0;
+    gctUINT first = (gctUINT)StreamInfo->first;
+    gcoVERTEX vertex = gcvNULL;
+    gcoSTREAM stream = gcvNULL;
+    gctUINT minIndex;
+    gctUINT maxIndex;
+    glsATTRIBUTEWRAP_PTR attribubteWrap;
+    gcsATTRIBUTE_PTR vertexPtr;
+    gctUINT8_PTR src, dest, destAddress;
+    gctUINT32 offset = 0;
+    gctBOOL dirty = gcvFALSE;
+    /* Zero the arrays. */
+    glsATTRIBUTEWRAP attributeArray[gcdATTRIBUTE_COUNT];
+    glsATTRIBUTEWRAP_PTR attributePtr = attributeArray;
+
+    gcmHEADER_ARG("gc=0x%x StreamInfo=0x%x IndexInfo=0x%x",
+                  gc, StreamInfo, IndexInfo);
+
+    gcmVERIFY_ARGUMENT(StreamInfo->u.es30.attributes != gcvNULL);
+    gcmVERIFY_ARGUMENT(chipCtx->currProgram->vs.attributes);
+    gcmVERIFY_ARGUMENT(StreamInfo->count > 0);
+    gcmSAFECASTSIZET(count32, StreamInfo->count);
+
+    /* Initialize the attribute wrap list pointer. */
+    attribubteWrap = chipCtx->currProgram->vs.attributes;
+    vertexPtr = StreamInfo->u.es30.attributes;
+
+    /* Construct a vertex object. */
+    gcmONERROR(gcoVERTEX_Construct(
+        chipCtx->hal,
+        &vertex
+        ));
+
+    /* Query the number of attributes. */
+    gcmONERROR(gcSHADER_GetAttributeCount(
+        chipCtx->currProgram->vs.shader,
+        &attributeCount
+        ));
+
+    for (i = 0; i < attributeCount; i++)
+    {
+        gctBOOL attributeEnabled;
+        gcmONERROR(gcATTRIBUTE_IsEnabled(
+            attribubteWrap->attribute,
+            &attributeEnabled
+            ));
+
+        if (attributeEnabled)
+        {
+            glsATTRIBUTEINFO_PTR attributeInfo = attribubteWrap->info;
+            attributePtr->info = attributeInfo;
+            activeAttributeCount++;
+
+            if (vertexPtr->enable && (vertexPtr->pointer != gcvNULL))
+            {
+                attributePtr->info->pointer = vertexPtr->pointer;
+            }
+            else
+            {
+                attributePtr->info->components = 4;
+                attributePtr->info->pointer = vertexPtr->genericValue;
+                attributePtr->info->attributeSize = vertexPtr->genericSize * 4;
+                attributePtr->info->stride = vertexPtr->genericSize * 4;
+            }
+            totalStride += attributePtr->info->attributeSize;
+            attributePtr++;
+        }
+
+        attribubteWrap++;
+        vertexPtr++;
+    }
+
+    attributePtr = attributeArray;
+    attribubteWrap = chipCtx->currProgram->vs.attributes;
+    vertexPtr = StreamInfo->u.es30.attributes;
+
+    if (IndexInfo->u.es30.indexBuffer != gcvNULL)
+    {
+        /* Get the index range. */
+        gcmONERROR(gcoBUFOBJ_IndexGetRange(IndexInfo->u.es30.indexBuffer,
+                                            IndexInfo->indexType,
+                                            gcmPTR2SIZE(IndexInfo->indexMemory),
+                                            count32,
+                                            &minIndex, &maxIndex));
+        /* Compute vertex range. */
+        first = minIndex;
+        streamCount = maxIndex - minIndex + 1;
+    }
+    /* No indices present. */
+    else
+    {
+        /* Copy vertex range. */
+        streamCount = count32;
+    }
+
+    /* If index count is 0, do not change First.     */
+    /* Otherwise, the First is 0 for DrawElements to */
+    /* locate vertex correctly.                      */
+    StreamInfo ->first = (IndexInfo ->count == 0) ? first : 0;
+    totalSize = totalStride * first + totalStride * streamCount;
+
+    /* Construct stream wrapper. */
+    gcmONERROR(gcoSTREAM_Construct(chipCtx->hal, &stream));
+    gcmONERROR(gcoSTREAM_Reserve(stream, totalSize));
+    gcmONERROR(gcoSTREAM_SetStride(stream, totalStride));
+    gcmONERROR(gcoSTREAM_Lock(stream, (gctPOINTER) &destAddress, gcvNULL));
+
+    for (i = 0; i < activeAttributeCount; ++i)
+    {
+        gctUINT j;
+        gctUINT32 srcOffset = 0, destOffset = 0;
+        gctUINT32 srcStride = 0;
+        gctUINT32 size;
+
+        dest = (gctUINT8_PTR)destAddress + totalStride * first + offset;
+        size = attributePtr->info->attributeSize;
+        src = (gctUINT8_PTR)attributePtr->info->pointer + first * attributePtr->info->stride;
+        srcStride = attributePtr->info->stride;
+
+        for (j = 0; j < streamCount; j += 1)
+        {
+            if (vertexPtr->enable && (vertexPtr->pointer != gcvNULL))
+            {
+                gcoOS_MemCopy(dest + destOffset, src + srcOffset, size);
+
+                destOffset += totalStride;
+                srcOffset  += srcStride;
+            }
+            else
+            {
+                gcoOS_MemCopy(dest + destOffset, src, size);
+                destOffset += totalStride;
+            }
+        }
+
+        /* Add the stream to the vertex. */
+        gcmONERROR(gcoVERTEX_EnableAttribute(
+            vertex, i,
+            attributePtr->info->format,
+            attributePtr->info->normalize,
+            attributePtr->info->components,
+            stream,
+            offset,
+            totalStride
+            ));
+
+        dirty = gcvTRUE;
+        offset += attributePtr->info->attributeSize;
+        attributePtr++;
+    }
+
+    if (dirty)
+    {
+        gcmONERROR(gcoSTREAM_Flush(stream));
+    }
+
+    gcmONERROR(gcoVERTEX_Bind(vertex));
+
+OnError:
+    if (stream != gcvNULL)
+    {
+        gcmONERROR(gcoSTREAM_Destroy(stream));
+        stream = gcvNULL;
+    }
+    if (vertex != gcvNULL)
+    {
+        gcmONERROR(gcoVERTEX_Destroy(vertex));
+        vertex = gcvNULL;
+    }
+    gcmFOOTER();
+    /* Return status. */
+    return status;
+}
+
+__GL_INLINE gceSTATUS
 gcChipSetVertexArrayBind(
     IN __GLcontext*         gc,
     IN __GLchipInstantDraw* instantDraw,
@@ -1140,6 +1328,12 @@ gcChipSetVertexArrayBind(
                                         &indexInfo));
 
     gcmONERROR(gcChipSetVertexArrayBindEnd(gc, instantDraw, fixWLimit));
+
+    /*if no stream been built on fix pipeline, build the stream with default attribute value and send to hardware*/
+    if (chipCtx->fixProgramFlag && (streamInfo.attribMask == 0))
+    {
+        gcmONERROR(buildDefaultStream(gc, &streamInfo, &indexInfo));
+    }
 
 OnError:
     gcmFOOTER();
