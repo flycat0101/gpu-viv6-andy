@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2020 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1286,6 +1286,8 @@ static vx_status initConfigration(arch_nn_config *pArchNnConfig,arch_drv_option 
     gcoHAL_QueryCoreCount(gcvNULL, hwType, &coreCount, chipIDs);
     pArchNnConfig->fixedFeature.multiVIPnum = coreCount;
 
+
+
     /* archNN_CUSTOMIZED_FEATURE */
     pArchNnConfig->customizedFeature.vipSRAMSize = pContextNnConfig->customizedFeature.vipSRAMSize;
     pArchNnConfig->customizedFeature.axiSRAMSize = pContextNnConfig->customizedFeature.axiSRAMSize;
@@ -1345,6 +1347,7 @@ static vx_status initConfigration(arch_nn_config *pArchNnConfig,arch_drv_option 
     pArchNnConfig->derivedFeature.internalLatency = pContextNnConfig->derivedFeature.internalLatency;
     pArchNnConfig->derivedFeature.ddrReadBWInBytePerCycle = pContextNnConfig->derivedFeature.ddrReadBWInBytePerCycle;
     pArchNnConfig->derivedFeature.ddrWriteBWInBytePerCycle = pContextNnConfig->derivedFeature.ddrWriteBWInBytePerCycle;
+
     /* set Drv Option */
     pArchOptions->enableTP = pContextOptions->enableTP;
     pArchOptions->enableMultiTP = pContextOptions->enableMultiTP;

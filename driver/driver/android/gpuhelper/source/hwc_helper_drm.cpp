@@ -23,7 +23,7 @@
 #include <sys/time.h>
 #include <gc_hal.h>
 #include <gc_hal_base.h>
-#include <gc_hal_driver.h>
+#include <shared/gc_hal_driver.h>
 #include <gc_hal_raster.h>
 #include <gc_hal_engine_vg.h>
 #include <gralloc_helper.h>

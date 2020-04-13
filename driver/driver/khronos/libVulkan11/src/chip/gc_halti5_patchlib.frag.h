@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2020 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -11,7 +11,7 @@
 *****************************************************************************/
 
 
-/*Auto created on 2020-02-24 03:28:44*/
+/*Auto created on 2020-03-31 16:11:31*/
 static uint8_t gc_halti5_patchlib_frag[] = {
   0x03, 0x02, 0x23, 0x07, 0x00, 0x00, 0x01, 0x00,
   0x01, 0x00, 0x08, 0x00, 0x65, 0x12, 0x00, 0x00,
