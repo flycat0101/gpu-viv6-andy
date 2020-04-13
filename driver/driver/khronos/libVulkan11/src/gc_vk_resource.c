@@ -2362,6 +2362,16 @@ VkResult __vki_AllocateTileStatus(
             __VK_MEMSET(tsResource->tsNode.logical,
                     (uint8_t)tsResource->tileStatusInvalidFiller,
                     tsResource->tsNode.size);
+ #if gcdDUMP
+
+            gcmDUMP(gcvNULL, "#[info: initialize device memory(TS buffer)]");
+            gcmDUMP_BUFFER(gcvNULL,
+                            gcvDUMP_BUFFER_MEMORY,
+                            tsResource->devAddr,
+                            tsResource->hostAddr,
+                            0,
+                            tsResource->tsNode.size);
+#endif
 
             /* Get surface compression setting.*/
             if (devCtx->database->REG_ZCompression)

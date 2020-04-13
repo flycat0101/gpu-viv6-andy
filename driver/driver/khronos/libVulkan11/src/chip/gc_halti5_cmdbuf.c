@@ -5203,7 +5203,6 @@ uint32_t halti5_computeTileStatusAddr(
         }
     }
 
-    tileStatusAddress += 64;
     tileStatusAddress += tileStatusOffset;
 
     return tileStatusAddress;
@@ -5641,7 +5640,7 @@ VkResult halti5_setRtTileStatus(
             }
 
             __vkCmdLoadSingleHWState(commandBuffer, 0x05F0 + hwRtIndex, VK_FALSE,
-                tileStatusAddress + 64);
+                tileStatusAddress);
 
             /* Program surface base address register. */
             __vkCmdLoadSingleHWState(commandBuffer, 0x05F8 + hwRtIndex, VK_FALSE,
@@ -5776,7 +5775,7 @@ VkResult halti5_setRtTileStatus(
             }
 
             __vkCmdLoadSingleHWState(commandBuffer, 0x0599, VK_FALSE,
-                tileStatusAddress + 64);
+                tileStatusAddress);
 
             __vkCmdLoadSingleHWState(commandBuffer, 0x059A, VK_FALSE,
                 img->memory->devAddr);
@@ -10142,7 +10141,7 @@ VkResult halti5_setTxTileStatus(
  16:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16))));
 
-            __vkCmdLoadSingleHWState(&pCmdBuffer, VK_FALSE, 0x05D0 + samplerTSIndex, tileStatusAddress + 64);
+            __vkCmdLoadSingleHWState(&pCmdBuffer, VK_FALSE, 0x05D0 + samplerTSIndex, tileStatusAddress);
 
             __vkCmdLoadSingleHWState(&pCmdBuffer, VK_FALSE, 0x05D8 + samplerTSIndex,
                 tsResource->fcValue[pRanges->baseMipLevel][pRanges->baseArrayLayer]);

@@ -3025,6 +3025,7 @@ VkResult halti5_clearImage(
 
         __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x5011, VK_FALSE, 2, clearVals);
         __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x5013, VK_FALSE, 2, clearMasks);
+
 #if __VK_ENABLETS
         if (fastClear)
         {
@@ -3038,6 +3039,7 @@ VkResult halti5_clearImage(
             __vkCmdLoadBatchHWStates(&pCmdBuffer, 0x500D, VK_FALSE, 2, fcClearValue);
         }
 #endif
+
         originX = rect->offset.x * img->sampleInfo.x;
         originY = rect->offset.y * img->sampleInfo.y;
         width   = rect->extent.width  * img->sampleInfo.x;
@@ -3279,53 +3281,12 @@ VkResult halti5_clearImage(
 #if __VK_ENABLETS
         if (fastClear)
         {
-            cmd->fastClearImage[cmd->clearImgCount] = img;
-            if (cmd->clearValue[cmd->clearImgCount] == VK_NULL_HANDLE)
-            {
-                __vkCommandPool* cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, cmd->commandPool);
-                __vkClearValue* valueHandle = VK_NULL_HANDLE;
-                __VK_SET_ALLOCATIONCB(&cdp->memCb);
-
-                valueHandle = (__vkClearValue *)__VK_ALLOC(sizeof(__vkClearValue),
-                        8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
-
-                valueHandle->fcValue = (uint32_t**)__VK_ALLOC(img->createInfo.mipLevels * sizeof(uint32_t*),
-                    8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
-                __VK_ONERROR(valueHandle->fcValue ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-
-                for (i = 0; i < img->createInfo.mipLevels; i++)
-                {
-                    *(valueHandle->fcValue + i) = (uint32_t*)__VK_ALLOC(img->createInfo.arrayLayers * sizeof(uint32_t),
-                        8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
-                    __VK_ONERROR(*(valueHandle->fcValue + i) ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-                    __VK_MEMZERO(*(valueHandle->fcValue + i), img->createInfo.arrayLayers * sizeof(uint32_t));
-                }
-
-                valueHandle->fcValueUpper = (uint32_t**)__VK_ALLOC(img->createInfo.mipLevels * sizeof(uint32_t*),
-                    8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
-                __VK_ONERROR(valueHandle->fcValueUpper ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-
-                for (i = 0; i < img->createInfo.mipLevels; i++)
-                {
-                    *(valueHandle->fcValueUpper + i) = (uint32_t*)__VK_ALLOC(img->createInfo.arrayLayers * sizeof(uint32_t),
-                        8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
-                    __VK_ONERROR(*(valueHandle->fcValueUpper + i) ? VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY);
-                    __VK_MEMZERO(*(valueHandle->fcValueUpper + i), img->createInfo.arrayLayers * sizeof(uint32_t));
-                }
-
-                cmd->clearValue[cmd->clearImgCount] = valueHandle;
-            }
-
             /* Record FC value. */
             tsResource->fcValue[subResource->mipLevel][subResource->arrayLayer] = fcClearValue[0];
             tsResource->fcValueUpper[subResource->mipLevel][subResource->arrayLayer] = fcClearValue[1];
 
             /* Turn the tile status on again. */
             tsResource->tileStatusDisable[subResource->mipLevel][subResource->arrayLayer] = gcvFALSE;
-
-            cmd->clearValue[cmd->clearImgCount]->fcValue[subResource->mipLevel][subResource->arrayLayer] = fcClearValue[0];
-            cmd->clearValue[cmd->clearImgCount]->fcValueUpper[subResource->mipLevel][subResource->arrayLayer] = fcClearValue[1];
-            cmd->clearImgCount++;
         }
 #endif
         partIndex++;

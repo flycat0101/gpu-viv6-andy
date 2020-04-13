@@ -227,11 +227,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateCommandBuffers(
             }
             tmp->next = cmd;
         }
-
-#if __VK_ENABLETS
-        cmd->clearImgCount = 0;
-#endif
-
     }
 
     if (result != VK_SUCCESS)
@@ -287,9 +282,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeCommandBuffers(
     __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, commandPool);
     __vkCommandBuffer *cmd;
     uint32_t i;
-#if __VK_ENABLETS
-    uint32_t j;
-#endif
 
     __VK_SET_ALLOCATIONCB(&cdp->memCb);
 
@@ -366,16 +358,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeCommandBuffers(
                 }
 
                 (*devCtx->chipFuncs->FreeCommandBuffer)(device, (VkCommandBuffer)(uintptr_t)cmd);
-
-#if __VK_ENABLETS
-                if (cmd->clearImgCount)
-                {
-                    for (j = 0; j < cmd->clearImgCount; j++)
-                    {
-                        __VK_FREE(cmd->clearValue[j]);
-                    }
-                }
-#endif
 
                 __VK_VERIFY_OK(__vk_DestroyObject(devCtx, __VK_OBJECT_COMMAND_BUFFER, (__vkObject *)cmd));
 
@@ -894,11 +876,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
             __vkStateBuffer *stateBuffer = cmd->stateBufferList;
             uint32_t stateBufCount = cmd->lastStateBufferIndex;
             uint32_t icommits = 0;
-#if __VK_ENABLETS
-            uint32_t imgIndex = 0;
-            uint32_t mipLevel = 0;
-            uint32_t layerIndex = 0;
-#endif
 
             if (cmd->state != __VK_CMDBUF_STATE_EXECUTABLE)
                 continue;
@@ -908,63 +885,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
             /* If the last state buffer is not empty increment the state buffer count */
             if ((cmd->stateBufferTail->bufOffset != 0) || (cmd->stateBufferTail->secBufCount != 0))
                 stateBufCount++;
-#if __VK_ENABLETS
-            for (imgIndex = 0; imgIndex < cmd->clearImgCount; imgIndex++)
-            {
-                __vkImage *img = cmd->fastClearImage[imgIndex];
-                __vkClearValue *val = cmd->clearValue[imgIndex];
-                __vkTileStatus *ts = img->memory->ts;
-                __vkCommandPool* cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, cmd->commandPool);
-                __VK_SET_ALLOCATIONCB(&cdp->memCb);
-
-                for (mipLevel = 0; mipLevel < img->createInfo.mipLevels; mipLevel++)
-                {
-                    for (layerIndex = 0; layerIndex < img->createInfo.arrayLayers; layerIndex++)
-                    {
-                        if (!ts->tileStatusDisable[mipLevel][layerIndex])
-                        {
-                            ts->fcValue[mipLevel][layerIndex] = val->fcValue[mipLevel][layerIndex];
-                            ts->fcValueUpper[mipLevel][layerIndex] = val->fcValueUpper[mipLevel][layerIndex];
-                        }
-                    }
-                    __VK_FREE(val->fcValue[mipLevel]);
-                    __VK_FREE(val->fcValueUpper[mipLevel]);
-                }
-                __VK_FREE(val->fcValue);
-                __VK_FREE(val->fcValueUpper);
-            }
-            cmd->clearImgCount = 0;
-
-            if (stateBuffer->secBufCount > 0)
-            {
-                __vkCommandBuffer *secCmd = (__vkCommandBuffer *)exeInfo->secondary;
-                __vkCommandPool* cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, secCmd->commandPool);
-                __VK_SET_ALLOCATIONCB(&cdp->memCb);
-
-                for (imgIndex = 0; imgIndex < secCmd->clearImgCount; imgIndex++)
-                {
-                    __vkImage *img = secCmd->fastClearImage[imgIndex];
-                    __vkClearValue *val = secCmd->clearValue[imgIndex];
-                    __vkTileStatus *ts = img->memory->ts;
-                    for (mipLevel = 0; mipLevel < img->createInfo.mipLevels; mipLevel++)
-                    {
-                        for (layerIndex = 0; layerIndex < img->createInfo.arrayLayers; layerIndex++)
-                        {
-                            if (!ts->tileStatusDisable[mipLevel][layerIndex])
-                            {
-                                ts->fcValue[mipLevel][layerIndex] = val->fcValue[mipLevel][layerIndex];
-                                ts->fcValueUpper[mipLevel][layerIndex] = val->fcValueUpper[mipLevel][layerIndex];
-                            }
-                        }
-                        __VK_FREE(val->fcValue[mipLevel]);
-                        __VK_FREE(val->fcValueUpper[mipLevel]);
-                    }
-                    __VK_FREE(val->fcValue);
-                    __VK_FREE(val->fcValueUpper);
-                }
-                secCmd->clearImgCount = 0;
-            }
-#endif
 
             for (istate = 0; istate < stateBufCount; istate++)
             {
