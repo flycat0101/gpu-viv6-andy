@@ -555,6 +555,7 @@ _LoadBuiltInConstants(
 {
     gceSTATUS           status;
     gceAPI              apiVersion;
+    gctINT              minimumValue;
     static BuiltinConstInfo    constantInfos[] =
     {
         {"gl_MaxVertexAttribs",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
@@ -658,21 +659,24 @@ _LoadBuiltInConstants(
 
     constantInfos[gcBIConst_MaxFragmentUniformVectors].value[0].intValue = GetGLMaxFragmentUniformVectors();
 
-    constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue = GetGLMaxDrawBuffers();
-
-    if (apiVersion == gcvAPI_OPENGL_ES20)
+    /* gl_MaxDrawBuffers is a implementation dependent constant, FE only needs to check if it matches the minimum value. */
+    /* ES30 and above, the minimum value is 4. */
+    if (sloCOMPILER_IsES30VersionOrAbove(Compiler))
     {
-        constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue = 1;
+        minimumValue = 4;
     }
-    else if (apiVersion == gcvAPI_OPENGL_ES30 || apiVersion == gcvAPI_OPENGL_ES31)
+    /* OGL, the minimum value is 8.*/
+    else if (sloCOMPILER_IsOGLVersion(Compiler))
     {
-        constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue = (constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue > 4)
-            ? constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue : 4;
-    } else if (apiVersion == gcvAPI_OPENGL)
-    {
-        constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue = (constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue > 8)
-            ? constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue : 8;
+        minimumValue = 8;
     }
+    /* Others, the minimum value is 1. */
+    else
+    {
+        minimumValue = 1;
+    }
+    constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue = ((gctINT)GetGLMaxDrawBuffers() > minimumValue)
+            ? (gctINT)GetGLMaxDrawBuffers() : minimumValue;
 
     constantInfos[gcBIConst_MaxSamples].value[0].intValue = GetGLMaxSamples();
     constantInfos[gcBIConst_MinProgramTexelOffset].value[0].intValue = GetGLMinProgramTexelOffset();

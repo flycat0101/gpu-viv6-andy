@@ -4401,11 +4401,19 @@ sloCOMPILER_IsES30Version(
 }
 
 gctBOOL
+sloCOMPILER_IsES30VersionOrAbove(
+    IN sloCOMPILER Compiler
+    )
+{
+    return sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_HALTI_VERSION;
+}
+
+gctBOOL
 sloCOMPILER_IsES31VersionOrAbove(
     IN sloCOMPILER Compiler
     )
 {
-    return sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_ES31_VERSION;
+    return (sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_ES31_VERSION) && !sloCOMPILER_IsOGLVersion(Compiler);
 }
 
 gctBOOL

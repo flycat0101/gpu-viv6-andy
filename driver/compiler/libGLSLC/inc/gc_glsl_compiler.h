@@ -213,6 +213,11 @@ sloCOMPILER_IsES30Version(
 );
 
 gctBOOL
+sloCOMPILER_IsES30VersionOrAbove(
+    IN sloCOMPILER Compiler
+    );
+
+gctBOOL
 sloCOMPILER_IsES31VersionOrAbove(
     IN sloCOMPILER Compiler
 );
