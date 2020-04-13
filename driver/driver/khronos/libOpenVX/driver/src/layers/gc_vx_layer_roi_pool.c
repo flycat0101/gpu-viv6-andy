@@ -616,8 +616,9 @@ VX_PRIVATE_API vx_bool vxoROIPoolLayer_TP_Support(vx_node node, const vx_referen
     vxoLayer_VerificationHead(node, parameters, num, reg_param);
 
     support = support && (vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_TP_ROI_POOLING) &&
-                            vxnneIsTPSupportFormat(node->base.context, input_data, VX_NULL, outputs) &&
-                            (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_BFLOAT16));
+                          vxnneIsTPSupportFormat(node->base.context, input_data, VX_NULL, outputs) &&
+                          (roisFormat == VX_TYPE_FLOAT16 || roisFormat == VX_TYPE_BFLOAT16) &&
+                          (TENSOR_VIEW_SIZE_INDEX(outputs, 3) >= (node->base.context->options.enableMultiTP ? node->base.context->nnConfig.fixedFeature.tpCoreCount : 1) * 4));
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -693,8 +694,8 @@ VX_PRIVATE_API vx_status vxoROIPoolLayer_TP_Initialize(vxnne_layer ops_layer, co
 
     /* Prepare ROI intermediate output buffer. */
     maxpool = (TENSOR_VIEW_SIZE_INDEX(input_data, 0) + pool_width - 1) / pool_width;
-    poolx = 1 << (vx_uint32) ceil(log(TENSOR_VIEW_SIZE_INDEX(input_data, 0)) / log(2));
-    pooly = 1 << (vx_uint32) ceil(log(TENSOR_VIEW_SIZE_INDEX(input_data, 1)) / log(2));
+    poolx = (vx_uint32)ceil((vx_float32)TENSOR_VIEW_SIZE_INDEX(input_data, 0) / maxpool) * maxpool;
+    pooly = TENSOR_VIEW_SIZE_INDEX(input_data, 1);
     poolz = TENSOR_VIEW_SIZE_INDEX(input_data, 2);
     size = poolx * pooly * poolz * maxpool * TENSOR_DATA_SIZE(input_data);
 
