@@ -213,6 +213,26 @@ IN clsDATA_TYPE * DataType
     return gcvSTATUS_OK;
 }
 
+gctBOOL
+clDeclIsSameVectorType(
+IN clsDECL *Decl1,
+IN clsDECL *Decl2
+)
+{
+    gctBOOL sameType = gcvTRUE;
+
+    if(Decl1->dataType->elementType != Decl2->dataType->elementType)
+    {
+        clsBUILTIN_DATATYPE_INFO *typeInfo;
+
+        typeInfo = clGetBuiltinDataTypeInfo(Decl1->dataType->type);
+        sameType = typeInfo->dualType == Decl2->dataType->type;
+    }
+    return sameType &&
+           clmDATA_TYPE_vectorSize_GET(Decl1->dataType) ==
+           clmDATA_TYPE_vectorSize_GET(Decl2->dataType);
+}
+
 gctCONST_STRING
 clGetElementTypeName(IN cltELEMENT_TYPE ElementType)
 {
@@ -3664,8 +3684,7 @@ OUT gctBOOL *HasImplicitConversion
   }
 
   if(sameType ||
-     (lDecl->dataType->elementType == rDecl->dataType->elementType &&
-     (clmDATA_TYPE_vectorSize_NOCHECK_GET(lDecl->dataType) == clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType)) &&
+     (clDeclIsSameVectorType(lDecl, rDecl) &&
      (clmDATA_TYPE_matrixRowCount_GET(lDecl->dataType) == clmDATA_TYPE_matrixRowCount_GET(rDecl->dataType)) &&
      (clmDATA_TYPE_matrixColumnCount_GET(lDecl->dataType) == clmDATA_TYPE_matrixColumnCount_GET(rDecl->dataType)) &&
      (lDecl->dataType->u.generic == rDecl->dataType->u.generic))) {
