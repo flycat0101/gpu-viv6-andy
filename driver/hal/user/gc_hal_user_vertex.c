@@ -39,7 +39,8 @@
 #define gcdSTREAM_CACHE_SLOTS   2048
 #define gcdSTREAM_CACHE_HASH    8192
 #define gcdSTREAM_CACHE_SIZE    (4 << 10)
-#define gcdSTREAM_CACHE_COUNT   1
+#define gcdSTREAM_CACHE_COUNT   2
+#define REUSE_CACHED_STREAM     1
 #else
 #define DYNAMIC_STREAM_COUNT           0x10000
 #define gcdSTREAM_CACHE_SLOTS   2048
@@ -64,6 +65,17 @@ typedef enum _gceSTREAM_CACHE_TYPE
 }
 gceSTREAM_CACHE_TYPE;
 
+#if REUSE_CACHED_STREAM
+typedef struct _gcsSTREAM_CACHED_NODE
+{
+    gctSIZE_T                       bytes;
+    gctUINT                         offset;
+    struct _gcsSTREAM_CACHED_NODE * next;
+}
+gcsSTREAM_CACHED_NOTE,
+* gcsSTREAM_CACHED_NOTE_PTR;
+#endif
+
 typedef struct _gcsSTREAM_CACHE_BUFFER
 {
     /* Signal for cache. */
@@ -83,6 +95,10 @@ typedef struct _gcsSTREAM_CACHE_BUFFER
 
     /* Index into cacheArray of next free entry. */
     gctUINT                     index;
+
+#if REUSE_CACHED_STREAM
+    gcsSTREAM_CACHED_NOTE_PTR   list;
+#endif
 }
 gcsSTREAM_CACHE_BUFFER,
 * gcsSTREAM_CACHE_BUFFER_PTR;
@@ -398,6 +414,18 @@ gcoSTREAM_Destroy(
             {
                 if (Stream->cache[i].dynamicNode)
                 {
+#if REUSE_CACHED_STREAM
+                    while (Stream->cache[i].list)
+                    {
+                        gcsSTREAM_CACHED_NOTE_PTR tempPtr = gcvNULL;
+
+                        tempPtr = Stream->cache[i].list;
+                        Stream->cache[i].list = Stream->cache[i].list->next;
+
+                        gcoOS_Free(gcvNULL, tempPtr);
+                        tempPtr = gcvNULL;
+                    }
+#endif
                     /* Unlock the stream. */
                     gcmVERIFY_OK(gcoHARDWARE_Unlock(Stream->cache[i].dynamicNode,
                         gcvSURF_VERTEX));
@@ -2711,6 +2739,19 @@ _NewDynamicCache(
     /* destory old cache.*/
     if (cache->dynamicNode != gcvNULL)
     {
+#if REUSE_CACHED_STREAM
+        while (cache->list)
+        {
+            gcsSTREAM_CACHED_NOTE_PTR tempPtr = gcvNULL;
+
+            tempPtr = cache->list;
+            cache->list = cache->list->next;
+
+            gcoOS_Free(gcvNULL, tempPtr);
+            tempPtr = gcvNULL;
+        }
+#endif
+
         /* Check we can reuse or not */
         if (gcmIS_SUCCESS(gcoOS_WaitSignal(gcvNULL, cache->signal, 0)) && Bytes < cache->bytes)
         {
@@ -3476,6 +3517,15 @@ gcoSTREAM_DynamicCacheAttributes(
     gctSIZE_T copiedBytes = 0;
     gctUINT32 address;
     gctBOOL bForceVirtual = gcvFALSE;
+#if REUSE_CACHED_STREAM
+    gctUINT8 tempBuffer[gcdSTREAM_CACHE_SIZE] = {0};
+    gcsSTREAM_CACHED_NOTE_PTR nodePtr = NULL;
+    gctBOOL  needRealCopy = gcvTRUE;
+    gctUINT8_PTR srcLogical = NULL;
+    gctINT i = 0;
+    gcsSTREAM_CACHE_BUFFER_PTR preCache = gcvNULL;
+    gcsSTREAM_CACHED_NOTE_PTR newNodePtr = NULL;
+#endif
 
     gcmHEADER_ARG("Stream=0x%x First=%u Count=%u Bytes=%u BufferCount=%u "
                   "Buffers=0x%x AttributeCount=%u Attributes=0x%x",
@@ -3521,6 +3571,99 @@ gcoSTREAM_DynamicCacheAttributes(
         cache = &Stream->cache[(Stream->cacheCurrent) % gcdSTREAM_CACHE_COUNT];
     }
 
+    if (!cache->dynamicNode)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+#if REUSE_CACHED_STREAM
+    preCache = cache;
+
+    /* Copy the data to tempbuffer. */
+    gcmONERROR(_copyBuffers(BufferCount,
+                            Buffers,
+                            AttributeCount,
+                            Attributes,
+                            First,
+                            Count,
+                            tempBuffer,
+                            &copiedBytes
+                            ));
+
+    for (i = 0; i < gcdSTREAM_CACHE_COUNT; i++)
+    {
+        /* Check if need real copy the data to stream dynamic cache */
+        cache = &Stream->cache[i % gcdSTREAM_CACHE_COUNT];
+        nodePtr = cache->list;
+
+        while (nodePtr)
+        {
+            if (nodePtr->bytes == copiedBytes)
+            {
+                /* now need to do really data compare */
+                srcLogical = (gctUINT8_PTR) (cache->dynamicNode->logical + nodePtr->offset);
+                if (gcmIS_SUCCESS(gcoOS_MemCmp(srcLogical, tempBuffer, copiedBytes)))
+                {
+                    offset = nodePtr->offset;
+                    needRealCopy = gcvFALSE;
+                    break;
+                }
+            }
+
+            nodePtr = nodePtr->next;
+        }
+
+        if (!needRealCopy)
+        {
+            break;
+        }
+    }
+
+    if (needRealCopy)
+    {
+        cache = preCache;
+
+        /* Allocate data form the cache. */
+        offset         = cache->offset;
+        cache->offset += Bytes;
+        cache->free   -= Bytes;
+
+        /* Copy the data. */
+        gcmONERROR(_copyBuffers(BufferCount,
+                                Buffers,
+                                AttributeCount,
+                                Attributes,
+                                First,
+                                Count,
+                                cache->dynamicNode->logical + offset,
+                                &copiedBytes
+                                ));
+
+        /* add new sub stream node to the header of the list */
+        gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsSTREAM_CACHED_NOTE), (gctPOINTER *)&newNodePtr));
+
+        newNodePtr->bytes = copiedBytes;
+        newNodePtr->offset = offset;
+
+        newNodePtr->next = cache->list;
+        cache->list = newNodePtr;
+
+        /* Flush the uploaded data. */
+        gcmONERROR(gcoSURF_NODE_Cache(cache->dynamicNode,
+                                      cache->dynamicNode->logical + offset,
+                                      copiedBytes,
+                                      gcvCACHE_CLEAN));
+
+        /* Dump the buffer. */
+        gcmDUMP_BUFFER(gcvNULL,
+                       gcvDUMP_BUFFER_STREAM,
+                       gcsSURF_NODE_GetHWAddress(cache->dynamicNode),
+                       cache->dynamicNode->logical,
+                       offset,
+                       copiedBytes);
+    }
+
+#else
     /* Allocate data form the cache. */
     offset         = cache->offset;
     cache->offset += Bytes;
@@ -3555,6 +3698,8 @@ gcoSTREAM_DynamicCacheAttributes(
                    cache->dynamicNode->logical,
                    offset,
                    copiedBytes);
+
+#endif
 
     /* Return physical address for stream. */
     gcmGETHARDWAREADDRESS(*(cache->dynamicNode), *Physical);
