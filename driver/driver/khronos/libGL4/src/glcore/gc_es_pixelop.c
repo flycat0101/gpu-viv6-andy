@@ -384,7 +384,6 @@ GLvoid GL_APIENTRY __glim_DrawBuffers(__GLcontext *gc, GLsizei n, const GLenum *
                 {
                     __GL_ERROR_EXIT(GL_INVALID_OPERATION);
                 }
-
             }
 
             for (i = GL_FRONT_LEFT; i <= GL_AUX3; i++)

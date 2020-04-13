@@ -3044,6 +3044,7 @@ OnExit:
             transferInfo->applyPixelTransfer = GL_FALSE;
         }
     }
+
     /* Clean the flag of snorm */
     gc->snorm8Flag = GL_FALSE;
     gc->snorm16Flag = GL_FALSE;

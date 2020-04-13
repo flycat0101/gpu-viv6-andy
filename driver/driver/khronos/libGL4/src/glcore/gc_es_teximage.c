@@ -1034,6 +1034,8 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         break;
     }
 
+    /* TODO: Comment this code for now, will be removed if it realy not work in the future. */
+
     /*check internalFormat*/
     switch (internalFormat)
     {
@@ -1133,6 +1135,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
                     break;
             }
             break;
+
             /*depth component*/
         case GL_DEPTH_COMPONENT:
         case GL_DEPTH_COMPONENT16:
