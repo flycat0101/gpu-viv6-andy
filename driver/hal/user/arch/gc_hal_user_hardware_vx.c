@@ -35697,7 +35697,15 @@ gcoHARDWAREVX_TriggerAccelerator(
             smallBatch = 0x0;
         }
 
-        if (Hardware->config->nnConfig.customizedFeature.ddrKernelBurstSize == 256)
+        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_256B))
+        {
+            ddrBurstSize = 0x2;
+        }
+        else if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_64B))
+        {
+            ddrBurstSize = 0x0;
+        }
+        else if (Hardware->config->nnConfig.customizedFeature.ddrKernelBurstSize == 256)
         {
             ddrBurstSize = 0x2;
         }

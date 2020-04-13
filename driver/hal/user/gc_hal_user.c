@@ -409,12 +409,17 @@ _FillInOptions(
     }
 
     envctrl = gcvNULL;
-    gcOptions[gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_256B] = gcvTRUE;
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_NN_DDR_BURST_SIZE_256B", &envctrl)) && envctrl)
+    gcOptions[gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_256B] = gcvFALSE;
+    gcOptions[gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_64B] = gcvFALSE;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_NN_DDR_BURST_SIZE", &envctrl)) && envctrl)
     {
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "0")))
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "256")))
         {
-            gcOptions[gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_256B] = gcvFALSE;
+            gcOptions[gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_256B] = gcvTRUE;
+        }
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "64")))
+        {
+            gcOptions[gcvOPTION_OVX_ENABLE_NN_DDR_BURST_SIZE_64B] = gcvTRUE;
         }
     }
 
