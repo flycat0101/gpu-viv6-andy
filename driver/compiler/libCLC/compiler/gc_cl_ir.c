@@ -4635,7 +4635,7 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
 )
 {
     gceSTATUS  status;
-    clsNAME *name;
+    clsNAME *name = gcvNULL;
     gctPOINTER      nameCandidates[_cldCandidateFunctionArraySize];
     gctINT          nameCandidateDistances[_cldCandidateFunctionArraySize];
     clsDATA_TYPE    nameCandidateDataTypes[_cldCandidateFunctionArraySize];
