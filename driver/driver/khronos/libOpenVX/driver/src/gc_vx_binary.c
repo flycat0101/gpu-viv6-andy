@@ -1829,7 +1829,18 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNetworkNameAndRank(
         gcoOS_StrCatSafe(networkName, VX_MAX_NAME_LEGTH, env);
     }
 
-    gcoOS_StrCopySafe(binarySave->headerInfo.networkName, VX_MAX_NAME_LEGTH, networkName);
+    vxInfo("NBG network name field : %s\n", networkName);
+
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_DISABLE_SET_NBG_NAME", &env);
+    if (env != VX_NULL)
+    {
+        gcoOS_StrCopySafe(binarySave->headerInfo.networkName, VX_MAX_NAME_LEGTH, "dummy_network_name");
+    }
+    else
+    {
+        gcoOS_StrCopySafe(binarySave->headerInfo.networkName, VX_MAX_NAME_LEGTH, networkName);
+    }
+
     return VX_SUCCESS;
 }
 
