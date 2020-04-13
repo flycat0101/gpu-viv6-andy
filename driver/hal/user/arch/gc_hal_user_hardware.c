@@ -2853,7 +2853,6 @@ _FillInFeatureTable(
     Features[gcvFEATURE_USC_EVICT_CTRL_FIFO_FLOP_RESET_FIX] = database->USC_EVICT_CTRL_FIFO_FLOP_RESET_FIX;
     Features[gcvFEATURE_NEGATIVE_POST_SHIFT_FIX] = database->NEGATIVE_POST_SHIFT_FIX;
     Features[gcvFEATURE_NN_COMMAND_KERNEL_REQUEST_CONFICT_FIX] = database->NN_COMMAND_KERNEL_REQUEST_CONFICT_FIX;
-    Features[gcvFEATURE_DDR_BURST_LEN_256B] = database->DDR_BURST_LEN_256B;
     Features[gcvFEATURE_NN_LEAKY_RELU] = 0;/*database->NN_LEAKY_RELU;*/
     Features[gcvFEATURE_NN_PRELU] = 0;/*database->NN_PRELU;*/
     Features[gcvFEATURE_NN_NATIVE_STRIDE_TWO] = database->NN_NATIVE_STRIDE_TWO;
@@ -3266,6 +3265,7 @@ if (smallBatch){    Config->vsConstBase  = 0xD000;
     Config->nnConfig.fixedFeature.nnMaxKYSize = featureDatabase->NN_KERNEL_Y_SIZE;
     Config->nnConfig.fixedFeature.nnMaxKZSize = featureDatabase->NN_KERNEL_Z_SIZE;
 
+    Config->nnConfig.customizedFeature.ddrKernelBurstSize = featureDatabase->DDR_KERNEL_BURST_SIZE;
     Config->nnConfig.customizedFeature.vipSRAMSize = featureDatabase->VIP_SRAM_SIZE;
     Config->nnConfig.customizedFeature.axiSRAMSize = featureDatabase->AXI_SRAM_SIZE;
 

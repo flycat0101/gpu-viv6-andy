@@ -125,6 +125,7 @@ typedef struct _gcsNN_CUSTOMIZED_FEATURE
     gctUINT  nnWriteWithoutUSC;
     gctUINT  depthWiseSupport;
     gctUINT  vipVectorPrune;
+    gctUINT  ddrKernelBurstSize;
 } gcsNN_CUSTOMIZED_FEATURE;
 
 /* Features are unified (hardcoded) for hardwares */
