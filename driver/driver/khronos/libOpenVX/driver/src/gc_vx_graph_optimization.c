@@ -367,11 +367,21 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                 SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_PAD_Y_B_INDEX], u32)
             };
 
+            vx_int32 stride_x = 1, stride_y = 1;
+            if(node->paramTable[PARAM_POOLING_POOL_STRIDE_X_INDEX] != NULL && node->paramTable[PARAM_POOLING_POOL_STRIDE_Y_INDEX] != NULL)
+            {
+                stride_x = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_STRIDE_X_INDEX], u32);
+                stride_y = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_STRIDE_Y_INDEX], u32);
+            }
+            else
+            {
+                vxWarning("stride paramters is not passed, it will be computed");
+                stride_x = (vx_int32)roundRTNE((vx_float32)(input_w + pad[0] + pad[1] - kernelx)/(output_w == 1? 1: output_w -1));
+                stride_y = (vx_int32)roundRTNE((vx_float32)(input_h + pad[2] + pad[3]- kernely)/(output_h == 1? 1: output_h-1));
+                stride_x = stride_x == 0 ? 1: stride_x;
+                stride_y = stride_y == 0 ? 1: stride_y;
+            }
 
-            vx_int32 stride_x = (vx_int32)roundRTNE((vx_float32)(input_w + pad[0] + pad[1] - kernelx)/(output_w == 1? 1: output_w -1));
-            vx_int32 stride_y = (vx_int32)roundRTNE((vx_float32)(input_h + pad[2] + pad[3]- kernely)/(output_h == 1? 1: output_h-1));
-            stride_x = stride_x == 0 ? 1: stride_x;
-            stride_y = stride_y == 0 ? 1: stride_y;
             if(poolType == VX_NN_POOLING_MAX)
             {
                 vx_uint32 poolx = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_SIZE_X_INDEX], u32);
@@ -930,6 +940,11 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_stroeNodeDetail2json(vx_node node
         vxoJson_AddNumberToObject(paramters, "ksize_h", SCALAR_VALUE(node->paramTable[3], u32));
         vxoJson_AddNumberToObject(paramters, "pad_w", SCALAR_VALUE(node->paramTable[4], u32));
         vxoJson_AddNumberToObject(paramters, "pad_h", SCALAR_VALUE(node->paramTable[6], u32));
+        if(node->paramTable[PARAM_POOLING_POOL_STRIDE_X_INDEX] != NULL && node->paramTable[PARAM_POOLING_POOL_STRIDE_Y_INDEX] != NULL)
+        {
+            vxoJson_AddNumberToObject(paramters, "stride_x", SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_STRIDE_X_INDEX], u32));
+            vxoJson_AddNumberToObject(paramters, "stride_y", SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_STRIDE_Y_INDEX], u32));
+        }
         break;
     }
     case VX_KERNEL_ACTIVATION_LAYER:
@@ -2696,11 +2711,19 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
 
             vx_uint32 weight_dims[] = {kernel_x, kernel_y, TENSOR_SIZE_INDEX(input, 2),1};
 
-            vx_int32 stride_x = (TENSOR_SIZE_INDEX(input, 0) + pads[0] + pads[1] - kernel_x)/(TENSOR_SIZE_INDEX(output, 0)== 1? 1: TENSOR_SIZE_INDEX(output, 0) -1);
-            vx_int32 stride_y = (TENSOR_SIZE_INDEX(input, 1) + pads[2] + pads[3] - kernel_y)/(TENSOR_SIZE_INDEX(output, 1)== 1? 1: TENSOR_SIZE_INDEX(output, 1)-1);
-
-            stride_x = stride_x == 0? 1: stride_x;
-            stride_y = stride_y == 0? 1: stride_y;
+            vx_int32 stride_x = 1, stride_y = 1;
+            if(node->paramTable[PARAM_POOLING_POOL_STRIDE_X_INDEX] != NULL && node->paramTable[PARAM_POOLING_POOL_STRIDE_Y_INDEX] != NULL)
+            {
+                stride_x = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_STRIDE_X_INDEX], u32);
+                stride_y = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_STRIDE_Y_INDEX], u32);
+            }
+            else
+            {
+                stride_x = (vx_int32)roundRTNE((vx_float32)(TENSOR_SIZE_INDEX(input, 0) + pads[0] + pads[1] - kernel_x)/(TENSOR_SIZE_INDEX(output, 0) == 1? 1: TENSOR_SIZE_INDEX(output, 0) -1));
+                stride_y = (vx_int32)roundRTNE((vx_float32)(TENSOR_SIZE_INDEX(input, 1) + pads[2] + pads[3] - kernel_y)/(TENSOR_SIZE_INDEX(output, 1) == 1? 1: TENSOR_SIZE_INDEX(output, 1) -1));
+                stride_x = stride_x == 0 ? 1: stride_x;
+                stride_y = stride_y == 0 ? 1: stride_y;
+            }
 
             if(!vxoGraphOptimization_nnHalSupport(input))
                 continue;
