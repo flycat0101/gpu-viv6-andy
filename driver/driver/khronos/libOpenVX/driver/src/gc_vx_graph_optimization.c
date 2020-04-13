@@ -2854,8 +2854,6 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
                 stride_x = stride_x == 0 ? 1: stride_x;
                 stride_y = stride_y == 0 ? 1: stride_y;
             }
-            if(stride_x > 2 || stride_y > 2)
-                continue;
 
             if(!vxoGraphOptimization_nnHalSupport(input))
                 continue;
@@ -2864,6 +2862,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
             if(vxoGraphOptimization_dwConvHalSupport(input))
             {
                 if(kernel_x > 15 || kernel_y>15)
+                    continue;
+                if(stride_x > 2 || stride_y > 2)
                     continue;
             }
             else
