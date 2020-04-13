@@ -513,6 +513,8 @@ veglClientApiEntry eglApiEntryTbl[] =
 
 veglClientApiEntry glExtApiAliasTbl[] =
 {
+    /* GL_KHR_blend_equation_advanced */
+    eglApiEntry(glBlendBarrierKHR),
     /* GL_OES_texture_3D */
     eglApiEntry(glTexImage3DOES),
     eglApiEntry(glTexSubImage3DOES),
@@ -618,6 +620,12 @@ veglClientApiEntry glExtApiAliasTbl[] =
     eglApiEntry(glGetnUniformfvKHR),
     eglApiEntry(glGetnUniformivKHR),
     eglApiEntry(glGetnUniformuivKHR),
+    /* GL_EXT_robustness */
+    eglApiEntry(glGetGraphicsResetStatusEXT),
+    eglApiEntry(glReadnPixelsEXT),
+    eglApiEntry(glGetnUniformfvEXT),
+    eglApiEntry(glGetnUniformivEXT),
+    eglApiEntry(glGetnUniformuivEXT),
     /* GL_EXT_framebuffer_object */
     eglApiEntry(glIsRenderbufferEXT),
     eglApiEntry(glBindRenderbufferEXT),
