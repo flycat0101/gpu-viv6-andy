@@ -3462,7 +3462,7 @@ gcoSURF_UpdateMetadata(
         iface.u.SetVidMemMetadata.fc_enabled        = !Surface->tileStatusDisabled[0];
         iface.u.SetVidMemMetadata.fc_value          = Surface->fcValue[0];
         iface.u.SetVidMemMetadata.fc_value_upper    = Surface->fcValueUpper[0];
-        iface.u.SetVidMemMetadata.compressed        = gcoSURF_IsCompressed(&srcView);;
+        iface.u.SetVidMemMetadata.compressed        = gcoSURF_IsCompressed(&srcView);
         iface.u.SetVidMemMetadata.compress_format   = compressFmt;
     }
 #endif
