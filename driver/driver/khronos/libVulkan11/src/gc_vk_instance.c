@@ -262,7 +262,7 @@ static void __vki_InitializeDrvOption(
 
 static VkBool32 __vki_IsUTF8(const char* str)
 {
-    uint32_t length = strlen(str);
+    uint32_t length = (uint32_t)gcoOS_StrLen(str, gcvNULL);
     uint32_t i = 0;
     VkBool32 allChinese = VK_TRUE;
 
