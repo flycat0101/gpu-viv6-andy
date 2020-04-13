@@ -30,6 +30,10 @@
 #include "archModelInterface.h"
 #endif
 
+#if defined(__linux__)
+#include <execinfo.h>
+#endif
+
 #define ENABLE_SAVE_OFFSET_IN_NBG    1
 
 #define SH_COMMAND_ALIGN_SIZE        256
@@ -4280,11 +4284,34 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_Write(
         vx_uint8 *buf = tmp;
         for (i = 0; i < size; i++)
         {
+            buf = tmp + i;
+            /* please fill data you want to find in NBG */
             if ((tmp[i] == 0x0C) && (tmp[i + 1] == 0x66) && (tmp[i + 2] == 0x3D))
             {
-                vxInfo("find this data in NBG\n");
+                vx_uint32 *dump = (vx_uint32*)buf;
+
+                #if defined(__linux__)
+                void *buffer[256];
+                vx_char **string;
+                vx_uint32 num = 0, j = 0;
+                vxError("find this data in NBG .. dump data, 0x%x, 0x%x, 0x%x. \n", dump[0], dump[1], dump[2]);
+                num = backtrace(buffer, 256);
+                string = backtrace_symbols(buffer, num);
+                if (string != VX_NULL)
+                {
+                    vxInfo("%s backtrace return %d address\n", __FUNCTION__, num);
+                    for (j = 0; j < num; j++)
+                    {
+                        vxInfo("%s\n", string[j]);
+                    }
+                    free(string);
+                }
+                #else
+                vxError("find this data in NBG .. dump data, 0x%x, 0x%x, 0x%x. \n", dump[0], dump[1], dump[2]);
+                #endif
+
+                break;
             }
-            buf = tmp + i;
         }
     }
 #endif
