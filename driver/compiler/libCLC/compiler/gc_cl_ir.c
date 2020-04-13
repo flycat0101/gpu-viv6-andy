@@ -3820,6 +3820,8 @@ OUT clsNAME **NewFuncName
    clsNAME *newFuncName = gcvNULL;
    clsNAME_SPACE *builtinSpace;
    clsNAME_SPACE *orgSpace;
+   slsDLINK_NODE *bucket;
+   clsNAME_NODE *node;
 
    /* Verify the arguments. */
    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -3851,6 +3853,18 @@ OUT clsNAME **NewFuncName
    newFuncName->die = cloCOMPILER_AddDIEWithName(Compiler, newFuncName);
 
    slsDLINK_LIST_InsertFirst(&builtinSpace->names, &newFuncName->node);
+
+   bucket = clsHASH_TABLE_Bucket(&builtinSpace->nameHash,
+                                 clmBUCKET_INDEX(clHashString(newFuncName->symbol)));
+   status = cloCOMPILER_Allocate(Compiler,
+                                 sizeof(clsNAME_NODE),
+                                 (gctPOINTER *) &node);
+   if (gcmIS_ERROR(status)) {
+       cloCOMPILER_SetCurrentSpace(Compiler, orgSpace);
+       return status;
+   }
+   node->name = newFuncName;
+   slsDLINK_LIST_InsertFirst(bucket, &node->node);
 
    newFuncName->u.funcInfo.isInline = FuncName->u.funcInfo.isInline;
    newFuncName->u.funcInfo.hasVarArg = FuncName->u.funcInfo.hasVarArg;
@@ -4123,9 +4137,15 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
     clsNAME *name;
     clsDATA_TYPE dataType[1];
     gctBOOL hasGenType;
+    slsDLINK_NODE *bucket;
+    clsNAME_NODE *node;
 
     gcmASSERT(PolynaryExpr->exprBase.decl.dataType);
-    FOR_EACH_DLINK_NODE(&NameSpace->names, clsNAME, name) {
+
+    bucket = clsHASH_TABLE_Bucket(&NameSpace->nameHash,
+                                  clmBUCKET_INDEX(clHashString(PolynaryExpr->funcSymbol)));
+    FOR_EACH_DLINK_NODE(bucket, clsNAME_NODE, node) {
+        name = node->name;
         hasGenType = gcvFALSE;
         if (((name->type == clvFUNC_NAME) || (name->type == clvKERNEL_FUNC_NAME))
             && clsDECL_IsEqual(&name->decl, &PolynaryExpr->exprBase.decl)
