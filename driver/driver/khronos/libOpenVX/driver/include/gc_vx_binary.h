@@ -26,6 +26,8 @@
 #define VX_MAX_WAIT_STATE_SIZE            0x200
 #define VX_MAX_TEMP_TENSORS_NUM           6144
 
+#define VX_MAX_INPUT_NODE_NUM             256  /* the MAX number of network input layer */
+
 enum
 {
     VX_BINARY_DYN_FROM_FILE,
@@ -446,8 +448,8 @@ vx_binary_layer_parameter_s;
 typedef struct _vx_binary_input_node_info_s
 {
     vx_node                                 node;
-    vx_uint32                               inputPhysical[VX_MAX_NN_INOUT_PARAM_COUNT];
-    vx_uint32                               paramIndex[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_uint32                               inputPhysical[VX_MAX_PARAMETERS];
+    vx_uint32                               paramIndex[VX_MAX_PARAMETERS];
     vx_uint32                               count;
 }
 vx_binary_input_node_info_s;
@@ -464,7 +466,7 @@ typedef struct _vx_binary_save_s
     vx_uint32                                inputInPatchedPhysical[VX_MAX_NN_INOUT_PARAM_COUNT];
     vx_uint32                                inputInPatchedIndex[VX_MAX_NN_INOUT_PARAM_COUNT];
     vx_uint32                                inputInPatchedNum;
-    vx_binary_input_output_info_s            inputInfo[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_binary_input_output_info_s            *inputInfo;
 
     vx_reference                             inputEntry[VX_MAX_NN_INOUT_PARAM_COUNT];
     vx_reference                             outputEntry[VX_MAX_NN_INOUT_PARAM_COUNT];
@@ -536,7 +538,7 @@ typedef struct _vx_binary_save_s
 
     vx_char                                  binaryFileName[256];
 
-    vx_binary_input_node_info_s              inputNode[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_binary_input_node_info_s              inputNode[VX_MAX_INPUT_NODE_NUM];
     vx_uint32                                inputNodeCount;
 
     vx_uint32                                savedOperationCount;

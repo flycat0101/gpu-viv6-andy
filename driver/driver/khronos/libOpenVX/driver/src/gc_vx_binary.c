@@ -58,6 +58,11 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
     vx_size *size
     );
 
+VX_PRIVATE_API vx_status vxoBinaryGraph_SaveErrorHandle(
+    vx_graph graph,
+    vx_status status
+    );
+
 VX_PRIVATE_API vx_type_e vxoBinaryGraph_ConvertToOVXDataFormat(
     vx_uint32 format,
     vx_uint32 type
@@ -4676,6 +4681,13 @@ VX_PRIVATE_API vx_uint32 vxoBinaryGraph_SaveLoadingConfigData(
     binarySave->loadingDataTotalBytes += alignedBytes;
 
  OnError:
+
+    status = vxoBinaryGraph_SaveErrorHandle(graph, status);
+    if (status != VX_SUCCESS)
+    {
+        loadingDataTableIndex = 0xFFFFFFFF;
+    }
+
     gcmFOOTER_ARG("%d", loadingDataTableIndex);
     return loadingDataTableIndex;
 }
@@ -5231,6 +5243,12 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_RefineInputOutput(
     }
     vxInfo("\n");
 
+    if ((0 == *outputCount) || (0 == *inputCount))
+    {
+        vxError("%s[%d]: failed input or output count is 0\n", __FUNCTION__, __LINE__);
+        status = VX_FAILURE;
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -5590,8 +5608,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_InputsOutputs(
         }
     }
 
-    if ((inNum > VX_MAX_NN_INOUT_PARAM_COUNT) || (outNum > VX_MAX_NN_INOUT_PARAM_COUNT))
+    if ((inNum >= VX_MAX_NN_INOUT_PARAM_COUNT) || (outNum >= VX_MAX_NN_INOUT_PARAM_COUNT))
     {
+        vxError("failed input or output bigger than MAX value..\n");
         vxmONERROR(VX_FAILURE);
     }
 
@@ -5663,6 +5682,12 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_unInitial(
         vxInfo("network binary graph file has been closed\n");
     }
 
+    if (graph->binarySave->inputInfo != VX_NULL)
+    {
+        vxFree(graph->binarySave->inputInfo);
+        graph->binarySave->inputInfo = VX_NULL;
+    }
+
     if (graph->binarySave != VX_NULL)
     {
         gcmVERIFY_OK(gcoOS_Free(gcvNULL, (gctPOINTER)graph->binarySave));
@@ -5671,6 +5696,37 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_unInitial(
 
     gcmFOOTER_ARG("%d", VX_SUCCESS);
     return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status vxoBinaryGraph_SaveErrorHandle(
+    vx_graph graph,
+    vx_status status
+    )
+{
+    vx_status re_status = status;
+    vx_binary_save_s *binarySave = graph->binarySave;
+
+    if ((graph->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS) && (binarySave != VX_NULL))
+    {
+        /* error in cache binary graph mode, original path run network */
+        re_status = VX_SUCCESS;
+        if (gcoOS_StrCmp(binarySave->binaryFileName, "\0") != gcvSTATUS_OK)
+        {
+            gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
+        }
+        vxoBinaryGraph_unInitial(graph);
+    }
+    else if ((graph->base.context->options.enableSaveBinary == 1) && (status != VX_SUCCESS) && (binarySave != VX_NULL))
+    {
+        re_status = VX_FAILURE;
+        vxError("%s[%d]: failed to generate NBG file, remove it\n", __FUNCTION__, __LINE__);
+        if (gcoOS_StrCmp(binarySave->binaryFileName, "\0") != gcvSTATUS_OK)
+        {
+            gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
+        }
+    }
+
+    return re_status;
 }
 
 VX_PRIVATE_API vx_bool vxoBinaryGraph_isSupportSWOperation(
@@ -6041,6 +6097,7 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveSWOperation(
 )
 {
     vx_context context = operation->layer->node->base.context;
+    vx_graph graph = operation->layer->node->graph;
     vx_status status = VX_SUCCESS;
     gcmHEADER_ARG("operation=%p", operation);
 
@@ -6063,7 +6120,11 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveSWOperation(
 
     gcmFOOTER_ARG("%d", status);
     return status;
+
 OnError:
+
+    status = vxoBinaryGraph_SaveErrorHandle(graph, status);
+
     vxError("%s[%d]: fail to save SW layer\n", __FUNCTION__, __LINE__);
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -6408,16 +6469,8 @@ OnError:
         initBuffer = VX_NULL;
     }
 
-    if ((graph->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS) && (binarySave != VX_NULL))
-    {
-        /* error in cache binary graph mode, original path run network */
-        status = VX_SUCCESS;
-        if (gcoOS_StrCmp(binarySave->binaryFileName, "\0") != gcvSTATUS_OK)
-        {
-            gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
-        }
-        vxoBinaryGraph_unInitial(graph);
-    }
+    status = vxoBinaryGraph_SaveErrorHandle(graph, status);
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -6438,6 +6491,13 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveEndOperation(
     if ((binarySave == VX_NULL) || (stateSize == 0) || (stateBuffer == VX_NULL))
     {
         vxError("%s[%d]: binary save or stateBuffer is NULL\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_ERROR_INVALID_VALUE);
+    }
+
+    if (stateSize > VX_MAX_INITIALIZE_COMMAND_SIZE)
+    {
+        vxError("%s[%d]: failed, states size is bigget than %d > %d\n", __FUNCTION__, __LINE__,
+                    stateSize, VX_MAX_INITIALIZE_COMMAND_SIZE);
         vxmONERROR(VX_ERROR_INVALID_VALUE);
     }
 
@@ -6468,16 +6528,8 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveEndOperation(
     binarySave->savedOperationCount++;
 
 OnError:
-    if ((graph->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS) && (binarySave != VX_NULL))
-    {
-        /* error in cache binary graph mode, original path run network */
-        status = VX_SUCCESS;
-        if (gcoOS_StrCmp(binarySave->binaryFileName, "\0") != gcvSTATUS_OK)
-        {
-            gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
-        }
-        vxoBinaryGraph_unInitial(graph);
-    }
+    status = vxoBinaryGraph_SaveErrorHandle(graph, status);
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -6927,6 +6979,9 @@ OnError:
         gcmVERIFY_OK(gcoOS_Free(gcvNULL, (gctPOINTER)stateBuffer));
         stateBuffer = VX_NULL;
     }
+
+    status = vxoBinaryGraph_SaveErrorHandle(graph, status);
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -7044,10 +7099,10 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveShaderOperation(
 
         patchInfo.offset = offsetArray[0];
 #if ENABLE_SAVE_OFFSET_IN_NBG
-        patchInfo.originalBaseAddress = address;
-#else
         patchInfo.originalBaseAddress = 0;
         vxmONERROR(vxoBinaryGraph_ChangeAddressToOffset(stateBuffer, offsetArray[0], address, patchInfo.transformation));
+#else
+        patchInfo.originalBaseAddress = address;
 #endif
         patchInfo.transformation = VX_BINARY_PATCH_TRANSFORMATION_ORIGINAL;
         patchInfo.index = -1; /* meaningless for this type of patch */
@@ -7346,16 +7401,8 @@ OnError:
         stateBuffer = VX_NULL;
     }
 
-    if ((node->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS) && (binarySave != VX_NULL))
-    {
-        /* error in cache binary graph mode, original path run network */
-        status = VX_SUCCESS;
-        if (gcoOS_StrCmp(binarySave->binaryFileName, "\0") != gcvSTATUS_OK)
-        {
-            gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
-        }
-        vxoBinaryGraph_unInitial(node->graph);
-    }
+    status = vxoBinaryGraph_SaveErrorHandle(graph, status);
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -8043,6 +8090,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
     /*4. save nn/tp instruction */
     if (cmdType == VX_BINARY_OPERATION_TYPE_NN)
     {
+        if (binarySave->nnOpNum > binarySave->nnOperationCount)
+        {
+            vxError("%s[%d]: nn count is bigger than %d > %d\n", __FUNCTION__, __LINE__, binarySave->nnOpNum, binarySave->nnOperationCount);
+            vxmONERROR(VX_FAILURE);
+        }
+
         binarySave->NNTPDataCmdPhysical[binarySave->NNTPDataCount] = cmdPhysicalAddress;
         binarySave->NNTPDataOffset[binarySave->NNTPDataCount] = binarySave->currNNOperationOffset;
         binarySave->NNTPDataCount++;
@@ -8058,15 +8111,15 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
         binarySave->currNNOperationIndex++;
 
         binarySave->nnOpNum++;
-
-        if (binarySave->nnOpNum > binarySave->nnOperationCount)
-        {
-            vxError("%s[%d]: nn count is bigger than %d > %d\n", __FUNCTION__, __LINE__, binarySave->nnOpNum, binarySave->nnOperationCount);
-            vxmONERROR(VX_FAILURE);
-        }
     }
     else if (cmdType == VX_BINARY_OPERATION_TYPE_TP)
     {
+        if (binarySave->tpOpNum > binarySave->tpOperationCount)
+        {
+            vxError("%s[%d]: tp count is bigger than %d > %d\n", __FUNCTION__, __LINE__, binarySave->tpOpNum, binarySave->tpOperationCount);
+            vxmONERROR(VX_FAILURE);
+        }
+
         binarySave->NNTPDataCmdPhysical[binarySave->NNTPDataCount] = cmdPhysicalAddress;
         binarySave->NNTPDataOffset[binarySave->NNTPDataCount] = binarySave->currTPOperationOffset;
         binarySave->NNTPDataCount++;
@@ -8082,12 +8135,6 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveTPNNOperation(
         binarySave->currTPOperationIndex++;
 
         binarySave->tpOpNum++;
-
-        if (binarySave->tpOpNum > binarySave->tpOperationCount)
-        {
-            vxError("%s[%d]: tp count is bigger than %d > %d\n", __FUNCTION__, __LINE__, binarySave->tpOpNum, binarySave->tpOperationCount);
-            vxmONERROR(VX_FAILURE);
-        }
     }
     else
     {
@@ -8135,16 +8182,8 @@ OnError:
         cmdLogicalAddress = VX_NULL;
     }
 
-    if ((node->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS) && (binarySave != VX_NULL))
-    {
-        /* error in cache binary graph mode, original path run network */
-        status = VX_SUCCESS;
-        if (gcoOS_StrCmp(binarySave->binaryFileName, "\0") != gcvSTATUS_OK)
-        {
-            gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
-        }
-        vxoBinaryGraph_unInitial(node->graph);
-    }
+    status = vxoBinaryGraph_SaveErrorHandle(graph, status);
+
     gcmFOOTER_ARG("%d", status);
 
     return status;
@@ -8196,15 +8235,9 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveNNTPCommand(
     WRITE_NBG_STATUS_CHECK();
 
 OnError:
-    if ((node->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS) && (binarySave != VX_NULL))
-    {
-        status = VX_SUCCESS;
-        if (gcoOS_StrCmp(binarySave->binaryFileName, "\0") != gcvSTATUS_OK)
-        {
-            gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
-        }
-        vxoBinaryGraph_unInitial(node->graph);
-    }
+
+    status = vxoBinaryGraph_SaveErrorHandle(node->graph, status);
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -8330,16 +8363,8 @@ OnError:
         stateBuffer = VX_NULL;
     }
 
-    if ((node->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS) && (binarySave != VX_NULL))
-    {
-        /* error in cache binary graph mode, original path run network */
-        status = VX_SUCCESS;
-        if (gcoOS_StrCmp(binarySave->binaryFileName, "\0") != gcvSTATUS_OK)
-        {
-            gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
-        }
-        vxoBinaryGraph_unInitial(node->graph);
-    }
+    status = vxoBinaryGraph_SaveErrorHandle(node->graph, status);
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -8499,15 +8524,9 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_ReSaveInputAndPatchTable(
     }
 
 OnError:
-    if ((graph->base.context->options.enableSaveBinary == 0) && (status != VX_SUCCESS) && (binarySave != VX_NULL))
-    {
-        /* error in cache binary graph mode, original path run network */
-        status = VX_SUCCESS;
-        if (gcoOS_StrCmp(binarySave->binaryFileName, "\0") != gcvSTATUS_OK)
-        {
-            gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
-        }
-    }
+
+    status = vxoBinaryGraph_SaveErrorHandle(graph, status);
+
     /* save binary graph done, destructor all resource */
     vxoBinaryGraph_unInitial(graph);
     gcmFOOTER_ARG("%d", status);
@@ -8841,6 +8860,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                         binarySave->inputNode[i].paramIndex[count] = paramIndex;
                         binarySave->inputNode[i].count++;
                         binarySave->inputNodeCount++;
+                        if (binarySave->inputNodeCount >= VX_MAX_INPUT_NODE_NUM)
+                        {
+                            vxError("%s[%d]: input node count is bigger than %d > %d\n", __FUNCTION__, __LINE__,
+                                     binarySave->inputNodeCount, VX_MAX_INPUT_NODE_NUM);
+                            vxmONERROR(VX_FAILURE);
+                        }
                     }
                     else
                     {
@@ -8979,6 +9004,12 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
                         binarySave->inputNode[i].paramIndex[count] = paramIndex;
                         binarySave->inputNode[i].count++;
                         binarySave->inputNodeCount++;
+                        if (binarySave->inputNodeCount >= VX_MAX_INPUT_NODE_NUM)
+                        {
+                            vxError("%s[%d]: input node count is bigger than %d > %d\n", __FUNCTION__, __LINE__,
+                                     binarySave->inputNodeCount, VX_MAX_INPUT_NODE_NUM);
+                            vxmONERROR(VX_FAILURE);
+                        }
                     }
                     else
                     {
@@ -9844,7 +9875,15 @@ VX_INTERNAL_API vx_status vxoBinaryGraph_SaveBinaryEntrance(
     currPos += sizeof(vx_binary_entrance_info_s);
 
     /* refine input/output of graph if user call api vxIdentifyGraphInputsAndOutputs() */
-    vxoBinaryGraph_RefineInputOutput(graph, &inputCount, &outputCount);
+    vxmONERROR(vxoBinaryGraph_RefineInputOutput(graph, &inputCount, &outputCount));
+
+    /* allocate memory for inputInfo */
+    graph->binarySave->inputInfo = (vx_binary_input_output_info_s*)vxAllocateAndZeroMemory(inputCount * sizeof(vx_binary_input_output_info_s));
+    if (graph->binarySave->inputInfo == VX_NULL)
+    {
+        vxError("%s[%d]: failed to allocate memory for inputInfo\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_ERROR_NO_MEMORY);
+    }
 
     /* save network input info */
     inputInfoArray = graph->binarySave->inputInfo;
@@ -10405,16 +10444,8 @@ OnError:
         shaderParam = VX_NULL;
     }
 
-    if ((context->options.enableSaveBinary == 0) && (status != VX_SUCCESS) && (binarySave != VX_NULL))
-    {
-        /* error in cache binary graph mode, original path run network */
-        status = VX_SUCCESS;
-        if (gcoOS_StrCmp(binarySave->binaryFileName, "\0") != gcvSTATUS_OK)
-        {
-            gcoOS_Remove(gcvNULL, binarySave->binaryFileName);
-        }
-        vxoBinaryGraph_unInitial(graph);
-    }
+    status = vxoBinaryGraph_SaveErrorHandle(graph, status);
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -11091,9 +11122,9 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
     )
 {
     vx_status status = VX_SUCCESS;
-    vx_reference inputTable[VX_MAX_NN_INOUT_PARAM_COUNT];
-    vx_reference outputTable[VX_MAX_NN_INOUT_PARAM_COUNT];
-    vx_uint32 ioPhysical[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_reference *inputTable = VX_NULL;
+    vx_reference *outputTable = VX_NULL;
+    vx_uint32 *ioPhysical = VX_NULL;
     vx_uint32 inputNum = 0, outputNum = 0;
     vx_uint32 i = 0, j = 0, k = 0;
     vx_uint32 ioNum = 0;
@@ -11102,6 +11133,25 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
 
     if ((graph->inputCount == 0) || (graph->outputCount == 0))
     {
+        inputTable = (vx_reference*)vxAllocateAndZeroMemory(VX_MAX_NN_INOUT_PARAM_COUNT * sizeof(vx_reference) );
+        if (inputTable == VX_NULL)
+        {
+            vxError("%s[%d]: failed to allocate memory for inputTable\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_ERROR_NO_MEMORY);
+        }
+        outputTable = (vx_reference*)vxAllocateAndZeroMemory(VX_MAX_NN_INOUT_PARAM_COUNT * sizeof(vx_reference) );
+        if (outputTable == VX_NULL)
+        {
+            vxError("%s[%d]: failed to allocate memory for outputTable\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_ERROR_NO_MEMORY);
+        }
+        ioPhysical = (vx_uint32*)vxAllocateAndZeroMemory(VX_MAX_NN_INOUT_PARAM_COUNT * sizeof(vx_uint32) );
+        if (ioPhysical == VX_NULL)
+        {
+            vxError("%s[%d]: failed to allocate memory for ioPhysical\n", __FUNCTION__, __LINE__);
+            vxmONERROR(VX_ERROR_NO_MEMORY);
+        }
+
         vxmONERROR(vxoBinaryGraph_InputsOutputs(graph, inputTable, &inputNum, outputTable, &outputNum));
         if ((inputNum == 0) || (outputNum == 0))
         {
@@ -11135,6 +11185,11 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
             for (j = 0; j < inputNum; j++)
             {
                 vx_bool dupFlag = vx_false_e;
+                if (inputTable[j] == VX_NULL)
+                {
+                    vxError("%s[%d]: failed, inputTable[%d] is NULL\n", __FUNCTION__, __LINE__, j);
+                    vxmONERROR(VX_FAILURE);
+                }
                 if ((input->dataType == VX_BINARY_BUFFER_TYPE_TENSOR) && (inputTable[j]->type == VX_TYPE_TENSOR))
                 {
                     vx_tensor tensor = (vx_tensor)inputTable[j];
@@ -11271,6 +11326,11 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
             for (j = 0; j < outputNum; j++)
             {
                 vx_bool dupFlag = vx_false_e;
+                if (outputTable[j] == VX_NULL)
+                {
+                    vxError("%s[%d]: failed, outputTable[%d] is NULL\n", __FUNCTION__, __LINE__, j);
+                    vxmONERROR(VX_FAILURE);
+                }
                 if ((output->dataType == VX_BINARY_BUFFER_TYPE_TENSOR) && (outputTable[j]->type == VX_TYPE_TENSOR))
                 {
                     vx_tensor tensor = (vx_tensor)outputTable[j];
@@ -11359,6 +11419,19 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SetInputOutput(
     }
 
 OnError:
+    if (inputTable != VX_NULL)
+    {
+        vxFree(inputTable);
+    }
+    if (outputTable != VX_NULL)
+    {
+        vxFree(outputTable);
+    }
+    if (ioPhysical != VX_NULL)
+    {
+        vxFree(ioPhysical);
+    }
+
     gcmFOOTER_ARG("status=%d", status);
     return status;
 }
@@ -12396,8 +12469,22 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
     vx_uint32 outputCount = 0;
     vx_uint32 totalSize = 0;
     vx_uint32 inputOutputSize = 0;
-    vx_reference inputTableRef[VX_MAX_NN_INOUT_PARAM_COUNT];
-    vx_reference outputTableRef[VX_MAX_NN_INOUT_PARAM_COUNT];
+    vx_reference *inputTableRef = VX_NULL;
+    vx_reference *outputTableRef = VX_NULL;
+
+    inputTableRef = (vx_reference*)vxAllocateAndZeroMemory(VX_MAX_NN_INOUT_PARAM_COUNT * sizeof(vx_reference) );
+    if (inputTableRef == VX_NULL)
+    {
+        vxError("%s[%d]: failed to allocate memory for inputTableRef\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_ERROR_NO_MEMORY);
+    }
+
+    outputTableRef = (vx_reference*)vxAllocateAndZeroMemory(VX_MAX_NN_INOUT_PARAM_COUNT * sizeof(vx_reference) );
+    if (outputTableRef == VX_NULL)
+    {
+        vxError("%s[%d]: failed to allocate memory for outputTableRef\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_ERROR_NO_MEMORY);
+    }
 
     /* 1. enrtance size */
     nbEntranceSize = sizeof(vx_binary_header_s) + sizeof(vx_binary_memory_pool_info_s) +
@@ -12534,6 +12621,15 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_GetNBGSize(
 
     vxInfo("Calculate NBG size : %d bytes\n", (vx_uint32)(totalSize));
 OnError:
+    if (inputTableRef != VX_NULL)
+    {
+        vxFree(inputTableRef);
+    }
+    if (outputTableRef != VX_NULL)
+    {
+        vxFree(outputTableRef);
+    }
+
     return status;
 }
 
