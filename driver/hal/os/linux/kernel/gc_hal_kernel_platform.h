@@ -124,6 +124,8 @@ typedef struct _gcsMODULE_PARAMETERS
 
     gctUINT                 mmuDynamicMap;
     gctUINT                 allMapInOne;
+
+    gctUINT                 isrPoll;
 }
 gcsMODULE_PARAMETERS;
 

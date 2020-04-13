@@ -7204,6 +7204,10 @@ gckOS_QueryOption(
     {
         *Value = device->args.allMapInOne;
     }
+    else if (!strcmp(Option, "isrPoll"))
+    {
+        *Value = device->args.isrPoll;
+    }
     else
     {
         status = gcvSTATUS_NOT_SUPPORTED;

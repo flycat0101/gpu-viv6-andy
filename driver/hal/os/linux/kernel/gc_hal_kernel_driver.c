@@ -271,6 +271,10 @@ static uint mmuDynamicMap = 1;
 module_param(mmuDynamicMap, uint, 0644);
 MODULE_PARM_DESC(mmuDynamicMap, "Default 1 means enable mmu dynamic mapping in virsual memory, 0 means disable dynnamic mapping.");
 
+static uint isrPoll = 0;
+module_param(isrPoll, uint, 0644);
+MODULE_PARM_DESC(isrPoll, "Default 0 means auto, -1 means disable isr polling mode,1 means force enable isr polling mode");
+
 #if USE_LINUX_PCIE
 static int bar = 1;
 module_param(bar, int, 0644);
@@ -426,6 +430,8 @@ _InitModuleParam(
 
     p->mmuDynamicMap = mmuDynamicMap;
     p->allMapInOne = allMapInOne;
+
+    p->isrPoll = isrPoll;
 #if !gcdENABLE_3D
     p->irqs[gcvCORE_MAJOR]          = irqLine = -1;
     p->registerBases[gcvCORE_MAJOR] = registerMemBase = 0;
@@ -545,6 +551,7 @@ _SyncModuleParam(
     mmuPageTablePool = p->mmuDynamicMap;
     mmuDynamicMap = p->mmuDynamicMap;
     allMapInOne = p->allMapInOne;
+    isrPoll = p->isrPoll;
 }
 
 void
@@ -675,6 +682,7 @@ gckOS_DumpParam(
 
     printk("  mmuPageTablePool  = %d\n", mmuPageTablePool);
     printk("  mmuDynamicMap     = %d\n", mmuDynamicMap);
+    printk("  isrPoll           = %d\n", isrPoll);
 
     printk("Build options:\n");
     printk("  gcdGPU_TIMEOUT    = %d\n", gcdGPU_TIMEOUT);
