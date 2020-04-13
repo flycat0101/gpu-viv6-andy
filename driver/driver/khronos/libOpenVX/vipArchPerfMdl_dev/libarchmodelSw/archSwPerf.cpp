@@ -4219,6 +4219,7 @@ APMHandle archApmInit(arch_nn_config *pArchNnConfig,archHAL_CHIPIDENTITY *pChipI
     {
         bwl.ddr_read_bw_in_byte_per_cycle = pArchNnConfig->customizedFeature.ddrReadBWLimit;   /*ddr bw limit*/
         bwl.ddr_write_bw_in_byte_per_cycle = pArchNnConfig->customizedFeature.ddrWriteBWLimit;
+
         bwl.ddr_total_bw_in_byte_per_cycle = pArchNnConfig->customizedFeature.ddrTotalBWLimit;
         bwl.axiSramReadBWLimit = pArchNnConfig->customizedFeature.axiSramReadBWLimit;          /*axi bw limit*/
         bwl.axi_sram_write_bw_limit = pArchNnConfig->customizedFeature.axiSramWriteBWLimit;
@@ -4229,6 +4230,7 @@ APMHandle archApmInit(arch_nn_config *pArchNnConfig,archHAL_CHIPIDENTITY *pChipI
         bwl.internal_write_bw_limit = (arch_float32)pArchNnConfig->fixedFeature.nnLanesPerOutCycle;    /*internal write bw limite*/
         bwl.ddr_latency = pArchNnConfig->customizedFeature.ddrLatency;                         /*ddr latency*/
         bwl.total_latency = totalLatency;                                                       /*total latency*/
+        bwl.maxSocOTNumber = (float)pArchNnConfig->customizedFeature.maxSocOTNumber;
 
         /* burst setting */
         bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_64B = pArchDataFeature->ddrReadSustainedBw64BBurst;

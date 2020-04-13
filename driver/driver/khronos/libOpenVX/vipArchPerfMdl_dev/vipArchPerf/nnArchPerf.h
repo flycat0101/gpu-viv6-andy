@@ -61,6 +61,7 @@ typedef struct _bandwidth_latency
 
     float ddr_latency;
     float total_latency;
+    float maxSocOTNumber;
 
     /* todo: kernelDDR readbandwidth inImageDDRReadBandwidth, may be more */
     /* following info is for FPGA or Simulation test bench to model the behavior of DDR*/

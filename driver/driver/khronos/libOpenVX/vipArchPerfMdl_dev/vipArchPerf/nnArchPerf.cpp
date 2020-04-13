@@ -5225,6 +5225,8 @@ APMHandle CreateAPModel (
         assert(0);
     }
 
+    //InitHWModeling(inParam.bwl);
+
     // copy fpga info from inParam
     memcpy(&p_hwInfo->fpagInfo, &inParam.fpagInfo, sizeof(FPGA_INFO_T));
 
@@ -5240,7 +5242,23 @@ APMHandle CreateAPModel (
     initBugStatus(&pContext->bf);
     initFeatureStatus(&pContext->bf);
 
+
     return (APMHandle)(p_hwInfo);
+}
+
+void InitHWModeling(
+    BWL_T &bwl
+    )
+{
+    float totalLatency = bwl.total_latency; // total_latency is generate in archApmInit
+    float OUTSTANDING_TRANSFER = bwl.maxSocOTNumber;
+    float MaxOutstandingCycle = OUTSTANDING_TRANSFER * 4;
+    if (totalLatency > MaxOutstandingCycle)
+    {
+        float DDR_BW_limited_by_latency    = (16 * MaxOutstandingCycle) / totalLatency;
+        bwl.ddr_read_bw_in_byte_per_cycle  = min(bwl.ddr_read_bw_in_byte_per_cycle, DDR_BW_limited_by_latency);
+        bwl.ddr_write_bw_in_byte_per_cycle = min(bwl.ddr_write_bw_in_byte_per_cycle, DDR_BW_limited_by_latency);
+    }
 }
 
 void DestroyAPModel(

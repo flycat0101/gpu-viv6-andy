@@ -268,3 +268,7 @@ void UpdateManualParams(
     unsigned int &iny
     );
 
+void InitHWModeling(
+    BWL_T &bwl
+    );
+
