@@ -150,7 +150,8 @@ enum g2d_format hwc_alterFormat(buffer_handle_t hnd, enum g2d_format format)
         switch (format)
         {
         case G2D_RGBA8888:
-            halFormat = G2D_BGRA8888;
+            /*VIV: Check PE_A8B8G8R8 feature. */
+            halFormat = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_PE_A8B8G8R8) ? G2D_RGBA8888 : G2D_BGRA8888;
             break;
         case G2D_RGBX8888:
             halFormat = G2D_BGRX8888;
