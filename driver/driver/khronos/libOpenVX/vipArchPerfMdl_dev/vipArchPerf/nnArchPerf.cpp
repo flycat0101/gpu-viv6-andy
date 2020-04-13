@@ -2209,9 +2209,11 @@ static double WriteBandWidth(
 double rw_accum_bubble(
     unsigned int kx,
     unsigned int ky,
+    /*unsigned int kz,*/
     unsigned int tile_ysize,
     unsigned int kernel_per_core,
-    unsigned int zdp,
+    unsigned int xydp_x,
+    /*unsigned int zdp,*/
     unsigned int interleave_mode,
     double non_zero_ratio,
     double org3DCC // roginal 3D tile Compute Cycle
@@ -2220,9 +2222,19 @@ double rw_accum_bubble(
 {
     double new3DCCWithBubble = org3DCC;
 
-    double rotate_num = kernel_per_core * ceilf((float)kx * ky / zdp) * non_zero_ratio;
-    double bubble_per_2dtile = max(3 + rotate_num - org3DCC, 0);
-    new3DCCWithBubble = org3DCC * (1 + ((double)bubble_per_2dtile / org3DCC));
+    int i_rotate_num = 0;
+    if (xydp_x != 1)
+    {
+        i_rotate_num = (int)ceilf( (float)kx / xydp_x) * ky;
+    }
+
+    double rotate_num = i_rotate_num * non_zero_ratio;
+
+    double cycle_per_input_2dtile     =  ceilf((float)tile_ysize / interleave_mode) * rotate_num * kernel_per_core;
+    double bubbles_per_rotatedGroup = max(3 + rotate_num - tile_ysize * rotate_num, 0);
+    double bubble_per_input_2dtile = bubbles_per_rotatedGroup * kernel_per_core;
+    new3DCCWithBubble = org3DCC * (1 + ((double)bubble_per_input_2dtile / cycle_per_input_2dtile));
+
 
     return new3DCCWithBubble;
 }
@@ -2483,7 +2495,7 @@ double ComputeCycleCount(
         }
     }
 
-    //tile3DComputeCycle = rw_accum_bubble(kx, ky, tile_ysize, kernel_per_core, zdp, interleave_mode, non_zero_ratio, tile3DComputeCycle);
+    //tile3DComputeCycle = rw_accum_bubble(kx, ky, tile_ysize, kernel_per_core, xydp_x, /*zdp,*/ interleave_mode, non_zero_ratio, tile3DComputeCycle);
 
     tmp = y % tile_ysize;
     if (tmp != 0)
@@ -2504,7 +2516,7 @@ double ComputeCycleCount(
         }
 
         // rw_accum_sync_pause bubble for bottom 3D tile, timeYsize is tmp
-        //bottomTile3DComputeCycle = rw_accum_bubble(kx, ky, tmp, kernel_per_core, zdp, interleave_mode, non_zero_ratio, tile3DComputeCycle);
+        //bottomTile3DComputeCycle = rw_accum_bubble(kx, ky, tmp, kernel_per_core, xydp_x, interleave_mode, non_zero_ratio, tile3DComputeCycle);
     }
     else
     {
