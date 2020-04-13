@@ -2434,7 +2434,6 @@ _Commit(
         {
             kernel = Device->map[HwType].kernels[subCommit->coreId];
         }
-
         if (Engine == gcvENGINE_BLT)
         {
             command  = kernel->asyncCommand;
@@ -2446,8 +2445,8 @@ _Commit(
             eventObj = kernel->eventObj;
         }
 
-        /* Commit command buffers. */
         {
+            /* Commit command buffers. */
             status = gckCOMMAND_Commit(command,
                                        subCommit,
                                        ProcessId,
@@ -5456,18 +5455,20 @@ gckDEVICE_ChipInfo(
     IN gcsHAL_INTERFACE_PTR Interface
     )
 {
-    gctUINT i;
-    gcsCORE_INFO * info = Device->coreInfoArray;
-
-    for (i = 0; i < Device->coreNum; i++)
     {
-        Interface->u.ChipInfo.types[i] = info[i].type;
-        Interface->u.ChipInfo.ids[i] = info[i].chipID;
+        gctUINT i;
+        gcsCORE_INFO * info = Device->coreInfoArray;
 
-        Interface->u.ChipInfo.coreIndexs[i] = info[i].core;
+        for (i = 0; i < Device->coreNum; i++)
+        {
+            Interface->u.ChipInfo.types[i] = info[i].type;
+            Interface->u.ChipInfo.ids[i] = info[i].chipID;
+
+            Interface->u.ChipInfo.coreIndexs[i] = info[i].core;
+        }
+
+        Interface->u.ChipInfo.count = Device->coreNum;
     }
-
-    Interface->u.ChipInfo.count = Device->coreNum;
 
     return gcvSTATUS_OK;
 }
