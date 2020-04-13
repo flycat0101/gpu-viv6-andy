@@ -381,6 +381,10 @@ else
   CFLAGS            += -DgcdSTATIC_LINK=0
 endif
 
+ifeq ($(gcdIGNORE_DRIVER_VERSIONS_MISMATCH),1)
+  CFLAGS            += -DgcdIGNORE_DRIVER_VERSIONS_MISMATCH=1
+endif
+
 ifneq (,$(GL_2_APPENDIX))
   CFLAGS            += -D_GL_2_APPENDIX=$(GL_2_APPENDIX)
 endif
