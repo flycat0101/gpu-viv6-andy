@@ -1601,10 +1601,10 @@ arch_status archCalculateArchPerf(
                                     k = APMCalcNumOfKernel(x, y, outZSize, adjustAccuBuffDepth, numCores, interleaveMode,
                                                            zdp, kernelXSize, kernelYSize, pArchNnConfig->derivedFeature.nnXYDPX, isV8,
                                                            /*inputDataSize,*/ lanesPerConv, poolingStride,isDepthWise, isDepthWiseMerge, kernelPerCoreLTOneThirdCoefFix,asymmetricQuantization);
-                                    if ( isV8 && (k==0) )
-                                    {
-                                        break;
-                                    }
+                                    //if ( isV8 && (k==0) )
+                                    //{
+                                    //    break;
+                                    //}
 
                                     if (!pArchNnConfig->unifiedFeature.coefDeltaCordOverFlowZRL8BitFix &&
                                         ((kernelXSize == 2 && kernelYSize == 2) ||
