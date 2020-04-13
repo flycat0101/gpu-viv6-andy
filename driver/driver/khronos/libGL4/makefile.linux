@@ -11,29 +11,18 @@
 ##############################################################################
 
 
-#
-# Driver part of GLES 3.x and GL4
-#
-
-#############################################################################
 # Include common definitions.
-
 include $(AQROOT)/makefile.linux.def
 
-GL4_CHIP         := src/chip
-GL4_API          := src/glcore/api
-GL4_DISPLAY_LIST := src/glcore/display_list
 GL4_GLCORE       := src/glcore
 GL4_CLIENT       := src/GLX/client
 GL4_SERVER       := src/GLX/server
 
 ifeq ($(YOCTO_DRI_BUILD),1)
-$(GL4_GLCORE): $(GL4_CHIP) $(GL4_API) $(GL4_DISPLAY_LIST)
-MODULES 	:= $(GL4_CHIP) $(GL4_API) $(GL4_DISPLAY_LIST) $(GL4_GLCORE) $(GL4_CLIENT)
+MODULES 	:= $(GL4_GLCORE) $(GL4_CLIENT)
 MAIN_MODULE	= $(GL4_GLCORE) $(GL4_CLIENT)
 else
-$(GL4_GLCORE): $(GL4_CHIP) $(GL4_API) $(GL4_DISPLAY_LIST)
-MODULES 	:= $(GL4_CHIP) $(GL4_API) $(GL4_DISPLAY_LIST) $(GL4_GLCORE)
+MODULES 	:= $(GL4_GLCORE)
 MAIN_MODULE	= $(GL4_GLCORE)
 endif
 
