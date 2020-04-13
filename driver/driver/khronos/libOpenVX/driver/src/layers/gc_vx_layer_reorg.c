@@ -969,6 +969,63 @@ vx_status vxnneReorg2_Space2BatchND(struct _vxnne_operation_s *operation)
     return status;
 }
 
+vx_status vxnneReorg2_ShuffleChannel(struct _vxnne_operation_s *operation)
+{
+    vx_status status = VX_SUCCESS;
+    vxnne_reorg_operation reorgOperation = (vxnne_reorg_operation)operation;
+
+    vx_tensor  inputs  = (vx_tensor)reorgOperation->inputs;
+    vx_tensor  outputs = (vx_tensor)reorgOperation->outputs;
+
+    vx_uint8_ptr inputBase = VX_NULL, outputBase = VX_NULL;
+    vx_int32 i, j, n, len = 1, num = 1, feature_map_size = 1;
+
+    const vx_int32 item_size = vxnneGetTypeSize((vx_type_e)TENSOR_DATA_TYPE(outputs));
+
+    vx_int32 num_group = 0, axis = 0, group_size = 0, size = 0, fms_bytes = 0;
+
+    vxoTensor_GetTensorViewMemory(inputs, (gctPOINTER*)&inputBase, VX_NULL);
+    vxoTensor_GetTensorViewMemory(outputs, (gctPOINTER*)&outputBase, VX_NULL);
+
+    num_group = reorgOperation->num_group->value->e;
+    axis = reorgOperation->axis->value->e;
+
+    gcmASSERT(axis < 4);
+
+    group_size = inputs->dims[axis] / num_group;
+
+
+    for (i = 0; i < axis; i++)
+    {
+        len *= inputs->dims[i];
+    }
+
+    for (i = axis + 1; i < (vx_int32)inputs->dimCount; i++)
+    {
+        num *= inputs->dims[i];
+    }
+
+    for (i = 0; i <= axis; i++)
+    {
+        feature_map_size *= inputs->dims[i];
+    }
+
+    /* Shuffle Channel CPU Implement, the shape and dtype of output must same as input */
+    size = len * item_size;
+    fms_bytes = feature_map_size * item_size;
+    for (n = 0; n < num; n++)
+    {
+        for (i = 0; i < num_group; i++)
+        {
+            for (j = 0; j < group_size; j++)
+            {
+                memcpy(outputBase + n * fms_bytes + (j * num_group + i) * size, inputBase + n * fms_bytes + (i * group_size + j) * size, size);
+            }
+        }
+    }
+
+    return status;
+}
 
 vx_status vxnneExecuteSWReorg2(struct _vxnne_operation_s *operation)
 {
@@ -995,6 +1052,10 @@ vx_status vxnneExecuteSWReorg2(struct _vxnne_operation_s *operation)
 
         case VX_REORG_SPACE_TO_BATCH_ND:
             vxnneReorg2_Space2BatchND(operation);
+            break;
+
+        case VX_REORG_SHUFFLE_CHANNEL:
+            vxnneReorg2_ShuffleChannel(operation);
             break;
 
         default:
@@ -1046,6 +1107,10 @@ VX_PRIVATE_API vx_status _GetTPReorgCmdType(vx_enum reorg_type,
         *cmd_type = TP_REORG_BATCH2SPACE;
         break;
 
+    case VX_REORG_SHUFFLE_CHANNEL:
+        *cmd_type = TP_REORG_SHUFFLECHANNEL;
+        break;
+
     default:
         status = VX_ERROR_NOT_SUPPORTED;
         break;
@@ -1062,6 +1127,8 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationTP(
     vx_tensor block_size,
     vx_scalar type_s,
     vx_tensor pad,
+    vx_scalar num_group_s,
+    vx_scalar axis_s,
     vx_uint32 *op_index)
 {
     vx_status status = VX_SUCCESS;
@@ -1118,6 +1185,15 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationTP(
     op_param->tp_value->u32[1] = block_size_height;
     op_param->tp_value->u32[2] = TENSOR_VIEW_SIZE_INDEX(input, 3);
 
+    if (num_group_s)
+    {
+        op_param->tp_value->u32[3] = num_group_s->value->e;
+    }
+
+    if (axis_s)
+    {
+        op_param->tp_value->u32[4] = axis_s->value->e;
+    }
     vxmONERROR(vxnneLayer_SetOperation(&layer->base,
                                        &layer->reorg_tp_operation.base,
                                        (*op_index)++));
@@ -1246,6 +1322,8 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSW(
     vx_tensor block_size,
     vx_scalar type_s,
     vx_tensor pad,
+    vx_scalar num_group_s,
+    vx_scalar axis_s,
     vx_uint32 *op_index)
 {
     vx_status status = VX_SUCCESS;
@@ -1273,6 +1351,9 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSW(
     layer->reorg_sw_operation.type    = type_s;
     layer->reorg_sw_operation.pad     = pad;
     layer->reorg_sw_operation.outputs = output;
+    layer->reorg_sw_operation.num_group = num_group_s;
+    layer->reorg_sw_operation.axis = axis_s;
+
 
     vxnneOperation_AddReference(&layer->reorg_sw_operation.base, (vx_reference)input, VXNNE_OPERATION_REFENRENCE_INPUT);
     vxnneOperation_AddReference(&layer->reorg_sw_operation.base, (vx_reference)output, VXNNE_OPERATION_REFENRENCE_OUTPUT);
@@ -1290,6 +1371,8 @@ VX_PRIVATE_API vx_status vxoNNReorgLayer2_SW_Initialize(vxnne_layer ops_layer, c
     vx_scalar type_s = (vx_scalar)parameters[2];
     vx_tensor pad = (vx_tensor)parameters[3];
     vx_tensor outputs = (vx_tensor)parameters[4];
+    vx_scalar num_group_s = (vx_scalar)parameters[5];
+    vx_scalar axis_s = (vx_scalar)parameters[6];
     vx_enum type = type_s->value->e;
     vx_uint32 batch_count = (type == VX_REORG_BATCH_TO_SPACE_ND || type == VX_REORG_SPACE_TO_BATCH_ND) ? 1 : TENSOR_SIZE_INDEX(inputs, 3);
     vx_uint32 op_index = 0;
@@ -1304,6 +1387,8 @@ VX_PRIVATE_API vx_status vxoNNReorgLayer2_SW_Initialize(vxnne_layer ops_layer, c
         block_size,
         type_s,
         pad,
+        num_group_s,
+        axis_s,
         &op_index));
 
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
@@ -1477,6 +1562,8 @@ VX_PRIVATE_API vx_status vxoNNReorgLayer2_TP_Initialize(vxnne_layer ops_layer, c
     vx_scalar type_s = (vx_scalar)parameters[2];
     vx_tensor pad = (vx_tensor)parameters[3];
     vx_tensor outputs = (vx_tensor)parameters[4];
+    vx_scalar num_group_s = (vx_scalar)parameters[5];
+    vx_scalar axis_s = (vx_scalar)parameters[6];
     vx_enum type = type_s->value->e;
     vx_uint32 batch_count = (type == VX_REORG_BATCH_TO_SPACE_ND || type == VX_REORG_SPACE_TO_BATCH_ND) ? 1 : TENSOR_SIZE_INDEX(inputs, 3);
 
@@ -1492,6 +1579,8 @@ VX_PRIVATE_API vx_status vxoNNReorgLayer2_TP_Initialize(vxnne_layer ops_layer, c
         block_size,
         type_s,
         pad,
+        num_group_s,
+        axis_s,
         &op_index));
 
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
