@@ -181,6 +181,22 @@ VkBool32 halti5_isMismatch(VSC_IMAGE_FORMAT vscFormat, VkFormat descFormat)
     return result;
 }
 
+VSC_IMAGE_FORMAT halti5_toVscFormat(VkFormat format)
+{
+    int m;
+    VSC_IMAGE_FORMAT vscFormat = VSC_IMAGE_FORMAT_NONE;
+    for (m = 0; m < __VK_VSC_DRV_FORMAT_MAP_NUM; m++)
+    {
+        if (format == mapTable[m].drvFormat)
+        {
+            vscFormat = mapTable[m].vscFormat;
+            break;
+        }
+    }
+
+    return vscFormat;
+}
+
 VkResult halti5_helper_convert_VertexAttribDesc(
     __vkDevContext *devCtx,
     uint32_t count,
@@ -7769,6 +7785,15 @@ VkResult halti5_patch_pipeline(
                                         VSC_RES_ACT_BIT actBits = 0;
                                         uint32_t subType;
                                         int32_t idx = 0;
+                                        VSC_IMAGE_FORMAT  vscPlaneFormat[__VK_MAX_PLANE] = {VSC_IMAGE_FORMAT_NONE};
+                                        __vkYCbCrFormatInfo fmtFormat = __vk_GetYCbCrFormatInfo((VkFormat)patchInfo->originalFormat);
+
+                                        for (idx = 0; idx < fmtFormat.planeCount; idx++)
+                                        {
+                                            vscPlaneFormat[idx] = halti5_toVscFormat(fmtFormat.planeFormat[idx]);
+                                            __VK_ASSERT(vscPlaneFormat[idx] != VSC_IMAGE_FORMAT_NONE);
+                                        }
+
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.applyLevel = VSC_SHLEVEL_Post_Medium;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib->vscHandle;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
@@ -7781,7 +7806,7 @@ VkResult halti5_patch_pipeline(
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.opTypeBits = opTypeBits;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.actBits = actBits;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.subType = subType;
-                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.pPrivData = gcvNULL;
+                                        vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.pPrivData = (void*)vscPlaneFormat;
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount = 2; /* 2 ivec4 */
 
                                         vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts =
