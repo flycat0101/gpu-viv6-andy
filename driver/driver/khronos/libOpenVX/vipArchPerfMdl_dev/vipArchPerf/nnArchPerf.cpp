@@ -2204,6 +2204,31 @@ static double WriteBandWidth(
     return WriteBandWidth;
 }
 
+// model bug read write accumulation bubble
+// bug ID:
+double rw_accum_bubble(
+    unsigned int kx,
+    unsigned int ky,
+    unsigned int tile_ysize,
+    unsigned int kernel_per_core,
+    unsigned int zdp,
+    unsigned int interleave_mode,
+    double non_zero_ratio,
+    double org3DCC // roginal 3D tile Compute Cycle
+
+    )
+{
+    double new3DCCWithBubble = org3DCC;
+
+    double rotate_num = kernel_per_core * ceilf((float)kx * ky / zdp) * non_zero_ratio;
+
+    int cycle_per_2dtile     = (int) ceilf((float)tile_ysize / interleave_mode);
+    double bubble_per_2dtile = max(3 + rotate_num - org3DCC, 0);
+    new3DCCWithBubble = org3DCC * (1 + ((double)bubble_per_2dtile / org3DCC));
+
+    return new3DCCWithBubble;
+}
+
 double ComputeCycleCount(
     unsigned int tile_xsize,
     unsigned int tile_ysize,
@@ -2460,6 +2485,8 @@ double ComputeCycleCount(
         }
     }
 
+    //tile3DComputeCycle = rw_accum_bubble(kx, ky, tile_ysize, kernel_per_core, zdp, interleave_mode, non_zero_ratio, tile3DComputeCycle);
+
     tmp = y % tile_ysize;
     if (tmp != 0)
     {
@@ -2477,6 +2504,9 @@ double ComputeCycleCount(
         {
             bottomTile3DComputeCycle = max(ceilf((float)tmp / interleave_mode) * rotate_cell, pipeLatency) * kernel_per_core;
         }
+
+        // rw_accum_sync_pause bubble for bottom 3D tile, timeYsize is tmp
+        //bottomTile3DComputeCycle = rw_accum_bubble(kx, ky, tmp, kernel_per_core, zdp, interleave_mode, non_zero_ratio, tile3DComputeCycle);
     }
     else
     {
