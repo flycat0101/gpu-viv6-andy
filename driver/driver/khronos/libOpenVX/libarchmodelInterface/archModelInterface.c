@@ -1516,7 +1516,8 @@ static vx_status updateConfigration(archNN_DATABASE_FEATURE *pArchDataFeature,ar
     /* tp comp 2pixel per cycle */
     pArchDataFeature->tpComp2pixelPerCycle = 0;;
 
-
+    /* graph batch count */
+    pArchDataFeature->grachBatchCount = pContextOptions->graphBatchCount;
     return 0;
 }
 

@@ -1107,6 +1107,13 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
             globalData->nnConfig.fixedFeature.vipCoreCount       = 0;
         }
     }
+    /* get the graph_batchCount from env */
+    envctrl = gcvNULL;
+    globalData->options.graphBatchCount = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_GRAPH_BATCH_COUNT", &envctrl)) && envctrl)
+    {
+        globalData->options.graphBatchCount = atoi(envctrl);
+    }
 
     /*Solely for BRCM 2019July */
     #define  DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_64B              2

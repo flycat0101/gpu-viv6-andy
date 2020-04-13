@@ -3108,6 +3108,8 @@ typedef struct _vx_drv_option
     gctUINT commandBufferDump;
     gctUINT enableWBShare;
 
+    /* graph batch count */
+    gctUINT graphBatchCount;
     /* add env setting for DDR Burst */
     gctUINT specificDDRLimitByBurst;
     gctFLOAT ddrReadSustainedBw64BBurst;

@@ -508,6 +508,9 @@ typedef struct _archNN_DATABASE_FEATURE
     /* tp comp 2pixel per cycle */
     arch_uint32 tpComp2pixelPerCycle;
 
+    /* graph batch count */
+    arch_uint32 grachBatchCount;
+
 }archNN_DATABASE_FEATURE;
 
 typedef struct _arch_nn_config
