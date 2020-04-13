@@ -210,6 +210,8 @@
 #define SPV_ID_FUNC_VIR_RET_SYM(id) (spv->idDescriptor[id].u.func.virRetSymbol)
 #define SPV_ID_FUNC_ARG_STORAGE(id) (spv->idDescriptor[id].u.func.argStorage)
 
+#define SPV_ID_EXT_INST_SET(id) (spv->idDescriptor[id].u.extInstSet.virIntrinsicSetKind)
+
 #define SPV_CACHED_INST(index) (spv->cachedInst[index])
 #define SPV_CACHED_INST_COUNT() (spv->cachedInstCount)
 
@@ -563,6 +565,7 @@ VSC_ErrCode __SpvEmitCompositeInsert(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitVectorExtractDynamic(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitVectorInsertDynamic(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitCompositeConstruct(gcSPV spv, VIR_Shader * virShader);
+VSC_ErrCode __SpvEmitExtInst(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitIntrinsicCall(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitSampledImage(gcSPV spv, VIR_Shader * virShader);
@@ -580,11 +583,9 @@ VSC_ErrCode __SpvEmitName(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitBranch(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitBranchConditional(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitReturn(gcSPV spv, VIR_Shader * virShader);
-VSC_ErrCode __SpvEmitExtInst(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitFunctionParameter(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitReturnValue(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitNop(gcSPV spv, VIR_Shader * virShader);
-VSC_ErrCode __SpvEmitIntrinsicFunction(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitUnsupported(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitLoopMerge(gcSPV spv, VIR_Shader * virShader);
 VSC_ErrCode __SpvEmitBarrier(gcSPV spv, VIR_Shader * virShader);
