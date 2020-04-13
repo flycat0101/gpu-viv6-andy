@@ -14,7 +14,7 @@
 #include "gc_hal_types.h"
 
 
-typedef unsigned int handle_t;
+typedef unsigned int gctEDMA_HANDLE;
 
 typedef enum
 {
@@ -42,7 +42,7 @@ typedef struct
 {
     IN gcvEDMA_IOCTL_CMD cmd;
 
-    INOUT handle_t edma_chan;
+    INOUT gctEDMA_HANDLE edma_chan;
     IN gctUINT64 src;
     IN gctUINT64 dst;
     INOUT size_t len;
