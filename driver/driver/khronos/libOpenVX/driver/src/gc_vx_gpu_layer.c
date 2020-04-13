@@ -958,10 +958,10 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
             inzp = (vx_float32)TENSOR_TF_ZEROPOINT(input);
 
             tail = 0 - inzp * inscale;
-
-            scale = vxCreateScalar(context, VX_TYPE_FLOAT32, &inscale);
-            zp = vxCreateScalar(context, VX_TYPE_FLOAT32, &tail);
         }
+
+        scale = vxCreateScalar(context, VX_TYPE_FLOAT32, &inscale);
+        zp = vxCreateScalar(context, VX_TYPE_FLOAT32, &tail);
 
         parameters[2] = (vx_reference)scale;
         parameters[3] = (vx_reference)zp;
@@ -1010,7 +1010,7 @@ vxnne_shader_executable vxnneGPUTensorCopyShaderExecutable(
             goto OnError;
         }
 
-        status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
+        status  = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
         status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
         if (is_write_4x)
         {
