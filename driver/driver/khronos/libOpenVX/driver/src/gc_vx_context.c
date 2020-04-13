@@ -979,6 +979,13 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitOptions(vx_global_data globalData)
     }
 
     envctrl = gcvNULL;
+    globalData->options.enableWBShare = 0;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_VX_ENABLE_WB_SHARE", &envctrl)) && envctrl)
+    {
+        globalData->options.enableWBShare = atoi(envctrl);
+    }
+
+    envctrl = gcvNULL;
     globalData->options.enableGraphTranform = 1;
     globalData->options.enableGraphMerge = 1;
     globalData->options.enableGraphDump = 0;

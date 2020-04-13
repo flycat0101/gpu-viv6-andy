@@ -2408,7 +2408,7 @@ VX_PRIVATE_API vx_status GenerateTilingSegmentInfo(
 
             vxmASSERT(convOperation->swtWeightBiases == VX_NULL);
 
-            convOperation->swtWeightBiases = vxoCreateWeightsBiasesFromWeightBias(
+            convOperation->swtWeightBiases = vxoCreateWeightsBiasesParameterFromWeightBias(
                                                  graph->base.context,
                                                  opInfo.weightsBiases,
                                                  WB_WEIGHT_DIMS_SIZES(opInfo.weightsBiases),

@@ -1318,6 +1318,12 @@ typedef struct _vx_global_data_s
     vx_nn_config                            nnConfig;
 } vx_global_data_s, *vx_global_data;
 
+typedef struct _vx_wb_list
+{
+    vx_weights_biases_parameter             wb;
+    struct _vx_wb_list                      *next;
+} vx_wb_list_s, *vx_wb_list;
+
 typedef struct _vx_context
 {
     vx_reference_s                          base;
@@ -1408,6 +1414,7 @@ typedef struct _vx_context
     vx_nn_config                            nnConfig;
     /*end COPY_FROM_GLOBAL_DATA*/
 
+    vx_wb_list                              wbList;
 }
 vx_context_s;
 

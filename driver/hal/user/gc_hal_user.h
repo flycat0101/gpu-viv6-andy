@@ -3099,6 +3099,7 @@ typedef struct _vx_drv_option
     gctUINT disableTPNNEvis;
     gctUINT enableWBDump;
     gctUINT commandBufferDump;
+    gctUINT enableWBShare;
 }
 vx_drv_option;
 

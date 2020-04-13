@@ -112,6 +112,7 @@ vx_weight_bias_slice_item_s, *vx_weight_bias_slice_item;
 typedef struct _vx_weight_bias_compress_param_s
 {
     vx_enum                                  target;
+    vx_uint8                                 step;
 
     vx_memory_s                              whole_memory;
     vx_size                                  whole_memory_size;
@@ -123,6 +124,10 @@ typedef struct _vx_weight_bias_compress_param_s
 
     vx_float64                               whole_non_zero_ratio;
     vx_float64                               whole_general_compression_ratio;
+
+    /* for record */
+    vx_uint32                                kernel_per_core;
+    vx_uint32                                z_offset;
 }
 vx_weight_bias_compress_param_s, *vx_weight_bias_compress_param;
 
@@ -243,7 +248,18 @@ vx_weights_biases_parameter_s;
 #define WB_COMPRESS_RATIO(wb)                  (wb)->compress_param.whole_general_compression_ratio
 
 #define WB_COMPRESS_TARGET(wb)                 (wb)->compress_param.target
+#define WB_COMPRESS_STEP(wb)                   (wb)->compress_param.step
+#define WB_KERNEL_PER_CORE(wb)                 (wb)->compress_param.kernel_per_core
+#define WB_Z_OFFSET(wb)                        (wb)->compress_param.z_offset
+
 #define WB_IS_TP_COMPRESS(wb)                  (WB_COMPRESS_TARGET(wb) == VXNNE_OPERATION_TARGET_TP ? vx_true_e : vx_false_e)
+
+#define WB_IS_CALCULATED(wb)                   (WB_COMPRESS_STEP(wb) >= 1 ? vx_true_e : vx_false_e)
+#define WB_IS_COMPRESSED(wb)                   (WB_COMPRESS_STEP(wb) == 2 ? vx_true_e : vx_false_e)
+
+#define RESET_WB_COMPRESS_FLAG(wb)             WB_COMPRESS_STEP(wb) = 0
+#define SET_WB_CALCULATED_FLAG(wb)             WB_COMPRESS_STEP(wb) = 1
+#define SET_WB_COMPRESS_FLAG(wb)               WB_COMPRESS_STEP(wb) = 2
 
 #define WB_MEMORY(wb)                          (wb)->compress_param.whole_memory
 #define WB_MEMORY_NODE(wb)                     (wb)->compress_param.whole_memory.nodePtrs[0]
@@ -328,7 +344,7 @@ vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromTensorsPRelu(
     vx_tensor   alpha
     );
 
-vx_weights_biases_parameter vxoCreateWeightsBiasesFromWeightBias(
+vx_weights_biases_parameter vxoCreateWeightsBiasesParameterFromWeightBias(
     vx_context                  context,
     vx_weights_biases_parameter old_wb,
     vx_uint32*                  weight_dims,
