@@ -4766,6 +4766,91 @@ vx_status  vxnneOperation_commandBufferDump(vxnne_execution_layer executionLayer
 
 }
 
+VX_PRIVATE_API vx_status vxnneOperation_NodeDumpForBinaryGraph(
+    vxnne_operation_command opCommand
+)
+{
+    vx_tensor output = VX_NULL;
+    vx_uint32 i = 0;
+    vx_uint8_ptr outputsBase = VX_NULL;
+    char layerFileName[256] = {'\0'};
+    FILE *fpLayer = VX_NULL;
+    vx_uint32 width = 0, height = 0, depth = 0, batch = 0;
+    vx_uint32 totalSize = 1;
+    vx_uint32 offset = 0;
+    static vx_uint32 layerNum = 0;
+    static vxnne_layer dumpedLayerPtr[VX_MAX_NODE_COUNT];
+    static vx_uint32 layerOperationNum[VX_MAX_NODE_COUNT];
+
+    /* the last operation of layer if mGpuSync is true */
+    if (opCommand->operation->mGpuSync == vx_true_e)
+    {
+        layerOperationNum[layerNum]++;
+        if (layerOperationNum[layerNum] < opCommand->operation->layer->num_operations)
+        {
+            /* only dump last operation in this layer */
+            return VX_SUCCESS;
+        }
+
+        for (i = 0; i < layerNum; i++)
+        {
+            /* ignore this layer if it has been dumped */
+            if (dumpedLayerPtr[i] == opCommand->operation->layer)
+            {
+                return VX_SUCCESS;
+            }
+        }
+
+        for (i = 0; i < opCommand->operation->outputsNum; i++)
+        {
+            if (opCommand->operation->outputs[i]->type == VX_TYPE_TENSOR)
+            {
+                /* dump last operation in layer.
+                   dump tensor total size for coverage multivip split operation */
+                vx_int32 *dims = VX_NULL;
+                vx_size tensorSize = 0;
+
+                output = (vx_tensor)(opCommand->operation->outputs[i]);
+                dims = TENSOR_ORIG_SIZES(output);
+                width = dims[0];
+                height = dims[1];
+                depth = dims[2];
+                batch = dims[3];
+                outputsBase = TENSOR_LOGICAL_ADDR(output);
+                vxoTensor_GetTensorWholeSize(output, &tensorSize);
+                totalSize = (vx_uint32)tensorSize;
+
+                memset(layerFileName, 0, sizeof(layerFileName));
+                gcoOS_PrintStrSafe(layerFileName, 256, &offset, "%d_%s_%d_%d_%d_%d_%d.bin", layerNum,
+                                    opCommand->operation->layer->name, width, height, depth, batch,
+                                    opCommand->batchID);
+
+                gcmVERIFY_OK(gcoOS_Open(gcvNULL, layerFileName, gcvFILE_CREATE, (gctFILE*)(&fpLayer)));
+
+                if(fpLayer)
+                {
+                    gcoOS_Seek(gcvNULL, fpLayer, 0, gcvFILE_SEEK_SET);
+                    gcoOS_Write(gcvNULL, fpLayer, totalSize, outputsBase);
+
+                    gcoOS_Flush(gcvNULL, fpLayer);
+                    gcmVERIFY_OK(gcoOS_Close(gcvNULL, fpLayer));
+                }
+                else
+                    vxmASSERT(0);
+                dumpedLayerPtr[layerNum] = opCommand->operation->layer;
+
+                layerNum++;
+            }
+            else
+            {
+                vxError("%s[%d]: not support this data type dump\n", __FUNCTION__, __LINE__);
+            }
+        }
+    }
+
+    return VX_SUCCESS;
+}
+
 vx_status vxnneOperation_NodeDump(
     vxnne_operation_command opCommand
     )
@@ -4783,6 +4868,14 @@ vx_status vxnneOperation_NodeDump(
     vx_uint32 index;
     vx_bool isDumpOperation = vx_true_e;
     size_t len = 0;
+
+    if (1 == opCommand->operation->layer->node->base.context->options.enableSaveBinary)
+    {
+        /* dump output is binary file if enable saving NBG */
+        vxnneOperation_NodeDumpForBinaryGraph(opCommand);
+
+        return VX_SUCCESS;
+    }
 
     for (i = 0; i < opCommand->operation->outputsNum; i++)
     {
