@@ -108,6 +108,7 @@ typedef struct _gckGALDEVICE
     gctBOOL             isrInitializeds[gcdMAX_GPU_COUNT];
     struct task_struct  *isrThread[gcdMAX_GPU_COUNT];
     gctBOOL             killIsrThread;
+    gctBOOL             parkIsrThread;
 
     /* Register memory. */
     gctPOINTER          registerBases[gcdMAX_GPU_COUNT];

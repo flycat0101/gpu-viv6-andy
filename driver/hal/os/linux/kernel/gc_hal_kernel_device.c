@@ -1330,6 +1330,16 @@ static int isrRoutinePoll(void *ctxt)
             return 0;
         }
 
+        if (unlikely(device->parkIsrThread))
+        {
+            /* The daemon exits. */
+            while (!kthread_should_park())
+            {
+                gckOS_Delay(device->os, 1);
+            }
+            kthread_parkme();
+        }
+
         if (core == gcvCORE_VG)
         {
             isrRoutineVG(-1, gcvNULL);
@@ -1339,7 +1349,7 @@ static int isrRoutinePoll(void *ctxt)
             isrRoutine(-1, (gctPOINTER)(uintptr_t)(core + 1));
         }
 
-        gckOS_Delay(device->os, 1);
+        gckOS_Delay(device->os, 10);
     }
 
     return 0;
@@ -1362,14 +1372,26 @@ _SetupIsr(
     gcmSTATIC_ASSERT(gcvCORE_COUNT == gcmCOUNTOF(isrNames),
                      "isrNames array does not match core types");
 
-    if (Device->irqLines[Core] < 0)
+    if (Device->irqLines[Core] == -1)
     {
+        gctUINT64 isrPolling = -1;
+
+        if (Device->isrThread[Core])
+        {
+            return status;
+        }
+
+        gckOS_QueryOption(Device->os, "isrPoll", &isrPolling);
+
         /* use kthread to poll int stat */
-        if (!Device->isrThread[Core])
+        if (gcmBITTEST(isrPolling, Core) != 0)
         {
             struct task_struct * task;
 
-            task = kthread_run(isrRoutinePoll, (gctPOINTER)Core, "%s-poll", isrNames[Core]);
+            Device->killIsrThread = gcvFALSE;
+            Device->parkIsrThread = gcvFALSE;
+
+            task = kthread_run(isrRoutinePoll, (gctPOINTER)Core, "%s_poll", isrNames[Core]);
 
             if (IS_ERR(task))
             {
@@ -1385,11 +1407,12 @@ _SetupIsr(
             gcmkPRINT("galcore: polling core%d int state\n", Core);
 
             Device->isrThread[Core] = task;
-            Device->killIsrThread = gcvFALSE;
             Device->isrInitializeds[Core] = gcvTRUE;
-        }
 
-        return status;
+            return status;
+        }
+        /* it should not run to here */
+        return gcvSTATUS_INVALID_ARGUMENT;
     }
 
     handler = (Core == gcvCORE_VG) ? isrRoutineVG : isrRoutine;
@@ -1573,6 +1596,7 @@ gckGALDEVICE_Construct(
     gctINT32 i, j;
     gceHARDWARE_TYPE type;
     gceSTATUS status = gcvSTATUS_OK;
+    gctUINT64 isrPolling = -1;
 
     gcmkHEADER_ARG("Platform=%p Args=%p", Platform, Args);
 
@@ -1723,7 +1747,9 @@ gckGALDEVICE_Construct(
 
     device->platform->dev = device->device;
 
-    if (device->irqLines[gcvCORE_MAJOR] != -1)
+    gckOS_QueryOption(device->os, "isrPoll", &isrPolling);
+
+    if (device->irqLines[gcvCORE_MAJOR] != -1 || gcmBITTEST(isrPolling, gcvCORE_MAJOR)!= 0)
     {
         gcmkONERROR(gctaOS_ConstructOS(device->os, &device->taos));
     }
@@ -1779,9 +1805,11 @@ gckGALDEVICE_Construct(
 
                 for (j = 0; j < gcdMAX_GPU_COUNT; j++)
                 {
-                    if (device->irqLines[j] != -1 && device->kernels[j])
+                    if ((device->irqLines[j] != -1 || gcmBITTEST(isrPolling, j)!= 0)
+                        && device->kernels[j])
                     {
-                        device->kernels[j]->hardware->options.extSRAMGPUPhysNames[i] = gckKERNEL_AllocateNameFromPointer(device->kernels[j], device->extSRAMPhysical[i]);
+                        device->kernels[j]->hardware->options.extSRAMGPUPhysNames[i] =
+                            gckKERNEL_AllocateNameFromPointer(device->kernels[j], device->extSRAMPhysical[i]);
                     }
                 }
             }
@@ -1791,7 +1819,7 @@ gckGALDEVICE_Construct(
     /* Add core for all available major cores. */
     for (i = gcvCORE_MAJOR; i <= gcvCORE_3D_MAX; i++)
     {
-        if (device->irqLines[i] != -1)
+        if (device->irqLines[i] != -1 || gcmBITTEST(isrPolling, i)!= 0)
         {
             gcmkONERROR(gcTA_Construct(
                 device->taos,
@@ -1836,7 +1864,7 @@ gckGALDEVICE_Construct(
         }
     }
 
-    if (device->irqLines[gcvCORE_2D] != -1)
+    if (device->irqLines[gcvCORE_2D] != -1 || gcmBITTEST(isrPolling, gcvCORE_2D)!= 0)
     {
         gcmkONERROR(gckDEVICE_AddCore(
             device->device,
@@ -1880,7 +1908,7 @@ gckGALDEVICE_Construct(
         device->kernels[gcvCORE_2D] = gcvNULL;
     }
 
-    if (device->irqLines[gcvCORE_VG] != -1)
+    if (device->irqLines[gcvCORE_VG] != -1 || gcmBITTEST(isrPolling, gcvCORE_VG)!= 0)
     {
 #if gcdENABLE_VG
         gcmkONERROR(gckDEVICE_AddCore(
@@ -1905,7 +1933,8 @@ gckGALDEVICE_Construct(
     /* Initialize the kernel thread semaphores. */
     for (i = 0; i < gcdMAX_GPU_COUNT; i++)
     {
-        if (device->irqLines[i] != -1 && device->kernels[i])
+        if ((device->irqLines[i] != -1 || gcmBITTEST(isrPolling, i)!= 0)
+            && device->kernels[i])
         {
             sema_init(&device->semas[i], 0);
         }

@@ -273,7 +273,7 @@ MODULE_PARM_DESC(mmuDynamicMap, "Default 1 means enable mmu dynamic mapping in v
 
 static uint isrPoll = 0;
 module_param(isrPoll, uint, 0644);
-MODULE_PARM_DESC(isrPoll, "Default 0 means auto, -1 means disable isr polling mode,1 means force enable isr polling mode");
+MODULE_PARM_DESC(isrPoll, "Bits isr polling for per-core, default 0'1b means disable, 1'1b means auto enable isr polling mode");
 
 #if USE_LINUX_PCIE
 static int bar = 1;

@@ -4094,12 +4094,24 @@ gckOS_SuspendInterruptEx(
     IN gceCORE Core
     )
 {
+    gctUINT64 isrPolling = -1;
+
     gcmkHEADER_ARG("Os=%p Core=%d", Os, Core);
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
 
-    disable_irq(Os->device->irqLines[Core]);
+    gckOS_QueryOption(Os, "isrPoll", &isrPolling);
+
+    if (Os->device->irqLines[Core] != -1)
+    {
+        disable_irq(Os->device->irqLines[Core]);
+    }
+    else if (gcmBITTEST(isrPolling, Core))
+    {
+        Os->device->parkIsrThread = gcvTRUE;
+        kthread_park(Os->device->isrThread[Core]);
+    }
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
@@ -4119,12 +4131,24 @@ gckOS_ResumeInterruptEx(
     IN gceCORE Core
     )
 {
+    gctUINT64 isrPolling = -1;
+
     gcmkHEADER_ARG("Os=%p Core=%d", Os, Core);
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
 
-    enable_irq(Os->device->irqLines[Core]);
+    gckOS_QueryOption(Os, "isrPoll", &isrPolling);
+
+    if (Os->device->irqLines[Core] != -1)
+    {
+        enable_irq(Os->device->irqLines[Core]);
+    }
+    else if (gcmBITTEST(isrPolling, Core))
+    {
+        Os->device->parkIsrThread = gcvFALSE;
+        kthread_unpark(Os->device->isrThread[Core]);
+    }
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
