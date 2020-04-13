@@ -218,7 +218,7 @@ static void _InitDispatchTables(
     extern veglDISPATCH GLESv2_DISPATCH_TABLE;
     extern veglDISPATCH GL_DISPATCH_TABLE;
 #  endif
-#ifndef VIVANTE_NO_VG
+#if !defined(VIVANTE_NO_VG)
     extern veglDISPATCH OpenVG_DISPATCH_TABLE;
 #  endif
 
@@ -228,7 +228,7 @@ static void _InitDispatchTables(
     Thread->dispatchTables[vegl_OPENGL_ES20]    = &GLESv2_DISPATCH_TABLE;
     Thread->dispatchTables[vegl_OPENGL] = &GL_DISPATCH_TABLE;
 #  endif
-#ifndef VIVANTE_NO_VG
+#if !defined(VIVANTE_NO_VG)
     Thread->dispatchTables[vegl_OPENVG]         = &OpenVG_DISPATCH_TABLE;
 #  endif
 #else /* gcdSTATIC_LINK */
@@ -272,7 +272,9 @@ static void _InitDispatchTables(
 #if defined(EGL_API_FB)
         veglInitClientApiProcTbl(client_lib[vegl_OPENGL], gl4xApiEntryTbl, "gl", "GL4X");
 #endif
+#if !defined(VIVANTE_NO_VG)
         veglInitClientApiProcTbl(client_lib[vegl_OPENVG], vgApiEntryTbl, "vg", "OpenVG");
+#endif
         veglInitEsCommonApiDispatchTbl(client_lib[vegl_OPENGL_ES11], client_lib[vegl_OPENGL_ES20],
                                        glesCommonApiDispatchTbl, "gl");
         apiTblInitialized = gcvTRUE;
