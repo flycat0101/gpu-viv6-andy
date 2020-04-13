@@ -318,6 +318,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_WaitForFences(
     else
         waitTimeout = gcmMAX(1, (uint32_t)(timeout / 1000000 / fenceCount));
 
+#if defined(_WINDOWS)
+    if (waitTimeout < 30000)
+        waitTimeout = gcvINFINITE;
+#endif
+
     gcoOS_GetTime(&startTime);
     do
     {
