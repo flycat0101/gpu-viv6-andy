@@ -836,7 +836,7 @@ _Pattern_ReplaceNormal(
 
             if (Pattern->flags & VIR_PATN_FLAG_EXPAND)
             {
-                if (Pattern->flags & VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O)
+                if (Pattern->flags & VIR_PATN_FLAG_EXPAND_MODE_SAME_COMPONENT_VALUE)
                 {
                     opnd = _Pattern_GetOperand(insertedInst, j);
                     if (VIR_Operand_isLvalue(opnd))
@@ -933,19 +933,33 @@ _Pattern_DestroyClonedPattern(
 }
 
 static gctBOOL
-_Pattern_NotExpand(
-    IN VIR_Shader      *Shader,
-    IN VIR_Instruction *Inst
+_Pattern_NotExpandForSameComponentValue(
+    IN VIR_Pattern*     pPattern,
+    IN VIR_Shader*      pShader,
+    IN VIR_Instruction* pInst
     )
 {
-    gctSIZE_T i = 0;
-    gctBOOL   shouldExpand = gcvFALSE;
+    gctUINT8            i, j;
+    gctBOOL             bShouldExpand = gcvFALSE;
+    VIR_Enable          enable = VIR_Inst_GetEnable(pInst);
 
-    for (i = 0; i < VIR_Inst_GetSrcNum(Inst); ++i)
+    gcmASSERT(VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(pInst)));
+
+    /*
+    ** If the source uses the same swizzle for all enabled channels, then we don't need to expand this instruction,
+    ** we just need to re-swizzle the source operand, for example:
+    **  1) DIV, r0, r1.xxxx, r2.xxxx     ----> not expand.
+    **  2) DIV, r0.xz   r1.xyxx, r2.yxyy     ----> not epxand and w-shift to:
+    **     DIV, r0.xz   r1.xxxx, r2.yyyy
+    */
+    for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
     {
         VIR_OperandInfo opndInfo;
-        VIR_Swizzle     swiz;
-        VIR_Operand_GetOperandInfo(Inst, VIR_Inst_GetSource(Inst, i), &opndInfo);
+        VIR_Swizzle     swiz, currentChannelSwizzle, prevEnableSwizzle = VIR_SWIZZLE_X;
+        gctBOOL         bFirstEnable = gcvTRUE;
+        VIR_Operand*    pSrcOpnd = VIR_Inst_GetSource(pInst, i);
+
+        VIR_Operand_GetOperandInfo(pInst, pSrcOpnd, &opndInfo);
 
         if (opndInfo.isImmVal)
         {
@@ -957,19 +971,60 @@ _Pattern_NotExpand(
             return gcvFALSE;
         }
 
-        swiz = VIR_Operand_GetSwizzle(VIR_Inst_GetSource(Inst, i));
+        swiz = VIR_Operand_GetSwizzle(pSrcOpnd);
 
-        if (!(swiz == VIR_SWIZZLE_XXXX ||
-           swiz == VIR_SWIZZLE_YYYY ||
-           swiz == VIR_SWIZZLE_ZZZZ ||
-           swiz == VIR_SWIZZLE_WWWW))
+        for (j = 0; j < VIR_CHANNEL_COUNT; j++)
         {
-            shouldExpand = gcvTRUE;
+            /* Skip the non-enabled channel. */
+            if (!(enable & (1 << j)))
+            {
+                continue;
+            }
+
+            currentChannelSwizzle = VIR_Swizzle_GetChannel(swiz, j);
+            if (bFirstEnable)
+            {
+                prevEnableSwizzle = currentChannelSwizzle;
+                bFirstEnable = gcvFALSE;
+            }
+            else if (currentChannelSwizzle != prevEnableSwizzle)
+            {
+                bShouldExpand = gcvTRUE;
+                break;
+            }
+        }
+
+        /* Check if we should expand this source operand. */
+        if (bShouldExpand)
+        {
             break;
         }
+
+        /* Use the same swizzle for all channels. */
+        for (j = 0; j < VIR_CHANNEL_COUNT; j++)
+        {
+            VIR_Swizzle_SetChannel(swiz, j, prevEnableSwizzle);
+        }
+        VIR_Operand_SetSwizzle(pSrcOpnd, swiz);
     }
 
-    return !shouldExpand;
+    return !bShouldExpand;
+}
+
+static gctBOOL
+_Pattern_NotExpand(
+    IN VIR_Pattern     *Pattern,
+    IN VIR_Shader      *Shader,
+    IN VIR_Instruction *Inst
+    )
+{
+    /* Check if we need to expand the instruction for the same component value pattern. */
+    if (Pattern->flags & VIR_PATN_FLAG_EXPAND_MODE_SAME_COMPONENT_VALUE)
+    {
+        return _Pattern_NotExpandForSameComponentValue(Pattern, Shader, Inst);
+    }
+
+    return gcvTRUE;
 }
 
 static gctBOOL
@@ -1035,10 +1090,10 @@ _Pattern_ReplaceInline(
     gctSIZE_T        i                  = 0;
     VIR_Enable       expandEnable       = VIR_ENABLE_NONE;
 
-    gcmASSERT(VIR_Inst_GetDest(Inst) != gcvNULL &&
-        Pattern->matchCount == 1);
+    gcmASSERT(VIR_Inst_GetDest(Inst) != gcvNULL && Pattern->matchCount == 1);
 
-    if (_Pattern_NotExpand(Context->shader, Inst))
+    /* Check if we need to expand this instruction. */
+    if (_Pattern_NotExpand(Pattern, Context->shader, Inst))
     {
         /*
         VIR_Dumper *dumper     = Context->shader->dumper;
@@ -1047,7 +1102,12 @@ _Pattern_ReplaceInline(
         */
 
         Pattern = _Pattern_ClonePattern(Context, Pattern);
-        Pattern->flags = (VIR_PatnFlag)(Pattern->flags ^ VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O);
+
+        /* Reset the flags. */
+        if (Pattern->flags & VIR_PATN_FLAG_EXPAND_MODE_SAME_COMPONENT_VALUE)
+        {
+            Pattern->flags = (VIR_PatnFlag)(Pattern->flags ^ VIR_PATN_FLAG_EXPAND_MODE_SAME_COMPONENT_VALUE);
+        }
         Pattern->flags = (VIR_PatnFlag)(Pattern->flags ^ VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE);
 
         errCode = _Pattern_ReplaceNormal(Context, Function, Inst, Pattern, 0);
@@ -1131,8 +1191,11 @@ _Pattern_Replace(
 {
     VSC_ErrCode       errCode = VSC_ERR_NONE;
 
-    if (Pattern->flags & VIR_PATN_FLAG_ALREADY_MATCHED_AND_REPLACED) return errCode;
-    if (Pattern->flags & VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE)
+    if (Pattern->flags & VIR_PATN_FLAG_ALREADY_MATCHED_AND_REPLACED)
+    {
+        return errCode;
+    }
+    else if (Pattern->flags & VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE)
     {
         errCode = _Pattern_ReplaceInline(Context, Function, Inst, Pattern);
     }
