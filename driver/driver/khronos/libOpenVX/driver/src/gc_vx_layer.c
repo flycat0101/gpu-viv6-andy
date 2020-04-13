@@ -3112,6 +3112,220 @@ OnError:
     gcmFOOTER_NO();
     return VX_NULL;
 }
+
+/********vxcReorg2 ShuffleChannel****************************************/
+vxnne_shader_executable vxnneGetShuffleChannelShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               num_group_s,
+    vx_scalar               axis_s,
+    vx_tensor               output)
+{
+#if !gcdUSE_VXC_BINARY
+    vx_size    programLength = 0;
+    char *programSources = NULL;
+#endif
+    vx_program program = VX_NULL;
+    vx_status  status = VX_FAILURE;
+    vxnne_shader_executable shaderExecutable = VX_NULL;
+    vxnne_kernel_shaders        kernel;
+
+    vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    vx_reference  parameters[3]              = {(vx_reference)input, (vx_reference)output, (vx_reference)num_group_s};
+    vx_enum       inputFormat                = TENSOR_DATA_TYPE(input);
+    vx_enum       outputFormat               = TENSOR_DATA_TYPE(output);
+    vx_uint32     input_dim                  = TENSOR_DIM_NUM(input);
+    vx_uint32     output_dim                 = TENSOR_DIM_NUM(output);
+    vx_uint32     input_width                = TENSOR_VIEW_SIZE_INDEX(input, 0);
+    vx_uint32     input_height               = input_dim > 1 ? TENSOR_VIEW_SIZE_INDEX(input, 1) : 1;
+    vx_uint32     input_depth                = input_dim > 2 ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
+    vx_uint32     input_batch                = input_dim > 3 ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
+    vx_uint32     output_width               = TENSOR_VIEW_SIZE_INDEX(output, 0);
+    vx_uint32     output_height              = output_dim > 1 ? TENSOR_VIEW_SIZE_INDEX(output, 1) : 1;
+    vx_uint32     output_depth               = output_dim > 2 ? TENSOR_VIEW_SIZE_INDEX(output, 2) : 1;
+    vx_uint32     output_batch               = output_dim > 3 ? TENSOR_VIEW_SIZE_INDEX(output, 3) : 1;
+    vx_int32      sizes[4]                   = {input_width, input_height, input_depth, input_batch};
+
+    vx_tensor     input_rs                   = NULL;
+    vx_tensor     output_rs                  = NULL;
+    vx_int32      num_group                  = 0;
+    vx_int32      axis                       = 0;
+    vx_int32      chs                        = 0;
+    vx_int32      group_column               = 0;
+    float         rgroup_column              = 0.0f;
+
+    gcmHEADER_ARG("context=%p, kernelEnum=0x%x, borderMode=%p, input=%p, output=%p",
+         context, kernelEnum, borderMode, input, output);
+
+    borderMode->mode = VX_BORDER_REPLICATE;
+
+    num_group   = num_group_s->value->n32;
+    axis        = axis_s->value->n32;
+    chs         = sizes[axis];
+
+    if (chs % num_group)
+    {
+        vxError("input channel can't be exact divided by group number! at line %d\n", __LINE__);
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    if (0 == axis)
+    {
+        sizes[0] = 1;
+        sizes[1] = output_width;
+        sizes[2] = output_height * output_depth;
+        sizes[3] = output_batch;
+        output_rs     = vxoTensor_ReshapeTensor(output, sizes, 4);
+        parameters[1] = (vx_reference)output_rs;
+
+        sizes[0] = 1;
+        sizes[1] = input_width;
+        sizes[2] = input_height * input_depth;
+        sizes[3] = input_batch;
+        input_rs      = vxoTensor_ReshapeTensor(input, sizes, 4);
+        parameters[0] = (vx_reference)input_rs;
+
+        axis  = 1;
+    }
+
+    execution_parameters.globalWorkOffset[0] = 0;
+    execution_parameters.globalWorkOffset[1] = 0;
+    execution_parameters.globalWorkOffset[2] = 0;
+    if (2 == axis)
+    {
+        if (inputFormat == VX_TYPE_FLOAT16 || outputFormat == VX_TYPE_INT16)
+        {
+            execution_parameters.globalWorkScale[0]  = 8;
+        }
+        else
+        {
+            execution_parameters.globalWorkScale[0]  = 16;
+        }
+        execution_parameters.globalWorkScale[1]  = 4;
+        execution_parameters.globalWorkScale[2]  = 1;
+        execution_parameters.globalWorkSize[0]   = gcmALIGN((sizes[0] + execution_parameters.globalWorkScale[0] - 1)
+            / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
+        execution_parameters.globalWorkSize[1]   = (sizes[1] + execution_parameters.globalWorkScale[1] - 1)
+            / execution_parameters.globalWorkScale[1];
+        execution_parameters.globalWorkSize[2]   = sizes[2];
+    }
+    else if (1 == axis)
+    {
+        execution_parameters.globalWorkScale[0]  = 32;
+        execution_parameters.globalWorkScale[1]  = 1;
+        execution_parameters.globalWorkScale[2]  = 1;
+        execution_parameters.globalWorkSize[0]   = gcmALIGN((sizes[0] + execution_parameters.globalWorkScale[0] - 1)
+            / execution_parameters.globalWorkScale[0], SHADER_THREAD_COUNT);
+        execution_parameters.globalWorkSize[1]   = sizes[1];
+        execution_parameters.globalWorkSize[2]   = sizes[2];
+    }
+    else
+    {
+        vxError("[%s : %d]Initializer failure, not support axis: %d! \n",__FILE__, __LINE__, axis);
+        status = VX_FAILURE;
+        goto OnError;
+    }
+
+    kernel = vxnneGetKernelShadersByEnum(context, kernelEnum);
+    group_column = chs / num_group;
+    rgroup_column = 1.0f / group_column;
+
+    if (!kernel)
+    {
+        /* register an shader kernel */
+#if gcdUSE_VXC_BINARY
+        vx_uint32 len;
+        void * ptr = getVXCKernelInfo(context, ShuffleChannel, &len);
+        program = vxCreateProgramWithBinary(context, ptr, len);
+#else
+        char path[_vxcFILENAME_MAX];
+        vxmONERROR(getFilePath("nnvxc_kernels/ShuffleChannel.vx", path));
+        vxmONERROR_NULLPTR(programSources = loadSources(path, &programLength));
+        vxmONERROR_NULLPTR(program = vxCreateProgramWithSource(context, 1, (const vx_char**)&programSources, &programLength));
+        if (programSources)
+        {
+            vxFree(programSources);
+            programSources = NULL;
+        }
+#endif /*gcdUSE_VXC_BINARY*/
+        status = vxGetStatus((vx_reference)program);
+        if (status != VX_SUCCESS) goto OnError;
+
+        status = vxBuildProgram(program, "-cl-viv-vx-extension");
+        if (status != VX_SUCCESS) goto OnError;
+
+        kernel = vxnneAddKernelShadersInProgram(context, "shuffleChannel", program, 3, kernelEnum);
+        if (!kernel) goto OnError;
+
+        vxReleaseProgram(&program);
+    }
+
+    if ((inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
+        || (inputFormat == VX_TYPE_INT8 && outputFormat == VX_TYPE_INT8))
+    {
+        if (1 == axis)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_8Bits_Axis1", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_8Bits", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+    }
+    else if ((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16)
+        || (inputFormat == VX_TYPE_INT16 && outputFormat == VX_TYPE_INT16))
+    {
+        if (1 == axis)
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_16Bits_Axis1", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+        else
+        {
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_16Bits", borderMode);
+            if (!shaderExecutable) goto OnError;
+        }
+    }
+
+    status  = vxnneShaderExecutable_SetUniform(shaderExecutable, "group_column", 1, &group_column);
+    status |= vxnneShaderExecutable_SetUniform(shaderExecutable, "rgroup_column", 1, &rgroup_column);
+    if (status != VX_SUCCESS) goto OnError;
+
+    status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 3);
+    if (status != VX_SUCCESS) goto OnError;
+
+    status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
+    if (status != VX_SUCCESS) goto OnError;
+
+    if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
+    if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
+
+    gcmFOOTER_ARG("%p", shaderExecutable);
+    return shaderExecutable;
+
+OnError:
+    if (program)  vxReleaseProgram(&program);
+    if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
+    if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
+    if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
+
+#if !gcdUSE_VXC_BINARY
+    if (programSources)
+    {
+        vxFree(programSources);
+        programSources = NULL;
+    }
+#endif
+
+    gcmFOOTER_NO();
+    return VX_NULL;
+}
+
 /********vxcActivation****************************************************/
 vxnne_shader_executable vxnneGetActivationShaderExecutable(
     vx_context              context,

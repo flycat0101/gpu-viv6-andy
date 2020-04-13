@@ -1216,7 +1216,10 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
     vx_tensor block_size_s,
     vx_scalar type_s,
     vx_tensor pad,
-    vx_uint32 *op_index, vx_bool evis)
+    vx_uint32 *op_index,
+    vx_scalar num_group_s,
+    vx_scalar axis_s,
+    vx_bool evis)
 {
     vx_status status = VX_SUCCESS;
 
@@ -1254,6 +1257,9 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
         else if(type == VX_REORG_BATCH_TO_SPACE_ND)
             shaderExecutable = vxnneGetBatch2SpaceShaderExecutable(context, VXNNE_KERNEL_BATCH2SPACE, &node->kernelAttributes.borderMode,
                 inputs, pad_list[0], pad_list[2], block_size_s, outc_s, outputs);
+        else if(type == VX_REORG_SHUFFLE_CHANNEL)
+            shaderExecutable = vxnneGetShuffleChannelShaderExecutable(context, VXNNE_KERNEL_SHUFFLECHANNEL, &node->kernelAttributes.borderMode,
+                inputs, num_group_s, axis_s, outputs);
     }
     else
     {
@@ -1269,6 +1275,9 @@ VX_PRIVATE_API vx_status _InitializeReorg2OperationSH(
         else if(type == VX_REORG_SPACE_TO_BATCH_ND)
             shaderExecutable = vxnneGetGPUSpace2BatchShaderExecutable(context, VXNNE_KERNEL_SPACE2BATCH, &node->kernelAttributes.borderMode,
                 inputs, block_size_s, outc_s, outputs, pad_list);
+        else if(type == VX_REORG_SHUFFLE_CHANNEL)
+            shaderExecutable = vxnneGetGPUShuffleChannelShaderExecutable(context, VXNNE_KERNEL_SPACE2BATCH, &node->kernelAttributes.borderMode,
+                inputs, num_group_s, axis_s, outputs);
 
         if(type == VX_REORG_BATCH_TO_SPACE_ND || type == VX_REORG_SPACE_TO_BATCH_ND)
             batchCount = 1;
@@ -1401,15 +1410,17 @@ VX_PRIVATE_API vx_bool vxoNNReorgLayer2_SH_EVIS_Support_Ext(vx_node node, const 
     vx_tensor inputs = (vx_tensor)parameters[0];
     vx_scalar type_s = (vx_scalar)parameters[2];
     vx_tensor outputs = (vx_tensor)parameters[4];
-    vx_enum type = type_s->value->e;
+    vx_scalar axis_s = (vx_scalar)parameters[6];
+    vx_enum    type = type_s->value->e;
     vx_bool    dataFormat_flag[5] = { vx_false_e };
-    vx_bool    depth2Space_flag = vx_false_e;
-    vx_bool    space2Depth_flag = vx_false_e;
-    vx_bool    space2Batch_flag = vx_false_e;
-    vx_bool    batch2Space_flag = vx_false_e;
-    vx_int8    in_fixpoint = TENSOR_POS(inputs);
+    vx_bool    depth2Space_flag   = vx_false_e;
+    vx_bool    space2Depth_flag   = vx_false_e;
+    vx_bool    space2Batch_flag   = vx_false_e;
+    vx_bool    batch2Space_flag   = vx_false_e;
+    vx_bool    shuffle_flag       = vx_false_e;
+    vx_int8    in_fixpoint  = TENSOR_POS(inputs);
     vx_int8    out_fixpoint = TENSOR_POS(outputs);
-    vx_enum    inputFormat = TENSOR_DATA_TYPE(inputs);
+    vx_enum    inputFormat  = TENSOR_DATA_TYPE(inputs);
     vx_enum    outputFormat = TENSOR_DATA_TYPE(outputs);
 
     vx_bool support = vxoLayer_CheckSupport(node->base.context, VX_NN_QUERY_SHADER, VX_TYPE_INVALID, VX_NULL);
@@ -1425,6 +1436,8 @@ VX_PRIVATE_API vx_bool vxoNNReorgLayer2_SH_EVIS_Support_Ext(vx_node node, const 
     space2Depth_flag = (vx_bool)(type == VX_REORG_SPACE_TO_DEPTH && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[2] || dataFormat_flag[3]));
     space2Batch_flag = (vx_bool)(type == VX_REORG_SPACE_TO_BATCH_ND && (dataFormat_flag[0] || dataFormat_flag[1]));
     batch2Space_flag = (vx_bool)(type == VX_REORG_BATCH_TO_SPACE_ND && (dataFormat_flag[0] || dataFormat_flag[1]));
+    shuffle_flag     = (vx_bool)(type == VX_REORG_SHUFFLE_CHANNEL && (axis_s->value->n32 <= 2) && _IsSameType(inputs, outputs)
+                                && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[2] || dataFormat_flag[3]));
 
     if (!evis)
     {
@@ -1432,9 +1445,10 @@ VX_PRIVATE_API vx_bool vxoNNReorgLayer2_SH_EVIS_Support_Ext(vx_node node, const 
         space2Depth_flag = space2Depth_flag || (type == VX_REORG_SPACE_TO_DEPTH && dataFormat_flag[4]);
         space2Batch_flag = space2Batch_flag || (type == VX_REORG_SPACE_TO_BATCH_ND && dataFormat_flag[4]);
         batch2Space_flag = batch2Space_flag || (type == VX_REORG_BATCH_TO_SPACE_ND && dataFormat_flag[4]);
+        shuffle_flag     = shuffle_flag     || (type == VX_REORG_SHUFFLE_CHANNEL && dataFormat_flag[4]);
     }
 
-    support = support && (depth2Space_flag || space2Depth_flag || space2Batch_flag || batch2Space_flag);
+    support = support && (depth2Space_flag || space2Depth_flag || space2Batch_flag || batch2Space_flag || shuffle_flag);
 
     vxoLayer_VerificationFoot(node, parameters, num, reg_param, &support);
 
@@ -1450,6 +1464,8 @@ VX_PRIVATE_API vx_status vxoNNReorgLayer2_SH_EVIS_Initialize_Ext(vxnne_layer ops
     vx_scalar type_s = (vx_scalar)parameters[2];
     vx_tensor pad = (vx_tensor)parameters[3];
     vx_tensor outputs = (vx_tensor)parameters[4];
+    vx_scalar num_group_s = (vx_scalar)parameters[5];
+    vx_scalar axis_s = (vx_scalar)parameters[6];
     vx_enum type = type_s->value->e;
     vx_uint32 batch_count = (type == VX_REORG_BATCH_TO_SPACE_ND || type == VX_REORG_SPACE_TO_BATCH_ND) ? 1 : TENSOR_SIZE_INDEX(inputs, 3);
     vx_uint32 op_index = 0;
@@ -1466,6 +1482,8 @@ VX_PRIVATE_API vx_status vxoNNReorgLayer2_SH_EVIS_Initialize_Ext(vxnne_layer ops
         type_s,
         pad,
         &op_index,
+        num_group_s,
+        axis_s,
         evis));
 
     vxoLayer_InitializeFoot(ops_layer, parameters, num, reg_param);
@@ -1623,7 +1641,9 @@ VX_PRIVATE_API vx_status _InitializeReorg2Operation(
     vx_tensor block_size,
     vx_scalar type_s,
     vx_tensor pad,
-    vx_uint32 *op_index)
+    vx_uint32 *op_index,
+    vx_scalar num_group_s,
+    vx_scalar axis_s)
 {
     vx_status status = VX_SUCCESS;
 
@@ -1653,7 +1673,10 @@ VX_PRIVATE_API vx_status _InitializeReorg2Operation(
                                                 block_size,
                                                 type_s,
                                                 pad,
-                                                op_index, layer->base.node->base.context->evisNoInst.supportEVIS));
+                                                op_index,
+                                                num_group_s,
+                                                axis_s,
+                                                layer->base.node->base.context->evisNoInst.supportEVIS));
         break;
 
     case VXNNE_OPERATION_TARGET_SW:
@@ -1701,6 +1724,8 @@ OnError:
     vx_scalar type_s                = (vx_scalar)parameters[2];
     vx_tensor pad                   = (vx_tensor)parameters[3];
     vx_tensor outputs               = (vx_tensor)parameters[4];
+    vx_scalar num_group_s           = (vx_scalar)parameters[5];
+    vx_scalar axis_s                = (vx_scalar)parameters[6];
     vx_context context              = vxGetContext((vx_reference)node);
     vx_enum type                    = type_s->value->e;
     vx_uint32 batch_count           = (type == VX_REORG_BATCH_TO_SPACE_ND || type == VX_REORG_SPACE_TO_BATCH_ND) ? 1 : TENSOR_SIZE_INDEX(inputs, 3);
@@ -1713,6 +1738,7 @@ OnError:
     vx_bool    space2Depth_flag     = vx_false_e;
     vx_bool    space2Batch_flag     = vx_false_e;
     vx_bool    batch2Space_flag     = vx_false_e;
+    vx_bool    shuffle_flag         = vx_false_e;
     vx_int8    in_fixpoint          = TENSOR_POS(inputs);
     vx_int8    out_fixpoint         = TENSOR_POS(outputs);
     vx_enum    inputFormat          = TENSOR_DATA_TYPE(inputs);
@@ -1727,7 +1753,7 @@ OnError:
     space2Depth_flag   = (vx_bool)(type == VX_REORG_SPACE_TO_DEPTH && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[2] || dataFormat_flag[3] || dataFormat_flag[4]));
     space2Batch_flag   = (vx_bool)(type == VX_REORG_SPACE_TO_BATCH_ND && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[4]));
     batch2Space_flag   = (vx_bool)(type == VX_REORG_BATCH_TO_SPACE_ND && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[4]));
-
+    shuffle_flag       = (vx_bool)(type == VX_REORG_SHUFFLE_CHANNEL && (dataFormat_flag[0] || dataFormat_flag[1] || dataFormat_flag[2] || dataFormat_flag[3]));
     /* Destroy the existing layer. */
     if (node->layer)
     {
@@ -1757,7 +1783,7 @@ OnError:
     {
         target = VXNNE_OPERATION_TARGET_TP;
     }
-    else if ((depth2Space_flag || space2Depth_flag || space2Batch_flag || batch2Space_flag) && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER))
+    else if ((depth2Space_flag || space2Depth_flag || space2Batch_flag || batch2Space_flag || shuffle_flag) && vxoContext_IsFeatureAvailable(node->base.context, VX_NN_FEATURE_SHADER))
     {
         target = VXNNE_OPERATION_TARGET_SH;
     }
@@ -1775,7 +1801,9 @@ OnError:
                                           block_size,
                                           type_s,
                                           pad,
-                                          &op_index));
+                                          &op_index,
+                                          num_group_s,
+                                          axis_s));
 
     node->layer = &reorg_layer->base;
 

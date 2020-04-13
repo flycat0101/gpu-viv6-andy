@@ -339,6 +339,7 @@ enum vxnne_kernel_e
     VXNNE_KERNEL_SPACE2DEPTH = 70,
     VXNNE_KERNEL_SPACE2BATCH = 71,
     VXNNE_KERNEL_BATCH2SPACE = 72,
+    VXNNE_KERNEL_SHUFFLECHANNEL = 73,
     VXNNE_KERNEL_FIXED_COUNT,
 };
 
@@ -3002,6 +3003,16 @@ vxnne_shader_executable vxnneGetBatch2SpaceShaderExecutable(
     vx_tensor               output
     );
 
+vxnne_shader_executable vxnneGetShuffleChannelShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               num_group_s,
+    vx_scalar               axis_s,
+    vx_tensor               output
+    );
+
 vxnne_shader_executable vxnneGetBatchNormShaderExecutable(
     vx_context              context,
     vx_enum                 kernelEnum,
@@ -3986,6 +3997,15 @@ vxnne_shader_executable vxnneGetGPUSpace2BatchShaderExecutable(
     vx_scalar               outc,
     vx_tensor               output,
     vx_uint32*              padList);
+
+vxnne_shader_executable vxnneGetGPUShuffleChannelShaderExecutable(
+    vx_context              context,
+    vx_enum                 kernelEnum,
+    vx_border_mode_t        *borderMode,
+    vx_tensor               input,
+    vx_scalar               num_group_s,
+    vx_scalar               axis_s,
+    vx_tensor               output);
 
 vxnne_shader_executable vxnneGetGPUTensorMeanAxisShaderExecutable(
     vx_context              context,
