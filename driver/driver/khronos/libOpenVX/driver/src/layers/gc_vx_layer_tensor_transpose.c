@@ -117,6 +117,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorTrans_SH_EVIS_Support_Ext(vx_node node, const 
     vx_bool        shExe_copy_flag = vx_true_e;
     vx_bool        enable_4Dtensor = vx_false_e;
     vx_bool        enable_batch_sh = vx_false_e;
+    vx_bool        enable_4D_perm = vx_false_e;
     vx_bool        enable_dataFormat = vx_false_e;
     vx_enum        inputFormat = TENSOR_DATA_TYPE(input);
     vx_enum        outputFormat = TENSOR_DATA_TYPE(output);
@@ -138,6 +139,9 @@ VX_PRIVATE_API vx_bool vxoNNTensorTrans_SH_EVIS_Support_Ext(vx_node node, const 
         enable_dataFormat = (vx_bool)((inputFormat == VX_TYPE_FLOAT16 && outputFormat == VX_TYPE_FLOAT16) ||
             (inputFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32) ||
             (inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8));
+
+        enable_4D_perm = (vx_bool)(enable_dataFormat && num == 4 && batch != 1 && pPerm[3] != 3
+                    && TENSOR_DIM_NUM(input) == 4 && _IsSameQuantType(input, output));
     }
 
     enable_4Dtensor = (vx_bool)(enable_dataFormat && pPerm[0] == 1 && pPerm[1] == 2 && pPerm[2] == 3 && pPerm[3] == 0 && num == 4 && batch == 1);
@@ -149,7 +153,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorTrans_SH_EVIS_Support_Ext(vx_node node, const 
         || (enable_dataFormat && pPerm[0] == 0 && pPerm[1] == 2 && pPerm[2] == 1 && num == 3)
         || (enable_dataFormat && pPerm[0] == 1 && pPerm[1] == 0 && num <= 3 && num >= 2)
         || (enable_dataFormat && pPerm[0] == 1 && pPerm[1] == 3 && pPerm[2] == 2 && pPerm[3] == 0 && num == 4)
-        || enable_4Dtensor || enable_batch_sh);
+        || enable_4Dtensor || enable_batch_sh || enable_4D_perm);
 
     for (i = 0; i < gcmMIN(TENSOR_DIM_NUM(input), num); i++)
     {
@@ -184,6 +188,7 @@ VX_PRIVATE_API vx_bool vxoNNTensorTrans_SH_EVIS_Support_Ext(vx_node node, const 
         SETBIT(reg_param->flag, ((shExe_copy_flag == vx_true_e) ? 1 : 0), 1);
         SETBIT(reg_param->flag, ((enable_4Dtensor == vx_true_e) ? 1 : 0), 2);
         SETBIT(reg_param->flag, ((enable_batch_sh == vx_true_e) ? 1 : 0), 3);
+        SETBIT(reg_param->flag, ((enable_4D_perm  == vx_true_e) ? 1 : 0), 4);
     }
 
     vxoLayer_VerificationFoot(node, parameters, _num, reg_param, &support);
@@ -228,6 +233,7 @@ VX_PRIVATE_API vx_status vxoNNTensorTrans_SH_Initialize_Ext(vxnne_layer ops_laye
     vx_bool        shExe_copy_flag = GETBIT(reg_param->flag, 1);
     vx_bool        enable_4Dtensor = GETBIT(reg_param->flag, 2);
     vx_bool        enable_batch_sh = GETBIT(reg_param->flag, 3);
+    vx_bool        enable_4D_perm  = GETBIT(reg_param->flag, 4);
 
     vxoLayer_InitializeHead(ops_layer, parameters, _num, reg_param);
 
@@ -397,6 +403,10 @@ VX_PRIVATE_API vx_status vxoNNTensorTrans_SH_Initialize_Ext(vxnne_layer ops_laye
             dst = vxoTensor_ReshapeTensor(output, size, dims);
 
             num = 2;
+        }
+        else if (enable_4D_perm)
+        {
+            batchCount = 1;
         }
 
         if (src && dst)

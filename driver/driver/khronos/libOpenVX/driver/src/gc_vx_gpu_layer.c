@@ -1017,11 +1017,12 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
     vxnne_shader_executable shaderExecutable   = VX_NULL;
     vxnne_kernel_shaders    kernel             = VX_NULL;
     vx_kernel_execution_parameters_t execution_parameters = {3, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    vx_reference parameters[2]     = {(vx_reference)input, (vx_reference)output};
+    vx_reference parameters[4]     = {(vx_reference)input, (vx_reference)output, (vx_reference)NULL, (vx_reference)NULL};
     vx_uint32    dims              = TENSOR_DIM_NUM(input);
     vx_uint32    width             = TENSOR_VIEW_SIZE_INDEX(input, 0);
     vx_uint32    height            = TENSOR_VIEW_SIZE_INDEX(input, 1);
     vx_uint32    depth             = (dims > 2) ? TENSOR_VIEW_SIZE_INDEX(input, 2) : 1;
+    vx_uint32    batch             = (dims > 3) ? TENSOR_VIEW_SIZE_INDEX(input, 3) : 1;
     vx_enum      inputFormat       = TENSOR_DATA_TYPE(input);
     vx_enum      outputFormat      = TENSOR_DATA_TYPE(output);
     vx_float32   input_scale       = TENSOR_TF_SCALE(input);
@@ -1035,15 +1036,100 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
     vx_int32     flFlg             = 0;
     vx_scalar    scaleU8           = NULL;
     vx_scalar    zpU8              = NULL;
+    vx_scalar    depth_in          = NULL;
+    vx_scalar    depth_out         = NULL;
+    vx_scalar    perm_0            = NULL;
+    vx_scalar    perm_1            = NULL;
+    vx_scalar    perm_2            = NULL;
+    vx_scalar    perm_3            = NULL;
+    vx_tensor    input_rs          = NULL;
+    vx_tensor    output_rs         = NULL;
+    vx_bool      enable_4D_trans   = vx_false_e;
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
+
+    if (pnum == 4 && perm[3] != 3 && batch != 1 && _IsSameQuantType(input, output))
+        enable_4D_trans = vx_true_e;
+
+    if (enable_4D_trans)
+    {
+        vx_uint32 output_width = TENSOR_VIEW_SIZE_INDEX(output, 0);
+        vx_uint32 output_height = TENSOR_VIEW_SIZE_INDEX(output, 1);
+        vx_uint32 output_depth = TENSOR_VIEW_SIZE_INDEX(output, 2);
+        vx_uint32 output_batch = TENSOR_VIEW_SIZE_INDEX(output, 3);
+        vx_uint32 sizes[4] = {1};
+
+        depth_in = vxCreateScalar(context, VX_TYPE_INT32, &depth);
+        depth_out = vxCreateScalar(context, VX_TYPE_INT32, &output_depth);
+        perm_0 = vxCreateScalar(context, VX_TYPE_INT32, &perm[0]);
+        perm_1 = vxCreateScalar(context, VX_TYPE_INT32, &perm[1]);
+        perm_2 = vxCreateScalar(context, VX_TYPE_INT32, &perm[2]);
+        perm_3 = vxCreateScalar(context, VX_TYPE_INT32, &perm[3]);
+
+        sizes[0] = width;
+        sizes[1] = height;
+        sizes[2] = batch * depth;
+        input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, 3);
+
+        sizes[0] = output_width;
+        sizes[1] = output_height;
+        sizes[2] = output_depth * output_batch;
+        output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, 3);
+    }
+    else if (pnum == 3 && perm[0] == 2 && perm[1] == 0 && perm[2] == 1 && (width * height < IMG_MAX_WIDTH))
+    {
+        vx_uint32 sizes[4] = {1};
+
+        sizes[0] = width * height;
+        sizes[1] = depth;
+        sizes[2] = 1;
+        sizes[3] = batch;
+        input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
+
+        sizes[0] = depth;
+        sizes[1] = width * height;
+        sizes[2] = 1;
+        sizes[3] = batch;
+        output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+
+        pnum = 2;
+
+        width = width * height;
+        height = depth;
+
+        parameters[0] = (vx_reference)input_rs;
+        parameters[1] = (vx_reference)output_rs;
+    }
+    else if (pnum == 3 && perm[0] == 1 && perm[1] == 2 && perm[2] == 0 && (height * depth < IMG_MAX_WIDTH))
+    {
+        vx_uint32 sizes[4] = {1};
+
+        sizes[0] = width;
+        sizes[1] = height * depth;
+        sizes[2] = 1;
+        sizes[3] = batch;
+        input_rs = vxoTensor_ReshapeTensor(input, (vx_int32*)sizes, dims);
+
+        sizes[0] = height * depth;
+        sizes[1] = width;
+        sizes[2] = 1;
+        sizes[3] = batch;
+        output_rs = vxoTensor_ReshapeTensor(output, (vx_int32*)sizes, dims);
+
+        pnum = 2;
+
+        height = height * depth;
+
+        parameters[0] = (vx_reference)input_rs;
+        parameters[1] = (vx_reference)output_rs;
+    }
 
     if(inputFormat == VX_TYPE_UINT8 && outputFormat == VX_TYPE_UINT8)
     {
         mixScale = input_scale / output_scale;
         mixZp = outputZP - inputZP * mixScale;
 
-        if((input_scale != output_scale) || (inputZP != outputZP))
+        if(!_IsSameQuantType(input, output))
         {
             flFlg = 1;
 
@@ -1092,7 +1178,19 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
     execution_parameters.globalWorkScale[1]  = 1;
     execution_parameters.globalWorkScale[2]  = 1;
 
-    if(pnum == 3)
+    if (enable_4D_trans)
+    {
+        if(inputFormat == VX_TYPE_FLOAT16 || inputFormat == VX_TYPE_FLOAT32)
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_FP32toFP32_4D", borderMode);
+        else if(inputFormat == VX_TYPE_INT8 || inputFormat == VX_TYPE_INT16 || inputFormat == VX_TYPE_INT32)
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_I32toI32_4D", borderMode);
+        else if(inputFormat == VX_TYPE_UINT8 || inputFormat == VX_TYPE_UINT16 || inputFormat == VX_TYPE_UINT32)
+            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_U32toU32_4D", borderMode);
+        execution_parameters.globalWorkSize[0]    = width;
+        execution_parameters.globalWorkSize[1]    = height;
+        execution_parameters.globalWorkSize[2]    = depth * batch;
+    }
+    else if(pnum == 3)
     {
         if((inputFormat == VX_TYPE_FLOAT16) || (inputFormat == VX_TYPE_FLOAT32))
         {
@@ -1385,23 +1483,9 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
     {
         if((inputFormat == VX_TYPE_FLOAT16) || (inputFormat == VX_TYPE_FLOAT32))
         {
-            if(width % 4 == 0 && height % 4 == 0)
+            if(height % 4 == 0)
             {
                 shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "FP32_2D_opt", borderMode);
-                if (!shaderExecutable) goto OnError;
-
-                status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                if (status != VX_SUCCESS) goto OnError;
-
-                execution_parameters.globalWorkScale[0]  = 4;
-                execution_parameters.globalWorkScale[1]  = 4;
-                execution_parameters.globalWorkScale[2]  = 1;
-                optFlg = vx_true_e;
-            }
-            else if(width == 3 && height % 4 == 0)
-            {
-                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "FP32_2D_3h", borderMode);
                 if (!shaderExecutable) goto OnError;
 
                 status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -1418,29 +1502,12 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
         }
         else if(inputFormat == VX_TYPE_UINT8)
         {
-            if(width % 4 == 0 && height % 4 == 0)
+            if(height % 4 == 0)
             {
                 if(flFlg)
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "Quant8FL_2D_opt", borderMode);
                 else
                     shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "Quant8_2D_opt", borderMode);
-                if (!shaderExecutable) goto OnError;
-
-                status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                if (status != VX_SUCCESS) goto OnError;
-
-                execution_parameters.globalWorkScale[0]  = 4;
-                execution_parameters.globalWorkScale[1]  = 4;
-                execution_parameters.globalWorkScale[2]  = 1;
-                optFlg = vx_true_e;
-            }
-            else if(width == 3 && height % 4 == 0)
-            {
-                if(flFlg)
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "Quant8FL_2D_3h", borderMode);
-                else
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "Quant8_2D_3h", borderMode);
                 if (!shaderExecutable) goto OnError;
 
                 status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 0, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
@@ -1482,10 +1549,18 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
 
     if (!shaderExecutable) goto OnError;
 
-    if(flFlg)
+    if (enable_4D_trans)
     {
-        vx_reference parameters_fl[4]     = {(vx_reference)input, (vx_reference)output, (vx_reference)scaleU8, (vx_reference)zpU8};
-        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters_fl, 4);
+        vx_reference parameters_fl[8] = {(vx_reference)input_rs, (vx_reference)output_rs, (vx_reference)depth_in, (vx_reference)depth_out,
+            (vx_reference)perm_0, (vx_reference)perm_1, (vx_reference)perm_2, (vx_reference)perm_3};
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters_fl, 8);
+    }
+    else if(flFlg)
+    {
+        parameters[2] = (vx_reference)scaleU8;
+        parameters[3] = (vx_reference)zpU8;
+
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 4);
     }
     else
         status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 2);
@@ -1494,15 +1569,31 @@ vxnne_shader_executable vxnneGPUTensorTransposeShaderExecutable(
     status = vxnneShaderExecutable_SetExecutionParameters(shaderExecutable, &execution_parameters);
     if (status != VX_SUCCESS) goto OnError;
 
-    if(scaleU8) vxReleaseScalar(&scaleU8);
-    if(zpU8) vxReleaseScalar(&zpU8);
+    if (scaleU8) vxReleaseScalar(&scaleU8);
+    if (zpU8) vxReleaseScalar(&zpU8);
+    if (depth_in) vxReleaseScalar(&depth_in);
+    if (depth_out) vxReleaseScalar(&depth_out);
+    if (perm_0) vxReleaseScalar(&perm_0);
+    if (perm_1) vxReleaseScalar(&perm_1);
+    if (perm_2) vxReleaseScalar(&perm_2);
+    if (perm_3) vxReleaseScalar(&perm_3);
+    if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
+    if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
 
     gcmFOOTER_ARG("%p", shaderExecutable);
     return shaderExecutable;
 
 OnError:
-    if(scaleU8) vxReleaseScalar(&scaleU8);
-    if(zpU8) vxReleaseScalar(&zpU8);
+    if (scaleU8) vxReleaseScalar(&scaleU8);
+    if (zpU8) vxReleaseScalar(&zpU8);
+    if (depth_in) vxReleaseScalar(&depth_in);
+    if (depth_out) vxReleaseScalar(&depth_out);
+    if (perm_0) vxReleaseScalar(&perm_0);
+    if (perm_1) vxReleaseScalar(&perm_1);
+    if (perm_2) vxReleaseScalar(&perm_2);
+    if (perm_3) vxReleaseScalar(&perm_3);
+    if (input_rs) vxoTensor_ReleaseTensor(&input_rs);
+    if (output_rs) vxoTensor_ReleaseTensor(&output_rs);
     if (program) vxReleaseProgram(&program);
     if (shaderExecutable) vxnneShaderExecutable_Destroy(shaderExecutable);
 
