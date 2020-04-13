@@ -7535,9 +7535,62 @@ OnError:
     return status;
 }
 
+static gceSTATUS clfDisableOpencvENVConfig(cl_kernel Kernel, gctUINT workGroupSize)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 threadCount;
+    VSC_HW_CONFIG hwCfg;
+    gcePATCH_ID patchId;
+
+    clmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg), CL_INVALID_VALUE);
+
+    if (workGroupSize == 0)
+    {
+        threadCount = hwCfg.maxCoreCount * hwCfg.maxThreadCountPerCore;
+        hwCfg.initWorkGroupSizeToCalcRegCount       = 128;
+        hwCfg.maxWorkGroupSize                      = gcmMIN(threadCount, 1024);
+        hwCfg.minWorkGroupSize                      = 1;
+    }
+    else
+    {
+        threadCount = workGroupSize;
+        hwCfg.initWorkGroupSizeToCalcRegCount       = threadCount;
+        hwCfg.maxWorkGroupSize                      = threadCount;
+        hwCfg.minWorkGroupSize                      = threadCount;
+    }
+
+    clmONERROR(gcoHAL_GetPatchID(gcvNULL, &patchId), CL_INVALID_VALUE);
+    clmONERROR((*Kernel->context->platform->loadCompiler)(&hwCfg, patchId), CL_INVALID_VALUE);
+    clmONERROR((*Kernel->context->platform->unloadCompiler)(), CL_INVALID_VALUE);
+
+OnError:
+    return status;
+}
+
+static gceSTATUS clfEnableOpencvENVConfig(cl_kernel Kernel)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    VSC_HW_CONFIG hwCfg;
+    gcePATCH_ID patchId;
+
+    clmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg), CL_INVALID_VALUE);
+
+    hwCfg.initWorkGroupSizeToCalcRegCount       = 256;
+    hwCfg.maxWorkGroupSize                      = 256;
+    hwCfg.minWorkGroupSize                      = 256;
+
+    clmONERROR(gcoHAL_GetPatchID(gcvNULL, &patchId), CL_INVALID_VALUE);
+    clmONERROR((*Kernel->context->platform->loadCompiler)(&hwCfg, patchId), CL_INVALID_VALUE);
+    clmONERROR((*Kernel->context->platform->unloadCompiler)(), CL_INVALID_VALUE);
+
+OnError:
+    return status;
+}
+
 gceSTATUS
 clfRecompileVIRKernel(
-    cl_kernel Kernel
+    cl_kernel Kernel,
+    gctUINT workGroupSize
     )
 {
     VSC_SHADER_COMPILER_PARAM  vscCompileParams;
@@ -7553,6 +7606,11 @@ clfRecompileVIRKernel(
     gctPOINTER ptrImage = gcvNULL;
     gctPOINTER ptrSampler = gcvNULL;
     SHADER_HANDLE localShader = gcvNULL;
+
+    if (Kernel->recompileThreadRemap == gcvTRUE)
+    {
+        gcmONERROR(clfDisableOpencvENVConfig(Kernel, workGroupSize));
+    }
 
     vscCopyShader(&localShader, (SHADER_HANDLE)Kernel->shaderHandle);
 
@@ -7647,6 +7705,11 @@ clfRecompileVIRKernel(
     }
 
 OnError:
+    if (Kernel->recompileThreadRemap == gcvTRUE)
+    {
+        gcmONERROR(clfEnableOpencvENVConfig(Kernel));
+    }
+
     return status;
 }
 
