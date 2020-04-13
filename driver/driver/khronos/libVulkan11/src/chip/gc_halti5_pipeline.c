@@ -1962,13 +1962,21 @@ static int32_t get_used_color_count(
     )
 {
     uint32_t i;
-    int32_t colorOutCount = 0;
+    int32_t colorOutCount = subPass->colorCount;
 
-    for (i = 0; i < subPass->colorCount; i++)
+    for (i = subPass->colorCount - 1; i >= 0; i--)
     {
-        if (hints->psOutput2RtIndex[i] != -1 && subPass->color_attachment_index[i] != VK_ATTACHMENT_UNUSED)
+        if (subPass->color_attachment_index[i] == VK_ATTACHMENT_UNUSED)
         {
-            colorOutCount++;
+            colorOutCount--;
+        }
+        else if (hints->psOutput2RtIndex[i] == -1)
+        {
+            colorOutCount--;
+        }
+        else
+        {
+            break;
         }
     }
 
