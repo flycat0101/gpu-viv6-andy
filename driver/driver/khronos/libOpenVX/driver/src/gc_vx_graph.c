@@ -3598,6 +3598,8 @@ VX_PRIVATE_API vx_status DetectSegmentsFromConfig(
     char *s = config;
     char buf[32];
     int stage = BLOCK_ARGS_INIT_FLAG, len = 0, start = 0, last = 0, type = 0;
+    vx_uint32 i;
+    vxnne_segment_collection_s detectedOnce;
 
     while (s && *s != '\0')
     {
@@ -3635,8 +3637,14 @@ VX_PRIVATE_API vx_status DetectSegmentsFromConfig(
 
                 last = gcmMIN(last, (vx_int32)(graph->layer->base.num_operations - 1));
 
-                status = DetectSegmentsWithOption(graph, start, last - start + 1, type, detected);
+                gcoOS_ZeroMemory(&detectedOnce, sizeof(vxnne_segment_collection_s));
+                status = DetectSegmentsWithOption(graph, start, last - start + 1, type, &detectedOnce);
                 if (status != VX_SUCCESS) goto OnError;
+
+                for (i = 0; i < detectedOnce.segmentNum && detected->segmentNum < VX_MAX_SEGMENT_COUNT; i++)
+                {
+                    detected->segments[detected->segmentNum++] = detectedOnce.segments[i];
+                }
             }
         }
         else if (*s == ',')

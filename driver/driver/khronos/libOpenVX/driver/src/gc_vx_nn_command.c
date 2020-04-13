@@ -1857,7 +1857,7 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
 
     vx_bool again = vx_false_e;
     vx_enum split = split_type;
-    vx_uint32 slice, size;
+    vx_uint32 slice, size, slice2 = 1;
     vx_uint32 core = tpType != TP_SINGLE_FC ? context->nnConfig.fixedFeature.tpCoreCount :
                                               context->nnConfig.fixedFeature.tpCoreCount + context->nnConfig.fixedFeature.tpliteCoreCount;
     vx_bool mult = context->options.enableMultiTP && core > 1;
@@ -2059,37 +2059,63 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
             if (slice == 1 && (dnum == 3 || (dnum == 4 && dims[3] == 1)))
             {
                 vx_uint32_ptr perm = (vx_uint32*)value->p8[0];
-                if (perm[0] == 1 && perm[1] == 0) /* y, x, z */
+
+                if (parameter->tpTransposeSize > 0 && ((!output->sRAM) && (!input->sRAM))/*context->hwChipInfo.customerID == 0xAE*/)
                 {
-                    slice = x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
-                    size = dims[2];
-                    value->e32[0] = 1;
-                }
-                else if (perm[0] == 1 && perm[1] == 2) /* y, z, x */ /* use single TP to reduce bandwidth */
-                {
-                    slice = context->hwChipInfo.customerID == 0xAE && x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
-                    size = dims[2];
-                    value->e32[0] = 2;
-                }
-                else if (context->hwChipInfo.customerID == 0xAE)
-                {
-                    if (perm[0] == 2 && perm[1] == 0) /* z, x, y */
+                    if (1)/*(perm[0] == 1 && perm[1] == 0) || /* y, x, z */
+                        /*(perm[0] == 1 && perm[1] == 2) || /* y, z, x */
+                        /*(perm[0] == 2 && perm[1] == 1))   /* z, y, x */
                     {
-                        slice = mult ? gcmMIN(dims[1], core) : 1;
+                        vx_uint32 splitXCount = 1;/*4 * vxnneGetTypeSize(input->dataFormat);*/
+                        vx_uint32 tempXCount = 0;
                         size = dims[1];
-                        value->e32[0] = 3;
+                        slice = mult ? gcmMIN(dims[1], core) : 1;
+                        tempXCount = parameter->tpTransposeSize / (vxnneGetTypeSize(input->dataFormat) * dims[1] * dims[2]);/*get higher SRAM usage*/
+                        tempXCount = 1 << (vx_uint32) (floor(log(tempXCount)) / log(2));
+                        splitXCount = gcmMAX(dims[0] / tempXCount, 1);
+                        slice2 = splitXCount * slice * 2;
+                        value->u32[1] = slice;
+                        value->u32[2] = splitXCount;
+                        value->e32[0] = 6;
+                        vxmASSERT(input->dataFormat == output->dataFormat);
+                        vxmASSERT(dims[0] % splitXCount == 0);
+                        vxmASSERT(dims[0] / splitXCount * dims[1] * dims[2] * vxnneGetTypeSize(input->dataFormat) < parameter->tpTransposeSize);
                     }
-                    else if (perm[0] == 2 && perm[1] == 1) /* z, y, x */
+                }
+                else
+                {
+                    if (perm[0] == 1 && perm[1] == 0) /* y, x, z */
                     {
-                        slice = mult ? gcmMIN(dims[1], core) : 1;
-                        size = dims[1];
-                        value->e32[0] = 4;
+                        slice = x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
+                        size = dims[2];
+                        value->e32[0] = 1;
                     }
-                    else if (perm[0] == 0 && perm[1] == 2) /* x, z, y */
+                    else if (perm[0] == 1 && perm[1] == 2) /* y, z, x */ /* use single TP to reduce bandwidth */
                     {
-                        slice = mult ? gcmMIN(dims[1], core) : 1;
-                        size = dims[1];
-                        value->e32[0] = 5;
+                        slice = /*context->hwChipInfo.customerID == 0xAE &&*/ x * y > 128 && mult ? gcmMIN(dims[2], core) : 1;
+                        size = dims[2];
+                        value->e32[0] = 2;
+                    }
+                    else if (1/*context->hwChipInfo.customerID == 0xAE*/)
+                    {
+                        if (perm[0] == 2 && perm[1] == 0) /* z, x, y */
+                        {
+                            slice = mult ? gcmMIN(dims[1], core) : 1;
+                            size = dims[1];
+                            value->e32[0] = 3;
+                        }
+                        else if (perm[0] == 2 && perm[1] == 1) /* z, y, x */
+                        {
+                            slice = mult ? gcmMIN(dims[1], core) : 1;
+                            size = dims[1];
+                            value->e32[0] = 4;
+                        }
+                        else if (perm[0] == 0 && perm[1] == 2) /* x, z, y */
+                        {
+                            slice = mult ? gcmMIN(dims[1], core) : 1;
+                            size = dims[1];
+                            value->e32[0] = 5;
+                        }
                     }
                 }
             }
@@ -2155,7 +2181,10 @@ VX_PRIVATE_API void _calculateTPSplitSizeOffset(
         calculateSplitSize(size, slice, split_size_array, split_offset_array);
     }
 
-    *split_count = slice;
+    if (tpType == TP_TRANSPOSE && parameter->tpTransposeSize > 0 /*context->hwChipInfo.customerID == 0xAE*/)
+        *split_count = slice2;
+    else
+       *split_count = slice;
 }
 
 #define FILL_TP_COMMAND(context, input, output, param, stype, scount, ssizes, soffsets, sinfoarray, info, NAME) \
@@ -2774,7 +2803,222 @@ void _fill_TP_TRANSPOSE_Command(
 
     for (i = 0; i < split_count; i++)
     {
-        if (value_cmd_ptr->e32[0] == 1)
+        if (parameter->tpTransposeSize > 0 && ((!output->sRAM) && (!input->sRAM)) && value_cmd_ptr->e32[0] == 6/*context->hwChipInfo.customerID == 0xAE*/)
+        {
+            vx_uint32 multiTPCount = value_cmd_ptr->u32[1];
+            vx_uint32 xSplit = value_cmd_ptr->u32[2];
+            vx_uint32 xSize = dims[0] / xSplit;
+            vx_uint32 ii = i % multiTPCount;
+            vx_uint32 bufferSize = parameter->tpTransposeSize;/*xSize * inYSize * inZSize;*/
+
+            if (i % (multiTPCount * 2) < multiTPCount) /* transpose from ddr to sram */
+            {
+                vx_uint32 inXSizeT = xSize, inYSizeT = split_sizes[ii], inZSizeT = inZSize;
+                vx_uint32 outTileX = 0, outTileY = 0, outTileZ = 0;
+                vx_uint32 outYStrideT = perm[0] == 2 && perm[1] == 0 ? xSize * inZSize : perm[0] == 2 && perm[1] == 1 ? inZSize * outputElemSize : outputElemSize;
+                vx_uint32 outZStrideT = 0;
+                vx_uint32 inputOffset = 0, outputOffset = 0;
+                vx_uint32 inc[3], loopCount[3];
+                /*vx_uint32 outZDistance = perm[0] == 1 && perm[1] == 0 ? distances[2] / xSplit : distances[2];*/
+
+                inputBase = input->physical.start + ((i / multiTPCount / 2) % xSplit) * xSize * inputElemSize;
+                outputBase = parameter->tpTransposeStart;
+                inputOffset = inYStride * split_offsets[ii];
+
+                if(perm[0] == 2 && perm[1] == 0)
+                {
+                    outTileX = inZSizeT;
+                    outTileY = inXSizeT;
+                    outTileZ = inYSizeT;
+                    outYStrideT = outTileX * outputElemSize;
+                    outZStrideT = outYStrideT * outTileY;
+                    outputOffset = outZStrideT * split_offsets[ii];
+                    inc[0] = outTileX;
+                    inc[1] = outZStrideT/outputElemSize;
+                    inc[2] = 1;
+                    loopCount[0] = inXSizeT;
+                    loopCount[1] = inYSizeT;
+                    loopCount[2] = inZSizeT;
+                }
+                else if(perm[0] == 1 && perm[1] == 0)
+                {
+                    outTileX = inYSizeT;
+                    outTileY = inXSizeT;
+                    outTileZ = inZSizeT;
+                    outYStrideT = dims[0] * outputElemSize;
+                    outZStrideT = outYStrideT * outTileY ;
+                    outputOffset = split_offsets[ii] * outputElemSize;
+                    inc[0] = outYStrideT/outputElemSize;
+                    inc[1] = 1;
+                    inc[2] = outZStrideT/outputElemSize;
+                    loopCount[0] = inXSizeT;
+                    loopCount[1] = inYSizeT;
+                    loopCount[2] = inZSizeT;
+                }
+                else if(perm[0] == 2 && perm[1] == 1)
+                {
+                    outTileX = inZSizeT;
+                    outTileY = inYSizeT;
+                    outTileZ = inXSizeT;
+                    outYStrideT = dims[2] * outputElemSize;
+                    outZStrideT = outYStrideT * dims[1];
+                    outputOffset = outYStrideT * split_offsets[ii];
+                    inc[0] = outZStrideT/outputElemSize;
+                    inc[1] = outTileX;
+                    inc[2] = 1;
+                    loopCount[0] = inXSizeT;
+                    loopCount[1] = inYSizeT;
+                    loopCount[2] = inZSizeT;
+                }
+                else if(perm[0] == 1 && perm[1] == 2)
+                {
+                    outTileX = inYSizeT;
+                    outTileY = inZSizeT;
+                    outTileZ = inXSizeT;
+                    outYStrideT = dims[1] * outputElemSize;
+                    outZStrideT = outTileY * outYStrideT;
+                    outputOffset = split_offsets[ii] * outputElemSize;
+                    inc[0] = outZStrideT/outputElemSize;
+                    inc[1] = 1;
+                    inc[2] = outYStrideT;
+                    loopCount[0] = inXSizeT;
+                    loopCount[1] = inYSizeT;
+                    loopCount[2] = inZSizeT;
+                }
+
+                info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + inputOffset;
+                info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + outputOffset;
+                info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = inYSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = inZSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inImageStride  = inYStride / inputElemSize;
+                info_array[i].vx_tp_general_cmd_split_info.inImageSlice   = inZStride / inputElemSize;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd   = inXSizeT - 1;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd   = inYSizeT - 1;
+                info_array[i].vx_tp_general_cmd_split_info.inTileXSize    = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inTileYSize    = inYSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inTileXInc     = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inTileYInc     = inYSizeT;
+
+                info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = inc[0];
+                info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = loopCount[0];
+                info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = inc[1];
+                info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = loopCount[1];
+                info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = inc[2];
+                info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = loopCount[2];
+                info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = 0;
+
+                info_array[i].vx_tp_general_cmd_split_info.inImageCircularBufSize = 0;
+                info_array[i].vx_tp_general_cmd_split_info.inImageCircularBufEndAddrPlus1 = 0xFFFFFFFF;
+                info_array[i].vx_tp_general_cmd_split_info.outImageCircularBufSize = bufferSize;
+                info_array[i].vx_tp_general_cmd_split_info.outImageCircularBufEndAddrPlus1 = outputBase + info_array[i].vx_tp_general_cmd_split_info.outImageCircularBufSize;
+            }
+            else /* copy from sram to ddr */
+            {
+                vx_uint32 inXSizeT, inYSizeT, inZSizeT, inYStrideT, inZStrideT, outYStrideT, outZStrideT, multiInOffset, multiOutOffset;
+                inputBase = parameter->tpTransposeStart;
+                outputBase = output->physical.start + ((i / multiTPCount / 2) % xSplit) * xSize * distances[0] * outputElemSize;
+
+                if (perm[0] == 1 && perm[1] == 0) /* x y z -> y x z */
+                {
+                    inXSizeT = split_sizes[ii];
+                    inYSizeT = xSize;
+                    inZSizeT = dims[2];
+                    inYStrideT = dims[1] * outputElemSize;
+                    inZStrideT = dims[1] * xSize * outputElemSize;
+                    multiInOffset = outputElemSize * split_offsets[ii];
+                    outYStrideT = dims[1] * outputElemSize;
+                    outZStrideT = dims[1] * dims[0] * outputElemSize;
+                    multiOutOffset = outputElemSize * split_offsets[ii];
+                }
+                else if (perm[0] == 1 && perm[1] == 2) /* x y z -> y z x */
+                {
+                    inXSizeT = split_sizes[ii];
+                    inYSizeT = dims[2];
+                    inZSizeT = xSize;
+                    inYStrideT = dims[1] * outputElemSize;
+                    inZStrideT = dims[1] * dims[2] * outputElemSize;
+                    multiInOffset = outputElemSize * split_offsets[ii];
+                    outYStrideT = dims[1] * outputElemSize;
+                    outZStrideT = dims[1] * dims[2] * outputElemSize;
+                    multiOutOffset = outputElemSize * split_offsets[ii];
+                }
+                else if (perm[0] == 2 && perm[1] == 1) /* x y z -> z y x */
+                {
+                    inXSizeT = dims[2];
+                    inYSizeT = split_sizes[ii];
+                    inZSizeT = xSize;
+                    inYStrideT = dims[2] * outputElemSize;
+                    inZStrideT = dims[2] * dims[1] * outputElemSize;
+                    multiInOffset = inYStrideT * split_offsets[ii];
+                    outYStrideT = dims[2] * outputElemSize;
+                    outZStrideT = dims[2] * dims[1] * outputElemSize;
+                    multiOutOffset = outYStrideT * split_offsets[ii];
+                }
+                else if(perm[0] == 2 && perm[1] == 0 && perm[2] == 1) /* x y z -> z x y */
+                {
+                    inXSizeT = dims[2];
+                    inYSizeT = xSize;
+                    inZSizeT = split_sizes[ii];
+                    inYStrideT = dims[2] * outputElemSize;
+                    inZStrideT = dims[2] * xSize * outputElemSize;
+                    multiInOffset = inZStrideT * split_offsets[ii];
+                    outYStrideT = dims[2] * outputElemSize;
+                    outZStrideT = dims[2] * dims[0] * outputElemSize;
+                    multiOutOffset = outZStrideT * split_offsets[ii];
+                }
+
+                info_array[i].vx_tp_general_cmd_split_info.inImageBaseAddress = inputBase + multiInOffset;
+                info_array[i].vx_tp_general_cmd_split_info.outBaseAddress = outputBase + multiOutOffset;
+                info_array[i].vx_tp_general_cmd_split_info.inImageXSize   = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inImageYSize   = inYSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inImageZSize   = inZSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inImageStride  = inYStrideT / outputElemSize;
+                info_array[i].vx_tp_general_cmd_split_info.inImageSlice   = inZStrideT / outputElemSize;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowXStart = 0;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowYStart = 0;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowXEnd   = inXSizeT - 1;
+                info_array[i].vx_tp_general_cmd_split_info.inWindowYEnd   = inYSizeT - 1;
+                info_array[i].vx_tp_general_cmd_split_info.inTileXSize    = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inTileYSize    = inYSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inTileXInc     = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.inTileYInc     = inYSizeT;
+
+                info_array[i].vx_tp_general_cmd_split_info.outLoop0Inc   = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop0Count = inXSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop1Inc   = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop1Count = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop1Reset = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop2Inc   = outYStrideT / outputElemSize;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop2Count = inYSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop2Reset = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop3Inc   = outZStrideT / outputElemSize;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop3Count = inZSizeT;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop3Reset = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop4Inc   = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop4Count = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop5Inc   = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop5Count = 1;
+                info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = 0;
+
+                info_array[i].vx_tp_general_cmd_split_info.inImageCircularBufSize = bufferSize;
+                info_array[i].vx_tp_general_cmd_split_info.inImageCircularBufEndAddrPlus1 = inputBase + info_array[i].vx_tp_general_cmd_split_info.inImageCircularBufSize;
+                info_array[i].vx_tp_general_cmd_split_info.outImageCircularBufSize = 0;
+                info_array[i].vx_tp_general_cmd_split_info.outImageCircularBufEndAddrPlus1 = 0xFFFFFFFF;
+            }
+        }
+        else if (value_cmd_ptr->e32[0] == 1)
         {
             vx_uint32 inTileXSize = gcmMIN(8, inXSize);
             vx_uint32 inTileYSize = gcmMIN(32, inYSize);
@@ -2992,7 +3236,14 @@ void _fill_TP_TRANSPOSE_Command(
             info_array[i].vx_tp_general_cmd_split_info.outLoop6Inc   = pnum > 5 ? distances[5] : 0;
         }
 
-        info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
+        if (value_cmd_ptr->e32[0] == 6)
+        {
+            info_array[i].vx_tp_general_cmd_split_info.noFlush = (i % parameter->tp_value->u32[1] == parameter->tp_value->u32[1] - 1 ? 0 : 1);
+        }
+        else
+        {
+            info_array[i].vx_tp_general_cmd_split_info.noFlush = (i == split_count - 1 ? 0 : 1);
+        }
         info_array[i].vx_tp_general_cmd_split_info.last = 1;
     }
 }
@@ -5867,42 +6118,45 @@ VX_PRIVATE_API vx_status vxnneCommandBuffer_GetTPSplitCommandInfo(
             }
         }
 
-        if (output->sRAM)
+        if (tpType != TP_TRANSPOSE || parameter->tp_value->e32[0] != 6)
         {
-            tmpPtr->outImageCircularBufSize = output->circleBufferSize;
-            tmpPtr->outImageCircularBufEndAddrPlus1 = output->physical.circularBufEndAddrPlus1;
-
-            if (tmpPtr->outBaseAddress >= output->physical.circularBufEndAddrPlus1)
+            if (output->sRAM)
             {
-                vx_uint32 offset = tmpPtr->outBaseAddress - output->physical.circularBufEndAddrPlus1;
-                offset = offset % output->circleBufferSize;
-                tmpPtr->outBaseAddress = output->physical.circularBufEndAddrPlus1 - output->circleBufferSize + offset;
+                tmpPtr->outImageCircularBufSize = output->circleBufferSize;
+                tmpPtr->outImageCircularBufEndAddrPlus1 = output->physical.circularBufEndAddrPlus1;
+
+                if (tmpPtr->outBaseAddress >= output->physical.circularBufEndAddrPlus1)
+                {
+                    vx_uint32 offset = tmpPtr->outBaseAddress - output->physical.circularBufEndAddrPlus1;
+                    offset = offset % output->circleBufferSize;
+                    tmpPtr->outBaseAddress = output->physical.circularBufEndAddrPlus1 - output->circleBufferSize + offset;
+                }
+                vxmASSERT(tmpPtr->outBaseAddress < output->physical.circularBufEndAddrPlus1);
             }
-            vxmASSERT(tmpPtr->outBaseAddress < output->physical.circularBufEndAddrPlus1);
-        }
-        else
-        {
-            tmpPtr->outImageCircularBufSize         = 0;
-            tmpPtr->outImageCircularBufEndAddrPlus1 = 0xFFFFFFFF;
-        }
-
-        if (input->sRAM)
-        {
-            tmpPtr->inImageCircularBufSize = input->circleBufferSize;
-            tmpPtr->inImageCircularBufEndAddrPlus1  = input->physical.circularBufEndAddrPlus1;
-
-            if (tmpPtr->inImageBaseAddress >= input->physical.circularBufEndAddrPlus1)
+            else
             {
-                vx_uint32 offset = tmpPtr->inImageBaseAddress - input->physical.circularBufEndAddrPlus1;
-                offset = offset % input->circleBufferSize;
-                tmpPtr->inImageBaseAddress = input->physical.circularBufEndAddrPlus1 - input->circleBufferSize + offset;
+                tmpPtr->outImageCircularBufSize         = 0;
+                tmpPtr->outImageCircularBufEndAddrPlus1 = 0xFFFFFFFF;
             }
-            vxmASSERT(tmpPtr->inImageBaseAddress < input->physical.circularBufEndAddrPlus1);
-        }
-        else
-        {
-            tmpPtr->inImageCircularBufSize   = 0;
-            tmpPtr->inImageCircularBufEndAddrPlus1     = 0xFFFFFFFF;
+
+            if (input->sRAM)
+            {
+                tmpPtr->inImageCircularBufSize = input->circleBufferSize;
+                tmpPtr->inImageCircularBufEndAddrPlus1  = input->physical.circularBufEndAddrPlus1;
+
+                if (tmpPtr->inImageBaseAddress >= input->physical.circularBufEndAddrPlus1)
+                {
+                    vx_uint32 offset = tmpPtr->inImageBaseAddress - input->physical.circularBufEndAddrPlus1;
+                    offset = offset % input->circleBufferSize;
+                    tmpPtr->inImageBaseAddress = input->physical.circularBufEndAddrPlus1 - input->circleBufferSize + offset;
+                }
+                vxmASSERT(tmpPtr->inImageBaseAddress < input->physical.circularBufEndAddrPlus1);
+            }
+            else
+            {
+                tmpPtr->inImageCircularBufSize   = 0;
+                tmpPtr->inImageCircularBufEndAddrPlus1     = 0xFFFFFFFF;
+            }
         }
     }
 
@@ -7348,7 +7602,15 @@ VX_INTERNAL_API vx_status vxnneCommandBuffer_GenerateCommands(
                                                  info.vx_nn_tp_cmd_info.outBaseAddress));
             }
 
-            command_buffer->eventID[i] = i != command_buffer->commandCount - 1 ? 1 : 0;
+            if (operation_command->operation->operatorType == VXNNE_OPERATOR_TENSOR_TRANS && parameter->tp_value->e32[0] == 6)
+            {
+                command_buffer->eventID[i] = i % parameter->tp_value->u32[1] != parameter->tp_value->u32[1] - 1 ? 1 : 0;
+            }
+            else
+            {
+                command_buffer->eventID[i] = i != command_buffer->commandCount - 1 ? 1 : 0;
+            }
+
             /*parameter->tp_value->u32[0] == 1 :  kz not split*/
             /*parameter->tp_value->u32[0] != 1 && parameter->tp_value->e32[0] == 0 : kz split and not the last vertical process operation*/
             if (operation_command->operation->operatorType == VXNNE_OPERATOR_FULLYCONNECTED && (parameter->tp_value->u32[0] == 1 || (parameter->tp_value->u32[0] != 1 && parameter->tp_value->e32[0] == 0)))

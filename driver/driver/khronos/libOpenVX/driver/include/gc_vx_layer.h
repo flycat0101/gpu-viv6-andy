@@ -460,6 +460,7 @@ typedef struct _vx_op_param_s
     vx_uint32    kernelCacheStart;
     vx_uint32    kernelCacheSize;
     vx_enum      kernelCacheMode;
+
     vx_uint32    imageCacheStart;
     vx_uint32    imageCacheSize;
     vx_enum      imageCacheMode;
@@ -475,6 +476,9 @@ typedef struct _vx_op_param_s
     vx_uint8     transposeOutChannel;
 
     /* for TP */
+    vx_uint32 tpTransposeSize;
+    vx_uint32 tpTransposeStart;
+
     vx_enum          tpType;
     vx_tp_value_cmd  tp_value;
     vx_reference     other_ref;
@@ -867,6 +871,8 @@ typedef struct _vxnne_operation_command_s
         vx_uint32 kernelCacheStart;
         vx_uint32 kernelCacheSize;
         vx_enum   kernelCacheMode;
+        vx_uint32 tpTransposeSize;
+        vx_uint32 tpTransposeStart;
         vx_uint32 imageCacheStart;
         vx_uint32 imageCacheSize;
         vx_enum   imageCacheMode;

@@ -1791,6 +1791,7 @@ typedef struct _vxnne_mem_request_s
     vx_memory   outputMemory[VX_MAX_MEM_REQUEST_OUTPUT];
     vx_memory_s kernelCache;
     vx_memory_s imageCache;
+    vx_memory_s tpTransposeBuffer;
     vx_memory_s transposeIn;
     vx_memory_s transposeOut;
 }
