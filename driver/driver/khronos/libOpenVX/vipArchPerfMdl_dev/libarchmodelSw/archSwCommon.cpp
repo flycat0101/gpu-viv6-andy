@@ -1520,6 +1520,8 @@ arch_status archCalculateArchPerf(
 
                 if (perf->resultInfo.calculated != HALF_DONE)
                 {
+                    perf->resultInfo.outImageTileXSize = 0;
+                    perf->resultInfo.outImageTileYSize = 0;
                     perf->resultInfo.kernelsPerCore    = 0;
                     minCycleCount    = ~0ULL;
                     minRDBandWidth   = ~0ULL;
@@ -1529,8 +1531,7 @@ arch_status archCalculateArchPerf(
                     maxOutTileXSize = archMIN(archMIN(inXSize, maxOutTileXSize), maxInTileXSize - kernelXSize + 1);
                     minOutTileXSize = archMAX((arch_int32)poolingSize, archMAX(-xOffSet - (arch_int32)kernelXSize + 1 + 1, 0));
                     minOutTileYSize = archMAX((arch_int32)poolingSize, archMAX(-yOffSet - (arch_int32)kernelYSize + 1 + 1, 0));
-                    perf->resultInfo.outImageTileXSize = minOutTileXSize;
-                    perf->resultInfo.outImageTileYSize = minOutTileYSize;
+
                     if (maxOutTileXSize < minOutTileXSize)
                     {
                         archInfo("WARNING: maxOutTileXSize < minOutTileXSize\n");
@@ -1555,20 +1556,27 @@ arch_status archCalculateArchPerf(
                             tmpCovAccuMode = adjustAccuBuffDepth * interleaveMode;
 
 
-                            if ( !isV8 && (tmpCovMode < kernelYSize))
+                            //if ( !isV8 && (tmpCovMode < kernelYSize))
+                            //{
+                            //    // V6 or V7 has this limitation,V8, V9 and later version do not have
+                            //    break;
+                            //}
+
+                            //if (!isV8 || ((kernelXSize == 1) && (kernelYSize == 1)))
+                            //{
+                            //    tmpMaxOutTileYSize = archMIN(127, archMIN(tmpCovMode-kernelYSize+1, archMIN(tmpCovAccuMode, inYSize)));
+                            //}
+                            //else
+                            //{
+                            //    tmpMaxOutTileYSize = archMIN(127, inYSize);
+                            //}
+
+                            if (tmpCovMode < kernelYSize)
                             {
-                                // V6 or V7 has this limitation,V8, V9 and later version do not have
                                 break;
                             }
 
-                            if (!isV8 || ((kernelXSize == 1) && (kernelYSize == 1)))
-                            {
-                                tmpMaxOutTileYSize = archMIN(127, archMIN(tmpCovMode-kernelYSize+1, archMIN(tmpCovAccuMode, inYSize)));
-                            }
-                            else
-                            {
-                                tmpMaxOutTileYSize = archMIN(127, inYSize);
-                            }
+                            tmpMaxOutTileYSize = archMIN(127, archMIN(tmpCovMode-kernelYSize+1, archMIN(tmpCovAccuMode, inYSize)));
 
                             if (tmpMaxOutTileYSize < minOutTileYSize)
                             {
