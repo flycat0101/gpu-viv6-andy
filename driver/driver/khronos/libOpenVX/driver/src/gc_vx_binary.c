@@ -6128,6 +6128,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
             if (ret == 1)
             {   /* The AXI-SRAM need to be patched */
                 /*1.1 patch start remap address */
+                gcoOS_ZeroMemory(&patchInfo, sizeof(vx_binary_patch_info_s));
                 patchInfo.offset = offsetArray[0];
                 patchInfo.type                = VX_BINARY_PATCH_TYPE_COMMAND;
                 patchInfo.sourceType          = VX_BINARY_SOURCE_AXI_SRAM;
@@ -6158,6 +6159,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                                       axiSRAMPhysicalEnd, offsetArray, vx_true_e);
                 if (ret == 1)
                 {
+                    gcoOS_ZeroMemory(&patchInfo, sizeof(vx_binary_patch_info_s));
                     patchInfo.offset = offsetArray[0];
                     patchInfo.type                = VX_BINARY_PATCH_TYPE_COMMAND;
                     patchInfo.sourceType          = VX_BINARY_SOURCE_AXI_SRAM;
@@ -6185,6 +6187,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                                           0x08010e50, offset, vx_true_e);
                     if (ret == 1)
                     {
+                        gcoOS_ZeroMemory(&patchInfo, sizeof(vx_binary_patch_info_s));
                         patchInfo.offset = offset[0] + sizeof(vx_uint32);
                         patchInfo.type                = VX_BINARY_PATCH_TYPE_COMMAND;
                         patchInfo.sourceType          = VX_BINARY_SOURCE_AXI_SRAM;
@@ -6222,6 +6225,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                 {
                     pathLocal = offset[0] + sizeof(vx_uint32);
                     /*1.1 patch start remap address */
+                    gcoOS_ZeroMemory(&patchInfo, sizeof(vx_binary_patch_info_s));
                     patchInfo.offset = pathLocal;
                     patchInfo.type                = VX_BINARY_PATCH_TYPE_COMMAND;
                     patchInfo.sourceType          = VX_BINARY_SOURCE_AXI_SRAM;
@@ -6252,6 +6256,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                                           axiSRAMPhysicalEnd, offsetArray, vx_true_e);
                     if (ret == 1)
                     {
+                        gcoOS_ZeroMemory(&patchInfo, sizeof(vx_binary_patch_info_s));
                         patchInfo.offset = offsetArray[0];
                         patchInfo.type                = VX_BINARY_PATCH_TYPE_COMMAND;
                         patchInfo.sourceType          = VX_BINARY_SOURCE_AXI_SRAM;
@@ -6296,6 +6301,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
             if (ret == 1)
             {   /* The VIP-SRAM need to be patched */
                 /*1.1 patch start remap address */
+                gcoOS_ZeroMemory(&patchInfo, sizeof(vx_binary_patch_info_s));
                 patchInfo.offset = offsetArray[0];
                 patchInfo.type                = VX_BINARY_PATCH_TYPE_COMMAND;
                 patchInfo.sourceType          = VX_BINARY_SOURCE_VIP_SRAM;
@@ -6330,6 +6336,7 @@ VX_PRIVATE_API vx_status vxoBinaryGraph_SaveInitialOperation(
                 if (ret == 1)
                 {
                     /*1.1 patch start remap address */
+                    gcoOS_ZeroMemory(&patchInfo, sizeof(vx_binary_patch_info_s));
                     patchInfo.offset = offset[0] + sizeof(vx_uint32);
                     patchInfo.type                = VX_BINARY_PATCH_TYPE_COMMAND;
                     patchInfo.sourceType          = VX_BINARY_SOURCE_VIP_SRAM;
