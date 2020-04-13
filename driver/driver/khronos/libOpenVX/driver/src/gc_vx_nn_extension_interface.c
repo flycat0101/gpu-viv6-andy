@@ -1832,13 +1832,12 @@ vx_status vxnneExecutionLayer_Execute(vxnne_layer layer)
         vxnneMultiChannel_ApplySyncMode(executionLayer->opIndices[i].wakeMode, executionLayer->opIndices[i].semaWakeHandle);
         if (executionLayer->graph->base.context->options.enableCNNPerf && executionLayer->opIndices[i].operation->mGpuSync)
         {
-            vxInfo("layer id: %d layer name:%s operation[%d]:%s target:%s.\nuid: %d\n",
+            vxInfo("layer id: %d layer name:%s operation[%d]:%s target:%s.\n",
                 operation->layer->node->id,
                 operation->layer->name,
                 operation->id,
                 vxnneGetOperatorTypeName(operation->operatorType),
-                vxnneGetOperatorTargetName(operation->target),
-                getUserIDFromOutputTensor((vx_tensor)operation->outputs[0]));
+                vxnneGetOperatorTargetName(operation->target));
 
             gcfVX_Flush(gcvTRUE);
 
