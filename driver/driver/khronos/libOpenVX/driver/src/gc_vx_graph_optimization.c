@@ -399,12 +399,17 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                         nodeOpType = OP_POOLING;
                 }
             }
-            else if(poolType == VX_NN_POOLING_AVG)
+            else if(poolType == VX_NN_POOLING_AVG || poolType == VX_NN_POOLING_AVG_ANDROID)
             {
                 /*TODO: whether to convert VX_NN_POOLING_AVG_ANDROID to CONV*/
                 vx_enum roundMode = SCALAR_VALUE(node->paramTable[PARAM_POOLING_POOL_ROUND_MODE_INDEX], u32);
                 if(TENSOR_DATA_TYPE(input) != TENSOR_DATA_TYPE(output))
                     break;
+
+                if((poolType == VX_NN_POOLING_AVG_ANDROID) &&
+                    (pad[0] + pad[1] + pad[2] + pad[3] != 0) )
+                    break;
+
                 if(roundMode == VX_NN_DS_SIZE_ROUNDING_FLOOR)
                 {
                     nodeOpType = OP_AVG_POOL;
