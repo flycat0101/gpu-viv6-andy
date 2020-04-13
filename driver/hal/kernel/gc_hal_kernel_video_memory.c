@@ -3585,7 +3585,7 @@ gckVIDMEM_NODE_LockCPU(
     gckOS os = Kernel->os;
     gctBOOL acquired = gcvFALSE;
     gcuVIDMEM_NODE_PTR node;
-    gckVIDMEM_BLOCK vidMemBlock = node->VirtualChunk.parent;
+    gckVIDMEM_BLOCK vidMemBlock;
     gctPOINTER logical = gcvNULL;
 
     gcmkHEADER_ARG("NodeObject=%p", NodeObject);
@@ -3599,6 +3599,8 @@ gckVIDMEM_NODE_LockCPU(
     {
         node = NodeObject->node;
     }
+
+    vidMemBlock = node->VirtualChunk.parent;
 
     /* Grab the mutex. */
     gcmkONERROR(gckOS_AcquireMutex(os, NodeObject->mutex, gcvINFINITE));
@@ -3745,7 +3747,7 @@ gckVIDMEM_NODE_UnlockCPU(
     gckOS os = Kernel->os;
     gctBOOL acquired = gcvFALSE;
     gcuVIDMEM_NODE_PTR node;
-    gckVIDMEM_BLOCK vidMemBlock = node->VirtualChunk.parent;
+    gckVIDMEM_BLOCK vidMemBlock;
 
     gcmkHEADER_ARG("NodeObject=%p", NodeObject);
 
@@ -3758,6 +3760,8 @@ gckVIDMEM_NODE_UnlockCPU(
     {
         node = NodeObject->node;
     }
+
+    vidMemBlock = node->VirtualChunk.parent;
 
     /* Grab the mutex. */
     gcmkONERROR(gckOS_AcquireMutex(os, NodeObject->mutex, gcvINFINITE));
