@@ -5288,7 +5288,8 @@ static void halti5_pip_build_patchKeyMask(
                                 break;
                             }
                         }
-                        __VK_ASSERT(entryIdx < resSet->separatedTexTable.countOfEntries);
+                        if (entryIdx == resSet->separatedTexTable.countOfEntries)
+                            break;
 
                         for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; arrayIdx++)
                         {
@@ -5357,7 +5358,9 @@ static void halti5_pip_build_patchKeyMask(
                                 break;
                             }
                         }
-                        __VK_ASSERT(entryIdx < resSet->inputAttachmentTable.countOfEntries);
+
+                        if (entryIdx == resSet->inputAttachmentTable.countOfEntries)
+                            break;
                         for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; arrayIdx++)
                         {
                             VSC_RES_OP_BIT *pResOp = &inputAttachmentEntry->pResOpBits[arrayIdx];
