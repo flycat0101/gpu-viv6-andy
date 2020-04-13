@@ -208,6 +208,9 @@ gcoOS_DumpBuffer(
 #else
     gcmLOCKDUMP();
 
+    /* sometimes the Offset is not aligned to 4 bytes */
+    bytes += (Offset & 3);
+
     gcmDUMP(Os, "@[%s 0x%08X 0x%08X",
             tagString[Type], phys, bytes);
 
