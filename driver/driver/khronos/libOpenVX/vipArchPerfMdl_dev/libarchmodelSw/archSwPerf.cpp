@@ -5716,6 +5716,7 @@ void printConfig(arch_nn_config *pArchNnConfig,arch_drv_option *pArchOptions, ar
     archInfo("enableGraphMergeTranspose is %d.\n",pArchOptions->enableGraphMergeTranspose);
     archInfo("enableGraphDeleteRelu is %d.\n",pArchOptions->enableGraphDeleteRelu);
     archInfo("enableGraphDeleteSqueeze is %d.\n",pArchOptions->enableGraphDeleteSqueeze);
+    archInfo("enableGraphAvgPoolandPWConv is %d.\n",pArchOptions->enableGraphAvgPoolandPWConv);
     archInfo("freqInMHZ is %d.\n",pArchOptions->freqInMHZ);
     archInfo("axiClockFreqInMHZ is %d.\n",pArchOptions->axiClockFreqInMHZ);
     archInfo("maxSocOTNumber is %d.\n",pArchOptions->maxSocOTNumber);

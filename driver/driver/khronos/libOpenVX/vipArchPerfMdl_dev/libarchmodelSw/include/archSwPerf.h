@@ -595,6 +595,7 @@ typedef struct _arch_drv_option
     arch_uint32    enableGraphMergeTranspose;      /* NO */
     arch_uint32    enableGraphDeleteRelu;          /* NO */
     arch_uint32    enableGraphDeleteSqueeze;       /* NO */
+    arch_uint32    enableGraphAvgPoolandPWConv;    /* NO */
     arch_uint32    freqInMHZ;
     arch_uint32    axiClockFreqInMHZ;
     arch_uint32    maxSocOTNumber;
