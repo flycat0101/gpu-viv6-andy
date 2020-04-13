@@ -598,17 +598,6 @@ static VSC_DG_NODE* _PopStack(VSC_SIMPLE_STACK* pStack, VSC_MM* pMM)
     return pRetNode;
 }
 
-static VSC_DG_NODE* _TopStack(VSC_SIMPLE_STACK* pStack)
-{
-    VSC_QUEUE_STACK_ENTRY*       pStackEntry;
-    VSC_DG_NODE*                 pRetNode;
-
-    pStackEntry = STACK_PEEK_TOP_ENTRY(pStack);
-    pRetNode = (VSC_DG_NODE*)SQE_GET_CONTENT(pStackEntry);
-
-    return pRetNode;
-}
-
 static void _EnQueue(VSC_SIMPLE_QUEUE* pQueue, VSC_DG_NODE* pNode, VSC_MM* pMM)
 {
     VSC_QUEUE_STACK_ENTRY* pQueueEntry;
@@ -1176,12 +1165,12 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
             {
                 if (pPopEdge != gcvNULL
                     &&
-                    SAFE_CALL_DG_NODE_HANDLER(pfnHandlerDescendantPre, pPopNode, pParam))
+                    SAFE_CALL_DG_NODE_HANDLER_CHECK(pfnHandlerDescendantPre, pPopNode, pParam))
                 {
                     _PopStackWithEdge(&stack, gcvNULL, pDG->pMM);
                 }
 
-                if (SAFE_CALL_DG_NODE_HANDLER(pfnHandlerOwnPre, pPopNode, pParam))
+                if (SAFE_CALL_DG_NODE_HANDLER_CHECK(pfnHandlerOwnPre, pPopNode, pParam))
                 {
                     _PopStackWithEdge(&stack, gcvNULL, pDG->pMM);
                 }

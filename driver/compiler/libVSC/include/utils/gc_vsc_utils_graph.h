@@ -304,8 +304,14 @@ typedef void    (*PFN_DG_EDGE_HANLDER)(VSC_DIRECTED_GRAPH* pDG, VSC_DG_EDGE* pEd
         }                                                                \
     }
 
-#define SAFE_CALL_DG_NODE_HANDLER(dgNodeHandler, pNode, pParam)          \
+#define SAFE_CALL_DG_NODE_HANDLER_CHECK(dgNodeHandler, pNode, pParam)    \
     ((dgNodeHandler) && ((dgNodeHandler)(pDG, (pNode), (pParam))))
+
+#define SAFE_CALL_DG_NODE_HANDLER(dgNodeHandler, pNode, pParam)          \
+    if ((dgNodeHandler))                                                 \
+    {                                                                    \
+        (dgNodeHandler)(pDG, (pNode), (pParam));                         \
+    }
 
 #define SAFE_CALL_DG_EDGE_HANDLER(dgEdgeHandler, pEdge, pParam)          \
     if ((dgEdgeHandler))                                                 \
