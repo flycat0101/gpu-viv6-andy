@@ -1097,17 +1097,19 @@ VX_PRIVATE_API vx_status vxoNNConcatIndefiniteLayer_TP_Initialize(vxnne_layer op
     vx_uint32  i                = 0;
     vx_uint32  dimCount         = TENSOR_VIEW_DIM_NUM(output_s);
     vx_uint32  itemCount        = (vx_uint32)input_s->itemCount;
-    vx_uint32  batchCount       = dimCount > 3 ? TENSOR_SIZE_INDEX(output_s, 3) : 1;
+    vx_uint32  batchCount       = 1 ;
     vx_uint32  operationIndex   = 0;
     vx_uint32  tmpTensorIndex   = 0;
 
     vx_tensor input = VX_NULL, output = VX_NULL;
     vx_tensor_view tensor_view = VX_NULL;
-    vx_uint32 start[4] = {0, 0, 0, 0}, end[4] = {0, 0, 0, 0};
+    vx_uint32 start[6] = {0, 0, 0, 0, 0, 0}, end[6] = {0, 0, 0, 0, 0, 0};
     vx_uint32 op_count = itemCount;
     vx_op_param param = VX_NULL;
 
     vxoLayer_InitializeHead(ops_layer, parameters, num, reg_param);
+
+    vxmASSERT(axis<3);
 
     gcoOS_Allocate(gcvNULL, sizeof(vxnne_tp_operation_s) * op_count, (gctPOINTER*)&concatNLayer->tp_operation);
     gcoOS_ZeroMemory(concatNLayer->tp_operation, sizeof(vxnne_tp_operation_s) * op_count);
@@ -1118,6 +1120,11 @@ VX_PRIVATE_API vx_status vxoNNConcatIndefiniteLayer_TP_Initialize(vxnne_layer op
         {
             end[i] = TENSOR_VIEW_SIZE_INDEX(output_s, i);
         }
+    }
+
+    for (i = 3; i < dimCount; i++)
+    {
+        batchCount *= TENSOR_SIZE_INDEX(output_s, i);
     }
 
     end[axis] = start[axis];
