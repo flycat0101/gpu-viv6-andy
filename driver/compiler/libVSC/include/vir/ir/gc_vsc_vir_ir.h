@@ -4576,6 +4576,7 @@ typedef enum _VIR_FUNCTIONFLAG
   VIR_FUNCFLAG_HAS_GOTO                 = 0x400000, /* This function has goto branch */
   VIR_FUNCFLAG_HAS_CALL_OP              = 0x800000, /* Call the other functions within this function. */
   VIR_FUNCFLAG_HAS_BARRIER              = 0x1000000, /* This function uses BARRIER. */
+  VIR_FUNCFLAG_HAS_LOOP                 = 0x2000000, /* This function has LOOP. */
 } VIR_FunctionFlag;
 
 typedef struct _VIR_KERNELPROPERTY
