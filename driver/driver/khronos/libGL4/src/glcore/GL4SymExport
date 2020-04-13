@@ -903,6 +903,8 @@ VERSION {
 
         GL_DISPATCH_TABLE;
         GLESv2_DISPATCH_TABLE;
+        __driCreateScreen;
+        __driCreateNewScreen;
 
     local: *;
 };
