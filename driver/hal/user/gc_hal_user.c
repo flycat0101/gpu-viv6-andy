@@ -2941,6 +2941,80 @@ OnError:
 
 /*******************************************************************************
 **
+**  gcoHAL_PrepareVideoMemory
+**
+**  Sync a video buffer before read operation.
+**
+**  INPUT:
+**
+**      gctUINT32 Handle
+**          Handle of video memory.
+**
+**
+**  OUTPUT:
+**
+**      gceSTATUS
+**
+*/
+gceSTATUS gcoHAL_PrepareVideoMemory(gctUINT32 Node)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsHAL_INTERFACE iface;
+
+    gcmHEADER_ARG("Node=0x%x", Node);
+
+    iface.command = gcvHAL_SYNC_VIDEO_MEMORY;
+    iface.u.SyncVideoMemory.node = Node;
+    iface.u.SyncVideoMemory.reason = gcvSYNC_REASON_BEFORE_READ;
+
+    /* Call kernel HAL. */
+    gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+
+OnError:
+    /* Return status. */
+    gcmFOOTER();
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoHAL_FinishVideoMemory
+**
+**  Sync a video buffer after write operation.
+**
+**  INPUT:
+**
+**      gctUINT32 Handle
+**          Handle of video memory.
+**
+**
+**  OUTPUT:
+**
+**      gceSTATUS
+**
+*/
+gceSTATUS gcoHAL_FinishVideoMemory(gctUINT32 Node)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsHAL_INTERFACE iface;
+
+    gcmHEADER_ARG("Node=0x%x", Node);
+
+    iface.command = gcvHAL_SYNC_VIDEO_MEMORY;
+    iface.u.SyncVideoMemory.node = Node;
+    iface.u.SyncVideoMemory.reason = gcvSYNC_REASON_AFTER_WRITE;
+
+    /* Call kernel HAL. */
+    gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+
+OnError:
+    /* Return status. */
+    gcmFOOTER();
+    return status;
+}
+
+/*******************************************************************************
+**
 **  gcoHAL_WrapUserMemory
 **
 **  Wrap a memory from other allocator to a vidmem node.

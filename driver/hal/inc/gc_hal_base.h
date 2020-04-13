@@ -1113,6 +1113,16 @@ gcoHAL_QueryTargetCaps(
 #endif
 
 gceSTATUS
+gcoHAL_PrepareVideoMemory(
+    IN gctUINT32 Node
+    );
+
+gceSTATUS
+gcoHAL_FinishVideoMemory(
+    IN gctUINT32 Node
+    );
+
+gceSTATUS
 gcoHAL_WrapUserMemory(
     IN gcsUSER_MEMORY_DESC_PTR UserMemoryDesc,
     IN gceVIDMEM_TYPE Type,
