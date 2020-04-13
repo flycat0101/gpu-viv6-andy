@@ -1389,3 +1389,114 @@ __kernel void gpuPooling_AvgNoPadFP32_K3S2_M4_2D
     write_imagef(output, coord.xy, result);
 }
 
+__kernel void gpuPooling_globalpooling_FP32_M4
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+                 int        kernel_size,
+                 float      scale
+    )
+{
+    int4 coord = (int4)(0, get_global_id(1), 0, get_global_id(1));
+    float4 result = 0;
+
+    do
+    {
+        float4 src00 = read_imagef(input, coord.xy);
+        coord.x += 4;
+
+        result = result + src00;
+    } while (coord.x < kernel_size);
+
+    float4 one = (float4)(1.0f, 1.0f, 1.0f, 1.0f);
+    result.x = dot(result, one);
+
+    result *= scale;
+
+    write_imagef(output, coord.zy, result);
+}
+
+__kernel void gpuPooling_globalpooling_FP32_M1
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+                 int        kernel_size,
+                 float      scale
+    )
+{
+    int4 coord = (int4)(0, get_global_id(1), 0, get_global_id(1));
+    float4 result = 0;
+
+    do
+    {
+        float4 src00 = read_imagef(input, coord.xy);
+        coord.x ++;
+
+        result = result + src00;
+    } while (coord.x < kernel_size);
+
+    result *= scale;
+
+    write_imagef(output, coord.zy, result);
+}
+
+__kernel void gpuPooling_globalpooling_U8_M4
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+                 int        kernel_size,
+                 float      scale,
+                 float      input_tail,
+                 float      outputZP
+    )
+{
+    int4 coord = (int4)(0, get_global_id(1), 0, get_global_id(1));
+    uint4 sum = 0;
+
+    do
+    {
+        uint4 src00 = read_imageui(input, coord.xy);
+        coord.x += 4;
+
+        sum = sum + src00;
+    } while (coord.x < kernel_size);
+
+    float4 one = (float4)(1.0f, 1.0f, 1.0f, 1.0f);
+    float4 result = convert_float4(sum);
+    result.x = dot(result, one);
+
+    result.x = (result.x - input_tail) * scale + outputZP;
+    sum = convert_uint4(convert_uchar4_sat(result));
+
+    write_imageui(output, coord.zy, sum);
+}
+
+__kernel void gpuPooling_globalpooling_U8_M1
+    (
+    __read_only  image2d_t  input,
+    __write_only image2d_t  output,
+                 int        kernel_size,
+                 float      scale,
+                 float      input_tail,
+                 float      outputZP
+    )
+{
+    int4 coord = (int4)(0, get_global_id(1), 0, get_global_id(1));
+    uint4 sum = 0;
+
+    do
+    {
+        uint4 src00 = read_imageui(input, coord.xy);
+        coord.x ++;
+
+        sum = sum + src00;
+    } while (coord.x < kernel_size);
+
+    float4 result = convert_float4(sum);
+
+    result.x = (result.x - input_tail) * scale + outputZP;
+    sum = convert_uint4(convert_uchar4_sat(result));
+
+    write_imageui(output, coord.zy, sum);
+}
+
