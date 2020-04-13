@@ -1753,14 +1753,13 @@ gckKERNEL_Notify(
     IN gceNOTIFY Notifcation
     );
 
-#if gcdDEVICE_EXTEND_IOCTL
-/* platform device extend ioctl function */
+/* Sync video memory by dma */
 gceSTATUS
-gckKERNEL_ExtendDeviceControl(
+gckKERNEL_SyncVideoMemory(
     IN gckKERNEL Kernel,
-    INOUT gcsDEVICE_EXTEND_CONTROL_ARGS *Args
+    IN gctUINT32 Node,
+    IN gctUINT32 Reason
     );
-#endif
 
 /*******************************************************************************
 **

@@ -220,10 +220,8 @@ typedef enum _gceHAL_COMMAND_CODES
     /* Destory MMU. */
     gcvHAL_DESTROY_MMU,
 
-#if gcdDEVICE_EXTEND_IOCTL
-    /* platform extend ioctrl interface */
-    gcvHAL_DEVICE_EXTEND_CONTROL,
-#endif
+    /* sync video memory for special memory pool */
+    gcvHAL_SYNC_VIDEO_MEMORY,
     /*************** Reserved end ***************/
 }
 gceHAL_COMMAND_CODES;
@@ -1277,16 +1275,19 @@ typedef struct _gcsHAL_DEC300_FLUSH_WAIT
 DEC300FlushWait;
 #endif
 
-#if gcdDEVICE_EXTEND_IOCTL
-typedef struct _gcsDEVICE_EXTEND_CONTROL_ARGS
+typedef enum _gceSYNC_VIDEO_MEMORY_REASON
 {
-    gctUINT64               InputBuffer;
-    gctUINT64               InputBufferSize;
-    gctUINT64               OutputBuffer;
-    gctUINT64               OutputBufferSize;
+    gcvSYNC_REASON_BEFORE_READ = 0,
+    gcvSYNC_REASON_AFTER_WRITE,
 }
-gcsDEVICE_EXTEND_CONTROL_ARGS;
-#endif
+gceSYNC_VIDEO_MEMORY_REASON;
+
+typedef struct _gcsHAL_SYNC_VIDEO_MEMORY
+{
+    IN gctUINT64 node;
+    IN gceSYNC_VIDEO_MEMORY_REASON reason;
+}
+gcsHAL_SYNC_VIDEO_MEMORY;
 
 typedef struct _gcsHAL_INTERFACE
 {
@@ -1419,9 +1420,7 @@ typedef struct _gcsHAL_INTERFACE
         gcsHAL_DEC300_FLUSH_WAIT            DEC300FlushWait;
 #endif
 
-#if gcdDEVICE_EXTEND_IOCTL
-        gcsDEVICE_EXTEND_CONTROL_ARGS       ExtendControlArgs;
-#endif
+        gcsHAL_SYNC_VIDEO_MEMORY            SyncVideoMemory;
     }
     u;
 }

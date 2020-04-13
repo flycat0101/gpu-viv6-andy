@@ -668,11 +668,11 @@ gckKERNEL_Notify(
     return status;
 }
 
-#if gcdDEVICE_EXTEND_IOCTL
 gceSTATUS
-gckKERNEL_ExtendDeviceControl(
+gckKERNEL_SyncVideoMemory(
     IN gckKERNEL Kernel,
-    INOUT gcsDEVICE_EXTEND_CONTROL_ARGS *Args
+    IN gctUINT32 Node,
+    IN gctUINT32 Reason
     )
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
@@ -685,13 +685,12 @@ gckKERNEL_ExtendDeviceControl(
 
     platform = Kernel->os->device->platform;
 
-    if (platform && platform->ops->extendControl)
+    if (platform && platform->ops->syncMemory)
     {
-        status = platform->ops->extendControl(Kernel, Args);
+        status = platform->ops->syncMemory(Kernel, Node, Reason);
     }
 
     gcmkFOOTER();
     return status;
 }
-#endif
 

@@ -2130,6 +2130,67 @@ OnError:
     return status;
 }
 
+/*******************************************************************************
+**
+**  _LockVideoMemory
+**
+**      Lock a video memory node. It will generate a cpu virtual address used
+**      by software and a GPU address used by GPU.
+**
+**  INPUT:
+**
+**      gckKERNEL Kernel
+**          Pointer to an gckKERNEL object.
+**
+**      gceCORE Core
+**          GPU to which video memory is locked.
+**
+**      gcsHAL_INTERFACE * Interface
+**          Pointer to a gcsHAL_INTERFACE structure that defines the command to
+**          be dispatched.
+**
+**  OUTPUT:
+**
+**      gcsHAL_INTERFACE * Interface
+**          Pointer to a gcsHAL_INTERFACE structure that receives any data to be
+**          returned.
+*/
+static gceSTATUS
+_SyncVidoMemory(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 ProcessID,
+    IN OUT gcsHAL_INTERFACE * Interface
+)
+{
+    gceSTATUS status;
+    gckVIDMEM_NODE nodeObject;
+
+    gcmkHEADER_ARG("Kernel=%p ProcessID=%d",
+                   Kernel, ProcessID);
+
+    gcmkONERROR(gckVIDMEM_HANDLE_Lookup(
+        Kernel,
+        ProcessID,
+        (gctUINT32)Interface->u.SyncVideoMemory.node,
+        &nodeObject
+        ));
+
+    if (nodeObject->pool == gcvPOOL_LOCAL_EXCLUSIVE)
+    {
+        gcmkONERROR(gckKERNEL_SyncVideoMemory(
+            Kernel,
+            (gctUINT32)Interface->u.SyncVideoMemory.node,
+            Interface->u.SyncVideoMemory.reason
+            ));
+    }
+
+    gcmkFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmkFOOTER();
+    return status;
+}
 
 gceSTATUS
 gckKERNEL_QueryDatabase(
@@ -3769,11 +3830,9 @@ gckKERNEL_Dispatch(
                 &Interface->u.QueryChipOptions));
         break;
 
-#if gcdDEVICE_EXTEND_IOCTL
-    case gcvHAL_DEVICE_EXTEND_CONTROL:
-        gcmkONERROR(gckKERNEL_ExtendDeviceControl(Kernel, &Interface->u.ExtendControlArgs));
+    case gcvHAL_SYNC_VIDEO_MEMORY:
+        gcmkONERROR(_SyncVidoMemory(Kernel, processID, Interface));
         break;
-#endif
 
     default:
         /* Invalid command. */

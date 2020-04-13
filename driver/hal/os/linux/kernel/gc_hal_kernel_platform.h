@@ -296,19 +296,18 @@ typedef struct _gcsPLATFORM_OPERATIONS
         OUT gctUINT32_PTR AXIConfig
         );
 
-#if gcdDEVICE_EXTEND_IOCTL
     /*******************************************************************************
     **
-    ** deviceControl
+    ** syncMemory
     **
-    ** Special device ioctl interface.
+    ** sync invisible memory by dma if support.
     */
     gceSTATUS
-    (*extendControl)(
+    (*syncMemory)(
         IN gctPOINTER Object,
-        INOUT gcsDEVICE_EXTEND_CONTROL_ARGS *Args
-        );
-#endif
+        IN gctUINT32 Node,
+        IN gctUINT32 Reason
+    );
 }
 gcsPLATFORM_OPERATIONS;
 
