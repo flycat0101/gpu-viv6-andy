@@ -2784,11 +2784,14 @@ static VSC_ErrCode _VIR_CheckAndSetSkHpForLdInst(
                 /* if the dest is not used by texld and any source is defined by a .skhp instruction,
                  * set skhp flag to load instruction */
                 VIR_Operand *dest = VIR_Inst_GetDest(inst);
-                if ((!_VIR_CheckDestIsUsedByTexld(inst, dest, pDuInfo, visitedInstSet)) &&
-                    (_VIR_CheckSrcDefinedBySkHp(inst, pDuInfo, srcvisitedInstSet)))
+                gctBOOL destUsedByTexld = _VIR_CheckDestIsUsedByTexld(inst, dest, pDuInfo, visitedInstSet);
+                gctBOOL srcDefinedBySkHp = _VIR_CheckSrcDefinedBySkHp(inst, pDuInfo, srcvisitedInstSet);
+                if ((!destUsedByTexld) && srcDefinedBySkHp)
                 {
                     VIR_INST_SetSkHp(inst, gcvTRUE);
                 }
+                /* if dest is used by texld and defined by a skhp, report error */
+                gcmASSERT(!destUsedByTexld || !srcDefinedBySkHp);
                 vscHTBL_Reset(visitedInstSet);
                 vscHTBL_Reset(srcvisitedInstSet);
             }
