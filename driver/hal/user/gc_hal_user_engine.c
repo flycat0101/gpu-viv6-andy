@@ -665,6 +665,8 @@ gco3D_SetDepth(
         gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
     }
 
+    gcmONERROR(gcoHARDWARE_MultiGPUSync(gcvNULL, gcvNULL));
+
     /* Only process if different than current depth buffer. */
     if (Engine->depth != Surface || Engine->depthSliceOffset != SliceIndex)
     {
