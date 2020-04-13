@@ -2908,6 +2908,7 @@ _FillInFeatureTable(
     Features[gcvFEATURE_NO_NARROW_POST_PROCESS_PIPE] = database->NO_NARROW_POST_PROCESS_PIPE;
     Features[gcvFEATURE_TP_NN_PROBE] = database->TP_NN_PROBE;
     Features[gcvFEATURE_VIP_DEC400] = database->VIP_DEC400;
+    Features[gcvFEATURE_DEPTHWISE_NEIGHBOR_IMG_DATA_TRANSFER_NOT_EFFICIENT_FIX] = database->DEPTHWISE_NEIGHBOR_IMG_DATA_TRANSFER_NOT_EFFICIENT_FIX;
 
     /*these chip don't have maxpointSize limit, so need fix */
     if (((chipModel == gcv880) && (chipRevision == 0x5106))
