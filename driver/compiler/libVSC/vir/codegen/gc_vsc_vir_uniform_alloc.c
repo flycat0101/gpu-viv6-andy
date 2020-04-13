@@ -1784,9 +1784,8 @@ static void _VIR_CG_FindPushConstUniform(
 
             if (VIR_Symbol_GetLayoutOffset(sym) == rangeStart)
             {
-                if (VIR_UBO_GetBlockSize(pUbo) != rangeEnd)
+                if (VIR_UBO_GetBlockSize(pUbo) > rangeEnd)
                 {
-                    gcmASSERT(gcvFALSE);
                 }
 
                 pushConstUniform = uniform;
