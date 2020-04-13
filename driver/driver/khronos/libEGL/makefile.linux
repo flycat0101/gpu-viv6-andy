@@ -141,7 +141,7 @@ endif
 # Define flags for the linker.
 
 LDFLAGS := \
-    $(LFLAGS)
+    $(LDFLAGS)
 
 ifneq ($(USE_ARMCC),1)
   ifeq ($(EGL_APPENDIX),)

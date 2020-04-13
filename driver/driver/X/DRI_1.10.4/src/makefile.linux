@@ -27,12 +27,12 @@ CFLAGS += -I. -I.. -I/usr/include/xorg -I/usr/include/$(PIXMAN)
 CFLAGS += -I../../EXA/src/vivante_gal
 CFLAGS += -marm
 
-LFLAGS += -lGAL -lm -ldl -ldrm -lX11 -Wl,-soname -Wl,$(target)
+LDFLAGS += -lGAL -lm -ldl -ldrm -lX11 -Wl,-soname -Wl,$(target)
 
 all: .libs/$(target)
 
 .libs/$(target): .libs $(OBJS)
-	gcc -shared -fPIC -o .libs/$(target) $(OBJS) $(LFLAGS)
+	gcc -shared -fPIC -o .libs/$(target) $(OBJS) $(LDFLAGS)
 
 .libs:
 	mkdir .libs

@@ -87,7 +87,7 @@ CFLAGS += -D__GL_EXPORTS
 # Define flags for the linker.
 
 LDFLAGS := \
-    $(LFLAGS)
+    $(LDFLAGS)
 
 ifneq ($(USE_ARMCC),1)
   ifeq ($(GL_11_APPENDIX),)

@@ -67,7 +67,7 @@ CFLAGS += \
     -std=c99
 
 LDFLAGS := \
-    $(LFLAGS) \
+    $(LDFLAGS) \
     -Wall \
     -shared \
     -Wl,-z,defs \

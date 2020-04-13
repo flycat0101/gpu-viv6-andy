@@ -121,7 +121,7 @@ CFLAGS += \
     -Wno-unused-function
 
 LDFLAGS := \
-    $(LFLAGS) \
+    $(LDFLAGS) \
     -shared \
     -pthread \
     -Wl,-z,defs \

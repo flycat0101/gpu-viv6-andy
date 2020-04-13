@@ -163,7 +163,7 @@ OBJECTS :=  \
 ################################################################################
 # Define flags for the linker.
 
-LDFLAGS := $(LFLAGS)
+LDFLAGS := $(LDFLAGS)
 LDFLAGS += -Wl,--version-script=GL4SymExport
 LDFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
 
