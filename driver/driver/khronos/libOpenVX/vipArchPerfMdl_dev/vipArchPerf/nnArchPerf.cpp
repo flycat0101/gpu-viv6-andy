@@ -777,10 +777,17 @@ unsigned int _calcNumOfKernel(
         }
     }
 
+    if (numKernel == 0)
+    {
+        return (unsigned int)0;
+    }
+
     int Num_of_VZGroup = (int)ceilf((float)z / (numKernel * cores));
     numKernel = (unsigned int)ceilf((float)z / (Num_of_VZGroup * cores));
-    if(numKernel == 0)
-        numKernel = 0;
+
+    //if(numKernel == 0)
+    //    numKernel = 0;
+
     return (unsigned int)numKernel;
 }
 
