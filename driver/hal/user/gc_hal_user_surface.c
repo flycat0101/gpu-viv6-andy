@@ -12990,7 +12990,7 @@ gcoSURF_BlitCPU(
     }
 
 #if gcdDUMP
-
+#if !gcdCAPTURE_ONLY_MODE
     if (gcvSURF_BITMAP != srcSurf->type)
     {
         gcmDUMP(gcvNULL, "#[info: verify BlitCPU source]");
@@ -13003,6 +13003,7 @@ gcoSURF_BlitCPU(
                        srcSurf->size);
 
     }
+#endif
     /* upload the destination */
     gcmDUMP_BUFFER(gcvNULL,
                    gcvDUMP_BUFFER_MEMORY,
