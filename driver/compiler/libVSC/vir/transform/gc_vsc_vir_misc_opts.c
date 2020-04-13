@@ -3931,6 +3931,11 @@ _vscGenerateNewImageUniformIfNeeded(
     if (!(VIR_Symbol_isImageT(imageSym) || VIR_Symbol_isImage(imageSym)))
     {
         parentSrc = _vscVIR_FindParentImgOperandFromIndex(pInst, imageSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(imageSrc), 0));
+        if (!parentSrc)
+        {
+            gcmASSERT(gcvFALSE);
+            return;
+        }
         imageSym = VIR_Operand_GetSymbol(parentSrc);
     }
     gcmASSERT(imageSym && (VIR_Symbol_isImageT(imageSym)|| VIR_Symbol_isImage(imageSym)));
@@ -4621,6 +4626,11 @@ _vscTransformImgReadToLibFuncCall(
     if (!(VIR_Symbol_isImageT(imageSym) || VIR_Symbol_isImage(imageSym)))
     {
         parentSrc = _vscVIR_FindParentImgOperandFromIndex(pInst, imageSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(imageSrc), 0));
+        if (!parentSrc)
+        {
+            gcmASSERT(gcvFALSE);
+            return gcvFALSE;
+        }
         imageSym = VIR_Operand_GetSymbol(parentSrc);
     }
     gcmASSERT(imageSym && (VIR_Symbol_isImageT(imageSym)|| VIR_Symbol_isImage(imageSym)));
@@ -4754,6 +4764,11 @@ _vscTransformImgWriteToLibFuncCall(
     if (!(VIR_Symbol_isImageT(imageSym) || VIR_Symbol_isImage(imageSym)))
     {
         parentSrc = _vscVIR_FindParentImgOperandFromIndex(pInst, imageSrc, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(imageSrc), 0));
+        if (!parentSrc)
+        {
+            gcmASSERT(gcvFALSE);
+            return gcvFALSE;
+        }
         imageSym = VIR_Operand_GetSymbol(parentSrc);
     }
     gcmASSERT(imageSym && (VIR_Symbol_isImageT(imageSym)|| VIR_Symbol_isImage(imageSym)));
