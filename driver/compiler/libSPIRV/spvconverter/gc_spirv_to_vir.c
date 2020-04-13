@@ -11057,7 +11057,6 @@ VSC_ErrCode __SpvEmitBarrier(gcSPV spv, VIR_Shader * virShader)
     SpvId                       memoryScopeId;
     VIR_Const*                  pMemoryScopeConst = gcvNULL;
     VIR_Type*                   pMemoryScopeType = gcvNULL;
-    VIR_MEMORY_SCOPE_TYPE       memoryScope = VIR_MEMORY_SCOPE_TYPE_WORKGROUP;
     SpvId                       memorySemanticId;
     VIR_Const*                  pMemorySemanticConst = gcvNULL;
     VIR_Type*                   pMemorySemanticType = gcvNULL;
@@ -11087,13 +11086,6 @@ VSC_ErrCode __SpvEmitBarrier(gcSPV spv, VIR_Shader * virShader)
 
     pNewOpnd = VIR_Inst_GetSource(pNewInst, 0);
     VIR_Operand_SetImmediateInt(pNewOpnd, pMemoryScopeConst->value.scalarVal.iValue);
-
-    memoryScope = (VIR_MEMORY_SCOPE_TYPE)pMemoryScopeConst->value.scalarVal.iValue;
-    /* So far we can't support DEVICE barrier. */
-    if (memoryScope == VIR_MEMORY_SCOPE_TYPE_CROSS_DEVICE || memoryScope == VIR_MEMORY_SCOPE_TYPE_DEVICE)
-    {
-        gcmASSERT(gcvFALSE);
-    }
 
     /* Src1 -- Memory semantic. */
     memorySemanticId = spv->operands[1];

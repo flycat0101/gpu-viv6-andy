@@ -4923,6 +4923,24 @@ static VSC_ErrCode _VIR_HL_Preprocess(
             useMatrix = compositeRegAssignment = aggregateMemoryAssignment = gcvFALSE;
             opcode = VIR_Inst_GetOpcode(inst);
 
+            /* Check BARRIER. */
+            if (VIR_OPCODE_isBarrier(opcode))
+            {
+                VIR_MEMORY_SCOPE_TYPE   memoryScope = VIR_MEMORY_SCOPE_TYPE_WORKGROUP;
+
+                memoryScope = (VIR_MEMORY_SCOPE_TYPE)VIR_Operand_GetImmediateInt(VIR_Inst_GetSource(inst, 0));
+
+                /* So far we can't support DEVICE/CROSS_DEVICE barrier. */
+                if (memoryScope == VIR_MEMORY_SCOPE_TYPE_DEVICE)
+                {
+                    WARNING_REPORT(VSC_ERR_NOT_SUPPORTED, "We can't support device scope barrier.");
+                }
+                else if (memoryScope == VIR_MEMORY_SCOPE_TYPE_CROSS_DEVICE)
+                {
+                    WARNING_REPORT(VSC_ERR_NOT_SUPPORTED, "We can't support cross-device scope barrier.");
+                }
+            }
+
             /* Check DEST. */
             dest = VIR_Inst_GetDest(inst);
             if (dest && VIR_Operand_GetOpKind(dest) == VIR_OPND_SYMBOL)
