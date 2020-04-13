@@ -1346,10 +1346,10 @@ VX_PRIVATE_API vx_status vxoGlobalData_InitSRAM(
             globalData->axiSRAM[i].captureLogical = vxAllocateAndZeroMemory(globalData->axiSRAM[i].size);
             globalData->axiSRAM[i].logical  = globalData->axiSRAM[i].captureLogical;
 #else
-            globalData->axiSRAM[i].logical  = (vx_uint8_ptr)axiSRAMLogical + globalData->axiSRAM[i-1].size;
+            globalData->axiSRAM[i].logical  = (vx_uint8_ptr)(globalData->axiSRAM[i-1].logical) + globalData->axiSRAM[i-1].size;
 #endif
 
-            globalData->axiSRAM[i].physical = axiSRAMPhysical + globalData->axiSRAM[i-1].size;
+            globalData->axiSRAM[i].physical = globalData->axiSRAM[i-1].physical + globalData->axiSRAM[i-1].size;
             globalData->axiSRAM[i].used     = 0;
         }
     }
