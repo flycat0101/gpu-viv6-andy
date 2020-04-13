@@ -910,7 +910,7 @@ arch_status showArchPerformanceLib(
              opInfo[index]->layerId, opInfo[index]->layerName,
              opInfo[index]->operationId, archnneGetOperatorTypeName(opInfo[index]->op), archnneGetOperatorTargetName(opInfo[index]->target));
 
-    archInfo("abs_op_id:%d\n", opInfo[index]->absoluteOperationID);
+    archInfo("abs_op_id:%d\nuid:%d\n", opInfo[index]->absoluteOperationID, opInfo[index]->uid);
 
     archInfo("upstream_layer_num:%d upstream_opertaion_num:%d\n",
         opInfo[index]->upLayerCount, opInfo[index]->upOpCount);

@@ -188,6 +188,10 @@ vx_uint32 readBits(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 dataBits);
 void packZeros(uint32_t **buffer, vx_uint32 *bitOffset, vx_uint32 alignedOffset);
 void _DataGeneralConvert(void* input_ptr, void* output_ptr, vx_uint32 input_size, vx_uint32 output_size);
 
+
+vx_int32 getUserIDFromOutputTensor(
+    vx_tensor tensor);
+
 vx_int32 getHwPoolingType(vx_enum poolingType);
 vx_int32 getHWRoundingMode(vx_nn_round_mode_e roundingMode, vx_enum dataFormat, vx_bool isTP);
 vx_int32 getHWBorderMode(vx_enum padMode, gceVX_ACCELERATOR_TYPE accelerator);

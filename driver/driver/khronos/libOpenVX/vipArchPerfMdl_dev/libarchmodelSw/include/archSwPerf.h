@@ -644,6 +644,7 @@ struct _archModelOpInfo
     /* add for remove opt */
     arch_uint32 tpType;                        /* used for driver to decide op target */
     arch_int32  absoluteOperationID;
+    arch_int32  uid;
     arch_int32  layerId;
     const char  *layerName;
     arch_int32  operationId;                /* The operation index for a specific layer */
