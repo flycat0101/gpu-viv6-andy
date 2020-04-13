@@ -1080,8 +1080,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxScheduleGraph(vx_graph graph);
  */
 VX_API_ENTRY vx_status VX_API_CALL vxWaitGraph(vx_graph graph);
 
-/*! \brief Allows the user to query attributes of the Graph. This API
- * must be called before <tt>\ref vxVerifyGraph</tt>.
+/*! \brief Allows the user to query attributes of the Graph.
  * \param [in] graph The reference to the created graph.
  * \param [in] attribute The <tt>\ref vx_graph_attribute_e</tt> type needed.
  * \param [out] ptr The location at which to store the resulting value.
