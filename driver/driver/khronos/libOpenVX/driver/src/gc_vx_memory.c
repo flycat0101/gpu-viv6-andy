@@ -1476,7 +1476,10 @@ vxoMemoryPool_RequestList(
             {
                 list[i].outputMemory[j]->firstUseId = i;
             }
-            list[i].outputMemory[j]->lastUseId = i;
+            if (!list[i].outputMemory[j]->ignoreLastUseId)
+            {
+                list[i].outputMemory[j]->lastUseId = i;
+            }
 
             if (i >= start + count &&
                 list[i].outputMemory[j]->firstUseId >= start &&
@@ -1532,8 +1535,10 @@ vxoMemoryPool_RequestList(
             {
                 list[i].inputMemory[j]->firstUseId = i;
             }
-            list[i].inputMemory[j]->lastUseId = i;
-
+            if (!list[i].inputMemory[j]->ignoreLastUseId)
+            {
+                list[i].inputMemory[j]->lastUseId = i;
+            }
             if (i >= start + count &&
                 list[i].inputMemory[j]->firstUseId >= start &&
                 list[i].inputMemory[j]->firstUseId < start + count &&

@@ -115,6 +115,12 @@ vx_status vxnneLayer_Deinitialize(struct _vxnne_layer_s* layer)
         {
             layer->operations[i]->deinitialize(layer->operations[i]);
         }
+
+        if (layer->operations[i]->tilingInfo)
+        {
+            gcoOS_Free(gcvNULL, layer->operations[i]->tilingInfo);
+        }
+
     }
 
     return VX_SUCCESS;
@@ -1944,7 +1950,6 @@ vx_status vxnneExecutionLayer_Deinitialize(vxnne_layer layer)
 
     if (executionLayer->operations)
     {
-        /* free opertions */
         gcoOS_Free(gcvNULL, executionLayer->operations);
         executionLayer->base.num_operations = 0;
         executionLayer->operations   = gcvNULL;

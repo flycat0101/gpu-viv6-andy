@@ -1262,7 +1262,7 @@ VX_PRIVATE_API vx_status QuerySRAM(
 
             gcmONERROR(gcoHAL_QuerySRAM(gcvNULL,
                                         type,
-                                        &size,
+                                        gcvNULL,
                                         &gpuVirtual,
                                         &gpuPhysical,
                                         &gpuPhysicalName,
@@ -1294,7 +1294,7 @@ VX_PRIVATE_API vx_status QuerySRAM(
         {
             gcmONERROR(gcoHAL_QuerySRAM(gcvNULL,
                                         type,
-                                        &size,
+                                        gcvNULL,
                                         &gpuVirtual,
                                         VX_NULL,
                                         VX_NULL,

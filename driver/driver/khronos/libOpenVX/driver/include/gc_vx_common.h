@@ -1755,6 +1755,7 @@ typedef struct _vx_memory_s
 #define VXNNE_MEM_ID_INIT_VALUE   0xFFFFFFFF
     vx_uint32                               lastUseId;
     vx_uint32                               firstUseId;
+    vx_bool                                 ignoreLastUseId;
 
     vx_size                                 memOffset;
     vx_bool                                 memReverse;
@@ -1960,6 +1961,7 @@ typedef struct _vx_tensor_t
 
     vx_view_region_s                        viewRegion; /* default is whole size */
     vx_bool                                 isViewed;
+    vx_bool                                 isReshaped;
     vx_uint32                               viewOffset;
 
     vx_tensor_buffer_s *                    tensorBuffer; /* shared by all related tensors */

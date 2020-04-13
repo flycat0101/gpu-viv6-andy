@@ -35,6 +35,7 @@ extern "C" {
     (context->nnConfig.fixedFeature.latencyHidingAtFullAxiBw * context->nnConfig.fixedFeature.axiBusWidth)
 
 #define SW_TILING_DEBUG                     1
+#define SW_TILING_BRANCH                    1
 
 struct _vxnne_operation_s;
 struct _vxnne_layer_s;
@@ -43,6 +44,7 @@ struct _vx_node_block_s;
 struct _vxnne_tiling_rect_s;
 struct _vxnne_command_buffer_s;
 struct _vxnne_tiling_block_info_s;
+struct _vxnne_tiling_info_s;
 
 typedef struct _vxnne_mem_param_s *vxnne_mem_param;
 typedef struct _vxnne_mem_request_s *vxnne_mem_request;
@@ -543,6 +545,11 @@ typedef struct _vxnne_operation_s
     vx_bool                         bTransposeIn;
     vx_bool                         bTransposeOut;
 
+    struct _vxnne_tiling_info_s    *tilingInfo;
+    vx_uint32                       tilingYCount;
+    vx_uint32                       initY;
+    vx_uint32                       walked;
+
     vx_uint32                       esitimateKernelCacheSize;
     vx_uint32                       esitimateImageCacheSize;
 
@@ -732,9 +739,11 @@ typedef struct _vxnne_segment_tiling_info_s
     vx_uint32                    N;
     vx_uint32                    estimateAxiSRAMUsed;
     vx_uint32                    estimateVipSRAMUsed;
+#if !SW_TILING_BRANCH
     vx_uint32                    tileXCount;
     vx_uint32                    tileYCount;
     vxnne_tiling_info            tilingInfo;
+#endif
     vx_uint32                    tilingOrderCount;
     vxnne_tiling_order_info      tilingOrderInfo;
 }vxnne_segment_tiling_info_s, *vxnne_segment_tiling_info;

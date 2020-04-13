@@ -2691,6 +2691,12 @@ _ReshapeTensor(
                 tensor->base.isVirtual ? VX_TENSOR_SHARED | VX_TENSOR_VIRTUAL : VX_TENSOR_SHARED,
                 kind
                 );
+
+    if (reshapeTensor)
+    {
+        reshapeTensor->isReshaped = vx_true_e;
+    }
+
     vxSetReferenceName((vx_reference)reshapeTensor, ((vx_reference)tensor)->name);
     return reshapeTensor;
 }
