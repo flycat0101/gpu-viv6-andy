@@ -1829,6 +1829,7 @@ Fill2DFeaturesByDatabase(
 
     Features[gcvFEATURE_2D_10BIT_OUTPUT_LINEAR] = database->PE2D_LINEAR_YUV420_10BIT;
     Features[gcvFEATURE_2D_YUV420_OUTPUT_LINEAR] = database->PE2D_LINEAR_YUV420_OUTPUT;
+    Features[gcvFEATURE_FORMAT_YUV_I010] = database->FORMAT_P010LSB_I010;
 }
 #endif
 

@@ -611,6 +611,8 @@ typedef enum _gceFEATURE
     gcvFEATURE_NN_FAST_FIRST_PIXEL_POOLING,
     gcvFEATURE_NN_FLOAT_POST_MULT,
 
+    gcvFEATURE_FORMAT_YUV_I010, /*support YUVI010 & P010_LSB format*/
+
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
 }
