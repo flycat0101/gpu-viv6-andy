@@ -682,7 +682,7 @@ gckOS_DumpParam(
 
     printk("  mmuPageTablePool  = %d\n", mmuPageTablePool);
     printk("  mmuDynamicMap     = %d\n", mmuDynamicMap);
-    printk("  isrPoll           = %d\n", isrPoll);
+    printk("  isrPoll           = 0x%08X\n", isrPoll);
 
     printk("Build options:\n");
     printk("  gcdGPU_TIMEOUT    = %d\n", gcdGPU_TIMEOUT);
