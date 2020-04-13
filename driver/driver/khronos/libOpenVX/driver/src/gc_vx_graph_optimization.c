@@ -1754,7 +1754,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeConvolutionNodes(vx_node nod
     return VX_SUCCESS;
 }
 
-VX_INTERNAL_API vx_node vxoGraphOptimization_TransferFC2FCRelu(vx_node FCnode)
+VX_INTERNAL_API vx_node vxoGraphOptimization_TransferFC2FCRelu(vx_node FCnode, vx_tensor reluOut)
 {
     vx_node     FCReluNode = VX_NULL;
     vx_uint32   pad;
@@ -1764,9 +1764,15 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_TransferFC2FCRelu(vx_node FCnode)
     vx_tensor   weight = (vx_tensor)FCnode->paramTable[1];
     vx_tensor   bias   = (vx_tensor)FCnode->paramTable[2];
     vx_tensor   output = (vx_tensor)FCnode->paramTable[FCnode->numParameters - 1];
+    vx_bool     isRelu = vx_false_e;
 
     gcmHEADER_ARG("FCnode=%p", FCnode);
 
+    if(VX_NULL != reluOut)
+    {
+        isRelu = vx_true_e;
+        output = vxoGraphOptimization_reshapeTensorAsOld(output, reluOut);
+    }
     vxoNode_getInfoFromFCNode(FCnode, &pad, &acc, &rounding, &overflow, &down_scale_round);
     {
         vx_uint32 padValue = 0;
@@ -1776,7 +1782,7 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_TransferFC2FCRelu(vx_node FCnode)
                         { 0, 0,
                           pad, pad, pad, pad, acc, overflow,
                           rounding, down_scale_round,
-                          vx_false_e, 0, 0, 0, VX_PAD_CONSTANT, padConst},
+                          isRelu, 0, 0, 0, VX_PAD_CONSTANT, padConst},
                         1, 1
                 },
                 0,
@@ -1812,6 +1818,7 @@ VX_INTERNAL_API vx_node vxoGraphOptimization_TransferFC2FCRelu(vx_node FCnode)
 VX_INTERNAL_API vx_status vxoGraphOptimization_MergeFullyConnectedNodes(vx_node nodes[], vx_uint32 nodeCount)
 {
     vx_bool newNodeflag = vx_false_e;
+    vx_tensor reluOut = VX_NULL;
     gcmHEADER_ARG("nodes=%p, nodeCount=0x%x", nodes, nodeCount);
 
     if(!vxnneIsTPSupportFormat(
@@ -1826,23 +1833,18 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeFullyConnectedNodes(vx_node 
     if(nodeCount == 2 && vxoGraphOptimization_getKernelType(nodes[1]) != OP_RELU)
         return VX_SUCCESS;
 
+    if(nodeCount == 2)
+    {
+        nodes[1]->merged = vx_true_e;
+        reluOut = (vx_tensor)vxoGraphOptimization_getOutputParameter(nodes[1]);
+    }
     if(VX_KERNEL_NN_FULLY_CONNECTED_LAYER == nodes[0]->kernel->enumeration ||
         VX_KERNEL_FULLY_CONNECTED_LAYER == nodes[0]->kernel->enumeration)
     {
-        vx_node newNode = vxoGraphOptimization_TransferFC2FCRelu(nodes[0]);
+        vx_node newNode = vxoGraphOptimization_TransferFC2FCRelu(nodes[0], reluOut);
         nodes[0]->merged = vx_true_e;
         nodes[0] = newNode;
         newNodeflag = vx_true_e;
-    }
-
-    /*replace fc's output with relu's output, but reshape it as fc's output*/
-    if(nodeCount >1)
-    {
-        vx_tensor reluOut = (vx_tensor)vxoGraphOptimization_getOutputParameter(nodes[1]);
-        vxoGraphOptimization_updateTensorInNodeWithIndex(nodes, PARAM_FULLYCONNECTED_RELU_OUTPUT_INDEX, reluOut);
-
-        SCALAR_VALUE(nodes[0]->paramTable[PARAM_FULLYCONNECTED_RELU_ENABLE_RELU_INDEX], b) = vx_true_e;
-        nodes[1]->merged = vx_true_e;
     }
 
     if(newNodeflag)
