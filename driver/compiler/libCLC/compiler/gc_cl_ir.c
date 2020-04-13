@@ -3684,7 +3684,8 @@ OUT gctBOOL *HasImplicitConversion
   }
 
   if(sameType ||
-     (clDeclIsSameVectorType(lDecl, rDecl) &&
+     (lDecl->dataType->elementType == rDecl->dataType->elementType &&
+     (clmDATA_TYPE_vectorSize_NOCHECK_GET(lDecl->dataType) == clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType)) &&
      (clmDATA_TYPE_matrixRowCount_GET(lDecl->dataType) == clmDATA_TYPE_matrixRowCount_GET(rDecl->dataType)) &&
      (clmDATA_TYPE_matrixColumnCount_GET(lDecl->dataType) == clmDATA_TYPE_matrixColumnCount_GET(rDecl->dataType)) &&
      (lDecl->dataType->u.generic == rDecl->dataType->u.generic))) {
