@@ -32,6 +32,8 @@
 
 #define BF16_BIAS_SIZE 3
 
+#define FEATURE_BFP16_ZRL_ENABLE 0
+
 #define SET_1_LOG (1) /*Default is 1, can be 0, 1, 2, 0 is the best (small win), but can only put in 3 bit Huffman code*/
 #define SET_1_SIZE (1<<SET_1_LOG)
 #define THROUGHPUT 2       /*The decoder throughput, version 1.0, 2 bits*/
@@ -4738,7 +4740,9 @@ void reorderTPKernelBufferHuffman(
                         signedBit = 0;
 
                     /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
+#if !FEATURE_BFP16_ZRL_ENABLE
                     exp = exp ^ 0x80; /*~OrgValue[14]*/
+#endif
                     temp = (exp << 8) | (mantissa << 1) | signedBit;
 
                     weight = temp;
@@ -4962,7 +4966,9 @@ void reorderDepthWiseKernelBufferV8Huffman(
                                             signedBit = 0;
 
                                         /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
+#if !FEATURE_BFP16_ZRL_ENABLE
                                         expH = expH ^ 0x80; /*~OrgValue[14]*/
+#endif
                                         biasH = (expH << 8) | (mantissaH << 1) | signedBit;
 #if DUMP_BF16_ENC
                                         if(pfile1 != NULL)
@@ -5020,7 +5026,9 @@ void reorderDepthWiseKernelBufferV8Huffman(
                                         }
 #endif
                                         /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
+#if !FEATURE_BFP16_ZRL_ENABLE
                                         expM = expM ^ 0x80; /*~OrgValue[14]*/
+#endif
                                         biasM = (expM << 8) | mantissaM | signedBit;
                                     }
 
@@ -5077,7 +5085,9 @@ void reorderDepthWiseKernelBufferV8Huffman(
                                             fprintf(pfile1, "vz:%d, biasL: 0x%x\n", filterIndex, biasL);
                                         }
 #endif
+#if !FEATURE_BFP16_ZRL_ENABLE
                                         expL = expL ^ 0x80; /*~OrgValue[14]*/
+#endif
                                         biasL = (expL << 8) | mantissaL | signedBit;
                                     }
 
@@ -5159,7 +5169,9 @@ void reorderDepthWiseKernelBufferV8Huffman(
                                     signedBit = 0;
 
                                 /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
+#if !FEATURE_BFP16_ZRL_ENABLE
                                 exp = exp ^ 0x80; /*~OrgValue[14]*/
+#endif
                                 temp = (exp << 8) | (mantissa << 1) | signedBit;
 
                                 *kernelBufferInt16Ptr = temp;
@@ -5388,7 +5400,9 @@ void reorderKernelBufferV8Huffman(
                                             signedBit = 0;
 
                                         /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
+#if !FEATURE_BFP16_ZRL_ENABLE
                                         expH = expH ^ 0x80; /*~OrgValue[14]*/
+#endif
                                         biasH = (expH << 8) | (mantissaH << 1) | signedBit;
 #if DUMP_BF16_ENC
                                         if(pfile1 != NULL)
@@ -5446,7 +5460,9 @@ void reorderKernelBufferV8Huffman(
                                         }
 #endif
                                         /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
+#if !FEATURE_BFP16_ZRL_ENABLE
                                         expM = expM ^ 0x80; /*~OrgValue[14]*/
+#endif
                                         biasM = (expM << 8) | mantissaM | signedBit;
                                     }
 
@@ -5503,7 +5519,9 @@ void reorderKernelBufferV8Huffman(
                                             fprintf(pfile1, "vz:%d, biasL: 0x%x\n", filterIndex, biasL);
                                         }
 #endif
+#if !FEATURE_BFP16_ZRL_ENABLE
                                         expL = expL ^ 0x80; /*~OrgValue[14]*/
+#endif
                                         biasL = (expL << 8) | mantissaL | signedBit;
                                     }
 
@@ -5585,7 +5603,9 @@ void reorderKernelBufferV8Huffman(
                                     signedBit = 0;
 
                                 /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
+#if !FEATURE_BFP16_ZRL_ENABLE
                                 exp = exp ^ 0x80; /*~OrgValue[14]*/
+#endif
                                 temp = (exp << 8) | (mantissa << 1) | signedBit;
 
                                 *kernelBufferInt16Ptr = temp;
@@ -11131,7 +11151,9 @@ vx_uint32 fillinTPKernelBuffer(
                         signedBit = 0;
 
                     /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
+#if !FEATURE_BFP16_ZRL_ENABLE
                     exp = exp ^ 0x80; /*~OrgValue[14]*/
+#endif
                     temp = (exp << 8) | (mantissa << 1) | signedBit;
 
                     weight = temp;
