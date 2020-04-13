@@ -1,22 +1,57 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2020 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
 
-
-#ifndef __NN_GPU_BINARY_INTERFACE_H__
-#define __NN_GPU_BINARY_INTERFACE_H__
+#ifndef __NNGPU_BINARY_INTERFACE_H__
+#define __NNGPU_BINARY_INTERFACE_H__
 
 typedef enum _nngpu_kernel_enum
 {
-    NNGPU_KERNEL_NUM /*NNVXC_KERNEL_NUM should be the last item in the enum*/
+    TensorTranspose,
+    Activation,
+    Normalization,
+    DepthwiseConv,
+    AvgPooling,
+    TensorStridedSlice,
+    Batch2Space,
+    Conv2D_1x1,
+    TensorCopyROI,
+    ROIPool,
+    Space2Depth,
+    TensorScale,
+    TensorPad2,
+    Rnn,
+    TensorPad,
+    Space2Batch,
+    Gemm,
+    BatchNorm,
+    Gemm_noBias,
+    Depth2Space,
+    Tensor2Row,
+    HashLUT,
+    ShuffleChannel,
+    L2NormAxis2,
+    TensorMaxValue,
+    LSTMUnitProjection,
+    Svdf,
+    TensorCopy,
+    Floor,
+    Reorg,
+    LeakyRelu,
+    TensorCrop,
+    TensorEltwise,
+    LSTMUnit,
+    TensorReduceDiv,
+    EmbeddingLUT,
+    SoftMax,
+    FullyConnected,
+    L2NormAxis0,
+    TensorTR,
+    Prelu,
+    L2Pooling,
+    ResizeNearestNeighbor,
+    L2NormAxis1,
+    TensorMeanAxis,
+    MaxPooling,
+    Reverse,
+    NNGPU_KERNEL_NUM /*NNGPU_KERNEL_NUM should be the last item in the enum*/
 }
 nngpu_kernel_enum;
 

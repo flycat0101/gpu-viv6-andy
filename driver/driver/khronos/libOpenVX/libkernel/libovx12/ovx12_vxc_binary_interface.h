@@ -1,21 +1,35 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2020 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
 
 #ifndef __OVX12_VXC_BINARY_INTERFACE_H__
 #define __OVX12_VXC_BINARY_INTERFACE_H__
 
 typedef enum _ovx12_vxc_kernel_enum
 {
+    copy,
+    makepoints,
+    scalar_operation,
+    hog_cells,
+    threshold,
+    upsample_padding,
+    arrayCopy,
+    bilateral_filter,
+    lutCopy,
+    non_max_suppression,
+    scalarCopy,
+    transpose_2d_tensor,
+    hog_features,
+    max,
+    remapCopy,
+    multiply_2d_matrixes,
+    upsample_convert,
+    fillaccum,
+    min,
+    tensor_convert_depth,
+    getlines,
+    pyramid_copy_image,
+    imageCopy,
+    lbp,
+    match_template,
+    tensorlut,
     OVX12_VXC_KERNEL_NUM /*OVX12_VXC_KERNEL_NUM should be the last item in the enum*/
 }
 ovx12_vxc_kernel_enum;
