@@ -54,7 +54,7 @@ typedef struct
 {
     gcvEXTERN_IOCTL_CMD cmd;
 
-    union _u
+    union _uu
     {
         gcsEDMA_TRANSFACTION edma;
     }
