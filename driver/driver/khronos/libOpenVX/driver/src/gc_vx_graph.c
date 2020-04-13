@@ -5223,6 +5223,12 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForCONV(
     weight = WB_WEIGHT_TENSOR(weights_biases);
     bias   = WB_BIAS_TENSOR(weights_biases);
 
+    if (VX_NULL == weight)
+    {
+        vxError("%s[%d]: weight is NULL, not support split convolution\n", __FUNCTION__, __LINE__);
+        vxmONERROR(VX_FAILURE);
+    }
+
     vxmONERROR(vxQueryTensor(weight, VX_TENSOR_NUMBER_OF_DIMS, &weightDim, sizeof(weightDim)));
     vxmONERROR(vxQueryTensor(weight, VX_TENSOR_DIMS, weightSizeEnd, sizeof(weightSizeEnd)));
 
@@ -5241,35 +5247,38 @@ VX_PRIVATE_API vx_status vxoMultiGPU_SplitResourceForCONV(
     dstOperation->references[VX_MULTIVIP_WEIGHT_TENSOR_REFERENCE] = (vx_reference)weightTensor;
 
     /*3. split bias tensor*/
-    if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 0))
+    if (bias != VX_NULL)
     {
-        biasSplitAxis = 0;
+        if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 0))
+        {
+            biasSplitAxis = 0;
+        }
+        else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 1))
+        {
+            biasSplitAxis = 1;
+        }
+        else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 2))
+        {
+            biasSplitAxis = 2;
+        }
+        else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 3))
+        {
+            biasSplitAxis = 3;
+        }
+        else
+        {
+            vxmASSERT(0);
+        }
+        vxmASSERT(TENSOR_VIEW_SIZE_INDEX(bias, biasSplitAxis) == TENSOR_VIEW_SIZE_INDEX(origOutputTensor, splitAxisZ));
+        vxmONERROR(vxQueryTensor(bias, VX_TENSOR_DIMS, biasSizeEnd, sizeof(biasSizeEnd)));
+        vxmONERROR(vxQueryTensor(bias, VX_TENSOR_NUMBER_OF_DIMS, &biasDim, sizeof(biasDim)));
+        biasSizeStart[biasSplitAxis] = outputStart;
+        biasSizeEnd[biasSplitAxis] = outputEnd;
+        biasView = vxCreateTensorView(node->base.context, biasSizeStart, biasSizeEnd, (vx_uint8)biasDim);
+        biasTensor  = vxoTensor_CreateTensorFromView(bias, biasView);
+        if (biasView != VX_NULL) vxReleaseTensorView(&biasView);
+        dstOperation->references[VX_MULTIVIP_BIAS_TENSOR_REFERENCE] = (vx_reference)biasTensor;
     }
-    else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 1))
-    {
-        biasSplitAxis = 1;
-    }
-    else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 2))
-    {
-        biasSplitAxis = 2;
-    }
-    else if (1 != TENSOR_VIEW_SIZE_INDEX(bias, 3))
-    {
-        biasSplitAxis = 3;
-    }
-    else
-    {
-        vxmASSERT(0);
-    }
-    vxmASSERT(TENSOR_VIEW_SIZE_INDEX(bias, biasSplitAxis) == TENSOR_VIEW_SIZE_INDEX(origOutputTensor, splitAxisZ));
-    vxmONERROR(vxQueryTensor(bias, VX_TENSOR_DIMS, biasSizeEnd, sizeof(biasSizeEnd)));
-    vxmONERROR(vxQueryTensor(bias, VX_TENSOR_NUMBER_OF_DIMS, &biasDim, sizeof(biasDim)));
-    biasSizeStart[biasSplitAxis] = outputStart;
-    biasSizeEnd[biasSplitAxis] = outputEnd;
-    biasView = vxCreateTensorView(node->base.context, biasSizeStart, biasSizeEnd, (vx_uint8)biasDim);
-    biasTensor  = vxoTensor_CreateTensorFromView(bias, biasView);
-    if (biasView != VX_NULL) vxReleaseTensorView(&biasView);
-    dstOperation->references[VX_MULTIVIP_BIAS_TENSOR_REFERENCE] = (vx_reference)biasTensor;
 
     /*4. create new vx weights biases parameter */
     params.ext.base.pad_x_left = srcOperation->parameter.pad_x_left;
