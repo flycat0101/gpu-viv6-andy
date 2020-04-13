@@ -2906,6 +2906,9 @@ _FillInFeatureTable(
     Features[gcvFEATURE_TP_NN_PROBE] = database->TP_NN_PROBE;
     Features[gcvFEATURE_VIP_DEC400] = database->VIP_DEC400;
 
+    /* single port VIPSRAM */
+    Features[gcvFEATURE_USE_SINGLE_PORT_VIPSRAM] = database->USE_SINGLE_PORT_VIPSRAM;
+
     /*these chip don't have maxpointSize limit, so need fix */
     if (((chipModel == gcv880) && (chipRevision == 0x5106))
      || ((chipModel == gcv2000) && (chipRevision == 0x5108))
