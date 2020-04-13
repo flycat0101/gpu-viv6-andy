@@ -99,6 +99,8 @@ typedef struct _cl_command_queue
 #endif
 
     gcoHARDWARE                 hardware;
+
+    gctBOOL                     needEnqueueNOP;
 }
 clsCommandQueue;
 
