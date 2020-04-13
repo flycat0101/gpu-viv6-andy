@@ -3084,7 +3084,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
             }
 
             /*can not do it for viewed tensor*/
-            if(tensorIn[0]->isViewed || tensorIn[1]->isViewed)
+            if(vxoTensor_IsViewed(tensorIn[0]) || vxoTensor_IsViewed(tensorIn[1]))
                 continue;
 
             /*do not process the head node*/
