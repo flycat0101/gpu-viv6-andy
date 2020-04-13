@@ -4744,6 +4744,21 @@ void reorderTPKernelBufferHuffman(
                     weight = temp;
 
                 }
+                else if (weight_format == VX_TYPE_FLOAT16)
+                {
+                    vx_uint16 exp = (weight & 0x7C00) >> 10;
+                    vx_uint16 mantissa = weight & 0x3FF;
+                    vx_uint8 signedBit = (weight & 0x8000) >> 15;
+                    vx_uint16 temp = 0;
+
+                    /* convert -zero to +zero*/
+                    if (exp == 0 && mantissa == 0 && signedBit == 1)
+                        signedBit = 0;
+                    temp = (exp << 10) | mantissa | signedBit << 15;
+
+                    weight = temp;
+
+                }
 
                 *kernelBufferInt16Ptr = (vx_uint16)weight;
                 kernelBufferInt16Ptr ++;
@@ -7599,7 +7614,8 @@ vx_uint32 calcNonZeroCountV8Huffman(
 
                     if (zeroBlock0 && zeroBlock1 && zeroBlock2)
                         nonZeroCount += 0;
-                    else if (zeroBlock0 || zeroBlock1 || zeroBlock2)
+                    else if ((zeroBlock0 || zeroBlock1 || zeroBlock2) &&
+                            (weight_format == VX_TYPE_UINT8 || weight_format == VX_TYPE_INT8 || weight_format == VX_TYPE_INT16))
                         nonZeroCount += 6;
                     else
                         nonZeroCount += 9;
@@ -11117,6 +11133,21 @@ vx_uint32 fillinTPKernelBuffer(
                     /*newCoef [15:0] = {~OrgValue[14],OrgValue[13:0], OrgValue[15]}*/
                     exp = exp ^ 0x80; /*~OrgValue[14]*/
                     temp = (exp << 8) | (mantissa << 1) | signedBit;
+
+                    weight = temp;
+
+                }
+                else if (weight_format == VX_TYPE_FLOAT16)
+                {
+                    vx_uint16 exp = (weight & 0x7C00) >> 10;
+                    vx_uint16 mantissa = weight & 0x3FF;
+                    vx_uint8 signedBit = (weight & 0x8000) >> 15;
+                    vx_uint16 temp = 0;
+
+                    /* convert -zero to +zero*/
+                    if (exp == 0 && mantissa == 0 && signedBit == 1)
+                        signedBit = 0;
+                    temp = (exp << 10) | mantissa | signedBit << 15;
 
                     weight = temp;
 
