@@ -657,7 +657,7 @@ VX_PRIVATE_API vx_status vxoNNPooling_SH_EVIS_Initialize_Ext(vxnne_layer ops_lay
             vx_tensor mask          = NULL;
 
             mask = _get_AvgPoolingMaskData(ops_layer->node->graph, inputs, outputs, poolSizeXValue, poolSizeYValue,
-                            stride_x, stride_y, pool_pad_x_left, pool_pad_x_right);
+                            stride_x, stride_y, pool_pad_x_left, pool_pad_y_top);
 
             if (mask == NULL)
             {
