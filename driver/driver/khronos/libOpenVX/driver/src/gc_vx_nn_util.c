@@ -1430,65 +1430,21 @@ void initUndefinedHardwareConfig(vx_global_data globalData)
     }
 }
 
-/*Solely for BRCM 2019July */
-#define  DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_64B              2
-#define  DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_128B             14.2
-#define  DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_256B             14.7
-#define  DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_64B         0.32
-#define  DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_128B        1.8
-#define  DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_256B        3.04
-#define  DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_64B      1.28
-#define  DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_128B     7.2
-#define  DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_256B     12.16
 
-static vx_uint32 isZeroForFloat(gctFLOAT value)
-{
-    if(value > -0.000000001 && value < 0.000000001)
-        return 1;
-    else
-        return 0;
-}
 
 void initArchModelConfig(vx_global_data globalData, APM_IN_PARAM_T *pInParam)
 {
     pInParam->specified_ddr_bw_limit_by_burst = globalData->options.specificDDRLimitByBurst;
 
-    /* specified_ddr_bw_limit_by_burst is 0, use default value */
-    pInParam->bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_64B = (gctFLOAT)DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_64B;
-    pInParam->bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_128B = (gctFLOAT)DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_128B;
-    pInParam->bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_256B = (gctFLOAT)DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_256B;
-    pInParam->bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_64B = (gctFLOAT)DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_64B;
-    pInParam->bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_128B = (gctFLOAT)DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_128B;
-    pInParam->bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_256B = (gctFLOAT)DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_256B;
-    pInParam->bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_64B =(gctFLOAT)DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_64B;
-    pInParam->bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_128B = (gctFLOAT)DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_128B;
-    pInParam->bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_256B = (gctFLOAT)DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_256B;
-
-    if(pInParam->specified_ddr_bw_limit_by_burst == 1)
-    {
-        if(isZeroForFloat(globalData->options.ddrReadSustainedBw64BBurst) == 0)
-            pInParam->bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_64B = globalData->options.ddrReadSustainedBw64BBurst;
-        if(isZeroForFloat(globalData->options.ddrReadSustainedBw128BBurst) == 0)
-            pInParam->bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_128B = globalData->options.ddrReadSustainedBw128BBurst;
-        if(isZeroForFloat(globalData->options.ddrReadSustainedBw256BBurst) == 0)
-            pInParam->bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_256B = globalData->options.ddrReadSustainedBw256BBurst;
-        if(isZeroForFloat(globalData->options.ddrMaskWriteSustainedBw64BBurst) == 0)
-            pInParam->bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_64B = globalData->options.ddrMaskWriteSustainedBw64BBurst;
-        if(isZeroForFloat(globalData->options.ddrMaskWriteSustainedBw128BBurst) == 0)
-            pInParam->bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_128B = globalData->options.ddrMaskWriteSustainedBw128BBurst;
-        if(isZeroForFloat(globalData->options.ddrMaskWriteSustainedBw256BBurst) == 0)
-            pInParam->bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_256B = globalData->options.ddrMaskWriteSustainedBw256BBurst;
-        if(isZeroForFloat(globalData->options.ddrNonMaskWriteSustainedBw64BBurst) == 0)
-            pInParam->bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_64B = globalData->options.ddrNonMaskWriteSustainedBw64BBurst;
-        if(isZeroForFloat(globalData->options.ddrNonMaskWriteSustainedBw128BBurst) == 0)
-            pInParam->bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_128B = globalData->options.ddrNonMaskWriteSustainedBw128BBurst;
-        if(isZeroForFloat(globalData->options.ddrNonMaskWriteSustainedBw256BBurst) == 0)
-            pInParam->bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_256B = globalData->options.ddrNonMaskWriteSustainedBw256BBurst;
-    }
-    else
-    {
-
-    }
+    pInParam->bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_64B = globalData->options.ddrReadSustainedBw64BBurst;
+    pInParam->bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_128B = globalData->options.ddrReadSustainedBw128BBurst;
+    pInParam->bwl.DDR_READ_BW_IN_BYTE_PER_CYCLE_256B = globalData->options.ddrReadSustainedBw256BBurst;
+    pInParam->bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_64B = globalData->options.ddrMaskWriteSustainedBw64BBurst;
+    pInParam->bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_128B = globalData->options.ddrMaskWriteSustainedBw128BBurst;
+    pInParam->bwl.DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_256B = globalData->options.ddrMaskWriteSustainedBw256BBurst;
+    pInParam->bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_64B = globalData->options.ddrNonMaskWriteSustainedBw64BBurst;
+    pInParam->bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_128B = globalData->options.ddrNonMaskWriteSustainedBw128BBurst;
+    pInParam->bwl.DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_256B = globalData->options.ddrNonMaskWriteSustainedBw256BBurst;
 
     pInParam->NN_DDR_BURST_SIZE = 64;     /* default set as 64, some of the config need to set as 256, will add into freature DB */
 

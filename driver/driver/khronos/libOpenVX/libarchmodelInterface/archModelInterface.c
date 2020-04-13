@@ -1496,38 +1496,16 @@ static vx_status updateConfigration(archNN_DATABASE_FEATURE *pArchDataFeature,ar
     /* DDR sustained BW burst, these data should be get from App in the furture, hard code to 16 for now */
     pArchDataFeature->specificDDRLimitByBurst = pContextOptions->specificDDRLimitByBurst;
 
-    /* Set default value */
-    pArchDataFeature->ddrReadSustainedBw64BBurst = (arch_float32)DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_64B;
-    pArchDataFeature->ddrReadSustainedBw128BBurst = (arch_float32)DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_128B;
-    pArchDataFeature->ddrReadSustainedBw256BBurst = (arch_float32)DEFAULT_DDR_READ_BW_IN_BYTE_PER_CYCLE_256B;
-    pArchDataFeature->ddrMaskWriteSustainedBw64BBurst = (arch_float32)DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_64B;
-    pArchDataFeature->ddrMaskWriteSustainedBw128BBurst = (arch_float32)DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_128B;
-    pArchDataFeature->ddrMaskWriteSustainedBw256BBurst = (arch_float32)DEFAULT_DDR_MASKWRITE_BW_IN_BYTE_PER_CYCLE_256B;
-    pArchDataFeature->ddrNonMaskWriteSustainedBw64BBurst = (arch_float32)DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_64B;
-    pArchDataFeature->ddrNonMaskWriteSustainedBw128BBurst = (arch_float32)DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_128B;
-    pArchDataFeature->ddrNonMaskWriteSustainedBw256BBurst = (arch_float32)DEFAULT_DDR_NONMASKWRITE_BW_IN_BYTE_PER_CYCLE_256B;
+    pArchDataFeature->ddrReadSustainedBw64BBurst = pContextOptions->ddrReadSustainedBw64BBurst;
+    pArchDataFeature->ddrReadSustainedBw128BBurst = pContextOptions->ddrReadSustainedBw128BBurst;
+    pArchDataFeature->ddrReadSustainedBw256BBurst = pContextOptions->ddrReadSustainedBw256BBurst;
+    pArchDataFeature->ddrMaskWriteSustainedBw64BBurst = pContextOptions->ddrMaskWriteSustainedBw64BBurst;
+    pArchDataFeature->ddrMaskWriteSustainedBw128BBurst = pContextOptions->ddrMaskWriteSustainedBw128BBurst;
+    pArchDataFeature->ddrMaskWriteSustainedBw256BBurst = pContextOptions->ddrMaskWriteSustainedBw256BBurst;
+    pArchDataFeature->ddrNonMaskWriteSustainedBw64BBurst = pContextOptions->ddrNonMaskWriteSustainedBw64BBurst;
+    pArchDataFeature->ddrNonMaskWriteSustainedBw128BBurst = pContextOptions->ddrNonMaskWriteSustainedBw128BBurst;
+    pArchDataFeature->ddrNonMaskWriteSustainedBw256BBurst =pContextOptions->ddrNonMaskWriteSustainedBw256BBurst;
 
-    if(pArchDataFeature->specificDDRLimitByBurst == 1)
-    {
-        if(isZeroForFloat(pContextOptions->ddrReadSustainedBw64BBurst) == 0)
-            pArchDataFeature->ddrReadSustainedBw64BBurst = pContextOptions->ddrReadSustainedBw64BBurst;
-        if(isZeroForFloat(pContextOptions->ddrReadSustainedBw128BBurst) == 0)
-            pArchDataFeature->ddrReadSustainedBw128BBurst = pContextOptions->ddrReadSustainedBw128BBurst;
-        if(isZeroForFloat(pContextOptions->ddrReadSustainedBw256BBurst) == 0)
-            pArchDataFeature->ddrReadSustainedBw256BBurst = pContextOptions->ddrReadSustainedBw256BBurst;
-        if(isZeroForFloat(pContextOptions->ddrMaskWriteSustainedBw64BBurst) == 0)
-            pArchDataFeature->ddrMaskWriteSustainedBw64BBurst = pContextOptions->ddrMaskWriteSustainedBw64BBurst;
-        if(isZeroForFloat(pContextOptions->ddrMaskWriteSustainedBw128BBurst) == 0)
-            pArchDataFeature->ddrMaskWriteSustainedBw128BBurst = pContextOptions->ddrMaskWriteSustainedBw128BBurst;
-        if(isZeroForFloat(pContextOptions->ddrMaskWriteSustainedBw256BBurst) == 0)
-            pArchDataFeature->ddrMaskWriteSustainedBw256BBurst = pContextOptions->ddrMaskWriteSustainedBw256BBurst;
-        if(isZeroForFloat(pContextOptions->ddrNonMaskWriteSustainedBw64BBurst) == 0)
-            pArchDataFeature->ddrNonMaskWriteSustainedBw64BBurst = pContextOptions->ddrNonMaskWriteSustainedBw64BBurst;
-        if(isZeroForFloat(pContextOptions->ddrNonMaskWriteSustainedBw128BBurst) == 0)
-            pArchDataFeature->ddrNonMaskWriteSustainedBw128BBurst = pContextOptions->ddrNonMaskWriteSustainedBw128BBurst;
-        if(isZeroForFloat(pContextOptions->ddrNonMaskWriteSustainedBw256BBurst) == 0)
-            pArchDataFeature->ddrNonMaskWriteSustainedBw256BBurst =pContextOptions->ddrNonMaskWriteSustainedBw256BBurst;
-    }
     /* VIPSRAM ASYNC FIFO */
     pArchDataFeature->vipSramAsyncFifo = 0;             /* From Feature DB */
 
