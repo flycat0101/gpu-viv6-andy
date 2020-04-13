@@ -5752,7 +5752,7 @@ gcChipRecompileEvaluateKeyStates(
                     if ((rtFormat >= gcvSURF_X16B16G16R16F_2_A8R8G8B8 && rtFormat <= gcvSURF_B10G11R11F_1_A8R8G8B8) ||
                         (rtFormat >= gcvSURF_G32R32I_2_A8R8G8B8 && rtFormat <= gcvSURF_B32G32R32UI_3_A8R8G8B8)      ||
                         (rtFormat >= gcvSURF_R8_1_X8R8G8B8 && rtFormat <= gcvSURF_G8R8_1_X8R8G8B8 && !gc->state.enables.colorBuffer.blend[i])   ||
-                        (rtFormat == gcvSURF_A8B12G12R12_2_A8R8G8B8))
+                        (rtFormat == gcvSURF_A8B12G12R12_2_A8R8G8B8) || (rtFormat == gcvSURF_R8_SNORM))
                     {
                         rtPatchFormat = rtFormat;
                     }

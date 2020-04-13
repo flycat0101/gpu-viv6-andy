@@ -1428,10 +1428,13 @@ gcChipResidentTextureLevel(
     gceTEXTURE_FACE halFace = (__GL_TEXTURE_CUBEMAP_INDEX == texObj->targetIndex)
                             ? gcvFACE_POSITIVE_X + face : gcvFACE_NONE;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
+    __GLpixelTransferInfo transferInfo;
 
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x texObj=0x%x face=%d level=%d buf=0x%x",
                    gc, chipCtx, texObj, face, level, buf);
 
+    memset(&transferInfo, 0, sizeof(__GLpixelTransferInfo));
+    transferInfo.isPBO = unpackBufObj;
     if (!texInfo)
     {
         gcmFOOTER();
@@ -1489,6 +1492,59 @@ gcChipResidentTextureLevel(
     if (unpackBufObj)
     {
         gcmONERROR(gcChipProcessPBO(gc, unpackBufObj, &buf));
+        __gl_doSwizzleForSpecialFormat(&transferInfo, &mipmap->format);
+        __glGenericPixelTransfer(gc, mipmap->width, mipmap->height, 1, (texObj->faceMipmap[face][level]).formatInfo, mipmap->format, &(mipmap->type), buf, &transferInfo, __GL_TexImage);
+        buf = transferInfo.dstImage;
+
+        switch (mipmap->type)
+        {
+        case GL_UNSIGNED_INT_2_10_10_10_REV:
+        switch (mipmap->format)
+        {
+        case GL_RED:
+        case GL_RG:
+        case GL_RGB:
+            mipmap->format = GL_RGBA;
+            break;
+        case GL_RGB_INTEGER:
+            mipmap->format = GL_RGBA_INTEGER;
+            break;
+        default:
+            break;
+        }
+            break;
+        case GL_UNSIGNED_INT_10_10_10_2:
+        switch (mipmap->format)
+        {
+        case GL_RED:
+        case GL_RG:
+        case GL_RGB:
+            mipmap->format = GL_RGBA;
+            break;
+        case GL_RGB_INTEGER:
+            mipmap->format = GL_RGBA_INTEGER;
+            break;
+        default:
+            break;
+        }
+            break;
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+        case GL_UNSIGNED_SHORT_5_6_5:
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+        switch (mipmap->format)
+        {
+        case GL_RED:
+        case GL_RG:
+        case GL_RGBA:
+            mipmap->format = GL_RGB;
+            break;
+        default:
+            break;
+        }
+            break;
+        default:
+            break;
+        }
     }
 
     while (lods-- > 0)
@@ -5461,6 +5517,7 @@ __glChipGetTexImage(
     gceSURF_FORMAT wrapformat = gcvSURF_UNKNOWN;
     gceSURF_FORMAT srcFormat = gcvSURF_UNKNOWN;
     __GLformatInfo *formatInfo = mipmap->formatInfo;
+    __GLpixelTransferInfo transferInfo;
     gctUINT w, h;
     gctUINT dstWidth, dstHeight;
     gctUINT numSlice = 0;
@@ -5475,12 +5532,22 @@ __glChipGetTexImage(
     GLint dx, dy, sx, sy;
     GLuint width;
 
-
     gcmHEADER_ARG("gc=0x%x, texObj=0x%x, face=%d, level=%d, buf=0x%x",
         gc, texObj, face, level, buf);
 
     srcView = gcChipGetTextureSurface(chipCtx, texObj, gcvFALSE, level, slice);
 
+    /* The image is from pack buffer object? */
+    packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
+    memset(&transferInfo, 0, sizeof(__GLpixelTransferInfo));
+    transferInfo.isPBO = packBufObj;
+
+    /* Do PixelTransfer for PBO */
+    if (packBufObj)
+    {
+        __gl_doSwizzleForSpecialFormat(&transferInfo, &format);
+        __glGenericPixelTransfer(gc, mipmap->width, mipmap->height, 1, (texObj->faceMipmap[face][level]).formatInfo, format, &type, gcvNULL, &transferInfo, __GL_GetTexImagePre);
+    }
     __glGetWrapFormat(format ,type, &wrapformat);
 
     if (formatInfo == gcvNULL)
@@ -5512,8 +5579,6 @@ __glChipGetTexImage(
         &imgHeight,
         &skipOffset);
 
-    /* The image is from pack buffer object? */
-    packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
     if (packBufObj)
     {
         packBufInfo = (__GLchipVertexBufferInfo *)(packBufObj->privateData);
@@ -5526,6 +5591,13 @@ __glChipGetTexImage(
     }
     logicalAddress = (gctPOINTER)((gctINT8_PTR)logicalAddress + skipOffset);
 
+    if (format == GL_DEPTH_STENCIL || format == GL_DEPTH_COMPONENT || format == GL_STENCIL_INDEX)
+    {
+        if(transferInfo.srcImage == gcvNULL && gcvNULL != packBufObj)
+        {
+            transferInfo.srcImage = logicalAddress;
+        }
+    }
     switch (texObj->targetIndex)
     {
     case __GL_TEXTURE_1D_INDEX:
@@ -5598,9 +5670,14 @@ __glChipGetTexImage(
 
             if (packBufObj)
             {
-                if (gcmIS_SUCCESS(gcoSURF_ResolveRect(&srcView, &dstView, &rlvArgs)))
+                if (format != GL_DEPTH_COMPONENT && format != GL_DEPTH_STENCIL && format != GL_STENCIL_INDEX)
                 {
-                    break;
+                    transferInfo.dstImage = dstView.surf->node.logical;
+
+                    if (transferInfo.srcImage)
+                    {
+                        dstView.surf->node.logical = (gctUINT8_PTR)transferInfo.srcImage;
+                    }
                 }
             }
             gcmERR_BREAK(gcoSURF_CopyPixels(&srcView, &dstView, &rlvArgs));
@@ -5616,7 +5693,15 @@ __glChipGetTexImage(
 
             gcmONERROR(gcoSURF_Lock(dstView.surf, gcvNULL, srcData));
 
-            dstData = (GLubyte*)buf + rowStride * imgHeight * i; sx = 0; sy = 0; dx = 0; dy = 0;
+            if (packBufObj)
+            {
+                dstData = (GLubyte*)transferInfo.srcImage + rowStride * imgHeight * i;
+            }
+            else
+            {
+                dstData = (GLubyte*)buf + rowStride * imgHeight * i;
+            }
+            sx = 0; sy = 0; dx = 0; dy = 0;
             w = gcmMIN(mipmap->width, (gctINT)w);
             h = gcmMIN(mipmap->height, (gctINT)h);
             width = mipmap->width;
@@ -5757,6 +5842,20 @@ __glChipGetTexImage(
             gcoSURF_Unlock(dstView.surf, gcvNULL);
         }
 
+        if (GL_TRUE == transferInfo.applyPixelTransfer)
+        {
+            if (format == GL_DEPTH_COMPONENT || format == GL_DEPTH_STENCIL || format == GL_STENCIL_INDEX)
+            {
+                transferInfo.dstImage = logicalAddress;
+            }
+
+            __glGenericPixelTransfer(gc, mipmap->width, mipmap->height, 1, mipmap->formatInfo, format, &type, gcvNULL, &transferInfo, __GL_ReadPixels);
+        }
+
+        if ((GL_TRUE == transferInfo.srcNeedFree) && (gcvNULL != transferInfo.srcImage)){
+        (*gc->imports.free)(gc, (void*)transferInfo.srcImage);
+        transferInfo.srcImage = gcvNULL;
+        }
         if (dstView.surf)
         {
             gcmONERROR(gcoSURF_Destroy(dstView.surf));

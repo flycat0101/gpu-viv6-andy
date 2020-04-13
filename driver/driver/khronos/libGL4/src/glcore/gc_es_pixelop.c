@@ -1041,8 +1041,6 @@ __GL_INLINE GLvoid __glReadPixelsEnd(__GLcontext *gc)
     }
 }
 
-extern void __gl_doSwizzleForSpecialFormat(__GLpixelTransferInfo *transferInfo, GLenum * format);
-
 GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei width, GLsizei height,
                                      GLenum format, GLenum type, GLvoid* pixels)
 {
@@ -1060,7 +1058,10 @@ GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei 
         __GL_EXIT();
     }
 
-    __gl_doSwizzleForSpecialFormat(&transferInfo, &format);
+    if (gcvNULL == packBufObj)
+    {
+        __gl_doSwizzleForSpecialFormat(&transferInfo, &format);
+    }
 
     /* Check if framebuffer is complete */
     if (READ_FRAMEBUFFER_BINDING_NAME == 0)
@@ -1084,7 +1085,7 @@ GLvoid GL_APIENTRY __glim_ReadPixels(__GLcontext *gc, GLint x, GLint y, GLsizei 
         formatInfo =  (GL_FLOAT_32_UNSIGNED_INT_24_8_REV == type) ? __glGetFormatInfo(GL_DEPTH32F_STENCIL8) : __glGetFormatInfo(GL_DEPTH24_STENCIL8);
     }
 
-    if (formatInfo != gcvNULL)
+    if (formatInfo != gcvNULL && gcvNULL == packBufObj)
     {
         __glGenericPixelTransfer(gc, width, height, 1, formatInfo, format, &type, pixels, &transferInfo, __GL_ReadPixelsPre);
     }

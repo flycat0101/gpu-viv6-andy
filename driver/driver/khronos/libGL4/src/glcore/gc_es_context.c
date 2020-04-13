@@ -1203,6 +1203,8 @@ GLvoid __glInitContextState(__GLcontext *gc)
     gc->invalidCommonCommit = gcvTRUE;
     gc->invalidDrawCommit = gcvTRUE;
     gc->conditionalRenderDiscard = gcvFALSE;
+    gc->snorm8Flag = gcvFALSE;
+    gc->snorm16Flag = gcvFALSE;
 
     /* Some init functions should be isolated from ES3, TO DO */
     __glInitCurrentState(gc);

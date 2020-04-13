@@ -1251,6 +1251,8 @@ struct __GLcontextRec
 #ifdef OPENGL40
     /* The drawable change mask: resize, move, and etc*/
     GLuint changeMask;
+    GLboolean snorm8Flag;
+    GLboolean snorm16Flag;
 #endif
 };
 

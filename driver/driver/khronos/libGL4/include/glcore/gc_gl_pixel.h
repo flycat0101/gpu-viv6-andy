@@ -541,6 +541,7 @@ typedef struct __GLpixelTransferInfoRec{
 
     GLenum operaitonFlag;           /* Record pixelTransferOperations */
     __GLPixelTransferConfiguration configFlag;          /* How to use pixel transfer? */
+    __GLbufferObject *isPBO;        /* Judge whether use PBO */
 
     /*
     ** Generic source info.
@@ -588,6 +589,7 @@ extern GLint __glBytesPerElement(GLenum type);
 extern GLint __glElementsPerGroup(GLenum format, GLenum type);
 extern GLvoid __glMemoryAlignment(__GLpixelTransferInfo *transferInfo);
 extern GLboolean __glCheckSpecialFormat(GLenum internalFormat, GLenum format, GLenum* type);
+extern GLvoid __gl_doSwizzleForSpecialFormat(__GLpixelTransferInfo *transferInfo, GLenum * format);
 
 /*data types which aren't defined by spec. but supported by Vivante internal*/
 #define __GL_UNSIGNED_BYTE_4_4_REV_VIVPRIV                   0x1FFFF

@@ -951,6 +951,9 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
                              GLenum type,
                              GLenum InOrOutput)
 {
+    /* Clean the flag of snorm */
+    gc->snorm8Flag = GL_FALSE;
+    gc->snorm16Flag = GL_FALSE;
 
     if (!tex)
     {
@@ -1084,14 +1087,6 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_INTENSITY8:
         case GL_INTENSITY12:
         case GL_INTENSITY16:
-        case GL_RGBA8_SNORM:
-        case GL_RGBA16_SNORM:
-        case GL_RGB8_SNORM:
-        case GL_RGB16_SNORM:
-        case GL_RG8_SNORM:
-        case GL_RG16_SNORM:
-        case GL_R8_SNORM:
-        case GL_R16_SNORM:
             switch (format)
             {
                 __GL_CASE_IS_INTEGER_FORMAT:
@@ -1104,7 +1099,40 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
                     break;
             }
             break;
-
+        case GL_RGBA8_SNORM:
+        case GL_RGB8_SNORM:
+        case GL_RG8_SNORM:
+        case GL_R8_SNORM:
+            gc->snorm8Flag = gcvTRUE;
+            switch (format)
+            {
+                __GL_CASE_IS_INTEGER_FORMAT:
+                    __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                    break;
+                case GL_DEPTH_COMPONENT:
+                case GL_DEPTH_STENCIL:
+                    goto bad_operation;
+                default:
+                    break;
+            }
+            break;
+        case GL_RGBA16_SNORM:
+        case GL_RGB16_SNORM:
+        case GL_RG16_SNORM:
+        case GL_R16_SNORM:
+            gc->snorm16Flag = gcvTRUE;
+            switch (format)
+            {
+                __GL_CASE_IS_INTEGER_FORMAT:
+                    __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+                    break;
+                case GL_DEPTH_COMPONENT:
+                case GL_DEPTH_STENCIL:
+                    goto bad_operation;
+                default:
+                    break;
+            }
+            break;
             /*depth component*/
         case GL_DEPTH_COMPONENT:
         case GL_DEPTH_COMPONENT16:
@@ -1936,7 +1964,12 @@ GLuint __glGetNumberOfElement(GLenum format)
     switch(format)
     {
     case GL_DEPTH_COMPONENT:
+    case GL_STENCIL_INDEX:
     case GL_RED:
+    case GL_BLUE:
+    case GL_GREEN:
+    case GL_GREEN_INTEGER:
+    case GL_BLUE_INTEGER:
     case GL_LUMINANCE:
     case GL_ALPHA:
     case GL_RED_INTEGER:
@@ -1949,11 +1982,14 @@ GLuint __glGetNumberOfElement(GLenum format)
         return 2;
 
     case GL_RGB:
+    case GL_BGR:
     case GL_RGB_INTEGER:
+    case GL_BGR_INTEGER:
         return 3;
 
     case GL_RGBA:
     case GL_RGBA_INTEGER:
+    case GL_BGRA_INTEGER:
     case GL_BGRA_EXT:
         return 4;
     }
@@ -1980,16 +2016,27 @@ GLuint __glGetSizeOfType(GLenum type, GLboolean *packed)
     case GL_FLOAT:
         return 4;
 
+    case GL_UNSIGNED_BYTE_3_3_2:
+    case GL_UNSIGNED_BYTE_2_3_3_REV:
+        *packed = GL_TRUE;
+        return 1;
+
     case GL_UNSIGNED_SHORT_5_6_5:
+    case GL_UNSIGNED_SHORT_5_6_5_REV:
     case GL_UNSIGNED_SHORT_4_4_4_4:
+    case GL_UNSIGNED_SHORT_4_4_4_4_REV:
     case GL_UNSIGNED_SHORT_5_5_5_1:
+    case GL_UNSIGNED_SHORT_1_5_5_5_REV:
         *packed = GL_TRUE;
         return 2;
 
     case GL_UNSIGNED_INT_2_10_10_10_REV:
+    case GL_UNSIGNED_INT_10_10_10_2:
     case GL_UNSIGNED_INT_24_8:
     case GL_UNSIGNED_INT_10F_11F_11F_REV:
     case GL_UNSIGNED_INT_5_9_9_9_REV:
+    case GL_UNSIGNED_INT_8_8_8_8:
+    case GL_UNSIGNED_INT_8_8_8_8_REV:
         *packed = GL_TRUE;
         return 4;
 
@@ -2011,7 +2058,48 @@ GLboolean __glCheckPBO(__GLcontext *gc,
                        GLenum type,
                        const GLvoid *buf)
 {
-    return GL_FALSE;
+    GLuint alignment = packMode->alignment;
+    GLuint lineLength = packMode->lineLength ? packMode->lineLength : (GLuint)width;
+    GLuint imageHeight = packMode->imageHeight ? packMode->imageHeight : (GLuint)height;
+    GLuint skipPixels = packMode->skipPixels;
+    GLuint skipLines = packMode->skipLines;
+    GLuint skipImages = packMode->skipImages;
+
+    GLuint numElement = __glGetNumberOfElement(format);
+    GLboolean packed;
+    GLuint sizeType = __glGetSizeOfType(type, &packed);
+    GLuint bytePerPixel = packed ? sizeType : numElement * sizeType;
+
+    GLuint rowStride = __GL_ALIGN(bytePerPixel * lineLength, alignment);
+    GLuint imageStride = depth > 0 ? rowStride * imageHeight : 0;
+    GLuint requireSize = 0;
+
+    /* If a pixel unpack buffer object is bound and data is not evenly divisible by the number
+     * of basic machine units needed to store in memory the corresponding GL data type
+     */
+    if (!sizeType || (__GL_PTR2UINT(buf) % sizeType) != 0)
+    {
+        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+    }
+
+    if (!bufObj || bufObj->bufferMapped)
+    {
+        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+    }
+
+    /* If a pixel unpack buffer object is bound and storing texture data would access
+     * memory beyond the end of the pixel unpack buffer, an INVALID_OPERATION error results.
+     */
+    requireSize = __GL_PTR2UINT(buf)
+                + (skipImages + depth - 1) * imageStride
+                + (skipLines + height - 1) * rowStride
+                + (skipPixels + width) * bytePerPixel;
+    if (requireSize > (GLuint)bufObj->size)
+    {
+        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+    }
+
+    return GL_TRUE;
 }
 
 GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex, GLint internalFormat, GLboolean compSizeMatch)
@@ -3493,45 +3581,6 @@ void __glClearProxyTextureState(__GLcontext *gc,
     faceMipmap->border = 0;
 }
 
-/* TODO: Conver G/B/BGR/GBRA to R/R/RGB/RGBA to avoid the crash for now.
- * May use "TEXTURE_SWIZZLE_*" or convert them to RGB/RGBA to handle them. */
-void __gl_doSwizzleForSpecialFormat(__GLpixelTransferInfo *transferInfo, GLenum *format)
-{
-    transferInfo->applyGBConvert = GL_FALSE;
-    transferInfo->srcFormat = *format;
-    switch (*format)
-    {
-    case GL_GREEN:
-    case GL_BLUE:
-        *format = GL_RGB;
-        transferInfo->applyGBConvert = GL_TRUE;
-        break;
-    case GL_BGR:
-        *format = GL_RGB;
-        transferInfo->applySpecialSwizzle = GL_TRUE;
-        break;
-    case GL_BGRA:
-        *format = GL_RGBA;
-        transferInfo->applySpecialSwizzle = GL_TRUE;
-        break;
-    case GL_GREEN_INTEGER:
-    case GL_BLUE_INTEGER:
-        *format = GL_RGB_INTEGER;
-        transferInfo->applyGBConvert = GL_TRUE;
-        break;
-    case GL_BGR_INTEGER:
-        *format = GL_RGB_INTEGER;
-        transferInfo->applySpecialSwizzle = GL_TRUE;
-        break;
-    case GL_BGRA_INTEGER:
-        *format = GL_RGBA_INTEGER;
-        transferInfo->applySpecialSwizzle = GL_TRUE;
-        break;
-    default:
-        break;
-    }
-}
-
 void __gl_ConvertCompressedInternalFormat(GLint *internalFormat)
 {
     switch (*internalFormat)
@@ -3803,7 +3852,7 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
         __GL_EXIT();
     }
 
-    if (gcvNULL != buf)
+    if (gcvNULL != buf || gcvNULL != unpackBufObj)
     {
         __gl_ConvertCompressedInternalFormat(&internalFormat);
     }
@@ -3836,56 +3885,88 @@ GLvoid GL_APIENTRY __glim_TexImage2D(__GLcontext *gc,
         __GL_EXIT();
     }
 
-    __glGenericPixelTransfer(gc, width, height, 1, (tex->faceMipmap[face][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
-    (tex->faceMipmap[face][lod]).type = type;
-    switch (type)
+    if (transferInfo.applySpecialSwizzle && gcvNULL != unpackBufObj)
     {
-    case GL_UNSIGNED_INT_2_10_10_10_REV:
-        switch (format)
+        switch(format)
         {
-        case GL_RED:
-        case GL_RG:
         case GL_RGB:
-            tex->faceMipmap[face][lod].format = GL_RGBA;
+            format = GL_BGR;
             break;
-        case GL_RGB_INTEGER:
-            tex->faceMipmap[face][lod].format = GL_RGBA_INTEGER;
-            break;
-        default:
-            break;
-        }
-        break;
-    case GL_UNSIGNED_INT_10_10_10_2:
-        switch (format)
-        {
-        case GL_RED:
-        case GL_RG:
-        case GL_RGB:
-            tex->faceMipmap[face][lod].format = GL_RGBA;
-            break;
-        case GL_RGB_INTEGER:
-            tex->faceMipmap[face][lod].format = GL_RGBA_INTEGER;
-            break;
-        default:
-            break;
-        }
-        break;
-    case GL_UNSIGNED_INT_10F_11F_11F_REV:
-    case GL_UNSIGNED_SHORT_5_6_5:
-    case GL_UNSIGNED_INT_5_9_9_9_REV:
-        switch (format)
-        {
-        case GL_RED:
-        case GL_RG:
         case GL_RGBA:
-            tex->faceMipmap[face][lod].format = GL_RGB;
+            format = GL_BGRA;
+            break;
+        case GL_RGB_INTEGER:
+            format = GL_BGR_INTEGER;
+            break;
+        case GL_RGBA_INTEGER:
+            format = GL_BGRA_INTEGER;
             break;
         default:
             break;
         }
-        break;
-    default:
-        break;
+
+        transferInfo.applySpecialSwizzle = GL_FALSE;
+    }
+
+    if (gcvNULL == unpackBufObj)
+    {
+        __glGenericPixelTransfer(gc, width, height, 1, (tex->faceMipmap[face][lod]).formatInfo, format, &type, buf, &transferInfo, __GL_TexImage);
+
+        (tex->faceMipmap[face][lod]).type = type;
+        switch (type)
+        {
+        case GL_UNSIGNED_INT_2_10_10_10_REV:
+            switch (format)
+            {
+            case GL_RED:
+            case GL_RG:
+            case GL_RGB:
+                tex->faceMipmap[face][lod].format = GL_RGBA;
+                break;
+            case GL_RGB_INTEGER:
+                tex->faceMipmap[face][lod].format = GL_RGBA_INTEGER;
+                break;
+            default:
+                break;
+            }
+            break;
+        case GL_UNSIGNED_INT_10_10_10_2:
+            switch (format)
+            {
+            case GL_RED:
+            case GL_RG:
+            case GL_RGB:
+                tex->faceMipmap[face][lod].format = GL_RGBA;
+                break;
+            case GL_RGB_INTEGER:
+                tex->faceMipmap[face][lod].format = GL_RGBA_INTEGER;
+                break;
+            default:
+                break;
+            }
+            break;
+        case GL_UNSIGNED_INT_10F_11F_11F_REV:
+        case GL_UNSIGNED_SHORT_5_6_5:
+        case GL_UNSIGNED_INT_5_9_9_9_REV:
+            switch (format)
+            {
+            case GL_RED:
+            case GL_RG:
+            case GL_RGBA:
+                tex->faceMipmap[face][lod].format = GL_RGB;
+                break;
+            default:
+                break;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+    else
+    {
+        (tex->faceMipmap[face][lod]).type = type;
+        (tex->faceMipmap[face][lod]).format = format;
     }
 
     if (!(*gc->dp.texImage2D)(gc, tex, face, lod, transferInfo.dstImage))
@@ -8176,8 +8257,6 @@ GLvoid GL_APIENTRY __glim_GetTexImage(__GLcontext *gc, GLenum target, GLint leve
         __GL_EXIT();
     }
 
-    __gl_doSwizzleForSpecialFormat(&transferInfo, &format);
-
     /* The image is from unpack buffer object? */
     if (packBufObj)
     {
@@ -8189,10 +8268,19 @@ GLvoid GL_APIENTRY __glim_GetTexImage(__GLcontext *gc, GLenum target, GLint leve
         }
     }
 
+    if (gcvNULL == packBufObj)
+    {
+        __gl_doSwizzleForSpecialFormat(&transferInfo, &format);
+    }
+
     faceMipmap = &tex->faceMipmap[face][level];
 
     __GL_SAVE_AND_SET_SCALE_BIAS(gc,transferInfo);
-    __glGenericPixelTransfer(gc, faceMipmap->width, faceMipmap->height, 1, faceMipmap->formatInfo, format, &type, pixels, &transferInfo, __GL_GetTexImagePre);
+
+    if (gcvNULL == packBufObj)
+    {
+        __glGenericPixelTransfer(gc, faceMipmap->width, faceMipmap->height, 1, faceMipmap->formatInfo, format, &type, pixels, &transferInfo, __GL_GetTexImagePre);
+    }
 
     if (!(*gc->dp.getTexImage)(gc, tex, face, level, format, type, (GLvoid*)transferInfo.srcImage))
     {

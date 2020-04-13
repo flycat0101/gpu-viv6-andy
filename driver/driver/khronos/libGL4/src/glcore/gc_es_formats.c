@@ -4175,7 +4175,7 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
     case GL_R16_SNORM:
         if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
         {
-             drvFormat = __GL_FMT_R16F;
+             drvFormat = __GL_FMT_R32F;
         }
         else
         {
@@ -4185,7 +4185,7 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
     case GL_RG16_SNORM:
         if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
         {
-             drvFormat = __GL_FMT_RG16F;
+             drvFormat = __GL_FMT_RG32F;
         }
         else
         {
@@ -4195,7 +4195,7 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
     case GL_RGB16_SNORM:
         if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
         {
-             drvFormat = __GL_FMT_RGB16F;
+             drvFormat = __GL_FMT_RGB32F;
         }
         else
         {
@@ -4205,7 +4205,7 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
     case GL_RGBA16_SNORM:
         if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
         {
-             drvFormat = __GL_FMT_RGBA16F;
+             drvFormat = __GL_FMT_RGBA32F;
         }
         else
         {

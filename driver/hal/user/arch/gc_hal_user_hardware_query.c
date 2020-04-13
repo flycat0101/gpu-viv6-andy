@@ -3520,6 +3520,8 @@ gcoHARDWARE_InitializeFormatArrayTable(
         info->closestTXFormat     = gcvSURF_R8_SNORM;
         info->txFormat            = 0x0E << 12;
         info->txSwizzle           = baseComponents_r001;
+        info->closestRenderFormat = gcvSURF_R8_SNORM;
+        info->renderFormat        = 0x23;
 
         info = gcmGET_SURF_FORMAT_INFO(gcvSURF_G8R8_SNORM);
         info->closestTXFormat     = gcvSURF_G8R8_SNORM;

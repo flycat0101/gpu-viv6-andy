@@ -928,11 +928,13 @@ GLboolean __glInitTransferInfo(__GLcontext *gc,
     __glMemoryAlignment(transferInfo);
 
     /* Calc: applyPixelTransfer */
-    if ((GL_FALSE == transferInfo->applyGenericScaleBias) && (transferInfo->srcType == transferInfo->dstType)
+    if ((GL_FALSE == transferInfo->applyGenericScaleBias)
+        && (transferInfo->srcType == transferInfo->dstType)
         && ((1 == transferInfo->srcSizeOfElement) || (0 == transferInfo->swapBytes))
         && !transferInfo->applyPixelTransfer
         && !transferInfo->applySpecialSwizzle
-        && !transferInfo->applyGBConvert)
+        && !transferInfo->applyGBConvert
+        && (!(gc->snorm16Flag && (transferInfo->srcType != GL_SHORT))))
     {
         /* No need do pixel operation */
         transferInfo->applyPixelTransfer = GL_FALSE;
@@ -2749,7 +2751,11 @@ GLvoid __glGenericPixelTransferSub(__GLcontext *gc,
     {
         __glScaleAndBias(transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf, (GLfloat *)(&(transferInfo->scale)), (GLfloat *)(&(transferInfo->bias)), &(transferInfo->compMask[0]));
     }
-    __glClamp2ZeroOne(transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf);
+
+    if (!(gc->snorm16Flag && (transferInfo->srcType == GL_SHORT || transferInfo->dstType == GL_SHORT)))
+    {
+        __glClamp2ZeroOne(transferInfo->numOfComponents, transferInfo->compNumber, tmpBuf);
+    }
 
     /* Malloc a new buf to avoid modifying unconcerned content of original buffer for ReadPixels when using "pixel storage modes". */
     if ((__GL_ReadPixels == transferInfo->operaitonFlag) && (transferInfo->dstRowByteNeedAlign || transferInfo->dstIncreByteOfTotal))
@@ -2794,6 +2800,45 @@ const __GLpixelTransferDealFunc __GL_transferDealFunc[] ={
     {__GL_transferUnknown,              gcvNULL},
 };
 
+/* TODO: Conver G/B/BGR/GBRA to R/R/RGB/RGBA to avoid the crash for now.
+ * May use "TEXTURE_SWIZZLE_*" or convert them to RGB/RGBA to handle them. */
+GLvoid __gl_doSwizzleForSpecialFormat(__GLpixelTransferInfo *transferInfo,
+                               GLenum *format)
+{
+    transferInfo->applyGBConvert = GL_FALSE;
+    transferInfo->srcFormat = *format;
+    switch (*format)
+    {
+    case GL_GREEN:
+    case GL_BLUE:
+        *format = GL_RGB;
+        transferInfo->applyGBConvert = GL_TRUE;
+        break;
+    case GL_BGR:
+        *format = GL_RGB;
+        transferInfo->applySpecialSwizzle = GL_TRUE;
+        break;
+    case GL_BGRA:
+        *format = GL_RGBA;
+        transferInfo->applySpecialSwizzle = GL_TRUE;
+        break;
+    case GL_GREEN_INTEGER:
+    case GL_BLUE_INTEGER:
+        *format = GL_RGB_INTEGER;
+        transferInfo->applyGBConvert = GL_TRUE;
+        break;
+    case GL_BGR_INTEGER:
+        *format = GL_RGB_INTEGER;
+        transferInfo->applySpecialSwizzle = GL_TRUE;
+        break;
+    case GL_BGRA_INTEGER:
+        *format = GL_RGBA_INTEGER;
+        transferInfo->applySpecialSwizzle = GL_TRUE;
+        break;
+    default:
+        break;
+    }
+}
 
 /* A GenericPixelTransfer function template*/
 GLvoid __glGenericPixelTransfer(__GLcontext *gc,
@@ -2818,7 +2863,7 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
         __GL_EXIT();
     }
 
-    if ((gcvNULL == buf) || (gcvNULL == formatInfo) || (gcvNULL == transferInfo))
+    if ((gcvNULL == buf && gcvNULL == transferInfo->isPBO) || (gcvNULL == formatInfo) || (gcvNULL == transferInfo))
     {
         if ((gcvNULL != formatInfo) && (*type != formatInfo->dataType))
         {
@@ -2940,7 +2985,8 @@ GLvoid __glGenericPixelTransfer(__GLcontext *gc,
         }
 
         /* Use special type(float) to read some special type, then, do pixel transfer. */
-        if ((internalFormat != GL_SRGB8) && (format != GL_DEPTH_COMPONENT) && (format != GL_DEPTH_STENCIL))
+        if ((internalFormat != GL_SRGB8) && (format != GL_DEPTH_COMPONENT) && (format != GL_DEPTH_STENCIL)
+            && (gc->snorm8Flag == GL_FALSE))
         {
             __glCheckSpcecialType(baseFmt, &inType, outType);
         }
@@ -2998,5 +3044,8 @@ OnExit:
             transferInfo->applyPixelTransfer = GL_FALSE;
         }
     }
+    /* Clean the flag of snorm */
+    gc->snorm8Flag = GL_FALSE;
+    gc->snorm16Flag = GL_FALSE;
 }
 
