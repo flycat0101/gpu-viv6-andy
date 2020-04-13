@@ -2802,7 +2802,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     if (status != VX_SUCCESS) goto OnError;
 
     radio = (vx_float32)element_cnt_kernel / (vx_float32)element_cnt_input;
-    enable_small_kernel = radio < 0.5 ? vx_true_e : vx_false_e;
+    enable_small_kernel = /*radio < 0.5 ? vx_true_e : */vx_false_e;
 
     is_static_weights_biases = (vx_bool)(TENSOR_DATA_LIFETIME(weight) == VX_TENSOR_LIFE_TIME_STATIC && TENSOR_DATA_LIFETIME(bias) == VX_TENSOR_LIFE_TIME_STATIC);
     enable_adjust_biases     = is_static_weights_biases && TENSOR_QUANT_TYPE(weight) == VX_QUANT_AFFINE_SCALE && TENSOR_QUANT_TYPE(bias);
