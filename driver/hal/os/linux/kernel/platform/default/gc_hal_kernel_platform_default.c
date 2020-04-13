@@ -185,7 +185,7 @@ _AdjustParam(
 #if USE_LINUX_PCIE
     struct _gcsPLATFORM_PCIE *pcie_platform = (struct _gcsPLATFORM_PCIE *)Platform;
     struct pci_dev *pdev = pcie_platform->pcie_info[0].pdev;
-    unsigned char irqline = pdev->irq;
+    int irqline = pdev->irq;
     unsigned int i;
 
     unsigned int dev_index, core_index = 0;
