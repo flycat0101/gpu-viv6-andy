@@ -66,7 +66,7 @@ typedef enum _gceMMU_TYPE
 gceMMU_TYPE;
 
 /* VIP SRAM start virtual address. */
-#define gcdRESERVE_START (4 << 10)
+#define gcdRESERVE_START (4 << 20)
 #define gcdRESERVE_ALIGN (4 << 10)
 
 #define gcmENTRY_TYPE(x) (x & 0xF0)
