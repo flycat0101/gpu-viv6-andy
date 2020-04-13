@@ -3756,46 +3756,52 @@ VX_API_ENTRY vx_status VX_API_CALL vxSwapTensorHandle(vx_tensor tensor, void* co
                     gcoOS_CacheInvalidate(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
                 }
             }
+
             *prev_ptrs = tensor->tensorBuffer->memory.logicals[0];
-            vxInfo("prev_ptrs = %p", *prev_ptrs);
+            vxInfo("prev_ptrs = %p\n", *prev_ptrs);
         }
 
         /* reclaim previous and set new handlers for this image */
-
         if (new_ptrs != NULL)
         {
             if(tensor->tensorBuffer->memory.wrapFlag == gcvALLOC_FLAG_USERMEMORY)
             {
-                if(tensor->useInternalMem == vx_false_e)
+                if (tensor->useInternalMem == vx_false_e)
                 {
-                    vxoTensor_FreeWrappedMemory(tensor);
-                    /* offset is non zero if this is a subimage of some image */
-                    tensor->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)new_ptrs;
-                    vxoTensro_WrapUserMemory(tensor);
-                    vxInfo("memory.logicals = %p\n", tensor->tensorBuffer->memory.logicals[0]);
+                    if (new_ptrs != tensor->tensorBuffer->memory.logicals[0])
+                    {
+                        vxoTensor_FreeWrappedMemory(tensor);
+                        /* offset is non zero if this is a subimage of some image */
+                        tensor->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)new_ptrs;
+                        vxoTensro_WrapUserMemory(tensor);
+                        vxInfo("memory.logicals = %p\n", tensor->tensorBuffer->memory.logicals[0]);
+                    }
                 }
                 else
                 {
                     gctUINT32_PTR logical = 0;
                     vx_uint32 size = 0;
 
-                    if (tensor->tensorBuffer->memory.nodePtrs[0] != VX_NULL &&
-                        tensor->tensorBuffer->memory.logicals[0] != tensor->tensorBuffer->memory.nodePtrs[0]->logical)
+                    if (new_ptrs != tensor->tensorBuffer->memory.logicals[0])
                     {
-                        vxoTensor_ReleaseMemory(tensor);
-                        tensor->tensorBuffer->memory.nodePtrs[0] = VX_NULL;
-                        vxoTensor_GetTensorSize(tensor, &size);
-                        tensor->tensorBuffer->memory.sizes[0] = size;
+                        if (tensor->tensorBuffer->memory.nodePtrs[0] != VX_NULL &&
+                            tensor->tensorBuffer->memory.logicals[0] != tensor->tensorBuffer->memory.nodePtrs[0]->logical)
+                        {
+                            vxoTensor_ReleaseMemory(tensor);
+                            tensor->tensorBuffer->memory.nodePtrs[0] = VX_NULL;
+                            vxoTensor_GetTensorSize(tensor, &size);
+                            tensor->tensorBuffer->memory.sizes[0] = size;
+                        }
+
+                        tensor->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)new_ptrs;
+
+                        gcoVX_AllocateMemory((gctUINT32)tensor->tensorBuffer->memory.sizes[0], (gctPOINTER*)&logical,
+                                    &tensor->tensorBuffer->memory.physicals[0],
+                                    &tensor->tensorBuffer->memory.nodePtrs[0]);
+                        tensor->tensorBuffer->memory.allocated = vx_true_e;
                     }
 
-                    tensor->tensorBuffer->memory.logicals[0] = (vx_uint8_ptr)new_ptrs;
-
-                    gcoVX_AllocateMemory((gctUINT32)tensor->tensorBuffer->memory.sizes[0], (gctPOINTER*)&logical,
-                                &tensor->tensorBuffer->memory.physicals[0],
-                                &tensor->tensorBuffer->memory.nodePtrs[0]);
-                    tensor->tensorBuffer->memory.allocated = vx_true_e;
                     gcoOS_MemCopy(tensor->tensorBuffer->memory.nodePtrs[0]->logical, tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.sizes[0]);
-
                 }
             }
         }
