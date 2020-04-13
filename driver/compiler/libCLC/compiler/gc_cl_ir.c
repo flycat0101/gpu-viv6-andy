@@ -2284,6 +2284,7 @@ OUT clsNAME_SPACE ** NameSpace
         nameSpace->die = VSC_DI_INVALIDE_DIE;
         slsDLINK_LIST_Initialize(&nameSpace->names);
         slsDLINK_LIST_Initialize(&nameSpace->subSpaces);
+        clsHASH_TABLE_Initialize(&nameSpace->nameHash);
 
         if (Parent != gcvNULL) slsDLINK_LIST_InsertLast(&Parent->subSpaces, &nameSpace->node);
         *NameSpace = nameSpace;
@@ -2379,16 +2380,23 @@ OUT clsNAME ** Name
 )
 {
     clsNAME *name;
+    slsDLINK_NODE *bucket;
+    clsNAME_NODE *node;
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
     gcmASSERT(NameSpace);
 
-    FOR_EACH_DLINK_NODE(&NameSpace->names, clsNAME, name) {
+    bucket = clsHASH_TABLE_Bucket(&NameSpace->nameHash,
+                                  clmBUCKET_INDEX(clHashString(Symbol)));
+
+    FOR_EACH_DLINK_NODE(bucket, clsNAME_NODE, node) {
+        name = node->name;
         if (name->symbol == Symbol) {
             if (name->extension != clvEXTENSION_NONE) {
                if (!cloCOMPILER_ExtensionEnabled(Compiler,
-                                 name->extension)) continue;
+                                                 name->extension))
+                   continue;
             }
             *Name = name;
             return gcvSTATUS_OK;
@@ -4115,9 +4123,16 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
     clsNAME *name;
     clsDATA_TYPE dataType[1];
     gctBOOL hasGenType;
+    slsDLINK_NODE *bucket;
+    clsNAME_NODE *node;
 
     gcmASSERT(PolynaryExpr->exprBase.decl.dataType);
-    FOR_EACH_DLINK_NODE(&NameSpace->names, clsNAME, name) {
+    bucket = clsHASH_TABLE_Bucket(&NameSpace->nameHash,
+                                  clmBUCKET_INDEX(clHashString(PolynaryExpr->funcSymbol)));
+    FOR_EACH_DLINK_NODE(bucket, clsNAME_NODE, node) {
+        name = node->name;
+        if (name->symbol != PolynaryExpr->funcSymbol)
+            continue;
         hasGenType = gcvFALSE;
         if (((name->type == clvFUNC_NAME) || (name->type == clvKERNEL_FUNC_NAME))
             && clsDECL_IsEqual(&name->decl, &PolynaryExpr->exprBase.decl)
@@ -4612,13 +4627,21 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
     gctINT          nameCandidateDistances[_cldCandidateFunctionArraySize];
     clsDATA_TYPE    nameCandidateDataTypes[_cldCandidateFunctionArraySize];
     gctBOOL         nameCandidateHasGenType[_cldCandidateFunctionArraySize];
-    gctUINT         i, currentCandidateIndex = 0;
+    gctUINT         i = 0, currentCandidateIndex = 0;
     gctINT          distance = 0, minDistance = cldINT_MAX;
     clsDATA_TYPE dataType[1];
     gctBOOL hasGenType = gcvFALSE;
     gctBOOL nameCloned = gcvFALSE;
+    slsDLINK_NODE *bucket;
+    clsNAME_NODE *node;
 
-    FOR_EACH_DLINK_NODE(&NameSpace->names, clsNAME, name) {
+    bucket = clsHASH_TABLE_Bucket(&NameSpace->nameHash,
+                                  clmBUCKET_INDEX(clHashString(PolynaryExpr->funcSymbol)));
+
+    FOR_EACH_DLINK_NODE(bucket, clsNAME_NODE, node) {
+        name = node->name;
+        if (name->symbol != PolynaryExpr->funcSymbol)
+            continue;
         hasGenType = gcvFALSE;
         if (((name->type == clvFUNC_NAME) || (name->type == clvKERNEL_FUNC_NAME))) {
 
@@ -4627,7 +4650,6 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
                    continue;
                }
             }
-
             distance = _IsCorrespondingFuncName(Compiler, name, PolynaryExpr, &hasGenType, dataType);
             if (distance == -1) {
                 /* does not match */
@@ -4641,6 +4663,7 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
                     nameCandidateHasGenType[currentCandidateIndex] = hasGenType;
                     if(distance < minDistance) minDistance = distance;
                     currentCandidateIndex++;
+                    /* stop searching if it's the best match. */
                     if (distance == 0)
                         break;
                 }
@@ -4996,6 +5019,21 @@ IN clsNAME_SPACE * NameSpace,
 IN clsNAME *Name
 )
 {
+    clsNAME *name;
+    slsDLINK_NODE *bucket;
+    clsNAME_NODE *node;
+
+    bucket = clsHASH_TABLE_Bucket(&NameSpace->nameHash,
+                                  clmBUCKET_INDEX(clHashString(Name->symbol)));
+
+    FOR_EACH_DLINK_NODE(bucket, clsNAME_NODE, node) {
+        name = node->name;
+        if (name == Name) {
+            slsDLINK_NODE_Detach(&node->node);
+            return gcvSTATUS_OK;
+        }
+    }
+
    return gcvSTATUS_OK;
 }
 
@@ -5120,6 +5158,8 @@ OUT clsNAME **Name
     }
     /* Create a new name */
     do {
+        slsDLINK_NODE *bucket;
+        clsNAME_NODE *node;
         gcmONERROR(_clsNAME_Construct(Compiler,
                                       NameSpace,
                                       LineNo,
@@ -5144,11 +5184,20 @@ OUT clsNAME **Name
         else {
            slsDLINK_LIST_InsertLast(&NameSpace->names, &name->node);
         }
+
         if (Name != gcvNULL) {
             name->die = cloCOMPILER_AddDIEWithName(Compiler, name);
             *Name = name;
         }
-
+        bucket = clsHASH_TABLE_Bucket(&NameSpace->nameHash,
+                                      clmBUCKET_INDEX(clHashString(name->symbol)));
+        status = cloCOMPILER_Allocate(Compiler,
+                                     sizeof(clsNAME_NODE),
+                                     (gctPOINTER *) &node);
+        if (gcmIS_ERROR(status))
+            break;
+        node->name = name;
+        slsDLINK_LIST_InsertFirst(bucket, &node->node);
         return gcvSTATUS_OK;
     } while (gcvFALSE);
 OnError:

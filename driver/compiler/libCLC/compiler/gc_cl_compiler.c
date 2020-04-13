@@ -5035,6 +5035,15 @@ clsNAME_SPACE *  NameSpace
 }
 
 gctBOOL
+cloCOMPILER_IsNameSpaceGeneralBuiltin(
+IN cloCOMPILER Compiler,
+clsNAME_SPACE *  NameSpace
+)
+{
+   return NameSpace == Compiler->context.generalBuiltinSpace;
+}
+
+gctBOOL
 cloCOMPILER_IsDumpOn(
 IN cloCOMPILER Compiler,
 IN cleDUMP_OPTION DumpOption
