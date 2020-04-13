@@ -1,6 +1,6 @@
 @REM #########################################################################
 @REM #
-@REM #  Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+@REM #  Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 @REM #  All Rights Reserved.
 @REM #
 @REM #  Permission is hereby granted, free of charge, to any person obtaining

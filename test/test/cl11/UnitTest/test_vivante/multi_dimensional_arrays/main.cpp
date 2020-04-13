@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -245,7 +245,7 @@ int main(int argc, const char *argv[]) {
     int error = runTests(argc, argv);
 
     char a;
-    scanf(&a);
+    scanf("%c", &a);
 
     cleanTests();
 

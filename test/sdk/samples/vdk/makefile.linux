@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -34,9 +34,9 @@ include $(AQROOT)/makefile.linux.def
 ######################################################
 # Components of the project.
 
-SAMPLES	:= tut1 cover_flow es11 es20
+SAMPLES	:= cover_flow es11 es20 gl eglimage
 ifneq ($(VIVANTE_NO_VG), 1)
-SAMPLES += vg
+SAMPLES += vg mixed
 endif # VIVANTE_NO_VG
 
 ######################################################

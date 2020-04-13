@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -92,13 +92,13 @@ endif
 
 ifeq ($(DYNAMIC), 1)
 ifeq ($(USE_ARMCC), 1)
-LFLAGS += --shared -L--soname=,$(TARGET_NAME)
+LDFLAGS += --shared -L--soname=,$(TARGET_NAME)
 else
-LFLAGS += -Wall -shared -Wl,-soname,$(TARGET_NAME) -Wl,-z,defs
+LDFLAGS += -Wall -shared -Wl,-soname,$(TARGET_NAME) -Wl,-z,defs
 endif
 $(TARGET_OUTPUT): $(OBJECTS)
 	@echo "  LINK    \033[1m$(notdir $@)\033[0m"
-	@$(CC) $(LFLAGS) $(OBJECTS) -o $(TARGET_OUTPUT) $(LIBS)
+	@$(CC) $(LDFLAGS) $(OBJECTS) -o $(TARGET_OUTPUT) $(LIBS)
 endif
 
 ifeq ($(STATIC), 1)

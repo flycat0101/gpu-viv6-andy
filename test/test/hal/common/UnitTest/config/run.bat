@@ -1,6 +1,6 @@
 @REM #########################################################################
 @REM #
-@REM #  Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+@REM #  Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 @REM #  All Rights Reserved.
 @REM #
 @REM #  Permission is hereby granted, free of charge, to any person obtaining
@@ -85,6 +85,7 @@ galRunTest2.exe gal2DBlendFactors_001.dll -c %CONFIG%
 galRunTest2.exe gal2DBlendFactors_002.dll -c %CONFIG%
 galRunTest2.exe gal2DBlendFactors_003.dll -c %CONFIG%
 galRunTest2.exe gal2DBlitFullRotate.dll -c %CONFIG%
+galRunTest2.exe gal2DBusSwap.dll -c %CONFIG%
 galRunTest2.exe gal2DClear001.dll -c %CONFIG%
 galRunTest2.exe gal2DClear002.dll -c %CONFIG%
 galRunTest2.exe gal2DClear003.dll -c %CONFIG%
@@ -147,6 +148,7 @@ galRunTest2.exe gal2DFormat10Bit003.dll -c %CONFIG%
 galRunTest2.exe gal2DFormat10Bit004.dll -c %CONFIG%
 galRunTest2.exe gal2DFormat10Bit005.dll -c %CONFIG%
 galRunTest2.exe gal2DFormat10Bit006.dll -c %CONFIG%
+galRunTest2.exe gal2DFormat10Bit007.dll -c %CONFIG%
 galRunTest2.exe gal2DFormatA8_001.dll -c %CONFIG%
 galRunTest2.exe gal2DFormatA8_002.dll -c %CONFIG%
 galRunTest2.exe gal2DFormatA8_003.dll -c %CONFIG%
@@ -197,6 +199,9 @@ galRunTest2.exe gal2DFormatCompressedDEC400_005.dll -c %CONFIG%
 galRunTest2.exe gal2DFormatCompressedDEC400_006.dll -c %CONFIG%
 galRunTest2.exe gal2DFormatCompressedDEC400_007.dll -c %CONFIG%
 galRunTest2.exe gal2DFormatCompressedDEC400_008.dll -c %CONFIG%
+galRunTest2.exe gal2DFormatCompressedDEC400_010.dll -c %CONFIG%
+galRunTest2.exe gal2DFormatCompressedDEC400_011.dll -c %CONFIG%
+galRunTest2.exe gal2DFormatCompressedDEC400_012.dll -c %CONFIG%
 galRunTest2.exe gal2DFormatCompressedTPC001.dll -c %CONFIG%
 galRunTest2.exe gal2DFormatCompressedTPC002.dll -c %CONFIG%
 galRunTest2.exe gal2DFormatCompressedTPC003.dll -c %CONFIG%

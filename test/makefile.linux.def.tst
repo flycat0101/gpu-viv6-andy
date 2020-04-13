@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -67,7 +67,7 @@ USE_VDK             ?= 0
 EGL_API_FB          ?= 0
 EGL_API_WL          ?= 0
 EGL_API_DRI         ?= 0
-X11_DRI3        ?= 0
+X11_DRI3            ?= 0
 EGL_API_DFB         ?= 0
 EGL_API_X           ?= 0
 
@@ -91,7 +91,12 @@ SOC_PLATFORM        ?= default
 GPU_CONFIG          ?= default
 USE_VXC_BINARY      ?= 0
 
-USE_KMS             ?= 0
+USE_VSC_LITE        ?= 0
+
+USE_STATIC_STDCxx   ?= 0
+
+#If need to user ori arch model, set to 1
+ORI_NNARCHPERF   ?= 0
 
 ################################################################
 # Option dependency.
@@ -132,14 +137,14 @@ endif
 
 ORIG_CFLAGS         ?= $(CFLAGS)
 ORIG_CXXFLAGS       ?= $(CXXFLAGS)
-ORIG_LFLAGS         ?= $(LFLAGS)
+ORIG_LDFLAGS         ?= $(LDFLAGS)
 ORIG_PFLAGS         ?= $(PFLAGS)
 
-export ORIG_CFLAGS ORIG_CXXFLAGS ORIG_LFLAGS ORIG_PFLAGS
+export ORIG_CFLAGS ORIG_CXXFLAGS ORIG_LDFLAGS ORIG_PFLAGS
 
 CFLAGS              := $(ORIG_CFLAGS)
 CXXFLAGS            := $(ORIG_CXXFLAGS)
-LFLAGS              := $(ORIG_LFLAGS)
+LDFLAGS              := $(ORIG_LDFLAGS)
 PFLAGS              := $(ORIG_PFLAGS)
 
 ################################################################
@@ -167,6 +172,7 @@ else
 endif
 
 PKG_CONFIG          ?= $(CROSS_COMPILE)pkg-config
+
 
 ################################################################
 # Resource.
@@ -216,6 +222,12 @@ CONFIG_DOVE_GPU     := 0
 
 ###############################################################
 # Common flags.
+LDFLAGS += $(LFLAGS)
+
+ifneq (,$(findstring -mcpu=,$(CC) $(CFLAGS)))
+CPU_TYPE=0
+CPU_ARCH=0
+endif
 
 ifeq ($(USE_ARMCC),1)
   CFLAGS            += --c99 #--strict
@@ -228,7 +240,7 @@ else
 
   ifneq ($(ENDIANNESS),)
     CFLAGS          += $(ENDIANNESS)
-    LFLAGS          += $(ENDIANNESS)
+#   LDFLAGS         += $(ENDIANNESS)
     PFLAGS          += $(ENDIANNESS)
   endif
 
@@ -238,7 +250,7 @@ else
   ifneq ($(CPU_TYPE),)
     ifneq ($(CPU_TYPE),0)
       CFLAGS        += -mtune=$(CPU_TYPE)
-      LFLAGS        += -mtune=$(CPU_TYPE)
+#     LDFLAGS       += -mtune=$(CPU_TYPE)
       PFLAGS        += -mtune=$(CPU_TYPE)
     endif
   endif
@@ -246,7 +258,7 @@ else
   ifneq ($(CPU_ARCH),)
     ifneq ($(CPU_ARCH),0)
       CFLAGS        += -march=$(CPU_ARCH)
-      LFLAGS        += -march=$(CPU_ARCH)
+#     LDFLAGS       += -march=$(CPU_ARCH)
       PFLAGS        += -march=$(CPU_ARCH)
     endif
   endif
@@ -260,7 +272,7 @@ endif
 ifneq ($(FLOAT_ABI),)
   CFLAGS            += -mfloat-abi=$(FLOAT_ABI)
   CXXFLAGS          += -mfloat-abi=$(FLOAT_ABI)
-  LFLAGS            += -mfloat-abi=$(FLOAT_ABI)
+# LDFLAGS           += -mfloat-abi=$(FLOAT_ABI)
   PFLAGS            += -mfloat-abi=$(FLOAT_ABI)
 endif
 
@@ -325,45 +337,35 @@ ifeq ($(EGL_API_NULLWS),1)
 endif
 
 ifeq ($(EGL_API_FB),1)
-  CFLAGS            += -DEGL_API_FB
+  CFLAGS            += -DEGL_API_FB -DOPENGL40
 endif
 
 ifeq ($(EGL_API_WL),1)
   CFLAGS            += -DEGL_API_WL -DWL_EGL_PLATFORM -Wno-deprecated-declarations
-  ifeq ($(GL4_LINUX_ENABLE),1)
-    CFLAGS            += -DOPENGL40
+  ifeq ($(YOCTO_DRI_BUILD),1)
+    CFLAGS            += -DDRI_PIXMAPRENDER_ASYNC
+    CFLAGS            += -DDRI_PIXMAPRENDER_GL
   endif
-  LFLAGS             += -L$(VIVANTE_SDK_LIB) -L$(ROOTFS_USR)/lib
-endif
-
-ifeq ($(EGL_API_DRI),1)
+else
+  ifeq ($(EGL_API_DRI),1)
   ifeq ($(YOCTO_DRI_BUILD),1)
     CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
   endif
-  CFLAGS          += -DDRI_PIXMAPRENDER_ASYNC
-  CFLAGS          += -DDRI_PIXMAPRENDER_GL
-
-  ifeq ($(GL4_LINUX_ENABLE),1)
-   CFLAGS            += -DEGL_API_DRI -DOPENGL40
-  else
-   CFLAGS            += -DEGL_API_DRI
-  endif
+  CFLAGS            += -DDRI_PIXMAPRENDER_ASYNC
+  CFLAGS            += -DDRI_PIXMAPRENDER_GL
+  CFLAGS            += -DEGL_API_DRI
   CFLAGS            += -I$(X11_ARM_DIR)/include
-endif
+  endif
 
-ifeq ($(X11_DRI3),1)
+  ifeq ($(X11_DRI3),1)
   ifeq ($(YOCTO_DRI_BUILD),1)
     CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
   endif
-  CFLAGS          += -DDRI_PIXMAPRENDER_ASYNC
-  CFLAGS          += -DDRI_PIXMAPRENDER_GL
-
-  ifeq ($(GL4_LINUX_ENABLE),1)
-   CFLAGS            += -DX11_DRI3 -DOPENGL40
-  else
-   CFLAGS            += -DX11_DRI3
-  endif
+  CFLAGS            += -DDRI_PIXMAPRENDER_ASYNC
+  CFLAGS            += -DDRI_PIXMAPRENDER_GL
+  CFLAGS            += -DX11_DRI3
   CFLAGS            += -I$(X11_ARM_DIR)/include
+  endif
 endif
 
 ifeq ($(EGL_API_DFB),1)
@@ -399,6 +401,10 @@ else
   CFLAGS            += -DgcdSTATIC_LINK=0
 endif
 
+ifeq ($(gcdIGNORE_DRIVER_VERSIONS_MISMATCH),1)
+  CFLAGS            += -DgcdIGNORE_DRIVER_VERSIONS_MISMATCH=1
+endif
+
 ifneq (,$(GL_2_APPENDIX))
   CFLAGS            += -D_GL_2_APPENDIX=$(GL_2_APPENDIX)
 endif
@@ -415,18 +421,18 @@ ifneq ($(VG_APPENDIX),)
   CFLAGS            += -D_VG_APPENDIX=$(VG_APPENDIX)
 endif
 
-CFLAGS              += -DgcdREGISTER_ACCESS_FROM_USER=1
+ifeq ($(REGISTER_READ_FROM_USER),1)
+CFLAGS              += -DgcdREGISTER_READ_FROM_USER=1
+endif
+
+ifeq ($(REGISTER_WRITE_FROM_USER),1)
+CFLAGS              += -DgcdREGISTER_WRITE_FROM_USER=1
+endif
 
 ifeq ($(FPGA_BUILD),1)
   CFLAGS            += -DgcdFPGA_BUILD=1
 else
   CFLAGS            += -DgcdFPGA_BUILD=0
-endif
-
-ifeq ($(FORCE_ALL_VIDEO_MEMORY_CACHED),1)
-  CFLAGS            += -DgcdPAGED_MEMORY_CACHEABLE=1
-else
-  CFLAGS            += -DgcdPAGED_MEMORY_CACHEABLE=0
 endif
 
 ifeq ($(USE_LOADTIME_OPT),1)
@@ -466,6 +472,17 @@ soc_board     := $(lastword  $(subst -, ,$(SOC_PLATFORM)))
 CFLAGS              += -DVIVANTE_PROFILER=1
 CFLAGS              += -DVIVANTE_PROFILER_CONTEXT=1
 
+ifeq ($(USE_FILE_OFFSET_BITS_64),1)
+  CFLAGS            += -D_FILE_OFFSET_BITS=64
+endif
+
+#If need to user ori arch model, set to 1
+#CFLAGS              += -DORI_NNARCHPERF
+
+#If need to remove cl libs
+ifeq ($(REMOVE_CL_LIBS),1)
+  CFLAGS            += -DREMOVE_CL_LIBS=$(REMOVE_CL_LIBS)
+endif
 
 ################################################################################
 #
@@ -486,6 +503,7 @@ GLES2X_DIR          := $(AQROOT)/driver/khronos/libGLESv3
 
 GLSLC_DIR           := $(AQROOT)/compiler/libGLSLC
 VSC_DIR             := $(AQROOT)/compiler/libVSC
+VSC_Lite_DIR        := $(AQROOT)/compiler/libVSC_Lite
 
 VULKAN_DIR          := $(AQROOT)/driver/khronos/libVulkan10
 SPIRV_DIR           := $(AQROOT)/compiler/libSPIRV
@@ -500,11 +518,7 @@ else
 EXA_DIR             := $(AQROOT)/driver/X/EXA/src
 endif
 
-ifeq ($(GL4_LINUX_ENABLE),1)
-GL21_DIR            := $(AQROOT)/driver/khronos/libGL4
-else
-GL21_DIR            := $(AQROOT)/driver/khronos/libGL2
-endif
+GL4X_DIR            := $(AQROOT)/driver/khronos/libGL4
 
 CL11_DIR            := $(AQROOT)/driver/khronos/libCL
 CL11_ICD_DIR        := $(AQROOT)/driver/khronos/libCL/icdloader12

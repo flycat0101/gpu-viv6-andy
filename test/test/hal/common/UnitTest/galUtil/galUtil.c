@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -776,6 +776,17 @@ static STATUS_MAP sStatusMap[] = {
     {gcvSTATUS_INVALID_INDEX        , "Invalid Index" },
 };
 
+
+gctBOOL _IsDEC400EXAvailable(gce2D_TILE_STATUS_CONFIG TileStatusConfig)
+{
+    if(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400EX_COMPRESSION) &&
+        (TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED))
+    {
+        return gcvTRUE;
+    } else {
+        return gcvFALSE;
+    }
+}
 
 const char* CDECL GalStatusString(gceSTATUS status)
 {
@@ -2264,6 +2275,7 @@ gceSTATUS GalSaveTSurfToVimg(
                 break;
 
             case gcvSURF_P010:
+            case gcvSURF_P010_LSB:
                 width[1] = surf->width / 2;
                 height[1] = surf->height / 2;
                 nPlane = 2;
@@ -3495,6 +3507,8 @@ gceSTATUS GalQueryBpp(gceSURF_FORMAT Format, gctUINT *Bpp)
     case gcvSURF_R10G10B10A2:
     case gcvSURF_B10G10R10A2:
     case gcvSURF_P010:
+    case gcvSURF_P010_LSB:
+    case gcvSURF_I010:
         *Bpp = 4;
         break;
 
@@ -3576,7 +3590,7 @@ gceSTATUS GalCreateTSurfWithPool(
             alignedWidth = gcmALIGN(Width, 16);
             alignedHeight = gcmALIGN(Height, 64);
         }
-        else if (Format == gcvSURF_P010)
+        else if (Format == gcvSURF_P010 || Format == gcvSURF_P010_LSB)
         {
             alignedWidth = gcmALIGN(Width, 8);
             alignedHeight = gcmALIGN(Height, 64);
@@ -3648,10 +3662,11 @@ gceSTATUS GalCreateTSurfWithPool(
         {
             alignedWidth = gcmALIGN(Width, 64);
 
-            if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) &&
+            if ((gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) ||
+                 gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400EX_COMPRESSION))&&
                 TileStatusConfig == gcv2D_TSC_DEC_COMPRESSED &&
                 Tiling == gcvTILED_64X4 &&
-                (Format == gcvSURF_NV12 || Format == gcvSURF_P010))
+                (Format == gcvSURF_NV12 || Format == gcvSURF_P010) || Format == gcvSURF_P010_LSB)
             {
                 alignedHeight = gcmALIGN(alignedHeight, 8);
             }
@@ -3684,18 +3699,20 @@ gceSTATUS GalCreateTSurfWithPool(
             {
                 alignedBase = 256;
             }
-            else if (Format == gcvSURF_P010)
+            else if (Format == gcvSURF_P010 || Format == gcvSURF_P010_LSB)
             {
                 alignedBase = 512;
             }
         }
     }
     else if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_TPCV11_COMPRESSION) ||
-             gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION))
+             gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) ||
+             _IsDEC400EXAvailable(TileStatusConfig))
     {
         if (Format == gcvSURF_NV12)
         {
-            if (!gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION))
+            if (!gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) &&
+                !gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400EX_COMPRESSION))
             {
                 alignedWidth = gcmALIGN(alignedWidth, 256);
             }
@@ -3706,7 +3723,7 @@ gceSTATUS GalCreateTSurfWithPool(
             alignedWidth = gcmALIGN(alignedWidth, 256);
             alignedBase = 320;
         }
-        else if (Format == gcvSURF_P010)
+        else if (Format == gcvSURF_P010 || Format == gcvSURF_P010_LSB)
         {
             alignedWidth = gcmALIGN(alignedWidth, 32);
             alignedHeight = gcmALIGN(alignedHeight, 8);
@@ -3737,15 +3754,17 @@ gceSTATUS GalCreateTSurfWithPool(
                 break;
 
             case gcvSURF_P010:
+            case gcvSURF_P010_LSB:
                 alignedStride = gcmALIGN(alignedStride, 64);
                 aligned = 512;
                 break;
         }
     }
     else if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_TPCV11_COMPRESSION) ||
-             gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION))
+             gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) ||
+             _IsDEC400EXAvailable(TileStatusConfig))
     {
-        if (Format == gcvSURF_P010)
+        if (Format == gcvSURF_P010 || Format == gcvSURF_P010_LSB)
         {
             alignedStride = gcmALIGN(alignedStride, 64);
             aligned = 512;
@@ -3899,7 +3918,8 @@ gceSTATUS GalCreateTSurfWithPool(
         {
             surf->tileStatusNode.size = gcmMIN(surf->vNode.size, 150 * 1024);
         }
-        else if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) &&
+        else if ((gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) ||
+                  gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400EX_COMPRESSION))&&
                  (TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED))
         {
             gctUINT32 total = 0, tsbit = 0;
@@ -3920,6 +3940,7 @@ gceSTATUS GalCreateTSurfWithPool(
                 {
                     case gcvTILED_8X8_XMAJOR:
                     case gcvSUPERTILED_256B:
+                    case gcvSUPERTILED:
                         total = 64;
                         tsbit = tileBitsArray[gcd2D_COMPRESSION_DEC400_ALIGN_MODE][1];
                         break;
@@ -3967,16 +3988,28 @@ gceSTATUS GalCreateTSurfWithPool(
                     {2, 1, 1}, /* 64 aligned */
                 };
 
-                if (Format == gcvSURF_P010 && surf->tiling == gcvTILED_32X4)
+                if ((Format == gcvSURF_P010 && surf->tiling == gcvTILED_32X4) ||
+                (Format == gcvSURF_P010_LSB && surf->tiling == gcvTILED_32X4) ||
+                (Format == gcvSURF_I010 && surf->tiling == gcvTILED_32X4))
                 {
                     total = 32 * 4;
                     /* Y tile status size = 32 * 4 * 2 = 256 */
+                    tsbit = tileBitsArray[gcd2D_COMPRESSION_DEC400_ALIGN_MODE][0];
+                }
+                else if(Format == gcvSURF_P010 && surf->tiling == gcvTILED)
+                {
+                    total = 4 * 4;
                     tsbit = tileBitsArray[gcd2D_COMPRESSION_DEC400_ALIGN_MODE][0];
                 }
                 else if (Format == gcvSURF_NV12 && surf->tiling == gcvTILED_64X4)
                 {
                     total = 64 * 4;
                     /* Y tile status size = 64 * 4 * 1 = 256 */
+                    tsbit = tileBitsArray[gcd2D_COMPRESSION_DEC400_ALIGN_MODE][0];
+                }
+                else if (Format == gcvSURF_NV12 && surf->tiling == gcvTILED)
+                {
+                    total = 4 * 4;
                     tsbit = tileBitsArray[gcd2D_COMPRESSION_DEC400_ALIGN_MODE][0];
                 }
                 else if (surf->tiling == gcvTILED_8X8_XMAJOR)
@@ -4135,7 +4168,8 @@ gceSTATUS GalCreateTSurfWithPool(
 
                 surf->validAddressNum = surf->validStrideNum = 2;
 
-                if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION))
+                if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) ||
+                    _IsDEC400EXAvailable(TileStatusConfig))
                 {
                     aligned = 80;
                 }
@@ -4165,9 +4199,10 @@ gceSTATUS GalCreateTSurfWithPool(
             break;
 
         case gcvSURF_P010:
+        case gcvSURF_P010_LSB:
             {
                 gctUINT32 size, delta;
-
+                aligned = 128;
                 surf->validAddressNum = surf->validStrideNum = 2;
                 surf->stride[0] = surf->stride[1] = gcmALIGN(alignedWidth * 2, aligned);
 
@@ -4177,13 +4212,43 @@ gceSTATUS GalCreateTSurfWithPool(
                 surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + delta);
             }
             break;
+        case gcvSURF_I010:
+            {
+                gctUINT32 size, delta;
+               if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) ||
+                   _IsDEC400EXAvailable(TileStatusConfig))
+                {
+                    aligned = 256;
+                }
+                else
+                {
+                    aligned = 128;
+                }
+                surf->validAddressNum = surf->validStrideNum = 3;
 
+                surf->stride[0] = gcmALIGN(alignedWidth * 2, aligned);
+                size = surf->stride[0] * alignedHeight;
+
+                surf->address[1] = gcmALIGN(surf->address[0] + size, aligned);
+                delta = surf->address[1] - surf->address[0] - size;
+                surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + delta);
+
+                surf->stride[1] = gcmALIGN(alignedWidth, aligned);
+                surf->stride[2] = gcmALIGN(alignedWidth, aligned);
+
+                size >>= 2;
+                surf->address[2] = gcmALIGN(surf->address[1] + size, aligned);
+                delta = surf->address[2] - surf->address[1] - size;
+                surf->logical[2] = GAL_POINTER_OFFSET(surf->logical[1], size + delta);
+            }
+            break;
         default:
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
 
         if ((TileStatusConfig & gcv2D_TSC_DEC_TPC_COMPRESSED) ||
-            (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) &&
+            ((gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) ||
+              gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400EX_COMPRESSION))&&
              (TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED)))
         {
             if (surf->validAddressNum > 1)
@@ -4192,7 +4257,8 @@ gceSTATUS GalCreateTSurfWithPool(
                 {
                     surf->tileStatusNodeEx[0].size = gcmMIN(surf->stride[1] * alignedHeight, 150 * 1024);
                 }
-                else if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION))
+                else if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) ||
+                         gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400EX_COMPRESSION))
                 {
                     gctUINT total = 0, tsbit = 0;
 
@@ -4204,16 +4270,27 @@ gceSTATUS GalCreateTSurfWithPool(
                         {2, 1, 1}, /* 64 aligned */
                     };
 
-                    if (Format == gcvSURF_P010 && surf->tiling == gcvTILED_32X4)
+                    if ((Format == gcvSURF_P010 && surf->tiling == gcvTILED_32X4) ||
+                        (Format == gcvSURF_P010_LSB && surf->tiling == gcvTILED_32X4))
                     {
                         total = 16 * 4;
                         /* UV tile status size = 16 * 4 * 4 = 256 */
+                        tsbit = tileBitsArray[gcd2D_COMPRESSION_DEC400_ALIGN_MODE][0];
+                    }
+                    else if(Format == gcvSURF_P010 && surf->tiling == gcvTILED)
+                    {
+                        total = 2 * 4;
                         tsbit = tileBitsArray[gcd2D_COMPRESSION_DEC400_ALIGN_MODE][0];
                     }
                     else if (Format == gcvSURF_NV12 && surf->tiling == gcvTILED_64X4)
                     {
                         total = 32 * 4;
                         /* UV tile status size = 32 * 4 * 2 = 256 */
+                        tsbit = tileBitsArray[gcd2D_COMPRESSION_DEC400_ALIGN_MODE][0];
+                    }
+                    else if (Format == gcvSURF_NV12 && surf->tiling == gcvTILED)
+                    {
+                        total = 2 * 4;
                         tsbit = tileBitsArray[gcd2D_COMPRESSION_DEC400_ALIGN_MODE][0];
                     }
                     else if (surf->tiling == gcvTILED_8X8_XMAJOR)
@@ -4260,7 +4337,8 @@ gceSTATUS GalCreateTSurfWithPool(
                     surf->tileStatusNodeEx[0].size);
 #endif
 
-                if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION))
+                if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC400_COMPRESSION) ||
+                    _IsDEC400EXAvailable(TileStatusConfig))
                 {
                     memset(surf->tileStatusNodeEx[0].memory, 0, surf->tileStatusNodeEx[0].allocatedSize);
                 }
@@ -5025,7 +5103,8 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             height[1] = head.imageHeight / 2;
             bpp[1] = 2;
             if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) ||
-                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION))
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) ||
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400EX_COMPRESSION))
                 widthT = gcmALIGN(head.imageWidth, 256);
             break;
 
@@ -5039,7 +5118,8 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             height[1] = head.imageHeight / 2;
             bpp[1] = 2;
             if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) ||
-                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION))
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) ||
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400EX_COMPRESSION))
                 widthT = gcmALIGN(head.imageWidth, 256);
             break;
 
@@ -5075,6 +5155,7 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             height[1] = head.imageHeight / 2;
             bpp[1] = 2.5;
             if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) ||
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) ||
                 gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION))
                 widthT = gcmALIGN(head.imageWidth, 256);
             break;
@@ -5089,6 +5170,7 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             height[1] = head.imageHeight / 2;
             bpp[1] = 2.5;
             if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) ||
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) ||
                 gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION))
                 widthT = gcmALIGN(head.imageWidth, 256);
             break;
@@ -5112,7 +5194,8 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             gctUINT32 addressT, aligned;
 
             if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) ||
-                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION))
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) ||
+                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400EX_COMPRESSION))
             {
                 memset(memory[0], 0, alignedStride * alignedHeight * 2);
             }
@@ -6149,6 +6232,8 @@ GalIsYUVFormat(IN gceSURF_FORMAT Format)
     case gcvSURF_NV12_10BIT:
     case gcvSURF_NV21_10BIT:
     case gcvSURF_P010:
+    case gcvSURF_P010_LSB:
+    case gcvSURF_I010:
         return gcvSTATUS_TRUE;
 
     default:
@@ -8208,7 +8293,9 @@ const struct FeatureInfo
     {"gcvFEATURE_2D_YUV420_OUTPUT_LINEAR " , "2D YUV420 output", gcvFEATURE_2D_YUV420_OUTPUT_LINEAR, gcvFALSE},
     {"gcvFEATURE_TPCV11_COMPRESSION " , "TPCv11 compression", gcvFEATURE_TPCV11_COMPRESSION, gcvFALSE},
     {"gcvFEATURE_DEC400_COMPRESSION " , "DEC400 compression", gcvFEATURE_DEC400_COMPRESSION, gcvFALSE},
+    {"gcvFEATURE_DEC400EX_COMPRESSION " , "DEC400EX compression", gcvFEATURE_DEC400EX_COMPRESSION, gcvFALSE},
     {"gcvFEATURE_2D_FAST_CLEAR " , "2D tilestatus Fast Clear", gcvFEATURE_2D_FAST_CLEAR, gcvFALSE},
+    {"gcvFEATURE_FORMAT_YUV_I010 " , "P010_LSB and I010 format", gcvFEATURE_FORMAT_YUV_I010, gcvFALSE},
 };
 
 gceSTATUS GalQueryFeatureStr(

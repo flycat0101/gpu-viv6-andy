@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -163,7 +163,7 @@ int initializers_union_multiple(cl_device_id device, cl_context context, cl_comm
 
 
 
-    sprintf(kernel_code_int, kernel_code_initializers_union_multiple);
+    sprintf(kernel_code_int, "%s", kernel_code_initializers_union_multiple);
     constkernelint = kernel_code_int;
     err = create_kernel(context, &program, &kernel, 1, &constkernelint, "initializers_union_multiple" );
     if (err){

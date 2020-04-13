@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -56,7 +56,7 @@ endif
 ifeq ($(EGL_API_DFB), 1)
 	INCLUDE += -I$(DFB_DIR)/include/directfb
 endif
-CFLAGS += $(INCLUDE)
+CFLAGS += $(INCLUDE) -g
 
 ################################################################################
 # Supply necessary libraries.
@@ -64,12 +64,11 @@ CFLAGS += $(INCLUDE)
 ifeq ($(gcdSTATIC_LINK), 1)
   LIBS += $(VIVANTE_SDK_LIB)/libVIVANTE.a
 else
-  LIBS += -L$(VIVANTE_SDK_LIB) -lGLESv1_CM -lVDK -lEGL
+  LIBS += -L$(VIVANTE_SDK_LIB) -lVDK -lEGL -lGLES_CM
 endif
 
-LIBS += -lm
+LIBS += -lpthread -ldl -lrt -lm
 
-LIBS += -l pthread -ldl -lrt
 ifeq ($(EGL_API_DRI), 1)
   LIBS += -Wl,-rpath-link,$(X11_ARM_DIR)/lib
 endif

@@ -26,6 +26,7 @@ NAME=galUtil
 include $(qnx_build_dir)/common.mk
 
 EXTRA_INCVPATH += $(driver_root)/hal/inc
+EXTRA_INCVPATH += $(driver_root)/hal/inc/shared
 EXTRA_INCVPATH += $(driver_root)/sdk/inc
 
 EXTRA_INCVPATH += $(HAL2D_UNIT_TEST_DIR)/inc

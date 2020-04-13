@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -393,9 +393,11 @@ GLuint LoadTGA( const char* strFileName)
     unsigned int nPixelSize = header.PixelDepth / 8;
     format = nPixelSize == 3 ? GL_RGB : GL_BGRA_EXT;
 
+
     const unsigned short data = 0xff00;
     if ((*(unsigned char*)&data) == 0xff)
     {
+
 #define SWAP16(x) ((unsigned short)( \
     (((unsigned short)(x) & (unsigned short)0x00FF) << 8) | \
     (((unsigned short)(x) & (unsigned short)0xFF00) >> 8)))
@@ -941,7 +943,7 @@ void LoadShaders(const char * vShaderFName, const char * pShaderFName)
         printf("%d: Link failed.\n", __LINE__);
         // Retrieve error buffer size.
         GLint errorBufSize, errorLength;
-        glGetShaderiv(programHandle, GL_INFO_LOG_LENGTH, &errorBufSize);
+        glGetProgramiv(programHandle, GL_INFO_LOG_LENGTH, &errorBufSize);
 
         char * infoLog = (char*)malloc(errorBufSize * sizeof (char) + 1);
         if (!infoLog)

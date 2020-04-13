@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -47,6 +47,7 @@ LIBS += -L $(VIVANTE_SDK_LIB) -lGAL -lm
 # Supply additional include directories.
 
 INCLUDE = -I$(VIVANTE_SDK_INC)/HAL -I$(AQROOT)/sdk/inc
+INCLUDE += -I$(VIVANTE_SDK_INC)/HAL -I$(AQROOT)/sdk/inc/shared
 INCLUDE += -I$(UNIT_ROOT)/inc
 
 CFLAGS += $(INCLUDE)

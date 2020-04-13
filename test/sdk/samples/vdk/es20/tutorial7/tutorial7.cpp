@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -448,7 +448,7 @@ void LoadShaders(const char * vShaderFName, const char * pShaderFName, unsigned 
     {
         /* Retrieve error buffer size.*/
         GLint errorBufSize, errorLength;
-        glGetShaderiv(programHandle[index], GL_INFO_LOG_LENGTH, &errorBufSize);
+        glGetProgramiv(programHandle[index], GL_INFO_LOG_LENGTH, &errorBufSize);
 
         char * infoLog = (char*)malloc(errorBufSize * sizeof (char) + 1);
         if (!infoLog)

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -41,6 +41,8 @@ CASELIST := 001 \
             004 \
             005 \
             006 \
+            007 \
+
 
 ######################################################
 # Define the macros used in the common file.

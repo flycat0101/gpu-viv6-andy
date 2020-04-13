@@ -67,7 +67,7 @@ arm-yocto)
     export ROOTFS=/home/software/Linux/YOCTO/x11-20130912221643
     export ROOTFS_USR=$ROOTFS/usr
     export CFLAGS="-D__ARM_PCS_VFP --sysroot=$ROOTFS"
-    export LFLAGS="--sysroot=$ROOTFS"
+    export LDFLAGS="--sysroot=$ROOTFS"
     export PFLAGS="--sysroot=$ROOTFS"
     export FPU=vfp
     export FLOAT_ABI=hard

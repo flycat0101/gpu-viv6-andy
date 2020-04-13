@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2020 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -29,7 +29,7 @@
 ################################################################################
 # Include the common difinitions.
 
-include ../makefile.linux.def
+include makefile.linux.def
 
 ################################################################################
 # Define the program.
