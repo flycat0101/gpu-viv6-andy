@@ -1886,7 +1886,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeWithChildNodes(vx_node node)
 {
     vx_node next = node;
     vx_graph graph = NULL;
-
+    vx_reference ref = NULL;
     vx_node mergedNodes[3];
     vx_uint32 nodeCount;
     vx_uint32 nodeIndex = 0;
@@ -1938,6 +1938,12 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_MergeWithChildNodes(vx_node node)
         }
 
         if((next->numChildren != 1))
+            break;
+
+        /* stop merging if the node's output is normal tensor,
+           application maybe want to check the tensor's result */
+        ref = vxoGraphOptimization_getOutputParameter(next);
+        if(ref->type == VX_TYPE_TENSOR && !vxoTensor_IsVirtualTensor((vx_tensor)ref))
             break;
 
         nodeIndex = next->childNodes[0];
@@ -3158,6 +3164,10 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_TensorAdd2Conv(vx_graph graph)
 
             if(TENSOR_DATA_TYPE(tensorIn[0]) != TENSOR_DATA_TYPE(tensorIn[1]) ||
                 TENSOR_DATA_TYPE(tensorIn[0]) != TENSOR_DATA_TYPE(output) )
+                continue;
+
+            /*normal tensor could not be replaced, because app maybe want its result*/
+            if((!vxoTensor_IsVirtualTensor(tensorIn[0])) || (!vxoTensor_IsVirtualTensor(tensorIn[1])) )
                 continue;
 
             if(gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NEGATIVE_POST_SHIFT_FIX) &&
