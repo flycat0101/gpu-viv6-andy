@@ -2492,6 +2492,7 @@ VX_PRIVATE_API vx_bool vxoNNDilationConvolutionLayer_SH_EVIS_Support_Ext(vx_node
                     || (inputFormat == VX_TYPE_FLOAT32 && weightFormat == VX_TYPE_FLOAT32 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_FLOAT32)
                     || (inputFormat == VX_TYPE_INT16  && weightFormat == VX_TYPE_INT16  && biasFormat == VX_TYPE_INT64 && outputFormat == VX_TYPE_INT16)
                     || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_UINT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8)
+                    || (inputFormat == VX_TYPE_UINT8 && weightFormat == VX_TYPE_INT8 && biasFormat == VX_TYPE_INT32 && outputFormat == VX_TYPE_UINT8)
                     || (inputFormat == VX_TYPE_BFLOAT16 && weightFormat == VX_TYPE_BFLOAT16 && biasFormat == VX_TYPE_FLOAT32 && outputFormat == VX_TYPE_BFLOAT16));
             }
             else
@@ -2830,6 +2831,7 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
         vx_bool   enable_ofm_gt_xy    = vx_false_e;
         vx_tensor weights_rs          = NULL;
         vx_tensor weights_new         = NULL;
+        vx_uint32 padValue            = is_asym_quant ? TENSOR_TF_ZEROPOINT(weights) : 0;
 
         sizes[0] = enableAlign4 ? gcmALIGN(k_w * k_h * inputDepth, CONV2D_ALIGN_SIZE4) : (k_w * k_h * inputDepth);
         sizes[0] = enableAlign16 ? gcmALIGN(sizes[0], CONV2D_ALIGN_SIZE16) : sizes[0];
@@ -2893,7 +2895,8 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
             && ((outputWidth * outputHeight < IMG_MAX_WIDTH) && outputDepth < IMG_MAX_WIDTH && input_size < IMG_MAX_WIDTH)
             && (outputDepth % CONV2D_ALIGN_SIZE4 == 0)
             && ((TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE && TENSOR_DATA_TYPE(weights) == VX_TYPE_UINT8)
-            || (TENSOR_QUANT_TYPE(weights) == VX_QUANT_NONE && TENSOR_DATA_TYPE(weights) == VX_TYPE_FLOAT16)))
+            || (TENSOR_QUANT_TYPE(weights) == VX_QUANT_NONE && TENSOR_DATA_TYPE(weights) == VX_TYPE_FLOAT16)
+            || TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL))
         {
             enable_packed_weights = vx_true_e;
         }
@@ -2948,6 +2951,15 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
             {
                 tensor_create_params.quant_data.dfp.fixed_point_pos = TENSOR_POS(weights);
             }
+            else if (tensor_create_params.quant_format == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+            {
+                tensor_create_params.quant_data.affinePerChannel.channelDim = TENSOR_TF_CHANNEL_DIMS(weights);
+                tensor_create_params.quant_data.affinePerChannel.scaleCount = TENSOR_TF_SCALE_COUNT(weights);
+                tensor_create_params.quant_data.affinePerChannel.zeroPointCount = TENSOR_TF_SCALE_COUNT(weights);
+
+                tensor_create_params.quant_data.affinePerChannel.scales = TENSOR_TF_SCALE_POINTER(weights);
+                tensor_create_params.quant_data.affinePerChannel.zeroPoint = TENSOR_TF_ZEROPOINT_POINTER(weights);
+            }
             else
             {
                 tensor_create_params.quant_data.affine.scale = TENSOR_TF_SCALE(weights);
@@ -2966,7 +2978,7 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
 
             TENSOR_DATA_LIFETIME(weights_new) = VX_TENSOR_LIFE_TIME_STATIC;
 
-            vxnneTensorConstPad(weights_rs, weights_new, 0, ifm_rs - ifm, 0, 0, TENSOR_TF_ZEROPOINT(weights));
+            vxnneTensorConstPad(weights_rs, weights_new, 0, ifm_rs - ifm, 0, 0, padValue);
 
             if (enable_packed_weights)
             {
@@ -2977,6 +2989,11 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
                 if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE)
                 {
                     weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
+                    convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
+                }
+                else if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+                {
+                    weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_INT32);
                     convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
                 }
                 else
@@ -3036,6 +3053,11 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
                     weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_UINT32);
                     convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
                 }
+                else if (TENSOR_QUANT_TYPE(weights) == VX_QUANT_AFFINE_SCALE_PER_CHANNEL)
+                {
+                    weights_new_rs = vxoTensor_ReformatTensor(t, VX_TYPE_INT32);
+                    convolutionLayer->base.temp_tensors[numTmpTensor++] = weights_new_rs;
+                }
                 else
                 {
                     weights_new_rs = t;
@@ -3078,7 +3100,8 @@ VX_PRIVATE_API vx_status vxoNNDilationConvolutionLayer_SH_EVIS_Initialize_Ext(vx
             {
                 outputs_rs = outputs;
                 shaderExecutable = vxnneGPUGemmShaderExecutable(ops_layer->node->base.context, VXNNE_KERNEL_GPU_GEMM,
-                    &ops_layer->node->kernelAttributes.borderMode, enable_packed_weights, input_rs, weights_new_rs, newBiases, outputs_rs);
+                    &ops_layer->node->kernelAttributes.borderMode, enable_packed_weights,
+                    input_rs, weights_new_rs, newBiases, scales, outputs_rs);
             }
         }
         else

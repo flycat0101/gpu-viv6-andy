@@ -3801,6 +3801,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     vx_tensor               input,
     vx_tensor               weight,
     vx_tensor               bias,
+    vx_tensor               scales,
     vx_tensor               output);
 
 vxnne_shader_executable vxnneGetGPUDepthwiseConvShaderExecutable(

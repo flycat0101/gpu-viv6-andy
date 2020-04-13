@@ -3028,7 +3028,9 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     vx_tensor               input,
     vx_tensor               weight,
     vx_tensor               bias,
-    vx_tensor               output)
+    vx_tensor               scales,
+    vx_tensor               output
+    )
 {
 #if !gcdUSE_VXC_BINARY
     vx_size    programLength = 0;
@@ -3076,6 +3078,10 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     vx_uint32   element_cnt_input        = 0;
     vx_uint32   element_cnt_kernel       = 0;
     vx_float32  radio                    = 0;
+    vx_enum     weight_quant_type        = TENSOR_QUANT_TYPE(weight);
+    vx_enum     bias_quant_type          = TENSOR_QUANT_TYPE(bias);
+    vx_bool     is_per_channel_quant     = (vx_bool)(weight_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL && bias_quant_type == VX_QUANT_AFFINE_SCALE_PER_CHANNEL);
+    vx_bool     is_asymmetric_quant      = (vx_bool)(weight_quant_type == VX_QUANT_AFFINE_SCALE && bias_quant_type == VX_QUANT_AFFINE_SCALE);
 
 
     gcmHEADER_ARG("context=%p, kernelEnum=0x%x, input=%p, output=%p", context, kernelEnum, input, output);
@@ -3088,7 +3094,8 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
     enable_small_kernel = /*radio < 0.5 ? vx_true_e : */vx_false_e;
 
     is_static_weights_biases = (vx_bool)(TENSOR_DATA_LIFETIME(weight) == VX_TENSOR_LIFE_TIME_STATIC && TENSOR_DATA_LIFETIME(bias) == VX_TENSOR_LIFE_TIME_STATIC);
-    enable_adjust_biases     = is_static_weights_biases && TENSOR_QUANT_TYPE(weight) == VX_QUANT_AFFINE_SCALE && TENSOR_QUANT_TYPE(bias);
+    enable_adjust_biases     = is_static_weights_biases && (is_asymmetric_quant || is_per_channel_quant);
+    enable_adjust_biases     = enable_adjust_biases && (TENSOR_DATA_TYPE(bias) != VX_TYPE_UINT8);
 
     size[0] = kernel_x * kernel_y * ifm;
     size[1] = ofm;
@@ -3198,10 +3205,11 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
         }
         else
         {
-            vx_reference parameters[8] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)output};
+            vx_reference parameters[9] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)output};
             vx_float32 uint8Scale  = input_scale * weight_scale * output_scale;
             vx_float32 outputZP = (vx_float32)output_ZP + 0.5f;
             vx_float32 weightZP = (vx_float32)weight_ZP;
+            vx_int32   param_num = is_per_channel_quant ? 9 : 8;
 
             scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &uint8Scale);
             zpWeight = vxCreateScalar(context, VX_TYPE_FLOAT32, &weightZP);
@@ -3211,6 +3219,7 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
             parameters[5] = (vx_reference)scaleIn;
             parameters[6] = (vx_reference)zpWeight;
             parameters[7] = (vx_reference)zpOut;
+            parameters[8] = (vx_reference)scales;
 
             if (enable_2d_img)
             {
@@ -3223,9 +3232,19 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
                 execution_parameters.globalWorkScale[0] = 8;
                 execution_parameters.globalWorkScale[1] = 8;
                 if (output_width % 4 == 0)
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8x_Wpacked", borderMode);
+                {
+                    if (is_per_channel_quant)
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_2D_8x_Wpacked", borderMode);
+                    else
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8x_Wpacked", borderMode);
+                }
                 else
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8s_Wpacked", borderMode);
+                {
+                    if (is_per_channel_quant)
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_2D_8s_Wpacked", borderMode);
+                    else
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_8s_Wpacked", borderMode);
+                }
             }
 
             if (!shaderExecutable) goto OnError;
@@ -3235,8 +3254,10 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             if (output_width % 4 == 0)
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 3, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (is_per_channel_quant)
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
 
-            status |= vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 8);
+            status |= vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, param_num);
             if (status != VX_SUCCESS) goto OnError;
         }
     }
@@ -3307,10 +3328,11 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
         vx_float32 outZP        = (vx_float32)output_ZP;
         vx_float32 uint8_scale  = input_scale * weight_scale * output_scale;
         vx_float32 inputZP      = (vx_float32)input_ZP;
-        vx_float32 weightZP      = (vx_float32)weight_ZP;
+        vx_float32 weightZP     = (vx_float32)weight_ZP;
+        vx_uint32  param_num    = is_asymmetric_quant ? 9 : 10;
 
-        vx_reference parameters[9] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)cycle,
-                     (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output};
+        vx_reference parameters[10] = {(vx_reference)input, (vx_reference)weights, (vx_reference)biases, (vx_reference)cycle,
+                     (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)NULL, (vx_reference)output, (vx_reference)scales};
 
         scaleIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &uint8_scale);
         zpIn = vxCreateScalar(context, VX_TYPE_FLOAT32, &inputZP);
@@ -3334,40 +3356,44 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
 
             if (enable_2d_img)
             {
-                if (enable_small_kernel)
-                {
-                    execution_parameters.globalWorkScale[1] = 4;
-                    if (output_width % ALIGN_SIZE4 == 0)
-                    {
-                        execution_parameters.globalWorkScale[0] = 4;
-                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4XS", borderMode);
-                        if (!shaderExecutable) goto OnError;
-
-                        status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
-                        if (status != VX_SUCCESS) goto OnError;
-                    }
-                    else
-                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4S", borderMode);
-                }
-                else if (enable_four_pixel)
+                if (enable_four_pixel)
                 {
                     execution_parameters.globalWorkScale[0] = 4;
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4X", borderMode);
+
+                    if (is_asymmetric_quant)
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D_4X", borderMode);
+                    else
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_2D_4X", borderMode);
                     if (!shaderExecutable) goto OnError;
-                    status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+
+                    status = vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 8, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+                    if (status != VX_SUCCESS) goto OnError;
                 }
                 else
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D", borderMode);
+                {
+                    if (is_asymmetric_quant)
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_2D", borderMode);
+                    else
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_2D", borderMode);
+                }
             }
             else
             {
                 if (enable_four_pixel)
                 {
                     execution_parameters.globalWorkScale[0] = 4;
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4X", borderMode);
+                    if (is_asymmetric_quant)
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_4X", borderMode);
+                    else
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_4X", borderMode);
                 }
                 else
-                    shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+                {
+                    if (is_asymmetric_quant)
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8", borderMode);
+                    else
+                        shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel", borderMode);
+                }
             }
 
             if (!shaderExecutable) goto OnError;
@@ -3376,16 +3402,21 @@ vxnne_shader_executable vxnneGPUGemmShaderExecutable(
             status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 1, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
             if (enable_small_kernel)
                 status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 2, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
+            if (is_per_channel_quant)
+                status |= vxnneShaderExecutable_SetParametersAttribute(shaderExecutable, 9, VXNNE_SHADER_PARAMETERS_ATTRIBUTE_FOUR_COMPONENTS);
 
             if (status != VX_SUCCESS) goto OnError;
         }
         else
         {
-            shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_non_static", borderMode);
+            if (is_asymmetric_quant)
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_non_static", borderMode);
+            else
+                shaderExecutable = vxnneKernelShaders_CreateShaderExecutable(kernel, "_Quant8_sym_per_channel_non_static", borderMode);
             if (!shaderExecutable) goto OnError;
         }
 
-        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, 9);
+        status = vxnneShaderExecutable_SetParameters(shaderExecutable, parameters, param_num);
         if (status != VX_SUCCESS) goto OnError;
     }
     else if(inputFormat == VX_TYPE_INT16)
