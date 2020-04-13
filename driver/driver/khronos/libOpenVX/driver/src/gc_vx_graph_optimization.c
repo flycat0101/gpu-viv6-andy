@@ -325,7 +325,9 @@ VX_INTERNAL_API vx_enum vxoGraphOptimization_getKernelType(vx_node node)
                 {
                     if(SCALAR_VALUE(node->paramTable[PARAM_CONV_DEPTH_MULTIPLIER_INDEX], u32) == 1 &&
                         vxoGraphOptimization_dwConvHalSupport(weight) &&
-                        (TENSOR_SIZE_INDEX(weight, 0) != 1 || TENSOR_SIZE_INDEX(weight, 1) != 1 )
+                        (TENSOR_SIZE_INDEX(weight, 0) != 1 || TENSOR_SIZE_INDEX(weight, 1) != 1 ) &&
+                        (TENSOR_SIZE_INDEX(weight, 0) < 15 && TENSOR_SIZE_INDEX(weight, 1) < 15) &&
+                        (strideX <= 2 && strideY <=2)
                         )
                     {
                         nodeOpType = OP_CONVOLUTION;
@@ -2730,6 +2732,8 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
                 stride_x = stride_x == 0 ? 1: stride_x;
                 stride_y = stride_y == 0 ? 1: stride_y;
             }
+            if(stride_x > 2 || stride_y > 2)
+                continue;
 
             if(!vxoGraphOptimization_nnHalSupport(input))
                 continue;
@@ -2737,9 +2741,7 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
             /*V8 support depwiseConv hardware feature*/
             if(vxoGraphOptimization_dwConvHalSupport(input))
             {
-                vx_uint32 actual_x = stride_x > 1? vxoGraphOptimization_computeFinalKernelSize(kernel_x, stride_x) : kernel_x;
-                vx_uint32 actual_y = stride_y > 1? vxoGraphOptimization_computeFinalKernelSize(kernel_y, stride_y): kernel_y;
-                if(actual_x > 15 || actual_y>15)
+                if(kernel_x > 15 || kernel_y>15)
                     continue;
             }
             else
@@ -2776,14 +2778,15 @@ VX_INTERNAL_API vx_status vxoGraphOptimization_ConvertAvgPool2Conv(vx_graph grap
                     (vx_uint32)stride_x, (vx_uint32)stride_y, depth_multiplier
                 };
 
-                CHECK_NULL(vxConvolutionLayer(graph,
+                vx_node convNode = vxConvolutionLayer(graph,
                     input,
                     weight,
                     VX_NULL,
                     (const vx_nn_convolution_params_t *)&params,
                     sizeof(vx_nn_convolution_params_ext2_t),
-                    (vx_tensor)output));
+                    (vx_tensor)output);
 
+                vxReleaseNode(&convNode);
                 vxReleaseScalar(&padscalar);
             }
 
