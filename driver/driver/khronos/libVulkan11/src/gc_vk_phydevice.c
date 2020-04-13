@@ -707,7 +707,10 @@ static void __vki_InitializePhysicalDeviceFeatures(
     phyDev->phyDevFeatures.sparseResidencyAliased                  = VK_FALSE;
     phyDev->phyDevFeatures.variableMultisampleRate                 = VK_FALSE;
 
-    phyDev->phyDevFeatures.samplerAnisotropy = VK_TRUE;
+    if (phyDev->pInst->patchID == gcvPATCH_VKMARK)
+    {
+        phyDev->phyDevFeatures.samplerAnisotropy = VK_TRUE;
+    }
 }
 
 static void __vki_InitializePhysicalDeviceName(
