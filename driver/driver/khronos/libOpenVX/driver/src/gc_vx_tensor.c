@@ -395,7 +395,15 @@ vxoTensor_Create(
     tensor = (vx_tensor)vxoReference_Create(context, VX_TYPE_TENSOR, kind, &context->base);
     if (vxoReference_GetStatus((vx_reference)tensor) != VX_SUCCESS) goto OnError;
 
-    tensor->quantFormat = tensor_create_params->quant_format;
+    if(tensor_create_params->data_format == VX_TYPE_FLOAT16 || tensor_create_params->data_format == VX_TYPE_BFLOAT16)
+    {
+        tensor->quantFormat = VX_QUANT_NONE;
+    }
+    else
+    {
+        tensor->quantFormat = tensor_create_params->quant_format;
+    }
+
     tensor->fixedPointPos = 0;
     tensor->scale = 1.0f;
     tensor->zeroPoint = 0;
@@ -405,7 +413,7 @@ vxoTensor_Create(
         tensor->scale = tensor_create_params->quant_data.affine.scale;
         tensor->zeroPoint = tensor_create_params->quant_data.affine.zeroPoint;
     }
-    else
+    else if(tensor->quantFormat == VX_QUANT_DYNAMIC_FIXED_POINT)
     {
         tensor->fixedPointPos = tensor_create_params->quant_data.dfp.fixed_point_pos;
     }
