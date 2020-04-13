@@ -1087,6 +1087,13 @@ gckKERNEL_AllocateVideoMemory(
 
 AllocateMemory:
 
+#if gcdCAPTURE_ONLY_MODE
+    if (!virtualPool4K)
+    {
+        *Pool = gcvPOOL_SYSTEM;
+    }
+#endif
+
     /* Get initial pool. */
     switch (pool = *Pool)
     {
@@ -1105,13 +1112,6 @@ AllocateMemory:
         loopCount = 1;
         break;
     }
-
-#if gcdCAPTURE_ONLY_MODE
-    if (!virtualPool4K)
-    {
-        pool = gcvPOOL_SYSTEM;
-    }
-#endif
 
     while (loopCount-- > 0)
     {
@@ -1246,6 +1246,13 @@ AllocateMemory:
                     /* Memory allocated. */
                     break;
                 }
+#if gcdCAPTURE_ONLY_MODE
+                else
+                {
+                    gcmkPRINT("Capture only mode: Out of Memory");
+                }
+#endif
+
             }
         }
 

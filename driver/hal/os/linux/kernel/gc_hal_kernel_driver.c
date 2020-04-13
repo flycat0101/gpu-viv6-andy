@@ -1212,6 +1212,8 @@ static int __devinit gpu_probe(struct platform_device *pdev)
     contiguousBaseCap = moduleParam.contiguousBase;
     contiguousSizeCap = moduleParam.contiguousSize;
 
+    gcmkPRINT("Capture only mode is enabled");
+
     for (i = 0; i < gcvCORE_COUNT; i++)
     {
         for (j = 0; j < gcvSRAM_INTER_COUNT; j++)
