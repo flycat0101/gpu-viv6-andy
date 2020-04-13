@@ -2354,7 +2354,6 @@ _IsOperandFloat16(
 {
     VIR_Operand*            pOpnd = bDst ?  VIR_Inst_GetDest(pInst) : VIR_Inst_GetSource(pInst, srcIndex);
     VIR_TypeId              typeId = VIR_Operand_GetTypeId(pOpnd);
-    VIR_TypeId              componentTypeId = VIR_GetTypeComponentType(typeId);
 
     if (VIR_Shader_isDual16Mode(pShader) &&
         (VIR_Inst_GetThreadMode(pInst) == VIR_THREAD_D16_DUAL_16 ||
@@ -2362,7 +2361,7 @@ _IsOperandFloat16(
     {
         return gcvFALSE;
     }
-    else if (componentTypeId == VIR_TYPE_FLOAT16)
+    else if (VIR_TypeId_isFloat16(typeId))
     {
         return gcvTRUE;
     }
@@ -2530,7 +2529,7 @@ _VIR_FCP_ModifyFP16Instruction(
         VIR_TypeId      src0CompTypeId = VIR_TYPE_FLOAT16;
 
         /* If dest and source have the same type, just change MOV to CONV. */
-        if (dstCompTypeId == VIR_TYPE_FLOAT16)
+        if (VIR_TypeId_isFloat16(dstCompTypeId)) /* src and dest are f16, use conv.f16 */
         {
             VIR_Operand*    pNewOpnd = gcvNULL;
             VIR_Inst_SetOpcode(pInst, VIR_OP_CONV);

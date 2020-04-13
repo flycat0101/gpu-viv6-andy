@@ -8578,7 +8578,7 @@ VIR_TypeId_ConvertFP16Type(
     gctUINT             componentCount = VIR_GetTypeComponents(fp16TypeId);
     VIR_TypeId          newTypeId = fp16TypeId;
 
-    if (VIR_GetTypeComponentType(fp16TypeId) == VIR_TYPE_FLOAT16)
+    if (VIR_TypeId_isFloat16(fp16TypeId))
     {
         newTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_UINT16, componentCount, 1);
     }

@@ -9075,15 +9075,13 @@ _fix_src_type_to_dest_type(
     {
         VIR_Operand *dest;
         VIR_TypeId typeId;
-        VIR_BuiltinTypeInfo * typeInfo;
 
         dest = VIR_Inst_GetDest(Inst);
         gcmASSERT(dest);
 
         typeId = VIR_Operand_GetTypeId(dest);
-        typeInfo = VIR_Shader_GetBuiltInTypes(typeId);
 
-        if(typeInfo->componentType != VIR_TYPE_FLOAT16)
+        if (!VIR_TypeId_isFloat16(typeId))
         {
             VIR_Operand_SetTypeId(Opnd, typeId);
         }
