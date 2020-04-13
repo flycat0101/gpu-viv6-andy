@@ -34,6 +34,11 @@ typedef struct VIR_CFO
     gctBOOL bInvalidCfg;
 } VIR_CFO;
 
+typedef struct _VSC_CFO_PASS_DATA
+{
+    gctBOOL    cfgChanged;
+} VSC_CFO_PASS_DATA;
+
 #define VIR_CFO_GetShader(lo)              ((lo)->shader)
 #define VIR_CFO_SetShader(lo, s)           ((lo)->shader = (s))
 #define VIR_CFO_GetHWCfg(lo)               ((lo)->hwCfg)
