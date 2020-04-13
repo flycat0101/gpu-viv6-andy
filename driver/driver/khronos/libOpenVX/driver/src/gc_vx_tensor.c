@@ -3994,7 +3994,7 @@ VX_INTERNAL_API vx_tensor vxoTensor_ReformatTensor(vx_tensor tensor, vx_enum for
 
 VX_API_ENTRY vx_status VX_API_CALL vxFlushHandle(vx_reference ref)
 {
-    vx_status status = vx_true_e;
+    vx_status status = VX_SUCCESS;
 
     if(ref->type == VX_TYPE_TENSOR)
     {
@@ -4003,13 +4003,13 @@ VX_API_ENTRY vx_status VX_API_CALL vxFlushHandle(vx_reference ref)
             return status;
         else
         {
-            if(tensor->tensorBuffer->memory.isDirty)
+            /*if(tensor->tensorBuffer->memory.isDirty)*/
             {
                 gcoOS_CacheFlush(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
                 gcoOS_CacheInvalidate(gcvNULL, tensor->tensorBuffer->memory.wrappedNode[0], tensor->tensorBuffer->memory.logicals[0], tensor->tensorBuffer->memory.wrappedSize[0]);
                 tensor->tensorBuffer->memory.isDirty = vx_false_e;
             }
-            status = vx_true_e;
+            status = VX_SUCCESS;
         }
     }
     else if(ref->type == VX_TYPE_IMAGE)
@@ -4019,7 +4019,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxFlushHandle(vx_reference ref)
             return status;
         else
         {
-            if(image->memory.isDirty)
+            /*if(image->memory.isDirty)*/
             {
                 vx_uint32 p = 0;
                 for (p = 0; p < image->planeCount; p++)
@@ -4029,11 +4029,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxFlushHandle(vx_reference ref)
                     image->memory.isDirty = vx_false_e;
                 }
             }
-            status = vx_true_e;
+            status = VX_SUCCESS;
         }
     }
     else
-        status = vx_false_e;
+        status = VX_FAILURE;
 
     return status;
 }
