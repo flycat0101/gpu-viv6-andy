@@ -45,6 +45,7 @@
 static gceSTATUS _SetTargetCompression(
     IN gcoHARDWARE Hardware,
     IN gcoSURF Surface,
+    IN gctBOOL EnableAlpha,
     IN OUT gctUINT32_PTR Config
     )
 {
@@ -283,7 +284,7 @@ static gceSTATUS _SetTargetCompression(
                     Hardware,
                     Surface,
                     Surface->tileStatusConfig,
-                    0, 0
+                    0, 0, EnableAlpha
                     ));
 
         if ((Surface->tileStatusConfig & gcv2D_TSC_DEC_COMPRESSED) &&
@@ -751,6 +752,7 @@ gceSTATUS gcoHARDWARE_SetTarget(
     IN gctINT32_PTR CscRGB2YUV,
     IN gctUINT32_PTR GammaTable,
     IN gctBOOL GdiStretch,
+    IN gctBOOL enableAlpha,
     OUT gctUINT32_PTR DestConfig
     )
 {
@@ -1278,7 +1280,7 @@ gceSTATUS gcoHARDWARE_SetTarget(
     }
 
     /* Set compression related config for target. */
-    gcmONERROR(_SetTargetCompression(Hardware, Surface, &data[0]));
+    gcmONERROR(_SetTargetCompression(Hardware, Surface,enableAlpha, &data[0]));
 
     if (data[0] != ~0U)
     {
@@ -1336,6 +1338,29 @@ gceSTATUS gcoHARDWARE_SetTarget(
  10:9) - (0 ?
  10:9) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)));
+        } else if(Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION] &&
+          Surface->tileStatusConfig & gcv2D_TSC_DEC_COMPRESSED)
+        {
+            destConfig |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x3  & ((gctUINT32) ((((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9))) |
+                                   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:5) - (0 ?
+ 7:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:5) - (0 ?
+ 7:5) + 1))))))) << (0 ?
+ 7:5))) | (((gctUINT32) (0x5  & ((gctUINT32) ((((1 ?
+ 7:5) - (0 ?
+ 7:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:5) - (0 ? 7:5) + 1))))))) << (0 ? 7:5)));
         }
 
         break;

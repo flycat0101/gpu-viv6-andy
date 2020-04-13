@@ -1949,7 +1949,8 @@ gcoDECHARDWARE_SetDstDECCompression(
     IN gcoSURF Surface,
     IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
     IN gctUINT32 ReadId,
-    IN gctUINT32 WriteId
+    IN gctUINT32 WriteId,
+    IN gctBOOL enableAlpha
     );
 
 gceSTATUS
@@ -1957,6 +1958,11 @@ gcoDECHARDWARE_FlushDECCompression(
     IN gcoHARDWARE Hardware,
     IN gctBOOL Flush,
     IN gctBOOL Wait
+    );
+
+gceSTATUS
+gcoDECHARDWARE_ResetDEC400EXStream(
+    IN gcoHARDWARE Hardware
     );
 
 #define gcmHAS2DCOMPRESSION(Surface) \

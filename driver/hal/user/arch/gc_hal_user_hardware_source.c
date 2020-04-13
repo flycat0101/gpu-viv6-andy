@@ -1468,6 +1468,8 @@ gcoHARDWARE_GetCompressionCmdSize(
             Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
             size += 2 * gcdMULTI_SOURCE_NUM;
+            if(Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
+                size += (16 + 3) * 2 * 5; /*reset 19 streams for read(16)/write(3) client*/
         }
     }
 
@@ -2561,7 +2563,30 @@ gceSTATUS gcoHARDWARE_SetColorSource(
             Hardware->features[gcvFEATURE_DEC400_COMPRESSION]  ||
             Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
-            data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if((Surface->tileStatusConfig & gcv2D_TSC_DEC_COMPRESSED) &&
+                Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
+                data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)))
+                        |  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:17) - (0 ?
+ 19:17) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:17) - (0 ?
+ 19:17) + 1))))))) << (0 ?
+ 19:17))) | (((gctUINT32) (0x5 & ((gctUINT32) ((((1 ?
+ 19:17) - (0 ?
+ 19:17) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:17) - (0 ? 19:17) + 1))))))) << (0 ? 19:17)));
+            else
+                data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:9) - (0 ?
  10:9) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -2572,9 +2597,7 @@ gceSTATUS gcoHARDWARE_SetColorSource(
  10:9) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)));
         }
-
         configEx = 0x00000000;
-
         break;
 
     case gcvSUPERTILED:
@@ -5473,9 +5496,58 @@ gcoHARDWARE_SetMultiSource(
         break;
 
     case gcvTILED:
-        if (Hardware->features[gcvFEATURE_2D_MAJOR_SUPER_TILE])
+        if (Hardware->features[gcvFEATURE_2D_MAJOR_SUPER_TILE] ||
+            Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
         {
-            config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if((Surface->tileStatusConfig & gcv2D_TSC_DEC_COMPRESSED) &&
+                Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
+            {
+                config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 7:7) - (0 ?
+ 7:7) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
+ 10:9) - (0 ?
+ 10:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)))
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:17) - (0 ?
+ 19:17) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 19:17) - (0 ?
+ 19:17) + 1))))))) << (0 ?
+ 19:17))) | (((gctUINT32) (0x5 & ((gctUINT32) ((((1 ?
+ 19:17) - (0 ?
+ 19:17) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 19:17) - (0 ? 19:17) + 1))))))) << (0 ? 19:17)))
+                    |  ((Surface->format == gcvSURF_P010_LSB)
+                        ?
+ ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:22) - (0 ?
+ 22:22) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 22:22) - (0 ?
+ 22:22) + 1))))))) << (0 ?
+ 22:22))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 22:22) - (0 ?
+ 22:22) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 22:22) - (0 ? 22:22) + 1))))))) << (0 ? 22:22)))
+                        : 0);
+                /*cannot support endian mode with dec400 at the same time*/
+            } else {
+                config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:7) - (0 ?
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5508,7 +5580,7 @@ gcoHARDWARE_SetMultiSource(
  22:22) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 22:22) - (0 ? 22:22) + 1))))))) << (0 ? 22:22)))
                         : 0);
-            {    switch(Surface->eEndianMode)    {        case gcvENDIAN_MODE0:            config |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                {    switch(Surface->eEndianMode)    {        case gcvENDIAN_MODE0:            config |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:30) - (0 ?
  31:30) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5687,6 +5759,7 @@ gcoHARDWARE_SetMultiSource(
         default:            gcmASSERT(0);
     }};
 
+            }
             gcmONERROR(gcoHARDWARE_Load2DState32(
                 Hardware,
                 0x12A60 + regOffset,

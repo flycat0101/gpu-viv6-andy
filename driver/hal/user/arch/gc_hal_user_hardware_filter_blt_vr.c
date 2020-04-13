@@ -604,7 +604,7 @@ static gceSTATUS _CheckOPFBlock(
         res = gcvTRUE;
     }
     else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] ||
-        _IsDEC400EXAvaiable(Hardware, DstSurface->tileStatusConfig))
+             Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
     {
         res = gcvTRUE;
     }
@@ -1042,6 +1042,10 @@ static gceSTATUS _SetOPFBlockSize(
         {
             switch (DstSurface->tiling)
             {
+                case gcvTILED:
+                    width = 32;
+                    height = 8;
+                    break;
                 case gcvTILED_8X8_XMAJOR:
                     width = 16;
                     height = 8;
@@ -1263,6 +1267,7 @@ static gceSTATUS _StartVR(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 anyCompress = 0;
 
     do
     {
@@ -1517,6 +1522,12 @@ static gceSTATUS _StartVR(
             Hardware,
             State->dither
             ));
+
+        gcmONERROR(gcoHARDWARE_Load2DState32(
+                Hardware,
+                0x001AC,
+                0x00000000
+                ));
 
         if (Hardware->features[gcvFEATURE_2D_OPF_YUV_OUTPUT])
         {
@@ -1917,6 +1928,11 @@ static gceSTATUS _StartVR(
                 ));
         }
 
+        if(Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
+        {
+            gcoDECHARDWARE_ResetDEC400EXStream(Hardware);
+        }
+
         /* Set source. */
         gcmONERROR(gcoHARDWARE_SetColorSource(
             Hardware,
@@ -1927,6 +1943,107 @@ static gceSTATUS _StartVR(
             curSrc->srcDeGamma,
             gcvTRUE
             ));
+
+        /* Set DE block info*/
+        if(Hardware->hw2DBlockSize)
+        {
+            gctUINT32 power2BlockWidth = 3;
+            gctUINT32 power2BlockHeight = 3;
+            gctUINT32 srcBpp,dstBpp;
+            anyCompress = gcmHASCOMPRESSION(DstSurface) ? 0x100 : 0;
+
+            gcmONERROR(gcoHARDWARE_ConvertFormat(
+            SrcSurface->format,
+            &srcBpp,
+            gcvNULL));
+            gcmONERROR(gcoHARDWARE_ConvertFormat(
+            DstSurface->format,
+            &dstBpp,
+            gcvNULL));
+
+            /* change YUV bpp to 16 anyway. */
+            srcBpp = srcBpp == 12 ? 16 : srcBpp;
+            dstBpp = dstBpp == 12 ? 16 : dstBpp;
+            if ((Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION]) &&
+                (anyCompress & 0x100) &&
+                DstSurface->tiling != gcvTILED_8X8_YMAJOR)
+            {
+                switch (DstSurface->tiling)
+                {
+                    case gcvTILED_8X8_XMAJOR:
+                        power2BlockWidth = 4;
+                        power2BlockHeight = 3;
+                        break;
+                    case gcvTILED_8X4:
+                    case gcvTILED_4X8:
+                        power2BlockWidth = 3;
+                        power2BlockHeight = 3;
+                        break;
+                    case gcvTILED:
+                        power2BlockWidth = 2;
+                        power2BlockHeight = 3;
+                        if(DstSurface->format == gcvSURF_NV12)
+                        {
+                            power2BlockWidth = 6;
+                            power2BlockHeight = 3;
+                        } else if (DstSurface->format == gcvSURF_P010)
+                        {
+                            power2BlockWidth = 5;
+                            power2BlockHeight = 3;
+                        }
+                        break;
+                    case gcvSUPERTILED:
+                    case gcvSUPERTILED_128B:
+                    case gcvSUPERTILED_256B:
+                        power2BlockWidth = 6;
+                        power2BlockHeight = 6;
+                        break;
+                    case gcvTILED_64X4:
+                        power2BlockWidth = 6;
+                        power2BlockHeight = 3;
+                        break;
+                    case gcvTILED_32X4:
+                        power2BlockWidth = 5;
+                        power2BlockHeight = 3;
+                        break;
+                    default:
+                        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+                }
+        }
+
+        if (!anyCompress &&
+            Hardware->features[gcvFEATURE_BLOCK_SIZE_16x16])
+            {
+                power2BlockWidth = 4;
+                power2BlockHeight = 4;
+            }
+
+            /* Config block size. */
+            gcmONERROR(gcoHARDWARE_Load2DState32(
+                Hardware,
+                0x01324,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (power2BlockWidth) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ?
+ 15:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:16) - (0 ?
+ 31:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ?
+ 31:16))) | (((gctUINT32) ((gctUINT32) (power2BlockHeight) & ((gctUINT32) ((((1 ?
+ 31:16) - (0 ?
+ 31:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ? 31:16)))
+            ));
+        }
 
         /* Set src global color for A8 source. */
         if (curSrc->srcSurface.format == gcvSURF_A8)
@@ -2009,6 +2126,7 @@ static gceSTATUS _StartVR(
             State->cscRGB2YUV,
             State->dstEnGamma ? State->enGamma : gcvNULL,
             curSrc->enableGDIStretch,
+            curSrc->enableAlpha,
             memory
             ));
 

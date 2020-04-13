@@ -567,6 +567,7 @@ static gceSTATUS gcoHARDWARE_Set2DState(
     gcsSURF_FORMAT_INFO_PTR srcFormatInfo, dstFormatInfo;
     gctBOOL blf = Hardware->features[gcvFEATURE_2D_MULTI_SRC_BLT_BILINEAR_FILTER] ||
                   Hardware->features[gcvFEATURE_2D_MULTI_SRC_BLT_1_5_ENHANCEMENT];
+    gctBOOL anyAlphaBlending = 0;
     gctUINT config = 0;
 
     gcmHEADER_ARG("Hardware=0x%x State=%x Command=0x%x",
@@ -595,6 +596,11 @@ static gceSTATUS gcoHARDWARE_Set2DState(
         Hardware,
         State));
 
+    gcmONERROR(gcoHARDWARE_Load2DState32(
+        Hardware,
+        0x001AC,
+        0x00000000));
+
     gcmONERROR(gcoHARDWARE_QueryFormat(State->dstSurface.format, &dstFormatInfo));
 
     if (Hardware->features[gcvFEATURE_2D_YUV420_OUTPUT_LINEAR])
@@ -620,6 +626,29 @@ static gceSTATUS gcoHARDWARE_Set2DState(
         }
     }
 
+    if(Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
+    {
+        gcoDECHARDWARE_ResetDEC400EXStream(Hardware);
+    }
+
+    /* check alphablending enabled */
+    if (Command == gcv2D_MULTI_SOURCE_BLT)
+    {
+        for(i = 0; i < gcdMULTI_SOURCE_NUM; i++)
+        {
+            if (!(State->srcMask& (1 << i)))
+            {
+                continue;
+            }
+            src = State->multiSrc + i;
+            anyAlphaBlending |= src->enableAlpha;
+        }
+    } else
+    {
+        src = State->multiSrc + State->currentSrcIndex;
+        anyAlphaBlending = src->enableAlpha;
+    }
+
     /* Set target surface */
     gcmONERROR(gcoHARDWARE_SetTarget(
         Hardware,
@@ -629,6 +658,7 @@ static gceSTATUS gcoHARDWARE_Set2DState(
         State->cscRGB2YUV,
         State->dstEnGamma ? State->enGamma : gcvNULL,
         State->multiSrc[State->currentSrcIndex].enableGDIStretch,
+        anyAlphaBlending,
         &destConfig
         ));
 
@@ -1645,6 +1675,19 @@ static gceSTATUS gcoHARDWARE_Set2DState(
                                         case gcvTILED_4X8:
                                             power2BlockWidth = 3;
                                             power2BlockHeight = 3;
+                                            break;
+                                        case gcvTILED:
+                                            power2BlockWidth = 2;
+                                            power2BlockHeight = 3;
+                                            if(State->dstSurface.format == gcvSURF_NV12)
+                                            {
+                                                power2BlockWidth = 6;
+                                                power2BlockHeight = 3;
+                                            } else if (State->dstSurface.format == gcvSURF_P010)
+                                            {
+                                                power2BlockWidth = 5;
+                                                power2BlockHeight = 3;
+                                            }
                                             break;
                                         case gcvSUPERTILED:
                                         case gcvSUPERTILED_128B:
@@ -4480,6 +4523,15 @@ gceSTATUS gcoHARDWARE_StartDE(
     else
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    if(Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION] &&
+        (State->dstSurface.tileStatusConfig == gcv2D_TSC_DEC_COMPRESSED) &&
+        ((State->dstSurface.format == gcvSURF_NV12) || (State->dstSurface.format == gcvSURF_NV21) ) &&
+        State->dstSurface.tiling == gcvTILED_8X8_XMAJOR)
+    {
+        gcmFOOTER_ARG("status=%d", gcvSTATUS_NOT_SUPPORTED);
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
     do

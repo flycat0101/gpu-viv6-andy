@@ -26,6 +26,45 @@ typedef enum _gcePLANAR
 gcePLANAR;
 
 static gceSTATUS
+_gcoDECHARDWARE_GetEndAddress(
+    IN gcoSURF Surface,
+    IN gcePLANAR AddressType,
+    OUT gctUINT32 * Address
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 address = 0;
+    if(!Address)
+        return status;
+
+    switch(Surface->format)
+    {
+    case gcvSURF_NV12:
+    case gcvSURF_P010:
+        if(AddressType == gcvDEC_PLANAR_ONE)
+        {
+            gcmGETHARDWAREADDRESS(Surface->node, address);
+            address += Surface->stride * Surface->alignedH -1;
+        }
+        else if(AddressType == gcvDEC_PLANAR_TWO)
+        {
+            address = Surface->node.physical2 + Surface->uStride * Surface->alignedH / 2 - 1;
+        }
+        else
+        {
+            status = gcvSTATUS_INVALID_ARGUMENT;
+        }
+        break;
+    default:
+        gcmGETHARDWAREADDRESS(Surface->node, address);
+        address = address + Surface->stride * Surface->alignedH -1;
+        break;
+    }
+    *Address = address;
+    return status;
+}
+
+static gceSTATUS
 gcoDECHARDWARE_UploadData(
     IN gcoHARDWARE Hardware,
     IN gctUINT32 Address,
@@ -3146,6 +3185,7 @@ gcoDECHARDWARE_CheckSurface(
                     break;
                 case gcvTILED_8X4:
                 case gcvTILED_4X8:
+                case gcvTILED:
                     alignW = 8;
                     alignH = 8;
                     break;
@@ -3406,10 +3446,21 @@ gceSTATUS _gcoDECHARDWARE_EnableDEC400EXCompression(
  1:1) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)));
     }
+    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1))))))) << (0 ?
+ 16:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 16:16) - (0 ?
+ 16:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16)));
+
 
     gcmONERROR(gcoDECHARDWARE_UploadData(
         Hardware,
-        0x18180,
+        0x18800,
         config
         ));
 
@@ -4187,7 +4238,9 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
     gceSTATUS status = gcvSTATUS_OK;
     gctBOOL enable, data3D, tpcEnable, tpcComEnable, onePlanar;
     gceSURF_FORMAT format = gcvSURF_UNKNOWN;
-    gctUINT32 address;
+    gctUINT32 address,endAddress;
+    gctUINT32 config = 0, configEx = 0;
+    gctUINT32 regOffset[3] = {0}, regOffsetEx[3] = {0};
 
     enable = TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED;
     data3D = TileStatusConfig & (gcv2D_TSC_COMPRESSED | gcv2D_TSC_ENABLE | gcv2D_TSC_DOWN_SAMPLER);
@@ -4204,26 +4257,21 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
         }
     }
 
+    gcmGETHARDWAREADDRESS(Surface->node, address);
+
+    /* Non-DEC_Compression or Only DEC TPC DeTile */
+    if (!enable || (tpcEnable && !tpcComEnable))
     {
-        gctUINT32 config = 0, configEx = 0;
-        gctUINT32 regOffset[3] = {0}, regOffsetEx[3] = {0};
-
-        gcmGETHARDWAREADDRESS(Surface->node, address);
-
-        /* Non-DEC_Compression or Only DEC TPC DeTile */
-        if (!enable || (tpcEnable && !tpcComEnable))
-        {
-
-                regOffset[0] = (ReadId + 8)  << 2;
-                /* UV of DEC400 use 1 2 3 6 */
-                if (ReadId == 3)
-                    regOffset[1] = 6 << 2;
-                else
-                    regOffset[1] = (ReadId + 1) << 2;
+        regOffset[0] = (ReadId + 8)  << 2;
+        /* UV of DEC400 use 1 2 3 6 */
+        if (ReadId == 3)
+            regOffset[1] = 6 << 2;
+        else
+            regOffset[1] = (ReadId + 1) << 2;
 
 
-            /* Disable DEC 2D & 3D compression. */
-            config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        /* Disable DEC 2D & 3D compression. */
+        config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4234,44 +4282,43 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));
 
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+        Hardware,
+        0x18880 + regOffset[0],
+        config
+        ));
+
+        if (ReadId < 4)
+        {
             gcmONERROR(gcoDECHARDWARE_UploadData(
                 Hardware,
-                0x18880 + regOffset[0],
+                0x18880 + regOffset[1],
                 config
                 ));
-
-            if (ReadId < 4)
-            {
-                gcmONERROR(gcoDECHARDWARE_UploadData(
-                    Hardware,
-                    0x18880 + regOffset[1],
-                    config
-                    ));
-            }
-
         }
+
+    }
+    else
+    {
+        tpcEnable = gcvFALSE;
+
+        regOffset[0] = (ReadId + 8)  << 2;
+        /* UV of DEC400 use 1 2 3 6 */
+        if (ReadId == 3)
+            regOffset[1] = 6 << 2;
         else
+            regOffset[1] = (ReadId + 1) << 2;
+
+        /* 2D or 3D compression */
+        if (!data3D)
         {
-                tpcEnable = gcvFALSE;
+            gcmONERROR(gcoHARDWARE_TranslateXRGBFormat(
+                Hardware,
+                Surface->format,
+                &format
+            ));
 
-                    regOffset[0] = (ReadId + 8)  << 2;
-                    /* UV of DEC400 use 1 2 3 6 */
-                    if (ReadId == 3)
-                        regOffset[1] = 6 << 2;
-                    else
-                        regOffset[1] = (ReadId + 1) << 2;
-
-
-                /* 2D or 3D compression */
-                if (!data3D)
-                {
-                    gcmONERROR(gcoHARDWARE_TranslateXRGBFormat(
-                        Hardware,
-                        Surface->format,
-                        &format
-                        ));
-
-                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4281,7 +4328,7 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
  0:0) - (0 ?
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));
-                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:1) - (0 ?
  2:1) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4293,7 +4340,7 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
  ~0U : (~(~0U << ((1 ? 2:1) - (0 ? 2:1) + 1))))))) << (0 ? 2:1)));
 
 #if !gcd2D_COMPRESSION_DEC400_ALIGN_MODE
-                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  17:16) - (0 ?
  17:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4304,7 +4351,7 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
  17:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 17:16) - (0 ? 17:16) + 1))))))) << (0 ? 17:16)));
 #elif gcd2D_COMPRESSION_DEC400_ALIGN_MODE == 1
-                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  17:16) - (0 ?
  17:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4315,7 +4362,7 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
  17:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 17:16) - (0 ? 17:16) + 1))))))) << (0 ? 17:16)));
 #elif gcd2D_COMPRESSION_DEC400_ALIGN_MODE == 2
-                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  17:16) - (0 ?
  17:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4327,113 +4374,18 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
  ~0U : (~(~0U << ((1 ? 17:16) - (0 ? 17:16) + 1))))))) << (0 ? 17:16)));
 #endif
 
-                    gcmONERROR(gcoDEC400EXHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_ONE, gcvTRUE, gcvFALSE, &config));
+            gcmONERROR(gcoDEC400EXHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_ONE, gcvTRUE, gcvFALSE, &config));
 
+            gcmONERROR(gcoDEC400EXHARDWARE_SetTilingConfig(
+                Surface->tiling,
+                format,
+                gcvDEC_PLANAR_ONE,
+                gcvTRUE,
+                &config));
 
-                    gcmONERROR(gcoDEC400EXHARDWARE_SetTilingConfig(
-                                    Surface->tiling,
-                                    format,
-                                    gcvDEC_PLANAR_ONE,
-                                    gcvTRUE,
-                                    &config));
-
-                        if (format == gcvSURF_NV12_10BIT)
-                        {
-                            configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 18:16) - (0 ?
- 18:16) + 1))))))) << (0 ?
- 18:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)));
-                        }
-                        else if (format == gcvSURF_P010)
-                        {
-                            configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 18:16) - (0 ?
- 18:16) + 1))))))) << (0 ?
- 18:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16))) |
-                                       ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:28) - (0 ?
- 28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 28:28) - (0 ?
- 28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 28:28) - (0 ?
- 28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ? 28:28)));
-                        }
-                        else
-                        {
-                            configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 18:16) - (0 ?
- 18:16) + 1))))))) << (0 ?
- 18:16))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)));
-                        }
-
-                        gcmONERROR(gcoDECHARDWARE_UploadData(
-                            Hardware,
-                            0x18900 + regOffset[0],
-                            configEx
-                            ));
-
-                }
-
-                gcmONERROR(gcoDECHARDWARE_UploadData(
-                    Hardware,
-                    0x18880 + regOffset[0],
-                    config
-                    ));
-
-
-
-
-            gcmONERROR(gcoDECHARDWARE_UploadData(
-                Hardware,
-                tpcEnable ? 0x18A80 + regOffsetEx[0] :
-                            0x18A80 + regOffset[0],
-                address
-                ));
-
-            gcmONERROR(gcoDECHARDWARE_UploadData(
-                Hardware,
-                tpcEnable ? 0x19080 + regOffsetEx[0] :
-                            0x19080 + regOffset[0],
-                Surface->tileStatusGpuAddress
-                ));
-
-            if (!data3D && !onePlanar && Surface->node.physical2 && Surface->tileStatusGpuAddressEx[0])
+            if (format == gcvSURF_NV12_10BIT)
             {
-                if (!tpcEnable)
-                {
-                    gcmONERROR(gcoDEC400EXHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_TWO, gcvTRUE, gcvFALSE, &config));
-
-                        gcmONERROR(gcoDEC400EXHARDWARE_SetTilingConfig(
-                                    Surface->tiling,
-                                    format,
-                                    gcvDEC_PLANAR_TWO,
-                                    gcvTRUE,
-                                    &config));
-
-                        if (format == gcvSURF_NV12_10BIT)
-                        {
-                            configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4443,10 +4395,10 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)));
-                        }
-                        else if (format == gcvSURF_P010)
-                        {
-                            configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            }
+            else if (format == gcvSURF_P010)
+            {
+                configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4456,7 +4408,7 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16))) |
-                                       ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4466,10 +4418,10 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ? 28:28)));
-                        }
-                        else
-                        {
-                            configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            }
+            else
+            {
+                configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -4479,36 +4431,138 @@ _gcoDECHARDWARE_SetSrcDEC400EXCompression(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)));
-                        }
+            }
 
-                        gcmONERROR(gcoDECHARDWARE_UploadData(
-                            Hardware,
-                            0x18900 + regOffset[1],
-                            configEx
-                            ));
+            gcmONERROR(gcoDECHARDWARE_UploadData(
+                Hardware,
+                0x18900 + regOffset[0],
+                configEx
+            ));
 
+        }
 
-                    gcmONERROR(gcoDECHARDWARE_UploadData(
-                        Hardware,
-                        0x18880 + regOffset[1],
-                        config
-                        ));
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18880 + regOffset[0],
+            config
+        ));
+
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            tpcEnable ? 0x18A80 + regOffsetEx[0] :
+                        0x18A80 + regOffset[0],
+            address
+        ));
+
+        gcmONERROR(_gcoDECHARDWARE_GetEndAddress(Surface, gcvDEC_PLANAR_ONE, &endAddress));
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18B80 + regOffset[0],
+            endAddress
+        ));
+
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            tpcEnable ? 0x19080 + regOffsetEx[0] :
+                        0x19080 + regOffset[0],
+            Surface->tileStatusGpuAddress
+        ));
+
+        if (!data3D && !onePlanar && Surface->node.physical2 && Surface->tileStatusGpuAddressEx[0])
+        {
+            if (!tpcEnable)
+            {
+                gcmONERROR(gcoDEC400EXHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_TWO, gcvTRUE, gcvFALSE, &config));
+                gcmONERROR(gcoDEC400EXHARDWARE_SetTilingConfig(
+                    Surface->tiling,
+                    format,
+                    gcvDEC_PLANAR_TWO,
+                    gcvTRUE,
+                    &config));
+
+                if (format == gcvSURF_NV12_10BIT)
+                {
+                    configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ?
+ 18:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)));
+                }
+                else if (format == gcvSURF_P010)
+                {
+                    configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ?
+ 18:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16))) |
+                                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ?
+ 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ?
+ 28:28) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ? 28:28)));
+                }
+                else
+                {
+                     configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ?
+ 18:16))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 18:16) - (0 ?
+ 18:16) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)));
                 }
 
                 gcmONERROR(gcoDECHARDWARE_UploadData(
                     Hardware,
-                    tpcEnable ? 0x18A80 + regOffsetEx[1] :
-                                0x18A80 + regOffset[1],
-                    Surface->node.physical2
-                    ));
+                    0x18900 + regOffset[1],
+                    configEx
+                ));
+
 
                 gcmONERROR(gcoDECHARDWARE_UploadData(
                     Hardware,
-                    tpcEnable ? 0x19080 + regOffsetEx[1] :
-                                0x19080 + regOffset[1],
-                    Surface->tileStatusGpuAddressEx[0]
-                    ));
+                    0x18880 + regOffset[1],
+                    config
+                ));
             }
+
+            gcmONERROR(gcoDECHARDWARE_UploadData(
+                Hardware,
+                tpcEnable ? 0x18A80 + regOffsetEx[1] :
+                            0x18A80 + regOffset[1],
+                Surface->node.physical2
+            ));
+            gcmONERROR(_gcoDECHARDWARE_GetEndAddress(Surface, gcvDEC_PLANAR_TWO, &endAddress));
+            gcmONERROR(gcoDECHARDWARE_UploadData(
+                Hardware,
+                0x18B80 + regOffset[1],
+                endAddress
+           ));
+
+            gcmONERROR(gcoDECHARDWARE_UploadData(
+                Hardware,
+                tpcEnable ? 0x19080 + regOffsetEx[1] :
+                            0x19080 + regOffset[1],
+                Surface->tileStatusGpuAddressEx[0]
+            ));
         }
     }
 
@@ -5168,20 +5222,21 @@ _gcoDECHARDWARE_SetDstDEC400EXCompression(
     IN gcoSURF Surface,
     IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
     IN gctUINT32 ReadId,
-    IN gctUINT32 WriteId
+    IN gctUINT32 WriteId,
+    IN gctBOOL   enableAlpha
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
     gceSURF_FORMAT format;
-    gctUINT32 address;
+    gctUINT32 address,endAddress;
     gctBOOL enable, onePlanar;
     gctUINT32 configR = 0, configW = 0, configEx = 0;
     gctUINT32 regOffsetR[3]={0}, regOffsetW[3]={0};
 
 
-        regOffsetR[0] = 0 << 2;
-        regOffsetW[0] = 1 << 2;
-        regOffsetW[1] = 3 << 2;
+    regOffsetR[0] = 0 << 2;
+    regOffsetW[0] = 1 << 2;
+    regOffsetW[1] = 3 << 2;
 
     gcmGETHARDWAREADDRESS(Surface->node, address);
 
@@ -5196,20 +5251,8 @@ _gcoDECHARDWARE_SetDstDEC400EXCompression(
 
     /* Dst only need to disable 2D DEC compression. */
     /* Set DST read client. */
-    if (!enable)
-    {
-        configR = ((((gctUINT32) (configR)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ?
- 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 0:0) - (0 ?
- 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 0:0) - (0 ?
- 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));
-    }
-    else
+
+    if(enable && enableAlpha)
     {
         configR = ((((gctUINT32) (configR)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
@@ -5224,16 +5267,16 @@ _gcoDECHARDWARE_SetDstDEC400EXCompression(
 
         gcmONERROR(gcoDEC400EXHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_ONE, gcvTRUE, gcvFALSE, &configR));
 
-            gcmONERROR(gcoDEC400EXHARDWARE_SetTilingConfig(
-                        Surface->tiling,
-                        format,
-                        gcvDEC_PLANAR_ONE,
-                        gcvTRUE,
-                        &configR));
+        gcmONERROR(gcoDEC400EXHARDWARE_SetTilingConfig(
+                    Surface->tiling,
+                    format,
+                    gcvDEC_PLANAR_ONE,
+                    gcvTRUE,
+                    &configR));
 
-            if (format == gcvSURF_NV12_10BIT)
-            {
-                configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        if (format == gcvSURF_NV12_10BIT)
+        {
+            configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5243,10 +5286,10 @@ _gcoDECHARDWARE_SetDstDEC400EXCompression(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)));
-            }
-            else if (format == gcvSURF_P010)
-            {
-                configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        }
+        else if (format == gcvSURF_P010)
+        {
+            configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5266,10 +5309,10 @@ _gcoDECHARDWARE_SetDstDEC400EXCompression(
  28:28) - (0 ?
  28:28) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ? 28:28)));
-            }
-            else
-            {
-                configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        }
+        else
+        {
+            configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5279,14 +5322,7 @@ _gcoDECHARDWARE_SetDstDEC400EXCompression(
  18:16) - (0 ?
  18:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)));
-            }
-
-            gcmONERROR(gcoDECHARDWARE_UploadData(
-                Hardware,
-                0x18900 + regOffsetR[0],
-                configEx
-                ));
-
+        }
 
         configR = ((((gctUINT32) (configR)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:1) - (0 ?
@@ -5336,148 +5372,40 @@ _gcoDECHARDWARE_SetDstDEC400EXCompression(
 
         gcmONERROR(gcoDECHARDWARE_UploadData(
             Hardware,
+            0x18880 + regOffsetR[0],
+            configR
+        ));
+
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18900 + regOffsetR[0],
+            configEx
+        ));
+
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
             0x18A80 + regOffsetR[0],
             address
-            ));
+        ));
+
+        gcmONERROR(_gcoDECHARDWARE_GetEndAddress(Surface, gcvDEC_PLANAR_ONE, &endAddress));
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18B80 + regOffsetR[0],
+            endAddress
+        ));
 
         gcmONERROR(gcoDECHARDWARE_UploadData(
             Hardware,
             0x19080 + regOffsetR[0],
             Surface->tileStatusGpuAddress
-            ));
-    }
-
-    gcmONERROR(gcoDECHARDWARE_UploadData(
-        Hardware,
-        0x18880 + regOffsetR[0],
-        configR
         ));
 
-    if (enable && !onePlanar && Surface->node.physical2 && Surface->tileStatusGpuAddressEx[0])
-    {
-        gcmONERROR(gcoDEC400EXHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_TWO, gcvTRUE, gcvFALSE, &configR));
-
-            gcmONERROR(gcoDEC400EXHARDWARE_SetTilingConfig(
-                        Surface->tiling,
-                        format,
-                        gcvDEC_PLANAR_TWO,
-                        gcvTRUE,
-                        &configR));
-
-            if (format == gcvSURF_NV12_10BIT)
-            {
-                configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 18:16) - (0 ?
- 18:16) + 1))))))) << (0 ?
- 18:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)));
-            }
-            else if (format == gcvSURF_P010)
-            {
-                configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 18:16) - (0 ?
- 18:16) + 1))))))) << (0 ?
- 18:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16))) |
-                           ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:28) - (0 ?
- 28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 28:28) - (0 ?
- 28:28) + 1))))))) << (0 ?
- 28:28))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 28:28) - (0 ?
- 28:28) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ? 28:28)));
-            }
-            else
-            {
-                configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 18:16) - (0 ?
- 18:16) + 1))))))) << (0 ?
- 18:16))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 18:16) - (0 ?
- 18:16) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ? 18:16)));
-            }
-
-            gcmONERROR(gcoDECHARDWARE_UploadData(
-                Hardware,
-                0x18900 + regOffsetR[1],
-                configEx
-                ));
-
-
-        gcmONERROR(gcoDECHARDWARE_UploadData(
-            Hardware,
-            0x18880 + regOffsetR[1],
-            configR
-            ));
-
-        gcmONERROR(gcoDECHARDWARE_UploadData(
-            Hardware,
-            0x18A80 + regOffsetR[1],
-            Surface->node.physical2
-            ));
-
-        gcmONERROR(gcoDECHARDWARE_UploadData(
-            Hardware,
-            0x19080 + regOffsetR[1],
-            Surface->tileStatusGpuAddressEx[0]
-            ));
-
-        if (Surface->node.physical3 && Surface->tileStatusGpuAddressEx[1])
-        {
-            gcmONERROR(gcoDEC400EXHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_THREE, gcvTRUE, gcvFALSE, &configR));
-
-            gcmONERROR(gcoDECHARDWARE_UploadData(
-                Hardware,
-                0x18880 + regOffsetR[2],
-                configR
-                ));
-
-            gcmONERROR(gcoDECHARDWARE_UploadData(
-                Hardware,
-                0x18A80 + regOffsetR[2],
-                Surface->node.physical3
-                ));
-
-            gcmONERROR(gcoDECHARDWARE_UploadData(
-                Hardware,
-                0x19080 + regOffsetR[2],
-                Surface->tileStatusGpuAddressEx[1]
-                ));
-        }
     }
+
 
     /* Set DST write client. */
-    if (!enable)
-    {
-        configW = ((((gctUINT32) (configW)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ?
- 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 0:0) - (0 ?
- 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 0:0) - (0 ?
- 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));
-    }
-    else
+    if(enable)
     {
         configW = ((((gctUINT32) (configW)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
@@ -5607,19 +5535,27 @@ _gcoDECHARDWARE_SetDstDEC400EXCompression(
             address
             ));
 
+        gcmONERROR(_gcoDECHARDWARE_GetEndAddress(Surface, gcvDEC_PLANAR_ONE, &endAddress));
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18E80 + regOffsetW[0],
+            endAddress
+            ));
+
         gcmONERROR(gcoDECHARDWARE_UploadData(
             Hardware,
             0x19180 + regOffsetW[0],
             Surface->tileStatusGpuAddress
             ));
-    }
 
-    gcmONERROR(gcoDECHARDWARE_UploadData(
+        gcmONERROR(gcoDECHARDWARE_UploadData(
         Hardware,
         0x18980 + regOffsetW[0],
         configW
         ));
+    }
 
+    /*planar 2*/
     if (enable && !onePlanar && Surface->node.physical2 && Surface->tileStatusGpuAddressEx[0])
     {
         gcmONERROR(gcoDEC400EXHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_TWO, gcvTRUE, gcvFALSE, &configW));
@@ -5700,42 +5636,19 @@ _gcoDECHARDWARE_SetDstDEC400EXCompression(
             Surface->node.physical2
             ));
 
+        gcmONERROR(_gcoDECHARDWARE_GetEndAddress(Surface, gcvDEC_PLANAR_TWO, &endAddress));
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18E80 + regOffsetW[1],
+            endAddress
+            ));
+
         gcmONERROR(gcoDECHARDWARE_UploadData(
             Hardware,
             0x19180 + regOffsetW[1],
             Surface->tileStatusGpuAddressEx[0]
             ));
 
-        if (Surface->node.physical3 && Surface->tileStatusGpuAddressEx[1])
-        {
-            gcmONERROR(gcoDEC400EXHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_THREE, gcvTRUE, gcvFALSE, &configW));
-
-            gcmONERROR(gcoDECHARDWARE_UploadData(
-                Hardware,
-                0x18980 + regOffsetW[2],
-                configW
-                ));
-
-            gcmONERROR(gcoDECHARDWARE_UploadData(
-                Hardware,
-                0x18D80 + regOffsetW[2],
-                Surface->node.physical3
-                ));
-
-            gcmONERROR(gcoDECHARDWARE_UploadData(
-                Hardware,
-                0x19180 + regOffsetW[2],
-                Surface->tileStatusGpuAddressEx[1]
-                ));
-        }
-    }
-    else if (!enable)
-    {
-        gcmONERROR(gcoDECHARDWARE_UploadData(
-            Hardware,
-            0x18980 + regOffsetW[1],
-            configW
-            ));
     }
 
 OnError:
@@ -5780,11 +5693,12 @@ gcoDECHARDWARE_SetDstDECCompression(
     IN gcoSURF Surface,
     IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
     IN gctUINT32 ReadId,
-    IN gctUINT32 WriteId
+    IN gctUINT32 WriteId,
+    IN gctBOOL enableAlpha
     )
 {
     if(Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
-        return _gcoDECHARDWARE_SetDstDEC400EXCompression(Hardware,Surface,TileStatusConfig,ReadId,WriteId);
+        return _gcoDECHARDWARE_SetDstDEC400EXCompression(Hardware,Surface,TileStatusConfig,ReadId,WriteId,enableAlpha);
     else
         return _gcoDECHARDWARE_SetDstDECCompression(Hardware,Surface,TileStatusConfig,ReadId,WriteId);
 }
@@ -5927,5 +5841,114 @@ gcoDECHARDWARE_FlushDECCompression(
 OnError:
     return status;
 }
+
+gceSTATUS gcoDECHARDWARE_ResetDEC400EXStream(IN gcoHARDWARE Hardware)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 config,configEx;
+    gctUINT32 iter = 0;
+    gctUINT32 regOffsetR[3]={0}, regOffsetW[3]={0};
+    if(!Hardware->features[gcvFEATURE_DEC400EX_COMPRESSION])
+        return status;
+
+    /*reset read config*/
+    config = 0x00020000;
+    configEx = 0x00000000;
+    regOffsetR[0] = 0 << 2;
+    regOffsetW[0] = 1 << 2;
+    regOffsetW[1] = 3 << 2;
+
+    for(iter = 0; iter < 16; iter ++)
+    {
+        if(iter == 0)
+            continue;
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18880 + (iter << 2),
+            config
+        ));
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18900 + (iter << 2),
+            configEx
+        ));
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18A80 + (iter << 2),
+            0xFFFFFFFF
+        ));
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18B80 + (iter << 2),
+            0xFFFFFFFF
+        ));
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x19080 + (iter << 2),
+            0x00000000
+        ));
+    }
+
+    /*reset write stream*/
+    gcmONERROR(gcoDECHARDWARE_UploadData(
+        Hardware,
+        0x18880 + regOffsetR[0],
+        0x00020000
+    ));
+    gcmONERROR(gcoDECHARDWARE_UploadData(
+        Hardware,
+        0x18900 + regOffsetR[0],
+        0x00000000
+    ));
+    gcmONERROR(gcoDECHARDWARE_UploadData(
+        Hardware,
+        0x18A80 + regOffsetR[0],
+        0xFFFFFFFF
+    ));
+    gcmONERROR(gcoDECHARDWARE_UploadData(
+        Hardware,
+        0x18B80 + regOffsetR[0],
+        0xFFFFFFFF
+    ));
+    gcmONERROR(gcoDECHARDWARE_UploadData(
+        Hardware,
+        0x19080 + regOffsetR[0],
+        0x00000000
+    ));
+
+    for(iter = 0; iter < 2; iter ++)
+    {
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18980 + regOffsetW[iter],
+            0x00020000
+        ));
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18A00 + regOffsetW[iter],
+            0x00000000
+        ));
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18D80 + regOffsetW[iter],
+            0xFFFFFFFF
+        ));
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18E80 + regOffsetW[iter],
+            0xFFFFFFFF
+        ));
+
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x19180 + regOffsetW[iter],
+            0x00000000
+        ));
+    }
+OnError:
+    return status;
+
+}
+
 #endif
 

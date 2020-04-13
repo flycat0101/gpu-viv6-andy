@@ -1664,6 +1664,7 @@ gcoHARDWARE_SetTarget(
     IN gctINT32_PTR CscRGB2YUV,
     IN gctUINT32_PTR GammaTable,
     IN gctBOOL GdiStretch,
+    IN gctBOOL enableAlpha,
     OUT gctUINT32_PTR DestConfig
     );
 
