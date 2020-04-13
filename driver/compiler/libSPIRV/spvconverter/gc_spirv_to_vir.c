@@ -12648,11 +12648,14 @@ static void __SpvIntegrateCalls(SpvMemPool * memPool, SpvFuncCallTable * funcTab
 }
 
 static gceSTATUS __SpvProcessFuncCall(
+    IN SpvMemPool * MemPoolForFuncTable,
     IN gcSPV spv,
     IN SpvFuncCallTable * funcTable)
 {
     SpvFuncCallInfo * curFuncInfo = gcvNULL;
     spv->word = SPV_INSTRUCTION_START;
+
+    gcmASSERT(MemPoolForFuncTable == funcTable->memPool);
 
     while (spv->word < spv->size)
     {
@@ -12702,12 +12705,12 @@ static gceSTATUS __SpvProcessFuncCall(
             if (!__SpvIsFuncCallInTable(funcTable, entryId))
             {
                 SpvFuncCallInfo * funcInfo = gcvNULL;
-                __SpvCreateFuncCallInfo(spv->spvMemPool, &funcInfo);
+                __SpvCreateFuncCallInfo(MemPoolForFuncTable, &funcInfo);
 
                 funcInfo->funcId = entryId;
                 funcInfo->isEntry = gcvTRUE;
 
-                __SpvAddNewFuncCallToTable(spv->spvMemPool, funcTable, funcInfo);
+                __SpvAddNewFuncCallToTable(MemPoolForFuncTable, funcTable, funcInfo);
             }
 
             __SpvDecodeLiteralString(spv, &entryPointNameLength, entryPointName, gcvTRUE);
@@ -12727,17 +12730,17 @@ static gceSTATUS __SpvProcessFuncCall(
             }
             else
             {
-                __SpvCreateFuncCallInfo(spv->spvMemPool, &curFuncInfo);
+                __SpvCreateFuncCallInfo(MemPoolForFuncTable, &curFuncInfo);
 
                 curFuncInfo->funcId = funcId;
 
-                __SpvAddNewFuncCallToTable(spv->spvMemPool, funcTable, curFuncInfo);
+                __SpvAddNewFuncCallToTable(MemPoolForFuncTable, funcTable, curFuncInfo);
             }
         }
         else if (spv->opCode == SpvOpFunctionCall && curFuncInfo)
         {
             gctUINT calleeId = SPV_NEXT_WORD;
-            __SpvAddNewFuncToCallInfo(spv->spvMemPool, curFuncInfo, calleeId);
+            __SpvAddNewFuncToCallInfo(MemPoolForFuncTable, curFuncInfo, calleeId);
         }
         else if (spv->opCode == SpvOpFunctionEnd)
         {
@@ -12747,7 +12750,7 @@ static gceSTATUS __SpvProcessFuncCall(
         SPV_NEXT_INST;
     }
 
-    __SpvIntegrateCalls(spv->spvMemPool, funcTable);
+    __SpvIntegrateCalls(MemPoolForFuncTable, funcTable);
 
     return gcvSTATUS_OK;
 }
@@ -13524,14 +13527,19 @@ gceSTATUS
 gcSPV_PreDecode(
     IN SpvDecodeInfo * info,
     INOUT gctPOINTER* FuncTable
-)
+    )
 {
     gceSTATUS               status = gcvSTATUS_OK;
     gcSPV                   Spv = gcvNULL;
     SpvMemPool             *spvMemPool = gcvNULL;
+    SpvMemPool             *memPoolForFuncTable = gcvNULL;
     SpvFuncCallTable       *funcTable = gcvNULL;
 
+    /* Initialize the memory pool for the spirv converter. */
     spvInitializeMemPool(SPV_MEMPOOL_PAGESIZE, &spvMemPool);
+
+    /* Initialize the memory pool for the function table only. */
+    spvInitializeMemPool(SPV_MEMPOOL_PAGESIZE, &memPoolForFuncTable);
 
     Spv = (gcSPV)gcSPV_CreateSPV(spvMemPool, info);
 
@@ -13548,11 +13556,11 @@ gcSPV_PreDecode(
     {
         status = gcvSTATUS_INVALID_DATA;
     }
-    else if (gcmIS_ERROR(__SpvCreateFuncCallTable(spvMemPool, &funcTable)))
+    else if (gcmIS_ERROR(__SpvCreateFuncCallTable(memPoolForFuncTable, &funcTable)))
     {
         status = gcvSTATUS_INVALID_DATA;
     }
-    else if (gcmIS_ERROR(__SpvProcessFuncCall(Spv, funcTable)))
+    else if (gcmIS_ERROR(__SpvProcessFuncCall(memPoolForFuncTable, Spv, funcTable)))
     {
         status = gcvSTATUS_INVALID_DATA;
     }
@@ -13572,12 +13580,14 @@ gcSPV_PreDecode(
     }
     vscBV_Finalize(&Spv->internalIdMask);
 
-    /* We will call "spvUninitializeMemPool" in gcSPV_PostDecode. */
+    /* Call gcSPV_PostDecode to free the memory pool for the function table only. */
+    spvUninitializeMemPool(spvMemPool);
     return status;
 
 OnError:
     /* Uninitialize, this will destroy Spv */
     spvUninitializeMemPool(spvMemPool);
+    spvUninitializeMemPool(memPoolForFuncTable);
     return status;
 }
 
