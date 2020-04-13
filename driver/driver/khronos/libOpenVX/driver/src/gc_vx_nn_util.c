@@ -3845,7 +3845,7 @@ vx_status vxnnePoolingAvg(
                         }
                     }
                     if(count != 0)
-                        vxnneSaveDataExt(dstFormat, dstQuantFormat, pool_index, sum/((type == 3) ? (kernel_y_v * kernel_x_v) : count), data_d, dstFixPointPos, outputZP, outputScale, dstRoundingMode);
+                        vxnneSaveDataExt(dstFormat, dstQuantFormat, pool_index, sum/((type == 2) ? (kernel_y_v * kernel_x_v) : count), data_d, dstFixPointPos, outputZP, outputScale, dstRoundingMode);
                 }
 
             }
