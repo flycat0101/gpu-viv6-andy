@@ -17,7 +17,7 @@
    Disalbe for now
 */
 #if __VK_ENABLETS
-static VkBool32 g_dbgNoTS = VK_TRUE;
+static VkBool32 g_dbgNoTS = VK_FALSE;
 #endif
 __vkFormatInfo g_vkFormatInfoTable[] =
 {
@@ -2215,12 +2215,17 @@ VkResult __vki_AllocateTileStatus(
     uint32_t j = 0;
     gctSIZE_T totalBytes = 0;
     int32_t compressedFormat = -1;
+    gctUINT32 resolveAlignX, resolveAlignY;
+    gctUINT32 alignment;
 
     __VK_SET_ALLOCATIONCB(&img->memCb);
 
     do
     {
-        if (g_dbgNoTS) return VK_SUCCESS;
+        if (g_dbgNoTS || !devCtx->database->TS_FC_VULKAN_SUPPORT)
+        {
+            return VK_SUCCESS;
+        }
 
         if (img->createInfo.usage &
             (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT))
@@ -2312,10 +2317,17 @@ VkResult __vki_AllocateTileStatus(
                 }
             }
 
-            /* Query tileStatus size. */
+            resolveAlignX = (devCtx->database->REG_BltEngine) ? 1 : 16;
+            resolveAlignY = (devCtx->database->REG_BltEngine) ? 1 : 4;
+
+            alignment = resolveAlignX * resolveAlignY * 4;
+
             if (devCtx->database->CACHE128B256BPERLINE)
             {
-                /*Todo: 128B cache mode.*/
+                totalBytes = (img->sampleInfo.product == 4) ?
+                            (img->memory->node.size >> 9) : (img->memory->node.size >> 8);
+
+                tsResource->tileStatusFiller = 0xFFFFFFFF;
             }
             else
             {
@@ -2325,9 +2337,12 @@ VkResult __vki_AllocateTileStatus(
                     __VK_ASSERT(is2BitPerTile);
                     totalBytes >>= 2;
                 }
+                tsResource->tileStatusFiller = is2BitPerTile ? 0x55555555 : 0x11111111;
             }
 
-            tsResource->tileStatusFiller = is2BitPerTile ? 0x55555555 : 0x11111111;
+            totalBytes += 64;
+            totalBytes = gcmALIGN(totalBytes, alignment);
+
             tsResource->tileStatusInvalidFiller = 0;
 
             /* Tile status supported? */

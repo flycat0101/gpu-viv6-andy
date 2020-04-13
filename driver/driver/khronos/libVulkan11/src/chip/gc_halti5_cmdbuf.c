@@ -5159,13 +5159,23 @@ uint32_t halti5_computeTileStatusAddr(
     __vkTileStatus *tsResource = img->memory->ts;
     uint32_t tileStatusAddress = tsResource->devAddr;
     uint32_t tileStatusOffset = 0;
-    tileStatusOffset = is2BitPerTile ? (offset >> 8) : (offset >> 7);
 
-    if (img->sampleInfo.product > 1)
+    if (devCtx->database->CACHE128B256BPERLINE)
     {
-        tileStatusOffset >>= 2;
+        tileStatusOffset = (img->sampleInfo.product == 4) ?
+                          (offset >> 9) : (offset >> 8);
+    }
+    else
+    {
+        tileStatusOffset = is2BitPerTile ? (offset >> 8) : (offset >> 7);
+
+        if (img->sampleInfo.product > 1)
+        {
+            tileStatusOffset >>= 2;
+        }
     }
 
+    tileStatusAddress += 64;
     tileStatusAddress += tileStatusOffset;
 
     return tileStatusAddress;
@@ -5465,7 +5475,7 @@ VkResult halti5_setRtTileStatus(
 
         if (devCtx->database->CACHE128B256BPERLINE)
         {
-            /*Todo*/
+            tileCount = size / ((img->sampleInfo.product > 1) ? 256 : 128);
         }
         else
         {
@@ -5492,115 +5502,8 @@ VkResult halti5_setRtTileStatus(
  1:1) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1))));
 
-            /*
-            ** 1. 0x0690 slot 0 is uesless on RTL impelmetation.
-            ** 2. we need keep memoryConfig always has correct information for RT0,
-            **    as it's combined with depth information.
-            */
-            if (hwRtIndex == 0)
-            {
-                chipCommand->rt0TSEnable = VK_TRUE;
-
-                /* Enable fast clear or not. */
-                chipCommand->memoryConfig = ((((gctUINT32) (chipCommand->memoryConfig)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 1:1) - (0 ?
- 1:1) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 1:1) - (0 ?
- 1:1) + 1))))))) << (0 ?
- 1:1))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 1:1) - (0 ?
- 1:1) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)));
-
-                /* Turn on color compression when in MSAA mode. */
-                chipCommand->memoryConfig = ((((gctUINT32) (chipCommand->memoryConfig)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 7:7) - (0 ?
- 7:7) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 7:7) - (0 ?
- 7:7) + 1))))))) << (0 ?
- 7:7))) | (((gctUINT32) ((gctUINT32) (tsResource->compressed) & ((gctUINT32) ((((1 ?
- 7:7) - (0 ?
- 7:7) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
-
-                if (tsResource->compressed)
-                {
-                    chipCommand->memoryConfig = ((((gctUINT32) (chipCommand->memoryConfig)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 11:8) - (0 ?
- 11:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 11:8) - (0 ?
- 11:8) + 1))))))) << (0 ?
- 11:8))) | (((gctUINT32) ((gctUINT32) (tsResource->compressedFormat) & ((gctUINT32) ((((1 ?
- 11:8) - (0 ?
- 11:8) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)));
-                }
-
-                if (devCtx->database->V4Compression)
-                {
-                    /* Todo */
-                }
-
-                if (devCtx->database->CACHE128B256BPERLINE)
-                {
-                    /* Todo. */
-                }
-
-                /* Automatically disable fast clear or not. */
-                chipCommand->memoryConfig = ((((gctUINT32) (chipCommand->memoryConfig)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 5:5) - (0 ?
- 5:5) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 5:5) - (0 ?
- 5:5) + 1))))))) << (0 ?
- 5:5))) | (((gctUINT32) ((gctUINT32) (autoDisable) & ((gctUINT32) ((((1 ?
- 5:5) - (0 ?
- 5:5) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5)));
-
-                chipCommand->memoryConfig = ((((gctUINT32) (chipCommand->memoryConfig)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 30:30) - (0 ?
- 30:30) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ?
- 30:30) - (0 ?
- 30:30) + 1))))))) << (0 ?
- 30:30))) | (((gctUINT32) ((gctUINT32) ((bitsPerPixel == 64)) & ((gctUINT32) ((((1 ?
- 30:30) - (0 ?
- 30:30) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)));
-
-                if (autoDisable)
-                {
-                    __vkCmdLoadSingleHWState(commandBuffer, 0x059D, VK_FALSE, tileCount);
-                }
-
-                /* Program tile status base address register. */
-                __vkCmdLoadSingleHWState(commandBuffer, 0x0596, VK_FALSE,
-                    tileStatusAddress);
-
-                /* Program surface base address register. */
-                __vkCmdLoadSingleHWState(commandBuffer, 0x0597, VK_FALSE,
-                    img->memory->devAddr);
-
-                /* Program clear value register. */
-                __vkCmdLoadSingleHWState(commandBuffer, 0x0598, VK_FALSE,
-                    tsResource->fcValue[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
-
-                __vkCmdLoadSingleHWState(commandBuffer, 0x05AF, VK_FALSE,
-                    tsResource->fcValueUpper[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
-
-                gcmDUMP(gcvNULL, "#[surface 0x%x 0x%x]", tileStatusAddress, tsResource->tsNode.size);
-
-                /* Program memory configuration register. */
-                __vkCmdLoadSingleHWState(commandBuffer, 0x0595, VK_FALSE, chipCommand->memoryConfig);
-            }
-            else
-            {
-                /* Enable fast clear or not. */
-                chipCommand->memoryConfigMRT[hwRtIndex] = ((((gctUINT32) (chipCommand->memoryConfigMRT[hwRtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            /* Enable fast clear or not. */
+            chipCommand->memoryConfigMRT[hwRtIndex] = ((((gctUINT32) (chipCommand->memoryConfigMRT[hwRtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ?
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5611,8 +5514,8 @@ VkResult halti5_setRtTileStatus(
  0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));
 
-                /* Turn on color compression when in MSAA mode. */
-                chipCommand->memoryConfigMRT[hwRtIndex] = ((((gctUINT32) (chipCommand->memoryConfigMRT[hwRtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            /* Turn on color compression when in MSAA mode. */
+            chipCommand->memoryConfigMRT[hwRtIndex] = ((((gctUINT32) (chipCommand->memoryConfigMRT[hwRtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:2) - (0 ?
  2:2) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5623,9 +5526,9 @@ VkResult halti5_setRtTileStatus(
  2:2) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ? 2:2)));
 
-                if (tsResource->compressed)
-                {
-                    chipCommand->memoryConfigMRT[hwRtIndex] = ((((gctUINT32) (chipCommand->memoryConfigMRT[hwRtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if (tsResource->compressed)
+            {
+                chipCommand->memoryConfigMRT[hwRtIndex] = ((((gctUINT32) (chipCommand->memoryConfigMRT[hwRtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  6:3) - (0 ?
  6:3) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5635,20 +5538,54 @@ VkResult halti5_setRtTileStatus(
  6:3) - (0 ?
  6:3) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
-                }
+            }
 
-                if (devCtx->database->V4Compression)
+            if (devCtx->database->V4Compression || devCtx->database->DEC400)
+            {
+                if (img->sampleInfo.product > 1 && devCtx->database->DEC400)
                 {
-                    /* Todo */
+                    chipCommand->memoryConfigMRT[hwRtIndex] = ((((gctUINT32) (chipCommand->memoryConfigMRT[hwRtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:9) - (0 ?
+ 9:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 9:9) - (0 ?
+ 9:9) + 1))))))) << (0 ?
+ 9:9))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 9:9) - (0 ?
+ 9:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 9:9) - (0 ? 9:9) + 1))))))) << (0 ? 9:9)));
                 }
-
-                if (devCtx->database->CACHE128B256BPERLINE)
+                else
                 {
-                    /* Todo. */
+                    chipCommand->memoryConfigMRT[hwRtIndex] = ((((gctUINT32) (chipCommand->memoryConfigMRT[hwRtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:9) - (0 ?
+ 9:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 9:9) - (0 ?
+ 9:9) + 1))))))) << (0 ?
+ 9:9))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 9:9) - (0 ?
+ 9:9) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 9:9) - (0 ? 9:9) + 1))))))) << (0 ? 9:9)));
                 }
+            }
 
-                /* Automatically disable fast clear or not. */
+            if (devCtx->database->CACHE128B256BPERLINE)
+            {
                 chipCommand->memoryConfigMRT[hwRtIndex] = ((((gctUINT32) (chipCommand->memoryConfigMRT[hwRtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 27:27) - (0 ?
+ 27:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 27:27) - (0 ?
+ 27:27) + 1))))))) << (0 ?
+ 27:27))) | (((gctUINT32) ((gctUINT32) (img->halTiling == gcvYMAJOR_SUPERTILED) & ((gctUINT32) ((((1 ?
+ 27:27) - (0 ?
+ 27:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 27:27) - (0 ? 27:27) + 1))))))) << (0 ? 27:27)));
+            }
+
+            /* Automatically disable fast clear or not. */
+            chipCommand->memoryConfigMRT[hwRtIndex] = ((((gctUINT32) (chipCommand->memoryConfigMRT[hwRtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:1) - (0 ?
  1:1) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5659,7 +5596,7 @@ VkResult halti5_setRtTileStatus(
  1:1) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)));
 
-                chipCommand->memoryConfigMRT[hwRtIndex] = ((((gctUINT32) (chipCommand->memoryConfigMRT[hwRtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            chipCommand->memoryConfigMRT[hwRtIndex] = ((((gctUINT32) (chipCommand->memoryConfigMRT[hwRtIndex])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:7) - (0 ?
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ?
@@ -5670,31 +5607,29 @@ VkResult halti5_setRtTileStatus(
  7:7) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-                if (autoDisable)
-                {
-                    __vkCmdLoadSingleHWState(commandBuffer, 0x0690 + hwRtIndex, VK_FALSE, tileCount);
-                }
-
-                /* Program tile status base address register. */
-                __vkCmdLoadSingleHWState(commandBuffer, 0x05F0 + hwRtIndex, VK_FALSE,
-                    tileStatusAddress);
-
-                /* Program surface base address register. */
-                __vkCmdLoadSingleHWState(commandBuffer, 0x05F8 + hwRtIndex, VK_FALSE,
-                    img->memory->devAddr);
-
-                /* Program clear value register. */
-                __vkCmdLoadSingleHWState(commandBuffer, 0x0680 + hwRtIndex, VK_FALSE,
-                    tsResource->fcValue[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
-
-                __vkCmdLoadSingleHWState(commandBuffer, 0x0688 + hwRtIndex, VK_FALSE,
-                    tsResource->fcValueUpper[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
-
-                gcmDUMP(gcvNULL, "#[surface 0x%x 0x%x]", tileStatusAddress, tsResource->tsNode.size);
-
-                /* Program memory configuration register. */
-                __vkCmdLoadSingleHWState(commandBuffer, 0x05E8 + hwRtIndex, VK_FALSE, chipCommand->memoryConfigMRT[hwRtIndex]);
+            if (autoDisable)
+            {
+                __vkCmdLoadSingleHWState(commandBuffer, 0x0690 + hwRtIndex, VK_FALSE, tileCount);
             }
+
+            __vkCmdLoadSingleHWState(commandBuffer, 0x05F0 + hwRtIndex, VK_FALSE,
+                tileStatusAddress + 64);
+
+            /* Program surface base address register. */
+            __vkCmdLoadSingleHWState(commandBuffer, 0x05F8 + hwRtIndex, VK_FALSE,
+                img->memory->devAddr);
+
+            /* Program clear value register. */
+            __vkCmdLoadSingleHWState(commandBuffer, 0x0680 + hwRtIndex, VK_FALSE,
+                tsResource->fcValue[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
+
+            __vkCmdLoadSingleHWState(commandBuffer, 0x0688 + hwRtIndex, VK_FALSE,
+                tsResource->fcValueUpper[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
+
+            gcmDUMP(gcvNULL, "#[surface 0x%x 0x%x]", tileStatusAddress, tsResource->tsNode.size);
+
+            /* Program memory configuration register. */
+            __vkCmdLoadSingleHWState(commandBuffer, 0x05E8 + hwRtIndex, VK_FALSE, chipCommand->memoryConfigMRT[hwRtIndex]);
         }
         else if (img->createInfo.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
         {
@@ -5748,9 +5683,34 @@ VkResult halti5_setRtTileStatus(
  6:6) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6)));
 
-            if (devCtx->database->V4Compression)
+            if (devCtx->database->V4Compression || devCtx->database->DEC400)
             {
-                /* Todo */
+                if (img->sampleInfo.product > 1 && devCtx->database->DEC400)
+                {
+                    chipCommand->memoryConfig = ((((gctUINT32) (chipCommand->memoryConfig)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ? 26:26)));
+                }
+                else
+                {
+                    chipCommand->memoryConfig = ((((gctUINT32) (chipCommand->memoryConfig)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ? 26:26)));
+                }
             }
 
             /* Automatically disable fast clear or not. */
@@ -5787,12 +5747,8 @@ VkResult halti5_setRtTileStatus(
                 __vkCmdLoadSingleHWState(commandBuffer, 0x059C, VK_FALSE, tileCount);
             }
 
-            /* Program fast clear registers. */
-            __vkCmdLoadSingleHWState(commandBuffer, 0x0599, VK_FALSE, 3);
-
-            /* Program tile status base address register. */
             __vkCmdLoadSingleHWState(commandBuffer, 0x0599, VK_FALSE,
-                tileStatusAddress);
+                tileStatusAddress + 64);
 
             __vkCmdLoadSingleHWState(commandBuffer, 0x059A, VK_FALSE,
                 img->memory->devAddr);
@@ -5831,8 +5787,57 @@ VkResult halti5_setRtTileStatus(
         /* Any time tile status enable, we need set cache mode */
         if (devCtx->database->CACHE128B256BPERLINE && tileStatusAddress)
         {
-            /* Todo*/
             /* When enable TS, we don't always trigger flushTarget, but cachemode could change */
+            uint32_t cacheMode = (img->sampleInfo.product > 1) ?
+                                0x1:
+                                0x0;
+
+            __vkCmdLoadSingleHWState(commandBuffer, 0x0529, gcvFALSE,
+                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1))))))) << (0 ?
+ 24:24))) | (((gctUINT32) ((gctUINT32) (cacheMode) & ((gctUINT32) ((((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 24:24) - (0 ?
+ 24:24) + 1))))))) << (0 ?
+ 24:24))) &((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:25) - (0 ?
+ 25:25) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 25:25) - (0 ?
+ 25:25) + 1))))))) << (0 ?
+ 25:25))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 25:25) - (0 ?
+ 25:25) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 25:25) - (0 ? 25:25) + 1))))))) << (0 ? 25:25)))) &
+                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26))) | (((gctUINT32) ((gctUINT32) (cacheMode) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ?
+ 26:26))) &((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 27:27) - (0 ?
+ 27:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ?
+ 27:27) - (0 ?
+ 27:27) + 1))))))) << (0 ?
+ 27:27))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 27:27) - (0 ?
+ 27:27) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 27:27) - (0 ? 27:27) + 1))))))) << (0 ? 27:27)))));
+
         }
 
     }while (VK_FALSE);
@@ -5860,6 +5865,7 @@ static VkResult halti5_3DBlitTileFill(
     uint32_t level;
     uint32_t dstAddress = img->memory->devAddr;
     uint32_t offset = 0;
+    uint32_t bytesPerTile = 0;
     __vkImageLevel *baseLevel = &img->pImgLevels[pRanges->baseMipLevel];
 
     do
@@ -5875,9 +5881,21 @@ static VkResult halti5_3DBlitTileFill(
         dstAddress += offset;
         tileStatusAddress = halti5_computeTileStatusAddr(devCtx, img, offset);
 
+        tileStatusAddress -= 64;
+
         if (devCtx->database->CACHE128B256BPERLINE)
         {
-            /* Todo. */
+            if (img->sampleInfo.product == 4)
+            {
+                bytesPerTile = 256;
+                fillerTileSize = 0x1;
+            }
+            else
+            {
+                bytesPerTile = 128;
+                fillerTileSize = 0x0;
+            }
+
             switch (bitsPerPixel)
             {
             case 8:
@@ -5906,16 +5924,17 @@ static VkResult halti5_3DBlitTileFill(
             /* Calculate tile count. */
             if (img->sampleInfo.product > 1)
             {
-                tileCount = size / 256;
+                bytesPerTile = 256;
                 fillerTileSize = 0x1;
             }
             else
             {
-                tileCount = size / 128;
+                bytesPerTile = 64;
                 fillerTileSize = 0x0;
             }
         }
 
+        tileCount = size / bytesPerTile;
         fillerFormat = 0x1;
 
         generalConfig
@@ -7954,7 +7973,6 @@ void halti5_helper_setSamplerStates(
     uint32_t hwSamplerCtrl0 = samplerDesc->halti5.hwSamplerCtrl0;
 #if __VK_ENABLETS
     int32_t tsSlotIndex = -1;
-    __vkDevContext *devCtx = cmdBuf->devCtx;
     halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
     halti5_commandBuffer *chipCommand = (halti5_commandBuffer *)cmdBuf->chipPriv;
 #endif
@@ -10120,7 +10138,7 @@ VkResult halti5_setTxTileStatus(
  16:16) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16))));
 
-            __vkCmdLoadSingleHWState(&pCmdBuffer, VK_FALSE, 0x05D0 + samplerTSIndex, tileStatusAddress);
+            __vkCmdLoadSingleHWState(&pCmdBuffer, VK_FALSE, 0x05D0 + samplerTSIndex, tileStatusAddress + 64);
 
             __vkCmdLoadSingleHWState(&pCmdBuffer, VK_FALSE, 0x05D8 + samplerTSIndex,
                 tsResource->fcValue[pRanges->baseMipLevel][pRanges->baseArrayLayer]);
