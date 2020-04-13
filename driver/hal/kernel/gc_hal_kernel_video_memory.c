@@ -2254,9 +2254,6 @@ gckVIDMEM_LockVirtual(
                                     0,
                                     &physicalAddress));
 
-    /* Expect 4096 aligned. */
-    gcmkASSERT((physicalAddress & 0xFFF) == 0);
-
 #if gcdENABLE_VG
     Node->Virtual.physicalAddress = physicalAddress;
 #endif
